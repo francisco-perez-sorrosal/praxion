@@ -220,6 +220,18 @@ repos:
       # fails rather than silently shipping an ungated file. Working-tree read
       # (no `--staged`): unlike the ADR gate below, no tooling here stages a blob
       # that differs from the tree.
+      # `PROGRESS.md` survives only as an orchestrator-owned hackathon journal.
+      # The original sweep scanned `agents/` alone, so producer-side claims
+      # survived in user docs and in a canonical block shipped to every managed
+      # project -- two of them asserting the opposite of the matching command.
+      # The wider scan is only a guard if something runs it.
+      - id: progress-mandate-drift
+        name: PROGRESS.md writer discipline
+        entry: python3 scripts/strip_progress_mandate.py --check
+        language: system
+        files: '^(agents/.*\.md|commands/.*\.md|docs/.*\.md|claude/canonical-blocks/.*\.md|skills/.*\.md|hooks/send_event\.py|rules/writing/html-output-conventions\.md|scripts/strip_progress_mandate\.py)$'
+        pass_filenames: false
+
       - id: state-ledger-schema
         name: .ai-state/ ledger schema
         entry: python3 scripts/check_state_ledgers.py --check --repo-root .

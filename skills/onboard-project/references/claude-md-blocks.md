@@ -110,9 +110,10 @@ orchestrator creates the worktree at that transition and records it in PROGRESS.
 
 **Creative-blocker signal.** If an agent hits a genuine design dead-end (the current
 approach is exhausted and fresh ideation is needed — NOT "this is hard," NOT "I need more
-research"), it appends a `CREATIVE-BLOCKER: <desc> #blocker` line to
-`.ai-work/<slug>/PROGRESS.md`, STOPS at that stage, and surfaces it to you. YOU decide
-whether to move the work back to ideation. The agent does not auto-loop.
+research"), it STOPS at that stage and returns the `[BLOCKED]` terminal marker with a
+`CREATIVE-BLOCKER: <desc>` reason. The orchestrator records the line in
+`.ai-work/<slug>/PROGRESS.md` and surfaces it to you. YOU decide whether to move the work
+back to ideation. The agent does not auto-loop.
 
 To run a single task at full 5-tier ceremony instead, say so explicitly; that one task
 yields back to the normal selector.
@@ -145,6 +146,11 @@ mid-task, the safety net is that NONE of it is invisible:
 - Every mid-task movement is recorded in PROGRESS.md.
 A reviewer or a graduation audit can always reconstruct exactly what process was applied
 to any change.
+
+`PROGRESS.md` is written by **the orchestrator alone**, and only in hackathon mode — it
+is the journal of decisions you and it made about process. Pipeline agents do not write
+it: they report through their terminal marker and their `WIP.md` checkbox, which is what
+the recovery reconciler reads.
 
 ### Discovery is full-strength — only delivery ceremony is relaxed
 

@@ -230,6 +230,67 @@ def apply_scattered_edits() -> list[tuple[str, str]]:
     return applied
 
 
+# Surfaces beyond `agents/` that may mention PROGRESS.md. The original sweep
+# scanned only agent definitions, so producer-side claims survived in user docs
+# and in a canonical block shipped to every managed project -- two of them
+# asserting the opposite of what the corresponding command says. These paths are
+# scanned for any PROGRESS.md mention, and every legitimate one must be
+# allowlisted below with the reason it is legitimate.
+WIDER_SCAN_GLOBS = (
+    "commands/*.md",
+    "docs/*.md",
+    "claude/canonical-blocks/*.md",
+    "skills/*/SKILL.md",
+    "skills/*/references/*.md",
+)
+
+# PROGRESS.md survives as an **orchestrator-owned hackathon journal**: the
+# per-phase *agent* write mandate is what was retired. Each entry names a file
+# permitted to mention it, and why.
+WIDER_SCAN_ALLOWLIST: dict[str, str] = {
+    # The hackathon spine's own definition: the orchestrator records skipped
+    # stages and mid-task movement here, and the block names it as sole writer.
+    "claude/canonical-blocks/hackathon-mode.md": "defines the orchestrator-owned journal",
+    "skills/onboard-project/references/claude-md-blocks.md": "synced copy of the block above",
+    # States that the agent no longer maintains the log -- a denial, not a mandate.
+    "commands/skill-genesis.md": "documents the retirement",
+    # Consumes orchestrator writes; the branch is live but narrow.
+    "hooks/send_event.py": "reads the journal, never mandates a write",
+    # A dashboard live-refresh example, not a write instruction.
+    "rules/writing/html-output-conventions.md": "cites it as a polling example",
+    # A record of what a past experiment observed. Factual history, like a
+    # finalized ADR: describing a write that happened is not mandating one.
+    "docs/multidisciplinary-identities-evidence.md": "historical experiment record",
+    # The artifact inventory must list every artifact, including this one; its
+    # entry names the orchestrator as sole writer and the hackathon-only scope.
+    "skills/software-planning/references/artifact-inventory.md": "inventories it correctly",
+}
+
+
+def check_wider_surfaces() -> list[str]:
+    """Flag PROGRESS.md mentions outside `agents/` that are not allowlisted.
+
+    `--check` passed while five surfaces still promised producer-side behaviour
+    no agent performs any more, because nothing outside `agents/` was scanned.
+    """
+    violations: list[str] = []
+    for pattern in WIDER_SCAN_GLOBS:
+        for path in sorted(REPO_ROOT.glob(pattern)):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel in WIDER_SCAN_ALLOWLIST:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if "PROGRESS.md" in text or "PROGRESS_" in text:
+                violations.append(
+                    f"{rel}: mentions PROGRESS.md but is not in WIDER_SCAN_ALLOWLIST; "
+                    "PROGRESS.md is orchestrator-written in hackathon mode only"
+                )
+    return violations
+
+
 def check() -> list[str]:
     """Returns a list of violation descriptions; empty means clean."""
     violations = []
@@ -250,6 +311,7 @@ def check() -> list[str]:
         violations.append(
             f"{reconciliation_path}: '### PROGRESS.md Reconciliation' section still present"
         )
+    violations.extend(check_wider_surfaces())
     return violations
 
 

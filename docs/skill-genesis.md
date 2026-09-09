@@ -74,14 +74,14 @@ Once the agent completes, run /skill-genesis-review to disposition the pending p
 The agent is working in the background. You can close this pane, continue other work, or check progress:
 
 ```bash
-# Check the agent's phase transitions
-cat .ai-work/skill-genesis-<slug>/PROGRESS.md
-
 # Check the run-log to see when harvests completed
 cat .ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md
 ```
 
-**Step 2.** Once the agent completes (check PROGRESS.md or wait for a phase-final line), the report exists:
+The agent no longer maintains a separate phase-transition log; track it through the
+run-log above or the background task's own output.
+
+**Step 2.** Once the agent completes (watch the background task, or the run-log above), the report exists:
 
 ```bash
 cat .ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_2026-05-15_14-32-58.md
@@ -236,7 +236,7 @@ skill-genesis proposes skills, rules, and CLAUDE.md additions; it does not propo
 <details>
 <summary>No unreviewed report found</summary>
 
-You've run `/skill-genesis-review` but no report exists yet. Solution: run `/skill-genesis` first to create a harvest report, then wait for it to complete (check PROGRESS.md for phase transitions).
+You've run `/skill-genesis-review` but no report exists yet. Solution: run `/skill-genesis` first to create a harvest report, then wait for it to complete (watch the background task's output).
 
 </details>
 
@@ -271,7 +271,7 @@ Try `cat .ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md | grep "revie
 <details>
 <summary>The agent crashed or didn't write a report</summary>
 
-Check `.ai-work/<slug>/PROGRESS.md` for phase-transition signals. The report is only written if the agent completes all 7 phases. If a phase failed:
+Check the background task's output for where it stopped. The report is only written if the agent completes all 7 phases. If a phase failed:
 
 - Phase 1–2 (Scope, Source Analysis): typically means no learnings exist. Run `/skill-genesis-review` and you'll see a "nothing to harvest" message.
 - Phase 3–4 (Dedup, Triage): unlikely to fail; internal logic error. Check logs.

@@ -110,7 +110,6 @@ The canonical output is `ROADMAP.md` at the **project root** — a living docume
 
 - `ROADMAP_DRAFT.md` — intermediate draft before Gate 3
 - `AUDIT_<lens>.md` — one per researcher (Phase 3 fragments)
-- `PROGRESS.md` — phase-transition signals
 
 Use [`assets/ROADMAP_TEMPLATE.md`](assets/ROADMAP_TEMPLATE.md) as the scaffold. The template's 10-section shape (Executive Summary → Decision Log, including the **Opportunities (Forward Lines)** section between Weaknesses and Improvement Roadmap) is the output contract. In `diff` mode the cartographer updates sections in place and appends a new Decision Log entry — it never rewrites the Decision Log. Opportunities catalogue forward-looking items (new capabilities, strategic bets, evolution trends) that may or may not be promoted to Improvement Roadmap items in this cycle — cataloguing them keeps the road ahead visible without forcing premature commitment.
 

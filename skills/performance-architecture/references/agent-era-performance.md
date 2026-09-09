@@ -57,7 +57,7 @@ A performance budget that is never measured is an assertion, not a budget. State
 | --- | --- | --- |
 | Token budget (always-loaded) | `scripts/measure_token_budget.py` — real tokenizer, file set encoded in the script | Yes -- static files, re-measurable anytime |
 | Context-window efficiency | Harder to measure directly; proxy via task success rate as irrelevant content grows, or manual review of what a session actually referenced | Partially -- requires session transcripts |
-| Spawn cost per agent | Wall-clock + token cost captured at spawn time (harness telemetry, `PROGRESS.md` timestamps) | **No, unless captured at the time** -- post-hoc reconstruction from logs is unreliable once the session ends |
-| Pipeline wall-clock | Timestamp delta between pipeline start and terminal marker, cross-referenced against `PROGRESS.md` phase transitions | Yes, if phase-transition timestamps were logged; no, if they weren't |
+| Spawn cost per agent | Wall-clock + token cost captured at spawn time (harness telemetry, `.ai-state/observations.jsonl` WAL rows) | **No, unless captured at the time** -- post-hoc reconstruction from logs is unreliable once the session ends |
+| Pipeline wall-clock | Timestamp delta between pipeline start and terminal marker, cross-referenced against the `.ai-state/observations.jsonl` WAL | Yes, if phase-transition timestamps were logged; no, if they weren't |
 
 The asterisk on spawn cost is the operative constraint: **per-spawn cost is unrecoverable unless captured at the time.** This makes instrumentation-before-optimization a prerequisite for this dimension specifically, not a general nicety -- the skill's "Measure Before Optimizing" principle already establishes profiling-before-optimizing as the default; for spawn cost, the window to measure is exactly the spawn itself, so instrumentation must be designed in before the first agent runs, not added retroactively once fan-out looks expensive.

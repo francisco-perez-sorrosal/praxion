@@ -13,6 +13,10 @@ import urllib.request
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
 
+# `PROGRESS.md` is written by the orchestrator alone, and only in hackathon
+# mode; pipeline agents report through their terminal marker and `WIP.md`
+# checkbox instead. This branch is therefore live but narrow -- it fires on
+# an orchestrator write, never on an agent one.
 PROGRESS_MARKER = "PROGRESS.md"
 DEFAULT_PORT = 8765
 PORT_RANGE_SIZE = 1000

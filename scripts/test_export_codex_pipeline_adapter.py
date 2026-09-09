@@ -91,8 +91,14 @@ def test_export_pipeline_adapter_fails_when_canonical_table_changes(tmp_path: Pa
     (rules_dir / "swe-agent-coordination-protocol.md").write_text(
         "## SWE Agent Coordination Protocol\n\n### Process Calibration\n\n"
         "| Tier | Signals | Process |\n|---|---|---|\n| Weird | x | y |\n\n"
-        "### Available Agents\n\n| Agent | Purpose | Output | Bg Safe |\n|---|---|---|---|\n"
-        "| `researcher` | x | y | Yes |\n",
+        "### Available Agents\n\nRoster lives in coordination-details.md.\n",
+        encoding="utf-8",
+    )
+    roster_dir = repo_root / "skills" / "software-planning" / "references"
+    roster_dir.mkdir(parents=True)
+    (roster_dir / "coordination-details.md").write_text(
+        "## Agent Roster\n\n| Agent | Output | Bg Safe |\n|---|---|---|\n"
+        "| `researcher` | y | Yes |\n",
         encoding="utf-8",
     )
     (rules_dir / "agent-model-routing.md").write_text(
@@ -157,8 +163,8 @@ def _write_model_routing_rule(repo_root: Path, *, tier: str, alias: str) -> None
 
 
 def test_rejects_unknown_tier_in_model_routing_rule(tmp_path: Path):
-    # REQ-02: export_model_routing()'s own raise (export-codex-pipeline-adapter.py:194)
-    # must fire, naming the tier, when the Tier Table declares a value
+    # export_model_routing()'s own raise must fire, naming the tier, when the
+    # Tier Table declares a value
     # CODEX_MODEL_TIER_ADAPTER does not know. The existing raise-path test above
     # (test_export_pipeline_adapter_fails_when_canonical_table_changes) only reaches
     # export_pipeline_semantics()'s *process*-tier raise -- export_pipeline_adapter()
@@ -175,7 +181,7 @@ def test_rejects_unknown_tier_in_model_routing_rule(tmp_path: Path):
 
 
 def test_model_routing_accepts_any_alias_for_a_recognised_tier(tmp_path: Path):
-    # REQ-01 companion: canonical_alias is opaque pass-through provenance, never a lookup
+    # canonical_alias is opaque pass-through provenance, never a lookup
     # key -- an arbitrary/unfamiliar alias string on a recognised Tier must resolve
     # cleanly, not raise, so an alias-only rule change can never break the Codex export.
     exporter = load_exporter()
@@ -187,3 +193,55 @@ def test_model_routing_accepts_any_alias_for_a_recognised_tier(tmp_path: Path):
     route = next(r for r in routing["agent_routes"] if r["agent"] == "researcher")
     assert route["canonical_tier"] == "M"
     assert route["canonical_alias"] == "claude-future-9"
+
+
+def test_table_after_heading_stops_at_the_next_heading():
+    """A heading whose table has been relocated must fail loudly.
+
+    The scan used to run to end-of-file, so when the agent roster moved out of
+    the always-loaded rule the exporter silently bound the *pipeline rules*
+    table and shipped 16 rows of it to Codex as the agent list. Failing is the
+    only safe behaviour: a wrong roster is worse than no roster.
+    """
+    exporter = load_exporter()
+    text = "\n".join(
+        [
+            "### Empty Section",
+            "",
+            "Prose, no table here.",
+            "",
+            "### Next Section",
+            "",
+            "| a | b |",
+            "|---|---|",
+            "| 1 | 2 |",
+        ]
+    )
+    with pytest.raises(exporter.PipelineAdapterError, match="table not found under heading"):
+        exporter.table_after_heading(text, "### Empty Section")
+
+
+def test_agent_roster_is_sourced_from_the_reference_and_matches_agents_dir():
+    """The exported roster must be the real one: same names as `agents/`.
+
+    Pins both halves of the relocation -- that the exporter reads the roster
+    from its new home, and that what it reads is an agent table rather than
+    whatever table happens to sit nearby.
+    """
+    exporter = load_exporter()
+    pipeline = exporter.export_pipeline_semantics(REPO_ROOT)
+
+    assert pipeline["source_paths"]["agent_roster"].endswith(
+        "skills/software-planning/references/coordination-details.md"
+    )
+
+    exported = {row["agent"].strip("`") for row in pipeline["agents"]}
+    on_disk = {
+        path.stem
+        for path in (REPO_ROOT / "agents").glob("*.md")
+        if path.name not in {"CLAUDE.md", "README.md"}
+    }
+    assert exported == on_disk
+
+    bg_safe = {row["bg_safe"] for row in pipeline["agents"]}
+    assert bg_safe == {"Yes", "No"}, bg_safe

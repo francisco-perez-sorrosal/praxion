@@ -120,13 +120,19 @@ def table_after_heading(text: str, heading: str) -> list[dict[str, str]]:
 
     header_index = None
     for index in range(start_index + 1, len(lines) - 1):
+        # Stop at the next heading. Without this the scan runs to end-of-file,
+        # so a section whose table is relocated silently binds whatever table
+        # comes next -- which is how the agent roster once exported 16 rows of
+        # the pipeline-rules table as if they were agents.
+        if lines[index].lstrip().startswith("#"):
+            break
         if lines[index].lstrip().startswith("|") and TABLE_SEPARATOR_PATTERN.match(
             lines[index + 1]
         ):
             header_index = index
             break
     if header_index is None:
-        raise PipelineAdapterError(f"table not found after heading: {heading}")
+        raise PipelineAdapterError(f"table not found under heading: {heading}")
 
     headers = [slug_header(cell) for cell in lines[header_index].strip().strip("|").split("|")]
     rows: list[dict[str, str]] = []
@@ -147,6 +153,11 @@ def export_pipeline_semantics(repo_root: Path) -> dict[str, object]:
     intermediate_path, _intermediate_text = read_source(
         repo_root, "rules/swe/agent-intermediate-documents.md"
     )
+    # The agent roster is a pure inventory and was relocated out of the
+    # always-loaded rule; the rule keeps only the background-safety rule.
+    roster_path, roster_text = read_source(
+        repo_root, "skills/software-planning/references/coordination-details.md"
+    )
 
     tiers = []
     for row in table_after_heading(coordination_text, "### Process Calibration"):
@@ -162,13 +173,14 @@ def export_pipeline_semantics(repo_root: Path) -> dict[str, object]:
             }
         )
 
-    agents = table_after_heading(coordination_text, "### Available Agents")
+    agents = table_after_heading(roster_text, "## Agent Roster")
     return {
         "generated_by": "Praxion Codex pipeline adapter exporter",
         "schema_version": 1,
         "source_paths": {
             "coordination_protocol": coordination_path.resolve().as_posix(),
             "agent_intermediate_documents": intermediate_path.resolve().as_posix(),
+            "agent_roster": roster_path.resolve().as_posix(),
         },
         "process_tiers": tiers,
         "pipeline": {

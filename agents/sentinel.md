@@ -119,7 +119,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | X02 | A | plugin.json skill/command dirs contain loadable artifacts | `skills/` has skill dirs **each holding a `SKILL.md`**; `commands/` has command files **that are non-empty**. A registered directory containing nothing loadable is the failure this catches — the directory existing is not evidence it ships anything |
 | X03 | A | CLAUDE.md `## Structure` dirs exist | Every dir in Structure section exists on filesystem |
 | X04 | L | Idea ledger implemented ideas reference real artifacts | Implemented ideas correspond to artifacts that exist |
-| X05 | A | Agent coordination protocol table matches `agents/` | Agent names in Available Agents table match agent files 1:1 |
+| X05 | A | Agent roster matches `agents/` | Agent names in the Agent Roster table (`skills/software-planning/references/coordination-details.md`) match agent files 1:1 |
 | X06 | A | `agents/README.md` table matches `agents/` | Agent names in README table match agent files 1:1 |
 | X07 | L | README catalog entries match artifacts | Descriptions in README tables consistent with frontmatter descriptions |
 | X08 | L | Agent collaboration sections reference correct counterparts | Cross-agent refs name agents that actually exist |

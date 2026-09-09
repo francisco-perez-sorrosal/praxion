@@ -49,27 +49,11 @@ Native Claude Code worktree isolation refuses `Write`/`Edit` (including through 
 
 ### Available Agents
 
-Path prefix signals lifecycle: `.ai-work/<slug>/` ephemeral, `.ai-state/` permanent (committed). Rows reading → point to [Delegation Checklists](#delegation-checklists).
+Every agent is safe to run in the background **except `promethean` and
+`roadmap-cartographer`**, which are interactive. Each one's output paths follow the
+lifecycle convention — `.ai-work/<slug>/` ephemeral, `.ai-state/` permanent (committed).
 
-| Agent | Output | Bg Safe |
-|-------|--------|---------|
-| `promethean` | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
-| `researcher` | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
-| `systems-architect` | → Delegation Checklists | Yes |
-| `implementation-planner` | → Delegation Checklists | Yes |
-| `context-engineer` | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
-| `implementer` | → Delegation Checklists | Yes |
-| `test-engineer` | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired) | Yes |
-| `verifier` | → Delegation Checklists | Yes |
-| `doc-engineer` | Doc report or file fixes | Yes |
-| `sentinel` | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
-| `architect-validator` | `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md`, `.ai-state/TECH_DEBT_LEDGER.md` rows on FAIL | Yes |
-| `skill-genesis` | `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md`, `.ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md` | Yes |
-| `cicd-engineer` | Workflow files + pipeline config | Yes |
-| `roadmap-cartographer` | `ROADMAP.md` at project root, `.ai-work/<slug>/ROADMAP_DRAFT.md`, `.ai-work/<slug>/AUDIT_<lens>.md` fragments | No |
-| `interface-designer` | `.ai-work/<slug>/INTERFACE_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
-| `agentic-transactions-architect` | `.ai-work/<slug>/TRANSACTIONS_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
-| `discipline-consultant` | `.ai-work/<slug>/CONSULT_<discipline>.md`; convener appends `.ai-state/CONSULT_LEDGER.md` rows | Yes |
+Full roster with per-agent output paths: [`coordination-details.md § Agent Roster`](../../skills/software-planning/references/coordination-details.md#agent-roster).
 
 ### Delegation Checklists
 

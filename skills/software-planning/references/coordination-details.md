@@ -37,6 +37,36 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Read `TEST_RESULTS.md` at `.ai-work/<task-slug>/` for test outcomes (missing file → WARN, not FAIL)"
 
 <a id="pipeline-worktree-lifecycle"></a>
+## Agent Roster
+
+Relocated here from the always-loaded coordination rule: a pure inventory is read when
+choosing an agent, not on every spawn, and every always-loaded token is paid again by
+each subagent the pipeline spawns. The rule keeps the one datum that governs a decision
+without a lookup — background-safety.
+
+Path prefix signals lifecycle: `.ai-work/<slug>/` ephemeral, `.ai-state/` permanent
+(committed). Rows reading → point to [Delegation Checklists](#delegation-checklists).
+
+| Agent | Output | Bg Safe |
+|-------|--------|---------|
+| `promethean` | `.ai-work/<slug>/IDEA_PROPOSAL.md`, `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` | No |
+| `researcher` | `.ai-work/<slug>/RESEARCH_FINDINGS.md` | Yes |
+| `systems-architect` | → Delegation Checklists | Yes |
+| `implementation-planner` | → Delegation Checklists | Yes |
+| `context-engineer` | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
+| `implementer` | → Delegation Checklists | Yes |
+| `test-engineer` | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired) | Yes |
+| `verifier` | → Delegation Checklists | Yes |
+| `doc-engineer` | Doc report or file fixes | Yes |
+| `sentinel` | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
+| `architect-validator` | `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md`, `.ai-state/TECH_DEBT_LEDGER.md` rows on FAIL | Yes |
+| `skill-genesis` | `.ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md`, `.ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md` | Yes |
+| `cicd-engineer` | Workflow files + pipeline config | Yes |
+| `roadmap-cartographer` | `ROADMAP.md` at project root, `.ai-work/<slug>/ROADMAP_DRAFT.md`, `.ai-work/<slug>/AUDIT_<lens>.md` fragments | No |
+| `interface-designer` | `.ai-work/<slug>/INTERFACE_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
+| `agentic-transactions-architect` | `.ai-work/<slug>/TRANSACTIONS_DESIGN.md` + ADR fragments in `.ai-state/decisions/drafts/` | Yes |
+| `discipline-consultant` | `.ai-work/<slug>/CONSULT_<discipline>.md`; convener appends `.ai-state/CONSULT_LEDGER.md` rows | Yes |
+
 ## Pipeline Worktree Lifecycle
 
 The pipeline worktree lifecycle — entry, during-execution rules, exit procedure, multi-instance guidance, when not to isolate, and the "Do NOT use `isolation: \"worktree\"`" constraint — is fully specified in [agent-pipeline-details.md#pipeline-worktree-lifecycle](agent-pipeline-details.md#pipeline-worktree-lifecycle).

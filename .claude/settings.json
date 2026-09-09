@@ -24,20 +24,5 @@
       "Bash(obsidian theme:install*)",
       "Bash(obsidian theme:set*)"
     ]
-  },
-  "skillOverrides": {
-    "agentic-sdks": "name-only",
-    "agentic-transactions": "name-only",
-    "api-design": "name-only",
-    "api-design-craft": "name-only",
-    "beautiful-code": "name-only",
-    "cicd": "name-only",
-    "data-structure-design": "name-only",
-    "doc-management": "name-only",
-    "mcp-crafting": "name-only",
-    "refactoring": "name-only",
-    "software-planning": "name-only",
-    "tui-design": "name-only",
-    "web-ui-design": "name-only"
   }
 }

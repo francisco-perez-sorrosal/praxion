@@ -24,6 +24,7 @@ STATE_DIR = ".ai-state"
 # what separates a schema row from a prose table sharing the same file.
 TD_ID = r"td-\d{3,}"
 ISO_UTC = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
+ISO_DATE = r"\d{4}-\d{2}-\d{2}"
 
 # Pipe policies. `forbid` == blocking (the tech-debt schema mandates " // ");
 # `warn` == advisory (the CONSULT files document the escape but read with `cut`).
@@ -121,6 +122,20 @@ CHALLENGE_CLASSIFICATION_COLUMNS: tuple[str, ...] = (
     "prompt-areas",
 )
 
+# Declared with the header's own capitalisation: `_table_ranges` matches the
+# header row by exact cell equality, and this log's header predates the
+# lowercase convention the CONSULT/tech-debt ledgers use. Matching the file as
+# it is keeps this a parser registration, not a rewrite of 105 rows of history.
+CALIBRATION_COLUMNS: tuple[str, ...] = (
+    "Timestamp",
+    "Task",
+    "Signals",
+    "Recommended Tier",
+    "Actual Tier",
+    "Source",
+    "Retrospective",
+)
+
 LEDGERS: tuple[LedgerSpec, ...] = (
     LedgerSpec(
         path=f"{STATE_DIR}/TECH_DEBT_LEDGER.md",
@@ -156,6 +171,18 @@ LEDGERS: tuple[LedgerSpec, ...] = (
             TableSpec("challenge-classification", CHALLENGE_CLASSIFICATION_COLUMNS),
         ),
         pipe_policy=PIPE_WARN,
+    ),
+    # `td-195`: the calibration log went ungated while carrying the exact defect
+    # this parser exists to catch -- two rows split by a literal `|` in prose (a
+    # `grep` alternation and a shell pipe). It is also becoming a *read*
+    # instrument (roadmap P2.6 analyses the Retrospective enum distribution), so
+    # its rows must parse mechanically. `PIPE_FORBID`: the file documents no
+    # `\|` escape and prose has no need of the delimiter.
+    LedgerSpec(
+        path=f"{STATE_DIR}/calibration_log.md",
+        row_signature=ISO_DATE,
+        tables=(TableSpec("calibration", CALIBRATION_COLUMNS),),
+        pipe_policy=PIPE_FORBID,
     ),
 )
 

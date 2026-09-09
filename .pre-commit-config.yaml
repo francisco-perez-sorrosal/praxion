@@ -224,7 +224,7 @@ repos:
         name: .ai-state/ ledger schema
         entry: python3 scripts/check_state_ledgers.py --check --repo-root .
         language: system
-        files: '^\.ai-state/(TECH_DEBT_(LEDGER|RESOLVED)|CONSULT_(LEDGER|COSTS|PRIORS))\.md$'
+        files: '^\.ai-state/(TECH_DEBT_(LEDGER|RESOLVED)|CONSULT_(LEDGER|COSTS|PRIORS)|calibration_log)\.md$'
         pass_filenames: false
 
       # Block B5 — artifact frontmatter must LOAD, not merely contain the right

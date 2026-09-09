@@ -63,6 +63,10 @@ tmp/
 .ai-state/observations.jsonl
 .ai-state/observations.jsonl.1
 .ai-state/*.pre-forget.json
+# Judge-verdict cache: content-addressed, regenerated on demand by a judged
+# eval run. Local-only (td-189): 1.1 MB trips check-added-large-files and its
+# content-hash keys trip gitleaks. A fresh clone simply re-judges.
+.ai-state/praxion_eval_reports/judge_cache.jsonl
 
 # User-specific local settings
 **/.claude/settings.local.json

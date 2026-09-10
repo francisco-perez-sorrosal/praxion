@@ -1,14 +1,14 @@
-"""Tests for promote_learnings.py -- Step 12 gate_fire coverage.
+"""Tests for promote_learnings.py -- gate_fire coverage and CLEANUP_PATTERNS precision.
 
 `promote_learnings.py` had no prior dedicated test file (only
 `test_cleanup_gate.py`, which exercises the `cleanup_gate.sh` shell wrapper's
 own delegation/fast-path contract via a spy hook, not this hook's own
-pass/warn decision or its Step-12 `record_gate_fire` call site).
+pass/warn decision or its `record_gate_fire` call site).
 
 Contract under test (hooks/promote_learnings.py): the hook fires on Bash
 commands matching CLEANUP_PATTERNS, warns (stdout hookSpecificOutput) when
 `.ai-work/**/LEARNINGS.md` under `payload["cwd"]` has unpromoted entries, and
-always exits 0 (fail-open). Step 12 adds one `record_gate_fire` call per
+always exits 0 (fail-open). It also makes one `record_gate_fire` call per
 invocation, wrapped in its own `except Exception: pass` (belt-and-suspenders
 on top of `_hook_utils.record_gate_fire`'s own fail-open contract).
 """
@@ -19,6 +19,8 @@ import io
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 HOOKS_DIR = Path(__file__).resolve().parent
 HOOK_PATH = HOOKS_DIR / "promote_learnings.py"
@@ -129,3 +131,51 @@ def test_non_cleanup_command_never_fires_gate(tmp_path: Path, monkeypatch) -> No
     module.main()
 
     assert _read_gate_fire_rows(tmp_path) == []
+
+
+# ---------------------------------------------------------------------------
+# CLEANUP_PATTERNS precision -- reproduced false positives from a live PreToolUse
+# session polluting P03's gate-liveness input with spurious `gate_fire` rows.
+# Table-driven per dec-378: the test IS the guard, so it must fail on the
+# unfixed patterns (verified manually -- see LEARNINGS.md) before it can be
+# trusted to pass on the fixed ones.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "should_fire"),
+    [
+        # Reproduced false positives: "rm" matched mid-word (inside "confirm"),
+        # or ".ai-work"/"workspace" matched via clean.work's wildcarded dot.
+        ("grep -rn 'confirm ' .ai-work/", False),
+        ("echo 'please confirm .ai-work exists'", False),
+        ("cat docs/clean-workflow.md", False),
+        ("python3 scripts/clean_workspace.py --check", False),
+        # find ... -delete: documented in cleanup_gate.sh's fast-path grep but
+        # was missing from CLEANUP_PATTERNS, the authoritative source.
+        ("find .ai-work -delete", True),
+        ("find .ai-work/some-slug -type f -delete", True),
+        # True positives, unchanged.
+        ("rm -rf .ai-work/x", True),
+        ("rm -rf .ai-work/some-slug", True),
+    ],
+    ids=[
+        "fp-confirm-in-grep",
+        "fp-confirm-in-echo",
+        "fp-clean-workflow-doc",
+        "fp-clean-workspace-script",
+        "tp-find-delete",
+        "tp-find-delete-with-flags",
+        "tp-rm-rf-x",
+        "tp-rm-rf-slug",
+    ],
+)
+def test_is_cleanup_command_precision(command: str, should_fire: bool) -> None:
+    """`_is_cleanup_command` fires only on genuine .ai-work deletions.
+
+    `rmdir` and `trash` are documented, accepted false negatives -- not
+    covered here; widening CLEANUP_PATTERNS to catch them is out of scope.
+    """
+    module = _load_module()
+
+    assert module._is_cleanup_command(command) is should_fire

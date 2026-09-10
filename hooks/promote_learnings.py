@@ -17,8 +17,15 @@ from _hook_utils import record_gate_fire
 # variant of these patterns for the PreToolUse fast-path; Python remains
 # authoritative. Keep in sync when editing either side.
 CLEANUP_PATTERNS = [
-    r"rm\s+.*\.ai-work",
-    r"clean.work",
+    # "rm" as its own shell word (preceded by start-of-string or a separator,
+    # never mid-word as in "confirm"), targeting ".ai-work" as its own
+    # whitespace-delimited operand (never a substring match, e.g. inside a
+    # quoted sentence) -- fixes the two reproduced false positives that fired
+    # on `grep ... .ai-work/` and `echo '... .ai-work ...'`.
+    r"(?:^|[;&|\s])rm\b(?:\s+\S+)*\s+\.ai-work(?:/\S*)?(?=\s|$)",
+    # `find .ai-work ... -delete` -- already matched by cleanup_gate.sh's
+    # fast-path grep but missing here, the authoritative source.
+    r"find\s+.*\.ai-work.*-delete",
 ]
 
 ENTRY_PREFIX = "- **["

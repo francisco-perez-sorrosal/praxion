@@ -37,7 +37,16 @@ affected_files:
 """
 
 
-def _adr(root: Path, n: int, *, title="A decision", date="2026-01-01", summary="s", files=()):
+def _adr(
+    root: Path,
+    n: int,
+    *,
+    title="A decision",
+    date="2026-01-01",
+    summary="s",
+    files=(),
+    category="architectural",
+):
     """Write a finalized ADR carrying the given affected_files."""
     d = root / ".ai-state" / "decisions"
     d.mkdir(parents=True, exist_ok=True)
@@ -47,7 +56,7 @@ def _adr(root: Path, n: int, *, title="A decision", date="2026-01-01", summary="
         date=date,
         summary=summary,
         files="\n".join(f"  - {f}" for f in files) or "  - noop",
-    )
+    ).replace("category: architectural", f"category: {category}")
     path = d / f"{n:03d}-slug.md"
     path.write_text(body, encoding="utf-8")
     return path
@@ -497,6 +506,63 @@ def test_category_mix_counts_terminal_decisions_too(repo: Path) -> None:
     report = adr_health.classify(repo)
     assert report["skipped_terminal"] == ["002-slug.md"]
     assert report["category_mix"]["corpus"] == {"architectural": 2}
+
+
+# -- category_mix: adoption baseline and verdict -------------------------------
+
+
+def test_category_mix_reports_the_adoption_baseline(repo: Path) -> None:
+    """`baseline` is a fixed, reported reference -- present regardless of post_adoption size."""
+    _adr(repo, 1, files=["present.py"])
+    (repo / "present.py").write_text("x", encoding="utf-8")
+    baseline = adr_health.classify(repo)["category_mix"]["baseline"]
+    assert baseline["corpus"] == 0.72
+    assert baseline["recent"] == 0.84
+    assert baseline["source"]
+
+
+def _post_adoption_adrs(repo: Path, n: int, *, category: str) -> None:
+    """Write `n` ADRs numbered just above the adoption id, all in one category."""
+    for i in range(n):
+        _adr(repo, adr_health._ADOPTION_ID + 1 + i, category=category)
+
+
+def test_verdict_is_insufficient_n_below_the_recent_window_even_if_share_would_discriminate(
+    repo: Path,
+) -> None:
+    """A sample this small cannot evidence either reading -- the share is not consulted at all."""
+    _post_adoption_adrs(repo, 10, category="implementation")  # share=0.0, would read discriminating
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["post_adoption"]["n"] == 10
+    assert mix["verdict"] == "insufficient-n"
+
+
+def test_verdict_is_widening_when_post_adoption_share_meets_or_exceeds_the_baseline(
+    repo: Path,
+) -> None:
+    """The golden bad-case: enough post-adoption decisions, all still `architectural`."""
+    _post_adoption_adrs(repo, adr_health._RECENT_WINDOW, category="architectural")
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["post_adoption"]["architectural_share"] == 1.0
+    assert mix["verdict"] == "widening"
+
+
+def test_verdict_is_discriminating_when_post_adoption_share_is_below_the_baseline(
+    repo: Path,
+) -> None:
+    _post_adoption_adrs(repo, adr_health._RECENT_WINDOW, category="implementation")
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["post_adoption"]["architectural_share"] == 0.0
+    assert mix["verdict"] == "discriminating"
+
+
+def test_verdict_never_reads_widening_when_post_adoption_n_is_zero(repo: Path) -> None:
+    """Inverse guard: an empty post-adoption window must never read as widening."""
+    _adr(repo, 1, files=["present.py"])  # pre-adoption only; no post-adoption ADRs at all
+    (repo / "present.py").write_text("x", encoding="utf-8")
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["post_adoption"]["n"] == 0
+    assert mix["verdict"] != "widening"
 
 
 def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:

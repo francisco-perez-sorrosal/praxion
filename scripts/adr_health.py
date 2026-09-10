@@ -150,6 +150,19 @@ _RECENT_WINDOW = 50
 # behaviour.
 _ADOPTION_ID = 318
 
+# Measured the day the falsifiable test landed (dec-318): the corpus as a whole
+# was 72% `architectural` (227/317), while the 50 decisions immediately
+# preceding adoption were already trending to 84% -- the widening `verdict`
+# exists to detect a return to. `corpus` is what `_category_mix_verdict`
+# compares `post_adoption.architectural_share` against; `recent` is retained
+# purely as reported context, per `adr-authoring-protocols.md § The
+# \`architectural\` Test`.
+_ARCHITECTURAL_BASELINE = {
+    "corpus": 0.72,
+    "recent": 0.84,
+    "source": "adr-authoring-protocols.md § The `architectural` Test",
+}
+
 _GIT_TIMEOUT = 30
 
 
@@ -573,10 +586,11 @@ def _category_mix(categories: list[str], ids: list[int] | None = None) -> dict:
         "recent": counts(recent),
         "recent_window": len(recent),
         "architectural_share_recent": round(share, 3),
+        "baseline": _ARCHITECTURAL_BASELINE,
     }
     if ids is not None:
         since = [c for n, c in zip(ids, categories, strict=False) if n > _ADOPTION_ID]
-        mix["post_adoption"] = {
+        post_adoption = {
             "since_decision": _ADOPTION_ID,
             "n": len(since),
             "counts": counts(since),
@@ -584,7 +598,33 @@ def _category_mix(categories: list[str], ids: list[int] | None = None) -> dict:
                 round(since.count("architectural") / len(since), 3) if since else None
             ),
         }
+        mix["post_adoption"] = post_adoption
+        mix["verdict"] = _category_mix_verdict(post_adoption)
     return mix
+
+
+def _category_mix_verdict(post_adoption: dict) -> str:
+    """Classify post-adoption `architectural`-share movement against the baseline.
+
+    A separate function from `_category_mix` on purpose: `adr_health.py` already
+    carries a hotspot function per the sentinel's complexity ledger, and folding
+    a new classification into it would compound that rather than leave it as a
+    later, dedicated cleanup.
+
+    `insufficient-n` holds whenever `post_adoption["n"]` is below the recent
+    window, *regardless of the share* -- a sample that small cannot evidence
+    either "the test discriminates" or "the test is widening", so the share is
+    not consulted at all until enough decisions have been authored under the
+    rule. Once `n` clears the window, `widening` at-or-above the baseline
+    mirrors the row's own "at or above it, flag as Suggested" wording -- a share
+    equal to the pre-adoption trend is not evidence the trend reversed.
+    """
+    if post_adoption["n"] < _RECENT_WINDOW:
+        return "insufficient-n"
+    share = post_adoption["architectural_share"]
+    if share is not None and share >= _ARCHITECTURAL_BASELINE["corpus"]:
+        return "widening"
+    return "discriminating"
 
 
 def _finding(adr_name: str, ref: str, cls: str, disp: str, detail: str) -> dict:

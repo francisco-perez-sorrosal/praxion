@@ -365,3 +365,15 @@ repos:
         language: system
         files: '^(\.ai-state/doc_manifest\.yaml|docs/.*|\.ai-state/.*|scripts/check_doc_manifest_freshness\.py)$'
         pass_filenames: false
+
+      # Block K — agent lifecycle pairing (P03). WARN-only by construction
+      # (no --check): a WAL classification is advisory, matching the F11/T03
+      # precedent -- a blocking gate on a rotating append-only log would
+      # redden commits on backlog noise the check's own pre_baseline/
+      # no_tool_use/incident classes exist to separate from a live defect.
+      - id: agent-lifecycle-pairing
+        name: Agent lifecycle pairing (advisory)
+        entry: python3 scripts/check_agent_lifecycle_pairing.py --repo-root .
+        language: system
+        files: '^(\.ai-state/observations\.jsonl|scripts/check_agent_lifecycle_pairing\.py)$'
+        pass_filenames: false

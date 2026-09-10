@@ -350,3 +350,18 @@ repos:
         language: system
         files: '^(agents/.*\.md|scripts/check_agent_prompt_size\.py)$'
         pass_filenames: false
+
+      # Block J — doc manifest freshness (F11). WARN-only by construction
+      # (never wired --check): staleness lags the dashboard's navigation, it
+      # does not corrupt anything, and every commit touching docs/ or
+      # .ai-state/ would otherwise redden on the routine case the check's own
+      # two exclusions exist to filter out (its own regen commit; a body-only
+      # edit to an already-indexed file). Scoped to the manifest, docs/,
+      # .ai-state/, and the script itself -- the same substrate the script's
+      # own git-log scan reads.
+      - id: doc-manifest-freshness
+        name: Doc manifest freshness (advisory)
+        entry: python3 scripts/check_doc_manifest_freshness.py --repo-root .
+        language: system
+        files: '^(\.ai-state/doc_manifest\.yaml|docs/.*|\.ai-state/.*|scripts/check_doc_manifest_freshness\.py)$'
+        pass_filenames: false

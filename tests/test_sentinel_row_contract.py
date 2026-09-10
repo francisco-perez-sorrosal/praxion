@@ -352,6 +352,7 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("DH05", "adr_health"),
     ("DL06", "check_adr_reciprocity"),
     ("T03", "check_agent_prompt_size"),
+    ("F11", "check_doc_manifest_freshness"),
 ]
 
 

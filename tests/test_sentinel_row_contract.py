@@ -8,12 +8,18 @@ and appends its `(check_id, script_name)` pair to `EXTRACTED_CHECKS` below, in t
 commit that collapses its row into the four-part template.
 
 The budget binds the **verdict map** -- the Pass column with its three mandated
-template parts (Conditional, Invocation, Spec pointer) stripped out -- at <=200 bytes,
-not the Pass column as a whole: the template parts are fixed-format boilerplate whose
-size tracks script-name length, not discipline, so a whole-column budget hands a
-longer-named script arbitrarily more verdict-map room for a reason unconnected to
-prose discipline. See `_verdict_map` for the extraction and the module-level comment
-above `_VERDICT_MAP_MAX_BYTES` for the derivation.
+template parts (Conditional, Invocation, Spec pointer) parsed out, in their mandated
+order, with nothing left over -- at <=300 bytes, not the Pass column as a whole: the
+template parts are fixed-format boilerplate whose size tracks script-name length, not
+discipline, so a whole-column budget hands a longer-named script arbitrarily more
+verdict-map room for a reason unconnected to prose discipline.
+
+`_verdict_map` parses rather than strips: the whole Pass column is matched in one
+`re.fullmatch` against the ordered four-part shape, so any content that isn't part of
+a recognized part -- trailing prose after the Spec pointer, a reordered part, a fifth
+part -- fails the match instead of silently defaulting to zero. See `_row_pattern` for
+the shape and the module-level comment above `_VERDICT_MAP_MAX_BYTES` for the budget's
+derivation.
 
 `EXTRACTED_CHECKS` is append-only: entries are never removed or reordered, only added,
 one per extraction step.
@@ -29,22 +35,59 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SENTINEL_PATH = PROJECT_ROOT / "agents" / "sentinel.md"
 
-# Derived, not fitted: the richest currently-extracted verdict map measures 108 bytes
-# (DH05); 200 leaves headroom for a denser check (e.g. a seven-output-class classifier)
-# while still representing a >=85% reduction against the smallest pre-extraction row
-# (AC13, 1,481 bytes before extraction). See `test_every_extracted_row_satisfies_the_contract`
-# for the measured margin on each live row.
-_VERDICT_MAP_MAX_BYTES = 200
+# Derived from a template-conforming measurement of the three live rows plus a
+# realistic verdict map for the largest check still to be extracted (P03, seven output
+# classes: WARN, three `info.*` counts, and `unmatched_stops` split three ways) --
+# not fitted to whichever row happens to pass. Measured: AC13 103 b, DH05 108 b,
+# DL06 67 b (all folded-sentence-conditional, the template this file's canaries now
+# enforce). A terse but faithful seven-class P03 verdict map -- naming the `agent_id`/
+# `agent_type`/`session_id` fields the check's own golden bad-case requires on its WARN,
+# plus the three `info.*` counts and the three `unmatched_stops` sub-keys, all as
+# backticked JSON keys -- measures 227 b; 200 b (the prior ceiling) falls 27 b short of
+# it. 300 b clears that estimate with 73 b (32%) of margin and is still a 5.6x
+# (95.6%) reduction against P03's own pre-extraction size (6,837 b) and a 4.9x (79.7%)
+# reduction against the smallest pre-extraction row (AC13, 1,481 b) -- decisively
+# distinct from the 1,481-6,804-byte range these rows started in. (The "reduction
+# against 1,481 b" framing alone does not discriminate: it stays true all the way up
+# to 222 b, so it is cited here for context, not as the derivation's basis.)
+_VERDICT_MAP_MAX_BYTES = 300
 
 _DIMENSION_HEADING = re.compile(r"^###\s+(.+)$", re.M)
 _TABLE_ROW = re.compile(r"^\|\s*(?P<id>[A-Za-z0-9]+)\s*\|.*\|\s*$", re.M)
 
-# The three mandated template parts, in the order the Extraction Contract fixes them:
-# an optional Conditional clause, a mandatory Invocation phrase, then (after the
-# verdict map) a mandatory Spec pointer. Each is stripped from the Pass column in turn;
-# what remains is the verdict map the byte budget actually polices.
-_CONDITIONAL_RE = re.compile(r"^\s*Conditional on .*?\.\s")
-_SPEC_POINTER_RE = re.compile(r"Spec \+ golden bad-cases:.*$")
+# The Conditional's fixed shape -- a single sentence, `Conditional on <path> present`,
+# optionally qualified by a parenthetical (e.g. "(either lifecycle stage)"), then
+# `; skip with a(n) <D>-dimension INFO note.` -- per the folded-sentence template
+# `SYSTEMS_PLAN.md § The Extraction Contract` now specifies (amended in this commit to
+# match the three live rows, which never wrote the split two-sentence form). Bounded by
+# its own closing anchor rather than an open `.*?\.\s`, so padding cannot ride along
+# inside it disguised as path text -- see `_row_pattern`.
+_CONDITIONAL_SHAPE = (
+    r"Conditional on .+? present(?: \([^)]*\))?; skip with an? [A-Za-z]+-dimension INFO note\.\s*"
+)
+
+
+def _row_pattern(script_name: str) -> re.Pattern[str]:
+    """Build the whole-Pass-column parser for a row naming `script_name`.
+
+    Anchored (via `fullmatch`, not `search`) to consume the entire column: an optional
+    Conditional, the mandatory Invocation, the verdict map (captured -- its length is
+    measured after the match, not constrained by the regex), then the mandatory Spec
+    pointer, and nothing else. This is what turns "content the four-part template
+    doesn't account for" into a parse failure instead of the open-ended `.*$` strip
+    silently discarding it (dec-378's own "fails, not skips" property, extended from
+    the mandatory parts to the column as a whole).
+    """
+    escaped = re.escape(script_name)
+    invocation = rf"Run `python3 scripts/{escaped}\.py[^`]*`\."
+    spec_pointer = (
+        rf"Spec \+ golden bad-cases: `scripts/{escaped}\.py` docstring; "
+        rf"canary `scripts/test_{escaped}\.py`\."
+    )
+    return re.compile(
+        rf"(?:{_CONDITIONAL_SHAPE})?{invocation}\s*(?P<verdict>.*?)\s*{spec_pointer}",
+        re.DOTALL,
+    )
 
 
 def _find_row(sentinel_text: str, check_id: str) -> str:
@@ -69,7 +112,7 @@ def _dimension_heading_before(sentinel_text: str, row: str) -> str | None:
 def _pass_column(row: str) -> str:
     """Return the last (Pass/verdict) cell of a `| ID | Tp | Rule | Pass |` row.
 
-    `_verdict_map` further strips this cell down to the part the byte budget actually
+    `_verdict_map` further parses this cell down to the part the byte budget actually
     binds. ID/Tp are trivially short and the Rule/claim column already carries its own
     separate <=120-char budget in the Extraction Contract's template, so this cell is
     the only place the mandated template parts and the verdict map they wrap can live.
@@ -81,40 +124,22 @@ def _pass_column(row: str) -> str:
 
 
 def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
-    """Strip the three mandated template parts from `pass_column`, returning the verdict map.
+    """Parse `pass_column` against the ordered four-part template, returning the verdict map.
 
-    The Conditional clause (optional) is stripped from the front if present; the
-    Invocation phrase and the Spec pointer (both mandatory) are located by regex and
-    removed. What remains is the verdict map -- the only part of the Pass column the
-    200-byte budget polices.
-
-    Raises AssertionError, not a silent skip, when the mandatory Invocation or Spec
-    pointer cannot be located: a row whose mandated parts don't parse is exactly the
-    drift this contract exists to catch, not a case to pass over.
+    `re.fullmatch` demands the *entire* column decompose into Conditional? + Invocation
+    + verdict map + Spec pointer, in that order, with nothing left over. Anything the
+    parse cannot assign to a named part -- a missing mandatory part, parts out of
+    order, or trailing content after the Spec pointer -- raises AssertionError instead
+    of silently discarding it: an unparseable row is exactly the drift this contract
+    exists to catch, not a case to pass over.
     """
-    residual = pass_column
-
-    conditional_match = _CONDITIONAL_RE.match(residual)
-    if conditional_match:
-        residual = residual[conditional_match.end() :]
-
-    invocation_re = re.compile(rf"Run `python3 scripts/{re.escape(script_name)}\.py[^`]*`\.")
-    invocation_match = invocation_re.search(residual)
-    assert invocation_match is not None, (
-        f"{check_id}: cannot locate the mandatory `Run \\`python3 scripts/{script_name}.py "
-        "...\\`.` invocation phrase in the mandated format -- the row is unparseable, not "
-        "merely over budget"
+    match = _row_pattern(script_name).fullmatch(pass_column)
+    assert match is not None, (
+        f"{check_id}: Pass column does not decompose into the mandated "
+        "Conditional? + Invocation + verdict map + Spec pointer shape, in that exact "
+        "order, with no content left over (SYSTEMS_PLAN.md § The Extraction Contract)"
     )
-    residual = residual[: invocation_match.start()] + residual[invocation_match.end() :]
-
-    spec_match = _SPEC_POINTER_RE.search(residual)
-    assert spec_match is not None, (
-        f"{check_id}: cannot locate the mandatory `Spec + golden bad-cases:` pointer -- "
-        "the row is unparseable, not merely over budget"
-    )
-    residual = residual[: spec_match.start()] + residual[spec_match.end() :]
-
-    return residual.strip()
+    return match.group("verdict").strip()
 
 
 def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name: str) -> None:
@@ -125,8 +150,8 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
     `python3 scripts/<script_name>.py` invocation phrase -- the same phrase
     `_delegated_gates`, GL04 (`check_uninvoked_gate`) and GL05 (`check_ambient_import`) all
     key on; (b) the row names its canary sibling, `scripts/test_<script_name>.py`; (c) the
-    verdict map -- the Pass column minus its three mandated template parts -- is at most
-    200 bytes.
+    verdict map -- the Pass column parsed down to its non-template residue -- is at most
+    `_VERDICT_MAP_MAX_BYTES`.
     """
     row = _find_row(sentinel_text, check_id)
 
@@ -155,7 +180,7 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
 
 def test_row_missing_invocation_phrase_is_rejected() -> None:
     """Canary: a row that never names its script's invocation must fail the contract."""
-    text = "### D\n\n| X01 | A | rule | Run something else. scripts/test_x.py, 400b budget |\n"
+    text = "### D\n\n| X01 | A | rule | Run something else. scripts/test_x.py, no invocation |\n"
     try:
         assert_residual_row_contract(text, "X01", "x")
     except AssertionError:
@@ -179,14 +204,14 @@ _SPEC_TAIL = "Spec + golden bad-cases: `scripts/x.py` docstring; canary `scripts
 
 
 def test_verdict_map_over_budget_is_rejected() -> None:
-    """Canary: a verdict map past the 200-byte budget must fail, even with a well-formed,
+    """Canary: a verdict map past the budget must fail, even with a well-formed,
     parseable Invocation and Spec pointer on either side of it.
 
     The padding sits in the verdict map, not the Rule column -- the budget is scoped to
     the part `_verdict_map` extracts, so padding the Rule column alone must not trip it
     (see the inverse guard below).
     """
-    padding = "x" * 250
+    padding = "x" * 320
     text = (
         "### D\n\n"
         f"| X01 | A | rule | Run `python3 scripts/x.py --json`. {padding} scripts/test_x.py "
@@ -200,7 +225,7 @@ def test_verdict_map_over_budget_is_rejected() -> None:
 
 
 def test_padding_the_rule_column_alone_does_not_trip_the_budget() -> None:
-    """Inverse guard: the 200-byte budget is scoped to the verdict map, not the whole row."""
+    """Inverse guard: the byte budget is scoped to the verdict map, not the whole row."""
     padding = "x" * 500
     text = (
         f"### D\n\n| X01 | A | {padding} | Run `python3 scripts/x.py --json`. "
@@ -226,6 +251,19 @@ def test_well_formed_row_is_accepted() -> None:
     text = (
         f"### D\n\n| X01 | A | rule | Run `python3 scripts/x.py --json`. verdict text here. "
         f"scripts/test_x.py {_SPEC_TAIL} |\n"
+    )
+    assert_residual_row_contract(text, "X01", "x")  # must not raise
+
+
+def test_conditional_folded_sentence_is_accepted() -> None:
+    """Inverse guard: the folded single-sentence Conditional the three live rows actually
+    write -- `Conditional on <path> present; skip with a <D>-dimension INFO note.` --
+    parses cleanly and contributes nothing to the verdict map.
+    """
+    text = (
+        "### D\n\n"
+        "| X01 | A | rule | Conditional on `some/path` present; skip with a D-dimension "
+        f"INFO note. Run `python3 scripts/x.py --json`. verdict text here. {_SPEC_TAIL} |\n"
     )
     assert_residual_row_contract(text, "X01", "x")  # must not raise
 
@@ -264,17 +302,43 @@ def test_spec_pointer_missing_mandated_phrase_is_rejected() -> None:
     raise AssertionError("a row missing the mandated spec-pointer phrase must fail")
 
 
-def test_totally_unparseable_pass_column_fails_not_skips() -> None:
-    """Canary: a Pass column with no recognizable template structure at all must fail --
-    not skip -- per `dec-378`'s "an unparseable row is exactly the drift this contract
-    exists to catch" requirement, exercised on the degenerate no-structure case.
+def test_content_after_spec_pointer_is_rejected() -> None:
+    """Canary (dec-378, closes the FAIL-1 shape a prior `.*$` strip let through): prose
+    parked *after* the mandated Spec pointer -- naturally arising, e.g., from an author
+    extending the pointer with extra guidance -- must fail the contract, not vanish into
+    an unbounded strip. `re.fullmatch` cannot match with a non-empty tail, so this is
+    exactly the escape a whole-column parse closes that a to-end-of-string strip left
+    open.
     """
-    text = "### D\n\n| X01 | A | rule | Completely unrelated prose, no markers at all. |\n"
+    trailing_prose = "x" * 800
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | Run `python3 scripts/x.py --json`. verdict text. {_SPEC_TAIL} "
+        f"{trailing_prose} |\n"
+    )
     try:
         assert_residual_row_contract(text, "X01", "x")
     except AssertionError:
         return
-    raise AssertionError("a totally unparseable Pass column must fail, not silently pass")
+    raise AssertionError("prose parked after the Spec pointer must fail, not silently pass")
+
+
+def test_reordered_parts_is_rejected() -> None:
+    """Canary (dec-378, ordering): parts in any order other than Conditional? +
+    Invocation + verdict map + Spec pointer must fail -- `SYSTEMS_PLAN.md § The
+    Extraction Contract` fixes the order ("Four parts, in this order, and no fifth"),
+    and the whole-column parse enforces it structurally rather than leaving it
+    unasserted.
+    """
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | {_SPEC_TAIL} Run `python3 scripts/x.py --json`. verdict text. |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError:
+        return
+    raise AssertionError("a row with parts out of the mandated order must fail")
 
 
 # ---------------------------------------------------------------------------

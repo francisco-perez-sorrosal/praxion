@@ -320,3 +320,18 @@ repos:
         language: system
         files: '^\.ai-state/decisions/.*\.md$'
         pass_filenames: false
+
+      # Block H — ADR back-link reciprocity (DL06). A one-directional
+      # supersedes/superseded_by (or re_affirms/re_affirmed_by, or
+      # supersedes_in_part/superseded_in_part_by) pair is invisible from any
+      # single file's diff -- the missing half lives in the OTHER file -- so
+      # this is a whole-corpus scan, per the agent-shared-blocks model above,
+      # not a --staged single-file check. `--check` opts the advisory-by-
+      # default script into a blocking gate; measured clean (0 findings) on
+      # the live corpus before wiring.
+      - id: adr-reciprocity
+        name: ADR back-link reciprocity
+        entry: python3 scripts/check_adr_reciprocity.py --repo-root . --check
+        language: system
+        files: '^(\.ai-state/decisions/.*\.md|scripts/check_adr_reciprocity\.py)$'
+        pass_filenames: false

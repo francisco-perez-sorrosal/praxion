@@ -170,6 +170,7 @@ def test_well_formed_row_is_accepted() -> None:
 EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("AC13", "check_architecture_projection"),
     ("DH05", "adr_health"),
+    ("DL06", "check_adr_reciprocity"),
 ]
 
 

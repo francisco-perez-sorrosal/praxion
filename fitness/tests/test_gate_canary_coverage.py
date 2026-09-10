@@ -408,6 +408,24 @@ def test_every_declared_check_has_canary(project_root: Path) -> None:
     )
 
 
+def test_build_doc_manifest_reaches_canary_coverage_via_sentinel(project_root: Path) -> None:
+    """`build_doc_manifest.py` has exactly one route into this suite's gate set.
+
+    It is absent from `.pre-commit-config.yaml`, so `_invoked_gates` cannot see it —
+    `agents/sentinel.md`'s F11 row (the literal `python3 scripts/build_doc_manifest.py`
+    remedy phrase) is the script's **only** discovery route, via `_delegated_gates`. If a
+    later edit to that row drops the phrase, canary-coverage enforcement for this script
+    disappears silently rather than failing loudly. This pin exists so that edit reddens
+    this test instead (see `feedback_relocation_needs_structural_consumer_check`).
+    """
+    delegated = _delegated_gates(project_root)
+    assert project_root / "scripts" / "build_doc_manifest.py" in delegated, (
+        "build_doc_manifest.py dropped out of _delegated_gates — check F11's row in "
+        "agents/sentinel.md still carries the literal `python3 scripts/build_doc_manifest.py` "
+        f"phrase; delegated gates seen: {delegated}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Own canary: prove this meta-test bites on a known-bad fixture
 # ---------------------------------------------------------------------------

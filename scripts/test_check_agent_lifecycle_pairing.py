@@ -335,3 +335,40 @@ def test_exits_zero_when_substrate_absent(tmp_path: Path) -> None:
         check=False,
     )
     assert rc.returncode == 0
+
+
+# -- Guarded import (rules/swe/gate-liveness.md GL05) -----------------------------
+
+
+def test_missing_capture_session_exits_with_remedy_not_a_bare_traceback(tmp_path: Path) -> None:
+    """The ambient-interpreter case: `hooks/capture_session.py` is unreachable.
+
+    Runs a real copy of this script from an isolated tree whose `hooks/`
+    directory has no `capture_session.py`, reproducing exactly what the
+    ambient `python3` invocation in agents/sentinel.md would hit if the WAL
+    emitter were missing. Non-vacuous: a bare `except ImportError: pass` or a
+    reverted guard would print a `Traceback (most recent call last):` here
+    instead of the remedy message, so this assertion fails the moment the
+    guard is removed or degrades to a silent fallback -- it does not just
+    confirm the current exit code.
+    """
+    fake_root = tmp_path / "fake_repo"
+    (fake_root / "scripts").mkdir(parents=True)
+    (fake_root / "hooks").mkdir(parents=True)  # present but empty -- no capture_session.py
+    real_scripts_dir = Path(clp.__file__).resolve().parent
+    for name in ("check_agent_lifecycle_pairing.py", "_repo_root.py", "_script_cli.py"):
+        (fake_root / "scripts" / name).write_text(
+            (real_scripts_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+
+    rc = subprocess.run(
+        [sys.executable, str(fake_root / "scripts" / "check_agent_lifecycle_pairing.py")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert rc.returncode != 0
+    assert "Traceback (most recent call last)" not in rc.stderr
+    assert "capture_session is not importable" in rc.stderr
+    assert sys.executable in rc.stderr

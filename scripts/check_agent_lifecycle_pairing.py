@@ -109,14 +109,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root  # noqa: E402
 from _script_cli import configure_logging  # noqa: E402
-from capture_session import (  # noqa: E402
-    CORRELATION_PAIRED,
-    CORRELATION_UNOBSERVED_AGENT,
-    CORRELATION_UNOBSERVED_START,
-    resolve_agent_id,
-    resolve_agent_type,
-    resolve_start_correlation,
-)
+
+try:
+    from capture_session import (
+        CORRELATION_PAIRED,
+        CORRELATION_UNOBSERVED_AGENT,
+        CORRELATION_UNOBSERVED_START,
+        resolve_agent_id,
+        resolve_agent_type,
+        resolve_start_correlation,
+    )
+except ImportError as exc:
+    # This runs through the ambient interpreter invoked from agents/sentinel.md
+    # (`python3 scripts/check_agent_lifecycle_pairing.py`), which is not
+    # guaranteed to load `hooks/capture_session.py` -- e.g. `fcntl`, one of its
+    # transitive stdlib imports, does not exist on non-POSIX platforms. A raw
+    # traceback here reads as noise and gets ignored, which is how a gate dying
+    # on import goes unnoticed (rules/swe/gate-liveness.md). Name the
+    # interpreter actually in use rather than limping on with a substitute --
+    # the constants and resolvers below must stay bound to the same values
+    # `capture_session.py` writes into the WAL, never re-literalled here.
+    sys.exit(
+        f"check_agent_lifecycle_pairing: capture_session is not importable "
+        f"under {sys.executable} ({exc}).\n"
+        "  Run this check with an interpreter that can load hooks/capture_session.py, "
+        "e.g. `uv run python scripts/check_agent_lifecycle_pairing.py`."
+    )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 

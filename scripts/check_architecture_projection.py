@@ -32,6 +32,21 @@ is a projection of it. Those rows carry the highest blast radius in the repo
 undocumented, or a documented block the registry does not declare, is drift on
 the same footing as a missing component row.
 
+**Six finding kinds, one per drift shape.** Structural half (model <-> 3a):
+`element-without-row` (a modelled component the doc never documents),
+`row-without-element` (a documented component carrying no structural
+enforcement -- the shape that let most of the table drift), `unknown-element`
+(the doc names an element the model does not declare, typically a rename the
+doc did not follow), `not-structural` (a row for a layer container, which
+double-counts its children). Published half (registry <-> section 4):
+`block-without-row` (a block installed into every managed project's
+`CLAUDE.md` that the doc does not record -- the highest blast radius finding
+this dimension produces, since it costs N repositories rather than one),
+`row-without-block` (a retired block still advertised as part of the
+contract). Resolving one is a judgment about which side is right: the model
+wins when its edges encode enforced structure, the doc wins when the model is
+over-granular.
+
 Exit 1 when findings exist, so this doubles as a commit gate. Reports; never
 edits either side.
 

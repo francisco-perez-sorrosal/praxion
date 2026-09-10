@@ -335,3 +335,18 @@ repos:
         language: system
         files: '^(\.ai-state/decisions/.*\.md|scripts/check_adr_reciprocity\.py)$'
         pass_filenames: false
+
+      # Block I — agent prompt size (T03). Advisory only, deliberately no
+      # --check: the live agents/sentinel.md already sits in derived WARN
+      # today (S=352 -> warn 652, 680-line file), so a blocking wiring here
+      # would redden every commit by every contributor touching any file, not
+      # just the one over its ceiling. The safety is the script's own default
+      # exit-0 behavior, not special pre-commit syntax -- no `|| true` or
+      # similar softening exists anywhere else in this file and none is added
+      # here either.
+      - id: agent-prompt-size
+        name: Agent prompt size (advisory)
+        entry: python3 scripts/check_agent_prompt_size.py --repo-root .
+        language: system
+        files: '^(agents/.*\.md|scripts/check_agent_prompt_size\.py)$'
+        pass_filenames: false

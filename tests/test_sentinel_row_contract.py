@@ -40,7 +40,11 @@ SENTINEL_PATH = PROJECT_ROOT / "agents" / "sentinel.md"
 # classes: WARN, three `info.*` counts, and `unmatched_stops` split three ways) --
 # not fitted to whichever row happens to pass. Measured: AC13 103 b, DH05 108 b,
 # DL06 67 b (all folded-sentence-conditional, the template this file's canaries now
-# enforce). A terse but faithful seven-class P03 verdict map -- naming the `agent_id`/
+# enforce). The budget is **UTF-8 bytes**, not characters: the assertion measures
+# `len(verdict_map.encode("utf-8"))`. AC13 is the row where these differ -- 101
+# characters, 103 bytes, on one em-dash. Every other extracted row is ASCII, so a
+# `len()` on the str agrees there and silently disagrees on AC13. All six rows, in
+# bytes: AC13 103, DH05 108, DL06 67, F11 247, T03 253, P03 265 -- all /300. A terse but faithful seven-class P03 verdict map -- naming the `agent_id`/
 # `agent_type`/`session_id` fields the check's own golden bad-case requires on its WARN,
 # plus the three `info.*` counts and the three `unmatched_stops` sub-keys, all as
 # backticked JSON keys -- measures 227 b; 200 b (the prior ceiling) falls 27 b short of

@@ -134,62 +134,89 @@ def test_non_cleanup_command_never_fires_gate(tmp_path: Path, monkeypatch) -> No
 
 
 # ---------------------------------------------------------------------------
-# CLEANUP_PATTERNS precision -- reproduced false positives from a live PreToolUse
-# session polluting P03's gate-liveness input with spurious `gate_fire` rows.
-# Table-driven per dec-378: the test IS the guard, so it must fail on the
-# unfixed patterns (verified manually -- see LEARNINGS.md) before it can be
-# trusted to pass on the fixed ones.
+# CLEANUP_PATTERNS precision -- three fixes, three defect classes
+#
+# 1. original (unanchored): "rm" matched mid-word (inside "confirm"); the
+#    wildcarded "." in `clean.work` matched any character.
+# 2. first fix (anchored, quote/path-blind): closed (1), but `rm -rf
+#    /abs/path/.ai-work/slug` and quoted operands went unmatched.
+# 3. second fix (`_outside_quotes`, quote-balance heuristic): closed (2),
+#    but counted quote characters across the WHOLE command prefix -- so ANY
+#    unpaired quote earlier in the command (an apostrophe in "it's", an
+#    unrelated -m "message") silently suppressed the gate on a real,
+#    unquoted `rm -rf .ai-work/...` later in the same command. Verified:
+#    `echo "it's done"; rm -rf .ai-work/slug` fired True before this
+#    revision's parent commit, False at it.
+#
+# `_outside_quotes` is deleted rather than patched a third time: quote-aware
+# matching is shell parsing, which a regex over raw command text cannot do
+# precisely without a real parser (the same failure class dec-379 retired
+# elsewhere in this codebase). The hook is advisory (exits 0
+# unconditionally, warns about unpromoted LEARNINGS.md entries) -- a miss
+# costs a reminder, not data, so scope is kept narrow and DOCUMENTED rather
+# than chased. This table is that documentation: every accepted
+# false-negative (and the one accepted false-positive the simplification
+# introduces) gets a row with a reason, per dec-378 non-vacuity.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("command", "should_fire"),
     [
-        # Reproduced false positives: "rm" matched mid-word (inside "confirm"),
-        # or ".ai-work"/"workspace" matched via clean.work's wildcarded dot.
+        # --- True positives: genuine .ai-work deletions ---
+        ("rm -rf .ai-work/x", True),
+        ("rm -rf .ai-work/some-slug", True),
+        ("rm -rf /abs/path/.ai-work/slug", True),
+        ('rm -rf ".ai-work/slug"', True),
+        # --- Accepted true negatives: "rm"/".ai-work" as substrings only,
+        # not shell words -- word-boundary anchoring alone (no quote logic
+        # involved) keeps these False. ---
         ("grep -rn 'confirm ' .ai-work/", False),
         ("echo 'please confirm .ai-work exists'", False),
         ("cat docs/clean-workflow.md", False),
         ("python3 scripts/clean_workspace.py --check", False),
-        # find ... -delete: documented in cleanup_gate.sh's fast-path grep but
-        # was missing from CLEANUP_PATTERNS, the authoritative source.
-        ("find .ai-work -delete", True),
-        ("find .ai-work/some-slug -type f -delete", True),
-        # True positives, unchanged.
-        ("rm -rf .ai-work/x", True),
-        ("rm -rf .ai-work/some-slug", True),
-        # Verifier probes (FAIL-3, rw-e31eec70): the find clause reintroduced
-        # the unanchored-wildcard class clean.work was deleted for (clause 1
-        # -- mere mention inside another command's quoted string must not
-        # fire; substring match on ".ai-work" inside a longer token must
-        # not fire), and the rm clause's missing path-prefix/quoting
-        # discipline silently dropped clause 2 (actual deletions with an
-        # absolute-path or quoted operand must fire).
-        ("echo 'run find .ai-work -delete to clean'", False),
-        ("find . -name '*.ai-workflow' -print -delete", False),
-        ("rm -rf /abs/path/.ai-work/slug", True),
-        ('rm -rf ".ai-work/slug"', True),
+        # --- Defect-3 regressions, now closed: quote-awareness is gone, so
+        # an unrelated unpaired quote earlier in the command no longer
+        # suppresses a real, unquoted deletion later in the command. ---
+        ('echo "it\'s done"; rm -rf .ai-work/slug', True),  # apostrophe-in-message variant
+        ('vcs commit -m "don\'t fire" && rm -rf .ai-work/x', True),  # unbalanced-quote variant
+        # --- Accepted false negatives: deliberately out of scope. Widening
+        # CLEANUP_PATTERNS to cover these needs shell-aware parsing this
+        # regex design does not attempt (see module docstring). ---
+        ("rmdir .ai-work/slug", False),  # rmdir not matched; mirrors cleanup_gate.sh's v1 scope
+        ("trash .ai-work/slug", False),  # trash not matched; same reason
+        ("find .ai-work -delete", False),  # find clause dropped with quote logic (row rw-9a9c268a)
+        ("find .ai-work/some-slug -type f -delete", False),  # same
+        # --- Accepted false positive: the trade-off's cost side. Without
+        # quote-awareness, an rm-shaped mention fully inside another
+        # command's quoted argument now over-fires (extra reminder, no
+        # deletion actually happens) instead of being correctly ignored. ---
+        ("echo 'reminder: run rm -rf .ai-work/x later'", True),
     ],
     ids=[
+        "tp-rm-rf-x",
+        "tp-rm-rf-slug",
+        "tp-rm-rf-absolute-path-prefix",
+        "tp-rm-rf-quoted-operand",
         "fp-confirm-in-grep",
         "fp-confirm-in-echo",
         "fp-clean-workflow-doc",
         "fp-clean-workspace-script",
-        "tp-find-delete",
-        "tp-find-delete-with-flags",
-        "tp-rm-rf-x",
-        "tp-rm-rf-slug",
-        "fp-find-delete-mentioned-in-echo",
-        "fp-find-name-glob-ai-workflow-substring",
-        "tp-rm-rf-absolute-path-prefix",
-        "tp-rm-rf-quoted-operand",
+        "regression-closed-apostrophe-in-message",
+        "regression-closed-unbalanced-quote-flag",
+        "fn-accepted-rmdir",
+        "fn-accepted-trash",
+        "fn-accepted-find-delete",
+        "fn-accepted-find-delete-with-flags",
+        "fp-accepted-rm-mentioned-in-echo",
     ],
 )
 def test_is_cleanup_command_precision(command: str, should_fire: bool) -> None:
-    """`_is_cleanup_command` fires only on genuine .ai-work deletions.
+    """`_is_cleanup_command` fires on genuine .ai-work deletions.
 
-    `rmdir` and `trash` are documented, accepted false negatives -- not
-    covered here; widening CLEANUP_PATTERNS to catch them is out of scope.
+    This IS the documentation of the hook's real precision (see the table's
+    header comment) -- a future change to CLEANUP_PATTERNS that alters what
+    is caught must break a row here, not silently narrow or widen scope.
     """
     module = _load_module()
 

@@ -187,15 +187,20 @@ def test_rm_ai_work_invokes_promote_learnings(
     [
         "rm -rf .ai-work/some-slug",
         "rm -f .ai-work/foo/bar",
-        "find .ai-work -name 'PROGRESS.md' -delete",
     ],
-    ids=["rm-rf", "rm-f", "find-delete"],
+    ids=["rm-rf", "rm-f"],
 )
 def test_shell_gate_delegates_to_python(command: str, tmp_path: Path) -> None:
     """Delegation contract: shell gate forwards stdin to `python3 $1` for
     every command its regex matches, including patterns that Python's own
     CLEANUP_PATTERNS filter would reject. This isolates the gate's contract
-    (forwarding) from promote_learnings.py's authoritative filter."""
+    (forwarding) from promote_learnings.py's authoritative filter.
+
+    `find ... -delete` is no longer part of this contract: both the shell
+    grep and CLEANUP_PATTERNS dropped the `find` clause together (row
+    rw-9a9c268a) rather than reintroduce a wildcard-match false positive on
+    only one side -- see hooks/promote_learnings.py's CLEANUP_PATTERNS
+    comment and hooks/test_promote_learnings.py's false-negative table."""
     spy_hook = _write_delegation_spy(tmp_path)
     result = _run_gate(_make_bash_payload(command), hook=spy_hook)
     assert result.returncode == 0

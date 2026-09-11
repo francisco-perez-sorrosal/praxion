@@ -8,7 +8,8 @@
 # Shell regex escapes \. for correctness. The shell filter is intentionally
 # loose — ambiguous payloads fall through to the Python hook, which remains
 # authoritative. False positives (rare) just run Python unnecessarily — same
-# as before. Known false-negatives (accepted for v1): `rmdir`, `trash`.
+# as before. Known false-negatives (accepted, documented and tested in
+# hooks/test_promote_learnings.py): `find ... -delete`, `rmdir`, `trash`.
 #
 # Usage: cleanup_gate.sh <python-hook-script>
 
@@ -20,7 +21,7 @@ input=$(cat)
 # POSIX mode, whose builtin echo interprets backslash escapes, so a command that
 # contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
 # every Python hook's json.loads fails silently -- td-188.
-if printf '%s\n' "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work|find[[:space:]]+.*\.ai-work.*-delete'; then
+if printf '%s\n' "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work'; then
     printf '%s\n' "$input" | python3 "$1"
 else
     exit 0

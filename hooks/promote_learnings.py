@@ -13,58 +13,54 @@ from pathlib import Path
 
 from _hook_utils import record_gate_fire
 
-# Source-of-truth for cleanup detection. hooks/cleanup_gate.sh mirrors a looser
-# variant of these patterns for the PreToolUse fast-path; Python remains
-# authoritative. Keep in sync when editing either side.
+# Source-of-truth for cleanup detection. hooks/cleanup_gate.sh mirrors this
+# pattern for the PreToolUse fast-path; Python remains authoritative. Keep in
+# sync when editing either side.
 #
-# Both patterns share one operand shape: an optional leading quote, an
-# optional path prefix ending in "/", the literal ".ai-work", and an optional
-# "/<rest>" -- so a bare `.ai-work`, a quoted `".ai-work/slug"`, and an
-# absolute `/abs/path/.ai-work/slug` all count as targeting the directory,
-# while a longer token like `.ai-workflow` does not (the trailing lookahead
-# requires the operand to end at whitespace/end-of-string right after
-# ".ai-work" or its "/<rest>" suffix).
+# The operand shape: an optional leading quote, an optional path prefix
+# ending in "/", the literal ".ai-work", and an optional "/<rest>" -- so a
+# bare `.ai-work`, a quoted `".ai-work/slug"`, and an absolute
+# `/abs/path/.ai-work/slug` all count as targeting the directory, while a
+# longer token like `.ai-workflow` does not (the trailing lookahead requires
+# the operand to end at whitespace/end-of-string right after ".ai-work" or
+# its "/<rest>" suffix).
+#
+# Deliberately narrow scope (see hooks/test_promote_learnings.py's
+# false-negative table for the exhaustive, tested list of what this does
+# NOT catch):
+#   - "rm" only. `find ... -delete`, `rmdir`, and `trash` are not matched.
+#     A prior revision covered `find ... -delete` too, but closing it
+#     precisely requires shell-aware parsing this regex cannot do without
+#     reintroducing a wildcard-match false positive (`.ai-work` found
+#     inside an unrelated glob argument). Two prior "precision" fixes each
+#     traded one false-positive/negative class for another (see
+#     LEARNINGS.md, rw-9a9c268a) -- this scope is deliberately narrow rather
+#     than chasing the next edge case.
+#   - No quote-awareness. Distinguishing a real invocation from a mention
+#     embedded in another command's quoted argument (`echo 'run rm -rf
+#     .ai-work/x later'`) needs the same shell-aware parsing. This hook is
+#     advisory (exits 0 unconditionally) and fail-open, so the cost of
+#     either direction of imprecision is a spurious or missed reminder, not
+#     lost data -- an acceptable trade for a regex over raw command text.
 _AI_WORK_OPERAND = r"[\"']?(?:\S*/)?\.ai-work(?:/\S*)?[\"']?(?=\s|$)"
 
 CLEANUP_PATTERNS = [
     # "rm" as its own shell word (preceded by start-of-string or a separator,
     # never mid-word as in "confirm"), targeting .ai-work as an operand.
     rf"(?:^|[;&|\s])rm\b(?:\s+\S+)*\s+{_AI_WORK_OPERAND}",
-    # "find" as its own shell word, same operand discipline, followed
-    # eventually by "-delete". Loose `.*` wildcards here would reintroduce
-    # the substring-match false positive that `clean.work` was deleted for
-    # (e.g. matching ".ai-work" inside a `'*.ai-workflow'` glob argument).
-    rf"(?:^|[;&|\s])find\b(?:\s+\S+)*\s+{_AI_WORK_OPERAND}.*-delete",
 ]
 
 ENTRY_PREFIX = "- **["
 
 
-def _outside_quotes(command: str, index: int) -> bool:
-    """True if `index` is not inside a single- or double-quoted span.
-
-    Heuristic quote-balance check, not a shell parser: counts quote
-    characters before `index` and treats an odd count as "inside a quoted
-    string". Distinguishes a real invocation (`rm -rf ".ai-work/x"`, where
-    only the operand is quoted) from a mere mention embedded in another
-    command's quoted argument (`echo 'run find .ai-work -delete ...'`).
-    """
-    prefix = command[:index]
-    return prefix.count("'") % 2 == 0 and prefix.count('"') % 2 == 0
-
-
 def _is_cleanup_command(command: str) -> bool:
     """Check if the command targets .ai-work/ for deletion.
 
-    A pattern match only counts when the "rm"/"find" keyword itself sits
-    outside any quoted span -- a match entirely inside a quote (e.g. text
-    passed to `echo`) is a mention, not an invocation.
+    A plain regex match over the raw command text -- no shell parsing, no
+    quote tracking. See the CLEANUP_PATTERNS comment and the false-negative
+    table in test_promote_learnings.py for the documented, tested scope.
     """
-    return any(
-        _outside_quotes(command, m.start())
-        for pattern in CLEANUP_PATTERNS
-        for m in re.finditer(pattern, command)
-    )
+    return any(re.search(pattern, command) for pattern in CLEANUP_PATTERNS)
 
 
 def _count_entries(content: str) -> int:

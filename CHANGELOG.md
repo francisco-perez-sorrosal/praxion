@@ -1,3 +1,33 @@
+## v0.30.1 (2026-09-11)
+
+### Feat
+
+- **sentinel**: extract P03 into check_agent_lifecycle_pairing.py
+- **sentinel**: extract F11 doc-manifest-freshness check into check_doc_manifest_freshness.py
+- **sentinel**: extract DL06 into check_adr_reciprocity.py
+- **sentinel**: extract DH05 into adr_health.py's category_mix
+
+### Fix
+
+- **scripts**: give F11 a sixth state for an unreadable manifest
+- **tests**: bound the row contract's remaining unbounded slots
+- **hooks**: simplify cleanup-detection regex instead of patching quote logic
+- **sentinel**: F11 signals its skip instead of a bare empty list
+- **scripts**: compare DH05's verdict against the cited recent baseline
+- **hooks**: apply rm's operand discipline to the find cleanup pattern
+- **tests**: bound the row contract's Conditional/Invocation slots and assert the Rule budget
+- **scripts**: guard capture_session import in check_agent_lifecycle_pairing (rework of Step 8a)
+- **sentinel**: move P03 dispatch from LLM judgment to auto mapping rule
+- **hooks**: tighten promote_learnings.py cleanup-pattern precision
+- **codex**: repoint the pipeline adapter at the relocated agent roster
+- **docs**: one writer for PROGRESS.md across every surface (td-193)
+- **state**: ledger-gate the calibration log, make the judge cache local-only
+
+### Refactor
+
+- **sentinel**: collapse AC13's row to the extraction contract's four parts
+- **rules**: relocate the agent roster out of always-loaded context
+
 ## v0.30.0 (2026-09-08)
 
 ### Feat

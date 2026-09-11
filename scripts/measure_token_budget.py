@@ -439,49 +439,23 @@ def _extract_description(frontmatter: str) -> str:
 _DISABLE_MODEL_INVOCATION_RE = re.compile(r"^disable-model-invocation:\s*true\s*$", re.M)
 
 
-def name_only_overrides(repo_root: Path) -> set[str]:
-    """Skill names the project settings list under `skillOverrides` as `name-only`.
-
-    Claude Code shows only the name for these -- their description leaves the
-    model-facing listing. Keys may carry the plugin namespace (`praxion:x`);
-    both forms are accepted. Read from `.claude/settings.json` and
-    `.claude/settings.local.json` (local wins on conflict, as in the harness).
-    """
-    names: set[str] = set()
-    for rel in (".claude/settings.json", ".claude/settings.local.json"):
-        path = repo_root / rel
-        if not path.is_file():
-            continue
-        try:
-            overrides = json.loads(path.read_text(encoding="utf-8")).get("skillOverrides", {})
-        except (OSError, ValueError):
-            continue
-        for key, mode in overrides.items():
-            if mode == "name-only":
-                names.add(key.split(":", 1)[-1])
-    return names
-
-
-def measure_listing(
-    repo_root: Path, *, api_key: str | None = None, honor_overrides: bool = True
-) -> dict:
+def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
     """Measure the listing surface as the model sees it: `description:` frontmatter only,
-    minus entries `disable-model-invocation: true` removes outright, and with
-    `skillOverrides` name-only skills contributing their name instead of a description."""
+    minus entries `disable-model-invocation: true` removes outright.
+
+    Deliberately blind to `skillOverrides` in settings (td-197): an instrument that
+    reads the same configuration as the thing it measures cannot confirm the
+    configuration took effect, and the `name-only` form was shown inert on two
+    independent instruments. Crediting it once reported 7,936 tokens for a listing
+    that measured 9,243 -- so this reading refuses to bank any override and reports
+    the corpus the harness demonstrably renders."""
     files = listing_files(repo_root)
-    # `honor_overrides=False` measures what the model sees if Claude Code ignores the
-    # `skillOverrides` key form written to settings -- the ratchet uses that reading
-    # until the baseline records `listing_overrides_verified: true` (checked live).
-    name_only = name_only_overrides(repo_root) if honor_overrides else set()
     descriptions = []
     for f in files:
         frontmatter = _frontmatter_block(f.read_text(encoding="utf-8"))
         if frontmatter is None:
             continue
         if _DISABLE_MODEL_INVOCATION_RE.search(frontmatter):
-            continue
-        if f.name == "SKILL.md" and f.parent.name in name_only:
-            descriptions.append(f.parent.name)
             continue
         description = _extract_description(frontmatter)
         if description:
@@ -562,9 +536,7 @@ def ratchet(
     if baseline is None:
         return _ratchet_skip(f"no baseline file at {path}")
 
-    overrides_verified = bool(baseline.get("listing_overrides_verified", False))
-
-    listing = measure_listing(repo_root, api_key=api_key, honor_overrides=overrides_verified)
+    listing = measure_listing(repo_root, api_key=api_key)
     updated = _append_sample(
         baseline,
         today=today,
@@ -604,7 +576,6 @@ def ratchet(
         "governed_bytes": governed["bytes"],
         "listing_tokens": listing["tokens"],
         "listing_ceiling": listing_ceiling,
-        "listing_overrides_verified": overrides_verified,
         "notes": notes,
     }
 

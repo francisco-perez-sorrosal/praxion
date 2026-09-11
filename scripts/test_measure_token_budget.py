@@ -774,33 +774,20 @@ def test_listing_skips_disable_model_invocation_entries(tmp_path):
     assert reading["bytes"] == expected
 
 
-def test_listing_counts_name_only_overrides_as_their_name(tmp_path):
-    import json
-
-    from measure_token_budget import measure_listing, name_only_overrides
-
-    repo = _listing_repo(tmp_path)
-    (repo / ".claude" / "settings.json").write_text(
-        json.dumps({"skillOverrides": {"praxion:beta": "name-only"}})
-    )
-    assert name_only_overrides(repo) == {"beta"}
-    reading = measure_listing(repo)
-    expected = len(b"Alpha does alpha things when alpha is asked.\nbeta")
-    assert reading["bytes"] == expected
-
-
-def test_listing_ignores_overrides_when_not_honoured(tmp_path):
+def test_listing_never_credits_skill_overrides(tmp_path):
+    """td-197: a `skillOverrides` block in settings is configuration the instrument cannot
+    verify took effect (the harness ignores it), so it must not move the reading."""
     import json
 
     from measure_token_budget import measure_listing
 
     repo = _listing_repo(tmp_path)
+    before = measure_listing(repo)["bytes"]
     (repo / ".claude" / "settings.json").write_text(
-        json.dumps({"skillOverrides": {"praxion:beta": "name-only"}})
+        json.dumps({"skillOverrides": {"praxion:beta": "name-only", "alpha": "name-only"}})
     )
-    assumed = measure_listing(repo, honor_overrides=True)["bytes"]
-    floor = measure_listing(repo, honor_overrides=False)["bytes"]
-    assert floor > assumed
-    assert floor == len(
+    after = measure_listing(repo)["bytes"]
+    assert after == before
+    assert after == len(
         b"Alpha does alpha things when alpha is asked.\nBeta description that is fairly long and descriptive."
     )

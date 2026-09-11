@@ -20,7 +20,7 @@ input=$(cat)
 # POSIX mode, whose builtin echo interprets backslash escapes, so a command that
 # contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
 # every Python hook's json.loads fails silently -- td-188.
-if printf '%s\n' "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work|find[[:space:]]+.*\.ai-work.*-delete|clean\.work|clean-work'; then
+if printf '%s\n' "$input" | grep -qE 'rm[[:space:]]+.*\.ai-work|find[[:space:]]+.*\.ai-work.*-delete'; then
     printf '%s\n' "$input" | python3 "$1"
 else
     exit 0

@@ -158,6 +158,17 @@ def test_non_cleanup_command_never_fires_gate(tmp_path: Path, monkeypatch) -> No
         # True positives, unchanged.
         ("rm -rf .ai-work/x", True),
         ("rm -rf .ai-work/some-slug", True),
+        # Verifier probes (FAIL-3, rw-e31eec70): the find clause reintroduced
+        # the unanchored-wildcard class clean.work was deleted for (clause 1
+        # -- mere mention inside another command's quoted string must not
+        # fire; substring match on ".ai-work" inside a longer token must
+        # not fire), and the rm clause's missing path-prefix/quoting
+        # discipline silently dropped clause 2 (actual deletions with an
+        # absolute-path or quoted operand must fire).
+        ("echo 'run find .ai-work -delete to clean'", False),
+        ("find . -name '*.ai-workflow' -print -delete", False),
+        ("rm -rf /abs/path/.ai-work/slug", True),
+        ('rm -rf ".ai-work/slug"', True),
     ],
     ids=[
         "fp-confirm-in-grep",
@@ -168,6 +179,10 @@ def test_non_cleanup_command_never_fires_gate(tmp_path: Path, monkeypatch) -> No
         "tp-find-delete-with-flags",
         "tp-rm-rf-x",
         "tp-rm-rf-slug",
+        "fp-find-delete-mentioned-in-echo",
+        "fp-find-name-glob-ai-workflow-substring",
+        "tp-rm-rf-absolute-path-prefix",
+        "tp-rm-rf-quoted-operand",
     ],
 )
 def test_is_cleanup_command_precision(command: str, should_fire: bool) -> None:

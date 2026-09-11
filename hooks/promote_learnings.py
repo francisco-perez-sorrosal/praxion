@@ -16,24 +16,55 @@ from _hook_utils import record_gate_fire
 # Source-of-truth for cleanup detection. hooks/cleanup_gate.sh mirrors a looser
 # variant of these patterns for the PreToolUse fast-path; Python remains
 # authoritative. Keep in sync when editing either side.
+#
+# Both patterns share one operand shape: an optional leading quote, an
+# optional path prefix ending in "/", the literal ".ai-work", and an optional
+# "/<rest>" -- so a bare `.ai-work`, a quoted `".ai-work/slug"`, and an
+# absolute `/abs/path/.ai-work/slug` all count as targeting the directory,
+# while a longer token like `.ai-workflow` does not (the trailing lookahead
+# requires the operand to end at whitespace/end-of-string right after
+# ".ai-work" or its "/<rest>" suffix).
+_AI_WORK_OPERAND = r"[\"']?(?:\S*/)?\.ai-work(?:/\S*)?[\"']?(?=\s|$)"
+
 CLEANUP_PATTERNS = [
     # "rm" as its own shell word (preceded by start-of-string or a separator,
-    # never mid-word as in "confirm"), targeting ".ai-work" as its own
-    # whitespace-delimited operand (never a substring match, e.g. inside a
-    # quoted sentence) -- fixes the two reproduced false positives that fired
-    # on `grep ... .ai-work/` and `echo '... .ai-work ...'`.
-    r"(?:^|[;&|\s])rm\b(?:\s+\S+)*\s+\.ai-work(?:/\S*)?(?=\s|$)",
-    # `find .ai-work ... -delete` -- already matched by cleanup_gate.sh's
-    # fast-path grep but missing here, the authoritative source.
-    r"find\s+.*\.ai-work.*-delete",
+    # never mid-word as in "confirm"), targeting .ai-work as an operand.
+    rf"(?:^|[;&|\s])rm\b(?:\s+\S+)*\s+{_AI_WORK_OPERAND}",
+    # "find" as its own shell word, same operand discipline, followed
+    # eventually by "-delete". Loose `.*` wildcards here would reintroduce
+    # the substring-match false positive that `clean.work` was deleted for
+    # (e.g. matching ".ai-work" inside a `'*.ai-workflow'` glob argument).
+    rf"(?:^|[;&|\s])find\b(?:\s+\S+)*\s+{_AI_WORK_OPERAND}.*-delete",
 ]
 
 ENTRY_PREFIX = "- **["
 
 
+def _outside_quotes(command: str, index: int) -> bool:
+    """True if `index` is not inside a single- or double-quoted span.
+
+    Heuristic quote-balance check, not a shell parser: counts quote
+    characters before `index` and treats an odd count as "inside a quoted
+    string". Distinguishes a real invocation (`rm -rf ".ai-work/x"`, where
+    only the operand is quoted) from a mere mention embedded in another
+    command's quoted argument (`echo 'run find .ai-work -delete ...'`).
+    """
+    prefix = command[:index]
+    return prefix.count("'") % 2 == 0 and prefix.count('"') % 2 == 0
+
+
 def _is_cleanup_command(command: str) -> bool:
-    """Check if the command targets .ai-work/ for deletion."""
-    return any(re.search(p, command) for p in CLEANUP_PATTERNS)
+    """Check if the command targets .ai-work/ for deletion.
+
+    A pattern match only counts when the "rm"/"find" keyword itself sits
+    outside any quoted span -- a match entirely inside a quote (e.g. text
+    passed to `echo`) is a mention, not an invocation.
+    """
+    return any(
+        _outside_quotes(command, m.start())
+        for pattern in CLEANUP_PATTERNS
+        for m in re.finditer(pattern, command)
+    )
 
 
 def _count_entries(content: str) -> int:

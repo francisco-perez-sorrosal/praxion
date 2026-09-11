@@ -185,13 +185,23 @@ verified against both the trunk set and the Python leaf's superset.
 markdown backticks of `` `.ai-state/` `` / `` `.ai-work/` `` stripped — the backticks are
 table formatting, not part of the component's name.
 
-**One group declares `integration_boundaries`.** `decision-records` names `knowledge-projection`,
+**Two groups declare `integration_boundaries`.** `decision-records` names `knowledge-projection`,
 populated by the `adr-living-view` pipeline: `rules/swe/adr-conventions.md` and
 `skills/software-planning/references/adr-authoring-protocols.md` are `decision-records`
 `file_dependencies` *and* match `knowledge-projection`'s `rules/**/*.md` / `skills/**/*.md`
 globs, and `agents/sentinel.md`'s DL/DH rows are behavioural consumers of `scripts/adr_health.py`.
-A change to the ADR schema therefore has a radius neither group's own selectors cover. Every
-other group omits the field. It is planner-owned, optional in the
+A change to the ADR schema therefore has a radius neither group's own selectors cover.
+`repo-gates` names `architecture-fitness` and `state-ledgers`, populated by the
+`process-economy-p2-1` pipeline: `repo-gates`' own `file_dependencies` already include
+`agents/*.md` and `.pre-commit-config.yaml`, so its selectors correctly re-fire on a sentinel-row
+or pre-commit-wiring edit — but `architecture-fitness` runs as a **separate CI job outside
+`testpaths`** (see the coverage-invariant note above) and will not, so a row edit that removes a
+`` python3 scripts/<name>.py `` phrase can silently shrink
+`fitness/tests/test_gate_canary_coverage.py::_delegated_gates`'s canary-coverage scope without
+`repo-gates`' own run ever seeing it; `state-ledgers` is named because a new `agents/sentinel.md`-
+invoked script that parses `.ai-state/observations.jsonl` (or imports `hooks/capture_session.py`'s
+correlation constants) depends on the WAL schema `state-ledgers` governs, a coupling `repo-gates`'
+own selectors do not express. Every other group omits the field. It is planner-owned, optional in the
 trunk schema ("0 or more entries"), and populates lazily when a real pipeline discovers actual
 cross-group coupling — guessed boundaries would be indistinguishable from measured ones the
 moment they were written. Omission, not `[]`, is how that zero state is written, for a
@@ -462,6 +472,9 @@ file_dependencies:
   - "claude/aac-templates/**"
   - ".pre-commit-config.yaml"
   - "pyproject.toml"
+integration_boundaries:
+  - architecture-fitness
+  - state-ledgers
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:

@@ -1,7 +1,7 @@
 ---
-id: dec-draft-6b1c73e0
+id: dec-380
 title: Sentinel check extraction contract — three destinations, no new file
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-09
 summary: A sentinel `A`-typed check row keeps a fixed four-part shape (Conditional · Invocation · Verdict map · Spec pointer) whose whole Pass column must parse against that shape, with the verdict map budgeted at ≤300 bytes; rationale moves to the script's module docstring, golden bad-cases to the canary test, and reporting discipline to the script's `--json` output — never to a new reference file.

@@ -9,6 +9,11 @@
 #
 # Activate once with `pre-commit install` (install_claude.sh runs this). Bump
 # rev: pins in lock-step with the project-baseline asset.
+#
+# `default_install_hook_types` makes a plain `pre-commit install` register the
+# commit-msg stage too (Block L below); without it that gate is configured but
+# never runs, which is the dead-gate shape check_gate_liveness exists to catch.
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
   # --- UNIVERSAL (mirrors the shipped canonical baseline) ----------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -377,3 +382,16 @@ repos:
         language: system
         files: '^(\.ai-state/observations\.jsonl|scripts/check_agent_lifecycle_pairing\.py)$'
         pass_filenames: false
+
+      # Block L — no AI-authorship trailer (td-196). Blocking, on the commit-msg
+      # stage: the message file is the single positional argument pre-commit
+      # passes for that stage. The rule lives in rules/swe/vcs/git-conventions.md
+      # and was prose-only; subagents receive a session-level instruction that
+      # presents the trailer as mandated and prose loses that contest, so two of
+      # 21 pipeline commits shipped one. Stdlib-only script: liveness under any
+      # interpreter pre-commit resolves.
+      - id: no-ai-authorship-trailer
+        name: Commit message carries no AI-authorship trailer
+        entry: python3 scripts/check_commit_msg_authorship.py
+        language: system
+        stages: [commit-msg]

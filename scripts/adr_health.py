@@ -61,6 +61,13 @@ to reverse, and re-firing on it every run would just be noise. Without git
 history the deletion index cannot answer, so no re-open candidates are
 offered at all (withheld, not defaulted to silence).
 
+Also reports `category_mix`: whether a decision changed the component
+inventory is not derivable from its frontmatter, so the `architectural` test
+cannot be checked here -- only its *effect* can be watched, against the
+adoption baseline recorded in `adr-authoring-protocols.md`. A measurement,
+not a threshold: inventing a cutoff would be a number with no evidence
+behind it.
+
 Invoked by the sentinel's DH dimension (`--json`); also runnable standalone.
 Exit code is always 0 -- this reports, it does not gate.
 
@@ -153,10 +160,10 @@ _ADOPTION_ID = 318
 # Measured the day the falsifiable test landed (dec-318): the corpus as a whole
 # was 72% `architectural` (227/317), while the 50 decisions immediately
 # preceding adoption were already trending to 84% -- the widening `verdict`
-# exists to detect a return to. `corpus` is what `_category_mix_verdict`
-# compares `post_adoption.architectural_share` against; `recent` is retained
-# purely as reported context, per `adr-authoring-protocols.md § The
-# \`architectural\` Test`.
+# exists to detect a return to. `recent` is what `_category_mix_verdict`
+# compares `post_adoption.architectural_share` against, per
+# `adr-authoring-protocols.md § The architectural Test`; `corpus` is
+# retained purely as reported context.
 _ARCHITECTURAL_BASELINE = {
     "corpus": 0.72,
     "recent": 0.84,
@@ -615,14 +622,18 @@ def _category_mix_verdict(post_adoption: dict) -> str:
     window, *regardless of the share* -- a sample that small cannot evidence
     either "the test discriminates" or "the test is widening", so the share is
     not consulted at all until enough decisions have been authored under the
-    rule. Once `n` clears the window, `widening` at-or-above the baseline
-    mirrors the row's own "at or above it, flag as Suggested" wording -- a share
-    equal to the pre-adoption trend is not evidence the trend reversed.
+    rule. Once `n` clears the window, the comparison is against
+    `_ARCHITECTURAL_BASELINE["recent"]` (84%), not `["corpus"]` (72%):
+    `adr-authoring-protocols.md § The architectural Test` states "a later run
+    showing the recent share below 84% is the test working, and a run at or
+    above it is the test being ignored" -- `corpus` is the wider-history
+    reference point the same section reports alongside it, not the verdict
+    boundary.
     """
     if post_adoption["n"] < _RECENT_WINDOW:
         return "insufficient-n"
     share = post_adoption["architectural_share"]
-    if share is not None and share >= _ARCHITECTURAL_BASELINE["corpus"]:
+    if share is not None and share >= _ARCHITECTURAL_BASELINE["recent"]:
         return "widening"
     return "discriminating"
 

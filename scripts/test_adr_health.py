@@ -527,6 +527,14 @@ def _post_adoption_adrs(repo: Path, n: int, *, category: str) -> None:
         _adr(repo, adr_health._ADOPTION_ID + 1 + i, category=category)
 
 
+def _post_adoption_adrs_mixed(repo: Path, n_architectural: int, n_other: int) -> None:
+    """Write a post-adoption window mixing categories, for an in-band share."""
+    for i in range(n_architectural):
+        _adr(repo, adr_health._ADOPTION_ID + 1 + i, category="architectural")
+    for i in range(n_other):
+        _adr(repo, adr_health._ADOPTION_ID + 1 + n_architectural + i, category="implementation")
+
+
 def test_verdict_is_insufficient_n_below_the_recent_window_even_if_share_would_discriminate(
     repo: Path,
 ) -> None:
@@ -553,6 +561,24 @@ def test_verdict_is_discriminating_when_post_adoption_share_is_below_the_baselin
     _post_adoption_adrs(repo, adr_health._RECENT_WINDOW, category="implementation")
     mix = adr_health.classify(repo)["category_mix"]
     assert mix["post_adoption"]["architectural_share"] == 0.0
+    assert mix["verdict"] == "discriminating"
+
+
+def test_verdict_pins_the_recent_baseline_not_the_wider_corpus_one(repo: Path) -> None:
+    """FAIL-4 (rw-a629c016): the verdict boundary is `recent` (84%), not `corpus` (72%).
+
+    `_ARCHITECTURAL_BASELINE["corpus"]` and `["recent"]` differ (0.72 vs
+    0.84); the two golden cases above use shares of 0.0 and 1.0, which
+    classify identically under either value -- the divergence was invisible
+    to CI. A share of 0.78 sits strictly between the two: below the cited
+    `recent` boundary (discriminating, the test is working) but at-or-above
+    the `corpus` one (would misread as widening). Pins the comparison to the
+    boundary `adr-authoring-protocols.md § The architectural Test` actually
+    states.
+    """
+    _post_adoption_adrs_mixed(repo, n_architectural=39, n_other=11)  # share=0.78
+    mix = adr_health.classify(repo)["category_mix"]
+    assert mix["post_adoption"]["architectural_share"] == 0.78
     assert mix["verdict"] == "discriminating"
 
 

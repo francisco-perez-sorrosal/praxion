@@ -32,6 +32,7 @@ import sys
 from pathlib import Path
 
 import check_doc_manifest_freshness as cdmf
+import pytest
 
 _T1 = "2026-01-01T00:00:00+00:00"
 _T2 = "2026-01-02T00:00:00+00:00"
@@ -130,6 +131,63 @@ def test_unparseable_generated_at_signals_a_skip_not_an_empty_list(tmp_path: Pat
         "reason": "generated-at-unparseable",
         "detail": cdmf.MANIFEST_REL,
     }
+    assert report["findings"] == []
+
+
+def test_non_utf8_manifest_signals_a_skip_not_a_traceback(tmp_path: Path) -> None:
+    """Sixth-state canary (rework rw-00594c26): a manifest whose bytes are not
+    valid UTF-8 raises `UnicodeDecodeError` from `read_text`, a `ValueError`
+    subclass `main`'s `except OSError` never caught pre-fix -- a raw
+    traceback and exit 1 for a `--json` consumer. Bites before this fix
+    (`report["skipped"]` would never be reached at all).
+    """
+    manifest_path = tmp_path / cdmf.MANIFEST_REL
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_bytes(b"generated_at: '\xff\xfe\x00\x01not-utf8'\n")
+
+    report = cdmf.run_f11(tmp_path)
+
+    assert report["skipped"]["reason"] == "manifest-unreadable"
+    assert cdmf.MANIFEST_REL in report["skipped"]["detail"]
+    assert report["findings"] == []
+
+
+def test_non_utf8_manifest_cli_emits_well_formed_json(tmp_path: Path) -> None:
+    """Same defect, through the CLI: `--json` must never hand a consumer empty
+    stdout or a traceback -- exit 0 (a skip is never a finding) with a
+    well-formed envelope on stdout.
+    """
+    manifest_path = tmp_path / cdmf.MANIFEST_REL
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_bytes(b"generated_at: '\xff\xfe\x00\x01not-utf8'\n")
+
+    rc = _run_cli(tmp_path, "--json")
+
+    assert rc.returncode == 0
+    assert rc.stdout.strip() != ""
+    assert '"manifest-unreadable"' in rc.stdout
+
+
+def test_unreadable_mode_manifest_signals_a_skip_not_empty_stdout(tmp_path: Path) -> None:
+    """Sixth-state canary (rework rw-00594c26): a `0o000` manifest raises
+    `PermissionError` (an `OSError`), which pre-fix `main` caught and turned
+    into `sys.exit(0)` with **no JSON printed at all** -- worse for a
+    `--json` consumer than the bare `[]` this rework replaced. Bites before
+    this fix (`report["skipped"]` would never be reached; `run_f11` itself
+    raised).
+    """
+    if os.geteuid() == 0:
+        pytest.skip("root ignores file modes; the unreadable-file shape cannot be built")
+    manifest_path = tmp_path / cdmf.MANIFEST_REL
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(f"generated_at: '{_T1}'\n", encoding="utf-8")
+    manifest_path.chmod(0o000)
+    try:
+        report = cdmf.run_f11(tmp_path)
+    finally:
+        manifest_path.chmod(0o644)  # restore so tmp_path teardown can remove it
+
+    assert report["skipped"]["reason"] == "manifest-unreadable"
     assert report["findings"] == []
 
 

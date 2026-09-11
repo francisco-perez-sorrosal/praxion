@@ -36,8 +36,8 @@ This is a faithful transcription of F11's documented procedure
 a deliberately deferred improvement, recorded in this pipeline's
 `LEARNINGS.md`.
 
-`run_f11` can land in **five** states, and they are not all the same kind of
-thing. Three are genuine skips -- the check was asked to examine reality and
+`run_f11` can land in **six** states, and they are not all the same kind of
+thing. Four are genuine skips -- the check was asked to examine reality and
 could not, so `--json` carries a `skipped` tagged union
 (`{"reason": ..., "detail": ...}`, matching `check_adr_reciprocity.py`'s
 `_skipped_report` shape) rather than an empty findings list a consumer cannot
@@ -45,10 +45,25 @@ tell apart from "ran and found nothing":
 
 - `manifest-absent` -- the manifest is designed to be absent sometimes (it is
   *generated*, never hand-edited); this is the row's own Conditional clause.
-- `generated-at-unparseable` -- the manifest exists but its one load-bearing
-  field is corrupt; a degraded state, not the expected-absence above.
+- `manifest-unreadable` -- the manifest exists (`is_file()` is true) but its
+  bytes could not be turned into a report: a non-UTF-8 encoding
+  (`UnicodeDecodeError`) or an OS-level read failure such as a `0o000` mode
+  (`PermissionError`). Distinct from `manifest-absent` -- "the file is not
+  there" and "the file is there and I cannot read it" are different facts for
+  a `--json` consumer, and collapsing them would make the second look like
+  the design-expected first.
+- `generated-at-unparseable` -- the manifest was read successfully but its
+  one load-bearing field is corrupt; a degraded state, not an unreadable one.
 - `git-unanswerable` -- git itself could not answer (no repository, no
   history for the scanned paths); an environment problem, not a manifest one.
+
+The read that can raise `manifest-unreadable` is caught at its own call
+site, inside `run_f11`, rather than left to an outer handler in `main`: this
+is what makes `run_f11` **total** -- every path through it returns one of the
+six well-formed states below, so `--json` can never hand a consumer an empty
+stdout or a bare traceback. `main`'s own `except OSError` is a last-resort
+backstop for failures outside `run_f11` (e.g. `resolve_repo_root`), not the
+mechanism this envelope's well-formedness depends on.
 
 The other two states are NOT skips -- the check ran to completion and
 concluded there is nothing to flag, which is a real (if boring) answer:
@@ -199,6 +214,7 @@ def _report(findings: list[dict]) -> dict:
 # -- Core detection -------------------------------------------------------------
 
 _SKIP_MANIFEST_ABSENT = "manifest-absent"
+_SKIP_MANIFEST_UNREADABLE = "manifest-unreadable"
 _SKIP_GENERATED_AT_UNPARSEABLE = "generated-at-unparseable"
 _SKIP_GIT_UNANSWERABLE = "git-unanswerable"
 
@@ -208,13 +224,21 @@ def run_f11(repo_root: Path) -> dict:
     reality, else `findings` -- a single WARN when the manifest predates the
     newest add/delete/rename under `docs/` or `.ai-state/`, else `[]`.
 
-    See the module docstring for the five-state partition this implements.
+    Total over its input: every return statement below produces a
+    well-formed envelope, so no exception raised while examining the
+    manifest or the repository ever escapes to a caller. See the module
+    docstring for the six-state partition this implements.
     """
     manifest_path = repo_root / MANIFEST_REL
     if not manifest_path.is_file():
         return _skipped_report(_SKIP_MANIFEST_ABSENT, MANIFEST_REL)
 
-    generated_at = _generated_at(manifest_path.read_text(encoding="utf-8"))
+    try:
+        manifest_text = manifest_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return _skipped_report(_SKIP_MANIFEST_UNREADABLE, f"{MANIFEST_REL}: {exc}")
+
+    generated_at = _generated_at(manifest_text)
     if generated_at is None:
         return _skipped_report(_SKIP_GENERATED_AT_UNPARSEABLE, MANIFEST_REL)
 

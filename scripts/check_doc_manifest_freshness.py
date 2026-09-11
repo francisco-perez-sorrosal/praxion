@@ -36,17 +36,41 @@ This is a faithful transcription of F11's documented procedure
 a deliberately deferred improvement, recorded in this pipeline's
 `LEARNINGS.md`.
 
+`run_f11` can land in **five** states, and they are not all the same kind of
+thing. Three are genuine skips -- the check was asked to examine reality and
+could not, so `--json` carries a `skipped` tagged union
+(`{"reason": ..., "detail": ...}`, matching `check_adr_reciprocity.py`'s
+`_skipped_report` shape) rather than an empty findings list a consumer cannot
+tell apart from "ran and found nothing":
+
+- `manifest-absent` -- the manifest is designed to be absent sometimes (it is
+  *generated*, never hand-edited); this is the row's own Conditional clause.
+- `generated-at-unparseable` -- the manifest exists but its one load-bearing
+  field is corrupt; a degraded state, not the expected-absence above.
+- `git-unanswerable` -- git itself could not answer (no repository, no
+  history for the scanned paths); an environment problem, not a manifest one.
+
+The other two states are NOT skips -- the check ran to completion and
+concluded there is nothing to flag, which is a real (if boring) answer:
+
+- no qualifying add/delete/rename commit exists to compare the manifest
+  against;
+- the manifest is genuinely fresh.
+
+Both return `skipped: None, findings: []` -- "ran and found nothing" is one
+value, reused; "could not run" is a different value, never collapsed into it.
+
 Invocation:
 
     check_doc_manifest_freshness.py                  # human-readable summary
-    check_doc_manifest_freshness.py --json           # machine-readable JSON array
+    check_doc_manifest_freshness.py --json           # machine-readable JSON envelope
     check_doc_manifest_freshness.py --check          # exit 1 when any finding, else 0
     check_doc_manifest_freshness.py --repo-root DIR  # operate on another checkout (tests)
 
 Exit code: 0 by default (advisory, WARN-only). With --check, 1 when >=1
-finding is present. Always 0 when the manifest is absent, or when git cannot
-answer (no repository, no history for the scanned paths).
-Exit code 2 when the resolved root is a plugin-cache path.
+finding is present -- a skip is never a finding, so --check exits 0 on every
+skip regardless of reason. Exit code 2 when the resolved root is a
+plugin-cache path.
 
 Invoked by the sentinel's F dimension (`--json`); also runnable standalone.
 
@@ -116,18 +140,17 @@ def _self_commit_sha(repo_root: Path) -> str | None:
     return git_output(repo_root, "log", "-1", "--format=%H", "--", MANIFEST_REL, logger=logger)
 
 
-def _newest_indexed_set_change(
-    repo_root: Path, self_sha: str | None
-) -> tuple[str, datetime] | None:
-    """Return `(sha, committer_date)` of the newest add/delete/rename touching
-    `docs/` or `.ai-state/`, excluding `self_sha`, or None if none exists.
+def _commit_log(repo_root: Path) -> str | None:
+    """Return the raw `git log` text for adds/deletes/renames under the scanned
+    paths, or None if git could not answer at all (no repository, or any other
+    failure `git_output` swallows).
 
-    `self_sha` is excluded by direct sha comparison (exclusion 1 above), never
-    by narrowing the scanned paths -- the manifest's own regeneration commit
-    can legitimately also add or rename a `docs/` page in the same commit, and
-    a path-based exclusion would not catch that case.
+    Kept separate from `_newest_indexed_set_change` so "git could not answer"
+    (a skip) and "git answered, no qualifying commit in the answer" (a clean
+    result) are two distinct return values instead of one `None` standing for
+    both -- exactly the collapse this envelope exists to avoid.
     """
-    log = git_output(
+    return git_output(
         repo_root,
         "log",
         "--diff-filter=ADR",
@@ -136,8 +159,17 @@ def _newest_indexed_set_change(
         *_SCANNED_PATHS,
         logger=logger,
     )
-    if log is None:
-        return None
+
+
+def _newest_indexed_set_change(log: str, self_sha: str | None) -> tuple[str, datetime] | None:
+    """Return `(sha, committer_date)` of the newest add/delete/rename in `log`,
+    excluding `self_sha`, or None if none exists.
+
+    `self_sha` is excluded by direct sha comparison (exclusion 1 above), never
+    by narrowing the scanned paths -- the manifest's own regeneration commit
+    can legitimately also add or rename a `docs/` page in the same commit, and
+    a path-based exclusion would not catch that case.
+    """
     for line in log.splitlines():
         sha, _, date_str = line.partition(" ")
         if not sha or sha == self_sha:
@@ -148,50 +180,72 @@ def _newest_indexed_set_change(
     return None
 
 
+# -- Envelope -------------------------------------------------------------------
+
+
+def _skipped_report(reason: str, detail: str) -> dict:
+    """The tagged-union skip envelope -- shape matches
+    `check_adr_reciprocity.py::_skipped_report`, generalized to `detail` since
+    F11's three skip reasons don't all name a filesystem path.
+    """
+    return {"check": CHECK_ID, "skipped": {"reason": reason, "detail": detail}, "findings": []}
+
+
+def _report(findings: list[dict]) -> dict:
+    """The clean envelope: the check ran to completion, `findings` is the answer."""
+    return {"check": CHECK_ID, "skipped": None, "findings": findings}
+
+
 # -- Core detection -------------------------------------------------------------
 
+_SKIP_MANIFEST_ABSENT = "manifest-absent"
+_SKIP_GENERATED_AT_UNPARSEABLE = "generated-at-unparseable"
+_SKIP_GIT_UNANSWERABLE = "git-unanswerable"
 
-def run_f11(repo_root: Path) -> list[dict]:
-    """Return a single WARN finding when the manifest predates the newest
-    add/delete/rename under `docs/` or `.ai-state/`, else `[]`.
 
-    Skips silently (returns `[]`) when the manifest is absent, unreadable,
-    its `generated_at` does not parse, git cannot answer, or no qualifying
-    commit exists to compare against -- every one of those is "nothing to
-    report", not a finding of its own.
+def run_f11(repo_root: Path) -> dict:
+    """Return F11's envelope: `skipped` when the check could not examine
+    reality, else `findings` -- a single WARN when the manifest predates the
+    newest add/delete/rename under `docs/` or `.ai-state/`, else `[]`.
+
+    See the module docstring for the five-state partition this implements.
     """
     manifest_path = repo_root / MANIFEST_REL
     if not manifest_path.is_file():
-        logger.info("F11 skip: %s absent", MANIFEST_REL)
-        return []
+        return _skipped_report(_SKIP_MANIFEST_ABSENT, MANIFEST_REL)
 
     generated_at = _generated_at(manifest_path.read_text(encoding="utf-8"))
     if generated_at is None:
-        logger.warning("F11 skip: %s has no parseable generated_at", MANIFEST_REL)
-        return []
+        return _skipped_report(_SKIP_GENERATED_AT_UNPARSEABLE, MANIFEST_REL)
 
     self_sha = _self_commit_sha(repo_root)
-    candidate = _newest_indexed_set_change(repo_root, self_sha)
+    log = _commit_log(repo_root)
+    if log is None:
+        return _skipped_report(_SKIP_GIT_UNANSWERABLE, " ".join(_SCANNED_PATHS))
+
+    candidate = _newest_indexed_set_change(log, self_sha)
     if candidate is None:
-        return []
+        return _report([])
 
     sha, committer_date = candidate
     if generated_at >= committer_date:
-        return []
+        return _report([])
 
-    return [
-        {
-            "check": CHECK_ID,
-            "severity": SEVERITY,
-            "entity": MANIFEST_REL,
-            "message": (
-                f"{MANIFEST_REL}: generated_at={generated_at.isoformat()} predates "
-                f"{sha[:12]} ({committer_date.isoformat()}), which added, deleted, or "
-                "renamed a docs/ or .ai-state/ surface -- run "
-                "`python3 scripts/build_doc_manifest.py` to refresh"
-            ),
-        }
-    ]
+    return _report(
+        [
+            {
+                "check": CHECK_ID,
+                "severity": SEVERITY,
+                "entity": MANIFEST_REL,
+                "message": (
+                    f"{MANIFEST_REL}: generated_at={generated_at.isoformat()} predates "
+                    f"{sha[:12]} ({committer_date.isoformat()}), which added, deleted, or "
+                    "renamed a docs/ or .ai-state/ surface -- run "
+                    "`python3 scripts/build_doc_manifest.py` to refresh"
+                ),
+            }
+        ]
+    )
 
 
 # -- CLI --------------------------------------------------------------------------
@@ -222,7 +276,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _format_human(findings: list[dict]) -> str:
+def _format_human(report: dict) -> str:
+    if report["skipped"] is not None:
+        return f"check_doc_manifest_freshness: skipped ({report['skipped']['reason']})"
+    findings = report["findings"]
     if not findings:
         return "check_doc_manifest_freshness: no F11 violations found."
     lines = [f"F11 ({len(findings)} finding(s)):"]
@@ -237,16 +294,17 @@ def _run(args: argparse.Namespace) -> int:
         logger.error("Refusing to operate on plugin-cache path: %s", repo_root)
         return 2
 
-    findings = run_f11(repo_root)
+    report = run_f11(repo_root)
+    findings = report["findings"]
 
     if args.json:
-        print(json.dumps(findings, indent=2))
+        print(json.dumps(report, indent=2))
     else:
-        report = _format_human(findings)
+        text = _format_human(report)
         if findings:
-            print(report, file=sys.stderr)
+            print(text, file=sys.stderr)
         else:
-            print(report)
+            print(text)
 
     return 1 if (args.check and findings) else 0
 

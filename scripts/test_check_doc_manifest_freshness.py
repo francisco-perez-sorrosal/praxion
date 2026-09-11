@@ -15,6 +15,13 @@ add/delete/rename under `docs/` or `.ai-state/` must WARN; a commit that only
 edits the body of an already-indexed file must not; the manifest's own
 regeneration commit (which routinely also touches `docs/` in the same commit)
 must not.
+
+The three skip-state tests below are this rework's own canary: before it,
+`run_f11` returned a bare `[]` for all three states (and for the two clean
+states), so a consumer could not tell "could not run" from "ran and found
+nothing". `test_missing_manifest_signals_a_skip_not_an_empty_list` fails
+against that pre-fix shape -- `report["skipped"]` does not exist on a list --
+which is the non-vacuity proof: this canary bites the defect it is named for.
 """
 
 from __future__ import annotations
@@ -100,19 +107,44 @@ def _run_cli(tmp_path: Path, *extra_args: str) -> subprocess.CompletedProcess[st
     )
 
 
-# -- Absent / unparseable substrate -------------------------------------------
+# -- Skip states: could not examine reality, signalled via `skipped` ----------
 
 
-def test_missing_manifest_is_a_skip_not_a_finding(tmp_path: Path) -> None:
+def test_missing_manifest_signals_a_skip_not_an_empty_list(tmp_path: Path) -> None:
     _init_repo(tmp_path)
-    assert cdmf.run_f11(tmp_path) == []
+
+    report = cdmf.run_f11(tmp_path)
+
+    assert report["skipped"] == {"reason": "manifest-absent", "detail": cdmf.MANIFEST_REL}
+    assert report["findings"] == []
 
 
-def test_unparseable_generated_at_is_a_skip_not_a_finding(tmp_path: Path) -> None:
+def test_unparseable_generated_at_signals_a_skip_not_an_empty_list(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     _write_manifest(tmp_path, "not-a-timestamp")
     _commit(tmp_path, "chore: add manifest", _T1)
-    assert cdmf.run_f11(tmp_path) == []
+
+    report = cdmf.run_f11(tmp_path)
+
+    assert report["skipped"] == {
+        "reason": "generated-at-unparseable",
+        "detail": cdmf.MANIFEST_REL,
+    }
+    assert report["findings"] == []
+
+
+def test_no_git_repository_signals_a_skip_not_an_empty_list(tmp_path: Path) -> None:
+    """A readable, parseable manifest sitting outside any git repository is the
+    concrete `git-unanswerable` case -- `git log` cannot answer for a directory
+    that is not a repository at all, distinct from "answered, nothing found".
+    """
+    (tmp_path / cdmf.MANIFEST_REL).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / cdmf.MANIFEST_REL).write_text(f"generated_at: '{_T1}'\n", encoding="utf-8")
+
+    report = cdmf.run_f11(tmp_path)
+
+    assert report["skipped"] == {"reason": "git-unanswerable", "detail": "docs/ .ai-state/"}
+    assert report["findings"] == []
 
 
 # -- Golden bad-case -----------------------------------------------------------
@@ -122,8 +154,10 @@ def test_stale_manifest_warns_naming_the_offending_commit(tmp_path: Path) -> Non
     """Golden bad-case: generated_at predates a later commit that ADDS a docs/ page."""
     self_sha, newer_sha = _build_stale_repo(tmp_path)
 
-    findings = cdmf.run_f11(tmp_path)
+    report = cdmf.run_f11(tmp_path)
 
+    assert report["skipped"] is None
+    findings = report["findings"]
     assert len(findings) == 1
     finding = findings[0]
     assert finding["check"] == "F11"
@@ -151,7 +185,7 @@ def test_body_only_edit_to_already_indexed_file_does_not_warn(tmp_path: Path) ->
     _write(tmp_path, "docs/existing.md", "# Existing (edited body)\n")
     _commit(tmp_path, "docs: reword existing page", _T3)
 
-    assert cdmf.run_f11(tmp_path) == []
+    assert cdmf.run_f11(tmp_path) == {"check": "F11", "skipped": None, "findings": []}
 
 
 # -- Inverse guard 2: the manifest's own regeneration commit --------------------
@@ -163,13 +197,16 @@ def test_manifest_own_regeneration_commit_does_not_warn_even_though_it_touches_d
     """The manifest's own regeneration commit is excluded by sha, not by path -- even
     when that same commit also adds a docs/ page (the builder stamps generated_at
     *before* the commit, so a naive unexcluded comparison would false-positive here).
+
+    This is also the "no qualifying commit" clean state: once the self-commit is
+    excluded, nothing remains to compare against -- a real, non-skip answer.
     """
     _init_repo(tmp_path)
     _write_manifest(tmp_path, "2025-12-31T23:59:00+00:00")  # stamped before the commit
     _write(tmp_path, "docs/rendered-page.md", "# Rendered\n")
     _commit(tmp_path, "chore: regenerate doc manifest", _T1)
 
-    assert cdmf.run_f11(tmp_path) == []
+    assert cdmf.run_f11(tmp_path) == {"check": "F11", "skipped": None, "findings": []}
 
 
 # -- CLI contract: advisory by default -------------------------------------------

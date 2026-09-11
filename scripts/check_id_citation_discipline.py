@@ -51,7 +51,21 @@ from _git_runner import run_git
 # directory, not on sys.path by default -- add it, mirroring the reverse
 # direction hooks/remind_calibration.py already uses for scripts/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
-from _hook_utils import record_gate_fire  # noqa: E402
+try:
+    from _hook_utils import record_gate_fire  # noqa: E402
+except ImportError:
+    # `commands/decontaminate-ids.md` runs this script under the ambient
+    # `python3`, and a PATH-installed or plugin-cache copy has no `hooks/`
+    # sibling to resolve. A raw traceback there reads as a crash and gets
+    # ignored, so the gate would die on import and catch nothing
+    # (check_gate_liveness GL05). Name the cause and the fix instead.
+    sys.exit(
+        "check_id_citation_discipline: hooks/_hook_utils.py is not importable "
+        f"under {sys.executable}.\n"
+        "  Run it from a Praxion checkout that still has its hooks/ sibling "
+        "directory, e.g. `uv run python scripts/check_id_citation_discipline.py` "
+        "from the repo root."
+    )
 
 CODE_EXTENSIONS = frozenset(
     {

@@ -21,6 +21,13 @@ part -- fails the match instead of silently defaulting to zero. See `_row_patter
 the shape and the module-level comment above `_VERDICT_MAP_MAX_BYTES` for the budget's
 derivation.
 
+A verdict-map budget alone does not close the row: the two mandated template parts that
+wrap it -- the Conditional's path slot and the Invocation's backtick span -- are each
+themselves explicitly bounded (`_CONDITIONAL_PATH_MAX_CHARS`, `_INVOCATION_FLAGS_MAX_CHARS`),
+so padding cannot grow the row by riding inside a part the verdict-map budget doesn't
+measure. The Rule/claim cell carries its own separate `_RULE_MAX_CHARS` budget, asserted
+directly rather than left as unenforced prose.
+
 `EXTRACTED_CHECKS` is append-only: entries are never removed or reordered, only added,
 one per extraction step.
 
@@ -63,12 +70,26 @@ _TABLE_ROW = re.compile(r"^\|\s*(?P<id>[A-Za-z0-9]+)\s*\|.*\|\s*$", re.M)
 # optionally qualified by a parenthetical (e.g. "(either lifecycle stage)"), then
 # `; skip with a(n) <D>-dimension INFO note.` -- per the folded-sentence template
 # `SYSTEMS_PLAN.md § The Extraction Contract` now specifies (amended in this commit to
-# match the three live rows, which never wrote the split two-sentence form). Bounded by
-# its own closing anchor rather than an open `.*?\.\s`, so padding cannot ride along
-# inside it disguised as path text -- see `_row_pattern`.
+# match the three live rows, which never wrote the split two-sentence form). An open
+# `.+? present` anchor is *not* a bound: a non-greedy quantifier still backtracks past
+# arbitrary padding to find a later "present", so the path slot needs its own explicit
+# ceiling, not just a closing phrase to search for -- see `_CONDITIONAL_PATH_MAX_CHARS`
+# and `_row_pattern`.
+_CONDITIONAL_PATH_MAX_CHARS = 80  # widest live path slot is DH05's two joined paths (50
+# chars: "`.ai-state/decisions/` and `scripts/adr_health.py`"); other live rows: AC13 37,
+# DL06 22, F11 29, P03 30. 80 leaves room for a realistic second joined path without
+# leaving room for padding (SYSTEMS_PLAN.md's template joins at most two backticked paths
+# with "and").
 _CONDITIONAL_SHAPE = (
-    r"Conditional on .+? present(?: \([^)]*\))?; skip with an? [A-Za-z]+-dimension INFO note\.\s*"
+    rf"Conditional on .{{1,{_CONDITIONAL_PATH_MAX_CHARS}}}? present(?: \([^)]*\))?; "
+    r"skip with an? [A-Za-z]+-dimension INFO note\.\s*"
 )
+
+
+_INVOCATION_FLAGS_MAX_CHARS = 20  # every live invocation carries exactly " --json" (7
+# chars); 20 leaves room for a second short flag (e.g. " --json --strict") without
+# leaving room for padding riding the open `[^\`]*` span a prior version of this pattern
+# used.
 
 
 def _row_pattern(script_name: str) -> re.Pattern[str]:
@@ -83,7 +104,7 @@ def _row_pattern(script_name: str) -> re.Pattern[str]:
     the mandatory parts to the column as a whole).
     """
     escaped = re.escape(script_name)
-    invocation = rf"Run `python3 scripts/{escaped}\.py[^`]*`\."
+    invocation = rf"Run `python3 scripts/{escaped}\.py[^`]{{0,{_INVOCATION_FLAGS_MAX_CHARS}}}`\."
     spec_pointer = (
         rf"Spec \+ golden bad-cases: `scripts/{escaped}\.py` docstring; "
         rf"canary `scripts/test_{escaped}\.py`\."
@@ -113,18 +134,36 @@ def _dimension_heading_before(sentinel_text: str, row: str) -> str | None:
     return headings[-1].group(1) if headings else None
 
 
-def _pass_column(row: str) -> str:
-    """Return the last (Pass/verdict) cell of a `| ID | Tp | Rule | Pass |` row.
+def _row_cells(row: str) -> list[str]:
+    """Split a `| ID | Tp | Rule | Pass |` row into its four cells.
 
-    `_verdict_map` further parses this cell down to the part the byte budget actually
-    binds. ID/Tp are trivially short and the Rule/claim column already carries its own
-    separate <=120-char budget in the Extraction Contract's template, so this cell is
-    the only place the mandated template parts and the verdict map they wrap can live.
     A literal `\\|` (e.g. a shell pipe inside a rule) is protected from the split.
     """
     protected = row.replace("\\|", "\x00")
-    cells = [c.strip() for c in protected.strip().strip("|").split("|")]
-    return cells[-1].replace("\x00", "\\|")
+    return [c.strip().replace("\x00", "\\|") for c in protected.strip().strip("|").split("|")]
+
+
+def _pass_column(row: str) -> str:
+    """Return the last (Pass/verdict) cell of `row`.
+
+    `_verdict_map` further parses this cell down to the part the byte budget actually
+    binds. ID/Tp are trivially short; the Rule/claim cell is checked separately by
+    `assert_residual_row_contract` against `_RULE_MAX_CHARS`, so this cell is the only
+    place the mandated template parts and the verdict map they wrap can live.
+    """
+    return _row_cells(row)[-1]
+
+
+_RULE_MAX_CHARS = 120  # `SYSTEMS_PLAN.md § The Extraction Contract`'s residual row
+# template: "<one-line claim, <=120 chars, unchanged from today>". Measured in
+# characters, per the template's own wording -- unlike the verdict map, no live row sits
+# close enough to the boundary for the chars-vs-bytes distinction to matter (widest live
+# Rule column: P03 113 chars/bytes).
+
+
+def _rule_column(row: str) -> str:
+    """Return the third (Rule/claim) cell of `row`."""
+    return _row_cells(row)[2]
 
 
 def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
@@ -149,13 +188,13 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
 def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name: str) -> None:
     """Assert `check_id`'s row in `sentinel_text` satisfies the Extraction Contract's residual shape.
 
-    Four checks, each binding a live consumer named in `SYSTEMS_PLAN.md § The Extraction
+    Five checks, each binding a live consumer named in `SYSTEMS_PLAN.md § The Extraction
     Contract`: (a) the row sits under a `### <dimension>` heading and carries the literal
     `python3 scripts/<script_name>.py` invocation phrase -- the same phrase
     `_delegated_gates`, GL04 (`check_uninvoked_gate`) and GL05 (`check_ambient_import`) all
     key on; (b) the row names its canary sibling, `scripts/test_<script_name>.py`; (c) the
-    verdict map -- the Pass column parsed down to its non-template residue -- is at most
-    `_VERDICT_MAP_MAX_BYTES`.
+    Rule/claim cell is at most `_RULE_MAX_CHARS`; (d) the verdict map -- the Pass column
+    parsed down to its non-template residue -- is at most `_VERDICT_MAP_MAX_BYTES`.
     """
     row = _find_row(sentinel_text, check_id)
 
@@ -167,6 +206,12 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
 
     canary_ref = f"scripts/test_{script_name}.py"
     assert canary_ref in row, f"{check_id}: row is missing its canary pointer `{canary_ref}`"
+
+    rule = _rule_column(row)
+    assert len(rule) <= _RULE_MAX_CHARS, (
+        f"{check_id}: Rule column is {len(rule)} chars, exceeds the {_RULE_MAX_CHARS}-char "
+        "budget (SYSTEMS_PLAN.md § The Extraction Contract's residual row template)"
+    )
 
     verdict_map = _verdict_map(_pass_column(row), check_id, script_name)
     verdict_bytes = len(verdict_map.encode("utf-8"))
@@ -212,8 +257,8 @@ def test_verdict_map_over_budget_is_rejected() -> None:
     parseable Invocation and Spec pointer on either side of it.
 
     The padding sits in the verdict map, not the Rule column -- the budget is scoped to
-    the part `_verdict_map` extracts, so padding the Rule column alone must not trip it
-    (see the inverse guard below).
+    the part `_verdict_map` extracts, so a Rule column at its own legal maximum must not
+    trip it (see the inverse guard below).
     """
     padding = "x" * 320
     text = (
@@ -228,14 +273,78 @@ def test_verdict_map_over_budget_is_rejected() -> None:
     raise AssertionError("a row with an over-budget verdict map must fail")
 
 
-def test_padding_the_rule_column_alone_does_not_trip_the_budget() -> None:
-    """Inverse guard: the byte budget is scoped to the verdict map, not the whole row."""
-    padding = "x" * 500
+def test_full_length_rule_column_does_not_trip_the_verdict_map_budget() -> None:
+    """Inverse guard: a Rule column at its own legal maximum (`_RULE_MAX_CHARS`) does not
+    leak into the verdict-map budget -- the two budgets are scoped to different cells,
+    not summed.
+    """
+    rule = "x" * _RULE_MAX_CHARS
     text = (
-        f"### D\n\n| X01 | A | {padding} | Run `python3 scripts/x.py --json`. "
-        f"scripts/test_x.py {_SPEC_TAIL} |\n"
+        f"### D\n\n| X01 | A | {rule} | Run `python3 scripts/x.py --json`. verdict text. "
+        f"{_SPEC_TAIL} |\n"
     )
     assert_residual_row_contract(text, "X01", "x")  # must not raise
+
+
+def test_rule_column_over_budget_is_rejected() -> None:
+    """Canary (FAIL-2, Rule-column probe): a Rule/claim cell past `_RULE_MAX_CHARS` must
+    fail. Previously unenforced -- the <=120-char budget existed only as prose in
+    `SYSTEMS_PLAN.md:130`, and 1,500 bytes parked here was ACCEPTED.
+    """
+    padding = "x" * 500
+    text = (
+        f"### D\n\n| X01 | A | {padding} | Run `python3 scripts/x.py --json`. verdict text. "
+        f"{_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "Rule column" not in str(exc):
+            raise AssertionError(f"expected the Rule-column message, got: {exc}") from exc
+        return
+    raise AssertionError("a Rule column past the char budget must fail")
+
+
+def test_conditional_path_over_budget_is_rejected() -> None:
+    """Canary (FAIL-2, Conditional probe): a path slot past `_CONDITIONAL_PATH_MAX_CHARS`
+    must fail the parse. The prior open `.+? present` anchor backtracked past arbitrary
+    padding to find a later "present" and was ACCEPTED at 900 bytes; the explicit char
+    ceiling turns that into a parse failure instead.
+    """
+    padding = "x" * 900
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | Conditional on {padding} present; skip with a D-dimension "
+        f"INFO note. Run `python3 scripts/x.py --json`. verdict text here. {_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "does not decompose" not in str(exc):
+            raise AssertionError(f"expected the parse-failure message, got: {exc}") from exc
+        return
+    raise AssertionError("a Conditional path past the char budget must fail")
+
+
+def test_invocation_flags_over_budget_is_rejected() -> None:
+    """Canary (FAIL-2, Invocation probe): a backtick span past
+    `_INVOCATION_FLAGS_MAX_CHARS` must fail the parse. The prior open `[^\\`]*` span was
+    ACCEPTED at 700 bytes; the explicit char ceiling turns that into a parse failure
+    instead.
+    """
+    padding = "x" * 700
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | Run `python3 scripts/x.py --json {padding}`. verdict text here. "
+        f"{_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "does not decompose" not in str(exc):
+            raise AssertionError(f"expected the parse-failure message, got: {exc}") from exc
+        return
+    raise AssertionError("an Invocation backtick span past the char budget must fail")
 
 
 def test_row_outside_any_dimension_heading_is_rejected() -> None:

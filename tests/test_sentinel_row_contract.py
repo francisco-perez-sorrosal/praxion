@@ -21,12 +21,21 @@ part -- fails the match instead of silently defaulting to zero. See `_row_patter
 the shape and the module-level comment above `_VERDICT_MAP_MAX_BYTES` for the budget's
 derivation.
 
-A verdict-map budget alone does not close the row: the two mandated template parts that
-wrap it -- the Conditional's path slot and the Invocation's backtick span -- are each
-themselves explicitly bounded (`_CONDITIONAL_PATH_MAX_CHARS`, `_INVOCATION_FLAGS_MAX_CHARS`),
-so padding cannot grow the row by riding inside a part the verdict-map budget doesn't
-measure. The Rule/claim cell carries its own separate `_RULE_MAX_CHARS` budget, asserted
-directly rather than left as unenforced prose.
+A verdict-map budget alone does not close the row: every other slot that can vary --
+the Conditional's path (`_CONDITIONAL_PATH_MAX_CHARS`) and its optional parenthetical
+(`_CONDITIONAL_PAREN_MAX_CHARS`), the dimension-name token (`_DIMENSION_MAX_CHARS`), the
+Invocation's backtick span (`_INVOCATION_FLAGS_MAX_CHARS`), the Tp cell
+(`_TP_MAX_CHARS`), and the Rule/claim cell (`_RULE_MAX_CHARS`) -- carries its own
+explicit ceiling, asserted directly rather than left as unenforced prose. That list is a
+cache, not the invariant it restates: this file's two prior FAILs were each exactly one
+slot missing from a list shaped just like it. The invariant that cannot silently go
+stale the same way is checked structurally instead --
+`test_no_unbounded_quantifier_escapes_the_verdict_slot` below scans the built row
+pattern's own regex source and asserts that no `*`/`+` repetition survives outside the
+two constructs deliberately left open: the verdict-map capture itself (bounded after the
+match, by byte length, not by the regex) and `\\s*` separators (whitespace-only, stripped
+before measurement, so they cannot carry graded content). A new unbounded slot fails
+that scan on sight, without first needing to be added to this paragraph.
 
 `EXTRACTED_CHECKS` is append-only: entries are never removed or reordered, only added,
 one per extraction step.
@@ -80,9 +89,21 @@ _CONDITIONAL_PATH_MAX_CHARS = 80  # widest live path slot is DH05's two joined p
 # DL06 22, F11 29, P03 30. 80 leaves room for a realistic second joined path without
 # leaving room for padding (SYSTEMS_PLAN.md's template joins at most two backticked paths
 # with "and").
+
+_CONDITIONAL_PAREN_MAX_CHARS = 40  # the only live parenthetical is DL06's "(either
+# lifecycle stage)" -- 23 chars of content. 40 leaves room for a second short qualifier
+# without leaving room for the 900-char padding NEW-2 found ACCEPTED on the prior open
+# `[^)]*` span.
+
+_DIMENSION_MAX_CHARS = 4  # every live dimension token is 1-2 uppercase letters (F, P,
+# AC, DH, DL, TT, GL, RD, SH, TD, CA, PR, EC -- see agents/sentinel.md's `### <dim>`
+# headings). 4 leaves room for a slightly longer future dimension code without leaving
+# room for the 900-char padding NEW-2 found ACCEPTED on the prior open `[A-Za-z]+` token.
+
 _CONDITIONAL_SHAPE = (
-    rf"Conditional on .{{1,{_CONDITIONAL_PATH_MAX_CHARS}}}? present(?: \([^)]*\))?; "
-    r"skip with an? [A-Za-z]+-dimension INFO note\.\s*"
+    rf"Conditional on .{{1,{_CONDITIONAL_PATH_MAX_CHARS}}}? present"
+    rf"(?: \([^)]{{0,{_CONDITIONAL_PAREN_MAX_CHARS}}}\))?; "
+    rf"skip with an? [A-Za-z]{{1,{_DIMENSION_MAX_CHARS}}}-dimension INFO note\.\s*"
 )
 
 
@@ -90,6 +111,11 @@ _INVOCATION_FLAGS_MAX_CHARS = 20  # every live invocation carries exactly " --js
 # chars); 20 leaves room for a second short flag (e.g. " --json --strict") without
 # leaving room for padding riding the open `[^\`]*` span a prior version of this pattern
 # used.
+
+_TP_MAX_CHARS = 10  # every live Tp value is a single letter ("A" or "L" --
+# `SYSTEMS_PLAN.md § The Extraction Contract`'s type column). 10 leaves room for a short
+# future type code without leaving room for the 900-char padding NEW-2 found ACCEPTED on
+# the unchecked Tp cell.
 
 
 def _row_pattern(script_name: str) -> re.Pattern[str]:
@@ -147,11 +173,16 @@ def _pass_column(row: str) -> str:
     """Return the last (Pass/verdict) cell of `row`.
 
     `_verdict_map` further parses this cell down to the part the byte budget actually
-    binds. ID/Tp are trivially short; the Rule/claim cell is checked separately by
-    `assert_residual_row_contract` against `_RULE_MAX_CHARS`, so this cell is the only
-    place the mandated template parts and the verdict map they wrap can live.
+    binds. The Tp cell is checked separately against `_TP_MAX_CHARS` and the Rule/claim
+    cell separately against `_RULE_MAX_CHARS`, so this cell is the only place the
+    mandated template parts and the verdict map they wrap can live.
     """
     return _row_cells(row)[-1]
+
+
+def _tp_column(row: str) -> str:
+    """Return the second (Tp/type) cell of `row`."""
+    return _row_cells(row)[1]
 
 
 _RULE_MAX_CHARS = 120  # `SYSTEMS_PLAN.md § The Extraction Contract`'s residual row
@@ -188,13 +219,14 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
 def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name: str) -> None:
     """Assert `check_id`'s row in `sentinel_text` satisfies the Extraction Contract's residual shape.
 
-    Five checks, each binding a live consumer named in `SYSTEMS_PLAN.md § The Extraction
+    Six checks, each binding a live consumer named in `SYSTEMS_PLAN.md § The Extraction
     Contract`: (a) the row sits under a `### <dimension>` heading and carries the literal
     `python3 scripts/<script_name>.py` invocation phrase -- the same phrase
     `_delegated_gates`, GL04 (`check_uninvoked_gate`) and GL05 (`check_ambient_import`) all
     key on; (b) the row names its canary sibling, `scripts/test_<script_name>.py`; (c) the
-    Rule/claim cell is at most `_RULE_MAX_CHARS`; (d) the verdict map -- the Pass column
-    parsed down to its non-template residue -- is at most `_VERDICT_MAP_MAX_BYTES`.
+    Tp cell is at most `_TP_MAX_CHARS`; (d) the Rule/claim cell is at most
+    `_RULE_MAX_CHARS`; (e) the verdict map -- the Pass column parsed down to its
+    non-template residue -- is at most `_VERDICT_MAP_MAX_BYTES`.
     """
     row = _find_row(sentinel_text, check_id)
 
@@ -206,6 +238,11 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
 
     canary_ref = f"scripts/test_{script_name}.py"
     assert canary_ref in row, f"{check_id}: row is missing its canary pointer `{canary_ref}`"
+
+    tp = _tp_column(row)
+    assert len(tp) <= _TP_MAX_CHARS, (
+        f"{check_id}: Tp column is {len(tp)} chars, exceeds the {_TP_MAX_CHARS}-char budget"
+    )
 
     rule = _rule_column(row)
     assert len(rule) <= _RULE_MAX_CHARS, (
@@ -324,6 +361,112 @@ def test_conditional_path_over_budget_is_rejected() -> None:
             raise AssertionError(f"expected the parse-failure message, got: {exc}") from exc
         return
     raise AssertionError("a Conditional path past the char budget must fail")
+
+
+def test_conditional_parenthetical_over_budget_is_rejected() -> None:
+    """Canary (NEW-2, parenthetical probe): the optional `(...)` qualifier past
+    `_CONDITIONAL_PAREN_MAX_CHARS` must fail the parse. The prior open `[^)]*` span was
+    ACCEPTED at 900 chars; the explicit char ceiling turns that into a parse failure
+    instead.
+    """
+    padding = "x" * 900
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | Conditional on `some/path` present ({padding}); skip with a "
+        f"D-dimension INFO note. Run `python3 scripts/x.py --json`. verdict text here. "
+        f"{_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "does not decompose" not in str(exc):
+            raise AssertionError(f"expected the parse-failure message, got: {exc}") from exc
+        return
+    raise AssertionError("a Conditional parenthetical past the char budget must fail")
+
+
+def test_dimension_token_over_budget_is_rejected() -> None:
+    """Canary (NEW-2, dimension-token probe): the `<D>-dimension` token past
+    `_DIMENSION_MAX_CHARS` must fail the parse. The prior open `[A-Za-z]+` token was
+    ACCEPTED at 900 chars; the explicit char ceiling turns that into a parse failure
+    instead.
+    """
+    padding = "x" * 900
+    text = (
+        "### D\n\n"
+        f"| X01 | A | rule | Conditional on `some/path` present; skip with a "
+        f"{padding}-dimension INFO note. Run `python3 scripts/x.py --json`. verdict text "
+        f"here. {_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "does not decompose" not in str(exc):
+            raise AssertionError(f"expected the parse-failure message, got: {exc}") from exc
+        return
+    raise AssertionError("a dimension-name token past the char budget must fail")
+
+
+def test_conditional_with_parenthetical_is_accepted() -> None:
+    """Inverse guard: DL06's real shape -- a Conditional carrying the optional
+    parenthetical qualifier at ordinary length -- parses cleanly.
+    """
+    text = (
+        "### D\n\n"
+        "| X01 | A | rule | Conditional on `.ai-state/decisions/` present (either "
+        f"lifecycle stage); skip with a D-dimension INFO note. Run "
+        f"`python3 scripts/x.py --json`. verdict text here. {_SPEC_TAIL} |\n"
+    )
+    assert_residual_row_contract(text, "X01", "x")  # must not raise
+
+
+def test_tp_column_over_budget_is_rejected() -> None:
+    """Canary (NEW-2, Tp probe): a Tp/type cell past `_TP_MAX_CHARS` must fail.
+    Previously unenforced -- the module docstring asserted "ID/Tp are trivially
+    short" while nothing checked it, and 900 chars parked here was ACCEPTED.
+    """
+    padding = "x" * 900
+    text = (
+        f"### D\n\n| X01 | {padding} | rule | Run `python3 scripts/x.py --json`. verdict "
+        f"text. {_SPEC_TAIL} |\n"
+    )
+    try:
+        assert_residual_row_contract(text, "X01", "x")
+    except AssertionError as exc:
+        if "Tp column" not in str(exc):
+            raise AssertionError(f"expected the Tp-column message, got: {exc}") from exc
+        return
+    raise AssertionError("a Tp column past the char budget must fail")
+
+
+_BARE_QUANTIFIER = re.compile(r"(?<!\})(?<!\\)[*+]")  # `}` excludes `{m,n}` bounds; `\`
+# excludes an escaped literal `+`/`*` (e.g. `spec_pointer`'s `\+` for the literal "+" in
+# "Spec + golden bad-cases") -- neither is a repetition operator.
+
+
+def test_no_unbounded_quantifier_escapes_the_verdict_slot() -> None:
+    """Totalizing guard (NEW-2): rather than re-listing which slots are individually
+    bounded -- a list two prior FAILs each fell out of sync with by exactly one slot --
+    this scans the *built row pattern's own regex source* for any repetition operator
+    that isn't an explicit `{m,n}` bound. Only two constructs are allowed to stay
+    unbounded: the deliberately-open verdict-map capture (`(?P<verdict>.*?)`, bounded
+    after the match by `_VERDICT_MAP_MAX_BYTES` rather than by the regex) and `\\s*`
+    separators (whitespace-only, stripped by `_verdict_map` before measurement, so
+    padding there carries no measurable content). A new unbounded slot -- the
+    parenthetical, the dimension token, and the Tp cell were each exactly this shape --
+    fails this scan on sight, without needing to be named here first.
+    """
+    pattern_text = _row_pattern("x").pattern
+    verdict_slot = "(?P<verdict>.*?)"
+    assert verdict_slot in pattern_text, "verdict capture group not found in the built pattern"
+    residue = pattern_text.replace(verdict_slot, "", 1)
+
+    for match in _BARE_QUANTIFIER.finditer(residue):
+        preceding = residue[: match.start()]
+        assert preceding.endswith("\\s"), (
+            f"unbounded quantifier {match.group(0)!r} found outside the verdict slot and "
+            f"outside a \\s separator, near: ...{residue[max(0, match.start() - 24) : match.start() + 4]!r}"
+        )
 
 
 def test_invocation_flags_over_budget_is_rejected() -> None:

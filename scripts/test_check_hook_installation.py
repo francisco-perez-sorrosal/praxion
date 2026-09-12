@@ -70,7 +70,7 @@ def test_multiplexed_source_installed_under_three_names_is_clean(
     assert report["examined"]["F10"]["sources"] == 1
 
 
-def test_source_matching_no_hook_and_executable_warns(tmp_path: Path, monkeypatch) -> None:
+def test_source_with_no_installed_hook_is_flagged(tmp_path: Path, monkeypatch) -> None:
     _make_source(tmp_path, "git-orphan-hook.sh", "#!/bin/sh\necho orphan\n", executable=True)
     hooks_dir = _make_hooks_dir(tmp_path)
     monkeypatch.setattr(chi, "_resolve_hooks_dir", lambda _root: hooks_dir)
@@ -90,7 +90,7 @@ def test_source_not_executable_and_no_derived_hook_is_silent(tmp_path: Path, mon
     assert report["findings"] == []
 
 
-def test_derived_name_hook_exists_but_differs_warns(tmp_path: Path, monkeypatch) -> None:
+def test_installed_hook_differing_from_source_is_flagged(tmp_path: Path, monkeypatch) -> None:
     _make_source(tmp_path, "git-refresh-hook.sh", "#!/bin/sh\necho new\n", executable=True)
     hooks_dir = _make_hooks_dir(tmp_path)
     (hooks_dir / "refresh").write_text("#!/bin/sh\necho old\n", encoding="utf-8")

@@ -464,3 +464,19 @@ repos:
         language: system
         files: '^(\.ai-state/TEST_TOPOLOGY\.md|skills/testing-strategy/references/.*\.md|scripts/check_topology_conformance\.py)$'
         pass_filenames: false
+
+      # Block R — hackathon graduation nudge (HK01). Declared exception: the
+      # real gate is `PRAXION_HACKATHON_MODE=1` in a project's own
+      # `.claude/settings.json`, which no commit in this repo carries, so this
+      # entry exists for LIVENESS (the script is invoked by something and loads
+      # under the ambient interpreter -- check_gate_liveness GL04/GL05), not
+      # enforcement. There is no sensible `files:` substrate scope -- the check
+      # is env-gated, not filesystem-substrate-gated -- so it is scoped to the
+      # script itself, same declared-exception pattern as Block N (P07). The
+      # sentinel's Phase 3 is the enforcing/reporting caller.
+      - id: hackathon-graduation
+        name: Hackathon mode graduation nudge (liveness only)
+        entry: python3 scripts/check_hackathon_graduation.py --repo-root .
+        language: system
+        files: '^scripts/check_hackathon_graduation\.py$'
+        pass_filenames: false

@@ -790,6 +790,7 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("TT02", "check_topology_conformance"),
     ("TT05", "check_topology_conformance"),
     ("TT06", "check_topology_conformance"),
+    ("HK01", "check_hackathon_graduation"),
 ]
 
 

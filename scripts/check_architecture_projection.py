@@ -444,6 +444,14 @@ def classify(repo_root: Path) -> dict:
             else {"rows": ac13["rows"], "elements": ac13["elements"]},
         },
         "withheld": ac13["withheld"],
+        "bound": {
+            "AC04": "AC04 clean means every inline dec-NNN in DESIGN.md and the developer "
+            "guide resolves to a finalized ADR file; fenced code is not scanned.",
+            "AC05": "AC05 clean means docs/architecture.md exists with content whenever "
+            ".ai-state/DESIGN.md exists; its substance is AC06-AC09's question.",
+            "AC13": "AC13 clean means DESIGN.md projects both the architecture model and "
+            "the shipped-block registry; read withheld before reading zero findings.",
+        },
     }
 
 

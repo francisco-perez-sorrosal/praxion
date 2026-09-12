@@ -86,7 +86,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | F01 | A | Referenced files exist on disk | Run `python3 scripts/check_path_resolution.py --json`. WARN per `findings` entry with `check: "F01"` — a declared-limit detector; see docstring for accepted false positives. Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
-| F02 | A | Skill `references/` files exist | Run `python3 scripts/check_path_resolution.py --json`. FAIL when a skill's own `references/*.md` mention does not exist under that skill. Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
+| F02 | A | Skill `references/` files exist | Run `python3 scripts/check_path_resolution.py --json`. WARN when a skill's own `references/*.md` mention does not exist under that skill (declared limit: a bare prose mention of another skill's leaf also fires). Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
 | F03 | L | Content references current tools/patterns | No references to replaced tools, APIs, or patterns |
 | F04 | L | Agent prompts reflect current pipeline | Collaboration sections reference correct agent names, outputs, stages |
 | F05 | A | `SYSTEM_DEPLOYMENT.md` referenced file paths exist | Conditional on `.ai-state/SYSTEM_DEPLOYMENT.md` present; skip with an F-dimension INFO note. Run `python3 scripts/check_path_resolution.py --json`. FAIL per `findings` entry with `check: "F05"`. Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |

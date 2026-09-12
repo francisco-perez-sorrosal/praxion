@@ -377,6 +377,14 @@ def test_ac04_ignores_a_dec_id_inside_a_fenced_block(repo: Path) -> None:
     assert [f["entity"] for f in ac04] == ["dec-998"]
 
 
+def test_envelope_carries_a_keyed_bound_for_every_check(repo: Path) -> None:
+    """REQ-06 (verifier W-2): the family envelope reproduces a PASS statement per check."""
+    _write_rows(repo, ALL_THREE)
+    report = cap.classify(repo)
+    assert set(report["bound"]) == set(cap.CHECK_IDS)
+    assert all(report["bound"][cid] for cid in cap.CHECK_IDS)
+
+
 def test_developer_guide_with_content_passes(repo: Path) -> None:
     _write_rows(repo, ALL_THREE)
     (repo / "docs").mkdir(parents=True, exist_ok=True)

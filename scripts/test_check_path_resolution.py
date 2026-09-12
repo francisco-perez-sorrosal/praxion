@@ -80,7 +80,7 @@ def test_f02_flags_missing_own_reference(tmp_path: Path) -> None:
     report = classify(tmp_path)
     findings = [f for f in report["findings"] if f["check"] == "F02"]
     assert any("ghost.md" in f["entity"] for f in findings)
-    assert all(f["severity"] == "fail" for f in findings)
+    assert all(f["severity"] == "warn" for f in findings)
 
 
 def test_f02_ignores_cross_skill_href(tmp_path: Path) -> None:

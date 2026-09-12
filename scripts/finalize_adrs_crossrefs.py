@@ -24,6 +24,7 @@ in, so this module never guesses which checkout it is operating on.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -33,6 +34,14 @@ logger = logging.getLogger("finalize_adrs")
 # reader, and (verified) carry zero `dec-draft-<hash>` ids -- so excluding
 # them from the sweep can never strand a dangling draft reference.
 _FROZEN_DOCS_SUBTREE = Path("docs") / "independent-analysis"
+
+# A finalized ADR's `draft_id:` frontmatter field (td-198) permanently
+# records the `dec-draft-<hash>` it was promoted from -- promotion provenance,
+# never a live citation, even though it is byte-identical to one. Without
+# this exclusion the rewrite below would clobber that very field on the same
+# run that wrote it (the field lives in the citation net it walks), and
+# idempotent-promotion detection would never find a match again.
+_DRAFT_ID_LINE_PATTERN = re.compile(r"^draft_id:\s*")
 
 # The pipeline documents that cite drafts while the pipeline authoring them is
 # still in flight. `.ai-work/` is gitignored and local to the checkout finalize
@@ -47,8 +56,9 @@ def rewrite_cross_references(repo_root: Path, old_id: str, new_id: str) -> int:
     """Rewrite every occurrence of `old_id` to `new_id` across the citation net.
 
     `old_id` is a concrete `dec-draft-<8-hex>` id, never the shape, so the
-    rewrite alters nothing but the citation it is looking for. Returns the
-    number of files modified.
+    rewrite alters nothing but the citation it is looking for. A `draft_id:`
+    frontmatter field is never touched (see `_DRAFT_ID_LINE_PATTERN`).
+    Returns the number of files modified.
     """
     modified = 0
     for target in citation_net(repo_root):
@@ -64,7 +74,10 @@ def detect_unrewritten_ids(repo_root: Path, promoted_ids: list[str]) -> list[tup
     can only mean the rewrite of that file failed -- unreadable, unwritable,
     changed underneath the run -- and the caller reports it for a human to
     inspect. Matching concrete ids rather than the `dec-draft-<hash>` shape
-    keeps teaching placeholders from registering as findings. Read-only.
+    keeps teaching placeholders from registering as findings. A `draft_id:`
+    field is excluded the same way `rewrite_cross_references` excludes it, or
+    its permanent provenance would read as a rewrite failure on every single
+    promotion. Read-only.
     """
     if not promoted_ids:
         return []
@@ -73,7 +86,7 @@ def detect_unrewritten_ids(repo_root: Path, promoted_ids: list[str]) -> list[tup
         text = _read(entry)
         if text is None:
             continue
-        survivors.extend((entry, i) for i in promoted_ids if i in text)
+        survivors.extend((entry, i) for i in promoted_ids if _cites_outside_draft_id_field(text, i))
     return survivors
 
 
@@ -139,11 +152,32 @@ def _rewrite_in_file(path: Path, old_id: str, new_id: str) -> bool:
     content = _read(path)
     if content is None or old_id not in content:
         return False
+    rewritten = _replace_outside_draft_id_field(content, old_id, new_id)
+    if rewritten == content:
+        # The only occurrence(s) of `old_id` were inside a `draft_id:` field
+        # -- permanent provenance, not a citation to rewrite.
+        return False
     try:
-        path.write_text(content.replace(old_id, new_id), encoding="utf-8")
+        path.write_text(rewritten, encoding="utf-8")
     except OSError as exc:
         # Left in place for `detect_unrewritten_ids` to report: the id is still there.
         logger.warning("cannot rewrite %s: %s", path, exc)
         return False
     logger.debug("rewrote %s -> %s in %s", old_id, new_id, path)
     return True
+
+
+def _replace_outside_draft_id_field(content: str, old_id: str, new_id: str) -> str:
+    """Replace `old_id` -> `new_id` on every line except a `draft_id:` field."""
+    lines = content.split("\n")
+    return "\n".join(
+        line if _DRAFT_ID_LINE_PATTERN.match(line) else line.replace(old_id, new_id)
+        for line in lines
+    )
+
+
+def _cites_outside_draft_id_field(text: str, id_value: str) -> bool:
+    """True when `id_value` appears in `text` on a line that is not a `draft_id:` field."""
+    return any(
+        id_value in line and not _DRAFT_ID_LINE_PATTERN.match(line) for line in text.split("\n")
+    )

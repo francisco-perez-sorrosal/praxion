@@ -570,10 +570,17 @@ class TestFinalizeSingleDraft:
         # Draft is gone from drafts/
         assert not draft_path.exists()
 
-        # id rewritten in frontmatter
+        # id rewritten in frontmatter; the draft hash no longer occupies the
+        # canonical `id:` field -- it survives only in the additive
+        # `draft_id:` provenance marker (td-198), which enables idempotent
+        # re-promotion detection (see TestIdempotentPromotionByDraftId).
         content = new_path.read_text(encoding="utf-8")
         assert "id: dec-043" in content
-        assert "dec-draft-" not in content.split("---")[1]  # id gone from frontmatter
+        id_line = next(
+            line for line in content.split("---")[1].splitlines() if line.startswith("id:")
+        )
+        assert "dec-draft-" not in id_line
+        assert f"draft_id: {expected_draft_id}" in content
 
         # Returned old_id matches what was in the draft
         assert old_id == expected_draft_id
@@ -2580,3 +2587,200 @@ class TestFinalizeStateRootMountRedirection:
         assert result.returncode == 0, result.stderr
         mount_status = _git_status_porcelain(fixture.mount_dir)
         assert any(line.startswith("R") for line in mount_status), mount_status
+
+
+# -- Origin-aware NNN assignment (td-198) -------------------------------------
+#
+# Two finalizers (a local post-merge hook and a CI finalize backstop, say)
+# can each promote a draft before either has seen the other's push, both
+# reading the same local `next_adr_number` and claiming the same NNN. These
+# fixtures drive a real git repo with a real `origin` remote -- a local path
+# is a perfectly real remote to git, no network involved -- since the
+# behavior under test *is* `git fetch`/`git ls-tree` against that remote, and
+# a monkeypatched subprocess cannot reproduce it.
+
+
+class TestOriginAwareNumbering:
+    """`next_adr_number(decisions_dir, state_git_root=...)` accounts for
+    finalized ADRs already on origin's default branch.
+    """
+
+    @staticmethod
+    def _git(root: Path, *args: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+
+    def test_next_number_accounts_for_remote_default_branch(self, tmp_path: Path) -> None:
+        """origin holds 382-x.md; local holds up to 381 -- next is 383."""
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        self._git(origin, "init", "-q", "-b", "main")
+        self._git(origin, "config", "user.email", "tester@example.com")
+        self._git(origin, "config", "user.name", "Tester")
+        make_finalized(origin, 382, "remote-only-decision")
+        self._git(origin, "add", "-A")
+        self._git(origin, "commit", "-qm", "seed origin")
+
+        local = tmp_path / "local"
+        local.mkdir()
+        self._git(local, "init", "-q", "-b", "main")
+        self._git(local, "config", "user.email", "tester@example.com")
+        self._git(local, "config", "user.name", "Tester")
+        self._git(local, "remote", "add", "origin", str(origin))
+        make_finalized(local, 381, "local-only-decision")
+
+        decisions_dir = local / ".ai-state" / "decisions"
+        next_n = finalize.next_adr_number(decisions_dir, state_git_root=local)
+
+        assert next_n == 383
+
+    def test_offline_path_falls_back_to_local_max_plus_one(self, tmp_path: Path) -> None:
+        """No `origin` remote configured -- next number is local max + 1."""
+        local = tmp_path / "local"
+        local.mkdir()
+        self._git(local, "init", "-q", "-b", "main")
+        self._git(local, "config", "user.email", "tester@example.com")
+        self._git(local, "config", "user.name", "Tester")
+        make_finalized(local, 5, "local-only-decision")
+
+        decisions_dir = local / ".ai-state" / "decisions"
+        next_n = finalize.next_adr_number(decisions_dir, state_git_root=local)
+
+        assert next_n == 6
+
+    def test_omitting_state_git_root_preserves_local_only_behavior(self, tmp_path: Path) -> None:
+        """No `state_git_root` -- the pre-td-198 local-only count, unchanged.
+
+        No git repo exists at all here: if this call attempted a git
+        operation, it would raise rather than silently returning a wrong
+        answer, which is exactly the property this canary pins.
+        """
+        decisions_dir = tmp_path / ".ai-state" / "decisions"
+        make_finalized(tmp_path, 9, "local-only-decision")
+
+        assert finalize.next_adr_number(decisions_dir) == 10
+
+
+# -- Idempotent promotion by draft id (td-198) --------------------------------
+
+
+class TestIdempotentPromotionByDraftId:
+    """A draft that reappears in `drafts/` after another finalizer already
+    promoted it reuses the existing NNN instead of claiming a new one.
+    """
+
+    def test_reappeared_draft_reuses_existing_nnn_no_duplicate_file(self, repo_root: Path) -> None:
+        """Promoting the same draft twice yields the same dec-NNN, no duplicate file."""
+        draft = make_draft(repo_root, "20260101-1200", "alice", "main", "race-decision")
+        draft_id = f"dec-draft-{_draft_hash(draft.name)}"
+
+        # First finalizer: builds and executes the plan for real.
+        first_plans = finalize.build_promotion_plan([draft])
+        assert [p.new_id for p in first_plans] == ["dec-001"]
+        finalize.promote_draft(draft, first_plans[0].nnn, repo_root)
+        assert (repo_root / ".ai-state" / "decisions" / "001-race-decision.md").exists()
+
+        # The draft reappears in drafts/ (rebase restoring a pre-promotion
+        # commit, or a duplicated fragment write) with the SAME id.
+        reappeared = make_draft(repo_root, "20260101-1200", "alice", "main", "race-decision")
+        assert reappeared.exists()
+
+        # Second finalizer's plan must not allocate dec-002 for it.
+        second_plans = finalize.build_promotion_plan([reappeared])
+
+        assert second_plans == []
+        decisions_files = sorted(
+            p.name
+            for p in (repo_root / ".ai-state" / "decisions").iterdir()
+            if p.is_file() and finalize.FINALIZED_ADR_PATTERN.match(p.name)
+        )
+        assert decisions_files == ["001-race-decision.md"]
+        finalized_content = (
+            repo_root / ".ai-state" / "decisions" / "001-race-decision.md"
+        ).read_text(encoding="utf-8")
+        assert f"draft_id: {draft_id}" in finalized_content
+
+    def test_unrelated_draft_still_gets_a_new_number(self, repo_root: Path) -> None:
+        """A genuinely new draft is unaffected by another decision's marker."""
+        make_finalized(
+            repo_root,
+            1,
+            "already-promoted",
+            frontmatter_extra={"draft_id": "dec-draft-aaaaaaaa"},
+        )
+        fresh = make_draft(repo_root, "20260101-1300", "alice", "main", "fresh-decision")
+
+        plans = finalize.build_promotion_plan([fresh])
+
+        assert [p.new_id for p in plans] == ["dec-002"]
+
+
+# -- Merged-mode fallback on the default branch (td-198) ----------------------
+#
+# After a rebase-style merge, `mode="merged"` git detection can legitimately
+# find nothing to promote (the drafts arrived in commits the rebase
+# rewrote) even though real fragments sit in drafts/. These fixtures drive a
+# real git repo -- the behavior under test is the current-branch check, which
+# a monkeypatched subprocess would not exercise meaningfully.
+
+
+class TestMergedModeDefaultBranchFallback:
+    @staticmethod
+    def _git(root: Path, *args: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+
+    def _build_repo_with_stray_fragment(self, root: Path) -> Path:
+        """Commit history where the reflog range adds nothing to drafts/,
+        but one fragment remains present on disk -- the rebase-collapse shape.
+        """
+        root.mkdir()
+        self._git(root, "init", "-q", "-b", "main")
+        self._git(root, "config", "user.email", "tester@example.com")
+        self._git(root, "config", "user.name", "Tester")
+        draft = make_draft(root, "20260101-1200", "alice", "main", "stray-decision")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "add draft")
+        (root / "unrelated.txt").write_text("noise\n", encoding="utf-8")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "unrelated change")
+        return draft
+
+    def test_promoted_on_default_branch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On `main` (the default branch) with a stray fragment, it is promoted."""
+        root = tmp_path / "repo"
+        draft = self._build_repo_with_stray_fragment(root)
+        monkeypatch.setattr(finalize, "REPO_ROOT", root)
+        monkeypatch.setattr(finalize, "DRAFTS_DIR", draft.parent)
+        monkeypatch.setattr(finalize, "STATE_GIT_ROOT", root)
+
+        result = finalize.detect_drafts_to_promote("merged", None)
+
+        assert result == [draft]
+
+    def test_not_promoted_on_a_non_default_branch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The identical repo, checked out on `feature` -- never promoted."""
+        root = tmp_path / "repo"
+        self._build_repo_with_stray_fragment(root)
+        self._git(root, "checkout", "-q", "-b", "feature")
+        monkeypatch.setattr(finalize, "REPO_ROOT", root)
+        monkeypatch.setattr(finalize, "DRAFTS_DIR", root / ".ai-state" / "decisions" / "drafts")
+        monkeypatch.setattr(finalize, "STATE_GIT_ROOT", root)
+
+        result = finalize.detect_drafts_to_promote("merged", None)
+
+        assert result == []

@@ -70,7 +70,19 @@ STATE_GIT_ROOT = REPO_ROOT
 
 FINALIZED_ADR_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
 FRONTMATTER_ID_PATTERN = re.compile(r"^(id:\s*)(dec-draft-[0-9a-f]{8})\s*$", re.MULTILINE)
+FRONTMATTER_FINALIZED_ID_PATTERN = re.compile(r"^(id:\s*dec-\d{3})\s*$", re.MULTILINE)
 FRONTMATTER_STATUS_PROPOSED_PATTERN = re.compile(r"^(status:\s*)proposed\s*$", re.MULTILINE)
+FRONTMATTER_DRAFT_ID_PATTERN = re.compile(r"^draft_id:\s*(dec-draft-[0-9a-f]{8})\s*$", re.MULTILINE)
+
+# Used only when `refs/remotes/origin/HEAD` cannot be read (no remote, or the
+# ref was never populated by a clone/`remote set-head`) -- a guess that costs
+# one wasted `git fetch <wrong-branch>` below, which itself degrades to the
+# same local-only fallback rather than raising.
+DEFAULT_BRANCH_FALLBACK = "main"
+
+# `git fetch` is the one call in this module that can touch the network, so it
+# gets its own tighter bound than the 30s plumbing default in `_git_runner`.
+REMOTE_FETCH_TIMEOUT_SECONDS = 10.0
 
 logger = logging.getLogger("finalize_adrs")
 
@@ -315,6 +327,22 @@ def detect_drafts_to_promote(mode: str, branch: str | None) -> list[Path]:
         )
         return []
 
+    # Merged-mode fallback (td-198): after a rebase-style merge, the diff
+    # range genuinely contains no draft additions (the drafts arrived in
+    # commits the rebase rewrote), and `mode="merged"` reports an empty --
+    # not None -- set even though real fragments sit in drafts/. Promoting
+    # them is only safe when we are actually on the default branch: `added`
+    # is also legitimately empty on every other branch, where fragments in
+    # drafts/ are normal in-progress work that must NOT be swept up.
+    if mode == "merged" and not added and _is_default_branch(REPO_ROOT, STATE_GIT_ROOT):
+        logger.info(
+            "finalize_adrs: merge-range detection found nothing to promote, "
+            "but %d fragment(s) remain in drafts/ on the default branch; "
+            "promoting all of them as a merged-mode fallback (td-198)",
+            len(existing),
+        )
+        return sorted(existing)
+
     # Intersect git-detected paths with existing files (ignore renamed-away).
     added_paths = {(DRAFTS_DIR / name).resolve() for name in added}
     return sorted(p for p in existing if p.resolve() in added_paths)
@@ -371,20 +399,32 @@ def _drafts_added_by_branch(branch: str) -> set[str] | None:
 
 
 def _diff_added_names(base: str, tip: str) -> set[str] | None:
-    """Return filenames added under drafts/ in the given commit range."""
-    out = _git(
-        "log",
-        "--diff-filter=A",
-        "--name-only",
-        "--pretty=format:",
-        f"{base}..{tip}",
-        "--",
-        ".ai-state/decisions/drafts/",
-    )
-    if out is None:
+    """Return filenames added under drafts/ in the given commit range.
+
+    `None` means git could not answer; an empty set means the range added
+    nothing. The two must stay distinct (td-198): `git_output` folds empty
+    stdout into `None`, which made every "nothing added" range read as a
+    detection failure -- the reason `mode=merged` reported nothing to do after
+    a rebase-style merge and `--all` had to be forced. `run_git` is used
+    directly so only a non-zero exit is a failure.
+    """
+    try:
+        result = run_git(
+            REPO_ROOT,
+            "log",
+            "--diff-filter=A",
+            "--name-only",
+            "--pretty=format:",
+            f"{base}..{tip}",
+            "--",
+            ".ai-state/decisions/drafts/",
+        )
+    except GitUnavailableError:
+        return None
+    if result.returncode != 0:
         return None
     names: set[str] = set()
-    for line in out.splitlines():
+    for line in result.stdout.splitlines():
         line = line.strip()
         if not line:
             continue
@@ -396,14 +436,31 @@ def _diff_added_names(base: str, tip: str) -> set[str] | None:
 # -- NNN assignment -----------------------------------------------------------
 
 
-def next_adr_number(decisions_dir: Path) -> int:
+def next_adr_number(decisions_dir: Path, *, state_git_root: Path | None = None) -> int:
     """Return the next sequential NNN, scanning only finalized ADRs.
 
     Ignores `drafts/` subdirectory entirely. Returns 1 when no finalized
     ADRs exist yet.
+
+    When `state_git_root` is given, the number also accounts for finalized
+    ADRs already on `origin`'s default branch (td-198): a local post-merge
+    hook and a CI finalize backstop can each promote a draft before either
+    has seen the other's push, and comparing against the remote closes that
+    race instead of both claiming the same NNN. Omitting `state_git_root`
+    (the default) preserves the pre-td-198 local-only count exactly -- the
+    behavior every caller that has no git root to offer, direct unit tests
+    among them, continues to get.
     """
+    highest = _local_highest_adr_number(decisions_dir)
+    if state_git_root is not None:
+        highest = max(highest, _remote_highest_adr_number(state_git_root))
+    return highest + 1
+
+
+def _local_highest_adr_number(decisions_dir: Path) -> int:
+    """Highest finalized NNN on disk, or 0 when the directory is empty/absent."""
     if not decisions_dir.is_dir():
-        return 1
+        return 0
     highest = 0
     for entry in decisions_dir.iterdir():
         if not entry.is_file():
@@ -412,19 +469,113 @@ def next_adr_number(decisions_dir: Path) -> int:
         if match is None:
             continue
         highest = max(highest, int(match.group(1)))
-    return highest + 1
+    return highest
+
+
+def _origin_default_branch(state_git_root: Path) -> str:
+    """origin's default branch name, or `DEFAULT_BRANCH_FALLBACK` when unknown.
+
+    Reads `refs/remotes/origin/HEAD` -- the ref a clone (or `git remote
+    set-head origin -a`) populates from the remote's own HEAD -- rather than
+    assuming "main". No network call: this is a local ref read, never a fetch.
+    """
+    ref = git_output(state_git_root, "symbolic-ref", "refs/remotes/origin/HEAD")
+    if ref is None:
+        return DEFAULT_BRANCH_FALLBACK
+    return ref.rsplit("/", 1)[-1]
+
+
+def _fetch_origin_quiet(state_git_root: Path, branch: str) -> bool:
+    """Fetch `origin/<branch>` quietly; True on success, False on any failure.
+
+    Uses `run_git` rather than `git_output`: a `--quiet` fetch prints nothing
+    to stdout even on success, and `git_output` folds an empty stdout and a
+    failed command into the same `None` -- success here can only be read from
+    the exit code.
+    """
+    try:
+        result = run_git(
+            state_git_root,
+            "fetch",
+            "origin",
+            branch,
+            "--quiet",
+            timeout=REMOTE_FETCH_TIMEOUT_SECONDS,
+        )
+    except GitUnavailableError:
+        return False
+    return result.returncode == 0
+
+
+def _remote_highest_adr_number(state_git_root: Path) -> int:
+    """Highest finalized NNN on origin's default branch, or 0 when unknown.
+
+    0 is indistinguishable from "the remote has no finalized ADRs yet" and
+    from "no remote data is available at all" -- both are the correct no-op
+    for the caller's `max(local, remote)`, since 0 never outweighs a real
+    local count. Every failure mode -- no remote configured, offline, a fetch
+    timeout -- collapses to this same 0 after exactly one INFO log line, so a
+    finalize run never fails or blocks on a flaky or absent remote (td-198).
+    """
+    default_branch = _origin_default_branch(state_git_root)
+    if not _fetch_origin_quiet(state_git_root, default_branch):
+        logger.info(
+            "finalize_adrs: could not fetch origin/%s (no remote, offline, or "
+            "timeout); NNN assignment falls back to the local decisions/ "
+            "directory only",
+            default_branch,
+        )
+        return 0
+    listing = git_output(
+        state_git_root,
+        "ls-tree",
+        "--name-only",
+        f"origin/{default_branch}:{STATE_DIR_NAME}/decisions",
+    )
+    if listing is None:
+        return 0
+    highest = 0
+    for name in listing.splitlines():
+        match = FINALIZED_ADR_PATTERN.match(name.strip())
+        if match is not None:
+            highest = max(highest, int(match.group(1)))
+    return highest
+
+
+def _current_branch_name(repo_root: Path) -> str | None:
+    """Raw current branch name (unsanitized), or None on a detached HEAD."""
+    return git_output(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
+
+
+def _is_default_branch(repo_root: Path, state_git_root: Path) -> bool:
+    """True when `repo_root`'s current branch is `state_git_root`'s default.
+
+    Guards the merged-mode fallback in `detect_drafts_to_promote` (td-198):
+    both sides resolve independently, and any failure to determine either one
+    means "unknown," which this treats as False -- the fallback promotes only
+    when it can positively confirm the current branch is the default, never
+    as a guess.
+    """
+    current = _current_branch_name(repo_root)
+    if current is None:
+        return False
+    return current == _origin_default_branch(state_git_root)
 
 
 # -- Promotion ----------------------------------------------------------------
 
 
-def build_promotion_plan(draft_paths: list[Path]) -> list[DraftPlan]:
+def build_promotion_plan(
+    draft_paths: list[Path], *, state_git_root: Path | None = None
+) -> list[DraftPlan]:
     """Build a deterministic per-draft promotion plan from the detected set.
 
     Assigns NNN in filename-sort order for reproducibility across runs.
+    `state_git_root`, when given, is forwarded to `next_adr_number` for
+    origin-aware numbering (td-198); see its docstring.
     """
     sorted_drafts = sorted(draft_paths, key=lambda p: p.name)
-    start = next_adr_number(DECISIONS_DIR)
+    start = next_adr_number(DECISIONS_DIR, state_git_root=state_git_root)
 
     plans: list[DraftPlan] = []
     offset = 0
@@ -442,6 +593,21 @@ def build_promotion_plan(draft_paths: list[Path]) -> list[DraftPlan]:
             old_id = _read_draft_id(draft_path)
         except ValueError as exc:
             logger.warning("finalize_adrs: skipping malformed draft: %s", exc)
+            continue
+
+        already_promoted = _find_already_promoted(DECISIONS_DIR, old_id)
+        if already_promoted is not None:
+            # Idempotent re-promotion guard (td-198): the same draft can
+            # reappear in drafts/ -- a rebase restoring a pre-promotion
+            # commit, a duplicated fragment write -- after another finalizer
+            # already claimed it. Skipping here is what makes a second run
+            # reuse the existing NNN instead of allocating a new one: no plan
+            # entry means no `offset` advance and no second file.
+            logger.info(
+                "finalize_adrs: %s already promoted as %s; skipping re-promotion",
+                draft_path.name,
+                already_promoted.name,
+            )
             continue
         nnn = start + offset
         new_name = f"{nnn:03d}-{slug}.md"
@@ -471,6 +637,32 @@ def _read_draft_id(draft_path: Path) -> str:
     if match is None:
         raise ValueError(f"draft {draft_path.name} has no `id: dec-draft-<hash>` in frontmatter")
     return match.group(2)
+
+
+def _find_already_promoted(decisions_dir: Path, draft_id: str) -> Path | None:
+    """Return the finalized ADR already carrying `draft_id`, or None.
+
+    Enables idempotent re-runs (td-198): a draft can reappear in `drafts/`
+    after a rebase-style merge or a duplicated fragment write even though
+    another finalizer already promoted it, and this is the check that stops
+    a second run from claiming a second NNN for the same decision. Only
+    finalized files written by the `draft_id`-recording `promote_draft`
+    carry the marker -- a decision promoted before this fix has none, so a
+    draft from that era reappearing is not caught here.
+    """
+    if not decisions_dir.is_dir():
+        return None
+    for entry in decisions_dir.iterdir():
+        if not entry.is_file() or FINALIZED_ADR_PATTERN.match(entry.name) is None:
+            continue
+        try:
+            content = entry.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = FRONTMATTER_DRAFT_ID_PATTERN.search(content)
+        if match is not None and match.group(1) == draft_id:
+            return entry
+    return None
 
 
 def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Path, str]:
@@ -513,6 +705,14 @@ def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Pat
     content = new_path.read_text(encoding="utf-8")
     rewritten = FRONTMATTER_ID_PATTERN.sub(rf"\g<1>{new_id}", content, count=1)
     rewritten = FRONTMATTER_STATUS_PROPOSED_PATTERN.sub(r"\g<1>accepted", rewritten, count=1)
+    # Record provenance (td-198, additive schema): `draft_id` is what lets a
+    # second finalizer recognize this decision already has an NNN and reuse
+    # it -- see `_find_already_promoted` -- rather than allocating a second
+    # one for a draft that reappears in `drafts/` after a rebase or a
+    # duplicated fragment write.
+    rewritten = FRONTMATTER_FINALIZED_ID_PATTERN.sub(
+        rf"\g<1>\ndraft_id: {old_id}", rewritten, count=1
+    )
     new_path.write_text(rewritten, encoding="utf-8")
 
     # `git mv` stages the rename from the *index* blob, so the rewrite above
@@ -762,7 +962,7 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
         logger.info("finalize_adrs: nothing to do")
         return 0
 
-    plans = build_promotion_plan(draft_paths)
+    plans = build_promotion_plan(draft_paths, state_git_root=STATE_GIT_ROOT)
     logger.info(_describe_plan(plans))
 
     if dry_run:
@@ -790,7 +990,9 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
             plan.new_id,
         )
 
-    # Cross-reference rewrite across bounded scope, one id at a time.
+    # Cross-reference rewrite across bounded scope, one id at a time. A
+    # promoted ADR's own `draft_id:` frontmatter field is never touched by
+    # this walk -- see `finalize_adrs_crossrefs._DRAFT_ID_LINE_PATTERN`.
     total_rewrites = 0
     for plan in plans:
         count = rewrite_cross_references(REPO_ROOT, plan.old_id, plan.new_id)

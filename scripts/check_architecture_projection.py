@@ -69,6 +69,16 @@ stale decision reference or an empty developer guide is real drift but not
 worth reddening every commit over (measured against the live corpus before
 shipping; see `LEARNINGS.md § Step F2`).
 
+**AC03/AC06/AC07 extend `classify()` further, each with its own substrate.**
+Unlike AC04/AC05, these three do not ride AC13's `.c4`-and-DESIGN.md gate:
+AC03 (>50% of DESIGN.md's §3a Key Files paths unresolved) needs only
+`.ai-state/DESIGN.md`; AC06 (a §3a row's Key Files anchor names a real
+top-level module -- heuristic, see `_check_ac06`) and AC07 (every Key Files
+path in the developer guide resolves) need only `docs/architecture.md`. Each
+runs whenever its own input exists, independent of whether the other two
+authorities are present. All three are `severity: "warn"`, same reasoning as
+AC04/AC05 (measured against the live corpus before shipping).
+
 Cites: rules/writing/aac-dac-conventions.md (model is the structural
 authority, prose is authored); CLAUDE.md§Context Engineering.
 """
@@ -94,7 +104,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # `check_agent_lifecycle_pairing.py`, `check_doc_manifest_freshness.py`), this script
 # never emits a `"check"` key -- there is no runtime id for this declaration to drift
 # from, only Leg 3's static one.
-CHECK_IDS: tuple[str, ...] = ("AC04", "AC05", "AC13")
+CHECK_IDS: tuple[str, ...] = ("AC03", "AC04", "AC05", "AC06", "AC07", "AC13")
 
 SCRIPT_NAME = "check_architecture_projection"
 
@@ -103,11 +113,14 @@ _DESIGN = Path(".ai-state/DESIGN.md")
 _ARCH_DOC = Path("docs/architecture.md")
 _DECISIONS_DIR = Path(".ai-state/decisions")
 
-# AC04/AC05 findings are always advisory: unlike AC13's exit-code-bearing findings,
-# a broken `dec-NNN` reference or a missing developer guide must not flip the
-# `architecture-projection` pre-commit gate red -- see `classify()`.
+# AC03/AC04/AC05/AC06/AC07 findings are always advisory: unlike AC13's exit-code-bearing
+# findings, an illustrative Key Files path or a heuristic module mismatch must not flip
+# the `architecture-projection` pre-commit gate red -- see `classify()`.
+_AC03_SEVERITY = "warn"
 _AC04_SEVERITY = "warn"
 _AC05_SEVERITY = "warn"
+_AC06_SEVERITY = "warn"
+_AC07_SEVERITY = "warn"
 
 # Three digits by construction: finalized files are `<NNN>-<slug>.md` and finalize_adrs.py
 # assigns `\d{3}` ids, so a 4-digit id is not a finalized ADR here. Declared limit: if the
@@ -182,21 +195,35 @@ def structural_components(elements: dict[str, str]) -> set[str]:
 
 
 def parse_section_3a(text: str) -> list[dict[str, str]]:
-    """Rows of the structural-component table, as {component, element}."""
+    """Rows of the structural-component table, as {component, element, key_files}.
+
+    Shared by both authorities: `.ai-state/DESIGN.md`'s header reads "Key Files
+    (illustrative)" and carries an Element column; `docs/architecture.md`'s reads
+    plain "Key Files" and carries none. Matching the header by substring rather
+    than exact text is what lets one parser serve both -- `key_files` is the raw,
+    unsplit cell text; `parse_key_files()` extracts its backtick-quoted paths.
+    """
     lines = text.splitlines()
     try:
         start = next(i for i, line in enumerate(lines) if _SECTION_3A.match(line))
     except StopIteration:
         return []
-    rows, header = [], None
+    rows, header, key_files_header = [], None, None
     for line in lines[start + 1 :]:
         if _SECTION_NEXT.match(line):
             break
         if not line.startswith("|"):
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        # A literal `\|` (e.g. prose citing the Markdown column delimiter itself,
+        # as the live Tech-debt-ledger row does) must not split the row -- an
+        # unprotected split shifts every later column's cell for that row, which
+        # is invisible for Component/Element (already-correct rows never carry a
+        # `\|`) but silently corrupted `key_files` the day a consumer first read it.
+        protected = line.strip().strip("|").replace("\\|", "\x00")
+        cells = [c.strip().replace("\x00", "\\|") for c in protected.split("|")]
         if header is None:
             header = [c.lower() for c in cells]
+            key_files_header = next((h for h in header if "key files" in h), None)
             continue
         if all(set(c) <= {"-", ":", " "} for c in cells):
             continue
@@ -205,9 +232,35 @@ def parse_section_3a(text: str) -> list[dict[str, str]]:
             {
                 "component": row.get("component", "").strip("`"),
                 "element": row.get("element", "").strip("`").strip(),
+                "key_files": row.get(key_files_header, "") if key_files_header else "",
             }
         )
     return rows
+
+
+def parse_key_files(cell: str) -> list[str]:
+    """Backtick-quoted path-like spans in a Key Files column cell.
+
+    Declared limit: any backtick span in the cell is read as a path, including
+    a non-path term an author might drop into that column by mistake -- live
+    rows never do this (Element and Key Files are separate columns), but a
+    violation would inflate AC03/AC07's finding count rather than being
+    silently ignored.
+    """
+    return re.findall(r"`([^`]+)`", cell)
+
+
+def _path_resolves(repo_root: Path, path: str) -> bool:
+    """Whether *path* (a literal path or a glob pattern) matches something on disk.
+
+    A `<placeholder>` segment (e.g. `.ai-work/<task-slug>/`) is illustrative, not
+    literal, so it is normalized to `*` before matching -- otherwise every row
+    using the plan's own `<task-slug>` convention would misreport as unresolved.
+    """
+    pattern = re.sub(r"<[^>]+>", "*", path.rstrip("/"))
+    if "*" in pattern:
+        return any(repo_root.glob(pattern))
+    return (repo_root / pattern).exists()
 
 
 def parse_canonical_block_rows(text: str) -> list[str]:
@@ -365,6 +418,95 @@ def check_projection(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _
 # -- AC04/AC05 (advisory, riding AC13's substrate gate) -----------------------
 
 
+def _check_ac03(repo_root: Path, design_text: str) -> tuple[list[dict], dict]:
+    """WARN when more than half of DESIGN.md's §3a Key Files paths don't resolve.
+
+    An aggregate check, not a per-path one (contrast AC07): the row's own
+    catalogue text is a >50% threshold, not "every path", because DESIGN.md's
+    Key Files column is documented as illustrative -- occasional stale entries
+    are expected, and only a majority-unresolved table signals real drift.
+    """
+    paths = [p for row in parse_section_3a(design_text) for p in parse_key_files(row["key_files"])]
+    if not paths:
+        return [], {"paths_examined": 0}
+    unresolved = [p for p in paths if not _path_resolves(repo_root, p)]
+    if len(unresolved) <= len(paths) / 2:
+        return [], {"paths_examined": len(paths)}
+    sample = ", ".join(unresolved[:5]) + ("..." if len(unresolved) > 5 else "")
+    finding = {
+        "check": "AC03",
+        "severity": _AC03_SEVERITY,
+        "entity": str(_DESIGN),
+        "message": f"{len(unresolved)}/{len(paths)} §3a Key Files path(s) do not resolve: {sample}",
+    }
+    return [finding], {"paths_examined": len(paths)}
+
+
+def _check_ac06(repo_root: Path, arch_text: str) -> tuple[list[dict], dict]:
+    """Every developer-guide §3a Component row anchors to a real top-level module.
+
+    Heuristic, not exact: "module" is derived from the row's first Key Files
+    path segment (e.g. `skills/*/SKILL.md` -> `skills`), not from the free-text
+    Component name -- prose titles ("Agent runtime / Pipeline", "Agents
+    (authored definitions)") do not slugify to a directory name reliably, so
+    matching on name text would both miss real drift (a renamed directory) and
+    invent false drift on every multi-word or punctuated title. Declared
+    limit: this only catches a row whose anchor segment does not exist at all
+    -- a row that cites a real but wrong top-level module is undetectable by
+    this heuristic and needs a human's judgment call, same as AC09.
+    """
+    findings = []
+    rows = parse_section_3a(arch_text)
+    for row in rows:
+        paths = parse_key_files(row["key_files"])
+        if not paths:
+            continue
+        anchor = re.sub(r"<[^>]+>", "", paths[0]).split("/")[0].strip()
+        if anchor and not (repo_root / anchor).exists():
+            findings.append(
+                {
+                    "check": "AC06",
+                    "severity": _AC06_SEVERITY,
+                    "entity": row["component"],
+                    "message": f"Key Files anchor `{anchor}` does not exist as a top-level path",
+                }
+            )
+    return findings, {"rows_examined": len(rows)}
+
+
+def _check_ac07(repo_root: Path, arch_text: str) -> tuple[list[dict], dict]:
+    """Every Key Files path in the developer guide's §3a table resolves on disk.
+
+    Per-path, unlike AC03's aggregate threshold: the developer guide's Key
+    Files column is documented as code-verified (`docs/architecture.md § How
+    to verify your work`), so any single unresolved entry is itself the drift.
+
+    Declared limit: `parse_key_files()` reads each backtick span as a
+    standalone path, so a cell that abbreviates a listing -- `{a,b,c}.md`
+    brace expansion, or a bare filename meant to be read relative to the
+    directory named earlier in the same cell -- reports as unresolved even
+    though a human reader would resolve it correctly. Measured on the live
+    corpus before wiring: this shape produces real, expected WARN noise
+    (never a FAIL), which is why the check stays advisory.
+    """
+    entries = [
+        (row["component"], path)
+        for row in parse_section_3a(arch_text)
+        for path in parse_key_files(row["key_files"])
+    ]
+    findings = [
+        {
+            "check": "AC07",
+            "severity": _AC07_SEVERITY,
+            "entity": path,
+            "message": f"'{path}' (row '{component}') does not resolve to an existing path",
+        }
+        for component, path in entries
+        if not _path_resolves(repo_root, path)
+    ]
+    return findings, {"paths_examined": len(entries)}
+
+
 def _check_ac04(repo_root: Path, design_text: str) -> tuple[list[dict], dict]:
     """Every `dec-NNN` in DESIGN.md or the developer guide resolves to a finalized ADR."""
     arch_path = repo_root / _ARCH_DOC
@@ -409,9 +551,15 @@ def _check_ac05(repo_root: Path) -> tuple[list[dict], dict]:
 
 
 def classify(repo_root: Path) -> dict:
-    """AC04 + AC05 + AC13 in one envelope -- see module docstring for the shape."""
+    """AC03 + AC04 + AC05 + AC06 + AC07 + AC13 in one envelope -- module docstring has the shape.
+
+    Substrate is per-check, not one shared gate: AC13/AC04/AC05 ride AC13's own
+    `.c4`-model-and-DESIGN.md trigger (unchanged since AC04/AC05 shipped), while
+    AC03 needs only DESIGN.md and AC06/AC07 need only the developer guide -- each
+    can run when its own input exists even if the other authority is absent.
+    """
     ac13 = check_projection(repo_root)
-    skipped = ac13["skipped"]
+    ac13_gate_skipped = ac13["skipped"]
 
     ac13_findings = [
         {
@@ -423,32 +571,73 @@ def classify(repo_root: Path) -> dict:
         for f in ac13["findings"]
     ]
 
-    if skipped is not None:
-        ac04_findings, ac04_examined = [], None
-        ac05_findings, ac05_examined = [], None
-    else:
-        design_text = (repo_root / _DESIGN).read_text(encoding="utf-8")
+    design_path, arch_path = repo_root / _DESIGN, repo_root / _ARCH_DOC
+    skipped: dict[str, str | None] = {
+        "AC13": ac13_gate_skipped,
+        "AC04": ac13_gate_skipped,
+        "AC05": ac13_gate_skipped,
+        "AC03": None if design_path.is_file() else f"substrate absent ({_DESIGN})",
+        "AC06": None if arch_path.is_file() else f"substrate absent ({_ARCH_DOC})",
+        "AC07": None if arch_path.is_file() else f"substrate absent ({_ARCH_DOC})",
+    }
+
+    design_text = design_path.read_text(encoding="utf-8") if design_path.is_file() else None
+    arch_text = arch_path.read_text(encoding="utf-8") if arch_path.is_file() else None
+
+    if ac13_gate_skipped is None:
         ac04_findings, ac04_examined = _check_ac04(repo_root, design_text)
         ac05_findings, ac05_examined = _check_ac05(repo_root)
+    else:
+        ac04_findings, ac04_examined = [], None
+        ac05_findings, ac05_examined = [], None
+
+    if skipped["AC03"] is None:
+        ac03_findings, ac03_examined = _check_ac03(repo_root, design_text)
+    else:
+        ac03_findings, ac03_examined = [], None
+
+    if skipped["AC06"] is None:
+        ac06_findings, ac06_examined = _check_ac06(repo_root, arch_text)
+    else:
+        ac06_findings, ac06_examined = [], None
+
+    if skipped["AC07"] is None:
+        ac07_findings, ac07_examined = _check_ac07(repo_root, arch_text)
+    else:
+        ac07_findings, ac07_examined = [], None
 
     return {
         "script": SCRIPT_NAME,
         "checks": list(CHECK_IDS),
-        "findings": ac13_findings + ac04_findings + ac05_findings,
-        "skipped": {"AC04": skipped, "AC05": skipped, "AC13": skipped},
+        "findings": ac13_findings
+        + ac03_findings
+        + ac04_findings
+        + ac05_findings
+        + ac06_findings
+        + ac07_findings,
+        "skipped": skipped,
         "examined": {
+            "AC03": ac03_examined,
             "AC04": ac04_examined,
             "AC05": ac05_examined,
+            "AC06": ac06_examined,
+            "AC07": ac07_examined,
             "AC13": None
-            if skipped is not None
+            if ac13_gate_skipped is not None
             else {"rows": ac13["rows"], "elements": ac13["elements"]},
         },
         "withheld": ac13["withheld"],
         "bound": {
+            "AC03": "AC03 clean means at most half of DESIGN.md's §3a Key Files paths "
+            "are unresolved; the column is documented illustrative, not exhaustive.",
             "AC04": "AC04 clean means every inline dec-NNN in DESIGN.md and the developer "
             "guide resolves to a finalized ADR file; fenced code is not scanned.",
             "AC05": "AC05 clean means docs/architecture.md exists with content whenever "
             ".ai-state/DESIGN.md exists; its substance is AC06-AC09's question.",
+            "AC06": "AC06 clean means every developer-guide §3a row's first Key Files "
+            "path segment names an existing top-level module (heuristic, see docstring).",
+            "AC07": "AC07 clean means every Key Files path in the developer guide's §3a "
+            "table resolves on disk.",
             "AC13": "AC13 clean means DESIGN.md projects both the architecture model and "
             "the shipped-block registry; read withheld before reading zero findings.",
         },

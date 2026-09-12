@@ -902,6 +902,9 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("S02", "check_artifact_conformance"),
     ("S03", "check_artifact_conformance"),
     ("S04", "check_artifact_conformance"),
+    ("AC03", "check_architecture_projection"),
+    ("AC06", "check_architecture_projection"),
+    ("AC07", "check_architecture_projection"),
 ]
 
 

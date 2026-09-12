@@ -400,3 +400,123 @@ def test_severity_splits_fail_for_structural_drift_warn_for_advisory_checks(repo
     severities = {f["check"]: f["severity"] for f in report["findings"]}
     assert severities["AC13"] == "fail"
     assert severities["AC05"] == "warn"
+
+
+# -- AC03/AC06/AC07 -----------------------------------------------------------
+#
+# AC03 needs only DESIGN.md; AC06/AC07 need only the developer guide -- neither
+# rides AC13's `.c4`-and-DESIGN.md gate, unlike AC04/AC05.
+
+
+def _arch_doc(rows: str) -> str:
+    return (
+        "# Architecture\n\n## 3. Components\n\n### 3a. Structural components\n\n"
+        f"| Component | Responsibility | Key Files |\n|---|---|---|\n{rows}"
+    )
+
+
+def _write_arch_doc(repo: Path, rows: str) -> None:
+    arch_path = repo / cap._ARCH_DOC
+    arch_path.parent.mkdir(parents=True, exist_ok=True)
+    arch_path.write_text(_arch_doc(rows), encoding="utf-8")
+
+
+def test_canary_ac03_warns_when_majority_of_key_files_paths_are_unresolved(repo: Path) -> None:
+    """The live shape: a Key Files cell where most backticked paths are stale."""
+    _write_rows(
+        repo, "| Skills | `knowledge.skills` | r | Built | `ghost/a.py`, `ghost/b.py`, `x.md` |\n"
+    )
+    (repo / "x.md").write_text("real", encoding="utf-8")
+    report = cap.classify(repo)
+    ac03 = [f for f in report["findings"] if f["check"] == "AC03"]
+    assert len(ac03) == 1
+    assert ac03[0]["severity"] == "warn"
+
+
+def test_ac03_below_half_unresolved_does_not_warn(repo: Path) -> None:
+    """Inverse guard: a minority of stale paths is the documented illustrative slack."""
+    _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | `ghost/a.py`, `x.md` |\n")
+    (repo / "x.md").write_text("real", encoding="utf-8")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC03"] == []
+
+
+def test_ac03_runs_without_the_c4_model_present(repo: Path) -> None:
+    """AC03 does not ride AC13's substrate gate -- DESIGN.md alone is enough."""
+    (repo / cap._MODEL).unlink()
+    _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | `ghost/a.py` |\n")
+    report = cap.classify(repo)
+    assert report["skipped"]["AC13"] is not None
+    assert report["skipped"]["AC03"] is None
+    ac03 = [f for f in report["findings"] if f["check"] == "AC03"]
+    assert len(ac03) == 1
+
+
+def test_canary_ac06_flags_a_row_whose_key_files_anchor_does_not_exist(repo: Path) -> None:
+    """The live shape: a component's first Key Files path names a nonexistent top-level dir."""
+    _write_arch_doc(repo, "| Ghost Component | r | `ghost-dir/file.py` |\n")
+    report = cap.classify(repo)
+    ac06 = [f for f in report["findings"] if f["check"] == "AC06"]
+    assert len(ac06) == 1
+    assert ac06[0]["entity"] == "Ghost Component"
+    assert ac06[0]["severity"] == "warn"
+
+
+def test_ac06_passes_when_the_anchor_exists(repo: Path) -> None:
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
+    _write_arch_doc(repo, "| Scripts | r | `scripts/foo.py` |\n")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC06"] == []
+
+
+def test_ac06_runs_without_design_md_present(repo: Path) -> None:
+    """AC06 does not ride AC13's substrate gate -- the developer guide alone is enough."""
+    (repo / cap._DESIGN).unlink(missing_ok=True)
+    _write_arch_doc(repo, "| Ghost Component | r | `ghost-dir/file.py` |\n")
+    report = cap.classify(repo)
+    assert report["skipped"]["AC06"] is None
+    assert [f for f in report["findings"] if f["check"] == "AC06"] != []
+
+
+def test_canary_ac07_flags_an_unresolved_key_files_path(repo: Path) -> None:
+    """The live shape: an individual stale path in an otherwise-real Key Files cell."""
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
+    _write_arch_doc(repo, "| Scripts | r | `scripts/foo.py`, `scripts/ghost.py` |\n")
+    report = cap.classify(repo)
+    ac07 = [f for f in report["findings"] if f["check"] == "AC07"]
+    assert len(ac07) == 1
+    assert ac07[0]["entity"] == "scripts/ghost.py"
+
+
+def test_ac07_passes_when_every_path_resolves(repo: Path) -> None:
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
+    _write_arch_doc(repo, "| Scripts | r | `scripts/foo.py` |\n")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC07"] == []
+
+
+def test_ac07_normalizes_a_placeholder_segment_to_a_glob(repo: Path) -> None:
+    """A `<task-slug>`-style placeholder is illustrative, not literal (light-review parity
+    with AC04's fenced-block exclusion): a real subdirectory must still satisfy it."""
+    (repo / ".ai-work" / "some-task").mkdir(parents=True)
+    _write_arch_doc(repo, "| Pipeline | r | `.ai-work/<task-slug>/` |\n")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC07"] == []
+
+
+def test_canary_a_literal_escaped_pipe_in_prose_does_not_corrupt_later_columns(
+    repo: Path,
+) -> None:
+    """Regression for the live corpus shape: a row citing the Markdown delimiter `\\|`
+    inside its Responsibility prose must not shift the Key Files column into that prose."""
+    _write_arch_doc(
+        repo,
+        "| Tech-debt ledger | Separator avoids the delimiter `\\|` in prose. | `scripts/foo.py` |\n",
+    )
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] in {"AC06", "AC07"}] == []

@@ -448,7 +448,7 @@ Record counts and paths. This inventory is the "actual state" that Pass 1 compar
 
 Run every `A` row: the family scripts first (table below), then the remaining script-backed rows, then whatever is left batched into single Bash calls with `echo` separators and `&&`. Record PASS/WARN/FAIL per check with evidence. Target **~15–20 turns** for the whole pass, not 50+. (The former ad-hoc `wc -c` budget fence is gone: T02 runs `measure_token_budget.py`, the one governed basis — an inline recount over a different file set was a second, contradicting number.)
 
-**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped` first (keyed by `<id>` for a multi-check script, flat for a single-check one) and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound` (keyed the same way) verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
+**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped` first (keyed by `<id>`; the one flat single-check envelope is DL03's — read whichever shape the script emits) and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound` (keyed the same way) verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
 
 | Substrate (skip when absent) | Invocation | Rows |
 |---|---|---|

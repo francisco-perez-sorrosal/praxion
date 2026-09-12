@@ -11,7 +11,7 @@ one-off table/section walkers (X03, X09).
   files. `README.md`/`CLAUDE.md` are excluded from the `agents/`/`commands/`
   globs for the same reason X01's sibling C05 excludes them: neither is the
   artifact type its directory's glob names.
-* **F02** (fail) -- every bare `references/<name>.md` path a `SKILL.md`
+* **F02** (warn) -- every bare `references/<name>.md` path a `SKILL.md`
   names, that is genuinely a same-skill reference (see extraction below),
   exists under that skill's own directory.
 * **F05** (fail) -- Conditional on `.ai-state/SYSTEM_DEPLOYMENT.md`; every
@@ -287,7 +287,11 @@ def _check_f02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
                 findings.append(
                     {
                         "check": "F02",
-                        "severity": "fail",
+                        # WARN, not FAIL: the detector has a declared false-positive class
+                        # (a bare prose mention of another skill's leaf) measured at
+                        # 5/5 of its live findings -- a declared-limit detector reports
+                        # at the severity its precision earns (verifier F-1).
+                        "severity": "warn",
                         "entity": f"skills/{skill_dir.name}:{ref}",
                         "message": f"'{ref}' named in skills/{skill_dir.name}/SKILL.md does "
                         "not exist under that skill",

@@ -53,8 +53,17 @@ _SCRIPT_NAME_MAX_CHARS = 40  # the longest live script name is
 # defeats it) and a citation living in the Rule cell rather than the Pass cell (Leg 1
 # scans the whole row, see `_rows_by_cited_script`, not just the Pass column). The
 # trailing `\b` additionally keeps `scripts/x.pyc` from being read as citing `x`.
+# A citation is an INVOCATION -- `python3 scripts/<name>.py` (optionally `python`, optionally
+# `./scripts/`) -- anywhere in the row, whatever its Tp. The live catalogue falsified the
+# earlier "only Tp=A rows invoke scripts" premise: CA02 is Tp=L and genuinely runs
+# check_calibration_coverage.py, while AC09 (also Tp=L) merely *mentions* AC13's script in
+# prose. `Tp` encodes how the verdict is reached, not whether a script runs; the invocation
+# phrase is what separates a run from a mention, and it is the same shape
+# `fitness/tests/test_gate_canary_coverage.py::_delegated_gates` keys on, so Leg 1 and the
+# canary-coverage consumer agree on what "dispatched" means. Space run bounded (no `\s+`)
+# so the pattern passes the unbounded-quantifier meta-guard.
 _SCRIPT_CITATION = re.compile(
-    rf"(?<![\w/.-])(?:\./)?scripts/(?P<script>[a-z0-9_]{{1,{_SCRIPT_NAME_MAX_CHARS}}})\.py\b"
+    rf"\bpython3?[ ]{{1,4}}(?:\./)?scripts/(?P<script>[a-z0-9_]{{1,{_SCRIPT_NAME_MAX_CHARS}}})\.py\b"
 )
 
 # Rows that cite a script the registry already names, but in the pre-extraction legacy
@@ -90,20 +99,13 @@ def _rows_by_cited_script(sentinel_text: str) -> dict[str, set[str]]:
     doesn't ask for. A row naming two scripts registers under both; a name longer than
     `_SCRIPT_NAME_MAX_CHARS` is a parse miss rather than a silent accept.
 
-    Scoped to Tp-A (automated) rows: only a Tp=A row actually invokes a script, so only
-    it can carry a genuine citation in Leg 1's sense. A Tp=L (LLM-judged) row may still
-    *mention* a script's name in explanatory prose without invoking it -- the live
-    catalogue's AC09 does exactly this, cross-referencing AC13's script while running no
-    script of its own -- and counting that mention as a citation would wrongly demand a
-    registry entry for a row that has no script to register. Narrowing on Tp rather than
-    exempting AC09 by id keeps the scope a property of the row's own declared type, not
-    a second hand-maintained allow-list next to `_LEGACY_CITING_ROWS`.
+    Not scoped by Tp: a citation is an invocation phrase (see `_SCRIPT_CITATION`), so a
+    Tp=L row that runs a script (CA02) is seen and a Tp=L row that only mentions one
+    (AC09) is not -- without an allow-list next to `_LEGACY_CITING_ROWS`.
     """
     by_script: dict[str, set[str]] = {}
     for row in contract._TABLE_ROW.finditer(sentinel_text):
         text = row.group(0)
-        if contract._tp_column(text) != "A":
-            continue
         for citation in _SCRIPT_CITATION.finditer(text):
             by_script.setdefault(citation.group("script"), set()).add(row.group("id"))
     return by_script
@@ -279,7 +281,7 @@ def test_row_citing_script_with_dotslash_prefix_is_detected_as_a_citation() -> N
     as citing the script -- a second such row with no registry entry fails Leg 1, proving
     the citation was seen rather than silently skipped because of the `./` prefix.
     """
-    dotslash = _triangle_row("X02").replace("python3 scripts/x.py", "./scripts/x.py")
+    dotslash = _triangle_row("X02").replace("python3 scripts/x.py", "python3 ./scripts/x.py")
     doc = _triangle_doc(_triangle_row("X01"), dotslash)
     try:
         assert_check_registration_triangle(
@@ -297,7 +299,9 @@ def test_row_citing_script_in_rule_cell_is_detected_as_a_citation() -> None:
     cell, must still be detected -- a row with no registry entry fails Leg 1 rather than
     being invisible because `_rows_by_cited_script` only looked at the Pass column.
     """
-    rule_cell_citation = "| X02 | A | mirrors scripts/x.py | verdict text, no citation here |"
+    rule_cell_citation = (
+        "| X02 | A | mirrors `python3 scripts/x.py` | verdict text, no citation here |"
+    )
     doc = _triangle_doc(_triangle_row("X01"), rule_cell_citation)
     try:
         assert_check_registration_triangle(
@@ -310,12 +314,31 @@ def test_row_citing_script_in_rule_cell_is_detected_as_a_citation() -> None:
     raise AssertionError("a row citing the script in its Rule cell must fail Leg 1")
 
 
+def test_tp_l_row_invoking_a_script_is_a_citation() -> None:
+    """Leg 1 canary (light-review N1): a Tp=L row that INVOKES a registered script -- the
+    shape the live catalogue's CA02 takes -- is a citation and must fail Leg 1 when it has
+    no registry entry. A Tp-based scope lost exactly this row.
+    """
+    invoking_l_row = (
+        "| Z02 | L | enum-distribution analysis | Read `enum_compliance` from "
+        "`python3 scripts/x.py --json`, then judge the distribution |"
+    )
+    doc = _triangle_doc(_triangle_row("X01"), invoking_l_row)
+    try:
+        assert_check_registration_triangle(
+            doc, [("X01", "x")], _fixed_source('CHECK_IDS = ("X01",)\n')
+        )
+    except AssertionError as exc:
+        if "Leg 1" not in str(exc):
+            raise AssertionError(f"expected the Leg 1 message, got: {exc}") from exc
+        return
+    raise AssertionError("a Tp=L row invoking a registered script slipped past Leg 1")
+
+
 def test_tp_l_row_mentioning_a_script_is_not_a_citation() -> None:
-    """Inverse guard (live-catalogue re-probe): a Tp=L row that mentions a registered
-    script's name in explanatory prose -- the shape the live catalogue's AC09 takes,
-    cross-referencing AC13's script -- must not be read as citing it. Without the Tp=A
-    scope, this row would fail Leg 1 for having no registry entry, even though it
-    invokes no script at all.
+    """Inverse guard: a Tp=L row that only MENTIONS a registered script's name in prose
+    (the live catalogue's AC09, cross-referencing AC13's script) is not a citation --
+    there is no invocation phrase -- so it must not be asked for a registry entry.
     """
     prose_mention = (
         "| Z09 | L | cross-consistency check | prose that discusses "

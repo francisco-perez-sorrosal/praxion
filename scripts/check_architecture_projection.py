@@ -68,8 +68,13 @@ from _repo_root import resolve_repo_root
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 # The check ids this script's row surface declares -- a literal tuple so the row/registry/
-# script Triangle in `tests/test_sentinel_row_contract.py` can read it without importing
-# this module. Additive only: a new id lands here in the same commit that writes its row.
+# script Triangle in `tests/test_sentinel_check_triangle.py` can read it via AST without
+# importing this module. Additive only: a new id lands here in the same commit that
+# writes its row. Registry-facing only: unlike CHECK_ID in the flat-declaration pilot
+# scripts (`check_agent_prompt_size.py`, `check_adr_reciprocity.py`,
+# `check_agent_lifecycle_pairing.py`, `check_doc_manifest_freshness.py`), this script
+# never emits a `"check"` key -- there is no runtime id for this declaration to drift
+# from, only Leg 3's static one.
 CHECK_IDS: tuple[str, ...] = ("AC13",)
 
 _MODEL = Path("docs/diagrams/architecture/src/architecture.c4")

@@ -265,16 +265,41 @@ def _dl03_report(index_content: str, adr_count: int) -> dict:
                 "message": f"{INDEX_PATH} is stale ({adr_count} entries in source of truth).",
             }
         )
+    # `collect_adrs` drops a finalized file that lacks a REQUIRED_FIELD (stderr
+    # warning, no row), so such a file is absent from BOTH sides of the diff above
+    # and the index would read as current with one ADR missing -- the case the
+    # sentinel's old glob-count-vs-row-count fence caught. Count the files the
+    # filename pattern admits and report the gap as its own finding (light-review
+    # C2, F1). Non-recursive on purpose: drafts/ is excluded by design.
+    file_count = (
+        sum(1 for f in DECISIONS_DIR.iterdir() if ADR_FILENAME_PATTERN.match(f.name))
+        if DECISIONS_DIR.is_dir()
+        else 0
+    )
+    if file_count != adr_count:
+        findings.append(
+            {
+                "check": CHECK_ID,
+                "severity": SEVERITY,
+                "entity": str(DECISIONS_DIR),
+                "message": (
+                    f"{file_count - adr_count} finalized ADR file(s) on disk could not be "
+                    "parsed into the index (missing required frontmatter) -- the index is "
+                    "incomplete even if it is not stale."
+                ),
+            }
+        )
     return {
         "check": CHECK_ID,
         "skipped": None,
-        "examined": {"adrs": adr_count},
+        "examined": {"adrs": adr_count, "files": file_count},
         "findings": findings,
         "info": {},
         "withheld": [],
         "bound": (
-            "DL03 clean means DECISIONS_INDEX.md reflects every finalized ADR's current "
-            "frontmatter; draft fragments under drafts/ are excluded by design, not a gap."
+            "DL03 clean means DECISIONS_INDEX.md reflects the current frontmatter of every "
+            "finalized ADR file on disk, and every such file parsed into a row; draft "
+            "fragments under drafts/ are excluded by design, not a gap."
         ),
     }
 

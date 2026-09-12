@@ -768,10 +768,7 @@ def test_reordered_parts_is_rejected() -> None:
 
 EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("AC13", "check_architecture_projection"),
-    ("DH02", "adr_health"),
-    ("DH04", "adr_health"),
     ("DH05", "adr_health"),
-    ("DL03", "regenerate_adr_index"),
     ("DL06", "check_adr_reciprocity"),
     ("T03", "check_agent_prompt_size"),
     ("F11", "check_doc_manifest_freshness"),
@@ -795,6 +792,9 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("V02", "check_sentinel_self_audit"),
     ("V03", "check_sentinel_self_audit"),
     ("V04", "check_sentinel_self_audit"),
+    ("DH02", "adr_health"),
+    ("DH04", "adr_health"),
+    ("DL03", "regenerate_adr_index"),
 ]
 
 

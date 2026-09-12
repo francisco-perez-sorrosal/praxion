@@ -261,4 +261,37 @@ def test_json_reports_clean_after_regeneration(cli_repo_root: Path):
 
     assert result.returncode == 0
     assert report["findings"] == []
-    assert report["examined"] == {"adrs": 1}
+    assert report["examined"] == {"adrs": 1, "files": 1}
+
+
+def test_draft_fragment_is_excluded_and_never_flagged(cli_repo_root: Path):
+    """DL03's one unique invariant (light-review C2, F3): a fragment under drafts/ is not
+    a finalized ADR -- it must neither count as a file nor make a fresh index read stale."""
+    assert _run_cli(["--repo-root", str(cli_repo_root)]).returncode == 0
+    drafts = cli_repo_root / ".ai-state" / "decisions" / "drafts"
+    drafts.mkdir()
+    (drafts / "20260101-0000-user-branch-a-slug.md").write_text(
+        "---\nid: dec-draft-0badc0de\ntitle: T\nstatus: proposed\ncategory: behavioral\n"  # id-citation-discipline:ignore -- fixture literal
+        "date: 2026-01-01\nsummary: s\ntags: []\n---\n",
+        encoding="utf-8",
+    )
+    report = json.loads(_run_cli(["--repo-root", str(cli_repo_root), "--check", "--json"]).stdout)
+    assert report["findings"] == []
+    assert report["examined"] == {"adrs": 1, "files": 1}
+
+
+def test_unparseable_finalized_adr_is_flagged_as_missing_from_index(cli_repo_root: Path):
+    """Light-review C2, F1: a finalized file the parser drops (missing a required field)
+    is absent from both sides of the staleness diff, so a fresh index would read as
+    current with one ADR missing. The file/row count gap must fire its own finding."""
+    assert _run_cli(["--repo-root", str(cli_repo_root)]).returncode == 0
+    decisions = cli_repo_root / ".ai-state" / "decisions"
+    (decisions / "002-b.md").write_text(
+        "---\nid: dec-002\ntitle: T\nstatus: accepted\n---\n", encoding="utf-8"
+    )
+    result = _run_cli(["--repo-root", str(cli_repo_root), "--check", "--json"])
+    report = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert report["examined"] == {"adrs": 1, "files": 2}
+    assert [f["check"] for f in report["findings"]] == ["DL03"]
+    assert "could not be parsed" in report["findings"][0]["message"]

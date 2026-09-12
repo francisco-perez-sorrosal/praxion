@@ -1,3 +1,42 @@
+## v0.30.2 (2026-09-12)
+
+### Feat
+
+- **sentinel**: fold T01/T04 into the prompt-size family; every residual row now scripted
+- **sentinel**: fold AC03/AC06/AC07 into the architecture-projection family
+- **sentinel**: extract the artifact-conformance family (Batch G) under the family form
+- **sentinel**: family row form (dec-380 amendment); Triangle meta-guards closed (td-202)
+- **agents**: implementer turn cap 80 -> 100 with write-early ordering
+- **scripts**: collapse Family dispatch table into one aggregator call
+- **sentinel**: extract BC01/BC03/BC04 behavioral-contract family
+- **sentinel**: extract the registry-projection family; consolidate family dispatch
+- **sentinel**: extract HK01 into check_hackathon_graduation.py
+- **sentinel**: extract the test-topology family into a script
+- **sentinel**: extract F10 and the state-corpus family into scripts
+- **sentinel**: extract P07 and the staleness-marker family into scripts
+- **gates**: reject AI-authorship trailers at commit-msg (td-196)
+
+### Fix
+
+- **sentinel**: digest carries bound and withheld; family form rejects a third part; ADR summary parses
+- **scripts**: EC02 counts commands, skills and docs as reference surfaces
+- **scripts**: finalize_adrs numbers against origin, promotes idempotently, falls back on the default branch (td-198)
+- **scripts**: path-resolution gate covers every F01 substrate; F02 cross-skill probe
+- **scripts**: BC01 recognises every YAML spelling of the paths key
+- **sentinel**: F02 row and canary at WARN; keyed bound for the projection family
+- **sentinel**: F02 advisory, keyed bound for the projection family, byte-ceiling guard
+- **sentinel**: AC04/AC05 dispatch severity, fenced-id exclusion, AC05 empty-arm canary
+- **scripts**: DL03 counts on-disk ADR files, registry in append order
+- **tests**: Triangle Leg 1 detects citations by invocation shape, not row type
+- **tests**: import the Triangle sibling by bare name, not tests.<module>
+- **sentinel**: close A0 light-review findings, split Triangle guard test file
+- **scripts**: guard the hooks import in the id-citation gate
+- **scripts**: stop crediting inert skillOverrides in the listing (td-197)
+
+### Refactor
+
+- **scripts**: extract check-envelope aggregators under the 50-line ceiling
+
 ## v0.30.1 (2026-09-11)
 
 ### Feat

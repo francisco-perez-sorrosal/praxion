@@ -67,6 +67,11 @@ from _repo_root import resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+# The check ids this script's row surface declares -- a literal tuple so the row/registry/
+# script Triangle in `tests/test_sentinel_row_contract.py` can read it without importing
+# this module. Additive only: a new id lands here in the same commit that writes its row.
+CHECK_IDS: tuple[str, ...] = ("AC13",)
+
 _MODEL = Path("docs/diagrams/architecture/src/architecture.c4")
 _DESIGN = Path(".ai-state/DESIGN.md")
 # The shipped-block registry, read from the tree under inspection. Both this and

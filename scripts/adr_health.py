@@ -91,6 +91,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 # -- Constants ----------------------------------------------------------------
 
+# The check ids this script's row surface declares -- a literal tuple so the row/registry/
+# script Triangle in `tests/test_sentinel_row_contract.py` can read it without importing
+# this module. Additive only: a new id lands here in the same commit that writes its row.
+CHECK_IDS: tuple[str, ...] = ("DH05",)
+
 # A path *shape* teaching a convention, never a concrete file.
 _SHAPE = re.compile(r"<[^>]*>|\*|\{\{|\bNNN\b|\bYYYY\b")
 

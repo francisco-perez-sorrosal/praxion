@@ -525,3 +525,15 @@ repos:
         language: system
         files: '^(rules/swe/agent-behavioral-contract\.md|agents/[^/]+\.md|skills/code-review/references/report-template\.md|scripts/check_behavioral_contract\.py)$'
         pass_filenames: false
+
+      # Block Q — ADR health (DH02 DH04 DH05). Advisory (no --check): decay and
+      # re-open candidates are corpus state the sentinel reports, not a property
+      # of the commit touching one ADR; the DH01/DH03/DH06 readers are unchanged.
+      # Added at the residual pipeline's verifier round (AC-5(b): every family
+      # script carries an entry) -- the C2 re-point had assumed one existed.
+      - id: adr-health
+        name: ADR health (advisory)
+        entry: python3 scripts/adr_health.py --repo-root . --json
+        language: system
+        files: '^(\.ai-state/decisions/.*|scripts/adr_health\.py)$'
+        pass_filenames: false

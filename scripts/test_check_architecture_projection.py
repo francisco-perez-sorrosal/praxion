@@ -350,6 +350,33 @@ def test_canary_ac05_flags_a_missing_developer_guide(repo: Path) -> None:
     assert "does not exist" in ac05[0]["message"]
 
 
+def test_canary_ac05_flags_an_empty_developer_guide(repo: Path) -> None:
+    """The other arm of AC05 (light-review F2): the file exists but carries no content."""
+    _write_rows(repo, ALL_THREE)
+    (repo / "docs").mkdir(parents=True, exist_ok=True)
+    (repo / cap._ARCH_DOC).write_text("\n\n", encoding="utf-8")
+    report = cap.classify(repo)
+    ac05 = [f for f in report["findings"] if f["check"] == "AC05"]
+    assert len(ac05) == 1
+    assert ac05[0]["severity"] == "warn"
+
+
+def test_ac04_ignores_a_dec_id_inside_a_fenced_block(repo: Path) -> None:
+    """An illustrative `dec-NNN` inside ``` fences is not a reference (light-review F2, F3);
+    the same id outside a fence still must be flagged."""
+    _write_rows(repo, ALL_THREE)
+    design = repo / ".ai-state" / "DESIGN.md"
+    design.write_text(
+        design.read_text(encoding="utf-8") + "\n```\nsee dec-998\n```\n", encoding="utf-8"
+    )
+    assert [f for f in cap.classify(repo)["findings"] if f["check"] == "AC04"] == []
+    design.write_text(
+        design.read_text(encoding="utf-8") + "\nprose cites dec-998\n", encoding="utf-8"
+    )
+    ac04 = [f for f in cap.classify(repo)["findings"] if f["check"] == "AC04"]
+    assert [f["entity"] for f in ac04] == ["dec-998"]
+
+
 def test_developer_guide_with_content_passes(repo: Path) -> None:
     _write_rows(repo, ALL_THREE)
     (repo / "docs").mkdir(parents=True, exist_ok=True)

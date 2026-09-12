@@ -109,7 +109,13 @@ _DECISIONS_DIR = Path(".ai-state/decisions")
 _AC04_SEVERITY = "warn"
 _AC05_SEVERITY = "warn"
 
+# Three digits by construction: finalized files are `<NNN>-<slug>.md` and finalize_adrs.py
+# assigns `\d{3}` ids, so a 4-digit id is not a finalized ADR here. Declared limit: if the
+# corpus ever passes dec-999 the filename schema changes first and this pattern with it.
 _DEC_ID_RE = re.compile(r"\bdec-(\d{3})\b")
+# Fenced code is illustrative, not a reference: an ADR id inside ``` ... ``` is dropped
+# before scanning (light-review F2, F3).
+_FENCED_BLOCK_RE = re.compile(r"```.*?```", re.S)
 # The shipped-block registry, read from the tree under inspection. Both this and
 # the two paths above resolve against `repo_root`, so every authority the check
 # compares comes from the same tree.
@@ -366,7 +372,9 @@ def _check_ac04(repo_root: Path, design_text: str) -> tuple[list[dict], dict]:
     if arch_path.is_file():
         texts.append(arch_path.read_text(encoding="utf-8"))
 
-    dec_ids = sorted({m.group(1) for text in texts for m in _DEC_ID_RE.finditer(text)})
+    dec_ids = sorted(
+        {m.group(1) for text in texts for m in _DEC_ID_RE.finditer(_FENCED_BLOCK_RE.sub("", text))}
+    )
     decisions_dir = repo_root / _DECISIONS_DIR
     findings = [
         {

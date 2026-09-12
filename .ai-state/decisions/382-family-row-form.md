@@ -1,5 +1,6 @@
 ---
-id: dec-draft-239ddd67
+id: dec-382
+draft_id: dec-draft-239ddd67
 title: Family row form — a two-part sentinel row for scripts dispatched from the Family table
 status: accepted
 category: behavioral

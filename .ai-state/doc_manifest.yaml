@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-12T19:40:43Z'
+generated_at: '2026-09-12T20:06:56Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2864,6 +2864,12 @@ surfaces:
   title: Sentinel residual extraction uses family check scripts, bound by a row/registry/script triangle
   last_modified: '2026-09-12'
   renderer: adr_card
+- id: ai-state-decisions-382-family-row-form
+  path: .ai-state/decisions/382-family-row-form.md
+  type: markdown
+  title: "Family row form \u2014 a two-part sentinel row for scripts dispatched from the Family table"
+  last_modified: '2026-09-12'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -2876,12 +2882,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_21-27-47.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-05'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-06-08-49-10
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-06_08-49-10.md
   type: markdown
@@ -2934,6 +2934,12 @@ surfaces:
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-12_02-10-28.md
   type: markdown
   title: "Sentinel Report \u2014 2026-09-12_02-10-28"
+  last_modified: '2026-09-12'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-09-12-12-49-16
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-12_12-49-16.md
+  type: markdown
+  title: Sentinel Report
   last_modified: '2026-09-12'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
@@ -3543,6 +3549,7 @@ groups:
   - ai-state-decisions-379-retire-worktree-guard-hooks
   - ai-state-decisions-380-sentinel-check-extraction-contract
   - ai-state-decisions-381-sentinel-family-check-scripts
+  - ai-state-decisions-382-family-row-form
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3567,7 +3574,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
-  - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-08-49-10
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
@@ -3577,6 +3583,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-06-12-31-26
   - ai-state-sentinel-reports-sentinel-report-2026-09-11-17-10-27
   - ai-state-sentinel-reports-sentinel-report-2026-09-12-02-10-28
+  - ai-state-sentinel-reports-sentinel-report-2026-09-12-12-49-16
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

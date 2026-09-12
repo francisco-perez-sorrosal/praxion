@@ -514,3 +514,14 @@ repos:
         language: system
         files: '^(skills/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
         pass_filenames: false
+
+      # Block U — behavioral-contract family (BC01 BC03 BC04). Advisory
+      # (no --check): the substrate is one always-loaded rule, the agent
+      # roster, and one report template; scoped to those surfaces plus the
+      # script itself.
+      - id: behavioral-contract
+        name: Behavioral contract (advisory)
+        entry: python3 scripts/check_behavioral_contract.py --repo-root .
+        language: system
+        files: '^(rules/swe/agent-behavioral-contract\.md|agents/[^/]+\.md|skills/code-review/references/report-template\.md|scripts/check_behavioral_contract\.py)$'
+        pass_filenames: false

@@ -43,8 +43,15 @@ root (e.g. `../sibling/SKILL.md`) is still checked against the repo root and
 will read as missing; a literal filename template using a placeholder
 segment without bracket/brace/asterisk delimiters (e.g.
 `SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md`) is indistinguishable from a real
-missing file. F01 is WARN precisely because of this: a declared-limit
-detector over-reports before it under-reports, and severity reflects that.
+missing file; an illustrative path in flowing prose ("a file such as
+`docs/foo.md`") is the dominant live noise class -- measured at roughly half
+of F01's findings on this corpus -- and is accepted rather than guessed at.
+Fenced code blocks are dropped before scanning by counting ``` fences, so a
+document with unbalanced fences flips which half is scanned; declared, not
+guarded. Class (b) tokens without a `/` (a bare `scripts` word) yield no
+candidate by construction. F01 is WARN precisely because of all this: a
+declared-limit detector over-reports before it under-reports, and severity
+reflects that.
 
 F02 extraction and declared limits: a `SKILL.md` commonly cites *other*
 skills' `references/` files -- via a markdown link whose href carries the
@@ -283,20 +290,28 @@ def _check_f02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
             continue
         for ref in sorted(_f02_references(text)):
             refs_examined += 1
-            if not (skill_dir / ref).exists():
-                findings.append(
-                    {
-                        "check": "F02",
-                        # WARN, not FAIL: the detector has a declared false-positive class
-                        # (a bare prose mention of another skill's leaf) measured at
-                        # 5/5 of its live findings -- a declared-limit detector reports
-                        # at the severity its precision earns (verifier F-1).
-                        "severity": "warn",
-                        "entity": f"skills/{skill_dir.name}:{ref}",
-                        "message": f"'{ref}' named in skills/{skill_dir.name}/SKILL.md does "
-                        "not exist under that skill",
-                    }
-                )
+            if (skill_dir / ref).exists():
+                continue
+            # A bare `references/x.md` mention that exists under ANOTHER skill is a
+            # cross-skill mention in prose, not a missing own-leaf: the "known
+            # skill names" registry the earlier limit asked for is `skills/` itself
+            # (light-review E2, F-2). Closes 4 of the 5 measured false positives;
+            # the remaining declared class is a leaf that exists nowhere yet.
+            if any((other / ref).exists() for other in skill_dirs if other != skill_dir):
+                continue
+            findings.append(
+                {
+                    "check": "F02",
+                    # WARN, not FAIL: the detector has a declared false-positive class
+                    # (a bare prose mention of another skill's leaf) measured at
+                    # 5/5 of its live findings -- a declared-limit detector reports
+                    # at the severity its precision earns (verifier F-1).
+                    "severity": "warn",
+                    "entity": f"skills/{skill_dir.name}:{ref}",
+                    "message": f"'{ref}' named in skills/{skill_dir.name}/SKILL.md does "
+                    "not exist under that skill",
+                }
+            )
     return findings, None, {"skill_dirs": len(skill_dirs), "refs_examined": refs_examined}
 
 

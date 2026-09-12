@@ -83,6 +83,20 @@ def test_f02_flags_missing_own_reference(tmp_path: Path) -> None:
     assert all(f["severity"] == "warn" for f in findings)
 
 
+def test_f02_ignores_a_bare_mention_of_another_skills_leaf(tmp_path: Path) -> None:
+    """Light-review E2, F-2: a bare `references/x.md` that exists under another skill is a
+    cross-skill mention, not a missing own-leaf; the same mention with no home anywhere
+    is still flagged (declared residual)."""
+    _write(tmp_path / "skills" / "other" / "references" / "leaf.md", "# leaf\n")
+    _write(tmp_path / "skills" / "other" / "SKILL.md", "# other\n")
+    _write(
+        tmp_path / "skills" / "widget" / "SKILL.md",
+        "see `references/leaf.md` and `references/nowhere.md`\n",
+    )
+    findings = [f for f in classify(tmp_path)["findings"] if f["check"] == "F02"]
+    assert [f["entity"] for f in findings] == ["skills/widget:references/nowhere.md"]
+
+
 def test_f02_ignores_cross_skill_href(tmp_path: Path) -> None:
     """A markdown link's href, not its text, decides own-skill-vs-not: a
     `../other-skill/references/x.md` href is cross-skill even if the link

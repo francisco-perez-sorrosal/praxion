@@ -512,7 +512,7 @@ repos:
         name: Path resolution (advisory)
         entry: python3 scripts/check_path_resolution.py --repo-root .
         language: system
-        files: '^(skills/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
+        files: '^(skills/.*\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
         pass_filenames: false
 
       # Block U — behavioral-contract family (BC01 BC03 BC04). Advisory

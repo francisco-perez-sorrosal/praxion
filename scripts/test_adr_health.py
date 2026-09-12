@@ -917,3 +917,33 @@ def test_full_supersession_of_a_different_id_than_the_partial_edge_is_not_a_conf
         extra_fields={"supersedes": "dec-002", "superseded_by": "dec-003"},
     )
     assert _conflicts(adr_health.classify(repo)) == []
+
+
+# -- DH02/DH04 CHECK_IDS re-point: envelope shape unchanged (Triangle extension) ---
+
+
+def test_check_ids_repoint_leaves_envelope_shape_unchanged(repo: Path) -> None:
+    """DH02/DH04 join `CHECK_IDS` with zero new comparison logic (R2 re-point).
+
+    The pre-existing top-level keys every other consumer (DH01/DH03/DH06, the
+    `adr-frontmatter-promotion` pre-commit path, `finalize_adrs.py`) reads must
+    still be present and hold their pre-existing types after the re-point --
+    a re-point that quietly renamed or dropped one would break every sibling
+    reader without touching a single test of theirs.
+    """
+    report = adr_health.classify(repo)
+    assert report.keys() >= {
+        "scanned_references",
+        "adrs",
+        "findings",
+        "withheld",
+        "skipped_terminal",
+        "reopen_candidates",
+        "category_mix",
+        "summary",
+        "status_edge_conflicts",
+    }
+    assert isinstance(report["findings"], list)
+    assert isinstance(report["reopen_candidates"], list)
+    assert isinstance(report["status_edge_conflicts"], list)
+    assert adr_health.CHECK_IDS == ("DH02", "DH04", "DH05")

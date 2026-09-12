@@ -6,6 +6,7 @@ Mirrors the `_write_adr`/fixture conventions of `test_query_adrs.py`.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -218,3 +219,46 @@ def test_check_reports_clean_after_regeneration(cli_repo_root: Path):
     assert check_result.returncode == 0
     assert "up to date" in check_result.stdout.lower()
     assert index_path.read_text(encoding="utf-8") == regenerated_content
+
+
+# -- DL03 `--json` envelope (golden bad-case: a stale index) -----------------
+
+
+def test_json_golden_bad_case_stale_index_fires(cli_repo_root: Path):
+    """The DL03 envelope carries a WARN finding when the on-disk index is stale."""
+    index_path = cli_repo_root / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+    before_content = index_path.read_text(encoding="utf-8")
+
+    result = _run_cli(["--repo-root", str(cli_repo_root), "--check", "--json"])
+    report = json.loads(result.stdout)
+
+    assert result.returncode == 1
+    assert report["check"] == "DL03"
+    assert report["skipped"] is None
+    assert len(report["findings"]) == 1
+    assert report["findings"][0]["check"] == "DL03"
+    assert report["findings"][0]["severity"] == "warn"
+    # Read-only: the envelope never writes, even though a plain --check would
+    # report the same staleness.
+    assert index_path.read_text(encoding="utf-8") == before_content
+
+
+def test_json_alone_never_blocks_even_when_stale(cli_repo_root: Path):
+    """A bare `--json` (no `--check`) always exits 0 -- the advisory pre-commit shape."""
+    result = _run_cli(["--repo-root", str(cli_repo_root), "--json"])
+    report = json.loads(result.stdout)
+
+    assert result.returncode == 0
+    assert len(report["findings"]) == 1
+
+
+def test_json_reports_clean_after_regeneration(cli_repo_root: Path):
+    write_result = _run_cli(["--repo-root", str(cli_repo_root)])
+    assert write_result.returncode == 0
+
+    result = _run_cli(["--repo-root", str(cli_repo_root), "--check", "--json"])
+    report = json.loads(result.stdout)
+
+    assert result.returncode == 0
+    assert report["findings"] == []
+    assert report["examined"] == {"adrs": 1}

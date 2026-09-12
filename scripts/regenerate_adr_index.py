@@ -4,15 +4,27 @@
 Reads all ADR files in .ai-state/decisions/, extracts YAML frontmatter,
 and generates a markdown index table sorted by ID.
 
+DL03 (sentinel): the index is consistent with finalized ADRs only. Drafts
+under `drafts/` are intentionally excluded -- the finalize protocol
+regenerates the index post-merge, so draft-stage fragments never appear and
+must not be flagged as missing rows. `--json` wraps the same read-only diff
+`--check` already performs (no new comparison logic) in the DL03 envelope;
+it never writes, regardless of whether `--check` is also passed. Exit code
+mirrors the flat-check convention (`check_adr_reciprocity.py`'s DL06): 1
+only when `--check` is combined with a finding, so a bare `--json` call
+(the pre-commit advisory wiring) always exits 0.
+
 Usage:
     python scripts/regenerate_adr_index.py                 # write the index
     python scripts/regenerate_adr_index.py --check          # read-only: diff, no write
+    python scripts/regenerate_adr_index.py --check --json   # read-only: DL03 envelope
     python scripts/regenerate_adr_index.py --repo-root PATH
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -23,6 +35,13 @@ from _repo_root import resolve_repo_root as _resolve_repo_root
 SCRIPT_DIR = Path(__file__).resolve().parent
 DECISIONS_DIR = SCRIPT_DIR.parent / ".ai-state" / "decisions"
 INDEX_PATH = DECISIONS_DIR / "DECISIONS_INDEX.md"
+
+# The check id this script's row surface declares -- read via AST by the row/registry/
+# script Triangle in `tests/test_sentinel_check_triangle.py`, mirroring the flat
+# CHECK_ID shape of `check_adr_reciprocity.py` (DL06) rather than the keyed DS-A shape:
+# this script owns exactly one sentinel row.
+CHECK_ID = "DL03"
+SEVERITY = "warn"
 
 
 def resolve_repo_root(cli_repo_root: str | None) -> Path:
@@ -209,6 +228,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "committed file. Exits 0 if identical, 1 with a summary if stale. "
         "Never writes.",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Machine-readable DL03 envelope (read-only, never writes). Exit 1 "
+        "only when combined with --check and a finding is present.",
+    )
     return parser
 
 
@@ -221,6 +246,37 @@ def _run_check(index_content: str, adr_count: int) -> int:
     print(f"{INDEX_PATH} is stale ({adr_count} entries in source of truth).", file=sys.stderr)
     print("Run without --check to regenerate.", file=sys.stderr)
     return 1
+
+
+def _dl03_report(index_content: str, adr_count: int) -> dict:
+    """Build the DL03 envelope from the same in-memory diff `_run_check` performs.
+
+    Read-only: never writes the index. `findings` holds at most one entry -- the
+    index is either current or stale as a whole, there is no partial-row shape.
+    """
+    on_disk = INDEX_PATH.read_text(encoding="utf-8") if INDEX_PATH.is_file() else None
+    findings: list[dict] = []
+    if on_disk != index_content:
+        findings.append(
+            {
+                "check": CHECK_ID,
+                "severity": SEVERITY,
+                "entity": str(INDEX_PATH),
+                "message": f"{INDEX_PATH} is stale ({adr_count} entries in source of truth).",
+            }
+        )
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {"adrs": adr_count},
+        "findings": findings,
+        "info": {},
+        "withheld": [],
+        "bound": (
+            "DL03 clean means DECISIONS_INDEX.md reflects every finalized ADR's current "
+            "frontmatter; draft fragments under drafts/ are excluded by design, not a gap."
+        ),
+    }
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -237,6 +293,11 @@ def main(argv: list[str] | None = None) -> None:
     apply_repo_root(root)
     adrs = collect_adrs()
     index_content = generate_index(adrs)
+
+    if args.json:
+        report = _dl03_report(index_content, len(adrs))
+        print(json.dumps(report, indent=2))
+        sys.exit(1 if (args.check and report["findings"]) else 0)
 
     if args.check:
         sys.exit(_run_check(index_content, len(adrs)))

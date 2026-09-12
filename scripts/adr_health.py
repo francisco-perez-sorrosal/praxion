@@ -97,9 +97,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # writes its row. Registry-facing only: unlike CHECK_ID in the flat-declaration pilot
 # scripts (`check_agent_prompt_size.py`, `check_adr_reciprocity.py`,
 # `check_agent_lifecycle_pairing.py`, `check_doc_manifest_freshness.py`), this script
-# never emits a `"check"` key -- there is no runtime id for this declaration to drift
-# from, only Leg 3's static one.
-CHECK_IDS: tuple[str, ...] = ("DH05",)
+# never emits a `"check"` key -- each row routes off an existing field
+# (`decay_class` for DH02, `reopen_candidates` membership for DH04,
+# `category_mix.verdict` for DH05) rather than a per-finding runtime id, so there
+# is nothing for this declaration to drift from except Leg 3's static one.
+CHECK_IDS: tuple[str, ...] = ("DH02", "DH04", "DH05")
 
 # A path *shape* teaching a convention, never a concrete file.
 _SHAPE = re.compile(r"<[^>]*>|\*|\{\{|\bNNN\b|\bYYYY\b")

@@ -341,6 +341,18 @@ repos:
         files: '^(\.ai-state/decisions/.*\.md|scripts/check_adr_reciprocity\.py)$'
         pass_filenames: false
 
+      # Block H2 — ADR index freshness (DL03). Advisory (no --check): invoked
+      # with --json alone, which always exits 0 regardless of staleness (see
+      # regenerate_adr_index.py's exit-code contract) -- the index self-heals
+      # at the next finalize, so a blocking wiring here would redden every
+      # feature-branch commit touching decisions/ before merge.
+      - id: adr-index-freshness
+        name: ADR index freshness (advisory)
+        entry: python3 scripts/regenerate_adr_index.py --repo-root . --json
+        language: system
+        files: '^(\.ai-state/decisions/.*\.md|scripts/regenerate_adr_index\.py)$'
+        pass_filenames: false
+
       # Block I — agent prompt size (T03). Advisory only, deliberately no
       # --check: the live agents/sentinel.md already sits in derived WARN
       # today (S=352 -> warn 652, 680-line file), so a blocking wiring here

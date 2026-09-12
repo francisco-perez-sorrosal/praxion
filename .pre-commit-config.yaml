@@ -441,3 +441,14 @@ repos:
         language: system
         files: '^(\.ai-state/(decisions/.*|specs/.*|calibration_log\.md)|scripts/check_state_corpus\.py)$'
         pass_filenames: false
+
+      # Block Q — test-topology conformance (TT01 TT02 TT05 TT06). Advisory
+      # (no --check): TT06 runs even when TEST_TOPOLOGY.md is absent, so a
+      # blocking entry would fire on every commit in a topology-less project.
+      # Scoped to the topology file, its trunk/leaf schema docs, and the script.
+      - id: topology-conformance
+        name: Test-topology conformance (advisory)
+        entry: python3 scripts/check_topology_conformance.py --repo-root .
+        language: system
+        files: '^(\.ai-state/TEST_TOPOLOGY\.md|skills/testing-strategy/references/.*\.md|scripts/check_topology_conformance\.py)$'
+        pass_filenames: false

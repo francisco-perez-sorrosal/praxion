@@ -365,7 +365,7 @@ repos:
         name: Agent prompt size (advisory)
         entry: python3 scripts/check_agent_prompt_size.py --repo-root .
         language: system
-        files: '^(agents/.*\.md|scripts/check_agent_prompt_size\.py)$'
+        files: '^(agents/.*\.md|skills/.*\.md|scripts/check_agent_prompt_size\.py)$'
         pass_filenames: false
 
       # Block J — doc manifest freshness (F11). WARN-only by construction

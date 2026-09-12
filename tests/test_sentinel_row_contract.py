@@ -905,6 +905,8 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("AC03", "check_architecture_projection"),
     ("AC06", "check_architecture_projection"),
     ("AC07", "check_architecture_projection"),
+    ("T01", "check_agent_prompt_size"),
+    ("T04", "check_agent_prompt_size"),
 ]
 
 

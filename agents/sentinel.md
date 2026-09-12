@@ -129,10 +129,10 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
-| T01 | A | Skill SKILL.md line count within guideline | Under 500 lines (warn 400, fail 600) |
+| T01 | A | Skill SKILL.md line count within guideline | Family: `python3 scripts/check_agent_prompt_size.py --json`; WARN per `check: "T01"` finding past 400 lines, FAIL past 600. |
 | T02 | A | Combined always-loaded content size, plus the listing (skill/command/agent `description:` frontmatter) surface | Run `python3 scripts/measure_token_budget.py --json`; **FAIL when `over_by > 0`** (the governed 9-file set). Report `basis` next to each number: a run without `ANTHROPIC_API_KEY` is a labelled estimate that errs ~5% high, not a measurement, and saying which one you got is the whole guard. Report the second, `listing` object alongside it — its `tokens`/`file_count`/`basis` — as an **advisory** figure; this row does not fail on the listing size alone (`scripts/check_token_ratchet.py`, wired into the commit-gate chain, is the enforcement point for both the governed-delta ratchet and the listing ceiling breach — this row reports, it does not gate the listing side). **Do not restate a divisor in this row** — `rules/CLAUDE.md § Token Budget` and that script are the single source, and a copy here is precisely how the bases diverged before (`/3.5` here vs `/3.6` there, straddling the ceiling on identical bytes). Golden bad-case: a corpus past the ceiling reported as passing because the check used its own divisor |
-| T03 | A | Agent prompt size within range | Run `python3 scripts/check_agent_prompt_size.py --json`. Standard warn 400/fail 500; `agents/verifier.md` fixed warn 550/fail 700; `agents/sentinel.md` **derived**: warn `S+300`/fail `S+400`, `S` = `## Check Catalog` span, recomputed each run. Advisory: exits 0 by default; `--check` opts into a blocking gate. Spec + golden bad-cases: `scripts/check_agent_prompt_size.py` docstring; canary `scripts/test_check_agent_prompt_size.py`. |
-| T04 | A | Individual reference file sizes | No single reference file >800 lines |
+| T03 | A | Agent prompt size within range | Family: `python3 scripts/check_agent_prompt_size.py --json`; Standard warn 400/fail 500; `agents/verifier.md` fixed warn 550/fail 700; `agents/sentinel.md` **derived**: warn `S+300`/fail `S+400`, `S` = `## Check Catalog` span, recomputed each run. Advisory: exits 0 by default; `--check` opts into a blocking gate. |
+| T04 | A | Individual reference file sizes | Family: `python3 scripts/check_agent_prompt_size.py --json`; WARN per `check: "T04"` finding — a `references/*.md` file over 800 lines. |
 | T05 | L | Progressive disclosure used where appropriate | Monolithic artifacts that could split core vs. reference without losing coherence |
 | T06 | L | No significant redundancy across artifacts | Same info in multiple places = token waste; flag duplicates |
 
@@ -462,6 +462,7 @@ Run every `A` row: the family scripts first (table below), then the remaining sc
 | per check: `.claude-plugin/plugin.json` (X01) · `skills/`+`commands/` (X02) · the roster in `coordination-details.md` (X05) · `agents/README.md` (X06 EC01) · `agents/`+CLAUDE.md (EC02) | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
 | `skills/`/`agents/`/`commands/`/`rules/` (per check; `.ai-state/SYSTEM_DEPLOYMENT.md` and CLAUDE.md's Structure heading each conditional) | `python3 scripts/check_path_resolution.py --json` | F01 F02 F05 X03 X09 |
 | always (contract is unconditional) | `python3 scripts/check_behavioral_contract.py --json` | BC01 BC03 BC04 |
+| `agents/` (T03) · `skills/` (T01 T04) | `python3 scripts/check_agent_prompt_size.py --json` | T01 T03 T04 |
 | `.ai-work/` | `python3 scripts/check_specialist_dispositions.py --json` | P07 |
 | `skills/` · `agents/` · `commands/` (per check) | `python3 scripts/check_artifact_conformance.py --json` | C01 C02 C03 C04 C05 N01 N02 N03 S01 S02 S03 S04 |
 | `.c4` model + `.ai-state/DESIGN.md` (AC13); `.ai-state/DESIGN.md` + `docs/architecture.md` (per check) | `python3 scripts/check_architecture_projection.py --json` | AC03 AC04 AC05 AC06 AC07 AC13 |

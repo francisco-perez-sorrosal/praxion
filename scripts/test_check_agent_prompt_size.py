@@ -167,4 +167,101 @@ def test_live_repo_exits_zero_despite_a_warn_finding_for_sentinel_md() -> None:
     )
     assert rc.returncode == 0
     payload = json.loads(rc.stdout)
-    assert any(f["entity"] == "agents/sentinel.md" and f["severity"] == "warn" for f in payload)
+    assert any(
+        f["entity"] == "agents/sentinel.md" and f["severity"] == "warn" for f in payload["findings"]
+    )
+
+
+# -- T01/T04 (generalisation) + the classify() envelope -----------------------
+
+
+def _write_skill(root: Path, name: str, line_count: int) -> Path:
+    """Write `skills/<name>/SKILL.md` with exactly `line_count` filler lines."""
+    skill_dir = root / "skills" / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    path = skill_dir / "SKILL.md"
+    path.write_text("\n".join(f"line {i}" for i in range(line_count)) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_reference(root: Path, skill: str, name: str, line_count: int) -> Path:
+    """Write `skills/<skill>/references/<name>` with exactly `line_count` filler lines."""
+    ref_dir = root / "skills" / skill / "references"
+    ref_dir.mkdir(parents=True, exist_ok=True)
+    path = ref_dir / name
+    path.write_text("\n".join(f"line {i}" for i in range(line_count)) + "\n", encoding="utf-8")
+    return path
+
+
+def test_run_t03_output_keys_are_pinned(tmp_path: Path) -> None:
+    """`run_t03()` stays a flat finding list -- `classify()` must never touch it."""
+    _write_agent(tmp_path, "some-agent.md", 500)
+    findings = ck.run_t03(tmp_path)
+    assert len(findings) == 1
+    assert set(findings[0]) == {"check", "severity", "entity", "message"}
+
+
+def test_canary_t01_flags_a_skill_at_its_fail_ceiling(tmp_path: Path) -> None:
+    """The catalogue's own bound: under 500 lines, warn 400 / fail 600."""
+    _write_skill(tmp_path, "some-skill", 600)
+    findings, examined = ck.run_t01(tmp_path)
+    assert len(findings) == 1
+    assert findings[0] == {
+        "check": "T01",
+        "severity": "fail",
+        "entity": "skills/some-skill/SKILL.md",
+        "message": "skills/some-skill/SKILL.md: 600 lines, at or past fail ceiling "
+        "(warn 400 / fail 600)",
+    }
+    assert examined == {"files_examined": 1}
+
+
+def test_t01_under_warn_ceiling_is_clean(tmp_path: Path) -> None:
+    _write_skill(tmp_path, "some-skill", 399)
+    assert ck.run_t01(tmp_path) == ([], {"files_examined": 1})
+
+
+def test_t01_missing_skills_dir_is_a_skip_not_a_finding(tmp_path: Path) -> None:
+    assert ck.run_t01(tmp_path) == ([], {"files_examined": 0})
+
+
+def test_canary_t04_flags_a_reference_file_over_800_lines(tmp_path: Path) -> None:
+    """The catalogue's own bound: no single reference file >800 lines."""
+    _write_reference(tmp_path, "some-skill", "big.md", 801)
+    findings, examined = ck.run_t04(tmp_path)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "warn"
+    assert findings[0]["entity"] == "skills/some-skill/references/big.md"
+    assert examined == {"files_examined": 1}
+
+
+def test_t04_at_800_lines_is_clean(tmp_path: Path) -> None:
+    """Inverse guard: the ceiling is exclusive ("no single file >800 lines")."""
+    _write_reference(tmp_path, "some-skill", "big.md", 800)
+    assert ck.run_t04(tmp_path) == ([], {"files_examined": 1})
+
+
+def test_classify_envelope_carries_a_keyed_bound_for_every_check(tmp_path: Path) -> None:
+    _write_agent(tmp_path, "some-agent.md", 500)
+    report = ck.classify(tmp_path)
+    assert set(report["bound"]) == set(ck.CHECK_IDS)
+    assert all(report["bound"][cid] for cid in ck.CHECK_IDS)
+    assert set(report["skipped"]) == set(ck.CHECK_IDS)
+    assert set(report["examined"]) == set(ck.CHECK_IDS)
+
+
+def test_classify_skips_t01_and_t04_independently_of_t03(tmp_path: Path) -> None:
+    """T01/T04 do not ride T03's substrate -- `agents/` alone must not unlock them."""
+    _write_agent(tmp_path, "some-agent.md", 500)
+    report = ck.classify(tmp_path)
+    assert report["skipped"]["T03"] is None
+    assert report["skipped"]["T01"] == "substrate absent (skills/)"
+    assert report["skipped"]["T04"] == "substrate absent (skills/)"
+
+
+def test_classify_findings_combine_all_three_checks(tmp_path: Path) -> None:
+    _write_agent(tmp_path, "some-agent.md", 500)
+    _write_skill(tmp_path, "some-skill", 600)
+    _write_reference(tmp_path, "some-skill", "big.md", 801)
+    report = ck.classify(tmp_path)
+    assert {f["check"] for f in report["findings"]} == {"T01", "T03", "T04"}

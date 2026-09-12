@@ -20,9 +20,15 @@ from pathlib import Path
 CEILING_BYTES = 107_397  # authorised by: dec-380 / AC-10 of the P2.1 residual pipeline
 
 
+def exceeds_ceiling(size: int, ceiling: int = CEILING_BYTES) -> bool:
+    """The one predicate both the gate and its canary evaluate (verifier W-12: a canary
+    that asserts its own fixture rather than the gate's predicate discriminates nothing)."""
+    return size > ceiling
+
+
 def test_sentinel_definition_does_not_exceed_its_byte_ceiling(project_root: Path) -> None:
     size = (project_root / "agents" / "sentinel.md").stat().st_size
-    assert size <= CEILING_BYTES, (
+    assert not exceeds_ceiling(size), (
         f"agents/sentinel.md is {size:,} B, over the {CEILING_BYTES:,} B ceiling (AC-10). "
         "Offset the growth (a dispatch-table row costs ~110 B; a prose sentence ~350-700 B) "
         "or raise CEILING_BYTES citing the ADR that authorises it."
@@ -30,8 +36,10 @@ def test_sentinel_definition_does_not_exceed_its_byte_ceiling(project_root: Path
 
 
 def test_ceiling_canary_flags_a_file_over_the_limit(tmp_path: Path) -> None:
-    """The assertion fires on an oversized file (gate-canary discipline)."""
+    """The gate's predicate fires one byte over the ceiling and stays quiet at it."""
     big = tmp_path / "agents" / "sentinel.md"
     big.parent.mkdir(parents=True)
     big.write_bytes(b"x" * (CEILING_BYTES + 1))
-    assert big.stat().st_size > CEILING_BYTES
+    assert exceeds_ceiling(big.stat().st_size)
+    assert not exceeds_ceiling(CEILING_BYTES)
+    assert exceeds_ceiling(1, ceiling=0)

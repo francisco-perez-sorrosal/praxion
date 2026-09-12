@@ -86,7 +86,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | F01 | A | Referenced files exist on disk | Run `python3 scripts/check_path_resolution.py --json`. WARN per `findings` entry with `check: "F01"` — a declared-limit detector; see docstring for accepted false positives. Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
-| F02 | A | Skill `references/` files exist | Run `python3 scripts/check_path_resolution.py --json`. WARN when a skill's own `references/*.md` mention does not exist under that skill (declared limit: a bare prose mention of another skill's leaf also fires). Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
+| F02 | A | Skill `references/` files exist | Run `python3 scripts/check_path_resolution.py --json`. WARN when a skill's own `references/*.md` mention does not exist under that skill (declared limit: cross-skill prose mentions fire too). Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
 | F03 | L | Content references current tools/patterns | No references to replaced tools, APIs, or patterns |
 | F04 | L | Agent prompts reflect current pipeline | Collaboration sections reference correct agent names, outputs, stages |
 | F05 | A | `SYSTEM_DEPLOYMENT.md` referenced file paths exist | Conditional on `.ai-state/SYSTEM_DEPLOYMENT.md` present; skip with an F-dimension INFO note. Run `python3 scripts/check_path_resolution.py --json`. FAIL per `findings` entry with `check: "F05"`. Spec + golden bad-cases: `scripts/check_path_resolution.py` docstring; canary `scripts/test_check_path_resolution.py`. |
@@ -448,7 +448,7 @@ Record counts and paths. This inventory is the "actual state" that Pass 1 compar
 
 Run every `A` row: the family scripts first (table below), then the remaining script-backed rows, then whatever is left batched into single Bash calls with `echo` separators and `&&`. Record PASS/WARN/FAIL per check with evidence. Target **~15–20 turns** for the whole pass, not 50+. (The former ad-hoc `wc -c` budget fence is gone: T02 runs `measure_token_budget.py`, the one governed basis — an inline recount over a different file set was a second, contradicting number.)
 
-**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped` first (keyed by `<id>`; the one flat single-check envelope is DL03's — read whichever shape the script emits) and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound` (keyed the same way) verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
+**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped` first (keyed by `<id>`; DL03's is flat) and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound` (keyed the same way) verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
 
 | Substrate (skip when absent) | Invocation | Rows |
 |---|---|---|

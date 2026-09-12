@@ -446,21 +446,9 @@ Record counts and paths. This inventory is the "actual state" that Pass 1 compar
 
 ### Phase 3 — Pass 1: Automated Checks (3/7)
 
-Execute all auto type checks from the check catalog above. **Batch related checks into single tool calls** — group by dimension or by tool type:
+Run every `A` row: the family scripts first (table below), then the remaining script-backed rows, then whatever is left batched into single Bash calls with `echo` separators and `&&`. Record PASS/WARN/FAIL per check with evidence. Target **~15–20 turns** for the whole pass, not 50+. (The former ad-hoc `wc -c` budget fence is gone: T02 runs `measure_token_budget.py`, the one governed basis — an inline recount over a different file set was a second, contradicting number.)
 
-```bash
-# Example: batch remaining ad-hoc checks (~1 turn instead of ~6)
-echo "=== T02: token budget ===" && { cat CLAUDE.md claude/config/CLAUDE.md 2>/dev/null; find rules -name '*.md' ! -name 'README.md' -exec sh -c 'head -5 "$1" | grep -q "^paths:" || cat "$1"' _ {} \; ; } | wc -c
-echo "=== DL01/DL05: draft fragments (informational — excluded from DL03 by design) ===" && ls .ai-state/decisions/drafts/*.md 2>/dev/null | grep -v '/CLAUDE\.md$' | wc -l
-```
-
-Guidelines:
-1. Combine 3-6 related checks per Bash call using `echo` separators and `&&`
-2. Use `python3 -c` inline scripts for checks requiring JSON parsing or multi-step logic
-3. Record PASS/WARN/FAIL for each check with evidence
-4. Target: **~15-20 turns total** for all auto checks (not 50+)
-
-**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped.<id>` first and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound.<id>` verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
+**Family dispatch (auto).** For every family script in the table: run it once, route each `findings[]` entry to the catalogue row named by its `check` key at that entry's `severity`, read `skipped` first (keyed by `<id>` for a multi-check script, flat for a single-check one) and report a check that could not run as an INFO note in that row's dimension, and reproduce `bound` (keyed the same way) verbatim as the row's PASS statement. Skip a family with an INFO note in its dimension when its substrate is absent.
 
 | Substrate (skip when absent) | Invocation | Rows |
 |---|---|---|
@@ -471,7 +459,7 @@ Guidelines:
 | `.ai-state/TEST_TOPOLOGY.md` — run regardless; TT06 reads its absence | `python3 scripts/check_topology_conformance.py --json` | TT01 TT02 TT05 TT06 |
 | `PRAXION_HACKATHON_MODE=1` | `python3 scripts/check_hackathon_graduation.py --json` | HK01 |
 | always (the sentinel's own definition) | `python3 scripts/check_sentinel_self_audit.py --json` | V01 V02 V03 V04 |
-| `.claude-plugin/plugin.json` | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
+| per check: `.claude-plugin/plugin.json` (X01) · `skills/`+`commands/` (X02) · the roster in `coordination-details.md` (X05) · `agents/README.md` (X06 EC01) · `agents/`+CLAUDE.md (EC02) | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
 | `skills/`/`agents/`/`commands/`/`rules/` (per check; `.ai-state/SYSTEM_DEPLOYMENT.md` and CLAUDE.md's Structure heading each conditional) | `python3 scripts/check_path_resolution.py --json` | F01 F02 F05 X03 X09 |
 | `.ai-work/` | `python3 scripts/check_specialist_dispositions.py --json` | P07 |
 

@@ -395,3 +395,27 @@ repos:
         entry: python3 scripts/check_commit_msg_authorship.py
         language: system
         stages: [commit-msg]
+
+      # Block M — staleness markers (F07/F08/F09). Advisory (no --check): a
+      # marker older than its skill's threshold is sentinel-visible drift, not a
+      # defect in the commit that happens to touch the skill; the live corpus
+      # carries 42 such warnings today, so a blocking entry would redden every
+      # skill edit on backlog. Matches the F11/T03/P03 precedent.
+      - id: staleness-markers
+        name: Skill staleness markers (advisory)
+        entry: python3 scripts/check_staleness_markers.py --repo-root .
+        language: system
+        files: '^(skills/.*/(SKILL\.md|references/.*\.md|contexts/.*\.md)|scripts/check_staleness_markers\.py)$'
+        pass_filenames: false
+
+      # Block N — specialist dispositions (P07). Declared exception: the real
+      # substrate is the gitignored .ai-work/ tree, which no commit can carry,
+      # so this entry exists for LIVENESS (the script is invoked by something
+      # and loads under the ambient interpreter — check_gate_liveness GL04/GL05),
+      # not enforcement. The sentinel's Phase 3 is the enforcing caller.
+      - id: specialist-dispositions
+        name: Specialist-design dispositions (liveness only)
+        entry: python3 scripts/check_specialist_dispositions.py --repo-root .
+        language: system
+        files: '^scripts/check_specialist_dispositions\.py$'
+        pass_filenames: false

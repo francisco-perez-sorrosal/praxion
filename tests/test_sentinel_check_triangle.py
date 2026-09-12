@@ -39,7 +39,7 @@ import ast
 import re
 from collections.abc import Callable, Sequence
 
-import tests.test_sentinel_row_contract as contract
+import test_sentinel_row_contract as contract  # bare name: see the deferred import in that module
 
 _SCRIPT_NAME_MAX_CHARS = 40  # the longest live script name is
 # `check_agent_lifecycle_pairing` (29 chars); 40 leaves room for a longer family script

@@ -499,7 +499,12 @@ def _triangle_module():
     also import it back at load time. Deferring to call time -- only the two totalising
     tests below need it -- breaks the cycle without either module owning the other.
     """
-    import tests.test_sentinel_check_triangle as triangle
+    # Bare-name import, not `tests.…`: `tests/` has no `__init__.py`, so the dotted form
+    # only resolves while the repo root is the sole `tests` on sys.path -- and any
+    # invocation that also collects `fitness/` (a package whose `tests/` subdir IS a
+    # package) binds `tests` to the wrong tree and errors here. pytest prepends this
+    # file's own directory, so the sibling is importable by name in every invocation.
+    import test_sentinel_check_triangle as triangle
 
     return triangle
 

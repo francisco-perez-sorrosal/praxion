@@ -419,3 +419,25 @@ repos:
         language: system
         files: '^scripts/check_specialist_dispositions\.py$'
         pass_filenames: false
+
+      # Block O — git hook installation (F10). Advisory (no --check): an installed
+      # hook drifting from its source is an environment fact, not a property of the
+      # commit; the sentinel's Phase 3 is the reporting caller. Files-scoped to the
+      # hook sources so the entry fires exactly when a source changes.
+      - id: hook-installation
+        name: Git hook source/installed mirror (advisory)
+        entry: python3 scripts/check_hook_installation.py --repo-root .
+        language: system
+        files: '^(scripts/git-.*-hook\.sh|scripts/check_hook_installation\.py)$'
+        pass_filenames: false
+
+      # Block P — state corpus (DL01 DL02 SH01 SH02 CA01). Advisory (no --check):
+      # the live corpus carries 42 SH01 spec-path findings today, so a blocking
+      # entry would redden every .ai-state edit on backlog; the F11/T03/P03
+      # precedent. Scoped to the substrate the five checks read.
+      - id: state-corpus
+        name: .ai-state decision/spec/calibration corpus (advisory)
+        entry: python3 scripts/check_state_corpus.py --repo-root .
+        language: system
+        files: '^(\.ai-state/(decisions/.*|specs/.*|calibration_log\.md)|scripts/check_state_corpus\.py)$'
+        pass_filenames: false

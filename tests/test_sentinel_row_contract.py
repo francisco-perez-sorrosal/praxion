@@ -777,6 +777,12 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("F07", "check_staleness_markers"),
     ("F08", "check_staleness_markers"),
     ("F09", "check_staleness_markers"),
+    ("F10", "check_hook_installation"),
+    ("DL01", "check_state_corpus"),
+    ("DL02", "check_state_corpus"),
+    ("SH01", "check_state_corpus"),
+    ("SH02", "check_state_corpus"),
+    ("CA01", "check_state_corpus"),
 ]
 
 

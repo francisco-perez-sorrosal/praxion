@@ -233,6 +233,25 @@ def test_ec02_passes_when_all_artifacts_referenced(tmp_path: Path) -> None:
     assert [f for f in report["findings"] if f["check"] == "EC02"] == []
 
 
+def test_ec02_skill_referenced_only_by_a_command_is_not_flagged(tmp_path: Path) -> None:
+    """Widened surfaces: a command naming the skill is a reference (30 live false orphans
+    came from the narrower agents+CLAUDE.md+rules set)."""
+    _write(tmp_path / "skills" / "quiet-skill" / "SKILL.md", "content\n")
+    _write(tmp_path / "commands" / "use-it.md", "run the quiet-skill skill\n")
+    _write_ec02_surfaces(tmp_path, mentions=["use-it"])
+    findings = [f for f in classify(tmp_path)["findings"] if f["check"] == "EC02"]
+    assert not any("quiet-skill" in f["entity"] for f in findings)
+
+
+def test_ec02_skill_that_only_names_itself_is_still_flagged(tmp_path: Path) -> None:
+    """Self-exclusion: a skill's own SKILL.md (or its references) is not a reference to it."""
+    _write(tmp_path / "skills" / "solo-skill" / "SKILL.md", "solo-skill is great\n")
+    _write(tmp_path / "skills" / "solo-skill" / "references" / "notes.md", "solo-skill again\n")
+    _write_ec02_surfaces(tmp_path, mentions=[])
+    findings = [f for f in classify(tmp_path)["findings"] if f["check"] == "EC02"]
+    assert any("solo-skill" in f["entity"] for f in findings)
+
+
 def test_ec02_flags_orphaned_skill(tmp_path: Path) -> None:
     _write(tmp_path / "skills" / "unmentioned-skill" / "SKILL.md", "content\n")
     _write_ec02_surfaces(tmp_path, mentions=[])

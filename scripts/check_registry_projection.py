@@ -349,6 +349,15 @@ def _reference_pairs(repo_root: Path) -> list[tuple[Path, str]]:
         candidate_paths.extend(sorted(agents_dir.glob("*.md")))
     if rules_dir.is_dir():
         candidate_paths.extend(sorted(rules_dir.glob("**/*.md")))
+    # Widened surfaces (P2.1 residual wrap-up): a skill named by a command, by another
+    # skill, or by the docs tree is not an orphan -- the narrower agents+CLAUDE.md+rules
+    # set produced 30 false "orphans" per sweep against a corpus where every one of them
+    # was referenced somewhere shipped. Each artifact's OWN files are excluded from its
+    # haystack by the per-artifact callers below, so a skill cannot reference itself.
+    for rel in (_COMMANDS_DIR_REL, _SKILLS_DIR_REL, "docs"):
+        d = repo_root / rel
+        if d.is_dir():
+            candidate_paths.extend(sorted(d.glob("**/*.md")))
     pairs: list[tuple[Path, str]] = []
     for p in candidate_paths:
         text = _read_text(p)
@@ -357,8 +366,13 @@ def _reference_pairs(repo_root: Path) -> list[tuple[Path, str]]:
     return pairs
 
 
-def _check_ec02_skills(repo_root: Path, haystack: str) -> tuple[list[dict], int]:
-    """`(findings, examined_count)` for every skill dir against `haystack`."""
+def _haystack_excluding(pairs: list[tuple[Path, str]], own: Path) -> str:
+    """Every reference surface's text except files under (or equal to) `own`."""
+    return "\n".join(text for p, text in pairs if not (p == own or p.is_relative_to(own)))
+
+
+def _check_ec02_skills(repo_root: Path, pairs: list[tuple[Path, str]]) -> tuple[list[dict], int]:
+    """`(findings, examined_count)` for every skill dir against the other surfaces' text."""
     findings: list[dict] = []
     examined = 0
     skills_dir = repo_root / _SKILLS_DIR_REL
@@ -368,20 +382,20 @@ def _check_ec02_skills(repo_root: Path, haystack: str) -> tuple[list[dict], int]
         if not d.is_dir() or not (d / "SKILL.md").is_file():
             continue
         examined += 1
-        if d.name not in haystack:
+        if d.name not in _haystack_excluding(pairs, d):
             findings.append(
                 {
                     "check": "EC02",
                     "severity": "warn",
                     "entity": f"skills/{d.name}",
-                    "message": f"skill '{d.name}' is not referenced by any agent, CLAUDE.md, or rule",
+                    "message": f"skill '{d.name}' is not referenced by any agent, CLAUDE.md, rule, command, skill or doc",
                 }
             )
     return findings, examined
 
 
-def _check_ec02_commands(repo_root: Path, haystack: str) -> tuple[list[dict], int]:
-    """`(findings, examined_count)` for every command file against `haystack`."""
+def _check_ec02_commands(repo_root: Path, pairs: list[tuple[Path, str]]) -> tuple[list[dict], int]:
+    """`(findings, examined_count)` for every command file against the other surfaces' text."""
     findings: list[dict] = []
     examined = 0
     commands_dir = repo_root / _COMMANDS_DIR_REL
@@ -391,13 +405,13 @@ def _check_ec02_commands(repo_root: Path, haystack: str) -> tuple[list[dict], in
         if f.name in _EXCLUDED_META_FILES:
             continue
         examined += 1
-        if f.stem not in haystack:
+        if f.stem not in _haystack_excluding(pairs, f):
             findings.append(
                 {
                     "check": "EC02",
                     "severity": "warn",
                     "entity": f"commands/{f.name}",
-                    "message": f"command '{f.stem}' is not referenced by any agent, CLAUDE.md, or rule",
+                    "message": f"command '{f.stem}' is not referenced by any agent, CLAUDE.md, rule, command, skill or doc",
                 }
             )
     return findings, examined
@@ -434,15 +448,13 @@ def _check_ec02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
             {"reason": "substrate-absent", "path": "agents/CLAUDE.md/rules surfaces"},
             None,
         )
-    haystack = "\n".join(text for _, text in pairs)
-
     findings: list[dict] = []
     examined = {"skills": 0, "commands": 0, "rules": 0}
 
-    skill_findings, examined["skills"] = _check_ec02_skills(repo_root, haystack)
+    skill_findings, examined["skills"] = _check_ec02_skills(repo_root, pairs)
     findings.extend(skill_findings)
 
-    command_findings, examined["commands"] = _check_ec02_commands(repo_root, haystack)
+    command_findings, examined["commands"] = _check_ec02_commands(repo_root, pairs)
     findings.extend(command_findings)
 
     rule_findings, examined["rules"] = _check_ec02_rules(repo_root, pairs)

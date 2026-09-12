@@ -122,6 +122,39 @@ def _derived_hook_name(source_name: str) -> str | None:
     return stem[len(_SOURCE_PREFIX) : -len(_SOURCE_SUFFIX)]
 
 
+def _hook_finding_for_source(
+    source: Path, source_bytes: bytes, installed: dict[str, bytes]
+) -> dict | None:
+    """A WARN finding for `source`, or None when it is installed under >=1 name."""
+    matched_names = [name for name, content in installed.items() if content == source_bytes]
+    if matched_names:
+        return None  # installed under >=1 name (possibly multiplexed) -- PASS
+
+    derived = _derived_hook_name(source.name)
+    if derived is not None and derived in installed:
+        return {
+            "check": "F10",
+            "severity": "warn",
+            "entity": f"scripts/{source.name}",
+            "message": (
+                f"scripts/{source.name}: installed hook '.git/hooks/{derived}' "
+                "differs from source -- run install_claude.sh (or --hooks-only) "
+                "to refresh it"
+            ),
+        }
+    if os.access(source, os.X_OK):
+        return {
+            "check": "F10",
+            "severity": "warn",
+            "entity": f"scripts/{source.name}",
+            "message": (
+                f"scripts/{source.name}: matches no installed hook and is "
+                "executable -- run install_claude.sh (or --hooks-only) to install it"
+            ),
+        }
+    return None
+
+
 def classify(repo_root: Path) -> dict:
     """Build the F10 envelope: every `git-*-hook.sh` source vs. installed hooks by content."""
     hooks_dir = _resolve_hooks_dir(repo_root)
@@ -136,36 +169,9 @@ def classify(repo_root: Path) -> dict:
         source_bytes = _read_bytes_or_none(source)
         if source_bytes is None:
             continue  # unreadable source -- nothing to compare
-        matched_names = [name for name, content in installed.items() if content == source_bytes]
-        if matched_names:
-            continue  # installed under >=1 name (possibly multiplexed) -- PASS
-
-        derived = _derived_hook_name(source.name)
-        if derived is not None and derived in installed:
-            findings.append(
-                {
-                    "check": "F10",
-                    "severity": "warn",
-                    "entity": f"scripts/{source.name}",
-                    "message": (
-                        f"scripts/{source.name}: installed hook '.git/hooks/{derived}' "
-                        "differs from source -- run install_claude.sh (or --hooks-only) "
-                        "to refresh it"
-                    ),
-                }
-            )
-        elif os.access(source, os.X_OK):
-            findings.append(
-                {
-                    "check": "F10",
-                    "severity": "warn",
-                    "entity": f"scripts/{source.name}",
-                    "message": (
-                        f"scripts/{source.name}: matches no installed hook and is "
-                        "executable -- run install_claude.sh (or --hooks-only) to install it"
-                    ),
-                }
-            )
+        finding = _hook_finding_for_source(source, source_bytes, installed)
+        if finding is not None:
+            findings.append(finding)
 
     return {
         "script": SCRIPT_NAME,

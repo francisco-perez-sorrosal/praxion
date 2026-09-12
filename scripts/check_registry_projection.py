@@ -357,6 +357,75 @@ def _reference_pairs(repo_root: Path) -> list[tuple[Path, str]]:
     return pairs
 
 
+def _check_ec02_skills(repo_root: Path, haystack: str) -> tuple[list[dict], int]:
+    """`(findings, examined_count)` for every skill dir against `haystack`."""
+    findings: list[dict] = []
+    examined = 0
+    skills_dir = repo_root / _SKILLS_DIR_REL
+    if not skills_dir.is_dir():
+        return findings, examined
+    for d in sorted(skills_dir.iterdir()):
+        if not d.is_dir() or not (d / "SKILL.md").is_file():
+            continue
+        examined += 1
+        if d.name not in haystack:
+            findings.append(
+                {
+                    "check": "EC02",
+                    "severity": "warn",
+                    "entity": f"skills/{d.name}",
+                    "message": f"skill '{d.name}' is not referenced by any agent, CLAUDE.md, or rule",
+                }
+            )
+    return findings, examined
+
+
+def _check_ec02_commands(repo_root: Path, haystack: str) -> tuple[list[dict], int]:
+    """`(findings, examined_count)` for every command file against `haystack`."""
+    findings: list[dict] = []
+    examined = 0
+    commands_dir = repo_root / _COMMANDS_DIR_REL
+    if not commands_dir.is_dir():
+        return findings, examined
+    for f in sorted(commands_dir.glob("*.md")):
+        if f.name in _EXCLUDED_META_FILES:
+            continue
+        examined += 1
+        if f.stem not in haystack:
+            findings.append(
+                {
+                    "check": "EC02",
+                    "severity": "warn",
+                    "entity": f"commands/{f.name}",
+                    "message": f"command '{f.stem}' is not referenced by any agent, CLAUDE.md, or rule",
+                }
+            )
+    return findings, examined
+
+
+def _check_ec02_rules(repo_root: Path, pairs: list[tuple[Path, str]]) -> tuple[list[dict], int]:
+    """`(findings, examined_count)` for every rule, checked against the other pairs' text."""
+    findings: list[dict] = []
+    examined = 0
+    rules_dir = repo_root / _RULES_DIR_REL
+    for path, _ in pairs:
+        if not path.is_relative_to(rules_dir) or path.name in _EXCLUDED_META_FILES:
+            continue
+        examined += 1
+        other_text = "\n".join(text for p, text in pairs if p != path)
+        if path.stem not in other_text:
+            findings.append(
+                {
+                    "check": "EC02",
+                    "severity": "warn",
+                    "entity": str(path.relative_to(repo_root)),
+                    "message": f"rule '{path.stem}' is not referenced by any agent, "
+                    "CLAUDE.md, or another rule",
+                }
+            )
+    return findings, examined
+
+
 def _check_ec02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     pairs = _reference_pairs(repo_root)
     if not pairs:
@@ -370,55 +439,14 @@ def _check_ec02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     findings: list[dict] = []
     examined = {"skills": 0, "commands": 0, "rules": 0}
 
-    skills_dir = repo_root / _SKILLS_DIR_REL
-    if skills_dir.is_dir():
-        for d in sorted(skills_dir.iterdir()):
-            if not d.is_dir() or not (d / "SKILL.md").is_file():
-                continue
-            examined["skills"] += 1
-            if d.name not in haystack:
-                findings.append(
-                    {
-                        "check": "EC02",
-                        "severity": "warn",
-                        "entity": f"skills/{d.name}",
-                        "message": f"skill '{d.name}' is not referenced by any agent, "
-                        "CLAUDE.md, or rule",
-                    }
-                )
+    skill_findings, examined["skills"] = _check_ec02_skills(repo_root, haystack)
+    findings.extend(skill_findings)
 
-    commands_dir = repo_root / _COMMANDS_DIR_REL
-    if commands_dir.is_dir():
-        for f in sorted(commands_dir.glob("*.md")):
-            if f.name in _EXCLUDED_META_FILES:
-                continue
-            examined["commands"] += 1
-            if f.stem not in haystack:
-                findings.append(
-                    {
-                        "check": "EC02",
-                        "severity": "warn",
-                        "entity": f"commands/{f.name}",
-                        "message": f"command '{f.stem}' is not referenced by any agent, "
-                        "CLAUDE.md, or rule",
-                    }
-                )
+    command_findings, examined["commands"] = _check_ec02_commands(repo_root, haystack)
+    findings.extend(command_findings)
 
-    for path, _ in pairs:
-        if not path.is_relative_to(repo_root / _RULES_DIR_REL) or path.name in _EXCLUDED_META_FILES:
-            continue
-        examined["rules"] += 1
-        other_text = "\n".join(text for p, text in pairs if p != path)
-        if path.stem not in other_text:
-            findings.append(
-                {
-                    "check": "EC02",
-                    "severity": "warn",
-                    "entity": str(path.relative_to(repo_root)),
-                    "message": f"rule '{path.stem}' is not referenced by any agent, "
-                    "CLAUDE.md, or another rule",
-                }
-            )
+    rule_findings, examined["rules"] = _check_ec02_rules(repo_root, pairs)
+    findings.extend(rule_findings)
 
     return findings, None, examined
 

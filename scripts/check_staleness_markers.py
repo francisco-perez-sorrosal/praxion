@@ -226,6 +226,35 @@ def _parse_marker(line: str, resolved_path: Path, today: dt.date) -> _MarkerStat
     return _MarkerStatus(kind="valid", date=date_value)
 
 
+def _check_marker_age(
+    entity: str, marker_date: dt.date, threshold_days: int, today: dt.date
+) -> list[dict]:
+    """F08: age a "valid" marker against its skill's staleness threshold."""
+    age_days = (today - marker_date).days
+    if age_days > threshold_days * 2:
+        return [
+            {
+                "check": "F08",
+                "severity": "fail",
+                "entity": entity,
+                "message": (
+                    f"{entity}: marker is {age_days}d old, exceeds 2x the "
+                    f"{threshold_days}d threshold"
+                ),
+            }
+        ]
+    if age_days > threshold_days:
+        return [
+            {
+                "check": "F08",
+                "severity": "warn",
+                "entity": entity,
+                "message": f"{entity}: marker is {age_days}d old, exceeds the {threshold_days}d threshold",
+            }
+        ]
+    return []
+
+
 def _check_section(
     entity: str, status: _MarkerStatus, threshold_days: int, today: dt.date
 ) -> list[dict]:
@@ -254,29 +283,7 @@ def _check_section(
         ]
 
     assert status.date is not None  # "valid" always carries a date
-    age_days = (today - status.date).days
-    if age_days > threshold_days * 2:
-        return [
-            {
-                "check": "F08",
-                "severity": "fail",
-                "entity": entity,
-                "message": (
-                    f"{entity}: marker is {age_days}d old, exceeds 2x the "
-                    f"{threshold_days}d threshold"
-                ),
-            }
-        ]
-    if age_days > threshold_days:
-        return [
-            {
-                "check": "F08",
-                "severity": "warn",
-                "entity": entity,
-                "message": f"{entity}: marker is {age_days}d old, exceeds the {threshold_days}d threshold",
-            }
-        ]
-    return []
+    return _check_marker_age(entity, status.date, threshold_days, today)
 
 
 # -- Envelope (DS-A, keyed) -------------------------------------------------------

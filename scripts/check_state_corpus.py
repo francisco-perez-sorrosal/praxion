@@ -260,6 +260,19 @@ def _check_path_cell(spec_rel: str, repo_root: Path, cell: str) -> list[dict]:
     return findings
 
 
+def _check_sh01_table_cells(
+    spec_rel: str, repo_root: Path, path_columns: list[int], rows: list[list[str]]
+) -> list[dict]:
+    """Check every path-column cell across `rows`, flattening the row x column walk."""
+    findings: list[dict] = []
+    for row in rows:
+        for col in path_columns:
+            if col >= len(row):
+                continue
+            findings.extend(_check_path_cell(spec_rel, repo_root, row[col]))
+    return findings
+
+
 def _check_sh01(spec_path: Path, repo_root: Path) -> list[dict]:
     spec_rel = spec_path.relative_to(repo_root).as_posix()
     text = spec_path.read_text(encoding="utf-8")
@@ -272,10 +285,7 @@ def _check_sh01(spec_path: Path, repo_root: Path) -> list[dict]:
             path_columns = [i for i, name in enumerate(header) if "implement" in name.lower()]
             if not path_columns:
                 continue
-            for row in rows:
-                for col in path_columns:
-                    if col < len(row):
-                        findings.extend(_check_path_cell(spec_rel, repo_root, row[col]))
+            findings.extend(_check_sh01_table_cells(spec_rel, repo_root, path_columns, rows))
     return findings
 
 
@@ -341,67 +351,103 @@ def _check_ca01(repo_root: Path) -> list[dict]:
 # -- Envelope (DS-A, keyed) -------------------------------------------------------
 
 
-def classify(repo_root: Path) -> dict:
+def _classify_decisions(
+    repo_root: Path,
+) -> tuple[list[dict], dict[str, dict | None], dict[str, dict | None]]:
+    """DL01 (spec-vs-ADR reconciliation) + DL02 (ADR frontmatter completeness)."""
     findings: list[dict] = []
-    skipped: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
-    examined: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+    skipped: dict[str, dict | None] = {"DL01": None, "DL02": None}
+    examined: dict[str, dict | None] = {"DL01": None, "DL02": None}
 
-    # -- decisions family (DL01, DL02) --------------------------------------
     decisions_dir = repo_root / ".ai-state" / "decisions"
     specs_dir = repo_root / ".ai-state" / "specs"
     if not decisions_dir.is_dir():
         reason = {"reason": "substrate-absent", "path": str(decisions_dir)}
         skipped["DL01"] = reason
         skipped["DL02"] = reason
-    else:
-        finalized = sorted(p for p in decisions_dir.glob("*.md") if _FINALIZED_ADR.match(p.name))
-        drafts_dir = decisions_dir / "drafts"
-        drafts = (
-            sorted(p for p in drafts_dir.glob("*.md") if _DRAFT_FRAGMENT.match(p.name))
-            if drafts_dir.is_dir()
-            else []
-        )
-        archived_specs = sorted(specs_dir.glob("SPEC_*.md")) if specs_dir.is_dir() else []
-        examined["DL01"] = {
-            "finalized": len(finalized),
-            "drafts": len(drafts),
-            "archived_specs": len(archived_specs),
-        }
-        findings.extend(_check_dl01(archived_specs, finalized, drafts))
+        return findings, skipped, examined
 
-        adr_files = finalized + drafts
-        if not adr_files:
-            examined["DL02"] = {"adrs": 0}
-        else:
-            try:
-                yaml_module = _require_yaml()
-            except MissingParserError as exc:
-                skipped["DL02"] = {"reason": "missing-yaml-parser", "path": str(exc)}
-            else:
-                examined["DL02"] = {"adrs": len(adr_files)}
-                for adr in adr_files:
-                    findings.extend(_check_dl02(adr, repo_root, yaml_module))
+    finalized = sorted(p for p in decisions_dir.glob("*.md") if _FINALIZED_ADR.match(p.name))
+    drafts_dir = decisions_dir / "drafts"
+    drafts = (
+        sorted(p for p in drafts_dir.glob("*.md") if _DRAFT_FRAGMENT.match(p.name))
+        if drafts_dir.is_dir()
+        else []
+    )
+    archived_specs = sorted(specs_dir.glob("SPEC_*.md")) if specs_dir.is_dir() else []
+    examined["DL01"] = {
+        "finalized": len(finalized),
+        "drafts": len(drafts),
+        "archived_specs": len(archived_specs),
+    }
+    findings.extend(_check_dl01(archived_specs, finalized, drafts))
 
-    # -- spec health (SH01, SH02) --------------------------------------------
+    adr_files = finalized + drafts
+    if not adr_files:
+        examined["DL02"] = {"adrs": 0}
+        return findings, skipped, examined
+    try:
+        yaml_module = _require_yaml()
+    except MissingParserError as exc:
+        skipped["DL02"] = {"reason": "missing-yaml-parser", "path": str(exc)}
+        return findings, skipped, examined
+    examined["DL02"] = {"adrs": len(adr_files)}
+    for adr in adr_files:
+        findings.extend(_check_dl02(adr, repo_root, yaml_module))
+    return findings, skipped, examined
+
+
+def _classify_spec_health(
+    repo_root: Path,
+) -> tuple[list[dict], dict[str, dict | None], dict[str, dict | None]]:
+    """SH01 (path-column resolution) + SH02 (non-empty traceability matrix)."""
+    findings: list[dict] = []
+    skipped: dict[str, dict | None] = {"SH01": None, "SH02": None}
+    examined: dict[str, dict | None] = {"SH01": None, "SH02": None}
+
+    specs_dir = repo_root / ".ai-state" / "specs"
     persistent_specs = sorted(specs_dir.glob("SPEC_*.md")) if specs_dir.is_dir() else []
     if not persistent_specs:
         reason = {"reason": "substrate-absent", "path": str(specs_dir)}
         skipped["SH01"] = reason
         skipped["SH02"] = reason
-    else:
-        examined["SH01"] = {"specs": len(persistent_specs)}
-        examined["SH02"] = {"specs": len(persistent_specs)}
-        for spec in persistent_specs:
-            findings.extend(_check_sh01(spec, repo_root))
-            findings.extend(_check_sh02(spec, repo_root))
+        return findings, skipped, examined
 
-    # -- calibration accuracy (CA01) -----------------------------------------
+    examined["SH01"] = {"specs": len(persistent_specs)}
+    examined["SH02"] = {"specs": len(persistent_specs)}
+    for spec in persistent_specs:
+        findings.extend(_check_sh01(spec, repo_root))
+        findings.extend(_check_sh02(spec, repo_root))
+    return findings, skipped, examined
+
+
+def _classify_calibration(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
+    """CA01: calibration_log.md parses with >=1 data row."""
     calibration_path = repo_root / ".ai-state" / "calibration_log.md"
     if not calibration_path.is_file():
-        skipped["CA01"] = {"reason": "substrate-absent", "path": str(calibration_path)}
-    else:
-        examined["CA01"] = {"present": True}
-        findings.extend(_check_ca01(repo_root))
+        return [], {"reason": "substrate-absent", "path": str(calibration_path)}, None
+    return _check_ca01(repo_root), None, {"present": True}
+
+
+def classify(repo_root: Path) -> dict:
+    findings: list[dict] = []
+    skipped: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+    examined: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+
+    dec_findings, dec_skipped, dec_examined = _classify_decisions(repo_root)
+    findings.extend(dec_findings)
+    skipped.update(dec_skipped)
+    examined.update(dec_examined)
+
+    spec_findings, spec_skipped, spec_examined = _classify_spec_health(repo_root)
+    findings.extend(spec_findings)
+    skipped.update(spec_skipped)
+    examined.update(spec_examined)
+
+    ca_findings, ca_skipped, ca_examined = _classify_calibration(repo_root)
+    findings.extend(ca_findings)
+    skipped["CA01"] = ca_skipped
+    examined["CA01"] = ca_examined
 
     return {
         "script": SCRIPT_NAME,

@@ -435,43 +435,56 @@ def _recorded_full_suite_runtime(repo_root: Path) -> float | None:
     return None
 
 
-def _check_tt06(repo_root: Path) -> tuple[list[dict], dict[str, Any]]:
-    topology_present = (repo_root / _TOPOLOGY_REL).is_file()
-    if topology_present:
-        return [], {"reason": "topology-present"}
+def _tt06_measure(repo_root: Path) -> dict[str, Any]:
+    """Raw values for the three Growth-Trigger Policy signals.
 
+    `component_count` and `runtime_seconds` may be `None` when their oracle is
+    unavailable -- the caller reports those terms `withheld`, never crossed.
+    """
     design_path = repo_root / _DESIGN_REL
     component_count: int | None = None
     if design_path.is_file():
         built_status = _parse_3a_status(design_path.read_text(encoding="utf-8"))
         component_count = sum(1 for status in built_status.values() if _STATUS_BUILT.search(status))
+    return {
+        "component_count": component_count,
+        "test_count": _count_tests(repo_root),
+        "runtime_seconds": _recorded_full_suite_runtime(repo_root),
+    }
 
-    test_count = _count_tests(repo_root)
-    runtime_seconds = _recorded_full_suite_runtime(repo_root)
 
+def _tt06_evaluate(measurements: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """`(crossed, withheld_terms)` against the Growth-Trigger Policy thresholds."""
     crossed: list[str] = []
     withheld_terms: list[str] = []
 
+    runtime_seconds = measurements["runtime_seconds"]
     if runtime_seconds is None:
         withheld_terms.append("full-suite wall-clock runtime")
     elif runtime_seconds >= _RUNTIME_THRESHOLD_SECONDS:
         crossed.append(f"full-suite wall-clock runtime ({runtime_seconds:.0f}s)")
 
+    component_count = measurements["component_count"]
     if component_count is None:
         withheld_terms.append("Built structural components (DESIGN.md absent)")
     elif component_count >= _COMPONENT_THRESHOLD:
         crossed.append(f"Built structural components ({component_count})")
 
+    test_count = measurements["test_count"]
     if test_count >= _TEST_COUNT_THRESHOLD:
         crossed.append(f"test count ({test_count})")
 
-    info: dict[str, Any] = {
-        "component_count": component_count,
-        "test_count": test_count,
-        "runtime_seconds": runtime_seconds,
-        "crossed": crossed,
-        "withheld_terms": withheld_terms,
-    }
+    return crossed, withheld_terms
+
+
+def _check_tt06(repo_root: Path) -> tuple[list[dict], dict[str, Any]]:
+    topology_present = (repo_root / _TOPOLOGY_REL).is_file()
+    if topology_present:
+        return [], {"reason": "topology-present"}
+
+    measurements = _tt06_measure(repo_root)
+    crossed, withheld_terms = _tt06_evaluate(measurements)
+    info: dict[str, Any] = {**measurements, "crossed": crossed, "withheld_terms": withheld_terms}
 
     findings: list[dict] = []
     if len(crossed) == 3:
@@ -493,59 +506,79 @@ def _check_tt06(repo_root: Path) -> tuple[list[dict], dict[str, Any]]:
 # -- Envelope (DS-A, keyed) -------------------------------------------------------
 
 
+def _load_topology_groups(repo_root: Path) -> tuple[list[dict[str, Any]] | None, dict | None]:
+    """Parse `TEST_TOPOLOGY.md` into its `id`-bearing group blocks.
+
+    Returns `(groups, None)` on success, or `(None, skip-reason)` when the
+    file is absent or fails the closed YAML subset parser.
+    """
+    topology_path = repo_root / _TOPOLOGY_REL
+    if not topology_path.is_file():
+        return None, {"reason": "substrate-absent", "path": str(topology_path)}
+    text = topology_path.read_text(encoding="utf-8")
+    try:
+        groups = [
+            block
+            for body, lineno in iter_yaml_blocks(text, str(topology_path))
+            if isinstance(
+                (block := parse_yaml_subset(body, str(topology_path), lineno)).get("id"), str
+            )
+        ]
+    except TopologyError as exc:
+        return None, {"reason": "topology-unparseable", "detail": str(exc)}
+    return groups, None
+
+
+def _classify_topology_groups(
+    repo_root: Path, groups: list[dict[str, Any]]
+) -> tuple[list[dict], dict[str, dict | None], dict[str, dict | None]]:
+    """TT01 (subsystems resolve) + TT02 (selector registration) + TT05 (marker names)."""
+    findings: list[dict] = []
+    skipped: dict[str, dict | None] = {"TT01": None, "TT02": None, "TT05": None}
+    examined: dict[str, dict | None] = {
+        "TT01": {"groups": len(groups)},
+        "TT02": {"groups": len(groups)},
+        "TT05": {"groups": len(groups)},
+    }
+
+    design_path = repo_root / _DESIGN_REL
+    if design_path.is_file():
+        built_status = _parse_3a_status(design_path.read_text(encoding="utf-8"))
+        findings.extend(_check_tt01(groups, built_status))
+    else:
+        skipped["TT01"] = {"reason": "substrate-absent", "path": str(design_path)}
+
+    leaf_path = repo_root / _LEAF_REL
+    if leaf_path.is_file():
+        registry = _parse_registry1(leaf_path.read_text(encoding="utf-8"))
+        findings.extend(_check_tt02(groups, registry))
+        reserved = _reserved_name_set(repo_root)
+        tt05_findings, tt05_info = _check_tt05(groups, repo_root, reserved)
+        findings.extend(tt05_findings)
+        examined["TT05"] = {**examined["TT05"], **tt05_info}
+    else:
+        reason = {"reason": "substrate-absent", "path": str(leaf_path)}
+        skipped["TT02"] = reason
+        skipped["TT05"] = reason
+
+    return findings, skipped, examined
+
+
 def classify(repo_root: Path) -> dict:
     findings: list[dict] = []
     skipped: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
     examined: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
 
-    topology_path = repo_root / _TOPOLOGY_REL
-    if not topology_path.is_file():
-        reason = {"reason": "substrate-absent", "path": str(topology_path)}
-        skipped["TT01"] = reason
-        skipped["TT02"] = reason
-        skipped["TT05"] = reason
+    groups, skip_reason = _load_topology_groups(repo_root)
+    if groups is None:
+        skipped["TT01"] = skip_reason
+        skipped["TT02"] = skip_reason
+        skipped["TT05"] = skip_reason
     else:
-        text = topology_path.read_text(encoding="utf-8")
-        groups: list[dict[str, Any]] | None
-        try:
-            groups = [
-                block
-                for body, lineno in iter_yaml_blocks(text, str(topology_path))
-                if isinstance(
-                    (block := parse_yaml_subset(body, str(topology_path), lineno)).get("id"), str
-                )
-            ]
-        except TopologyError as exc:
-            reason = {"reason": "topology-unparseable", "detail": str(exc)}
-            skipped["TT01"] = reason
-            skipped["TT02"] = reason
-            skipped["TT05"] = reason
-            groups = None
-
-        if groups is not None:
-            examined["TT01"] = {"groups": len(groups)}
-            examined["TT02"] = {"groups": len(groups)}
-            examined["TT05"] = {"groups": len(groups)}
-
-            design_path = repo_root / _DESIGN_REL
-            if design_path.is_file():
-                built_status = _parse_3a_status(design_path.read_text(encoding="utf-8"))
-                findings.extend(_check_tt01(groups, built_status))
-            else:
-                skipped["TT01"] = {"reason": "substrate-absent", "path": str(design_path)}
-
-            leaf_path = repo_root / _LEAF_REL
-            if leaf_path.is_file():
-                registry = _parse_registry1(leaf_path.read_text(encoding="utf-8"))
-                findings.extend(_check_tt02(groups, registry))
-                reserved = _reserved_name_set(repo_root)
-                tt05_findings, tt05_info = _check_tt05(groups, repo_root, reserved)
-                findings.extend(tt05_findings)
-                examined["TT05"] = {**examined["TT05"], **tt05_info}
-            else:
-                reason = {"reason": "substrate-absent", "path": str(leaf_path)}
-                skipped["TT02"] = reason
-                skipped["TT05"] = reason
+        group_findings, group_skipped, group_examined = _classify_topology_groups(repo_root, groups)
+        findings.extend(group_findings)
+        skipped.update(group_skipped)
+        examined.update(group_examined)
 
     tt06_findings, tt06_info = _check_tt06(repo_root)
     findings.extend(tt06_findings)

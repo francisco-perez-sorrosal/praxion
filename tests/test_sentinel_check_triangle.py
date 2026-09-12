@@ -111,6 +111,24 @@ def _rows_by_cited_script(sentinel_text: str) -> dict[str, set[str]]:
     return by_script
 
 
+def _module_level_statements(body: list[ast.stmt]) -> list[ast.stmt]:
+    """Module-level statements including those nested in `if`/`try`/`for`/`while`/`with`
+    blocks, but never inside a function or class body (td-202 N3: a `CHECK_IDS` reassigned
+    under a module-level `if:` is a second declaration a top-level-only walk missed)."""
+    out: list[ast.stmt] = []
+    for node in body:
+        out.append(node)
+        for field in ("body", "orelse", "finalbody"):
+            nested = getattr(node, field, None)
+            if isinstance(nested, list) and not isinstance(
+                node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+            ):
+                out.extend(_module_level_statements(nested))
+        for handler in getattr(node, "handlers", []) or []:
+            out.extend(_module_level_statements(handler.body))
+    return out
+
+
 def _check_id_declarations(source: str) -> list[tuple[str, ast.expr]]:
     """Return `(constant_name, value_node)` per module-level CHECK_ID/CHECK_IDS assignment.
 
@@ -124,7 +142,7 @@ def _check_id_declarations(source: str) -> list[tuple[str, ast.expr]]:
     pre-augment value, leaving the appended ids invisible to every leg.
     """
     declarations: list[tuple[str, ast.expr]] = []
-    for node in ast.parse(source).body:
+    for node in _module_level_statements(ast.parse(source).body):
         if isinstance(node, ast.AnnAssign):
             targets: list[ast.expr] = [node.target]
         elif isinstance(node, ast.AugAssign):
@@ -312,6 +330,12 @@ def test_row_citing_script_in_rule_cell_is_detected_as_a_citation() -> None:
             raise AssertionError(f"expected the Leg 1 message, got: {exc}") from exc
         return
     raise AssertionError("a row citing the script in its Rule cell must fail Leg 1")
+
+
+def test_check_ids_reassigned_under_a_module_if_is_a_second_declaration() -> None:
+    """Leg (c) canary (td-202 N3): a module-level `if:` reassignment is a declaration."""
+    source = 'CHECK_IDS = ("X01",)\nif True:\n    CHECK_IDS = ("X01", "X02")\n'
+    assert len(_check_id_declarations(source)) == 2
 
 
 def test_tp_l_row_invoking_a_script_is_a_citation() -> None:

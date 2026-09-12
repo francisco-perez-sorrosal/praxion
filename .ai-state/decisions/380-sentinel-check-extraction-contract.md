@@ -31,6 +31,7 @@ affected_files:
   - hooks/test_promote_learnings.py
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06]
 re_affirmed_by: [dec-381]
+superseded_in_part_by: [dec-draft-239ddd67]
 ---
 
 ## Context

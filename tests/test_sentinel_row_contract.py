@@ -148,6 +148,39 @@ def _row_pattern(script_name: str) -> re.Pattern[str]:
     )
 
 
+def _family_row_pattern(script_name: str) -> re.Pattern[str]:
+    """The two-part *family form* (the dec-380 amendment on family rows).
+
+    ``Family: `python3 scripts/<name>.py --json`; <verdict map>`` -- the invocation phrase
+    the three structural consumers key on, then the verdict map, nothing else. The
+    Conditional clause is carried by the Family dispatch table's substrate cell and the
+    Spec pointer by the Phase 3 preamble, so a row in this form is valid only when its
+    script is in that table (`assert_residual_row_contract` checks that).
+    """
+    escaped = re.escape(script_name)
+    invocation = (
+        rf"Family: `python3 scripts/{escaped}\.py[^`]{{0,{_INVOCATION_FLAGS_MAX_CHARS}}}`; "
+    )
+    return re.compile(rf"{invocation}(?P<verdict>.*?)\s*", re.DOTALL)
+
+
+_FAMILY_TABLE_HEADER = "| Substrate (skip when absent) | Invocation | Rows |"
+
+
+def _family_table_scripts(sentinel_text: str) -> set[str]:
+    """Script names invoked from the Family dispatch table (the rows right after its header)."""
+    start = sentinel_text.find(_FAMILY_TABLE_HEADER)
+    if start < 0:
+        return set()
+    scripts: set[str] = set()
+    for line in sentinel_text[start:].split("\n")[2:]:
+        if not line.startswith("|"):
+            break
+        for m in re.finditer(r"python3 scripts/([a-z0-9_]{1,40})\.py", line):
+            scripts.add(m.group(1))
+    return scripts
+
+
 def _find_row(sentinel_text: str, check_id: str) -> str:
     """Return the full `| <check_id> | ... |` table-row line for `check_id`.
 
@@ -214,11 +247,14 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
     of silently discarding it: an unparseable row is exactly the drift this contract
     exists to catch, not a case to pass over.
     """
-    match = _row_pattern(script_name).fullmatch(pass_column)
+    match = _row_pattern(script_name).fullmatch(pass_column) or _family_row_pattern(
+        script_name
+    ).fullmatch(pass_column)
     assert match is not None, (
         f"{check_id}: Pass column does not decompose into the mandated "
-        "Conditional? + Invocation + verdict map + Spec pointer shape, in that exact "
-        "order, with no content left over (SYSTEMS_PLAN.md § The Extraction Contract)"
+        "Conditional? + Invocation + verdict map + Spec pointer shape (or the family "
+        "form `Family: `python3 scripts/<name>.py --json`; <verdict map>`), in that "
+        "exact order, with no content left over (SYSTEMS_PLAN.md § The Extraction Contract)"
     )
     return match.group("verdict").strip()
 
@@ -244,7 +280,13 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
     assert invocation in row, f"{check_id}: row is missing the literal `{invocation}` phrase"
 
     canary_ref = f"scripts/test_{script_name}.py"
-    assert canary_ref in row, f"{check_id}: row is missing its canary pointer `{canary_ref}`"
+    if _pass_column(row).startswith("Family: "):
+        assert script_name in _family_table_scripts(sentinel_text), (
+            f"{check_id}: family-form row, but `{script_name}` is not invoked from the "
+            "Family dispatch table -- the table is what carries its substrate condition"
+        )
+    else:
+        assert canary_ref in row, f"{check_id}: row is missing its canary pointer `{canary_ref}`"
 
     tp = _tp_column(row)
     assert len(tp) <= _TP_MAX_CHARS, (
@@ -474,6 +516,12 @@ _VERDICT_SLOT = "(?P<verdict>.*?)"
 # globals rather than just this one.
 _BUDGET_BEARING_PATTERNS: tuple[re.Pattern[str], ...] = ()
 
+# Patterns built inside a function rather than held as globals. The quantifier scan
+# builds each one per registered script name; `test_every_function_built_pattern_is_registered`
+# keeps this list honest by walking the AST for `re.compile` calls inside function bodies
+# (td-202 N2: a function-local pattern used to escape the scan silently).
+_FUNCTION_BUILT_PATTERNS = (_row_pattern, _family_row_pattern)
+
 # Patterns exempt from the scan, each with the reason its quantifiers cannot carry
 # graded content. An exemption is a claim about the pattern, not a convenience.
 _NON_BUDGET_PATTERNS: dict[re.Pattern[str], str] = {
@@ -600,6 +648,36 @@ def test_every_module_pattern_is_classified() -> None:
         )
 
 
+def test_every_function_built_pattern_is_registered() -> None:
+    """Totalising (td-202 N2): every `re.compile` call inside a function body of this module
+    or the Triangle module belongs to a function named in `_FUNCTION_BUILT_PATTERNS`, so a
+    new function-local pattern cannot escape the quantifier scan without being registered."""
+    import ast
+
+    registered = {fn.__name__ for fn in _FUNCTION_BUILT_PATTERNS}
+    for module_path in (
+        Path(__file__),
+        Path(__file__).with_name("test_sentinel_check_triangle.py"),
+    ):
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        for func in ast.walk(tree):
+            if not isinstance(func, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            for node in ast.walk(func):
+                is_compile = (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "compile"
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "re"
+                )
+                if is_compile and not func.name.startswith("test_"):
+                    assert func.name in registered, (
+                        f"{module_path.name}::{func.name} builds a pattern with re.compile but is "
+                        "not in _FUNCTION_BUILT_PATTERNS -- register it so the quantifier scan sees it"
+                    )
+
+
 def test_no_unbounded_quantifier_escapes_the_verdict_slot() -> None:
     """Totalizing guard (NEW-2, extended for the Triangle split): rather than re-listing
     which slots are individually bounded -- a list two prior FAILs each fell out of sync
@@ -625,11 +703,12 @@ def test_no_unbounded_quantifier_escapes_the_verdict_slot() -> None:
         _assert_no_unbounded_quantifier(pattern.pattern, names.get(pattern, repr(pattern)))
 
     for script_name in sorted({script for _, script in EXTRACTED_CHECKS} | {"x"}):
-        built = _row_pattern(script_name).pattern
-        assert _VERDICT_SLOT in built, (
-            f"_row_pattern({script_name!r}): verdict capture group not found in the built pattern"
-        )
-        _assert_no_unbounded_quantifier(built, f"_row_pattern({script_name!r})")
+        for builder in _FUNCTION_BUILT_PATTERNS:
+            built = builder(script_name).pattern
+            assert _VERDICT_SLOT in built, (
+                f"{builder.__name__}({script_name!r}): verdict capture group not found"
+            )
+            _assert_no_unbounded_quantifier(built, f"{builder.__name__}({script_name!r})")
 
 
 def test_invocation_flags_over_budget_is_rejected() -> None:

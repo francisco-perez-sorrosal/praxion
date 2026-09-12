@@ -537,3 +537,14 @@ repos:
         language: system
         files: '^(\.ai-state/decisions/.*|scripts/adr_health\.py)$'
         pass_filenames: false
+
+      # Block R — artifact conformance (C01–C05 N01–N03 S01–S04). Advisory (no
+      # --check): shape and naming findings on the plugin's own catalogue are
+      # sentinel-visible state; check_frontmatter_parses.py owns parseability
+      # and blocks, this owns presence/shape and reports.
+      - id: artifact-conformance
+        name: Artifact conformance (advisory)
+        entry: python3 scripts/check_artifact_conformance.py --repo-root .
+        language: system
+        files: '^(skills/.*/SKILL\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.claude-plugin/plugin\.json|scripts/check_artifact_conformance\.py)$'
+        pass_filenames: false

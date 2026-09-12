@@ -890,6 +890,18 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("BC04", "check_behavioral_contract"),
     ("AC04", "check_architecture_projection"),
     ("AC05", "check_architecture_projection"),
+    ("C01", "check_artifact_conformance"),
+    ("C02", "check_artifact_conformance"),
+    ("C03", "check_artifact_conformance"),
+    ("C04", "check_artifact_conformance"),
+    ("C05", "check_artifact_conformance"),
+    ("N01", "check_artifact_conformance"),
+    ("N02", "check_artifact_conformance"),
+    ("N03", "check_artifact_conformance"),
+    ("S01", "check_artifact_conformance"),
+    ("S02", "check_artifact_conformance"),
+    ("S03", "check_artifact_conformance"),
+    ("S04", "check_artifact_conformance"),
 ]
 
 

@@ -4,7 +4,7 @@ title: Family row form — a two-part sentinel row for scripts dispatched from t
 status: accepted
 category: behavioral
 date: 2026-09-12
-summary: A sentinel `A` row whose script is dispatched from Phase 3's Family dispatch table may use a two-part form — `Family: \`python3 scripts/<name>.py --json\`; <verdict map>` — because the table carries the substrate condition and the Phase 3 preamble carries the spec pointer for every family; the four-part form stays valid for scripts dispatched by sentence. Verdict-map budget, Triangle binding and the invocation phrase are unchanged.
+summary: "A sentinel A row whose script is dispatched from the Phase 3 Family dispatch table may use a two-part form (the Family prefix, the python3 scripts/<name>.py --json invocation, then the verdict map) because the table carries the substrate condition and the Phase 3 preamble carries the spec pointer for every family; the four-part form stays valid for sentence-dispatched scripts. Verdict-map budget, Triangle binding and the invocation phrase are unchanged."
 tags: [sentinel, process-economy, roadmap-p2-1, data-structures, byte-budget]
 made_by: agent
 agent_type: orchestrator

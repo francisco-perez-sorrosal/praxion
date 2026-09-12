@@ -19,6 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from run_check_families import (  # noqa: E402
+    CheckAggregate,
+    RunnerError,
     build_aggregate,
     parse_dispatch_table,
     render_table,
@@ -166,7 +168,10 @@ def test_render_table_shape_has_the_documented_header_and_footer(tmp_path: Path)
 
     table = render_table(aggregate, max_entities=5)
 
-    assert "| Check | Family | FAIL | WARN | INFO | Skipped | Examined | Sample entity |" in table
+    assert (
+        "| Check | Family | FAIL | WARN | INFO | Skipped | Examined | Withheld | Sample entity | Bound |"
+        in table
+    )
     assert "| ST01 | check_stub_good | 0 | 1 | 0 |" in table
     assert "### Runner errors" in table
     assert "check_stub_bad" in table
@@ -194,3 +199,25 @@ def test_cli_exits_zero_even_when_a_family_is_invalid(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "runner-error" in result.stdout
+
+
+def test_render_table_carries_bound_and_keeps_a_failed_familys_checks(tmp_path: Path) -> None:
+    """Light-review wrap F1/W3: the digest must reproduce each check's `bound` (the preamble
+    tells the sentinel to copy it verbatim) and must list a runner-error family's check ids
+    as skipped rather than dropping them (absence reads as clean)."""
+    aggregate = {
+        "checks": {
+            "Z01": CheckAggregate(family="good", bound="Z01 clean means nothing is missing."),
+            "Z02": CheckAggregate(
+                family="bad", skipped={"reason": "runner-error", "detail": "exit 2"}
+            ),
+        },
+        "runner_errors": [
+            RunnerError(family="bad", invocation="python3 scripts/bad.py --json", reason="exit 2")
+        ],
+        "totals": {"families": 2, "checks": 2, "fail": 0, "warn": 0, "info": 0},
+    }
+    table = render_table(aggregate, max_entities=5)
+    assert "Z01 clean means nothing is missing." in table
+    assert "| Z02 | bad |" in table
+    assert "runner-error" in table

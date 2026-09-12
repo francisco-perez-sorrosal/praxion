@@ -101,6 +101,7 @@ class CheckAggregate:
     skipped: object = None
     examined: object = None
     bound: object = None
+    withheld: object = None
     entities: list[tuple[str, str]] = field(default_factory=list)
 
     def bump(self, severity: str) -> None:
@@ -238,6 +239,7 @@ def aggregate_family(
             skipped=_field_for(payload, "skipped", check_id, flat),
             examined=_field_for(payload, "examined", check_id, flat),
             bound=_field_for(payload, "bound", check_id, flat),
+            withheld=_field_for(payload, "withheld", check_id, flat),
         )
         for check_id in check_ids
     }
@@ -274,6 +276,16 @@ def build_aggregate(
             runner_errors.append(
                 RunnerError(family=row.family, invocation=row.invocation, reason=error)
             )
+            # The family's rows stay in the digest (light-review wrap, W3): a check the
+            # runner could not execute is reported as skipped with the reason, never
+            # silently absent -- absence would read as "clean".
+            for check_id in row.check_ids:
+                checks.setdefault(
+                    check_id,
+                    CheckAggregate(
+                        family=row.family, skipped={"reason": "runner-error", "detail": error}
+                    ),
+                )
             continue
 
         families.append(
@@ -333,15 +345,16 @@ def render_table(aggregate: dict, max_entities: int) -> str:
     """Render the Markdown digest: summary table, per-check entity detail, footer."""
     checks: dict[str, CheckAggregate] = aggregate["checks"]
     lines = [
-        "| Check | Family | FAIL | WARN | INFO | Skipped | Examined | Sample entity |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Check | Family | FAIL | WARN | INFO | Skipped | Examined | Withheld | Sample entity | Bound |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for check_id in sorted(checks):
         agg = checks[check_id]
         sample = agg.entities[0][0] if agg.entities else "-"
         lines.append(
             f"| {check_id} | {agg.family} | {agg.fail} | {agg.warn} | {agg.info} | "
-            f"{_compact(agg.skipped)} | {_compact(agg.examined)} | {sample} |"
+            f"{_compact(agg.skipped)} | {_compact(agg.examined)} | {_compact(agg.withheld)} | "
+            f"{sample} | {_cell(agg.bound)} |"
         )
 
     detail_lines = []
@@ -370,6 +383,11 @@ def render_table(aggregate: dict, max_entities: int) -> str:
         f"calls saved: {totals['families']} → 1"
     )
     return "\n".join(lines)
+
+
+def _cell(value: object) -> str:
+    """A free-text cell (the bound statement the sentinel reproduces verbatim): pipes escaped."""
+    return "-" if value in (None, "") else str(value).replace("|", "¦")
 
 
 def _compact(value: object) -> str:

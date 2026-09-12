@@ -165,6 +165,24 @@ def _family_row_pattern(script_name: str) -> re.Pattern[str]:
 
 
 _FAMILY_TABLE_HEADER = "| Substrate (skip when absent) | Invocation | Rows |"
+_FOUR_PART_ONLY_PHRASES = ("Conditional on ", "Spec + golden bad-cases", "skip with a")
+
+
+def _family_table_rows(sentinel_text: str) -> dict[str, set[str]]:
+    """Script name -> the check ids its Family dispatch table row lists."""
+    start = sentinel_text.find(_FAMILY_TABLE_HEADER)
+    rows: dict[str, set[str]] = {}
+    if start < 0:
+        return rows
+    for line in sentinel_text[start:].split("\n")[2:]:
+        if not line.startswith("|"):
+            break
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 3:
+            continue
+        for m in re.finditer(r"python3 scripts/([a-z0-9_]{1,40})\.py", cells[1]):
+            rows.setdefault(m.group(1), set()).update(cells[2].split())
+    return rows
 
 
 def _family_table_scripts(sentinel_text: str) -> set[str]:
@@ -256,7 +274,17 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
         "form `Family: `python3 scripts/<name>.py --json`; <verdict map>`), in that "
         "exact order, with no content left over (SYSTEMS_PLAN.md § The Extraction Contract)"
     )
-    return match.group("verdict").strip()
+    verdict = match.group("verdict").strip()
+    if pass_column.startswith("Family: "):
+        # Parse, don't strip (light-review wrap, W2): the family form has exactly two
+        # parts, so a Conditional clause or a Spec pointer riding inside the verdict
+        # slot is a third part, not verdict text.
+        for phrase in _FOUR_PART_ONLY_PHRASES:
+            assert phrase not in verdict, (
+                f"{check_id}: family-form verdict map carries {phrase!r} -- the table and "
+                "the preamble own that part; a family row has two parts, not three"
+            )
+    return verdict
 
 
 def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name: str) -> None:
@@ -646,6 +674,47 @@ def test_every_module_pattern_is_classified() -> None:
             "globals -- drop them from the registries rather than leaving a "
             "classification behind"
         )
+
+
+def test_family_table_rows_column_matches_the_registry() -> None:
+    """Triangle leg 4 (light-review wrap, W4): the ids a dispatch-table row lists are exactly
+    the ids registered for that script -- a row can neither promise a check the registry
+    lacks nor omit one it has."""
+    text = SENTINEL_PATH.read_text(encoding="utf-8")
+    registered: dict[str, set[str]] = {}
+    for check_id, script in EXTRACTED_CHECKS:
+        registered.setdefault(script, set()).add(check_id)
+    for script, ids in _family_table_rows(text).items():
+        assert ids == registered.get(script, set()), (
+            f"Family dispatch row for {script}: lists {sorted(ids)} but the registry has "
+            f"{sorted(registered.get(script, set()))}"
+        )
+
+
+def test_family_form_with_a_trailing_conditional_is_rejected() -> None:
+    """Canary (light-review wrap, W2): a Conditional clause after the verdict map is a third
+    part the family form does not have."""
+    pass_column = (
+        "Family: `python3 scripts/x.py --json`; WARN per finding. "
+        "Conditional on `foo` present; skip with an X-dimension INFO note."
+    )
+    try:
+        _verdict_map(pass_column, "X01", "x")
+    except AssertionError:
+        return
+    raise AssertionError("trailing Conditional inside a family-form verdict slot was accepted")
+
+
+def test_family_form_with_a_duplicate_spec_pointer_is_rejected() -> None:
+    pass_column = (
+        "Family: `python3 scripts/x.py --json`; WARN per finding. "
+        "Spec + golden bad-cases: `scripts/x.py` docstring; canary `scripts/test_x.py`."
+    )
+    try:
+        _verdict_map(pass_column, "X01", "x")
+    except AssertionError:
+        return
+    raise AssertionError("a Spec pointer inside a family-form verdict slot was accepted")
 
 
 def test_every_function_built_pattern_is_registered() -> None:

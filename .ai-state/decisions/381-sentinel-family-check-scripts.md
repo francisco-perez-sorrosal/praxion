@@ -1,7 +1,7 @@
 ---
-id: dec-draft-c5f5c3ad
+id: dec-381
 title: Sentinel residual extraction uses family check scripts, bound by a row/registry/script triangle
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-12
 summary: The 55 script-less sentinel `A` rows are extracted into ~12 family scripts (N rows cite one `python3 scripts/<family>.py --json`, each row selecting its own `check` id from one keyed envelope) rather than one script per row; dec-380's four-part row template, its 300-byte verdict-map budget and its parse-don't-strip guard are re-affirmed unchanged, and the new drift mode a shared script creates is closed by a three-way equality between catalogue rows, `EXTRACTED_CHECKS` and each script's declared `CHECK_IDS`.

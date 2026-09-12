@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-11T16:16:14Z'
+generated_at: '2026-09-12T10:05:02Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -544,7 +544,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-11'
+  last_modified: '2026-09-12'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -558,7 +558,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-11'
+  last_modified: '2026-09-12'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2856,7 +2856,13 @@ surfaces:
   path: .ai-state/decisions/380-sentinel-check-extraction-contract.md
   type: markdown
   title: "Sentinel check extraction contract \u2014 three destinations, no new file"
-  last_modified: '2026-09-11'
+  last_modified: '2026-09-12'
+  renderer: adr_card
+- id: ai-state-decisions-381-sentinel-family-check-scripts
+  path: .ai-state/decisions/381-sentinel-family-check-scripts.md
+  type: markdown
+  title: Sentinel residual extraction uses family check scripts, bound by a row/registry/script triangle
+  last_modified: '2026-09-12'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -2870,18 +2876,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_00-14-32.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-05'
-  renderer: default_markdown
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_09-52-51.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-05'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-05_21-27-47.md
   type: markdown
@@ -2929,6 +2923,18 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-09-06'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-09-11-17-10-27
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-11_17-10-27.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-09-12'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-09-12-02-10-28
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-09-12_02-10-28.md
+  type: markdown
+  title: "Sentinel Report \u2014 2026-09-12_02-10-28"
+  last_modified: '2026-09-12'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.json
@@ -3536,6 +3542,7 @@ groups:
   - ai-state-decisions-378-simplification-evidence-standard
   - ai-state-decisions-379-retire-worktree-guard-hooks
   - ai-state-decisions-380-sentinel-check-extraction-contract
+  - ai-state-decisions-381-sentinel-family-check-scripts
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3560,8 +3567,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
-  - ai-state-sentinel-reports-sentinel-report-2026-08-05-00-14-32
-  - ai-state-sentinel-reports-sentinel-report-2026-08-05-09-52-51
   - ai-state-sentinel-reports-sentinel-report-2026-08-05-21-27-47
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-08-49-10
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
@@ -3570,6 +3575,8 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
   - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
   - ai-state-sentinel-reports-sentinel-report-2026-09-06-12-31-26
+  - ai-state-sentinel-reports-sentinel-report-2026-09-11-17-10-27
+  - ai-state-sentinel-reports-sentinel-report-2026-09-12-02-10-28
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

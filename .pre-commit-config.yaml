@@ -503,3 +503,14 @@ repos:
         language: system
         files: '^(\.claude-plugin/plugin\.json|agents/[^/]+\.md|skills/software-planning/references/coordination-details\.md|skills/[^/]+/SKILL\.md|commands/[^/]+\.md|scripts/check_registry_projection\.py)$'
         pass_filenames: false
+
+      # Block T — path-resolution family (F01 F02 F05 X03 X09). Advisory
+      # (no --check): F01/F02's declared-limit and prose-ambiguity false positives
+      # (see the script's docstring) rule out a blocking gate; scoped to the
+      # surfaces the family reads plus the script itself.
+      - id: path-resolution
+        name: Path resolution (advisory)
+        entry: python3 scripts/check_path_resolution.py --repo-root .
+        language: system
+        files: '^(skills/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
+        pass_filenames: false

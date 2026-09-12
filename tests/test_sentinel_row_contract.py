@@ -801,6 +801,11 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("X06", "check_registry_projection"),
     ("EC01", "check_registry_projection"),
     ("EC02", "check_registry_projection"),
+    ("F01", "check_path_resolution"),
+    ("F02", "check_path_resolution"),
+    ("F05", "check_path_resolution"),
+    ("X03", "check_path_resolution"),
+    ("X09", "check_path_resolution"),
 ]
 
 

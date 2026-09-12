@@ -297,3 +297,71 @@ def test_never_edits_either_side(repo: Path) -> None:
     before = ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes())
     cap.check_projection(repo, block_slugs=())
     assert ((repo / cap._MODEL).read_bytes(), (repo / cap._DESIGN).read_bytes()) == before
+
+
+# -- AC04/AC05 (Step F2) -------------------------------------------------------
+#
+# Both ride AC13's own substrate gate; `classify()` composes them alongside
+# AC13 in one envelope. They always report `severity: "warn"` -- advisory,
+# never exit-code-bearing, so the pre-commit gate cannot redden on them.
+
+
+def test_check_projection_envelope_keys_are_pinned(repo: Path) -> None:
+    """Pins `check_projection()`'s own shape -- `classify()` must never touch it."""
+    _write_rows(repo, ALL_THREE)
+    report = cap.check_projection(repo, block_slugs=())
+    assert set(report.keys()) == {"findings", "skipped", "withheld", "rows", "elements"}
+
+
+def test_canary_ac04_flags_a_dec_reference_with_no_finalized_adr(repo: Path) -> None:
+    """The live shape: a stale `dec-NNN` mention nothing finalizes."""
+    _write_rows(repo, ALL_THREE)
+    (repo / cap._DESIGN).write_text(
+        (repo / cap._DESIGN).read_text(encoding="utf-8") + "\nSee dec-999 for rationale.\n",
+        encoding="utf-8",
+    )
+    report = cap.classify(repo)
+    ac04 = [f for f in report["findings"] if f["check"] == "AC04"]
+    assert len(ac04) == 1
+    assert ac04[0]["severity"] == "warn"
+    assert ac04[0]["entity"] == "dec-999"
+
+
+def test_dec_reference_with_a_finalized_adr_resolves(repo: Path) -> None:
+    _write_rows(repo, ALL_THREE)
+    (repo / cap._DESIGN).write_text(
+        (repo / cap._DESIGN).read_text(encoding="utf-8") + "\nSee dec-001 for rationale.\n",
+        encoding="utf-8",
+    )
+    decisions = repo / cap._DECISIONS_DIR
+    decisions.mkdir(parents=True)
+    (decisions / "001-example.md").write_text("---\nid: dec-001\n---\n", encoding="utf-8")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC04"] == []
+
+
+def test_canary_ac05_flags_a_missing_developer_guide(repo: Path) -> None:
+    """The live shape: `.ai-state/DESIGN.md` exists with no `docs/architecture.md` beside it."""
+    _write_rows(repo, ALL_THREE)
+    report = cap.classify(repo)
+    ac05 = [f for f in report["findings"] if f["check"] == "AC05"]
+    assert len(ac05) == 1
+    assert ac05[0]["severity"] == "warn"
+    assert "does not exist" in ac05[0]["message"]
+
+
+def test_developer_guide_with_content_passes(repo: Path) -> None:
+    _write_rows(repo, ALL_THREE)
+    (repo / "docs").mkdir(parents=True, exist_ok=True)
+    (repo / cap._ARCH_DOC).write_text("# Architecture\n", encoding="utf-8")
+    report = cap.classify(repo)
+    assert [f for f in report["findings"] if f["check"] == "AC05"] == []
+
+
+def test_severity_splits_fail_for_structural_drift_warn_for_advisory_checks(repo: Path) -> None:
+    """The exit code composes on severity, not check id -- pin the split explicitly."""
+    _write_rows(repo, ALL_THREE + "| Ghost | `tooling.ghost` | r | Built | f |\n")
+    report = cap.classify(repo)
+    severities = {f["check"]: f["severity"] for f in report["findings"]}
+    assert severities["AC13"] == "fail"
+    assert severities["AC05"] == "warn"

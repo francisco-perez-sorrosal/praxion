@@ -809,6 +809,8 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("BC01", "check_behavioral_contract"),
     ("BC03", "check_behavioral_contract"),
     ("BC04", "check_behavioral_contract"),
+    ("AC04", "check_architecture_projection"),
+    ("AC05", "check_architecture_projection"),
 ]
 
 

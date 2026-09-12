@@ -50,6 +50,25 @@ over-granular.
 Exit 1 when findings exist, so this doubles as a commit gate. Reports; never
 edits either side.
 
+**AC04/AC05 ride the same substrate gate, at a different severity.** AC13 (this
+script's original scope) is the exit-code-bearing check; `check_projection()`
+returns its own pre-existing flat envelope (`findings`/`skipped`/`withheld`/
+`rows`/`elements`) unchanged, so callers of that function see byte-identical
+behavior. `classify()` is the wider envelope `main()` and sentinel actually
+consume: it wraps AC13's findings (adding `check`/`severity` to a copy, never
+mutating the originals) alongside two new checks -- AC04 (every inline
+`dec-NNN` in `.ai-state/DESIGN.md` or `docs/architecture.md` resolves to a
+finalized ADR) and AC05 (`docs/architecture.md` exists and is non-empty) --
+sharing AC13's own substrate trigger (`.c4` model and `.ai-state/DESIGN.md`
+both present; all three skip together otherwise). `skipped` and `examined`
+are keyed by check id in this envelope; AC13's own `rows`/`elements` land
+under `examined["AC13"]`. AC04 and AC05 findings always carry
+`severity: "warn"` and never affect the exit code -- both are advisory
+findings living inside a script that otherwise blocks the commit, because a
+stale decision reference or an empty developer guide is real drift but not
+worth reddening every commit over (measured against the live corpus before
+shipping; see `LEARNINGS.md § Step F2`).
+
 Cites: rules/writing/aac-dac-conventions.md (model is the structural
 authority, prose is authored); CLAUDE.md§Context Engineering.
 """
@@ -75,10 +94,22 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # `check_agent_lifecycle_pairing.py`, `check_doc_manifest_freshness.py`), this script
 # never emits a `"check"` key -- there is no runtime id for this declaration to drift
 # from, only Leg 3's static one.
-CHECK_IDS: tuple[str, ...] = ("AC13",)
+CHECK_IDS: tuple[str, ...] = ("AC04", "AC05", "AC13")
+
+SCRIPT_NAME = "check_architecture_projection"
 
 _MODEL = Path("docs/diagrams/architecture/src/architecture.c4")
 _DESIGN = Path(".ai-state/DESIGN.md")
+_ARCH_DOC = Path("docs/architecture.md")
+_DECISIONS_DIR = Path(".ai-state/decisions")
+
+# AC04/AC05 findings are always advisory: unlike AC13's exit-code-bearing findings,
+# a broken `dec-NNN` reference or a missing developer guide must not flip the
+# `architecture-projection` pre-commit gate red -- see `classify()`.
+_AC04_SEVERITY = "warn"
+_AC05_SEVERITY = "warn"
+
+_DEC_ID_RE = re.compile(r"\bdec-(\d{3})\b")
 # The shipped-block registry, read from the tree under inspection. Both this and
 # the two paths above resolve against `repo_root`, so every authority the check
 # compares comes from the same tree.
@@ -325,36 +356,124 @@ def check_projection(repo_root: Path, *, block_slugs: tuple[str, ...] | None = _
     }
 
 
+# -- AC04/AC05 (advisory, riding AC13's substrate gate) -----------------------
+
+
+def _check_ac04(repo_root: Path, design_text: str) -> tuple[list[dict], dict]:
+    """Every `dec-NNN` in DESIGN.md or the developer guide resolves to a finalized ADR."""
+    arch_path = repo_root / _ARCH_DOC
+    texts = [design_text]
+    if arch_path.is_file():
+        texts.append(arch_path.read_text(encoding="utf-8"))
+
+    dec_ids = sorted({m.group(1) for text in texts for m in _DEC_ID_RE.finditer(text)})
+    decisions_dir = repo_root / _DECISIONS_DIR
+    findings = [
+        {
+            "check": "AC04",
+            "severity": _AC04_SEVERITY,
+            "entity": f"dec-{dec_id}",
+            "message": f"'dec-{dec_id}' referenced but has no finalized "
+            f"{_DECISIONS_DIR}/{dec_id}-*.md file",
+        }
+        for dec_id in dec_ids
+        if not decisions_dir.is_dir() or not any(decisions_dir.glob(f"{dec_id}-*.md"))
+    ]
+    return findings, {"dec_ids_examined": len(dec_ids)}
+
+
+def _check_ac05(repo_root: Path) -> tuple[list[dict], dict]:
+    """`docs/architecture.md` exists and carries content."""
+    arch_path = repo_root / _ARCH_DOC
+    if not arch_path.is_file():
+        detail = "does not exist"
+    elif not arch_path.read_text(encoding="utf-8").strip():
+        detail = "exists but is empty"
+    else:
+        return [], {"checked": True}
+    finding = {
+        "check": "AC05",
+        "severity": _AC05_SEVERITY,
+        "entity": str(_ARCH_DOC),
+        "message": f"'{_ARCH_DOC}' {detail} while {_DESIGN} is present",
+    }
+    return [finding], {"checked": True}
+
+
+def classify(repo_root: Path) -> dict:
+    """AC04 + AC05 + AC13 in one envelope -- see module docstring for the shape."""
+    ac13 = check_projection(repo_root)
+    skipped = ac13["skipped"]
+
+    ac13_findings = [
+        {
+            "check": "AC13",
+            "severity": "fail",
+            "entity": f["subject"],
+            "message": f"{f['kind']}: {f['detail']}",
+        }
+        for f in ac13["findings"]
+    ]
+
+    if skipped is not None:
+        ac04_findings, ac04_examined = [], None
+        ac05_findings, ac05_examined = [], None
+    else:
+        design_text = (repo_root / _DESIGN).read_text(encoding="utf-8")
+        ac04_findings, ac04_examined = _check_ac04(repo_root, design_text)
+        ac05_findings, ac05_examined = _check_ac05(repo_root)
+
+    return {
+        "script": SCRIPT_NAME,
+        "checks": list(CHECK_IDS),
+        "findings": ac13_findings + ac04_findings + ac05_findings,
+        "skipped": {"AC04": skipped, "AC05": skipped, "AC13": skipped},
+        "examined": {
+            "AC04": ac04_examined,
+            "AC05": ac05_examined,
+            "AC13": None
+            if skipped is not None
+            else {"rows": ac13["rows"], "elements": ac13["elements"]},
+        },
+        "withheld": ac13["withheld"],
+    }
+
+
 # -- CLI ----------------------------------------------------------------------
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Reconcile the LikeC4 model against DESIGN.md section 3a."
+        description="Reconcile the LikeC4 model + shipped blocks + dec-NNN refs against DESIGN.md."
     )
     parser.add_argument("--json", action="store_true", help="emit findings as JSON")
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
     args = parser.parse_args(argv)
 
-    report = check_projection(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
+    report = classify(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
 
     if args.json:
         print(json.dumps(report, indent=2))
-    elif report["skipped"]:
-        print(f"skipped: {report['skipped']}")
+    elif all(v is not None for v in report["skipped"].values()):
+        print(f"skipped: {report['skipped']['AC13']}")
     else:
-        print(
-            f"{report['elements']} structural component(s) in the model, "
-            f"{report['rows']} row(s) in section 3a"
-        )
+        ac13_meta = report["examined"]["AC13"] or {}
+        if ac13_meta:
+            print(
+                f"{ac13_meta['elements']} structural component(s) in the model, "
+                f"{ac13_meta['rows']} row(s) in section 3a"
+            )
         for reason in report["withheld"]:
             print(f"  WITHHELD -- {reason}")
         for finding in report["findings"]:
-            print(f"  {finding['kind']}: {finding['subject']}\n    {finding['detail']}")
+            print(
+                f"  {finding['check']} [{finding['severity']}] {finding['entity']}: "
+                f"{finding['message']}"
+            )
         if not report["findings"]:
-            print("  model and section 3a agree")
+            print("  AC04/AC05/AC13 agree")
 
-    return 1 if report["findings"] else 0
+    return 1 if any(f["severity"] == "fail" for f in report["findings"]) else 0
 
 
 if __name__ == "__main__":

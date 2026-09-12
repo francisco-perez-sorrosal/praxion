@@ -11,6 +11,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -33,6 +35,30 @@ def test_check_ids_declares_all_three() -> None:
 
 
 # -- BC01 -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("spelling", ["\"paths\": '*.py'", "paths : '*.py'", "'paths': x"])
+def test_bc01_flags_every_yaml_spelling_of_the_paths_key(tmp_path: Path, spelling: str) -> None:
+    """Light-review F1, W-1: a quoted or space-before-colon `paths` key is the same key to a
+    YAML parser; the line-prefix match missed it."""
+    _write(
+        tmp_path / "rules" / "swe" / "agent-behavioral-contract.md",
+        f"---\n{spelling}\n---\n\n" + _RULE_TEXT,
+    )
+    findings = [f for f in classify(tmp_path)["findings"] if f["check"] == "BC01"]
+    assert any("paths:" in f["message"] for f in findings), spelling
+
+
+def test_bc01_ignores_a_nested_paths_key(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "rules" / "swe" / "agent-behavioral-contract.md",
+        "---\nmeta:\n  paths: nested\n---\n\n" + _RULE_TEXT,
+    )
+    assert [
+        f
+        for f in classify(tmp_path)["findings"]
+        if f["check"] == "BC01" and "paths:" in f["message"]
+    ] == []
 
 
 def test_bc01_flags_paths_frontmatter_and_missing_behavior(tmp_path: Path) -> None:

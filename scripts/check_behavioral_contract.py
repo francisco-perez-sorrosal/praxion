@@ -118,6 +118,9 @@ def _read_text(path: Path) -> str | None:
         return None
 
 
+_PATHS_KEY_RE = re.compile(r'^["\']?paths["\']?\s*:')
+
+
 def _has_paths_frontmatter(text: str) -> bool:
     """True if `text` opens with a YAML frontmatter block declaring `paths:`."""
     lines = text.splitlines()
@@ -126,7 +129,12 @@ def _has_paths_frontmatter(text: str) -> bool:
     for line in lines[1:]:
         if line.strip() == "---":
             return False
-        if line.startswith("paths:"):
+        # A YAML key may be quoted or carry space before the colon (`"paths": …`,
+        # `paths : …`): normalise the key the way a parser would, stdlib-only,
+        # so the check agrees with regenerate_rules_manifest.py's yaml.safe_load
+        # (light-review F1, W-1). Top-level keys only: an indented `paths:` is a
+        # nested value, not the scoping key.
+        if _PATHS_KEY_RE.match(line):
             return True
     return False
 

@@ -795,6 +795,12 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("DH02", "adr_health"),
     ("DH04", "adr_health"),
     ("DL03", "regenerate_adr_index"),
+    ("X01", "check_registry_projection"),
+    ("X02", "check_registry_projection"),
+    ("X05", "check_registry_projection"),
+    ("X06", "check_registry_projection"),
+    ("EC01", "check_registry_projection"),
+    ("EC02", "check_registry_projection"),
 ]
 
 

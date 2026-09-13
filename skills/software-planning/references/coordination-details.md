@@ -23,6 +23,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Produce `IMPLEMENTATION_PLAN.md`, `WIP.md`, and `LEARNINGS.md` at `.ai-work/<task-slug>/`"
 - "Read the `SYSTEMS_PLAN.md` at `.ai-work/<task-slug>/` for input"
 - "If step decomposition reveals structural gaps not captured in the systems plan: update `.ai-state/DESIGN.md` and `docs/architecture.md` before implementation begins"
+- If `SYSTEMS_PLAN.md` carries a `## Behavioral Specification` (Standard/Full): "Initialize `.ai-work/<task-slug>/traceability.yml`; give every step that implements or tests a REQ an explicit owner for its `implementation:` and `tests:` arrays (the test-engineer when one is paired, otherwise the implementer's own test sub-step — the implementer's default protocol leaves `tests:` to the test-engineer, so an unpaired plan must say so); add a reconciliation step that merges any `traceability_*.yml` fragments into the single file before the verifier runs — the verifier FAILs on a missing merged file or on a REQ with an empty `tests:` array"
 
 **implementer** — always include in prompt:
 - "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`"

@@ -196,12 +196,20 @@ def extract_title(lines: list[str], path: Path) -> str:
 def extract_summary(lines: list[str]) -> str:
     paragraphs: list[str] = []
     current: list[str] = []
+    in_comment = False
     for line in lines:
         stripped = line.strip()
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
         if not stripped:
             if current:
                 paragraphs.append(" ".join(current).strip())
                 current = []
+            continue
+        if stripped.startswith("<!--"):
+            in_comment = "-->" not in stripped[4:]
             continue
         if stripped.startswith("## "):
             continue

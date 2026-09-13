@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d4692dce
+id: dec-383
+draft_id: dec-draft-d4692dce
 title: The behavioural-contract rule is the sole author of the four definitions; a shape-extracting guard single-sources them without fences
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-12
 summary: "The four behaviour definitions in rules/swe/agent-behavioral-contract.md become the only wording in the repository; five files (the shipped behavioral-contract canonical block, its onboarding embed, README.md, codex/config/AGENTS.md.tmpl and the generated root AGENTS.md) become byte-bound consumers and the hackathon block's restatement becomes a pointer. The binding mechanism is a new totalising BC05 check inside scripts/check_behavioral_contract.py that extracts and compares definition-shape bullet lines, NOT sync_canonical_blocks.py — because making the four bullets a sync unit forces the shipped canonical block to become a fenced consumer, and claude-md-blocks.md copies that body verbatim into every managed project's CLAUDE.md while hash_block_body does not strip HTML comments. The always-loaded task-slug paragraph becomes a pointer and the always-loaded return-contract clause is deleted after its orchestrator-facing clause moves into the rule row: net -613 B / -156 tokens governed."

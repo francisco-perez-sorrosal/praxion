@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-12T21:33:24Z'
+generated_at: '2026-09-13T15:52:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-13'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -50,7 +50,7 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-13'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
@@ -475,7 +475,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-13'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -505,7 +505,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-08'
+  last_modified: '2026-09-13'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -544,7 +544,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-12'
+  last_modified: '2026-09-13'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -558,7 +558,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-12'
+  last_modified: '2026-09-13'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2870,6 +2870,12 @@ surfaces:
   title: "Family row form \u2014 a two-part sentinel row for scripts dispatched from the Family table"
   last_modified: '2026-09-12'
   renderer: adr_card
+- id: ai-state-decisions-383-single-source-canonical-texts
+  path: .ai-state/decisions/383-single-source-canonical-texts.md
+  type: markdown
+  title: The behavioural-contract rule is the sole author of the four definitions; a shape-extracting guard single-sources them without fences
+  last_modified: '2026-09-13'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3550,6 +3556,7 @@ groups:
   - ai-state-decisions-380-sentinel-check-extraction-contract
   - ai-state-decisions-381-sentinel-family-check-scripts
   - ai-state-decisions-382-family-row-form
+  - ai-state-decisions-383-single-source-canonical-texts
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

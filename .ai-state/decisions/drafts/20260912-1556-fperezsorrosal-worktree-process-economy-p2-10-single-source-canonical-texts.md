@@ -221,6 +221,9 @@ becomes a fenced consumer.
 
 - **Hackathon-mode block is not refresh-tracked.** `hackathon-mode` is deliberately absent from `REFRESHABLE_SLUGS`, so the six managed projects keep their inlined four-bullet hackathon restatement with no stale signal until a later upgrade re-installs the block; the contract block itself refreshes. Accepted (user decision D-b: refresh later is fine); tracked with td-205.
 
+- **The Codex template is no longer pure ASCII.** Byte-identity with the rule brings its em-dashes into `codex/config/AGENTS.md.tmpl` and the generated `AGENTS.md`; nothing in the Codex export path is ASCII-gated (verified by the exporter tests), so this is a record, not a risk.
+- **One phrase left the always-loaded set.** The task-slug paragraph's "derived from the task description" now lives only in `coordination-details.md § Task Slug Propagation`, one hop from the always-loaded convention; the four binding conventions (kebab-case, 2–4 words, `Task slug: <slug>` in every prompt, `.ai-work/<task-slug>/`) stay resident. Accepted loss.
+
 ## Disconfirmation
 
 **Falsifier.** Exhibit a fenced arrangement in which

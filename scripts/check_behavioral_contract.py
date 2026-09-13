@@ -45,8 +45,9 @@ matcher that would need an allowlist of its own:
 - a numbered-list or heading restatement (`1. **Stay Surgical** -- ...`,
   `### Stay Surgical`): the bullet marker must be `-` or `*`.
 - a restatement carrying no separator at all (`- **Stay Surgical** touch only
-  what the change requires`) -- today the two Codex sites' terse bullets score
-  two of four for exactly this reason.
+  what the change requires`) -- before this pipeline the two Codex sites' terse
+  bullets scored two of four for exactly this reason; they are byte-bound
+  consumers now.
 - an indent deeper than eight spaces before the bullet marker (`         - **Stay
   Surgical** — ...`, nine spaces): the predicate allows at most eight.
 - an EN-dash separator (`- **Stay Surgical** – ...`): only the em-dash, colon,
@@ -208,7 +209,8 @@ _BC05_SKIP_DIRS: frozenset[str] = frozenset(
 )
 
 # Three of four, not four: a file restating most of the contract is already a second
-# wording, and the two Codex sites show four-of-four is not reachable for terse copy.
+# wording, and the pre-pipeline Codex sites showed four-of-four is not reachable for terse
+# copy (they are byte-bound consumers now).
 _BC05_UNREGISTERED_THRESHOLD = 3
 
 # Definition shape: a markdown bullet opening with the bolded behavior name, then a

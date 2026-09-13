@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     from spec_drift import detect_drift  # type: ignore[no-redef]  # standalone
 
 _SPECS_SUBPATH = Path(".ai-state") / "specs"
-_CHECK_ID = "SH07"
+CHECK_ID = "SH07"
 _ORPHANED_EDGE = "orphaned-edge"
 
 
@@ -53,7 +53,7 @@ def run_sh07(repo_root: Path) -> list[dict]:
                 continue  # deferred to SH01/SH04
             findings.append(
                 {
-                    "check": _CHECK_ID,
+                    "check": CHECK_ID,
                     "severity": finding.get("severity", "suggested"),
                     "message": (
                         f"{finding.get('req', '?')} in {finding.get('pointer', scope)}: "
@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(
-            json.dumps({"check": _CHECK_ID, "findings": findings, "count": len(findings)}, indent=2)
+            json.dumps({"check": CHECK_ID, "findings": findings, "count": len(findings)}, indent=2)
         )
     else:
         for row in findings:

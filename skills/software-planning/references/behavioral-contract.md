@@ -103,7 +103,7 @@ The contract is working if, over time: fewer collateral changes show up in diffs
 | `test-engineer` | Simplicity First, Register Objection | Fixture factory for one test; tests implementation detail. |
 | `verifier` | Surface Assumptions, Register Objection | Passes a step with ambiguous acceptance criteria. |
 | `doc-engineer` | Simplicity First, Register Objection | Future-work placeholders; duplicates rule content. |
-| `sentinel` | (audits contract via BC01-BC04) | — |
+| `sentinel` | (audits contract via BC01-BC05) | — |
 | `cicd-engineer` | Simplicity First, Stay Surgical | Unused CI runners or speculative matrix dimensions. |
 
 ## Failure-Mode Tags
@@ -119,4 +119,4 @@ Canonical definitions, severities, and example triggers live in `skills/code-rev
 - **Rule**: `rules/swe/agent-behavioral-contract.md` — always loaded, names the four behaviors.
 - **Global philosophy**: `~/.claude/CLAUDE.md` §The Behavioral Contract.
 - **Tag vocabulary**: `skills/code-review/references/report-template.md` §Behavioral Contract Findings.
-- **Audit checks**: `agents/sentinel.md` BC01-BC04.
+- **Audit checks**: `agents/sentinel.md` BC01-BC05.

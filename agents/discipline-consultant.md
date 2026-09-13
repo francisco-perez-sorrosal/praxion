@@ -149,7 +149,7 @@ Annotate confidence per `skills/multi-perspective-analysis/references/calibrated
 
 ## Output
 
-Return a pointer, not a payload — 5 lines or fewer:
+Return a pointer, not a payload, per the Return contract convention (`rules/swe/swe-agent-coordination-protocol.md`):
 
 1. Resolved discipline and the skill(s) bound at runtime
 2. Round reached (0 / 1)

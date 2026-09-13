@@ -275,8 +275,9 @@ Audit the four-behavior contract's single-source-of-truth architecture. Drift be
 |----|----|------|------|
 | BC01 | A | Rule exists, is always-loaded, and states the whole contract | Family: `python3 scripts/check_behavioral_contract.py --json`; FAIL if the file is missing, is `paths:`-scoped, or omits a behavior name. |
 | BC02 | L | Four canonical behaviors appear in canonical order in both CLAUDE.md anchors | `~/.claude/CLAUDE.md` (when readable) and project `CLAUDE.md` both name **Surface Assumptions → Register Objection → Stay Surgical → Simplicity First** in this order with identical spelling |
-| BC03 | A | Each of the 14 contract-bound agents references the rule | Family: `python3 scripts/check_behavioral_contract.py --json`; FAIL per missing or extra citer against the 14 contract-bound agents. |
+| BC03 | A | Each contract-bound agent named in `_BC03_EXPECTED_AGENTS` references the rule | Family: `python3 scripts/check_behavioral_contract.py --json`; FAIL per missing or extra citer against the script's canonical contract-bound roster. |
 | BC04 | A | Tag vocabulary subsection exists with all 6 canonical tags | Family: `python3 scripts/check_behavioral_contract.py --json`; FAIL per missing canonical tag in the Behavioral Contract Findings subsection. |
+| BC05 | A | Every restatement of the four behaviors is the source or a byte-bound consumer | Family: `python3 scripts/check_behavioral_contract.py --json`; FAIL per unregistered definition site, per consumer line diverging from the rule, and per missing registry path. |
 
 BC checks are unconditional — they run on every sentinel pass because the contract is an always-loaded ecosystem invariant, not a feature gated by presence of specs or ADRs.
 
@@ -461,7 +462,7 @@ Run every `A` row: the family scripts first (table below), then the remaining sc
 | always (the sentinel's own definition) | `python3 scripts/check_sentinel_self_audit.py --json` | V01 V02 V03 V04 |
 | per check: `.claude-plugin/plugin.json` (X01) · `skills/`+`commands/` (X02) · the roster in `coordination-details.md` (X05) · `agents/README.md` (X06 EC01) · `agents/`+CLAUDE.md (EC02) | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
 | `skills/`/`agents/`/`commands/`/`rules/` (per check; `.ai-state/SYSTEM_DEPLOYMENT.md` and CLAUDE.md's Structure heading each conditional) | `python3 scripts/check_path_resolution.py --json` | F01 F02 F05 X03 X09 |
-| always (contract is unconditional) | `python3 scripts/check_behavioral_contract.py --json` | BC01 BC03 BC04 |
+| always (contract is unconditional) | `python3 scripts/check_behavioral_contract.py --json` | BC01 BC03 BC04 BC05 |
 | `agents/` (T03) · `skills/` (T01 T04) | `python3 scripts/check_agent_prompt_size.py --json` | T01 T03 T04 |
 | `.ai-work/` | `python3 scripts/check_specialist_dispositions.py --json` | P07 |
 | `skills/` · `agents/` · `commands/` (per check) | `python3 scripts/check_artifact_conformance.py --json` | C01 C02 C03 C04 C05 N01 N02 N03 S01 S02 S03 S04 |

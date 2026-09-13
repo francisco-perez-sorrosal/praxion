@@ -91,9 +91,9 @@ Five durable principles shape how Praxion evolves, extending the global philosop
 
 The behavioral contract is a first-class operational pillar — enforced through an always-loaded rule, agent-runtime self-tests, and named failure-mode tags in verification reports. Four named behaviors define it:
 
-- **Surface Assumptions** — name every assumption before acting; ask when ambiguity could produce the wrong artifact.
-- **Register Objection** — when a request violates scope, structure, or evidence, flag the conflict with a reason before complying or declining.
-- **Stay Surgical** — touch only what the change requires; if scope grew mid-execution, stop and re-scope.
+- **Surface Assumptions** — state your interpretation upfront and surface each gap-filling assumption as you make it, unconditionally — a plausible default never *feels* like ambiguity. Pause before acting only when a surfaced assumption is load-bearing and hard to reverse, or could produce the wrong artifact.
+- **Register Objection** — when a request violates scope, structure, or evidence: state the conflict with a reason before complying or declining. Silent agreement is a contract violation.
+- **Stay Surgical** — touch only what the change requires; if scope grew, stop and re-scope instead of silently expanding.
 - **Simplicity First** — prefer the smallest solution that meets the behavior; every added line, file, or dependency must earn its place.
 
 ## What's Included

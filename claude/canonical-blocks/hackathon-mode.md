@@ -97,14 +97,9 @@ to the delivery ceremony, NEVER to discovery.
 
 ### The Behavioral Contract still applies — in every mode
 
-Hackathon mode is NOT license to skip the four-behavior contract. Every agent that
-writes, plans, or reviews code still honors:
-- **Surface Assumptions** — list assumptions before acting; ask when ambiguity could
-  produce the wrong artifact.
-- **Register Objection** — when a request violates scope, structure, or evidence, state
-  the conflict with a reason before complying or declining. Silent agreement is a violation.
-- **Stay Surgical** — touch only what the change requires; re-scope rather than silently expand.
-- **Simplicity First** — prefer the smallest solution that meets the behavior.
+Hackathon mode is NOT license to skip the four-behavior contract. Every agent still
+honors the four-behavior contract defined in the `## Behavioral Contract` block in this file —
+Surface Assumptions, Register Objection, Stay Surgical, Simplicity First.
 The architect's Surface Assumptions and Registered Objections sections are MANDATORY
 even in the slim SYSTEMS_PLAN shape.
 

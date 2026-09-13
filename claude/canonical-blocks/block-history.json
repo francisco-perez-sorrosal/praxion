@@ -13,10 +13,11 @@
       ]
     },
     "behavioral-contract": {
-      "current": "78f7ea2eb6c37c70d70bc0eb97ddc3e32a239086ae5e1b4e009512f1e118c6f7",
+      "current": "36525196b15323ae9c68af9849fcb51c8a956beddab754b8e4248fd75a2a5cc8",
       "history": [
         "059536f6c8a299b1f33b384561f078edb3116875e59881e4fc6b4f5077d5a062",
-        "78f7ea2eb6c37c70d70bc0eb97ddc3e32a239086ae5e1b4e009512f1e118c6f7"
+        "78f7ea2eb6c37c70d70bc0eb97ddc3e32a239086ae5e1b4e009512f1e118c6f7",
+        "36525196b15323ae9c68af9849fcb51c8a956beddab754b8e4248fd75a2a5cc8"
       ]
     },
     "compaction-guidance": {

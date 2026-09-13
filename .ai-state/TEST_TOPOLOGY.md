@@ -169,7 +169,7 @@ they do today.
 ### How these blocks were built
 
 **Selector strategy is `pytest-globs` for every group — deliberately, not by default.** A
-`pytest-markers` cut would require adding `@pytest.mark.<group>` to all 152 test files,
+`pytest-markers` cut would require adding `@pytest.mark.<group>` to all 220 test files,
 creating a second source of truth that drifts from the paths it duplicates. This corpus is
 already path-aligned (`scripts/test_X.py` sits beside `scripts/X.py`), so globs are both
 natural and precise. Two consequences worth knowing: no `[tool.pytest.ini_options] markers`
@@ -213,19 +213,26 @@ the whole file unparseable by its own resolver. Omitting the key is equally sche
 parses cleanly. **When the planner adds the first boundary it adds the key with entries in
 it** — there is never a reason to write the empty form.
 
-### Coverage invariant — 152 / 152, zero orphans
+### Coverage invariant — 227 / 227, zero orphans
 
-The canonical corpus (`testpaths = ["tests", "scripts", "hooks"]`) is **152 test files** — 88
-under `scripts/`, 45 under `tests/`, 19 under `hooks/`. Every one is selected by exactly one
-group's `selectors`. This was verified mechanically: `pytest --collect-only -q` was run per
-group, the resulting file sets unioned, and the union diffed against pytest's own collector
-output for the whole corpus. Result: **152 covered, 0 orphaned, 0 overlapping.**
+The full corpus (`git ls-files tests scripts hooks fitness`, filtered to `test_*.py`) is **227
+test files** — 132 under `scripts/`, 64 under `tests/`, 24 under `hooks/`, 7 under `fitness/`.
+The canonical corpus (`testpaths = ["tests", "scripts", "hooks"]`) is 220 of those; `fitness/`
+sits outside `testpaths` and runs as a dedicated CI job (`.github/workflows/architecture.yml`),
+contributing the remaining 7. Every one of the 227 is selected by exactly one group's
+`selectors`. This is verified mechanically by expanding each group's `pytest-globs` `selectors`
+(directories recurse, globs expand, bare files match exactly) against the corpus and diffing
+the union against `git ls-files`' own output for the whole corpus (the 2026-09-13 reconciliation
+found 40 orphans this way after the corpus grew from 152 to 227 files). Nothing mechanical
+re-runs that diff yet — a `TT07` check in `scripts/check_topology_conformance.py` is the natural
+home. Result: **227 covered, 0 orphaned, 0 overlapping.**
 
 A test file claimed by no group can never run under a scoped invocation — it would vanish
 silently from every `step`- and `phase`-tier run while the full suite still passed. **Re-run
 that diff whenever a group's `selectors` change or a test file is added or moved.** The
-`architecture-fitness` group contributes 0 to this count by design: `fitness/` sits outside
-`testpaths` and its 6 files are additional to the 152.
+`architecture-fitness` group contributes 0 of the 220 canonical-corpus files by design: its 7
+files sit outside `testpaths` and are the difference between the 220-file canonical corpus and
+the 227-file total above.
 
 ### About `expected_runtime_envelope`
 
@@ -314,9 +321,11 @@ selectors:
     arg:
       - "scripts/test_adr_health.py"
       - "scripts/test_check_adr_frontmatter_promotion.py"
+      - "scripts/test_check_adr_reciprocity.py"
       - "scripts/test_check_design_checkpoint.py"
       - "scripts/test_check_spec_archival_gap.py"
       - "scripts/test_check_spec_drift.py"
+      - "scripts/test_check_state_corpus.py"
       - "scripts/test_finalize_adrs.py"
       - "scripts/test_finalize_chain.py"
       - "scripts/test_query_adrs.py"
@@ -329,6 +338,8 @@ selectors:
       - "tests/test_spec_drift.py"
 file_dependencies:
   - "scripts/adr_health.py"
+  - "scripts/check_adr_reciprocity.py"
+  - "scripts/check_state_corpus.py"
   - "scripts/finalize_adrs.py"
   - "scripts/finalize_adrs_backlinks.py"
   - "scripts/finalize_adrs_crossrefs.py"
@@ -356,7 +367,7 @@ expected_runtime_envelope:
   p50_seconds: 10.3
   p95_seconds: 14
 shared_state: filesystem
-notes: "Carries test_adr_health.py (5.6 s), one of the four heavy files."
+notes: "Carries test_adr_health.py (5.6 s), one of the four heavy files. 2026-09-13 (process-economy-topology reconciliation): added check_adr_reciprocity.py (DL06 reciprocity gate) and check_state_corpus.py (DL01/DL02/SH01/SH02/CA01 decision+spec+calibration corpus walk -- the CA01 leg is a minor secondary check against calibration_log.md, but DL/SH substrate dominates 4 of its 5 checks)."
 ```
 
 Integration tier because the finalize suite drives real `git` over repositories built
@@ -383,6 +394,7 @@ selectors:
       - "scripts/test_check_state_ledgers.py"
       - "scripts/test_clean_work_safety.py"
       - "scripts/test_finalize_tech_debt_ledger.py"
+      - "scripts/test_merge_driver_observations.py"
       - "scripts/test_prune_reports.py"
       - "scripts/test_reconcile_ai_state.py"
       - "scripts/test_reconcile_pipeline_state.py"
@@ -413,7 +425,7 @@ expected_runtime_envelope:
   p50_seconds: 5.1
   p95_seconds: 6
 shared_state: tmp_path
-notes: "225 tests in ~5 s -- cheap and broad, a good phase-tier companion."
+notes: "225 tests in ~5 s -- cheap and broad, a good phase-tier companion. 2026-09-13 (process-economy-topology reconciliation): added the test_merge_driver_observations.py selector -- scripts/merge_driver_observations.py was already a file_dependency here, but its own test file had never been added as a selector (an orphan)."
 ```
 
 Two members target the `agent-evals` skill's producer and its schema-convention
@@ -436,40 +448,71 @@ selectors:
   - strategy: pytest-globs
     arg:
       - "scripts/test_check_aac_golden_rule.py"
+      - "scripts/test_check_agent_lifecycle_pairing.py"
+      - "scripts/test_check_agent_prompt_size.py"
       - "scripts/test_check_agent_shared_blocks.py"
       - "scripts/test_check_architecture_projection.py"
+      - "scripts/test_check_artifact_conformance.py"
+      - "scripts/test_check_behavioral_contract.py"
+      - "scripts/test_check_commit_msg_authorship.py"
       - "scripts/test_check_frontmatter_parses.py"
       - "scripts/test_check_gate_liveness.py"
       - "scripts/test_check_html_authorship.py"
       - "scripts/test_check_p06_task_brief.py"
+      - "scripts/test_check_path_resolution.py"
       - "scripts/test_check_paths_syntax.py"
+      - "scripts/test_check_registry_projection.py"
       - "scripts/test_check_ruff_pin_drift.py"
+      - "scripts/test_check_sentinel_self_audit.py"
       - "scripts/test_check_shipped_artifact_isolation.py"
       - "scripts/test_check_squash_safety.py"
+      - "scripts/test_check_staleness_markers.py"
       - "scripts/test_check_template_mirrors.py"
+      - "scripts/test_check_topology_conformance.py"
+      - "scripts/test_return_contract_clause_completeness.py"
+      - "scripts/test_run_check_families.py"
       - "tests/test_aac_fence_validator.py"
       - "tests/test_agent_frontmatter_plugin_compat.py"
       - "tests/test_check_id_citation_discipline.py"
+      - "tests/test_check_id_citation_discipline_hook_mode.py"
+      - "tests/test_plugin_namespace_invariants.py"
+      - "tests/test_pre_commit_onboarding_regex.py"
+      - "tests/test_sentinel_check_triangle.py"
+      - "tests/test_sentinel_row_contract.py"
 file_dependencies:
   - "scripts/check_aac_golden_rule.py"
   - "scripts/aac_fence_validator.py"
+  - "scripts/check_agent_lifecycle_pairing.py"
+  - "scripts/check_agent_prompt_size.py"
   - "scripts/check_agent_shared_blocks.py"
   - "scripts/check_architecture_projection.py"
+  - "scripts/check_artifact_conformance.py"
+  - "scripts/check_behavioral_contract.py"
+  - "scripts/check_commit_msg_authorship.py"
   - "scripts/check_frontmatter_parses.py"
   - "scripts/check_gate_liveness.py"
   - "scripts/check_html_authorship.py"
   - "scripts/check_id_citation_discipline.py"
   - "scripts/check_p06_task_brief.py"
+  - "scripts/check_path_resolution.py"
   - "scripts/check_paths_syntax.py"
+  - "scripts/check_registry_projection.py"
   - "scripts/check_ruff_pin_drift.py"
+  - "scripts/check_sentinel_self_audit.py"
   - "scripts/check_shipped_artifact_isolation.py"
   - "scripts/check_squash_safety.py"
+  - "scripts/check_staleness_markers.py"
   - "scripts/check_template_mirrors.py"
+  - "scripts/check_topology_conformance.py"
+  - "scripts/run_check_families.py"
+  - "scripts/_topology_yaml.py"
   - "rules/**/*.md"
   - "skills/**/*.md"
   - "agents/*.md"
   - "commands/*.md"
   - "claude/aac-templates/**"
+  - ".claude-plugin/plugin.json"
+  - ".ai-state/TEST_TOPOLOGY.md"
   - ".pre-commit-config.yaml"
   - "pyproject.toml"
 integration_boundaries:
@@ -481,7 +524,7 @@ expected_runtime_envelope:
   p50_seconds: 7.0
   p95_seconds: 11
 shared_state: filesystem
-notes: "The inner-loop group -- 200 tests in ~7 s, carrying none of the four heavy files."
+notes: "The inner-loop group -- 200 tests in ~7 s, carrying none of the four heavy files. 2026-09-13 (process-economy-topology reconciliation): added 17 orphaned sentinel Family-dispatch check scripts and their canaries (agent-lifecycle pairing, agent-prompt-size, artifact-conformance, behavioral-contract, commit-msg-authorship, path-resolution, registry-projection, sentinel-self-audit, staleness-markers, topology-conformance, the return-contract and sentinel-triangle/row-contract canaries, the plugin-namespace-invariants and pre-commit-onboarding-regex canaries, and the run_check_families dispatcher) that this group's own scope statement already claimed ('An edit to any scripts/check_*.py commit/CI gate') but whose test files had never been added as selectors."
 ```
 
 `file_dependencies` deliberately include the whole authored markdown surface, not just
@@ -504,16 +547,25 @@ tier: unit
 selectors:
   - strategy: pytest-globs
     arg:
+      - "scripts/test_apply_skill_description_diet.py"
       - "scripts/test_artifact_registry.py"
       - "scripts/test_build_doc_manifest.py"
       - "scripts/test_canonical_block_identity.py"
+      - "scripts/test_check_doc_manifest_freshness.py"
+      - "scripts/test_check_token_ratchet.py"
       - "scripts/test_claude_to_agents.py"
       - "scripts/test_measure_token_budget.py"
       - "scripts/test_refresh_claude_blocks.py"
       - "scripts/test_regenerate_rules_manifest.py"
       - "scripts/test_render_claude_md.py"
+      - "scripts/test_strip_progress_mandate.py"
       - "scripts/test_sync_canonical_blocks.py"
 file_dependencies:
+  - "scripts/apply_skill_description_diet.py"
+  - "scripts/skill_description_diet.yaml"
+  - "scripts/check_doc_manifest_freshness.py"
+  - "scripts/check_token_ratchet.py"
+  - "scripts/strip_progress_mandate.py"
   - "scripts/sync_canonical_blocks.py"
   - "scripts/canonical_block_identity.py"
   - "scripts/render_claude_md.py"
@@ -537,7 +589,7 @@ expected_runtime_envelope:
   p50_seconds: 5.2
   p95_seconds: 7
 shared_state: filesystem
-notes: "Generators only -- projection, not deployment."
+notes: "Generators only -- projection, not deployment. 2026-09-13 (process-economy-topology reconciliation): added apply_skill_description_diet.py and strip_progress_mandate.py (both content-rewriting generators over authored markdown, matching sync_canonical_blocks.py's dual generate/--check nature) and check_doc_manifest_freshness.py / check_token_ratchet.py (gates coupled by direct import -- check_token_ratchet.py wraps measure_token_budget.ratchet() -- or by generated-artifact locality -- check_doc_manifest_freshness.py validates build_doc_manifest.py's own output)."
 ```
 
 `scripts/test_claude_to_agents.py` targets `skills/adapt-claude-to-agents/scripts/`, a
@@ -562,9 +614,11 @@ selectors:
       - "scripts/test_export_codex_pipeline_adapter.py"
       - "scripts/test_export_codex_rules_bridge.py"
       - "scripts/test_export_codex_skills.py"
+      - "scripts/test_check_hook_installation.py"
       - "scripts/test_install_codex.py"
       - "scripts/test_install_dev_link.py"
       - "scripts/test_manage_codex_mcp.py"
+      - "scripts/test_rules_bridge_parsing.py"
       - "scripts/test_upgrade_project_pins.py"
       - "scripts/test_install_git_hooks.py"
 file_dependencies:
@@ -574,6 +628,7 @@ file_dependencies:
   - "install_cursor.sh"
   - "lib/install_shared.sh"
   - "scripts/upgrade_project_pins.sh"
+  - "scripts/check_hook_installation.py"
   - "scripts/git-finalize-hook.sh"
   - "scripts/install_git_hooks.py"
   - "scripts/assets/praxion-hook-wrapper.sh.tmpl"
@@ -588,7 +643,7 @@ expected_runtime_envelope:
   p50_seconds: 24.2
   p95_seconds: 32
 shared_state: filesystem
-notes: "The isolation win -- 72 tests but ~24 s, carrying two of the four heavy files."
+notes: "The isolation win -- 72 tests but ~24 s, carrying two of the four heavy files. 2026-09-13 (process-economy-topology reconciliation): added check_hook_installation.py (F10, installed-hook-vs-source content check, sibling of install_git_hooks.py already here) and test_rules_bridge_parsing.py (targets codex/config/rules_bridge_parsing.py, already covered by the codex/config/** file_dependency glob below)."
 ```
 
 `test_install_codex.py` (18.0 s) and `test_upgrade_project_pins.py` (7.0 s) both land
@@ -614,22 +669,31 @@ tier: contract
 selectors:
   - strategy: pytest-globs
     arg:
+      - "tests/commands/test_onboard_block_mechanism.py"
+      - "tests/commands/test_onboard_capability_defaults.py"
       - "tests/commands/test_onboard_ci_autofix_install.py"
       - "tests/commands/test_onboard_consult_ledgers_install.py"
+      - "tests/commands/test_onboard_gate_consolidation.py"
+      - "tests/commands/test_onboard_hackathon_teardown.py"
       - "tests/commands/test_onboard_labels_install.py"
       - "tests/commands/test_onboard_permissions_allow_install.py"
       - "tests/commands/test_onboard_praxion_feedback_install.py"
+      - "tests/commands/test_onboard_principles_install.py"
+      - "tests/commands/test_onboard_seed_signal_agreement.py"
       - "tests/commands/test_upgrade_labels_baseline.py"
       - "tests/commands/test_upgrade_project_command.py"
       - "tests/consumer_layout/"
       - "scripts/test_onboard_project_placement.py"
       - "scripts/test_onboard_placement_composition_agreement.py"
+      - "scripts/test_reconcile_aac_surfaces.py"
       - "tests/commands/test_onboard_placement_phase_matrix.py"
       - "tests/test_onboard_project_detection.py"
+      - "tests/test_retired_onboarding_surfaces.py"
 file_dependencies:
   - "commands/onboard-project.md"
   - "scripts/onboard_placement.sh"
   - "scripts/_sidecar_init.py"
+  - "scripts/reconcile_aac_surfaces.py"
   - "commands/new-project.md"
   - "commands/upgrade-project.md"
   - "new_project.sh"
@@ -643,6 +707,7 @@ file_dependencies:
   - ".github/workflows/labels-reconcile.yml"
   - "scripts/onboard-project"
   - "scripts/praxion-sidecar"
+  - "skills/onboard-project/SKILL.md"
   - "skills/onboard-project/references/*.md"
 parallel_safe: true
 shared_fixture_scope: per-test
@@ -650,7 +715,7 @@ expected_runtime_envelope:
   p50_seconds: 2.5
   p95_seconds: 10
 shared_state: filesystem
-notes: "Tier is contract, not integration -- a deliberate call; see below. scripts/test_onboard_project_placement.py drives scripts/onboard-project and the real scripts/praxion-sidecar (Praxion's own already-tested collaborator, not an external boundary) via real subprocesses and real git worktrees under tmp_path -- the p95 bump over the pre-existing 4s reflects that; only `claude` is stubbed. test_onboard_placement_phase_matrix.py and test_onboard_project_detection.py extend this group with the placement-axis phase-matrix regression suite (prose contract + a real detect_state() subprocess check)."
+notes: "Tier is contract, not integration -- a deliberate call; see below. scripts/test_onboard_project_placement.py drives scripts/onboard-project and the real scripts/praxion-sidecar (Praxion's own already-tested collaborator, not an external boundary) via real subprocesses and real git worktrees under tmp_path -- the p95 bump over the pre-existing 4s reflects that; only `claude` is stubbed. test_onboard_placement_phase_matrix.py and test_onboard_project_detection.py extend this group with the placement-axis phase-matrix regression suite (prose contract + a real detect_state() subprocess check). 2026-09-13 (process-economy-topology reconciliation): added 8 orphaned tests/commands/test_onboard_*.py structural canaries over skills/onboard-project/SKILL.md and its references/ (block-mechanism, capability-defaults, gate-consolidation, hackathon-teardown, principles-install, seed-signal-agreement), tests/test_retired_onboarding_surfaces.py (asserts the retired commands/onboard-project.md, commands/new-project.md, new_project.sh stay absent), and scripts/test_reconcile_aac_surfaces.py (/onboard-project Phase 8b's AaC-surface reconciler)."
 ```
 
 `/onboard-project` is a Markdown slash command that pytest cannot invoke, so these
@@ -674,7 +739,10 @@ tier: integration
 selectors:
   - strategy: pytest-globs
     arg:
+      - "scripts/test_check_hackathon_graduation.py"
+      - "scripts/test_check_specialist_dispositions.py"
       - "scripts/test_parse_pre_refactor_yaml.py"
+      - "scripts/test_resolve_test_scope.py"
       - "tests/agents/"
       - "tests/commands/test_resume_rework.py"
       - "tests/orchestration/"
@@ -692,6 +760,10 @@ file_dependencies:
   - "scripts/dispatch-reworks"
   - "scripts/rework_manifest.py"
   - "scripts/parse_pre_refactor_yaml.py"
+  - "scripts/check_hackathon_graduation.py"
+  - "scripts/check_specialist_dispositions.py"
+  - "scripts/resolve_test_scope.py"
+  - "scripts/_topology_yaml.py"
   - "scripts/sync_canonical_blocks.py"
   - "rules/swe/swe-agent-coordination-protocol.md"
   - "rules/swe/agent-intermediate-documents.md"
@@ -704,7 +776,7 @@ expected_runtime_envelope:
   p50_seconds: 6.5
   p95_seconds: 8
 shared_state: filesystem
-notes: "parallel_safe is false -- measured, not precautionary; see below."
+notes: "parallel_safe is false -- measured, not precautionary; see below. 2026-09-13 (process-economy-topology reconciliation): added check_hackathon_graduation.py (HK01 growth nudge, sibling of the hackathon-mode tiering tests already here), check_specialist_dispositions.py (P07, .ai-work/ substrate), and resolve_test_scope.py (the test-topology tier-selection resolver, a sibling of parse_pre_refactor_yaml.py's pipeline-document-parsing role)."
 ```
 
 `tests/test_dispatch_reworks_bg.py` and `tests/test_dispatch_reworks_manifest.py`
@@ -861,14 +933,17 @@ selectors:
       - "scripts/test__git_runner.py"
       - "scripts/test_repo_root.py"
       - "scripts/test_state_repo.py"
+      - "scripts/test_sidecar_checks.py"
+      - "scripts/test_sidecar_commit.py"
+      - "scripts/test_sidecar_convergence.py"
+      - "scripts/test_sidecar_identity.py"
+      - "scripts/test_sidecar_inputs.py"
+      - "scripts/test_sidecar_link.py"
       - "scripts/test_sidecar_manifest.py"
       - "scripts/test_sidecar_mount.py"
-      - "scripts/test_sidecar_link.py"
-      - "scripts/test_sidecar_commit.py"
-      - "scripts/test_sidecar_checks.py"
-      - "scripts/test_praxion_sidecar.py"
-      - "scripts/test_sidecar_identity.py"
       - "scripts/test_sidecar_render.py"
+      - "scripts/test_praxion_sidecar.py"
+      - "tests/commands/test_merge_worktree_convergence.py"
 file_dependencies:
   - "scripts/_git_runner.py"
   - "scripts/_sidecar_publish.py"
@@ -876,6 +951,8 @@ file_dependencies:
   - "scripts/_repo_root.py"
   - "scripts/_script_cli.py"
   - "scripts/_state_repo.py"
+  - "scripts/_sidecar_convergence.py"
+  - "scripts/_sidecar_testkit.py"
   - "scripts/_sidecar_manifest.py"
   - "scripts/_sidecar_mount.py"
   - "scripts/_sidecar_link.py"
@@ -898,7 +975,7 @@ expected_runtime_envelope:
   p50_seconds: 2.6
   p95_seconds: 4
 shared_state: tmp_path
-notes: "Small on purpose -- a node for the planner to hang wide boundaries off. sidecar-placement (P1) added _state_repo.py, _sidecar_manifest.py, _sidecar_checks.py, _sidecar_link.py, _sidecar_commit.py, praxion-sidecar and their test files as selectors/file_dependencies for the test-engineer to register in Steps 1b-7b; the integration_boundaries above widen because _state_repo.py is now a dependency of finalize_adrs.py (decision-records) and reconcile_ai_state.py/reconcile_aac_surfaces.py (state-ledgers)."
+notes: "Small on purpose -- a node for the planner to hang wide boundaries off. sidecar-placement (P1) added _state_repo.py, _sidecar_manifest.py, _sidecar_checks.py, _sidecar_link.py, _sidecar_commit.py, praxion-sidecar and their test files as selectors/file_dependencies for the test-engineer to register in Steps 1b-7b; the integration_boundaries above widen because _state_repo.py is now a dependency of finalize_adrs.py (decision-records) and reconcile_ai_state.py (state-ledgers). Correction (2026-09-13, process-economy-topology reconciliation): the prior version of this note also named reconcile_aac_surfaces.py here by name-pattern guess before the script existed; it imports only _git_runner, not _state_repo, so it carries no scripts-core coupling -- its test (an onboarding-Phase-8b AaC-surface reconciler, unrelated to .ai-state/ reconciliation despite the similar name) now lives in onboarding-contract. This pass also added test_sidecar_convergence.py and test_sidecar_inputs.py (_sidecar_convergence.py, _sidecar_testkit.py, _sidecar_inputs.py) and tests/commands/test_merge_worktree_convergence.py, all orphaned worktree/sidecar test files with no prior selector."
 ```
 
 Nearly every other `scripts/` group imports this plumbing, so a change here
@@ -936,7 +1013,7 @@ expected_runtime_envelope:
   p50_seconds: 6.0
   p95_seconds: 7
 shared_state: filesystem
-notes: "Outside testpaths -- contributes 0 of the 152 canonical files."
+notes: "Outside testpaths -- contributes 0 of the 220 canonical files (its 7 files are the rest of the 227-file total corpus)."
 ```
 
 The selector names `fitness/` explicitly rather than relying on the default corpus.

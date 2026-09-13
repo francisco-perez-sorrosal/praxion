@@ -18,21 +18,44 @@ at bootstrap.
 
 Also validates the Retrospective-cell enum convention: rows dated on or after
 `ENUM_CUTOFF_DATE` must start their Retrospective cell with one of ENUM_VALUES
-(`correct` / `over-calibrated` / `under-calibrated`), optionally followed by an
-em-dash and prose. Rows predating the cutover are exempt (mirrors the ADR corpus's
-clean-cutover precedent at dec-230). This stays advisory -- sentinel CA02 is the
-mechanical consumer, matching the existing non-blocking `remind_calibration.py`
-pattern; nothing wires `--check`'s exit code into the commit gate today.
+(`correct` / `over-calibrated` / `under-calibrated`) or the `ENUM_PENDING` marker
+(`[pending]`, sanctioned by the calibration-procedure skill but not yet a verdict),
+optionally followed by an em-dash and prose. Rows predating the cutover are exempt
+(mirrors the ADR corpus's clean-cutover precedent at dec-230). This stays advisory --
+sentinel CA02 is the mechanical consumer, matching the existing non-blocking
+`remind_calibration.py` pattern; nothing wires `--check`'s exit code into the commit
+gate today.
+
+CA02/CA03 family envelope (`classify`, `--json`): the instrument is the enum,
+computed here, not judged by an LLM. CA02 classifies the first token of the
+Retrospective cell on the last `window` post-cutover rows into a verdict
+(`correct`/`over-calibrated`/`under-calibrated`), the `[pending]` marker
+(unclassified, not a violation), or non-canonical (anything else). Its WARN shares
+(`over`/`under` > 25%, or the zero-variance alarm when every classified row reads
+`correct`) are computed over the CLASSIFIED denominator only -- pending and
+non-canonical rows are excluded from the denominator, since neither is a graded
+verdict; a non-canonical token also earns its own per-row WARN. CA02 skips (no
+findings) below 5 classified rows -- too few to be a distribution. CA03 wraps
+`compute_coverage` as a family row. Both skip with `substrate-absent` when
+calibration_log.md itself is absent.
+
+Golden bad-cases (see `scripts/test_check_calibration_coverage.py`): a window with
+>25% under-calibrated rows fails CA02; 20/20 `correct` rows fails CA02 (zero-variance);
+a non-canonical Retrospective token fails CA02 for that row; a `[pending]` row is
+silent (no finding, excluded from the denominator); a within-band mixed distribution
+(e.g. 12/4/4 correct/under/over) is the no-false-positive control.
 
 Invocation:
 
     check_calibration_coverage.py                 # summary to stdout
-    check_calibration_coverage.py --json          # machine-readable JSON
+    check_calibration_coverage.py --json          # machine-readable family envelope
     check_calibration_coverage.py --check         # exit 1 when under-covered or enum-noncompliant
     check_calibration_coverage.py --repo-root DIR # operate on another checkout (tests)
 
 Exit code: 0 by default (advisory). With --check, 1 when under-covered or when a
-post-cutover row is missing the required Retrospective enum prefix.
+post-cutover row is missing the required Retrospective enum prefix. A CA02
+distribution WARN never flips the exit code -- it is advisory, unlike coverage/enum
+compliance which --check gates on.
 Always 0 when calibration_log.md is absent (no substrate).
 """
 
@@ -52,6 +75,13 @@ from _script_cli import configure_logging
 # -- Constants ----------------------------------------------------------------
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+SCRIPT_NAME = "check_calibration_coverage"
+
+# The family-envelope check ids this script computes (dec-382 family-row form).
+# Read with `ast.literal_eval` by the sentinel Triangle contract -- see
+# tests/test_sentinel_check_triangle.py -- never by importing this module.
+CHECK_IDS: tuple[str, ...] = ("CA02", "CA03")
 
 CALIBRATION_LOG_REL = ".ai-state/calibration_log.md"
 
@@ -81,9 +111,28 @@ K_COMMITS = 2
 # Required first token of the Retrospective cell on rows dated on/after the cutover.
 ENUM_VALUES = ("correct", "over-calibrated", "under-calibrated")
 
+# Sanctioned but not a verdict (skills/spec-driven-development/references/
+# calibration-procedure.md, Retrospective bullet): a row logged before its
+# retrospective is known. Compliant for --check; unclassified (neither verdict nor
+# violation) for CA02's distribution -- excluded from the classified denominator.
+ENUM_PENDING = "[pending]"
+
 # Rows dated on/after this date must carry an ENUM_VALUES prefix; older rows are
 # exempt (the convention did not exist when they were written).
 ENUM_CUTOFF_DATE = "2026-09-07"  # the date the enum shipped; its own pipeline's row is not exempt
+
+# CA02: minimum classified rows before a distribution verdict is meaningful.
+CA02_MIN_CLASSIFIED = 5
+
+# CA02: over-/under-calibrated share of classified rows that triggers a WARN.
+CA02_SHARE_THRESHOLD = 0.25
+
+# CA02: default window of post-cutover rows the distribution is computed over.
+CA02_WINDOW = 20
+
+# Trailing punctuation stripped off a Retrospective cell's leading token before
+# enum-membership comparison (e.g. "correct—" written with no space before the dash).
+_TRAILING_TOKEN_PUNCT = "—:."
 
 # Timestamp column header in the calibration log Markdown table.
 _TIMESTAMP_COL = "Timestamp"
@@ -221,7 +270,7 @@ def compute_enum_compliance(repo_root: Path) -> dict[str, object]:
         if timestamp[:10] < ENUM_CUTOFF_DATE:
             continue
         new_rows += 1
-        if not retrospective.startswith(ENUM_VALUES):
+        if not retrospective.startswith(ENUM_VALUES) and not retrospective.startswith(ENUM_PENDING):
             violations.append({"timestamp": timestamp, "retrospective": retrospective})
 
     compliant = not violations
@@ -240,6 +289,189 @@ def compute_enum_compliance(repo_root: Path) -> dict[str, object]:
         "new_rows": new_rows,
         "violations": violations,
         "details": details,
+    }
+
+
+# -- Enum-distribution computation (CA02) --------------------------------------
+
+
+def _classify_token(retrospective: str) -> str:
+    """First token of a Retrospective cell, trailing enum punctuation stripped.
+
+    "Up to the first whitespace" rather than a full split: an em-dash written with
+    no leading space ("correct—retrospective") still yields "correct" once the
+    trailing punctuation strip runs, matching a spaced em-dash ("correct — ...").
+    """
+    token = retrospective.strip().split(None, 1)[0] if retrospective.strip() else ""
+    return token.rstrip(_TRAILING_TOKEN_PUNCT)
+
+
+def compute_enum_distribution(repo_root: Path, window: int = CA02_WINDOW) -> dict[str, object]:
+    """Classify the Retrospective enum token of the last `window` post-cutover rows.
+
+    Denominator limit: `shares` are computed over the CLASSIFIED rows only --
+    rows whose token is a verdict in ENUM_VALUES. `[pending]` rows and
+    non-canonical tokens are excluded from the denominator: neither is a graded
+    verdict, so folding them in would understate the share of an actual verdict.
+    """
+    log_path = repo_root / CALIBRATION_LOG_REL
+    counts = dict.fromkeys(ENUM_VALUES, 0)
+
+    if not log_path.exists():
+        return {
+            "window": window,
+            "classified": 0,
+            "counts": counts,
+            "shares": dict.fromkeys(ENUM_VALUES, 0.0),
+            "pending": 0,
+            "non_canonical": [],
+        }
+
+    text = log_path.read_text(encoding="utf-8")
+    post_cutover: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        cells = _row_timestamp_and_retrospective(line)
+        if cells is None:
+            continue
+        timestamp, retrospective = cells
+        if timestamp[:10] < ENUM_CUTOFF_DATE:
+            continue
+        post_cutover.append((timestamp, retrospective))
+
+    pending = 0
+    non_canonical: list[dict[str, str]] = []
+    for timestamp, retrospective in post_cutover[-window:]:
+        token = _classify_token(retrospective)
+        if token in counts:
+            counts[token] += 1
+        elif token == ENUM_PENDING:
+            pending += 1
+        else:
+            non_canonical.append({"timestamp": timestamp, "token": token})
+
+    classified = sum(counts.values())
+    shares = {value: (counts[value] / classified if classified else 0.0) for value in ENUM_VALUES}
+
+    return {
+        "window": window,
+        "classified": classified,
+        "counts": counts,
+        "shares": shares,
+        "pending": pending,
+        "non_canonical": non_canonical,
+    }
+
+
+def _ca02_findings(distribution: dict[str, object], classified: int) -> list[dict[str, str]]:
+    """CA02 findings for an already-above-threshold distribution: share WARNs,
+    the zero-variance alarm, and one WARN per non-canonical row."""
+    findings: list[dict[str, str]] = []
+    shares = distribution["shares"]
+    counts = distribution["counts"]
+
+    for value in ("over-calibrated", "under-calibrated"):
+        share = shares[value]
+        if share > CA02_SHARE_THRESHOLD:
+            findings.append(
+                {
+                    "check": "CA02",
+                    "severity": "warn",
+                    "entity": CALIBRATION_LOG_REL,
+                    "message": (
+                        f"{value} share is {share:.0%} of {classified} classified rows "
+                        f"(threshold: {CA02_SHARE_THRESHOLD:.0%})"
+                    ),
+                }
+            )
+
+    if counts["correct"] == classified:
+        findings.append(
+            {
+                "check": "CA02",
+                "severity": "warn",
+                "entity": CALIBRATION_LOG_REL,
+                "message": (
+                    f"zero-variance alarm: all {classified} classified rows read 'correct' -- "
+                    "an instrument that never records an error is evidence of grading bias, "
+                    "not of perfect calibration"
+                ),
+            }
+        )
+
+    for row in distribution["non_canonical"]:
+        findings.append(
+            {
+                "check": "CA02",
+                "severity": "warn",
+                "entity": row["timestamp"],
+                "message": f"non-canonical Retrospective token {row['token']!r} at {row['timestamp']}",
+            }
+        )
+
+    return findings
+
+
+# -- Family envelope (CA02, CA03) ----------------------------------------------
+
+
+def classify(repo_root: Path) -> dict:
+    """Return the CA02/CA03 family envelope: skipped/examined/findings/info/bound.
+
+    CA02 excludes unclassified rows (pending/non-canonical) from its denominator
+    (see `compute_enum_distribution`) and skips below `CA02_MIN_CLASSIFIED`. CA03 wraps `compute_coverage` as a family row. Both
+    skip with `substrate-absent` when calibration_log.md itself is absent.
+    """
+    log_present = (repo_root / CALIBRATION_LOG_REL).exists()
+
+    coverage = compute_coverage(repo_root)
+    enum_compliance = compute_enum_compliance(repo_root)
+    distribution = compute_enum_distribution(repo_root)
+
+    findings: list[dict[str, str]] = []
+    skipped: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+    examined: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+
+    if not log_present:
+        skipped["CA02"] = {"reason": "substrate-absent"}
+        skipped["CA03"] = {"reason": "substrate-absent"}
+    else:
+        classified = distribution["classified"]
+        examined["CA02"] = {"classified": classified, "window": distribution["window"]}
+        examined["CA03"] = {"uncalibrated_commits": coverage["uncalibrated_commits"]}
+
+        if classified < CA02_MIN_CLASSIFIED:
+            skipped["CA02"] = {"reason": "below-threshold", "classified": classified}
+        else:
+            findings.extend(_ca02_findings(distribution, classified))
+
+        if not coverage["covered"]:
+            findings.append(
+                {
+                    "check": "CA03",
+                    "severity": "warn",
+                    "entity": CALIBRATION_LOG_REL,
+                    "message": coverage["details"],
+                }
+            )
+
+    return {
+        "script": SCRIPT_NAME,
+        "checks": list(CHECK_IDS),
+        "skipped": skipped,
+        "examined": examined,
+        "findings": findings,
+        "info": {"coverage": coverage, "enum_compliance": enum_compliance},
+        "withheld": [],
+        "bound": {
+            "CA02": (
+                "CA02 clean means the Retrospective enum distribution over the last "
+                "20 post-cutover rows stays within band, with no non-canonical tokens."
+            ),
+            "CA03": (
+                "CA03 clean means recent task-completing commits are covered by a "
+                "calibration_log.md row."
+            ),
+        },
     }
 
 
@@ -359,13 +591,15 @@ def _run(args: argparse.Namespace) -> int:
     if is_plugin_cache_path(repo_root):
         logger.error("Refusing to operate on plugin-cache path: %s", repo_root)
         return 2
-    result = compute_coverage(repo_root)
-    enum_result = compute_enum_compliance(repo_root)
+
+    # The family envelope carries coverage/enum-compliance under info -- reused for
+    # --check and human mode rather than recomputed, see classify()'s docstring.
+    report = classify(repo_root)
+    result = report["info"]["coverage"]
+    enum_result = report["info"]["enum_compliance"]
 
     if args.json:
-        payload = dict(result)
-        payload["enum_compliance"] = enum_result
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(report, indent=2))
     else:
         covered = result["covered"]
         print(_format_human(result), file=sys.stdout if covered else sys.stderr)

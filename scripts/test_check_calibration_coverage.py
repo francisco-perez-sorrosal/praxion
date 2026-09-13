@@ -87,10 +87,29 @@ def _write_calibration_log_with_retrospective(
     repo: Path, timestamp: str, retrospective: str
 ) -> None:
     """Write a synthetic calibration_log.md with one row carrying a given Retrospective cell."""
+    _write_calibration_log_rows(repo, [(timestamp, retrospective)])
+
+
+def _write_calibration_log_rows(repo: Path, rows: list[tuple[str, str]]) -> None:
+    """Write a synthetic calibration_log.md with one row per (timestamp, retrospective) pair.
+
+    Rows land in the given order -- the log is append-only chronological, and
+    compute_enum_distribution's window takes the last N rows by file position.
+    """
     state_dir = repo / ".ai-state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    row = f"| {timestamp} | wave-test | signals | Standard | Standard | test | {retrospective} |\n"
-    (state_dir / "calibration_log.md").write_text(_CALIBRATION_HEADER + row, encoding="utf-8")
+    lines = [
+        f"| {timestamp} | wave-test | signals | Standard | Standard | test | {retrospective} |\n"
+        for timestamp, retrospective in rows
+    ]
+    (state_dir / "calibration_log.md").write_text(
+        _CALIBRATION_HEADER + "".join(lines), encoding="utf-8"
+    )
+
+
+def _post_cutover_dates(count: int) -> list[str]:
+    """`count` distinct post-cutover dates, one per day starting the day after the cutover."""
+    return [f"2026-09-{8 + i:02d}" for i in range(count)]
 
 
 def _make_commit(repo: Path, message: str) -> None:
@@ -264,11 +283,12 @@ def test_flags_stale_calibration_log(tmp_path: Path, capsys: pytest.CaptureFixtu
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["covered"] is False, (
+    coverage = payload["info"]["coverage"]
+    assert coverage["covered"] is False, (
         "Known-lapsed calibration state (far-past date + 2 pipeline commits) "
         "must report covered=false"
     )
-    assert payload["uncalibrated_commits"] >= 2, (
+    assert coverage["uncalibrated_commits"] >= 2, (
         "Must count at least 2 uncalibrated pipeline commits in the known-bad canary fixture"
     )
 
@@ -382,7 +402,163 @@ def test_json_reports_enum_compliance_counts(
     with pytest.raises(SystemExit):
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
-    enum_compliance = json.loads(capsys.readouterr().out)["enum_compliance"]
+    enum_compliance = json.loads(capsys.readouterr().out)["info"]["enum_compliance"]
     assert enum_compliance["compliant"] is False
     assert enum_compliance["new_rows"] == 1
     assert len(enum_compliance["violations"]) == 1
+
+
+# -- CA02/CA03 family envelope (classify) --------------------------------------
+
+
+def _findings_for(report: dict, check_id: str) -> list[dict]:
+    return [f for f in report["findings"] if f["check"] == check_id]
+
+
+def test_ca02_warns_when_under_calibrated_share_exceeds_band(tmp_path: Path) -> None:
+    """8/20 under-calibrated rows (40%) exceeds the 25% band and names the share."""
+    _init_repo(tmp_path)
+    dates = _post_cutover_dates(20)
+    rows = [(d, "correct — on target") for d in dates[:12]] + [
+        (d, "under-calibrated — too much process") for d in dates[12:]
+    ]
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    warnings = _findings_for(report, "CA02")
+    assert len(warnings) == 1
+    assert "40%" in warnings[0]["message"]
+
+
+def test_ca02_zero_variance_alarm_when_every_row_reads_correct(tmp_path: Path) -> None:
+    """20/20 'correct' rows trips the zero-variance alarm -- no error ever recorded."""
+    _init_repo(tmp_path)
+    rows = [(d, "correct — on target") for d in _post_cutover_dates(20)]
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    warnings = _findings_for(report, "CA02")
+    assert len(warnings) == 1
+    assert "zero-variance" in warnings[0]["message"]
+
+
+def test_ca02_skips_below_five_classified_rows(tmp_path: Path) -> None:
+    """Fewer than 5 classified rows is too few to be a distribution -- skip, no findings."""
+    _init_repo(tmp_path)
+    rows = [(d, "correct — on target") for d in _post_cutover_dates(4)]
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    assert report["skipped"]["CA02"] == {"reason": "below-threshold", "classified": 4}
+    assert _findings_for(report, "CA02") == []
+
+
+def test_ca02_warns_on_non_canonical_retrospective_token(tmp_path: Path) -> None:
+    """A Retrospective token outside the enum (e.g. 'well-calibrated') is a per-row WARN.
+
+    Mixed classified rows (not all 'correct'): isolates the non-canonical WARN from
+    the separate zero-variance alarm.
+    """
+    dates = _post_cutover_dates(6)
+    _init_repo(tmp_path)
+    rows = (
+        [(d, "correct — on target") for d in dates[:4]]
+        + [(dates[4], "under-calibrated — ran too little process")]
+        + [(dates[5], "well-calibrated — ran fine")]
+    )
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    warnings = _findings_for(report, "CA02")
+    assert len(warnings) == 1
+    assert warnings[0]["entity"] == dates[5]
+    assert "well-calibrated" in warnings[0]["message"]
+
+
+def test_ca02_pending_row_is_silent_and_excluded_from_denominator(tmp_path: Path) -> None:
+    """A `[pending]` row produces no finding and does not count toward classified."""
+    _init_repo(tmp_path)
+    dates = _post_cutover_dates(6)
+    rows = (
+        [(d, "correct — on target") for d in dates[:4]]
+        + [(dates[4], "under-calibrated — ran too little process")]
+        + [(dates[5], "[pending]")]
+    )
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    assert report["examined"]["CA02"]["classified"] == 5
+    assert _findings_for(report, "CA02") == []
+
+
+def test_ca02_within_band_mixed_distribution_has_no_findings(tmp_path: Path) -> None:
+    """No-false-positive control: 12/4/4 correct/under/over all stay within the 25% band."""
+    _init_repo(tmp_path)
+    dates = _post_cutover_dates(20)
+    rows = (
+        [(d, "correct — on target") for d in dates[:12]]
+        + [(d, "under-calibrated — ran too little process") for d in dates[12:16]]
+        + [(d, "over-calibrated — ran too much process") for d in dates[16:]]
+    )
+    _write_calibration_log_rows(tmp_path, rows)
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    assert _findings_for(report, "CA02") == []
+
+
+def test_ca03_warns_on_coverage_lapse(tmp_path: Path) -> None:
+    """A coverage lapse (old row + pipeline commits since) is a CA03 WARN."""
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2025-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+    _make_commit(tmp_path, "feat: add authentication service")
+    _make_commit(tmp_path, "feat: add payment gateway integration")
+
+    report = _load_module().classify(tmp_path)
+
+    warnings = _findings_for(report, "CA03")
+    assert len(warnings) == 1
+
+
+def test_absent_calibration_log_skips_both_checks(tmp_path: Path) -> None:
+    """No calibration_log.md at all -- both CA02 and CA03 skip substrate-absent."""
+    _init_repo(tmp_path)
+    _make_commit(tmp_path, "feat: initial commit — no calibration log exists yet")
+
+    report = _load_module().classify(tmp_path)
+
+    assert report["skipped"]["CA02"] == {"reason": "substrate-absent"}
+    assert report["skipped"]["CA03"] == {"reason": "substrate-absent"}
+    assert report["findings"] == []
+
+
+def test_envelope_declares_both_checks_and_bound_statements(tmp_path: Path) -> None:
+    """The family envelope's checks list and bound map cover both CA02 and CA03."""
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2030-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: baseline")
+
+    report = _load_module().classify(tmp_path)
+
+    assert report["checks"] == ["CA02", "CA03"]
+    assert set(report["bound"]) == {"CA02", "CA03"}

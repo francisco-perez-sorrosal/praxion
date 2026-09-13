@@ -977,6 +977,8 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("AC07", "check_architecture_projection"),
     ("T01", "check_agent_prompt_size"),
     ("T04", "check_agent_prompt_size"),
+    ("CA02", "check_calibration_coverage"),
+    ("CA03", "check_calibration_coverage"),
 ]
 
 

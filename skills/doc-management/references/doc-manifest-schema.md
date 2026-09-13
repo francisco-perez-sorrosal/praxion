@@ -79,7 +79,7 @@ groups:                                    # optional: sidebar grouping for the 
 | `summary` | string | recommended | One-line description; from frontmatter `summary:` or first non-heading paragraph (truncated). |
 | `surfaces_referenced` | list[string] | optional | Other surface ids this doc links to; built by parsing markdown links and resolving them against the manifest. |
 | `diagrams` | list[string] | optional | Paths to rendered diagram SVGs/PNGs embedded in the surface. |
-| `last_modified` | ISO date | yes | File mtime; used by sentinel to detect drift. |
+| `last_modified` | ISO date | yes | The surface's last git commit date (mtime only for untracked files). Informational: it refreshes when a structural change regenerates the manifest, and a change to it alone never triggers a rewrite; freshness (F11) compares `generated_at` against add/delete/rename commits, not this field. |
 | `frontmatter` | object | optional | Passthrough of source-file frontmatter (any keys), so renderers can access everything without re-parsing. |
 
 ## Reserved renderer names

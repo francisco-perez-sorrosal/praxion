@@ -6,7 +6,8 @@ Walks the project filesystem according to the schema specified in
 manifest the per-project dashboard reads at session start.
 
 The generator is deterministic: given the same filesystem state, it always
-emits identical YAML (modulo `generated_at`). That determinism is what makes a
+emits identical YAML (modulo `generated_at` and the per-surface `last_modified`
+dates). That determinism is what makes a
 regenerate-in-place safe without merge drivers. Regeneration is automatic via
 the finalize chain (``finalize_chain.sh``) after each merge to ``main`` — the
 chain calls this script when ``.ai-state/doc_manifest.yaml`` already exists,
@@ -513,10 +514,26 @@ def _build_groups(surfaces: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _strip_generated_at(text: str) -> str:
-    """Erase the `generated_at` timestamp value so two manifests can be compared
-    for content equality independent of when they were generated."""
-    return re.sub(r"^generated_at:.*$", "generated_at:", text, flags=re.MULTILINE)
+_VOLATILE_FIELDS = re.compile(r"^(\s*)(generated_at|last_modified):.*$", flags=re.MULTILINE)
+
+
+def _strip_volatile_fields(text: str) -> str:
+    """Erase the values that change without the indexed set changing, so two
+    manifests compare equal exactly when F11 would call the old one fresh.
+
+    `generated_at` drifts on every run. `last_modified` (a surface's git commit
+    date) drifts on every body edit to an already-indexed file -- and
+    `.ai-state/` receives such commits constantly (ledger rows migrating, a
+    calibration row appended). Measured over 30 days before this change: 51 of
+    469 commits rewrote the manifest and 17 commits carried nothing else.
+    `check_doc_manifest_freshness.py` (F11) defines stale as "a commit Added,
+    Deleted or Renamed a surface after `generated_at`" and never a Modify, so
+    a `last_modified`-only difference is noise by the instrument's own
+    definition. Nothing reads `last_modified` (the dashboard does not; F11
+    compares `generated_at` against git); it refreshes whenever a structural
+    change triggers a real write.
+    """
+    return _VOLATILE_FIELDS.sub(r"\1\2:", text)
 
 
 # ---------------------------------------------------------------------------
@@ -641,9 +658,9 @@ def main(argv: list[str] | None = None) -> int:
         if not output.is_file():
             print(f"FAIL: {output} does not exist", file=sys.stderr)
             return 1
-        # Compare excluding the `generated_at` timestamp (which always drifts)
+        # Compare excluding the volatile fields (see `_strip_volatile_fields`)
         old_text = output.read_text()
-        if _strip_generated_at(old_text) != _strip_generated_at(new_yaml):
+        if _strip_volatile_fields(old_text) != _strip_volatile_fields(new_yaml):
             print(
                 f"FAIL: {output} is out of sync (run scripts/build_doc_manifest.py)",
                 file=sys.stderr,
@@ -654,8 +671,9 @@ def main(argv: list[str] | None = None) -> int:
 
     output.parent.mkdir(parents=True, exist_ok=True)
     # Content-aware write: skip when the new manifest equals the existing one
-    # modulo `generated_at`, so a no-op regen produces no diff and no churn.
-    if output.is_file() and _strip_generated_at(output.read_text()) == _strip_generated_at(
+    # modulo the volatile fields, so a body-only edit to an indexed surface
+    # (a new commit date) produces no diff and no follow-up commit.
+    if output.is_file() and _strip_volatile_fields(output.read_text()) == _strip_volatile_fields(
         new_yaml
     ):
         print(f"{output} unchanged — skipping write")

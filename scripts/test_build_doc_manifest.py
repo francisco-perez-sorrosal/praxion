@@ -346,6 +346,66 @@ def test_last_modified_uses_the_commit_date_not_the_mtime(
     )
 
 
+def _commit_on(repo: Path, message: str, date: str) -> None:
+    """Commit the working tree with both git dates pinned to `date`."""
+    env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-qm", message],
+        check=True,
+        capture_output=True,
+        env=env,
+    )
+
+
+def test_body_edit_on_an_indexed_surface_does_not_rewrite_the_manifest(
+    committed_project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A commit that only edits an already-indexed file moves that surface's
+    `last_modified` but not the indexed set -- F11's definition of fresh -- so
+    the builder must report the manifest unchanged and leave its bytes alone.
+    Under the previous `generated_at`-only compare this rewrote the manifest on
+    every state commit and cost a follow-up commit each time."""
+    manifest = committed_project / ".ai-state" / "doc_manifest.yaml"
+    assert bdm.main(["--root", str(committed_project)]) == 0
+    _commit_on(committed_project, "manifest", "2026-01-01T12:00:00 +0000")
+    before = manifest.read_bytes()
+
+    (committed_project / "docs" / "guide.md").write_text("# Guide\n\nEdited body.\n")
+    _commit_on(committed_project, "body edit", "2026-01-02T12:00:00 +0000")
+    bdm._git_commit_dates.cache_clear()  # per-process cache; the CLI runs once per process
+    fresh_dates = {
+        s["id"]: s["last_modified"] for s in bdm.build_manifest(committed_project)["surfaces"]
+    }
+    assert fresh_dates["docs-guide"] == "2026-01-02", "fixture failed to move last_modified"
+
+    capsys.readouterr()
+    assert bdm.main(["--root", str(committed_project)]) == 0
+    assert "unchanged" in capsys.readouterr().out
+    assert manifest.read_bytes() == before, "a body-only edit rewrote the manifest"
+    assert bdm.main(["--root", str(committed_project), "--check"]) == 0
+
+
+def test_added_surface_still_rewrites_the_manifest(
+    committed_project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No-false-negative control for the volatile-field compare: adding a
+    surface changes the indexed set and must still write (and fail --check)."""
+    manifest = committed_project / ".ai-state" / "doc_manifest.yaml"
+    assert bdm.main(["--root", str(committed_project)]) == 0
+    before = manifest.read_bytes()
+
+    (committed_project / "docs" / "new.md").write_text("# New\n\nBody.\n")
+    _commit_on(committed_project, "add surface", "2026-01-03T12:00:00 +0000")
+    bdm._git_commit_dates.cache_clear()
+    assert bdm.main(["--root", str(committed_project), "--check"]) == 1
+
+    capsys.readouterr()
+    assert bdm.main(["--root", str(committed_project)]) == 0
+    assert "Wrote" in capsys.readouterr().out
+    assert manifest.read_bytes() != before
+
+
 def test_untracked_surface_falls_back_to_mtime(committed_project: Path) -> None:
     """An authored-but-uncommitted surface has no commit date; mtime is the
     only signal, so the fallback must still produce a usable value."""

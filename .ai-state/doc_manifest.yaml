@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-13T15:53:19Z'
+generated_at: '2026-09-13T16:57:00Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2876,6 +2876,12 @@ surfaces:
   title: The behavioural-contract rule is the sole author of the four definitions; a shape-extracting guard single-sources them without fences
   last_modified: '2026-09-13'
   renderer: adr_card
+- id: ai-state-decisions-384-calibration-enum-instrument
+  path: .ai-state/decisions/384-calibration-enum-instrument.md
+  type: markdown
+  title: The calibration instrument is the Retrospective enum, computed by a script; the tier-match check is retired
+  last_modified: '2026-09-13'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3557,6 +3563,7 @@ groups:
   - ai-state-decisions-381-sentinel-family-check-scripts
   - ai-state-decisions-382-family-row-form
   - ai-state-decisions-383-single-source-canonical-texts
+  - ai-state-decisions-384-calibration-enum-instrument
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

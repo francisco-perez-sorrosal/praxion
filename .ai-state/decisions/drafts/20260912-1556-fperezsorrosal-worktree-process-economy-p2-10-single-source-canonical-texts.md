@@ -121,8 +121,10 @@ sync; the rule gains the `commit-process` → `commands/co.md` HTML-comment pros
   itself"), losing the rule's own title — which `rules_bridge_parsing.extract_title()` and
   `rules/_manifest.yaml` both read — and contradicting D-b.
 - **Con**: `codex/config/rules_bridge_parsing.py:196-217` (`extract_summary`) classifies body lines
-  by prefix with branches for `## `, `- `/`* `, a code fence, `|` and `#` — and **no branch for
-  `<!--`**. No rule carries an HTML comment today, so this interaction has never been exercised.
+  by prefix with branches for `## `, `- `/`* `, a code fence, `|` and `#` — and, when this
+  decision was taken, **no branch for `<!--`**. Step 10b of this pipeline added a branch for a
+  leading comment line or block and pinned it with a fixture test; the decision stands on the
+  other reasons (the shipped block would still carry the anchor into every managed project).
 - **Con**: +~138 B in an always-loaded rule, cutting the governed saving from −613 B to −475 B.
 
 ### Option 2 — Rule-as-source via a new bullets-only canonical file
@@ -216,6 +218,8 @@ becomes a fenced consumer.
   always-loaded files is dead weight) applies verbatim to the task-slug paragraph, whose directive
   is nonetheless "one-line pointer". Deleting it instead would save a further ~35 tok × 7 ≈ 245
   tokens per pipeline. Followed the directive; flagged the asymmetry.
+
+- **Hackathon-mode block is not refresh-tracked.** `hackathon-mode` is deliberately absent from `REFRESHABLE_SLUGS`, so the six managed projects keep their inlined four-bullet hackathon restatement with no stale signal until a later upgrade re-installs the block; the contract block itself refreshes. Accepted (user decision D-b: refresh later is fine); tracked with td-205.
 
 ## Disconfirmation
 

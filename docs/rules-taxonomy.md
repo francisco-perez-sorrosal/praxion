@@ -11,7 +11,7 @@ Every Praxion-onboarded project inherits a curated set of rules: coding style, b
 
 **The maximum baseline token reduction this mechanism can deliver is the sum of the *hook-deliver* rule sizes — currently ~3,600 tokens across two rules** (`swe/agent-model-routing`, `swe/vcs/git-conventions`). Everything else in the disable list is a *policy guarantee*, not a token saver:
 
-- **Core rules** (`core: true`, ~15,900 tokens) are non-disableable. They load unconditionally — listing them in `disable:` emits a warning and changes nothing.
+- **Core rules** (`core: true`, ~9,174 tokens, tokenizer-measured) are non-disableable. They load unconditionally — listing them in `disable:` emits a warning and changes nothing.
 - **Path-scoped rules** (13 rules) are already lazy: they cost **zero tokens at SessionStart** regardless of the disable list. Adding them to `disable:` produces a *declarative* guarantee that they will never load — useful in projects where a generically-named trigger file could appear (`prepare.py` in a non-ML project) — but yields no baseline savings.
 - **Hook-deliver rules** are the only group whose disable status moves tokens.
 
@@ -36,13 +36,13 @@ Five rules encode Praxion's operating contract. They are **immune to the disable
 
 | ID | Rule file | Purpose | Token cost |
 |----|-----------|---------|------------|
-| `CLAUDE` | `rules/CLAUDE.md` | Agent reading order + build/test/lint + repo layout | ~640 tokens |
-| `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | ~3115 tokens |
-| `swe/agent-behavioral-contract` | `rules/swe/agent-behavioral-contract.md` | Four non-negotiable behaviors: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First | ~375 tokens |
-| `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~3200 tokens |
-| `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4245 tokens |
+| `CLAUDE` | `rules/CLAUDE.md` | Agent reading order + build/test/lint + repo layout | ~602 tokens |
+| `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | ~2499 tokens |
+| `swe/agent-behavioral-contract` | `rules/swe/agent-behavioral-contract.md` | Four non-negotiable behaviors: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First | ~370 tokens |
+| `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~1130 tokens |
+| `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4573 tokens |
 
-**Total core tokens:** ~11,575
+**Total core tokens:** ~9,174 (tokenizer-measured; see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`)
 
 ### 2. Always-Loaded Hook-Deliver Rules (disableable, biggest token savings)
 

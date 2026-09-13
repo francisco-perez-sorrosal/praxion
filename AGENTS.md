@@ -148,7 +148,7 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 
 - Username: `@fperezsorrosal` - refer to actions by this user as "you"
 - Email/GitHub: `fperezsorrosal@gmail.com`
-- GitHub: `https://github.com/fperezsorrosal`
+- GitHub: `https://github.com/francisco-perez-sorrosal`
 
 ## Project Layering
 

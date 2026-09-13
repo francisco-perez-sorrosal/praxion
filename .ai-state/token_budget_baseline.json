@@ -38,6 +38,12 @@
       "governed_tokens": 16639,
       "governed_bytes": 65174,
       "basis": "tokenizer"
+    },
+    {
+      "date": "2026-09-13",
+      "governed_tokens": 16569,
+      "governed_bytes": 64860,
+      "basis": "tokenizer"
     }
   ]
 }

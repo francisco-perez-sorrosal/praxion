@@ -97,7 +97,7 @@ Run these after step 7 (Self-review) and before step 8 (Update WIP.md):
          - src/auth/session.py::refresh_grace_period()
    ```
 
-   Only record the REQ IDs whose implementation you just wrote. Do not include test files — the test-engineer owns that layer. **Do not embed REQ/AC IDs in code, docstrings, or comments** — the traceability lives in this YAML file, not in the source. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip this sub-step entirely if no `## Behavioral Specification` section exists (Direct/Lightweight/Spike tier).
+   Only record the REQ IDs whose implementation you just wrote. Do not include test files — the test-engineer owns that layer. **Do not embed REQ/AC IDs in code, docstrings, or comments** — the traceability lives in this YAML file, not in the source. See [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip this sub-step entirely if no `## Behavioral Specification` section exists (Direct/Lightweight/Spike tier). If no test-engineer is paired on this step, also record the `tests:` array in the same REQ entry using the same `path::function` schema — the test layer has no other owner in that pairing configuration.
 
 8. **Update WIP.md** — mark your step as complete (see WIP.md Update Protocol).
 9. **Update LEARNINGS.md** — record any discoveries (see LEARNINGS.md Protocol).

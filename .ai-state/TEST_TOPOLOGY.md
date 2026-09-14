@@ -201,7 +201,14 @@ or pre-commit-wiring edit — but `architecture-fitness` runs as a **separate CI
 `repo-gates`' own run ever seeing it; `state-ledgers` is named because a new `agents/sentinel.md`-
 invoked script that parses `.ai-state/observations.jsonl` (or imports `hooks/capture_session.py`'s
 correlation constants) depends on the WAL schema `state-ledgers` governs, a coupling `repo-gates`'
-own selectors do not express. Every other group omits the field. It is planner-owned, optional in the
+own selectors do not express. **2026-09-13 (sentinel-phase-b):** `repo-gates` also names
+`decision-records` — `decision-records`' own file-dependency note already says
+`scripts/check_p06_task_brief.py` is a declared dependency there even though its test file
+(`scripts/test_check_p06_task_brief.py`) is a `repo-gates` selector, because
+`tests/test_criteria_spec_eval.py` drives `run_p06` as link 1 of the criteria-to-spec chain. That
+prose predates any `integration_boundaries` entry recording it; a family-dispatch conversion
+step touching `check_p06_task_brief.py` is the real pipeline that surfaced the gap. Every other
+group omits the field. It is planner-owned, optional in the
 trunk schema ("0 or more entries"), and populates lazily when a real pipeline discovers actual
 cross-group coupling — guessed boundaries would be indistinguishable from measured ones the
 moment they were written. Omission, not `[]`, is how that zero state is written, for a
@@ -518,6 +525,7 @@ file_dependencies:
 integration_boundaries:
   - architecture-fitness
   - state-ledgers
+  - decision-records
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:

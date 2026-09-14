@@ -15,7 +15,7 @@ with the CA03/SH08/RD01 pattern.
 Invocation:
 
     check_p06_task_brief.py                  # human-readable summary
-    check_p06_task_brief.py --json           # machine-readable JSON array
+    check_p06_task_brief.py --json           # flat single-check family envelope
     check_p06_task_brief.py --check          # exit 1 when any finding, else 0
     check_p06_task_brief.py --repo-root DIR  # operate on another checkout (tests)
 
@@ -136,6 +136,33 @@ def _format_human(findings: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_envelope(repo_root: Path, findings: list[dict]) -> dict:
+    """Wrap `run_p06`'s findings into the flat single-check family envelope.
+
+    `run_p06` itself keeps returning a bare `list[dict]` --
+    `tests/test_criteria_spec_eval.py` calls it directly for the
+    criteria-to-spec chain -- so the wrap happens only here, at the `--json`
+    CLI boundary. `run_check_families.aggregate_family` reads a family
+    payload via `payload.get(...)`, which raises `AttributeError` on a bare
+    list.
+    """
+    ai_work = repo_root / AI_WORK_REL
+    slug_count = sum(1 for d in ai_work.iterdir() if d.is_dir()) if ai_work.is_dir() else 0
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {"slugs": slug_count, "flagged": len(findings)},
+        "findings": findings,
+        "info": {},
+        "withheld": [],
+        "bound": (
+            "P06 clean means every Standard/Full .ai-work/<slug>/ directory "
+            "(SYSTEMS_PLAN.md present) also has TASK_BRIEF.md; slugs without "
+            "SYSTEMS_PLAN.md are out of scope."
+        ),
+    }
+
+
 def _run(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     if is_plugin_cache_path(repo_root):
@@ -145,7 +172,7 @@ def _run(args: argparse.Namespace) -> int:
     findings = run_p06(repo_root)
 
     if args.json:
-        print(json.dumps(findings, indent=2))
+        print(json.dumps(_build_envelope(repo_root, findings), indent=2))
     else:
         report = _format_human(findings)
         if findings:

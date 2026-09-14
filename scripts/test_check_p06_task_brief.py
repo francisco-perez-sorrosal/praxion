@@ -105,7 +105,7 @@ def test_canary_p06_fires_on_known_bad_input(tmp_path: Path) -> None:
 def test_canary_p06_fires_on_known_bad_input_json_mode(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Gate-liveness canary: --json output must have ≥1 P06 warn row for the bad-case."""
+    """Gate-liveness canary: --json output must wrap ≥1 P06 warn row in the flat envelope."""
     _make_missing_brief_slug(tmp_path)
 
     mod = _load_module()
@@ -113,11 +113,42 @@ def test_canary_p06_fires_on_known_bad_input_json_mode(
         mod.main(["--repo-root", str(tmp_path), "--json"])
 
     payload = json.loads(capsys.readouterr().out)
-    assert isinstance(payload, list), f"--json must return a JSON array, got: {payload!r}"
-    p06_rows = [r for r in payload if r.get("check") == "P06" and r.get("severity") == "warn"]
+    assert payload["check"] == "P06", (
+        f"--json must wrap findings under check='P06', got: {payload!r}"
+    )
+    findings = payload["findings"]
+    p06_rows = [r for r in findings if r.get("check") == "P06" and r.get("severity") == "warn"]
     assert len(p06_rows) >= 1, (
         f"--json must include ≥1 P06 warn row for the known-bad input, got: {payload!r}"
     )
+
+
+def test_json_output_is_flat_envelope_not_bare_list(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--json emits a flat single-check envelope (family-dispatch contract), not a bare list.
+
+    `run_check_families.aggregate_family` calls `payload.get(...)`, which raises
+    `AttributeError` on a bare list -- this is the shape `run_check_families.py`
+    itself requires to aggregate P06 alongside every other family.
+    """
+    slug = tmp_path / ".ai-work" / "compliant"
+    slug.mkdir(parents=True)
+    (slug / "SYSTEMS_PLAN.md").write_text("# Plan", encoding="utf-8")
+    (slug / "TASK_BRIEF.md").write_text("# Brief", encoding="utf-8")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit):
+        mod.main(["--repo-root", str(tmp_path), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert isinstance(payload, dict), (
+        f"--json must emit a dict envelope, not a bare list, got: {type(payload)}"
+    )
+    for key in ("check", "skipped", "examined", "findings", "info", "withheld", "bound"):
+        assert key in payload, f"envelope missing key {key!r}: {payload!r}"
+    assert payload["check"] == "P06"
+    assert payload["findings"] == []
 
 
 # -- No-false-positive control ------------------------------------------------

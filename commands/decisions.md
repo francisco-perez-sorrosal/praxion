@@ -55,7 +55,7 @@ determine their cause, so it proposes nothing for them. Report them with the wit
 **never** work them as candidates. Their presence also means the retirement list is shorter than
 it would otherwise be — a shorter list here is missing evidence, not a healthier corpus.
 
-If there are no findings, say so and stop. Re-running after a clean pass is a no-op.
+If `decay_findings` is empty, say so and stop. Re-running after a clean pass is a no-op.
 
 ### 2. Order the work — repairs first, retirement last
 

@@ -1436,7 +1436,7 @@ def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:
     agent_id = str(payload.get("agent_id") or "").strip()
     if not agent_id:
         return fields
-    read_path = module._transcript_source_for(payload)
+    read_path, _usage_source = module._transcript_source_for(payload)
     if not read_path:
         return fields
 

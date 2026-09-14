@@ -408,17 +408,20 @@ def _subagent_own_transcript_path(payload: dict) -> str:
     return str(projects_dir / session_id / "subagents" / f"agent-{agent_id}.jsonl")
 
 
-def _transcript_source_for(payload: dict) -> str:
-    """The file to scan for a subagent's usage: its own transcript when the
-    harness wrote one, else the parent's ``transcript_path`` as the last
-    resort. See ``_sum_subagent_transcript`` for why the fallback still
+def _transcript_source_for(payload: dict) -> tuple[str, str]:
+    """The file to scan for a subagent's usage and the ``usage_source`` label
+    that names it: the subagent's own transcript when the harness wrote one,
+    else the parent's ``transcript_path`` as the last resort. Returning the
+    label beside the path keeps the two from drifting -- a caller that
+    re-derived the label from the path would mislabel any source added here
+    later. See ``_sum_subagent_transcript`` for why the fallback still
     requires per-line tag matching rather than trusting the parent file
     outright.
     """
     subagent_path = _subagent_own_transcript_path(payload)
     if subagent_path and Path(subagent_path).is_file():
-        return subagent_path
-    return str(payload.get("transcript_path") or "")
+        return subagent_path, USAGE_SOURCE_SUBAGENT_TRANSCRIPT
+    return str(payload.get("transcript_path") or ""), USAGE_SOURCE_PARENT_TRANSCRIPT
 
 
 def _accumulate_assistant_line(
@@ -495,7 +498,7 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
     agent_id = str(payload.get("agent_id") or "").strip()
     if not agent_id:
         return fields
-    read_path = _transcript_source_for(payload)
+    read_path, usage_source = _transcript_source_for(payload)
     if not read_path:
         return fields
 
@@ -534,12 +537,7 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
         return fields
     fields.update(totals)
     fields["model"] = model
-    subagent_path = _subagent_own_transcript_path(payload)
-    fields["usage_source"] = (
-        USAGE_SOURCE_SUBAGENT_TRANSCRIPT
-        if subagent_path and read_path == subagent_path
-        else USAGE_SOURCE_PARENT_TRANSCRIPT
-    )
+    fields["usage_source"] = usage_source
     if first_ts and last_ts:
         fields["duration_ms"] = _duration_ms(first_ts, last_ts)
     return fields

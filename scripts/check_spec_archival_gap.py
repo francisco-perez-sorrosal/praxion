@@ -50,6 +50,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 N_DAYS: int = 90  # days the newest SPEC must trail the ADR cluster to flag a gap
 K_ADRS: int = 3  # minimum cluster size (ADRs sharing a tag) to constitute a signal
 
+# Registered with the sentinel row/registry/script triangle (`ast.literal_eval`-read
+# from this one module-level string literal -- see tests/test_sentinel_check_triangle.py).
+CHECK_ID = "SH08"
+
+_SEVERITY = "warn"
+
 # Regex to extract the ISO date from a SPEC filename.
 # Pattern: SPEC_<slug>_<YYYY-MM-DD>.md  (slug may contain hyphens)
 _SPEC_DATE_RE = re.compile(r"^SPEC_.+_(\d{4}-\d{2}-\d{2})\.md$")
@@ -226,6 +232,53 @@ def detect_gap(repo_root: Path, now: datetime | None = None) -> dict:
     }
 
 
+# -- Family envelope (additive, `run_check_families.py` flat-envelope shape) --
+
+
+def _sh08_findings(result: dict) -> list[dict]:
+    """Return the SH08 family finding, or none when no gap is detected."""
+    if not result["gap"]:
+        return []
+    return [
+        {
+            "check": CHECK_ID,
+            "severity": _SEVERITY,
+            "entity": result["newest_spec"] or ".ai-state/specs/",
+            "message": result["details"],
+        }
+    ]
+
+
+def sh08_envelope(result: dict) -> dict:
+    """Build the additive family-envelope keys around an existing `detect_gap` result.
+
+    Additive per dec-draft-34af7f36: `run_check_families.py` reads exactly
+    `check`/`findings`/`skipped`/`examined`/`bound`/`withheld` off a flat payload,
+    so these keys sit beside `detect_gap`'s own pre-existing keys without
+    displacing any of them. `spec_age_days is None` is `detect_gap`'s own
+    skip-with-INFO signal (both its skip branches leave it unset), reused here
+    rather than re-deriving "was the substrate absent" a second way.
+    """
+    skipped = result["details"] if result["spec_age_days"] is None else None
+    return {
+        "check": CHECK_ID,
+        "skipped": skipped,
+        "examined": {
+            "spec_age_days": result["spec_age_days"],
+            "recent_adr_count": result["recent_adr_count"],
+            "newest_spec": result["newest_spec"],
+        },
+        "findings": _sh08_findings(result),
+        "info": {},
+        "withheld": [],
+        "bound": (
+            f"SH08 clean means the newest archived spec is not more than {N_DAYS} days "
+            f"older than any tag cluster of ≥{K_ADRS} finalized ADRs; absent "
+            ".ai-state/specs/ substrate is skipped, never a finding."
+        ),
+    }
+
+
 # -- CLI ----------------------------------------------------------------------
 
 
@@ -283,7 +336,7 @@ def main(argv: list[str] | None = None) -> None:
     result = detect_gap(repo_root=repo_root)
 
     if args.json_output:
-        print(json.dumps(result, indent=2))
+        print(json.dumps({**result, **sh08_envelope(result)}, indent=2))
     else:
         print(result["details"])
 

@@ -191,3 +191,66 @@ def test_canary_known_gap_fixture_flags_gap() -> None:
     assert result["recent_adr_count"] >= _K_ADRS, (
         f"Expected ≥{_K_ADRS} qualifying ADRs in fixture, got {result['recent_adr_count']}"
     )
+
+
+# -- Family envelope: registration-triangle canary ---------------------------
+
+
+def test_canary_json_envelope_flags_sh08_finding(tmp_path: Path) -> None:
+    """Family-envelope canary: a detected gap must tag a `check: "SH08"` finding.
+
+    Golden bad-case for the registration triangle: `run_check_families.py`'s
+    `aggregate_family` buckets findings by `finding.get("check")`, so a gap
+    verdict that never emits that key would be silently invisible to the family
+    dispatch table even though `--check` still exits 1.
+    """
+    repo = _make_repo(
+        tmp_path,
+        specs={"old-feature": _STALE_SPEC_DATE},
+        adrs=[{"date": _RECENT_ADR_DATE, "tags": ["feature"]} for _ in range(_K_ADRS)],
+    )
+    result = csag.detect_gap(repo_root=repo, now=_NOW)
+    envelope = csag.sh08_envelope(result)
+
+    assert envelope["check"] == "SH08"
+    assert envelope["skipped"] is None
+    assert envelope["examined"] == {
+        "spec_age_days": result["spec_age_days"],
+        "recent_adr_count": result["recent_adr_count"],
+        "newest_spec": result["newest_spec"],
+    }
+    assert envelope["findings"] == [
+        {
+            "check": "SH08",
+            "severity": "warn",
+            "entity": result["newest_spec"],
+            "message": result["details"],
+        }
+    ]
+    assert envelope["info"] == {}
+    assert envelope["withheld"] == []
+
+
+def test_no_gap_envelope_findings_empty_when_spec_is_fresh(tmp_path: Path) -> None:
+    """No-false-positive control: no gap leaves `findings` empty."""
+    repo = _make_repo(
+        tmp_path,
+        specs={"fresh-feature": _FRESH_SPEC_DATE},
+        adrs=[{"date": _RECENT_ADR_DATE, "tags": ["feature"]} for _ in range(_K_ADRS)],
+    )
+    result = csag.detect_gap(repo_root=repo, now=_NOW)
+    envelope = csag.sh08_envelope(result)
+
+    assert envelope["findings"] == []
+    assert envelope["check"] == "SH08"
+
+
+def test_substrate_absent_envelope_reports_skipped_not_a_finding(tmp_path: Path) -> None:
+    """Absent .ai-state/specs/ surfaces via `skipped`, never as a family finding."""
+    repo = _make_repo(tmp_path, specs=None, adrs=None)
+    result = csag.detect_gap(repo_root=repo, now=_NOW)
+    envelope = csag.sh08_envelope(result)
+
+    assert envelope["findings"] == []
+    assert isinstance(envelope["skipped"], str)
+    assert "check skipped" in envelope["skipped"]

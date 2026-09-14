@@ -636,3 +636,53 @@ def test_canary_check_design_checkpoint_flags_a_malformed_mark(tmp_path):
     assert exit_code == 0
     assert payload["checkpoint_state"] == "malformed"
     assert payload["unfolded"] is None
+
+
+# -- Canary: family envelope --------------------------------------------------
+
+
+def test_canary_malformed_checkpoint_produces_an_ac14_fail_finding(tmp_path, capsys):
+    """The AC14 gate must bite: a malformed checkpoint is the one state the
+    envelope is required to FAIL on -- an un-folded suffix by itself must
+    never reach `severity: "fail"`, so this is the discriminating case."""
+    _write_design(tmp_path, "not-a-valid-id")
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["check"] == "AC14"
+    assert payload["findings"] == [
+        {
+            "check": "AC14",
+            "severity": "fail",
+            "entity": ".ai-state/DESIGN.md",
+            "message": "unparseable `Current as of` cell: 'not-a-valid-id'",
+        }
+    ]
+
+
+def test_unfolded_suffix_produces_a_warn_finding_never_a_fail(tmp_path, capsys):
+    """The positive control for the canary above: a non-empty un-folded suffix
+    is advisory (`severity: "warn"`), proving the FAIL path is reserved for
+    an unevaluable checkpoint, not for what the checkpoint reveals."""
+    decisions_dir = tmp_path / ".ai-state" / "decisions"
+    _write_adr(decisions_dir, "100-checkpoint.md", adr_id="dec-100")
+    _write_live_file(tmp_path, "src/module.py")
+    _write_adr(
+        decisions_dir,
+        "101-newer.md",
+        adr_id="dec-101",
+        status="accepted",
+        category="architectural",
+        affected_files=["src/module.py"],
+    )
+    _write_design(tmp_path, _present_cell("dec-100"))
+
+    exit_code = check_design_checkpoint.main(["--json", "--repo-root", str(tmp_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert len(payload["findings"]) == 1
+    assert payload["findings"][0]["check"] == "AC14"
+    assert payload["findings"][0]["severity"] == "warn"

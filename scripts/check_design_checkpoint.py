@@ -70,6 +70,17 @@ _PREDICATE_DESCRIPTION = (
     "status in {accepted,re-affirmation} AND category==architectural AND >=1 live affected_files"
 )
 
+# The check id this script's row surface declares -- read via AST by the row/registry/
+# script Triangle in `tests/test_sentinel_check_triangle.py`, mirroring the flat
+# CHECK_ID shape (this script owns exactly one sentinel row, not a keyed family).
+CHECK_ID = "AC14"
+_AC14_BOUND = (
+    "AC14 clean means DESIGN.md's checkpoint is present and well-formed and no "
+    "architecture-bearing ADR sorts after it unfolded; a malformed or absent "
+    "checkpoint is a FAIL, a non-empty un-folded suffix is advisory (WARN, never "
+    "a FAIL) -- the un-folded count itself must never read as a gate."
+)
+
 
 @dataclass(frozen=True)
 class DesignCheckpoint:
@@ -182,7 +193,7 @@ def _corpus_tip(records: list[query_adrs.AdrRecord]) -> query_adrs.AdrRecord | N
 # -- Report -----------------------------------------------------------------
 
 
-def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
+def _compute_design_checkpoint_payload(repo_root: Path) -> tuple[int, dict[str, object]]:
     """Compute the checkpoint report. Returns `(exit_code, json_payload)`."""
     design_path = repo_root / _DESIGN_DOC
     if not design_path.is_file():
@@ -267,6 +278,92 @@ def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
         )
 
     return 0, payload
+
+
+# -- Family envelope ----------------------------------------------------------
+
+
+def _ac14_findings(payload: dict[str, object]) -> list[dict[str, object]]:
+    """Build the family findings from the already-computed payload.
+
+    FAIL only on a checkpoint the mechanism could not evaluate at all
+    (`unreadable`/`absent`/`malformed`) -- the un-folded suffix itself is
+    advisory (`severity: "warn"`) so a merge-day suffix never reads as a gate.
+    """
+    state = payload["checkpoint_state"]
+    if state == "unreadable":
+        return [
+            {
+                "check": CHECK_ID,
+                "severity": "fail",
+                "entity": str(_DESIGN_DOC),
+                "message": payload["message"],
+            }
+        ]
+    if state == "absent":
+        return [
+            {
+                "check": CHECK_ID,
+                "severity": "fail",
+                "entity": str(_DESIGN_DOC),
+                "message": "no `Current as of` row in DESIGN.md section 1",
+            }
+        ]
+    if state == "malformed":
+        return [
+            {
+                "check": CHECK_ID,
+                "severity": "fail",
+                "entity": str(_DESIGN_DOC),
+                "message": f"unparseable `Current as of` cell: {payload['raw']!r}",
+            }
+        ]
+    count = payload.get("count")
+    if not count:
+        return []
+    return [
+        {
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": str(payload["checkpoint"]),
+            "message": (
+                f"{count} architecture-bearing ADR(s) sort after checkpoint "
+                f"{payload['checkpoint']} and are not yet folded into DESIGN.md"
+            ),
+        }
+    ]
+
+
+def _ac14_withheld(payload: dict[str, object]) -> list[dict[str, object]]:
+    """A `draft` checkpoint makes the un-folded suffix unanswerable, not empty --
+    distinct from both a FAIL (unreadable/absent/malformed) and a clean WARN."""
+    if payload["checkpoint_state"] != "draft":
+        return []
+    return [{"field": "unfolded", "reason": payload["message"]}]
+
+
+def check_design_checkpoint(repo_root: Path) -> tuple[int, dict[str, object]]:
+    """Compute the checkpoint report, then add the flat family envelope keys.
+
+    Wraps `_compute_design_checkpoint_payload` in one place rather than
+    editing each of its four early returns, so the six envelope keys are
+    always present exactly once regardless of which branch produced the
+    base payload.
+    """
+    exit_code, payload = _compute_design_checkpoint_payload(repo_root)
+    payload["check"] = CHECK_ID
+    payload["skipped"] = None
+    payload["examined"] = {
+        "checkpoint_state": payload["checkpoint_state"],
+        "checkpoint": payload["checkpoint"],
+        "corpus_tip": payload.get("corpus_tip"),
+        "count": payload.get("count"),
+    }
+    payload["findings"] = _ac14_findings(payload)
+    payload["info"] = {}
+    payload["withheld"] = _ac14_withheld(payload)
+    payload["bound"] = _AC14_BOUND
+    return exit_code, payload
 
 
 # -- CLI ----------------------------------------------------------------------

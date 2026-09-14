@@ -7,7 +7,7 @@
 **Archived**: 2026-09-13
 **Status**: completed
 **Complexity**: large
-**ADRs**: `dec-draft-34af7f36` (family envelope additive; AC10 stays sentence-dispatched; DH01/DH06 registered A rows; EC07 Invocation string)
+**ADRs**: `dec-385` (family envelope additive; AC10 stays sentence-dispatched; DH01/DH06 registered A rows; EC07 Invocation string)
 
 ## Requirements
 
@@ -121,9 +121,9 @@ Rendered from the merged `.ai-work/sentinel-phase-b/traceability.yml` (15 fragme
 
 ## Key Decisions
 
-Four architect decisions landed under one ADR draft, `dec-draft-34af7f36`, plus one implementation-planner traceability-mapping judgement extending the same feature (full context copied from `LEARNINGS.md § Decisions Made`):
+Four architect decisions landed under one ADR draft, `dec-385`, plus one implementation-planner traceability-mapping judgement extending the same feature (full context copied from `LEARNINGS.md § Decisions Made`):
 
-**[systems-architect] The family envelope is additive, so a dict-emitting tool needs no wrapper (dec-draft-34af7f36)**:
+**[systems-architect] The family envelope is additive, so a dict-emitting tool needs no wrapper (dec-385)**:
 `run_check_families.py` reads exactly six keys from a family payload (`checks`/`check`, `findings`, `skipped`,
 `examined`, `bound`, `withheld`), so those keys can be added beside a script's existing `--json` keys without breaking
 any consumer. `clean_work_safety.py` (P08) and `measure_token_budget.py` (T02) therefore become in-place family
@@ -133,7 +133,7 @@ reads `task_dirs`/`summary` by key and that `check_token_ratchet.py` / `apply_sk
 module rather than its CLI JSON. **Alternatives**: a thin wrapper script per tool (rejected on price and component
 count); leaving both as four-part sentence rows (rejected — together they cost 1,797 row bytes and two Bash calls).
 
-**[systems-architect] AC10 stays sentence-dispatched (dec-draft-34af7f36)**: `aac_fence_validator.py` keeps its
+**[systems-architect] AC10 stays sentence-dispatched (dec-385)**: `aac_fence_validator.py` keeps its
 per-file positional contract; no wrapper, no in-place `--json` corpus mode. **Why**: two surfaces outside the sentinel
 depend on exactly that shape — `.github/workflows/architecture.yml:264`'s `xargs -r -I {} python3
 scripts/aac_fence_validator.py {}` and dec-275's architect-validator allowlist entry — and AC10's value is the
@@ -142,7 +142,7 @@ Bash calls). **Alternatives**: a wrapper family script (rejected: worst byte-and
 in-place corpus-walking mode (rejected: adds a second responsibility to a script two surfaces depend on).
 
 **[systems-architect] DH01 and DH06 become registered A rows and `_LEGACY_CITING_ROWS` is deleted
-(dec-draft-34af7f36)**: `adr_health.py` already computes both — DH01 is the `removed-by-later` decay class (line 752;
+(dec-385)**: `adr_health.py` already computes both — DH01 is the `removed-by-later` decay class (line 752;
 `--only removed-by-later` already filters it), DH06 is the top-level `status_edge_conflicts` list (line 571). **Why**:
 leaving them to LLM judgment spends sweep turns on a question a script has already answered, and they are the two
 largest single-row savings in the DH block (−353 B, −775 B). The exemption is deleted rather than emptied because a
@@ -152,7 +152,7 @@ becomes unconditional, which is strictly stronger than an exemption with a guard
 keep it and its staleness test (rejected on Simplicity First — ~25 lines of vacuously-green test).
 
 **[systems-architect] EC07's table Invocation is `python3 scripts/check_aac_golden_rule.py --mode=audit --json`
-(dec-draft-34af7f36)**: exactly 20 flag characters against `_INVOCATION_FLAGS_MAX_CHARS = 20`, quantifier `{0,20}`,
+(dec-385)**: exactly 20 flag characters against `_INVOCATION_FLAGS_MAX_CHARS = 20`, quantifier `{0,20}`,
 match confirmed by executing the contract's own regex. **Why**: bare `--json` prints nothing — `--help` states JSON is
 audit-mode only — so `--mode=audit` is mandatory in the table row. **Alternatives**: `--json --mode=audit` (same 20
 chars, also matches; the chosen order reads as mode-then-format and matches the existing EC07 row); leaving EC07 as a

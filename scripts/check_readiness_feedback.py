@@ -208,7 +208,7 @@ def _rd01_findings(verdict: dict[str, object]) -> list[dict[str, object]]:
 def rd01_envelope(verdict: dict[str, object]) -> dict[str, object]:
     """Build the additive family-envelope keys around an existing verdict dict.
 
-    Additive per dec-draft-34af7f36: `run_check_families.py` reads exactly
+    Additive per dec-385: `run_check_families.py` reads exactly
     `check`/`findings`/`skipped`/`examined`/`bound`/`withheld` off a flat payload,
     so these keys sit beside the verdict's own pre-existing keys without displacing
     any of them. `adjusted_level is None` is the verdict's own skip-with-INFO

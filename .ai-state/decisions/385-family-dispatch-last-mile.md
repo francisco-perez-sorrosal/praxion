@@ -1,7 +1,8 @@
 ---
-id: dec-draft-34af7f36
+id: dec-385
+draft_id: dec-draft-34af7f36
 title: The family envelope is additive — tool scripts join the dispatch table without a wrapper, and AC10 stays out
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-13
 summary: "run_check_families.py reads exactly six keys from a family payload, so any script whose --json already emits a dict can carry the envelope alongside its existing keys — no wrapper component, no broken consumer. On that basis clean_work_safety.py (P08) and measure_token_budget.py (T02) join the Family dispatch table as in-place adapters, DH01/DH06 become registered A rows because adr_health.py already computes both (removed-by-later decay class; status_edge_conflicts) which lets the _LEGACY_CITING_ROWS exemption be deleted outright, and aac_fence_validator.py (AC10) stays sentence-dispatched because its per-file positional contract is load-bearing for the CI dsl-validate job and the architect-validator allowlist while its value is the smallest in the set (333 B row, 2-file corpus)."

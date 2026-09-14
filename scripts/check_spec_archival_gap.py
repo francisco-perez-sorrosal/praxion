@@ -252,7 +252,7 @@ def _sh08_findings(result: dict) -> list[dict]:
 def sh08_envelope(result: dict) -> dict:
     """Build the additive family-envelope keys around an existing `detect_gap` result.
 
-    Additive per dec-draft-34af7f36: `run_check_families.py` reads exactly
+    Additive per dec-385: `run_check_families.py` reads exactly
     `check`/`findings`/`skipped`/`examined`/`bound`/`withheld` off a flat payload,
     so these keys sit beside `detect_gap`'s own pre-existing keys without
     displacing any of them. `spec_age_days is None` is `detect_gap`'s own

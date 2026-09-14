@@ -1,3 +1,28 @@
+## v0.32.0 (2026-09-14)
+
+### Feat
+
+- **sentinel**: P08, T02 and TT07 dispatch from the family table; Phase-3 prose collapsed
+- **sentinel**: RD01, SH08, P06 and EC07 dispatch from the family table
+- **sentinel**: GL02-GL06, AC14 and TD06 dispatch from the family table
+- **sentinel**: adr_health serves DH01-DH06 from the family dispatch table
+- **sentinel**: measure_token_budget carries the T02 envelope additively
+- **sentinel**: clean_work_safety carries the P08 envelope additively
+- **sentinel**: check_aac_golden_rule audit mode emits the EC07 flat envelope
+- **sentinel**: check_p06_task_brief wraps its list in the P06 flat envelope
+- **sentinel**: check_spec_archival_gap emits the SH08 flat envelope
+- **sentinel**: check_readiness_feedback emits the RD01 flat envelope
+- **sentinel**: check_metrics_freshness emits the TD06 flat envelope
+- **sentinel**: check_design_checkpoint emits the AC14 flat envelope
+- **sentinel**: check_gate_liveness emits the GL family envelope
+
+### Fix
+
+- usage_source comes from the source selector; /decisions checks decay_findings
+- **hooks**: mark which transcript an agent_stop row's usage came from
+- **adr-health**: name the two findings streams and filter both under --class
+- **hooks**: SubagentStop enrichment reads the subagent's own transcript
+
 ## v0.31.0 (2026-09-14)
 
 ### Feat

@@ -1036,9 +1036,15 @@ def main(argv: list[str] | None = None) -> int:
 
     report = classify(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
     if args.only:
+        # Both streams carry `decay_class` on every entry -- family findings
+        # inherit it from the decay entry they derive from (DH01/DH02) or set
+        # their own (DH04/DH05/DH06) -- so a single `--class` filters both
+        # consistently instead of narrowing `decay_findings` while leaving the
+        # family `findings` an unfiltered, contradicting view of the corpus.
         report["decay_findings"] = [
             f for f in report["decay_findings"] if f["decay_class"] == args.only
         ]
+        report["findings"] = [f for f in report["findings"] if f["decay_class"] == args.only]
 
     if args.json:
         print(json.dumps(report, indent=2))

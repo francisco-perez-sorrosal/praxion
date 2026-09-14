@@ -13,6 +13,7 @@ from the happy path.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -1102,3 +1103,72 @@ def test_canary_reopen_candidate_and_status_edge_conflict_each_print_exactly_onc
 
     assert out.count("RE-OPEN?") == 1
     assert out.count("CONFLICT (a)") == 1
+
+
+# -- `--class` filters both streams consistently (WARN-2 regression) --------
+
+
+def _mixed_class_repo(repo: Path) -> None:
+    """Seed three decay classes: `renamed` (DH02), `removed-by-later` (DH01),
+    and `removed-by-self` (decay-only -- no family `check` tag).
+    """
+    (repo / "ARCHITECTURE.md").write_text("x", encoding="utf-8")
+    (repo / "subsystem.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "mv", "ARCHITECTURE.md", "DESIGN.md")
+    _git(repo, "rm", "-q", "subsystem.py")
+    _git(repo, "commit", "-qm", "rename and remove")
+    _adr(repo, 1, title="Cite the architecture doc", date="2026-01-01", files=["ARCHITECTURE.md"])
+    _adr(repo, 2, title="Design the subsystem", date="2026-01-02", files=["subsystem.py"])
+    _adr(repo, 3, title="Remove the subsystem", date="2026-02-01", files=["subsystem.py"])
+
+
+def test_class_filter_excludes_out_of_class_entries_from_both_streams(repo: Path, capsys) -> None:
+    """`--class renamed` must not leave a `removed-by-later` entry in either stream.
+
+    Before this fix, `--class` filtered `decay_findings` only; the family
+    `findings` stream came back unfiltered, so a single-class run returned
+    entries the run never asked for -- contradicting `commands/decisions.md`'s
+    "a count from it must never be presented as one".
+    """
+    _mixed_class_repo(repo)
+    adr_health.main(["--repo-root", str(repo), "--class", "renamed", "--json"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["decay_findings"], "precondition: the requested class has a decay entry"
+    assert report["findings"], "precondition: the requested class also has a family entry"
+    assert all(f["decay_class"] == "renamed" for f in report["decay_findings"])
+    assert all(f["decay_class"] == "renamed" for f in report["findings"])
+
+
+def test_json_payload_carries_both_streams_with_decay_findings_the_larger_set(
+    repo: Path, capsys
+) -> None:
+    """`decay_findings` is the per-reference superset; `findings` is the check-tagged subset.
+
+    `removed-by-self` never earns a family `check` tag, so on a fixture mixing
+    it with two family-actionable classes `decay_findings` must outnumber
+    `findings` -- pinning the size relationship a consumer like
+    `commands/decisions.md` relies on to know which stream is the full picture.
+    """
+    _mixed_class_repo(repo)
+    adr_health.main(["--repo-root", str(repo), "--json"])
+    report = json.loads(capsys.readouterr().out)
+    assert len(report["decay_findings"]) == 3
+    assert len(report["findings"]) == 2
+    assert len(report["decay_findings"]) >= len(report["findings"])
+
+
+def test_decay_findings_and_findings_key_names_are_the_public_contract(repo: Path) -> None:
+    """Pins the two key names so a future rename or repurposing is loud, not silent.
+
+    `commands/decisions.md` reads `decay_findings` by name for the per-reference
+    decay list; `run_check_families.py` reads `findings` by name for the
+    sentinel family stream. Handing the old `findings` name to a new, narrower
+    meaning (as happened here) breaks the first consumer without either
+    consumer's own tests failing -- only a test that names both keys catches it.
+    """
+    _mixed_class_repo(repo)
+    report = adr_health.classify(repo)
+    assert set(report) >= {"decay_findings", "findings"}
+    assert report["decay_findings"] != report["findings"]

@@ -37,6 +37,11 @@ command work in a managed project; if it is not found, fall back to
 `python3 scripts/adr_health.py --json` from a Praxion checkout and mention that the installer
 has not been run.
 
+The decay findings this command works through are the `decay_findings` array of the payload —
+every per-reference finding, every decay class. The payload's `findings` array is a different
+thing entirely: the sentinel's check-tagged family stream (`DH01`/`DH02`/`DH04`/`DH05`/`DH06`),
+consumed by `run_check_families.py`, not by this command.
+
 Under `--class`, say which class was scoped to when reporting. A single-class run is not a
 picture of the corpus, and a count from it must never be presented as one.
 

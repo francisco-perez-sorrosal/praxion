@@ -53,6 +53,8 @@ _HUNK_HEADER_RE = re.compile(r"\+(\d+)(?:,\d+)?")
 CODE_PATH_PAIR = "aac-golden-rule-path-pair"
 CODE_FENCE_INTERIOR = "aac-golden-rule-fence-interior"
 
+CHECK_ID = "EC07"
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -347,25 +349,45 @@ def run_gate(repo_root: Path) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _emit_audit_findings(findings: list[Finding], emit_json: bool) -> None:
-    """Print audit findings in human or JSON format."""
+def _build_audit_envelope(findings: list[Finding], commits_scanned: int) -> dict:
+    """Wrap audit-mode findings into the flat single-check family envelope.
+
+    Mirrors `_dl03_report` in `regenerate_adr_index.py`: `run_check_families
+    .aggregate_family` reads `check`/`findings`/`skipped`/`examined`/`info`/
+    `withheld`/`bound` from a flat payload -- a bare list makes it raise
+    `AttributeError` on `payload.get(...)`. Only the `--json` output wraps;
+    the human-readable audit listing below is unaffected.
+    """
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {"commits": commits_scanned, "findings": len(findings)},
+        "findings": [
+            {
+                "check": CHECK_ID,
+                "severity": f.severity.lower(),
+                "entity": f.path,
+                "message": f.message,
+                "commit": f.commit,
+                "code": f.code,
+                "line": f.line,
+            }
+            for f in findings
+        ],
+        "info": {},
+        "withheld": [],
+        "bound": (
+            "EC07 clean means no commit in the scanned horizon staged a generated "
+            "artifact (rendered diagram output or an aac:generated fence) without "
+            "its declared source or an aac-override comment."
+        ),
+    }
+
+
+def _emit_audit_findings(findings: list[Finding], emit_json: bool, commits_scanned: int) -> None:
+    """Print audit findings in human or JSON (flat family envelope) format."""
     if emit_json:
-        print(
-            json.dumps(
-                [
-                    {
-                        "commit": f.commit,
-                        "path": f.path,
-                        "line": f.line,
-                        "severity": f.severity,
-                        "code": f.code,
-                        "message": f.message,
-                    }
-                    for f in findings
-                ],
-                indent=2,
-            )
-        )
+        print(json.dumps(_build_audit_envelope(findings, commits_scanned), indent=2))
     else:
         for f in findings:
             sha_prefix = f.commit[:7] if f.commit else "?"
@@ -397,7 +419,7 @@ def run_audit(repo_root: Path, horizon: int, emit_json: bool) -> int:
             f.severity = "WARN"  # audit mode: sentinel decides escalation
         all_findings.extend(findings)
 
-    _emit_audit_findings(all_findings, emit_json)
+    _emit_audit_findings(all_findings, emit_json, len(commits))
     return 0
 
 

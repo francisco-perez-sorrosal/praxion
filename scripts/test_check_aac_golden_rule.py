@@ -337,7 +337,7 @@ def test_likec4_disabled_gate_still_enforces_path_pair(
 
 
 def test_audit_mode_with_clean_history_no_findings(tmp_path: Path, capsys: Any) -> None:
-    """Audit mode over clean commits must exit 0 and emit an empty JSON findings list."""
+    """Audit mode over clean commits must exit 0 and emit an envelope with no findings."""
     repo = _make_repo(tmp_path)
     # Three commits that touch only unrelated files
     _commit_file(repo, "README.md", "# hi\n", "init")
@@ -345,8 +345,9 @@ def test_audit_mode_with_clean_history_no_findings(tmp_path: Path, capsys: Any) 
     _commit_file(repo, "src/bar.py", "y = 2\n", "add bar")
     exit_code = _run_audit(repo, horizon=3, emit_json=True)
     assert exit_code == 0
-    findings = json.loads(capsys.readouterr().out)
-    assert findings == []
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["check"] == "EC07"
+    assert payload["findings"] == []
 
 
 def test_audit_mode_with_violations_emits_findings(tmp_path: Path, capsys: Any) -> None:
@@ -362,9 +363,11 @@ def test_audit_mode_with_violations_emits_findings(tmp_path: Path, capsys: Any) 
     )
     exit_code = _run_audit(repo, horizon=3, emit_json=True)
     assert exit_code == 0  # audit always exits 0
-    findings = json.loads(capsys.readouterr().out)
+    payload = json.loads(capsys.readouterr().out)
+    findings = payload["findings"]
     assert len(findings) >= 1
-    assert any("docs/diagrams/system/main.d2" in f["path"] for f in findings)
+    assert all(f["check"] == "EC07" for f in findings)
+    assert any("docs/diagrams/system/main.d2" in f["entity"] for f in findings)
 
 
 def test_audit_mode_with_overrides_no_findings(tmp_path: Path, capsys: Any) -> None:
@@ -380,8 +383,29 @@ def test_audit_mode_with_overrides_no_findings(tmp_path: Path, capsys: Any) -> N
     )
     exit_code = _run_audit(repo, horizon=3, emit_json=True)
     assert exit_code == 0
-    findings = json.loads(capsys.readouterr().out)
-    assert findings == []
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["findings"] == []
+
+
+def test_audit_json_output_is_flat_envelope_not_bare_list(tmp_path: Path, capsys: Any) -> None:
+    """--mode=audit --json emits a flat single-check envelope, not a bare list.
+
+    `run_check_families.aggregate_family` calls `payload.get(...)`, which raises
+    `AttributeError` on a bare list -- this is the shape the Family dispatch
+    table's `python3 scripts/check_aac_golden_rule.py --mode=audit --json`
+    invocation requires to aggregate EC07 alongside every other family.
+    """
+    repo = _make_repo(tmp_path)
+    _commit_file(repo, "README.md", "# hi\n", "init")
+    exit_code = _run_audit(repo, horizon=3, emit_json=True)
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert isinstance(payload, dict), (
+        f"--json must emit a dict envelope, not a bare list, got: {type(payload)}"
+    )
+    for key in ("check", "skipped", "examined", "findings", "info", "withheld", "bound"):
+        assert key in payload, f"envelope missing key {key!r}: {payload!r}"
+    assert payload["check"] == "EC07"
 
 
 def test_audit_mode_always_exits_zero_on_violations(tmp_path: Path) -> None:

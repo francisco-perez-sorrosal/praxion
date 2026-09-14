@@ -124,6 +124,8 @@ def test_canary_flags_hotspot_rewritten_after_the_report(repo: Path, tmp_path: P
     assert "hot.py" in flagged, "the rewritten hotspot must be flagged"
     assert "cold.py" not in flagged, "an untouched hotspot must NOT be flagged"
     assert result["findings"][0]["kind"] == "hotspot-moved-since-report"
+    assert result["findings"][0]["check"] == "TD06"
+    assert result["findings"][0]["severity"] == "warn"
 
 
 def test_canary_day_based_freshness_would_have_passed_this(repo: Path, tmp_path: Path) -> None:
@@ -261,6 +263,41 @@ def test_dirty_capture_is_surfaced(repo: Path, tmp_path: Path) -> None:
     result = evaluate_freshness(repo, reports_dir=reports)
 
     assert result["dirty"] is True
+
+
+# ---------------------------------------------------------------------------
+# Canary: family envelope — WARN fires on `withheld`, not only on `stale`.
+# ---------------------------------------------------------------------------
+
+
+def test_canary_withheld_report_produces_a_td06_warn_finding(repo: Path, tmp_path: Path) -> None:
+    """The TD06 gate must bite on `withheld`, not only on `stale`: a report the
+    checker cannot judge is exactly the case TD01 filing must be warned away
+    from, so a withheld verdict with an EMPTY `findings` list would be a
+    silent miss of the class this envelope exists to surface."""
+
+    reports = tmp_path / "reports"
+    _write_report(reports, commit=None, paths=["hot.py"])
+
+    result = evaluate_freshness(repo, reports_dir=reports)
+
+    assert result["status"] == "withheld"
+    assert result["findings"], "a withheld verdict must produce at least one WARN finding"
+    assert all(f["check"] == "TD06" and f["severity"] == "warn" for f in result["findings"])
+
+
+def test_fresh_report_produces_no_findings(repo: Path, tmp_path: Path) -> None:
+    """Positive control: a fresh verdict raises neither a stale nor a
+    withheld signal, so `findings` stays empty."""
+
+    head = _git(repo, "rev-parse", "HEAD")
+    reports = tmp_path / "reports"
+    _write_report(reports, commit=head, paths=["hot.py"])
+
+    result = evaluate_freshness(repo, reports_dir=reports)
+
+    assert result["status"] == "fresh"
+    assert result["findings"] == []
 
 
 # ---------------------------------------------------------------------------

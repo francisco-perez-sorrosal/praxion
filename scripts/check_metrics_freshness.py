@@ -59,6 +59,16 @@ _FILENAME_TIMESTAMP = re.compile(r"METRICS_REPORT_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}
 _FILENAME_TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 _GIT_TIMEOUT_SECONDS = 30.0
 
+# The check id this script's row surface declares -- read via AST by the row/registry/
+# script Triangle in `tests/test_sentinel_check_triangle.py`, mirroring the flat
+# CHECK_ID shape (this script owns exactly one sentinel row, not a keyed family).
+CHECK_ID = "TD06"
+_TD06_BOUND = (
+    "TD06 clean means the newest metrics report's ranked hotspots have not been "
+    "touched since the report's commit; WARN on a `stale` verdict or a non-empty "
+    "`withheld` -- both are signals TD01 filing must see before trusting the report."
+)
+
 
 # ---------------------------------------------------------------------------
 # git helpers — every one returns None rather than raising, so an unavailable
@@ -161,7 +171,7 @@ def _age_days(report_path: Path, now: datetime) -> int | None:
 # ---------------------------------------------------------------------------
 
 
-def evaluate_freshness(
+def _compute_freshness(
     repo_root: Path,
     *,
     reports_dir: Path | None = None,
@@ -289,6 +299,62 @@ def evaluate_freshness(
 
 
 # ---------------------------------------------------------------------------
+# Family envelope -- wraps `_compute_freshness` in one place so the six
+# envelope keys are always present exactly once, regardless of which of its
+# early returns (absent / withheld / stale / fresh) produced the base result.
+# ---------------------------------------------------------------------------
+
+
+def _td06_findings(result: dict[str, object]) -> list[dict[str, object]]:
+    """Tag every existing `findings[]` entry with the TD06 check id, and add
+    one WARN finding per `withheld` reason -- WARN fires on either signal,
+    per REQ, not on `stale` alone. `kind`/`path`/`rank`/`detail` are kept
+    on the stale entries unchanged; existing consumers read those by key."""
+    tagged = [
+        {
+            **finding,
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": finding["path"],
+            "message": finding["detail"],
+        }
+        for finding in result["findings"]
+    ]
+    withheld_findings = [
+        {
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": entry["field"],
+            "message": entry["reason"],
+            "kind": "freshness-withheld",
+        }
+        for entry in result["withheld"]
+    ]
+    return tagged + withheld_findings
+
+
+def evaluate_freshness(
+    repo_root: Path,
+    *,
+    reports_dir: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Compute the freshness verdict, then add the flat family envelope keys."""
+    result = _compute_freshness(repo_root, reports_dir=reports_dir, now=now)
+    result["check"] = CHECK_ID
+    result["skipped"] = None
+    result["examined"] = {
+        "status": result["status"],
+        "report": result["report"],
+        "hotspots_touched": result["hotspots_touched"],
+    }
+    result["findings"] = _td06_findings(result)
+    result["info"] = {}
+    result["bound"] = _TD06_BOUND
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI.
 # ---------------------------------------------------------------------------
 
@@ -306,7 +372,12 @@ def _render_human(result: dict[str, object]) -> str:
         lines.append("  tree:          dirty at capture (describes no single commit)")
     for entry in result.get("withheld") or []:
         lines.append(f"  WITHHELD {entry['field']}: {entry['reason']}")
+    # Only the stale-hotspot shape carries `rank`/`detail` -- the envelope's
+    # withheld-derived findings are already rendered by the WITHHELD loop
+    # above, so re-rendering them here would either double-print or KeyError.
     for finding in result.get("findings") or []:
+        if finding.get("kind") != "hotspot-moved-since-report":
+            continue
         lines.append(f"  STALE #{finding['rank']} {finding['path']}")
         lines.append(f"    {finding['detail']}")
     if status == "fresh":

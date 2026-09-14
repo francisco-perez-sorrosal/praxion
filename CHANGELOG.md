@@ -1,3 +1,21 @@
+## v0.31.0 (2026-09-14)
+
+### Feat
+
+- **calibration**: CA02 and CA03 become family checks over the enum distribution
+- **check**: BC05 binds every behavioural-contract copy to the rule
+
+### Fix
+
+- **manifest**: rewrite doc_manifest.yaml only when the indexed set changes
+- **pre-commit**: fire the sync and contract gates on every consumer
+
+### Refactor
+
+- **sentinel**: move F11, P03, SH07 and DL06 into the Family dispatch table
+- **rules**: state each always-loaded convention once
+- **canonical**: one wording of the behavioural contract
+
 ## v0.30.2 (2026-09-12)
 
 ### Feat

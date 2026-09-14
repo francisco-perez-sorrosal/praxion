@@ -363,32 +363,109 @@ _USAGE_KEY_BY_FIELD = dict(
 )
 
 
+def _subagent_own_transcript_path(payload: dict) -> str:
+    """Path to the subagent's own transcript, when the harness would have one.
+
+    Measured live (2026-09-13): a subagent's transcript is a sibling of the
+    parent session's, not the same file. Given the parent's
+    ``transcript_path`` (``<projects_dir>/<session_id>.jsonl``), the
+    subagent's own file lives at
+    ``<projects_dir>/<session_id>/subagents/agent-<agent_id>.jsonl``. Returns
+    ``""`` when ``session_id`` or ``agent_id`` is missing -- there is nothing
+    to key the sibling path on.
+    """
+    transcript_path = str(payload.get("transcript_path") or "")
+    session_id = str(payload.get("session_id") or "").strip()
+    agent_id = str(payload.get("agent_id") or "").strip()
+    if not transcript_path or not session_id or not agent_id:
+        return ""
+    projects_dir = Path(transcript_path).parent
+    return str(projects_dir / session_id / "subagents" / f"agent-{agent_id}.jsonl")
+
+
+def _transcript_source_for(payload: dict) -> str:
+    """The file to scan for a subagent's usage: its own transcript when the
+    harness wrote one, else the parent's ``transcript_path`` as the last
+    resort. See ``_sum_subagent_transcript`` for why the fallback still
+    requires per-line tag matching rather than trusting the parent file
+    outright.
+    """
+    subagent_path = _subagent_own_transcript_path(payload)
+    if subagent_path and Path(subagent_path).is_file():
+        return subagent_path
+    return str(payload.get("transcript_path") or "")
+
+
+def _accumulate_assistant_line(
+    row: object, agent_id: str, totals: dict[str, int]
+) -> tuple[bool, str | None, str | None]:
+    """Fold one parsed transcript line into ``totals`` when it matches
+    ``agent_id``. Mutates ``totals`` in place for a matching line and
+    returns ``(True, model, timestamp)``; returns ``(False, None, None)``
+    for a non-assistant, mistagged, malformed-message, or
+    numerically-unusable line. Callers key off the first element, not the
+    presence of ``model``/``timestamp`` -- both are legitimately absent on
+    some real matching lines.
+    """
+    if not isinstance(row, dict) or row.get("type") != "assistant":
+        return False, None, None
+    row_agent_id = row.get("agentId")
+    if row_agent_id is None or str(row_agent_id) != agent_id:
+        return False, None, None
+    message = row.get("message")
+    if not isinstance(message, dict):
+        return False, None, None
+    model: str | None = None
+    try:
+        usage = message.get("usage") or {}
+        if isinstance(usage, dict):
+            for field, usage_key in _USAGE_KEY_BY_FIELD.items():
+                totals[field] += int(usage.get(usage_key) or 0)
+        if message.get("model"):
+            model = str(message["model"])
+    except (TypeError, ValueError):
+        return False, None, None  # this line's numbers are unusable
+    timestamp = row.get("timestamp")
+    return True, model, str(timestamp) if timestamp else None
+
+
 def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
     """Recover token usage, model, and duration from a SubagentStop transcript.
 
-    Reads ``payload["transcript_path"]`` line by line -- the file can run
-    100+ MiB, so it is streamed rather than loaded whole -- and sums
-    ``message.usage`` across every ``assistant`` line. A line carrying its own
-    ``agentId`` is counted only when it matches this stop's ``agent_id``
-    (defensive against a transcript shared across agents via sidechain
-    markers; every real transcript inspected so far uses one agent per file
-    and omits the field entirely -- see LEARNINGS.md). ``model`` is taken from
-    the last matching line; ``duration_ms`` spans the first to the last
-    matching line's timestamp.
+    Reads the subagent's own transcript file when it exists (see
+    ``_transcript_source_for``); falls back to ``payload["transcript_path"]``
+    -- the *parent* session's transcript -- only when that file is absent.
+    Either way the file can run 100+ MiB, so it is streamed rather than
+    loaded whole, summing ``message.usage`` across every ``assistant`` line
+    (see ``_accumulate_assistant_line``).
 
-    A missing file, an unreadable path, or a transcript with no matching
-    assistant line degrades every field to None -- this is a best-effort
-    enrichment of an already-written row, never a reason to fail the stop.
-    A malformed individual line is skipped, not fatal to the rest of the scan.
+    A line counts only when its own ``agentId`` field is present and equals
+    this stop's ``agent_id`` -- a line carrying no ``agentId`` never matches,
+    in either source. This is load-bearing: the parent transcript's own
+    assistant lines carry no ``agentId``, so without this requirement a
+    fallback read sums the *parent's* cumulative usage onto the subagent's
+    row (measured live: a Sonnet subagent's stop row recorded the parent's
+    332,258 output tokens and `claude-fable-5-1` instead of its own 103,573
+    and `claude-sonnet-5` -- see LEARNINGS.md). ``model`` is taken from the
+    last matching line; ``duration_ms`` spans the first to the last matching
+    line's timestamp.
+
+    Neither file existing, an unreadable path, or a transcript with no
+    matching assistant line degrades every field to None -- an honest empty
+    beats a plausible wrong number, and this is a best-effort enrichment of
+    an already-written row, never a reason to fail the stop. A malformed
+    individual line is skipped, not fatal to the rest of the scan.
     """
     fields: dict[str, int | str | None] = dict.fromkeys(TOKEN_USAGE_FIELDS)
     fields["duration_ms"] = None
     fields["model"] = None
 
-    transcript_path = str(payload.get("transcript_path") or "")
-    if not transcript_path:
-        return fields
     agent_id = str(payload.get("agent_id") or "").strip()
+    if not agent_id:
+        return fields
+    read_path = _transcript_source_for(payload)
+    if not read_path:
+        return fields
 
     totals = dict.fromkeys(TOKEN_USAGE_FIELDS, 0)
     model: str | None = None
@@ -398,7 +475,7 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
     try:
         # errors="replace": a single undecodable byte must degrade one line,
         # never drop the whole agent_stop row (light-review 2, item 1).
-        with open(transcript_path, encoding="utf-8", errors="replace") as handle:
+        with open(read_path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
                 line = line.strip()
                 if not line:
@@ -407,28 +484,17 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
                     row = json.loads(line)
                 except (json.JSONDecodeError, TypeError):
                     continue
-                if not isinstance(row, dict) or row.get("type") != "assistant":
+                line_matched, line_model, timestamp = _accumulate_assistant_line(
+                    row, agent_id, totals
+                )
+                if not line_matched:
                     continue
-                row_agent_id = row.get("agentId")
-                if row_agent_id is not None and agent_id and str(row_agent_id) != agent_id:
-                    continue
-                message = row.get("message")
-                if not isinstance(message, dict):
-                    continue
-                try:
-                    usage = message.get("usage") or {}
-                    if isinstance(usage, dict):
-                        for field, usage_key in _USAGE_KEY_BY_FIELD.items():
-                            totals[field] += int(usage.get(usage_key) or 0)
-                    if message.get("model"):
-                        model = str(message["model"])
-                except (TypeError, ValueError):
-                    continue  # this line's numbers are unusable; keep scanning
-                timestamp = row.get("timestamp")
-                if timestamp:
-                    first_ts = first_ts or str(timestamp)
-                    last_ts = str(timestamp)
                 matched = True
+                if line_model:
+                    model = line_model
+                if timestamp:
+                    first_ts = first_ts or timestamp
+                    last_ts = timestamp
     except OSError:
         return fields
 

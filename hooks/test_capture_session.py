@@ -1245,6 +1245,7 @@ class TestSubagentTranscriptUsage:
                     cache_create=5,
                     model="claude-opus-5",
                     timestamp="2026-09-07T00:00:00.000Z",
+                    agent_id="a1",
                 ),
                 _assistant_line(
                     input_tokens=3,
@@ -1253,6 +1254,7 @@ class TestSubagentTranscriptUsage:
                     cache_create=0,
                     model="claude-opus-5",
                     timestamp="2026-09-07T00:00:05.500Z",
+                    agent_id="a1",
                 ),
             ],
         )
@@ -1286,19 +1288,54 @@ class TestSubagentTranscriptUsage:
         assert fields["tokens_in"] == 2
         assert fields["tokens_out"] == 4
 
-    def test_lines_without_agentid_are_counted_unconditionally(self, tmp_path: Path) -> None:
-        """The observed real shape: per-agent transcripts carry no `agentId` key."""
+    def test_lines_without_agentid_are_never_counted(self, tmp_path: Path) -> None:
+        """Degrade-to-None: the parent transcript's own assistant lines carry no
+        `agentId` (measured live, 2026-09-13) -- a fallback read must not count
+        them just because they're the only lines available. This is the exact
+        shape of the bug the file-preference fix and this filter both guard
+        against: an untagged line is never a match, regardless of source.
+        """
         module = _load_module()
         transcript = _write_usage_transcript(
-            tmp_path / "agent-a1.jsonl", [_assistant_line(input_tokens=7, output_tokens=8)]
+            tmp_path / "sess-1.jsonl", [_assistant_line(input_tokens=7, output_tokens=8)]
         )
 
         fields = module._sum_subagent_transcript(
-            {"transcript_path": str(transcript), "agent_id": "a1"}
+            {"transcript_path": str(transcript), "session_id": "sess-1", "agent_id": "a1"}
         )
 
-        assert fields["tokens_in"] == 7
-        assert fields["tokens_out"] == 8
+        assert all(value is None for value in fields.values())
+
+    def test_subagent_file_wins_over_untagged_parent_lines(self, tmp_path: Path) -> None:
+        """The subagent's own file -- a sibling of the parent transcript, keyed
+        by session_id and agent_id -- must be preferred over the parent
+        transcript named in `transcript_path`, and its own untagged noise
+        lines must not be swept in alongside the correctly tagged one.
+        """
+        module = _load_module()
+        projects_dir = tmp_path / "projects"
+        parent_transcript = _write_usage_transcript(
+            projects_dir / "sess-1.jsonl",
+            [_assistant_line(input_tokens=1000, output_tokens=2000)],
+        )
+        _write_usage_transcript(
+            projects_dir / "sess-1" / "subagents" / "agent-a1.jsonl",
+            [
+                _assistant_line(input_tokens=2, output_tokens=4, agent_id="a1"),
+                _assistant_line(input_tokens=999, output_tokens=999),  # untagged noise
+            ],
+        )
+
+        fields = module._sum_subagent_transcript(
+            {
+                "transcript_path": str(parent_transcript),
+                "session_id": "sess-1",
+                "agent_id": "a1",
+            }
+        )
+
+        assert fields["tokens_in"] == 2
+        assert fields["tokens_out"] == 4
 
     def test_missing_transcript_path_degrades_every_field_to_none(self) -> None:
         module = _load_module()
@@ -1320,7 +1357,7 @@ class TestSubagentTranscriptUsage:
         module = _load_module()
         transcript = _write_usage_transcript(
             tmp_path / "agent-a1.jsonl",
-            ["not-json-at-all", _assistant_line(input_tokens=9, output_tokens=1)],
+            ["not-json-at-all", _assistant_line(input_tokens=9, output_tokens=1, agent_id="a1")],
         )
 
         fields = module._sum_subagent_transcript(
@@ -1335,7 +1372,8 @@ class TestSubagentTranscriptUsage:
     ) -> None:
         module = _load_module()
         transcript = _write_usage_transcript(
-            tmp_path / "agent-a1.jsonl", [_assistant_line(input_tokens=4, output_tokens=6)]
+            tmp_path / "agent-a1.jsonl",
+            [_assistant_line(input_tokens=4, output_tokens=6, agent_id="a1")],
         )
 
         row = module.build_observation(
@@ -1358,6 +1396,112 @@ class TestSubagentTranscriptUsage:
         row = module.build_observation({"agent_id": "a1", "cwd": str(project)}, "agent_start")
 
         assert "tokens_in" not in row
+
+
+def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:
+    """Mutation probe: a duplicate of `_sum_subagent_transcript` with the
+    per-line ``agentId == agent_id`` equality requirement deleted -- every
+    assistant line in the chosen file counts, tagged or not. Exists to prove
+    that requirement is load-bearing: run against the identical fixture
+    `test_subagent_file_wins_over_untagged_parent_lines` builds, it must
+    reproduce the wrong-numbers bug the real fix eliminates (the untagged
+    noise line gets summed in alongside the correctly tagged one).
+    """
+    fields: dict = dict.fromkeys(module.TOKEN_USAGE_FIELDS)
+    fields["duration_ms"] = None
+    fields["model"] = None
+
+    agent_id = str(payload.get("agent_id") or "").strip()
+    if not agent_id:
+        return fields
+    subagent_path = module._subagent_own_transcript_path(payload)
+    read_path = (
+        subagent_path
+        if subagent_path and Path(subagent_path).is_file()
+        else str(payload.get("transcript_path") or "")
+    )
+    if not read_path:
+        return fields
+
+    totals = dict.fromkeys(module.TOKEN_USAGE_FIELDS, 0)
+    model: str | None = None
+    first_ts: str | None = None
+    last_ts: str | None = None
+    matched = False
+    with open(read_path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if not isinstance(row, dict) or row.get("type") != "assistant":
+                continue
+            # Mutation: the real function's `if row_agent_id is None or
+            # str(row_agent_id) != agent_id: continue` guard is deleted here
+            # -- every assistant line matches, unconditionally.
+            message = row.get("message")
+            if not isinstance(message, dict):
+                continue
+            usage = message.get("usage") or {}
+            for field, usage_key in module._USAGE_KEY_BY_FIELD.items():
+                totals[field] += int(usage.get(usage_key) or 0)
+            if message.get("model"):
+                model = str(message["model"])
+            timestamp = row.get("timestamp")
+            if timestamp:
+                first_ts = first_ts or str(timestamp)
+                last_ts = str(timestamp)
+            matched = True
+
+    if not matched:
+        return fields
+    fields.update(totals)
+    fields["model"] = model
+    if first_ts and last_ts:
+        fields["duration_ms"] = module._duration_ms(first_ts, last_ts)
+    return fields
+
+
+class TestSubagentTagCheckMutationProbe:
+    """A variant with the tag-equality check removed must fail the assertion
+    `test_subagent_file_wins_over_untagged_parent_lines` makes, demonstrating
+    the check -- not just the file-preference logic -- is what keeps noise
+    out of the summed totals.
+    """
+
+    def test_removing_the_tag_equality_check_reintroduces_the_wrong_numbers(
+        self, tmp_path: Path
+    ) -> None:
+        module = _load_module()
+        projects_dir = tmp_path / "projects"
+        parent_transcript = _write_usage_transcript(
+            projects_dir / "sess-1.jsonl",
+            [_assistant_line(input_tokens=1000, output_tokens=2000)],
+        )
+        _write_usage_transcript(
+            projects_dir / "sess-1" / "subagents" / "agent-a1.jsonl",
+            [
+                _assistant_line(input_tokens=2, output_tokens=4, agent_id="a1"),
+                _assistant_line(input_tokens=999, output_tokens=999),  # untagged noise
+            ],
+        )
+        payload = {
+            "transcript_path": str(parent_transcript),
+            "session_id": "sess-1",
+            "agent_id": "a1",
+        }
+
+        correct = module._sum_subagent_transcript(payload)
+        mutated = _sum_subagent_transcript_without_tag_check(module, payload)
+
+        assert correct["tokens_in"] == 2
+        assert correct["tokens_out"] == 4
+        # The mutant sweeps in the untagged noise line the real check excludes
+        # -- proving the equality check, not just the file choice, is what
+        # test_subagent_file_wins_over_untagged_parent_lines depends on.
+        assert mutated["tokens_in"] != correct["tokens_in"]
+        assert mutated["tokens_in"] == 1001
+        assert mutated["tokens_out"] == 1003
 
 
 # ---------------------------------------------------------------------------

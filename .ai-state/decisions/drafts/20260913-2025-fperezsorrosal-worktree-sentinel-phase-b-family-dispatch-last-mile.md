@@ -20,7 +20,7 @@ affected_files:
   - scripts/check_aac_golden_rule.py
   - tests/test_sentinel_check_triangle.py
   - tests/test_sentinel_row_contract.py
-affected_reqs: []
+affected_reqs: [REQ-01, REQ-08, REQ-09, REQ-10, REQ-11, REQ-13]
 ---
 
 ## Context

@@ -1,4 +1,4 @@
-"""Canaries for the Gate Liveness detector (GL02, GL04, GL05).
+"""Canaries for the Gate Liveness detector (GL02, GL04, GL05, GL06).
 
 Cites: rules/swe/gate-liveness.md — a CODE gate ships a canary proving it fails on
 a known-bad input, not merely passes on the current good state. These tests feed
@@ -35,7 +35,8 @@ def test_flags_dead_grep_contradiction(tmp_path: Path) -> None:
     )
     findings = gl.check_forbidden_pattern(tmp_path)
     assert findings, "GL02 must flag a grep for a pattern forbidden in test files"
-    assert findings[0]["check"] == "forbidden-pattern"
+    assert findings[0]["check"] == "GL02"
+    assert findings[0]["kind"] == "forbidden-pattern"
 
 
 def test_accepts_traceability_read_instead_of_grep(tmp_path: Path) -> None:
@@ -85,7 +86,7 @@ def test_canary_the_documented_golden_bad_case_fires(tmp_path: Path) -> None:
     _write(tmp_path, "agents/planner.md", _GOLDEN_BAD_CASE)
     findings = gl.check_forbidden_pattern(tmp_path)
     assert findings, f"GL02's documented golden bad-case must fire: {_GOLDEN_BAD_CASE!r}"
-    assert findings[0]["check"] == "forbidden-pattern"
+    assert findings[0]["check"] == "GL02"
 
 
 def test_canary_inflected_scan_verbs_are_not_invisible(tmp_path: Path) -> None:
@@ -147,7 +148,8 @@ def test_flags_a_gate_script_nothing_invokes(tmp_path: Path) -> None:
     _write(tmp_path, "scripts/test_check_orphan.py", "import check_orphan\n")
     findings = gl.check_uninvoked_gate(tmp_path)
     assert [f["file"] for f in findings] == ["scripts/check_orphan.py"]
-    assert findings[0]["check"] == "uninvoked-gate"
+    assert findings[0]["check"] == "GL04"
+    assert findings[0]["kind"] == "uninvoked-gate"
 
 
 def test_a_gate_invoked_from_pre_commit_is_not_flagged(tmp_path: Path) -> None:
@@ -273,7 +275,7 @@ def test_canary_flags_a_hook_guard_no_registration_names(tmp_path: Path) -> None
     _write(tmp_path, "hooks/hooks.json", '{"hooks": {}}\n')
     findings = gl.check_uninvoked_gate(tmp_path)
     assert [f["file"] for f in findings] == ["hooks/policy_guard.py"]
-    assert findings[0]["check"] == "uninvoked-gate"
+    assert findings[0]["check"] == "GL04"
 
 
 def test_a_hook_guard_named_in_the_registrations_is_not_flagged(tmp_path: Path) -> None:
@@ -326,7 +328,8 @@ def test_canary_flags_a_hook_whose_findings_exit_cannot_block(tmp_path: Path) ->
     _registers(tmp_path, "python3 hooks/policy_gate.py")
     findings = gl.check_discarded_verdict(tmp_path)
     assert [f["file"] for f in findings] == ["hooks/policy_gate.py"]
-    assert findings[0]["check"] == "discarded-verdict"
+    assert findings[0]["check"] == "GL06"
+    assert findings[0]["kind"] == "discarded-verdict"
 
 
 def test_canary_a_findings_exit_reached_through_main_is_still_detected(tmp_path: Path) -> None:
@@ -404,6 +407,13 @@ def test_the_live_repo_discards_no_gate_verdict() -> None:
         "a registered gate's findings exit cannot reach a decision:\n"
         + "\n".join(f"  - {f['file']}: {f['why']}" for f in findings)
     )
+
+
+def test_check_ids_matches_the_kind_map() -> None:
+    """`CHECK_IDS` is declared as a literal (the triangle test requires it);
+    this is the guard against it silently drifting from `_CHECK_ID_BY_KIND`.
+    """
+    assert set(gl._CHECK_ID_BY_KIND.values()) == set(gl.CHECK_IDS)
 
 
 def test_cli_exits_nonzero_on_findings(tmp_path: Path) -> None:

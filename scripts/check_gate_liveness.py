@@ -5,14 +5,14 @@ Cites: rules/swe/gate-liveness.md — a gate is a claim that it catches a defect
 class and must be proven to bite. This detector is itself a gate, so it ships with
 canaries (scripts/test_check_gate_liveness.py).
 
-Four checks from one `--json` run, three of them routed to sentinel dimensions:
+Four checks from one `--json` run, each routed to a sentinel dimension:
 
     forbidden-pattern  GL02  a scan for a pattern another rule forbids there,
                              so it can never match
     uninvoked-gate     GL04  a gate nothing calls
     ambient-import     GL05  a gate something calls with an interpreter that
                              cannot load it
-    discarded-verdict   --   a gate whose findings exit code the surface it is
+    discarded-verdict  GL06  a gate whose findings exit code the surface it is
                              registered on structurally cannot transmit
 
 The last three are the same clause — *existence is not operation* — asked three
@@ -20,12 +20,11 @@ ways: is it called, can it load, is its verdict read? Each failure is invisible
 from the gate's own passing tests, because each lives in the wiring rather than
 in the gate.
 
-`discarded-verdict` has **no sentinel dimension id yet**, so its named consumer
-(the rule's clause-6 requirement, which this detector is not exempt from) is
+`discarded-verdict`'s named consumer per the rule's clause-6 requirement is the
+GL06 row at `agents/sentinel.md:350`, plus
 `test_check_gate_liveness.py::test_the_live_repo_discards_no_gate_verdict` — a
-real-repo assertion that reddens the root suite. Allocating a GL row in
-`agents/sentinel.md` would add a second reader; until then the test is the one
-that decides, and it is deliberately not optional.
+real-repo assertion that reddens the root suite independently of the sentinel
+sweep, since this detector is not exempt from the rule it enforces.
 
 GL01 (orphaned-consumer) was prototyped here but moved to the sentinel's Pass-2
 LLM judgment — "is this section produced anywhere?" is a semantic question a
@@ -48,6 +47,7 @@ import ast
 import json
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 # Files that legitimately *describe* forbidden patterns as teaching material
@@ -66,6 +66,42 @@ _EXCLUDE_SUBSTRINGS = (
 )
 _IGNORE = "gate-liveness:ignore"
 _SCAN_DIRS = ("agents", "rules", "skills", "commands")
+
+# Each finding's `kind` (the detector's own vocabulary, e.g. "forbidden-pattern")
+# resolves to its sentinel GL id here -- the one non-additive change this family
+# envelope makes: findings used to carry `check: <kind>`, and now carry both
+# `kind` (the classification, unchanged) and `check` (the GL id `run_check_
+# families.py` aggregates on). An unmapped kind is a loud failure -- see
+# `_finding` -- never a silent drop that would vanish from every keyed-envelope
+# consumer with no trace.
+_CHECK_ID_BY_KIND: dict[str, str] = {
+    "forbidden-pattern": "GL02",
+    "uninvoked-gate": "GL04",
+    "ambient-import": "GL05",
+    "discarded-verdict": "GL06",
+}
+
+# Declared as a literal, not derived from `_CHECK_ID_BY_KIND.values()`: the
+# registration-triangle test (`tests/test_sentinel_check_triangle.py`) reads
+# this declaration with `ast.literal_eval` and rejects any computed
+# expression. `test_check_ids_matches_the_kind_map` below is the guard against
+# the two drifting apart.
+CHECK_IDS: tuple[str, ...] = ("GL02", "GL04", "GL05", "GL06")
+
+
+def _finding(kind: str, **fields: object) -> dict:
+    """Build a finding dict, resolving `kind` to its registered GL id.
+
+    Raises (rather than silently dropping the finding) when `kind` has no
+    entry in `_CHECK_ID_BY_KIND` -- a new check kind ships its GL id in the
+    same change, never after.
+    """
+    try:
+        check_id = _CHECK_ID_BY_KIND[kind]
+    except KeyError:
+        raise ValueError(f"check_gate_liveness: no GL id registered for kind {kind!r}") from None
+    return {"kind": kind, "check": check_id, **fields}
+
 
 # A grep/scan directive that targets a pattern id-citation-discipline forbids in
 # test/code. Canonical dead-grep shape: "scan test files for req{NN}_".
@@ -112,18 +148,18 @@ def check_forbidden_pattern(root: Path) -> list[dict]:
                 and _TESTCODE.search(line)
             ):
                 findings.append(
-                    {
-                        "check": "forbidden-pattern",
-                        "severity": "fail",
-                        "file": str(path.relative_to(root)),
-                        "line": lineno,
-                        "evidence": line.strip()[:200],
-                        "why": (
+                    _finding(
+                        "forbidden-pattern",
+                        severity="fail",
+                        file=str(path.relative_to(root)),
+                        line=lineno,
+                        evidence=line.strip()[:200],
+                        why=(
                             "instruction greps/scans test or code for a pattern "
                             "id-citation-discipline forbids there — it can never "
                             "match, so the gate is dead"
                         ),
-                    }
+                    )
                 )
     return findings
 
@@ -200,18 +236,18 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
         )
         if not invoked:
             findings.append(
-                {
-                    "check": "uninvoked-gate",
-                    "severity": "fail",
-                    "file": str(gate.relative_to(root)),
-                    "line": 1,
-                    "evidence": gate.name,
-                    "why": (
+                _finding(
+                    "uninvoked-gate",
+                    severity="fail",
+                    file=str(gate.relative_to(root)),
+                    line=1,
+                    evidence=gate.name,
+                    why=(
                         "no hook, command, agent, workflow, or sibling script "
                         "invokes this gate — it catches nothing, and its own "
                         "tests cannot reveal that"
                     ),
-                }
+                )
             )
     return findings
 
@@ -347,19 +383,19 @@ def check_ambient_import(root: Path) -> list[dict]:
             continue
         packages = ", ".join(sorted(needed))
         findings.append(
-            {
-                "check": "ambient-import",
-                "severity": "fail",
-                "file": target,
-                "line": 1,
-                "evidence": f"{caller}:{lineno} runs `python3 {target}` — needs {packages}",
-                "why": (
+            _finding(
+                "ambient-import",
+                severity="fail",
+                file=target,
+                line=1,
+                evidence=f"{caller}:{lineno} runs `python3 {target}` — needs {packages}",
+                why=(
                     f"invoked through the ambient interpreter, which is not "
                     f"guaranteed to have {packages}; the gate dies on import and "
                     f"catches nothing. Guard the import with a remedy message, "
                     f"drop the dependency, or resolve an interpreter that has it"
                 ),
-            }
+            )
         )
     return findings
 
@@ -478,13 +514,13 @@ def check_discarded_verdict(root: Path) -> list[dict]:
                     if _HOOK_FINDINGS_EXIT not in codes:
                         continue
                     findings.append(
-                        {
-                            "check": "discarded-verdict",
-                            "severity": "fail",
-                            "file": relative,
-                            "line": 1,
-                            "evidence": f"{event} registration: {command.strip()[:120]}",
-                            "why": (
+                        _finding(
+                            "discarded-verdict",
+                            severity="fail",
+                            file=relative,
+                            line=1,
+                            evidence=f"{event} registration: {command.strip()[:120]}",
+                            why=(
                                 f"exits {_HOOK_FINDINGS_EXIT} on findings, but a {event} "
                                 f"hook only reaches a decision at exit "
                                 f"{_HOOK_BLOCKING_EXIT} — the verdict is computed and "
@@ -492,21 +528,63 @@ def check_discarded_verdict(root: Path) -> list[dict]:
                                 f"`commit_gate.sh {_BLOCKING_FLAG}`, or exit "
                                 f"{_HOOK_BLOCKING_EXIT} directly"
                             ),
-                        }
+                        )
                     )
     return findings
 
 
-_CHECKS = {
+_CHECKS: dict[str, Callable[[Path], list[dict]]] = {
     "forbidden-pattern": check_forbidden_pattern,
     "uninvoked-gate": check_uninvoked_gate,
     "ambient-import": check_ambient_import,
     "discarded-verdict": check_discarded_verdict,
 }
 
+_BOUND = {
+    "GL02": "GL02 clean means no instruction greps/scans for a pattern forbidden there.",
+    "GL04": "GL04 clean means every check_*/validate_* gate and hook guard has a caller.",
+    "GL05": "GL05 clean means every ambient-invoked gate loads under the ambient interpreter.",
+    "GL06": "GL06 clean means every hook's findings exit reaches a blocking decision.",
+}
+
+
+def classify(root: Path, selected: dict[str, Callable[[Path], list[dict]]] | None = None) -> dict:
+    """Run the selected liveness checks and fold them into a family envelope.
+
+    `selected` (kind -> check function) defaults to all four checks. A
+    narrower selection -- the CLI's `--check <kind>` mode -- still reports the
+    full `CHECK_IDS` set, with any id outside the selection marked `skipped`
+    rather than silently absent: a partial run must never read as a clean
+    verdict for the ids nobody examined.
+    """
+    selected = _CHECKS if selected is None else selected
+    findings: list[dict] = []
+    examined: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+    skipped: dict[str, dict | None] = dict.fromkeys(CHECK_IDS)
+
+    for kind, fn in selected.items():
+        check_id = _CHECK_ID_BY_KIND[kind]
+        findings.extend(fn(root))
+        examined[check_id] = {"kind": kind}
+
+    for check_id in CHECK_IDS:
+        if examined[check_id] is None:
+            skipped[check_id] = {"reason": "not-selected"}
+
+    return {
+        "script": "check_gate_liveness",
+        "checks": list(CHECK_IDS),
+        "skipped": skipped,
+        "examined": examined,
+        "findings": findings,
+        "info": {},
+        "withheld": [],
+        "bound": _BOUND,
+    }
+
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Gate Liveness detector (GL02).")
+    parser = argparse.ArgumentParser(description="Gate Liveness detector (GL02/GL04/GL05/GL06).")
     parser.add_argument(
         "--check",
         choices=[*_CHECKS, "all"],
@@ -519,16 +597,18 @@ def main(argv: list[str] | None = None) -> int:
 
     root = Path(args.root)
     selected = _CHECKS if args.check == "all" else {args.check: _CHECKS[args.check]}
-    findings: list[dict] = []
-    for fn in selected.values():
-        findings.extend(fn(root))
+    report = classify(root, selected)
+    findings = report["findings"]
 
     if args.json:
-        print(json.dumps({"findings": findings, "count": len(findings)}, indent=2))
+        print(json.dumps(report, indent=2))
     else:
         for finding in findings:
             loc = f"{finding['file']}:{finding['line']}"
-            print(f"[{finding['severity'].upper()}] {finding['check']} {loc} — {finding['why']}")
+            print(
+                f"[{finding['severity'].upper()}] {finding['check']} "
+                f"({finding['kind']}) {loc} — {finding['why']}"
+            )
         print(f"{len(findings)} gate-liveness finding(s)")
     return 1 if findings else 0
 

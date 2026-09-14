@@ -1,12 +1,14 @@
-"""Tests for check_topology_conformance.py -- TT01/TT02/TT05/TT06 gate-liveness canary.
+"""Tests for check_topology_conformance.py -- TT01/TT02/TT05/TT06/TT07 gate-liveness canary.
 
 Each test builds the minimal `.ai-state`/`skills/testing-strategy/references` substrate
 a check needs under `tmp_path`. One canary-named test per check id, plus supporting
-clean/skip cases.
+clean/skip cases. TT07 additionally needs `tmp_path` to be a real git repo with its
+corpus files committed, since `_tt07_corpus` shells out to `git ls-files`.
 """
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -81,9 +83,14 @@ def _write_topology(tmp_path: Path, groups_yaml: str) -> None:
 
 
 def _group_block(
-    group_id: str, subsystems: list[str], strategy: str = "pytest-globs", arg: str = "tests/"
+    group_id: str,
+    subsystems: list[str],
+    strategy: str = "pytest-globs",
+    arg: str | list[str] = "tests/",
 ) -> str:
     subs = "\n".join(f"  - {s}" for s in subsystems)
+    args = arg if isinstance(arg, list) else [arg]
+    arg_yaml = ", ".join(f'"{a}"' for a in args)
     return (
         "```yaml\n"
         f"id: {group_id}\n"
@@ -92,7 +99,7 @@ def _group_block(
         "tier: unit\n"
         "selectors:\n"
         f"  - strategy: {strategy}\n"
-        f'    arg: ["{arg}"]\n'
+        f"    arg: [{arg_yaml}]\n"
         "file_dependencies:\n"
         '  - "x/**"\n'
         "parallel_safe: true\n"
@@ -101,16 +108,17 @@ def _group_block(
     )
 
 
-def test_check_ids_declares_the_four_topology_checks() -> None:
-    assert CHECK_IDS == ("TT01", "TT02", "TT05", "TT06")
+def test_check_ids_declares_the_five_topology_checks() -> None:
+    assert CHECK_IDS == ("TT01", "TT02", "TT05", "TT06", "TT07")
 
 
-def test_no_topology_file_skips_tt01_tt02_tt05(tmp_path: Path) -> None:
+def test_no_topology_file_skips_tt01_tt02_tt05_tt07(tmp_path: Path) -> None:
     _write_design(tmp_path, [("Skills", "Built")])
     report = classify(tmp_path)
     assert report["skipped"]["TT01"]["reason"] == "substrate-absent"
     assert report["skipped"]["TT02"]["reason"] == "substrate-absent"
     assert report["skipped"]["TT05"]["reason"] == "substrate-absent"
+    assert report["skipped"]["TT07"]["reason"] == "substrate-absent"
 
 
 # -- TT01: subsystems resolve to a Built §3a component -----------------------
@@ -295,3 +303,78 @@ def test_tt06_two_of_three_crossed_without_runtime_does_not_flag(tmp_path: Path)
     report = classify(tmp_path)
     assert [f for f in report["findings"] if f["check"] == "TT06"] == []
     assert "full-suite wall-clock runtime" in report["examined"]["TT06"]["withheld_terms"]
+
+
+# -- TT07: corpus coverage (every test_*.py claimed by exactly one group) ----
+
+_TEST_STUB = "def test_stub():\n    pass\n"
+
+
+def _git_commit_tree(tmp_path: Path, files: dict[str, str]) -> None:
+    """Init a git repo at `tmp_path`, write `files`, and commit them.
+
+    TT07's corpus walk shells out to `git ls-files` -- an uncommitted fixture is
+    invisible to it, which would silently pass every bad-case canary below rather
+    than exercise the code under test.
+    """
+    for rel, content in files.items():
+        _write(tmp_path / rel, content)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "fixture"], cwd=tmp_path, check=True)
+
+
+def test_tt07_flags_orphaned_test_file(tmp_path: Path) -> None:
+    """Golden bad-case: a corpus file no group selector claims."""
+    _git_commit_tree(
+        tmp_path,
+        {"tests/test_claimed.py": _TEST_STUB, "tests/test_orphan.py": _TEST_STUB},
+    )
+    _write_topology(tmp_path, _group_block("g1", ["Skills"], arg="tests/test_claimed.py"))
+    report = classify(tmp_path)
+    findings = [f for f in report["findings"] if f["check"] == "TT07"]
+    assert len(findings) == 1
+    assert findings[0]["entity"] == "tests/test_orphan.py"
+
+
+def test_tt07_flags_file_claimed_by_two_groups(tmp_path: Path) -> None:
+    """Golden bad-case: two groups' selectors both resolve to the same file."""
+    _git_commit_tree(tmp_path, {"tests/test_shared.py": _TEST_STUB})
+    both_groups = _group_block("g1", ["Skills"], arg="tests/") + _group_block(
+        "g2", ["Skills"], arg="tests/"
+    )
+    _write_topology(tmp_path, both_groups)
+    report = classify(tmp_path)
+    findings = [f for f in report["findings"] if f["check"] == "TT07"]
+    assert len(findings) == 1
+    assert "more than one group" in findings[0]["message"]
+
+
+def test_tt07_flags_dangling_selector_arg(tmp_path: Path) -> None:
+    """Golden bad-case: a literal selector arg resolving to no file at all."""
+    _git_commit_tree(tmp_path, {"tests/test_real.py": _TEST_STUB})
+    _write_topology(
+        tmp_path,
+        _group_block("g1", ["Skills"], arg=["tests/test_real.py", "tests/test_typo.py"]),
+    )
+    report = classify(tmp_path)
+    findings = [f for f in report["findings"] if f["check"] == "TT07"]
+    assert len(findings) == 1
+    assert findings[0]["entity"] == "g1:tests/test_typo.py"
+    assert "neither a corpus file nor an existing path" in findings[0]["message"]
+
+
+def test_tt07_fully_covered_corpus_is_clean(tmp_path: Path) -> None:
+    _git_commit_tree(tmp_path, {"tests/test_one.py": _TEST_STUB, "tests/test_two.py": _TEST_STUB})
+    _write_topology(tmp_path, _group_block("g1", ["Skills"], arg="tests/"))
+    report = classify(tmp_path)
+    assert [f for f in report["findings"] if f["check"] == "TT07"] == []
+    assert report["examined"]["TT07"] == {
+        "corpus": 2,
+        "covered": 2,
+        "orphans": 0,
+        "overlaps": 0,
+        "dangling": 0,
+    }

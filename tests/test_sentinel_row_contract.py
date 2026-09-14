@@ -992,6 +992,9 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("CA02", "check_calibration_coverage"),
     ("CA03", "check_calibration_coverage"),
     ("SH07", "check_spec_drift"),
+    ("P08", "clean_work_safety"),
+    ("T02", "measure_token_budget"),
+    ("TT07", "check_topology_conformance"),
 ]
 
 

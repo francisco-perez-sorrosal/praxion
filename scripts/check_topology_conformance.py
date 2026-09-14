@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TT01/TT02/TT05/TT06: test-topology conformance checks.
+"""TT01/TT02/TT05/TT06/TT07: test-topology conformance checks.
 
 Reads `.ai-state/TEST_TOPOLOGY.md` through the existing `_topology_yaml.py` parser
 (`iter_yaml_blocks` + `parse_yaml_subset` -- reused, not re-parsed) and checks the
@@ -34,14 +34,25 @@ declared groups against three independent authorities:
   three-signal advisory can be exercised only via that seam (see the canary).
   Emits an INFO advisory only when all three signals are confirmed crossed. Never
   writes `.ai-state/TEST_TOPOLOGY.md` or a ledger row.
+* **TT07** (fail) -- corpus-coverage: every git-tracked `test_*.py` file under
+  `tests/`, `scripts/`, `hooks/`, `fitness/` must be claimed by exactly one group's
+  `selectors[].arg` entry (a directory prefix, a glob, or a literal path). Three
+  independent finding kinds: a file no selector claims (**orphan**), a file two or
+  more groups both claim (**overlap** -- ambiguous scope ownership, not a
+  correctness bug in either group), and a literal-path `arg` that resolves to
+  neither a corpus file nor an existing filesystem entry (**dangling** -- a typo'd
+  selector argument). Ported from the one-shot audit script that measured the live
+  corpus before this check existed (`.ai-work/sentinel-phase-b/inputs/
+  audit_topology.py`) rather than re-derived, since that script's coverage walk was
+  already the measured instrument.
 
 Skip conditions (DS-A, keyed): `.ai-state/TEST_TOPOLOGY.md` absent -> TT01, TT02,
-TT05 skip (TT06 does not skip -- see above). `.ai-state/DESIGN.md` absent -> TT01
-skips (TT06's component-count term withholds instead of skipping, since TT06 runs
-regardless). The leaf file absent -> TT02, TT05 skip. `TEST_TOPOLOGY.md` present
-but unparseable by the closed YAML subset -> TT01, TT02, TT05 skip with the parse
-error recorded (structural validation of the file itself is `resolve_test_scope.py`
-/ `--tests`-field consumers' job, not this check's).
+TT05, TT07 skip (TT06 does not skip -- see above). `.ai-state/DESIGN.md` absent ->
+TT01 skips (TT06's component-count term withholds instead of skipping, since TT06
+runs regardless). The leaf file absent -> TT02, TT05 skip. `TEST_TOPOLOGY.md`
+present but unparseable by the closed YAML subset -> TT01, TT02, TT05, TT07 skip
+with the parse error recorded (structural validation of the file itself is
+`resolve_test_scope.py` / `--tests`-field consumers' job, not this check's).
 
 Invocation:
 
@@ -57,6 +68,7 @@ import argparse
 import json
 import logging
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -69,7 +81,7 @@ from state_ledger_schema import split_row
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT_NAME = "check_topology_conformance"
 
-CHECK_IDS: tuple[str, ...] = ("TT01", "TT02", "TT05", "TT06")
+CHECK_IDS: tuple[str, ...] = ("TT01", "TT02", "TT05", "TT06", "TT07")
 
 _TOPOLOGY_REL = ".ai-state/TEST_TOPOLOGY.md"
 _DESIGN_REL = ".ai-state/DESIGN.md"
@@ -92,6 +104,12 @@ _BULLET_LINE = re.compile(r"^-\s")
 _BACKTICK_IDENT = re.compile(r"`([a-zA-Z0-9_.-]+)`")
 _TEST_FUNC = re.compile(r"^\s*def test_[a-zA-Z0-9_]*\(")
 _MARKER_NAME = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*:")
+
+# TT07 corpus-coverage scope: the same four directories the test-topology trunk
+# names as "the test corpus" (`skills/testing-strategy/references/test-topology.md`).
+_TEST_CORPUS_DIRS: tuple[str, ...] = ("tests", "scripts", "hooks", "fitness")
+_TEST_FILE_RE = re.compile(r"(^|/)test_[^/]*\.py$")
+_GLOB_CHARS = frozenset("*?[")
 
 logger = logging.getLogger(SCRIPT_NAME)
 
@@ -503,6 +521,121 @@ def _check_tt06(repo_root: Path) -> tuple[list[dict], dict[str, Any]]:
     return findings, info
 
 
+# -- TT07: corpus coverage (every test_*.py claimed by exactly one group) ----
+
+
+def _tt07_corpus(repo_root: Path) -> list[str]:
+    """Git-tracked `test_*.py` paths under the four test-bearing directories."""
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", *_TEST_CORPUS_DIRS],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return sorted(f for f in result.stdout.split() if _TEST_FILE_RE.search(f))
+
+
+def _tt07_selector_hits(arg: str, corpus: list[str], repo_root: Path) -> tuple[list[str], bool]:
+    """Corpus files `arg` selects, and whether `arg` is a dangling literal path.
+
+    Mirrors the one-shot audit script's three selector shapes: a directory
+    (prefix match), a glob (expand and intersect with the corpus), or a literal
+    path (exact corpus membership; dangling when it also fails to exist on disk).
+    """
+    candidate = repo_root / arg
+    if candidate.is_dir():
+        prefix = arg.rstrip("/") + "/"
+        return [f for f in corpus if f.startswith(prefix)], False
+    if any(ch in arg for ch in _GLOB_CHARS):
+        matched = {str(p.relative_to(repo_root)) for p in repo_root.glob(arg)}
+        return [f for f in corpus if f in matched], False
+    hits = [arg] if arg in corpus else []
+    return hits, not hits and not candidate.exists()
+
+
+def _tt07_examine(repo_root: Path, groups: list[dict[str, Any]]) -> dict[str, Any]:
+    """Raw coverage data: the corpus, its group-claim map, and dangling selectors."""
+    corpus = _tt07_corpus(repo_root)
+    cover: dict[str, set[str]] = {}
+    dangling: list[tuple[str, str]] = []
+    for group in groups:
+        group_id = group.get("id")
+        selectors = group.get("selectors")
+        if not isinstance(group_id, str) or not isinstance(selectors, list):
+            continue
+        for selector in selectors:
+            args = selector.get("arg") if isinstance(selector, dict) else None
+            if not isinstance(args, list):
+                continue
+            for arg in args:
+                if not isinstance(arg, str):
+                    continue
+                hits, is_dangling = _tt07_selector_hits(arg, corpus, repo_root)
+                if is_dangling:
+                    dangling.append((group_id, arg))
+                for hit in hits:
+                    cover.setdefault(hit, set()).add(group_id)
+    return {
+        "corpus": corpus,
+        "cover": cover,
+        "orphans": sorted(f for f in corpus if f not in cover),
+        "overlaps": {f: sorted(gids) for f, gids in cover.items() if len(gids) > 1},
+        "dangling": dangling,
+    }
+
+
+def _tt07_findings(examine: dict[str, Any]) -> list[dict]:
+    """One FAIL per orphan, per overlapping file, and per dangling selector arg."""
+    findings: list[dict] = []
+    for path in examine["orphans"]:
+        findings.append(
+            {
+                "check": "TT07",
+                "severity": "fail",
+                "entity": path,
+                "message": f"'{path}' is not claimed by any TEST_TOPOLOGY.md group selector",
+            }
+        )
+    for path, group_ids in examine["overlaps"].items():
+        findings.append(
+            {
+                "check": "TT07",
+                "severity": "fail",
+                "entity": path,
+                "message": f"'{path}' is claimed by more than one group: {', '.join(group_ids)}",
+            }
+        )
+    for group_id, arg in examine["dangling"]:
+        findings.append(
+            {
+                "check": "TT07",
+                "severity": "fail",
+                "entity": f"{group_id}:{arg}",
+                "message": (
+                    f"group '{group_id}': selector arg '{arg}' resolves to neither a "
+                    "corpus file nor an existing path"
+                ),
+            }
+        )
+    return findings
+
+
+def _check_tt07(repo_root: Path, groups: list[dict[str, Any]]) -> tuple[list[dict], dict[str, Any]]:
+    examine = _tt07_examine(repo_root, groups)
+    info = {
+        "corpus": len(examine["corpus"]),
+        "covered": len(examine["cover"]),
+        "orphans": len(examine["orphans"]),
+        "overlaps": len(examine["overlaps"]),
+        "dangling": len(examine["dangling"]),
+    }
+    return _tt07_findings(examine), info
+
+
 # -- Envelope (DS-A, keyed) -------------------------------------------------------
 
 
@@ -574,11 +707,16 @@ def classify(repo_root: Path) -> dict:
         skipped["TT01"] = skip_reason
         skipped["TT02"] = skip_reason
         skipped["TT05"] = skip_reason
+        skipped["TT07"] = skip_reason
     else:
         group_findings, group_skipped, group_examined = _classify_topology_groups(repo_root, groups)
         findings.extend(group_findings)
         skipped.update(group_skipped)
         examined.update(group_examined)
+
+        tt07_findings, tt07_info = _check_tt07(repo_root, groups)
+        findings.extend(tt07_findings)
+        examined["TT07"] = tt07_info
 
     tt06_findings, tt06_info = _check_tt06(repo_root)
     findings.extend(tt06_findings)
@@ -597,6 +735,7 @@ def classify(repo_root: Path) -> dict:
             "TT02": "TT02 clean means every selector strategy is registered (or flagged optional).",
             "TT05": "TT05 clean means every marker-selector group id is registered and collision-free.",
             "TT06": "TT06 never fails -- it advises adoption when all three growth signals are confirmed crossed.",
+            "TT07": "TT07 clean means every corpus test_*.py file is claimed by exactly one group, with no dangling selector args.",
         },
     }
 

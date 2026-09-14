@@ -57,8 +57,18 @@ from artifact_registry import cleanup_policy_for
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 AI_WORK_DIRNAME = ".ai-work"
+CHECK_ID = "P08"
 # A SAFE task dir idle longer than this is a prime cleanup candidate (advisory only).
 STALE_DAYS = 14
+# The sentinel's accumulation advisory fires once this many stale-SAFE dirs pile
+# up unattended -- the threshold this module now decides, rather than a sentinel
+# prose paragraph re-deriving it from summary.stale_safe on every sweep.
+STALE_ADVISORY_THRESHOLD = 3
+
+_P08_BOUND = (
+    f"P08 clean means fewer than {STALE_ADVISORY_THRESHOLD} SAFE .ai-work/ task "
+    f"directories are idle >= {STALE_DAYS} days without cleanup."
+)
 
 # An unchecked GitHub-flavoured task box anywhere in WIP.md means the pipeline
 # still has work to do — the strongest "do not delete" signal.
@@ -322,12 +332,65 @@ def render_text(verdicts: list[TaskVerdict], ai_work_root: Path) -> str:
     return "\n".join(lines)
 
 
+def _p08_findings(summary: dict[str, int], ai_work_root: Path) -> list[dict[str, str]]:
+    """P08's one finding: an advisory once stale-SAFE accumulation meets the
+    threshold. Below it, P08 is clean -- there is nothing to warn about yet."""
+    stale_safe = summary["stale_safe"]
+    if stale_safe < STALE_ADVISORY_THRESHOLD:
+        return []
+    return [
+        {
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": str(ai_work_root),
+            "message": (
+                f"{stale_safe} stale safe task directories in .ai-work/ -- "
+                "consider running /clean-work"
+            ),
+        }
+    ]
+
+
+def _p08_envelope(ai_work_root: Path, summary: dict[str, int]) -> dict:
+    """The P08 family envelope -- additive keys beside the existing
+    ai_work_root/task_dirs/summary payload, never replacing them.
+
+    Skips with `substrate-absent` when `.ai-work/` itself does not exist,
+    the one case `summary` alone cannot distinguish from "present but empty".
+    """
+    if not ai_work_root.is_dir():
+        return {
+            "check": CHECK_ID,
+            "skipped": {"reason": "substrate-absent"},
+            "examined": None,
+            "findings": [],
+            "info": {},
+            "withheld": [],
+            "bound": _P08_BOUND,
+        }
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {
+            "stale_safe": summary["stale_safe"],
+            "threshold": STALE_ADVISORY_THRESHOLD,
+            "stale_days": STALE_DAYS,
+        },
+        "findings": _p08_findings(summary, ai_work_root),
+        "info": {},
+        "withheld": [],
+        "bound": _P08_BOUND,
+    }
+
+
 def render_json(verdicts: list[TaskVerdict], ai_work_root: Path) -> str:
+    summary = _summary_counts(verdicts)
     payload = {
         "ai_work_root": str(ai_work_root),
         "task_dirs": [asdict(v) for v in verdicts],
-        "summary": _summary_counts(verdicts),
+        "summary": summary,
     }
+    payload.update(_p08_envelope(ai_work_root, summary))
     return json.dumps(payload, indent=2, sort_keys=False)
 
 

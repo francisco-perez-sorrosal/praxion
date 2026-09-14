@@ -573,3 +573,99 @@ def test_detected_blockers_equal_registry_non_delete_artifacts(tmp_path: Path) -
         "Canary failed: blockers should NOT equal the extended set because "
         "detect_reasons has no predicate for FAKE_ARTIFACT.md."
     )
+
+
+# -- P08 family envelope (additive) -------------------------------------------
+# The envelope moves the "stale-SAFE accumulation" advisory (previously
+# sentinel prose re-deriving it from summary.stale_safe on every sweep) into
+# this script. Seeded from the golden bad-case / control pair in
+# tests/fixtures/sentinel/stale_slug_advisory/ so the fixture and this gate's
+# own canary stay pinned to the same threshold.
+
+
+def _make_stale_safe_dir(ai_work: Path, slug: str, days_ago: float) -> None:
+    task = _make_task(ai_work, slug, {"RESEARCH_FINDINGS.md": "x\n"})
+    _age_file(task / "RESEARCH_FINDINGS.md", days_ago=days_ago)
+
+
+def test_envelope_keys_are_additive_beside_the_existing_payload(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`task_dirs`/`summary` (the `/clean-work` reader's contract) survive
+    byte-for-byte in shape once the envelope keys land beside them."""
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "safe", {"RESEARCH_FINDINGS.md": "x\n"})
+    with pytest.raises(SystemExit):
+        cws.main(["--ai-work-root", str(ai_work), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert set(payload["task_dirs"][0].keys()) == {
+        "slug",
+        "classification",
+        "reasons",
+        "age_days",
+    }
+    assert set(payload["summary"].keys()) == {"total", "block", "warn", "safe", "stale_safe"}
+    assert payload["check"] == "P08"
+    assert set(payload.keys()) >= {
+        "ai_work_root",
+        "task_dirs",
+        "summary",
+        "check",
+        "skipped",
+        "examined",
+        "findings",
+        "info",
+        "withheld",
+        "bound",
+    }
+
+
+def test_canary_three_stale_safe_dirs_trigger_the_advisory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Golden bad-case (mirrors clean_work_safety_stale.json): 3 SAFE dirs idle
+    >= 14 days must produce a P08 finding, matching the fixture's threshold."""
+    ai_work = tmp_path / ".ai-work"
+    _make_stale_safe_dir(ai_work, "auth-flow", days_ago=42)
+    _make_stale_safe_dir(ai_work, "cache-layer", days_ago=31)
+    _make_stale_safe_dir(ai_work, "email-templates", days_ago=21)
+    with pytest.raises(SystemExit):
+        cws.main(["--ai-work-root", str(ai_work), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["stale_safe"] == 3
+    assert payload["examined"] == {"stale_safe": 3, "threshold": 3, "stale_days": 14}
+    assert len(payload["findings"]) == 1
+    assert payload["findings"][0]["check"] == "P08"
+    assert payload["findings"][0]["severity"] == "warn"
+
+
+def test_below_threshold_stale_safe_count_produces_no_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No-false-positive control (mirrors clean_work_safety_clean.json's intent
+    at the boundary): 2 stale-SAFE dirs stay under the threshold of 3."""
+    ai_work = tmp_path / ".ai-work"
+    _make_stale_safe_dir(ai_work, "auth-flow", days_ago=42)
+    _make_stale_safe_dir(ai_work, "cache-layer", days_ago=31)
+    with pytest.raises(SystemExit):
+        cws.main(["--ai-work-root", str(ai_work), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["stale_safe"] == 2
+    assert payload["findings"] == []
+
+
+def test_missing_ai_work_root_skips_with_substrate_absent(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing = tmp_path / ".ai-work"
+    with pytest.raises(SystemExit) as exc:
+        cws.main(["--ai-work-root", str(missing), "--json"])
+    assert exc.value.code == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["skipped"] == {"reason": "substrate-absent"}
+    assert payload["examined"] is None
+    assert payload["findings"] == []

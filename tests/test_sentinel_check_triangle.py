@@ -15,12 +15,6 @@ are parsed from their own substrate, never hand-listed:
   via `_check_id_declarations`): the check ids a script's own `CHECK_ID`/`CHECK_IDS`
   literal declares, read with `ast.literal_eval` rather than by importing the script.
 
-`_LEGACY_CITING_ROWS` narrows Leg 1 to the extracted surface: `adr_health.py` is cited
-by DH01/DH06 in pre-extraction legacy prose as well as by the extracted DH05, so a
-script-name-only scope would false-fail on day one. The exemption is itself guarded
-(`test_legacy_citing_rows_allowlist_is_not_stale`) so it cannot outlive its rows or
-shelter a row that has since become conforming.
-
 Split out of `tests/test_sentinel_row_contract.py` (Step A0 rework) once the file
 crossed the 800-line hard ceiling in `rules/swe/coding-style.md` -- the residual-row
 contract and the Triangle are cohesive but separable concerns, and this is their seam.
@@ -66,19 +60,6 @@ _SCRIPT_CITATION = re.compile(
     rf"\bpython3?[ ]{{1,4}}(?:\./)?scripts/(?P<script>[a-z0-9_]{{1,{_SCRIPT_NAME_MAX_CHARS}}})\.py\b"
 )
 
-# Rows that cite a script the registry already names, but in the pre-extraction legacy
-# shape -- so they are not part of the extracted surface Leg 1 totalises over. Scoping
-# Leg 1 to *registered scripts* is necessary but not sufficient: `adr_health.py` is cited
-# by DH01 and DH06 (legacy prose) as well as by DH05 (extracted), so a script-name-only
-# scope fails on day one exactly the way an unscoped leg would.
-#
-# The exemption cannot silently go stale: `test_legacy_citing_rows_allowlist_is_not_stale`
-# asserts it stays disjoint from `EXTRACTED_CHECKS`, that every entry still cites a
-# registered script, and that every entry still genuinely fails the four-part template
-# parse -- so it can neither outlive its rows nor be used to park a conforming row
-# outside the guard.
-_LEGACY_CITING_ROWS = frozenset({"DH01", "DH06"})
-
 _CHECK_ID_NAMES = ("CHECK_ID", "CHECK_IDS")
 
 # This module's own pair of the two pattern-classification registries
@@ -101,7 +82,7 @@ def _rows_by_cited_script(sentinel_text: str) -> dict[str, set[str]]:
 
     Not scoped by Tp: a citation is an invocation phrase (see `_SCRIPT_CITATION`), so a
     Tp=L row that runs a script (CA02) is seen and a Tp=L row that only mentions one
-    (AC09) is not -- without an allow-list next to `_LEGACY_CITING_ROWS`.
+    (AC09) is not.
     """
     by_script: dict[str, set[str]] = {}
     for row in contract._TABLE_ROW.finditer(sentinel_text):
@@ -218,7 +199,7 @@ def assert_check_registration_triangle(
 
     * **Leg 1, document to registry**: a row cites a live family script but the registry
       never learned about it -- the drift the family shape (one script, many rows) newly
-      creates. Scoped to registered scripts minus `_LEGACY_CITING_ROWS`.
+      creates. Scoped to registered scripts, unconditional over every row.
     * **Leg 2, registry to script**: a registry entry names a check its script does not
       emit.
     * **Leg 3, script to document**: a script declares a check id no row cites -- dead
@@ -232,7 +213,7 @@ def assert_check_registration_triangle(
 
     for script_name in sorted(registered):
         expected = registered[script_name]
-        from_rows = cited.get(script_name, set()) - _LEGACY_CITING_ROWS
+        from_rows = cited.get(script_name, set())
         from_script = _declared_check_ids(read_script_source(script_name), script_name)
 
         unregistered = from_rows - expected
@@ -573,42 +554,3 @@ def test_every_extracted_check_is_bound_by_the_triangle() -> None:
         contract.EXTRACTED_CHECKS,
         _script_source,
     )
-
-
-def test_legacy_citing_rows_allowlist_is_not_stale() -> None:
-    """`_LEGACY_CITING_ROWS` narrows Leg 1's scope, so it is itself guarded three ways:
-    it stays disjoint from the registry, every entry still cites a registered script, and
-    every entry still genuinely fails the four-part template parse.
-
-    Without these, the exemption is the one place in this contract where a conforming row
-    could be parked outside the guard -- or where an extracted row could keep an
-    exemption it no longer needs.
-    """
-    sentinel_text = contract.SENTINEL_PATH.read_text(encoding="utf-8")
-    cited = _rows_by_cited_script(sentinel_text)
-    registered_ids = {check_id for check_id, _ in contract.EXTRACTED_CHECKS}
-    registered_scripts = {script for _, script in contract.EXTRACTED_CHECKS}
-
-    both = _LEGACY_CITING_ROWS & registered_ids
-    assert not both, (
-        f"{sorted(both)} are allow-listed as legacy *and* registered in EXTRACTED_CHECKS "
-        "-- an extracted row leaves the allow-list in the same commit that registers it"
-    )
-
-    citing_registered = {
-        row_id for script in registered_scripts for row_id in cited.get(script, set())
-    }
-    orphans = _LEGACY_CITING_ROWS - citing_registered
-    assert not orphans, (
-        f"{sorted(orphans)} no longer cite any registered script -- drop them rather "
-        "than leaving a scope exemption with nothing behind it"
-    )
-
-    for row_id in sorted(_LEGACY_CITING_ROWS):
-        pass_column = contract._pass_column(contract._find_row(sentinel_text, row_id))
-        for citation in _SCRIPT_CITATION.finditer(pass_column):
-            script_name = citation.group("script")
-            assert contract._row_pattern(script_name).fullmatch(pass_column) is None, (
-                f"{row_id} parses as a four-part template row citing {script_name} -- it "
-                "belongs in EXTRACTED_CHECKS, not in the legacy scope exemption"
-            )

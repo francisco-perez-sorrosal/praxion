@@ -942,6 +942,8 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("V04", "check_sentinel_self_audit"),
     ("DH02", "adr_health"),
     ("DH04", "adr_health"),
+    ("DH01", "adr_health"),
+    ("DH06", "adr_health"),
     ("DL03", "regenerate_adr_index"),
     ("X01", "check_registry_projection"),
     ("X02", "check_registry_projection"),

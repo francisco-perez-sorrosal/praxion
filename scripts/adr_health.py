@@ -94,14 +94,19 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # The check ids this script's row surface declares -- a literal tuple so the row/registry/
 # script Triangle in `tests/test_sentinel_check_triangle.py` can read it via AST without
 # importing this module. Additive only: a new id lands here in the same commit that
-# writes its row. Registry-facing only: unlike CHECK_ID in the flat-declaration pilot
-# scripts (`check_agent_prompt_size.py`, `check_adr_reciprocity.py`,
-# `check_agent_lifecycle_pairing.py`, `check_doc_manifest_freshness.py`), this script
-# never emits a `"check"` key -- each row routes off an existing field
-# (`decay_class` for DH02, `reopen_candidates` membership for DH04,
-# `category_mix.verdict` for DH05) rather than a per-finding runtime id, so there
-# is nothing for this declaration to drift from except Leg 3's static one.
-CHECK_IDS: tuple[str, ...] = ("DH02", "DH04", "DH05")
+# writes its row. DH01 (`removed-by-later`) and DH06 (`status_edge_conflicts`) join
+# DH02/DH04/DH05 here as the family envelope's `findings[].check` tagging (below)
+# takes over the routing that used to live only in the sentinel's prose -- see
+# `_dh01_dh02_findings`/`_dh04_findings`/`_dh05_findings`/`_dh06_findings`.
+CHECK_IDS: tuple[str, ...] = ("DH01", "DH02", "DH04", "DH05", "DH06")
+
+# Decay classes DH02's row treats as findings -- `renamed`/`placeholder-shape`/
+# `out-of-repo` (simple repairs). `removed-by-later` is DH01's own class, tagged
+# separately in `_dh01_dh02_findings`. Every other class (`lazy-artifact`,
+# `removed-by-self`, `renamed-by-self`, `unclassified`, `vanished`) stays a
+# `findings[]` member -- every existing consumer reads every class from there --
+# but carries no family `check` tag, matching the sentinel row's own exclusion.
+_DH02_DECAY_CLASSES = frozenset({"renamed", "placeholder-shape", "out-of-repo"})
 
 # A path *shape* teaching a convention, never a concrete file.
 _SHAPE = re.compile(r"<[^>]*>|\*|\{\{|\bNNN\b|\bYYYY\b")
@@ -183,6 +188,18 @@ _ARCHITECTURAL_BASELINE = {
 }
 
 _GIT_TIMEOUT = 30
+
+# Family envelope's `bound` -- what "clean" means per check id, shared verbatim
+# by every consumer (no computed pieces, so a constant rather than a function).
+_DH_BOUND: dict[str, str] = {
+    "DH01": "DH01 clean means every removed-by-later reference carries a supersession link.",
+    "DH02": (
+        "DH02 clean means renamed/placeholder-shape/out-of-repo references are repaired promptly."
+    ),
+    "DH04": "DH04 clean means no retired decision's subject has quietly returned.",
+    "DH05": "DH05 clean means the architectural-category test still discriminates (not widening).",
+    "DH06": "DH06 clean means status and supersession edges never contradict each other.",
+}
 
 
 # -- Git history indexes ------------------------------------------------------
@@ -481,16 +498,8 @@ def _status_edge_conflicts(adrs: list[Path]) -> list[dict]:
 # -- Classification -----------------------------------------------------------
 
 
-def classify(repo_root: Path) -> dict:
-    """Classify every unresolved `affected_files` reference in the corpus."""
-    decisions_dir = repo_root / ".ai-state" / "decisions"
-    adrs = sorted(decisions_dir.glob("[0-9]*.md"))
-
-    have_history = history_available(repo_root)
-    deletions = build_deletion_index(repo_root) if have_history else {}
-    renames = build_rename_index(repo_root) if have_history else {}
-    lazy_shapes = load_expected_absent_shapes(repo_root)
-
+def _withheld_reasons(have_history: bool, lazy_shapes: list[str] | None) -> list[str]:
+    """Reasons a dependent class is suppressed rather than defaulted -- see the module docstring."""
     withheld = []
     if not have_history:
         withheld.append(
@@ -509,9 +518,17 @@ def classify(repo_root: Path) -> dict:
             f"parse {_INVENTORY} under either the project root or the plugin (needs "
             f"{_MIN_INVENTORY_ROWS}+ lifecycle rows) -- withheld, not defaulted"
         )
+    return withheld
 
-    # Removal-intent ADRs, so a deletion can be attributed to the decision that
-    # caused it rather than to whichever decision merely mentioned the path.
+
+def _removal_index(
+    adrs: list[Path], repo_root: Path
+) -> tuple[list[tuple[str, str, set[str], set[str]]], list[str], list[int]]:
+    """Removal-intent ADRs (name, date, cited paths, gone paths) plus category/id columns.
+
+    Lets a deletion be attributed to the decision that caused it rather than to
+    whichever decision merely mentioned the path.
+    """
     removers, categories, adr_ids = [], [], []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
@@ -524,7 +541,19 @@ def classify(repo_root: Path) -> dict:
             paths = set(parse_affected_files(text))
             gone = {p for p in paths if not (repo_root / p).exists()}
             removers.append((adr.name, date, paths, gone))
+    return removers, categories, adr_ids
 
+
+def _scan_references(
+    adrs: list[Path],
+    repo_root: Path,
+    deletions: dict[str, str],
+    renames: dict[str, str],
+    lazy_shapes: list[str] | None,
+    removers: list[tuple[str, str, set[str], set[str]]],
+    have_history: bool,
+) -> tuple[list[dict], int, list[str], list[dict]]:
+    """Classify every unresolved reference; skip terminal ADRs, probing `retired` ones for re-open."""
     findings, scanned, skipped_terminal, reopen = [], 0, [], []
     for adr in adrs:
         text = adr.read_text(encoding="utf-8")
@@ -558,17 +587,186 @@ def classify(repo_root: Path) -> dict:
                 adr.name, ref, deletions, renames, lazy_shapes, removers, have_history
             )
             findings.append(_finding(adr.name, ref, cls, disp, detail))
+    return findings, scanned, skipped_terminal, reopen
+
+
+# -- Family envelope (DH01, DH02, DH04, DH05, DH06) ---------------------------
+
+
+def _dh01_dh02_findings(decay_findings: list[dict]) -> list[dict]:
+    """Return only the two family-actionable classes, `check`-tagged.
+
+    `removed-by-later` -> DH01; the three simple-repair classes -> DH02. Every
+    other class (`lazy-artifact`, `removed-by-self`, `renamed-by-self`,
+    `unclassified`, `vanished`) is dropped here -- it stays a `decay_findings[]`
+    member (existing consumers read every class from there), but has no family
+    `check` id and must not enter the family-aggregated `findings[]`, which
+    `run_check_families.py` buckets strictly by `finding["check"]`.
+    """
+    tagged = []
+    for f in decay_findings:
+        if f["decay_class"] == "removed-by-later":
+            check = "DH01"
+        elif f["decay_class"] in _DH02_DECAY_CLASSES:
+            check = "DH02"
+        else:
+            continue
+        tagged.append(
+            {
+                **f,
+                "check": check,
+                "severity": "warn",
+                "entity": f"{f['adr']}:{f['path']}",
+                "message": f"{f['decay_class']} -> {f['disposition']} ({f['detail']})",
+            }
+        )
+    return tagged
+
+
+def _dh04_findings(reopen: list[dict]) -> list[dict]:
+    """One DH04 finding per retired decision whose subject resolves again."""
+    findings = []
+    for r in reopen:
+        paths = ", ".join(r["paths_returned"])
+        detail = f"{len(r['paths_returned'])} path(s) resolve again: {paths}"
+        findings.append(
+            {
+                "adr": r["adr"],
+                "path": paths,
+                "decay_class": "reopen-candidate",
+                "disposition": "reopen",
+                "detail": detail,
+                "check": "DH04",
+                "severity": "warn",
+                "entity": r["adr"],
+                "message": f"retired decision has {detail}",
+            }
+        )
+    return findings
+
+
+def _dh05_findings(category_mix: dict) -> list[dict]:
+    """One Suggested DH05 finding, only on a `widening` verdict."""
+    if category_mix.get("verdict") != "widening":
+        return []
+    post = category_mix["post_adoption"]
+    share = post["architectural_share"] or 0.0
+    detail = f"architectural share {share:.0%} of {post['n']} post-adoption decisions"
+    return [
+        {
+            "adr": "",
+            "path": "",
+            "decay_class": "category-mix-widening",
+            "disposition": "none",
+            "detail": detail,
+            "check": "DH05",
+            "severity": "suggested",
+            "entity": "category_mix",
+            "message": f"architectural share is widening: {detail}",
+        }
+    ]
+
+
+def _dh06_findings(conflicts: list[dict]) -> list[dict]:
+    """One DH06 finding per status/edge contradiction shape (a)-(e)."""
+    return [
+        {
+            "adr": c["id"],
+            "path": "",
+            "decay_class": "status-edge-conflict",
+            "disposition": c["disposition"],
+            "detail": c["detail"],
+            "check": "DH06",
+            "severity": "warn",
+            "entity": c["id"],
+            "message": f"shape {c['shape']}: {c['detail']} -> {c['disposition']}",
+        }
+        for c in conflicts
+    ]
+
+
+def _family_skipped(decisions_dir: Path) -> dict[str, dict | None]:
+    """All 5 checks skip together -- they share one substrate, the ADR corpus."""
+    if decisions_dir.is_dir():
+        return dict.fromkeys(CHECK_IDS)
+    reason = {"reason": "substrate-absent", "path": str(decisions_dir)}
+    return dict.fromkeys(CHECK_IDS, reason)
+
+
+def _family_examined(
+    scanned: int,
+    family_findings: list[dict],
+    reopen: list[dict],
+    skipped_terminal: list[str],
+    category_mix: dict,
+    adrs: list[Path],
+) -> dict[str, dict]:
+    """Per-check corpus-size stats -- a measurement, never a verdict."""
+    by_check: dict[str, int] = {}
+    for f in family_findings:
+        check = f.get("check")
+        if check:
+            by_check[check] = by_check.get(check, 0) + 1
+    post = category_mix["post_adoption"]
+    return {
+        "DH01": {"scanned_references": scanned, "findings": by_check.get("DH01", 0)},
+        "DH02": {"scanned_references": scanned, "findings": by_check.get("DH02", 0)},
+        "DH04": {"retired": len(skipped_terminal), "findings": by_check.get("DH04", 0)},
+        "DH05": {
+            "verdict": category_mix["verdict"],
+            "post_adoption_n": post["n"],
+            "architectural_share": post["architectural_share"],
+        },
+        "DH06": {"adrs": len(adrs), "findings": by_check.get("DH06", 0)},
+    }
+
+
+def classify(repo_root: Path) -> dict:
+    """Classify every unresolved `affected_files` reference in the corpus."""
+    decisions_dir = repo_root / ".ai-state" / "decisions"
+    adrs = sorted(decisions_dir.glob("[0-9]*.md"))
+
+    have_history = history_available(repo_root)
+    deletions = build_deletion_index(repo_root) if have_history else {}
+    renames = build_rename_index(repo_root) if have_history else {}
+    lazy_shapes = load_expected_absent_shapes(repo_root)
+    withheld = _withheld_reasons(have_history, lazy_shapes)
+
+    removers, categories, adr_ids = _removal_index(adrs, repo_root)
+    decay_findings, scanned, skipped_terminal, reopen = _scan_references(
+        adrs, repo_root, deletions, renames, lazy_shapes, removers, have_history
+    )
+    category_mix = _category_mix(categories, adr_ids)
+    conflicts = _status_edge_conflicts(adrs)
+
+    # `findings` is the family-aggregated stream `run_check_families.py` buckets
+    # strictly by `finding["check"]` -- every entry here MUST carry one. The
+    # pre-existing per-reference classification (every decay class, tagged or
+    # not) stays under `decay_findings`, untouched, for `--only`/the text report.
+    family_findings = (
+        _dh01_dh02_findings(decay_findings)
+        + _dh04_findings(reopen)
+        + _dh05_findings(category_mix)
+        + _dh06_findings(conflicts)
+    )
 
     return {
         "scanned_references": scanned,
         "adrs": len(adrs),
-        "findings": findings,
+        "decay_findings": decay_findings,
+        "findings": family_findings,
         "withheld": withheld,
         "skipped_terminal": skipped_terminal,
         "reopen_candidates": reopen,
-        "category_mix": _category_mix(categories, adr_ids),
-        "summary": _summarize(findings),
-        "status_edge_conflicts": _status_edge_conflicts(adrs),
+        "category_mix": category_mix,
+        "summary": _summarize(decay_findings),
+        "status_edge_conflicts": conflicts,
+        "checks": list(CHECK_IDS),
+        "skipped": _family_skipped(decisions_dir),
+        "examined": _family_examined(
+            scanned, family_findings, reopen, skipped_terminal, category_mix, adrs
+        ),
+        "bound": _DH_BOUND,
     }
 
 
@@ -838,7 +1036,9 @@ def main(argv: list[str] | None = None) -> int:
 
     report = classify(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
     if args.only:
-        report["findings"] = [f for f in report["findings"] if f["decay_class"] == args.only]
+        report["decay_findings"] = [
+            f for f in report["decay_findings"] if f["decay_class"] == args.only
+        ]
 
     if args.json:
         print(json.dumps(report, indent=2))
@@ -870,7 +1070,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {cls:20} {n:4}")
     for c in report["status_edge_conflicts"]:
         print(f"\n  CONFLICT ({c['shape']}) {c['id']}: {c['detail']}\n    {c['disposition']}")
-    for f in report["findings"]:
+    for f in report["decay_findings"]:
         if f["disposition"] != "none":
             print(
                 f"\n  {f['adr']}: {f['path']}\n    {f['decay_class']} -> "

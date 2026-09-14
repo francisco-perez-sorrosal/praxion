@@ -105,11 +105,11 @@ def _inventory(path: Path, *, lazy_artifact: str) -> None:
 
 
 def _classes(report):
-    return {f["path"]: f["decay_class"] for f in report["findings"]}
+    return {f["path"]: f["decay_class"] for f in report["decay_findings"]}
 
 
 def _dispositions(report):
-    return {f["path"]: f["disposition"] for f in report["findings"]}
+    return {f["path"]: f["disposition"] for f in report["decay_findings"]}
 
 
 # -- Non-history classes -------------------------------------------------------
@@ -139,7 +139,7 @@ def test_canary_ephemeral_ai_work_path_is_flagged_even_when_present_on_disk(repo
     report = adr_health.classify(repo)
     finding = next(
         f
-        for f in report["findings"]
+        for f in report["decay_findings"]
         if f["path"] == ".ai-work/sidecar-placement/INTERFACE_DESIGN.md"
     )
     assert finding["decay_class"] == "ephemeral-path"
@@ -186,7 +186,7 @@ def test_canary_renamed_subject_is_repaired_not_retired(repo: Path) -> None:
     _git(repo, "commit", "-qm", "rename")
     _adr(repo, 1, files=["ARCHITECTURE.md"])
     report = adr_health.classify(repo)
-    finding = next(f for f in report["findings"] if f["path"] == "ARCHITECTURE.md")
+    finding = next(f for f in report["decay_findings"] if f["path"] == "ARCHITECTURE.md")
     assert finding["decay_class"] == "renamed"
     assert finding["disposition"] == "update-path"
     assert "DESIGN.md" in finding["detail"]
@@ -199,7 +199,9 @@ def test_canary_removed_by_self_is_the_decision_working(repo: Path) -> None:
     _git(repo, "rm", "-q", "old_module.py")
     _git(repo, "commit", "-qm", "remove")
     _adr(repo, 1, title="Remove the old module", files=["old_module.py"])
-    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "old_module.py")
+    finding = next(
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "old_module.py"
+    )
     assert finding["decay_class"] == "removed-by-self"
     assert finding["disposition"] == "none"
 
@@ -218,7 +220,7 @@ def test_canary_renamed_by_self_is_the_decision_working(repo: Path) -> None:
         files=["ARCHITECTURE.md", "DESIGN.md"],
     )
     finding = next(
-        f for f in adr_health.classify(repo)["findings"] if f["path"] == "ARCHITECTURE.md"
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "ARCHITECTURE.md"
     )
     assert finding["decay_class"] == "renamed-by-self"
     assert finding["disposition"] == "none"
@@ -246,7 +248,7 @@ def test_rename_intent_without_citing_the_target_stays_repairable(repo: Path) ->
         files=["ARCHITECTURE.md"],
     )
     finding = next(
-        f for f in adr_health.classify(repo)["findings"] if f["path"] == "ARCHITECTURE.md"
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "ARCHITECTURE.md"
     )
     assert finding["decay_class"] == "renamed"
     assert finding["disposition"] == "update-path"
@@ -261,7 +263,7 @@ def test_canary_removed_by_later_yields_a_supersession_link(repo: Path) -> None:
     _git(repo, "commit", "-qm", "remove")
     _adr(repo, 1, title="Design the subsystem", date="2026-01-01", files=["subsystem.py"])
     _adr(repo, 2, title="Remove the subsystem", date="2026-02-01", files=["subsystem.py"])
-    findings = {f["adr"]: f for f in adr_health.classify(repo)["findings"]}
+    findings = {f["adr"]: f for f in adr_health.classify(repo)["decay_findings"]}
     assert findings["001-slug.md"]["decay_class"] == "removed-by-later"
     assert findings["001-slug.md"]["disposition"] == "link-supersession"
     assert "002-slug.md" in findings["001-slug.md"]["detail"]
@@ -290,7 +292,9 @@ def test_canary_removed_directory_is_the_decision_working_not_a_candidate(repo: 
     _git(repo, "rm", "-qr", "subsystem")
     _git(repo, "commit", "-qm", "remove")
     _adr(repo, 1, title="Remove the subsystem", files=["subsystem/"])
-    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "subsystem/")
+    finding = next(
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "subsystem/"
+    )
     assert finding["decay_class"] == "removed-by-self"
     assert finding["disposition"] == "none"
 
@@ -306,7 +310,7 @@ def test_canary_directory_removed_by_later_yields_a_supersession_link(repo: Path
     _git(repo, "commit", "-qm", "remove")
     _adr(repo, 1, title="Build the old app", date="2026-01-01", files=["old_app/"])
     _adr(repo, 2, title="Replace the old app", date="2026-02-01", files=["old_app/"])
-    findings = {f["adr"]: f for f in adr_health.classify(repo)["findings"]}
+    findings = {f["adr"]: f for f in adr_health.classify(repo)["decay_findings"]}
     assert findings["001-slug.md"]["decay_class"] == "removed-by-later"
     assert findings["001-slug.md"]["disposition"] == "link-supersession"
     assert "002-slug.md" in findings["001-slug.md"]["detail"]
@@ -336,7 +340,9 @@ def test_canary_moved_directory_is_renamed_not_removed(repo: Path) -> None:
     _git(repo, "mv", "old_dir", "new_dir")
     _git(repo, "commit", "-qm", "move")
     _adr(repo, 1, title="Some decision", files=["old_dir/"])
-    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "old_dir/")
+    finding = next(
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "old_dir/"
+    )
     assert finding["decay_class"] == "renamed"
     assert finding["disposition"] == "update-path"
     assert "new_dir/" in finding["detail"]
@@ -358,7 +364,9 @@ def test_canary_remover_citing_the_parent_directory_owns_the_deletion(repo: Path
     _git(repo, "commit", "-qm", "remove")
     _adr(repo, 1, title="Use the subsystem", date="2026-01-01", files=["subsystem/config.toml"])
     _adr(repo, 2, title="Remove the subsystem", date="2026-02-01", files=["subsystem/"])
-    finding = next(f for f in adr_health.classify(repo)["findings"] if f["adr"] == "001-slug.md")
+    finding = next(
+        f for f in adr_health.classify(repo)["decay_findings"] if f["adr"] == "001-slug.md"
+    )
     assert finding["decay_class"] == "removed-by-later"
     assert "002-slug.md" in finding["detail"]
 
@@ -375,7 +383,9 @@ def test_surviving_directory_does_not_claim_deletions_beneath_it(repo: Path) -> 
     _git(repo, "commit", "-qm", "drop one file")
     _adr(repo, 1, title="Some decision", date="2026-01-01", files=["app/drop.py"])
     _adr(repo, 2, title="Replace the app runtime", date="2026-02-01", files=["app/"])
-    finding = next(f for f in adr_health.classify(repo)["findings"] if f["path"] == "app/drop.py")
+    finding = next(
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "app/drop.py"
+    )
     assert finding["decay_class"] == "vanished"
 
 
@@ -392,7 +402,7 @@ def test_canary_terminal_status_decisions_are_skipped(repo: Path) -> None:
         encoding="utf-8",
     )
     report = adr_health.classify(repo)
-    assert report["findings"] == []
+    assert report["decay_findings"] == []
     assert report["skipped_terminal"] == ["001-slug.md"]
 
 
@@ -600,7 +610,7 @@ def test_directory_that_never_existed_is_still_vanished(repo: Path) -> None:
 def test_vanished_is_the_residual_not_the_default(repo: Path) -> None:
     _adr(repo, 1, title="Some decision", files=["never_existed.py"])
     finding = next(
-        f for f in adr_health.classify(repo)["findings"] if f["path"] == "never_existed.py"
+        f for f in adr_health.classify(repo)["decay_findings"] if f["path"] == "never_existed.py"
     )
     assert finding["decay_class"] == "vanished"
     assert finding["disposition"] == "retire-candidate"
@@ -655,7 +665,7 @@ def test_canary_a_withheld_class_never_re_emerges_as_a_retirement_candidate(
     _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md", "never-existed.py"])
     report = adr_health.classify(repo)
     assert report["withheld"], "precondition: the oracle must be unavailable"
-    assert [f for f in report["findings"] if f["disposition"] == "retire-candidate"] == []
+    assert [f for f in report["decay_findings"] if f["disposition"] == "retire-candidate"] == []
 
 
 def test_lifecycle_oracle_resolves_from_the_plugin_when_the_project_has_none(
@@ -708,7 +718,7 @@ def test_shallow_clone_is_treated_as_no_history(repo: Path, monkeypatch) -> None
 def test_resolving_references_produce_no_findings(repo: Path) -> None:
     (repo / "present.py").write_text("x", encoding="utf-8")
     _adr(repo, 1, files=["present.py"])
-    assert adr_health.classify(repo)["findings"] == []
+    assert adr_health.classify(repo)["decay_findings"] == []
 
 
 def test_exits_zero_even_with_findings(repo: Path) -> None:
@@ -919,13 +929,13 @@ def test_full_supersession_of_a_different_id_than_the_partial_edge_is_not_a_conf
     assert _conflicts(adr_health.classify(repo)) == []
 
 
-# -- DH02/DH04 CHECK_IDS re-point: envelope shape unchanged (Triangle extension) ---
+# -- CHECK_IDS re-point: envelope shape unchanged (Triangle extension) -------
 
 
 def test_check_ids_repoint_leaves_envelope_shape_unchanged(repo: Path) -> None:
-    """DH02/DH04 join `CHECK_IDS` with zero new comparison logic (R2 re-point).
+    """DH01/DH02/DH04/DH05/DH06 join `CHECK_IDS` with zero new comparison logic.
 
-    The pre-existing top-level keys every other consumer (DH01/DH03/DH06, the
+    The pre-existing top-level keys every other consumer (the
     `adr-frontmatter-promotion` pre-commit path, `finalize_adrs.py`) reads must
     still be present and hold their pre-existing types after the re-point --
     a re-point that quietly renamed or dropped one would break every sibling
@@ -935,6 +945,7 @@ def test_check_ids_repoint_leaves_envelope_shape_unchanged(repo: Path) -> None:
     assert report.keys() >= {
         "scanned_references",
         "adrs",
+        "decay_findings",
         "findings",
         "withheld",
         "skipped_terminal",
@@ -942,8 +953,152 @@ def test_check_ids_repoint_leaves_envelope_shape_unchanged(repo: Path) -> None:
         "category_mix",
         "summary",
         "status_edge_conflicts",
+        "checks",
+        "skipped",
+        "examined",
+        "bound",
     }
+    assert isinstance(report["decay_findings"], list)
     assert isinstance(report["findings"], list)
     assert isinstance(report["reopen_candidates"], list)
     assert isinstance(report["status_edge_conflicts"], list)
-    assert adr_health.CHECK_IDS == ("DH02", "DH04", "DH05")
+    assert adr_health.CHECK_IDS == ("DH01", "DH02", "DH04", "DH05", "DH06")
+
+
+def test_family_findings_are_all_check_tagged_and_disjoint_from_decay_findings(
+    repo: Path,
+) -> None:
+    """Every `findings[]` entry carries `check` -- `run_check_families.py` buckets by it.
+
+    The golden bad-case this guards: an untagged decay entry leaking into
+    `findings[]` used to create a spurious `None`-keyed aggregate (F1), and a
+    synthesized DH04/DH06 entry used to double-print in the text report because
+    it also lived in the list the CLI's disposition loop iterates (F2). Asserting
+    the two lists are disjoint pins both fixes at once.
+    """
+    (repo / "subsystem.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-q", "subsystem.py")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Design the subsystem", date="2026-01-01", files=["subsystem.py"])
+    _adr(repo, 2, title="Remove the subsystem", date="2026-02-01", files=["subsystem.py"])
+    report = adr_health.classify(repo)
+    assert report["findings"], "precondition: at least one family finding exists"
+    assert all("check" in f for f in report["findings"])
+    assert report["decay_findings"], "precondition: at least one decay finding exists"
+    assert not (set(map(id, report["findings"])) & set(map(id, report["decay_findings"])))
+
+
+# -- Family envelope: one canary per declared check id ------------------------
+
+
+def test_canary_dh01_removed_by_later_finding_is_family_tagged(repo: Path) -> None:
+    """DH01's family finding is the `removed-by-later` entry, `check`-tagged in place."""
+    (repo / "subsystem.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "rm", "-q", "subsystem.py")
+    _git(repo, "commit", "-qm", "remove")
+    _adr(repo, 1, title="Design the subsystem", date="2026-01-01", files=["subsystem.py"])
+    _adr(repo, 2, title="Remove the subsystem", date="2026-02-01", files=["subsystem.py"])
+    findings = {f["adr"]: f for f in adr_health.classify(repo)["findings"]}
+    finding = findings["001-slug.md"]
+    assert finding["decay_class"] == "removed-by-later"  # old key preserved, not replaced
+    assert finding["check"] == "DH01"
+    assert finding["severity"] == "warn"
+    assert finding["entity"] == "001-slug.md:subsystem.py"
+    assert "removed-by-later" in finding["message"]
+
+
+def test_canary_dh02_renamed_finding_is_family_tagged(repo: Path) -> None:
+    """DH02's family finding covers `renamed`/`placeholder-shape`/`out-of-repo`."""
+    (repo / "ARCHITECTURE.md").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add")
+    _git(repo, "mv", "ARCHITECTURE.md", "DESIGN.md")
+    _git(repo, "commit", "-qm", "rename")
+    _adr(
+        repo,
+        1,
+        title="Replace the hardcoded lens set",
+        summary="migrate the derivation methodology",
+        files=["ARCHITECTURE.md"],
+    )
+    finding = next(
+        f for f in adr_health.classify(repo)["findings"] if f["path"] == "ARCHITECTURE.md"
+    )
+    assert finding["decay_class"] == "renamed"  # old key preserved, not replaced
+    assert finding["check"] == "DH02"
+    assert finding["severity"] == "warn"
+    assert finding["entity"] == "001-slug.md:ARCHITECTURE.md"
+
+
+def test_canary_dh04_reopen_candidate_is_a_family_finding(repo: Path) -> None:
+    """DH04's family finding is a synthesized entry, one per reopen candidate."""
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add revived")
+    _git(repo, "rm", "-q", "revived.py")
+    _git(repo, "commit", "-qm", "remove revived")
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _retire(_adr(repo, 1, title="Some decision", files=["revived.py"]))
+    findings = [f for f in adr_health.classify(repo)["findings"] if f.get("check") == "DH04"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "warn"
+    assert findings[0]["entity"] == "001-slug.md"
+    assert "revived.py" in findings[0]["message"]
+
+
+def test_canary_dh05_widening_verdict_is_a_suggested_family_finding(repo: Path) -> None:
+    """DH05's family finding fires only on the `widening` verdict -- the golden bad-case."""
+    _post_adoption_adrs(repo, adr_health._RECENT_WINDOW, category="architectural")
+    findings = [f for f in adr_health.classify(repo)["findings"] if f.get("check") == "DH05"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "suggested"
+    assert "widening" in findings[0]["message"]
+
+
+def test_canary_dh05_discriminating_verdict_emits_no_family_finding(repo: Path) -> None:
+    """The inverse guard: a `discriminating` verdict must not manufacture a DH05 finding."""
+    _post_adoption_adrs(repo, adr_health._RECENT_WINDOW, category="implementation")
+    findings = [f for f in adr_health.classify(repo)["findings"] if f.get("check") == "DH05"]
+    assert findings == []
+
+
+def test_canary_dh06_status_edge_conflict_is_a_family_finding(repo: Path) -> None:
+    """DH06's family finding mirrors one `status_edge_conflicts` row, naming shape and disposition."""
+    _conflict_adr(repo, 1, extra_fields={"supersedes": "dec-002", "superseded_by": "dec-002"})
+    findings = [f for f in adr_health.classify(repo)["findings"] if f.get("check") == "DH06"]
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "warn"
+    assert findings[0]["entity"] == "dec-001"
+    assert "shape a" in findings[0]["message"]
+
+
+def test_canary_reopen_candidate_and_status_edge_conflict_each_print_exactly_once(
+    repo: Path, capsys
+) -> None:
+    """The golden bad-case for the historical double-print (F2).
+
+    Before `decay_findings`/`findings` were split, a synthesized DH04/DH06 entry
+    lived in the same list the CLI's disposition loop iterates, so a reopen
+    candidate or status-edge conflict printed twice: once from its own dedicated
+    loop (`RE-OPEN?`/`CONFLICT`), once more from `report["decay_findings"]`'s
+    disposition-based loop. Corpus has zero of either today, so this reproduces
+    the shape directly rather than relying on the live repo to surface it.
+    """
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "add revived")
+    _git(repo, "rm", "-q", "revived.py")
+    _git(repo, "commit", "-qm", "remove revived")
+    (repo / "revived.py").write_text("x", encoding="utf-8")
+    _retire(_adr(repo, 1, title="Some decision", files=["revived.py"]))
+    _conflict_adr(repo, 2, extra_fields={"supersedes": "dec-003", "superseded_by": "dec-003"})
+
+    adr_health.main(["--repo-root", str(repo)])
+    out = capsys.readouterr().out
+
+    assert out.count("RE-OPEN?") == 1
+    assert out.count("CONFLICT (a)") == 1

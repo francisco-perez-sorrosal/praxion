@@ -111,6 +111,20 @@ Named consumers: the sentinel's pipeline-dimension pairing check and
 pairing by scanning the whole file and report an unpaired stop as a failure
 rather than as an unobserved start.
 
+`agent_stop` usage-field changeover at commit 23b1bbc5
+-------------------------------------------------------
+That commit fixed `_sum_subagent_transcript` to read the subagent's own
+transcript instead of the parent session's, which silently redefines what
+`tokens_in`/`tokens_out`/`cache_read`/`cache_create`/`model`/`duration_ms`
+*mean* on every `agent_stop` row: before the commit they were the parent
+session's cumulative figures, after it they are the subagent's own -- the
+schema is unchanged, so nothing in the row previously distinguished the two
+populations. `usage_source` is the marker added to close that gap: rows
+written from commit 23b1bbc5 onward carry it (`subagent-transcript` or
+`parent-transcript`, or `None` when every usage field degraded to None);
+rows written before that commit simply lack the key. A WAL reader partitions
+on the *absence* of the key, not on a value, to tell old rows from new ones.
+
 Committed per-session summary (`observations_summary.jsonl`, dec-draft-66cd5bb6)
 ----------------------------------------------------------------------------
 The raw WAL above is gitignored (P0.5) so a fresh clone carries no history at
@@ -173,6 +187,17 @@ CORRELATION_NOT_APPLICABLE = "not-applicable"
 # this field -- start rows and session rows have nothing to attribute.
 STOP_SOURCE_HOOK = "hook"
 STOP_SOURCE_TRANSCRIPT_NOTIFICATION = "transcript-notification"
+
+# Which transcript `_sum_subagent_transcript` actually read to populate the
+# usage fields below. Commit 23b1bbc5 changed what those fields *mean* on an
+# `agent_stop` row -- pre-fix rows carried the parent session's cumulative
+# usage, post-fix rows carry the subagent's own -- with no marker in the
+# append-only WAL to tell the two populations apart. `usage_source` is that
+# marker, added after the fact: rows written before commit 23b1bbc5 simply
+# lack the key, which is itself the partition a WAL reader needs (same
+# additive-schema convention as `agent_type_source`/`stop_source` above).
+USAGE_SOURCE_SUBAGENT_TRANSCRIPT = "subagent-transcript"
+USAGE_SOURCE_PARENT_TRANSCRIPT = "parent-transcript"
 
 # Bound on the transcript scan for suspended-subagent task-notifications. The
 # Stop payload's transcript can grow long over a session; a just-suspended
@@ -455,10 +480,17 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
     beats a plausible wrong number, and this is a best-effort enrichment of
     an already-written row, never a reason to fail the stop. A malformed
     individual line is skipped, not fatal to the rest of the scan.
+
+    ``usage_source`` records which file the returned numbers came from --
+    ``USAGE_SOURCE_SUBAGENT_TRANSCRIPT`` when the subagent's own sibling file
+    matched, ``USAGE_SOURCE_PARENT_TRANSCRIPT`` when the parent-transcript
+    fallback matched -- and stays ``None`` whenever every other field
+    degrades to None, since there is then no source to attribute.
     """
     fields: dict[str, int | str | None] = dict.fromkeys(TOKEN_USAGE_FIELDS)
     fields["duration_ms"] = None
     fields["model"] = None
+    fields["usage_source"] = None
 
     agent_id = str(payload.get("agent_id") or "").strip()
     if not agent_id:
@@ -502,6 +534,12 @@ def _sum_subagent_transcript(payload: dict) -> dict[str, int | str | None]:
         return fields
     fields.update(totals)
     fields["model"] = model
+    subagent_path = _subagent_own_transcript_path(payload)
+    fields["usage_source"] = (
+        USAGE_SOURCE_SUBAGENT_TRANSCRIPT
+        if subagent_path and read_path == subagent_path
+        else USAGE_SOURCE_PARENT_TRANSCRIPT
+    )
     if first_ts and last_ts:
         fields["duration_ms"] = _duration_ms(first_ts, last_ts)
     return fields

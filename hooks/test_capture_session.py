@@ -1269,6 +1269,9 @@ class TestSubagentTranscriptUsage:
         assert fields["cache_create"] == 5
         assert fields["model"] == "claude-opus-5"
         assert fields["duration_ms"] == 5500
+        # No session_id -> no subagent sibling file to prefer; the parent
+        # transcript named in `transcript_path` is what actually matched.
+        assert fields["usage_source"] == module.USAGE_SOURCE_PARENT_TRANSCRIPT
 
     def test_filters_to_matching_agent_id_when_agentid_is_present(self, tmp_path: Path) -> None:
         """A shared/sidechain transcript must not count another agent's lines."""
@@ -1336,6 +1339,7 @@ class TestSubagentTranscriptUsage:
 
         assert fields["tokens_in"] == 2
         assert fields["tokens_out"] == 4
+        assert fields["usage_source"] == module.USAGE_SOURCE_SUBAGENT_TRANSCRIPT
 
     def test_missing_transcript_path_degrades_every_field_to_none(self) -> None:
         module = _load_module()
@@ -1353,6 +1357,21 @@ class TestSubagentTranscriptUsage:
 
         assert all(value is None for value in fields.values())
 
+    def test_degraded_result_carries_usage_source_none(self, tmp_path: Path) -> None:
+        """A degraded result -- nothing matched -- has no source to attribute,
+        distinct from the two populated-source values below.
+        """
+        module = _load_module()
+        transcript = _write_usage_transcript(
+            tmp_path / "sess-1.jsonl", [_assistant_line(input_tokens=7, output_tokens=8)]
+        )
+
+        fields = module._sum_subagent_transcript(
+            {"transcript_path": str(transcript), "session_id": "sess-1", "agent_id": "a1"}
+        )
+
+        assert fields["usage_source"] is None
+
     def test_malformed_line_is_skipped_not_fatal(self, tmp_path: Path) -> None:
         module = _load_module()
         transcript = _write_usage_transcript(
@@ -1366,6 +1385,7 @@ class TestSubagentTranscriptUsage:
 
         assert fields["tokens_in"] == 9
         assert fields["tokens_out"] == 1
+        assert fields["usage_source"] == module.USAGE_SOURCE_PARENT_TRANSCRIPT
 
     def test_build_observation_writes_transcript_fields_onto_agent_stop_row(
         self, project: Path, tmp_path: Path
@@ -1388,6 +1408,7 @@ class TestSubagentTranscriptUsage:
         assert row["tokens_in"] == 4
         assert row["tokens_out"] == 6
         assert row["model"] == "claude-opus-5"
+        assert row["usage_source"] == module.USAGE_SOURCE_PARENT_TRANSCRIPT
 
     def test_agent_start_rows_carry_no_transcript_fields(self, project: Path) -> None:
         """Only `agent_stop` rows are enriched -- a start has no transcript yet."""
@@ -1396,6 +1417,7 @@ class TestSubagentTranscriptUsage:
         row = module.build_observation({"agent_id": "a1", "cwd": str(project)}, "agent_start")
 
         assert "tokens_in" not in row
+        assert "usage_source" not in row
 
 
 def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:
@@ -1414,12 +1436,7 @@ def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:
     agent_id = str(payload.get("agent_id") or "").strip()
     if not agent_id:
         return fields
-    subagent_path = module._subagent_own_transcript_path(payload)
-    read_path = (
-        subagent_path
-        if subagent_path and Path(subagent_path).is_file()
-        else str(payload.get("transcript_path") or "")
-    )
+    read_path = module._transcript_source_for(payload)
     if not read_path:
         return fields
 
@@ -1428,7 +1445,7 @@ def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:
     first_ts: str | None = None
     last_ts: str | None = None
     matched = False
-    with open(read_path, encoding="utf-8") as handle:
+    with open(read_path, encoding="utf-8", errors="replace") as handle:
         for line in handle:
             line = line.strip()
             if not line:

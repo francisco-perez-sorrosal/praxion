@@ -21,7 +21,7 @@ from the gate's own passing tests, because each lives in the wiring rather than
 in the gate.
 
 `discarded-verdict`'s named consumer per the rule's clause-6 requirement is the
-GL06 row at `agents/sentinel.md:350`, plus
+GL06 row in the sentinel catalogue's dispatch table (`agents/sentinel.md`), plus
 `test_check_gate_liveness.py::test_the_live_repo_discards_no_gate_verdict` — a
 real-repo assertion that reddens the root suite independently of the sentinel
 sweep, since this detector is not exempt from the rule it enforces.

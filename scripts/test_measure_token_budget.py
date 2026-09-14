@@ -791,3 +791,167 @@ def test_listing_never_credits_skill_overrides(tmp_path):
     assert after == len(
         b"Alpha does alpha things when alpha is asked.\nBeta description that is fairly long and descriptive."
     )
+
+
+# -- T02 family envelope (additive) -------------------------------------------
+# The high-impact risk this envelope guards: dispatched from the family table
+# with no ANTHROPIC_API_KEY, T02 must never let an unmeasured `ratio`-basis
+# reading read back as a governed FAIL.
+
+
+def _stub_report(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tokens: int,
+    listing_tokens: int,
+    budget: int = mtb.BUDGET_TOKENS,
+    governed_measured: bool = True,
+    listing_measured: bool = True,
+) -> None:
+    """Stub `measure`/`measure_listing` with a full envelope-shaped payload —
+    `main()`'s own `report["over_by"]` exit-code read needs every key a real
+    reading carries, not just the ones this test happens to assert on."""
+    over_by = max(0, tokens - budget)
+    monkeypatch.setattr(
+        mtb,
+        "measure",
+        lambda repo_root, **kw: {
+            "files": ["x"],
+            "bytes": tokens * 4,
+            "tokens": tokens,
+            "budget": budget,
+            "over_by": over_by,
+            "headroom": max(0, budget - tokens),
+            "utilisation": round(tokens / budget, 4),
+            "basis": "tokenizer" if governed_measured else "estimate (bytes / 3.6)",
+            "measured": governed_measured,
+            "chars_per_token": 4.0 if governed_measured else None,
+            "reference_ratio": {
+                "chars_per_token": mtb._MEASURED_RATIO,
+                "measured_on": mtb._MEASURED_ON,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        mtb,
+        "measure_listing",
+        lambda repo_root, **kw: {
+            "tokens": listing_tokens,
+            "bytes": listing_tokens * 4,
+            "basis": "tokenizer" if listing_measured else "estimate (bytes / 3.6)",
+            "measured": listing_measured,
+            "file_count": 1,
+        },
+    )
+
+
+def test_t02_envelope_keys_are_additive_beside_the_existing_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The existing `tokens`/`budget`/`over_by`/`basis`/`listing` keys — the
+    shape `check_token_ratchet.py` and `apply_skill_description_diet.py`
+    import the module rather than this CLI output, but the CLI's own
+    consumers still read these — must survive byte-for-byte in shape."""
+    _stub_report(monkeypatch, tokens=100, listing_tokens=10)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["tokens"] == 100
+    assert payload["over_by"] == 0
+    assert payload["listing"]["tokens"] == 10
+    assert payload["check"] == "T02"
+    assert set(payload.keys()) >= {
+        "check",
+        "skipped",
+        "examined",
+        "findings",
+        "info",
+        "withheld",
+        "bound",
+    }
+
+
+def test_canary_tokenizer_basis_over_budget_produces_a_fail_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Gate-liveness canary: a real, tokenizer-measured breach must FAIL."""
+    _stub_report(monkeypatch, tokens=30_000, listing_tokens=10, governed_measured=True)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["basis"] == "tokenizer"
+    assert payload["examined"]["measured"] is True
+    fail_findings = [f for f in payload["findings"] if f["check"] == "T02"]
+    assert any(f["severity"] == "fail" for f in fail_findings)
+
+
+def test_ratio_basis_over_budget_never_produces_a_fail_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The high-impact risk item, pinned: no ANTHROPIC_API_KEY -> `ratio` basis
+    -> an over-budget reading annotates with `warn`, never `fail`."""
+    _stub_report(monkeypatch, tokens=30_000, listing_tokens=10, governed_measured=False)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["basis"] == "ratio"
+    assert payload["examined"]["measured"] is False
+    assert payload["findings"], "an over-budget ratio reading must still annotate"
+    assert all(f["severity"] != "fail" for f in payload["findings"])
+    assert any(f["severity"] == "warn" for f in payload["findings"])
+
+
+def test_tokenizer_basis_under_budget_has_no_findings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Inverse guard — a healthy tokenizer-basis reading must not flag."""
+    _stub_report(monkeypatch, tokens=100, listing_tokens=10, governed_measured=True)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["findings"] == []
+
+
+def test_listing_over_frozen_ceiling_fails_on_matching_tokenizer_basis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The frozen no-regression ceiling (not the report-only 2,000 target) is
+    what T02 gates on — seeded here below today's listing reading."""
+    baseline = tmp_path.joinpath(*mtb._BASELINE_RELATIVE_PATH)
+    _seed_baseline(baseline, listing_ceiling=50, samples=[])
+    _stub_report(monkeypatch, tokens=100, listing_tokens=200, listing_measured=True)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["listing_ceiling"] == 50
+    listing_findings = [f for f in payload["findings"] if f["entity"] == "listing surface"]
+    assert any(f["severity"] == "fail" for f in listing_findings)
+
+
+def test_missing_baseline_skips_the_listing_ceiling_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No baseline recorded yet -- the frozen ceiling is unknown, so T02 must
+    not invent a comparison rather than silently pass or fail one."""
+    _stub_report(monkeypatch, tokens=100, listing_tokens=999_999, listing_measured=True)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["listing_ceiling"] is None
+    assert not any(f["entity"] == "listing surface" for f in payload["findings"])
+
+
+def test_basis_mismatch_against_the_frozen_ceiling_skips_the_comparison(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The frozen ceiling was measured on a tokenizer basis; today's listing
+    reading is a `ratio` estimate -- comparing them would diff two different
+    rulers (mirrors `ratchet()`'s own basis-mismatch guard)."""
+    baseline = tmp_path.joinpath(*mtb._BASELINE_RELATIVE_PATH)
+    _seed_baseline(baseline, listing_ceiling=50, samples=[])
+    _stub_report(monkeypatch, tokens=100, listing_tokens=999_999, listing_measured=False)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["listing_ceiling"] is None
+    assert not any(f["entity"] == "listing surface" for f in payload["findings"])

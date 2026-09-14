@@ -65,6 +65,7 @@ from _repo_root import resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+CHECK_ID = "T02"
 BUDGET_TOKENS = 25_000
 
 # The P1.12 directional target for the listing surface: ~1% of a 200k-token
@@ -75,6 +76,15 @@ BUDGET_TOKENS = 25_000
 # (`--enforce-listing-ceiling` opts in) so the P1.12 description-diet sweep
 # does not block every intermediate commit before it lands the whole corpus.
 _LISTING_TARGET_CEILING_DEFAULT = 2_000
+
+_T02_BOUND = (
+    "T02 clean means the always-loaded governed surface is within its token "
+    "budget and the listing surface has not regressed past its frozen "
+    "ratchet ceiling, on a tokenizer-measured reading. A ratio (bytes/divisor) "
+    "reading -- taken when ANTHROPIC_API_KEY is absent -- never FAILs on "
+    "either count; it annotates with a warn finding instead, since an "
+    "estimate is not proof of a breach."
+)
 
 # Measured 2026-08-05 (see module docstring). Errs ~5% high, which is the
 # direction a guardrail should err. Re-derive with --json after a material
@@ -662,6 +672,96 @@ def _write_baseline(path: Path, baseline: dict) -> None:
     path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
 
 
+def _t02_frozen_listing_ceiling(repo_root: Path, listing_basis: str) -> int | None:
+    """The `ratchet()`-frozen no-regression listing ceiling, read-only.
+
+    Deliberately not `_LISTING_TARGET_CEILING_DEFAULT` (2,000): that is the
+    P1.12 *directional* target the module's own docstring marks report-only
+    until the description-diet sweep lands the whole corpus -- gating T02 on
+    it would FAIL every sweep today by design, contradicting that decision.
+    The frozen baseline value is the one the codebase already enforces
+    (`ratchet()`'s `listing_over_ceiling`); T02 mirrors its read, not its
+    write -- a dispatch-table check must not mutate `token_budget_baseline.json`
+    as a side effect of being asked "is this clean?". Returns None when no
+    baseline has been recorded yet, or its frozen basis disagrees with
+    today's reading (same guard `ratchet()` applies before comparing).
+    """
+    baseline = _load_baseline(repo_root.joinpath(*_BASELINE_RELATIVE_PATH))
+    if baseline is None:
+        return None
+    ceiling = baseline.get("listing_ceiling")
+    ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
+    if ceiling is None or ceiling_basis != listing_basis:
+        return None
+    return ceiling
+
+
+def _t02_findings(
+    report: dict, listing: dict, basis: str, listing_ceiling: int | None
+) -> list[dict[str, str]]:
+    """T02 findings for one `measure()` + listing reading.
+
+    Severity tracks basis, not just the breach: a `tokenizer` reading FAILs on
+    a real breach, but a `ratio` reading (no API key) only ever WARNs -- the
+    high-impact risk this family guards against is a dispatch-table sweep
+    reading an unmeasured estimate as a governed FAIL.
+    """
+    severity = "fail" if basis == "tokenizer" else "warn"
+    findings: list[dict[str, str]] = []
+
+    if report["over_by"] > 0:
+        findings.append(
+            {
+                "check": CHECK_ID,
+                "severity": severity,
+                "entity": "always-loaded budget",
+                "message": (
+                    f"{report['tokens']:,} tokens over the {report['budget']:,} "
+                    f"budget by {report['over_by']:,} (basis: {basis})"
+                ),
+            }
+        )
+    if listing_ceiling is not None and listing["tokens"] > listing_ceiling:
+        findings.append(
+            {
+                "check": CHECK_ID,
+                "severity": severity,
+                "entity": "listing surface",
+                "message": (
+                    f"listing {listing['tokens']:,} tokens exceeds the frozen "
+                    f"no-regression ceiling of {listing_ceiling:,} (basis: {basis})"
+                ),
+            }
+        )
+    return findings
+
+
+def _t02_envelope(report: dict, repo_root: Path) -> dict:
+    """The T02 family envelope -- additive keys beside `report`'s existing
+    tokens/bytes/budget/basis payload, never replacing them."""
+    listing = report["listing"]
+    basis = "tokenizer" if report["measured"] else "ratio"
+    listing_basis = "tokenizer" if listing["measured"] else "ratio"
+    listing_ceiling = _t02_frozen_listing_ceiling(repo_root, listing_basis)
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {
+            "basis": basis,
+            "measured": report["measured"],
+            "tokens": report["tokens"],
+            "budget": report["budget"],
+            "over_by": report["over_by"],
+            "listing_tokens": listing["tokens"],
+            "listing_ceiling": listing_ceiling,
+        },
+        "findings": _t02_findings(report, listing, basis, listing_ceiling),
+        "info": {},
+        "withheld": [],
+        "bound": _T02_BOUND,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Always-loaded token budget (measured).")
     parser.add_argument("--json", action="store_true", help="emit the reading as JSON")
@@ -724,6 +824,7 @@ def main(argv: list[str] | None = None) -> int:
 
     report = measure(repo_root, api_key=api_key)
     report["listing"] = measure_listing(repo_root, api_key=api_key)
+    report.update(_t02_envelope(report, repo_root))
 
     if args.json:
         print(json.dumps(report, indent=2))

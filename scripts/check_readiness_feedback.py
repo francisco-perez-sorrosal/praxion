@@ -58,6 +58,12 @@ READINESS_FLOOR = 3
 # Exact string that signals a mechanical-only run (LLM tier was skipped).
 _MECHANICAL_ONLY_NOTE = "mechanical-only"
 
+# Registered with the sentinel row/registry/script triangle (`ast.literal_eval`-read
+# from this one module-level string literal -- see tests/test_sentinel_check_triangle.py).
+CHECK_ID = "RD01"
+
+_SEVERITY = "warn"
+
 logger = logging.getLogger("check_readiness_feedback")
 
 
@@ -182,6 +188,53 @@ def compute_readiness_verdict(repo_root: Path) -> dict[str, object]:
     return _extract_readiness(report_path)
 
 
+# -- Family envelope (additive, `run_check_families.py` flat-envelope shape) --
+
+
+def _rd01_findings(verdict: dict[str, object]) -> list[dict[str, object]]:
+    """Return the RD01 family finding, or none when at/above the production floor."""
+    if not verdict["below_threshold"]:
+        return []
+    return [
+        {
+            "check": CHECK_ID,
+            "severity": _SEVERITY,
+            "entity": verdict["report_file"],
+            "message": verdict["details"],
+        }
+    ]
+
+
+def rd01_envelope(verdict: dict[str, object]) -> dict[str, object]:
+    """Build the additive family-envelope keys around an existing verdict dict.
+
+    Additive per dec-draft-34af7f36: `run_check_families.py` reads exactly
+    `check`/`findings`/`skipped`/`examined`/`bound`/`withheld` off a flat payload,
+    so these keys sit beside the verdict's own pre-existing keys without displacing
+    any of them. `adjusted_level is None` is the verdict's own skip-with-INFO
+    signal (`_skip_verdict` always sets it), reused here rather than re-deriving
+    "was the substrate absent" a second way.
+    """
+    skipped = verdict["details"] if verdict["adjusted_level"] is None else None
+    return {
+        "check": CHECK_ID,
+        "skipped": skipped,
+        "examined": {
+            "adjusted_level": verdict["adjusted_level"],
+            "mechanical_only": verdict["mechanical_only"],
+        },
+        "findings": _rd01_findings(verdict),
+        "info": {},
+        "withheld": [],
+        "bound": (
+            "RD01 clean means the latest METRICS_REPORT_*.json shows "
+            "readiness.data.adjusted_level (or the level fallback) at or above the "
+            f"{READINESS_FLOOR} (Practiced) floor; absent metrics substrate is "
+            "skipped, never a finding."
+        ),
+    }
+
+
 # -- Reporting ----------------------------------------------------------------
 
 
@@ -238,7 +291,7 @@ def _run(args: argparse.Namespace) -> int:
     result = compute_readiness_verdict(repo_root)
 
     if args.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps({**result, **rd01_envelope(result)}, indent=2))
     else:
         report = _format_human(result)
         below = result["below_threshold"]

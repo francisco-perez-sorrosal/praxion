@@ -303,3 +303,67 @@ def test_flags_below_floor_readiness(tmp_path: Path) -> None:
     )
     assert verdict["adjusted_level"] == 2
     assert "below the production floor" in verdict["details"]
+
+
+# -- Family envelope: registration-triangle canary ---------------------------
+
+
+def test_canary_json_envelope_flags_rd01_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Family-envelope canary: below-floor level must tag a `check: "RD01"` finding.
+
+    Golden bad-case for the registration triangle: `run_check_families.py`'s
+    `aggregate_family` buckets findings by `finding.get("check")`, so a below-floor
+    verdict that never emits that key would be silently invisible to the family
+    dispatch table even though `--check` still exits 1.
+    """
+    _write_report(tmp_path, {"adjusted_level": 2, "level": 2, "note": "mechanical-only"})
+
+    mod = _load_module()
+    with pytest.raises(SystemExit):
+        mod.main(["--repo-root", str(tmp_path), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["check"] == "RD01"
+    assert payload["skipped"] is None
+    assert payload["examined"] == {"adjusted_level": 2, "mechanical_only": True}
+    assert payload["findings"] == [
+        {
+            "check": "RD01",
+            "severity": "warn",
+            "entity": payload["report_file"],
+            "message": payload["details"],
+        }
+    ]
+    assert payload["info"] == {}
+    assert payload["withheld"] == []
+
+
+def test_no_false_positive_envelope_findings_empty_at_floor(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No-false-positive control: at/above the floor, `findings` stays empty."""
+    _write_report(tmp_path, {"adjusted_level": 3, "level": 3})
+
+    mod = _load_module()
+    with pytest.raises(SystemExit):
+        mod.main(["--repo-root", str(tmp_path), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["findings"] == []
+    assert payload["check"] == "RD01"
+
+
+def test_substrate_absent_envelope_reports_skipped_not_a_finding(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Absent substrate surfaces via `skipped`, never as a family finding."""
+    mod = _load_module()
+    with pytest.raises(SystemExit):
+        mod.main(["--repo-root", str(tmp_path), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["findings"] == []
+    assert isinstance(payload["skipped"], str)
+    assert "skip-with-INFO" in payload["skipped"]

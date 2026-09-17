@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-14T15:05:42Z'
+generated_at: '2026-09-17T16:16:45Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -536,7 +536,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-13'
+  last_modified: '2026-09-17'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -2888,6 +2888,12 @@ surfaces:
   title: "The family envelope is additive \u2014 tool scripts join the dispatch table without a wrapper, and AC10 stays out"
   last_modified: '2026-09-14'
   renderer: adr_card
+- id: ai-state-decisions-386-test-results-fixed-shape
+  path: .ai-state/decisions/386-test-results-fixed-shape.md
+  type: markdown
+  title: TEST_RESULTS.md has a fixed green-step shape, bounded by a byte ceiling the verifier checks; failures-only is the test-invocation default
+  last_modified: '2026-09-17'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3577,6 +3583,7 @@ groups:
   - ai-state-decisions-383-single-source-canonical-texts
   - ai-state-decisions-384-calibration-enum-instrument
   - ai-state-decisions-385-family-dispatch-last-mile
+  - ai-state-decisions-386-test-results-fixed-shape
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

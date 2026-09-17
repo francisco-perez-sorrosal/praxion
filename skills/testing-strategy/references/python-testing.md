@@ -19,6 +19,10 @@ pytest discovers tests by scanning for `test_*.py` / `*_test.py` files, collecti
 | `-m "marker"` | Run by marker (`-m "not integration"`) |
 | `--lf` / `--sw` | Re-run last failed / stepwise resume |
 | `--tb=short` | Shorter tracebacks for large suites |
+| `-q` | Quiet — suppress per-test verbosity, print only the summary line |
+| `-rf` | Summary of failed tests only, appended after the run |
+
+**Pipeline default**: `<runner> pytest <scope> -q --tb=short -rf > .ai-work/<task-slug>/logs/step-<N>.log 2>&1; tail -n 30 .ai-work/<task-slug>/logs/step-<N>.log` — quiet, short-traceback, failures-only is the agent invocation default across the implementer, test-engineer, and this leaf; the log captures full output, the tail feeds the agent's context, and the log path is cited only when the run is red.
 
 **Exit codes**: 0 = passed, 1 = failed, 2 = interrupted, 3 = internal error, 4 = usage error, 5 = no tests collected.
 

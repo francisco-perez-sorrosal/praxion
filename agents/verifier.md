@@ -245,7 +245,7 @@ Skip this sub-phase if `docs/architecture.md` does not exist.
 
 When tests exist or are expected:
 
-1. **Read `.ai-work/<task-slug>/TEST_RESULTS.md`** — the implementer/test-engineer's test-run handoff. If the file is missing and the plan expected tests, log a `WARN` (not a `FAIL`) — the artifact is advisory during rollout.
+1. **Read `.ai-work/<task-slug>/TEST_RESULTS.md`** — the implementer/test-engineer's test-run handoff. If the file is missing and the plan expected tests, log a `WARN` (not a `FAIL`) — the artifact is advisory during rollout. Then run `python3 scripts/check_test_results_shape.py .ai-work/<task-slug>/TEST_RESULTS.md` — a `green-over-ceiling` finding is a `WARN` naming the section and its byte count (advisory during rollout, like the missing-file case above); a `missing-result-line` finding is a `WARN` too.
 2. **Read `.ai-work/<task-slug>/TEST_BASELINE.md`** — the failing-test set captured by the implementation-planner at pipeline setup, before any code change. If the file is absent (standalone mode, or capture skipped), treat the baseline as unknown and apply the conservative branch in step 3.
 3. **Disposition every failing test** in `TEST_RESULTS.md`. A failure is never closeable by calling it "pre-existing" — classify each one and act:
    - **Regression** — failing now, not listed in `TEST_BASELINE.md`. This pipeline caused it. Emit `FAIL`; the failure routes to rework via Phase 12.5.

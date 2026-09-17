@@ -475,6 +475,7 @@ selectors:
       - "scripts/test_check_squash_safety.py"
       - "scripts/test_check_staleness_markers.py"
       - "scripts/test_check_template_mirrors.py"
+      - "scripts/test_check_test_results_shape.py"
       - "scripts/test_check_topology_conformance.py"
       - "scripts/test_return_contract_clause_completeness.py"
       - "scripts/test_run_check_families.py"

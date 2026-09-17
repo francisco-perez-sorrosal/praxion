@@ -282,27 +282,25 @@ Status: in-progress
 
 ### TEST_RESULTS.md Reconciliation
 
-**Schema:** Step-scoped sections with `## Step N` headers. Each step section contains: the test command, summary counts (pass/fail/skip + duration), failure blocks (test name, failure message, short traceback), optional coverage summary, and free-form notes. Written by the implementer (Post-implementation updates: write test results) or test-engineer (Phase 4 step 6).
+**Schema:** Step-scoped sections with `## Step N` headers, each following the fixed shape below. Written by the implementer (Post-implementation updates: write test results) or test-engineer (Phase 4 step 6).
 
-**Fragment naming:** `TEST_RESULTS_implementer.md` and `TEST_RESULTS_test-engineer.md` in `.ai-work/<task-slug>/`.
-
-**Canonical-writer rule:** When the implementer and test-engineer run as a paired step (BDD/TDD execution), the test-engineer is the canonical writer — the implementer skips its own write. Otherwise the implementer writes when the step runs tests.
-
-**Merge semantics:** Concatenate fragments by step number in ascending order. No dedup — each test run is independent evidence and multiple runs per step are additive, not conflicting. After merge, delete the fragment files.
-
-**Post-merge invariants:** Every `## Step N` present at most once per writer. All failure blocks preserved. No re-sorting within a step (ordering inside a step reflects test-run order).
-
-**Test Topology optional fields**: when a step has a `Tests:` field activating the topology protocol, the step section may include these optional lines after the standard pass/fail/skip counts:
-
-```
-Tier: <step|phase|pipeline>
+```markdown
+## Step N — <one-line description>
+Command: `<runner> pytest <scope> -q --tb=short -rf`
+Result: pass=<n> fail=<n> skip=<n>
+Duration: <s>s
+Tier: <step|phase|pipeline>                      # optional topology lines
 Groups: [<group_id>, ...]
 Parallelism: <parallel-safe | sequential | mixed>
 Per-group results:
   <group_id>: pass=N fail=N skip=N duration=<s>
 ```
 
-These lines are **optional and backward-compatible**. Existing `TEST_RESULTS.md` consumers that do not know about the topology protocol continue to work without modification. Producers that have topology data available should include these lines to enable sentinel TT04 monitoring.
+Green (`fail=0`, no `error=`>0): nothing after the lines above — no notes field, no coverage summary (coverage lives in `coverage.xml`, not the section). Red: same header lines, then `Log: .ai-work/<task-slug>/logs/step-<N>.log` and one `### Failures` block per failing test (test id, message, short traceback). The `Tier`/`Groups`/`Parallelism`/`Per-group results` lines are optional and backward-compatible — omit when the step carries no `Tests:` field; include when topology data is available so sentinel TT04 has per-group data.
+
+**Fragment naming:** `TEST_RESULTS_implementer.md` and `TEST_RESULTS_test-engineer.md` in `.ai-work/<task-slug>/`. **Canonical-writer rule:** when the implementer and test-engineer run as a paired step (BDD/TDD execution), the test-engineer is the canonical writer — the implementer skips its own write; otherwise the implementer writes when the step runs tests.
+
+**Merge semantics:** Concatenate fragments by step number in ascending order. No dedup — each test run is independent evidence and multiple runs per step are additive, not conflicting; after merge, delete the fragment files. **Post-merge invariants:** every `## Step N` present at most once per writer, all failure blocks preserved, no re-sorting within a step (ordering inside a step reflects test-run order).
 
 ### .ai-state/ Reconciliation for Worktree Merges
 

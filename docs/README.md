@@ -33,6 +33,8 @@ Focused recipes assuming familiarity. Skim for the step you need.
 Authoritative tables and schemas. Look up, don't read sequentially.
 
 - [Architecture](architecture.md) — code-verified Praxion architecture (paths, components, dependencies)
+- [Context economy](context-economy.md) — measured baseline, the orchestrator-context-at-spawn target, the
+  phase-boundary handoff as its means, and the operator's own compaction controls
 - [Architecture diagrams](architecture-diagrams.md) — LikeC4 view catalog and regen workflow
 - [Spec-driven development](spec-driven-development.md) — REQ ID conventions, traceability protocol, sentinel checks
 - [Rules Taxonomy](rules-taxonomy.md) — rule categories (core, hook-deliver, path-scoped), per-project disable list reaching both delivery channels, token accounting

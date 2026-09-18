@@ -85,9 +85,11 @@ Every event receives these fields on stdin:
 | **Stop** | Yes (exit 2) | `reason`, `stop_hook_active` | Completion enforcement, checklist gates |
 | **StopFailure** | No | `reason` | Cleanup after failed stop |
 | **PreCompact** | No | — | State snapshot before context compression |
-| **PostCompact** | No | — | State restoration after compression |
+| **PostCompact** | No | `trigger` (`manual`/`auto`), `compact_summary` | Side effects only — logging/telemetry after compression. No decision control, no `additionalContext` |
 
 **Stop** — `stop_hook_active` is `true` on the second invocation (after a block). Always check this to prevent infinite loops.
+
+**SessionStart `source: compact`** — the post-compaction restore seam; fires after both auto and manual compaction. Unlike `PostCompact`, `SessionStart` supports `additionalContext` injection.
 
 ### Subagent Lifecycle
 

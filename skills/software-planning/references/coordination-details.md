@@ -414,7 +414,7 @@ Operational depth for the **Conversation Checkpoints** summarized in `rules/swe/
 
 ### Where the pauses fire
 
-- **Phase boundaries** — `research → architecture`, `architecture → planning`, `planning → implementation`. A wrong assumption is cheapest to unwind at a phase boundary.
+- **Phase boundaries** — `research → architecture`, `architecture → planning`, `planning → implementation`. A wrong assumption is cheapest to unwind at a phase boundary; `/handoff` captures the outgoing window's mechanical state (§0 Preflight, §1 State, §2 Next action, §7 Start here) at each of these seams, leaving the orchestrator's own digest to supply the judgement sections (§3 Decisions & assumptions, §4 Operating constraints from the user, §5 Corrections in force, §6 Do not re-inherit).
 - **Load-bearing steps** — a step that took an assumption which is load-bearing and hard to reverse pauses on completion, even mid-phase.
 - **Not** intra-phase agent handoffs — `implementer ∥ test-engineer` and `doc-engineer` parallel work are tight loops working as designed; pausing there interrupts them for no gain.
 
@@ -473,7 +473,7 @@ The subsection is **advisory only and never blocks**. The user proceeds to verif
 
 ### The pre-verification checkpoint
 
-Before the orchestrator invokes the `verifier`, it presents the curated digest of the whole pipeline run plus an **acknowledgement of the load-bearing residue** — the load-bearing assumptions not already dispositioned at an earlier checkpoint. The acknowledgement is a single `AskUserQuestion` call with `multiSelect: true` ("which of these do you want to revisit before verification?"), one option per residue item, not one dialog per assumption — the user inspects every major item but in one interaction. Set each option's `preview` to the assumption text, why it's load-bearing, and its self-challenge result from `LEARNINGS.md`, so the user compares all residue items side-by-side instead of re-reading the digest prose.
+Before the orchestrator invokes the `verifier`, it presents the curated digest of the whole pipeline run plus an **acknowledgement of the load-bearing residue** — the load-bearing assumptions not already dispositioned at an earlier checkpoint. The acknowledgement is a single `AskUserQuestion` call with `multiSelect: true` ("which of these do you want to revisit before verification?"), one option per residue item, not one dialog per assumption — the user inspects every major item but in one interaction. Set each option's `preview` to the assumption text, why it's load-bearing, and its self-challenge result from `LEARNINGS.md`, so the user compares all residue items side-by-side instead of re-reading the digest prose. `/handoff` captures the outgoing window's mechanical state (§0 Preflight, §1 State, §2 Next action, §7 Start here) ahead of this pause; the orchestrator's own digest above supplies the judgement sections (§3 Decisions & assumptions, §4 Operating constraints from the user, §5 Corrections in force, §6 Do not re-inherit) the residue acknowledgement draws on.
 
 The user then either:
 

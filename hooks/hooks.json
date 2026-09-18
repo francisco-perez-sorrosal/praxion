@@ -59,6 +59,17 @@
             "async": false
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_compaction_orientation.py",
+            "timeout": 10,
+            "async": false
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -259,6 +270,25 @@
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/precompact_state.py",
             "timeout": 15,
             "async": false
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py 2>/dev/null",
+            "timeout": 10,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/capture_session.py 2>/dev/null",
+            "timeout": 5,
+            "async": true
           }
         ]
       }

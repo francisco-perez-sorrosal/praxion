@@ -153,7 +153,10 @@ def _write_transcript(path: Path, blocks: list[str]) -> Path:
     return path
 
 
-def _turn_limit_block(task_id: str, name: str = "Implementer: Step 1") -> str:
+_TURN_LIMIT_DEFAULT_NAME = "Implementer: Step 1"  # id-citation-discipline:ignore
+
+
+def _turn_limit_block(task_id: str, name: str = _TURN_LIMIT_DEFAULT_NAME) -> str:
     return (
         "<task-notification>\n"
         f"<task-id>{task_id}</task-id>\n"
@@ -990,6 +993,117 @@ class TestMainContract:
 
 
 # ---------------------------------------------------------------------------
+# PostCompact -- compaction becomes observable without copying the summary
+# body into the WAL (the row is a signal, not a second transcript)
+# ---------------------------------------------------------------------------
+
+
+def _post_compact_payload(cwd: Path, **overrides: object) -> dict:
+    payload: dict = {
+        "hook_event_name": "PostCompact",
+        "session_id": "sess-1",
+        "trigger": "manual",
+        "compact_summary": "recap of the pipeline state before compaction",
+        "cwd": str(cwd),
+    }
+    payload.update(overrides)
+    return payload
+
+
+class TestPostCompactTelemetry:
+    @pytest.mark.parametrize("trigger", ["manual", "auto"])
+    def test_appends_one_compaction_row_with_trigger_and_summary_length_only(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, trigger: str
+    ) -> None:
+        """Neither trigger value causes the summary body to be copied into the WAL."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        summary = "a recap the harness produced, arbitrarily long and free-text"
+
+        _run_main(
+            module,
+            _post_compact_payload(project, trigger=trigger, compact_summary=summary),
+            monkeypatch,
+        )
+
+        rows = _read_wal(obs_path)
+        assert len(rows) == 1, "PostCompact must append exactly one row"
+        emitted = rows[0]
+        assert emitted["event_type"] == "compaction"
+        assert emitted["trigger"] == trigger
+        assert emitted["summary_bytes"] == len(summary)
+        assert "compact_summary" not in emitted, "the row is a signal, never a second transcript"
+        assert summary not in json.dumps(emitted), "the summary body must never reach the WAL"
+
+    def test_compaction_row_appends_through_the_shared_wal_path_without_disturbing_existing_rows(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mirrors the SubagentStart/SubagentStop append pattern: fcntl-safe, one new line."""
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        _write_wal(obs_path, [_wal_row(), _wal_row(event_type="agent_stop")])
+
+        _run_main(module, _post_compact_payload(project), monkeypatch)
+
+        lines = obs_path.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 3, "PostCompact must append exactly one line to the existing WAL"
+        rows = _read_wal(obs_path)
+        assert rows[0]["event_type"] == "tool_use", "pre-existing rows must be untouched"
+        assert rows[1]["event_type"] == "agent_stop", "pre-existing rows must be untouched"
+        assert rows[2]["event_type"] == "compaction"
+
+    def test_emits_no_stdout(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        module = _load_module()
+
+        _run_main(module, _post_compact_payload(project), monkeypatch)
+
+        assert capsys.readouterr().out == "", "PostCompact has no decision control to exercise"
+
+    @pytest.mark.parametrize(
+        "payload_overrides",
+        [
+            {"compact_summary": {"unexpected": "shape"}},
+            {"compact_summary": None},
+            {"trigger": None, "compact_summary": None},
+        ],
+        ids=["non-string-summary", "null-summary", "null-trigger-and-summary"],
+    )
+    def test_malformed_payload_shape_never_raises_and_still_appends_a_row(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, payload_overrides: dict
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+
+        _run_main(
+            module, _post_compact_payload(project, **payload_overrides), monkeypatch
+        )  # must not raise
+
+        rows = _read_wal(obs_path)
+        assert len(rows) == 1
+        assert rows[0]["event_type"] == "compaction"
+
+    def test_missing_trigger_key_resolves_to_an_explicit_unknown_value(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        payload = {
+            "hook_event_name": "PostCompact",
+            "session_id": "sess-1",
+            "compact_summary": "recap text",
+            "cwd": str(project),
+        }
+
+        _run_main(module, payload, monkeypatch)
+
+        rows = _read_wal(obs_path)
+        assert len(rows) == 1
+        assert rows[0]["trigger"] == "unknown"
+
+
+# ---------------------------------------------------------------------------
 # Transcript-sourced suspension stops -- the harness reports a suspended
 # background subagent to the MAIN agent instead of firing SubagentStop
 # ---------------------------------------------------------------------------
@@ -1618,9 +1732,9 @@ class TestBuildSessionSummary:
     def test_tokens_by_agent_type_and_gate_fire_counts_are_empty_by_default(self) -> None:
         """No agent_stop/gate_fire rows in this session -> both stay empty dicts.
 
-        `gate_fire_counts` stays empty until Step 12 emits `gate_fire` rows;
+        `gate_fire_counts` stays empty until the gate_fire emitter lands;
         `tokens_by_agent_type` is exercised separately below once agent_stop
-        rows carry Step 10's usage fields.
+        rows carry the transcript-sourced usage fields.
         """
         module = _load_module()
         rows = [_wal_row(event_type="tool_use", tool_name="Write")]
@@ -1674,7 +1788,7 @@ class TestBuildSessionSummary:
         assert summary["tokens_by_agent_type"]["praxion:researcher"]["tokens_in"] == 100
 
     def test_gate_fire_counts_populated_from_a_synthetic_wal(self) -> None:
-        """Step 12's `gate_fire` rows roll up by `hook`, same shape as tool_calls_by_tool."""
+        """`gate_fire` rows roll up by `hook`, same shape as tool_calls_by_tool."""
         module = _load_module()
         rows = [
             _wal_row(event_type="gate_fire", hook="check_token_ratchet", outcome="pass"),
@@ -1689,7 +1803,7 @@ class TestBuildSessionSummary:
         assert summary["gate_fire_counts"] == {"check_token_ratchet": 2, "remind_adr": 1}
 
     def test_tokens_by_agent_type_excludes_stops_with_no_usage_data(self) -> None:
-        """A stop whose transcript parse failed (Step 10's None fields) contributes nothing."""
+        """A stop whose transcript parse failed (None usage fields) contributes nothing."""
         module = _load_module()
         rows = [
             _wal_row(
@@ -1709,7 +1823,7 @@ class TestBuildSessionSummary:
         assert summary["tokens_by_agent_type"] == {}
 
     def test_models_collects_unique_values_when_present(self) -> None:
-        """Forward-compatible: agent_stop rows carry no `model` field until Step 10."""
+        """Forward-compatible: agent_stop rows carry no `model` field until the transcript-sourced enrichment landed."""
         module = _load_module()
         rows = [
             _wal_row(event_type="agent_stop", model="claude-opus-5"),

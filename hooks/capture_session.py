@@ -1,6 +1,6 @@
 """Lifecycle hook: capture session and agent events into the observations WAL.
 
-Fires on SessionStart, Stop, SubagentStart, SubagentStop.
+Fires on SessionStart, Stop, SubagentStart, SubagentStop, PostCompact.
 Async hook (async: true) -- never blocks.
 Exit 0 unconditionally.
 
@@ -125,7 +125,7 @@ written from commit 23b1bbc5 onward carry it (`subagent-transcript` or
 rows written before that commit simply lack the key. A WAL reader partitions
 on the *absence* of the key, not on a value, to tell old rows from new ones.
 
-Committed per-session summary (`observations_summary.jsonl`, dec-draft-66cd5bb6)
+Committed per-session summary (`observations_summary.jsonl`, dec-377)
 ----------------------------------------------------------------------------
 The raw WAL above is gitignored (P0.5) so a fresh clone carries no history at
 all. Every `session_stop` event upserts one compact row into a second,
@@ -141,6 +141,22 @@ harness has not yet reported back (see the suspension-backfill section above)
 means real work can still be in flight that this row cannot see. Its own
 `complete` field says so explicitly, rather than leaving a reader to infer
 completeness from the row's mere existence.
+
+The `compaction` row (`PostCompact`)
+------------------------------------
+A compaction is not an agent lifecycle event: nothing spawned and nothing
+stopped, so `agent_id`, `agent_type` and `start_correlation` have no answer to
+give for it. `PostCompact` is therefore dispatched ahead of `EVENT_MAP` and
+writes its own row -- `{event_type: "compaction", timestamp, session_id,
+trigger, summary_bytes}` -- sharing only the append path with the lifecycle
+rows above. The key set is purely additive and no existing key changes
+meaning, which is load-bearing because this WAL is read as prose by slash
+commands and skills as well as parsed by code.
+
+`summary_bytes` is the *length of* the harness's own compaction summary, never
+the summary itself: the row is a signal that a compaction happened and on
+whose trigger, not a second copy of the transcript the compaction just
+replaced.
 """
 
 from __future__ import annotations
@@ -161,6 +177,13 @@ EVENT_MAP = {
     "SubagentStart": "agent_start",
     "SubagentStop": "agent_stop",
 }
+
+# A compaction is not a lifecycle event and is deliberately absent from
+# EVENT_MAP above -- its row shares no field with the lifecycle shape beyond
+# timestamp/session_id (see the module docstring's `compaction` row section).
+POST_COMPACT_HOOK_EVENT = "PostCompact"
+COMPACTION_EVENT_TYPE = "compaction"
+UNKNOWN_TRIGGER = "unknown"
 
 # Lifecycle events that describe a *subagent* rather than the session itself.
 # Only these are eligible for WAL backfill; a session row's agent is "main".
@@ -609,6 +632,24 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
     return row
 
 
+def build_compaction_observation(payload: dict) -> dict:
+    """Assemble the WAL row for one completed compaction.
+
+    Total by construction: every field degrades through its own ``get``
+    default and ``str()`` coercion, so a payload that omits or mis-types a key
+    still yields a row instead of raising inside an async hook whose failure
+    nobody would see. ``summary_bytes`` measures the harness summary without
+    copying it (module docstring).
+    """
+    return {
+        "event_type": COMPACTION_EVENT_TYPE,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": payload.get("session_id", ""),
+        "trigger": payload.get("trigger", UNKNOWN_TRIGGER),
+        "summary_bytes": len(str(payload.get("compact_summary", ""))),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Committed per-session summary -- see module docstring's
 # "Committed per-session summary" section for why this upserts rather than
@@ -658,7 +699,7 @@ def _tokens_by_agent_type(rows: list[dict]) -> dict[str, dict[str, int]]:
     """Sum each ``agent_stop`` row's token-usage fields per ``agent_type``.
 
     An agent_type contributes only from rows where at least one usage field
-    is populated (Step 10's transcript parse succeeded) -- an agent_type with
+    is populated (the transcript parse succeeded) -- an agent_type with
     no usage data anywhere in the session is absent from the result, not
     reported as an all-zero row.
     """
@@ -905,6 +946,17 @@ def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
         )
 
 
+def _resolve_ai_state_dir(payload: dict) -> Path | None:
+    """The payload project's ``.ai-state/`` directory, or None when it has none.
+
+    Resolved once, ahead of dispatch, so the compaction branch and the
+    lifecycle path below share one graceful-degradation check rather than
+    repeating it.
+    """
+    ai_state_dir = Path(payload.get("cwd", ".")) / ".ai-state"
+    return ai_state_dir if ai_state_dir.exists() else None
+
+
 def main() -> None:
     if is_disabled(DISABLE_OBSERVABILITY):
         return
@@ -916,16 +968,25 @@ def main() -> None:
     if not isinstance(payload, dict):
         return
 
-    event_type = EVENT_MAP.get(payload.get("hook_event_name", ""))
-    if event_type is None:
+    # Recognised-event check first: an event this hook does not handle returns
+    # before touching the filesystem at all.
+    hook_event = payload.get("hook_event_name", "")
+    event_type = EVENT_MAP.get(hook_event)
+    if event_type is None and hook_event != POST_COMPACT_HOOK_EVENT:
         return
 
-    cwd = payload.get("cwd", ".")
-    ai_state_dir = Path(cwd) / ".ai-state"
-    if not ai_state_dir.exists():
+    ai_state_dir = _resolve_ai_state_dir(payload)
+    if ai_state_dir is None:
         return  # graceful degradation
-
     obs_path = ai_state_dir / "observations.jsonl"
+
+    # Dispatched ahead of the lifecycle path because a compaction has no
+    # lifecycle row to build -- see the module docstring's `compaction` row
+    # section. Past the guard above, every remaining event has an event_type.
+    if hook_event == POST_COMPACT_HOOK_EVENT:
+        append_observation(obs_path, build_compaction_observation(payload))
+        return
+
     observation = build_observation(payload, event_type, obs_path)
     append_observation(obs_path, observation)
     if event_type == "session_stop":

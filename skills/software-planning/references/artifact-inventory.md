@@ -24,6 +24,7 @@ The canonical list of what exists and where. The inventory tables below add the 
       SPEC_DELTA.md
       IMPLEMENTATION_PLAN.md
       WIP.md
+      HANDOFF.md
       LEARNINGS.md
       TEST_BASELINE.md
       TEST_RESULTS.md
@@ -125,6 +126,7 @@ Optional/adoption-gated persistent artifacts not in the tree above (created only
 | Ephemeral | `.ai-work/<rework-slug>/` | `VERIFIER_FINDINGS.md` — writer: main agent; reader: `/resume-rework` + spawned session | Worktree-local ephemeral. |
 | Ephemeral | `.ai-work/<task-slug>/` | `PRE_REFACTOR_PLAN.md` — writer: systems-architect (Phase 2.5 outcome `emit-PRE_REFACTOR_PLAN`); readers: orchestrator (parses `## Verifier Bypass Criteria` + `## Loop-Back Conditions`), implementation-planner (steps tagged `[Phase: Refactoring]`), test-engineer (sources characterization-tests from `## Behavior Preservation Contract`), verifier (sources acceptance criteria from `## Acceptance Criteria` in pre-refactor mode) | Single pipeline run — receives a `[CONSUMED]` marker at architect's `post-refactor-adaptation` re-entry; deleted with `.ai-work/` at cleanup |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_BASELINE.md` — implementation-planner's pre-pipeline failing-test snapshot (failing node IDs + base commit SHA), captured before any code change; verifier Phase 10 reads it to separate regressions from pre-existing failures | Single pipeline run — delete with `.ai-work/` |
+| Ephemeral | `.ai-work/<task-slug>/` | `HANDOFF.md` — writer: `compose_handoff.py` (via `/handoff`, orchestrator-invoked at a Conversation Checkpoint); reader: `/resume-pipeline` (Tier-3 orientation only). Phase-boundary handoff document (Tier-3 orientation, never certification). Shape: the 8-section `HandoffDoc` from `SYSTEMS_PLAN.md` DS-1 (§0 Preflight · §1 State · §2 Next action · §3 Decisions & assumptions · §4 Operating constraints from the user · §5 Corrections in force · §6 Do not re-inherit · §7 Start here) | Single pipeline run — deleted with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_RESULTS.md` — implementer (or test-engineer) test-run handoff artifact (canonical schema in `skills/software-planning/references/agent-pipeline-details.md`) | Single pipeline run — merge into `VERIFICATION_REPORT.md`, then delete |
 | Ephemeral | `.ai-work/<task-slug>/` | `traceability.yml` — REQ-to-test/implementation mapping (canonical source of truth during the pipeline; rendered into the archived SPEC's matrix at feature end per [`id-citation-discipline.md`](../../../rules/swe/id-citation-discipline.md)) | Single pipeline run — rendered into archived SPEC matrix, then deleted with `.ai-work/` |
 | Session-persistent | `.ai-work/<task-slug>/` | `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md` | Across sessions — merge learnings into permanent locations at feature end |

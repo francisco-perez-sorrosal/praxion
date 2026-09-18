@@ -24,6 +24,7 @@ PIPELINE_DOCS = [
     "PRE_REFACTOR_PLAN.md",
     "IMPLEMENTATION_PLAN.md",
     "WIP.md",
+    "HANDOFF.md",
     "PROGRESS.md",
     "LEARNINGS.md",
     "TEST_RESULTS.md",

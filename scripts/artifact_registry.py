@@ -342,6 +342,18 @@ ARTIFACTS: tuple[Artifact, ...] = (
         cleanup_policy="consume-marker",  # WARNs: it is the auto-recovery audit trail
         description="Audit trail for truncation auto-recovery actions.",
     ),
+    Artifact(
+        "HANDOFF.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        dashboard=False,
+        snapshot=True,
+        production_gate="script:compose_handoff.py",
+        detection_gate="none",
+        cleanup_policy="delete",
+        description="Phase-boundary handoff document (Tier-3 orientation, never certification).",
+    ),
     # --- ai-work root (not slug-scoped) ---
     Artifact(
         "PIPELINE_STATE.md",

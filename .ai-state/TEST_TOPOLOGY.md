@@ -299,13 +299,15 @@ file_dependencies:
   - "hooks/*.sh"
   - "hooks/hooks.json"
   - ".claude-plugin/plugin.json"
+integration_boundaries:
+  - agent-orchestration
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:
   p50_seconds: 29.3
   p95_seconds: 30
 shared_state: tmp_path
-notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out. 2026-09-03: hooks/test_inject_sidecar_banner.py and hooks/test_sidecar_autocommit.py added (sidecar-placement P1, RED-first against praxion-sidecar stub fixtures); both already match the hooks/ selector glob above, no selector change needed."
+notes: "Self-contained by construction -- 20 files, 623 tests, no fan-out. 2026-09-03: hooks/test_inject_sidecar_banner.py and hooks/test_sidecar_autocommit.py added (sidecar-placement P1, RED-first against praxion-sidecar stub fixtures); both already match the hooks/ selector glob above, no selector change needed. 2026-09-18 (process-economy-p3-1 planning): integration_boundaries added -- hooks/inject_compaction_orientation.py (P3.1) parses WIP.md's current-step format, a shape agent-orchestration owns; a WIP.md step-schema change can silently break this hook without a hooks-lifecycle-local test catching it."
 ```
 
 The tier is `integration` rather than `unit` because 14 of the 20 files spawn real
@@ -426,13 +428,15 @@ file_dependencies:
   - "skills/software-planning/references/tech-debt-ledger.md"
   - "skills/software-planning/references/project-principles.md"
   - "rules/swe/agent-intermediate-documents.md"
+integration_boundaries:
+  - agent-orchestration
 parallel_safe: true
 shared_fixture_scope: per-test
 expected_runtime_envelope:
   p50_seconds: 5.1
   p95_seconds: 6
 shared_state: tmp_path
-notes: "225 tests in ~5 s -- cheap and broad, a good phase-tier companion. 2026-09-13 (process-economy-topology reconciliation): added the test_merge_driver_observations.py selector -- scripts/merge_driver_observations.py was already a file_dependency here, but its own test file had never been added as a selector (an orphan)."
+notes: "225 tests in ~5 s -- cheap and broad, a good phase-tier companion. 2026-09-13 (process-economy-topology reconciliation): added the test_merge_driver_observations.py selector -- scripts/merge_driver_observations.py was already a file_dependency here, but its own test file had never been added as a selector (an orphan). 2026-09-18 (process-economy-p3-1 planning): integration_boundaries added -- scripts/compose_handoff.py (P3.1) imports reconcile_pipeline_state.reconcile() and produces .ai-work/<slug>/HANDOFF.md, a task-slug-scoped artifact whose consumption path (commands/resume-pipeline.md, commands/handoff.md) is agent-orchestration territory."
 ```
 
 Two members target the `agent-evals` skill's producer and its schema-convention

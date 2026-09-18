@@ -61,12 +61,26 @@ re-derives the truth from the two strata that do not lie — **Tier 1** (codebas
 position. It restores *position*, not *correctness sign-off*; the verifier remains
 the behavioral gate.
 
+A `HANDOFF.md` left by a previous window is **Tier-3 evidence**, the same stratum as
+the `WIP.md` checkbox: useful orientation, never an authority. Where it disagrees with
+a Tier-1 verdict the verdict wins, and the disagreement is **reported in the resume
+summary** — never silently overridden in either direction. That one rule is what keeps
+a convenience document from becoming a correctness hazard.
+
 ## Procedure
 
-1. **Resolve the slug and roots.** Parse the slug and flags out of `$ARGUMENTS` per
-   **Arguments** above. `worktree_root = git rev-parse --show-toplevel`. The slug's
-   pipeline lives at `<worktree_root>/.ai-work/<slug>/`.
-2. **Reconcile (read-only).** Run the reconciler. It is installed on `PATH` by
+1. **Read the handoff, if there is one (orientation only).** Parse the slug out of
+   `$ARGUMENTS` per **Arguments** above; `worktree_root = git rev-parse --show-toplevel`.
+   If `<worktree_root>/.ai-work/<slug>/HANDOFF.md` exists, read it before anything else:
+   its Preflight and Next action sections orient you, and its **Operating constraints
+   from the user** and **Corrections in force** sections are standing instructions that
+   apply from this point on. If its header carries `readiness: overridden`, the handoff
+   was composed over a non-quiescent tree — say so in the resume summary and treat its
+   State section as unverified until the reconcile below re-derives it from ground truth.
+   If there is no handoff, continue; the reconciler never needed one.
+2. **Resolve the slug and roots.** The slug's pipeline lives at
+   `<worktree_root>/.ai-work/<slug>/`; the remaining flags parse per **Arguments** above.
+3. **Reconcile (read-only).** Run the reconciler. It is installed on `PATH` by
    `install_claude.sh` (linked into `~/.local/bin/`); in the Praxion self-host
    checkout, use `python3 scripts/reconcile_pipeline_state.py` instead:
    ```
@@ -77,7 +91,7 @@ the behavioral gate.
    This mutates nothing (the reconciler is side-effect-free). Parse the verdict
    array. Each verdict carries `step`, `wip_claim`, `verdict`, `needs_mark`,
    `tier1`, `tier2`, `evidence`, `resume_scope`.
-3. **Act per verdict** (skip all actions under `--dry-run` — print the plan instead):
+4. **Act per verdict** (skip all actions under `--dry-run` — print the plan instead):
 
    | Verdict | Action |
    |---|---|
@@ -87,10 +101,11 @@ the behavioral gate.
    | `unknown` | **Surface, do not act.** Report the step + its evidence to the user and stop on that step. |
    | `pending` | No action — a not-started step is normal. |
 
-4. **Write the audit trail** for every auto-action (Audit trail, below).
-5. **Summarize** to the user: counts per verdict, every auto-mark and auto-resume
-   with its evidence, and every `unknown` needing a decision. Point to
-   `RECOVERY_LOG.md` for the full record.
+5. **Write the audit trail** for every auto-action (Audit trail, below).
+6. **Summarize** to the user: counts per verdict, every auto-mark and auto-resume
+   with its evidence, and every `unknown` needing a decision. Name every point where
+   the handoff read in step 1 disagreed with a verdict, stating that the verdict won.
+   Point to `RECOVERY_LOG.md` for the full record.
 
 ## Auto-resume contract (clobber-safety)
 

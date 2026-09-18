@@ -9,7 +9,10 @@ against a three-tier reliability hierarchy and emits a per-step verdict that
 `/resume-pipeline` consumes.
 
 Reliability hierarchy (the spine):
-  Tier 1 (arbiter)        — codebase + `git diff` + `TEST_RESULTS.md`.
+  Tier 1 (arbiter)        — codebase + `git diff` + `TEST_RESULTS.md` (either
+                            the legacy free-form pytest-summary shape or the
+                            canonical `Result: pass=<n> fail=<n> skip=<n>`
+                            per-step shape, dec-386 — see `_read_test_status`).
   Tier 2 (localization)   — `.ai-state/observations.jsonl` (the harness WAL):
                             which agent stopped, where it last wrote. Only ever
                             *adds* a hint; never *overrides* a Tier-1 verdict.
@@ -69,6 +72,9 @@ _FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re
 # Pytest summary count tokens (word-boundary — never matches "ModuleNotFoundError").
 _PYTEST_FAIL_RE = re.compile(r"\b(\d+)\s+(?:failed|errors?)\b", re.IGNORECASE)
 _PYTEST_PASS_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
+# The fixed per-step shape (dec-386): "Result: pass=<n> fail=<n> skip=<n>".
+_RESULT_LINE_RE = re.compile(r"^Result:\s*.*$")
+_RESULT_COUNT_RE = re.compile(r"\b(?:fail|error)=(\d+)")
 
 
 # ---------------------------------------------------------------------------
@@ -391,13 +397,16 @@ def _split_files(raw: str) -> list[str]:
 
 
 def _read_test_status(path: Path) -> str:
-    """Test status from the FINAL pytest-style summary in TEST_RESULTS.md.
+    """Test status from the FINAL summary line in TEST_RESULTS.md.
 
-    Parses the LAST line that reads like a pytest summary (a count plus
-    passed/failed/error), so an early failure block in a long accumulating file
-    does not poison a suite that ended green. Coarse (global, not per-step — that
-    attribution is future work), but the *final* state is the safe signal.
-    `absent` does not block verified-complete (test-less steps are normal).
+    Two summary shapes are recognized, last-line-wins across both: the
+    free-form pytest summary line ("3579 passed", "3 failed") from the legacy
+    accumulating shape, and the fixed ``Result: pass=<n> fail=<n> skip=<n>``
+    line per ``## Step N`` section from the canonical shape (dec-386). An
+    early failure block in a long file does not poison a suite (or a later
+    step) that ends green. Coarse (global, not per-step — that attribution is
+    future work), but the *final* line is the safe signal. `absent` does not
+    block verified-complete (test-less steps are normal).
     """
     try:
         content = path.read_text(encoding="utf-8")
@@ -407,12 +416,30 @@ def _read_test_status(path: Path) -> str:
     # "ModuleNotFoundError"/"KeyError" in prose must not read as a failure.
     status = "absent"
     for line in content.splitlines():
+        result = _result_line_status(line)
+        if result is not None:
+            status = result  # a Result: line is authoritative for that line
+            continue
         fail = _PYTEST_FAIL_RE.search(line)
         if fail and int(fail.group(1)) > 0:
             status = "red"  # a line reporting >=1 failure/error wins for that line
         elif _PYTEST_PASS_RE.search(line):
             status = "green"
     return status
+
+
+def _result_line_status(line: str) -> str | None:
+    """Classify a fixed-shape ``Result: pass=<n> fail=<n> skip=<n>`` line.
+
+    Returns "red" when any ``fail=``/``error=`` count on the line is >0,
+    "green" when the line matches but every such count is 0, or ``None`` when
+    the line is not a Result: line at all (falls through to pytest-summary
+    matching in the caller).
+    """
+    if not _RESULT_LINE_RE.match(line):
+        return None
+    counts = [int(n) for n in _RESULT_COUNT_RE.findall(line)]
+    return "red" if any(n > 0 for n in counts) else "green"
 
 
 def _parse_ts(ts: str) -> datetime:

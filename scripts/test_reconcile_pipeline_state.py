@@ -357,6 +357,60 @@ def test_test_status_red_when_final_run_fails(tmp_path):
     assert rps._read_test_status(p) == "red"
 
 
+def test_test_status_green_for_fixed_shape_result_line(tmp_path):
+    """A file in the canonical per-step shape (dec-386) whose last section's
+    ``Result:`` line reports fail=0 reads as green."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=12 fail=0 skip=0\n"
+        "Duration: 0.5s\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
+def test_test_status_red_for_fixed_shape_result_line_with_failures(tmp_path):
+    """A fixed-shape Result: line with fail=2 reads as red for that line."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=10 fail=2 skip=0\n"
+        "Duration: 0.5s\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "red"
+
+
+def test_test_status_mixed_shapes_last_fixed_shape_section_wins(tmp_path):
+    """A pytest-style red line followed by a later fixed-shape green section —
+    last line wins overall, across shapes."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Early iteration: 3 failed, 50 passed\n"
+        "## Step 2\n"  # id-citation-discipline:ignore
+        "Result: pass=53 fail=0 skip=0\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
+def test_test_status_prose_summary_then_fixed_shape_green_wins(tmp_path):
+    """A prose line resembling a pytest summary, followed by a fixed-shape
+    green section, reads as green — the fixed-shape line is authoritative."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "Historical note: 11 passed / 1 failed in an earlier run\n"
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Result: pass=11 fail=0 skip=0\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
 # --- windowed WAL read + cross-boundary recovery (Step 5 / Group B) ----------
 #
 # These tests call _read_wal(obs_path, max_age_days=7, now=<datetime>) — the

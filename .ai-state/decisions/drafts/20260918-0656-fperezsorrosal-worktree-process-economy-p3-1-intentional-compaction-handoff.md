@@ -81,8 +81,10 @@ Three components are added and one existing consumer is extended.
    never overwritten.
    The composer is also a **readiness gate** (`ReadinessVerdict = Ready | Blocked(reasons) | Overridden(reasons)`): it
    refuses to write when the WAL shows an `agent_start` without its `agent_stop` for this session, or when
-   `git status --porcelain` intersects the current step's declared `Files:`. `--force` overrides and stamps
-   `readiness: overridden` into the header, so the next window learns it inherited a non-quiescent tree. A third
+   `git status --porcelain` intersects the current step's declared `Files:`, or when the WAL is missing, unparseable
+   or carries no `session_id`-bearing rows (`wal-unreadable`: a refusal gate that reports ready because it could not
+   look is fail-open; added at light-review, 2026-09-18). `--force` overrides and stamps
+   `readiness: overridden` into the header, so the next window learns it inherited a non-quiescent tree. A further
    proposed condition — a detached test suite still running — is **not adopted**: the `nohup` + done-file practice has
    no contracted path, so a gate checking it would be checking a file nobody is obliged to produce; the composer
    instead reports an advisory line when `dec-386`'s `.ai-work/<slug>/logs/step-<N>.log` was written in the last 60s.
@@ -133,6 +135,7 @@ windows the band would have compacted, split main vs. per agent type.
 | Continuity guarantee | **Add §4 Operating constraints from the user, carried verbatim** | **Chosen**: the ask-before list and session-scoped instructions travel byte-for-byte across boundaries |
 | Readiness | Compose whenever asked | Rejected: a handoff written over a half-finished state presents a false boundary with the authority of a generated document |
 | Readiness | **Block on unstopped spawn or dirty step files; `--force` stamps `overridden`** | **Chosen**: two mechanically decidable conditions, each fixable by one operator action, with the override recorded in the artifact rather than in memory |
+| Readiness | Report `ready` when the WAL cannot be read | **Rejected at light-review**: a gate whose purpose is refusal must fail closed; `wal-unreadable` is the third blocking reason, with the same `--force` override |
 | Readiness | Also block on a running detached test suite | **Not adopted**: no contracted path for the done-file convention, so the check could never honestly fire; downgraded to an advisory line over `dec-386`'s canonical log path |
 | Handoff | Prose-only section in `coordination-details.md` | Rejected: unprovable (AC-1 needs a fixture pipeline), and re-types the mechanical half into the window it is meant to close |
 | Handoff | **Composer script + thin command** | **Chosen**: testable, cannot drift from the reconciler (it *is* the reconciler), 0 listing tokens |

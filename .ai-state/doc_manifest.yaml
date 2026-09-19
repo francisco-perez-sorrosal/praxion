@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-17T16:16:45Z'
+generated_at: '2026-09-19T07:52:10Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -62,7 +62,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-18'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -75,6 +75,7 @@ surfaces:
   - docs-claude-code-limitations
   - docs-claude-ecosystem-learning-resources
   - docs-concepts
+  - docs-context-economy
   - docs-context-prj-comparison-2026-05-12-07-praxion-roadmap
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-cursor-compat
@@ -166,6 +167,14 @@ surfaces:
   - docs-getting-started
   - docs-ml-training-onramp
   - docs-spec-driven-development
+- id: docs-context-economy
+  path: docs/context-economy.md
+  type: markdown
+  title: Context economy
+  last_modified: '2026-09-18'
+  diataxis: reference
+  audience: developer
+  renderer: reference_shell
 - id: docs-context-prj-comparison-2026-05-12-00-karpathy-critique
   path: docs/context-prj-comparison-2026-05-12/00-karpathy-critique.md
   type: markdown
@@ -505,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-13'
+  last_modified: '2026-09-18'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -536,7 +545,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-17'
+  last_modified: '2026-09-18'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -544,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-13'
+  last_modified: '2026-09-18'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -558,7 +567,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-14'
+  last_modified: '2026-09-18'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2894,11 +2903,18 @@ surfaces:
   title: TEST_RESULTS.md has a fixed green-step shape, bounded by a byte ceiling the verifier checks; failures-only is the test-invocation default
   last_modified: '2026-09-17'
   renderer: adr_card
+- id: ai-state-decisions-387-intentional-compaction-handoff
+  path: .ai-state/decisions/387-intentional-compaction-handoff.md
+  type: markdown
+  title: "The phase-boundary handoff is the mechanism: a Tier-3 HANDOFF.md with verbatim user constraints and a readiness gate, plus a SessionStart(compact) safety net \u2014 Praxion sets no utilisation\
+    \ band"
+  last_modified: '2026-09-19'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-14'
+  last_modified: '2026-09-17'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3127,6 +3143,12 @@ surfaces:
   title: "SPEC: P5 \u2014 Praxion-Side Issue Autofix (Self-Healing Loop Subsystem C)"
   last_modified: '2026-08-13'
   renderer: default_markdown
+- id: ai-state-specs-spec-process-economy-p3-1-2026-09-18
+  path: .ai-state/specs/SPEC_process-economy-p3-1_2026-09-18.md
+  type: markdown
+  title: 'Spec: P3.1 -- Intentional Compaction (Phase-Boundary Handoff with Continuity Guarantees + a Compaction Safety Net)'
+  last_modified: '2026-09-18'
+  renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
   type: markdown
@@ -3170,6 +3192,7 @@ groups:
   surface_ids:
   - docs-architecture
   - docs-architecture-diagrams
+  - docs-context-economy
   - docs-context-prj-comparison-2026-05-12-08-claude-code-behavior-verification
   - docs-diagrams-readme
   - docs-metrics-readme
@@ -3584,6 +3607,7 @@ groups:
   - ai-state-decisions-384-calibration-enum-instrument
   - ai-state-decisions-385-family-dispatch-last-mile
   - ai-state-decisions-386-test-results-fixed-shape
+  - ai-state-decisions-387-intentional-compaction-handoff
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3624,6 +3648,7 @@ groups:
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24
+  - ai-state-specs-spec-process-economy-p3-1-2026-09-18
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13

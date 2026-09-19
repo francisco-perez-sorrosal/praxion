@@ -7,7 +7,7 @@
 **Archived**: 2026-09-18
 **Status**: completed
 **Complexity**: large
-**ADRs**: `dec-draft-3695d2e9` (category: architectural; amended at the user's pre-mortem-gate decision 2026-09-18 --
+**ADRs**: `dec-387` (category: architectural; amended at the user's pre-mortem-gate decision 2026-09-18 --
 no Praxion-set band, §4 user-operating-constraints section, DS-1b readiness gate; draft id shown -- finalize rewrites
 to `dec-NNN` at merge)
 
@@ -116,7 +116,7 @@ FAIL -- see `.ai-state/DESIGN.md` §3b.6, Status `Designed`).
 
 ## Key Decisions
 
-Four architect decisions landed under one ADR draft, `dec-draft-3695d2e9` (amended once, at the user's pre-mortem-gate
+Four architect decisions landed under one ADR draft, `dec-387` (amended once, at the user's pre-mortem-gate
 decision 2026-09-18), plus one implementer decision folded into the same architecture at a light review (full context
 copied from `LEARNINGS.md § Decisions Made` and `§ Verification Stage`):
 

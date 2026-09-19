@@ -1,7 +1,8 @@
 ---
-id: dec-draft-3695d2e9
+id: dec-387
+draft_id: dec-draft-3695d2e9
 title: "The phase-boundary handoff is the mechanism: a Tier-3 HANDOFF.md with verbatim user constraints and a readiness gate, plus a SessionStart(compact) safety net — Praxion sets no utilisation band"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-18
 summary: "Adds three components — commands/handoff.md, scripts/compose_handoff.py and hooks/inject_compaction_orientation.py — producing one new registered artifact (.ai-work/<slug>/HANDOFF.md) consumed by /resume-pipeline as Tier-3 orientation, carrying the user's operating constraints verbatim across boundaries and refusing to compose while a spawn is in flight or the step's files are dirty (--force stamps readiness: overridden). Praxion sets NO compaction threshold (user decision, pre-mortem gate 2026-09-18): forcing compaction at a token count gambles the orchestrator's judgement state on the harness summary and does not solve context rot; the threshold stays the operator's, docs/context-economy.md carries the 250k-p50 target and the verified control names, and context_baseline.py --band is an analysis flag. The SessionStart(source=compact) hook is a safety net for compactions Praxion did not choose; PostCompact, which has no decision control, records one telemetry row."

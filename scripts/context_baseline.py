@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Context guard: reports orchestrator/subagent context usage against the
-measured P3.1 baseline (promoted from an earlier ad hoc measurement; the
+measured context baseline (docs/context-economy.md) (promoted from an earlier ad hoc measurement; the
 durable target and methodology live in `docs/context-economy.md`).
 
 Praxion sets no compaction threshold and reads no live utilisation (D1) --
@@ -435,7 +435,7 @@ def render_table(report: dict) -> str:
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Context guard: reports usage against the P3.1 baseline (analysis only, sets no threshold)."
+        description="Context guard: reports usage against the measured context baseline in docs/context-economy.md (analysis only, sets no threshold)."
     )
     parser.add_argument(
         "--project-root", default=None, help="Project root; defaults to git toplevel of CWD."

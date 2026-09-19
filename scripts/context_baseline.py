@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Context guard: reports orchestrator/subagent context usage against the P3.1
-baseline (`.ai-work/process-economy-p3-1/BASELINE.md`).
+"""Context guard: reports orchestrator/subagent context usage against the
+measured P3.1 baseline (promoted from an earlier ad hoc measurement; the
+durable target and methodology live in `docs/context-economy.md`).
 
 Praxion sets no compaction threshold and reads no live utilisation (D1) --
 this script is a **measurement instrument**, not an enforcement gate. It
@@ -14,20 +15,30 @@ Two layers, mirroring `self_healing_metrics.py`'s split:
     compute(rows, band=None, ...) -> dict pure aggregation into the
                                           `ContextBaselineReport` shape
 
-`load()` promotes the ad hoc `baseline/{baseline,retype,main_sessions,
-first_turn}.py` scripts used to produce `BASELINE.md` -- same regexes, same
-percentile formula, same agent-type classification cascade, folded into one
-pass per transcript file instead of the original scripts' several. Their
-parsing logic is already correct and measured; nothing here rewrites it.
+`load()` promotes a set of ad hoc scripts used for that earlier measurement --
+same regexes, same percentile formula, same agent-type classification
+cascade, folded into one pass per transcript file instead of the originals'
+several. Their parsing logic was already correct and measured; nothing here
+rewrites it.
 
 Percentile convention: a floor-indexed pick (`sorted(xs)[min(len(xs)-1,
-int(p*len(xs)))]`), NOT `statistics.median` -- `BASELINE.md`'s published
-numbers were computed with this exact formula and a guard that silently used
-a different one would diverge on even-length groups.
+int(p*len(xs)))]`), NOT `statistics.median` -- the published baseline numbers
+were computed with this exact formula and a guard that silently used a
+different one would diverge on even-length groups.
+
+Instrument limit: `~/.claude/projects/<project>/` is keyed by the *current
+working directory's* mangled path, so a pipeline run from a git worktree (the
+Standard/Full-tier default) writes its transcripts under a sibling directory
+such as `<project>--claude-worktrees-<name>/`, invisible to a single
+`--project-root` pointed at the primary checkout. This script does not read
+across worktree-mangled siblings; a complete accounting needs either several
+`--project-root` invocations (one per worktree used) or a future
+`--include-worktrees` flag that globs the sibling directories -- neither is
+implemented here.
 
 Tests are fixture-only (`scripts/test_context_baseline.py`) -- real
-transcripts are never committed or read in CI; the reproduction against this
-machine's own transcripts is a manual, LEARNINGS.md-recorded check.
+transcripts are never committed or read in CI; reproducing the published
+baseline against a real machine's transcripts is a manual, out-of-band check.
 
 Run: `python3 scripts/context_baseline.py --project-root DIR [--band TOKENS]
 [--json] [--table]`
@@ -449,17 +460,31 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     rows = load(project_root)
+    transcripts_dir = _transcripts_dir(project_root)
     report = compute(
         rows,
         band=args.band,
         generated_at=datetime.now(timezone.utc).isoformat(),
-        source_root=str(_transcripts_dir(project_root)),
+        source_root=str(transcripts_dir),
     )
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=False))
     else:
         print(render_table(report))
+
+    if not rows:
+        # A silent "0 sessions" is the exact failure mode a measurement
+        # instrument must not have -- most often `--project-root` names a
+        # worktree checkout while the transcripts sit under the primary
+        # checkout's own mangled directory (see the module docstring).
+        print(
+            f"error: no session transcripts found under {transcripts_dir} -- "
+            "point --project-root at the checkout whose sessions you want to "
+            "measure.",
+            file=sys.stderr,
+        )
+        return 2
     return 0
 
 

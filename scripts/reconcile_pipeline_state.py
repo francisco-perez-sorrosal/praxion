@@ -74,7 +74,8 @@ _PYTEST_FAIL_RE = re.compile(r"\b(\d+)\s+(?:failed|errors?)\b", re.IGNORECASE)
 _PYTEST_PASS_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
 # The fixed per-step shape (dec-386): "Result: pass=<n> fail=<n> skip=<n>".
 _RESULT_LINE_RE = re.compile(r"^Result:\s*.*$")
-_RESULT_COUNT_RE = re.compile(r"\b(?:fail|error)=(\d+)")
+_RESULT_FAIL_COUNT_RE = re.compile(r"\b(?:fail|error)=(\d+)")
+_RESULT_PASS_COUNT_RE = re.compile(r"\bpass=(\d+)")
 
 
 # ---------------------------------------------------------------------------
@@ -431,15 +432,24 @@ def _read_test_status(path: Path) -> str:
 def _result_line_status(line: str) -> str | None:
     """Classify a fixed-shape ``Result: pass=<n> fail=<n> skip=<n>`` line.
 
-    Returns "red" when any ``fail=``/``error=`` count on the line is >0,
-    "green" when the line matches but every such count is 0, or ``None`` when
-    the line is not a Result: line at all (falls through to pytest-summary
-    matching in the caller).
+    Returns "red" when any ``fail=``/``error=`` count on the line is >0, OR
+    when ``pass=0`` with no failure/error recorded either — a pytest
+    collection error (e.g. a missing module, raised above a ``### Failures``
+    block) renders exactly that all-zero shape, and a Tier-1 arbiter must
+    never read "nothing ran" as "everything passed." Returns "green" only
+    when the line matches and reports a nonzero pass count with zero
+    failures/errors, or ``None`` when the line is not a Result: line at all
+    (falls through to pytest-summary matching in the caller).
     """
     if not _RESULT_LINE_RE.match(line):
         return None
-    counts = [int(n) for n in _RESULT_COUNT_RE.findall(line)]
-    return "red" if any(n > 0 for n in counts) else "green"
+    fail_counts = [int(n) for n in _RESULT_FAIL_COUNT_RE.findall(line)]
+    if any(n > 0 for n in fail_counts):
+        return "red"
+    pass_match = _RESULT_PASS_COUNT_RE.search(line)
+    if pass_match and int(pass_match.group(1)) == 0:
+        return "red"  # nothing proven — treat as red, the safe direction
+    return "green"
 
 
 def _parse_ts(ts: str) -> datetime:

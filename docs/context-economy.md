@@ -16,15 +16,27 @@ it down while the window still holds it. The full rationale is recorded as a dec
 
 ## 1. Measured baseline
 
-Source: 21 main-session transcripts and 297 subagent transcripts on the machine that produced this doc
-(2026-08-25..09-14), scraped by `scripts/context_baseline.py`. Context size per turn is
+Source: **20 main-session transcripts and 296 subagent transcripts**, reproduced on the machine that produced this
+doc (2026-08-25..09-14) with the documented command below. Context size per turn is
 `input + cache_read + cache_creation` tokens; peak is the max over a transcript. Re-measure on any machine holding
 its own transcripts with:
 
 ```
-uv run python scripts/context_baseline.py --json
-uv run python scripts/context_baseline.py --table   # human-readable form of the same data
+uv run python scripts/context_baseline.py --project-root <primary checkout> --json
+uv run python scripts/context_baseline.py --project-root <primary checkout> --table   # human-readable form
 ```
+
+**Name the primary checkout explicitly, or the guard sees less than the full corpus.** Claude Code keys a session's
+transcript directory by the *current working directory's* mangled path at the time each turn is written.
+Standard/Full-tier pipelines run from a git worktree (the coordination protocol's isolation convention), so any
+portion of a session's transcript written while the cwd was inside a worktree is filed under that worktree's own
+mangled project directory — invisible to a `--project-root` invocation that does not name the primary checkout, and
+the guard reports no sessions at all if run with no `--project-root` flag from inside a worktree. The pipeline that
+produced this document's original `BASELINE.md` scan globbed every sibling transcript directory by hand and counted
+**21 main-session transcripts and 297 subagent transcripts**; the one-session, one-subagent difference from the
+20/296 above is exactly one worktree-scoped transcript directory the documented single-`--project-root` command
+cannot see. A full accounting across every sibling `~/.claude/projects/<repo-mangled-prefix>*` directory is out of
+this guard's current scope.
 
 Compaction has never fired on this corpus (`isCompactSummary` count: 0 in both main and subagent transcripts) — the
 windows involved are 1M tokens wide.
@@ -35,7 +47,7 @@ windows involved are 1M tokens wide.
 |---|---|
 | peak context p50 / max | ~420k / 754,514 |
 | first-turn context, p50 | ~95k |
-| context when spawning an implementer, p50 / p90 / max (n=156) | 317,992 / 485,035 / 675,178 |
+| context when spawning an implementer, p50 / p90 / max (n=155) | 317,992 / 485,035 / 675,178 |
 | context when spawning the verifier, p50 / max (n=45) | 377,151 / 706,508 |
 | context when spawning the planner, p50 / max (n=12) | 289,130 / 446,692 |
 | context when spawning the architect, p50 / max (n=9) | 180,169 / 341,250 |
@@ -44,7 +56,7 @@ windows involved are 1M tokens wide.
 
 | type | n | first turn p50 | peak p50 | peak p90 | peak max |
 |---|---|---|---|---|---|
-| implementer | 87 | 91,718 | 174,706 | 260,805 | 439,364 |
+| implementer | 86 | 91,718 | 174,706 | 260,805 | 439,364 |
 | test-engineer | 23 | 76,463 | 174,731 | 253,046 | 272,946 |
 | verifier | 18 | 89,240 | 153,233 | 285,020 | 291,183 |
 | researcher | 15 | 68,137 | 168,385 | 231,870 | 234,519 |
@@ -81,7 +93,7 @@ they describe how many spawn-cycles might share one orchestrator window before a
 the target itself with:
 
 ```
-uv run python scripts/context_baseline.py --json
+uv run python scripts/context_baseline.py --project-root <primary checkout> --json
 ```
 
 and read `main.spawn_context.<agent-type>.p50` for each type spawned by a pipeline; judge the target against how
@@ -109,31 +121,24 @@ them can raise a window past what the model supports.
 many past windows would a threshold of *N* tokens have compacted":
 
 ```
-uv run python scripts/context_baseline.py --band 500000 --json
+uv run python scripts/context_baseline.py --project-root <primary checkout> --band 500000 --json
 ```
 
-On the corpus in §1, a 500,000-token band fires on **7 of 21** main sessions (peak p50 ≈ 420k, max 754,514) and
-**0 of 297** subagent transcripts — no subagent type has ever crossed it. The number is analysis an operator can
-reproduce against their own transcripts, never a value this repository ships or applies.
-
-**A known limit of this counterfactual, stated plainly.** Standard/Full-tier pipelines run from a git worktree
-(per the coordination protocol's pipeline-isolation rule), and Claude Code keys a session's transcript directory by
-the *current working directory's* mangled path at the time each turn is written — a session whose cwd moves into a
-worktree mid-session gets that portion of its transcript filed under the worktree's own mangled project directory,
-invisible to a single `--project-root` pointed at the primary checkout. Reproducing the counterfactual above with
-`--project-root` naming the primary checkout on this machine returns **6 of 20** main sessions, not 7 of 21 — one
-worktree-run session is simply not visible from that vantage point. This is a limit of the instrument (`--project-root`
-is deliberately singular; a full accounting would need to glob every sibling `~/.claude/projects/<repo-mangled-prefix>*`
-directory), not a parsing defect, and it does not change the invariant the counterfactual is cited for: at every band
-this instrument can measure, no subagent type has ever crossed 500,000 tokens. It also does not change the design
-decision this documents — the counterfactual is retained as reference material for an operator's own analysis, never
-as a value Praxion enforces, so the exact count is illustrative rather than load-bearing.
+On `BASELINE.md`'s original hand-globbed scan, a 500,000-token band fires on **7 of 21** main sessions (peak p50 ≈
+420k, max 754,514) and **0 of 297** subagent transcripts. Reproducing it with the documented command above — the
+same single-`--project-root` visibility described in §1 — returns **6 of 20** main sessions and **0 of 296**
+subagents on this machine: one fewer main session than the original scan, for the same worktree-scoped-directory
+reason, and the subagent invariant holds under either count. No subagent type has ever crossed the band at either
+count. The number is analysis an operator can reproduce against their own transcripts, never a value this repository
+ships or applies; the exact count is illustrative, not load-bearing — what is load-bearing is that no subagent type
+has ever crossed it.
 
 ## 4. After-measurement plan
 
 This pipeline (the one that added `/handoff` and this document) is the first data point toward the target in §2. No
 judgement is made on fewer than three pipelines' worth of measurements — re-run
-`uv run python scripts/context_baseline.py --json` after each of the next three pipelines and compare
+`uv run python scripts/context_baseline.py --project-root <primary checkout> --json` after each of the next three
+pipelines and compare
 `main.spawn_context.<agent-type>.p50` against the 250,000 target. If the practice of handing off at phase boundaries
 is not moving that number down, that is itself the signal to revisit this document, not a reason to add a
 Praxion-set band.

@@ -411,6 +411,37 @@ def test_test_status_prose_summary_then_fixed_shape_green_wins(tmp_path):
     assert rps._read_test_status(p) == "green"
 
 
+def test_test_status_red_for_fixed_shape_all_zero_result_line(tmp_path):
+    """A fixed-shape Result: line with pass=0 fail=0 skip=0 is a pytest collection
+    error (e.g. ModuleNotFoundError above a ### Failures block) rendering exactly
+    that all-zero shape — it must read red, never green, since nothing was proven."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=0 fail=0 skip=0\n"
+        "Duration: 0.1s\n"
+        "### Failures\n"
+        "ModuleNotFoundError: No module named 'missing_thing'\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "red"
+
+
+def test_test_status_all_zero_section_then_green_section_last_wins(tmp_path):
+    """An all-zero (collection error) fixed-shape section followed by a later
+    green fixed-shape section — last line wins, so the file reads green."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Result: pass=0 fail=0 skip=0\n"
+        "## Step 2\n"  # id-citation-discipline:ignore
+        "Result: pass=5 fail=0 skip=0\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
 # --- windowed WAL read + cross-boundary recovery (Step 5 / Group B) ----------
 #
 # These tests call _read_wal(obs_path, max_age_days=7, now=<datetime>) — the

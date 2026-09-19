@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import json
 import sys
 from pathlib import Path
 
@@ -272,3 +273,27 @@ def test_compute_source_contains_no_filesystem_or_clock_calls():
             f"compute() must stay pure -- found {forbidden!r} in its source; "
             "filesystem/clock access belongs only in load()"
         )
+
+
+# --------------------------------------------------------------------------- #
+# (f) an empty project directory warns loudly rather than silently reporting 0
+# --------------------------------------------------------------------------- #
+def test_no_transcripts_found_warns_on_stderr_and_exits_2(tmp_path, monkeypatch, capsys):
+    # Redirect Path.home() so `_transcripts_dir` cannot fall through to this
+    # machine's real ~/.claude/projects/ and mask the empty-input case.
+    monkeypatch.setattr(ctx.Path, "home", lambda: tmp_path / "home")
+    empty_project = tmp_path / "empty-project"
+    empty_project.mkdir()
+
+    exit_code = ctx.main(["--project-root", str(empty_project), "--json"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "no session transcripts found" in captured.err
+    assert "--project-root" in captured.err
+
+    # Still emits a parseable (empty) report on stdout -- a caller scripting
+    # against --json must not get silence just because the exit code is 2.
+    report = json.loads(captured.out)
+    assert report["sessions"] == 0
+    assert report["subagents"] == 0

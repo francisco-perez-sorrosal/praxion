@@ -1,3 +1,20 @@
+## v0.33.0 (2026-09-19)
+
+### Feat
+
+- **handoff**: /handoff composes HANDOFF.md at a phase boundary; resume reads it as Tier-3
+- **guard**: context_baseline.py measures window use per agent type and pipeline
+- **hooks**: SessionStart compaction orientation and PostCompact telemetry
+- **handoff**: register HANDOFF.md in the artifact registry, precompact snapshot and inventory
+- **pipeline**: fixed TEST_RESULTS shape and failures-only default
+
+### Fix
+
+- **guard**: help text names the documented baseline, not the pipeline
+- **handoff**: readiness gate fails closed on any dirty tree; unreadable handoff refuses
+- **p3.1**: verifier rework F4–F6, F8
+- **reconciler**: read the fixed TEST_RESULTS Result line as a summary
+
 ## v0.32.0 (2026-09-14)
 
 ### Feat

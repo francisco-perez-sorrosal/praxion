@@ -13,8 +13,11 @@ Three functions, and the split between them is the design:
   ``gather(slug, repo_root, force=...)`` -- `main()`'s single read pass.
       Every fact about the world that a run needs is read here, once: the
       reconciler's verdicts, the task directory's contents, the raw-log mtimes,
-      the branch and head, the WAL, the dirty paths, the clock. It returns a
-      `ComposeContext` carrying the readiness verdict alongside the facts.
+      the branch and fork point, the WAL, the dirty paths, the clock. It
+      returns a `ComposeContext` carrying the readiness verdict alongside the
+      facts. The individual readers live in the sibling `_handoff_inputs.py`
+      (one question each, no rendering); the clock stays here so the whole
+      time-dependent surface is one module and one monkeypatch seam.
 
   ``readiness(wal_rows, git_status, step_files, force)`` -- pure, and defined
       in the sibling `_handoff_readiness.py`, re-exported here so this module
@@ -66,11 +69,26 @@ from typing import Any
 
 from _git_runner import git_output
 
+# The world-reading layer; the composer renders what these return and never
+# reaches past them. One-way: nothing there imports from here.
+from _handoff_inputs import (
+    SCOPE_CURRENT_STEP,
+    SCOPE_DIRTY_SOURCE,
+    SCOPE_UNFINISHED_STEPS,
+    VERIFIED_COMPLETE,
+    artifact_names,
+    first_unfinished,
+    recent_log,
+    resolve_base_ref,
+    step_file_scope,
+)
+
 # The readiness gate lives in its own module; these names are re-exported here
 # so `compose_handoff.readiness` stays the one public entry point callers and
 # tests reach for, whichever file the decision itself is written in.
 from _handoff_readiness import (
     BLOCKED,
+    DIRTY_STEP_FILES,
     OVERRIDDEN,
     READY,
     REMEDIES,
@@ -125,22 +143,29 @@ MID_PHASE_PREFIX = "mid-phase:"
 # note, because the next window's correct behaviour differs between them.
 HEADER_READINESS = {READY: "clean", OVERRIDDEN: "overridden"}
 
-# Tried in order only when `refs/remotes/origin/HEAD` is unset (no remote, or a
-# clone that never populated it) -- both conventional default-branch names,
-# since guessing one and stopping is how a fixture or a `master` repo silently
-# loses its diff base.
-DEFAULT_BRANCH_FALLBACKS = ("main", "master")
 UNRESOLVED_BASE_ADVISORY = (
     "- Advisory: the pipeline's base ref could not be resolved, so the position above is diffed "
     "against the working tree alone — committed steps may over-report as disagreements."
 )
 
-BYTE_WARNING_THRESHOLD = 8192
-RECENT_LOG_WINDOW_SECONDS = 60
-RECENT_LOG_ADVISORY = "a test run may still be in progress"
-RAW_LOG_GLOB = "step-*.log"
+# Keyed by the scope rule the input layer reports. Only the widened two appear:
+# a gate that quietly changed its own scope is a gate a reader cannot calibrate.
+WIDENED_SCOPE_ADVISORY = {
+    SCOPE_UNFINISHED_STEPS: (
+        "- Advisory: the current step declares no `Files:`, so the readiness gate's step-owned "
+        "paths came from the union of every unfinished step's files. Every uncommitted path "
+        "outside `.ai-state/`, `.ai-work/` and coverage output was in scope regardless."
+    ),
+    SCOPE_DIRTY_SOURCE: (
+        "- Advisory: no unfinished step declares `Files:`, so the readiness gate had no "
+        "step-owned paths to lead with. Every uncommitted path outside `.ai-state/`, "
+        "`.ai-work/` and coverage output was in scope."
+    ),
+}
 
-VERIFIED_COMPLETE = "verified-complete"
+BYTE_WARNING_THRESHOLD = 8192
+RECENT_LOG_ADVISORY = "a test run may still be in progress"
+
 MISMATCH = "mismatch"
 
 
@@ -184,6 +209,8 @@ class ComposeContext:
     """
 
     readiness_verdict: dict[str, Any] | None = None
+    step_scope_rule: str = SCOPE_CURRENT_STEP
+    dirty_step_paths: Sequence[str] = ()
     verdicts: Sequence[dict[str, Any]] = ()
     artifact_names: Sequence[str] | None = ()
     recent_log: tuple[str, int] | None = None
@@ -437,6 +464,9 @@ def _render_state(context: ComposeContext, conflicts: Sequence[dict[str, Any]]) 
         lines.append("  - no tracked steps in `WIP.md` yet.")
     if context.base_sha == UNKNOWN:
         lines.append(UNRESOLVED_BASE_ADVISORY)
+    scope_advisory = WIDENED_SCOPE_ADVISORY.get(context.step_scope_rule)
+    if scope_advisory:
+        lines.append(scope_advisory)
     lines += [
         f"- Disagreement: `{c['step']}` is recorded as {c['handoff_claim']}, ground truth says "
         f"{c['reconciler_verdict']}. Ground truth wins; the record needs correcting."
@@ -553,14 +583,16 @@ def gather(
         _wal_rows_override=_wal_rows_override,
         _test_status_override=_test_status_override,
     )
+    dirty = dirty_paths(repo_root)
+    step_files, scope_rule = step_file_scope(facts.verdicts, dirty)
+    dirty_seen = set(dirty)
     return replace(
         facts,
-        readiness_verdict=readiness(
-            session_wal_rows(repo_root),
-            dirty_paths(repo_root),
-            _current_step_files(facts.verdicts),
-            force,
-        ),
+        readiness_verdict=readiness(session_wal_rows(repo_root), dirty, step_files, force),
+        step_scope_rule=scope_rule,
+        # Scope order is step-owned-first, so naming the intersection in that
+        # order puts the operator's own likely work at the head of the refusal.
+        dirty_step_paths=tuple(path for path in step_files if path in dirty_seen),
     )
 
 
@@ -579,7 +611,7 @@ def _read_render_context(
     commit its position was computed against, rather than two different SHAs.
     """
     task_dir = repo_root / ".ai-work" / slug
-    base_ref = _resolve_base_ref(repo_root)
+    base_ref = resolve_base_ref(repo_root)
     return ComposeContext(
         verdicts=reconcile(
             slug,
@@ -589,8 +621,8 @@ def _read_render_context(
             _wal_rows_override=_wal_rows_override,
             _test_status_override=_test_status_override,
         ),
-        artifact_names=_read_artifact_names(task_dir),
-        recent_log=_read_recent_log(task_dir, time.time()),
+        artifact_names=artifact_names(task_dir),
+        recent_log=recent_log(task_dir, time.time()),
         branch=git_output(repo_root, "rev-parse", "--abbrev-ref", "HEAD") or UNKNOWN,
         base_sha=base_ref or UNKNOWN,
         worktree_path=str(repo_root),
@@ -598,88 +630,30 @@ def _read_render_context(
     )
 
 
-def _resolve_base_ref(repo_root: Path) -> str | None:
-    """The pipeline's fork point: `git merge-base HEAD <default-branch>`.
-
-    Without it the reconciler diffs the working tree alone, so every *committed*
-    step reads as a disagreement -- and a resuming window would be told that
-    finished work contradicts the record, which is worse than being told
-    nothing. Returns None when no candidate resolves; §1 then says so rather
-    than presenting the over-report as fact.
-    """
-    for candidate in _base_ref_candidates(repo_root):
-        base_ref = git_output(repo_root, "merge-base", "HEAD", candidate)
-        if base_ref:
-            return base_ref
-    return None
-
-
-def _base_ref_candidates(repo_root: Path) -> tuple[str, ...]:
-    """Default-branch refs to fork from, best first.
-
-    `refs/remotes/origin/HEAD` is the ref a clone populates from the remote's
-    own HEAD -- a local read, never a fetch -- and is what the finalize chain
-    resolves the default branch from too. The remote-tracking ref is tried
-    before the bare branch name because pipeline worktrees branch from
-    `origin/<default>`, which is therefore the more recent common ancestor.
-    """
-    ref = git_output(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD")
-    if ref:
-        return (ref, ref.rsplit("/", 1)[-1])
-    return tuple(
-        candidate for name in DEFAULT_BRANCH_FALLBACKS for candidate in (f"origin/{name}", name)
-    )
-
-
-def _read_artifact_names(task_dir: Path) -> tuple[str, ...] | None:
-    """The task directory's Markdown artifacts, or None when it cannot be read."""
-    try:
-        return tuple(
-            sorted(p.name for p in task_dir.iterdir() if p.is_file() and p.suffix == ".md")
-        )
-    except OSError:
-        return None
-
-
-def _read_recent_log(task_dir: Path, now: float) -> tuple[str, int] | None:
-    """The first raw step log touched inside the advisory window, with its age."""
-    try:
-        logs = sorted((task_dir / "logs").glob(RAW_LOG_GLOB))
-    except OSError:
-        return None
-    for path in logs:
-        try:
-            age = now - path.stat().st_mtime
-        except OSError:
-            continue
-        if age < RECENT_LOG_WINDOW_SECONDS:
-            return path.name, int(age)
-    return None
-
-
-def _current_step_files(verdicts: Sequence[dict[str, Any]]) -> list[str]:
-    """The declared `Files:` of the first step ground truth has not confirmed."""
-    for verdict in verdicts:
-        if verdict.get("verdict") == VERIFIED_COMPLETE:
-            continue
-        tier1 = verdict.get("tier1", {})
-        return list(tier1.get("files_changed", [])) + list(tier1.get("files_unchanged", []))
-    return []
-
-
 def _default_boundary(verdicts: Sequence[dict[str, Any]]) -> str | None:
-    for verdict in verdicts:
-        step = verdict.get("step")
-        if verdict.get("verdict") != VERIFIED_COMPLETE and step:
-            return f"{MID_PHASE_PREFIX}{step}"
-    return None
+    """A mid-phase boundary naming the current step, when none was given."""
+    step = (first_unfinished(verdicts) or {}).get("step")
+    return f"{MID_PHASE_PREFIX}{step}" if step else None
 
 
-def _read_optional(path: Path) -> str | None:
+def _read_existing(path: Path) -> str | None:
+    """The prior handoff's text, or None when there genuinely is none.
+
+    Absence and unreadability are different answers and only one of them is
+    safe to act on. A file that exists but cannot be read -- permissions, a bad
+    mount -- would classify as `Absent` and be overwritten with a fresh
+    skeleton, destroying carried instructions nobody ever saw. That is the same
+    destruction the unparseable path refuses, so it takes the same exit.
+    """
     try:
         return path.read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
         return None
+    except OSError as exc:
+        raise HandoffError(
+            f"the existing {path} exists but could not be read ({exc.strerror or exc}); "
+            "refusing to overwrite it"
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -705,13 +679,13 @@ def main(argv: list[str] | None = None) -> int:
 
     verdict = context.readiness_verdict or {"state": READY, "reasons": []}
     if verdict["state"] == BLOCKED:
-        _report_refusal(verdict)
+        _report_refusal(verdict, context.dirty_step_paths)
         return 1
 
     handoff_path = task_dir / "HANDOFF.md"
     try:
         result = compose(
-            args.slug, repo_root, boundary, _read_optional(handoff_path), context=context
+            args.slug, repo_root, boundary, _read_existing(handoff_path), context=context
         )
     except Exception as exc:  # noqa: BLE001 — a composer refusal must not crash the seam
         return _fail(str(exc))
@@ -742,9 +716,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _report_refusal(verdict: dict[str, Any]) -> None:
+def _report_refusal(verdict: dict[str, Any], dirty_step_paths: Sequence[str]) -> None:
     for reason in verdict.get("reasons", []):
-        sys.stderr.write(f"compose_handoff: refused — {reason}: {REMEDIES.get(reason, '')}\n")
+        remedy = REMEDIES.get(reason, "")
+        if reason == DIRTY_STEP_FILES and dirty_step_paths:
+            remedy = f"{remedy}: {', '.join(dirty_step_paths)}"
+        sys.stderr.write(f"compose_handoff: refused — {reason}: {remedy}\n")
     sys.stderr.write(
         "compose_handoff: pass --force to compose anyway; the override is recorded in the "
         "artifact, not only in your memory\n"

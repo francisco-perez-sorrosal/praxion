@@ -14,6 +14,7 @@ Run: ``pytest scripts/test_compose_handoff.py`` (or the module directly).
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -24,6 +25,7 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import _handoff_readiness  # noqa: E402
 import compose_handoff  # noqa: E402
 
 SLUG = "demo-task"
@@ -659,8 +661,6 @@ def test_recent_log_mtime_is_advisory_only_and_never_blocks(tmp_path):
 
     # Age the log past the 60s window -- the advisory note must disappear.
     old_mtime = 0
-    import os
-
     os.utime(log_path, (old_mtime, old_mtime))
     stale = compose_handoff.compose(
         SLUG,
@@ -776,6 +776,278 @@ def test_uncommitted_step_work_is_not_silently_accepted_as_complete(tmp_path, mo
         "a ground-truth mismatch in the reconciled verdicts or a blocked/overridden readiness "
         "state"
     )
+
+
+# --- dirty_paths(): the real git-status adapter, not just its literal-list callers ---
+
+
+def _seed_quiescent_wal(repo_root: Path) -> None:
+    """A matched, session-scoped agent_start/agent_stop pair -- so the
+    `wal-unreadable` fail-closed reason never masks the behaviour under test."""
+    state_dir = repo_root / ".ai-state"
+    state_dir.mkdir(exist_ok=True)
+    quiescent_wal = [
+        {"event_type": "agent_start", "agent_id": "agent-1", "session_id": "s1"},
+        {"event_type": "agent_stop", "agent_id": "agent-1", "session_id": "s1"},
+    ]
+    (state_dir / "observations.jsonl").write_text(
+        "\n".join(json.dumps(row) for row in quiescent_wal) + "\n", encoding="utf-8"
+    )
+
+
+def _write_pipeline_docs(repo_root: Path, plan: str, wip: str) -> Path:
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "IMPLEMENTATION_PLAN.md").write_text(plan, encoding="utf-8")
+    (task_dir / "WIP.md").write_text(wip, encoding="utf-8")
+    return task_dir
+
+
+def _repo_with_modified_tracked_file(tmp_path: Path) -> Path:
+    """A single-branch git repo with exactly one tracked file, modified but
+    uncommitted -- the historical single-dirty-file bug's exact shape (a
+    leading-space porcelain status line whose first character a whole-output
+    `.strip()` silently eats)."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    tracked = repo_root / "tracked.py"
+    tracked.write_text("original\n", encoding="utf-8")
+    _run_git(["add", "tracked.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    tracked.write_text("modified\n", encoding="utf-8")
+    return repo_root
+
+
+def test_dirty_paths_reports_a_single_modified_tracked_file(tmp_path):
+    repo_root = _repo_with_modified_tracked_file(tmp_path)
+    assert _handoff_readiness.dirty_paths(repo_root) == ["tracked.py"]
+
+
+def test_dirty_paths_reports_rename_destination_not_source_alongside_untracked(tmp_path):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "old.py").write_text("content\n", encoding="utf-8")
+    _run_git(["add", "old.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+
+    _run_git(["mv", "old.py", "new.py"], repo_root)
+    (repo_root / "untracked.py").write_text("new file\n", encoding="utf-8")
+
+    paths = _handoff_readiness.dirty_paths(repo_root)
+    assert "new.py" in paths
+    assert "old.py" not in paths
+    assert "untracked.py" in paths
+
+
+def _find_porcelain_parse_helper():
+    """The pure parsing core `dirty_paths()`'s I/O wrapper should delegate to,
+    once the fix separates "run git" from "parse its output" -- polled by
+    name since the implementer's fix (in parallel) owns the exact name."""
+    for name in ("parse_porcelain", "_parse_porcelain", "parse_porcelain_z"):
+        fn = getattr(_handoff_readiness, name, None)
+        if fn is not None:
+            return fn
+    return None
+
+
+@pytest.mark.skipif(
+    _find_porcelain_parse_helper() is None,
+    reason="_handoff_readiness.py exposes no pure porcelain-parsing helper yet",
+)
+def test_parses_unstripped_porcelain_text_into_repo_relative_paths():
+    parse = _find_porcelain_parse_helper()
+    # NUL-terminated `git status --porcelain -z` records: a modified file, an
+    # untracked file, and a rename (new-path record followed by the bare
+    # original-path record git emits as a second, unprefixed record).
+    raw = "\0".join([" M a.py", "?? b.py", "R  new.py", "old.py"]) + "\0"
+    assert parse(raw) == ["a.py", "b.py", "new.py"]
+
+
+def test_dirty_step_file_blocks_main_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    repo_root = _repo_with_modified_tracked_file(tmp_path)
+    plan = (
+        "### Step 1: Build the thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: tracked.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = "# WIP\n\n## Progress\n\n- [ ] Step 1: build the thing\n"  # id-citation-discipline:ignore
+    task_dir = _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    assert "dirty-step-files" in capsys.readouterr().err
+    assert not (task_dir / "HANDOFF.md").exists()
+
+
+# --- the dirty-step-files fallback chain when the current step names no Files -----
+
+
+def test_falls_back_to_every_dirty_path_when_the_current_step_declares_no_files(
+    tmp_path, monkeypatch, capsys
+):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    elsewhere = repo_root / "elsewhere.py"
+    elsewhere.write_text("original\n", encoding="utf-8")
+    _run_git(["add", "elsewhere.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    elsewhere.write_text("modified\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n"
+    )
+    wip = "# WIP\n\n## Progress\n\n- [ ] Step 1: integration checkpoint\n"  # id-citation-discipline:ignore
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    assert "dirty-step-files" in capsys.readouterr().err
+
+
+def test_dirty_path_under_ai_state_alone_does_not_trigger_the_fallback(
+    tmp_path, monkeypatch, capsys
+):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+
+    plan = (
+        "### Step 1: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n"
+    )
+    wip = "# WIP\n\n## Progress\n\n- [ ] Step 1: integration checkpoint\n"  # id-citation-discipline:ignore
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    wal_path = repo_root / ".ai-state" / "observations.jsonl"
+    _run_git(["add", ".ai-state/observations.jsonl"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed wal"], repo_root)
+    # The only uncommitted path in the repo lives entirely under .ai-state/.
+    with wal_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"event_type": "agent_start", "agent_id": "agent-2"}) + "\n")
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 0
+    assert "dirty-step-files" not in capsys.readouterr().err
+
+
+# --- an unreadable existing HANDOFF.md is a refusal, never a silent Absent --------
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores file permission bits; chmod 0o000 would not actually block the read",
+)
+def test_unreadable_existing_handoff_refuses_and_leaves_the_file_untouched(
+    tmp_path, monkeypatch, capsys
+):
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    handoff_path = task_dir / "HANDOFF.md"
+    original_bytes = b"whatever prior content\n"
+    handoff_path.write_bytes(original_bytes)
+    handoff_path.chmod(0o000)
+    try:
+        code = _run_main(
+            monkeypatch,
+            tmp_path,
+            ["--boundary", BOUNDARY_PLAN_TO_IMPL],
+            readiness_result={"state": "ready", "reasons": []},
+        )
+        assert code != 0
+        assert "HANDOFF.md" in capsys.readouterr().err
+    finally:
+        handoff_path.chmod(0o644)
+    assert handoff_path.read_bytes() == original_bytes
+
+
+def test_missing_handoff_composes_as_absent_via_main(tmp_path, monkeypatch):
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    assert not (task_dir / "HANDOFF.md").exists()
+
+    code = _run_main(
+        monkeypatch,
+        tmp_path,
+        ["--boundary", BOUNDARY_PLAN_TO_IMPL],
+        readiness_result={"state": "ready", "reasons": []},
+    )
+    assert code == 0
+    assert (task_dir / "HANDOFF.md").exists()
+
+
+# --- dirty-step-files is a union of the three scope rules, not a tiered fallback --
+
+
+def test_dirty_file_owned_by_a_completed_step_still_blocks(tmp_path, monkeypatch, capsys):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+
+    # The completed step's file: committed once (ground truth confirms it),
+    # then dirtied again -- the step stays verified-complete, but its file is
+    # now uncommitted work the next window would inherit invisibly.
+    completed_step_file = repo_root / "done_thing.py"
+    completed_step_file.write_text("original\n", encoding="utf-8")
+    # The current step's own file: committed and left untouched -- clean.
+    current_step_file = repo_root / "clean_thing.py"
+    current_step_file.write_text("clean\n", encoding="utf-8")
+    _run_git(["add", "done_thing.py", "clean_thing.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    completed_step_file.write_text("modified\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Build the done thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: done_thing.py\n"
+        "**Done when**: it works\n\n"
+        "### Step 2: Build the clean thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: clean_thing.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [x] Step 1: build the done thing\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: build the clean thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert "dirty-step-files" in stderr
+    assert "done_thing.py" in stderr
 
 
 if __name__ == "__main__":

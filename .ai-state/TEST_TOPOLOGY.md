@@ -420,6 +420,7 @@ file_dependencies:
   - "scripts/reconcile_pipeline_state.py"
   - "scripts/compose_handoff.py"
   - "scripts/_handoff_readiness.py"
+  - "scripts/_handoff_inputs.py"
   - "scripts/prune_reports.py"
   - "scripts/clean_work_safety.py"
   - "scripts/check_calibration_coverage.py"

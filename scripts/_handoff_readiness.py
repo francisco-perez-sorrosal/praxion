@@ -25,8 +25,12 @@ Three reasons, each mechanically decidable:
                         with ``spawn-in-flight`` -- "cannot answer" and
                         "answered yes" are different states, and reporting both
                         would imply the gate had looked.
-  ``dirty-step-files``  uncommitted changes in the current step's declared
-                        files, which the next window would inherit invisibly.
+  ``dirty-step-files``  any uncommitted path outside bookkeeping; step-owned
+                        paths named first. The scope is deliberately wider than
+                        the name: the next window inherits uncommitted work
+                        invisibly whichever step owns it, including a step
+                        already verified-complete. The remedy is a pathspec
+                        commit, or ``--force`` with the override stamped.
 
 A fourth condition was considered and dropped: a detached test suite's
 done-file is not mechanically decidable (that convention fixes no path and no
@@ -44,7 +48,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from _git_runner import git_output
+from _git_runner import run_git
 
 # `_parse_jsonl` is imported rather than re-written: a second JSONL reader for
 # the same WAL would be free to disagree with the reconciler's about partial
@@ -61,13 +65,21 @@ REMEDIES = {
     WAL_UNREADABLE: (
         "check `.ai-state/observations.jsonl`; pass --force only if you know no subagent is running"
     ),
-    DIRTY_STEP_FILES: "commit or revert the current step's declared files, then re-run",
+    DIRTY_STEP_FILES: (
+        "commit these paths by pathspec, or revert them, then re-run (step-owned paths first)"
+    ),
 }
 
 WAL_AGENT_START = "agent_start"
 WAL_AGENT_STOP = "agent_stop"
 
 OBSERVATIONS_WAL = Path(".ai-state") / "observations.jsonl"
+
+# A porcelain record is two status columns, a space, then the path -- positions,
+# not fields, which is why the raw output is parsed and never a stripped copy.
+PORCELAIN_PATH_OFFSET = 3
+# Rename and copy entries trail one extra record carrying the original path.
+RENAME_STATUS_CODES = ("R", "C")
 
 
 def readiness(
@@ -132,13 +144,51 @@ def session_wal_rows(repo_root: Path) -> list[dict[str, Any]]:
 
 
 def dirty_paths(repo_root: Path) -> list[str]:
-    """Repo-relative paths `git status --porcelain` reports as not clean."""
-    output = git_output(repo_root, "status", "--porcelain")
-    if not output:
+    """Repo-relative paths `git status --porcelain` reports as not clean.
+
+    `run_git` rather than `git_output`, and `-z` rather than the newline form,
+    for one reason twice over: **porcelain's status columns are positional, so
+    any transformation of the raw bytes moves the path.** `git_output` strips
+    the whole output, which eats the leading space of the first entry -- a tree
+    with exactly one modified file (`" M src/thing.py"`) then parsed a character
+    short and this gate reported a clean tree over a dirty one, failing open in
+    the one direction a refusal gate must never fail.
+
+    `-z` is the robust form: paths arrive unquoted and unescaped (the newline
+    form wraps anything containing a space in quotes), and a rename carries its
+    *new* path in the entry itself with the original trailing as its own record
+    -- so nothing has to be recovered from an `old -> new` string.
+
+    Returns `[]` when git cannot answer, which is today's behaviour and the one
+    remaining fail-open direction here; distinguishing "clean" from "could not
+    look" for git would need a fourth reason name and belongs to whoever owns
+    the reason set, not to this fix.
+    """
+    try:
+        result = run_git(repo_root, "status", "--porcelain", "-z")
+    except OSError:  # GitUnavailableError subclasses it; so does a missing binary
         return []
-    paths = []
-    for line in output.splitlines():
-        entry = line[3:].strip()
-        # A rename is reported as `old -> new`; only the destination exists now.
-        paths.append(entry.split(" -> ")[-1].strip('"'))
-    return [path for path in paths if path]
+    if result.returncode != 0:
+        return []
+    return parse_porcelain_z(result.stdout)
+
+
+def parse_porcelain_z(output: str) -> list[str]:
+    """Paths out of NUL-terminated porcelain records; renames yield the new name.
+
+    Each record is ``XY<space><path>``. A rename or copy is followed by one
+    extra record holding the original path, which is consumed and discarded --
+    the original no longer exists in the tree, so it is not a dirty path.
+    """
+    records = [record for record in output.split("\0") if record]
+    paths: list[str] = []
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if len(record) <= PORCELAIN_PATH_OFFSET:
+            continue
+        if record[0] in RENAME_STATUS_CODES:
+            index += 1
+        paths.append(record[PORCELAIN_PATH_OFFSET:])
+    return paths

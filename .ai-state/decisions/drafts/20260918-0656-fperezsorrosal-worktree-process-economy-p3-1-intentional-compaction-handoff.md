@@ -11,6 +11,16 @@ agent_type: systems-architect
 branch: worktree-process-economy-p3-1
 pipeline_tier: standard
 affected_files:
+  - commands/handoff.md
+  - scripts/compose_handoff.py
+  - scripts/_handoff_readiness.py
+  - scripts/test_compose_handoff.py
+  - hooks/inject_compaction_orientation.py
+  - hooks/test_inject_compaction_orientation.py
+  - scripts/context_baseline.py
+  - scripts/test_context_baseline.py
+  - scripts/reconcile_pipeline_state.py
+  - docs/context-economy.md
   - hooks/hooks.json
   - hooks/precompact_state.py
   - hooks/capture_session.py
@@ -24,7 +34,7 @@ affected_reqs: [REQ-01, REQ-03, REQ-04, REQ-05, REQ-05b, REQ-06, REQ-08]
 dissent: "With no Praxion-set threshold there is no mechanical backstop: the whole mechanism now depends on a human remembering to run /handoff at a boundary, and an orchestrator that never does behaves exactly as the measured baseline did. The design accepts this deliberately — the alternative moves an irreversible act away from the person who can see the status line — but low uptake, not delivery failure, is the most likely way this decision turns out wrong. Secondarily: the restore's delivery is documented (SessionStart honours additionalContext) yet still unobserved here, since nothing in this repo has ever compacted."
 ---
 
-# Intentional compaction: a Tier-3 phase-boundary handoff, a 50% harness-enforced band, and a 1 KiB PostCompact restore
+# Intentional compaction: a Tier-3 phase-boundary handoff with a readiness gate, a SessionStart(compact) safety net, and no Praxion-set band
 
 Activation: fired — structural (≈15 files; hooks + scripts + commands + knowledge/docs) + novelty (no precedent for
 intentional compaction in this repo); lens set = Developer, Test, Operations, Simplicity, Performance, Testability

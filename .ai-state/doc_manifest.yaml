@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-19T07:52:10Z'
+generated_at: '2026-09-20T06:21:35Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -56,7 +56,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-14'
+  last_modified: '2026-09-19'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -128,7 +128,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-08'
+  last_modified: '2026-09-19'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -514,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-18'
+  last_modified: '2026-09-19'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-18'
+  last_modified: '2026-09-19'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -561,13 +561,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-13'
+  last_modified: '2026-09-19'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-18'
+  last_modified: '2026-09-19'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2914,7 +2914,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-17'
+  last_modified: '2026-09-19'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2982,12 +2982,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-09-14'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.json
-  type: json
-  title: METRICS_REPORT_2026-07-16_06-05-57.json
-  last_modified: '2026-07-15'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.json
   type: json
@@ -3042,12 +3036,12 @@ surfaces:
   title: METRICS_REPORT_2026-09-07_01-45-44.json
   last_modified: '2026-09-06'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-05-57.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-07-15'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_06-20-50.json
+  type: json
+  title: METRICS_REPORT_2026-09-20_06-20-50.json
+  last_modified: '2026-09-19'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-16_06-44-58.md
   type: markdown
@@ -3102,6 +3096,12 @@ surfaces:
   title: Project Metrics Report
   last_modified: '2026-09-06'
   renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_06-20-50.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-19'
+  renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
@@ -3147,7 +3147,7 @@ surfaces:
   path: .ai-state/specs/SPEC_process-economy-p3-1_2026-09-18.md
   type: markdown
   title: 'Spec: P3.1 -- Intentional Compaction (Phase-Boundary Handoff with Continuity Guarantees + a Compaction Safety Net)'
-  last_modified: '2026-09-18'
+  last_modified: '2026-09-19'
   renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
@@ -3612,8 +3612,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
-  - ai-state-metrics-reports-metrics-report-2026-07-16-06-05-57
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-16-06-44-58
   - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
@@ -3632,6 +3630,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
+  - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
+  - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27

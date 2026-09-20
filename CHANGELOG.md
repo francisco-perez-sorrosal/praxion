@@ -1,3 +1,13 @@
+## v0.34.0 (2026-09-20)
+
+### Feat
+
+- **ci**: scheduled audits workflow for the model-free audit set (process-economy P3.3, lane 1)
+
+### Fix
+
+- **telemetry**: resolve Workflow-tool agent transcripts under subagents/workflows/<run>/ in the SubagentStop enrichment and the context guard
+
 ## v0.33.0 (2026-09-19)
 
 ### Feat

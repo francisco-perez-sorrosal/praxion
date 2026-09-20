@@ -20,6 +20,7 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import mutation_sensor as ms  # noqa: E402
 import reconcile_pipeline_state as rps  # noqa: E402
 
 SLUG = "demo-task"
@@ -440,6 +441,108 @@ def test_test_status_all_zero_section_then_green_section_last_wins(tmp_path):
         encoding="utf-8",
     )
     assert rps._read_test_status(p) == "green"
+
+
+# --- backward compatibility: the optional `Mutation:` step-section line -----
+#
+# Both fixture lines are built by calling the shipped scripts/mutation_sensor.py
+# directly (imported below) rather than hand-copied strings, so a future
+# change to the runner's exact rendering re-derives the fixture instead of
+# silently drifting from it.
+
+
+def _mutation_survivors_line_at_cap() -> str:
+    """The real `survivors=` rendering, sized so it lands exactly at the
+    runner's 240-byte hard cap -- the boundary where a regression could
+    silently push a green section's byte count somewhere unexpected."""
+    per_function = {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 19,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 9,
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": 8,
+        "d": 4,
+        "e": 4,
+        "f": 3,
+        "g": 2,
+    }
+    histogram = {
+        "killed": 0,
+        "survived": sum(per_function.values()),
+        "no_tests": 0,
+        "skipped": 0,
+        "suspicious": 0,
+        "timeout": 0,
+        "segfault": 0,
+    }
+    outcome = ms.Ran(
+        targets=("a.py",),
+        mutants=sum(per_function.values()),
+        histogram=histogram,
+        per_function=per_function,
+        elapsed_s=1.0,
+    )
+    line = ms.render_line(outcome)
+    assert len(line.encode("utf-8")) == ms.LINE_BYTE_CAP, (
+        f"fixture drifted off the byte cap: {len(line.encode('utf-8'))} bytes, "
+        f"expected exactly {ms.LINE_BYTE_CAP}"
+    )
+    return line
+
+
+def _mutation_unavailable_line() -> str:
+    """The real `unavailable` refusal rendering, built the same way the
+    runner's own `_emit` renders a `toolchain-missing` refusal."""
+    reason = ms.ReasonCode.TOOLCHAIN_MISSING.value
+    detail = ms._one_line("uv not found on PATH")
+    return f"Mutation: unavailable reason={reason} ({detail})"
+
+
+def test_test_status_green_with_mutation_survivors_line_matches_shape_without_it(tmp_path):
+    """A green fixed-shape section carrying the `survivors=` line at exactly
+    its byte cap classifies exactly as it would without the line -- green."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=12 fail=0 skip=0\n"
+        "Duration: 0.5s\n"
+        f"{_mutation_survivors_line_at_cap()}\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
+def test_test_status_green_with_mutation_unavailable_line_matches_shape_without_it(tmp_path):
+    """A green fixed-shape section carrying the `unavailable` refusal line
+    classifies exactly as it would without the line -- green. A legitimate
+    refusal must never read as a failure."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=12 fail=0 skip=0\n"
+        "Duration: 0.5s\n"
+        f"{_mutation_unavailable_line()}\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "green"
+
+
+def test_test_status_red_result_line_wins_regardless_of_mutation_line(tmp_path):
+    """Canary: a red Result: line (fail > 0) still classifies red even when a
+    Mutation: line is present -- the line must never launder a real failure
+    into green, whichever of the two shapes it carries. `survivors=3` and
+    `(fn: 2)` must never be read as a passing count by the pytest-count
+    regexes this reader also scans for."""
+    p = tmp_path / "TEST_RESULTS.md"
+    p.write_text(
+        "## Step 1\n"  # id-citation-discipline:ignore
+        "Command: `uv run pytest -q`\n"
+        "Result: pass=10 fail=2 skip=0\n"
+        "Duration: 0.5s\n"
+        f"{_mutation_survivors_line_at_cap()}\n",
+        encoding="utf-8",
+    )
+    assert rps._read_test_status(p) == "red"
 
 
 # --- windowed WAL read + cross-boundary recovery (Step 5 / Group B) ----------

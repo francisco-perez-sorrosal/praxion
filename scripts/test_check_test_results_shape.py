@@ -164,6 +164,150 @@ def test_json_output_shape(tmp_path: Path, capsys: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Backward compatibility: the optional `Mutation:` step-section line must be
+# invisible to this checker, in both its documented shapes.
+#
+# Both fixture lines below are built by calling the shipped
+# scripts/mutation_sensor.py directly (loaded the same way this file loads
+# itself, above) rather than hand-copied strings -- so a future change to the
+# runner's exact rendering re-derives the fixture instead of silently
+# drifting from it.
+# ---------------------------------------------------------------------------
+
+_MUTATION_SENSOR_PATH = Path(__file__).resolve().parent / "mutation_sensor.py"
+
+
+def _load_mutation_sensor() -> Any:
+    spec = importlib.util.spec_from_file_location("mutation_sensor", _MUTATION_SENSOR_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["mutation_sensor"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_ms = _load_mutation_sensor()
+
+
+def _mutation_survivors_line_at_cap() -> str:
+    """The real `survivors=` rendering, sized so it lands exactly at the
+    runner's 240-byte hard cap -- the boundary where a regression could
+    silently push a green section over the ceiling."""
+    per_function = {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 19,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 9,
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": 8,
+        "d": 4,
+        "e": 4,
+        "f": 3,
+        "g": 2,
+    }
+    histogram = {
+        "killed": 0,
+        "survived": sum(per_function.values()),
+        "no_tests": 0,
+        "skipped": 0,
+        "suspicious": 0,
+        "timeout": 0,
+        "segfault": 0,
+    }
+    outcome = _ms.Ran(
+        targets=("a.py",),
+        mutants=sum(per_function.values()),
+        histogram=histogram,
+        per_function=per_function,
+        elapsed_s=1.0,
+    )
+    line = _ms.render_line(outcome)
+    assert len(line.encode("utf-8")) == _ms.LINE_BYTE_CAP, (
+        f"fixture drifted off the byte cap: {len(line.encode('utf-8'))} bytes, "
+        f"expected exactly {_ms.LINE_BYTE_CAP}"
+    )
+    return line
+
+
+def _mutation_unavailable_line() -> str:
+    """The real `unavailable` refusal rendering, built the same way the
+    runner's own `_emit` renders a `toolchain-missing` refusal."""
+    reason = _ms.ReasonCode.TOOLCHAIN_MISSING.value
+    detail = _ms._one_line("uv not found on PATH")
+    return f"Mutation: unavailable reason={reason} ({detail})"
+
+
+def _fixed_shape_green_with_mutation(mutation_line: str) -> str:
+    """The fixed green shape plus one optional line, placed after `Duration:`
+    per `agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`."""
+    return _fixed_shape_green() + f"{mutation_line}\n"
+
+
+def test_green_section_with_mutation_survivors_line_at_byte_cap_is_clean(tmp_path: Path) -> None:
+    """A green section carrying the `survivors=` shape at exactly its 240-byte
+    hard cap reads as zero findings -- no `green-over-ceiling`."""
+    body = _fixed_shape_green_with_mutation(_mutation_survivors_line_at_cap())
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert findings == [], f"the Mutation: line must not surface a finding: {findings}"
+    assert main([str(path)]) == 0
+
+
+def test_green_section_with_mutation_unavailable_line_is_clean(tmp_path: Path) -> None:
+    """A green section carrying the `unavailable` refusal shape reads as zero
+    findings -- a legitimate refusal is not itself a shape violation."""
+    body = _fixed_shape_green_with_mutation(_mutation_unavailable_line())
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert findings == []
+    assert main([str(path)]) == 0
+
+
+def test_red_section_with_mutation_line_is_never_flagged_for_size(tmp_path: Path) -> None:
+    """A red section (fail > 0) carrying a Mutation: line -- even a grossly
+    oversized one -- stays exempt from the size check, mirroring the
+    pre-existing red-sections-are-never-flagged-for-size behavior."""
+    oversized_line = "Mutation: survivors=1 mutants=1 targets=[a.py] (" + "x" * 2000 + ": 1)"
+    body = (
+        "## Step 1 — a step\n"  # id-citation-discipline:ignore
+        "\n"
+        "Command: `uv run pytest tests/ -q --tb=short -rf`\n"
+        "Result: pass=10 fail=2 skip=0\n"
+        "Duration: 4.0s\n"
+        f"{oversized_line}\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert findings == [], (
+        "a red section must stay exempt from size checks regardless of what it carries"
+    )
+
+
+def test_mutation_line_that_actually_blows_the_ceiling_is_still_caught(tmp_path: Path) -> None:
+    """Canary: if the runner's 240-byte line cap regressed and a Mutation:
+    line grew large enough to push a GREEN section's total past the
+    1,024-byte ceiling,
+    the checker must still flag it -- proving the two clean tests above pass
+    because the shipped line legitimately stays under budget, not because
+    this checker ignores the line's content."""
+    uncapped_line = (
+        "Mutation: survivors=1 mutants=1 targets=[a.py] (" + "x" * DEFAULT_CEILING_BYTES + ": 1)"
+    )
+    body = _fixed_shape_green_with_mutation(uncapped_line)
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert len(findings) == 1
+    assert findings[0].kind == "green-over-ceiling"
+    assert main([str(path)]) == 1
+
+
+# ---------------------------------------------------------------------------
 # Script error (exit 2)
 # ---------------------------------------------------------------------------
 

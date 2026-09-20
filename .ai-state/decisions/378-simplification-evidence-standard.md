@@ -10,6 +10,7 @@ made_by: agent
 agent_type: implementation-planner
 branch: worktree-process-economy-phase0
 pipeline_tier: standard
+re_affirmed_by: dec-draft-15ec5a75
 affected_files:
   - docs/independent-analysis/process-economy-roadmap.md
 ---

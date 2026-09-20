@@ -1,0 +1,118 @@
+# Scheduled audits — the mechanical, model-free half of Praxion's audit set
+# (process-economy P3.3, lane 1). The sentinel (the one audit that needs a
+# model) stays interactive by user decision (2026-09-19, option D); this
+# workflow only reports its age.
+#
+# What runs, weekly and on demand:
+#   1. `/project-metrics` (python -m scripts.project_metrics --mechanical-only)
+#      — the report triple under .ai-state/metrics_reports/, pruned to the
+#      newest 10 runs, committed back to `main`.
+#   2. The freshness guard `scripts/check_metrics_freshness.py` — the
+#      executable guard (dec-378) that the new report describes HEAD.
+#   3. Read-only checks, written to the job summary: check families, state
+#      ledgers (blocking on violations), gate liveness, token budget.
+#   4. An advisory line naming the age of the newest SENTINEL_LOG.md row.
+#
+# SECURITY ENVELOPE (same shape as finalize-adrs.yml):
+#   - Triggers are `schedule` and `workflow_dispatch` only — never a
+#     PR-context event that would run untrusted code with write credentials.
+#   - `permissions: {}` at the workflow floor; the single job re-grants ONLY
+#     `contents: write` (the commit-back push).
+#   - Every `uses:` is pinned to a full 40-hex commit SHA (dec-024).
+#   - NO agent/LLM step and no secret: `--mechanical-only` skips the
+#     agent-readiness LLM tier; the token budget uses its fallback counter.
+#   - Anti-recursion is structural: a GITHUB_TOKEN push does not re-trigger
+#     `push` workflows. The commit-back stages ONLY .ai-state/metrics_reports/.
+
+name: Scheduled audits
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+# Least-privilege floor; the job below re-grants only `contents: write`.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # the ONLY write grant — the commit-back push to `main`
+    steps:
+      - name: Checkout main (full history — churn metrics read 90 days of log)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv (manages Python 3.13)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Project metrics (mechanical tier, no credential)
+        run: |
+          uv run python -m scripts.project_metrics --mechanical-only
+          uv run python scripts/prune_reports.py --repo-root . --family .ai-state/metrics_reports:METRICS
+
+      - name: Freshness guard — the new report describes HEAD
+        run: uv run python scripts/check_metrics_freshness.py --repo-root .
+
+      - name: Read-only checks (report to the job summary; ledgers block)
+        run: |
+          {
+            echo "## Check families"
+            echo '```'
+            uv run python scripts/run_check_families.py --repo-root . --table
+            echo '```'
+            echo "## Gate liveness"
+            echo '```'
+            uv run python scripts/check_gate_liveness.py --json
+            echo '```'
+            echo "## Token budget"
+            echo '```'
+            uv run python scripts/measure_token_budget.py
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          uv run python scripts/check_state_ledgers.py --check
+
+      - name: Sentinel age (advisory — the sentinel stays interactive)
+        run: |
+          uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import datetime, re
+          from pathlib import Path
+          rows = [l for l in Path(".ai-state/sentinel_reports/SENTINEL_LOG.md").read_text().splitlines() if re.match(r"\| 20\d\d-", l)]
+          if not rows:
+              print("## Sentinel age\nno SENTINEL_LOG.md rows")
+              raise SystemExit
+          last = rows[-1].split("|")[1].strip()[:10]
+          age = (datetime.date.today() - datetime.date.fromisoformat(last)).days
+          flag = " — over 14 days, run the sentinel in a session" if age > 14 else ""
+          print(f"## Sentinel age\nnewest SENTINEL_LOG.md row: {last} ({age} days ago){flag}")
+          PY
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push the metrics report
+        # Pathspec-scoped: only the report family moves. An idle run (no new
+        # report — impossible here, but kept symmetric with finalize-adrs.yml)
+        # makes no commit and no push.
+        run: |
+          git add -A -- .ai-state/metrics_reports
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(state): scheduled metrics report"
+            git push
+          else
+            echo "No metrics-report changes to commit."
+          fi

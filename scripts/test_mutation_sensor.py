@@ -184,17 +184,23 @@ def _flat_git_dir(tmp_path: Path, *, name: str = "target") -> Path:
     return d
 
 
-def _install_fake_uv(monkeypatch: pytest.MonkeyPatch, plan: dict) -> list[list[str]]:
+def _install_fake_uv(
+    monkeypatch: pytest.MonkeyPatch, plan: dict, *, clock: dict[str, float] | None = None
+) -> list[list[str]]:
     """Patch `subprocess.run` so any `uv ...` invocation is faked per `plan`
-    (keyed by the mutmut subcommand -- "run" | "export-cicd-stats" | "results" --
-    or "__any__" for a failure before mutmut is ever reached, e.g. a bootstrap
-    failure). Every other executable, `git` in particular, passes through to the
-    real `subprocess.run` unchanged. Returns the captured argv lists, in call
-    order, for every intercepted `uv` invocation.
+    (keyed by the mutmut subcommand -- "--version" | "run" | "export-cicd-stats"
+    | "results" -- or "__any__" for a failure before mutmut is ever reached,
+    e.g. a bootstrap failure). Every other executable, `git` in particular,
+    passes through to the real `subprocess.run` unchanged. Returns the
+    captured argv lists, in call order, for every intercepted `uv` invocation.
 
     A behavior dict may set: `exit_code` (default 0), `stdout`, `stderr`,
     `raise_timeout` (raises `subprocess.TimeoutExpired` instead of returning),
-    `write` (a `{relative_path: content}` map written under the call's `cwd`).
+    `write` (a `{relative_path: content}` map written under the call's `cwd`),
+    `advance` (seconds added to `clock["t"]` before the call returns -- only
+    meaningful when `clock` is also passed; simulates wall-clock time elapsing
+    inside one faked subprocess call, for tests of the timeout budget without
+    a real sleep).
     """
     real_run = subprocess.run
     calls: list[list[str]] = []
@@ -210,6 +216,8 @@ def _install_fake_uv(monkeypatch: pytest.MonkeyPatch, plan: dict) -> list[list[s
             if idx + 1 < len(argv):
                 subcmd = argv[idx + 1]
         behavior = plan.get(subcmd) or plan.get("__any__") or {"exit_code": 0}
+        if clock is not None:
+            clock["t"] += behavior.get("advance", 0.0)
         if behavior.get("raise_timeout"):
             raise subprocess.TimeoutExpired(cmd=argv, timeout=kw.get("timeout"))
         cwd = Path(kw.get("cwd") or ".")
@@ -575,6 +583,301 @@ class TestForeignProjectRootDerivation:
         ), (
             f"--project must be the target's own git toplevel ({expected_root}), not the runner's; got {calls}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Method mutants (mutmut 3.8.0's class-bearing shape,
+# `x<sep>Class<sep>method__mutmut_N`, `sep` = U+01C1 "ǁ") must attribute to
+# `Class.method`, not silently fail to match the function-only regex --
+# a real live validation only ever exercised a function-only fixture module,
+# so the class-bearing shape was never proven.
+# ---------------------------------------------------------------------------
+
+
+class TestMethodMutantAttribution:
+    def test_method_and_function_mutants_are_both_attributed_and_counted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        # Verbatim shapes from a real mutmut 3.8.0 run: two method trampolines
+        # (a dunder method and an ordinary one) plus a module-level function,
+        # with one mutant of the function actually killed.
+        results_text = (
+            "    shape.xǁBoxǁ__init____mutmut_1: survived\n"
+            "    shape.xǁBoxǁarea__mutmut_1: survived\n"
+            "    shape.x_perimeter__mutmut_1: survived\n"
+            "    shape.x_perimeter__mutmut_2: killed\n"
+        )
+        stats = dict(
+            CICD_STATS_FIXTURE,
+            killed=1,
+            survived=3,
+            no_tests=0,
+            skipped=0,
+            suspicious=0,
+            timeout=0,
+            segfault=0,
+            total=4,
+        )
+        plan = {
+            "run": {},
+            "export-cicd-stats": {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}},
+            "results": {"stdout": results_text},
+        }
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py"), "--json"])
+
+        assert rc == ms.EXIT_OK, (
+            "a surviving method mutant must never be dropped from attribution and trip the "
+            "histogram/attribution consistency check into a run-failed refusal"
+        )
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["survivors"] == 3
+        per_function = payload["per_function"]
+        assert per_function.get("Box.__init__") == 1, (
+            f"a dunder method's mangled key must attribute to 'Box.__init__'; got {per_function!r}"
+        )
+        assert per_function.get("Box.area") == 1, (
+            f"an ordinary method's mangled key must attribute to 'Box.area'; got {per_function!r}"
+        )
+        assert per_function.get("perimeter") == 1, (
+            f"a module-level function survivor must still attribute as before; got {per_function!r}"
+        )
+        assert sum(per_function.values()) == 3, "the killed perimeter mutant must not be counted"
+
+
+class TestMultiTargetSameFunctionNameAttribution:
+    def test_two_targets_defining_the_same_function_name_are_not_merged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = tmp_path / "target"
+        d.mkdir()
+        (d / "mod_a.py").write_text("def helper(x):\n    return x + 1\n", encoding="utf-8")
+        (d / "mod_b.py").write_text("def helper(x):\n    return x - 1\n", encoding="utf-8")
+        (d / "test_helpers.py").write_text(
+            "from mod_a import helper as helper_a\nfrom mod_b import helper as helper_b\n\n\n"
+            "def test_helpers():\n    assert helper_a(1) == 2\n    assert helper_b(1) == 0\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "init", "-q"], cwd=d, check=True)
+        # Both modules' `helper` survives one mutant each -- a naive per-function
+        # dict keyed only on the bare function name would collapse these into a
+        # single "helper: 2" entry, hiding which module actually needs attention.
+        results_text = (
+            "    mod_a.x_helper__mutmut_1: survived\n    mod_b.x_helper__mutmut_1: survived\n"
+        )
+        stats = dict(
+            CICD_STATS_FIXTURE,
+            killed=0,
+            survived=2,
+            no_tests=0,
+            skipped=0,
+            suspicious=0,
+            timeout=0,
+            segfault=0,
+            total=2,
+        )
+        plan = {
+            "run": {},
+            "export-cicd-stats": {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}},
+            "results": {"stdout": results_text},
+        }
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(
+            [
+                "--targets",
+                str(d / "mod_a.py"),
+                str(d / "mod_b.py"),
+                "--tests",
+                str(d / "test_helpers.py"),
+                "--json",
+            ]
+        )
+
+        assert rc == ms.EXIT_OK
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["survivors"] == 2
+        per_function = payload["per_function"]
+        assert sum(per_function.values()) == 2
+        assert len(per_function) == 2, (
+            "two targets defining the same function name must not merge into one count/label "
+            f"-- module-qualify when more than one target is given; got {per_function!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# A missing --targets/--tests path is refused before any mutmut subprocess --
+# never left to mutmut's own opaque failure, and never silently producing a
+# "ran, zero mutants" reading below.
+# ---------------------------------------------------------------------------
+
+
+class TestPathMissingRefusal:
+    @pytest.mark.parametrize("missing_role", ["targets", "tests"])
+    def test_a_missing_targets_or_tests_path_refuses_before_any_subprocess(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        missing_role: str,
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        missing = d / "absent.py"  # never created
+        targets = [str(missing if missing_role == "targets" else d / "mod.py")]
+        tests = [str(missing if missing_role == "tests" else d / "test_mod.py")]
+        calls = _install_fake_uv(monkeypatch, {})
+
+        rc = ms.main(["--targets", *targets, "--tests", *tests])
+
+        captured = capsys.readouterr()
+        assert rc == ms.EXIT_ERROR
+        match = _UNAVAILABLE_LINE_RE.match(captured.out.strip())
+        assert match, (
+            f"stdout must be a 'Mutation: unavailable reason=...' line; got {captured.out!r}"
+        )
+        assert missing.name in match.group("detail"), (
+            f"the refusal detail must name the missing path; got {match.group('detail')!r}"
+        )
+        assert not calls, "a missing path must be refused before any mutmut invocation is made"
+
+
+# ---------------------------------------------------------------------------
+# A completed run whose histogram total is zero is a vacuous reading, not a
+# trustworthy "no mutants" result -- it must refuse, never publish
+# "survivors=0 mutants=0" at exit 0.
+# ---------------------------------------------------------------------------
+
+
+class TestZeroMutantsRefusal:
+    def test_a_run_with_zero_total_mutants_refuses_rather_than_publishing_a_vacuous_green(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        stats = dict(
+            CICD_STATS_FIXTURE,
+            killed=0,
+            survived=0,
+            no_tests=0,
+            skipped=0,
+            suspicious=0,
+            timeout=0,
+            segfault=0,
+            total=0,
+        )
+        plan = {
+            "run": {},
+            "export-cicd-stats": {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}},
+            "results": {"stdout": ""},
+        }
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        _assert_refusal(rc, captured, "run-failed")
+        assert "survivors=0" not in captured.out, (
+            "a zero-mutant run must never publish 'survivors=0 mutants=0' as a completed reading"
+        )
+
+
+# ---------------------------------------------------------------------------
+# A segfaulting mutant is a completed run, not a total-mismatch refusal -- it
+# folds into `inconclusive=`, the same bucket as timeout/suspicious.
+# ---------------------------------------------------------------------------
+
+
+class TestSegfaultCountsAsInconclusive:
+    def test_a_segfaulting_mutant_completes_the_run_and_counts_as_inconclusive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        stats = dict(
+            CICD_STATS_FIXTURE,
+            killed=1,
+            survived=0,
+            no_tests=0,
+            skipped=0,
+            suspicious=0,
+            timeout=0,
+            segfault=1,
+            total=2,
+        )
+        plan = {
+            "run": {},
+            "export-cicd-stats": {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}},
+            "results": {"stdout": ""},
+        }
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        assert rc == ms.EXIT_OK, "a segfaulting mutant is a completed run, not a refusal"
+        line = capsys.readouterr().out.strip()
+        assert "inconclusive=1" in line, (
+            "the segfaulting mutant must fold into inconclusive=, not trip a total-mismatch "
+            f"refusal; got {line!r}"
+        )
+        assert "survivors=0" in line
+
+
+# ---------------------------------------------------------------------------
+# `--timeout` is one wall-clock budget for the whole run (bootstrap probe +
+# mutmut run + export-cicd-stats + results), not a fresh ceiling handed to
+# each subprocess call -- a faked subprocess is used to simulate time passing
+# without a real sleep, per the no-wall-clock-dependency testing convention.
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutBudgetIsWholeRun:
+    def test_the_timeout_budget_covers_the_whole_run_not_just_the_mutmut_run_subprocess(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        clock = {"t": 0.0}
+        monkeypatch.setattr(ms.time, "monotonic", lambda: clock["t"])
+        # The `run` subcommand alone consumes 9.0s of a 10s budget; if the
+        # timeout were re-applied fresh to each subsequent subprocess call
+        # (the defect), there would be no observable difference here -- the
+        # discriminator is `elapsed_s`, which must bracket all four calls
+        # (0.1 + 9.0 + 0.3 + 0.3 = 9.7), not just the `run` call's own 9.0s.
+        plan = {
+            "--version": {"advance": 0.1},
+            "run": {"advance": 9.0},
+            "export-cicd-stats": {
+                "advance": 0.3,
+                "write": {"mutants/mutmut-cicd-stats.json": json.dumps(CICD_STATS_FIXTURE)},
+            },
+            "results": {"advance": 0.3, "stdout": POST_RESULTS_TEXT},
+        }
+        _install_fake_uv(monkeypatch, plan, clock=clock)
+
+        rc = ms.main(
+            [
+                "--targets",
+                str(d / "mod.py"),
+                "--tests",
+                str(d / "test_mod.py"),
+                "--timeout",
+                "10",
+                "--json",
+            ]
+        )
+
+        payload = json.loads(capsys.readouterr().out)
+        if rc == ms.EXIT_OK:
+            assert payload["outcome"] == "ran"
+            assert payload["elapsed_s"] >= 9.3, (
+                "elapsed_s must bracket the whole run (bootstrap + run + export + results), "
+                f"not just the mutmut run subprocess's own share; got {payload['elapsed_s']!r}"
+            )
+        else:
+            assert payload["outcome"] == "refused"
+            assert payload["reason"] == "run-timeout", (
+                "if the remaining budget after the first subprocess is insufficient, the only "
+                f"acceptable refusal is run-timeout; got {payload!r}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -554,3 +554,17 @@ repos:
         language: system
         files: '^(skills/.*/SKILL\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.claude-plugin/plugin\.json|scripts/check_artifact_conformance\.py)$'
         pass_filenames: false
+
+      # Block V — the harness's own plugin validator beside Praxion's (process-
+      # economy P3.7, native subsumption). `claude plugin validate` checks the
+      # manifest and every agent/command/skill it would load; its exit code
+      # stands (0 with warnings today — five known layout warnings on the
+      # catalog README/CLAUDE files and the root CLAUDE.md, which the harness
+      # does not load as plugin context). Skips, exit 0, when the CLI is not
+      # on PATH so a checkout without Claude Code can still commit.
+      - id: plugin-validate-native
+        name: Native plugin validate (advisory on warnings)
+        entry: bash -c 'command -v claude >/dev/null 2>&1 || { echo "claude CLI not on PATH; skipping native plugin validate"; exit 0; }; claude plugin validate .'
+        language: system
+        files: '^(\.claude-plugin/.*|agents/.*\.md|commands/.*\.md|skills/.*/SKILL\.md|hooks/hooks\.json)$'
+        pass_filenames: false

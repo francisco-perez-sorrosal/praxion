@@ -142,3 +142,18 @@ pipelines and compare
 `main.spawn_context.<agent-type>.p50` against the 250,000 target. If the practice of handing off at phase boundaries
 is not moving that number down, that is itself the signal to revisit this document, not a reason to add a
 Praxion-set band.
+
+## 5. Two learning stores, by audience (D5)
+
+Praxion keeps two stores on purpose and does not merge them (roadmap §10 D5, settled 2026-09-07):
+
+- **Personal, machine-local** — the harness's own auto-memory directory (`~/.claude/projects/<project>/memory/`,
+  `MEMORY.md` index + one file per fact). Gotchas, environment facts, corrections the operator gave. Never committed,
+  never shipped; it is the operator's, and it survives sessions without costing the repo a byte of always-loaded
+  context.
+- **Shareable, committed** — `.ai-work/<slug>/LEARNINGS.md` in flight, promoted by `/skill-genesis` into skills, rules
+  and ADRs, dispositioned by `/skill-genesis-review`. This is the only half a teammate or a managed project can see.
+
+The rule of thumb: if a second person would need it, it goes through LEARNINGS and the harvest; if only this machine
+would, it stays in memory. No MCP memory tools are registered (`dec-225`); nothing in Praxion reads the personal
+store programmatically.

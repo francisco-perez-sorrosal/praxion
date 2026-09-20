@@ -29,7 +29,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 - **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
 - **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write` (the sync-check is in *Build / test / lint* above; the sole embedding site is `skills/onboard-project/references/claude-md-blocks.md`).
-- **Run an audit or roadmap pass** — `/sentinel` (coherence), `/project-metrics` (health), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
+- **Run an audit or roadmap pass** — the `sentinel` agent (coherence; run `/skill-doctor` in the same session to see which loaded skills cost context unused), `/project-metrics` (health; also weekly via `.github/workflows/audits.yml`), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
 - **Work on the dashboard** — `dashboard_app/` (Next.js runtime over `.ai-state/`); its test + build commands are in *Build / test / lint* above.
 - **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `commands/README.md` / `rules/README.md`.
 
@@ -58,7 +58,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 - Run `pytest` over the relevant module(s) — behavior verification
 - `python3 scripts/sync_canonical_blocks.py --check` — shipped-block drift
-- `/sentinel` — ecosystem coherence audit
+- The `sentinel` agent — ecosystem coherence audit
 - For doc changes: render-time check via the dashboard; for HTML companions, browser preview
 - Anthropic's "single highest-leverage" practice: pair every claim a doc makes with a verification path
 

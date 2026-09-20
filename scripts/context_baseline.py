@@ -100,6 +100,25 @@ def _transcripts_dir(project_root: Path) -> Path:
     return Path.home() / ".claude" / "projects" / mangled
 
 
+# Where a session files its subagent transcripts, relative to the project's
+# transcript directory: Agent-tool spawns as siblings under `subagents/`,
+# Workflow-tool spawns one level deeper under the run's own directory
+# (measured live 2026-09-19, process-economy-p3-2).
+SUBAGENT_TRANSCRIPT_GLOBS = (
+    "*/subagents/agent-*.jsonl",
+    "*/subagents/workflows/*/agent-*.jsonl",
+)
+
+
+def _subagent_transcript_paths(transcripts_dir: Path) -> list[Path]:
+    """Every subagent transcript under the project's sessions, both spawn
+    shapes, in one deterministic order. A run's `journal.jsonl` and
+    `.meta.json` siblings never match: the patterns bind the `agent-` prefix."""
+    return sorted(
+        path for pattern in SUBAGENT_TRANSCRIPT_GLOBS for path in transcripts_dir.glob(pattern)
+    )
+
+
 def _agent_types_from_wal(wal_path: Path) -> dict[str, str]:
     """`agent_id -> agent_type` from `agent_start` WAL rows (join key for
     subagent transcripts, which carry the id in their filename)."""
@@ -263,7 +282,7 @@ def load(project_root: Path) -> list[dict]:
     id2type = _agent_types_from_wal(wal_path)
 
     rows: list[dict] = []
-    for path in sorted(transcripts_dir.glob("*/subagents/agent-*.jsonl")):
+    for path in _subagent_transcript_paths(transcripts_dir):
         row = _parse_subagent_transcript(path)
         if row is None:
             continue

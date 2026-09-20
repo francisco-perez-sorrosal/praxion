@@ -411,6 +411,23 @@ _USAGE_KEY_BY_FIELD = dict(
 )
 
 
+# Where the harness files a Workflow-tool agent's transcript, relative to the
+# session's ``subagents/`` directory: one run directory per workflow.
+WORKFLOWS_SUBDIR = "workflows"
+
+
+def _subagents_dir(payload: dict) -> Path | None:
+    """The session's ``subagents/`` directory, or None when the payload lacks
+    what keys it. Given the parent's ``transcript_path``
+    (``<projects_dir>/<session_id>.jsonl``), that directory is
+    ``<projects_dir>/<session_id>/subagents/``."""
+    transcript_path = str(payload.get("transcript_path") or "")
+    session_id = str(payload.get("session_id") or "").strip()
+    if not transcript_path or not session_id:
+        return None
+    return Path(transcript_path).parent / session_id / "subagents"
+
+
 def _subagent_own_transcript_path(payload: dict) -> str:
     """Path to the subagent's own transcript, when the harness would have one.
 
@@ -422,19 +439,39 @@ def _subagent_own_transcript_path(payload: dict) -> str:
     ``""`` when ``session_id`` or ``agent_id`` is missing -- there is nothing
     to key the sibling path on.
     """
-    transcript_path = str(payload.get("transcript_path") or "")
-    session_id = str(payload.get("session_id") or "").strip()
+    subagents_dir = _subagents_dir(payload)
     agent_id = str(payload.get("agent_id") or "").strip()
-    if not transcript_path or not session_id or not agent_id:
+    if subagents_dir is None or not agent_id:
         return ""
-    projects_dir = Path(transcript_path).parent
-    return str(projects_dir / session_id / "subagents" / f"agent-{agent_id}.jsonl")
+    return str(subagents_dir / f"agent-{agent_id}.jsonl")
+
+
+def _workflow_agent_transcript_path(payload: dict) -> str:
+    """Path to a Workflow-tool agent's transcript, when one exists.
+
+    Measured live (2026-09-19, process-economy-p3-2): an agent spawned by a
+    ``Workflow`` script fires the same SubagentStop, but its transcript is
+    filed one level deeper, under the run's own directory --
+    ``<projects_dir>/<session_id>/subagents/workflows/<run_id>/agent-<agent_id>.jsonl``
+    (beside the run's ``journal.jsonl``). The run id is not in the payload,
+    so the run directories are searched for the agent id; a match is unique
+    because agent ids are. Returns ``""`` when nothing keys the search or no
+    run directory holds the file.
+    """
+    subagents_dir = _subagents_dir(payload)
+    agent_id = str(payload.get("agent_id") or "").strip()
+    if subagents_dir is None or not agent_id:
+        return ""
+    matches = sorted((subagents_dir / WORKFLOWS_SUBDIR).glob(f"*/agent-{agent_id}.jsonl"))
+    return str(matches[0]) if matches else ""
 
 
 def _transcript_source_for(payload: dict) -> tuple[str, str]:
     """The file to scan for a subagent's usage and the ``usage_source`` label
-    that names it: the subagent's own transcript when the harness wrote one,
-    else the parent's ``transcript_path`` as the last resort. Returning the
+    that names it: the subagent's own transcript when the harness wrote one
+    (as an Agent-tool sibling file, else under a Workflow run directory --
+    both are the agent's own file and share one label), else the parent's
+    ``transcript_path`` as the last resort. Returning the
     label beside the path keeps the two from drifting -- a caller that
     re-derived the label from the path would mislabel any source added here
     later. See ``_sum_subagent_transcript`` for why the fallback still
@@ -444,6 +481,9 @@ def _transcript_source_for(payload: dict) -> tuple[str, str]:
     subagent_path = _subagent_own_transcript_path(payload)
     if subagent_path and Path(subagent_path).is_file():
         return subagent_path, USAGE_SOURCE_SUBAGENT_TRANSCRIPT
+    workflow_path = _workflow_agent_transcript_path(payload)
+    if workflow_path:
+        return workflow_path, USAGE_SOURCE_SUBAGENT_TRANSCRIPT
     return str(payload.get("transcript_path") or ""), USAGE_SOURCE_PARENT_TRANSCRIPT
 
 

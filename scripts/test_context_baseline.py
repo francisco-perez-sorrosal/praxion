@@ -278,6 +278,23 @@ def test_compute_source_contains_no_filesystem_or_clock_calls():
 # --------------------------------------------------------------------------- #
 # (f) an empty project directory warns loudly rather than silently reporting 0
 # --------------------------------------------------------------------------- #
+def test_subagent_transcript_paths_include_workflow_run_directories(tmp_path):
+    """Workflow-tool agents file their transcripts one level deeper than
+    Agent-tool spawns (`subagents/workflows/<run>/`); the guard must count
+    both, and must not mistake a run's journal for an agent."""
+    session = tmp_path / "-Users-x-proj" / "sess-1" / "subagents"
+    sibling = session / "agent-a1.jsonl"
+    nested = session / "workflows" / "wf_1234" / "agent-a2.jsonl"
+    journal = session / "workflows" / "wf_1234" / "journal.jsonl"
+    for path in (sibling, nested, journal):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+
+    found = ctx._subagent_transcript_paths(tmp_path / "-Users-x-proj")
+
+    assert found == [sibling, nested]
+
+
 def test_no_transcripts_found_warns_on_stderr_and_exits_2(tmp_path, monkeypatch, capsys):
     # Redirect Path.home() so `_transcripts_dir` cannot fall through to this
     # machine's real ~/.claude/projects/ and mask the empty-input case.

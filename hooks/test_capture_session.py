@@ -1455,6 +1455,38 @@ class TestSubagentTranscriptUsage:
         assert fields["tokens_out"] == 4
         assert fields["usage_source"] == module.USAGE_SOURCE_SUBAGENT_TRANSCRIPT
 
+    def test_workflow_agent_transcript_is_found_under_its_run_directory(
+        self, tmp_path: Path
+    ) -> None:
+        """An agent spawned by a `Workflow` script has no sibling file: the
+        harness files its transcript under `subagents/workflows/<run>/`
+        (measured live 2026-09-19). The stop row must still read the agent's
+        own file -- and label it as such -- rather than fall through to the
+        parent transcript and record nothing.
+        """
+        module = _load_module()
+        projects_dir = tmp_path / "projects"
+        parent_transcript = _write_usage_transcript(
+            projects_dir / "sess-1.jsonl",
+            [_assistant_line(input_tokens=1000, output_tokens=2000)],
+        )
+        _write_usage_transcript(
+            projects_dir / "sess-1" / "subagents" / "workflows" / "wf_1234" / "agent-a1.jsonl",
+            [_assistant_line(input_tokens=3, output_tokens=5, agent_id="a1")],
+        )
+
+        fields = module._sum_subagent_transcript(
+            {
+                "transcript_path": str(parent_transcript),
+                "session_id": "sess-1",
+                "agent_id": "a1",
+            }
+        )
+
+        assert fields["tokens_in"] == 3
+        assert fields["tokens_out"] == 5
+        assert fields["usage_source"] == module.USAGE_SOURCE_SUBAGENT_TRANSCRIPT
+
     def test_missing_transcript_path_degrades_every_field_to_none(self) -> None:
         module = _load_module()
 

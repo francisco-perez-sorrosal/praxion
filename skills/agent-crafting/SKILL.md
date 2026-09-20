@@ -160,7 +160,7 @@ Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs 
 - **Worktree isolation**: `isolation: worktree` runs the agent in a temporary git worktree branched from the default branch — for parallel pipelines that must not collide.
 - **Forked subagents**: `/fork` (or `CLAUDE_CODE_FORK_SUBAGENT=1`) spawns an agent that inherits the full conversation and shares the prompt cache — cheaper than a fresh subagent when it needs the parent's context.
 - **Disabling agents**: `claude --disallowedTools "Agent(my-agent)"` or add to the `deny` array in settings.
-- **Transcripts** persist at `~/.claude/projects/{project}/{sessionId}/subagents/agent-{agentId}.jsonl`.
+- **Transcripts** persist at `~/.claude/projects/{project}/{sessionId}/subagents/agent-{agentId}.jsonl`; an agent spawned by a `Workflow` script lands one level deeper, at `subagents/workflows/{runId}/agent-{agentId}.jsonl` beside the run's `journal.jsonl`.
 
 ## Anti-Patterns
 

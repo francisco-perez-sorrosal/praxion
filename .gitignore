@@ -46,6 +46,11 @@ coverage.xml
 .coverage
 .coverage.*
 
+# Mutation sensor residue (scripts/mutation_sensor.py). The runner's own
+# `finally` block removes this on every exit path; this entry is belt-and-
+# braces for a run killed hard enough to skip it (SIGKILL, a turn-budget cut).
+mutants/
+
 # Agent intermediate documents
 .ai-work/
 

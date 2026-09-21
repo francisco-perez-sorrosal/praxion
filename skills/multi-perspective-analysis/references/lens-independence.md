@@ -22,6 +22,8 @@ Three-phase discipline for any fan-out that claims to produce independent perspe
 
 The coordination protocol's fragment-file pattern is the mechanical enforcement surface for lens independence. Each parallel agent writes to a scoped fragment (`<artifact>_<lens>.md`) rather than the canonical document. The aggregator merges fragments. This prevents mid-run reads of sibling output because no sibling has written to the canonical path yet.
 
+Claude Code only: `lens-fanout`'s `parallel()` closures share no mutable state and cannot read a sibling's in-flight result — construction-level, stronger than the read-omission guarantee above.
+
 See `skills/software-planning/references/agent-pipeline-details.md § Multi-Perspective Analysis` for the fragment-file pattern in the pipeline context.
 
 ## Correlation vs. Convergence

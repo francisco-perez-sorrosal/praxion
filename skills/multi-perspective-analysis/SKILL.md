@@ -50,6 +50,7 @@ activate_multi_perspective(task) =
 | Heterogeneous model assignment | Moderate (mixed tiers) | Honest-uncertainty gate | [references/heterogeneous-orchestration.md](references/heterogeneous-orchestration.md) |
 | Tier-B cross-model challenge | High (extra frontier call) | Honest-uncertainty AND stakes ∈ {security, one-way-door, user-visible-breaking} | [references/disconfirmation-tiers.md](references/disconfirmation-tiers.md) |
 | Discipline-consultant dialogue | Moderate (1 agent call per discipline) | Registry trigger predicate matches, a pipeline agent nominates the discipline citing the signal and decision at stake, or on human request | [`agents/discipline-consultant.md`](../../agents/discipline-consultant.md), [coordination-details.md § Discipline-Consultant Dialogue Protocol](../software-planning/references/coordination-details.md) |
+| Workflow-encoded fan-out | Moderate (N `parallel()` agent calls) | Honest-uncertainty gate | [`skills/lens-fanout/SKILL.md`](../lens-fanout/SKILL.md) |
 
 **Domain vs. model diversity — not substitutes.** The discipline-consultant supplies **domain diversity** (different expertise applied against the same model backbone); Tier-B cross-model challenge supplies **model diversity** (the same question posed to a different backbone). They compose — a high-stakes contested decision may warrant both — neither supersedes the other.
 

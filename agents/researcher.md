@@ -297,3 +297,5 @@ After creating `RESEARCH_FINDINGS.md`, return a concise summary:
 - **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing `RESEARCH_FINDINGS.md`. At 80% budget consumed, wrap up and write output with what you have.
 
 **High-stakes deliberation.** For research tasks where the evidence is genuinely contested or the decision is high-stakes, load [`skills/multi-perspective-analysis`](../skills/multi-perspective-analysis/SKILL.md) for activation criteria, per-claim confidence annotation, and lens-independence discipline when running parallel analysis.
+
+In Claude Code, `lens-fanout` runs this fan-out with mechanically-isolated `parallel()` calls.

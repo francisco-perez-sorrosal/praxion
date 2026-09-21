@@ -227,6 +227,7 @@ After pairing test steps (Phase 4), scan each step for RISKY signals and annotat
 | **One-way-door** | Step description includes: schema migration, deletion, permission grant, external API write, irreversible data transform | Note in the step description; orchestrator auto-signals on this pattern |
 | **`tier: H`** (cross-cutting, high complexity) | Step touches 4+ files across package boundaries; or refactors a core abstraction used by many consumers; or is a critical-path change the architect flagged as high-risk | Add `tier: H` annotation to the step block |
 | **Planner override** | Planner judges a step risky independent of signals, or judges it safe despite signals | Add `review: force` or `review: off` to the step block |
+| **World-read step** | RISKY step, or a step whose `Files:` wrap a subprocess/git/filesystem/network/env/clock read | Tag `mutation: on` per [`decomposition-guide.md § Step Risk Tagging`](../skills/software-planning/references/decomposition-guide.md#step-risk-tagging) |
 
 **`review:` field** — add to a step block in `IMPLEMENTATION_PLAN.md` when an override is warranted:
 

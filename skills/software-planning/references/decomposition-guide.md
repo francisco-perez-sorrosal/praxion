@@ -112,6 +112,29 @@ When to use `off`: the planner judges the step safe despite signals (e.g., a `ti
 
 Full procedure and composition table: [`intra-step-review.md`](intra-step-review.md).
 
+### `mutation: on` / `mutation: off` — per-step mutation sensor
+
+Add `mutation: on` to a step when its production change is exactly the shape a passing-but-empty test would hide: any RISKY step (`tier: H`, one-way-door, or `review: force`), plus any step whose `Files:` wrap a function that performs a world read — a subprocess call, a git operation, a filesystem read, a network call, an environment-variable read, or a clock read. These are the functions where a test can assert the right shape on a stubbed return and still pass with the real read silently deleted; the sensor exists to catch exactly that gap.
+
+```markdown
+### Step N: [description]
+
+**Implementation**: ...
+**Files**: ...
+mutation: on
+**Done when**: ...
+```
+
+Precedence mirrors `review: force`/`review: off` exactly: the planner field wins over every auto-signal, and — unlike `review:` — there are no auto-signals in this tag's first version, so an absent field always means off. The tag costs nothing when absent: no invocation, no line, no reader action. When present, the step's canonical `TEST_RESULTS.md` writer runs `scripts/mutation_sensor.py` against the step's targets and tests and copies its stdout `Mutation:` line verbatim into the step's section (see [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](agent-pipeline-details.md#test_resultsmd-reconciliation) for the line's two shapes and placement).
+
+**Reversal trigger**: if two consecutive Standard/Full pipelines complete with zero steps tagged `mutation: on`, convert the tag to an auto-signal (mirroring `tier: H`'s detection table) rather than leaving it a planner-only opt-in the ecosystem never exercises.
+
+| Value | Effect |
+|-------|--------|
+| `mutation: on` | Canonical writer runs the sensor and copies its line into `TEST_RESULTS.md` |
+| `mutation: off` | Equivalent to omitting the field — no invocation |
+| *(omit field)* | No invocation, no line — the default |
+
 ## Anti-Patterns
 
 **Don't:** Commit without approval -- always wait for explicit "yes" before committing

@@ -246,3 +246,5 @@ After learnings are merged, delete all planning documents (see [agent intermedia
 The canonical `TEST_RESULTS.md` schema (section headers, pass/fail/skip counts, failure blocks, coverage, fragment naming) is defined in [`agent-pipeline-details.md`](agent-pipeline-details.md) under `### TEST_RESULTS.md Reconciliation`.
 
 **Test-topology optional fields**: when a step has a `Tests:` field activating the topology protocol, the `TEST_RESULTS.md` step section may include additional topology lines after the standard counts. These lines are optional and backward-compatible — see `agent-pipeline-details.md` for the extended schema.
+
+**Mutation optional field**: a step tagged `mutation: on` may carry one additional `Mutation:` line after the topology lines, even in an otherwise-green section — the line shape, placement rule, and byte cap live solely in `agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`; this bullet is a pointer, not a restatement.

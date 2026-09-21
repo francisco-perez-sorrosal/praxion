@@ -1,3 +1,16 @@
+## v0.35.0 (2026-09-21)
+
+### Feat
+
+- **mutation-sensor**: per-step mutation sensor runner (Steps 1, 3)
+
+### Fix
+
+- **mutation-sensor**: refuse on any leftover mutants/ before self-heal; heal only a stray marker config
+- **mutation-sensor**: reject a sub-floor --timeout at the CLI boundary; name a directory as not-a-file
+- **mutation-sensor**: uniform run-timeout classification, is_file path pre-check, budget floor
+- **mutation-sensor**: parse method trampolines, refuse missing paths and zero-mutant runs, one timeout budget
+
 ## v0.34.0 (2026-09-20)
 
 ### Feat

@@ -159,7 +159,7 @@ reading `unavailable` → recorded, no finding.
 
 - The F1 class of miss gets a machine detector at seconds of cost, on the steps where it lives.
 - `td-220` is closed by measurement, not by assertion: the acceptance criterion is the sensor's own reading
-  (survivors 49 → ≤3, each remainder given a written equivalence argument), which is the only way a test
+  (survivors 49 → a reading in which every remainder carries a proven equivalence-or-environment argument; a fixed count was rejected because equivalent mutants are not coverage debt and case-folding survivors vary with the filesystem), which is the only way a test
   written to close a coverage gap can be proven not to reproduce it.
 - The recipe stops being tribal knowledge. A future caller runs one command.
 - Zero always-loaded token cost — every prose landing site is a skill reference or an agent prompt.
@@ -193,7 +193,7 @@ recipe it claims to and the tool is not the spike's result, it is a different to
 (b) the `Mutation:` line changes what either existing reader reports on a fixture — then the "backward-
 compatible" claim is false and the schema extension must move to a separate artifact rather than into a
 document two pipeline-critical parsers read; (c) after the td-220 fix, survivors in `_handoff_inputs.py` do not
-fall from 49 to ≤3 — then either the sensor is not measuring what it claims or real-adapter tests do not close
+fall from 49 to a set whose every member is provably equivalent or environmental — then either the sensor is not measuring what it claims or real-adapter tests do not close
 this defect class, and in both cases the adoption evidence evaporates.
 
 **Steelmanned runner-up.** Option C (auto-fire on RISKY) is the design that would actually be right if the

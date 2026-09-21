@@ -1050,5 +1050,806 @@ def test_dirty_file_owned_by_a_completed_step_still_blocks(tmp_path, monkeypatch
     assert "done_thing.py" in stderr
 
 
+# --- _handoff_inputs.py's world-read functions, through the real adapters --------
+#
+# Every case below drives its target function through a real repo, a real
+# task directory, or both -- never a hand-built verdict dict standing in for
+# what the real read would have produced. Each assertion is on what the read's
+# *result* changes about the composed output; mentally replacing the read with
+# its fallback value (None, an empty tuple, the wrong verdict) must break the
+# assertion, not merely change some untested internal shape.
+
+
+def test_no_default_branch_or_remote_leaves_base_sha_unresolved(tmp_path):
+    """`resolve_base_ref` must exhaust every fallback candidate and report
+    unresolved -- not silently default to some other ref -- when neither
+    `main` nor `master` exists locally and there is no remote at all."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "trunk"], repo_root)  # neither "main" nor "master"
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+    assert context.base_sha == compose_handoff.UNKNOWN
+
+    result = compose_handoff.compose(SLUG, repo_root, BOUNDARY_PLAN_TO_IMPL, None, context=context)
+    assert compose_handoff.UNRESOLVED_BASE_ADVISORY in _extract_section(result["text"], "§1 State")
+
+
+def test_remote_default_branch_named_neither_main_nor_master_still_resolves_base_sha(
+    tmp_path,
+):
+    """`_base_ref_candidates` must read `refs/remotes/origin/HEAD` -- with the
+    remote's default branch named neither `main` nor `master`, the static
+    fallback list cannot resolve anything at all, so a real merge-base here
+    can only come from that read succeeding."""
+    bare = tmp_path / "upstream.git"
+    _run_git(["init", "-q", "--bare", str(bare)], tmp_path)
+
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    _run_git(["init", "-q"], seed)
+    _run_git(["config", "user.email", "test@example.com"], seed)
+    _run_git(["config", "user.name", "Test User"], seed)
+    (seed / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], seed)
+    _run_git(["commit", "-q", "-m", "seed"], seed)
+    _run_git(["branch", "-M", "trunk"], seed)
+    _run_git(["remote", "add", "origin", str(bare)], seed)
+    _run_git(["push", "-q", "origin", "trunk"], seed)
+    _run_git(["symbolic-ref", "HEAD", "refs/heads/trunk"], bare)
+
+    repo_root = tmp_path / "repo"
+    _run_git(["clone", "-q", str(bare), str(repo_root)], tmp_path)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    expected_base_sha = _git_capture(["merge-base", "HEAD", "refs/remotes/origin/HEAD"], repo_root)
+    assert expected_base_sha  # sanity: the real repo has a resolvable fork point
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == expected_base_sha
+
+
+def test_declared_files_unions_the_committed_and_uncommitted_halves(tmp_path, monkeypatch, capsys):
+    """A step's declared `Files:` field is split into a committed half and an
+    uncommitted half -- dropping either half of `declared_files`'s union would
+    silently shrink the readiness gate's step-owned scope."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    (repo_root / "a.py").write_text("committed\n", encoding="utf-8")
+    _run_git(["add", "a.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit a"], repo_root)
+    (repo_root / "b.py").write_text("uncommitted\n", encoding="utf-8")  # untracked, dirty
+
+    plan = (
+        "### Step 1: Build both halves\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: a.py, b.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n- [ ] Step 1: build both halves\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert "dirty-step-files" in stderr
+    assert "b.py" in stderr
+
+
+def test_step_owned_scope_falls_back_to_the_union_of_every_unfinished_step(
+    tmp_path, monkeypatch, capsys
+):
+    """The first unfinished step declares no `Files:` at all -- `_step_owned_paths`
+    must widen to the union of every unfinished step's declared files, and the
+    composed handoff must say the scope was widened, rather than silently
+    narrowing to nothing."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    later = repo_root / "later_step.py"
+    later.write_text("original\n", encoding="utf-8")
+    _run_git(["add", "later_step.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed later_step"], repo_root)
+    later.write_text("modified\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n\n"
+        "### Step 2: Build the later thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: later_step.py, pending_file.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [ ] Step 1: integration checkpoint\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: build the later thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert "dirty-step-files" in stderr
+    assert "later_step.py" in stderr
+
+    # Clean the dirty file -- Step 2 stays unfinished (pending_file.py never  # id-citation-discipline:ignore
+    # lands), so the widened scope persists and the composed handoff must
+    # name it, rather than silently reverting to the empty current step.
+    _run_git(["checkout", "-q", "--", "later_step.py"], repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 0
+    task_dir = repo_root / ".ai-work" / SLUG
+    text = (task_dir / "HANDOFF.md").read_text(encoding="utf-8")
+    assert "union of every unfinished step's files" in _extract_section(text, "§1 State")
+
+
+def test_first_unfinished_steps_own_files_lead_the_refusal_not_a_completed_steps(
+    tmp_path, monkeypatch, capsys
+):
+    """`first_unfinished` must skip a step ground truth already confirmed and
+    hand `_step_owned_paths` the next one -- named first in the refusal ahead
+    of an unrelated dirty path, per that function's own documented invariant,
+    however git status happens to order the raw dirty paths alphabetically."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    # Step 1's file: committed since the fork, clean -- verified-complete.  # id-citation-discipline:ignore
+    (repo_root / "a.py").write_text("done\n", encoding="utf-8")
+    _run_git(["add", "a.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit a"], repo_root)
+
+    # Step 2's own dirty file sorts AFTER the unrelated dirty file below, so  # id-citation-discipline:ignore
+    # leading-first order in the refusal is only explained by step ownership
+    # -- never by git status's own alphabetical listing.
+    (repo_root / "zzz_owned.py").write_text("new\n", encoding="utf-8")
+    (repo_root / "aaa_other.py").write_text("new\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Finish the first thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: a.py\n"
+        "**Done when**: it works\n\n"
+        "### Step 2: Build the second thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: zzz_owned.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [ ] Step 1: finish the first thing\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: build the second thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert "dirty-step-files" in stderr
+    assert stderr.index("zzz_owned.py") < stderr.index("aaa_other.py"), (
+        "the unfinished step's own file must lead the refusal, not trail behind "
+        "an unrelated dirty path in alphabetical order"
+    )
+
+
+def test_artifact_names_lists_only_markdown_files_sorted(tmp_path):
+    """`artifact_names` must filter to `.md` files, exclude directories even
+    when one is named like a markdown file, and sort the result -- the §1
+    State line is the only place an operator sees what is actually on disk."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    (task_dir / "NOTES.txt").write_text("not markdown\n", encoding="utf-8")
+    (task_dir / "WEIRD.md").mkdir()  # a directory, not a file -- must be excluded
+    (task_dir / "logs").mkdir()
+    (task_dir / "logs" / "nested.md").write_text("must not count\n", encoding="utf-8")
+    (task_dir / "ZZZ_NOTES.md").write_text("notes\n", encoding="utf-8")
+
+    result = compose_handoff.compose(
+        SLUG,
+        tmp_path,
+        BOUNDARY_PLAN_TO_IMPL,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override=None,
+    )
+
+    state = _extract_section(result["text"], "§1 State")
+    assert "Artifacts present: `WIP.md`, `ZZZ_NOTES.md`." in state
+    assert "NOTES.txt" not in state
+    assert "WEIRD.md`" not in state
+    assert "nested.md" not in state
+
+
+def test_recent_log_note_names_the_first_log_inside_the_window_not_the_first_by_name(
+    tmp_path,
+):
+    """`recent_log` must return the first log file *inside the advisory
+    window*, not simply the first by sorted filename -- an alphabetically
+    earlier but stale log must never suppress a genuinely fresh one."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    log_dir = task_dir / "logs"
+    log_dir.mkdir()
+    stale = log_dir / "step-1.log"  # id-citation-discipline:ignore
+    fresh = log_dir / "step-2.log"  # id-citation-discipline:ignore
+    stale.write_text("old run\n", encoding="utf-8")
+    fresh.write_text("new run\n", encoding="utf-8")
+    old_mtime = 0
+    os.utime(stale, (old_mtime, old_mtime))  # sorts first by name, ages out by mtime
+
+    result = compose_handoff.compose(
+        SLUG,
+        tmp_path,
+        BOUNDARY_PLAN_TO_IMPL,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override=None,
+    )
+
+    state = _extract_section(result["text"], "§1 State")
+    assert "step-2.log" in state
+    assert "step-1.log" not in state
+
+
+def test_recent_log_note_reports_the_logs_actual_age_in_seconds(tmp_path, monkeypatch):
+    """The advisory's age is the log's real seconds-since-mtime, computed
+    against the passed-in clock -- not a placeholder and not off by a whole
+    window's width."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    log_dir = task_dir / "logs"
+    log_dir.mkdir()
+    log_path = log_dir / "step-1.log"  # id-citation-discipline:ignore
+    log_path.write_text("running...\n", encoding="utf-8")
+    fixed_now = 2_000_000_000.0
+    os.utime(log_path, (fixed_now - 37, fixed_now - 37))
+    monkeypatch.setattr(time, "time", lambda: fixed_now)
+
+    result = compose_handoff.compose(
+        SLUG,
+        tmp_path,
+        BOUNDARY_PLAN_TO_IMPL,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override=None,
+    )
+
+    state = _extract_section(result["text"], "§1 State")
+    assert "`step-1.log` changed 37s ago" in state  # id-citation-discipline:ignore
+
+
+def test_master_only_repo_resolves_base_sha_via_the_static_fallback(tmp_path):
+    """No `main` branch and no remote at all -- the static fallback list must
+    still include `master`, or resolution has nothing left to try and reports
+    unresolved instead of finding the real fork point."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "master"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    expected_base_sha = _git_capture(["merge-base", "HEAD", "master"], repo_root)
+    assert expected_base_sha  # sanity: the real repo has a resolvable fork point
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == expected_base_sha
+
+
+def test_origin_tracking_branch_is_preferred_over_a_diverged_bare_branch_of_the_same_name(
+    tmp_path,
+):
+    """When no `refs/remotes/origin/HEAD` exists at all (a plain `fetch`, never
+    a `clone`), the static fallback list must still try `origin/main` before
+    the bare `main` -- a diverged local `main` must never win over the
+    remote-tracking branch of the same name."""
+    bare = tmp_path / "upstream.git"
+    _run_git(["init", "-q", "--bare", str(bare)], tmp_path)
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed A"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    seed_a = _git_capture(["rev-parse", "HEAD"], repo_root)
+
+    (repo_root / "b.txt").write_text("b\n", encoding="utf-8")
+    _run_git(["add", "b.txt"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed B"], repo_root)
+    seed_b = _git_capture(["rev-parse", "HEAD"], repo_root)
+
+    _run_git(["remote", "add", "origin", str(bare)], repo_root)
+    _run_git(["push", "-q", "origin", "main"], repo_root)
+    _run_git(["fetch", "-q", "origin"], repo_root)  # populates origin/main, never origin/HEAD
+
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+    (repo_root / "c.txt").write_text("c\n", encoding="utf-8")
+    _run_git(["add", "c.txt"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit C"], repo_root)
+    # Diverge the local branch backward -- only safe once it is no longer checked out.
+    _run_git(["branch", "-f", "main", seed_a], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == seed_b
+    assert context.base_sha != seed_a
+
+
+def test_declared_files_lead_with_the_committed_half_ahead_of_the_uncommitted_half(
+    tmp_path, monkeypatch, capsys
+):
+    """`declared_files` concatenates the committed half first -- swapping the
+    concatenation order must be observable in which path leads the refusal,
+    independent of git status's own alphabetical ordering of the two paths."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    # Committed-then-redirtied, named to sort AFTER the untracked file below --
+    # so leading-first order can only come from the changed/unchanged split.
+    changed = repo_root / "zzz_changed.py"
+    changed.write_text("committed\n", encoding="utf-8")
+    _run_git(["add", "zzz_changed.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit zzz_changed"], repo_root)
+    changed.write_text("modified\n", encoding="utf-8")
+    # Never committed at all -- sorts first alphabetically and by git status.
+    (repo_root / "aaa_unchanged.py").write_text("new\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Build both halves\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: zzz_changed.py, aaa_unchanged.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n- [ ] Step 1: build both halves\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert stderr.index("zzz_changed.py") < stderr.index("aaa_unchanged.py"), (
+        "the committed-then-redirtied half must lead, matching declared_files' "
+        "changed-before-unchanged concatenation order"
+    )
+
+
+def test_step_owned_scope_reports_dirty_source_advisory_when_no_unfinished_step_has_files(
+    tmp_path,
+    monkeypatch,
+):
+    """When no unfinished step declares `Files:` at all, `_step_owned_paths`
+    must fall all the way through to the dirty-source rule and the composed
+    handoff must name that widened scope explicitly."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    plan = (
+        "### Step 1: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n"
+    )
+    wip = "# WIP\n\n## Progress\n\n- [ ] Step 1: integration checkpoint\n"  # id-citation-discipline:ignore
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 0
+    task_dir = repo_root / ".ai-work" / SLUG
+    text = (task_dir / "HANDOFF.md").read_text(encoding="utf-8")
+    assert "no step-owned paths to lead with" in _extract_section(text, "§1 State")
+
+
+def test_main_only_repo_resolves_base_sha_via_the_static_fallback(tmp_path):
+    """No `master` branch and no remote at all -- the static fallback list
+    must still include bare `main`, distinctly from `master` (covered by the
+    sibling master-only case) and from `origin/main` (covered by the
+    origin-preference case)."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    expected_base_sha = _git_capture(["merge-base", "HEAD", "main"], repo_root)
+    assert expected_base_sha  # sanity: the real repo has a resolvable fork point
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == expected_base_sha
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores directory permission bits; chmod 0o000 would not actually block the read",
+)
+def test_recent_log_returns_no_advisory_when_the_logs_directory_cannot_be_listed(tmp_path):
+    """An unreadable `logs/` directory is a no-answer, not a crash -- the
+    advisory silently disappears rather than raising through `compose()`."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    log_dir = task_dir / "logs"
+    log_dir.mkdir()
+    (log_dir / "step-1.log").write_text("log\n", encoding="utf-8")  # id-citation-discipline:ignore
+    log_dir.chmod(0o000)
+    try:
+        result = compose_handoff.compose(
+            SLUG,
+            tmp_path,
+            BOUNDARY_PLAN_TO_IMPL,
+            None,
+            _changed_files_override=[],
+            _wal_rows_override=[],
+            _test_status_override=None,
+        )
+    finally:
+        log_dir.chmod(0o755)
+
+    assert "a test run may still be in progress" not in _extract_section(result["text"], "§1 State")
+
+
+def test_origin_head_branch_wins_over_a_working_fallback_candidate(tmp_path):
+    """When `refs/remotes/origin/HEAD` resolves, `_base_ref_candidates` must
+    return early with it -- never falling through to the static fallback list
+    -- even when a fallback candidate (`main`) would also resolve, just to a
+    different, earlier commit."""
+    bare = tmp_path / "upstream.git"
+    _run_git(["init", "-q", "--bare", str(bare)], tmp_path)
+
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    _run_git(["init", "-q"], seed)
+    _run_git(["config", "user.email", "test@example.com"], seed)
+    _run_git(["config", "user.name", "Test User"], seed)
+    (seed / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], seed)
+    _run_git(["commit", "-q", "-m", "seed A"], seed)
+    _run_git(["branch", "-M", "trunk"], seed)
+
+    (seed / "b.txt").write_text("b\n", encoding="utf-8")
+    _run_git(["add", "b.txt"], seed)
+    _run_git(["commit", "-q", "-m", "seed B"], seed)
+    seed_b = _git_capture(["rev-parse", "HEAD"], seed)
+
+    _run_git(["remote", "add", "origin", str(bare)], seed)
+    _run_git(["push", "-q", "origin", "trunk"], seed)
+    _run_git(["symbolic-ref", "HEAD", "refs/heads/trunk"], bare)
+
+    repo_root = tmp_path / "repo"
+    _run_git(["clone", "-q", str(bare), str(repo_root)], tmp_path)
+    # A local `main` that ALSO resolves -- but to the earlier commit, so the
+    # two candidates disagree and whichever wins is directly observable.
+    seed_a = _git_capture(["rev-parse", "HEAD~1"], repo_root)
+    _run_git(["branch", "main", seed_a], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+    (repo_root / "c.txt").write_text("c\n", encoding="utf-8")
+    _run_git(["add", "c.txt"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit C"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == seed_b  # via origin/HEAD -> trunk
+    assert context.base_sha != seed_a  # NOT via the also-working `main` fallback
+
+
+def test_origin_head_absent_falls_through_to_the_static_fallback(tmp_path):
+    """The companion case: with no `refs/remotes/origin/HEAD` at all (a plain
+    local repo, never cloned), resolution must still succeed via the static
+    fallback list -- the early-return branch is not the only path to an
+    answer."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+    (repo_root / "c.txt").write_text("c\n", encoding="utf-8")
+    _run_git(["add", "c.txt"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit C"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    expected_base_sha = _git_capture(["merge-base", "HEAD", "main"], repo_root)
+    assert expected_base_sha
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == expected_base_sha
+
+
+def test_step_owned_union_deduplicates_and_sorts_across_multiple_unfinished_steps(
+    tmp_path, monkeypatch, capsys
+):
+    """The union-of-unfinished-steps scope must de-duplicate a file declared
+    by more than one step and present the result sorted -- not a naive
+    concatenation that could repeat a path or leave it in declaration order."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    # All three declared files stay untracked -- never committed -- so every
+    # step below stays "pending" (unfinished) regardless of the WIP checkbox.
+    (repo_root / "zzz_two.py").write_text("new\n", encoding="utf-8")
+    (repo_root / "mmm_shared.py").write_text("new\n", encoding="utf-8")
+    (repo_root / "aaa_three.py").write_text("new\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n\n"
+        "### Step 2: Build the second thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: mmm_shared.py, zzz_two.py\n"
+        "**Done when**: it works\n\n"
+        "### Step 3: Build the third thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: aaa_three.py, mmm_shared.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [ ] Step 1: integration checkpoint\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: build the second thing\n"  # id-citation-discipline:ignore
+        "- [ ] Step 3: build the third thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert stderr.count("mmm_shared.py") == 1, "a file declared by two steps must appear once"
+    assert (
+        stderr.index("aaa_three.py") < stderr.index("mmm_shared.py") < stderr.index("zzz_two.py")
+    ), "the union must be reported sorted, not in step-declaration order"
+
+
+def test_step_owned_union_excludes_a_verified_complete_steps_files(tmp_path, monkeypatch, capsys):
+    """The union-of-unfinished-steps scope must exclude a step ground truth
+    already confirmed -- even though its file is also dirty and would
+    otherwise be swept in by the trailing dirty-source catch-all regardless,
+    a wrongly-included verified-complete step's file would LEAD the refusal
+    instead of trailing behind the genuinely unfinished step's own file."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "main"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    # Step 1's file: committed since the fork, then re-dirtied -- stays  # id-citation-discipline:ignore
+    # verified-complete (ground truth still sees it as "changed"), but its
+    # working-tree state is dirty, so the trailing catch-all alone would mask
+    # a union bug that wrongly includes it.
+    complete_file = repo_root / "aaa_complete.py"
+    complete_file.write_text("done\n", encoding="utf-8")
+    _run_git(["add", "aaa_complete.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "commit aaa_complete"], repo_root)
+    complete_file.write_text("done again\n", encoding="utf-8")
+
+    # Step 3's own dirty file, alphabetically AFTER Step 1's -- so leading  # id-citation-discipline:ignore
+    # order can only come from correct union membership, never from git
+    # status's own alphabetical listing.
+    (repo_root / "zzz_unfinished.py").write_text("new\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Finish the complete thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: aaa_complete.py\n"
+        "**Done when**: it works\n\n"
+        "### Step 2: Integration checkpoint\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Done when**: full suite green\n\n"
+        "### Step 3: Build the unfinished thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: zzz_unfinished.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [ ] Step 1: finish the complete thing\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: integration checkpoint\n"  # id-citation-discipline:ignore
+        "- [ ] Step 3: build the unfinished thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert stderr.index("zzz_unfinished.py") < stderr.index("aaa_complete.py"), (
+        "the genuinely unfinished step's file must lead; a verified-complete "
+        "step's file must trail via the dirty-source catch-all, never the union"
+    )
+
+
+def test_recent_log_boundary_at_exactly_the_window_width_is_not_recent(tmp_path, monkeypatch):
+    """The advisory window is a strict `<`, not `<=` -- a log aged exactly at
+    the window's width must already be treated as stale, not recent."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    log_dir = task_dir / "logs"
+    log_dir.mkdir()
+    log_path = log_dir / "step-1.log"  # id-citation-discipline:ignore
+    log_path.write_text("running...\n", encoding="utf-8")
+    fixed_now = 2_000_000_000.0
+    os.utime(log_path, (fixed_now - 60, fixed_now - 60))  # exactly the window's width, in seconds
+    monkeypatch.setattr(time, "time", lambda: fixed_now)
+
+    result = compose_handoff.compose(
+        SLUG,
+        tmp_path,
+        BOUNDARY_PLAN_TO_IMPL,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override=None,
+    )
+
+    assert "a test run may still be in progress" not in _extract_section(result["text"], "§1 State")
+
+
+def test_dangling_origin_head_falls_through_to_the_short_branch_name(tmp_path):
+    """A `refs/remotes/origin/HEAD` pointing at a remote-tracking ref that was
+    never fetched (or has since been deleted) must fall through to the bare
+    short branch name -- `git symbolic-ref` never validates its target
+    exists, so the exact ref it names can be unresolvable while the plain
+    name still is. This is the one real-adapter path where the second
+    `_base_ref_candidates` tuple element is actually consulted, not dead
+    code -- proving `ref.rsplit("/", 1)[-1]` computes the right short name."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    _run_git(["branch", "-M", "ghost"], repo_root)
+    _run_git(["checkout", "-q", "-b", "worktree-demo"], repo_root)
+
+    _run_git(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/ghost"], repo_root)
+
+    task_dir = repo_root / ".ai-work" / SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "WIP.md").write_text(_minimal_wip(), encoding="utf-8")
+
+    expected_base_sha = _git_capture(["merge-base", "HEAD", "ghost"], repo_root)
+    assert expected_base_sha  # sanity: the bare local branch resolves
+
+    context = compose_handoff.gather(SLUG, repo_root, force=False)
+
+    assert context.base_sha == expected_base_sha
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

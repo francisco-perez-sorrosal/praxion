@@ -351,6 +351,120 @@ class TestMutantsDirPresentRefusal:
 
 
 # ---------------------------------------------------------------------------
+# Self-heal must yield to the mutants-dir-present refusal: a marker-bearing
+# pyproject.toml alongside a mutants/ directory is exactly the residue shape a
+# concurrent, still-running invocation also has on disk. Self-heal may only
+# remove a stray marker-bearing pyproject.toml when it is alone -- the one
+# case that cannot belong to a live concurrent run, because a live run's own
+# mutants/ always exists once mutmut starts.
+# ---------------------------------------------------------------------------
+
+
+class TestSelfHealYieldsToMutantsDirPresent:
+    def test_marker_pyproject_with_mutants_dir_refuses_before_any_self_heal(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        marker_pyproject = d / "pyproject.toml"
+        marker_pyproject.write_text(f"{ms.PYPROJECT_MARKER}\n[tool.mutmut]\n", encoding="utf-8")
+        before_pyproject = marker_pyproject.read_bytes()
+        mutants_dir = d / "mutants"
+        mutants_dir.mkdir()
+        residue_file = mutants_dir / "in-flight.txt"
+        residue_file.write_text("a concurrent run's own working state\n", encoding="utf-8")
+        calls = _install_fake_uv(monkeypatch, {})
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        _assert_refusal(rc, capsys.readouterr(), "mutants-dir-present")
+        assert marker_pyproject.exists(), (
+            "a marker-bearing pyproject.toml must not be removed while mutants/ is also present "
+            "-- that residue shape is indistinguishable from a concurrent run's own working state"
+        )
+        assert marker_pyproject.read_bytes() == before_pyproject, (
+            "a marker-bearing pyproject.toml must be byte-identical after a refused run"
+        )
+        assert residue_file.exists(), (
+            "mutants/ must be left untouched when refusing mutants-dir-present"
+        )
+        assert not calls, "a mutants-dir-present refusal must never reach the mutmut invocation"
+
+    def test_mutants_dir_present_detail_names_directory_and_concurrency_caveat(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        (d / "pyproject.toml").write_text(
+            f"{ms.PYPROJECT_MARKER}\n[tool.mutmut]\n", encoding="utf-8"
+        )
+        mutants_dir = d / "mutants"
+        mutants_dir.mkdir()
+        _install_fake_uv(monkeypatch, {})
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        _assert_refusal(rc, captured, "mutants-dir-present")
+        detail = captured.err.split(":", 1)[1].strip()
+        assert str(mutants_dir) in detail, "the detail must name the mutants/ directory"
+        assert "progress" in detail.lower(), (
+            "the detail must say the directory may be removed only if no sensor run is "
+            "currently in progress -- a bare path with no caveat leaves an operator guessing "
+            "whether it is safe to delete"
+        )
+
+    def test_mutants_dir_present_refusal_never_calls_rmtree(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Pins the removal mechanism itself, not merely its observable effect on
+        one fixture's files -- a refusal must never reach `shutil.rmtree` at all,
+        so no future change to what lives inside `mutants/` can silently reopen
+        this path by coincidence of which files happen to survive."""
+        d = _flat_git_dir(tmp_path)
+        (d / "pyproject.toml").write_text(
+            f"{ms.PYPROJECT_MARKER}\n[tool.mutmut]\n", encoding="utf-8"
+        )
+        (d / "mutants").mkdir()
+        rmtree_calls: list[Path] = []
+        monkeypatch.setattr(
+            ms.shutil, "rmtree", lambda path, *a, **kw: rmtree_calls.append(Path(path))
+        )
+        _install_fake_uv(monkeypatch, {})
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        _assert_refusal(rc, capsys.readouterr(), "mutants-dir-present")
+        assert not rmtree_calls, f"a refusal must never call shutil.rmtree; got {rmtree_calls}"
+
+
+# ---------------------------------------------------------------------------
+# A stray marker-bearing pyproject.toml with NO mutants/ beside it cannot
+# belong to a concurrent run (mutmut always creates mutants/ once it starts) --
+# this is the one residue shape self-heal may still remove, letting the run
+# proceed.
+# ---------------------------------------------------------------------------
+
+
+class TestSelfHealRemovesStrayMarkerPyprojectAlone:
+    def test_marker_pyproject_without_mutants_dir_is_healed_and_the_run_proceeds(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        stray = d / "pyproject.toml"
+        stray.write_text(
+            f"{ms.PYPROJECT_MARKER}\n[tool.mutmut]\nleftover = true\n", encoding="utf-8"
+        )
+        calls = _install_fake_uv(monkeypatch, _success_plan())
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        assert rc == ms.EXIT_OK, capsys.readouterr().err
+        assert calls, (
+            "the run must reach the mutmut invocation once the lone stray marker file is "
+            "healed -- a leftover pyproject-present refusal would mean self-heal never ran"
+        )
+
+
+# ---------------------------------------------------------------------------
 # uv missing from PATH, or the uv bootstrap itself fails
 # ---------------------------------------------------------------------------
 

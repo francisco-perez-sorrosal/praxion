@@ -49,10 +49,17 @@ duplicated into any prose document -- point a reader here instead.
    this tool's own test suite depends on.
 8. The generated `pyproject.toml` carries a marker comment
    (`PYPROJECT_MARKER` below) so a run killed mid-flight (SIGKILL, a hard
-   turn-budget cutoff) leaves residue this script can recognize and remove on
-   its *next* invocation, without ever touching a `pyproject.toml` it did not
-   write itself -- see `_self_heal` and the existing-pyproject / unsupported-layout
-   refusal checks below.
+   turn-budget cutoff) leaves a stray config this script can recognize and
+   remove on its *next* invocation -- see `_self_heal`. Self-heal touches
+   ONLY that marker-bearing `pyproject.toml`, and only when no `mutants/`
+   directory exists alongside it; it never removes `mutants/` itself. A
+   concurrent live run has exactly the file shape of a killed run's residue
+   (marker pyproject + `mutants/`), so `mutants/`'s mere presence always
+   refuses as `mutants-dir-present` -- regardless of the pyproject's marker --
+   rather than being swept by a second invocation. A killed run's `mutants/`
+   is gitignored and harmless to remove by hand once no sensor run is in
+   progress; see the existing-pyproject / mutants-dir-present /
+   unsupported-layout refusal checks below.
 9. **`--no-project` is added, conditionally, when the target directory is
    itself the git toplevel.** Verified live against real `uv`/`mutmut`, not
    assumed: when point 2's `--project` root is the SAME directory this script
@@ -279,13 +286,24 @@ def _first_missing_path(paths: list[str]) -> Path | None:
 
 
 def _self_heal(target_dir: Path) -> None:
-    """Remove a marker-bearing `pyproject.toml` (and `mutants/` alongside it)
-    left behind by a run this script started but never finished cleaning up
-    after -- a SIGKILL or a hard turn-budget cutoff skips the `finally` below.
+    """Remove a marker-bearing `pyproject.toml` left behind by a run this
+    script started but never finished cleaning up after -- a SIGKILL or a
+    hard turn-budget cutoff skips the `finally` below.
 
-    Never touches a `pyproject.toml` lacking the marker: that is a project's
-    own configuration, and the runner refuses on it rather than guessing.
+    Never removes `mutants/`. A concurrent live run has exactly the same
+    residue shape as a killed run (marker pyproject + `mutants/`), so this
+    only heals when no `mutants/` directory exists at all -- otherwise a
+    second invocation could destroy a live run's in-progress output.
+    `main()`'s guard order already refuses on `mutants/` before self-heal
+    ever runs, but the check is repeated here so this function's contract
+    holds on its own, independent of caller order.
+
+    Also never touches a `pyproject.toml` lacking the marker: that is a
+    project's own configuration, and the runner refuses on it rather than
+    guessing.
     """
+    if (target_dir / "mutants").exists():
+        return
     pyproject_path = target_dir / "pyproject.toml"
     if not pyproject_path.exists():
         return
@@ -296,9 +314,6 @@ def _self_heal(target_dir: Path) -> None:
     if PYPROJECT_MARKER not in content:
         return
     pyproject_path.unlink()
-    mutants_dir = target_dir / "mutants"
-    if mutants_dir.exists():
-        shutil.rmtree(mutants_dir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -757,6 +772,16 @@ def main(argv: list[str] | None = None) -> int:
     except _FlatLayoutError as exc:
         return _emit(Refused(ReasonCode.NOT_FLAT_LAYOUT, str(exc)), json_mode=json_mode)
 
+    # `mutants-dir-present` is checked BEFORE self-heal, and regardless of the
+    # pyproject's marker: a concurrent live run has exactly the file shape of
+    # a killed run's residue (marker pyproject + `mutants/`), so a second
+    # invocation must refuse rather than self-heal its way into deleting a
+    # live run's in-progress output.
+    mutants_dir = target_dir / "mutants"
+    if mutants_dir.exists():
+        detail = f"{mutants_dir} (safe to remove by hand if no mutation-sensor run is in progress)"
+        return _emit(Refused(ReasonCode.MUTANTS_DIR_PRESENT, detail), json_mode=json_mode)
+
     _self_heal(target_dir)
 
     pyproject_path = target_dir / "pyproject.toml"
@@ -764,10 +789,6 @@ def main(argv: list[str] | None = None) -> int:
         return _emit(
             Refused(ReasonCode.PYPROJECT_PRESENT, str(pyproject_path)), json_mode=json_mode
         )
-
-    mutants_dir = target_dir / "mutants"
-    if mutants_dir.exists():
-        return _emit(Refused(ReasonCode.MUTANTS_DIR_PRESENT, str(mutants_dir)), json_mode=json_mode)
 
     if shutil.which("uv") is None:
         return _emit(

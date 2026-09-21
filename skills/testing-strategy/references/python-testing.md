@@ -220,6 +220,25 @@ Under pytest-cov 7.x, a test that drives a script via `subprocess.run([sys.execu
 - **Measure with in-process tests**: `runpy.run_path(script, run_name="__main__")` executes the real `if __name__ == "__main__"` guard (fail-open wrappers included) inside the measured process — the contract a bare `main()` call skips
 - **Keep subprocess tests** as end-to-end contract proof (real argv, real stdin, real exit codes); just don't expect them to move coverage
 
+## Mutation Sensor (Per-Step)
+
+Coverage answers "did this line run?"; it cannot answer "would a test have noticed if this line were wrong?" Mutation testing closes that gap by mutating the code under test (flipping a condition, dropping a line) and checking whether any test fails — a surviving mutant names a test suite gap coverage cannot see. The per-step mutation sensor operationalizes this as a bounded, opt-in check rather than a standing suite-wide run.
+
+**Why it exists.** Twice in this project's history, a test suite reached green coverage over a function while still missing the case that mattered: once for a change-detection helper's escalation path, and again for a world-read helper whose tests asserted the shape of its *fallback* value rather than any effect the real read had on downstream output. Both misses are the same class — a test that would still pass if the read were replaced by its fallback is not testing the read at all. The sensor makes that class of gap mechanically detectable instead of relying on a reviewer noticing it a second time.
+
+**Invocation** — `scripts/mutation_sensor.py --targets <files> --tests <files>`, run only on a step tagged `mutation: on` in `IMPLEMENTATION_PLAN.md`. Full tagging criteria and precedence (mirrors `review:`) live in [`decomposition-guide.md § Step Risk Tagging`](../../software-planning/references/decomposition-guide.md#step-risk-tagging). No tag, no invocation — the default cost is zero, and there is no auto-signal in v1. The runner's own module docstring is the single source for its mechanics (cwd rules, `uv run --with mutmut==3.8.0` invocation shape, the generated `pyproject.toml` and its cleanup, the two mutmut output surfaces it reads) — this section covers only when and why to reach for it, never the recipe itself.
+
+**Producer / consumer contract.** The step's canonical `TEST_RESULTS.md` writer runs the sensor and copies its stdout `Mutation:` line **verbatim** into that step's section — never re-rendered, never summarized. `agents/verifier.md` Phase 10 is the sole reader: it does not re-run the sensor, only disposes of the line it finds (or its absence, on a tagged step). The line's two fixed shapes and its interaction with the shape checker's byte ceiling are documented once, in [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](../../software-planning/references/agent-pipeline-details.md#test_resultsmd-reconciliation) — do not restate the shape here.
+
+**Cost envelope.** Measured directly, not estimated: **26–70 seconds** for a module-sized target (one file of production code against its paired test file), with a **~3-second floor** for a tiny fixture module. This is why the sensor is tag-gated rather than run on every step — a full-suite mutation pass at this per-target cost would dominate a pipeline's wall-clock time for a check that only a subset of steps need.
+
+**Reading survivors.** A survivor is not automatically a bug. Two classes turn up repeatedly and are not test-suite gaps:
+
+- **Mathematically equivalent mutants** — a mutation that produces code behaviorally indistinguishable from the original for every reachable input (e.g., an arithmetic identity that always evaluates the same way in context). No test can kill an equivalent mutant because there is no observable difference to assert on.
+- **Environment artifacts** — most commonly case-folding: a mutation that changes a string's case survives on a case-insensitive filesystem because the path comparison it feeds never distinguishes the two, independent of what the test asserts.
+
+Dispose of each remaining survivor with an explicit written argument for *why* it is equivalent or environmental — "acceptable" without the argument is not a disposition the verifier can trust.
+
 ## Async Testing
 
 Set `asyncio_mode = "auto"` in `[tool.pytest.ini_options]` so all `async def test_*` functions run as async tests without `@pytest.mark.asyncio`.

@@ -257,6 +257,12 @@ When tests exist or are expected:
 5. Note untested edge cases in complex logic.
 6. Flag if the plan required tests that were not written.
 7. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
+8. **Mutation sensor disposition** (when the step carries `mutation: on` per `IMPLEMENTATION_PLAN.md`) — read the `Mutation:` line in the step's `TEST_RESULTS.md` section; this is a document cross-check only, you never invoke the sensor yourself:
+   - `Mutation: survivors=…` naming a survivor inside a function that performs a world read (subprocess, git, filesystem, network, environment, or clock) → `WARN` naming the function(s), plus a `TECH_DEBT_LEDGER` row (category `coverage-gap`) describing a world-read function with a surviving mutant and no test through the real adapter — never cite a specific ledger row id in this file.
+   - `Mutation: unavailable reason=<code> (<detail>)` where `<code>` is one of the runner's closed reasons (`not-flat-layout`, `path-missing`, `pyproject-present`, `mutants-dir-present`, `toolchain-missing`, `run-timeout`, `run-failed`) → recorded, no finding — a refusal is a missing reading, never a failing test, and must never train the reader to ignore the signal.
+   - A step tagged `mutation: on` whose section carries **no** `Mutation:` line at all → `WARN`, advisory during rollout, mirroring the missing-`TEST_RESULTS.md` disposition in step 1 above.
+
+   Golden bad-case: a tagged step's `Mutation:` line reads `survivors=1 mutants=40 (subprocess_call: 1)` where `subprocess_call` is a world-read function — this WARN fires in Phase 10, naming `subprocess_call` and filing the `TECH_DEBT_LEDGER` row.
 
 #### Topology tier-appropriateness (when steps carried `Tests:` fields)
 

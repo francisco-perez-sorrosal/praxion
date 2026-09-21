@@ -72,19 +72,33 @@ a multi-hundred-KB debug log and is not meant to be parsed):
   `{killed, survived, total, no_tests, skipped, suspicious, timeout, segfault,
   check_was_interrupted_by_user}`, read from disk after the run completes.
 - **Attribution** -- `mutmut results` (default, non-`--all`) prints one line
-  per non-killed mutant: `    <module>.x_<fn>__mutmut_<n>: <status>`. Parsed
-  by `_MUTANT_KEY_RE`, anchored on **both** ends -- a naive `x_`-strip or
+  per non-killed mutant, in one of two shapes: a module-level function,
+  `    <module>.x_<fn>__mutmut_<n>: <status>`, or -- mutmut 3.8.0's real
+  class-bearing shape -- a method trampoline,
+  `    <module>.x<sep><Class><sep><method>__mutmut_<n>: <status>`, where
+  `<sep>` is U+01C1 (`ǁ`), never an ASCII pipe. Both are parsed by the single
+  `_MUTANT_KEY_RE`, anchored on **both** ends -- a naive `x_`-strip or
   `_`-split corrupts any function whose real name starts with `x_` or `_`
-  (mutmut's own private-function naming collides with both).
+  (mutmut's own private-function naming collides with both), and a naive
+  greedy word-character class for the class name would itself swallow the
+  `ǁ` separator, since Python's `re` classifies U+01C1 as a word character
+  too. A method mutant
+  attributes as `Class.method` (e.g. `Box.__init__`, `Box.area`); a function
+  mutant attributes by its bare name, exactly as before. When more than one
+  `--targets` file is given, every label is additionally qualified with its
+  owning module (`mod_a.helper` vs. `mod_b.helper`) so two targets defining
+  the same function or method name never collapse into one merged count --
+  irrelevant, and skipped, for the single-target case.
   *Gotcha, recorded so a future caller does not lose time to it*: `--all` is
   declared without `is_flag=True`, so a bare `--all` errors; it takes a value.
   This design never needs it.
 
-`no tests` counts as a survivor, folded in with `survived`; `timeout` and
-`suspicious` are reported separately as `inconclusive=` and never folded into
-either bucket -- a mutant no selected test exercises at all is a *stronger*
-signal than an ordinary survivor, and scoring it as clean would put this
-sensor's blind spot exactly where its reason for existing lives.
+`no tests` counts as a survivor, folded in with `survived`; `timeout`,
+`suspicious` and `segfault` are reported separately as `inconclusive=` and
+never folded into either bucket -- a mutant no selected test exercises at all
+(or one that crashes the test process outright) is a *stronger* signal than
+an ordinary survivor, and scoring it as clean would put this sensor's blind
+spot exactly where its reason for existing lives.
 """
 
 from __future__ import annotations
@@ -129,11 +143,17 @@ HISTOGRAM_KEYS = frozenset(
 # `mutmut results`' non-killed statuses that count as survivors.
 SURVIVOR_STATUSES = frozenset({"survived", "no tests"})
 
-# Anchored on both ends: `mod` up to the literal `.x_`, `fn` non-greedy up to
-# the literal `__mutmut_<digits>:`. See the module docstring's "Attribution"
-# paragraph for why an unanchored strip corrupts private (`_name`) functions.
+# Anchored on both ends: `mod` up to the literal `.x`, then either the
+# function shape (`_<fn>`) or the method shape (`ǁ<cls>ǁ<mname>`),
+# both non-greedy up to the literal `__mutmut_<digits>:`. See the module
+# docstring's "Attribution" paragraph for why an unanchored strip corrupts
+# private (`_name`) functions and dunder methods (`__init__`) alike, and why
+# `cls` excludes U+01C1 explicitly rather than relying on `\w` (which matches
+# it).
 _MUTANT_KEY_RE = re.compile(
-    r"^\s*(?P<mod>[\w.]+)\.x_(?P<fn>.+?)__mutmut_(?P<n>\d+):\s*(?P<status>.+)$"
+    r"^\s*(?P<mod>[\w.]+)\.x"
+    r"(?:ǁ(?P<cls>[^ǁ]+)ǁ(?P<mname>.+?)|_(?P<fname>.+?))"
+    r"__mutmut_(?P<n>\d+):\s*(?P<status>.+)$"
 )
 
 
@@ -142,6 +162,7 @@ class ReasonCode(enum.Enum):
     verifier's disposition table (and the refusal stdout line) cannot recognize."""
 
     NOT_FLAT_LAYOUT = "not-flat-layout"
+    PATH_MISSING = "path-missing"
     PYPROJECT_PRESENT = "pyproject-present"
     MUTANTS_DIR_PRESENT = "mutants-dir-present"
     TOOLCHAIN_MISSING = "toolchain-missing"
@@ -199,7 +220,7 @@ class Ran:
 
     @property
     def inconclusive(self) -> int:
-        return self.histogram["timeout"] + self.histogram["suspicious"]
+        return self.histogram["timeout"] + self.histogram["suspicious"] + self.histogram["segfault"]
 
     @property
     def killed(self) -> int:
@@ -235,6 +256,17 @@ def _flat_target_dir(targets: list[str], tests: list[str]) -> Path:
         detail = ", ".join(f"{raw} -> {rp.parent}" for raw, rp in resolved)
         raise _FlatLayoutError(detail)
     return parents.pop()
+
+
+def _first_missing_path(paths: list[str]) -> Path | None:
+    """A nonexistent `--targets`/`--tests` path must be refused by name before
+    any subprocess runs, rather than left to mutmut's own opaque failure or --
+    worse -- silently producing a trustworthy-looking zero-mutant reading."""
+    for raw in paths:
+        path = Path(raw)
+        if not path.exists():
+            return path
+    return None
 
 
 def _self_heal(target_dir: Path) -> None:
@@ -390,7 +422,17 @@ def _invoke_export_cicd_stats(
         return Refused(ReasonCode.RUN_FAILED, f"could not read {stats_path.name}: {exc}")
 
 
-def _parse_results_text(text: str) -> dict[str, int]:
+def _attribution_label(match: re.Match[str], *, module_qualify: bool) -> str:
+    """`Class.method` for a method trampoline, the bare name for a function --
+    then, only when more than one `--targets` file was given, prefixed with
+    the owning module so two targets defining the same name never merge into
+    one count (see the module docstring's "Attribution" paragraph)."""
+    cls = match.group("cls")
+    label = f"{cls}.{match.group('mname')}" if cls is not None else match.group("fname")
+    return f"{match.group('mod')}.{label}" if module_qualify else label
+
+
+def _parse_results_text(text: str, *, module_qualify: bool) -> dict[str, int]:
     per_function: dict[str, int] = {}
     for line in text.splitlines():
         match = _MUTANT_KEY_RE.match(line)
@@ -398,13 +440,13 @@ def _parse_results_text(text: str) -> dict[str, int]:
             continue
         if match.group("status").strip() not in SURVIVOR_STATUSES:
             continue
-        fn = match.group("fn")
-        per_function[fn] = per_function.get(fn, 0) + 1
+        key = _attribution_label(match, module_qualify=module_qualify)
+        per_function[key] = per_function.get(key, 0) + 1
     return per_function
 
 
 def _invoke_results(
-    target_root: Path, target_dir: Path, timeout: float, *, no_project: bool
+    target_root: Path, target_dir: Path, timeout: float, *, no_project: bool, module_qualify: bool
 ) -> dict[str, int] | Refused:
     argv = _mutmut_argv(target_root, "results", no_project=no_project)
     try:
@@ -415,7 +457,7 @@ def _invoke_results(
         return Refused(ReasonCode.RUN_FAILED, str(exc))
     if result.returncode != 0:
         return Refused(ReasonCode.RUN_FAILED, _tail(result.stderr) or f"exited {result.returncode}")
-    return _parse_results_text(result.stdout)
+    return _parse_results_text(result.stdout, module_qualify=module_qualify)
 
 
 def _build_ran(
@@ -426,10 +468,17 @@ def _build_ran(
         raise ValueError(f"mutmut-cicd-stats.json missing key(s): {', '.join(sorted(missing))}")
     if "total" not in stats:
         raise ValueError("mutmut-cicd-stats.json missing key: total")
+    total = int(stats["total"])
+    if total == 0:
+        # A vacuous green: mutmut generated no mutants at all for these targets
+        # (e.g. an empty or non-mutable file), which is indistinguishable from
+        # "everything killed" unless refused explicitly -- see the module's
+        # safety property in the header docstring.
+        raise ValueError("mutmut generated zero mutants for the given targets")
     histogram = MappingProxyType({key: int(stats[key]) for key in HISTOGRAM_KEYS})
     return Ran(
         targets=tuple(targets),
-        mutants=int(stats["total"]),
+        mutants=total,
         histogram=histogram,
         per_function=MappingProxyType(dict(per_function)),
         elapsed_s=elapsed_s,
@@ -447,10 +496,28 @@ def _cleanup(target_dir: Path, pyproject_path: Path | None) -> None:
         shutil.rmtree(mutants_dir, ignore_errors=True)
 
 
+def _charge_budget(elapsed_since: float, timeout: float, stage: str) -> float | Refused:
+    """One `--timeout` is a single wall-clock budget for the whole sequence
+    (bootstrap probe, `mutmut run`, `export-cicd-stats`, `results`) -- not a
+    fresh ceiling re-applied to each subprocess in turn, which would let a
+    completed run take up to 4x the stated budget. Returns the remaining
+    share to hand the next subprocess, or a `RUN_TIMEOUT` refusal the moment
+    that share is exhausted -- no further subprocess is ever invoked."""
+    remaining = timeout - elapsed_since
+    if remaining <= 0:
+        return Refused(ReasonCode.RUN_TIMEOUT, f"budget exhausted before {stage} ({timeout}s)")
+    return remaining
+
+
 def _run_mutmut(
     target_dir: Path, targets: list[str], tests: list[str], timeout: float, *, debug: bool
 ) -> Ran | Refused:
     pyproject_path: Path | None = None
+    start = time.monotonic()
+
+    def next_remaining(stage: str) -> float | Refused:
+        return _charge_budget(time.monotonic() - start, timeout, stage)
+
     try:
         try:
             target_root = _git_toplevel(target_dir)
@@ -463,28 +530,40 @@ def _run_mutmut(
         test_names = [Path(t).name for t in tests]
         pyproject_path = _write_pyproject(target_dir, target_names, test_names, debug=debug)
 
-        probe_detail = _bootstrap_probe(target_root, target_dir, timeout, no_project=no_project)
+        remaining = next_remaining("bootstrap probe")
+        if isinstance(remaining, Refused):
+            return remaining
+        probe_detail = _bootstrap_probe(target_root, target_dir, remaining, no_project=no_project)
         if probe_detail is not None:
             return Refused(ReasonCode.TOOLCHAIN_MISSING, probe_detail)
 
-        start = time.monotonic()
-        run_refusal = _invoke_mutmut_run(target_root, target_dir, timeout, no_project=no_project)
-        elapsed_s = time.monotonic() - start
+        remaining = next_remaining("mutmut run")
+        if isinstance(remaining, Refused):
+            return remaining
+        run_refusal = _invoke_mutmut_run(target_root, target_dir, remaining, no_project=no_project)
         if run_refusal is not None:
             return run_refusal
 
+        remaining = next_remaining("export-cicd-stats")
+        if isinstance(remaining, Refused):
+            return remaining
         stats_or_refusal = _invoke_export_cicd_stats(
-            target_root, target_dir, timeout, no_project=no_project
+            target_root, target_dir, remaining, no_project=no_project
         )
         if isinstance(stats_or_refusal, Refused):
             return stats_or_refusal
 
+        remaining = next_remaining("results")
+        if isinstance(remaining, Refused):
+            return remaining
+        module_qualify = len(targets) > 1
         results_or_refusal = _invoke_results(
-            target_root, target_dir, timeout, no_project=no_project
+            target_root, target_dir, remaining, no_project=no_project, module_qualify=module_qualify
         )
         if isinstance(results_or_refusal, Refused):
             return results_or_refusal
 
+        elapsed_s = time.monotonic() - start
         try:
             return _build_ran(targets, stats_or_refusal, results_or_refusal, elapsed_s)
         except (ValueError, TypeError, KeyError) as exc:
@@ -622,6 +701,12 @@ def main(argv: list[str] | None = None) -> int:
         target_dir = _flat_target_dir(args.targets, args.tests)
     except _FlatLayoutError as exc:
         return _emit(Refused(ReasonCode.NOT_FLAT_LAYOUT, str(exc)), json_mode=json_mode)
+
+    missing = _first_missing_path([*args.targets, *args.tests])
+    if missing is not None:
+        return _emit(
+            Refused(ReasonCode.PATH_MISSING, f"no such file: {missing}"), json_mode=json_mode
+        )
 
     _self_heal(target_dir)
 

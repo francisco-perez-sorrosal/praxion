@@ -102,7 +102,9 @@ def _project(tmp_path, monkeypatch):
 
 
 def _project_transcripts_dir(home, project_root):
-    mangled = str(project_root).replace("/", "-")
+    # The harness mangles both "/" and "." to "-" (a worktree under
+    # `.claude/worktrees/` lands in `...-praxion--claude-worktrees-...`).
+    mangled = str(project_root).replace("/", "-").replace(".", "-")
     return home / ".claude" / "projects" / mangled
 
 
@@ -586,6 +588,33 @@ def test_list_flag_enumerates_known_runs_with_timestamps(tmp_path, monkeypatch, 
     found_ids = {run["wf_id"] for run in runs}
     assert found_ids == {"wf_aaaa0001", "wf_bbbb0002"}
     assert all("launched_at" in run for run in runs)
+
+
+def test_project_root_with_dotted_segments_resolves_the_harness_directory(
+    tmp_path, monkeypatch, capsys
+):
+    home = tmp_path / "home"
+    project_root = tmp_path / ".claude" / "worktrees" / "wt"
+    project_root.mkdir(parents=True)
+    monkeypatch.setattr(wfc.Path, "home", lambda: home)
+    seed = _DEFAULT_AGENTS[0]
+    run_dir = _run_dir(home, project_root, "sess-1", "wf_dotted001")
+    _write_journal(run_dir, [seed])
+    _write_meta(run_dir, seed["agent_id"], label=seed["label"], phase=seed["phase"])
+    _write_transcript(
+        run_dir,
+        seed["agent_id"],
+        model=seed["model"],
+        peak_context=seed["peak_context"],
+        output_tokens=seed["output_tokens"],
+    )
+
+    exit_code, captured = _run_cli(
+        ["--list", "--project-root", str(project_root), "--json"], capsys
+    )
+
+    assert exit_code == 0
+    assert {run["wf_id"] for run in json.loads(captured.out)} == {"wf_dotted001"}
 
 
 def test_table_output_names_the_run_in_human_readable_form(tmp_path, monkeypatch, capsys):

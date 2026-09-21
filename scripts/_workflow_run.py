@@ -46,8 +46,10 @@ class WorkflowRunError(Exception):
 # --------------------------------------------------------------------------- #
 def transcripts_dir(project_root: Path) -> Path:
     """Claude Code's per-project transcript directory: the project's absolute
-    path with every "/" replaced by "-", under `~/.claude/projects/`."""
-    mangled = str(project_root).replace("/", "-")
+    path with every "/" and "." replaced by "-", under `~/.claude/projects/`.
+    The "." rule matters for worktrees under `.claude/worktrees/`, whose
+    harness directory reads `...-praxion--claude-worktrees-...`."""
+    mangled = str(project_root).replace("/", "-").replace(".", "-")
     return Path.home() / ".claude" / "projects" / mangled
 
 

@@ -4,9 +4,14 @@ Hermetic: pipelines are built under ``tmp_path``; the reconciler is driven
 hermetically through a WIP.md with no checklist lines (reconcile() then
 returns [] before touching git/WAL/test-status) or through compose()'s own
 ``_*_override`` pass-through kwargs, mirroring reconcile_pipeline_state.py's
-own hooks. Do not read compose_handoff.py -- it does not exist yet; this file
-is expected to fail at collection with ModuleNotFoundError (RED) until the
-paired implementation step lands.
+own hooks.
+
+A later section drives the world-read functions in the sibling
+``_handoff_inputs.py`` (base-ref resolution, declared-files scope,
+artifact listing, recent-log detection) through real throwaway git
+repositories and real filesystem fixtures instead of hand-built verdict
+dicts -- asserting each read's effect on the composed handoff, never on the
+shape of its fallback value.
 
 Run: ``pytest scripts/test_compose_handoff.py`` (or the module directly).
 """
@@ -1125,9 +1130,14 @@ def test_remote_default_branch_named_neither_main_nor_master_still_resolves_base
 
 
 def test_declared_files_unions_the_committed_and_uncommitted_halves(tmp_path, monkeypatch, capsys):
-    """A step's declared `Files:` field is split into a committed half and an
-    uncommitted half -- dropping either half of `declared_files`'s union would
-    silently shrink the readiness gate's step-owned scope."""
+    """A step's declared `Files:` field can span a committed file and an
+    uncommitted file at once -- this pins that the uncommitted half being
+    dirty still triggers the block. It does NOT, on its own, discriminate a
+    dropped union half: the trailing dirty-source catch-all sweeps in any
+    dirty path regardless of step attribution, so `b.py` would appear in
+    `stderr` here even if `declared_files` silently dropped its unchanged
+    half. `test_declared_files_lead_with_the_committed_half_ahead_of_the_uncommitted_half`
+    below is the one that actually kills that mutation, via ordering."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _run_git(["init", "-q"], repo_root)
@@ -1849,6 +1859,39 @@ def test_dangling_origin_head_falls_through_to_the_short_branch_name(tmp_path):
     context = compose_handoff.gather(SLUG, repo_root, force=False)
 
     assert context.base_sha == expected_base_sha
+
+
+def test_recent_log_skips_a_dangling_symlink_and_reports_the_real_log_behind_it(
+    tmp_path, monkeypatch
+):
+    """A dangling symlink among the raw logs must not abort the scan -- its
+    name sorts first and `Path.glob` lists it, but `.stat()` on a broken
+    symlink raises `FileNotFoundError` (an `OSError` subclass). The loop must
+    continue past it to the real log behind it, not stop the search there."""
+    task_dir = _setup_pipeline(tmp_path, _minimal_wip())
+    log_dir = task_dir / "logs"
+    log_dir.mkdir()
+    real_log = log_dir / "step-2.log"  # id-citation-discipline:ignore
+    real_log.write_text("running...\n", encoding="utf-8")
+    (log_dir / "step-1.log").symlink_to(
+        log_dir / "does-not-exist.log"
+    )  # id-citation-discipline:ignore
+    fixed_now = real_log.stat().st_mtime
+    monkeypatch.setattr(time, "time", lambda: fixed_now)
+
+    result = compose_handoff.compose(
+        SLUG,
+        tmp_path,
+        BOUNDARY_PLAN_TO_IMPL,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override=None,
+    )
+
+    state = _extract_section(result["text"], "§1 State")
+    assert "`step-2.log` changed 0s ago" in state
+    assert "step-1.log" not in state
 
 
 if __name__ == "__main__":

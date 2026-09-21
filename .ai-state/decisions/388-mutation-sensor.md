@@ -1,7 +1,8 @@
 ---
-id: dec-draft-15ec5a75
+id: dec-388
+draft_id: dec-draft-15ec5a75
 title: "A per-step mutation sensor: one stdlib runner owning the recipe, one bounded TEST_RESULTS line, one planner tag — sensor, never a gate"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-20
 summary: "Adds scripts/mutation_sensor.py, a stdlib-only, PATH-installed runner that encodes the P3.6 spike's eight-point mutmut recipe for the flat scripts/ layout, invokes mutmut 3.8.0 via uv run --with (no dependency change, uv.lock untouched), and prints one bounded line the producer copies verbatim into TEST_RESULTS.md. The TEST_RESULTS.md schema gains one optional line with two shapes (a reading and a reasoned refusal); IMPLEMENTATION_PLAN.md steps gain a planner-owned mutation: on tag with review:'s precedence and default-off zero cost; verifier Phase 10 gains three dispositions and still runs nothing. Totals come from mutmut export-cicd-stats' JSON and attribution from mutmut results' text — never from the carriage-return-rewritten progress line. Exit 0 on any survivor count, exit 2 with a closed reason code when the run cannot be trusted; v1 supports the flat-directory layout only."

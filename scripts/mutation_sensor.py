@@ -124,6 +124,12 @@ MUTMUT_VERSION = "3.8.0"
 DEFAULT_TIMEOUT_SECONDS = 600.0
 GIT_TIMEOUT_SECONDS = 30.0
 
+# Below this, a subprocess would be started with a sub-millisecond budget --
+# not enough to do anything, only enough to be reported as `run-failed` once
+# it inevitably times out on its own. `_charge_budget` refuses as
+# `run-timeout` itself instead of ever spending a share this thin.
+MIN_BUDGET_SECONDS = 1.0
+
 TOP_N_FUNCTIONS = 5
 LINE_BYTE_CAP = 240
 
@@ -259,12 +265,15 @@ def _flat_target_dir(targets: list[str], tests: list[str]) -> Path:
 
 
 def _first_missing_path(paths: list[str]) -> Path | None:
-    """A nonexistent `--targets`/`--tests` path must be refused by name before
-    any subprocess runs, rather than left to mutmut's own opaque failure or --
-    worse -- silently producing a trustworthy-looking zero-mutant reading."""
+    """A nonexistent, or non-file (e.g. a directory), `--targets`/`--tests`
+    path must be refused by name before any subprocess runs, rather than left
+    to mutmut's own opaque failure or -- worse -- silently producing a
+    trustworthy-looking zero-mutant reading. Checked with `is_file()`, not
+    `exists()`, so a directory path is refused here rather than surfacing
+    later as an unrelated `not-flat-layout`/`run-failed`."""
     for raw in paths:
         path = Path(raw)
-        if not path.exists():
+        if not path.is_file():
             return path
     return None
 
@@ -347,11 +356,14 @@ def _git_toplevel(target_dir: Path) -> Path:
 
 def _bootstrap_probe(
     target_root: Path, target_dir: Path, timeout: float, *, no_project: bool
-) -> str | None:
+) -> Refused | None:
     """A cheap `mutmut --version` call, before `mutmut run` is ever reached, so
     a failure to even resolve/install `mutmut==3.8.0` (no network, no `uv`
-    lockfile) is told apart from a real `mutmut run` failure (toolchain-missing vs
-    run-failed). Returns `None` on success, a one-line failure detail otherwise.
+    lockfile) is told apart from a real `mutmut run` failure (toolchain-missing
+    vs run-failed). A wall-clock exhaustion here is `run-timeout`, same as any
+    other of the four mutmut calls -- never folded into `toolchain-missing`,
+    which would misreport a slow-but-working toolchain as a broken one.
+    Returns `None` on success, a `Refused` otherwise.
     """
     argv = _mutmut_argv(target_root, "--version", no_project=no_project)
     try:
@@ -359,11 +371,12 @@ def _bootstrap_probe(
             argv, cwd=str(target_dir), capture_output=True, text=True, timeout=timeout
         )
     except subprocess.TimeoutExpired:
-        return f"{' '.join(argv)}: bootstrap exceeded {timeout}s"
+        return Refused(ReasonCode.RUN_TIMEOUT, f"{' '.join(argv)}: bootstrap exceeded {timeout}s")
     except (OSError, subprocess.SubprocessError) as exc:
-        return f"{' '.join(argv)}: {exc}"
+        return Refused(ReasonCode.TOOLCHAIN_MISSING, f"{' '.join(argv)}: {exc}")
     if result.returncode != 0:
-        return f"{' '.join(argv)}: {_tail(result.stderr) or _tail(result.stdout)}"
+        detail = f"{' '.join(argv)}: {_tail(result.stderr) or _tail(result.stdout)}"
+        return Refused(ReasonCode.TOOLCHAIN_MISSING, detail)
     return None
 
 
@@ -411,6 +424,8 @@ def _invoke_export_cicd_stats(
         result = subprocess.run(
             argv, cwd=str(target_dir), capture_output=True, text=True, timeout=timeout
         )
+    except subprocess.TimeoutExpired:
+        return Refused(ReasonCode.RUN_TIMEOUT, f"export-cicd-stats exceeded {timeout}s")
     except (OSError, subprocess.SubprocessError) as exc:
         return Refused(ReasonCode.RUN_FAILED, str(exc))
     if result.returncode != 0:
@@ -429,6 +444,11 @@ def _attribution_label(match: re.Match[str], *, module_qualify: bool) -> str:
     one count (see the module docstring's "Attribution" paragraph)."""
     cls = match.group("cls")
     label = f"{cls}.{match.group('mname')}" if cls is not None else match.group("fname")
+    # A nested class's method name still carries `ǁ` between the outer and
+    # inner class (mutmut's own separator, captured whole by `mname`'s
+    # non-greedy match) -- normalize every occurrence to `.` so the rendered
+    # label always reads as a dotted path.
+    label = label.replace("ǁ", ".")
     return f"{match.group('mod')}.{label}" if module_qualify else label
 
 
@@ -453,6 +473,8 @@ def _invoke_results(
         result = subprocess.run(
             argv, cwd=str(target_dir), capture_output=True, text=True, timeout=timeout
         )
+    except subprocess.TimeoutExpired:
+        return Refused(ReasonCode.RUN_TIMEOUT, f"results exceeded {timeout}s")
     except (OSError, subprocess.SubprocessError) as exc:
         return Refused(ReasonCode.RUN_FAILED, str(exc))
     if result.returncode != 0:
@@ -502,9 +524,11 @@ def _charge_budget(elapsed_since: float, timeout: float, stage: str) -> float | 
     fresh ceiling re-applied to each subprocess in turn, which would let a
     completed run take up to 4x the stated budget. Returns the remaining
     share to hand the next subprocess, or a `RUN_TIMEOUT` refusal the moment
-    that share is exhausted -- no further subprocess is ever invoked."""
+    that share drops below `MIN_BUDGET_SECONDS` -- no further subprocess is
+    ever invoked with a budget too thin to do anything but time out on its
+    own and be misreported as a failure of that subprocess."""
     remaining = timeout - elapsed_since
-    if remaining <= 0:
+    if remaining < MIN_BUDGET_SECONDS:
         return Refused(ReasonCode.RUN_TIMEOUT, f"budget exhausted before {stage} ({timeout}s)")
     return remaining
 
@@ -533,9 +557,9 @@ def _run_mutmut(
         remaining = next_remaining("bootstrap probe")
         if isinstance(remaining, Refused):
             return remaining
-        probe_detail = _bootstrap_probe(target_root, target_dir, remaining, no_project=no_project)
-        if probe_detail is not None:
-            return Refused(ReasonCode.TOOLCHAIN_MISSING, probe_detail)
+        probe_refusal = _bootstrap_probe(target_root, target_dir, remaining, no_project=no_project)
+        if probe_refusal is not None:
+            return probe_refusal
 
         remaining = next_remaining("mutmut run")
         if isinstance(remaining, Refused):
@@ -697,16 +721,20 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     json_mode = bool(args.json)
 
-    try:
-        target_dir = _flat_target_dir(args.targets, args.tests)
-    except _FlatLayoutError as exc:
-        return _emit(Refused(ReasonCode.NOT_FLAT_LAYOUT, str(exc)), json_mode=json_mode)
-
+    # Missing-path check runs first: a typo'd path that happens to live in a
+    # different directory must refuse as `path-missing`, not `not-flat-layout`
+    # -- the flat-layout check only makes sense once every path is known to
+    # resolve to a real file.
     missing = _first_missing_path([*args.targets, *args.tests])
     if missing is not None:
         return _emit(
             Refused(ReasonCode.PATH_MISSING, f"no such file: {missing}"), json_mode=json_mode
         )
+
+    try:
+        target_dir = _flat_target_dir(args.targets, args.tests)
+    except _FlatLayoutError as exc:
+        return _emit(Refused(ReasonCode.NOT_FLAT_LAYOUT, str(exc)), json_mode=json_mode)
 
     _self_heal(target_dir)
 

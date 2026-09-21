@@ -185,7 +185,11 @@ def _flat_git_dir(tmp_path: Path, *, name: str = "target") -> Path:
 
 
 def _install_fake_uv(
-    monkeypatch: pytest.MonkeyPatch, plan: dict, *, clock: dict[str, float] | None = None
+    monkeypatch: pytest.MonkeyPatch,
+    plan: dict,
+    *,
+    clock: dict[str, float] | None = None,
+    timeouts: list[tuple[float | None, float | None]] | None = None,
 ) -> list[list[str]]:
     """Patch `subprocess.run` so any `uv ...` invocation is faked per `plan`
     (keyed by the mutmut subcommand -- "--version" | "run" | "export-cicd-stats"
@@ -201,6 +205,13 @@ def _install_fake_uv(
     meaningful when `clock` is also passed; simulates wall-clock time elapsing
     inside one faked subprocess call, for tests of the timeout budget without
     a real sleep).
+
+    When `timeouts` is passed, each intercepted call appends
+    `(kw.get("timeout"), clock["t"])` to it -- the `timeout` kwarg the runner
+    handed this subprocess, paired with how much wall-clock time had already
+    elapsed *before* this call started (i.e. before its own `advance` is
+    applied). This is what lets a test assert the shared budget shrinks call
+    over call, without hardcoding the runner's exact remaining-budget formula.
     """
     real_run = subprocess.run
     calls: list[list[str]] = []
@@ -210,6 +221,8 @@ def _install_fake_uv(
         if Path(argv[0]).name != "uv":
             return real_run(args, *a, **kw)
         calls.append(argv)
+        if timeouts is not None:
+            timeouts.append((kw.get("timeout"), clock["t"] if clock is not None else None))
         subcmd = None
         if "mutmut" in argv:
             idx = argv.index("mutmut")
@@ -646,6 +659,43 @@ class TestMethodMutantAttribution:
         )
         assert sum(per_function.values()) == 3, "the killed perimeter mutant must not be counted"
 
+    def test_a_nested_class_method_mutant_attributes_to_its_full_dotted_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        # `Outer.Inner.m` carries the class separator twice inside one mangled
+        # key -- a fix that only handles a single class level (stopping at the
+        # first `ǁ`) would truncate the label to `Outer.Innerǁm` instead of
+        # normalizing every occurrence.
+        results_text = "    shape.xǁOuterǁInnerǁm__mutmut_1: survived\n"
+        stats = dict(
+            CICD_STATS_FIXTURE,
+            killed=0,
+            survived=1,
+            no_tests=0,
+            skipped=0,
+            suspicious=0,
+            timeout=0,
+            segfault=0,
+            total=1,
+        )
+        plan = {
+            "run": {},
+            "export-cicd-stats": {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}},
+            "results": {"stdout": results_text},
+        }
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py"), "--json"])
+
+        assert rc == ms.EXIT_OK
+        payload = json.loads(capsys.readouterr().out)
+        per_function = payload["per_function"]
+        assert per_function.get("Outer.Inner.m") == 1, (
+            "a nested class's mangled key must attribute to the full dotted path "
+            f"'Outer.Inner.m', not just its innermost segment; got {per_function!r}"
+        )
+
 
 class TestMultiTargetSameFunctionNameAttribution:
     def test_two_targets_defining_the_same_function_name_are_not_merged(
@@ -742,6 +792,53 @@ class TestPathMissingRefusal:
         )
         assert not calls, "a missing path must be refused before any mutmut invocation is made"
 
+    def test_an_existing_directory_passed_as_targets_refuses_path_missing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        calls = _install_fake_uv(monkeypatch, {})
+
+        # `d` exists but is a directory, not a file -- the check must use
+        # `is_file()`, not mere existence, or this would fall through to a
+        # `not-flat-layout`/opaque-mutmut failure instead.
+        rc = ms.main(["--targets", str(d), "--tests", str(d / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        assert rc == ms.EXIT_ERROR
+        match = _UNAVAILABLE_LINE_RE.match(captured.out.strip())
+        assert match, (
+            f"stdout must be a 'Mutation: unavailable reason=...' line; got {captured.out!r}"
+        )
+        assert match.group("code") == "path-missing", (
+            f"an existing directory is not a file and must refuse path-missing; got {match.group('code')!r}"
+        )
+        assert not calls, "a path-missing refusal must never reach the mutmut invocation"
+
+    def test_a_missing_path_in_a_different_directory_refuses_path_missing_not_flat_layout(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        dir_a = tmp_path / "a"
+        dir_b = tmp_path / "b"
+        dir_a.mkdir()
+        dir_b.mkdir()
+        missing = dir_a / "absent.py"  # never created, and in a different dir than --tests
+        (dir_b / "test_mod.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+        calls = _install_fake_uv(monkeypatch, {})
+
+        rc = ms.main(["--targets", str(missing), "--tests", str(dir_b / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        assert rc == ms.EXIT_ERROR
+        match = _UNAVAILABLE_LINE_RE.match(captured.out.strip())
+        assert match, (
+            f"stdout must be a 'Mutation: unavailable reason=...' line; got {captured.out!r}"
+        )
+        assert match.group("code") == "path-missing", (
+            "a missing path spanning more than one directory must still refuse path-missing "
+            f"-- the path check must run before the flat-layout check; got {match.group('code')!r}"
+        )
+        assert not calls, "a path-missing refusal must never reach the mutmut invocation"
+
 
 # ---------------------------------------------------------------------------
 # A completed run whose histogram total is zero is a vacuous reading, not a
@@ -831,25 +928,84 @@ class TestSegfaultCountsAsInconclusive:
 
 
 class TestTimeoutBudgetIsWholeRun:
-    def test_the_timeout_budget_covers_the_whole_run_not_just_the_mutmut_run_subprocess(
+    def test_each_subprocess_timeout_kwarg_shrinks_with_the_remaining_budget(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
         d = _flat_git_dir(tmp_path)
         clock = {"t": 0.0}
         monkeypatch.setattr(ms.time, "monotonic", lambda: clock["t"])
-        # The `run` subcommand alone consumes 9.0s of a 10s budget; if the
-        # timeout were re-applied fresh to each subsequent subprocess call
-        # (the defect), there would be no observable difference here -- the
-        # discriminator is `elapsed_s`, which must bracket all four calls
-        # (0.1 + 9.0 + 0.3 + 0.3 = 9.7), not just the `run` call's own 9.0s.
+        # Each call's own `advance` is small and stays well clear of the 1s
+        # floor after every step, so this scenario has exactly one legal
+        # outcome (`ran`) -- no if/else on rc. The `timeouts` capture is the
+        # discriminator: the original defect (the runner's own `--timeout`
+        # value handed unchanged to all four subprocesses) would leave every
+        # entry equal to the full 10s budget, which fails the checks below the
+        # moment any wall-clock time has already elapsed.
         plan = {
             "--version": {"advance": 0.1},
-            "run": {"advance": 9.0},
+            "run": {"advance": 2.0},
             "export-cicd-stats": {
-                "advance": 0.3,
+                "advance": 0.2,
                 "write": {"mutants/mutmut-cicd-stats.json": json.dumps(CICD_STATS_FIXTURE)},
             },
-            "results": {"advance": 0.3, "stdout": POST_RESULTS_TEXT},
+            "results": {"advance": 0.2, "stdout": POST_RESULTS_TEXT},
+        }
+        timeouts: list[tuple[float | None, float | None]] = []
+        _install_fake_uv(monkeypatch, plan, clock=clock, timeouts=timeouts)
+        budget = 10.0
+
+        rc = ms.main(
+            [
+                "--targets",
+                str(d / "mod.py"),
+                "--tests",
+                str(d / "test_mod.py"),
+                "--timeout",
+                str(budget),
+                "--json",
+            ]
+        )
+
+        assert rc == ms.EXIT_OK, "7.5s of advances against a 10s budget must complete, not refuse"
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["outcome"] == "ran"
+        assert len(timeouts) == 4, (
+            f"expected probe, run, export-cicd-stats, results; got {timeouts!r}"
+        )
+        for timeout_kwarg, elapsed_before_call in timeouts:
+            assert timeout_kwarg is not None, (
+                "every mutmut subprocess call must get an explicit timeout"
+            )
+            remaining_budget = budget - elapsed_before_call
+            assert timeout_kwarg <= remaining_budget + 1e-9, (
+                "a subprocess must never be handed more than what remains of the shared budget "
+                f"-- got timeout={timeout_kwarg} with only {remaining_budget}s left; a fresh "
+                "--timeout re-applied to every call would trip this"
+            )
+        kwargs_only = [t for t, _ in timeouts]
+        assert all(a > b for a, b in zip(kwargs_only, kwargs_only[1:], strict=False)), (
+            "the timeout kwarg must strictly decrease across probe -> run -> export -> results "
+            f"as the shared budget is spent; got {kwargs_only!r}"
+        )
+
+
+class TestTimeoutClassificationAndFloor:
+    def test_a_timeout_expired_from_a_later_subprocess_classifies_as_run_timeout_not_run_failed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        clock = {"t": 0.0}
+        monkeypatch.setattr(ms.time, "monotonic", lambda: clock["t"])
+        # `mutmut run` consumes almost the whole budget but leaves just over
+        # 1s remaining -- enough to clear the floor and reach the NEXT
+        # subprocess, which is where the TimeoutExpired actually fires. A
+        # naive implementation might only translate a `run`-subcommand
+        # timeout into `run-timeout`, silently mis-filing every other stage's
+        # timeout as `run-failed`.
+        plan = {
+            "--version": {"advance": 0.1},
+            "run": {"advance": 8.5, "write": {"mutants/.marker": "x"}},
+            "export-cicd-stats": {"raise_timeout": True},
         }
         _install_fake_uv(monkeypatch, plan, clock=clock)
 
@@ -865,19 +1021,59 @@ class TestTimeoutBudgetIsWholeRun:
             ]
         )
 
-        payload = json.loads(capsys.readouterr().out)
-        if rc == ms.EXIT_OK:
-            assert payload["outcome"] == "ran"
-            assert payload["elapsed_s"] >= 9.3, (
-                "elapsed_s must bracket the whole run (bootstrap + run + export + results), "
-                f"not just the mutmut run subprocess's own share; got {payload['elapsed_s']!r}"
-            )
-        else:
-            assert payload["outcome"] == "refused"
-            assert payload["reason"] == "run-timeout", (
-                "if the remaining budget after the first subprocess is insufficient, the only "
-                f"acceptable refusal is run-timeout; got {payload!r}"
-            )
+        captured = capsys.readouterr()
+        assert rc == ms.EXIT_ERROR
+        payload = json.loads(captured.out)
+        assert payload["outcome"] == "refused"
+        assert payload["reason"] == "run-timeout", (
+            "a TimeoutExpired from export-cicd-stats -- not `mutmut run` itself -- must still "
+            f"classify as run-timeout, never run-failed; got {payload!r}"
+        )
+        assert "survivors=" not in captured.out
+        assert not (d / "mutants").exists(), "cleanup must run on this timeout path too"
+
+    def test_remaining_budget_under_one_second_refuses_without_invoking_the_next_subprocess(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        clock = {"t": 0.0}
+        monkeypatch.setattr(ms.time, "monotonic", lambda: clock["t"])
+        # After probe + run, only 0.4s of the 10s budget remains -- under the
+        # 1s floor. `export-cicd-stats` is planned to fail loudly if reached,
+        # so this scenario only stays green if the floor check refuses BEFORE
+        # that next subprocess is ever invoked.
+        plan = {
+            "--version": {"advance": 0.1},
+            "run": {"advance": 9.5, "write": {"mutants/.marker": "x"}},
+            "export-cicd-stats": {"exit_code": 1, "stderr": "must never be reached"},
+        }
+        calls = _install_fake_uv(monkeypatch, plan, clock=clock)
+
+        rc = ms.main(
+            [
+                "--targets",
+                str(d / "mod.py"),
+                "--tests",
+                str(d / "test_mod.py"),
+                "--timeout",
+                "10",
+                "--json",
+            ]
+        )
+
+        captured = capsys.readouterr()
+        assert rc == ms.EXIT_ERROR
+        payload = json.loads(captured.out)
+        assert payload["outcome"] == "refused"
+        assert payload["reason"] == "run-timeout", (
+            f"a sub-one-second remaining budget must refuse run-timeout outright; got {payload!r}"
+        )
+        subcmds = [argv[argv.index("mutmut") + 1] for argv in calls if "mutmut" in argv]
+        assert "export-cicd-stats" not in subcmds, (
+            "the floor check must fire before the next subprocess is invoked, not after it runs "
+            f"and fails on its own; invoked subcommands were {subcmds!r}"
+        )
+        assert not (d / "mutants").exists(), "cleanup must run on the floor-refusal path too"
 
 
 # ---------------------------------------------------------------------------

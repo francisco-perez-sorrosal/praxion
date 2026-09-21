@@ -700,7 +700,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--timeout",
-        type=float,
+        type=_positive_seconds,
         default=DEFAULT_TIMEOUT_SECONDS,
         help=f"wall-clock seconds before the run is refused as run-timeout (default: {DEFAULT_TIMEOUT_SECONDS:g})",
     )
@@ -717,6 +717,27 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _positive_seconds(text: str) -> float:
+    """argparse type for `--timeout`: a budget that could never be spent is a
+    usage error at the boundary, not a run that exhausted itself at zero
+    elapsed -- rejecting it here keeps `run-timeout` meaning what it says."""
+    seconds = float(text)
+    if seconds < MIN_BUDGET_SECONDS:
+        raise argparse.ArgumentTypeError(
+            f"--timeout must be at least {MIN_BUDGET_SECONDS:g} seconds, got {text}"
+        )
+    return seconds
+
+
+def _path_missing_detail(path: Path) -> str:
+    """Say which of the two `is_file()` failures happened: a path that exists
+    but is a directory is not a typo, and 'no such file' would send the
+    operator hunting for one."""
+    if path.exists():
+        return f"not a file: {path}"
+    return f"no such file: {path}"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     json_mode = bool(args.json)
@@ -728,7 +749,7 @@ def main(argv: list[str] | None = None) -> int:
     missing = _first_missing_path([*args.targets, *args.tests])
     if missing is not None:
         return _emit(
-            Refused(ReasonCode.PATH_MISSING, f"no such file: {missing}"), json_mode=json_mode
+            Refused(ReasonCode.PATH_MISSING, _path_missing_detail(missing)), json_mode=json_mode
         )
 
     try:

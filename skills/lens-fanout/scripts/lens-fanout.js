@@ -61,7 +61,7 @@ if (dropped.length) {
 }
 const rows = collected.filter(Boolean);
 if (rows.length < 2) {
-  return { marker: '[BLOCKED]', reason: 'fewer-than-two-lenses-survived', lenses: rows, dropped, timestamp: args.timestamp };
+  return { marker: '[BLOCKED]', reason: 'fewer-than-two-lenses-survived', lenses: pointerRows(rows), dropped, timestamp: args.timestamp };
 }
 
 // --- Reconcile: the justified barrier -- the aggregator needs every lens before it can compare them ---

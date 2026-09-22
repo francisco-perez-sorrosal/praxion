@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-21T04:00:26Z'
+generated_at: '2026-09-22T06:47:03Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -56,7 +56,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -128,7 +128,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -2916,6 +2916,12 @@ surfaces:
   title: "A per-step mutation sensor: one stdlib runner owning the recipe, one bounded TEST_RESULTS line, one planner tag \u2014 sensor, never a gate"
   last_modified: '2026-09-20'
   renderer: adr_card
+- id: ai-state-decisions-389-workflow-encoded-lens-fan-out-skill
+  path: .ai-state/decisions/389-workflow-encoded-lens-fan-out-skill.md
+  type: markdown
+  title: "Workflow-encoded lens fan-out: a user-invocable skill carrying its own workflow script, plus an instrument/guard pair \u2014 isolation by construction, prose stays canonical"
+  last_modified: '2026-09-21'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3615,6 +3621,7 @@ groups:
   - ai-state-decisions-386-test-results-fixed-shape
   - ai-state-decisions-387-intentional-compaction-handoff
   - ai-state-decisions-388-mutation-sensor
+  - ai-state-decisions-389-workflow-encoded-lens-fan-out-skill
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-81c7a00e
+id: dec-389
+draft_id: dec-draft-81c7a00e
 title: "Workflow-encoded lens fan-out: a user-invocable skill carrying its own workflow script, plus an instrument/guard pair — isolation by construction, prose stays canonical"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-21
 summary: "Adds skills/lens-fanout/ (a user-invocable, disable-model-invocation skill) and its scripts/lens-fanout.js Workflow script, which collects N lens agents as parallel() closures that cannot read a sibling and reconciles in one aggregator returning a pointer, never a payload; adds scripts/workflow_run_cost.py (per-run cost instrument, never gates) and scripts/check_lens_isolation.py (the dec-378 executable guard, exits 1 on contamination and 2 rather than passing vacuously) over a shared scripts/_workflow_run.py resolver. The prose fragment-file protocol stays canonical and portable; the workflow is an additional enforcement path for one assistant. agentType is deliberately omitted in v1."

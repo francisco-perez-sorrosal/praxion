@@ -1,24 +1,24 @@
 """Tests for `check_lens_isolation.py` -- the guard that fires truly or
 refuses (dec-378's mandate): every `Collect`-phase transcript must be free of
 its siblings' *artifact identity* -- never a bare lens label. Run-directory
-layout is `WORKFLOW_CONTRACT.md § Where the run lands`, measured live
-2026-09-19 -- this test file cannot load the harness's own `workflow-authoring`
-skill and cites that document instead.
+layout as measured live 2026-09-19 against a real run (the harness's
+`workflow-authoring` skill is the upstream reference; a test file cannot load
+it, so the layout is restated in the fixture builders below).
 
 Exercised entirely through the real adapter (`main()` / the CLI), never the
 pure core directly -- a stubbed-return unit test would pass with the actual
 transcript read deleted.
 
-Needle set (O3, artifact-identity only, never vocabulary): for a target
+Needle set (artifact identity only, never vocabulary -- matching on lens
+vocabulary would fire on correct work): for a target
 `Collect` agent A, and every sibling B with phase `Collect` and B != A --
-`RESEARCH_<B.label>.md` (B's `fragment_path`, DS2 shape), `B.agent_id`, and
+`RESEARCH_<B.label>.md` (B's `fragment_path`), `B.agent_id`, and
 `B.summary` verbatim when >=40 chars. A bare lens label (e.g. the word
 "portability") is never a needle and must never produce a finding.
 
-Report envelope + finding shape (a design choice this suite pins, not
-otherwise fixed in `SYSTEMS_PLAN.md § I4/S3` beyond the finding codes and
-exit-code contract -- see `LEARNINGS.md` for the full rationale handed to the
-implementer):
+Report envelope + finding shape (a design choice this suite pins beyond the
+finding codes and the exit-code contract; the implementation was handed the
+rationale and satisfied it as written):
     {"wf_id": str, "findings": [<finding>, ...]}
     <finding> := {"code": "LI01", "agent_id": str, "sibling_agent_id": str,
                   "needle_kind": "fragment_path" | "agent_id" | "summary"}
@@ -53,13 +53,13 @@ cli = _load()
 
 # --------------------------------------------------------------------------- #
 # fixture builders -- a synthetic run directory + main transcript, matching
-# WORKFLOW_CONTRACT.md's measured layout and DS2's lens-return shape. Low-level
+# the live-measured run-directory layout and the lens-return shape. Low-level
 # pieces compose into `_standard_run()`, the default clean fixture most tests
 # start from.
 # --------------------------------------------------------------------------- #
 _SLUG = "demo-slug"
 
-# A summary >=40 chars, per O3's needle-set threshold -- short enough to read,
+# A summary >=40 chars, the needle-set threshold -- short enough to read,
 # long enough to qualify as a verbatim-summary needle.
 _ECON_SUMMARY = "Economy lens: subscription pricing dominates unit cost."
 _PORT_SUMMARY = "Portability lens: cross-runtime packaging drives the cost curve."
@@ -126,10 +126,10 @@ def _run_dir(home, project_root, session, wf_id):
 
 def _write_journal(run_dir, agents):
     """The launched/started/result triad per agent, with each `Collect`
-    agent's `result` carrying the full DS2 (`LENS_SCHEMA`) shape -- the
-    source of the artifact-identity needle set (S3). The `Reconcile`
+    agent's `result` carrying the full `LENS_SCHEMA` shape -- the
+    source of the artifact-identity needle set. The `Reconcile`
     aggregator's result is a bare completion marker; its own identity is
-    never part of the needle set (S3 draws needles from `Collect` siblings
+    never part of the needle set (needles are drawn from `Collect` siblings
     only)."""
     records = []
     for i, agent in enumerate(agents):
@@ -308,7 +308,7 @@ def test_sibling_summary_verbatim_in_a_collect_transcript_reports_li01(
 
 
 def test_bare_lens_label_in_a_sibling_transcript_is_not_a_finding(tmp_path, monkeypatch, capsys):
-    # "portability" is an ordinary domain word (O3) -- naming it in prose is
+    # "portability" is an ordinary domain word -- naming it in prose is
     # not evidence of contamination, only artifact identity is.
     project_root, wf_id = _standard_run(
         tmp_path,
@@ -349,8 +349,7 @@ def test_run_with_only_one_collect_transcript_on_disk_exits_2_insufficient_colle
 ):
     # Two Collect agents rostered, but only one has a transcript on disk --
     # the guard can only compare one side, so it refuses rather than pass
-    # vacuously (SYSTEMS_PLAN.md § Step Risk Tags: "a guard tested only on
-    # clean input is untested").
+    # vacuously -- a guard tested only on clean input is untested.
     project_root, wf_id = _standard_run(
         tmp_path, monkeypatch, write_transcript_for=["agent-econ-001", "agent-aggr-003"]
     )

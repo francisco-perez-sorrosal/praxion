@@ -5,8 +5,9 @@ as a sibling module -- `scripts/` is on `sys.path[0]` when either runs. Neither
 imports the other; both import this one, so the workflow-run layout has a
 single definition rather than two that could drift.
 
-Layout, measured live against a real Workflow run (`WORKFLOW_CONTRACT.md
-§ Where the run lands`, this repo's own spike): a run lives at
+Layout, measured live against a real Workflow run (this repo's own spike,
+2026-09-19; the harness's `workflow-authoring` skill is the upstream
+reference): a run lives at
 `~/.claude/projects/<mangled-project>/<session>/subagents/workflows/<wf_id>/`
 and holds `agent-<id>.jsonl` (transcript), `agent-<id>.meta.json`
 ({agentType, description, workflowPhase, spawnDepth, ...}) and `journal.jsonl`

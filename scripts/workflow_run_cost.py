@@ -231,7 +231,7 @@ def _window_json(window: dict | None) -> dict | None:
 
 def _orchestrator_stats(main_path: Path, wf_id: str) -> dict:
     """The main-session context at the `Workflow` launch turn and at the next
-    assistant turn (S1). The launch is the assistant turn whose `Workflow`
+    assistant turn. The launch is the assistant turn whose `Workflow`
     `tool_use` is answered by a `tool_result` naming `wf_id` -- the harness
     echoes the run directory into that result -- never the first launch by
     position: one session may hold several fan-outs, and the report is keyed

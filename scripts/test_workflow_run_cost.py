@@ -1,18 +1,18 @@
 """Tests for `workflow_run_cost.py` -- the per-run cost reader over a
 Workflow-tool run directory (`journal.jsonl` + `agent-<id>.meta.json` +
 `agent-<id>.jsonl`, joined against the `.ai-state/observations.jsonl` WAL and
-the main-session transcript). Run-directory layout is `WORKFLOW_CONTRACT.md
-§ Where the run lands`, measured live 2026-09-19 -- this test file cannot load
-the harness's own `workflow-authoring` skill and cites that document instead.
+the main-session transcript). Run-directory layout as measured live
+2026-09-19 against a real run (the harness's `workflow-authoring` skill is the
+upstream reference; a test file cannot load it, so the layout is restated in
+the fixture builders below).
 
 Exercised entirely through the real adapter (`main()` / the CLI), never the
 pure core directly -- a stubbed-return unit test would pass with the actual
 world-read deleted, exactly the failure class the mutation sensor targets for
 this instrument's implementation step.
 
-Report envelope (a design choice this suite pins, not otherwise fixed in
-`SYSTEMS_PLAN.md` -- see `LEARNINGS.md` for the full rationale handed to the
-implementer):
+Report envelope (a design choice this suite pins; the implementation was
+handed the rationale and satisfied it as written):
     {
       "wf_id": str,
       "agents": [<cost-report row>, ...],      # kind == "workflow-agent"
@@ -53,7 +53,7 @@ wfc = _load()
 
 # --------------------------------------------------------------------------- #
 # fixture builders -- a synthetic run directory + WAL + main transcript,
-# matching WORKFLOW_CONTRACT.md's measured layout. Low-level pieces compose
+# matching the live-measured run-directory layout. Low-level pieces compose
 # into `_standard_run()`, the default fully-populated fixture most tests use.
 # --------------------------------------------------------------------------- #
 _DEFAULT_AGENTS = [
@@ -123,8 +123,8 @@ def _run_dir(home, project_root, session, wf_id):
 
 
 def _write_journal(run_dir, agents):
-    """The launched/started[/result] triad per agent, per
-    `WORKFLOW_CONTRACT.md`. An agent dict with `"result": False` gets no
+    """The launched/started[/result] triad per agent, keyed by `type` as
+    the harness writes it. An agent dict with `"result": False` gets no
     result event -- a started-but-never-resulted roster entry."""
     records = []
     for i, agent in enumerate(agents):
@@ -371,9 +371,9 @@ def _run_json(project_root, wf_id, capsys):
 
 
 # --------------------------------------------------------------------------- #
-# (a) DS4 row shape + envelope, exact
+# (a) cost-report row shape + envelope, exact
 # --------------------------------------------------------------------------- #
-def test_workflow_agent_rows_match_ds4_shape_exactly(tmp_path, monkeypatch, capsys):
+def test_workflow_agent_rows_carry_the_exact_cost_report_key_set(tmp_path, monkeypatch, capsys):
     project_root, wf_id = _standard_run(tmp_path, monkeypatch)
 
     exit_code, _, report = _run_json(project_root, wf_id, capsys)
@@ -421,7 +421,7 @@ def test_agent_row_values_reflect_the_journal_meta_and_transcript_for_one_agent(
 
 
 # --------------------------------------------------------------------------- #
-# (b) S2 wal_agreement -- all four verdicts, never gates
+# (b) wal_agreement -- all four verdicts, never gates
 # --------------------------------------------------------------------------- #
 def test_wal_agreement_is_agree_when_wal_tokens_match_transcript_output(
     tmp_path, monkeypatch, capsys
@@ -519,7 +519,7 @@ def test_unobserved_helper_stops_are_reported_separately_and_never_merged_into_a
 ):
     project_root, wf_id = _standard_run(tmp_path, monkeypatch)
     # A WAL agent_stop row for an agent_id the journal roster never names --
-    # the dec-370 unobserved-agent (harness-helper) class (A12).
+    # the dec-370 unobserved-agent (harness-helper) class.
     wal_path = project_root / ".ai-state" / "observations.jsonl"
     existing = [json.loads(line) for line in wal_path.read_text(encoding="utf-8").splitlines()]
     existing.append(_wal_agent_stop("helper-xyz", tokens_in=800, tokens_out=50))
@@ -535,7 +535,7 @@ def test_unobserved_helper_stops_are_reported_separately_and_never_merged_into_a
 
 
 # --------------------------------------------------------------------------- #
-# (d) S1 orchestrator section
+# (d) orchestrator section
 # --------------------------------------------------------------------------- #
 def test_orchestrator_section_reports_launch_next_and_delta_tokens(tmp_path, monkeypatch, capsys):
     project_root, wf_id = _standard_run(
@@ -580,7 +580,7 @@ def test_session_flag_overrides_the_default_main_transcript_path(tmp_path, monke
             for a in agents
         ],
     )
-    # The default sibling-of-the-run-directory heuristic (A10) would look for
+    # The default sibling-of-the-run-directory resolution would look for
     # sess-1.jsonl -- deliberately never written, so only --session can supply
     # the orchestrator numbers.
     other_transcript = _project_transcripts_dir(home, project_root) / "sess-2.jsonl"
@@ -605,7 +605,7 @@ def test_session_flag_overrides_the_default_main_transcript_path(tmp_path, monke
 
 
 # --------------------------------------------------------------------------- #
-# (e) I3 CLI surface -- --list, --table
+# (e) CLI surface -- --list, --table
 # --------------------------------------------------------------------------- #
 def test_list_flag_enumerates_known_runs_with_timestamps(tmp_path, monkeypatch, capsys):
     home, project_root = _project(tmp_path, monkeypatch)
@@ -673,7 +673,7 @@ def test_table_output_names_the_run_in_human_readable_form(tmp_path, monkeypatch
 
 
 # --------------------------------------------------------------------------- #
-# (f) I3 exit 2 + named reason -- run-not-found, run-ambiguous,
+# (f) exit 2 + named reason -- run-not-found, run-ambiguous,
 # journal-unreadable, run-empty, transcripts-missing
 # --------------------------------------------------------------------------- #
 def test_exits_2_with_run_not_found_reason_for_unknown_wf_id(tmp_path, monkeypatch, capsys):
@@ -697,7 +697,7 @@ def test_exits_2_with_run_ambiguous_reason_when_latest_is_tied_between_two_runs(
         run_dir = _run_dir(home, project_root, session, wf_id)
         _write_journal(run_dir, [seed])
         journals.append(run_dir / "journal.jsonl")
-    # "latest" is resolved by newest journal mtime (A11); an exact tie makes
+    # "latest" is resolved by newest journal mtime; an exact tie makes
     # that resolution genuinely ambiguous rather than arbitrary.
     tied_time = 1_726_800_000
     for journal in journals:

@@ -29,7 +29,7 @@ from pathlib import Path
 
 
 class WorkflowRunError(Exception):
-    """A run-read failure with a named I3/I4 CLI reason code.
+    """A run-read failure with a named CLI reason code.
 
     One exception type for every typed failure (run resolution, journal
     parsing, transcript availability) -- callers branch on `.reason`, not on
@@ -62,7 +62,8 @@ def session_from_run_dir(run_dir: Path) -> str:
 
 def main_transcript_path(transcripts_dir: Path, session: str) -> Path:
     """The default main-session transcript: a sibling `.jsonl` of the
-    session's own subdirectory (A10). Callers needing a different path
+    session's own subdirectory, where the harness writes it. Callers
+    needing a different path
     (a non-default session, a moved transcript) use their own `--session`
     override instead of this default."""
     return transcripts_dir / f"{session}.jsonl"
@@ -90,7 +91,7 @@ def list_runs(transcripts_dir: Path) -> list[dict]:
 def resolve_run(transcripts_dir: Path, run_arg: str) -> dict:
     """Resolve `--run <wf_id|latest>` to one `{wf_id, session, run_dir}`.
 
-    "latest" picks the run whose `journal.jsonl` has the newest mtime (A11);
+    "latest" picks the run whose `journal.jsonl` has the newest mtime;
     an exact tie is genuinely ambiguous, not arbitrary, and is refused rather
     than broken by directory-listing order.
     """
@@ -128,11 +129,12 @@ def read_journal(run_dir: Path) -> dict:
     otherwise (a started-but-never-resulted agent, reported rather than
     dropped).
 
-    Raises `WorkflowRunError("journal-unreadable", ...)` when every non-blank
-    line fails to parse as JSON, and `WorkflowRunError("run-empty", ...)` when
+    Raises `WorkflowRunError("journal-unreadable", ...)` when any non-blank
+    line fails to parse as JSON (a partly corrupt journal would read as a
+    smaller roster -- a wrong answer, not a lesser one), and `WorkflowRunError("run-empty", ...)` when
     parsing succeeds but no `started` event names an agent -- the two states
-    `SYSTEMS_PLAN.md` distinguishes by name, kept apart here rather than
-    collapsed into one generic decode failure.
+    the CLI reason-code contract distinguishes by name, kept apart here
+    rather than collapsed into one generic decode failure.
     """
     path = run_dir / "journal.jsonl"
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -144,8 +146,11 @@ def read_journal(run_dir: Path) -> dict:
             records.append(json.loads(line))
         except json.JSONDecodeError:
             parse_failures += 1
-    if lines and parse_failures == len(lines):
-        raise WorkflowRunError("journal-unreadable", f"every line in {path} failed to parse")
+    if parse_failures:
+        raise WorkflowRunError(
+            "journal-unreadable",
+            f"{parse_failures} of {len(lines)} line(s) in {path} failed to parse",
+        )
 
     roster: dict[str, dict] = {}
     for record in records:

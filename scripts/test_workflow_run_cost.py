@@ -84,6 +84,14 @@ _DEFAULT_AGENTS = [
 ]
 
 
+# The synthetic run's wall-clock window. Every agent-transcript record and every
+# in-window WAL row carries a timestamp inside it; the unobserved-helper section
+# is windowed by it, so a WAL row outside it belongs to some other run.
+_RUN_START = "2026-09-19T10:00:00.000Z"
+_RUN_END = "2026-09-19T10:05:00.000Z"
+_OUTSIDE_WINDOW = "2026-09-18T08:00:00.000Z"
+
+
 def _write_jsonl(path, records):
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(r) for r in records]
@@ -155,7 +163,7 @@ def _write_meta(run_dir, agent_id, *, label, phase, agent_type="general-purpose"
     (run_dir / f"agent-{agent_id}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
 
-def _assistant_turn(model, context_tokens, output_tokens, tool_uses):
+def _assistant_turn(model, context_tokens, output_tokens, tool_uses, timestamp=_RUN_START):
     content = [{"type": "text", "text": "..."}]
     content += [
         {"type": "tool_use", "name": "Read", "id": f"toolu_{i}", "input": {}}
@@ -163,6 +171,7 @@ def _assistant_turn(model, context_tokens, output_tokens, tool_uses):
     ]
     return {
         "type": "assistant",
+        "timestamp": timestamp,
         "message": {
             "model": model,
             "usage": {
@@ -183,7 +192,9 @@ def _agent_transcript_records(model, peak_context, output_tokens, turns=3, tool_
     otherwise conflate."""
     records = [_assistant_turn(model, peak_context, output_tokens, tool_uses)]
     for _ in range(max(0, turns - 1)):
-        records.append(_assistant_turn(model, max(1_000, peak_context - 5_000), 0, 0))
+        records.append(
+            _assistant_turn(model, max(1_000, peak_context - 5_000), 0, 0, timestamp=_RUN_END)
+        )
     return records
 
 
@@ -194,7 +205,10 @@ def _write_transcript(run_dir, agent_id, *, model, peak_context, output_tokens):
     )
 
 
-def _main_transcript_records(launch_tokens, next_tokens):
+def _main_transcript_records(launch_tokens, next_tokens, wf_id="wf_test0001", tool_id="toolu_wf"):
+    """The `Workflow` launch turn, the harness's `tool_result` answering it (which
+    names the run directory, hence the `wf_id` -- the key the reader correlates
+    on), and the next assistant turn."""
     launch_turn = {
         "type": "assistant",
         "message": {
@@ -210,7 +224,7 @@ def _main_transcript_records(launch_tokens, next_tokens):
                 {
                     "type": "tool_use",
                     "name": "Workflow",
-                    "id": "toolu_wf",
+                    "id": tool_id,
                     "input": {"scriptPath": "..."},
                 },
             ],
@@ -229,13 +243,33 @@ def _main_transcript_records(launch_tokens, next_tokens):
             "content": [{"type": "text", "text": "Fan-out complete."}],
         },
     }
-    return [launch_turn, next_turn]
+    launch_result = {
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "content": (
+                        "Workflow launched in background. Task ID: task01\n"
+                        "Summary: synthetic run.\n"
+                        "Transcript dir: /home/x/.claude/projects/p/sess/subagents/workflows/"
+                        f"{wf_id}\nRun ID: {wf_id}"
+                    ),
+                }
+            ],
+        },
+    }
+    return [launch_turn, launch_result, next_turn]
 
 
-def _write_main_transcript(home, project_root, session, *, launch_tokens, next_tokens):
+def _write_main_transcript(
+    home, project_root, session, *, launch_tokens, next_tokens, wf_id="wf_test0001"
+):
     _write_jsonl(
         _project_transcripts_dir(home, project_root) / f"{session}.jsonl",
-        _main_transcript_records(launch_tokens, next_tokens),
+        _main_transcript_records(launch_tokens, next_tokens, wf_id=wf_id),
     )
 
 
@@ -249,9 +283,11 @@ def _wal_agent_stop(
     model="claude-sonnet-5",
     duration_ms=12_000,
     usage_source="subagent-transcript",
+    timestamp=_RUN_START,
 ):
     return {
         "event_type": "agent_stop",
+        "timestamp": timestamp,
         "agent_id": agent_id,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
@@ -298,7 +334,12 @@ def _standard_run(
                 output_tokens=agent["output_tokens"],
             )
     _write_main_transcript(
-        home, project_root, session, launch_tokens=main_launch_tokens, next_tokens=main_next_tokens
+        home,
+        project_root,
+        session,
+        launch_tokens=main_launch_tokens,
+        next_tokens=main_next_tokens,
+        wf_id=wf_id,
     )
 
     if wal_rows is None:
@@ -339,7 +380,7 @@ def test_workflow_agent_rows_match_ds4_shape_exactly(tmp_path, monkeypatch, caps
 
     assert exit_code == 0
     assert report["wf_id"] == wf_id
-    assert set(report.keys()) == {"wf_id", "agents", "unobserved", "orchestrator"}
+    assert set(report.keys()) == {"wf_id", "agents", "unobserved", "orchestrator", "window"}
     assert len(report["agents"]) == 3
     for row in report["agents"]:
         assert set(row.keys()) == {
@@ -512,6 +553,8 @@ def test_orchestrator_section_reports_launch_next_and_delta_tokens(tmp_path, mon
     assert report["orchestrator"]["launch_turn_tokens"] == 205_762
     assert report["orchestrator"]["next_turn_tokens"] == 208_358
     assert report["orchestrator"]["delta"] == 208_358 - 205_762
+    # the harness's tool_result answering the launch is measured, not left null
+    assert report["orchestrator"]["return_bytes"] > 0
 
 
 def test_session_flag_overrides_the_default_main_transcript_path(tmp_path, monkeypatch, capsys):
@@ -784,3 +827,96 @@ def test_journal_keyed_by_type_as_the_harness_writes_it_populates_the_roster(
         "agent-port-002": "present",
         "agent-aggr-003": "present",
     }
+
+
+# --------------------------------------------------------------------------- #
+# the orchestrator section is keyed by the run, never by launch position
+# --------------------------------------------------------------------------- #
+def test_orchestrator_section_is_keyed_by_the_run_id_not_the_first_workflow_launch(
+    tmp_path, monkeypatch, capsys
+):
+    """A session holding two fan-outs: `--run` on the second must report the
+    second launch's turns. The harness's `tool_result` names the run
+    directory, so the launch is found by that key -- the module's own
+    "never by position" contract applied to its one positional read."""
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    records = _main_transcript_records(100_000, 101_000, wf_id="wf_other0001", tool_id="toolu_a")
+    records += _main_transcript_records(205_762, 208_358, wf_id=wf_id, tool_id="toolu_b")
+    _write_jsonl(_project_transcripts_dir(home, project_root) / "sess-1.jsonl", records)
+
+    _, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert report["orchestrator"]["launch_turn_tokens"] == 205_762
+    assert report["orchestrator"]["next_turn_tokens"] == 208_358
+    assert report["orchestrator"]["delta"] == 208_358 - 205_762
+
+
+def test_orchestrator_section_is_null_when_no_launch_in_the_session_names_the_run(
+    tmp_path, monkeypatch, capsys
+):
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    _write_jsonl(
+        _project_transcripts_dir(home, project_root) / "sess-1.jsonl",
+        _main_transcript_records(100_000, 101_000, wf_id="wf_other0001"),
+    )
+
+    exit_code, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 0
+    assert report["orchestrator"] == {
+        "launch_turn_tokens": None,
+        "next_turn_tokens": None,
+        "delta": None,
+        "return_bytes": None,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# unobserved helpers are windowed to the run's own wall-clock span
+# --------------------------------------------------------------------------- #
+def test_unobserved_helper_rows_are_windowed_to_the_run_and_carry_their_attribution(
+    tmp_path, monkeypatch, capsys
+):
+    """The WAL spans every session of the project; a helper stop outside the
+    run's transcript window is some other run's business. Every row that
+    survives the window says how it got there."""
+    from datetime import datetime
+
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    wal_path = project_root / ".ai-state" / "observations.jsonl"
+    existing = [json.loads(line) for line in wal_path.read_text(encoding="utf-8").splitlines()]
+    existing.append(_wal_agent_stop("helper-in", tokens_in=800, tokens_out=50))
+    existing.append(
+        _wal_agent_stop("helper-out", tokens_in=800, tokens_out=50, timestamp=_OUTSIDE_WINDOW)
+    )
+    _write_wal(project_root, existing)
+
+    _, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert [row["agent_id"] for row in report["unobserved"]] == ["helper-in"]
+    assert report["unobserved"][0]["attribution"] == "time-window-heuristic"
+    assert report["window"] == {
+        "start": datetime.fromisoformat(_RUN_START.replace("Z", "+00:00")).isoformat(),
+        "end": datetime.fromisoformat(_RUN_END.replace("Z", "+00:00")).isoformat(),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# a partly corrupt journal is refused, not read as a smaller roster
+# --------------------------------------------------------------------------- #
+def test_exits_2_with_journal_unreadable_reason_when_any_journal_line_is_malformed(
+    tmp_path, monkeypatch, capsys
+):
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    journal = _run_dir(home, project_root, "sess-1", wf_id) / "journal.jsonl"
+    journal.write_text(journal.read_text(encoding="utf-8") + "{not json\n", encoding="utf-8")
+
+    exit_code, captured = _run_cli(
+        ["--run", wf_id, "--project-root", str(project_root), "--json"], capsys
+    )
+
+    assert exit_code == 2
+    assert "journal-unreadable" in captured.err

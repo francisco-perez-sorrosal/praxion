@@ -18,12 +18,13 @@ Report envelope:
       "agents": [<cost-report row>, ...],      # kind == "workflow-agent"
       "unobserved": [<cost-report row>, ...],   # kind == "unobserved-helper"
       "orchestrator": {launch_turn_tokens, next_turn_tokens, delta, return_bytes},
+      "window": {start, end} | null,           # the run's transcript wall-clock span
     }
 
 Cost-report row (the full key set, exact):
     agent_id, kind, label, phase, agent_type, model, peak_context_tokens,
     output_tokens, turns, tool_uses, duration_ms, transcript, journal_result,
-    wal, wal_agreement
+    wal, wal_agreement -- plus `attribution` on every unobserved-helper row
 
 Two layers, mirroring `context_baseline.py`'s split:
 
@@ -32,10 +33,13 @@ Two layers, mirroring `context_baseline.py`'s split:
     compute(...) -> dict   pure join of `load()`'s raw materials into the
                             report envelope above
 
-An `unobserved-helper` row (dec-370's harness-helper class, A12) is a WAL
-`agent_stop` whose `agent_id` the journal roster never names -- reported in
-its own section, never merged into `agents`, so a cost total built from
-`agents` alone is never silently inflated by a row the run itself didn't spawn.
+An `unobserved-helper` row (dec-370's harness-helper class) is a WAL
+`agent_stop` whose `agent_id` the journal roster never names and whose
+timestamp falls inside the run's transcript window -- co-occurrence, not a
+proven parent, which is why every such row carries
+`attribution: time-window-heuristic`. Reported in its own section, never
+merged into `agents`, so a cost total built from `agents` alone is never
+silently inflated by a row the run itself didn't spawn.
 
 Any field that cannot be derived is `null`, never a plausible default --
 `capture_session.py`'s own stance ("an honest empty beats a plausible wrong
@@ -92,7 +96,12 @@ def load(
 
     meta = {agent_id: wr.read_meta(wr.agent_meta_path(run_dir, agent_id)) for agent_id in roster}
     wal_rows = _read_wal(project_root / ".ai-state" / "observations.jsonl")
-    unobserved_ids = sorted(set(wal_rows) - set(roster))
+    window = _run_window(transcripts)
+    unobserved_ids = sorted(
+        agent_id
+        for agent_id, row in wal_rows.items()
+        if agent_id not in roster and _within(window, row.get("timestamp"))
+    )
     unobserved_transcripts = {
         agent_id: _transcript_stats(wr.agent_transcript_path(run_dir, agent_id))
         for agent_id in unobserved_ids
@@ -111,13 +120,15 @@ def load(
         "wal_rows": wal_rows,
         "unobserved_ids": unobserved_ids,
         "unobserved_transcripts": unobserved_transcripts,
-        "orchestrator": _orchestrator_stats(main_path),
+        "window": window,
+        "orchestrator": _orchestrator_stats(main_path, resolved["wf_id"]),
     }
 
 
 def _transcript_stats(path: Path) -> dict | None:
     """One pass over an agent transcript: model (first assistant turn's),
-    peak context tokens, summed output tokens, turn/tool-use counts. `None`
+    peak context tokens, summed output tokens, turn/tool-use counts, and the
+    first/last record stamps (the run window's raw material). `None`
     when the file has no assistant turn with usage -- covers both "the file
     does not exist" and "the file exists but is empty"."""
     model = None
@@ -125,7 +136,13 @@ def _transcript_stats(path: Path) -> dict | None:
     output_tokens = 0
     turns = 0
     tool_uses = 0
+    first_ts = None
+    last_ts = None
     for record in wr.iter_transcript_records(path):
+        stamp = _parse_ts(record.get("timestamp"))
+        if stamp is not None:
+            first_ts = stamp if first_ts is None or stamp < first_ts else first_ts
+            last_ts = stamp if last_ts is None or stamp > last_ts else last_ts
         if record.get("type") != "assistant":
             continue
         message = record.get("message") or {}
@@ -152,12 +169,14 @@ def _transcript_stats(path: Path) -> dict | None:
         "turns": turns,
         "tool_uses": tool_uses,
         "path": path,
+        "first_ts": first_ts,
+        "last_ts": last_ts,
     }
 
 
 def _read_wal(wal_path: Path) -> dict[str, dict]:
     """`agent_id -> {tokens_in, tokens_out, cache_read, cache_create, model,
-    duration_ms, usage_source}` from `agent_stop` WAL rows. The last row for
+    duration_ms, usage_source, timestamp}` from `agent_stop` WAL rows. The last row for
     a given `agent_id` wins when several exist."""
     rows: dict[str, dict] = {}
     for record in wr.iter_transcript_records(wal_path):
@@ -174,50 +193,71 @@ def _read_wal(wal_path: Path) -> dict[str, dict]:
             "model": record.get("model"),
             "duration_ms": record.get("duration_ms"),
             "usage_source": record.get("usage_source"),
+            "timestamp": record.get("timestamp"),
         }
     return rows
 
 
-def _orchestrator_stats(main_path: Path) -> dict:
+def _parse_ts(value) -> datetime | None:
+    """An ISO-8601 stamp (`Z` or offset form -- transcripts write the former,
+    the WAL the latter) as an aware datetime, or `None`."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _run_window(transcripts: dict[str, dict | None]) -> dict | None:
+    """The run's wall-clock span: earliest first stamp to latest last stamp
+    across the rostered transcripts, or `None` when none carries a stamp."""
+    starts = [s["first_ts"] for s in transcripts.values() if s and s.get("first_ts")]
+    ends = [s["last_ts"] for s in transcripts.values() if s and s.get("last_ts")]
+    if not starts or not ends:
+        return None
+    return {"start": min(starts), "end": max(ends)}
+
+
+def _within(window: dict | None, stamp) -> bool:
+    parsed = _parse_ts(stamp)
+    return bool(window and parsed and window["start"] <= parsed <= window["end"])
+
+
+def _window_json(window: dict | None) -> dict | None:
+    return {key: value.isoformat() for key, value in window.items()} if window else None
+
+
+def _orchestrator_stats(main_path: Path, wf_id: str) -> dict:
     """The main-session context at the `Workflow` launch turn and at the next
-    assistant turn (S1): find the first assistant record whose content carries
-    a `tool_use` block named `"Workflow"`, record its context tokens, then the
-    same for the next assistant turn with usage after it. `return_bytes` looks
-    for a `tool_result` block answering that same `tool_use` id between the
-    two turns. Every field is `null` when the main transcript is missing or
-    carries no such turn -- not a run-level failure, since I3/I4 name no
-    reason code for it (A10's escape hatch, `--session`, is the recovery)."""
+    assistant turn (S1). The launch is the assistant turn whose `Workflow`
+    `tool_use` is answered by a `tool_result` naming `wf_id` -- the harness
+    echoes the run directory into that result -- never the first launch by
+    position: one session may hold several fan-outs, and the report is keyed
+    by the run it was asked for. `return_bytes` is that result's size; the
+    next assistant turn with usage after the launch gives the second reading.
+    Every field is `null` when the main transcript is missing or no launch in
+    it names the run -- not a run-level failure (no CLI reason code covers
+    it); `--session` is the recovery when the transcript lives elsewhere."""
     records = list(wr.iter_transcript_records(main_path))
-
-    launch_idx = None
-    launch_tokens = None
-    launch_tool_id = None
-    for i, record in enumerate(records):
-        block = _workflow_tool_use_block(record)
-        if block is None:
-            continue
-        usage = (record.get("message") or {}).get("usage") or {}
-        launch_idx, launch_tokens, launch_tool_id = i, wr.context_tokens(usage), block.get("id")
-        break
-
-    if launch_idx is None:
+    launch = _find_launch(records, wf_id)
+    if launch is None:
         return {
             "launch_turn_tokens": None,
             "next_turn_tokens": None,
             "delta": None,
             "return_bytes": None,
         }
+    launch_idx, launch_tokens, return_bytes = launch
 
     next_tokens = None
-    return_bytes = None
     for record in records[launch_idx + 1 :]:
-        if return_bytes is None:
-            return_bytes = _tool_result_bytes(record, launch_tool_id)
-        if next_tokens is None and record.get("type") == "assistant":
-            usage = (record.get("message") or {}).get("usage") or {}
-            if usage:
-                next_tokens = wr.context_tokens(usage)
-        if next_tokens is not None and return_bytes is not None:
+        if record.get("type") != "assistant":
+            continue
+        usage = (record.get("message") or {}).get("usage") or {}
+        if usage:
+            next_tokens = wr.context_tokens(usage)
             break
 
     delta = next_tokens - launch_tokens if next_tokens is not None else None
@@ -227,6 +267,21 @@ def _orchestrator_stats(main_path: Path) -> dict:
         "delta": delta,
         "return_bytes": return_bytes,
     }
+
+
+def _find_launch(records: list[dict], wf_id: str) -> tuple[int, int, int] | None:
+    """`(index, context_tokens, return_bytes)` of the launch turn whose
+    answering `tool_result` names `wf_id`, or `None` when no launch does."""
+    for i, record in enumerate(records):
+        block = _workflow_tool_use_block(record)
+        if block is None:
+            continue
+        result = _tool_result_content(records[i + 1 :], block.get("id"))
+        if result is None or wf_id not in result:
+            continue
+        usage = (record.get("message") or {}).get("usage") or {}
+        return i, wr.context_tokens(usage), len(result.encode("utf-8"))
+    return None
 
 
 def _workflow_tool_use_block(record: dict) -> dict | None:
@@ -245,19 +300,24 @@ def _workflow_tool_use_block(record: dict) -> dict | None:
     )
 
 
-def _tool_result_bytes(record: dict, tool_use_id: str | None) -> int | None:
-    if tool_use_id is None or record.get("type") != "user":
+def _tool_result_content(records: list[dict], tool_use_id: str | None) -> str | None:
+    """The JSON-serialised content of the `tool_result` answering
+    `tool_use_id` among `records`, or `None` when nothing answers it."""
+    if tool_use_id is None:
         return None
-    content = (record.get("message") or {}).get("content")
-    if not isinstance(content, list):
-        return None
-    for block in content:
-        if (
-            isinstance(block, dict)
-            and block.get("type") == "tool_result"
-            and block.get("tool_use_id") == tool_use_id
-        ):
-            return len(json.dumps(block.get("content")).encode("utf-8"))
+    for record in records:
+        if record.get("type") != "user":
+            continue
+        content = (record.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if (
+                isinstance(block, dict)
+                and block.get("type") == "tool_result"
+                and block.get("tool_use_id") == tool_use_id
+            ):
+                return json.dumps(block.get("content"))
     return None
 
 
@@ -293,10 +353,13 @@ def compute(loaded: dict) -> dict:
         )
         for agent_id in loaded["unobserved_ids"]
     ]
+    for row in unobserved:
+        row["attribution"] = "time-window-heuristic"
     return {
         "wf_id": loaded["wf_id"],
         "agents": agents,
         "unobserved": unobserved,
+        "window": _window_json(loaded.get("window")),
         "orchestrator": loaded["orchestrator"],
     }
 
@@ -401,7 +464,9 @@ def main(argv: list[str] | None = None) -> int:
         "--project-root", default=None, help="Project root; defaults to git toplevel of CWD."
     )
     parser.add_argument(
-        "--session", default=None, help="Main-session transcript path override (A10 escape hatch)."
+        "--session",
+        default=None,
+        help="Main-session transcript path override, for a transcript that is not the run directory's sibling.",
     )
     parser.add_argument("--json", action="store_true", help="Emit the report as JSON.")
     parser.add_argument(

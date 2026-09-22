@@ -11,7 +11,7 @@ Layout, measured live against a real Workflow run (`WORKFLOW_CONTRACT.md
 and holds `agent-<id>.jsonl` (transcript), `agent-<id>.meta.json`
 ({agentType, description, workflowPhase, spawnDepth, ...}) and `journal.jsonl`
 (launched / started{key, agentId, label, phase} / result{key, agentId, result}
-events, in that order per agent). The main-session transcript is a sibling
+events discriminated by a `type` key, in that order per agent). The main-session transcript is a sibling
 `.jsonl` file one level up, alongside the `<session>/` directory.
 
 The context-token convention (`input_tokens + cache_read_input_tokens +
@@ -149,7 +149,7 @@ def read_journal(run_dir: Path) -> dict:
 
     roster: dict[str, dict] = {}
     for record in records:
-        event = record.get("event")
+        event = record.get("type")
         agent_id = record.get("agentId")
         if event == "started" and agent_id:
             roster[agent_id] = {

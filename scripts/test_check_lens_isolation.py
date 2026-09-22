@@ -134,10 +134,10 @@ def _write_journal(run_dir, agents):
     records = []
     for i, agent in enumerate(agents):
         key = f"call_{i}"
-        records.append({"event": "launched", "key": key})
+        records.append({"type": "launched", "key": key})
         records.append(
             {
-                "event": "started",
+                "type": "started",
                 "key": key,
                 "agentId": agent["agent_id"],
                 "label": agent["label"],
@@ -156,7 +156,7 @@ def _write_journal(run_dir, agents):
         else:
             result = {"marker": "[COMPLETE]"}
         records.append(
-            {"event": "result", "key": key, "agentId": agent["agent_id"], "result": result}
+            {"type": "result", "key": key, "agentId": agent["agent_id"], "result": result}
         )
     _write_jsonl(run_dir / "journal.jsonl", records)
 
@@ -505,3 +505,87 @@ def test_table_output_names_the_run_and_a_collect_agent_label(tmp_path, monkeypa
     assert exit_code == 0
     assert wf_id in captured.out
     assert "economy" in captured.out
+
+
+# --------------------------------------------------------------------------- #
+# the harness's own journal shape, verbatim -- the discriminator key is `type`
+# --------------------------------------------------------------------------- #
+def test_journal_keyed_by_type_as_the_harness_writes_it_yields_the_needle_set(
+    tmp_path, monkeypatch, capsys
+):
+    """A literal journal in the shape the Workflow tool wrote on the first
+    live run (2026-09-21), discriminated by `type`, with a planted sibling
+    fragment path in the economy transcript. Both the roster and the needle
+    derivation read the journal; a fixture mirroring an invented key would
+    keep the suite green while the live guard reads `run-empty` -- or,
+    one level down, derives an empty needle set and reports clean."""
+    project_root, wf_id = _standard_run(
+        tmp_path,
+        monkeypatch,
+        texts_by_agent={"agent-econ-001": [f"See {_fragment_path('portability')} for detail."]},
+    )
+    home = tmp_path / "home"
+    run_dir = _run_dir(home, project_root, "sess-1", wf_id)
+
+    def lens_result(label, agent):
+        return {
+            "marker": "[COMPLETE]",
+            "lens": label,
+            "fragment_path": _fragment_path(label),
+            "claims_count": agent["claims_count"],
+            "certainty": agent["certainty"],
+            "summary": agent["summary"],
+        }
+
+    econ, port, aggr = _DEFAULT_AGENTS
+    harness_journal = [
+        {"type": "launched"},
+        {
+            "type": "started",
+            "key": "v2:aaa",
+            "agentId": econ["agent_id"],
+            "label": "economy",
+            "phase": "Collect",
+        },
+        {
+            "type": "started",
+            "key": "v2:bbb",
+            "agentId": port["agent_id"],
+            "label": "portability",
+            "phase": "Collect",
+        },
+        {
+            "type": "result",
+            "key": "v2:aaa",
+            "agentId": econ["agent_id"],
+            "result": lens_result("economy", econ),
+        },
+        {
+            "type": "result",
+            "key": "v2:bbb",
+            "agentId": port["agent_id"],
+            "result": lens_result("portability", port),
+        },
+        {
+            "type": "started",
+            "key": "v2:ccc",
+            "agentId": aggr["agent_id"],
+            "label": "reconcile",
+            "phase": "Reconcile",
+        },
+        {
+            "type": "result",
+            "key": "v2:ccc",
+            "agentId": aggr["agent_id"],
+            "result": {"marker": "[COMPLETE]"},
+        },
+    ]
+    _write_jsonl(run_dir / "journal.jsonl", harness_journal)
+
+    exit_code, captured, report = _run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 1, captured.err
+    assert {
+        (f["code"], f["agent_id"], f["sibling_agent_id"], f["needle_kind"])
+        for f in report["findings"]
+    } == {("LI01", econ["agent_id"], port["agent_id"], "fragment_path")}

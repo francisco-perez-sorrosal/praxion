@@ -149,7 +149,7 @@ def _journal_results(run_dir: Path) -> dict[str, dict]:
     last-event-wins reading of the same file."""
     results: dict[str, dict] = {}
     for record in wr.iter_transcript_records(run_dir / "journal.jsonl"):
-        if record.get("event") != "result":
+        if record.get("type") != "result":
             continue
         agent_id = record.get("agentId")
         result = record.get("result")

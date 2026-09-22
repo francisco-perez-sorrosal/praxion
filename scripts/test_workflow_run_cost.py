@@ -121,10 +121,10 @@ def _write_journal(run_dir, agents):
     records = []
     for i, agent in enumerate(agents):
         key = f"call_{i}"
-        records.append({"event": "launched", "key": key})
+        records.append({"type": "launched", "key": key})
         records.append(
             {
-                "event": "started",
+                "type": "started",
                 "key": key,
                 "agentId": agent["agent_id"],
                 "label": agent["label"],
@@ -134,7 +134,7 @@ def _write_journal(run_dir, agents):
         if agent.get("result", True):
             records.append(
                 {
-                    "event": "result",
+                    "type": "result",
                     "key": key,
                     "agentId": agent["agent_id"],
                     "result": {"marker": "[COMPLETE]"},
@@ -716,3 +716,71 @@ def test_exits_2_with_transcripts_missing_reason_when_no_agent_transcripts_exist
 
     assert exit_code == 2
     assert "transcripts-missing" in captured.err
+
+
+# --------------------------------------------------------------------------- #
+# the harness's own journal shape, verbatim -- the discriminator key is `type`
+# --------------------------------------------------------------------------- #
+def test_journal_keyed_by_type_as_the_harness_writes_it_populates_the_roster(
+    tmp_path, monkeypatch, capsys
+):
+    """A literal journal in the shape the Workflow tool wrote on the first
+    live run (2026-09-21): `{"type": "launched"}` with no key, then
+    `started`/`result` records discriminated by `type`. Independent of
+    `_write_journal` on purpose -- a fixture that mirrors an invented key
+    keeps a suite green while every live run reads `run-empty`."""
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    run_dir = _run_dir(home, project_root, "sess-1", wf_id)
+    harness_journal = [
+        {"type": "launched"},
+        {
+            "type": "started",
+            "key": "v2:aaa",
+            "agentId": "agent-econ-001",
+            "label": "economy",
+            "phase": "Collect",
+        },
+        {
+            "type": "started",
+            "key": "v2:bbb",
+            "agentId": "agent-port-002",
+            "label": "portability",
+            "phase": "Collect",
+        },
+        {
+            "type": "result",
+            "key": "v2:aaa",
+            "agentId": "agent-econ-001",
+            "result": {"marker": "[COMPLETE]"},
+        },
+        {
+            "type": "result",
+            "key": "v2:bbb",
+            "agentId": "agent-port-002",
+            "result": {"marker": "[COMPLETE]"},
+        },
+        {
+            "type": "started",
+            "key": "v2:ccc",
+            "agentId": "agent-aggr-003",
+            "label": "reconcile",
+            "phase": "Reconcile",
+        },
+        {
+            "type": "result",
+            "key": "v2:ccc",
+            "agentId": "agent-aggr-003",
+            "result": {"marker": "[COMPLETE]"},
+        },
+    ]
+    _write_jsonl(run_dir / "journal.jsonl", harness_journal)
+
+    exit_code, captured, report = _run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 0, captured.err
+    assert {row["agent_id"]: row["journal_result"] for row in report["agents"]} == {
+        "agent-econ-001": "present",
+        "agent-port-002": "present",
+        "agent-aggr-003": "present",
+    }

@@ -29,7 +29,7 @@ Report envelope:
 Findings:
     {"code": "LI01", "agent_id": str, "sibling_agent_id": str,
      "needle_kind": "fragment_path" | "agent_id" | "summary"}
-        one per violating (searched transcript, sibling) pair
+        one per violating (searched transcript, sibling, needle kind) triple
     {"code": "LI02", "agent_id": str}
         a transcript the search was meant to cover and could not read -- a
         rostered `Collect` agent with no file on disk, or (under
@@ -220,25 +220,23 @@ def _scan_transcript(
 ) -> list[dict]:
     """The needle search -- the single implementation, used for both a lens's
     own transcript and (under `--include-main`) the main session's. One
-    finding per violating sibling, naming the first needle kind that hit in
-    `_needles_for`'s own precedence order."""
+    finding per (sibling, needle kind) that hit -- every kind is reported, so
+    a pointer-shaped hit (`fragment_path`, which the main transcript carries
+    by construction) never masks a payload-shaped one (`summary`)."""
     findings = []
     for sibling_id, sibling_needles in needles.items():
         if sibling_id == skip_sibling_id:
             continue
-        hit_kind = next(
-            (kind for kind, needle in sibling_needles if any(needle in text for text in strings)),
-            None,
-        )
-        if hit_kind is not None:
-            findings.append(
-                {
-                    "code": "LI01",
-                    "agent_id": target_id,
-                    "sibling_agent_id": sibling_id,
-                    "needle_kind": hit_kind,
-                }
-            )
+        findings += [
+            {
+                "code": "LI01",
+                "agent_id": target_id,
+                "sibling_agent_id": sibling_id,
+                "needle_kind": kind,
+            }
+            for kind, needle in sibling_needles
+            if any(needle in text for text in strings)
+        ]
     return findings
 
 
@@ -250,7 +248,7 @@ def _needles_for(agent_id: str, result: dict) -> list[tuple[str, str]]:
     here, because naming a domain is not evidence of reading a sibling."""
     summary = result.get("summary")
     candidates = [
-        ("fragment_path", result.get("fragment_path")),
+        ("fragment_path", _repo_relative(result.get("fragment_path"))),
         ("agent_id", agent_id),
         (
             "summary",
@@ -260,6 +258,17 @@ def _needles_for(agent_id: str, result: dict) -> list[tuple[str, str]]:
         ),
     ]
     return [(kind, value) for kind, value in candidates if isinstance(value, str) and value]
+
+
+def _repo_relative(path):
+    """The `.ai-work/...` tail of a fragment path, whatever prefix the lens
+    returned it with. An absolute path contains the repo-relative form, so
+    the tail matches a sibling quoting either form; a value with no such
+    tail is used verbatim."""
+    if not isinstance(path, str):
+        return path
+    index = path.find(".ai-work/")
+    return path[index:] if index > 0 else path
 
 
 # --------------------------------------------------------------------------- #

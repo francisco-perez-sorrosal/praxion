@@ -589,3 +589,113 @@ def test_journal_keyed_by_type_as_the_harness_writes_it_yields_the_needle_set(
         (f["code"], f["agent_id"], f["sibling_agent_id"], f["needle_kind"])
         for f in report["findings"]
     } == {("LI01", econ["agent_id"], port["agent_id"], "fragment_path")}
+
+
+# --------------------------------------------------------------------------- #
+# every matching needle kind is reported -- a pointer hit never masks a payload hit
+# --------------------------------------------------------------------------- #
+def test_every_matching_needle_kind_is_reported_per_sibling(tmp_path, monkeypatch, capsys):
+    """Under `--include-main` a completed run always hits `fragment_path` (the
+    pointer return delivers it); if that hit swallowed the `summary` kind the
+    flag could never report the one leak it exists to catch."""
+    econ, port = _DEFAULT_AGENTS[0], _DEFAULT_AGENTS[1]
+    project_root, wf_id = _standard_run(
+        tmp_path,
+        monkeypatch,
+        texts_by_agent={
+            econ["agent_id"]: [
+                f"See {_fragment_path('portability')}.",
+                f"Sibling {port['agent_id']}.",
+            ]
+        },
+    )
+
+    exit_code, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 1
+    assert {
+        (f["agent_id"], f["sibling_agent_id"], f["needle_kind"]) for f in report["findings"]
+    } == {
+        (econ["agent_id"], port["agent_id"], "fragment_path"),
+        (econ["agent_id"], port["agent_id"], "agent_id"),
+    }
+
+
+def test_absolute_fragment_path_in_the_journal_still_matches_a_relative_quote(
+    tmp_path, monkeypatch, capsys
+):
+    """A lens may return its fragment path absolute or repo-relative; the
+    needle is the repo-relative tail either way, so a sibling quoting either
+    form is caught."""
+    econ, port, aggr = _DEFAULT_AGENTS
+    project_root, wf_id = _standard_run(
+        tmp_path,
+        monkeypatch,
+        texts_by_agent={econ["agent_id"]: [f"See {_fragment_path('portability')} for detail."]},
+    )
+    home = tmp_path / "home"
+    run_dir = _run_dir(home, project_root, "sess-1", wf_id)
+
+    def result(label, agent, fragment_path):
+        return {
+            "marker": "[COMPLETE]",
+            "lens": label,
+            "fragment_path": fragment_path,
+            "claims_count": agent["claims_count"],
+            "certainty": agent["certainty"],
+            "summary": agent["summary"],
+        }
+
+    absolute_port = f"/abs/worktree/{_fragment_path('portability')}"
+    _write_jsonl(
+        run_dir / "journal.jsonl",
+        [
+            {"type": "launched"},
+            {
+                "type": "started",
+                "key": "a",
+                "agentId": econ["agent_id"],
+                "label": "economy",
+                "phase": "Collect",
+            },
+            {
+                "type": "started",
+                "key": "b",
+                "agentId": port["agent_id"],
+                "label": "portability",
+                "phase": "Collect",
+            },
+            {
+                "type": "result",
+                "key": "a",
+                "agentId": econ["agent_id"],
+                "result": result("economy", econ, _fragment_path("economy")),
+            },
+            {
+                "type": "result",
+                "key": "b",
+                "agentId": port["agent_id"],
+                "result": result("portability", port, absolute_port),
+            },
+            {
+                "type": "started",
+                "key": "c",
+                "agentId": aggr["agent_id"],
+                "label": "reconcile",
+                "phase": "Reconcile",
+            },
+            {
+                "type": "result",
+                "key": "c",
+                "agentId": aggr["agent_id"],
+                "result": {"marker": "[COMPLETE]"},
+            },
+        ],
+    )
+
+    exit_code, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 1
+    assert [
+        (f["agent_id"], f["sibling_agent_id"], f["needle_kind"]) for f in report["findings"]
+    ] == [(econ["agent_id"], port["agent_id"], "fragment_path")]

@@ -32,8 +32,7 @@ const RUN_SCHEMA = {
     marker: { type: 'string', enum: ['[COMPLETE]', '[PARTIAL]', '[BLOCKED]'] },
     findings_path: { type: 'string' },
     divergence_count: { type: 'integer' },
-    lenses_read: { type: 'integer' },
-    unresolved: { type: 'array', items: { type: 'string' } }
+    lenses_read: { type: 'integer' }
   },
   required: ['marker', 'findings_path', 'divergence_count', 'lenses_read']
 };
@@ -41,8 +40,10 @@ const RUN_SCHEMA = {
 // --- guard the envelope (the only code that runs post-launch) ---
 const lenses = Array.isArray(args.lenses) ? args.lenses : [];
 const names = lenses.map(l => l && l.name);
-if (lenses.length < 2 || lenses.length > 6 || new Set(names).size !== names.length) {
-  log(`refusing: need 2..6 uniquely-named lenses, got ${JSON.stringify(names)}`);
+const LENS_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;   // kebab-case: the shape RESEARCH_<name>.md and the needle set rely on
+const namesWellFormed = names.every(n => typeof n === 'string' && LENS_NAME.test(n));
+if (lenses.length < 2 || lenses.length > 6 || !namesWellFormed || new Set(names).size !== names.length) {
+  log(`refusing: need 2..6 uniquely-named kebab-case lenses, got ${JSON.stringify(names)}`);
   return { marker: '[BLOCKED]', reason: 'lens-set-invalid', lenses: [], dropped: names };
 }
 log(`lens-fanout: ${lenses.length} lenses on slug ${args.slug} (${args.timestamp})`);
@@ -91,7 +92,7 @@ function lensPrompt(lens) {
     ? `Shared sources (identical for every lens): ${args.sources.join(', ')}`
     : 'No shared sources were provided; ground findings in the question and your own lens.';
   return [
-    `Task slug: ${args.slug}. Use absolute paths under the repo worktree root for every file write; never a relative path.`,
+    `Task slug: ${args.slug}. Resolve the repo worktree root once and write every file through an absolute path under it; the paths below are given relative to that root.`,
     `If it exists, read .ai-work/${args.slug}/TASK_BRIEF.md first -- it may not have reached you (a hook-delivered brief does not fire for workflow agents).`,
     '',
     'Behavioral contract (four non-negotiable behaviors; full text at rules/swe/agent-behavioral-contract.md):',
@@ -105,7 +106,7 @@ function lensPrompt(lens) {
     'This is your only framing. Never name, quote, or infer another lens; you have no visibility into any sibling and must not invent one.',
     sourcesLine,
     'For per-claim confidence tiers, see skills/multi-perspective-analysis/references/calibrated-confidence.md.',
-    `Write your findings to exactly .ai-work/${args.slug}/RESEARCH_${lens.name}.md and nothing else.`,
+    `Write your findings to exactly <root>/.ai-work/${args.slug}/RESEARCH_${lens.name}.md and nothing else, and return fragment_path in exactly the repo-relative form .ai-work/${args.slug}/RESEARCH_${lens.name}.md.`,
     'Return marker, lens, fragment_path, claims_count, certainty, and a summary of 200 characters or fewer.'
   ].join('\n');
 }
@@ -118,7 +119,7 @@ function aggregatorPrompt(rows, dropped) {
     ? `Dropped lenses (not read, do not wait for them): ${dropped.join(', ')}.`
     : 'No lenses were dropped.';
   return [
-    `Task slug: ${args.slug}. Use absolute paths under the repo worktree root for every file write; never a relative path.`,
+    `Task slug: ${args.slug}. Resolve the repo worktree root once and write every file through an absolute path under it; the paths below are given relative to that root.`,
     '',
     'Behavioral contract (four non-negotiable behaviors; full text at rules/swe/agent-behavioral-contract.md):',
     '- Surface Assumptions: state your interpretation and each gap-filling assumption as you make it.',
@@ -130,8 +131,8 @@ function aggregatorPrompt(rows, dropped) {
     'Read every fragment below from disk before writing anything -- do not rely on this prompt for their content:',
     roster,
     droppedLine,
-    `Write .ai-work/${args.slug}/RESEARCH_FINDINGS.md with a "## Divergence Map" section recording agreements, surviving contradictions and blind spots across the lenses above. Preserve contradictions -- never average or homogenise them.`,
-    'Return marker, findings_path, divergence_count, lenses_read, and unresolved (array of open questions; may be empty).'
+    `Write <root>/.ai-work/${args.slug}/RESEARCH_FINDINGS.md with a "## Divergence Map" section recording agreements, surviving contradictions and blind spots across the lenses above, and an "## Open questions" section for whatever stays unresolved. Preserve contradictions -- never average or homogenise them.`,
+    `Return marker, findings_path (in exactly the repo-relative form .ai-work/${args.slug}/RESEARCH_FINDINGS.md), divergence_count and lenses_read; open questions belong in the findings file, never in the return.`
   ].join('\n');
 }
 

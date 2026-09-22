@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-22T06:47:03Z'
+generated_at: '2026-09-22T06:54:24Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -514,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -561,13 +561,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2853,7 +2853,7 @@ surfaces:
   path: .ai-state/decisions/378-simplification-evidence-standard.md
   type: markdown
   title: Simplification requires a measured cost and an executable guard
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: adr_card
 - id: ai-state-decisions-379-retire-worktree-guard-hooks
   path: .ai-state/decisions/379-retire-worktree-guard-hooks.md
@@ -2926,7 +2926,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-21'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -2994,12 +2994,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-09-14'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-29_22-11-31.json
-  type: json
-  title: METRICS_REPORT_2026-07-29_22-11-31.json
-  last_modified: '2026-07-29'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.json
   type: json
@@ -3054,12 +3048,12 @@ surfaces:
   title: METRICS_REPORT_2026-09-20_15-21-06.json
   last_modified: '2026-09-20'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-07-29_22-11-31.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-07-29'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-21_12-04-57.json
+  type: json
+  title: METRICS_REPORT_2026-09-21_12-04-57.json
+  last_modified: '2026-09-21'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.md
   type: markdown
@@ -3113,6 +3107,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-09-20'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-21_12-04-57.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-21'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -3626,8 +3626,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
-  - ai-state-metrics-reports-metrics-report-2026-07-29-22-11-31
   - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
   - ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
@@ -3646,6 +3644,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   - ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
   - ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
+  - ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
+  - ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27

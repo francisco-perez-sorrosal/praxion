@@ -117,6 +117,7 @@ recorded in the pipeline's learnings):
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -213,6 +214,61 @@ class TestClassifyProvenance:
         )
 
         assert _classify(parent_sourced_row) is Provenance.PARENT_SOURCED
+
+    def test_honest_marker_with_every_token_field_null_is_not_attributed(
+        self, attributed_row: dict[str, Any]
+    ) -> None:
+        """Attribution needs the honest marker AND at least one usage field;
+        a marker over four nulls has nothing to attribute and would otherwise
+        enter every total as a zero-token row."""
+
+        from scripts.project_metrics.collectors.cost_collector import (
+            Provenance,
+            _classify,
+        )
+
+        row = {
+            **attributed_row,
+            "tokens_in": None,
+            "tokens_out": None,
+            "cache_read": None,
+            "cache_create": None,
+        }
+
+        assert _classify(row) is Provenance.UNPARSED
+
+    @pytest.mark.parametrize("corrupt_value", ["n/a", float("inf")])
+    def test_a_token_field_that_cannot_be_coerced_quarantines_the_row_as_unparsed(
+        self, attributed_row: dict[str, Any], corrupt_value: object
+    ) -> None:
+        """A usage number the collector cannot read is not silently zero --
+        the row lands in the population named for exactly that, so the
+        census and the read path agree and the coverage block says so."""
+
+        from scripts.project_metrics.collectors.cost_collector import (
+            Provenance,
+            _classify,
+        )
+
+        row = {**attributed_row, "tokens_in": corrupt_value}
+
+        assert _classify(row) is Provenance.UNPARSED
+
+    def test_a_pre_attribution_row_with_an_unreadable_token_field_is_unparsed(
+        self, pre_attribution_row: dict[str, Any]
+    ) -> None:
+        """The key-absent branch applies the same readability rule, so the
+        census and the read path never disagree about which quarantine
+        bucket a corrupt row belongs to."""
+
+        from scripts.project_metrics.collectors.cost_collector import (
+            Provenance,
+            _classify,
+        )
+
+        row = {**pre_attribution_row, "tokens_out": "n/a"}
+
+        assert _classify(row) is Provenance.UNPARSED
 
     def test_classifies_key_absent_row_with_tokens_as_pre_attribution(
         self, pre_attribution_row: dict[str, Any]
@@ -349,6 +405,22 @@ class TestAttributedFromRow:
         assert result.cache_read == 0
         assert result.tokens_out == 100
         assert result.cache_create == 50
+
+    def test_an_infinite_duration_degrades_to_zero_instead_of_raising(
+        self, attributed_row: dict[str, Any]
+    ) -> None:
+        """`json.loads` accepts `Infinity`; one odd non-token field must never
+        fail the whole run -- the contract is a degraded field, never a
+        raise the runner has to catch."""
+
+        from scripts.project_metrics.collectors.cost_collector import _attributed_from_row
+
+        row = {**attributed_row, "duration_ms": float("inf")}
+
+        result = _attributed_from_row(row, source_path="x.jsonl")
+
+        assert result is not None
+        assert result.duration_ms == 0
 
 
 # ---------------------------------------------------------------------------
@@ -695,6 +767,49 @@ class TestParseCalibrationLog:
             "cells like 'Standard (batched, ...)' must normalize to 'Standard', "
             "not fail to parse or be indexed under the raw prose."
         )
+
+    @pytest.mark.skipif(
+        os.geteuid() == 0,
+        reason="root ignores file modes; remove when the reader is injected",
+    )
+    def test_an_unreadable_calibration_log_is_a_named_issue_not_a_raise(
+        self, tmp_path: Path, calibration_log_excerpt_path: Path
+    ) -> None:
+        from scripts.project_metrics.collectors.cost_collector import _load_tier_index
+
+        log = tmp_path / ".ai-state" / "calibration_log.md"
+        log.parent.mkdir()
+        log.write_text(calibration_log_excerpt_path.read_text())
+        log.chmod(0o000)
+        issues: list[str] = []
+
+        try:
+            index = _load_tier_index(str(tmp_path), issues)
+        finally:
+            log.chmod(0o600)
+
+        assert index == {}
+        assert len(issues) == 1, issues
+        assert "calibration log unreadable" in issues[0], issues
+
+    def test_an_invalid_utf8_byte_in_the_log_degrades_that_cell_not_the_index(
+        self, tmp_path: Path, calibration_log_excerpt_path: Path
+    ) -> None:
+        """The WAL reader and the producing hook both decode with
+        `errors="replace"`; the calibration log gets the same treatment so
+        one bad byte cannot raise a `UnicodeDecodeError` out of `collect()`."""
+
+        from scripts.project_metrics.collectors.cost_collector import parse_calibration_log
+
+        log = tmp_path / "calibration_log.md"
+        log.write_bytes(
+            calibration_log_excerpt_path.read_bytes()
+            + b"| 2026-01-01 | bad\xff-row | x | x | Direct | x | x |\n"
+        )
+
+        index = parse_calibration_log(str(log))
+
+        assert index["process-economy-p3-6-adopt"] == ["Standard"]
 
 
 class TestResolveTier:
@@ -1222,6 +1337,91 @@ class TestCostCollectorFaultInjection:
 # ---------------------------------------------------------------------------
 
 
+def _populate_repo(
+    root: Path, attributed_row: dict[str, Any], calibration_log_excerpt: Path
+) -> None:
+    """One attributed WAL row plus the calibration-log excerpt under `root/.ai-state/`."""
+
+    ai_state = root / ".ai-state"
+    ai_state.mkdir(parents=True)
+    (ai_state / "observations.jsonl").write_text(json.dumps(attributed_row) + "\n")
+    (ai_state / "calibration_log.md").write_text(calibration_log_excerpt.read_text())
+
+
+class TestCostCollectorProductionWiring:
+    """The runner builds every collector with the repository root and then
+    threads the literal `"."` through `CollectionContext.repo_root` -- the
+    readiness collector's fallback treats that `"."` as absent and reads its
+    constructor root. Every other `collect()` test in this module supplies
+    an absolute context root, a configuration the runner never uses; these
+    two drive the real call shape.
+    """
+
+    def test_runner_shaped_context_publishes_absolute_paths_and_named_checkouts(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        attributed_row: dict[str, Any],
+        calibration_log_excerpt_path: Path,
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+        from scripts.project_metrics.collectors.base import CollectionContext
+
+        repo = tmp_path / "praxion"
+        _populate_repo(repo, attributed_row, calibration_log_excerpt_path)
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+        )
+        monkeypatch.chdir(repo)
+
+        collector = cost_collector.CostCollector(repo_root=str(repo))
+        result = collector.collect(
+            CollectionContext(repo_root=".", window_days=90, git_sha="deadbeef")
+        )
+
+        sources = result.data["coverage"]["sources"]
+        assert sources, f"No sources published; issues={result.issues!r}"
+        relative = [s["path"] for s in sources if not Path(s["path"]).is_absolute()]
+        assert relative == [], f"A published source path must be absolute: {relative!r}"
+        assert {s["checkout"] for s in sources} == {"praxion"}, (
+            f"Every source must name its checkout; got {[s['checkout'] for s in sources]!r}"
+        )
+
+    def test_reads_the_constructor_root_when_the_process_cwd_is_elsewhere(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        attributed_row: dict[str, Any],
+        calibration_log_excerpt_path: Path,
+    ) -> None:
+        """`git rev-parse --show-toplevel` (the CLI's root) works from any
+        subdirectory, so the constructor root and the process cwd can differ
+        in production; `collect()` must read the former."""
+
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+        from scripts.project_metrics.collectors.base import CollectionContext
+
+        repo = tmp_path / "praxion"
+        _populate_repo(repo, attributed_row, calibration_log_excerpt_path)
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+        )
+        monkeypatch.chdir(elsewhere)
+
+        collector = cost_collector.CostCollector(repo_root=str(repo))
+        result = collector.collect(
+            CollectionContext(repo_root=".", window_days=90, git_sha="deadbeef")
+        )
+
+        assert result.data["coverage"]["attributed_rows"] == 1, result.issues
+        assert result.data["pipelines"][0]["tier"] == "Standard", (
+            "The tier index must be read from the constructor root, not the cwd: "
+            f"{result.data['pipelines']!r} issues={result.issues!r}"
+        )
+
+
 class TestCostCollectorResolve:
     def test_registers_as_the_cost_collector_at_tier_zero(self) -> None:
         """The collector must register under the exact name the report's
@@ -1271,6 +1471,38 @@ class TestComputeF12Cell:
     """Two shapes sharing no numeric key -- a consumer cannot read a
     ratio out of an `n/a` cell.
     """
+
+    def test_renders_na_when_the_lightweight_median_is_zero_tokens(self) -> None:
+        """Attributed rows do not imply a non-zero total; a zero divisor is
+        an `n/a` cell with a reason, never a raise."""
+
+        from scripts.project_metrics.collectors.cost_collector import compute_f12_cell
+
+        zero_tokens = {
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "cache_read": 0,
+            "cache_create": 0,
+            "tokens_total": 0,
+        }
+        standard_bucket = _make_pipeline_bucket(
+            pipeline_slug="standard-1",
+            tier="Standard",
+            attributed_rows=1,
+            tokens={**zero_tokens, "tokens_total": 1000},
+        )
+        lightweight_bucket = _make_pipeline_bucket(
+            pipeline_slug="lightweight-1",
+            tier="Lightweight",
+            attributed_rows=1,
+            tokens=zero_tokens,
+        )
+
+        cell = compute_f12_cell([standard_bucket, lightweight_bucket])
+
+        assert cell["status"] == "n/a"
+        assert "zero" in cell["reason"].lower(), cell
+        assert "ratio" not in cell
 
     def test_renders_na_with_a_reason_when_one_tier_has_zero_attributed_rows(self) -> None:
         from scripts.project_metrics.collectors.cost_collector import compute_f12_cell

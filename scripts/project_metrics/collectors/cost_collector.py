@@ -31,10 +31,12 @@ was written. Before a fix to the write-ahead hook, `tokens_in`/`tokens_out`/
 not the reporting agent's own. After the fix, a `usage_source` key marks which
 transcript the numbers came from. Rows written before the fix simply lack the
 key entirely -- so the honest population is identified by presence of
-`usage_source == "subagent-transcript"`, and the partition between "old,
-unmarked" rows and "new, but every field degraded to null" rows is made by
-whether the row carries any token field at all, never by the value of a
-token field itself.
+`usage_source == "subagent-transcript"` together with at least one readable
+token field, and the partition between "old, unmarked" rows and "new, but
+every field degraded to null" rows is made by whether the row carries any
+token field at all. A token field that is present but unreadable (a string,
+an infinity) quarantines its row as `unparsed` on both the read path and the
+census, so an understated total can never be published as an honest one.
 
 Source discovery (see `discover_sources` below)
 -------------------------------------------------
@@ -124,9 +126,9 @@ _AGENT_STOP_EVENT_TYPE = "agent_stop"
 _USAGE_SOURCE_SUBAGENT_TRANSCRIPT = "subagent-transcript"
 _USAGE_SOURCE_PARENT_TRANSCRIPT = "parent-transcript"
 
-# The token-shaped fields whose mere presence (irrespective of value)
-# distinguishes a row that at least tried to carry usage data from one that
-# carries none at all.
+# The token-shaped fields whose presence distinguishes a row that at least
+# tried to carry usage data from one that carries none at all -- and whose
+# readability (int-coercible) decides whether the row can enter a total.
 _TOKEN_FIELDS: tuple[str, ...] = ("tokens_in", "tokens_out", "cache_read", "cache_create")
 
 
@@ -148,10 +150,29 @@ class Provenance(StrEnum):
     UNPARSED = "unparsed"
 
 
+def _is_int_coercible(value: object) -> bool:
+    try:
+        int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return True
+
+
 def _has_any_token_field(row: dict) -> bool:
     """True when at least one token field is present and non-null."""
 
     return any(row.get(field) is not None for field in _TOKEN_FIELDS)
+
+
+def _has_unreadable_token_field(row: dict) -> bool:
+    """True when a present token field holds a value no total can absorb
+    (`"n/a"`, `Infinity`, a list) -- such a row is quarantined by name
+    rather than entering a total understated."""
+
+    return any(
+        row.get(field) is not None and not _is_int_coercible(row.get(field))
+        for field in _TOKEN_FIELDS
+    )
 
 
 def _classify(row: dict) -> Provenance:
@@ -173,15 +194,20 @@ def _partition_provenance(row: dict) -> Provenance:
     value: absence is the marker for the pre-fix population. A row that
     carries the key with a value other than the two honest markers (e.g.
     `None`, written when a post-fix row's usage extraction fully failed) has
-    no honest attribution to report and is classified `UNPARSED`.
+    no honest attribution to report and is classified `UNPARSED` -- as does
+    a row carrying the honest marker over four null usage fields, which has
+    nothing to attribute and must not enter a total as a zero-token row, and
+    a row whose token field holds a value no total can absorb, which would
+    otherwise enter a total understated with nothing in the report saying so.
     """
 
+    readable = _has_any_token_field(row) and not _has_unreadable_token_field(row)
     if "usage_source" not in row:
-        return Provenance.PRE_ATTRIBUTION if _has_any_token_field(row) else Provenance.UNPARSED
+        return Provenance.PRE_ATTRIBUTION if readable else Provenance.UNPARSED
 
     usage_source = row.get("usage_source")
     if usage_source == _USAGE_SOURCE_SUBAGENT_TRANSCRIPT:
-        return Provenance.ATTRIBUTED
+        return Provenance.ATTRIBUTED if readable else Provenance.UNPARSED
     if usage_source == _USAGE_SOURCE_PARENT_TRANSCRIPT:
         return Provenance.PARENT_SOURCED
     return Provenance.UNPARSED
@@ -217,13 +243,18 @@ class AttributedRow:
 
 
 def _coerce_numeric(value: object) -> int:
-    """`None` becomes `0`; anything else is coerced to `int`.
+    """`None` and anything not int-coercible become `0`.
 
     Coercion happens once, here, at construction -- never re-checked by a
-    downstream reader of `AttributedRow`.
+    downstream reader of `AttributedRow`. Token fields were screened by the
+    partition (an unreadable one quarantines its row), so the fallback is
+    reached only for a non-token field such as `duration_ms`; it never
+    raises out of the read pass and loses every other source.
     """
 
-    return 0 if value is None else int(value)  # type: ignore[arg-type]
+    if value is None or not _is_int_coercible(value):
+        return 0
+    return int(value)  # type: ignore[arg-type]
 
 
 def _attributed_from_row(row: dict, source_path: str) -> AttributedRow | None:
@@ -333,13 +364,16 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     """
 
     issues: list[str] = []
-    checkout_dirs: list[Path] = [Path(repo_root)]
+    # Resolved up front so a published `SourceRef` is always absolute with a
+    # named checkout, whatever shape the caller handed in (the runner's own
+    # context carries the literal ".").
+    checkout_dirs: list[Path] = [Path(repo_root).resolve()]
 
     main_checkout, error = _resolve_main_checkout(repo_root)
     if main_checkout is None:
         issues.append(f"worktree discovery unavailable: {error}")
     else:
-        main_path = Path(main_checkout)
+        main_path = Path(main_checkout).resolve()
         checkout_dirs.append(main_path)
         worktrees_dir = main_path / ".claude" / "worktrees"
         if worktrees_dir.is_dir():
@@ -358,7 +392,7 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
         seen_paths.add(resolved)
         sources.append(
             SourceRef(
-                path=str(candidate),
+                path=resolved,
                 kind=kind,
                 checkout=dir_path.name,
                 mtime_iso=_mtime_iso(candidate),
@@ -595,7 +629,9 @@ def parse_calibration_log(path: str) -> dict[str, list[str]]:
     """
 
     index: dict[str, list[str]] = {}
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
+    # `errors="replace"` matches the WAL reader and the producing hook: one
+    # bad byte degrades one cell, never the whole index.
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
         cells = _calibration_row_cells(line)
         if cells is None or len(cells) < _CALIBRATION_MIN_COLUMNS:
             continue
@@ -866,8 +902,8 @@ _F12_LIGHTWEIGHT_TIER = "Lightweight"
 
 def compute_f12_cell(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
     """Render `n/a` with a reason unless both tiers have >=1 attributed
-    row; the two shapes share no numeric key, so a consumer cannot read a
-    ratio out of an `n/a` cell."""
+    row and the Lightweight median is non-zero; the two shapes share no
+    numeric key, so a consumer cannot read a ratio out of an `n/a` cell."""
 
     standard = [b for b in buckets if b.tier == _F12_STANDARD_TIER and b.attributed_rows > 0]
     lightweight = [b for b in buckets if b.tier == _F12_LIGHTWEIGHT_TIER and b.attributed_rows > 0]
@@ -885,6 +921,10 @@ def compute_f12_cell(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
 
     standard_median = statistics.median(bucket.tokens["tokens_total"] for bucket in standard)
     lightweight_median = statistics.median(bucket.tokens["tokens_total"] for bucket in lightweight)
+    if lightweight_median == 0:
+        # Attributed rows do not imply a non-zero total; a zero divisor is a
+        # withheld cell with a reason, never a raise.
+        return {"status": "n/a", "reason": f"{_F12_LIGHTWEIGHT_TIER} median is zero tokens"}
     return {
         "status": "rendered",
         "basis": "tokens_total",
@@ -904,7 +944,11 @@ def _load_tier_index(repo_root: str, issues: list[str]) -> dict[str, list[str]]:
     if not path.is_file():
         issues.append(f"calibration log not found: {path}")
         return {}
-    return parse_calibration_log(str(path))
+    try:
+        return parse_calibration_log(str(path))
+    except OSError as exc:
+        issues.append(f"calibration log unreadable: {path}: {exc.strerror or exc!r}")
+        return {}
 
 
 def _bucket_to_json(bucket: PipelineBucket) -> dict[str, Any]:
@@ -1120,11 +1164,27 @@ class CostCollector(Collector):
 
     # ------------------------------------------------------------------ collect
 
+    def _resolve_repo_root(self, ctx: CollectionContext) -> Path:
+        """Prefer the constructor root; fall back to ctx, then the cwd.
+
+        The runner threads the literal `"."` through `ctx.repo_root`, so the
+        constructor value is the authoritative one -- the readiness
+        collector's precedent. Resolved, so every path derived from it is
+        absolute and names its checkout.
+        """
+
+        if self._repo_root and self._repo_root != ".":
+            return Path(self._repo_root).resolve()
+        if ctx.repo_root and ctx.repo_root != ".":
+            return Path(ctx.repo_root).resolve()
+        return Path.cwd()
+
     def collect(self, ctx: CollectionContext) -> CollectorResult:
         """Read pass, then aggregate pass, then the provenance guard."""
 
-        sources, discover_issues = discover_sources(ctx.repo_root)
-        tier_index = _load_tier_index(ctx.repo_root, discover_issues)
+        repo_root = str(self._resolve_repo_root(ctx))
+        sources, discover_issues = discover_sources(repo_root)
+        tier_index = _load_tier_index(repo_root, discover_issues)
         raw_rows, summary_rows, read_sources, read_issues = _read_all_sources(sources)
         issues = [*discover_issues, *read_issues]
 

@@ -452,6 +452,25 @@ class TestReadAgentStopRows:
         assert rows == []
         assert issue is not None
 
+    def test_torn_trailing_line_keeps_the_valid_rows_and_counts_the_skip(
+        self, tmp_path: Path
+    ) -> None:
+        """The WAL is append-only and live: a torn last line while a session
+        is running is a normal state, not corruption of the rows before it.
+        Those rows are kept; the skip is reported as a counted issue, never
+        as a silently smaller file."""
+        from scripts.project_metrics.collectors.cost_collector import read_agent_stop_rows
+
+        valid = json.dumps({"event_type": "agent_stop", "agent_id": "x"})
+        path = tmp_path / "live.jsonl"
+        path.write_text(valid + "\n" + valid.replace('"x"', '"y"') + '\n{"event_type": "agent_st')
+
+        rows, issue = read_agent_stop_rows(str(path))
+
+        assert [row["agent_id"] for row in rows] == ["x", "y"]
+        assert issue is not None
+        assert "1 malformed line" in issue
+
 
 # ---------------------------------------------------------------------------
 # Dedup -- last-in-file, first-across-files, by agent_id.

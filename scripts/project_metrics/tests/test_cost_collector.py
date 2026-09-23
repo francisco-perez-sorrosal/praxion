@@ -1157,6 +1157,65 @@ class TestCostCollectorFaultInjection:
         assert result.issues, "A caught invariant violation must be named, not silent."
         assert "invariant" in result.issues[0].lower()
 
+    def test_a_miscounted_dedup_drop_is_rejected_with_no_totals_published(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pre_attribution_row: dict[str, Any],
+    ) -> None:
+        """`total_agent_stop_rows` is derived from the read pass's own
+        per-source row counts, never re-derived from the same census that
+        also produces `attributed_rows`/`quarantine` -- so a defect in the
+        census's own dedup bookkeeping is still visible as a genuine
+        mismatch between two independently sourced numbers, not silently
+        absorbed by a call-site `len(before) - len(after)` recompute (which
+        would just re-measure whatever the -- possibly buggy -- dedup call
+        actually returned and stay self-consistent regardless of what
+        happened).
+        """
+
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+        from scripts.project_metrics.collectors.base import CollectionContext
+
+        # Two genuinely distinct pre-attribution rows (different agent_ids)
+        # -- no real duplicate exists, so an honest dedup pass drops nothing.
+        row_a = dict(pre_attribution_row)
+        row_a["agent_id"] = "audit-row-a"
+        row_b = dict(pre_attribution_row)
+        row_b["agent_id"] = "audit-row-b"
+
+        wal_path = tmp_path / ".ai-state" / "observations.jsonl"
+        wal_path.parent.mkdir(parents=True, exist_ok=True)
+        wal_path.write_text(json.dumps(row_a) + "\n" + json.dumps(row_b) + "\n")
+
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+        )
+
+        # The fault: the dedup core silently drops the second entry but
+        # misreports zero rows dropped.
+        real_dedup = cost_collector._dedup_by_agent_id
+
+        def _lying_dedup(items, agent_id_of, source_path_of):
+            deduped, duplicate_ids, _honest_dropped = real_dedup(items, agent_id_of, source_path_of)
+            if len(deduped) > 1:
+                deduped = deduped[:-1]
+            return deduped, duplicate_ids, 0
+
+        monkeypatch.setattr(cost_collector, "_dedup_by_agent_id", _lying_dedup)
+
+        collector = cost_collector.CostCollector(repo_root=str(tmp_path))
+        ctx = CollectionContext(repo_root=str(tmp_path), window_days=30, git_sha="deadbeef")
+
+        result = collector.collect(ctx)
+
+        assert result.status == "error"
+        assert "pipelines" not in result.data
+        assert "tiers" not in result.data
+        assert "agent_types" not in result.data
+        assert result.issues, "A caught invariant violation must be named, not silent."
+        assert "invariant" in result.issues[0].lower()
+
 
 # ---------------------------------------------------------------------------
 # CostCollector.resolve -- the always-present-vs-absent split.

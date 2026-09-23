@@ -631,6 +631,16 @@ def _needs_wal_lookup(payload: dict, event_type: str) -> bool:
     return event_type in AGENT_LIFECYCLE_EVENTS and not str(payload.get("agent_type") or "").strip()
 
 
+def _pipeline_slug(cwd: str) -> str:
+    """Derive the pipeline slug a working directory belongs to.
+
+    The one place every WAL/summary row's cwd-to-slug mapping goes through,
+    so a WAL row's ``project`` field and the committed summary row's
+    ``pipeline_slug`` can never independently drift from each other.
+    """
+    return Path(cwd).name
+
+
 def build_observation(payload: dict, event_type: str, obs_path: Path | None = None) -> dict:
     """Assemble one WAL row from a lifecycle payload.
 
@@ -656,7 +666,7 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
         "session_id": payload.get("session_id", ""),
         "agent_type": agent_type,
         "agent_id": resolve_agent_id(payload),
-        "project": Path(cwd).name,
+        "project": _pipeline_slug(cwd),
         "event_type": event_type,
         "tool_name": None,
         "summary": build_summary(event_type, payload, agent_type),
@@ -769,7 +779,10 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
     whose transcript parse failed); ``gate_fire_counts`` stays empty until
     gates emit `gate_fire` rows -- it is counted here defensively (the
     aggregation is generic over event_type/key) so no further change to this
-    function is needed once that field exists.
+    function is needed once that field exists. ``pipeline_slug`` is additive
+    and present only when ``payload`` carries a ``cwd`` -- a legacy payload
+    without one yields a row with no ``pipeline_slug`` key at all, matching
+    how a WAL row's own ``project`` field is derived.
     """
     session_id = payload.get("session_id", "")
     timestamps = [str(r["timestamp"]) for r in session_rows if r.get("timestamp")]
@@ -783,7 +796,7 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
     }
     models = sorted({str(r["model"]) for r in session_rows if r.get("model")})
 
-    return {
+    summary = {
         "session_id": session_id,
         "started_at": started_at,
         "ended_at": ended_at,
@@ -798,6 +811,14 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
         # that work land, so it says so rather than implying completeness.
         "complete": started_agent_ids.issubset(stopped_agent_ids),
     }
+    # Additive-only: a legacy payload with no cwd omits the key entirely
+    # rather than fabricating a slug from a meaningless default -- a reader
+    # of an older committed row treats a missing key as "not derivable",
+    # never as an empty or "." pipeline.
+    slug = _pipeline_slug(payload.get("cwd") or "")
+    if slug:
+        summary["pipeline_slug"] = slug
+    return summary
 
 
 def _write_summary_rows(summary_path: Path, rows: list[dict]) -> None:
@@ -923,7 +944,7 @@ def build_suspension_stop(
         "session_id": payload.get("session_id", ""),
         "agent_type": agent_type,
         "agent_id": task_id,
-        "project": Path(cwd).name,
+        "project": _pipeline_slug(cwd),
         "event_type": "agent_stop",
         "tool_name": None,
         "summary": _SUSPENSION_SUMMARY[kind].format(agent_type=agent_type),

@@ -1924,6 +1924,17 @@ class TestPipelineSlugSharedHelper:
 
         assert "pipeline_slug" not in summary
 
+    def test_cwd_that_derives_to_an_empty_slug_omits_the_key(self) -> None:
+        """A cwd the harness would never send ("." names no directory) must
+        not produce an empty slug: the key is either a real directory name
+        or absent, so no reader ever meets `pipeline_slug: ""`."""
+        module = _load_module()
+        payload = {"session_id": self._SESSION_ID, "cwd": "."}
+
+        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
+
+        assert "pipeline_slug" not in summary
+
 
 class TestSessionSummaryUpsert:
     def test_stop_writes_one_summary_row(

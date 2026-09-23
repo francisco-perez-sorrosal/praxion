@@ -242,6 +242,100 @@ The coverage collector **never invokes a test runner**. It reads pre-existing `c
 
 The composer reads churn from the `git` namespace and complexity from the `lizard` namespace (preferred) or the `scc` namespace (fallback). When both complexity sources are skipped, `status = "skipped"`, `top_n = []`, and the two aggregate hotspot columns become null. Files tied on score sort lexicographically ascending by path so the Top-N list is deterministic across identical-input runs.
 
+### 5.8 `cost` namespace — token usage per pipeline, per tier, per agent type
+
+```json
+"cost": {
+  "pipelines": [
+    {
+      "pipeline_slug":  "<slug>",
+      "tier":           "Standard" | "Lightweight" | "Direct" | "Full" | "Spike" | "ambiguous" | "unknown",
+      "tier_reason":    <string> | null,
+      "attributed_rows": <int>,
+      "sessions":        <int>,
+      "models":          ["<model>", ...],
+      "tokens": {
+        "tokens_in":     <int>,
+        "tokens_out":    <int>,
+        "cache_read":    <int>,
+        "cache_create":  <int>,
+        "tokens_total":  <int>
+      },
+      "by_agent_type": {
+        "<agent_type>": {"tokens_in": <int>, "tokens_out": <int>, "cache_read": <int>, "cache_create": <int>, "tokens_total": <int>}, ...
+      }
+    }, ...
+  ],
+  "tiers": {
+    "<tier>": {
+      "attributed_rows": <int>,
+      "tokens":          {"tokens_in": <int>, "tokens_out": <int>, "cache_read": <int>, "cache_create": <int>, "tokens_total": <int>},
+      "pipelines":       ["<pipeline_slug>", ...]
+    }, ...
+  },
+  "agent_types": {
+    "<agent_type>": {"tokens_in": <int>, "tokens_out": <int>, "cache_read": <int>, "cache_create": <int>, "tokens_total": <int>}, ...
+  },
+  "unresolved_agent_type_share": {
+    "unresolved_rows":  <int>,
+    "attributed_rows":  <int>,
+    "share":            <number>
+  },
+  "coverage": {
+    "attributed_rows":         <int>,
+    "total_agent_stop_rows":   <int>,
+    "quarantine": {
+      "parent-sourced":              <int>,
+      "pre-attribution":             <int>,
+      "unparsed":                    <int>,
+      "summary-rollup-unattributed": <int>
+    },
+    "duplicate_agent_ids":    ["<agent_id>", ...],
+    "duplicates_dropped":     <int>,
+    "sessions_durable":       <int>,
+    "sessions_with_slug":     <int>,
+    "sessions_slug_unknown":  <int>,
+    "sources": [
+      {
+        "path":            "<absolute path>",
+        "kind":            "wal" | "wal-archive" | "summary",
+        "checkout":        "<checkout dir name>",
+        "mtime_iso":       "<ISO 8601>",
+        "lines_scanned":   <int>,
+        "agent_stop_rows": <int>,
+        "attributed_rows": <int>
+      }, ...
+    ]
+  },
+  "f12": {
+    "status": "n/a",
+    "reason": "<string>"
+  }
+}
+```
+
+`pipelines`, `tiers`, and `agent_types` are three projections of one bucket list — grouped by pipeline slug, by resolved calibration tier, and by agent type respectively — so they cannot disagree with one another by construction. Every token cell carries `tokens_in` / `tokens_out` / `cache_read` / `cache_create` beside `tokens_total`; `cache_read` dominates measured volume, so the components are always shown beside the sum rather than folded away.
+
+**Provenance and coverage.** Only `attributed` rows (rows carrying `usage_source: "subagent-transcript"`) sum into any total. The other three WAL-sourced populations — `parent-sourced` (`usage_source: "parent-transcript"`), `pre-attribution` (no `usage_source` key at all, but at least one token field present), and `unparsed` (a `usage_source` value that matches neither honest marker, or no token field present) — are counted by name in `coverage.quarantine` and never folded into a total. `summary-rollup-unattributed` is a fourth, separately-sourced quarantine count: sessions in the committed `observations_summary.jsonl` census whose `tokens_by_agent_type` rollup is populated, read for census purposes only and never summed. `coverage.sources` lists every WAL/archive/summary file discovered across the main checkout and every sibling worktree — the same set regardless of which checkout the collector runs from (source-set symmetry).
+
+**Tier join.** `tier` is a leading-token join against `.ai-state/calibration_log.md`: `Resolved` renders the tier name; several disagreeing calibration rows for the same slug render `tier: "ambiguous"` with every disagreeing tier named in `tier_reason`; no calibration row at all renders `tier: "unknown"` with a reason.
+
+**`f12` — the Standard-vs-Lightweight cost cell.** Two shapes sharing no numeric key, so a consumer cannot read a ratio out of an `n/a` cell:
+
+```json
+"f12": {
+  "status":      "rendered",
+  "basis":       "tokens_total",
+  "standard":    {"n": <int>, "median": <number>},
+  "lightweight": {"n": <int>, "median": <number>},
+  "ratio":       <number>
+}
+```
+
+`status: "n/a"` renders whenever either tier has zero attributed rows, with `reason` naming which tier is missing. `status: "rendered"` requires both tiers to carry at least one attributed row; `ratio` is `standard.median / lightweight.median` over each tier's `tokens_total`.
+
+**Provenance guard (`status`/`issues`).** Before publishing any total, the collector re-derives its own attributed-row count and total-row accounting from an independent classification path and compares them against the numbers about to ship. On a mismatch, the top-level `CollectorResult` carries `status: "error"`, the `cost` namespace is empty (`{}`), and `issues` names the specific invariant that failed — no partial or inconsistent total is ever published. In ordinary operation `status` is `"ok"` (no issues) or `"partial"` (a named, non-fatal issue such as an unreadable source file, with every other figure still trustworthy).
+
 ## 6. Trends block
 
 The `trends` block reports the delta between the current run and the most-recent-strictly-prior `METRICS_REPORT_*.json` found in `.ai-state/metrics_reports/`. It is a tagged union discriminated by `status` — one of four values.

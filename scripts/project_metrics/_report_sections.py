@@ -31,6 +31,7 @@ __all__ = [
     "render_top_n",
     "render_trends",
     "render_per_language",
+    "render_cost",
 ]
 
 
@@ -235,6 +236,161 @@ def render_per_language(report: Report) -> str:
         )
     lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Cost section — token usage per pipeline, per tier, per agent type, built
+# only from honestly-attributed rows. Every other provenance population is
+# named and counted, never folded into a total (the guard that enforces this
+# at the data layer lives in the collector; this renderer only projects what
+# the collector already published).
+# ---------------------------------------------------------------------------
+
+_COST_TOKEN_COMPONENTS: tuple[str, ...] = (
+    "tokens_in",
+    "tokens_out",
+    "cache_read",
+    "cache_create",
+    "tokens_total",
+)
+
+
+def render_cost(report: Report) -> str:
+    data = _namespace_data(report, "cost")
+    lines = [
+        "## Cost",
+        "",
+        _render_cost_basis_line(),
+        "",
+        _render_cost_coverage_line(data),
+    ]
+    quarantine_line = _render_cost_quarantine_line(data)
+    if quarantine_line is not None:
+        lines.append(quarantine_line)
+    lines.append("")
+    lines.extend(_render_cost_pipeline_table(data))
+    lines.append("")
+    lines.extend(_render_cost_tier_table(data))
+    lines.append("")
+    lines.extend(_render_cost_agent_type_table(data))
+    lines.append("")
+    lines.extend(_render_cost_f12_section(data))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_cost_basis_line() -> str:
+    """State the section's basis up front: no total ever includes a non-honest row.
+
+    Placed as the section's first line of prose (Report-reading discipline —
+    a reader who skims only the tables below, without this line, could read
+    an absent ratio as "no difference" rather than "no evidence yet").
+    """
+
+    return (
+        "_Every table below sums attributed rows only; quarantined and "
+        "durable-summary populations are counted by name, never folded into a "
+        "total. This section makes no Standard-vs-Lightweight verdict._"
+    )
+
+
+def _render_cost_coverage_line(data: dict[str, Any]) -> str:
+    coverage = data.get("coverage", {})
+    attributed = fmt_int(coverage.get("attributed_rows"))
+    total = fmt_int(coverage.get("total_agent_stop_rows"))
+    return f"coverage: {attributed} attributed / {total} total"
+
+
+def _render_cost_quarantine_line(data: dict[str, Any]) -> str | None:
+    """Return the named-count quarantine bullet, or ``None`` when there is nothing to name."""
+
+    quarantine = data.get("coverage", {}).get("quarantine", {})
+    if not quarantine:
+        return None
+    named_counts = ", ".join(f"{name}: {fmt_int(count)}" for name, count in quarantine.items())
+    return f"- Quarantined (excluded from every total above): {named_counts}."
+
+
+def _cost_token_cells(tokens: dict[str, Any]) -> str:
+    return " | ".join(fmt_int(tokens.get(component)) for component in _COST_TOKEN_COMPONENTS)
+
+
+def _render_cost_pipeline_table(data: dict[str, Any]) -> list[str]:
+    lines = [
+        "### Per-pipeline",
+        "",
+        "| Pipeline | Tier | Attributed rows | tokens_in | tokens_out | cache_read | "
+        "cache_create | tokens_total |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for bucket in data.get("pipelines", []):
+        cells = _cost_token_cells(bucket.get("tokens", {}))
+        lines.append(
+            f"| {bucket.get('pipeline_slug', NULL_CELL)} | {bucket.get('tier', NULL_CELL)} | "
+            f"{fmt_int(bucket.get('attributed_rows'))} | {cells} |"
+        )
+    return lines
+
+
+def _render_cost_tier_table(data: dict[str, Any]) -> list[str]:
+    lines = [
+        "### Per-tier",
+        "",
+        "| Tier | Attributed rows | Pipelines | tokens_in | tokens_out | cache_read | "
+        "cache_create | tokens_total |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for tier, entry in data.get("tiers", {}).items():
+        cells = _cost_token_cells(entry.get("tokens", {}))
+        pipelines = ", ".join(entry.get("pipelines", []))
+        lines.append(
+            f"| {tier} | {fmt_int(entry.get('attributed_rows'))} | {pipelines} | {cells} |"
+        )
+    return lines
+
+
+def _render_cost_agent_type_table(data: dict[str, Any]) -> list[str]:
+    lines = [
+        "### Per-agent-type",
+        "",
+        "| Agent type | tokens_in | tokens_out | cache_read | cache_create | tokens_total |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for agent_type, tokens in data.get("agent_types", {}).items():
+        lines.append(f"| {agent_type} | {_cost_token_cells(tokens)} |")
+    lines.append("")
+    lines.append(_render_cost_unresolved_share_line(data))
+    return lines
+
+
+def _render_cost_unresolved_share_line(data: dict[str, Any]) -> str:
+    share_data = data.get("unresolved_agent_type_share", {})
+    unresolved = fmt_int(share_data.get("unresolved_rows"))
+    attributed = fmt_int(share_data.get("attributed_rows"))
+    share = share_data.get("share")
+    share_cell = fmt_pct(share) if share is not None else NULL_CELL
+    return (
+        f"- {unresolved} of {attributed} attributed rows carry an unresolved "
+        f"`agent_type_source` ({share_cell})."
+    )
+
+
+def _render_cost_f12_section(data: dict[str, Any]) -> list[str]:
+    f12 = data.get("f12", {})
+    lines = ["### Standard vs. Lightweight", ""]
+    if f12.get("status") != "rendered":
+        reason = f12.get("reason", "insufficient attributed rows in one tier")
+        lines.append(f"_n/a {EM_DASH} {reason}_")
+        return lines
+    standard = f12.get("standard", {})
+    lightweight = f12.get("lightweight", {})
+    basis = f12.get("basis", "tokens_total")
+    ratio = f12.get("ratio")
+    lines.append(
+        f"n={standard.get('n')} Standard vs n={lightweight.get('n')} Lightweight "
+        f"(basis: {basis}, ratio: {fmt_float_2(ratio) if ratio is not None else NULL_CELL})."
+    )
+    return lines
 
 
 def _namespace_data(report: Report, name: str) -> dict[str, Any]:

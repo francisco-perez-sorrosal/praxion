@@ -3,7 +3,7 @@
 Two public entry points:
 
 * ``render_markdown(report) -> str`` — produces a human-readable MD string
-  with a deterministic nine-section order. Byte-stable modulo the single
+  with a deterministic ten-section order. Byte-stable modulo the single
   ``Generated at <timestamp>`` line, which embeds wall-clock time.
 * ``render_json(report) -> bytes`` — produces the deterministic JSON bytes
   whose root is the flat shape the downstream UI consumes:
@@ -34,6 +34,7 @@ from scripts.project_metrics._report_deep_dive import render_deep_dive
 from scripts.project_metrics._report_format import EM_DASH, NULL_CELL
 from scripts.project_metrics._report_sections import (
     render_aggregate_summary,
+    render_cost,
     render_per_language,
     render_top_n,
     render_trends,
@@ -113,7 +114,7 @@ def _render_coverage_staleness_note(report: Report) -> str | None:
 
 
 def render_markdown(report: Report) -> str:
-    """Render ``report`` as a deterministic nine-section Markdown document."""
+    """Render ``report`` as a deterministic ten-section Markdown document."""
 
     sections: list[str] = [
         _render_header(report),
@@ -130,6 +131,7 @@ def render_markdown(report: Report) -> str:
             render_trends(report),
             render_deep_dive(report),
             render_per_language(report),
+            render_cost(report),
             _render_run_metadata(report),
         ]
     )

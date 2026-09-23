@@ -128,6 +128,33 @@ _not applicable for this repository_
 | Markdown | 8 | 250 | — | — |
 | YAML | 4 | 84 | — | — |
 
+## Cost
+
+_Every table below sums attributed rows only; quarantined and durable-summary populations are counted by name, never folded into a total. This section makes no Standard-vs-Lightweight verdict._
+
+coverage: — attributed / — total
+
+### Per-pipeline
+
+| Pipeline | Tier | Attributed rows | tokens_in | tokens_out | cache_read | cache_create | tokens_total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+
+### Per-tier
+
+| Tier | Attributed rows | Pipelines | tokens_in | tokens_out | cache_read | cache_create | tokens_total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+
+### Per-agent-type
+
+| Agent type | tokens_in | tokens_out | cache_read | cache_create | tokens_total |
+| --- | --- | --- | --- | --- | --- |
+
+- — of — attributed rows carry an unresolved `agent_type_source` (—).
+
+### Standard vs. Lightweight
+
+_n/a — insufficient attributed rows in one tier_
+
 ## Run Metadata
 
 - Command version: 0.2.1.dev0

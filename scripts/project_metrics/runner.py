@@ -443,7 +443,7 @@ def _build_partial_aggregate(
 
 
 # ---------------------------------------------------------------------------
-# Default registry — the six-collector factory wired into the CLI.
+# Default registry — the eight-collector factory wired into the CLI.
 # ---------------------------------------------------------------------------
 
 
@@ -453,10 +453,12 @@ def default_registry(repo_root: Path | str) -> CollectorRegistry:
     Declaration order is the execution contract — the runner never reorders:
 
         Git (required hard floor) -> Scc -> Lizard -> Complexipy -> Pydeps
-        -> Coverage -> Readiness
+        -> Coverage -> Readiness -> Cost
 
-    Readiness is registered last (after Coverage): it is a Tier-0, always-
-    available collector whose mechanical scan reads only the filesystem.
+    Readiness and Cost are registered last (after Coverage): both are Tier-0,
+    always-available collectors whose scans read only the filesystem --
+    Readiness the project tree, Cost the observability artifacts under
+    `.ai-state/` (eighth and final collector).
 
     Fresh instances are built on every call so callers can instantiate
     multiple runners in the same process without sharing collector state.
@@ -469,6 +471,7 @@ def default_registry(repo_root: Path | str) -> CollectorRegistry:
     from scripts.project_metrics.collectors.complexipy_collector import (
         ComplexipyCollector,
     )
+    from scripts.project_metrics.collectors.cost_collector import CostCollector
     from scripts.project_metrics.collectors.coverage_collector import CoverageCollector
     from scripts.project_metrics.collectors.git_collector import GitCollector
     from scripts.project_metrics.collectors.lizard_collector import LizardCollector
@@ -487,5 +490,6 @@ def default_registry(repo_root: Path | str) -> CollectorRegistry:
             PydepsCollector(repo_root=repo_root),
             CoverageCollector(repo_root=repo_root),
             ReadinessCollector(repo_root=repo_root),
+            CostCollector(repo_root=repo_root),
         ]
     )

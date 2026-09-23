@@ -1243,13 +1243,14 @@ _ = threading
 
 
 # ---------------------------------------------------------------------------
-# default_registry — six-collector factory, declaration order, fresh on each call.
+# default_registry — eight-collector factory, declaration order, fresh on each call.
 # ---------------------------------------------------------------------------
 
 
 class TestDefaultRegistry:
     """Validates the registry wire-up: the concrete collectors in declaration
-    order, with the always-available readiness collector registered last."""
+    order, with the two always-available Tier-0 collectors (readiness, then
+    cost) registered last."""
 
     def test_default_registry_contains_all_collectors_in_declaration_order(self, tmp_path):
         from scripts.project_metrics.runner import default_registry
@@ -1264,6 +1265,7 @@ class TestDefaultRegistry:
             "pydeps",
             "coverage",
             "readiness",
+            "cost",
         ]
 
     def test_default_registry_returns_fresh_list_on_each_call(self, tmp_path):

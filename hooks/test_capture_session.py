@@ -1870,6 +1870,61 @@ class TestBuildSessionSummary:
         assert summary["models"] == ["claude-opus-5", "claude-sonnet-5"]
 
 
+class TestPipelineSlugSharedHelper:
+    """RED: `build_session_summary` does not yet emit `pipeline_slug`.
+
+    The shared-helper agreement requires the summary row's new `pipeline_slug`
+    key to be derived by the exact same `Path(cwd).name` helper a WAL row's
+    `project` field already uses, so the two must always agree for one shared
+    payload -- not two independently-computed values that could drift.
+
+    `session_id="7edc5d0d-a503-4c19-9daa-39d73367d2b1"` is copied verbatim
+    from an `agent_stop` row in this repository's committed
+    `.ai-state/observations.jsonl`, and the same session is confirmed present
+    in the committed `.ai-state/observations_summary.jsonl` -- both are real
+    corpus rows, not invented. `cwd` is derived from this test file's own
+    location (this worktree's root, the directory the real row was written
+    from) rather than hardcoded as a literal path, per the no-hardcoded-paths
+    convention.
+    """
+
+    _SESSION_ID = "7edc5d0d-a503-4c19-9daa-39d73367d2b1"
+
+    def test_summary_pipeline_slug_matches_the_wal_rows_project_field(self) -> None:
+        module = _load_module()
+        cwd = HOOKS_DIR.parent
+        payload = {"session_id": self._SESSION_ID, "agent_id": "agent-1", "cwd": str(cwd)}
+
+        observation = module.build_observation(payload, "agent_stop")
+        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
+
+        assert observation["project"] == summary["pipeline_slug"]
+
+    def test_legacy_payload_without_cwd_still_has_no_pipeline_slug_key(self) -> None:
+        """Pins today's shape for a payload matching a pre-existing committed
+        row that carries no slug concept at all.
+
+        The real committed summary row for session
+        `7edc5d0d-a503-4c19-9daa-39d73367d2b1` (read directly from
+        `.ai-state/observations_summary.jsonl` in this repository) has no
+        `cwd` or `pipeline_slug` field -- only `session_id` and the
+        aggregate rollups. A payload built from that same minimal shape
+        (`session_id` only, matching how every pre-existing
+        `TestBuildSessionSummary` case above already calls this function)
+        must not have `build_session_summary` fabricate a slug out of an
+        absent `cwd`. This assertion already holds today (the key does not
+        exist yet at all) and is not itself the RED case -- it is the
+        baseline this RED step establishes that the implementer's additive
+        change must not break for a cwd-less legacy payload.
+        """
+        module = _load_module()
+        payload = {"session_id": self._SESSION_ID}
+
+        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
+
+        assert "pipeline_slug" not in summary
+
+
 class TestSessionSummaryUpsert:
     def test_stop_writes_one_summary_row(
         self, project: Path, monkeypatch: pytest.MonkeyPatch

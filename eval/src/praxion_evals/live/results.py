@@ -37,9 +37,18 @@ class Passed:
 
 @dataclass(frozen=True)
 class Failed:
+    """A measured failure: a graded value, or nothing elicited (with the reason)."""
+
     kind: FailKind
     recorded: Any | None
     findings: tuple[str, ...]
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind == "not_elicited" and self.recorded is not None:
+            raise ValueError("a not_elicited failure has nothing recorded")
+        if self.kind == "graded" and self.reason is not None:
+            raise ValueError("a graded failure carries findings, not a not-elicited reason")
 
 
 @dataclass(frozen=True)
@@ -70,7 +79,7 @@ Capture = Captured | NotElicited
 
 def capture_to_outcome(capture: NotElicited) -> Failed:
     """The only path a not-elicited capture takes — it never meets a grader."""
-    return Failed(kind="not_elicited", recorded=None, findings=())
+    return Failed(kind="not_elicited", recorded=None, findings=(), reason=capture.reason)
 
 
 def compute_pass_rate(*, passed: int, failed: int) -> float | None:
@@ -97,13 +106,15 @@ def to_session_record(outcome: Outcome, *, repeat: int) -> dict[str, Any]:
     match outcome:
         case Passed(recorded=recorded, findings=findings):
             record |= {"outcome": "pass", "recorded": recorded, "findings": list(findings)}
-        case Failed(kind=kind, recorded=recorded, findings=findings):
+        case Failed(kind=kind, recorded=recorded, findings=findings, reason=reason):
             record |= {
                 "outcome": "fail",
                 "fail_kind": kind,
                 "recorded": recorded,
                 "findings": list(findings),
             }
+            if reason is not None:
+                record["reason"] = reason
         case Errored(kind=kind, detail=detail):
             record |= {"outcome": "error", "error_kind": kind, "detail": detail}
         case _:

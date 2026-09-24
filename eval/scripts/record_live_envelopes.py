@@ -36,20 +36,25 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
-    from praxion_evals.live.session import PermissionMode, SessionSpec
+    from praxion_evals.live.results import ErrorKind
+    from praxion_evals.live.session import PermissionMode, SessionEnvelope, SessionRun, SessionSpec
 
 CREDENTIAL_KEYS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
-SECRET_SHAPE = re.compile(r"sk-ant-")
+SECRET_SHAPE = re.compile(r"sk-ant-[A-Za-z0-9_\-]*")
 SCENARIO_FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "scenarios"
 EFFORT = "medium"
 ERROR_SHAPE_MODEL = "sonnet"
 BUDGET_STOP_USD = 0.01
+# Shapes that fail before any API call still reserve a budget; keep it nominal.
+NO_SPEND_BUDGET_USD = 0.01
 REJECTED_CREDENTIAL = "rejected-credential-for-envelope-recording"
 UNKNOWN_FLAG = "--no-such-flag-for-envelope-recording"
-FIXTURE_IDENTITY = ("-c", "user.name=scenario", "-c", "user.email=scenario@example.invalid")
+FIXTURE_USER_NAME = "scenario"
+FIXTURE_USER_EMAIL = "scenario@example.invalid"
 
 ModelRole = Literal["scenario", "error"]
 Seeded = Mapping[str, Any]
+CLEAN: frozenset[ErrorKind | None] = frozenset({None})
 
 
 @dataclass(frozen=True)
@@ -65,6 +70,9 @@ class Shape:
     forward_subagent_text: bool = False
     extra_argv: tuple[str, ...] = ()
     env_overrides: Mapping[str, str | None] = field(default_factory=dict)
+    # The outcome that makes this shape's envelope worth keeping: a clean
+    # session for scenarios, the named infrastructure error for error shapes.
+    expected_errors: frozenset[ErrorKind | None] = CLEAN
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -93,11 +101,22 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--keep-sandbox", action="store_true", help="Keep the run directory.")
     parser.add_argument(
+        "--max-total-usd",
+        type=float,
+        default=None,
+        help="Run-level spend cap; a shape whose budget would cross it is not run (default: 10).",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="Print argv + env keys; spawn nothing."
     )
     args = parser.parse_args(argv)
     if not args.dry_run and args.output_dir is None:
         parser.error("--output-dir is required unless --dry-run")
+    if args.max_total_usd is None:
+        # Imported after parsing so `--help` works without the package installed.
+        from praxion_evals.live.spend import RECORDER_SPEND_CAP_USD
+
+        args.max_total_usd = RECORDER_SPEND_CAP_USD
     return args
 
 
@@ -108,14 +127,31 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def _record(shapes: list[Shape], target: Path, args: argparse.Namespace) -> int:
     from praxion_evals.live.materialize import materialize_head
+    from praxion_evals.live.results import Errored
+    from praxion_evals.live.spend import SpendLedger
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    credentials = _credential_values(os.environ)
+    ledger = SpendLedger(cap_usd=args.max_total_usd)
     run_root = Path(tempfile.mkdtemp(prefix="praxion-live-record-"))
     failures = 0
     try:
         copy = materialize_head(target, run_root / "copy")
         for shape in shapes:
-            failures += not _record_one(shape, copy.root, run_root / shape.name, args)
+            destination = args.output_dir / f"{shape.name}.stream.jsonl"
+            if destination.exists():
+                print(f"[{shape.name}] refused: {destination} exists (delete it to re-record)")
+                failures += 1
+                continue
+            admitted = ledger.reserve(shape.max_budget_usd)
+            if isinstance(admitted, Errored):
+                print(f"[{shape.name}] not run: {admitted.detail}")
+                failures += 1
+                continue
+            cost, written = _record_one(shape, copy.root, run_root / shape.name, args, credentials)
+            ledger = admitted.settle(shape.max_budget_usd, cost)
+            failures += not written
+            print(f"spent so far: ${ledger.spent_usd:.4f} of ${ledger.cap_usd:.2f}", flush=True)
     finally:
         if args.keep_sandbox:
             print(f"sandbox kept: {run_root}")
@@ -125,15 +161,16 @@ def _record(shapes: list[Shape], target: Path, args: argparse.Namespace) -> int:
 
 
 def _record_one(
-    shape: Shape, copy_root: Path, session_root: Path, args: argparse.Namespace
-) -> bool:
+    shape: Shape,
+    copy_root: Path,
+    session_root: Path,
+    args: argparse.Namespace,
+    credentials: Mapping[str, str],
+) -> tuple[float | None, bool]:
+    """Run one shape; return its reported cost and whether its envelope was written."""
     from praxion_evals.live.materialize import install_user_scope
     from praxion_evals.live.session import build_argv, parse_stream, run_argv
 
-    destination = args.output_dir / f"{shape.name}.stream.jsonl"
-    if destination.exists():
-        print(f"[{shape.name}] refused: {destination} exists (delete it to re-record)")
-        return False
     seeded = _load_seeded(shape)
     install_user_scope(copy_root, session_root)
     fixture = session_root / "fixture"
@@ -148,17 +185,65 @@ def _record_one(
     )
     envelope = parse_stream(run.stdout)
     result = envelope.final_result
+    cost = result.total_cost_usd if result else None
+    stderr = _redact(run.stderr.strip()[:300], credentials)
     print(
         f"[{shape.name}] exit={run.exit_code} results={envelope.result_count} "
-        f"subtype={result.subtype if result else None} "
-        f"cost={result.total_cost_usd if result else None} stderr={run.stderr.strip()[:300]!r}"
+        f"subtype={result.subtype if result else None} cost={cost} stderr={stderr!r}"
     )
-    if SECRET_SHAPE.search(run.stdout):
-        print(f"[{shape.name}] refused: stdout contains an sk-ant- shaped substring; not written")
-        return False
+    refusal = _write_refusal(shape, envelope, run, copy_root) or _leaked_secret(
+        run.stdout, credentials
+    )
+    if refusal is not None:
+        print(f"[{shape.name}] refused, nothing written: {refusal}")
+        return cost, False
+    destination = args.output_dir / f"{shape.name}.stream.jsonl"
     destination.write_text(run.stdout, encoding="utf-8")
     print(f"[{shape.name}] wrote {destination}")
-    return True
+    return cost, True
+
+
+def _write_refusal(
+    shape: Shape, envelope: SessionEnvelope, run: SessionRun, copy_root: Path
+) -> str | None:
+    """Why this session's envelope must not become a fixture, or ``None``.
+
+    A fixture is kept only when the session ended the way its shape exists to
+    capture, and — whenever the session reached ``init`` or ended cleanly —
+    only when isolation is proven. A leaked session must never be pinned as
+    an isolated one.
+    """
+    from praxion_evals.live.session import classify, isolation_breach
+
+    kind = classify(envelope, run.exit_code, run.timed_out)
+    if kind not in shape.expected_errors:
+        expected = sorted(str(k) for k in shape.expected_errors)
+        return f"session ended as {kind or 'clean'}, this shape keeps only {expected}"
+    if envelope.init is None and kind is not None:
+        return None  # failed before the session started: there is no layer to isolate
+    breach = isolation_breach(envelope, copy_root)
+    return None if breach is None else f"isolation_breach: {breach}"
+
+
+def _credential_values(environ: Mapping[str, str]) -> dict[str, str]:
+    return {key: environ[key] for key in CREDENTIAL_KEYS if environ.get(key)}
+
+
+def _leaked_secret(text: str, credentials: Mapping[str, str]) -> str | None:
+    """Name (never quote) the secret a would-be fixture contains, or ``None``."""
+    if SECRET_SHAPE.search(text):
+        return "output contains an sk-ant- shaped substring"
+    for name, value in credentials.items():
+        if value and value in text:
+            return f"output contains the value of {name}"
+    return None
+
+
+def _redact(text: str, credentials: Mapping[str, str]) -> str:
+    for name, value in credentials.items():
+        if value:
+            text = text.replace(value, f"<{name}>")
+    return SECRET_SHAPE.sub("<sk-ant-redacted>", text)
 
 
 def _spec(shape: Shape, seeded: Seeded, copy_root: Path, cwd: Path, model: str) -> SessionSpec:
@@ -226,16 +311,20 @@ def _write_tree(root: Path, files: Mapping[str, str]) -> None:
         path.write_text(content, encoding="utf-8")
 
 
-def _commit_all(root: Path, message: str) -> None:
-    _git(root, "add", "-A")
-    _git(root, *FIXTURE_IDENTITY, "commit", "-q", "-m", message)
-
-
 def _init_repo(root: Path, files: Mapping[str, str]) -> None:
+    """A fixture repo whose own config carries the identity.
+
+    The session's sandbox HOME has no git identity, and the session must be
+    able to commit the way an operator's session can — so the identity lives
+    in the repo, never in HOME.
+    """
     root.mkdir(parents=True)
     _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.name", FIXTURE_USER_NAME)
+    _git(root, "config", "user.email", FIXTURE_USER_EMAIL)
     _write_tree(root, {"README.md": "# fixture\n", **files})
-    _commit_all(root, "baseline")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "baseline")
 
 
 def _ui_step_fixture(root: Path, seeded: Seeded) -> None:
@@ -268,7 +357,6 @@ def _adr_fixture(root: Path, seeded: Seeded) -> None:
             "hooks/capture_memory.py": '"""Capture memory writes and filter them."""\n',
         },
     )
-    _git(root, "config", "user.email", "scenario@example.invalid")
 
 
 def _commit_staging_fixture(root: Path, seeded: Seeded) -> None:
@@ -324,6 +412,20 @@ _RECORD_ADR = (
 )
 _NO_TOOLS = "Do not use any tools. Reply with the single word READY."
 
+# Narrow per-command Bash patterns: each lets the seeded task complete and
+# nothing broader. `git diff` is granted only in exact forms because
+# `git diff --output=<path>` writes anywhere.
+_GIT_INSPECT = ("Bash(git status)", "Bash(git status *)", "Bash(git diff)")
+_GIT_STAGE_AND_COMMIT = ("Bash(git add *)", "Bash(git commit *)")
+_GIT_IDENTITY_READS = (
+    "Bash(git config --get *)",
+    "Bash(git config user.name)",
+    "Bash(git config user.email)",
+    "Bash(git rev-parse *)",
+    "Bash(git branch --show-current)",
+)
+_RUN_TESTS = ("Bash(python3 -m pytest)", "Bash(python3 -m pytest *)")
+
 SHAPES: dict[str, Shape] = {
     shape.name: shape
     for shape in (
@@ -335,7 +437,7 @@ SHAPES: dict[str, Shape] = {
             permission_mode="acceptEdits",
             max_budget_usd=3.0,
             model_role="scenario",
-            allowed_tools=("Bash(git status *)", "Bash(git diff *)"),
+            allowed_tools=_GIT_INSPECT,
             forward_subagent_text=True,
         ),
         Shape(
@@ -346,13 +448,7 @@ SHAPES: dict[str, Shape] = {
             permission_mode="acceptEdits",
             max_budget_usd=3.0,
             model_role="scenario",
-            allowed_tools=(
-                "Bash(git config *)",
-                "Bash(git rev-parse *)",
-                "Bash(date *)",
-                "Bash(shasum *)",
-                "Bash(python3 *)",
-            ),
+            allowed_tools=(*_GIT_IDENTITY_READS, "Bash(date *)", "Bash(shasum *)"),
         ),
         Shape(
             name="commit_staging",
@@ -362,7 +458,7 @@ SHAPES: dict[str, Shape] = {
             permission_mode="default",
             max_budget_usd=2.0,
             model_role="scenario",
-            allowed_tools=("Bash(git *)",),
+            allowed_tools=(*_GIT_INSPECT, "Bash(git diff --cached)", *_GIT_STAGE_AND_COMMIT),
         ),
         Shape(
             name="lightweight_fix",
@@ -372,7 +468,7 @@ SHAPES: dict[str, Shape] = {
             permission_mode="acceptEdits",
             max_budget_usd=3.0,
             model_role="scenario",
-            allowed_tools=("Bash(python3 *)", "Bash(git *)"),
+            allowed_tools=(*_RUN_TESTS, *_GIT_INSPECT, *_GIT_STAGE_AND_COMMIT),
         ),
         Shape(
             name="error_budget_stop",
@@ -382,6 +478,7 @@ SHAPES: dict[str, Shape] = {
             permission_mode="default",
             max_budget_usd=BUDGET_STOP_USD,
             model_role="error",
+            expected_errors=frozenset({"result_error"}),
         ),
         Shape(
             name="error_invalid_credential",
@@ -389,13 +486,14 @@ SHAPES: dict[str, Shape] = {
             build_fixture=_minimal_fixture,
             prompt=lambda _: _NO_TOOLS,
             permission_mode="default",
-            max_budget_usd=1.0,
+            max_budget_usd=NO_SPEND_BUDGET_USD,
             model_role="error",
             env_overrides={
                 "ANTHROPIC_API_KEY": REJECTED_CREDENTIAL,
                 "CLAUDE_CODE_OAUTH_TOKEN": None,
                 "ANTHROPIC_AUTH_TOKEN": None,
             },
+            expected_errors=frozenset({"result_error", "exit_nonzero"}),
         ),
         Shape(
             name="error_invalid_flag",
@@ -403,9 +501,10 @@ SHAPES: dict[str, Shape] = {
             build_fixture=_minimal_fixture,
             prompt=lambda _: _NO_TOOLS,
             permission_mode="default",
-            max_budget_usd=1.0,
+            max_budget_usd=NO_SPEND_BUDGET_USD,
             model_role="error",
             extra_argv=(UNKNOWN_FLAG,),
+            expected_errors=frozenset({"exit_nonzero"}),
         ),
     )
 }

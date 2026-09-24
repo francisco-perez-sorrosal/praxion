@@ -481,3 +481,208 @@ def test_check_isolation_breaches_for_the_ambient_control_fixture():
     envelope = parse_stream(_fixture_text("ambient_control_sonnet"))
 
     assert check_isolation(envelope, _PREFLIGHT_COPY_ROOT) is False
+
+
+# ---------------------------------------------------------------------------
+# Isolation breaches judged one clause at a time
+# ---------------------------------------------------------------------------
+
+
+def _preflight_with_init(**changes):
+    """The passing preflight envelope with its `init` telemetry altered."""
+    import dataclasses
+
+    from praxion_evals.live.session import parse_stream
+
+    envelope = parse_stream(_fixture_text("isolated_marker_preflight_sonnet"))
+    assert envelope.init is not None
+    return dataclasses.replace(envelope, init=dataclasses.replace(envelope.init, **changes))
+
+
+def _preflight_without_init() -> str:
+    lines = _fixture_text("isolated_marker_preflight_sonnet").splitlines()
+    return "\n".join(line for line in lines if '"subtype":"init"' not in line) + "\n"
+
+
+def test_check_isolation_breaches_when_only_an_mcp_server_leaked():
+    """Plugins are exactly the target copy plus builtins, but one user MCP
+    server started — that alone is a breach."""
+    from praxion_evals.live.session import check_isolation
+
+    envelope = _preflight_with_init(mcp_servers=({"name": "chub", "source": "user"},))
+
+    assert check_isolation(envelope, _PREFLIGHT_COPY_ROOT) is False
+
+
+def test_check_isolation_breaches_when_the_stream_has_no_init_event():
+    """Without `init` telemetry isolation cannot be proven — never assumed."""
+    from praxion_evals.live.session import check_isolation, parse_stream
+
+    envelope = parse_stream(_preflight_without_init())
+
+    assert envelope.init is None
+    assert check_isolation(envelope, _PREFLIGHT_COPY_ROOT) is False
+
+
+def test_check_isolation_exempts_a_builtin_only_when_it_is_really_builtin():
+    """A plugin whose source merely ends in `@builtin` but loads from a real
+    directory is a foreign plugin, not a builtin."""
+    from praxion_evals.live.session import check_isolation
+
+    impostor = {
+        "name": "evil",
+        "path": "/Users/operator/.claude/plugins/cache/evil",
+        "source": "evil@builtin",
+    }
+    clean = _preflight_with_init()
+    assert clean.init is not None
+    leaked = _preflight_with_init(plugins=(*clean.init.plugins, impostor))
+
+    assert check_isolation(clean, _PREFLIGHT_COPY_ROOT) is True
+    assert check_isolation(leaked, _PREFLIGHT_COPY_ROOT) is False
+
+
+def test_session_error_turns_a_stream_without_init_into_a_typed_isolation_error():
+    """A stream that completed but never reported `init` is an infrastructure
+    error of kind `isolation_breach` — never a gradeable session."""
+    from praxion_evals.live.results import Errored
+    from praxion_evals.live.session import SessionRun, parse_stream, session_error
+
+    run = SessionRun(stdout=_preflight_without_init(), stderr="", exit_code=0)
+
+    error = session_error(parse_stream(run.stdout), run, _PREFLIGHT_COPY_ROOT)
+
+    assert isinstance(error, Errored)
+    assert error.kind == "isolation_breach"
+    assert "init" in error.detail
+
+
+def test_session_error_names_the_leaked_mcp_server():
+    from praxion_evals.live.session import SessionRun, session_error
+
+    envelope = _preflight_with_init(mcp_servers=({"name": "chub", "source": "user"},))
+    run = SessionRun(stdout="", stderr="", exit_code=0)
+
+    error = session_error(envelope, run, _PREFLIGHT_COPY_ROOT)
+
+    assert error is not None
+    assert error.kind == "isolation_breach"
+    assert "chub" in error.detail
+
+
+def test_session_error_is_none_for_a_clean_isolated_session():
+    from praxion_evals.live.session import SessionRun, parse_stream, session_error
+
+    run = SessionRun(
+        stdout=_fixture_text("isolated_marker_preflight_sonnet"), stderr="", exit_code=0
+    )
+
+    assert session_error(parse_stream(run.stdout), run, _PREFLIGHT_COPY_ROOT) is None
+
+
+def test_session_error_reports_infrastructure_failure_before_isolation():
+    """Classification runs first: a timed-out ambient session is a timeout."""
+    from praxion_evals.live.session import SessionRun, parse_stream, session_error
+
+    run = SessionRun(stdout=_fixture_text("ambient_control_sonnet"), stderr="", exit_code=None)
+
+    error = session_error(parse_stream(run.stdout), run, _PREFLIGHT_COPY_ROOT)
+
+    assert error is not None
+    assert error.kind == "timeout"
+
+
+# ---------------------------------------------------------------------------
+# Spend telemetry — the one value the run-level cap sums
+# ---------------------------------------------------------------------------
+
+
+def test_parse_stream_reads_the_exact_session_cost_from_the_final_result():
+    import pytest
+
+    from praxion_evals.live.session import parse_stream
+
+    envelope = parse_stream(_fixture_text("spawn_selection_standard_opus"))
+
+    assert envelope.final_result is not None
+    assert envelope.final_result.total_cost_usd == pytest.approx(0.243873, abs=5e-7)
+
+
+# ---------------------------------------------------------------------------
+# run_argv / run_session — against a stand-in `claude` on a temporary PATH
+# ---------------------------------------------------------------------------
+
+_STAND_IN = """\
+import json, os, sys, time
+print(json.dumps({"argv": sys.argv[1:], "cwd": os.getcwd(),
+                  "home": os.environ.get("HOME"),
+                  "claudecode": os.environ.get("CLAUDECODE"),
+                  "stdin": sys.stdin.read()}), flush=True)
+if os.environ.get("STAND_IN_SLEEP"):
+    time.sleep(float(os.environ["STAND_IN_SLEEP"]))
+print("stand-in stderr", file=sys.stderr)
+sys.exit(int(os.environ.get("STAND_IN_EXIT", "0")))
+"""
+
+
+def _stand_in_env(tmp_path, **extra):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    claude = bin_dir / "claude"
+    claude.write_text(f"#!{sys.executable}\n{_STAND_IN}", encoding="utf-8")
+    claude.chmod(0o755)
+    return {"PATH": str(bin_dir), "HOME": str(tmp_path / "home"), **extra}
+
+
+def _stand_in_spec(tmp_path, timeout_s=30):
+    from praxion_evals.live.session import SessionSpec
+
+    cwd = tmp_path / "fixture"
+    cwd.mkdir()
+    return SessionSpec(
+        prompt="p",
+        model="sonnet",
+        effort="medium",
+        plugin_dir=tmp_path / "copy",
+        cwd=cwd,
+        permission_mode="default",
+        max_budget_usd=1.0,
+        timeout_s=timeout_s,
+    )
+
+
+def test_run_session_launches_claude_from_the_given_env_in_the_spec_cwd(tmp_path):
+    """The stand-in proves argv, cwd and env reach the child, an ambient
+    `CLAUDECODE` does not, and stdin is closed (never the runner's terminal)."""
+    from praxion_evals.live.session import build_argv, run_session
+
+    spec = _stand_in_spec(tmp_path)
+    env = _stand_in_env(tmp_path, STAND_IN_EXIT="3")
+
+    run = run_session(spec, env)
+
+    seen = json.loads(run.stdout.splitlines()[0])
+    assert seen["argv"] == build_argv(spec)[1:]
+    assert Path(seen["cwd"]).resolve() == spec.cwd.resolve()
+    assert seen["home"] == str(tmp_path / "home")
+    assert seen["claudecode"] is None
+    assert seen["stdin"] == ""
+    assert run.stderr.strip() == "stand-in stderr"
+    assert run.exit_code == 3
+    assert run.timed_out is False
+
+
+def test_run_argv_timeout_returns_the_decoded_partial_stdout_and_no_exit_code(tmp_path):
+    from praxion_evals.live.session import classify, parse_stream, run_argv
+
+    env = _stand_in_env(tmp_path, STAND_IN_SLEEP="30")
+    cwd = tmp_path / "fixture"
+    cwd.mkdir()
+
+    run = run_argv(["claude", "-p", "x"], cwd=cwd, env=env, timeout_s=1)
+
+    assert run.exit_code is None
+    assert run.timed_out is True
+    assert isinstance(run.stdout, str)
+    assert json.loads(run.stdout.splitlines()[0])["argv"] == ["-p", "x"]
+    assert classify(parse_stream(run.stdout), run.exit_code, run.timed_out) == "timeout"

@@ -131,26 +131,19 @@ def test_plant_nonces_writes_a_fresh_marker_into_each_of_the_four_locations(tmp_
     assert plant.hook_delivered_rule in hook_rule_md
 
 
-def test_plant_nonces_values_are_token_hex_4_shaped():
+def test_plant_nonces_values_are_token_hex_4_shaped(tmp_path):
     from praxion_evals.live.materialize import plant_nonces
 
-    tmp_root = Path(__file__).resolve().parent / "_plant_nonces_scratch"
-    tmp_root.mkdir(exist_ok=True)
-    try:
-        _build_stub_copy(tmp_root)
-        plant = plant_nonces(tmp_root, rule_relpath="rules/swe/agent-behavioral-contract.md")
+    _build_stub_copy(tmp_path)
+    plant = plant_nonces(tmp_path, rule_relpath="rules/swe/agent-behavioral-contract.md")
 
-        for value in (
-            plant.global_claude_md,
-            plant.coordination_rule,
-            plant.plugin_agent,
-            plant.hook_delivered_rule,
-        ):
-            assert _NONCE_SHAPE.match(value), f"{value!r} is not an 8-hex-char nonce"
-    finally:
-        import shutil
-
-        shutil.rmtree(tmp_root, ignore_errors=True)
+    for value in (
+        plant.global_claude_md,
+        plant.coordination_rule,
+        plant.plugin_agent,
+        plant.hook_delivered_rule,
+    ):
+        assert _NONCE_SHAPE.match(value), f"{value!r} is not an 8-hex-char nonce"
 
 
 def test_plant_nonces_is_fresh_per_call(tmp_path):

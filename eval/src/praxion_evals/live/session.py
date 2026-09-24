@@ -22,16 +22,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
-from praxion_evals.live.results import ErrorKind
+from praxion_evals.live.results import Errored, ErrorKind
 
 CLAUDE_BINARY = "claude"
 EMPTY_MCP_CONFIG = '{"mcpServers":{}}'
 DEFAULT_TIMEOUT_S = 900
 SUCCESS_SUBTYPE = "success"
 BUILTIN_PLUGIN_SUFFIX = "@builtin"
+BUILTIN_PLUGIN_PATH = "builtin"
 
 # ``bypassPermissions`` is deliberately not representable: a session with
 # unrestricted Bash could write outside its sandbox through absolute paths.
+# For the same reason every scenario grants Bash only through narrow
+# per-command patterns — a broad one (``python3 *``, ``git *``) is
+# unrestricted execution under another name.
 PermissionMode = Literal["default", "acceptEdits", "plan"]
 
 PASS_THROUGH_KEYS = (
@@ -492,20 +496,51 @@ def classify(envelope: SessionEnvelope, exit_code: int | None, timed_out: bool) 
     return None
 
 
+def session_error(envelope: SessionEnvelope, run: SessionRun, copy_root: Path) -> Errored | None:
+    """Why a session cannot be graded, or ``None`` when it can.
+
+    Order matters: an infrastructure failure is reported as itself before
+    isolation is judged, so a crashed session never reads as a breach.
+    """
+    kind = classify(envelope, run.exit_code, run.timed_out)
+    if kind is not None:
+        # stderr stays out: this detail lands in committed baseline records.
+        subtype = envelope.final_result.subtype if envelope.final_result else None
+        return Errored(kind=kind, detail=f"exit_code={run.exit_code} result_subtype={subtype}")
+    breach = isolation_breach(envelope, copy_root)
+    if breach is not None:
+        return Errored(kind="isolation_breach", detail=breach)
+    return None
+
+
 def check_isolation(envelope: SessionEnvelope, copy_root: Path) -> bool:
-    """True iff the session loaded the target copy, builtins, and nothing else.
+    """True iff the session loaded the target copy, builtins, and nothing else."""
+    return isolation_breach(envelope, copy_root) is None
+
+
+def isolation_breach(envelope: SessionEnvelope, copy_root: Path) -> str | None:
+    """What leaked into the session, or ``None`` when isolation is proven.
 
     ``copy_root`` must be the copy's resolved path — ``init`` reports real paths.
     """
     init = envelope.init
-    if init is None or init.mcp_servers:
-        return False
+    if init is None:
+        return "no init event: isolation cannot be proven"
+    if init.mcp_servers:
+        return f"MCP servers started: {[s.get('name') for s in init.mcp_servers]}"
     copy_path = os.path.normpath(copy_root)
     non_builtin = [p for p in init.plugins if not _is_builtin(p)]
-    return bool(non_builtin) and all(
-        os.path.normpath(str(p.get("path"))) == copy_path for p in non_builtin
-    )
+    foreign = [p for p in non_builtin if os.path.normpath(str(p.get("path"))) != copy_path]
+    if foreign:
+        return f"foreign plugins loaded: {[p.get('source') for p in foreign]}"
+    if not non_builtin:
+        return f"target copy {copy_path} not loaded"
+    return None
 
 
 def _is_builtin(plugin: Mapping[str, Any]) -> bool:
-    return str(plugin.get("source", "")).endswith(BUILTIN_PLUGIN_SUFFIX)
+    # A builtin both names itself so and loads from nowhere on disk.
+    return (
+        str(plugin.get("source", "")).endswith(BUILTIN_PLUGIN_SUFFIX)
+        and plugin.get("path") == BUILTIN_PLUGIN_PATH
+    )

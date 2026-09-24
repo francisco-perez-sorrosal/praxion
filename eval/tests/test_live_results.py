@@ -66,7 +66,44 @@ def test_not_elicited_capture_never_needs_a_grader_to_become_a_failed_outcome():
 
     outcome = capture_to_outcome(capture)
 
-    assert outcome == Failed(kind="not_elicited", recorded=None, findings=())
+    assert outcome == Failed(
+        kind="not_elicited",
+        recorded=None,
+        findings=(),
+        reason="no staging command in any Bash tool_use",
+    )
+
+
+def test_a_not_elicited_failure_cannot_carry_a_recorded_value():
+    """Nothing was elicited, so there is nothing recorded to carry."""
+    import pytest
+
+    from praxion_evals.live.results import Failed
+
+    with pytest.raises(ValueError, match="not_elicited"):
+        Failed(kind="not_elicited", recorded="git add -A", findings=())
+
+
+def test_a_graded_failure_cannot_carry_a_not_elicited_reason():
+    import pytest
+
+    from praxion_evals.live.results import Failed
+
+    with pytest.raises(ValueError, match="graded"):
+        Failed(kind="graded", recorded="git add -A", findings=("f",), reason="never elicited")
+
+
+def test_not_elicited_session_record_carries_the_reason():
+    """The operator must see *why* a session elicited nothing."""
+    from praxion_evals.live.results import NotElicited, capture_to_outcome, to_session_record
+
+    outcome = capture_to_outcome(NotElicited(reason="no ADR file created", diagnostics={}))
+
+    record = to_session_record(outcome, repeat=1)
+
+    assert record["fail_kind"] == "not_elicited"
+    assert record["reason"] == "no ADR file created"
+    assert record["recorded"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +183,9 @@ def test_failed_session_record_carries_fail_kind_and_a_possibly_null_recorded():
     assert graded["recorded"] == "git add x"
     assert not_elicited["fail_kind"] == "not_elicited"
     assert not_elicited["recorded"] is None
+    assert graded["findings"] == ["f"]
+    assert not_elicited["findings"] == []
+    assert "reason" not in graded
 
 
 def test_errored_session_record_carries_error_kind_and_detail_but_no_recorded_key():

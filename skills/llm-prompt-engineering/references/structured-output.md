@@ -33,7 +33,7 @@ Validation at the boundary is non-negotiable. The strict mode flags from provide
 
 ```python
 # Python, OpenAI SDK.
-# <!-- SDK version: 2026-04-16 training-data assumption; verify via `external-api-docs` before shipping. -->
+# <!-- SDK version: 2026-04-16 training-data assumption; verify against the vendor's current docs before shipping. -->
 
 response = client.chat.completions.create(
     model="gpt-5",  # pin a verified, dated model ID
@@ -68,7 +68,7 @@ response = client.chat.completions.create(
 - **Enum support**: closed `enum` arrays are honored. Use them whenever the downstream cares about a bounded vocabulary.
 - **`anyOf` and `oneOf`**: supported but less thoroughly tested in strict mode. Validate carefully on the specific model version.
 - **Unsupported keywords** (`minimum`, `maximum`, `minLength`, `pattern`, `format`): not enforced by the decoder. Validate at the boundary.
-- **Depth and recursion**: strict mode limits schema depth and disallows self-referential schemas in some providers/versions. Check the current guidance via `external-api-docs` before shipping a recursive schema.
+- **Depth and recursion**: strict mode limits schema depth and disallows self-referential schemas in some providers/versions. Check the current guidance against the vendor's current docs before shipping a recursive schema.
 
 ### Failure modes
 
@@ -91,7 +91,7 @@ Claude does not expose a direct `response_format` equivalent to OpenAI's JSON mo
 
 ```python
 # Python, Anthropic SDK.
-# <!-- SDK version: 2026-04-16 training-data assumption; verify via `external-api-docs`. -->
+# <!-- SDK version: 2026-04-16 training-data assumption; verify against the vendor's current docs. -->
 
 tool = {
     "name": "record_extraction",
@@ -144,7 +144,7 @@ Use `{"type": "tool", "name": "record_extraction"}` when you want guaranteed str
 
 ## Google Gemini Structured Output
 
-Gemini supports JSON-Schema-backed structured output via the native SDK. Behavior has drifted across releases (from "return the object" to "return a response with structured parts"). The current shape is documented in the Gemini SDK docs and is best fetched via `external-api-docs` before coding against it.
+Gemini supports JSON-Schema-backed structured output via the native SDK. Behavior has drifted across releases (from "return the object" to "return a response with structured parts"). The current shape is documented in the Gemini SDK docs — verify against the vendor's current docs before coding against it.
 
 Notes:
 
@@ -290,7 +290,7 @@ Regardless of provider or mode:
 - `../assets/envelope-manifest.yaml` — `schema_hash` field pins the schema version alongside the prompt.
 - Sibling skill: `agentic-sdks` — tool-use loops, multi-tool orchestration (outside this skill's scope).
 - Sibling skill: `claude-ecosystem` — prompt-caching thresholds relevant to stable tool blocks.
-- Sibling skill: `external-api-docs` — current SDK signatures for `response_format`, `tools`, Gemini SDK, Bedrock wrapper.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 
 ## External Sources
 

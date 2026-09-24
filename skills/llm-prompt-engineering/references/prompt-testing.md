@@ -340,7 +340,7 @@ Deeper cost-tiering architecture belongs in `agent-evals`.
 - `./prompt-injection-hardening.md` — adversarial fixtures as part of the regression suite.
 - `../assets/promptfoo-prompt-suite.yaml` — starter Promptfoo suite.
 - Sibling skill: `agent-evals` — multi-turn eval design, rubric engineering, grader reliability, eval CI architecture.
-- Sibling skill: `external-api-docs` — fetch current SDK signatures for test harness.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 
 ## External Sources
 

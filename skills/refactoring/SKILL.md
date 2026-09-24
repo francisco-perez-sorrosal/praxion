@@ -118,7 +118,7 @@ Either entry point delegates the HOW — the workflow, patterns, and verificatio
 - Read and understand the code
 - Identify what's working, what's painful
 - Run existing tests (or write characterization tests)
-- **If refactoring API integration code**: check the `external-api-docs` skill for current docs and compare against the project's dependency version. Refactoring an API layer is a natural opportunity to detect version drift and consider upgrades alongside the structural improvement
+- **If refactoring API integration code**: verify current docs per [§ Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) and compare against the project's dependency version. Refactoring an API layer is a natural opportunity to detect version drift and consider upgrades alongside the structural improvement
 
 ### 2. Plan the Change
 
@@ -208,7 +208,7 @@ Process-level pitfalls distinct from the code design anti-patterns above:
 - Bug reveals structural problem
 - Code duplication reaches three instances
 - Coupling prevents testing
-- **API version drift detected** -- when the `external-api-docs` skill flags that the project's API dependency is outdated, restructuring the API integration layer to accommodate the upgrade is a refactoring task. Coordinate with the systems-architect for scope decisions: upgrade only vs. upgrade + restructure
+- **API version drift detected** -- when a current-docs check flags that the project's API dependency is outdated, restructuring the API integration layer to accommodate the upgrade is a refactoring task. Coordinate with the systems-architect for scope decisions: upgrade only vs. upgrade + restructure
 
 ## Code Metrics
 

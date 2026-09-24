@@ -326,7 +326,7 @@ The worked example of a full exemplar lens set. This is the content originally i
 **Failure signals**: dependencies >1 major version behind with no tracked upgrade plan; architecture pattern documented as "our way" with no acknowledgment of industry convergence; no external-research citations in recent planning artifacts; standards adoption claimed but not implemented.
 
 **Example findings**:
-- *Deterministic*: "`httpx` pinned to 0.24 (released 2023-10); integration uses old `client.events()` shape. Evidence: `pyproject.toml`, `external-api-docs` skill drift check."
+- *Deterministic*: "`httpx` pinned to 0.24 (released 2023-10); integration uses old `client.events()` shape. Evidence: `pyproject.toml`, current-docs drift check."
 - *Agentic*: "MCP + AGENTS.md + A2A converging under AAIF (2026); project exposes MCP but not AGENTS.md — cross-tool portability gap. Evidence: `.claude-plugin/plugin.json`, repo root listing."
 
 ### Pragmatism

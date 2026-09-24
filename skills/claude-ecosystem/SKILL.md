@@ -152,16 +152,15 @@ The **platform knowledge layer** -- what the Claude API offers, which SDK to use
 
 | Skill/Agent | Owns | claude-ecosystem Provides |
 | --- | --- | --- |
-| [external-api-docs](../external-api-docs/SKILL.md) | Fetching current API docs from curated registries (context-hub) for any external API, including the Claude API | Architectural context: which model, which SDK, which feature. Use together -- this skill for *what to use*, external-api-docs for *current endpoint details* |
 | [agentic-sdks](../agentic-sdks/SKILL.md) | Building agents with OpenAI Agents SDK and Claude Agent SDK (implementation patterns, tools, multi-agent, hooks) | Model selection, SDK selection guidance, API features |
 | [mcp-crafting](../mcp-crafting/SKILL.md) | Building MCP servers (transports, tools, resources, prompts) | MCP connector API feature, protocol context |
 | claude-code-guide (subagent) | Claude Code operations (hooks, plugins, settings, CLI) | Messages API, SDK patterns underlying Claude Code |
 | [python-development](../python-development/SKILL.md) | Python coding patterns, testing, tooling | Anthropic Python SDK specifics |
 | [llm-prompt-engineering](../llm-prompt-engineering/SKILL.md) | End-user-facing prompt engineering (few-shot, CoT, structured output, injection hardening) for any provider | Claude-specific API features (prompt caching, extended thinking, model selection) that downstream prompts use |
 
-**Rule of thumb:** If the question is "How do I use feature X in the Claude API?" -- consult this skill. If it is "What are the current endpoint signatures and parameters?" -- consult `external-api-docs` to fetch current reference from context-hub. If it is "How do I build an agent with the Claude Agent SDK or OpenAI Agents SDK?" -- consult `agentic-sdks`. If it is "How do I build an MCP server?" -- consult `mcp-crafting`. If it is "How do I configure Claude Code hooks?" -- consult `claude-code-guide`.
+**Rule of thumb:** If the question is "How do I use feature X in the Claude API?" -- consult this skill. If it is "What are the current endpoint signatures and parameters?" -- fetch them from the official docs ([references/docs-map.md](references/docs-map.md) lists the LLM-friendly URLs) per [§ Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis). If it is "How do I build an agent with the Claude Agent SDK or OpenAI Agents SDK?" -- consult `agentic-sdks`. If it is "How do I build an MCP server?" -- consult `mcp-crafting`. If it is "How do I configure Claude Code hooks?" -- consult `claude-code-guide`.
 
-**Staleness note:** The model lineup, feature tables, and SDK references in this skill are point-in-time snapshots. The Claude API evolves frequently. When writing implementation code against the Claude API, also check the `external-api-docs` skill for current endpoint details from curated registries -- the combination of architectural guidance (this skill) and current reference (external-api-docs) produces the most reliable code.
+**Staleness note:** The model lineup, feature tables, and SDK references in this skill are point-in-time snapshots. The Claude API evolves frequently. When writing implementation code against the Claude API, also verify current endpoint details against the official docs -- the combination of architectural guidance (this skill) and the current reference produces the most reliable code.
 
 ## Resources
 

@@ -1,6 +1,6 @@
 ---
 name: llm-prompt-engineering
-description: "Prompt engineering for LLMs: few-shot patterns, chain-of-thought, reasoning-effort control, structured output (Pydantic/Zod), prompt versioning, regression testing. Framework-agnostic. Triggers: designing prompts for production LLM calls, writing system prompts, debugging output-quality issues, migrating across model versions, picking a prompt-management platform, establishing prompt regression tests. Defers to claude-ecosystem, agentic-sdks, agent-evals, external-api-docs. Python/TypeScript modules."
+description: "Prompt engineering for LLMs: few-shot patterns, chain-of-thought, reasoning-effort control, structured output (Pydantic/Zod), prompt versioning, regression testing. Framework-agnostic. Triggers: designing prompts for production LLM calls, writing system prompts, debugging output-quality issues, migrating across model versions, picking a prompt-management platform, establishing prompt regression tests. Defers to claude-ecosystem, agentic-sdks, agent-evals. Python/TypeScript modules."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
@@ -75,11 +75,11 @@ Reasoning capability and prompting discipline now diverge by family. The "always
 | OpenAI GPT-5 (all tiers) | Reasoning | `reasoning_effort` ∈ `{minimal, low, medium, high}`. Start at `medium`; profile before `high` (~23× tokens for ~5% gain). GPT-5-mini at medium often beats GPT-5 high on cost/quality | Variable; prefer zero-shot, add shots only if output misses | `response_format: {type: "json_schema", strict: true}` + `additionalProperties: false` |
 | OpenAI o-series | Reasoning | Use `reasoning_effort`. Do not add manual CoT | Low; often zero-shot | Same as GPT-5 |
 | OpenAI GPT-4.1 | Non-reasoning | Manual zero-shot CoT + optional self-consistency | High | Strict mode available |
-| Gemini 2.5 (Pro/Flash) | Reasoning (thinking tokens) | Supports adaptive thinking; check current SDK signature via `external-api-docs` before pinning | Moderate | JSON-Schema-backed structured output via native SDK |
+| Gemini 2.5 (Pro/Flash) | Reasoning (thinking tokens) | Supports adaptive thinking; verify against the vendor's [current docs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before pinning | Moderate | JSON-Schema-backed structured output via native SDK |
 | DeepSeek-R1 | Reasoning | Zero-shot only; few-shot **degrades** accuracy | Zero | Tool-based via OpenAI-compatible API |
 | Open-weights (Llama 3.x+, Mistral, Qwen) | Mostly non-reasoning | Manual CoT essential; self-consistency meaningful | High | `outlines` or `guidance` for hard constraints |
 
-**Do not pin exact model version numbers in code unless the project's `external-api-docs` dependency audit has confirmed them.** Use family-level language ("Claude 4.x Opus tier", "GPT-5 medium") in prompts and runbooks; pin specific IDs only at the deployment envelope (see **Prompt Versioning**).
+**Do not pin exact model version numbers in code unless a current-docs dependency audit has confirmed them.** Use family-level language ("Claude 4.x Opus tier", "GPT-5 medium") in prompts and runbooks; pin specific IDs only at the deployment envelope (see **Prompt Versioning**).
 
 ## Few-Shot Patterns
 
@@ -141,7 +141,7 @@ Deep dive: [references/reasoning-and-cot.md](references/reasoning-and-cot.md).
 
 - **OpenAI**: `response_format: {type: "json_schema", strict: true, schema: ...}` for free-form; `tools` with `strict: true` for function-calling. `additionalProperties: false` is **mandatory**; every property must be in `required`.
 - **Anthropic**: No direct `response_format` equivalent. Idiomatic path: tool-based structured output with `strict: true` on the tool schema. SDK silently rewrites constraints like `minimum`/`maximum`/`pattern` into the description and validates post-generation.
-- **Google Gemini, Mistral, AWS Bedrock**: JSON-Schema-backed structured output supported; behavior details vary by release. Check `external-api-docs` before pinning.
+- **Google Gemini, Mistral, AWS Bedrock**: JSON-Schema-backed structured output supported; behavior details vary by release. Verify against the vendor's current docs before pinning.
 
 See [contexts/python.md](contexts/python.md) and [contexts/typescript.md](contexts/typescript.md) for full retry-loop implementations. Deep dive: [references/structured-output.md](references/structured-output.md).
 
@@ -229,7 +229,7 @@ Prompt-management and prompt-ops platforms are a dense landscape. Pick one based
 | **Mirascope** | Library, code-first | Content-addressable versioning, env-based deploys | Prompts-as-code, richer than raw git |
 | **DSPy** | Library (optimizer) | Compiles prompts from metrics — auto-optimization (MIPROv2) | Pipelines with a measurable metric, affordable optimization runs |
 
-Cost, latency, and feature surface drift quarterly. Treat this matrix as a starting set, not a scorecard — verify via the vendor's current docs or `external-api-docs` before committing.
+Cost, latency, and feature surface drift quarterly. Treat this matrix as a starting set, not a scorecard — verify via the vendor's current docs before committing.
 
 ## Security: Prompt-Injection Hardening
 
@@ -265,7 +265,6 @@ Single-prompt testing is covered in **Prompt Testing** above. For anything beyon
 | [`agent-evals`](../agent-evals/SKILL.md) | Multi-turn evals, LLM-as-judge rubric design, trajectory grading, eval CI |
 | [`agent-crafting`](../agent-crafting/SKILL.md) | Claude Code subagent configuration; this skill shapes the prompt content inside subagents |
 | [`mcp-crafting`](../mcp-crafting/SKILL.md) | MCP protocol and prompts-primitive registration |
-| [`external-api-docs`](../external-api-docs/SKILL.md) | Current SDK method signatures and endpoint parameters — fetch before writing integration code |
 | [`context-security-review`](../context-security-review/SKILL.md) | Runtime prompt-injection detection and guardrails in shipped applications |
 
 ## References

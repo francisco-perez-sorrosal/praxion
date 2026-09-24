@@ -38,4 +38,3 @@ Triggers on: designing prompts for LLM calls, writing system prompts, debugging 
 - [`agentic-sdks`](../agentic-sdks/) -- Agent-loop plumbing, tool registration; this skill shapes the prompts inside agents
 - [`agent-evals`](../agent-evals/) -- Multi-turn evals, LLM-as-judge rubric design, trajectory grading, eval CI
 - [`agent-crafting`](../agent-crafting/) -- Claude Code subagent configuration; this skill shapes prompt content inside subagents
-- [`external-api-docs`](../external-api-docs/) -- Current SDK method signatures and endpoint parameters

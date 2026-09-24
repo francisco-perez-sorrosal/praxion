@@ -18,7 +18,7 @@ Back to: [../SKILL.md](../SKILL.md)
 
 Python 3.13 syntax throughout. Type annotations required -- the Pydantic model is the prompt, so the annotations travel to the model too.
 
-**Version drift.** Always verify current signatures via the [`external-api-docs`](../../external-api-docs/SKILL.md) skill (`chub_search` / `chub_get`) before shipping -- SDK method shapes move quarterly.
+**Version drift.** Always verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before shipping -- SDK method shapes move quarterly.
 
 ## `instructor` + Pydantic Retry Loop (Authoritative)
 
@@ -34,7 +34,7 @@ from anthropic import Anthropic
 from pydantic import BaseModel, Field, ValidationError
 
 MAX_RETRIES = 3  # cap to avoid token blow-up on degenerate input
-MODEL = "claude-sonnet-4-x"  # pinned via external-api-docs, not hard-coded below
+MODEL = "claude-sonnet-4-x"  # pinned after verifying the vendor's current docs, not hard-coded below
 
 
 class ExtractedFields(BaseModel):
@@ -298,4 +298,4 @@ Prefer deterministic assertions (schema conformance, contains/not-contains, rege
 
 ## Version Drift Checkpoint
 
-Before shipping any code against a pinned SDK version, run the [`external-api-docs`](../../external-api-docs/SKILL.md) skill -- `chub_search` for the library, `chub_get` for the specific reference -- and compare the documented call shape against what this file describes. SDK method signatures move quarterly; this context file is a starting point, not a contract.
+Before shipping any code against a pinned SDK version, verify against the vendor's current docs and compare the documented call shape against what this file describes. SDK method signatures move quarterly; this context file is a starting point, not a contract.

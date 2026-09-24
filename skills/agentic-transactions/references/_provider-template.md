@@ -5,9 +5,9 @@
 > beginning with `>`). Consult `references/provider-contract.md` for the formal
 > pseudotype spec before filling in the Core Verbs table.
 >
-> Before writing any integration code, run `chub_search({ query: "[PROVIDER NAME]" })`
-> via the `external-api-docs` skill. Fetch any available curated docs; mark every
-> volatile field "VERIFY AT USE TIME" regardless of search outcome.
+> Before writing any integration code, fetch [PROVIDER NAME]'s official developer docs
+> (its `llms.txt` / `.md` pages first) per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis);
+> mark every volatile field "VERIFY AT USE TIME" regardless of fetch outcome.
 
 Back-link: [../SKILL.md](../SKILL.md)
 
@@ -99,18 +99,18 @@ RailDetail(
 ## Volatile Specifics
 <!-- last-verified: [YYYY-MM-DD] -->
 
-> **VERIFY AT USE TIME via `external-api-docs` skill** — mark every item below with its
+> **VERIFY AT USE TIME against official docs** — mark every item below with its
 > current documentation status. Use the boilerplate phrase "undocumented as of [DATE]"
 > for items with no public docs. Never bake frozen values from this file into production
 > code.
 
 | Specific | Status | Action |
 |---|---|---|
-| **Auth scopes / token format** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time via `external-api-docs` |
-| **Rate limits** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time via `external-api-docs` |
-| **API / MCP endpoint URL** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time via `external-api-docs` |
-| **Order types** (trading) | [documented / undocumented as of YYYY-MM-DD] | Verify at use time via `external-api-docs` |
-| **Settlement finality** (payments) | [documented / undocumented as of YYYY-MM-DD] | Verify at use time via `external-api-docs` |
+| **Auth scopes / token format** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time against official docs |
+| **Rate limits** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time against official docs |
+| **API / MCP endpoint URL** | [documented / undocumented as of YYYY-MM-DD] | Verify at use time against official docs |
+| **Order types** (trading) | [documented / undocumented as of YYYY-MM-DD] | Verify at use time against official docs |
+| **Settlement finality** (payments) | [documented / undocumented as of YYYY-MM-DD] | Verify at use time against official docs |
 | [ADD MORE ROWS AS NEEDED] | | |
 
 ---
@@ -122,4 +122,4 @@ RailDetail(
 | [`mcp-crafting`](../../mcp-crafting/SKILL.md) | MCP client wiring (if `transport_kind: mcp-client`) |
 | [`agentic-sdks`](../../agentic-sdks/SKILL.md) | Agent loop integration and HITL wiring |
 | [`agentic-interface-design`](../../agentic-interface-design/SKILL.md) | Tool-schema design quality |
-| [`external-api-docs`](../../external-api-docs/SKILL.md) | Fetch current provider documentation |
+| [Current-docs protocol](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) | Fetch current provider documentation |

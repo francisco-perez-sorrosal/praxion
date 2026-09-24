@@ -138,14 +138,13 @@ When a pipeline agent (researcher, implementer, verifier) encounters behavior th
 3. **Flag for the user**: recommend invoking `/report-upstream owner/repo "description"` for formal filing
 4. **Do not file autonomously.** Upstream issue filing requires human judgment and approval.
 
-## Context-Hub Verification
+## Current-Docs Verification
 
 Before filing, optionally verify the bug is not a misunderstanding of the documented API:
 
-1. Search context-hub: `chub search "<upstream project name>"`
-2. If docs are available: `chub get <package-name>` to fetch curated API documentation
-3. Compare the reported behavior against the documented contract
-4. If the behavior matches documentation, it is not a bug — it may be a feature request or a documentation gap
+1. Fetch the upstream project's official docs and changelog for the version in use (per [§ Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis))
+2. Compare the reported behavior against the documented contract
+3. If the behavior matches documentation, it is not a bug — it may be a feature request or a documentation gap
 
 This step is optional but reduces false reports, especially for complex APIs.
 

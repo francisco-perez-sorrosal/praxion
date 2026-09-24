@@ -92,7 +92,7 @@ The fence boundary is what lets reference content regenerate from the spec witho
 | **Designing** the API (resources, endpoints, versioning strategy) | `api-design` | consumes the design; produces its docs |
 | API **quality / taste / review** (canon, Bloch lens, RFC 9457 design) | `api-design-craft` | applies the design's decisions in docs |
 | **Designing** MCP tools (naming, schema, fat-vs-thin, error grammar) | `agentic-interface-design` | DOCUMENTS an existing server; routes design questions there |
-| **Consuming** other people's API docs (Stripe, OpenAI, etc.) | `external-api-docs` | this skill documents your OWN API |
+| **Consuming** other people's API docs (Stripe, OpenAI, etc.) | the current-docs protocol (`software-planning` cross-agent conventions) | this skill documents your OWN API |
 | **General** project docs (README, catalogs, architecture, changelogs) | `doc-management` | the deep API-doc specialist; doc-management is the generalist entry point |
 
 This skill = **produce best-in-class docs for the API surface you own.**
@@ -121,5 +121,5 @@ The `/document-api` command operationalizes this skill: it detects the target's 
 - [`api-design`](../api-design/SKILL.md) — the methodology this skill documents the output of
 - [`api-design-craft`](../api-design-craft/SKILL.md) — the API quality/taste lens
 - [`agentic-interface-design`](../agentic-interface-design/SKILL.md) — designs the MCP tools this skill documents
-- [`external-api-docs`](../external-api-docs/SKILL.md) — consuming *others'* API docs (the inverse of this skill)
+- [Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) — the current-docs protocol for consuming *others'* API docs (the inverse of this skill)
 - [`doc-management`](../doc-management/SKILL.md) — general project documentation; the generalist entry point

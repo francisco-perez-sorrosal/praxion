@@ -88,7 +88,7 @@ Do not hardcode version constraints from memory — training-data cutoffs make r
 - **When an explicit constraint is required**, check first: `pixi search <pkg>` (conda-forge) or `uv pip index versions <pkg>` (PyPI) lists available versions; quote the current latest. Prefer ranges (`>=X.Y`) over exact pins unless reproducibility demands otherwise.
 - **On inherited projects**, a quick `pixi update --dry-run` or `uv lock --upgrade --dry-run` surfaces how stale the lockfile is before you touch it.
 
-This complements the `external-api-docs` skill (which handles *documentation* staleness) — together they cover both "is my API signature current?" and "is my pinned version current?".
+This complements the [current-docs protocol](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) (which handles *documentation* staleness) — together they cover both "is my API signature current?" and "is my pinned version current?".
 
 ## Running Commands
 <!-- last-verified: 2026-05-01 -->

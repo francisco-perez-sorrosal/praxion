@@ -150,8 +150,8 @@ Arbitrary key-value pairs for additional information. No predefined schema -- us
 
 ```yaml
 metadata:
-  default-provider: context-hub
-  mcp-tools: chub_search, chub_get, chub_list
+  owner: platform-team
+  upstream-docs: https://docs.example.com/llms.txt
   version: "2.0"
   languages: [python, typescript]
 ```

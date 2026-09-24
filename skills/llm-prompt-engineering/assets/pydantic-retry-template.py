@@ -8,7 +8,7 @@ Requires (at runtime, not at import):
   pip install instructor anthropic pydantic
 
 This template is illustrative. Adapt model IDs to your project's pinned versions
-(verify via the `external-api-docs` skill before shipping).
+(verify against the vendor's current docs before shipping).
 """
 
 from __future__ import annotations

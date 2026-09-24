@@ -1,6 +1,6 @@
-# Webhook Integration Patterns
+# Webhook Patterns — Receiving Side
 
-Patterns for receiving, validating, and processing webhooks from external services. Back to [SKILL.md](../SKILL.md).
+Receiver-side patterns for consuming webhooks from external services: endpoint shape, signature verification, idempotency, async processing, local testing, retries. For the sender side — designing the webhooks your own API emits — see [rest-patterns.md § Webhook Design](rest-patterns.md#webhook-design). Back to [SKILL.md](../SKILL.md).
 
 ## Core Concepts
 
@@ -51,6 +51,8 @@ async def receive_webhook(provider: str, request: Request):
 - **Validate signatures**: Never trust webhook payloads without verifying the cryptographic signature. This prevents replay attacks and forgery.
 - **Handle retries with idempotency**: Providers retry failed deliveries. Use the event ID to deduplicate.
 - **Use HTTPS**: Webhook payloads may contain sensitive data. Always use TLS endpoints.
+- **Don't assume ordering** — events for one resource can arrive out of order (sender contract: rest-patterns §5).
+- **Thin payloads**: fetch the object's current state from the API rather than trusting embedded state (rest-patterns §4).
 
 ## Signature Validation
 
@@ -75,10 +77,14 @@ def verify_hmac_sha256(
         hashlib.sha256,
     ).hexdigest()
 
-    # Strip prefix (e.g., "sha256=" for GitHub, "v1=" for Stripe)
+    # Strip prefix (e.g., "sha256=" for GitHub)
     actual = signature.removeprefix(header_prefix)
     return hmac.compare_digest(expected, actual)
 ```
+
+What is signed differs per provider (Stripe signs `{timestamp}.{payload}`; Twilio signs the URL + params with HMAC-SHA1) — prefer the provider SDK's verifier; the generic helper fits raw-body HMAC schemes like GitHub's.
+
+Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row. Change a table row only after verifying it, and cite the URL in the commit body.
 
 ### Provider-Specific Headers
 
@@ -211,6 +217,8 @@ async def save_webhook_for_testing(provider: str, payload: dict):
 
 ### Retry Behavior by Provider
 
+Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row. Change a table row only after verifying it, and cite the URL in the commit body.
+
 | Provider | Retry Count | Retry Window | Backoff |
 |----------|-------------|-------------|---------|
 | **Stripe** | Up to 3 | 3 days | Exponential |
@@ -233,8 +241,9 @@ async def receive_webhook(provider: str, request: Request):
         return {"status": "accepted"}
 
     except Exception:
-        # Log the error but still return 200 if the payload was valid
-        # Returning 500 causes retries, which may be unwanted for parse errors
+        # Returning 5xx asks the provider to retry -- use it only for transient
+        # failures; for payloads you can never process, log and dead-letter them
+        # and return 2xx so retries stop.
         logger.exception("Webhook processing error")
         return JSONResponse(status_code=500, content={"error": "Processing failed"})
 ```

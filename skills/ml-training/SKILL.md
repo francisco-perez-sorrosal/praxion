@@ -83,11 +83,11 @@ A step without a declared budget MUST be flagged FAIL by the verifier (per `rule
 
 | Library | autoresearch pin | Current upstream | Priority | Action |
 |---|---|---|---|---|
-| `torch` (PyTorch) | `2.9.1` | `2.10.0` (chub maintainer doc) | High (taught) | Note here; do not auto-upgrade autoresearch's pin |
+| `torch` (PyTorch) | `2.9.1` | `2.10.0` (maintainer docs) | High (taught) | Note here; do not auto-upgrade autoresearch's pin |
 | `skypilot` | not pinned by Praxion | `0.12.1` (PyPI) | Critical (default-remote backend) | Teach `~=0.12`; flag for refresh at 0.13+ |
 | `@runpod/mcp-server` | not pinned by Praxion | `1.1.0` (npm) | High (reference direct adapter) | Teach `~1.1`; vendor-maintained — verify before using |
 
-autoresearch pins `torch==2.9.1`. The chub maintainer doc covers `2.10.0`. This is minor
+autoresearch pins `torch==2.9.1`. The maintainer docs cover `2.10.0`. This is minor
 drift (backward-compatible minor release). Do not auto-upgrade autoresearch's pin. Users
 building new projects should start at `2.10.0`.
 

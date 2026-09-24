@@ -36,4 +36,4 @@ As the knowledge binding for the `evidence-appraiser` consulting discipline, con
 
 - [`applied-statistics`](../applied-statistics/) -- inference on our own numbers, once an imported claim has been appraised
 - [`multi-perspective-analysis`](../multi-perspective-analysis/) -- the convening mechanism that spawns a discipline consultant against a design
-- [`external-api-docs`](../external-api-docs/) -- verifying an external API's documented behavior, a related but distinct concern
+- [Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) -- verifying an external API's documented behavior is the current-docs protocol's job (`software-planning` cross-agent conventions), a related but distinct concern

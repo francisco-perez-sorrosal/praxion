@@ -18,7 +18,7 @@ Back to: [../SKILL.md](../SKILL.md)
 
 Modern TypeScript (5.x) with strict mode enabled, ESM imports. Node.js 20+ for `node:test` usage.
 
-**Version drift.** Verify current signatures via the [`external-api-docs`](../../external-api-docs/SKILL.md) skill before shipping. The TS SDKs move as quickly as the Python ones.
+**Version drift.** Verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before shipping. The TS SDKs move as quickly as the Python ones.
 
 ## Zod + `instructor-js` Retry Loop
 
@@ -30,7 +30,7 @@ import Instructor from "@instructor-ai/instructor";
 import { z } from "zod";
 
 const MAX_RETRIES = 3;
-const MODEL = "claude-sonnet-4-x"; // pinned via external-api-docs
+const MODEL = "claude-sonnet-4-x"; // pinned after verifying the vendor's current docs
 
 const ExtractedFields = z.object({
   title: z.string().describe("Document title, verbatim from the source."),
@@ -354,4 +354,4 @@ Vitest's built-in snapshots work well for stable-shape outputs (extraction, clas
 
 ## Version Drift Checkpoint
 
-Before shipping any code against a pinned SDK version, run the [`external-api-docs`](../../external-api-docs/SKILL.md) skill -- `chub_search` for the package, `chub_get` for the specific reference -- and compare the documented call shape against what this file describes. Both `@anthropic-ai/sdk` and `openai` ship breaking-within-major bumps frequently; this context file is a starting point, not a contract.
+Before shipping any code against a pinned SDK version, verify against the vendor's current docs and compare the documented call shape against what this file describes. Both `@anthropic-ai/sdk` and `openai` ship breaking-within-major bumps frequently; this context file is a starting point, not a contract.

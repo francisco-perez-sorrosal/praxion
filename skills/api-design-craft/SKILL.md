@@ -22,6 +22,7 @@ Start with the shared canon in `references/design-fundamentals.md` — Bloch's p
 - [references/design-fundamentals.md](references/design-fundamentals.md) -- durable design canon (Rams, Norman, Nielsen, Bloch) — the first-principles foundation
 - [references/api-canon.md](references/api-canon.md) -- canonical APIs (Stripe, GitHub, S3, Twilio, Linear, Resend) and standards (RFC 9457, OpenAPI 3.1, Relay, Google AIP)
 - [references/rest-patterns.md](references/rest-patterns.md) -- REST quality patterns: URL design, status codes, PATCH semantics, webhooks, long-running ops, versioning
+- [references/webhooks.md](references/webhooks.md) -- receiving webhooks: signature verification, idempotent handlers, async processing, local testing, retries/DLQ
 - [references/graphql-patterns.md](references/graphql-patterns.md) -- GraphQL quality patterns: when to use, schema design, Relay, error unions, DataLoader
 - [references/grpc-patterns.md](references/grpc-patterns.md) -- gRPC quality patterns: Protobuf design, FieldMask, streaming modes, Google AIP
 - [references/low-latency-ergonomics.md](references/low-latency-ergonomics.md) -- N+1 elimination, caching (ETag, Cache-Control), streaming decisions, round-trip cost
@@ -119,12 +120,13 @@ Apply Joshua Bloch's 8 principles as the primary review checklist for any API:
 | Latency: N+1, caching, streaming, payload shape | `low-latency-ergonomics.md` |
 | Reviewing an API design | `design-review-checklist.md` |
 | Shared design principles (Rams, Norman, Nielsen, Bloch) | `design-fundamentals.md` |
+| Build or review a webhook receiver (signature verification, dedup, async processing) | `webhooks.md` |
 
 ## Related Skills
 
 - **[`api-design`](../api-design/SKILL.md)** — the methodology layer: API-first process, resource modeling, OpenAPI spec patterns, versioning strategies, interface contracts. This skill is the quality lens; `api-design` is the how-to.
 - **[`agentic-interface-design`](../agentic-interface-design/SKILL.md)** — the same quality/taste lens applied to MCP tools, function-calling schemas, and A2A contracts (the model as consumer).
-- **[`external-api-docs`](../external-api-docs/SKILL.md)** — for verifying current API specifications, SDK versions, or library capabilities before committing to a paradigm decision.
+- **Current docs for external APIs** ([protocol](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)) — verify current API specifications, SDK versions, or library capabilities before committing to a paradigm decision.
 - **[`data-modeling`](../data-modeling/SKILL.md)** — backend schema design informs resource modeling; when the resource model feels wrong, often the data model is the root cause.
 - **[`performance-architecture`](../performance-architecture/SKILL.md)** — infrastructure-level performance behind the API surface; this skill covers interface-level latency ergonomics.
 - **[`api-documentation`](../api-documentation/SKILL.md)** — turning the reviewed API into best-in-class human + agent docs (the doc-production deliverable downstream of the design critique).

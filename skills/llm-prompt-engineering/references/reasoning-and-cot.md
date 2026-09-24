@@ -36,7 +36,7 @@ Reasoning-native model families (Claude 4.x Opus/Sonnet with extended thinking; 
 
 1. If the model is reasoning-native, **use the native effort knob** (Anthropic `thinking: {type: "adaptive", effort: ...}`, OpenAI `reasoning_effort`, Gemini thinking budget). Do not add manual CoT. Do not add reasoning-trace exemplars.
 2. If the model is **not** reasoning-native, manual CoT and self-consistency still work — see below.
-3. If you do not know which family the model is in, check the current SDK signature via `external-api-docs` and the `../SKILL.md` model-family matrix before committing.
+3. If you do not know which family the model is in, check the current SDK signature against the vendor's current docs and the `../SKILL.md` model-family matrix before committing.
 
 ## Reasoning-Effort Knobs by Family
 
@@ -56,7 +56,7 @@ Reasoning-native model families (Claude 4.x Opus/Sonnet with extended thinking; 
 
 ### Gemini 2.5 (Pro / Flash with thinking)
 
-- Thinking tokens are exposed via the native SDK; exact parameter names and defaults drift. Verify current via `external-api-docs` before pinning.
+- Thinking tokens are exposed via the native SDK; exact parameter names and defaults drift. Verify current against the vendor's docs before pinning.
 - Flash without thinking behaves as a non-reasoning model for CoT-decision purposes.
 
 ### DeepSeek-R1
@@ -176,7 +176,7 @@ If you have an existing prompt that uses one of the superseded patterns on a rea
 - `./versioning.md` — pin `reasoning_effort` / `thinking` parameters in the envelope manifest.
 - `./prompt-testing.md` — non-determinism discipline when self-consistency or reasoning effort is in play.
 - Sibling skill: `claude-ecosystem` — the current parameter shape for `thinking: adaptive`, deprecated `budget_tokens`, and the `temperature=1` constraint on extended thinking.
-- Sibling skill: `external-api-docs` — fetch current SDK signatures before pinning reasoning knobs.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 - Sibling skill: `agent-evals` — multi-turn and trajectory-level reasoning eval architecture (this file and `prompt-testing.md` cover only single-call assertions).
 
 ## External Sources

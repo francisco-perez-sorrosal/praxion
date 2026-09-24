@@ -122,10 +122,8 @@ Claude Code, Cursor, and Windsurf auto-load this skill when editing `.c4` files.
 For full LikeC4 DSL/API reference outside the auto-loaded Agent Skill context
 (e.g., headless agents, future MCP consumers, agents on systems without the
 Vercel skills protocol registered), fetch `https://likec4.dev/llms-full.txt`
-directly with a fetch-date annotation (per the `external-api-docs` skill's
-freshness discipline). No chub upstream entry currently exists for LikeC4 —
-the chub MCP has no ingestion tool for new entries; if one is added later,
-this section can be updated to point at it.
+directly with a fetch-date annotation (per the [current-docs protocol](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)'s
+freshness discipline).
 
 The thin `https://likec4.dev/llms.txt` navigation index is intentionally not
 vendored; its function is fully subsumed by either the Agent Skill or

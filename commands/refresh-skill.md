@@ -1,11 +1,11 @@
 ---
 description: Refresh version-sensitive sections of a skill against current upstream documentation
 argument-hint: "<skill-name>"
-allowed-tools: [Read, Edit, Write, Grep, Glob, AskUserQuestion]
+allowed-tools: [Read, Edit, Write, Grep, Glob, AskUserQuestion, WebFetch, WebSearch]
 disable-model-invocation: true
 ---
 
-Refresh the drift-prone sections of a skill declared in its `staleness_sensitive_sections:` frontmatter. Driven by the [external-api-docs](../skills/external-api-docs/SKILL.md) skill for fetching authoritative current-state docs. Gates every date bump on explicit user confirmation — never silently refreshes. See [rules/swe/staleness-policy.md](../rules/swe/staleness-policy.md) for the marker protocol.
+Refresh the drift-prone sections of a skill declared in its `staleness_sensitive_sections:` frontmatter. Driven by the [current-docs protocol](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) for fetching authoritative current-state docs. Gates every date bump on explicit user confirmation — never silently refreshes. See [rules/swe/staleness-policy.md](../rules/swe/staleness-policy.md) for the marker protocol.
 
 ## Arguments
 
@@ -34,10 +34,10 @@ If a listed title has no matching heading, report it as a rename/delete drift an
 
 ### 3. Fetch Authoritative Docs
 
-For each sensitive section, use the [external-api-docs](../skills/external-api-docs/SKILL.md) skill to fetch the current state:
+For each sensitive section, fetch the current state per that protocol:
 
 - Infer the topic from the section's heading and body content
-- Prefer `chub_search` + `chub_get` for curated coverage; fall back to `WebFetch` / `WebSearch` for topics without chub entries
+- Prefer the vendor's official docs (`llms.txt` / `.md` pages via `WebFetch`); fall back to `WebSearch` restricted to primary sources
 - Extract only the excerpts relevant to the section's claims — do not paste entire docs
 
 ### 4. Diff and Prompt

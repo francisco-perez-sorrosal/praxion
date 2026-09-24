@@ -3,8 +3,9 @@
 Integration recipe for connecting a training loop to Weights & Biases experiment tracking.
 Back to [SKILL.md](../SKILL.md).
 
-Curated chub reference: `wandb/package` (maintainer, Python, `0.25.1`). Fetch for
-current endpoint signatures: `chub get wandb/package --lang python`.
+Official reference: the W&B Python docs (https://docs.wandb.ai/ref/python/) —
+verify the current version per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)
+before pinning.
 
 <!-- last-verified: 2026-05-03 -->
 
@@ -21,7 +22,7 @@ current endpoint signatures: `chub get wandb/package --lang python`.
 
 ## Version Note
 
-W&B `0.25.1` is the chub-verified version used here. The SYSTEMS_PLAN specifies this as
+W&B `0.25.1` is the version verified at authoring. The SYSTEMS_PLAN specifies this as
 the v1 reference version. If the project pins a different `wandb` version, match that
 instead.
 

@@ -13,8 +13,8 @@ Back-link: [../SKILL.md](../SKILL.md)
 > **order-type enum**, **rate limits**, and the OAuth/token internals. The way to resolve
 > those is **operational, not documentary** — connect an MCP client to the live endpoint
 > and **introspect its tool list** (`tools/list`), then read the linked order-types doc.
-> Re-run `chub_search({ query: "robinhood trading" })` via `external-api-docs` before
-> coding in case curated docs have since appeared.
+> Re-fetch Robinhood's official agentic-trading docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before
+> coding in case Robinhood's documentation has changed since this file was last verified.
 >
 > **This surface moves fast** — 10 → ~50 tools plus a whole asset class in ~64 days. No
 > re-verification cadence tracks that: the surface moved *inside* the 60-day threshold meant
@@ -366,6 +366,6 @@ for the classification that replaced it.
 | [`mcp-crafting`](../../mcp-crafting/SKILL.md) | MCP **client** wiring — HTTP transport config, `tools/list` introspection, MCP Inspector testing against `https://agent.robinhood.com/mcp/trading` |
 | [`agentic-sdks`](../../agentic-sdks/SKILL.md) | Agent-loop integration — HITL interceptor wiring (enforced client-side), tool registration |
 | [`agentic-interface-design`](../../agentic-interface-design/SKILL.md) | Tool-schema design quality — evaluate the introspected Robinhood tools' naming/error grammar |
-| [`external-api-docs`](../../external-api-docs/SKILL.md) | Re-fetch current Robinhood docs before coding — the beta surface is churning |
+| [Current-docs protocol](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) | Re-fetch current Robinhood docs before coding — the beta surface is churning |
 
 **Explicit risk transfer:** Robinhood's docs state "Robinhood does not control, supervise, monitor, recommend, or audit these AI agents," and "You are ultimately responsible for the trades your AI agent places." The capital-segregated account + client-enforced HITL interceptor are the implementation-level mitigations — they **bound** this risk, they do not eliminate it.

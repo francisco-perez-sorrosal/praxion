@@ -87,7 +87,7 @@ To refresh one or more sensitive sections in a skill, invoke the slash command:
 /refresh-skill <skill-name>
 ```
 
-The command iterates every section listed in `staleness_sensitive_sections:`, fetches current-state docs via the [external-api-docs](../../skills/external-api-docs/SKILL.md) skill, diffs against the section body, and prompts per-section: Accept / Revise / Skip / Permanent. Date bumps require explicit user confirmation — no silent refreshes.
+The command iterates every section listed in `staleness_sensitive_sections:`, fetches current-state docs per the [current-docs protocol](../../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis), diffs against the section body, and prompts per-section: Accept / Revise / Skip / Permanent. Date bumps require explicit user confirmation — no silent refreshes.
 
 See [commands/refresh-skill.md](../../commands/refresh-skill.md).
 

@@ -136,13 +136,14 @@ edges:
 - **Stable core** — the six verbs, the error grammar, and the capability-flag contract
   change slowly (they are the seam).
 - **Volatile edges** — auth scopes, rate limits, order types, MCP endpoint URLs live in
-  `references/<provider>.md` and are explicitly marked "verify at use time via
-  `external-api-docs`". Do not bake frozen values into production code.
+  `references/<provider>.md` and are explicitly marked "verify at use time against the
+  vendor's current docs" (per [§ Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)).
+  Do not bake frozen values into production code.
 - **Provider transport strategies** and **Robinhood specifics** are flagged as
   `staleness_sensitive_sections` in this skill's frontmatter. Run `/refresh-skill
   agentic-transactions` when those sections feel stale.
-- Use the `external-api-docs` skill to fetch current provider documentation before
-  writing any integration code. See that skill's retrieval protocol.
+- Verify current provider documentation against official sources before writing any
+  integration code.
 
 ---
 
@@ -155,10 +156,10 @@ Load these skills alongside `agentic-transactions` as the task requires:
 | [`mcp-crafting`](../mcp-crafting/SKILL.md) | Building the MCP client transport layer — FastMCP config, tool schema design, Inspector testing |
 | [`agentic-sdks`](../agentic-sdks/SKILL.md) | Wiring the provider to an agent loop — SDK patterns, multi-agent orchestration, tool registration |
 | [`agentic-interface-design`](../agentic-interface-design/SKILL.md) | Designing the tool surface the model sees — tool naming, error grammar ergonomics, fat-vs-thin decomposition |
-| [`external-api-docs`](../external-api-docs/SKILL.md) | Fetching current provider API docs before writing integration code — mandatory for any undocumented or fast-moving surface |
+| [Current-docs protocol](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) | Fetching current provider API docs before writing integration code — mandatory for any undocumented or fast-moving surface |
 | [`api-design-craft`](../api-design-craft/SKILL.md) | Reviewing the quality of the provider contract or any REST/GraphQL surface the provider exposes |
 
-**Curated reference docs (fetch via `external-api-docs` at use time):** Context Hub carries the *plumbing* — `mcp/package` (the official Python MCP **client** over Streamable HTTP + OAuth — this is the Robinhood transport: `ClientSession` → `initialize()` → `list_tools()` → `call_tool()`), `fastmcp/package` (higher-level MCP client/server), and `stripe/package` (Python Stripe SDK, for a future Stripe payment provider). The novel protocols (x402, AP2, Nevermined, Coinbase AgentKit) and the brokers (Robinhood, Alpaca) are **not** in Context Hub — fetch those from the live web and introspect the provider's MCP server directly.
+**Reference docs (fetch at use time from official sources, per [§ Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)):** the *plumbing* — the official Python MCP SDK (the **client** over Streamable HTTP + OAuth — the Robinhood transport: `ClientSession` → `initialize()` → `list_tools()` → `call_tool()`), `fastmcp` (higher-level MCP client/server), and the Stripe Python SDK (for a future Stripe payment provider). The novel protocols (x402, AP2, Nevermined, Coinbase AgentKit) and the brokers (Robinhood, Alpaca) change fastest — fetch them from the live web and introspect the provider's MCP server directly.
 
 ### Robinhood Provider Specifics
 <!-- last-verified: 2026-08-05 -->
@@ -175,8 +176,8 @@ Key pre-flight facts:
   placement ungated — a pattern gate covers the next asset class on the day it ships.
 - **The tool surface is large and fast-moving** — it grew ~5× in about two months, and this
   skill deliberately states no count. Resolve it via a live `tools/list`.
-- Auth scopes, order types, and rate limits remain **undocumented** — re-fetch via
-  `external-api-docs` before implementing. (The **MCP endpoint URL is documented**:
+- Auth scopes, order types, and rate limits remain **undocumented** — re-verify against
+  the vendor's current docs before implementing. (The **MCP endpoint URL is documented**:
   `https://agent.robinhood.com/mcp/trading`. An earlier revision listed it as undocumented,
   contradicting this skill's own `references/robinhood.md` at the same verification date.)
 - Robinhood's agentic surface is MCP-only (no REST SDK for agentic flows).

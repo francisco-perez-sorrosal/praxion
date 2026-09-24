@@ -4,7 +4,7 @@
 # Docs: https://www.promptfoo.dev/docs/
 #
 # Replace `provider`, `prompts`, and `tests` with your project's values.
-# Pin a specific model ID only after verifying via the `external-api-docs` skill.
+# Pin a specific model ID only after verifying the vendor's current docs.
 
 description: Single-prompt regression suite (starter template)
 

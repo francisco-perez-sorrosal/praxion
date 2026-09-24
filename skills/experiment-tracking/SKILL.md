@@ -48,10 +48,10 @@ is the durable store; `TRAINING_RESULTS.md` is the pipeline-facing summary (owne
 
 Three tools cover the v1 scope. Pick one per project; `program.md` declares which.
 
-| Tool | Type | Version (chub verified) | Best for |
+| Tool | Type | Version (maintainer docs, verified at authoring) | Best for |
 |---|---|---|---|
-| **MLflow** | OSS, self-hostable | `3.10.1` (chub maintainer doc) | Projects wanting local or team-hosted tracking with no cloud account |
-| **W&B** | Cloud-native (OSS backend available) | `0.25.1` (chub maintainer doc) | Projects wanting a hosted UI, team collaboration, artifact versioning |
+| **MLflow** | OSS, self-hostable | `3.10.1` (maintainer docs, verified at authoring) | Projects wanting local or team-hosted tracking with no cloud account |
+| **W&B** | Cloud-native (OSS backend available) | `0.25.1` (maintainer docs, verified at authoring) | Projects wanting a hosted UI, team collaboration, artifact versioning |
 | **Aim** | OSS, local-first | latest as project pins | Lightweight OSS alternative; no cloud required; smaller community |
 
 v1 integration references cover MLflow and W&B. Aim follows the same pattern but is not

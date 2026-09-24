@@ -34,7 +34,7 @@ A "v3 prompt" without the envelope is not a deployable artifact — it is a frag
 
 - **`prompt_id`** — stable across versions (e.g., `issue-classifier`).
 - **`version`** — monotone, human-readable (`v3`, not a git SHA, though a git SHA may be embedded for traceability).
-- **`model`** — dated, exact model ID (e.g., `claude-sonnet-4-x` if the project has confirmed the ID via `external-api-docs`). Never ship a family-level name in production.
+- **`model`** — dated, exact model ID (e.g., `claude-sonnet-4-x` if the project has confirmed the ID against the vendor's current docs). Never ship a family-level name in production.
 - **`created_at`** — ISO-8601 UTC.
 - **`created_by`** — identity of author for audit.
 - **`parent_version`** — the version this replaces or extends.
@@ -255,7 +255,7 @@ Not a platform — an optimizer library. Combine with git-native or platform-bas
 
 ### What drifts between platforms
 
-Cost, latency, feature surface (new tracing views, new eval types, policy controls) drift quarterly. The table in `SKILL.md` is a starting set, not a scorecard. Verify specifics via the vendor's docs or `external-api-docs` before committing.
+Cost, latency, feature surface (new tracing views, new eval types, policy controls) drift quarterly. The table in `SKILL.md` is a starting set, not a scorecard. Verify specifics via the vendor's current docs before committing.
 
 ### Evaluation checklist for platforms
 
@@ -349,7 +349,7 @@ flagged by the sentinel.
 - `./reasoning-and-cot.md` — reasoning-effort as a pinnable envelope field.
 - `../assets/envelope-manifest.yaml` — canonical starter manifest.
 - Sibling skill: `claude-ecosystem` — per-model prompt-caching thresholds, automatic caching, and the 20-block lookback window that constrain cache-friendly layout.
-- Sibling skill: `external-api-docs` — verify current SDK parameter shapes before pinning envelope fields.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 - Sibling skill: `agent-evals` — eval CI architecture beyond single-prompt testing; `references/run-ledger-schema.md` defines the `prompt_hash` field bound to this hashing convention.
 
 ## External Sources

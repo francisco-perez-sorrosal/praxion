@@ -90,4 +90,4 @@ Prefer `railway.toml`/`railway.json` for single-service settings; reach for the 
 
 - Record Railway as the deployment target — services, environments, where tokens live — in `.ai-state/SYSTEM_DEPLOYMENT.md` (see [deployment-documentation.md](deployment-documentation.md)).
 - `cicd-engineer` owns workflow authoring; hand it the CI/CD Wiring facts above plus the `cicd` skill example.
-- Before writing code against the GraphQL API, use the `external-api-docs` skill; if context-hub lacks Railway coverage, fall back to `docs.railway.com` via WebFetch.
+- Before writing code against the GraphQL API, fetch the current reference from `docs.railway.com` via `WebFetch` (per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)).

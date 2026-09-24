@@ -3,8 +3,9 @@
 Integration recipe for connecting a training loop to MLflow experiment tracking.
 Back to [SKILL.md](../SKILL.md).
 
-Curated chub reference: `mlflow/package` (maintainer, Python, `3.10.1`). Fetch for
-current endpoint signatures: `chub get mlflow/package --lang python`.
+Official reference: the MLflow Python docs (https://mlflow.org/docs/latest/api_reference/python_api/index.html) —
+verify the current version per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis)
+before pinning.
 
 <!-- last-verified: 2026-05-03 -->
 
@@ -20,7 +21,7 @@ current endpoint signatures: `chub get mlflow/package --lang python`.
 
 ## Version Note
 
-MLflow `3.10.1` is the chub-verified current version. MLflow 3 introduced first-class
+MLflow `3.10.1` is the version verified at authoring. MLflow 3 introduced first-class
 Logged Models and `model_id`. Older codebases may use run-artifact URIs
 (`runs:/<run_id>/model`) rather than model IDs — both are valid in 3.x.
 

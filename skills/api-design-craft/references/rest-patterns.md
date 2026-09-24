@@ -131,6 +131,8 @@ X-Webhook-Timestamp: 1640000000
 
 **5. Don't guarantee ordering.** Events for the same resource may arrive out of order. Design receivers to handle `created` arriving after `updated` by checking timestamps on the fetched object.
 
+Receiver-side implementation (signature verification, dedup store, async processing, local tunnels, DLQ): [webhooks.md](webhooks.md).
+
 ## Long-Running Operations
 
 The standard pattern (Google AIP + Azure guidelines):

@@ -282,7 +282,7 @@ These surfaces are out of scope for this skill — see below.
 - Sibling skill: `context-security-review` — Claude Code plugin ecosystem security (not runtime user-facing LLM app security).
 - Sibling skill: `agentic-sdks` — agent-loop architecture, tool-integration safety.
 - Sibling skill: `mcp-crafting` — MCP server tool-permission model.
-- Sibling skill: `external-api-docs` — fetch current SDK tool-permission parameter shapes.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 
 ## External Sources
 

@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-09-27T23:43:53Z'
+generated_at: '2026-09-27T23:44:27Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -214,7 +214,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 4863
+  chars: 4927
   paths:
   - skills/**/SKILL.md
 - id: swe/testing-conventions

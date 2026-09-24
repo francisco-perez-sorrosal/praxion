@@ -34,5 +34,5 @@ Load explicitly with `api-documentation` or reference documenting your API, API 
 - [`api-design`](../api-design/) — designs the API this skill documents
 - [`api-design-craft`](../api-design-craft/) — the API quality/taste/review lens
 - [`agentic-interface-design`](../agentic-interface-design/) — designs the MCP tools this skill documents
-- [`external-api-docs`](../external-api-docs/) — consuming *others'* API docs (the inverse)
+- [Current docs for external APIs](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) — consuming *others'* API docs (the inverse)
 - [`doc-management`](../doc-management/) — general project documentation

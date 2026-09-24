@@ -212,7 +212,7 @@ Each exemplar costs tokens on every request. If five exemplars are 2000 tokens, 
 ### Gemini 2.5 (Pro / Flash with thinking)
 
 - Moderate tolerance. Structured output via JSON Schema plays well with wrapped exemplars.
-- Verify current SDK signature via `external-api-docs` before committing to a thinking-mode exemplar pattern.
+- Verify current SDK signature against the vendor's current docs before committing to a thinking-mode exemplar pattern.
 
 ### DeepSeek-R1 and other reasoning-only models
 
@@ -233,7 +233,7 @@ Each exemplar costs tokens on every request. If five exemplars are 2000 tokens, 
 - `./prompt-injection-hardening.md` — delimiter strategy for user-data vs. exemplars.
 - `../assets/envelope-manifest.yaml` — where exemplar-set hash can be pinned alongside the call envelope.
 - Sibling skill: `claude-ecosystem` — for Claude-family-specific prompt-caching thresholds that interact with few-shot block stability.
-- Sibling skill: `external-api-docs` — fetch current SDK signatures before pinning exemplar delivery code.
+- Current SDK signatures: verify against the vendor's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis).
 
 ## External Sources
 

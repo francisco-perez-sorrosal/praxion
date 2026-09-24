@@ -31,4 +31,3 @@ Trigger explicitly by asking about "Claude API," "Anthropic SDK," "model selecti
 - [`mcp-crafting`](../mcp-crafting/) -- Building MCP servers (transports, tools, resources)
 - [`agentic-sdks`](../agentic-sdks/) -- Agent SDK patterns and multi-agent orchestration
 - [`python-development`](../python-development/) -- General Python patterns and tooling
-- [`external-api-docs`](../external-api-docs/) -- Fetch current Claude API endpoint signatures

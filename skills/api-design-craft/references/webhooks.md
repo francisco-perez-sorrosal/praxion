@@ -58,7 +58,7 @@ async def receive_webhook(provider: str, request: Request):
 
 ### HMAC-SHA256 (Most Common)
 
-Used by: Stripe, GitHub, Shopify, Twilio, Slack.
+Used by: Stripe, GitHub, Shopify, Slack.
 
 ```python
 import hashlib
@@ -84,7 +84,7 @@ def verify_hmac_sha256(
 
 What is signed differs per provider (Stripe signs `{timestamp}.{payload}`; Twilio signs the URL + params with HMAC-SHA1) — prefer the provider SDK's verifier; the generic helper fits raw-body HMAC schemes like GitHub's.
 
-Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row. Change a table row only after verifying it, and cite the URL in the commit body.
+Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row.
 
 ### Provider-Specific Headers
 
@@ -217,7 +217,7 @@ async def save_webhook_for_testing(provider: str, payload: dict):
 
 ### Retry Behavior by Provider
 
-Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row. Change a table row only after verifying it, and cite the URL in the commit body.
+Point-in-time: provider specifics drift — verify against the provider's current docs per [§ Current docs for external APIs](../../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before relying on a row.
 
 | Provider | Retry Count | Retry Window | Backoff |
 |----------|-------------|-------------|---------|

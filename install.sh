@@ -458,9 +458,8 @@ EOF
 show_usage() {
     # LEGACY-CHUB-CLEANUP: the --complete-install/--complete-uninstall
     # bullets below describe the offer to remove leftover context-hub
-    # state. td-285's removal grep is code-only; when the shim is deleted,
-    # also drop those two "Also offers to remove leftover context-hub
-    # state" sentences from this heredoc.
+    # state. When the shim is deleted, drop those two "Also offers to
+    # remove leftover context-hub state" sentences from this heredoc too.
     cat <<EOF
 Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry-run] [--uninstall] [--help]
 

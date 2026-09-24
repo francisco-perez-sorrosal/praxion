@@ -8,7 +8,7 @@ Training data is stale for fast-moving APIs. Any agent about to write, design, t
 
 **Source order**: stop at the first source that answers the question:
 
-1. The vendor's official docs, preferring machine-readable variants: the site's `llms.txt` index to find the page, then that page's `.md` variant. `llms-full.txt` only when the whole corpus is genuinely needed. Fetch with `WebFetch` when you have it, asking for signatures quoted verbatim rather than paraphrased. Without it (not in your tools, or a host other than Claude Code), use Bash: `curl -sL --max-time 30 -o tmp/api-docs/<name>.md <url>` (a plain GET, never with credentials, and only for `llms.txt`/`.md`/plain-text URLs), then Grep/Read just the section you need.
+1. The vendor's official docs, preferring machine-readable variants: the site's `llms.txt` index to find the page, then that page's `.md` variant. `llms-full.txt` only when the whole corpus is genuinely needed. Fetch with `WebFetch` when you have it, asking for signatures quoted verbatim rather than paraphrased. Without it (not in your tools, or a host other than Claude Code), use Bash: `curl -sL --max-time 30 --create-dirs -o tmp/api-docs/<name>.md <url>` (a plain GET, never with credentials, and only for `llms.txt`/`.md`/plain-text URLs), then Grep/Read just the section you need.
 2. A vendor-official docs MCP server, if the user has one configured (e.g. Microsoft Learn, AWS Knowledge). First-party servers only.
 3. The official repository: README, CHANGELOG/release notes, type stubs.
 4. `WebSearch`, restricted to the vendor's domains and primary sources. Without it, skip to rung 5; if rung 5 cannot answer either, recommend a researcher pass in your output before falling back to rung 6.

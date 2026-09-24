@@ -863,20 +863,20 @@ start_test "test_install_claude_step_headers_number_contiguously"
 # Scenario (e): a Cursor install sweeps a dangling `.cursor/skills/` symlink,
 # drops the chub MCP entry with a notice, and a second run's --check is
 # clean. The dangling symlink's name is a fabricated one no
-# shipped skill uses (`zz-removed-skill-fixture`) — NOT `external-api-docs`.
+# shipped skill uses (`zz-removed-skill-fixture`), never a real skill name.
 # Naming it after a still-shipped skill would make the scenario silently
 # depend on that skill eventually being deleted from the repo: the sweep
 # would remove the dangling link correctly, but the pre-existing per-skill
 # reconcile loop that runs immediately after would re-create a link of the
 # same *name*, because it would legitimately find a live
-# `skills/external-api-docs/` directory to point it at — so the "was swept
+# `skills/<that-name>/` directory to point it at — so the "was swept
 # and stays swept" assertion below would be unsatisfiable regardless of the
 # sweep's own correctness. A name with no currently-shipped counterpart
 # isolates the sweep mechanism from that unrelated reconcile loop.
 #
 # Drives install_cursor.sh DIRECTLY rather than `install.sh cursor <path>`:
 # install.sh's default (no --check/--dry-run/--uninstall) flow runs
-# install_chub_cli/install_scc_cli/install_python_tooling/
+# legacy_chub_cleanup/install_scc_cli/install_python_tooling/
 # install_obsidian_deps FOR EVERY MODE, cursor included, before it even
 # delegates — each an interactive `ask()` prompt (or, for Obsidian, a
 # network-touching plugin operation) wholly unrelated to the Cursor sweep

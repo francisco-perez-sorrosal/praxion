@@ -105,7 +105,6 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 | Category                 | Skills                                                                                                                                                                                        |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI Assistant Crafting    | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting                                                                                                   |
-| External Knowledge       | external-api-docs                                                                                                                                                                             |
 | Platform Knowledge       | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering                                                                                                                  |
 | Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications                                                                                                                               |
 | Design & Architecture    | api-design, data-modeling, deployment, observability, performance-architecture                                                                                                                |
@@ -199,17 +198,16 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 
 ### Claude Code
 
-`./install.sh` (or `./install.sh code`) walks through seven steps:
+`./install.sh` (or `./install.sh code`) walks through six steps (0–5):
 
 | Step | What                                                                                                                      | Interactive?           |
 | ---- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| 1    | Personal config (CLAUDE.md, userPreferences.txt, settings.local.json) to `~/.claude/`                                     | No — always installed  |
-| 2    | Rules to `~/.claude/rules/` (auto-loaded when relevant)                                                                   | No — always installed  |
-| 3    | praxion plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (scope: user or project)   | Yes — recommended      |
-| 4    | Task Chronograph hooks (agent lifecycle observability)                                                                    | Yes — recommended      |
-| 5    | CLI scripts (`praxion-parallel` — multi-session terminal launcher) to `~/.local/bin/`                                      | No — always installed  |
-| 6    | External API docs ([context-hub](https://github.com/andrewyng/context-hub) MCP — curated docs for 600+ libraries)         | Yes — recommended      |
-| 7    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
+| 0    | Personal identifiers, rendered into `~/.claude/CLAUDE.md`                                                                 | Yes — defaults offered |
+| 1    | Symlinks: personal config, rules to `~/.claude/rules/`, CLI scripts to `~/.local/bin/`                                    | No — always            |
+| 2    | Git merge infrastructure (merge drivers + git hooks)                                                                      | No — always            |
+| 3    | praxion plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (skills, commands, agents, hooks incl. Task Chronograph) | Yes — recommended      |
+| 4    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
+| 5    | Claude Desktop config link                                                                                                | Yes — default skip     |
 
 When installed as a plugin, commands are namespaced: `/co` becomes `/praxion:co`.
 
@@ -273,7 +271,6 @@ Installer resources live in tool-specific config directories: [claude/config/](c
 
 - **[Core Concepts](docs/concepts.md)** — the building blocks, the layered architecture, and the agent pipeline.
 - **[Multi-Session Workflows](docs/multi-session.md)** — `praxion-parallel` CLI + web launcher, recipe layering, worktree modes, after-launch ergonomics, examples.
-- **[External API Docs](docs/external-api-docs.md)** — retrieve current API documentation for external libraries during development.
 - **[Spec-Driven Development](docs/spec-driven-development.md)** — behavioral specifications with requirement IDs for medium/large features.
 - **[Decision Tracking](docs/decision-tracking.md)** — Architecture Decision Records in `.ai-state/decisions/` capturing decisions from AI-assisted sessions.
 - **[Claude Code vs Cursor](docs/cursor-compat.md)** — format differences, discovery paths, and adaptation details.

@@ -262,6 +262,5 @@ These agents operate alongside the main pipeline:
 
 - [Agent catalog and pipeline diagram](../agents/README.md)
 - [Skills catalog](../skills/README.md)
-- [External API docs](external-api-docs.md) — retrieve current API documentation for external libraries during development
 - [Spec-driven development](spec-driven-development.md) — behavioral specifications for medium/large features
 - [Developer guide](../README_DEV.md) — project structure and contributor conventions

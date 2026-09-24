@@ -1,10 +1,10 @@
 ---
-description: Reverse /praxion-complete-install — remove rule/script symlinks and optional context-hub MCP. Plugin body is preserved.
+description: Reverse /praxion-complete-install — remove rule/script symlinks and offer to remove leftover state from earlier Praxion versions. Plugin body is preserved.
 allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
-Remove the system-level symlinks and MCP entry that `/praxion-complete-install` created. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
+Remove the system-level symlinks that `/praxion-complete-install` created, and offer to remove leftover state from earlier Praxion versions. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
 
 ## Procedure
 
@@ -18,9 +18,9 @@ Remove the system-level symlinks and MCP entry that `/praxion-complete-install` 
 
    If the plugin is not installed, report: *"Praxion plugin not found — nothing to uninstall."*
 
-3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each removal (rules, scripts, context-hub MCP). Do not suppress or auto-answer — each prompt represents a filesystem deletion the user should approve.
+3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each removal (rules, scripts, legacy remnants from earlier Praxion versions if present). Do not suppress or auto-answer — each prompt represents a filesystem deletion the user should approve.
 
-4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether the MCP entry was removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall praxion` to fully remove.
+4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether any legacy remnants were removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall praxion` to fully remove.
 
 ## Safety
 

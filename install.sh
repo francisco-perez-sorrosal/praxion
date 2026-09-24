@@ -35,72 +35,128 @@ ask() {
     REPLY="$choice"
 }
 
-# =============================================================================
-# Shared — External API Docs (context-hub CLI + telemetry config)
-# =============================================================================
+# ============================================================================
+# LEGACY-CHUB-CLEANUP — transitional. Praxion no longer installs context-hub.
+# Detects and offers to remove state that earlier Praxion installers wrote.
+# Remove this function and every call site together; see the tech-debt row
+# whose dedup_key is "legacy-chub-cleanup-shim". Do not cite ADR ids here.
+# ============================================================================
 
-install_chub_cli() {
-    header "Shared — External API Docs (context-hub)"
-
-    if ! command -v npm &>/dev/null; then
-        step "Node.js not found — skipping context-hub setup"
-        step "Install Node.js 18+ and re-run to enable external API docs"
-        return
+# Prints the manual removal command for each present kind (used by both
+# `report` mode and a non-TTY `offer`, so the two never drift apart).
+# Must always return 0: called as a bare statement under `set -e`, and a
+# `cond && cmd` tail whose cond is false would otherwise abort the caller.
+_legacy_chub_cleanup_manual_commands() {
+    local chub_home=$1 npm_global=$2
+    if $chub_home; then
+        step "rm -rf ~/.chub   # review first: may hold your annotations"
     fi
+    if $npm_global; then
+        step "npm uninstall -g @aisuite/chub"
+    fi
+}
 
+_legacy_chub_cleanup_report() {
+    local chub_home=$1 npm_global=$2
+    printf "\n  ${B}Legacy context-hub (chub) state found:${R}\n"
+    $chub_home && warn "~/.chub is still present"
+    $npm_global && warn "@aisuite/chub is still installed globally (npm)"
+    _legacy_chub_cleanup_manual_commands "$chub_home" "$npm_global"
+}
+
+_legacy_chub_cleanup_offer_chub_home() {
+    $1 || return 0
+    local entries
+    entries="$(ls -1A "${HOME}/.chub" 2>/dev/null | tr '\n' ' ')"
     cat <<EOF
 
-  ${B}[1] Install context-hub CLI (recommended)${R}
-      ${D}Installs chub globally (npm install -g). Curated API docs for${R}
-      ${D}600+ libraries (Stripe, OpenAI, AWS, etc.). Used by skills as${R}
-      ${D}a fallback and available to all users on this machine.${R}
-      ${D}Telemetry disabled by default.${R}
-
-  ${B}[2] Skip${R}
-      ${D}No chub CLI. Install later by re-running: ./install.sh${R}
+  ${B}Legacy context-hub data: ~/.chub${R}
+      ${D}Holds chub CLI config and any saved annotations.${R}
+      ${D}Contents: ${entries:-(empty)}${R}
+EOF
+    if [ -d "${HOME}/.chub/annotations" ]; then
+        warn "~/.chub/annotations/ present — holds your saved doc annotations"
+    fi
+    if [ -f "${HOME}/.chub/config.yaml" ] && grep -q '^sources:' "${HOME}/.chub/config.yaml" 2>/dev/null; then
+        warn "~/.chub/config.yaml configures custom sources beyond Praxion's default"
+    fi
+    printf "\n  ${B}[1] Keep${R}\n"
+    if command -v chub &>/dev/null; then
+        cat <<EOF
+      ${D}Leave ~/.chub in place. Export annotations first if you want${R}
+      ${D}them later: chub annotate --list > ~/chub-annotations.txt${R}
+EOF
+    else
+        printf "      ${D}Leave ~/.chub in place.${R}\n"
+    fi
+    cat <<EOF
+  ${B}[2] Remove${R}
+      ${D}Delete ~/.chub.${R}
 EOF
     ask 1 2
-
     if [ "$REPLY" -eq 2 ]; then
-        step "context-hub CLI skipped"
-        return
-    fi
-
-    step "Installing chub CLI globally..."
-    if npm install -g @aisuite/chub 2>&1 | tail -1; then
-        info "chub CLI installed ($(chub --cli-version 2>/dev/null || echo '?'))"
+        rm -rf "${HOME}/.chub" && info "~/.chub removed" || warn "~/.chub removal failed"
     else
-        warn "Global install failed — re-run or install manually: npm install -g @aisuite/chub"
-    fi
-
-    # Disable telemetry persistently
-    local chub_config_dir="${HOME}/.chub"
-    if [ ! -f "${chub_config_dir}/config.yaml" ]; then
-        mkdir -p "$chub_config_dir"
-        cat > "${chub_config_dir}/config.yaml" << 'YAML'
-telemetry: false
-feedback: false
-YAML
-        info "Telemetry disabled in ~/.chub/config.yaml"
+        step "~/.chub kept"
     fi
 }
 
-check_chub_cli() {
-    printf "\n  ${B}External API Docs (shared):${R}\n"
-    if command -v chub &>/dev/null; then
-        info "chub CLI installed ($(chub --cli-version 2>/dev/null || echo '?'))"
-    else
-        warn "chub CLI not installed globally"
-    fi
-}
+_legacy_chub_cleanup_offer_npm_global() {
+    $1 || return 0
+    cat <<EOF
 
-uninstall_chub_cli() {
-    if command -v chub &>/dev/null; then
-        step "Removing chub CLI..."
+  ${B}Legacy context-hub CLI: @aisuite/chub (global npm package)${R}
+
+  ${B}[1] Remove${R}
+      ${D}npm uninstall -g @aisuite/chub${R}
+  ${B}[2] Keep${R}
+EOF
+    ask 1 2
+    if [ "$REPLY" -eq 1 ]; then
         npm uninstall -g @aisuite/chub 2>/dev/null \
             && info "chub CLI removed" \
             || warn "chub CLI removal failed"
+    else
+        step "chub CLI kept"
     fi
+}
+
+# Detects leftover context-hub state written by earlier Praxion installers
+# and either reports it (mode=report) or offers to remove it (mode=offer).
+# Kinds owned here: chub-home (~/.chub), npm-global (@aisuite/chub via npm).
+legacy_chub_cleanup() {
+    local mode=$1
+    case "$mode" in
+        report|offer) ;;
+        *) fail "legacy_chub_cleanup: invalid mode '$mode'" ;;
+    esac
+
+    local npm_global_present=false chub_home_present=false
+    if command -v npm &>/dev/null; then
+        npm ls -g --depth=0 @aisuite/chub &>/dev/null && npm_global_present=true
+    elif command -v chub &>/dev/null; then
+        warn "chub binary at $(command -v chub) not installed via npm; leaving it"
+    fi
+    [ -d "${HOME}/.chub" ] && chub_home_present=true
+
+    if ! $chub_home_present && ! $npm_global_present; then
+        return 0
+    fi
+
+    if [ "$mode" = "report" ]; then
+        _legacy_chub_cleanup_report "$chub_home_present" "$npm_global_present"
+        return 0
+    fi
+
+    if [ ! -t 0 ]; then
+        warn "Non-interactive — leaving legacy context-hub state in place"
+        _legacy_chub_cleanup_manual_commands "$chub_home_present" "$npm_global_present"
+        return 0
+    fi
+
+    header "Legacy context-hub cleanup"
+    _legacy_chub_cleanup_offer_chub_home "$chub_home_present"
+    _legacy_chub_cleanup_offer_npm_global "$npm_global_present"
 }
 
 # =============================================================================
@@ -328,11 +384,13 @@ show_overview() {
     local mode=$1
     printf "\n${B}Praxion Installer${R}\n"
 
-    if [ "$mode" != "codex" ]; then
+    # --complete-uninstall only removes the plugin symlinks (§ Data Flow);
+    # it never runs the shared installers, so the "Shared:" bullets below
+    # (which name those installers) would be misleading here.
+    if [ "$mode" != "codex" ] && ! $COMPLETE_UNINSTALL; then
         cat <<EOF
 
   Shared:
-    • External API docs (chub CLI — curated docs for 600+ libraries)
     • Optional metrics tool (scc — SLOC counter used by /project-metrics)
     • Python tooling (uv + pytest/pytest-cov for Praxion's own tests and coverage)
     • Obsidian integration (kepano/obsidian-skills marketplace plugin — activates Obsidian integration)
@@ -351,7 +409,6 @@ EOF
     • praxion plugin      (skills, commands, agents)
     • Chronograph hooks (agent lifecycle observability)
     • CLI scripts       (praxion-parallel — multi-session terminal launcher)
-    • context-hub MCP   (chub-mcp — native agent tool access)
 EOF
             ;;
         desktop)
@@ -420,17 +477,19 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
   --relink     Re-symlink config, rules, and scripts (no prompts)
   --complete-install
                Marketplace-only users: finish a 'claude plugin install
-               praxion@bit-agora' by symlinking rules, CLI scripts, and
-               (optionally) context-hub MCP — the surfaces the plugin
-               mechanism does not cover natively. Prompts before each
-               system-level change. Reachable via /praxion-complete-install
-               inside a Claude Code session. Only valid with 'code'.
+               praxion@bit-agora' by symlinking rules and CLI scripts —
+               the surfaces the plugin mechanism does not cover natively.
+               Prompts before each system-level change. Also offers to
+               remove leftover context-hub state from earlier Praxion
+               versions. Reachable via /praxion-complete-install inside a
+               Claude Code session. Only valid with 'code'.
   --complete-uninstall
                Reverse of --complete-install: remove the rule/script
-               symlinks that point at the plugin cache, and optionally
-               remove context-hub MCP. Plugin body is preserved — run
-               'claude plugin uninstall praxion' separately to remove it.
-               Only valid with 'code'.
+               symlinks that point at the plugin cache. Plugin body is
+               preserved — run 'claude plugin uninstall praxion'
+               separately to remove it. Also offers to remove leftover
+               context-hub state from earlier Praxion versions. Only
+               valid with 'code'.
   --dev-link   Symlink the pinned plugin cache's hooks/, scripts/, and
                commands/ back to this working tree's own copies, so local
                edits take effect immediately without a manual cp between
@@ -557,29 +616,36 @@ elif $DEV_LINK || $DEV_LINK_OFF; then
 elif $CHECK; then
     delegate_rc=0
     delegate || delegate_rc=$?
-    check_chub_cli
+    legacy_chub_cleanup report
     check_scc_cli
     check_python_tooling
     check_obsidian_deps
     exit $delegate_rc
 elif $UNINSTALL; then
     delegate
-    uninstall_chub_cli
+    legacy_chub_cleanup offer
     uninstall_scc_cli
     uninstall_python_tooling
     uninstall_obsidian_deps
 elif $DRY_RUN; then
-    check_chub_cli
+    legacy_chub_cleanup report
     check_scc_cli
     check_python_tooling
     check_obsidian_deps
     delegate
 elif $COMPLETE_UNINSTALL; then
     # Reverses --complete-install only; the shared installers must not run here.
-    delegate
+    # rc is captured (not a bare `delegate;`) so a non-zero exit from the
+    # delegate script can't short-circuit `legacy_chub_cleanup offer` under
+    # `set -e` — this branch always runs cleanup, then exits with the
+    # delegate's own rc (0 unless the delegate itself failed).
+    delegate_rc=0
+    delegate || delegate_rc=$?
+    legacy_chub_cleanup offer
+    exit $delegate_rc
 else
     # Install: shared CLIs first, then tool-specific
-    install_chub_cli
+    legacy_chub_cleanup offer
     install_scc_cli
     install_python_tooling
     install_obsidian_deps

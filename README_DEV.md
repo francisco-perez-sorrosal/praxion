@@ -22,7 +22,6 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── data-modeling/
 ├── deployment/
 ├── doc-management/
-├── external-api-docs/
 ├── hook-crafting/
 ├── id-decontamination/
 ├── llm-prompt-engineering/
@@ -160,7 +159,6 @@ docs/                                # Cross-cutting documentation
 ├── concepts.md
 ├── cursor-compat.md
 ├── decision-tracking.md              # Content updated to describe ADR system
-├── external-api-docs.md
 ├── getting-started.md
 ├── observability.md
 └── spec-driven-development.md
@@ -539,10 +537,10 @@ When `claude plugin install praxion@bit-agora` runs, Claude Code clones the enti
 
 ### Marketplace-only install flow (internal architecture)
 
-The three system-level surfaces (rules, scripts, context-hub MCP) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook:
+The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook. It also offers consent-gated removal of leftover state from earlier Praxion versions (transitional cleanup, tagged in code for later removal).
 
 - `hooks/auto_complete_install.py` — SessionStart hook that detects missing surfaces and completes setup automatically on first session. Uses sensible defaults from `git config` (name, email) with optional operator override via single prompt.
-- `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts, delegates to `prompt_chub_mcp()` for the MCP entry.
+- `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts.
 - `commands/praxion-complete-install.md` — optional slash command for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT` and invokes `install.sh code --complete-install` from the cache.
 
 The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninstall`) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.

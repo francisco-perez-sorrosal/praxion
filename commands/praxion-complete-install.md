@@ -1,12 +1,12 @@
 ---
-description: Reconfigure or recover a marketplace-installed Praxion setup — symlink rules, CLI scripts, and optional context-hub MCP. Optional (auto-completes on first session).
+description: Reconfigure or recover a marketplace-installed Praxion setup — symlink rules and CLI scripts, and offer to remove leftover state from earlier Praxion versions. Optional (auto-completes on first session).
 allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
 Most users will not need this command — Praxion auto-completes the setup on your first Claude Code session. Use this command only if auto-install was disabled (`PRAXION_DISABLE_AUTO_COMPLETE=1`), to reconfigure personal settings, or to recover from a corrupted install state.
 
-The plugin body is already present; this command adds or refreshes the system-level surfaces the plugin mechanism does not cover natively: rules (auto-loaded by Claude Code globally), CLI scripts on `$PATH`, and optional context-hub MCP configuration.
+The plugin body is already present; this command adds or refreshes the system-level surfaces the plugin mechanism does not cover natively: rules (auto-loaded by Claude Code globally) and CLI scripts on `$PATH`. It also offers to remove leftover state from earlier Praxion versions, if any is found.
 
 ## Procedure
 
@@ -20,13 +20,13 @@ The plugin body is already present; this command adds or refreshes the system-le
 
    If neither resolution succeeds (plugin not installed), report: *"Praxion plugin not found. Run `claude plugin install praxion@bit-agora` first."*
 
-3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each system-level change (rules, scripts, context-hub MCP). Do not suppress, skip, or auto-answer these prompts — they are the user's signal that filesystem or `~/.claude.json` state is about to change.
+3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each system-level change (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions). Do not suppress, skip, or auto-answer these prompts — they are the user's signal that filesystem or `~/.claude.json` state is about to change.
 
 4. **Summarize the outcome** once the installer exits: which surfaces were linked, which were skipped, and whether a new Claude Code session is needed to pick up the rules (always yes if rules were linked).
 
 ## Idempotence
 
-The underlying operations are idempotent — running this command a second time is safe. Existing symlinks are replaced in place; `context-hub` MCP config is upserted, not duplicated.
+The underlying operations are idempotent — running this command a second time is safe. Existing symlinks are replaced in place.
 
 ## Reversal
 

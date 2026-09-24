@@ -24,7 +24,6 @@ Focused recipes assuming familiarity. Skim for the step you need.
 
 - [Project onboarding](onboarding.md) — bring a project into the Praxion ecosystem with `onboard-project` (empty directory, existing repo, or hackathon mode — one command detects the right one)
 - [Cursor compatibility](cursor-compat.md) — set up Praxion for Cursor in addition to Claude Code
-- [External API docs](external-api-docs.md) — configure context-hub MCP for SDK/API references
 - [Observability](observability.md) — wire up Phoenix telemetry for a managed project
 - [Harvesting Learnings with Skill-Genesis](skill-genesis.md) — run `/skill-genesis` to autonomously harvest patterns, disposition proposals via `/skill-genesis-review`
 

@@ -18,14 +18,6 @@
         "AGENTS_DIR": "{{AGENTS_DIR_ABS}}",
         "AGENT_TYPE": "cursor"
       }
-    },
-    "chub": {
-      "command": "npx",
-      "args": ["-y", "@aisuite/chub", "mcp"],
-      "env": {
-        "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "1"
-      }
     }
   }
 }

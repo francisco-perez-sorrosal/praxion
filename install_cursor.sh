@@ -32,6 +32,18 @@ warn() { printf "  ⚠ %s\n" "$*"; }
 header() { printf "\n${B}%s${R}\n" "$*"; }
 step() { printf "  %s\n" "$*"; }
 
+# LEGACY-CHUB-CLEANUP: true if $1 (an mcp.json path) exists and still carries
+# a "chub" entry under mcpServers — shared by both the --check warning and
+# the install-time drop notice below. Remove after >=1 minor release plus 90
+# days.
+mcp_json_has_chub() {
+    [ -f "$1" ] && python3 -c "
+import json, sys
+j = json.load(open(sys.argv[1]))
+sys.exit(0 if 'chub' in (j.get('mcpServers') or {}) else 1)
+" "$1" 2>/dev/null
+}
+
 show_usage() {
     cat <<EOF
 Usage: $(basename "$0") [path] [--check] [--dry-run] [--uninstall] [--help]
@@ -168,13 +180,21 @@ sys.exit(0 if sys.argv[2] in servers else 1)
                 fi
             done < "$expected_servers"
             if [ -z "$missing" ]; then
-                info "mcp.json present (task-chronograph, sub-agents, chub)"
+                info "mcp.json present (task-chronograph, sub-agents)"
             else
                 warn "mcp.json missing expected server(s):$missing"
                 healthy=false
             fi
         else
             info "mcp.json present"
+        fi
+
+        # LEGACY-CHUB-CLEANUP: warn (does not fail health) when a pre-removal
+        # mcp.json still carries the retired "chub" server entry — re-running
+        # install rewrites mcp.json wholesale from the template and drops it.
+        # Remove this block after >=1 minor release plus 90 days.
+        if mcp_json_has_chub "$CURSOR_DIR/mcp.json"; then
+            warn "mcp.json still has a legacy 'chub' MCP server entry — re-run install to regenerate mcp.json, or remove it manually"
         fi
     else
         warn "mcp.json not found"
@@ -198,6 +218,24 @@ step "Target: $INSTALL_MODE"
 # 1. Skills: symlink each skills/<name> -> TARGET/skills/<name>
 step "Linking skills..."
 mkdir -p "$CURSOR_DIR/skills"
+
+# Permanent sweep: remove any $CURSOR_DIR/skills/<name> symlink that points
+# into this repo's skills/ but no longer resolves (e.g., a skill deleted from
+# the repo since the last install). Never touches a non-symlink or a link
+# pointing elsewhere — the Cursor-skills analogue of
+# sweep_stale_rule_symlinks in lib/install_shared.sh. Not scoped to any one
+# skill's removal; applies to every future skill deletion too.
+while IFS= read -r link; do
+    target="$(readlink "$link")"
+    case "$target" in
+        "$REPO_ROOT/skills/"*) ;;
+        *) continue ;;
+    esac
+    [ -e "$link" ] && continue
+    rm -f "$link"
+    warn "Removed stale skill link: $(basename "$link")"
+done < <(find "$CURSOR_DIR/skills" -maxdepth 1 -type l 2>/dev/null)
+
 for d in skills/*/; do
     name="${d%/}"
     name="${name#skills/}"
@@ -232,14 +270,22 @@ if [ ! -f "$template" ]; then
     exit 1
 fi
 mkdir -p "$CURSOR_DIR"
+
+# LEGACY-CHUB-CLEANUP: the template no longer ships a "chub" server entry;
+# the rewrite below replaces mcp.json wholesale, so announce the drop when a
+# prior install's mcp.json still has one — otherwise the removal is silent.
+# Remove this block after >=1 minor release plus 90 days.
+if mcp_json_has_chub "$CURSOR_DIR/mcp.json"; then
+    warn "Dropping legacy 'chub' MCP server entry from mcp.json (context-hub is retired)"
+fi
+
 sed -e "s|{{MCP_ROOT}}|$MCP_ROOT|g" \
     -e "s|{{AGENTS_DIR_ABS}}|$AGENTS_DIR_ABS|g" \
     "$template" > "$CURSOR_DIR/mcp.json"
 info "MCP config written to $CURSOR_DIR/mcp.json (servers use repo: $MCP_ROOT)"
 info "sub-agents points at $AGENTS_DIR_ABS (requires Node/npx)"
-info "chub (context-hub) configured for external API docs (requires Node/npx)"
 
 printf "\n"
 info "Cursor install complete."
 step "Target: $CURSOR_DIR"
-step "MCP: task-chronograph requires \`uv\`; sub-agents and chub require Node/npx."
+step "MCP: task-chronograph requires \`uv\`; sub-agents require Node/npx."

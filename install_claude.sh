@@ -548,8 +548,7 @@ complete_install_from_plugin() {
     printf "  the plugin body (skills, commands, agents, hooks, MCP servers). This\n"
     printf "  command adds the surfaces the plugin mechanism does not cover natively:\n"
     printf "    • Rules (auto-loaded by Claude Code — shape agent behavior globally)\n"
-    printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n"
-    printf "    • context-hub MCP (curated docs for 600+ libraries)\n\n"
+    printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n\n"
     printf "  You will be prompted before each system-level change. Re-run anytime;\n"
     printf "  the operations are idempotent.\n\n"
 
@@ -606,11 +605,9 @@ complete_install_from_plugin() {
         step "Scripts skipped"
     fi
 
-    # ---- context-hub MCP ----
-    # prompt_chub_mcp has its own internal [1]/[2] prompt for install/skip,
-    # so we just delegate to it.
+    # ---- LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state ----
     printf "\n"
-    prompt_chub_mcp
+    legacy_chub_cleanup_claude offer
 
     printf "\n"
     info "Praxion complete install done"
@@ -673,35 +670,8 @@ complete_uninstall_from_plugin() {
         fi
     fi
 
-    # ---- context-hub MCP ----
-    local claude_json="${HOME}/.claude.json"
-    if [ -f "$claude_json" ] && grep -q "chub-mcp\|@aisuite/chub" "$claude_json" 2>/dev/null; then
-        printf "\n  ${B}[1] Remove context-hub MCP from ~/.claude.json?${R}\n"
-        printf "      ${D}Reverses what '/praxion-complete-install' added.${R}\n"
-        printf "  ${B}[2] Skip${R}\n"
-        ask 1 2
-        if [ "$REPLY" -eq 1 ]; then
-            python3 - "$claude_json" << 'PYEOF'
-import json, sys
-p = sys.argv[1]
-with open(p) as f:
-    data = json.load(f)
-servers = data.get("mcpServers", {})
-removed = 0
-for name in ["context-hub", "chub"]:
-    if name in servers:
-        del servers[name]
-        removed += 1
-with open(p, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
-print(f"removed {removed} MCP entr{'y' if removed == 1 else 'ies'}")
-PYEOF
-            info "context-hub MCP removed from ~/.claude.json"
-        else
-            step "MCP skipped"
-        fi
-    fi
+    # ---- LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state ----
+    legacy_chub_cleanup_claude offer
 
     printf "\n"
     info "Praxion complete uninstall done"
@@ -880,95 +850,126 @@ PYEOF
 # The installer only cleans up stale hooks from settings.json if present.
 
 # =============================================================================
-# External API Docs (context-hub MCP)
+# LEGACY-CHUB-CLEANUP — transitional. Praxion no longer installs context-hub.
+# Detects and offers to remove context-hub (chub) MCP entries that earlier
+# Praxion versions wrote into Claude Code's own config files. Remove this
+# function, its helpers, and every call site together; see the tech-debt row
+# whose dedup_key is "legacy-chub-cleanup-shim". Do not cite ADR ids here.
 # =============================================================================
 
-prompt_chub_mcp() {
-    header "Step 5 — context-hub MCP Server"
-
-    # Prefer globally installed chub-mcp, fall back to npx
-    local chub_mcp_cmd chub_mcp_args
-    if command -v chub-mcp &>/dev/null; then
-        chub_mcp_cmd="chub-mcp"
-        chub_mcp_args="[]"
-    elif command -v npx &>/dev/null; then
-        chub_mcp_cmd="npx"
-        chub_mcp_args='["-p", "@aisuite/chub", "chub-mcp"]'
-    else
-        step "Neither chub-mcp nor npx found — skipping MCP server setup"
-        step "Install chub globally (npm install -g @aisuite/chub) and re-run"
-        return
-    fi
-
-    cat <<EOF
-
-  ${B}[1] Configure context-hub MCP (recommended)${R}
-      ${D}Agents get native tool access to curated API docs (chub_search,${R}
-      ${D}chub_get). Modifies ~/.claude/settings.json.${R}
-
-  ${B}[2] Skip${R}
-      ${D}Agents can still use chub CLI as fallback (if installed globally).${R}
-      ${D}MCP gives agents native tool discovery without CLI teaching.${R}
-      ${D}Install later by re-running: ./install.sh code${R}
-EOF
-    ask 1 2
-
-    if [ "$REPLY" -eq 2 ]; then
-        step "context-hub MCP skipped"
-        return
-    fi
-
-    local claude_json="${HOME}/.claude.json"
-    step "Adding context-hub MCP to ~/.claude.json (command: ${chub_mcp_cmd})..."
-
-    python3 - "$claude_json" "$chub_mcp_cmd" "$chub_mcp_args" << 'PYEOF'
+# Prints "present", "absent", or "unparseable" for whether $1's mcpServers
+# has a "chub"/"context-hub" key. Always exits 0 — the printed word carries
+# the result, not the exit status, so callers stay safe under `set -e`.
+# Treats any shape that isn't a JSON object at the top level or at
+# mcpServers (e.g. `{"mcpServers": null}`, a top-level array) as
+# "unparseable" rather than crashing — this file was never Praxion's to
+# assume the shape of.
+_legacy_chub_json_probe() {
+    local file="$1"
+    [ -f "$file" ] || { printf 'absent'; return 0; }
+    python3 - "$file" << 'PYEOF'
 import json, sys
-
-claude_json_path = sys.argv[1]
-cmd = sys.argv[2]
-args = json.loads(sys.argv[3])
-
 try:
-    with open(claude_json_path) as f:
-        config = json.load(f)
-except FileNotFoundError:
-    config = {}
-
-servers = config.setdefault("mcpServers", {})
-servers["chub"] = {
-    "type": "stdio",
-    "command": cmd,
-    "args": args,
-    "env": {
-        "CHUB_TELEMETRY": "0",
-        "CHUB_FEEDBACK": "1"
-    }
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("top-level JSON is not an object")
+    servers = data.get("mcpServers") or {}
+    if not isinstance(servers, dict):
+        raise ValueError("mcpServers is not an object")
+except (OSError, ValueError):
+    print("unparseable", end="")
+    sys.exit(0)
+print("present" if ("chub" in servers or "context-hub" in servers) else "absent", end="")
+PYEOF
 }
 
-with open(claude_json_path, "w") as f:
-    json.dump(config, f, indent=2)
+# Deletes the "chub"/"context-hub" keys from $1's mcpServers, preserving
+# every other key and the indent=2 + trailing-newline convention. When $2 is
+# "1", also drops mcpServers itself once it is empty.
+_legacy_chub_json_remove() {
+    local file="$1" drop_if_empty="$2"
+    python3 - "$file" "$drop_if_empty" << 'PYEOF'
+import json, sys
+path, drop_if_empty = sys.argv[1], sys.argv[2] == "1"
+with open(path) as f:
+    data = json.load(f)
+servers = data.get("mcpServers", {})
+for name in ("chub", "context-hub"):
+    servers.pop(name, None)
+if drop_if_empty and not servers and "mcpServers" in data:
+    del data["mcpServers"]
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
     f.write("\n")
 PYEOF
+}
 
-    info "context-hub MCP configured (telemetry disabled)"
+# Prints the copy-pasteable manual removal command for $1.
+_legacy_chub_manual_cmd() {
+    printf 'python3 -c "import json; p=%s; d=json.load(open(p)); s=d.get(%s,{}); [s.pop(k, None) for k in (%s,%s)]; json.dump(d, open(p,%s), indent=2)"' \
+        "'$1'" "'mcpServers'" "'chub'" "'context-hub'" "'w'"
+}
 
-    # Migrate: remove stale chub entry from settings.json if present
-    local settings_file="${HOME}/.claude/settings.json"
-    if [ -f "$settings_file" ]; then
-        python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    s = json.load(f)
-servers = s.get('mcpServers', {})
-if 'chub' in servers:
-    del servers['chub']
-    if not servers:
-        del s['mcpServers']
-    with open(sys.argv[1], 'w') as f:
-        json.dump(s, f, indent=2)
-        f.write('\n')
-" "$settings_file" 2>/dev/null && step "Cleaned stale chub entry from settings.json" || true
+# Interactively offers to remove the context-hub MCP entry from $1 (caller
+# has already confirmed it is present). $2 is the human label used in
+# prompts/messages, $3 is "0"/"1" for _legacy_chub_json_remove's
+# drop_if_empty. Default (Enter) is Remove.
+_legacy_chub_offer_one() {
+    local file="$1" label="$2" drop_if_empty="$3"
+    printf "\n  ${B}[1] Remove context-hub MCP entry from %s?${R}\n" "$label"
+    printf "  ${B}[2] Keep${R}\n"
+    ask 1 2
+    if [ "$REPLY" -eq 1 ]; then
+        _legacy_chub_json_remove "$file" "$drop_if_empty" \
+            && info "context-hub MCP removed from ${label}" \
+            || warn "could not update ${label}"
+    else
+        step "${label} entry kept"
     fi
+}
+
+# Reports on (mode=report) or offers to remove (mode=offer) leftover
+# context-hub MCP entries in ~/.claude.json and the legacy ~/.claude/
+# settings.json location. Both kinds default to Remove.
+legacy_chub_cleanup_claude() {
+    local mode="$1"
+    case "$mode" in
+        report|offer) ;;
+        *) fail "legacy_chub_cleanup_claude: unknown mode '${mode}'" ;;
+    esac
+
+    local claude_json="${HOME}/.claude.json"
+    local settings_json="${HOME}/.claude/settings.json"
+    local claude_state settings_state
+    claude_state="$(_legacy_chub_json_probe "$claude_json")"
+    settings_state="$(_legacy_chub_json_probe "$settings_json")"
+
+    [ "$claude_state" = "unparseable" ] && warn "cannot inspect ~/.claude.json (invalid JSON) — leaving it alone"
+    [ "$settings_state" = "unparseable" ] && warn "cannot inspect ~/.claude/settings.json (invalid JSON) — leaving it alone"
+
+    if [ "$claude_state" != "present" ] && [ "$settings_state" != "present" ]; then
+        return 0
+    fi
+
+    if [ "$mode" = "report" ]; then
+        printf "\n  ${B}Legacy context-hub (chub) state found:${R}\n"
+        [ "$claude_state" = "present" ] && warn "context-hub MCP entry found in ~/.claude.json — remove: $(_legacy_chub_manual_cmd "$claude_json")"
+        [ "$settings_state" = "present" ] && warn "context-hub MCP entry found in ~/.claude/settings.json (legacy location) — remove: $(_legacy_chub_manual_cmd "$settings_json")"
+        return 0
+    fi
+
+    if [ ! -t 0 ]; then
+        warn "non-interactive — leaving legacy context-hub MCP entries in place"
+        [ "$claude_state" = "present" ] && step "Manual: $(_legacy_chub_manual_cmd "$claude_json")"
+        [ "$settings_state" = "present" ] && step "Manual: $(_legacy_chub_manual_cmd "$settings_json")"
+        return 0
+    fi
+
+    header "Legacy context-hub cleanup"
+    [ "$claude_state" = "present" ] && _legacy_chub_offer_one "$claude_json" "~/.claude.json" 0
+    [ "$settings_state" = "present" ] && _legacy_chub_offer_one "$settings_json" "~/.claude/settings.json (legacy location)" 1
+    return 0
 }
 
 # =============================================================================
@@ -976,7 +977,7 @@ if 'chub' in servers:
 # =============================================================================
 
 prompt_phoenix_install() {
-    header "Step 6 — Phoenix Observability Daemon"
+    header "Step 4 — Phoenix Observability Daemon"
 
     cat <<EOF
 
@@ -1013,7 +1014,7 @@ get_claude_desktop_config_dir() {
 }
 
 prompt_claude_desktop_link() {
-    header "Step 7 — Claude Desktop"
+    header "Step 5 — Claude Desktop"
     cat <<EOF
 
   ${B}[1] Skip${R}
@@ -1220,19 +1221,8 @@ sys.exit(0 if 'hooks' in s else 1)
         warn "Phoenix not installed (optional — run: phoenix-ctl install)"
     fi
 
-    printf "\n  ${B}context-hub MCP:${R}\n"
-    local claude_json="${HOME}/.claude.json"
-    if [ -f "$claude_json" ] && python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    s = json.load(f)
-servers = s.get('mcpServers', {})
-sys.exit(0 if 'chub' in servers else 1)
-" "$claude_json" 2>/dev/null; then
-        info "context-hub MCP configured"
-    else
-        warn "context-hub MCP not configured"
-    fi
+    # LEGACY-CHUB-CLEANUP: silent when no remnant is present.
+    legacy_chub_cleanup_claude report
 
     printf "\n"
     if $healthy; then
@@ -1345,40 +1335,17 @@ uninstall_claude_code() {
 import json, sys
 with open(sys.argv[1]) as f:
     s = json.load(f)
-changed = False
 if 'hooks' in s:
     del s['hooks']
-    changed = True
-# Clean up stale mcpServers from settings.json (moved to ~/.claude.json)
-servers = s.get('mcpServers', {})
-if 'chub' in servers:
-    del servers['chub']
-    changed = True
-if not servers and 'mcpServers' in s:
-    del s['mcpServers']
-    changed = True
-if changed:
     with open(sys.argv[1], 'w') as f:
         json.dump(s, f, indent=2)
         f.write('\n')
 " "$settings_file" 2>/dev/null && info "Hooks removed from settings.json" || true
     fi
 
-    # Remove chub MCP from ~/.claude.json
-    local claude_json="${HOME}/.claude.json"
-    if [ -f "$claude_json" ]; then
-        python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    s = json.load(f)
-servers = s.get('mcpServers', {})
-if 'chub' in servers:
-    del servers['chub']
-    with open(sys.argv[1], 'w') as f:
-        json.dump(s, f, indent=2)
-        f.write('\n')
-" "$claude_json" 2>/dev/null && info "context-hub MCP removed from ~/.claude.json" || true
-    fi
+    # LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state
+    # from ~/.claude.json and the legacy ~/.claude/settings.json location.
+    legacy_chub_cleanup_claude offer
 
     # Uninstall Phoenix daemon
     if [ -f "${HOME}/Library/LaunchAgents/com.praxion.phoenix.plist" ]; then
@@ -1426,7 +1393,7 @@ install_claude_code() {
 
     prompt_plugin_install
 
-    prompt_chub_mcp
+    legacy_chub_cleanup_claude offer
     prompt_phoenix_install
     prompt_claude_desktop_link
 
@@ -1476,6 +1443,9 @@ dry_run_claude_code() {
         [ -f "$script" ] && printf "    %s\n" "$(basename "$script")"
     done
     printf "\n"
+
+    # LEGACY-CHUB-CLEANUP: silent when no remnant is present.
+    legacy_chub_cleanup_claude report
 }
 
 dry_run_claude_desktop() {

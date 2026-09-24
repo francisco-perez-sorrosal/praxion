@@ -21,6 +21,7 @@ affected_reqs:
   - REQ-EV-05
 superseded_in_part_by:
   - dec-204
+  - dec-draft-2fdf564d
 re_affirmed_by:
   - dec-258
 ---

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-c3f0ca68
+id: dec-390
+draft_id: dec-draft-c3f0ca68
 title: "Cost collector: the agent_stop row is the grain, honest provenance is the only admissible population, and the committed summary gains a slug but no totals"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-22
 summary: "Adds scripts/project_metrics/collectors/cost_collector.py (CostCollector), a Tier-0 read-only collector emitting a `cost` namespace and a `## Cost` report section. Tokens are aggregated at the agent_stop grain keyed by agent_id over a union of per-checkout WALs (plus .1 rotation archives) discovered from git rev-parse --git-common-dir, filtered to usage_source == subagent-transcript; the other three provenance populations are counted by name and never summed. The pipeline slug joins to a tier through calibration_log.md with explicit ambiguous/unknown variants. hooks/capture_session.py's committed summary row gains pipeline_slug additively and nothing else: honest sub-totals were designed and rejected because the fleet-shipped merge driver collapses summary rows by session_id. No aggregate column, no METRICS_LOG.md cell. Guard is a pre-publication provenance invariant that errors with no totals."

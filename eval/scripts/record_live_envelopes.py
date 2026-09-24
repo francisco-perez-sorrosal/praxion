@@ -17,8 +17,9 @@ Sessions use the same isolation as the runner: a copy of the target's HEAD
 passed via ``--plugin-dir``, a per-session sandbox HOME populated by the copy's
 own installer, and an allowlisted environment. Before any file is written its
 content is scanned for ``sk-ant-``-shaped secrets; a hit refuses that write.
-Fixture repos here are minimal stand-ins for the runner's own fixture trees —
-they only need to elicit each shape once.
+The four scenario shapes reuse ``praxion_evals.live.scenarios`` — the fixture
+repos, prompts and allowlists are defined there, once, for both this recorder
+and the runner it records fixtures for.
 """
 
 from __future__ import annotations
@@ -34,6 +35,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+
+from praxion_evals.live import scenarios
 
 if TYPE_CHECKING:
     from praxion_evals.live.results import ErrorKind
@@ -327,72 +330,6 @@ def _init_repo(root: Path, files: Mapping[str, str]) -> None:
     _git(root, "commit", "-q", "-m", "baseline")
 
 
-def _ui_step_fixture(root: Path, seeded: Seeded) -> None:
-    _init_repo(
-        root,
-        {
-            ".gitignore": ".ai-work/\n",
-            "dashboard_app/src/styles/tokens.css": ":root {\n  --space-2: 8px;\n  --radius-1: 4px;\n}\n",
-            "dashboard_app/src/components/AdrList.tsx": (
-                "export function AdrList({ adrs }: { adrs: { id: string; title: string }[] }) {\n"
-                "  return <ul>{adrs.map((a) => <li key={a.id}>{a.title}</li>)}</ul>;\n}\n"
-            ),
-        },
-    )
-    step = f"## Current step\n\n{seeded['seeded_step']}"
-    _write_tree(
-        root,
-        {
-            ".ai-work/ui-step/IMPLEMENTATION_PLAN.md": f"# Plan: ADR list loading state\n\n{step}",
-            ".ai-work/ui-step/WIP.md": f"# WIP\n\n{step}\nStatus: TODO\n",
-        },
-    )
-
-
-def _adr_fixture(root: Path, seeded: Seeded) -> None:
-    _init_repo(
-        root,
-        {
-            ".ai-state/decisions/drafts/.gitkeep": "",
-            "hooks/capture_memory.py": '"""Capture memory writes and filter them."""\n',
-        },
-    )
-
-
-def _commit_staging_fixture(root: Path, seeded: Seeded) -> None:
-    _init_repo(root, {"scripts/foo.py": '"""Retrun the answer."""\n\nANSWER = 42\n'})
-    _write_tree(
-        root,
-        {
-            "scripts/foo.py": '"""Return the answer."""\n\nANSWER = 42\n',
-            "scripts/test_foo.py": (
-                "from foo import __doc__ as doc\n\n\ndef test_docstring():\n"
-                '    assert doc == "Return the answer."\n'
-            ),
-            ".ai-state/observations.jsonl": '{"event": "session_start"}\n',
-        },
-    )
-
-
-def _lightweight_fix_fixture(root: Path, seeded: Seeded) -> None:
-    _init_repo(
-        root,
-        {
-            "scripts/paginate.py": (
-                "def page(items, number, size):\n"
-                '    """Return the 1-based page ``number`` of ``items``."""\n'
-                "    start = number * size\n"
-                "    return items[start : start + size]\n"
-            ),
-            "scripts/test_paginate.py": (
-                "from paginate import page\n\n\ndef test_first_page():\n"
-                "    assert page(list(range(10)), 1, 3) == [0, 1, 2]\n"
-            ),
-            ".ai-state/calibration_log.md": "# Calibration Log\n\n| Date | Task | Tier |\n|---|---|---|\n",
-        },
-    )
-
-
 def _minimal_fixture(root: Path, seeded: Seeded) -> None:
     _init_repo(root, {})
 
@@ -400,31 +337,13 @@ def _minimal_fixture(root: Path, seeded: Seeded) -> None:
 # ---------------------------------------------------------------------------
 # Shapes
 # ---------------------------------------------------------------------------
+#
+# The four scenario shapes reuse `praxion_evals.live.scenarios` — the single
+# source for fixture repos, prompts, allowlists and permissions — so this
+# recorder never redefines a scenario, only the three infrastructure-error
+# shapes below that have no scenario counterpart.
 
-_SPAWN_IMPLEMENTER = (
-    "Spawn exactly one `praxion:implementer` subagent with the prompt "
-    "`Task slug: ui-step. Implement the current step in WIP.md.` "
-    "When it finishes, stop."
-)
-_RECORD_ADR = (
-    "Record the following decision as an ADR according to the conventions in your "
-    "context. Do not spawn agents.\n\n"
-)
 _NO_TOOLS = "Do not use any tools. Reply with the single word READY."
-
-# Narrow per-command Bash patterns: each lets the seeded task complete and
-# nothing broader. `git diff` is granted only in exact forms because
-# `git diff --output=<path>` writes anywhere.
-_GIT_INSPECT = ("Bash(git status)", "Bash(git status *)", "Bash(git diff)")
-_GIT_STAGE_AND_COMMIT = ("Bash(git add *)", "Bash(git commit *)")
-_GIT_IDENTITY_READS = (
-    "Bash(git config --get *)",
-    "Bash(git config user.name)",
-    "Bash(git config user.email)",
-    "Bash(git rev-parse *)",
-    "Bash(git branch --show-current)",
-)
-_RUN_TESTS = ("Bash(python3 -m pytest)", "Bash(python3 -m pytest *)")
 
 SHAPES: dict[str, Shape] = {
     shape.name: shape
@@ -432,43 +351,43 @@ SHAPES: dict[str, Shape] = {
         Shape(
             name="ui_step_conformance",
             seeded_file="02_ui_step_conformance.yaml",
-            build_fixture=_ui_step_fixture,
-            prompt=lambda _: _SPAWN_IMPLEMENTER,
-            permission_mode="acceptEdits",
-            max_budget_usd=3.0,
+            build_fixture=scenarios.SCENARIOS["ui-step-conformance"].build_fixture,
+            prompt=scenarios.SCENARIOS["ui-step-conformance"].prompt,
+            permission_mode=scenarios.SCENARIOS["ui-step-conformance"].permission_mode,
+            max_budget_usd=scenarios.SCENARIOS["ui-step-conformance"].max_budget_usd,
             model_role="scenario",
-            allowed_tools=_GIT_INSPECT,
-            forward_subagent_text=True,
+            allowed_tools=scenarios.SCENARIOS["ui-step-conformance"].allowed_tools,
+            forward_subagent_text=scenarios.SCENARIOS["ui-step-conformance"].forward_subagent_text,
         ),
         Shape(
             name="adr_authoring",
             seeded_file="03_adr_authoring.yaml",
-            build_fixture=_adr_fixture,
-            prompt=lambda seeded: _RECORD_ADR + seeded["seeded_decision"],
-            permission_mode="acceptEdits",
-            max_budget_usd=3.0,
+            build_fixture=scenarios.SCENARIOS["adr-authoring"].build_fixture,
+            prompt=scenarios.SCENARIOS["adr-authoring"].prompt,
+            permission_mode=scenarios.SCENARIOS["adr-authoring"].permission_mode,
+            max_budget_usd=scenarios.SCENARIOS["adr-authoring"].max_budget_usd,
             model_role="scenario",
-            allowed_tools=(*_GIT_IDENTITY_READS, "Bash(date *)", "Bash(shasum *)"),
+            allowed_tools=scenarios.SCENARIOS["adr-authoring"].allowed_tools,
         ),
         Shape(
             name="commit_staging",
             seeded_file="04_commit_staging.yaml",
-            build_fixture=_commit_staging_fixture,
-            prompt=lambda seeded: f"{seeded['seeded_change'].strip()} Commit it.",
-            permission_mode="default",
-            max_budget_usd=2.0,
+            build_fixture=scenarios.SCENARIOS["commit-staging"].build_fixture,
+            prompt=scenarios.SCENARIOS["commit-staging"].prompt,
+            permission_mode=scenarios.SCENARIOS["commit-staging"].permission_mode,
+            max_budget_usd=scenarios.SCENARIOS["commit-staging"].max_budget_usd,
             model_role="scenario",
-            allowed_tools=(*_GIT_INSPECT, "Bash(git diff --cached)", *_GIT_STAGE_AND_COMMIT),
+            allowed_tools=scenarios.SCENARIOS["commit-staging"].allowed_tools,
         ),
         Shape(
             name="lightweight_fix",
             seeded_file="05_lightweight_fix.yaml",
-            build_fixture=_lightweight_fix_fixture,
-            prompt=lambda seeded: seeded["seeded_fix"],
-            permission_mode="acceptEdits",
-            max_budget_usd=3.0,
+            build_fixture=scenarios.SCENARIOS["lightweight-fix"].build_fixture,
+            prompt=scenarios.SCENARIOS["lightweight-fix"].prompt,
+            permission_mode=scenarios.SCENARIOS["lightweight-fix"].permission_mode,
+            max_budget_usd=scenarios.SCENARIOS["lightweight-fix"].max_budget_usd,
             model_role="scenario",
-            allowed_tools=(*_RUN_TESTS, *_GIT_INSPECT, *_GIT_STAGE_AND_COMMIT),
+            allowed_tools=scenarios.SCENARIOS["lightweight-fix"].allowed_tools,
         ),
         Shape(
             name="error_budget_stop",

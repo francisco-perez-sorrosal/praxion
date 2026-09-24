@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 praxion-evals = "praxion_evals.harness.cli:main"
+praxion-evals-live = "praxion_evals.live.cli:main"
 
 [dependency-groups]
 dev = [
@@ -51,7 +52,10 @@ indent-style = "space"
 
 [tool.pyright]
 include = ["src"]
-exclude = ["tests", "build", "**/__pycache__"]
+# fixture_repos/ is disposable payload copied into live-session sandboxes at
+# runtime, with its own self-contained relative imports — not part of the
+# package's own importable surface.
+exclude = ["tests", "build", "**/__pycache__", "src/praxion_evals/live/fixture_repos"]
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
 reportMissingImports = "error"

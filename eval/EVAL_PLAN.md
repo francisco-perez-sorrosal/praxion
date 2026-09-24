@@ -117,6 +117,35 @@ This is deliberately **not** numbered against the deferred Family 3, 4, 6 roster
 
 A sixth scenario, `inheritance-probe`, is a **differential** test: it spawns two fresh out-of-band `claude -p` sessions — one top-level, one instructed to spawn a `praxion:researcher` subagent via the Agent tool — and asserts that the two *disagree* the way the subagent-inheritance correction (P0.3) predicts. Both sessions report the same 7 always-loaded `claude_md_paths` and whether a `## Agent Model Routing` heading (the `SessionStart`-hook-delivered rule's own heading) appears anywhere in context; the top-level run must report it present, the subagent run must report it absent. A single-run probe cannot exercise this claim — any "the subagent lacks X" assertion is unfalsifiable without a paired run proving a top-level session would have reported X present under the identical question — which is why v1 of this probe (a bare top-level invocation checked against a subagent-specific claim) could never fail. Grading a static fixture cannot prove a live-inheritance claim either, so it ships as a standalone script, `eval/scripts/inheritance_probe.py` (`--dry-run` prints both invocations without spawning; `--record <dir>` saves each run's raw output), run deliberately once per M-confidence slice rather than on every pass — invocation: `uv run python eval/scripts/inheritance_probe.py --record <dir>`, two API-metered headless sessions (`claude-sonnet-5`, ~$0.60 combined on the first live run, 2026-09-08 — see `.ai-state/eval_ledger/EVAL_LOG.md`). It is registered in this family for visibility only — the family always resolves it to a single `SKIP` result (`check_kind="skip"`) in both mechanical-only and full/judged runs; the family never spawns the live sessions itself.
 
+### Live context-layer runner (process-economy P0.7)
+
+Source: `eval/src/praxion_evals/live/` (`session.py`, `materialize.py`, `scenarios.py`, `results.py`,
+`spend.py`, `cli.py`).
+
+The seeded scenario corpus above grades five **frozen, golden-fixture** captures. This is the
+producer that makes those `recorded_*` values live: a separate, opt-in console entry,
+`praxion-evals-live`, never reachable from `/eval-praxion`, a hook, or CI. For each of the nine
+seeded cases it runs `k` fresh, isolated `claude -p` sessions against a chosen context-layer
+checkout, captures the observable from harness telemetry or a filesystem delta — never from the
+model's own self-report — and grades it through the same mechanical/judge seam the frozen fixtures
+use, so live and frozen grading cannot diverge.
+
+- **Isolation**: each session gets its own sandbox `HOME`/`CLAUDE_CONFIG_DIR`, an allowlisted
+  environment, and the target checkout passed only via `--plugin-dir` with all MCP servers disabled.
+  Before any scenario session runs, one preflight session over an identically built, nonce-planted
+  copy must echo every planted marker or the whole variant aborts having spent only the preflight.
+- **Canary**: with `--canary`, a second variant runs the tier/agent-selection cases against a copy
+  with one pre-registered process-convention section removed, and the baseline JSON records both
+  pass rates, the delta, and whether the guard's sensitivity is confirmed.
+- **Spend**: a run-level cap (`$50` default) is enforced before every session launch in addition to
+  each session's own per-session budget; `--dry-run` prints every session's argv and environment
+  keys and spawns nothing.
+- **Output**: a versioned baseline JSON with per-case pass/fail/error counts, refusing to overwrite
+  an existing file without `--overwrite`.
+
+Every capture function and the envelope parser are tested against verbatim recorded session
+transcripts, never hand-written JSON; no test in the suite starts a real `claude` process.
+
 ### Family 5 — Token-budget surface stability
 
 Source: `eval/src/praxion_evals/harness/families/family5_token_budget_stability.py`

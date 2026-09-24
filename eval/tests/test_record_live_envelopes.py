@@ -206,9 +206,18 @@ def test_no_shape_grants_unrestricted_execution(recorder):
 
 def test_commit_staging_can_stage_and_commit_but_nothing_else_in_git(recorder):
     tools = set(recorder.SHAPES["commit_staging"].allowed_tools)
+    git_tools = {tool for tool in tools if "git" in tool}
 
     assert {"Bash(git add *)", "Bash(git commit *)"} <= tools
-    assert all(tool.startswith("Bash(git ") for tool in tools)
+    assert all(tool.startswith("Bash(git ") for tool in git_tools)
+
+
+def test_commit_staging_also_grants_the_harmless_inspection_utilities(recorder):
+    from praxion_evals.live.scenarios import HARMLESS_UTILITIES
+
+    tools = set(recorder.SHAPES["commit_staging"].allowed_tools)
+
+    assert set(HARMLESS_UTILITIES) <= tools
 
 
 def test_lightweight_fix_can_run_its_tests_only_through_pytest(recorder):

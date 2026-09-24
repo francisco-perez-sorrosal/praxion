@@ -103,19 +103,33 @@ def load_scenario_fixtures(scenarios_dir: Path = _SCENARIOS_DIR) -> list[dict[st
 # ---------------------------------------------------------------------------
 
 
+def _normalize_agent_name(agent: str) -> str:
+    """Lowercase, stripped of any ``<plugin>:`` namespace prefix."""
+    return agent.strip().lower().rsplit(":", 1)[-1]
+
+
 def _check_spawn_selection(data: dict[str, Any]) -> tuple[bool, list[str]]:
-    """Every seeded case's recorded tier+agents must match the expected pair."""
+    """Every seeded case's recorded tier must match, and its recorded agents must
+    be a superset of the expected core (case-insensitively, prefix-stripped) --
+    the protocol's optional members (researcher when context suffices is skipped,
+    interface-designer only when an interface is in scope, ...) make strict
+    equality fail on correct behaviour, not incorrect."""
     mismatches: list[str] = []
     for case in data["cases"]:
-        if case["recorded_tier"] != case["expected_tier"]:
+        recorded_tier = str(case["recorded_tier"]).strip().lower()
+        expected_tier = str(case["expected_tier"]).strip().lower()
+        if recorded_tier != expected_tier:
             mismatches.append(
                 f"task {case['task']!r}: recorded_tier={case['recorded_tier']!r} "
                 f"!= expected_tier={case['expected_tier']!r}"
             )
-        elif case["recorded_agents"] != case["expected_agents"]:
+            continue
+        recorded_agents = {_normalize_agent_name(a) for a in case["recorded_agents"]}
+        expected_agents = {_normalize_agent_name(a) for a in case["expected_agents"]}
+        if not expected_agents <= recorded_agents:
             mismatches.append(
-                f"task {case['task']!r}: recorded_agents={case['recorded_agents']!r} "
-                f"!= expected_agents={case['expected_agents']!r}"
+                f"task {case['task']!r}: expected_agents {sorted(expected_agents)} "
+                f"not a subset of recorded_agents {sorted(recorded_agents)}"
             )
     return (not mismatches, mismatches)
 
@@ -230,6 +244,25 @@ def _judged_artifact(data: dict[str, Any]) -> str:
         if key in data:
             return yaml.safe_dump({key: data[key]}, sort_keys=False)
     raise KeyError(f"no judged field found in scenario fixture {data.get('scenario_id')!r}")
+
+
+# ---------------------------------------------------------------------------
+# Public grading seam — reused by the live scenario runner so live and frozen
+# grading cannot diverge (`SeededScenarioFamily.run()` and every `_check_*`
+# above stay byte-for-byte unchanged; these two functions only dispatch).
+# ---------------------------------------------------------------------------
+
+
+def grade_mechanical(data: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Mechanically grade one scenario's data through the same check the harness uses."""
+    return _MECHANICAL_CHECKS[data["scenario_id"]](data)
+
+
+def judge_scenario(data: dict[str, Any], judge: JudgeClient) -> JudgeVerdict:
+    """LLM-judge one scenario's data through the same rubric, artifact and schema."""
+    return judge.judge(
+        rubric=data["llm_rubric"], artifact=_judged_artifact(data), schema=_JUDGE_SCHEMA
+    )
 
 
 # ---------------------------------------------------------------------------

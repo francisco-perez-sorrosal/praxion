@@ -125,6 +125,33 @@ If any check emits FAIL, surface the check name, the artifact path, and the verd
 - The PASS-only family-2 corpus available at v1 limits calibration for false-negative detection; the `## Calibration Notes` section in every report records this gap explicitly.
 - This command is the single eval entrypoint. The retired `/eval` Tier 1 surface has been folded into Family 1's mechanical artifact-manifest check — invoke via `--task-slug <slug>` to reproduce the old behavior; combine with `--mechanical-only` to keep it free.
 
+## Separate Entry: The Live Context-Layer Runner
+
+`praxion-evals-live` is a **distinct console entry**, not a flag on `/eval-praxion` — `/eval-praxion`
+and its `--mechanical-only` route never start a live session, and this command never invokes it.
+Where `/eval-praxion`'s seeded-scenario family grades five **frozen, golden-fixture** captures, the
+live runner produces those `recorded_*` values fresh: for each seeded case it spawns real, isolated
+`claude -p` sessions against a chosen context-layer checkout, captures the observable from harness
+telemetry or a filesystem delta (never from the model's own self-report), and grades it through the
+same mechanical/judge seam `/eval-praxion` uses — so live and frozen grading never diverge.
+
+- **Opt-in and paid**: every session costs real API credits; run it deliberately, never from a hook,
+  a pipeline step, or CI.
+- **Cost**: roughly $15-40 for a full run with `--canary` at the default repeat count (`--dry-run`
+  prints exact argv/env and a session count before anything spends).
+- **Run detached**: a full run's wall time exceeds a single interactive tool call's time limit —
+  launch it in the background and poll, don't block on it inline.
+- **Credentials**: requires one of `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, or
+  `ANTHROPIC_AUTH_TOKEN` in the environment; the runner refuses to start without one.
+
+```bash
+cd eval && uv run praxion-evals-live --dry-run
+cd eval && uv run praxion-evals-live --k 3 --canary --output <path> &
+```
+
+**Invariant**: if any hook, agent script, or `/eval-praxion` invocation itself references
+`praxion_evals.live.*`, flag it as a bug — that package is reachable only through this console entry.
+
 ## Eval Results Are Human-Gated by Design
 
 `/eval-praxion` FAILs are **not** automatically routed to the tech-debt ledger or to

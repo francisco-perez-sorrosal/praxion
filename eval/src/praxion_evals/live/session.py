@@ -89,6 +89,10 @@ class SessionSpec:
     json_schema: Mapping[str, Any] | None = None
     forward_subagent_text: bool = False
     timeout_s: int = DEFAULT_TIMEOUT_S
+    # Grants Read of the plugin copy by absolute path: the copy lies outside
+    # the session's cwd, so without this a skill reference under
+    # `<copy>/skills/**` is denied (observed in the recorded envelopes).
+    add_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +155,8 @@ def build_argv(spec: SessionSpec) -> list[str]:
         argv += ["--json-schema", json.dumps(spec.json_schema, separators=(",", ":"))]
     if spec.forward_subagent_text:
         argv.append("--forward-subagent-text")
+    if spec.add_dir is not None:
+        argv += ["--add-dir", str(spec.add_dir)]
     return [*argv, "--max-budget-usd", str(spec.max_budget_usd)]
 
 

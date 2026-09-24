@@ -110,6 +110,29 @@ def test_build_argv_omits_optional_flags_when_unset():
     assert "--allowedTools" not in argv
     assert "--json-schema" not in argv
     assert "--forward-subagent-text" not in argv
+    assert "--add-dir" not in argv
+
+
+def test_build_argv_includes_add_dir_when_set_so_the_plugin_copy_is_readable():
+    """Without `--add-dir`, a session cannot Read files under the plugin copy
+    (it lies outside the session's cwd) — skill references become denied."""
+    from praxion_evals.live.session import SessionSpec, build_argv
+
+    spec = SessionSpec(
+        prompt="p",
+        model="sonnet",
+        effort="medium",
+        plugin_dir=Path("/tmp/copy"),
+        cwd=Path("/tmp/s/fixture"),
+        permission_mode="default",
+        max_budget_usd=1.0,
+        add_dir=Path("/tmp/copy"),
+    )
+
+    argv = build_argv(spec)
+
+    assert "--add-dir" in argv
+    assert argv[argv.index("--add-dir") + 1] == "/tmp/copy"
 
 
 def test_build_argv_includes_allowed_tools_json_schema_and_subagent_forwarding_when_set():

@@ -509,11 +509,10 @@ Every writer above — this phase, §Phase 5b, §Phase 8d, and `/upgrade-project
 
 **Predicate.** None — purely informational, idempotent by nature.
 
-**Action.** For each of `chub`, `scc`, `uv`, run `command -v <name>`. For each MISSING tool that is RELEVANT given the stack detected in §Pre-flight, print one-line install guidance. Do NOT run the install — print the command and let the user execute it.
+**Action.** For each tool in the table below, run `command -v <name>`. For each MISSING tool that is RELEVANT given the stack detected in §Pre-flight, print one-line install guidance. Do NOT run the install — print the command and let the user execute it.
 
 | Tool | Relevant when | Why useful | Install (print, do not run) |
 |------|---------------|------------|----------------------------|
-| `chub` | Always | Curated docs for 600+ external libraries; used by the `external-api-docs` skill to avoid hallucinated SDK signatures | `npm install -g @aisuite/chub` |
 | `scc` | Any stack | Fast SLOC counter used by `/project-metrics`; without it, metrics fall back to a stdlib counter that misses language detail | `brew install scc` (macOS) or `go install github.com/boyter/scc/v3@latest` |
 | `uv` | Python detected | Fast Python package manager; required for `pytest -q` in Praxion's metrics flow | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `cargo-nextest` | Rust detected | Process-per-test runner recommended by the `testing-strategy` Rust leaf and the `rust-development` skill for large local suites and CI; plain `cargo test` remains fine for a small crate | `cargo install cargo-nextest --locked` |
@@ -539,7 +538,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      Phase 4: .git/hooks/pre-commit (new), .git/hooks/{post-merge,post-commit,post-checkout} (symlinks)
      Phase 5: .claude/settings.json (PRAXION_DISABLE_OBSERVABILITY env var; permissions.allow baseline) — or 'skipped' per sub-step
      Phase 6: CLAUDE.md (appended Agent Pipeline + Compaction + Behavioral Contract + Praxion Process + Working-in-this-project blocks)
-     Phase 7: companion CLIs — chub missing (install: ...), scc missing (install: ...)
+     Phase 7: companion CLIs — scc missing (install: ...)
      Phase 8: architecture baseline produced — .ai-state/DESIGN.md + docs/architecture.md (+ N ADR draft(s))
      Phase 8b: AaC tier — fence seed, fitness/, Block D, architecture.yml, docs/diagrams/ (or skipped per sub-step)
      Phase 8c: ML scaffold — .ai-state/experiments/, .gitignore block, gpu_budget.yaml, program.md (or skipped per sub-step)

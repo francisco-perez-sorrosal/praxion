@@ -89,7 +89,7 @@ When the guard passes, follow these steps in order. Each step is a contract — 
 4. **Show the pipeline-framed prompt you're about to execute.** Print the wrapped task (from §Default App — Pipeline Framing or the custom variant) in a fenced block, preceded by: `Here's the task I'm about to run through the pipeline — watch how Claude orchestrates researcher → architect → planner → implementer + test-engineer → verifier.` The shape of this prompt is the teaching.
 
 5. **Execute the pipeline.** First, print preview **4** per §Phase Previews (the umbrella headline that announces the whole pipeline). Then act as orchestrator — delegate to Praxion subagents via the `Task` tool per `rules/swe/swe-agent-coordination-protocol.md`. Use the **Standard-tier pipeline with full delegation checklists** for architect and planner — the seed's pedagogical goal is to show every canonical artifact Praxion produces, so the user's first observation matches what real feature work will later produce. The one seed-specific trim is formal SPEC archival (no REQ IDs, no `.ai-state/specs/SPEC_*.md`) and the verifier's written report (the seed's in-chat summary is enough). Each delegation prints its own preview (4a–4e per §Phase Previews) *before* invoking the subagent, so the user sees what file(s) will appear before any work runs; the orchestrator's own Conversation Checkpoints govern any genuine pause.
-   - **5a.** Print preview **4a** (§Phase Previews), then delegate to `researcher` — fetch current Claude Agent SDK + `uv` + FastAPI signatures via `external-api-docs` (chub). Output: `.ai-work/<task-slug>/RESEARCH_FINDINGS.md` (structured doc with API summaries, version checks, capability gaps).
+   - **5a.** Print preview **4a** (§Phase Previews), then delegate to `researcher` — fetch current Claude Agent SDK + `uv` + FastAPI signatures from their official docs per the current-docs protocol (`skills/software-planning/references/cross-agent-skill-conventions.md § Current docs for external APIs`). Output: `.ai-work/<task-slug>/RESEARCH_FINDINGS.md` (structured doc with API summaries, version checks, capability gaps).
    - **5b.** Print preview **4b** (§Phase Previews), then delegate to `systems-architect` — full delegation checklist. Outputs: `.ai-work/<task-slug>/SYSTEMS_PLAN.md` (trade-offs + module-shape + dependency-direction), `.ai-state/DESIGN.md` (architect-facing design target), `docs/architecture.md` (developer-facing navigation guide, Built components only), and at least one ADR draft in `.ai-state/decisions/drafts/` pinned to the one-way `src/agent/` → `src/web/` dependency rule (leaving the SSE-over-WebSockets decision as genuinely novel material for L5 later). Use the fragment-filename scheme from `rules/swe/adr-conventions.md` and include the standard MADR body (Context / Decision / Considered Options / Consequences).
    - **5c.** Print preview **4c** (§Phase Previews), then delegate to `implementation-planner` — full three-doc model on first invocation. Outputs: `.ai-work/<task-slug>/IMPLEMENTATION_PLAN.md` (3–5 step decomposition; the canonical ordered step list), `.ai-work/<task-slug>/WIP.md` (live step-tracking the implementer updates as it works), `.ai-work/<task-slug>/LEARNINGS.md` (cross-session insights — seed it with at least the planner's decomposition decisions and any gotchas surfaced by the architect so the file is not empty).
    - **5d.** Print preview **4d** (§Phase Previews), then delegate to `test-engineer` first (it writes the tests and confirms they fail), then to `implementer` on the disjoint production file set until they pass. Output: code under `src/agent/`, `src/web/`, `tests/` (full file inventory in §Default App Spec).
@@ -98,7 +98,7 @@ When the guard passes, follow these steps in order. Each step is a contract — 
    - **5g.** Apply the Obsidian integration sub-flow. No gate — runs inline after the AaC sub-flow and before the SDK smoke check. If `obsidian` is not enabled (§Bootstrap Signal Derivation), skip the entire sub-flow and print: `Obsidian integration skipped (obsidian not in Capabilities). Re-enable later via /onboard-project.` Otherwise, run Phase 8d sub-steps 8d.1–8d.6 per §Phase 8d in `/onboard-project`. Each sub-step is idempotent.
    Ephemeral plan docs live in `.ai-work/<task-slug>/`; persistent design docs live in `.ai-state/` (architecture + ADR drafts) and `docs/` (developer-facing architecture guide). The seed writes every canonical artifact so the user's first pipeline observation includes the full document set — the subsequent `/co` will commit them.
 
-6. **Run the SDK smoke check** per §SDK smoke check. First, print preview **5** per §Phase Previews. If the probe fails, follow the recovery path (re-fetch chub, introspect installed package, regenerate the affected file, submit `chub_feedback`).
+6. **Run the SDK smoke check** per §SDK smoke check. First, print preview **5** per §Phase Previews. If the probe fails, follow the recovery path (re-fetch the official docs, introspect the installed package, regenerate the affected file, record the mismatch in `LEARNINGS.md`).
 
 7. **Run the test gate.** `uv sync && uv run pytest -q`. If `uv` is absent, see §Prereq Behaviors.
 
@@ -144,12 +144,12 @@ The seed onboarding is the densest pedagogical moment in a Praxion user's whole 
 | 2 | step 2 (orchestrator preamble) | `Phase 2 of 7: I'll explain how Claude drives Praxion — orchestrator routes plain-English tasks to specialist subagents (researcher / architect / planner / implementer / test-engineer / verifier). Reading this once now means you won't need to memorize slash commands later.` |
 | 3 | step 3 (branch + framed prompt) | `Phase 3 of 7: I'll show you the exact English task I'm about to feed the orchestrator. The shape of this prompt — concrete behaviors + acceptance criteria + explicit pipeline invocation — is the pattern you'll reuse forever.` |
 | 4 | step 5 (execute pipeline) | `Phase 4 of 7: HEADLINE EVENT. I delegate to researcher → systems-architect → implementation-planner → test-engineer → implementer (tests first) → verifier. I'll pause before each subagent so you can see what file it will produce.` |
-| 4a | step 5a (researcher) | `Pipeline step 1 of 5: researcher. Fetches current Claude Agent SDK / uv / FastAPI signatures via context-hub (the chub MCP). Produces .ai-work/<task-slug>/RESEARCH_FINDINGS.md — API summaries, version checks, capability notes — so downstream agents design against real signatures, not training-data guesses.` |
+| 4a | step 5a (researcher) | `Pipeline step 1 of 5: researcher. Fetches current Claude Agent SDK / uv / FastAPI signatures from their official docs (llms.txt / .md pages first). Produces .ai-work/<task-slug>/RESEARCH_FINDINGS.md — API summaries, version checks, capability notes — so downstream agents design against real signatures, not training-data guesses.` |
 | 4b | step 5b (systems-architect) | `Pipeline step 2 of 5: systems-architect. Full delegation checklist on first invocation — this is Praxion's complete architecture artifact set, appearing on your screen for the first time. Produces .ai-work/<task-slug>/SYSTEMS_PLAN.md (trade-offs + module shape), .ai-state/DESIGN.md (architect-facing design target; persists across every future feature), docs/architecture.md (developer-facing navigation guide), and an ADR draft in .ai-state/decisions/drafts/ pinning the one-way src/agent/ → src/web/ dependency rule. The ADR starts as a dec-draft-<hash> fragment and is promoted to a stable dec-NNN at merge-to-main.` |
 | 4c | step 5c (implementation-planner) | `Pipeline step 3 of 5: implementation-planner. Full three-doc model on first invocation. Produces .ai-work/<task-slug>/IMPLEMENTATION_PLAN.md (the canonical ordered step list), WIP.md (live step-tracking the implementer updates as it works), and LEARNINGS.md (cross-session insights — seeded with the planner's decomposition decisions so the file is not empty). This is the full planner artifact set you will see on every future feature.` |
 | 4d | step 5d (test-engineer, then implementer) | `Pipeline step 4 of 5: the test-engineer writes tests/ first and confirms they fail, then the implementer writes src/agent/ and src/web/ until they pass — real code lands in your project tree. Watch your editor's file tree refresh as files appear.` |
 | 4e | step 5e (verifier) | `Pipeline step 5 of 5: verifier. Checks the three §Default App acceptance criteria — agent→web import isolation, SAFE_COMMANDS shape, pytest green. Compact-seed output is a one-paragraph in-chat report; the formal VERIFICATION_REPORT.md is reserved for full-tier features.` |
-| 5 | step 6 (SDK smoke check) | `Phase 5 of 7: I verify the Claude Agent SDK import surface (chub docs sometimes drift from the installed package), run the test suite via uv, and lock down the .gitignore Python block.` |
+| 5 | step 6 (SDK smoke check) | `Phase 5 of 7: I verify the Claude Agent SDK import surface (published docs sometimes drift from the installed package), run the test suite via uv, and lock down the .gitignore Python block.` |
 | 6 | step 9 (/init) | `Phase 6 of 7: I run /init so CLAUDE.md describes the code that ACTUALLY exists (not what I imagined), then idempotently append five Praxion blocks — Agent Pipeline (how to delegate), Compaction Guidance (what to preserve when chat compacts), Behavioral Contract (Surface Assumptions / Register Objection / Stay Surgical / Simplicity First), Praxion Process (tier-driven pipeline principle + rule-inheritance obligation), and Working in this project (verification commands + frequent operations + corrections-become-rules — I fill the project-specific bits from the scaffold). Each is guarded by its own heading-detection predicate.` |
 | 7 | step 11 (mushi doc) | `Phase 7 of 7: I generate onboarding_for_mushi_busy_ppl.md — your project-specific map with a happy-path Mermaid diagram, file inventory, lesson ladder, and PoC-to-production journey.` |
 
@@ -188,7 +188,7 @@ When the user accepts the default, emit the following pipeline-framed task in ch
 Build a minimal conversational coding agent for Python 3.11+ using the Claude Agent SDK.
 
 Behaviors:
-- An agent loop over user turns via the Claude Agent SDK (use symbols fetched from external-api-docs; do NOT guess SDK surface).
+- An agent loop over user turns via the Claude Agent SDK (use symbols from the freshly fetched official docs; do NOT guess SDK surface).
 - Two starter tools: `read_file(path: str) -> str` (filesystem read) and `run_command(cmd: str) -> str` (safe-listed via a module-scope `SAFE_COMMANDS = frozenset({"ls", "pwd", "cat", "python"})` — first token not in the frozenset returns a refusal string, does not raise).
 - A FastAPI POST `/chat` that streams the agent's response as Server-Sent Events, plus a minimal HTML page at `static/index.html` that POSTs and renders the stream.
 - Strict one-way dependency: `src/agent/` imports nothing from `src/web/`; `src/web/` may import from `src/agent/`.
@@ -202,7 +202,7 @@ Acceptance:
 - `uv run pytest -q` passes on a fresh `uv sync` with only `ANTHROPIC_API_KEY` optionally set.
 
 Use Praxion's Standard-tier pipeline with the full delegation checklist for architect and planner (this is a seed app, so skip only SPEC archival and the verifier's formal written report — everything else fires):
-- researcher fetches current Claude Agent SDK + uv + FastAPI signatures via external-api-docs
+- researcher fetches current Claude Agent SDK + uv + FastAPI signatures from their official docs
 - systems-architect produces SYSTEMS_PLAN.md, .ai-state/DESIGN.md, docs/architecture.md, and one ADR draft in .ai-state/decisions/drafts/ for the one-way src/agent/ → src/web/ dependency rule (leave SSE-over-WebSockets as a future decision — it is tutorial material for a later lesson)
 - implementation-planner decomposes into 3–5 steps and produces the full three-doc model: IMPLEMENTATION_PLAN.md + WIP.md + LEARNINGS.md (seeded with the planner's decomposition decisions)
 - test-engineer runs first (tests fail), then the implementer on the disjoint production file set
@@ -245,7 +245,7 @@ Structural reference — the pipeline (§Flow step 5) must produce these paths a
 **File inventory (paths are mandatory):**
 
 - `src/agent/__init__.py` — package marker.
-- `src/agent/core.py` — agent entry point using symbols from `claude_agent_sdk` (or the current equivalent module path from chub). Exports one constructor/factory.
+- `src/agent/core.py` — agent entry point using symbols from `claude_agent_sdk` (or the current equivalent module path from the fetched docs). Exports one constructor/factory.
 - `src/agent/tools.py` — two tools: `read_file`, `run_command`. See safe-list invariant.
 - `src/agent/prompts.py` — system prompt(s) as plain constants.
 - `src/web/__init__.py` — package marker.
@@ -274,12 +274,12 @@ After `uv add claude-agent-sdk` succeeds, before or immediately after writing `s
 uv run python -c "from claude_agent_sdk import ClaudeSDKClient, query, tool; print('ok')"
 ```
 
-If it prints `ok`, proceed. If the import fails with `ImportError` / `ModuleNotFoundError` / `AttributeError`, the fetched chub doc has drifted from the installed SDK. Recovery:
+If it prints `ok`, proceed. If the import fails with `ImportError` / `ModuleNotFoundError` / `AttributeError`, the fetched docs have drifted from the installed SDK. Recovery:
 
-1. Re-read the fetched chub entry; request it again and prefer entries marked `official` or `maintainer`.
+1. Re-fetch the official docs page for the failing symbol (prefer the vendor's `llms.txt`-indexed `.md` page) and confirm which SDK version it documents.
 2. Inspect the installed package: `uv run python -c "import claude_agent_sdk; print(dir(claude_agent_sdk))"` and pick the actually-present public symbols.
 3. Regenerate `src/agent/core.py` against those symbols.
-4. Submit `chub_feedback` with `vote: "down"`, `label: "outdated"`, naming the missing symbol and the installed SDK version. Append the identity suffix per the `external-api-docs` skill.
+4. Record the mismatch in `.ai-work/<task-slug>/LEARNINGS.md`: the missing symbol, the installed SDK version, and the doc URL.
 
 Never copy symbol names from this file into generated code — this file deliberately does not pin them.
 
@@ -338,8 +338,8 @@ Ship all seven by default; L1 / L2 / L7 may be omitted only if anchor generation
 
 - **What you'll learn:** never guess an SDK signature — fetch the current doc first, even when Claude seems confident.
 - **Put this in Claude:**
-  > Before I extend the agent, I want a current summary of Claude Agent SDK's public API. Use context-hub (the external-api-docs skill) to fetch the latest Claude Agent SDK Python signatures, then produce a one-page cheat-sheet in this chat covering tool registration, hooks, and multi-turn sessions. No code changes — this is a read.
-- **What will happen:** Claude spawns `researcher`, which invokes the `external-api-docs` skill (`mcp__chub__chub_search` + `mcp__chub__chub_get`), then summarizes in-chat.
+  > Before I extend the agent, I want a current summary of Claude Agent SDK's public API. Fetch the latest Claude Agent SDK Python docs from the official source (prefer its llms.txt / .md pages), then produce a one-page cheat-sheet in this chat covering tool registration, hooks, and multi-turn sessions. No code changes — this is a read.
+- **What will happen:** Claude spawns `researcher`, which fetches the official docs with `WebFetch` (falling back to `WebSearch`), then summarizes in-chat.
 - **Expected touches:** none (read-only). Your transcript now has a fresh cheat-sheet you can anchor `src/agent/core.py:<line-of-import>` against.
 
 ### L4 — Add a feature end-to-end with full quality gates

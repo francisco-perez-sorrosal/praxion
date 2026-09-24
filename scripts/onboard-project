@@ -51,7 +51,7 @@ readonly NAME_REGEX='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 readonly PLUGIN_KEY='praxion@bit-agora'
 readonly SCRIPT_NAME='onboard-project'
 readonly SCRIPT_VERSION='1.0.0'
-readonly ALLOWED_TOOLS="mcp__chub__*,WebFetch,WebSearch,Bash(chub:*),Bash(uv:*),Bash(git:*),Bash(grep:*),Bash(pytest:*),Bash(test:*)"
+readonly ALLOWED_TOOLS="WebFetch,WebSearch,Bash(uv:*),Bash(git:*),Bash(grep:*),Bash(pytest:*),Bash(test:*)"
 
 # The 6-state predicate table -- single source of truth for the bash side.
 # A committed test (tests/onboard_project_test.sh T12) asserts this literal

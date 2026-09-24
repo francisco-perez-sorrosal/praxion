@@ -101,7 +101,7 @@ Full per-phase detail (writes, predicates, sub-steps) lives in [`skills/onboard-
 
 Runs the **seed pipeline** ([`references/seed-pipeline.md`](../skills/onboard-project/references/seed-pipeline.md)): the bash entry scaffolds `.git/`, the AI-assistants `.gitignore` block, and an empty `.claude/`, then hands off to a Claude Code session. That session asks one question (what to build — default is a mini coding agent with a web UI), runs the full Standard-tier agent pipeline (researcher → systems-architect → implementation-planner → implementer ∥ test-engineer → verifier), generates the default app (Python + `uv` + Claude Agent SDK + FastAPI), and produces a per-run `onboarding_for_mushi_busy_ppl.md` trail map.
 
-The default app is prose-specified, not templated: the pipeline mandates an `external-api-docs` lookup of the current Claude Agent SDK and `uv` docs at run time, so generated code matches the SDK release on your machine — not a version baked into training data. Full rationale: [`dec-053`](../.ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md).
+The default app is prose-specified, not templated: the pipeline mandates a current-docs lookup of the Claude Agent SDK and `uv` docs at run time (official sources, `llms.txt` first), so generated code matches the SDK release on your machine — not a version baked into training data. Full rationale: [`dec-053`](../.ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md) (mechanism narrowed by dec-draft-2a6891c5).
 
 **The `claude-desktop` editor caveat.** `--editor claude-desktop` (or `PRAXION_NEW_PROJECT_EDITOR=claude-desktop`) launches `Claude.app` and copies the project path to the clipboard. Anthropic ships no documented CLI flag or URL scheme to point the desktop app at a folder — so you click **Select folder** in the app and paste. macOS only.
 
@@ -128,7 +128,7 @@ Claude: Before I build, here's how this works:
           • verifier — checks acceptance criteria
         You speak English, Claude delegates. No /command memorization required.
 
-Claude: [researcher] Fetching Claude Agent SDK + uv + FastAPI docs via context-hub ...
+Claude: [researcher] Fetching Claude Agent SDK + uv + FastAPI docs from their official sources ...
         [systems-architect] Module shape: src/agent/{core,tools,prompts}, src/web/{app},
           tests/. One-way dependency src/agent → src/web.
           → Wrote .ai-work/<slug>/SYSTEMS_PLAN.md, .ai-state/DESIGN.md,

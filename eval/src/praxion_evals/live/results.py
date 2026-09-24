@@ -25,6 +25,7 @@ ErrorKind = Literal[
     "structured_output_missing",
     "isolation_breach",
     "not_run_budget_exhausted",
+    "evaluation_exception",  # an infra/judge exception raised after the session ran
 ]
 FailKind = Literal["graded", "not_elicited"]
 

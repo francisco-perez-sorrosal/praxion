@@ -138,8 +138,8 @@ use, so live and frozen grading cannot diverge.
   with one pre-registered process-convention section removed, and the baseline JSON records both
   pass rates, the delta, and whether the guard's sensitivity is confirmed.
 - **Spend**: a run-level cap (`$50` default) is enforced before every session launch in addition to
-  each session's own per-session budget; `--dry-run` prints every session's argv and environment
-  keys and spawns nothing.
+  each session's own per-session budget; `--dry-run` prints one representative session's argv and
+  environment keys per scenario (not every repeat) and spawns nothing.
 - **Output**: a versioned baseline JSON with per-case pass/fail/error counts, refusing to overwrite
   an existing file without `--overwrite`.
 

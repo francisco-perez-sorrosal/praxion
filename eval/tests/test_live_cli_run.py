@@ -1,7 +1,8 @@
 """Behavioral tests for the paid orchestration path of the live scenario runner.
 
 ``praxion_evals.live.cli``'s ``main``/``_run``/``_run_variant``/``_run_tasks``/
-``_isolation_proof``/``_build_output`` drive real, API-metered ``claude -p``
+``_isolation_proof`` and ``praxion_evals.live.report``'s ``build_output`` drive
+real, API-metered ``claude -p``
 sessions and had no test at all before this file. Every test here either
 drives that orchestration end-to-end against the ``fake_claude`` stand-in
 (never a real session — see ``conftest.py``), or exercises one of its pure
@@ -18,14 +19,13 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-import threading
 from pathlib import Path
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Hand-built variant records — the shape `cli._variant_record` produces, used
-# to drive the pure aggregation path (`_build_output`) without a live run.
+# Hand-built variant records — the shape `report.variant_record` produces,
+# used to drive the pure aggregation path (`build_output`) without a live run.
 # ---------------------------------------------------------------------------
 
 
@@ -81,14 +81,14 @@ def test_lowered_is_null_when_pooled_rates_move_but_three_cases_never_graded_in_
     pooled canary rate (0/2) reads as a large drop from HEAD's pooled rate
     (5/5), but no single case has a measurement in both variants for three
     of the five cases — `lowered` must be `None`, not `True`."""
-    from praxion_evals.live import cli
+    from praxion_evals.live import report
 
     head = _variant_stub("head", _spawn_selection_block([(1, 0, 0)] * 5))
     canary = _variant_stub(
         "canary", _spawn_selection_block([(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 1, 0), (0, 1, 0)])
     )
 
-    output = cli._build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
+    output = report.build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
 
     assert output["canary"]["lowered"] is None
 
@@ -96,12 +96,12 @@ def test_lowered_is_null_when_pooled_rates_move_but_three_cases_never_graded_in_
 def test_lowered_is_true_when_every_case_is_graded_in_both_variants_and_all_moved():
     """The positive case the guard must not over-suppress: every case has a
     graded session in both variants, and every one moved from pass to fail."""
-    from praxion_evals.live import cli
+    from praxion_evals.live import report
 
     head = _variant_stub("head", _spawn_selection_block([(1, 0, 0)] * 5))
     canary = _variant_stub("canary", _spawn_selection_block([(0, 1, 0)] * 5))
 
-    output = cli._build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
+    output = report.build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
 
     assert output["canary"]["lowered"] is True
 
@@ -145,9 +145,8 @@ def test_digest_mismatch_after_a_variant_marks_every_session_isolation_breach(
     ]
     args = argparse.Namespace(model="opus", effort="medium", judge=False)
     ledger = SpendLedger(cap_usd=50.0)
-    lock = threading.Lock()
 
-    records, _ = cli._run_tasks(tasks, copy, tmp_path / "run", args, fixtures_by_id, ledger, lock)
+    records, _ = cli._run_tasks(tasks, copy, tmp_path / "run", args, fixtures_by_id, ledger)
 
     assert len(records) == 2
     for _, record in records:

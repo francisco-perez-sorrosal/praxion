@@ -159,13 +159,32 @@ def materialize_path(source: Path, dest: Path, variant: Variant = "head") -> Mat
 def _finish(dest: Path, variant: Variant, target: TargetIdentity) -> Materialization:
     root = dest.resolve()  # sessions report real paths; isolation checks compare against this
     degradation = _degrade(root, CANARY_FILE, CANARY_HEADING) if variant == "canary" else None
+    digest = tree_digest(root)
+    # A `--add-dir` grant lets a session edit files under the copy; making
+    # the copy read-only on disk is the actual enforcement point for "the
+    # materialization is not mutated" — a permission grant cannot override a
+    # filesystem permission. Callers that must write into a fresh copy
+    # (nonce planting) restore write access first via `make_writable`.
+    make_read_only(root)
     return Materialization(
-        variant=variant,
-        root=root,
-        target=target,
-        degradation=degradation,
-        tree_digest=tree_digest(root),
+        variant=variant, root=root, target=target, degradation=degradation, tree_digest=digest
     )
+
+
+def make_read_only(root: Path) -> None:
+    _set_tree_writable(root, writable=False)
+
+
+def make_writable(root: Path) -> None:
+    _set_tree_writable(root, writable=True)
+
+
+def _set_tree_writable(root: Path, *, writable: bool) -> None:
+    for path in (root, *root.rglob("*")):
+        if path.is_symlink():
+            continue
+        mode = path.stat().st_mode
+        path.chmod(mode | 0o200 if writable else mode & ~0o222)
 
 
 def _copy_entry(source: Path, dest: Path) -> None:

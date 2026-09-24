@@ -248,8 +248,10 @@ def _judged_artifact(data: dict[str, Any]) -> str:
 
 # ---------------------------------------------------------------------------
 # Public grading seam — reused by the live scenario runner so live and frozen
-# grading cannot diverge (`SeededScenarioFamily.run()` and every `_check_*`
-# above stay byte-for-byte unchanged; these two functions only dispatch).
+# grading cannot diverge (`SeededScenarioFamily.run()` is byte-for-byte
+# unchanged; `_check_spawn_selection` above carries the orchestrator's
+# subset-match amendment, the one sanctioned grader change — these two
+# functions only dispatch to it and the other four `_check_*` functions).
 # ---------------------------------------------------------------------------
 
 

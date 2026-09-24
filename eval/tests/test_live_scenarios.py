@@ -345,13 +345,24 @@ def test_compute_fs_delta_detects_modification_by_hash_not_by_presence(tmp_path)
 # ---------------------------------------------------------------------------
 
 
-def test_every_scenario_grants_the_harmless_inspection_utilities():
+def test_every_tool_using_scenario_grants_the_harmless_inspection_utilities():
+    """spawn-selection is the one exception: a glob allowlist cannot tell
+    `tail` on stdin from `tail ~/.ssh/…`, so it gets no tools at all rather
+    than even the harmless set — see the no-Bash-tools test below."""
     from praxion_evals.live.scenarios import HARMLESS_UTILITIES, SCENARIOS
 
     for scenario_id, spec in SCENARIOS.items():
+        if scenario_id == "spawn-selection":
+            continue
         tools = set(spec.allowed_tools)
 
         assert set(HARMLESS_UTILITIES) <= tools, scenario_id
+
+
+def test_spawn_selection_grants_no_tools_at_all():
+    from praxion_evals.live.scenarios import SCENARIOS
+
+    assert SCENARIOS["spawn-selection"].allowed_tools == ()
 
 
 def test_no_scenario_grants_a_broad_git_or_python3_wildcard():

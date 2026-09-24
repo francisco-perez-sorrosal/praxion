@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -89,9 +90,12 @@ class SessionSpec:
     json_schema: Mapping[str, Any] | None = None
     forward_subagent_text: bool = False
     timeout_s: int = DEFAULT_TIMEOUT_S
-    # Grants Read of the plugin copy by absolute path: the copy lies outside
-    # the session's cwd, so without this a skill reference under
-    # `<copy>/skills/**` is denied (observed in the recorded envelopes).
+    # Grants read AND edit of the plugin copy by absolute path (the CLI's own
+    # docs: "read and edit"): the copy lies outside the session's cwd, so
+    # without this a skill reference under `<copy>/skills/**` is denied
+    # (observed in the recorded envelopes). The edit half is neutralized by
+    # the copy being read-only on disk (`materialize.make_read_only`) — a
+    # permission grant cannot override a filesystem permission.
     add_dir: Path | None = None
 
 
@@ -502,7 +506,9 @@ def classify(envelope: SessionEnvelope, exit_code: int | None, timed_out: bool) 
     return None
 
 
-def session_error(envelope: SessionEnvelope, run: SessionRun, copy_root: Path) -> Errored | None:
+def session_error(
+    envelope: SessionEnvelope, run: SessionRun, copy_root: Path, *, sandbox_root: Path | None = None
+) -> Errored | None:
     """Why a session cannot be graded, or ``None`` when it can.
 
     Order matters: an infrastructure failure is reported as itself before
@@ -513,21 +519,29 @@ def session_error(envelope: SessionEnvelope, run: SessionRun, copy_root: Path) -
         # stderr stays out: this detail lands in committed baseline records.
         subtype = envelope.final_result.subtype if envelope.final_result else None
         return Errored(kind=kind, detail=f"exit_code={run.exit_code} result_subtype={subtype}")
-    breach = isolation_breach(envelope, copy_root)
+    breach = isolation_breach(envelope, copy_root, sandbox_root=sandbox_root)
     if breach is not None:
         return Errored(kind="isolation_breach", detail=breach)
     return None
 
 
-def check_isolation(envelope: SessionEnvelope, copy_root: Path) -> bool:
+def check_isolation(
+    envelope: SessionEnvelope, copy_root: Path, *, sandbox_root: Path | None = None
+) -> bool:
     """True iff the session loaded the target copy, builtins, and nothing else."""
-    return isolation_breach(envelope, copy_root) is None
+    return isolation_breach(envelope, copy_root, sandbox_root=sandbox_root) is None
 
 
-def isolation_breach(envelope: SessionEnvelope, copy_root: Path) -> str | None:
+def isolation_breach(
+    envelope: SessionEnvelope, copy_root: Path, *, sandbox_root: Path | None = None
+) -> str | None:
     """What leaked into the session, or ``None`` when isolation is proven.
 
-    ``copy_root`` must be the copy's resolved path — ``init`` reports real paths.
+    ``copy_root`` must be the copy's resolved path — ``init`` reports real
+    paths. When ``sandbox_root`` is given, every tool_use input is also
+    scanned for an absolute path outside both roots: a Bash allowlist glob
+    (``cat *``, ``tail *``) cannot tell stdin from ``~/.ssh/…``, so this is
+    telemetry proof of a breach a permission grant alone cannot catch.
     """
     init = envelope.init
     if init is None:
@@ -541,6 +555,27 @@ def isolation_breach(envelope: SessionEnvelope, copy_root: Path) -> str | None:
         return f"foreign plugins loaded: {[p.get('source') for p in foreign]}"
     if not non_builtin:
         return f"target copy {copy_path} not loaded"
+    if sandbox_root is not None:
+        leak = _tool_use_path_leak(envelope.tool_uses, copy_root, sandbox_root)
+        if leak is not None:
+            return leak
+    return None
+
+
+_ABS_PATH_TOKEN = re.compile(r"(?<![\w.-])/[\w./-]+")
+
+
+def _tool_use_path_leak(
+    tool_uses: tuple[ToolUse, ...], copy_root: Path, sandbox_root: Path
+) -> str | None:
+    copy_path = os.path.normpath(copy_root)
+    sandbox_path = os.path.normpath(sandbox_root)
+    for tool_use in tool_uses:
+        for token in _ABS_PATH_TOKEN.findall(json.dumps(tool_use.input)):
+            named = os.path.normpath(token)
+            if named.startswith(copy_path) or named.startswith(sandbox_path):
+                continue
+            return f"tool_use {tool_use.name!r} named a path outside the sandbox: {token}"
     return None
 
 

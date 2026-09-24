@@ -136,9 +136,18 @@ telemetry or a filesystem delta (never from the model's own self-report), and gr
 same mechanical/judge seam `/eval-praxion` uses — so live and frozen grading never diverge.
 
 - **Opt-in and paid**: every session costs real API credits; run it deliberately, never from a hook,
-  a pipeline step, or CI.
-- **Cost**: roughly $15-40 for a full run with `--canary` at the default repeat count (`--dry-run`
-  prints exact argv/env and a session count before anything spends).
+  a pipeline step, or CI. A run-level spend cap (`$50` by default) is enforced before every launch,
+  on top of each session's own per-session budget.
+- **Cost**: roughly $15-40 for a full run with `--canary` at the default repeat count. `--dry-run`
+  prints one representative session's argv and environment keys per scenario (not every repeat) and
+  spawns nothing — it is a preview of the shape, not an exact session count.
+- **Isolation**: before any scenario session runs, one preflight session over an identically built,
+  nonce-planted copy must echo every planted marker (checked from harness telemetry, never the
+  model's self-report) or the whole variant aborts having spent only the preflight.
+- **Canary**: with `--canary`, a second variant runs the tier/agent-selection cases against a copy
+  with one process-convention section removed; the baseline JSON records both pass rates and
+  whether every case had a graded session in both variants before calling the guard's result
+  `lowered`.
 - **Run detached**: a full run's wall time exceeds a single interactive tool call's time limit —
   launch it in the background and poll, don't block on it inline.
 - **Credentials**: requires one of `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, or

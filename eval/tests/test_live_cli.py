@@ -126,7 +126,6 @@ def test_canary_variant_runs_only_the_spawn_selection_cases():
 
 
 def test_reserve_refuses_a_launch_that_would_cross_the_cap():
-    import threading
 
     from praxion_evals.live.cli import _reserve
     from praxion_evals.live.results import Errored
@@ -134,7 +133,7 @@ def test_reserve_refuses_a_launch_that_would_cross_the_cap():
 
     ledger = SpendLedger(cap_usd=1.0, spent_usd=0.9)
 
-    admitted, next_ledger = _reserve(ledger, threading.Lock(), 0.5)
+    admitted, next_ledger = _reserve(ledger, 0.5)
 
     assert isinstance(admitted, Errored)
     assert admitted.kind == "not_run_budget_exhausted"
@@ -154,7 +153,6 @@ def test_a_budget_exhausted_session_becomes_an_error_record_not_a_skip():
 
 
 def test_settle_charges_the_full_budget_when_the_envelope_reports_no_cost():
-    import threading
 
     from praxion_evals.live.cli import _settle
     from praxion_evals.live.session import SessionEnvelope
@@ -172,7 +170,7 @@ def test_settle_charges_the_full_budget_when_the_envelope_reports_no_cost():
         unparseable=False,
     )
 
-    settled = _settle(ledger, threading.Lock(), 3.0, empty_envelope)
+    settled = _settle(ledger, 3.0, empty_envelope)
 
     assert settled.spent_usd == 3.0
 

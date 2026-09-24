@@ -45,9 +45,9 @@ prompt = arg("-p") or ""
 plugin_dir = arg("--plugin-dir")
 schema = arg("--json-schema")
 config_dir = os.environ.get("CLAUDE_CONFIG_DIR", "")
-control_path = os.environ.get("FAKE_CLAUDE_CONTROL")
-control = json.loads(Path(control_path).read_text()) if control_path and Path(control_path).exists() else {}
-log_path = os.environ.get("FAKE_CLAUDE_LOG")
+control_path = CONTROL_PATH
+control = json.loads(Path(control_path).read_text()) if Path(control_path).exists() else {}
+log_path = LOG_PATH
 
 mutate_relpath = control.get("mutate_copy_relpath")
 if mutate_relpath and plugin_dir:
@@ -205,22 +205,26 @@ def fake_claude(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeClaude:
     ``os.environ`` at call time — so patching the test process's ``PATH``
     here reaches every session the run launches.
     """
-    bin_dir = tmp_path / "fakebin"
-    bin_dir.mkdir()
-    claude = bin_dir / "claude"
-    claude.write_text(f"#!{sys.executable}\n{_FAKE_CLAUDE_SOURCE}", encoding="utf-8")
-    claude.chmod(0o755)
-
     control_path = tmp_path / "fake_claude_control.json"
     log_path = tmp_path / "fake_claude_calls.log"
     control_path.write_text("{}", encoding="utf-8")
+
+    # The control channel is baked into the script, not passed through the
+    # environment: the session env is an isolation allowlist, and a test double
+    # must not need a hole in it.
+    bin_dir = tmp_path / "fakebin"
+    bin_dir.mkdir()
+    claude = bin_dir / "claude"
+    header = (
+        f"#!{sys.executable}\nCONTROL_PATH = {str(control_path)!r}\nLOG_PATH = {str(log_path)!r}\n"
+    )
+    claude.write_text(header + _FAKE_CLAUDE_SOURCE, encoding="utf-8")
+    claude.chmod(0o755)
 
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-test-not-a-real-key")
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
-    monkeypatch.setenv("FAKE_CLAUDE_CONTROL", str(control_path))
-    monkeypatch.setenv("FAKE_CLAUDE_LOG", str(log_path))
     return FakeClaude(control_path=control_path, log_path=log_path)
 
 

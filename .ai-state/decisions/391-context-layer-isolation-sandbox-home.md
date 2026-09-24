@@ -1,7 +1,8 @@
 ---
-id: dec-draft-0cbab284
+id: dec-391
+draft_id: dec-draft-0cbab284
 title: Context-layer isolation for live eval sessions via a per-session sandbox HOME and config dir, allowlisted env and --plugin-dir
-status: proposed
+status: accepted
 category: implementation
 date: 2026-09-24
 summary: A headless `claude -p` session loads only a target checkout's context layer when HOME and CLAUDE_CONFIG_DIR point at a per-session sandbox populated by the target's own render_claude_md + link_rules, the read-only target copy is passed via --plugin-dir and --add-dir, MCP is emptied with --strict-mcp-config, and the environment is rebuilt from an allowlist with the runner's own interpreter first on PATH (so hook-delivered rules reach the session); auth rides on an env credential; tool_use paths naming the operator's real home are detected from telemetry. Proven live by nonces plus harness telemetry with a paired ambient control.
@@ -17,7 +18,7 @@ affected_files:
 
 ## Context
 
-The live context-layer scenario runner (dec-draft-2fdf564d) needs each headless session to load the **target** checkout's context layer — global CLAUDE.md, user-scope rules, hook-delivered rules, plugin agents/skills/commands/hooks — and nothing from the operator's environment, while keeping the operator's auth and never modifying their files. The operator's environment loads `~/.claude/CLAUDE.md` and `~/.claude/rules/*` (symlinks into the main checkout), nine enabled marketplace plugins, five MCP servers (four from plugins, one user-scoped), user `settings.json` hooks, and a `settings.json` `env` that exports `CLAUDE_PLUGIN_ROOT=/Users/fperez/dev/praxion` — which `hooks/inject_rules.py` uses to locate its manifest. The ambient `python3` also lacks PyYAML, so `inject_rules.py` skips the hook-delivered rules. Claude Code CLI 2.1.281.
+The live context-layer scenario runner (dec-392) needs each headless session to load the **target** checkout's context layer — global CLAUDE.md, user-scope rules, hook-delivered rules, plugin agents/skills/commands/hooks — and nothing from the operator's environment, while keeping the operator's auth and never modifying their files. The operator's environment loads `~/.claude/CLAUDE.md` and `~/.claude/rules/*` (symlinks into the main checkout), nine enabled marketplace plugins, five MCP servers (four from plugins, one user-scoped), user `settings.json` hooks, and a `settings.json` `env` that exports `CLAUDE_PLUGIN_ROOT=/Users/fperez/dev/praxion` — which `hooks/inject_rules.py` uses to locate its manifest. The ambient `python3` also lacks PyYAML, so `inject_rules.py` skips the hook-delivered rules. Claude Code CLI 2.1.281.
 
 ## Decision
 

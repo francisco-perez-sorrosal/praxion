@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-24T02:49:37Z'
+generated_at: '2026-09-24T19:12:45Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -56,7 +56,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-21'
+  last_modified: '2026-09-24'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -514,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-22'
+  last_modified: '2026-09-23'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-23'
+  last_modified: '2026-09-24'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -561,13 +561,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-22'
+  last_modified: '2026-09-23'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-23'
+  last_modified: '2026-09-24'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -825,7 +825,7 @@ surfaces:
   path: .ai-state/decisions/040-eval-framework-out-of-band.md
   type: markdown
   title: Eval framework is out-of-band only (/eval command + CI, never hook-driven)
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-24'
   renderer: adr_card
 - id: ai-state-decisions-041-pyright-over-mypy
   path: .ai-state/decisions/041-pyright-over-mypy.md
@@ -2853,7 +2853,7 @@ surfaces:
   path: .ai-state/decisions/378-simplification-evidence-standard.md
   type: markdown
   title: Simplification requires a measured cost and an executable guard
-  last_modified: '2026-09-22'
+  last_modified: '2026-09-23'
   renderer: adr_card
 - id: ai-state-decisions-379-retire-worktree-guard-hooks
   path: .ai-state/decisions/379-retire-worktree-guard-hooks.md
@@ -2928,11 +2928,23 @@ surfaces:
   title: 'Cost collector: the agent_stop row is the grain, honest provenance is the only admissible population, and the committed summary gains a slug but no totals'
   last_modified: '2026-09-23'
   renderer: adr_card
+- id: ai-state-decisions-391-context-layer-isolation-sandbox-home
+  path: .ai-state/decisions/391-context-layer-isolation-sandbox-home.md
+  type: markdown
+  title: Context-layer isolation for live eval sessions via a per-session sandbox HOME and config dir, allowlisted env and --plugin-dir
+  last_modified: '2026-09-24'
+  renderer: adr_card
+- id: ai-state-decisions-392-live-context-layer-scenario-runner
+  path: .ai-state/decisions/392-live-context-layer-scenario-runner.md
+  type: markdown
+  title: "Live context-layer scenario runner \u2014 isolated headless sessions produce the seeded scenarios' recorded values"
+  last_modified: '2026-09-24'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-21'
+  last_modified: '2026-09-23'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3641,6 +3653,8 @@ groups:
   - ai-state-decisions-388-mutation-sensor
   - ai-state-decisions-389-workflow-encoded-lens-fan-out-skill
   - ai-state-decisions-390-cost-collector-agent-stop-grain
+  - ai-state-decisions-391-context-layer-isolation-sandbox-home
+  - ai-state-decisions-392-live-context-layer-scenario-runner
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

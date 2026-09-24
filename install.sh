@@ -574,6 +574,9 @@ elif $DRY_RUN; then
     check_python_tooling
     check_obsidian_deps
     delegate
+elif $COMPLETE_UNINSTALL; then
+    # Reverses --complete-install only; the shared installers must not run here.
+    delegate
 else
     # Install: shared CLIs first, then tool-specific
     install_chub_cli

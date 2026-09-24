@@ -1,3 +1,9 @@
+## v0.37.0 (2026-09-24)
+
+### Feat
+
+- Give /skill-genesis a queue mode over the parked harvest
+
 ## v0.36.0 (2026-09-24)
 
 ### Feat

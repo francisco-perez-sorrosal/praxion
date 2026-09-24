@@ -373,3 +373,131 @@ def test_no_scenario_grants_a_broad_git_or_python3_wildcard():
         tools = set(spec.allowed_tools)
 
         assert tools.isdisjoint(broad), (scenario_id, sorted(tools & broad))
+
+
+# ---------------------------------------------------------------------------
+# commit-staging: ground truth from the commit history, not the command text
+# ---------------------------------------------------------------------------
+
+
+def _git_repo(tmp_path):
+    import subprocess
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "scenario"], cwd=root, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "scenario@example.invalid"], cwd=root, check=True
+    )
+    return root
+
+
+def _commit(root, files):
+    import subprocess
+
+    for relpath, content in files.items():
+        path = root / relpath
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "c"], cwd=root, check=True)
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def test_commit_fs_delta_lists_exactly_the_paths_the_new_commit_touched(tmp_path):
+    from praxion_evals.live.scenarios import commit_fs_delta
+
+    root = _git_repo(tmp_path)
+    baseline_sha = _commit(root, {"scripts/foo.py": "a\n"})
+    _commit(root, {"scripts/foo.py": "b\n", "scripts/test_foo.py": "t\n"})
+
+    delta = commit_fs_delta(root, baseline_sha)
+
+    assert delta.changed_paths == ("scripts/foo.py", "scripts/test_foo.py")
+
+
+def test_commit_fs_delta_is_empty_when_no_new_commit_was_made(tmp_path):
+    from praxion_evals.live.scenarios import commit_fs_delta
+
+    root = _git_repo(tmp_path)
+    baseline_sha = _commit(root, {"scripts/foo.py": "a\n"})
+
+    delta = commit_fs_delta(root, baseline_sha)
+
+    assert delta.changed_paths == ()
+
+
+def test_commit_staging_catches_a_trap_file_committed_via_a_directory_pathspec():
+    """The verifier's exact reproduction: `git add scripts .ai-state` sweeps
+    in the untracked trap file through a directory pathspec the syntactic
+    check cannot see; ground truth from what was actually committed must
+    still surface it so the unchanged forbidden-path check can catch it."""
+    from praxion_evals.live.results import Captured
+    from praxion_evals.live.scenarios import FsDelta, capture_commit_staging
+    from praxion_evals.live.session import SessionEnvelope, ToolUse
+
+    envelope = SessionEnvelope(
+        init=None,
+        tool_uses=(
+            ToolUse(
+                id="t1",
+                name="Bash",
+                input={"command": "git add scripts .ai-state && git commit -m x"},
+                parent_tool_use_id=None,
+            ),
+        ),
+        subagent_texts=(),
+        task_notifications=(),
+        hook_outputs=(),
+        final_result=None,
+        result_count=0,
+        unparseable=False,
+    )
+    ground_truth = FsDelta(
+        created={
+            "scripts/foo.py": "",
+            "scripts/test_foo.py": "",
+            ".ai-state/observations.jsonl": "",
+        },
+        modified=(),
+    )
+
+    capture = capture_commit_staging(envelope, ground_truth, {})
+
+    assert isinstance(capture, Captured)
+    assert ".ai-state/observations.jsonl" in capture.value
+
+
+def test_commit_staging_stays_unchanged_when_no_ground_truth_is_available():
+    """Existing callers that never pass a filesystem delta (e.g. the
+    envelope-only tests against the recorded fixtures) must see the exact
+    same recorded string as before this change."""
+    from praxion_evals.live.results import Captured
+    from praxion_evals.live.scenarios import capture_commit_staging
+    from praxion_evals.live.session import SessionEnvelope, ToolUse
+
+    envelope = SessionEnvelope(
+        init=None,
+        tool_uses=(
+            ToolUse(
+                id="t1",
+                name="Bash",
+                input={"command": "git add scripts/foo.py scripts/test_foo.py"},
+                parent_tool_use_id=None,
+            ),
+        ),
+        subagent_texts=(),
+        task_notifications=(),
+        hook_outputs=(),
+        final_result=None,
+        result_count=0,
+        unparseable=False,
+    )
+
+    capture = capture_commit_staging(envelope, None, {})
+
+    assert isinstance(capture, Captured)
+    assert capture.value == "git add scripts/foo.py scripts/test_foo.py"

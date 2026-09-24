@@ -507,7 +507,7 @@ def classify(envelope: SessionEnvelope, exit_code: int | None, timed_out: bool) 
 
 
 def session_error(
-    envelope: SessionEnvelope, run: SessionRun, copy_root: Path, *, sandbox_root: Path | None = None
+    envelope: SessionEnvelope, run: SessionRun, copy_root: Path, *, real_home: Path | None = None
 ) -> Errored | None:
     """Why a session cannot be graded, or ``None`` when it can.
 
@@ -519,29 +519,33 @@ def session_error(
         # stderr stays out: this detail lands in committed baseline records.
         subtype = envelope.final_result.subtype if envelope.final_result else None
         return Errored(kind=kind, detail=f"exit_code={run.exit_code} result_subtype={subtype}")
-    breach = isolation_breach(envelope, copy_root, sandbox_root=sandbox_root)
+    breach = isolation_breach(envelope, copy_root, real_home=real_home)
     if breach is not None:
         return Errored(kind="isolation_breach", detail=breach)
     return None
 
 
 def check_isolation(
-    envelope: SessionEnvelope, copy_root: Path, *, sandbox_root: Path | None = None
+    envelope: SessionEnvelope, copy_root: Path, *, real_home: Path | None = None
 ) -> bool:
     """True iff the session loaded the target copy, builtins, and nothing else."""
-    return isolation_breach(envelope, copy_root, sandbox_root=sandbox_root) is None
+    return isolation_breach(envelope, copy_root, real_home=real_home) is None
 
 
 def isolation_breach(
-    envelope: SessionEnvelope, copy_root: Path, *, sandbox_root: Path | None = None
+    envelope: SessionEnvelope, copy_root: Path, *, real_home: Path | None = None
 ) -> str | None:
     """What leaked into the session, or ``None`` when isolation is proven.
 
     ``copy_root`` must be the copy's resolved path — ``init`` reports real
-    paths. When ``sandbox_root`` is given, every tool_use input is also
-    scanned for an absolute path outside both roots: a Bash allowlist glob
+    paths. When ``real_home`` is given (the operator's actual home
+    directory, never read here — the caller passes it), every tool_use
+    input is also scanned for a path under it: a Bash allowlist glob
     (``cat *``, ``tail *``) cannot tell stdin from ``~/.ssh/…``, so this is
-    telemetry proof of a breach a permission grant alone cannot catch.
+    telemetry proof of a breach a permission grant alone cannot catch. The
+    sandbox itself lives under the system temp dir, not HOME, so nothing a
+    session legitimately touches (its fixture, `/dev/null`, a URL fragment
+    that merely looks like a path) can collide with this check.
     """
     init = envelope.init
     if init is None:
@@ -555,8 +559,8 @@ def isolation_breach(
         return f"foreign plugins loaded: {[p.get('source') for p in foreign]}"
     if not non_builtin:
         return f"target copy {copy_path} not loaded"
-    if sandbox_root is not None:
-        leak = _tool_use_path_leak(envelope.tool_uses, copy_root, sandbox_root)
+    if real_home is not None:
+        leak = _tool_use_real_home_leak(envelope.tool_uses, real_home)
         if leak is not None:
             return leak
     return None
@@ -565,18 +569,22 @@ def isolation_breach(
 _ABS_PATH_TOKEN = re.compile(r"(?<![\w.-])/[\w./-]+")
 
 
-def _tool_use_path_leak(
-    tool_uses: tuple[ToolUse, ...], copy_root: Path, sandbox_root: Path
-) -> str | None:
-    copy_path = os.path.normpath(copy_root)
-    sandbox_path = os.path.normpath(sandbox_root)
+def _tool_use_real_home_leak(tool_uses: tuple[ToolUse, ...], real_home: Path) -> str | None:
+    """A token is a breach only if it resolves under the operator's real
+    home — both as given and as `realpath` (macOS's `/var` vs `/private/var`
+    symlink is exactly why the token is realpath'd too, not just the root).
+    """
+    home_roots = {_realnorm(real_home), os.path.normpath(real_home)}
     for tool_use in tool_uses:
         for token in _ABS_PATH_TOKEN.findall(json.dumps(tool_use.input)):
-            named = os.path.normpath(token)
-            if named.startswith(copy_path) or named.startswith(sandbox_path):
-                continue
-            return f"tool_use {tool_use.name!r} named a path outside the sandbox: {token}"
+            named = _realnorm(token)
+            if any(named == root or named.startswith(root + os.sep) for root in home_roots):
+                return f"tool_use {tool_use.name!r} named a path under the real home directory: {token}"
     return None
+
+
+def _realnorm(path: str | Path) -> str:
+    return os.path.normpath(os.path.realpath(path))
 
 
 def _is_builtin(plugin: Mapping[str, Any]) -> bool:

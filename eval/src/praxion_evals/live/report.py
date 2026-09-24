@@ -19,7 +19,7 @@ from praxion_evals.live.materialize import PathTarget, RefTarget, TargetIdentity
 from praxion_evals.live.results import compute_lowered, compute_pass_rate
 
 if TYPE_CHECKING:
-    from praxion_evals.live.materialize import Materialization, Variant
+    from praxion_evals.live.materialize import Degradation, Materialization, Variant
     from praxion_evals.live.spend import SpendLedger
 
 CREDENTIAL_KEYS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
@@ -90,10 +90,22 @@ def _sum_counts(all_counts: Iterable[Mapping[str, int]]) -> dict[str, int]:
     return total
 
 
+_TOKEN_FIELDS = ("input", "output", "cache_creation", "cache_read")
+
+
 def _totals(session_records: Sequence[dict[str, Any]]) -> dict[str, Any]:
     errors = sum(1 for record in session_records if record["outcome"] == "error")
     cost = sum(record.get("cost_usd") or 0 for record in session_records)
-    return {"scenario_sessions": len(session_records), "errors": errors, "cost_usd": cost}
+    tokens = {
+        field: sum((record.get("usage") or {}).get(field, 0) for record in session_records)
+        for field in _TOKEN_FIELDS
+    }
+    return {
+        "scenario_sessions": len(session_records),
+        "errors": errors,
+        "cost_usd": cost,
+        "tokens": tokens,
+    }
 
 
 def _target_json(target: TargetIdentity) -> dict[str, Any]:
@@ -109,7 +121,7 @@ def _target_json(target: TargetIdentity) -> dict[str, Any]:
     raise TypeError(f"unrecognized target identity: {target!r}")  # pragma: no cover — exhaustive
 
 
-def _degradation_json(degradation: Any) -> dict[str, Any] | None:
+def _degradation_json(degradation: Degradation | None) -> dict[str, Any] | None:
     if degradation is None:
         return None
     return {
@@ -241,18 +253,35 @@ def _leaked_credential(text: str) -> str | None:
 def print_eval_log_row(output: Mapping[str, Any], resolved: Path | str) -> None:
     """9 columns, matching ``.ai-state/eval_ledger/EVAL_LOG.md``'s header:
     date | commit | purpose | mechanical | judged | always-loaded tokens |
-    listing tokens | family5 verdict | notes."""
+    listing tokens | family5 verdict | notes. The per-scenario pass rates
+    and the canary verdict are the measurement — they ride in the notes
+    cell rather than being dropped, since this row has no other place for
+    them among the sibling harness's columns."""
     head = next((v for v in output["variants"] if v["variant"] == "head"), None)
     commit = resolved if isinstance(resolved, str) else "path-target"
     mechanical = (head or {}).get("totals", {}).get("scenario_sessions", 0)
     judged = "yes" if output["run"]["judge"] else "no"
-    canary = output.get("canary") or {}
-    notes = f"live context-layer run, k={output['run']['k']}, lowered={canary.get('lowered')}"
+    notes = f"live context-layer run, k={output['run']['k']}; {_notes_measurement(output, head)}"
     print(
         "\nEVAL_LOG.md row draft (append to .ai-state/eval_ledger/EVAL_LOG.md):\n"
         f"| {output['run']['finished_at'][:10]} | {commit[:12]} | context-layer-live "
         f"| {mechanical} sessions | {judged} | — | — | — | {notes} |"
     )
+
+
+def _notes_measurement(output: Mapping[str, Any], head: Mapping[str, Any] | None) -> str:
+    rates = "; ".join(
+        f"{s['scenario_id']}={_pct(s['pass_rate'])}" for s in (head or {}).get("scenarios", [])
+    )
+    canary = output.get("canary")
+    if canary is None:
+        return rates
+    verdict = f"lowered={canary['lowered']} (head={_pct(canary['head_pass_rate'])}, canary={_pct(canary['canary_pass_rate'])})"
+    return f"{rates}; {verdict}"
+
+
+def _pct(rate: float | None) -> str:
+    return "null" if rate is None else f"{rate:.0%}"
 
 
 def now_iso() -> str:

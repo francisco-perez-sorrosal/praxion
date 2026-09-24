@@ -71,7 +71,7 @@ from praxion_evals.live.session import (
 from praxion_evals.live.spend import RUNNER_SPEND_CAP_USD, SpendLedger
 
 if TYPE_CHECKING:
-    from praxion_evals.live.materialize import Materialization, Variant
+    from praxion_evals.live.materialize import Materialization, NoncePlant, Variant
     from praxion_evals.live.scenarios import ScenarioSpec
     from praxion_evals.live.session import SessionEnvelope, SessionRun
 
@@ -81,6 +81,8 @@ DEFAULT_MODEL = "opus"
 DEFAULT_EFFORT = "medium"
 PREFLIGHT_MODEL = "sonnet"
 PREFLIGHT_BUDGET_USD = 1.0
+# Read once, here — the isolation check itself stays pure and takes this in.
+REAL_HOME = Path.home()
 # Scenarios whose ground truth is a filesystem delta rather than the envelope alone.
 _FS_DELTA_SCENARIOS = ("adr-authoring", "lightweight-fix")
 # The recorded_* field each non-spawn-selection scenario's graded copy replaces.
@@ -320,14 +322,6 @@ def _run_variant(
     return report.variant_record(variant, scenario_copy, isolation_proof, identified), ledger
 
 
-def _rule_relpath(variant: Variant) -> str:
-    """Both variants plant their coordination-protocol-rule nonce in the same
-    file the canary degrades — REQ-level intent and the JSON key
-    ``coordination_rule`` both name that rule, not an unrelated one."""
-    del variant
-    return CANARY_FILE
-
-
 def _materialize(
     resolved: Path | str, repo_root: Path, dest: Path, variant: Variant
 ) -> Materialization:
@@ -343,7 +337,7 @@ def _materialize(
 
 def _run_preflight(
     copy: Materialization,
-    plant: Any,
+    plant: NoncePlant,
     session_root: Path,
     args: argparse.Namespace,
     ledger: SpendLedger,
@@ -371,7 +365,7 @@ def _run_preflight(
     return {"run": run, "envelope": envelope}, ledger
 
 
-def _preflight_prompt(plant: Any) -> str:
+def _preflight_prompt(plant: NoncePlant) -> str:
     prefix = next(iter(plant.markers().values())).rsplit("-", 2)[0]
     return (
         f"Reply with nothing but every marker string of the form {prefix}-<SURFACE>-<hex> "
@@ -380,7 +374,7 @@ def _preflight_prompt(plant: Any) -> str:
 
 
 def _isolation_proof(
-    preflight: dict[str, Any] | None, plant: Any, *, copy_root: Path
+    preflight: dict[str, Any] | None, plant: NoncePlant, *, copy_root: Path
 ) -> dict[str, Any]:
     """Telemetry-first, like every scenario session's check: echoing all four
     nonces proves the target layer loaded, not that nothing else did."""
@@ -467,6 +461,14 @@ def _run_one_session(
         fixture = session_root / "fixture"
         spec_def.build_fixture(fixture, task.seeded)
         before = scenarios.snapshot(fixture) if task.scenario_id in _FS_DELTA_SCENARIOS else None
+        # commit-staging's ground truth is the commit history, not file
+        # content: the seeded working tree already differs from HEAD before
+        # the session runs, so a content snapshot would show no delta.
+        baseline_sha = (
+            _git(fixture, "rev-parse", "HEAD").strip()
+            if task.scenario_id == "commit-staging"
+            else None
+        )
         spec = build_spec(task, copy.root, session_root, args.model, args.effort)
         run = run_session(spec, build_env(session_root, os.environ))
         envelope = parse_stream(run.stdout)
@@ -482,7 +484,7 @@ def _run_one_session(
             before,
             fixtures_by_id,
             args,
-            session_root=session_root,
+            baseline_sha=baseline_sha,
         )
     except Exception as exc:  # a fixture/judge/infra failure becomes this session's record,
         # never aborts a run that already paid for every other session.
@@ -503,6 +505,18 @@ def _session_metrics(envelope: SessionEnvelope) -> dict[str, Any]:
         "num_turns": result.num_turns if result else None,
         "duration_ms": result.duration_ms if result else None,
         "permission_denials": result.permission_denials if result else None,
+        "usage": _usage(result.usage) if result else None,
+    }
+
+
+def _usage(usage: Mapping[str, Any] | None) -> dict[str, int] | None:
+    if usage is None:
+        return None
+    return {
+        "input": usage.get("input_tokens", 0),
+        "output": usage.get("output_tokens", 0),
+        "cache_creation": usage.get("cache_creation_input_tokens", 0),
+        "cache_read": usage.get("cache_read_input_tokens", 0),
     }
 
 
@@ -517,18 +531,18 @@ def _evaluate(
     fixtures_by_id: Mapping[str, Mapping[str, Any]],
     args: argparse.Namespace,
     *,
-    session_root: Path,
+    baseline_sha: str | None = None,
 ) -> Outcome:
-    error = session_error(envelope, run, copy_root, sandbox_root=session_root)
+    error = session_error(envelope, run, copy_root, real_home=REAL_HOME)
     if error is not None:
         return error
     if spec_def.requires_structured_output and not _has_structured_output(envelope):
         return Errored(kind="structured_output_missing", detail="no structured_output reported")
-    fs_delta = (
-        scenarios.compute_fs_delta(before, scenarios.snapshot(fixture))
-        if before is not None
-        else None
-    )
+    fs_delta = None
+    if before is not None:
+        fs_delta = scenarios.compute_fs_delta(before, scenarios.snapshot(fixture))
+    elif baseline_sha is not None:
+        fs_delta = scenarios.commit_fs_delta(fixture, baseline_sha)
     capture = spec_def.capture(envelope, fs_delta, task.seeded)
     if isinstance(capture, NotElicited):
         return capture_to_outcome(capture)

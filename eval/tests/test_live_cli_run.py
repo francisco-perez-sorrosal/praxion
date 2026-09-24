@@ -23,6 +23,13 @@ from pathlib import Path
 
 import pytest
 
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "live_scenarios"
+
+
+def _fixture_text(name: str) -> str:
+    return (FIXTURES_DIR / f"{name}.stream.jsonl").read_text(encoding="utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Hand-built variant records — the shape `report.variant_record` produces,
 # used to drive the pure aggregation path (`build_output`) without a live run.
@@ -104,6 +111,30 @@ def test_lowered_is_true_when_every_case_is_graded_in_both_variants_and_all_move
     output = report.build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
 
     assert output["canary"]["lowered"] is True
+
+
+# ---------------------------------------------------------------------------
+# EVAL_LOG row draft: 9 columns, per-scenario pass rates and the canary
+# verdict carried in the notes cell
+# ---------------------------------------------------------------------------
+
+
+def test_eval_log_row_keeps_nine_columns_and_carries_pass_rates_and_verdict_in_notes(capsys):
+    from praxion_evals.live import report
+
+    head = _variant_stub("head", _spawn_selection_block([(1, 0, 0)] * 5))
+    canary = _variant_stub("canary", _spawn_selection_block([(0, 1, 0)] * 5))
+    output = report.build_output(_STUB_ARGS, "2026-01-01T00:00:00Z", [head, canary])
+
+    report.print_eval_log_row(output, "494dccaa")
+
+    printed = capsys.readouterr().out
+    row = next(line for line in printed.splitlines() if line.startswith("| "))
+    cells = [c.strip() for c in row.strip("|").split("|")]
+
+    assert len(cells) == 9
+    assert "spawn-selection" in cells[-1]  # per-scenario pass rate named in notes
+    assert "lowered=True" in cells[-1]  # the canary verdict, not swallowed
 
 
 # ---------------------------------------------------------------------------
@@ -293,44 +324,34 @@ def test_head_preflight_nonce_lands_in_the_coordination_protocol_rule():
     """REQ-level intent and the JSON key `coordination_rule` both name the
     coordination-protocol rule; the HEAD preflight must plant its nonce
     there — the same file the canary degrades — not in an unrelated rule."""
+    import inspect
+
     from praxion_evals.live import cli
-    from praxion_evals.live.materialize import CANARY_FILE
 
-    assert cli._rule_relpath("head") == CANARY_FILE
+    source = inspect.getsource(cli._run_variant)
+
+    assert "plant_nonces(preflight_copy.root, CANARY_FILE)" in source
 
 
 # ---------------------------------------------------------------------------
-# A tool_use naming a path outside the sandbox is an isolation breach;
-# spawn-selection gets no Bash tools at all
+# A tool_use naming a path under the operator's real home is an isolation
+# breach; spawn-selection gets no Bash tools at all
 # ---------------------------------------------------------------------------
 
 
-def test_tool_use_naming_a_path_outside_the_sandbox_is_an_isolation_breach():
-    """A glob allowlist (`cat *`, `tail *`) cannot distinguish stdin from
-    `~/.ssh/…`; any tool_use input naming an absolute path outside the
-    session's own sandbox and the plugin copy is telemetry proof of a
-    breach, detected regardless of which command carried it."""
-    from praxion_evals.live.session import InitInfo, SessionEnvelope, ToolUse, isolation_breach
+def _isolated_envelope(copy_root: Path, tool_uses: tuple) -> object:
+    from praxion_evals.live.session import InitInfo, SessionEnvelope
 
-    copy_root = Path("/tmp/run/head-copy")
-    sandbox_root = Path("/tmp/run/head-spawn-selection-1-0")
-    envelope = SessionEnvelope(
+    return SessionEnvelope(
         init=InitInfo(
             model="m",
             plugins=({"name": "praxion", "source": "praxion@inline", "path": str(copy_root)},),
             mcp_servers=(),
             api_key_source="k",
             claude_code_version="v",
-            cwd=str(sandbox_root / "fixture"),
+            cwd="/tmp/run/head-spawn-selection-1-0/fixture",
         ),
-        tool_uses=(
-            ToolUse(
-                id="t1",
-                name="Bash",
-                input={"command": "cat /Users/real-operator/.claude/CLAUDE.md"},
-                parent_tool_use_id=None,
-            ),
-        ),
+        tool_uses=tool_uses,
         subagent_texts=(),
         task_notifications=(),
         hook_outputs=(),
@@ -339,9 +360,117 @@ def test_tool_use_naming_a_path_outside_the_sandbox_is_an_isolation_breach():
         unparseable=False,
     )
 
-    breach = isolation_breach(envelope, copy_root, sandbox_root=sandbox_root)
+
+def test_tool_use_naming_a_path_under_the_real_home_is_an_isolation_breach():
+    """A glob allowlist (`cat *`, `tail *`) cannot distinguish stdin from
+    `~/.ssh/…`; any tool_use input naming a path under the operator's real
+    home is telemetry proof of a breach, detected regardless of which
+    command carried it — `real_home` is passed in, never read from the
+    environment by the check itself."""
+    from praxion_evals.live.session import ToolUse, isolation_breach
+
+    copy_root = Path("/tmp/run/head-copy")
+    real_home = Path("/Users/real-operator")
+    envelope = _isolated_envelope(
+        copy_root,
+        (
+            ToolUse(
+                id="t1",
+                name="Bash",
+                input={"command": "cat /Users/real-operator/.claude/CLAUDE.md"},
+                parent_tool_use_id=None,
+            ),
+        ),
+    )
+
+    breach = isolation_breach(envelope, copy_root, real_home=real_home)
 
     assert breach is not None
+
+
+def test_tool_use_naming_ssh_keys_under_the_real_home_is_an_isolation_breach():
+    from praxion_evals.live.session import ToolUse, isolation_breach
+
+    copy_root = Path("/tmp/run/head-copy")
+    real_home = Path("/Users/real-operator")
+    envelope = _isolated_envelope(
+        copy_root,
+        (
+            ToolUse(
+                id="t1",
+                name="Read",
+                input={"file_path": "/Users/real-operator/.ssh/id_ed25519"},
+                parent_tool_use_id=None,
+            ),
+        ),
+    )
+
+    breach = isolation_breach(envelope, copy_root, real_home=real_home)
+
+    assert breach is not None
+
+
+def test_dev_null_urls_and_the_sessions_own_fixture_are_not_isolation_breaches():
+    """Ordinary, genuinely isolated tool calls must not trip the check:
+    `/dev/null`, a URL that merely looks like a path, and the session's own
+    fixture/copy paths are all legitimate."""
+    from praxion_evals.live.session import ToolUse, isolation_breach
+
+    copy_root = Path("/tmp/run/head-copy")
+    real_home = Path("/Users/real-operator")
+    envelope = _isolated_envelope(
+        copy_root,
+        (
+            ToolUse(
+                id="t1",
+                name="Bash",
+                input={"command": "pytest -q 2>&1 | tail -3 > /dev/null"},
+                parent_tool_use_id=None,
+            ),
+            ToolUse(
+                id="t2",
+                name="Write",
+                input={
+                    "file_path": "/tmp/run/head-spawn-selection-1-0/fixture/a.txt",
+                    "content": "see https://example.com/a for details, and <ul></ul>",
+                },
+                parent_tool_use_id=None,
+            ),
+        ),
+    )
+
+    breach = isolation_breach(envelope, copy_root, real_home=real_home)
+
+    assert breach is None
+
+
+def test_real_envelope_fixtures_pass_clean_against_their_own_recorded_roots():
+    """The oracle: every committed verbatim envelope that reached `init` is a
+    genuinely isolated session and must never trip the real-home check
+    against the operator's actual home — this is the regression #refail-1
+    reproduced from real recordings, not synthetic ones."""
+    from praxion_evals.live.session import isolation_breach, parse_stream
+
+    fixture_names = [
+        "isolated_marker_preflight_sonnet",
+        "spawn_selection_standard_opus",
+        "subagent_implementer_background_sonnet",
+        "ui_step_conformance",
+        "adr_authoring",
+        "commit_staging",
+        "lightweight_fix",
+    ]
+    real_home = Path("/Users/operator")  # the README's substituted operator identity
+    for name in fixture_names:
+        envelope = parse_stream(_fixture_text(name))
+        assert envelope.init is not None, name
+        copy_root = Path(
+            next(p["path"] for p in envelope.init.plugins if p.get("path") not in (None, "builtin"))
+        )
+
+        breach = isolation_breach(envelope, copy_root, real_home=real_home)
+
+        assert breach is None, (name, breach)
 
 
 def test_spawn_selection_session_grants_no_bash_tools_at_all():
@@ -395,8 +524,21 @@ def test_baseline_json_records_per_session_metrics_and_the_resolved_model(tmp_pa
     assert session.get("model_resolved") == "claude-opus-5-5"
     assert session.get("num_turns") == 2
     assert session.get("permission_denials") == 0
+    assert session.get("usage") == {
+        "input": 10,
+        "output": 20,
+        "cache_creation": 0,
+        "cache_read": 0,
+    }
     assert data["run"]["model"]["resolved"] == ["claude-opus-5-5"]
     assert head["totals"].get("cost_usd") is not None
+    # 9 head sessions x the fake's fixed usage.
+    assert head["totals"].get("tokens") == {
+        "input": 90,
+        "output": 180,
+        "cache_creation": 0,
+        "cache_read": 0,
+    }
 
 
 def test_head_preflight_abort_skips_the_canary_variant_entirely(tmp_path, fake_claude):

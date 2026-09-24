@@ -1,9 +1,24 @@
 """Corpus-shape integration tests for Family 1 — real ADRs from .ai-state/decisions/.
 
-These tests parse REAL ADRs from the repository, not synthetic fixtures. That is the
-whole point: synthetic fixtures cannot catch parser failures against the actual corpus
-format, which uses multi-line block-list YAML syntax for fields like `affected_files`
-and `re_affirmed_by` (the dominant form in 94%+ of the ADR corpus).
+These tests parse REAL ADR text, not handcrafted YAML strings. That is the whole point:
+synthetic fixtures cannot catch parser failures against the actual corpus format, which
+uses multi-line block-list YAML syntax for fields like `affected_files` and
+`re_affirmed_by` (the dominant form in 94%+ of the ADR corpus).
+
+Two sourcing strategies are used, chosen per test by what the test is actually verifying:
+
+- The corpus-discipline test below (block-list `affected_files`) reads the LIVE corpus —
+  its purpose is to catch a parser regression against whatever real-world shapes exist
+  today, so it must track the corpus as it evolves.
+- The parser-contract and reciprocity-check tests read PINNED fixtures under
+  `tests/fixtures/pinned_adr_*.md` — verbatim frontmatter excerpts of real ADRs captured
+  at a fixed commit (cited in each fixture's header comment). Their purpose is to verify
+  the parser's and the reciprocity check's CONTRACT (scalar round-trips to a string,
+  block-list round-trips to a list, a genuine back-link yields PASS) — not whether two
+  specific live ADRs currently relate a particular way. Pinning decouples these tests
+  from legitimate future corpus edits (a new supersession, a new re-affirmation, an id
+  renumbering) while still exercising the real multi-line block-list YAML shape, because
+  the excerpts are themselves real corpus text, just frozen in time.
 
 This test file is the discipline: every future family must have a corpus-shape integration
 test that runs against real on-disk artifacts, not just handcrafted strings.
@@ -21,16 +36,21 @@ from typing import Any
 
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _DECISIONS_DIR = _REPO_ROOT / ".ai-state" / "decisions"
+_FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
-# dec-020 and dec-040 are known ADRs used as test anchors.
+# dec-020 is a known live-corpus ADR used as a test anchor for the
+# corpus-shape test below (block-list affected_files).
 _DEC_020_PATH = _DECISIONS_DIR / "020-architecture-md-living-artifact.md"
-_DEC_040_PATH = _DECISIONS_DIR / "040-eval-framework-out-of-band.md"
-_DEC_204_PATH = _DECISIONS_DIR / "204-praxion-self-eval-framework.md"
 
-# The finalized ADR id that superseded dec-040 and was also re-affirmed in its
-# re_affirmed_by list. dec-040 carries BOTH superseded_by: dec-204 AND
-# re_affirmed_by: [dec-204] to encode the partial-supersession-clause pattern.
-_FINALIZED_ID = "dec-204"
+# Pinned fixtures — verbatim frontmatter excerpts of real ADRs captured at a
+# fixed commit (see each fixture's header comment). Used instead of reading
+# the live corpus so that a later, legitimate ADR edit (supersession,
+# re-affirmation, id renumbering) cannot flip these parser/check-logic tests
+# red. What they exercise is the parser's and the reciprocity check's
+# CONTRACT — not any one ADR's current fields.
+_PINNED_DEC020_PATH = _FIXTURES_DIR / "pinned_adr_dec020.md"
+_PINNED_DEC022_PATH = _FIXTURES_DIR / "pinned_adr_dec022.md"
+_PINNED_DEC049_PATH = _FIXTURES_DIR / "pinned_adr_dec049.md"
 
 
 def _read_adr(path: Path) -> tuple[str, str]:
@@ -79,43 +99,43 @@ def test_dec020_affected_files_parses_to_nonempty_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 2: dec-040's superseded_by parses to the finalized id (scalar case)
+# Test 2: a scalar cross-reference field round-trips to a plain id string
 # ---------------------------------------------------------------------------
 
 
-def test_dec040_superseded_by_parses_to_finalized_id() -> None:
-    """dec-040's superseded_by is a plain scalar referencing the finalized ADR id.
+def test_pinned_scalar_crossref_field_parses_to_plain_id_string() -> None:
+    """A plain-scalar cross-reference field (e.g. superseded_by) parses to a bare string.
 
-    The draft that originally superseded dec-040 finalized to dec-204 at merge.
-    After finalization, dec-040's superseded_by field carries the permanent id
-    (dec-204), not the ephemeral draft hash. The parser must round-trip the
-    scalar form correctly.
+    Uses a pinned, verbatim frontmatter excerpt (see the fixture's header comment
+    for source path and commit) rather than reading the live corpus, so a later
+    legitimate ADR edit (e.g. a fresh supersession) cannot turn this test red —
+    the fixture's shape is what is under test, not any one ADR's current fields.
     """
     parse = _get_parse_fn()
-    _, content = _read_adr(_DEC_040_PATH)
+    _, content = _read_adr(_PINNED_DEC020_PATH)
 
     fm = parse(content)
 
     superseded_by = fm.get("superseded_by")
-    assert superseded_by == _FINALIZED_ID, (
-        f"superseded_by should be {_FINALIZED_ID!r}; got {superseded_by!r}"
-    )
+    assert superseded_by == "dec-021", f"superseded_by should be 'dec-021'; got {superseded_by!r}"
 
 
 # ---------------------------------------------------------------------------
-# Test 3: dec-040's re_affirmed_by parses to a list containing the finalized id
+# Test 3: a block-list cross-reference field round-trips to a list of ids
 # ---------------------------------------------------------------------------
 
 
-def test_dec040_re_affirmed_by_parses_to_list_with_finalized_id() -> None:
-    """dec-040's re_affirmed_by uses YAML block-list syntax (partial-supersession pattern).
+def test_pinned_list_crossref_field_parses_to_id_list() -> None:
+    """A YAML block-list cross-reference field (e.g. re_affirmed_by) parses to a list.
 
-    The stdlib parser returned an empty list for block lists; yaml.safe_load must
-    return a list that includes the finalized id. After the draft promoting to dec-204
-    at merge, dec-040 carries re_affirmed_by: [dec-204].
+    The stdlib parser silently returns an empty list for block-list syntax;
+    yaml.safe_load must return the real list of ids. Uses a pinned, verbatim
+    frontmatter excerpt (see the fixture's header comment) rather than the live
+    corpus, so a later legitimate re-affirmation added to the real ADR's list
+    cannot turn this test red.
     """
     parse = _get_parse_fn()
-    _, content = _read_adr(_DEC_040_PATH)
+    _, content = _read_adr(_PINNED_DEC022_PATH)
 
     fm = parse(content)
 
@@ -124,9 +144,7 @@ def test_dec040_re_affirmed_by_parses_to_list_with_finalized_id() -> None:
         f"re_affirmed_by should be a list; got {type(re_affirmed_by).__name__!r}: {re_affirmed_by!r}"
     )
     assert len(re_affirmed_by) >= 1, f"re_affirmed_by should have ≥1 item; got: {re_affirmed_by!r}"
-    assert _FINALIZED_ID in re_affirmed_by, (
-        f"{_FINALIZED_ID!r} not found in re_affirmed_by: {re_affirmed_by!r}"
-    )
+    assert "dec-049" in re_affirmed_by, f"'dec-049' not found in re_affirmed_by: {re_affirmed_by!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -211,40 +229,48 @@ def test_parser_handles_draft_id_in_re_affirmed_by_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 4: re_affirmation_reciprocity check PASS against the dec-040 ↔ dec-204 pair
+# Test 4: re_affirmation_reciprocity check PASS against a reciprocal pinned pair
 # ---------------------------------------------------------------------------
 
 
-def test_re_affirmation_reciprocity_passes_for_dec040_and_dec204() -> None:
-    """The re_affirmation_reciprocity check must return PASS for the dec-040/dec-204 pair.
+def test_re_affirmation_reciprocity_passes_for_reciprocal_pinned_pair() -> None:
+    """The re_affirmation_reciprocity check finds a real back-link and returns PASS.
 
-    dec-040 is the target of re_affirms from dec-204.
-    dec-040's re_affirmed_by field lists dec-204.
-    The check must find the back-link and return PASS, not FAIL.
+    This exercises the check's own logic (does it correctly match a `re_affirms`
+    scalar against the target's `re_affirmed_by` list and emit PASS, not whether
+    any two specific live ADRs currently reciprocate) — so it is deliberately built
+    from a pinned, verbatim two-ADR pair (see each fixture's header comment for
+    source path and commit) rather than reading the live corpus. A live-corpus
+    version of this test would pin the assertion to whichever two ADRs happen to
+    reciprocate today; a later legitimate re-affirmation, supersession, or id
+    renumbering elsewhere in the corpus could silently make it vacuous (PASS via
+    the check's own "no reciprocation links found, trivially consistent" branch)
+    or flip it red — neither of which says anything about the check's logic.
 
-    This is the partial-supersession-clause pattern the architect designed:
-    dec-040 carries BOTH superseded_by AND re_affirmed_by for the same id (dec-204),
-    encoding that dec-204 narrowly superseded one clause while re-affirming others.
+    The pinned pair genuinely reciprocates: dec-049 carries a scalar
+    `re_affirms: dec-022`; dec-022 carries a block-list `re_affirmed_by: [dec-049]`.
+    That non-trivial linkage is what makes the PASS meaningful — if either id
+    were dropped from either field, this test would fail.
     """
     from praxion_evals.harness.families.family1_pipeline_fidelity import (  # type: ignore[import]
         Family1PipelineOutcomeFidelity,
         _parse_frontmatter,
     )
 
-    assert _DEC_204_PATH.exists(), f"Finalized ADR dec-204 not found at {_DEC_204_PATH}"
+    dec022_entry = _read_adr(_PINNED_DEC022_PATH)
+    dec049_entry = _read_adr(_PINNED_DEC049_PATH)
 
-    dec040_entry = _read_adr(_DEC_040_PATH)
-    dec204_entry = _read_adr(_DEC_204_PATH)
+    # Sanity-check the fixture pair actually encodes reciprocity before asking
+    # the check to find it — a broken fixture must fail loudly here, not be
+    # papered over by the check's own vacuous-PASS branch below.
+    dec049_fm = _parse_frontmatter(dec049_entry[1])
+    assert dec049_fm.get("re_affirms") == "dec-022", (
+        f"fixture dec-049 should have re_affirms: dec-022; got {dec049_fm.get('re_affirms')!r}"
+    )
 
-    # Verify dec-204 has a re_affirms field or supersedes field pointing to dec-040
-    dec204_fm = _parse_frontmatter(dec204_entry[1])
-    supersedes = dec204_fm.get("supersedes")
-    assert supersedes == "dec-040", f"dec-204 should have supersedes: dec-040; got {supersedes!r}"
-
-    # Build a minimal corpus with just these two ADRs
     # _check_re_affirmation_reciprocity takes a list[tuple[str, str]] directly —
     # no need to construct a full Corpus object.
-    adr_entries = [dec040_entry, dec204_entry]
+    adr_entries = [dec022_entry, dec049_entry]
 
     family = Family1PipelineOutcomeFidelity()
 
@@ -255,10 +281,10 @@ def test_re_affirmation_reciprocity_passes_for_dec040_and_dec204() -> None:
 
     assert ra_results, "No re_affirmation_reciprocity results emitted"
 
-    # At least one result must be PASS (the dec-040 ↔ dec-204 pair)
+    # At least one result must be PASS (the dec-022 ↔ dec-049 pair)
     verdicts = [r.verdict for r in ra_results]
     assert "PASS" in verdicts, (
-        f"re_affirmation_reciprocity should PASS for dec-040 ↔ {_FINALIZED_ID}; "
+        f"re_affirmation_reciprocity should PASS for dec-022 ↔ dec-049; "
         f"verdicts={verdicts!r}, findings={[r.findings for r in ra_results]!r}"
     )
     # No FAIL should be emitted

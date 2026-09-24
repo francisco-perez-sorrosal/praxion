@@ -7,7 +7,7 @@ description: >
   developer guide. Use proactively for architecture or system design, trade-off
   analysis, technology selection, or structural assessment of a codebase before
   implementation.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit, WebFetch
 skills: [claude-ecosystem, data-structure-design]
 model: opus
 effort: xhigh

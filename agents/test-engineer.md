@@ -7,7 +7,7 @@ description: >
   integration), refactoring brittle or coupled suites, or establishing a module's
   testing infrastructure. Operates at the implementer's pipeline level, receiving
   steps from the implementation-planner.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
 skills: [software-planning, code-review, refactoring]
 background: true
 model: sonnet

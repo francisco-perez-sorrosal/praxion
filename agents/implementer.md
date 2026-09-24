@@ -6,7 +6,7 @@ description: >
   linters, self-reviews against coding conventions, and reports completion. Use
   when an IMPLEMENTATION_PLAN.md has steps ready to execute, or when the
   implementation-planner delegates a step.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
 skills: [software-planning, code-review, refactoring]
 background: true
 model: sonnet

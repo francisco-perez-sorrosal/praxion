@@ -27,7 +27,7 @@ description: >
   account wiring. Do NOT use for: general API design with no financial
   semantics, read-only market-data display, analytics dashboards, or
   wallet UI that does not execute transactions.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit, WebFetch
 skills: [agentic-transactions, mcp-crafting, agentic-sdks]
 model: opus
 effort: xhigh

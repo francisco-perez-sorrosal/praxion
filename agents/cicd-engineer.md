@@ -7,7 +7,7 @@ description: >
   GitHub Actions workflows, debug workflow failures, optimize pipeline
   performance, harden or review CI/CD security, configure caching, or set up
   deployment automation.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
 skills: [cicd]
 memory: user
 model: sonnet

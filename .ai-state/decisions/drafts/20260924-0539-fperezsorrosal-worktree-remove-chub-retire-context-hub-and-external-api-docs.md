@@ -4,7 +4,7 @@ title: Retire context-hub and the external-api-docs skill; fold a provider-neutr
 status: proposed
 category: architectural
 date: 2026-09-24
-summary: "Deletes the external-api-docs skill, its docs page and every context-hub (chub) install path. The methodology that never depended on chub is folded into one ~35-line section, software-planning/references/cross-agent-skill-conventions.md § Current external API docs: source order (official docs via WebFetch, llms.txt/.md first), version-drift detection, token hygiene, trust, and mismatches recorded in LEARNINGS.md in place of chub_feedback. The always-loaded rule line carries the trigger and pointer and reaches all 17 agents; agent skill preloads are dropped. Retires dec-001 and dec-348, narrows dec-053's mechanism clause, and moves the orphaned webhooks reference into api-design-craft."
+summary: "Deletes the external-api-docs skill, its docs page and every context-hub (chub) install path. The methodology that never depended on chub is folded into one ~35-line section, software-planning/references/cross-agent-skill-conventions.md § Current docs for external APIs: source order (official docs, llms.txt/.md first, via WebFetch or else a bounded Bash curl), version-drift detection, token hygiene, trust, and mismatches recorded in LEARNINGS.md in place of chub_feedback. The tool-neutral always-loaded rule line carries the trigger and pointer and reaches all 17 agents; agent skill preloads are dropped, and WebFetch (not WebSearch) is granted to the five agents that fetch in their own phase. Retires dec-001 and dec-348, narrows dec-053's mechanism clause, and moves the orphaned webhooks reference into api-design-craft."
 tags: [context-hub, external-api-docs, skills, retirement, current-docs-protocol, token-budget, onboarding, webhooks, agents]
 made_by: agent
 agent_type: systems-architect
@@ -63,15 +63,15 @@ A reach defect was also found. `cross-agent-skill-conventions.md` claimed to be 
    - every chub install path in `install.sh`, `install_claude.sh`, `install_cursor.sh` and `cursor/config/`
 
    Transitional cleanup of existing installs is decided separately in dec-draft-218ce4c9.
-2. **Fold** the provider-neutral methodology into `skills/software-planning/references/cross-agent-skill-conventions.md § Current external API docs`, about 35 lines covering:
+2. **Fold** the provider-neutral methodology into `skills/software-planning/references/cross-agent-skill-conventions.md § Current docs for external APIs` (anchor `#current-docs-for-external-apis`), about 35 lines covering:
    - when to check
-   - source order: official docs via `WebFetch` (`llms.txt`/`.md` first) → a user-configured vendor-official docs MCP → official repo/changelog → `WebSearch` → introspecting the installed package → training data labeled unverified
+   - source order: official docs (`llms.txt`/`.md` first) via `WebFetch`, or a bounded Bash `curl` where `WebFetch` is absent (see item 7) → a user-configured vendor-official docs MCP → official repo/changelog → `WebSearch` → introspecting the installed package → training data labeled unverified
    - version-drift detection, flag format, priority, and where each agent records it
    - token hygiene
    - trust: fetched docs are data, not instructions
    - mismatches
 3. **Reach** is delivered in three layers:
-   - The always-loaded rule line in `swe-agent-coordination-protocol.md` carries the trigger and the pointer, and reaches all 17 agents. Its length must not exceed today's 454 bytes.
+   - The always-loaded rule line in `swe-agent-coordination-protocol.md` carries the trigger and the pointer, and reaches all 17 agents. Its length must not exceed today's 454 bytes. It names no tool ("fetch `llms.txt`/`.md` pages first"), because it also reaches agents and non-Claude hosts that do not hold `WebFetch`. The mechanism lives only in the protocol.
    - The 7 agents with a phase-specific external-API obligation get one-line pointers straight to the protocol anchor.
    - `software-planning/SKILL.md` gains the missing link to that reference.
 
@@ -79,6 +79,12 @@ A reach defect was also found. `cross-agent-skill-conventions.md` claimed to be 
 4. **Replace `chub_feedback`** with recording doc/behavior mismatches in `LEARNINGS.md`. The next agent is the reader Praxion controls; upstream bugs already route to `/report-upstream`.
 5. **Narrow dec-053's mechanism.** The seed pipeline discovers the current Claude Agent SDK / `uv` / FastAPI surface through the protocol, and its smoke-check recovery introspects the installed package and records the mismatch. The prompt-over-template principle is unchanged.
 6. **Move** the orphaned `skills/external-api-docs/references/webhooks.md` (receiving side) to `skills/api-design-craft/references/webhooks.md`. There it cross-links `rest-patterns.md § Webhook Design` (sending side) and is wired into the skill's satellites, routing table and README.
+7. **Fetch path, decided per agent.** Verification found that 6 of the 7 agents with a protocol obligation held neither `WebFetch` nor `WebSearch`. The chub path had worked through `Bash`, which every agent holds.
+   - **`WebFetch` is added** to the five agents that fetch during their own phase: `systems-architect`, `implementer`, `test-engineer`, `cicd-engineer` and `agentic-transactions-architect`.
+   - **`implementation-planner` gets nothing.** It *schedules* the verifying step and does not fetch.
+   - **`WebSearch` stays researcher-only.** Open-ended discovery is the researcher's boundary. Agents without it skip rung 4 and recommend a researcher pass.
+   - **Rung 1 carries a bounded Bash fallback** for agents without `WebFetch` and for hosts where `tools:` does not bind. The Codex export copies the frontmatter as text, and Cursor's `sub-agents` MCP does not enforce it. The fallback is `curl -sL --max-time 30 -o tmp/api-docs/<name>.md <url>`: GET only, no credentials, `llms.txt`/`.md`/plain-text URLs only, then Grep/Read the needed section.
+   - **`WebFetch` callers ask for verbatim signatures**, because its extraction step paraphrases.
 
 This decision's action removes the subject of **dec-001** (skill wrapper as the primary context-hub integration) and of **dec-348** (its re-affirmation). Both are therefore retired, per the Retirement protocol, on their own records.
 
@@ -112,6 +118,23 @@ This decision's action removes the subject of **dec-001** (skill wrapper as the 
 - (−) Rate-limited free tier.
 - (−) It re-creates the single-vendor coupling that this decision removes.
 
+### Fetch-path sub-decision (Decision item 7)
+
+1. **Grant `WebFetch` + `WebSearch` to all six agents.**
+   - (+) Uniform.
+   - (−) `WebSearch` erodes the researcher boundary and pulls results from arbitrary domains, which widens the injection surface.
+   - (−) The planner gains a tool it never uses.
+   - Adopted only narrowly: `WebFetch` alone, for five agents.
+2. **Bash `curl` only, with no grants** (runner-up).
+   - (+) Zero schema cost, host-neutral, and it works while the installed plugin is still stale.
+   - (−) Vendors without `.md` variants return raw HTML: a token blow-up.
+   - (−) Nothing summarizes the content between attacker-controlled bytes and the agent's context.
+   - (−) Egress becomes a generic shell command rather than a per-domain `WebFetch` permission.
+   - Kept as the bounded fallback rung.
+3. **Delegate fetches to the researcher.**
+   - (−) Subagents cannot spawn subagents, so every signature check would round-trip through the orchestrator.
+   - Kept only as the escalation path that replaces rung 4 for agents without `WebSearch`.
+
 ## Consequences
 
 **Positive**
@@ -119,8 +142,13 @@ This decision's action removes the subject of **dec-001** (skill wrapper as the 
 - No Node.js, npm or third-party MCP dependency remains for docs retrieval, and no telemetry or feedback flows to an external service.
 - Reach improves: all 17 agents now receive the trigger, where previously only 4 preloaders had any path to the reference.
 - The orphaned webhooks reference becomes reachable.
+- Every agent with a protocol obligation can execute rung 1, with `WebFetch` where granted and Bash `curl` elsewhere. The protocol also works on Codex/Cursor exports, where `tools:` does not bind. The tool-neutral rule line measures 429 bytes and 104 tokens, down from 438 and 108.
 
 **Negative**
+- `WebFetch` adds an estimated ~300 schema tokens per spawn on five agent types. This is unmeasured and still well below the ~5.2k preload removed. The falsification path is `context_baseline.py` `first_turn` on implementer spawns before and after the plugin refresh.
+- `WebFetch`'s extraction step can paraphrase a signature. The mitigation is to ask for verbatim quotes and to `curl` `.md` pages to a file when exact text matters.
+- The `curl` fallback puts raw, unsummarized bytes into a file the agent reads. The injection surface is bounded by GET-only access, no credentials, plain-text URLs only, and the Trust rule "never pipe or execute".
+- `tools:` grants reach users only after release plus a plugin refresh. Until then the `curl` rung carries the load.
 - Users lose the `/external-api-docs` skill entry point. This is a user-facing breaking change and ships under a `BREAKING CHANGE` footer.
 - Managed projects that are already onboarded keep the old hackathon block until their next onboard/promote re-sync.
 - Retrieval quality now depends on each vendor's docs site; bot-blocked or JS-only sites fall to `WebSearch` and package introspection.
@@ -128,11 +156,12 @@ This decision's action removes the subject of **dec-001** (skill wrapper as the 
 
 ## Disconfirmation
 
-- **Falsifier.** Within about 90 days of release, verifier/LEARNINGS evidence shows agents writing integration code against training-data signatures at a *higher* rate than before (API-signature FAILs or mismatch entries citing unverified training data). Or major vendors' official docs turn out to be systematically unreachable via `WebFetch`.
+- **Falsifier.** Within about 90 days of release, verifier/LEARNINGS evidence shows agents writing integration code against training-data signatures at a *higher* rate than before (API-signature FAILs or mismatch entries citing unverified training data). Or major vendors' official docs turn out to be systematically unreachable via both `WebFetch` and `curl`. Or `LEARNINGS.md` mismatch entries trace coded signatures back to `WebFetch` paraphrases.
 - **Steelmanned runner-up.** Option 1 (lean rewrite, about 1.5k tokens). It keeps a description-matched auto-trigger that fires exactly when external-API work starts, rather than relying on a one-line pointer diluted among about 16.6k tokens of always-loaded text. It also keeps every inbound link valid and preserves a user-invocable entry point that users of the hackathon wrapper already knew.
 - **Reversal trigger.** Either of the following:
   - An open, free, curated, versioned docs service appears (or Claude Code ships native docs retrieval) that clears the trust bar context-hub was chosen for; then revisit a provider layer behind this protocol.
   - A measured L1 activation failure, i.e. sessions where external-API code was written with no fetch recorded in Sources and no "unverified" label.
+  - For the fetch path only: signature mismatches traced to `WebFetch` paraphrase. Then make `curl`-to-file the primary route for `.md` URLs. Alternatively, a measured `WebFetch` schema cost that rivals the removed preload; then fall back to the `curl`-only runner-up.
 
 ## Prior Decision
 
@@ -140,7 +169,7 @@ This decision's action removes the subject of **dec-001** (skill wrapper as the 
 
 **Clauses narrowed** by this record:
 
-- The "discovery hook" is no longer "the `external-api-docs` skill, which fetches current SDK docs from context-hub". It is now the provider-neutral current-docs protocol (`cross-agent-skill-conventions.md § Current external API docs`).
+- The "discovery hook" is no longer "the `external-api-docs` skill, which fetches current SDK docs from context-hub". It is now the provider-neutral current-docs protocol (`cross-agent-skill-conventions.md § Current docs for external APIs`).
 - In the smoke-check recovery, "fall back to the alternate symbol surfaced by chub" becomes "re-fetch the official docs page and introspect the installed package". The `chub_feedback` down-vote becomes a mismatch entry in `LEARNINGS.md`.
 - The Option C con "failures in chub … surface to the user" and the consequences "onboarding sessions exercise `external-api-docs` and chub feedback loops" and "a chub outage degrades the flow" now read as failures and outages of the vendor's docs site, degrading to `WebSearch` or introspection with the same clear diagnostic.
 

@@ -4,7 +4,7 @@ title: Context-layer isolation for live eval sessions via a per-session sandbox 
 status: proposed
 category: implementation
 date: 2026-09-24
-summary: A headless `claude -p` session loads only a target checkout's context layer when HOME and CLAUDE_CONFIG_DIR point at a per-session sandbox populated by the target's own render_claude_md + link_rules, the read-only target copy is passed via --plugin-dir and --add-dir, MCP is emptied with --strict-mcp-config, and the environment is rebuilt from an allowlist with the runner's own interpreter first on PATH (so hook-delivered rules reach the session); auth rides on an env credential; out-of-sandbox tool_use paths are detected from telemetry. Proven live by nonces plus harness telemetry with a paired ambient control.
+summary: A headless `claude -p` session loads only a target checkout's context layer when HOME and CLAUDE_CONFIG_DIR point at a per-session sandbox populated by the target's own render_claude_md + link_rules, the read-only target copy is passed via --plugin-dir and --add-dir, MCP is emptied with --strict-mcp-config, and the environment is rebuilt from an allowlist with the runner's own interpreter first on PATH (so hook-delivered rules reach the session); auth rides on an env credential; tool_use paths naming the operator's real home are detected from telemetry. Proven live by nonces plus harness telemetry with a paired ambient control.
 tags: [eval, context-layer, isolation, headless, claude-code-cli, sandbox, auth, process-economy, roadmap-p0-7]
 made_by: agent
 agent_type: systems-architect
@@ -62,6 +62,6 @@ Pros: typed messages; already a dependency of the eval package. Cons: runs its o
 
 ## Consequences
 
-Positive: isolation is structural, provable per run (four nonces, including the hook-delivered surface), and robust to future hooks that write under `$HOME`. Out-of-sandbox reads are caught from telemetry even where an allowlist glob cannot prevent them. The operator's configuration, installed plugin cache and transcripts are never touched.
+Positive: isolation is structural, provable per run (four nonces, including the hook-delivered surface), and robust to future hooks that write under `$HOME`. Reads that name the operator's real home by a literal path are caught from telemetry even where an allowlist glob cannot prevent them; indirect forms (`/Users/$USER/…`, `../` traversal, globs) are not, a declared limit of a text-level check. The operator's configuration, installed plugin cache and transcripts are never touched.
 
 Negative: operators who authenticate only through the keychain must supply `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or an API key; spend on this machine is API-metered. The measured layer assumes a PyYAML-capable hook interpreter, which the operator's ambient environment does not currently provide. The mechanism depends on CLI semantics for `CLAUDE_CONFIG_DIR`, `--plugin-dir`, `--add-dir` and `--strict-mcp-config` that a future release could change — the per-run nonce preflight is the tripwire.

@@ -32,7 +32,10 @@ The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.
 
 Determine the analysis scope:
 
-1. **Check invocation context** -- were you launched post-pipeline (`.ai-work/<task-slug>/LEARNINGS.md` and/or `.ai-work/<task-slug>/VERIFICATION_REPORT.md` exist) or standalone (user requesting a learning harvest)?
+1. **Check invocation context** -- one of three:
+   - **post-pipeline**: `.ai-work/<task-slug>/LEARNINGS.md` and/or `.ai-work/<task-slug>/VERIFICATION_REPORT.md` exist;
+   - **standalone**: the user requested a learning harvest with no pipeline directory;
+   - **queue mode**: the prompt carries a `Sources:` list (parked pipeline directories under a harvest queue such as `.ai-work/_harvest/<slug>/`, one batch of several). The listed directories replace `.ai-work/<task-slug>/` for every *read* below; the task slug still scopes anything you write under `.ai-work/`. Each source line carries two markers: `prior-report: yes` means an earlier report already cites it, `memory: yes` means a memory file names its slug. Neither says the source was captured whole, so read flagged sources for deduplication and extract only what the cited artifact lacks.
 2. **Read the existing artifact inventory** -- `Glob skills/*/SKILL.md` for skills, `Glob rules/**/*.md` for rules. Record names and descriptions for deduplication in Phase 3
 3. **Read the latest idea ledger** -- find the most recent `.ai-state/idea_ledgers/IDEA_LEDGER_*.md` (by timestamp in filename) to understand what has already been proposed, implemented, or discarded
 4. **State the scope** -- "Analyzing [N learning sources] for artifact promotion candidates"
@@ -43,8 +46,8 @@ If no learning sources exist (no LEARNINGS.md, no verification report, no sentin
 
 Consume all available learning sources in priority order. Skip any source that does not exist -- partial analysis is valid.
 
-1. **LEARNINGS.md** (`.ai-work/<task-slug>/`) -- gotchas, patterns, decisions, edge cases, technical debt
-2. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`) -- recurring quality patterns
+1. **LEARNINGS.md** (`.ai-work/<task-slug>/`; in queue mode, each listed source directory) -- gotchas, patterns, decisions, edge cases, technical debt
+2. **VERIFICATION_REPORT.md** (`.ai-work/<task-slug>/`; in queue mode, each listed source directory) -- recurring quality patterns. Queue mode also reads each source's `CONSULT_*.md` fragments here. When the prompt flags the batch **oversize**, do not read the source whole: read its `##`/`###` headings first and mine the sections whose headings name gotchas, patterns, decisions, edge cases, corrections or debt; record the sections you skipped in the sources table.
 3. **Latest SENTINEL_REPORT_*.md** (`.ai-state/sentinel_reports/`) -- ecosystem patterns and recurring findings
 4. **Latest IDEA_LEDGER_*.md** (`.ai-state/idea_ledgers/`) -- avoid re-proposing implemented or discarded ideas
 5. **ADR files** -- `.ai-state/decisions/DECISIONS_INDEX.md` is the scannable overview, but it grows unbounded. Prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the harvest scope is known; otherwise **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`). Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
@@ -67,6 +70,7 @@ For each extracted learning item, check whether it is already captured by an exi
 2. **Rules** -- read `rules/**/*.md`. Does an existing rule encode this knowledge?
 3. **CLAUDE.md** -- is this already documented as a project convention?
 4. **ADR files** -- check whether the learning item overlaps an existing decision via `python3 scripts/query_adrs.py --paths <files>` when the item's file scope is known, otherwise by grep-pre-scanning `.ai-state/decisions/DECISIONS_INDEX.md` on the item's keywords (never a full read — the index grows unbounded). Read the full ADR for matches to verify coverage.
+5. **Sibling reports of this harvest run** (queue mode) -- every `SKILL_GENESIS_REPORT_*.md` still `review_status: pending` was written by an earlier batch or an earlier run; grep their `## Proposals` headings for the item's keywords and do not re-propose what a pending proposal already covers. Note the overlap in the Triage table instead.
 
 Discard items already covered. Flag items that partially overlap but extend existing artifacts -- these become "update existing artifact" proposals rather than "create new artifact" proposals.
 
@@ -180,7 +184,7 @@ report_id: skill-genesis-<YYYY-MM-DD_HH-MM-SS>
 generated_at: <ISO-8601 timestamp>
 task_slug: <slug or "ad-hoc" when invoked outside a pipeline>
 agent_version: skill-genesis@<git-sha>
-invocation_args: { since: <commit-or-null>, scope: <area-or-null>, dry_run: <bool> }
+invocation_args: { since: <commit-or-null>, scope: <area-or-null>, sources: <queue-dir-or-null>, batch: <"i of N"-or-null>, dry_run: <bool> }
 review_status: pending
 disposition_count: { pending: <N>, approved: 0, rejected: 0, refined: 0, deferred: 0 }
 ---
@@ -198,6 +202,7 @@ Review status: pending.>
 |---|---|---|---|
 | LEARNINGS.md (current task) | `.ai-work/<slug>/LEARNINGS.md` | N | Read / Not found |
 | VERIFICATION_REPORT.md (current task) | `.ai-work/<slug>/VERIFICATION_REPORT.md` | N | Read / Not found |
+| Queue source (queue mode: one row per listed directory) | `<queue-dir>/<rel>/<file>` | N | Read / Sampled (sections skipped: …) / Not found |
 | Latest SENTINEL_REPORT_*.md | `.ai-state/sentinel_reports/<file>` | N | Read / Not found |
 | Latest IDEA_LEDGER_*.md | `.ai-state/idea_ledgers/<file>` | N | Read / Not found |
 | ADRs (recent) | `.ai-state/decisions/` | N | Read / N matched |

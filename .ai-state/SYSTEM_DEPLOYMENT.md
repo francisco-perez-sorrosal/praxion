@@ -35,7 +35,6 @@ Praxion is a meta-project distributed as a Claude Code plugin. There is no tradi
 | Git 2.x+ | External (runtime) | Strong | No | Worktree management, merge drivers |
 | `uv` | External (tooling) | Weak | No | MCP server launch; Python project management |
 | Arize Phoenix | External (observability) | Weak | No | Optional OTLP endpoint for traces; pipeline degrades gracefully without it |
-| `chub` (context-hub) | External (knowledge) | Weak | No | Curated API docs; MCP and CLI; fallback to web/training data when absent |
 
 ### Compute backend (taught — for ML/AI training archetype)
 
@@ -78,7 +77,6 @@ Praxion's runtime splits into session-scoped and long-lived surfaces. **Session-
 |---|---|---|---|---|
 | `PRAXION_DISABLE_CHRONOGRAPH_MCP` | No | unset | Skip span emission in this project | No |
 | `PRAXION_INJECT_NATIVE_SUBAGENTS` | No | `0` | Inject Praxion-process preamble into Praxion-native subagents (default off) | No |
-| `CHUB_TELEMETRY` | No | `0` | context-hub telemetry off by default | No |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | No | unset | Operator kill switch for subagent model routing | No |
 
 ### Compute backend env vars (taught)
@@ -127,7 +125,7 @@ GitHub Actions for Praxion's own repo handle skill linting, hook tests, MCP serv
 | ML compute backend (taught) — RunPod direct | `@runpod/mcp-server` upstream maintenance lapse | Low | Reference is reference-only; abstraction's contract is what matters; v2 specializations are alternatives | Reference rotation |
 | pipeline-dashboard (Next.js) | `next start` process crash | Low | macOS launchd `KeepAlive=true` restarts the process; `~/.praxion-dashboard/<port>.log` captures the crash trace; `praxion-dashboard restart [path]` recovers if KeepAlive loops | Per-developer-machine |
 | pipeline-dashboard (Next.js) | sha256 port collision across concurrent projects (~25% at ~24 projects) | Low | Override via `PRAXION_DASHBOARD_PORT`; widen `mod 1000 → mod 2000` if telemetry shows real collisions; `praxion-dashboard status [path]` reports the active port | Per-project (one project unreachable until override) |
-| pipeline-dashboard (Next.js) | Next.js / React major-version drift between the pinned `dashboard_app/package.json` and a future upgrade (e.g., Next 16 → 17) breaks the build at `praxion-dashboard install` time | Medium | `pnpm-lock.yaml` pins the full dependency closure; `pnpm install --frozen-lockfile` fails loudly rather than silently resolving a newer tree; bump deliberately and re-run `next build` in CI before shipping; API/version drift detection via `external-api-docs` skill at upgrade time | Dashboard install fails until pins reconciled; existing installs unaffected |
+| pipeline-dashboard (Next.js) | Next.js / React major-version drift between the pinned `dashboard_app/package.json` and a future upgrade (e.g., Next 16 → 17) breaks the build at `praxion-dashboard install` time | Medium | `pnpm-lock.yaml` pins the full dependency closure; `pnpm install --frozen-lockfile` fails loudly rather than silently resolving a newer tree; bump deliberately and re-run `next build` in CI before shipping; API/version drift detection against the official Next.js/React docs (current-docs protocol) at upgrade time | Dashboard install fails until pins reconciled; existing installs unaffected |
 | pipeline-dashboard (Next.js) | User-scoped Node home `~/.praxion-dashboard/` is stale relative to the plugin source (`dashboard_app/` changed but `praxion-dashboard install` not re-run) | Low | `praxion-dashboard start` rsyncs `dashboard_app/` into `~/.praxion-dashboard/app/` (excluding `node_modules`) on each start; `praxion-dashboard install` is the explicit full re-provision (re-runs `pnpm install` + `next build`); `praxion-dashboard uninstall --yes` resets the home | Per-developer-machine; stale UI until re-provisioned |
 | pipeline-dashboard (Next.js) | `.ai-work/<task-slug>/` cleaned up while the Workshops surface is open | Medium | Workshops reads are mtime-keyed with a `FileNotFoundError → empty-state` fallback; the surface refreshes on the `PRAXION_DASHBOARD_POLL_SECONDS` interval (15 s default) and reports "Workshop ended" | Page-level UX only; service healthy |
 | pipeline-dashboard (Next.js) | Linux/Windows user runs `praxion-dashboard install` | Medium | ctl detects the platform and prints the manual-launch recipe (`PRAXION_PROJECT_ROOT=... ~/.praxion-dashboard/app/node_modules/.bin/next start --hostname 127.0.0.1 --port <port>`); systemd support is v2; `commands/dashboard.md` documents the fallback | macOS-managed daemon unavailable on non-macOS; manual launch works |
@@ -141,7 +139,6 @@ GitHub Actions for Praxion's own repo handle skill linting, hook tests, MCP serv
 | Python 3.13+ | External (runtime) | Strong | MCP servers and hooks fail |
 | Git 2.x+ | External (runtime) | Strong | Worktree, merge driver, ADR finalize all fail |
 | Arize Phoenix | External (observability) | Weak | Spans not exported; pipeline continues |
-| `chub` | External (knowledge) | Weak | API doc fetch falls back to web/training data |
 | SkyPilot (taught) | External (taught backend) | Weak (project-side) | Project user installs and configures; Praxion teaches conventions |
 | `@runpod/mcp-server` (taught) | External (taught backend) | Weak (project-side) | Same — project-side concern |
 

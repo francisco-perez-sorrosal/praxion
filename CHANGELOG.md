@@ -1,3 +1,30 @@
+## v0.36.0 (2026-09-24)
+
+### Feat
+
+- Render the cost section in the metrics report
+- Register the cost collector in the default registry
+- Add the cost collector's aggregate pass and provenance guard
+- Add the cost collector's read pass
+- Name the pipeline on the committed session summary
+- Add lens-isolation guard over Workflow run transcripts
+- Add per-run workflow cost reader and run resolver
+- Add lens-fanout skill and Workflow script
+
+### Fix
+
+- Root cost collection at the constructor root
+- Give the SessionStart context hooks room at the compact moment
+- Report every needle kind and make lens paths consistent
+- Key the cost reader by run id and window helper rows
+- Read the Workflow journal's type key, not event
+- Mangle dots in the workflow run resolver's project directory
+- Project lens rows on the fewer-than-two-survived return
+
+### Refactor
+
+- Restate plan-document citations inline
+
 ## v0.35.0 (2026-09-21)
 
 ### Feat

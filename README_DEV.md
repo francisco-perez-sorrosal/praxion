@@ -537,7 +537,7 @@ When `claude plugin install praxion@bit-agora` runs, Claude Code clones the enti
 
 ### Marketplace-only install flow (internal architecture)
 
-The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook. It also offers consent-gated removal of leftover state from earlier Praxion versions (transitional cleanup, tagged in code for later removal).
+The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook. <!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence. --> It also offers consent-gated removal of leftover state from earlier Praxion versions (transitional cleanup, tagged in code for later removal).
 
 - `hooks/auto_complete_install.py` — SessionStart hook that detects missing surfaces and completes setup automatically on first session. Uses sensible defaults from `git config` (name, email) with optional operator override via single prompt.
 - `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts.

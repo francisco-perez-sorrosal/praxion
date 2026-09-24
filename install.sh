@@ -384,9 +384,9 @@ show_overview() {
     local mode=$1
     printf "\n${B}Praxion Installer${R}\n"
 
-    # --complete-uninstall only removes the plugin symlinks (§ Data Flow);
-    # it never runs the shared installers, so the "Shared:" bullets below
-    # (which name those installers) would be misleading here.
+    # --complete-uninstall only removes the plugin symlinks; it never runs
+    # the shared installers, so the "Shared:" bullets below (which name
+    # those installers) would be misleading here.
     if [ "$mode" != "codex" ] && ! $COMPLETE_UNINSTALL; then
         cat <<EOF
 
@@ -456,6 +456,11 @@ EOF
 # =============================================================================
 
 show_usage() {
+    # LEGACY-CHUB-CLEANUP: the --complete-install/--complete-uninstall
+    # bullets below describe the offer to remove leftover context-hub
+    # state. td-285's removal grep is code-only; when the shim is deleted,
+    # also drop those two "Also offers to remove leftover context-hub
+    # state" sentences from this heredoc.
     cat <<EOF
 Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry-run] [--uninstall] [--help]
 

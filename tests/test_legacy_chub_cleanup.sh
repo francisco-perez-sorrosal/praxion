@@ -16,17 +16,19 @@
 #     resolve them instead of any real binary. The `claude` stub exists
 #     because scripts/install-obsidian-deps.sh --check shells out to the
 #     real CLI regardless of chub state, and the real CLI does first-run
-#     bootstrap on whatever $HOME it sees (see LEARNINGS_7e.md).
+#     bootstrap on whatever $HOME it sees — silently rewriting .claude.json
+#     even when nothing under test touched it, which would pollute the
+#     "did X write to .claude.json" assertions below if left unstubbed.
 #   - Single-remnant scenarios (only one of chub-home/npm-global/
 #     claude-json-mcp/settings-json-mcp present) exercise a distinct code
 #     path from the full-remnants scenarios above: bash's `set -e` only
 #     aborts a function on a *tail-position* `$bool && cmd` whose `$bool`
-#     is false (non-tail occurrences of the same pattern are exempt — see
-#     LIGHT_REVIEW_7.md F1/F2). Seeding all four kinds at once makes every
-#     such guard true, so it never hits the tail-abort branch. The
-#     single-remnant scenarios below plant exactly one kind so each of
-#     report/non-TTY-offer/TTY-offer's tail guards gets exercised with a
-#     false condition at least once.
+#     is false (non-tail occurrences of the same pattern are exempt — the
+#     shell only checks the exit status of the pipeline's last command).
+#     Seeding all four kinds at once makes every such guard true, so it
+#     never hits the tail-abort branch. The single-remnant scenarios below
+#     plant exactly one kind so each of report/non-TTY-offer/TTY-offer's
+#     tail guards gets exercised with a false condition at least once.
 #   - `pty_scripted_run.py` accepts a repeatable `--answer VALUE` flag (in
 #     addition to the older `--answers N` blank-Enter count) so a scenario
 #     can script a specific sequence of prompt choices — e.g. `--answer 2
@@ -39,7 +41,7 @@
 #     from the script's own path, independent of $HOME). Every interactive/
 #     removal scenario below drives `--complete-uninstall` instead, whose
 #     dispatch (install_claude.sh's complete_uninstall_from_plugin) never
-#     reaches that code path. See LEARNINGS_7e.md for the finding.
+#     reaches that code path.
 #
 # Run from repo root:
 #   bash tests/test_legacy_chub_cleanup.sh
@@ -117,7 +119,7 @@ STUBEOF
     # .claude.json (merging in machineID/firstStartTime/etc.) even though
     # nothing in install.sh's own chub-cleanup code touched the file. Stub
     # it too so every scenario's "did X write to .claude.json" assertion
-    # measures only the code under test. See LEARNINGS_7e.md.
+    # measures only the code under test.
     cat > "${bindir}/claude" <<'STUBEOF'
 #!/bin/sh
 printf 'claude %s\n' "$*" >> "$STUB_LOG"
@@ -126,9 +128,9 @@ STUBEOF
     chmod +x "${bindir}/claude"
 }
 
-# Seed a HOME with all four remnant kinds from SYSTEMS_PLAN.md's Data
-# Structures table: claude-json-mcp, settings-json-mcp, npm-global (paired
-# with the stub above via STUB_NPM_HAS_CHUB=1), chub-home.
+# Seed a HOME with all four legacy chub remnant kinds: claude-json-mcp,
+# settings-json-mcp, npm-global (paired with the stub above via
+# STUB_NPM_HAS_CHUB=1), chub-home.
 seed_full_remnants() {
     local home="$1"
     mkdir -p "${home}/.claude"
@@ -278,8 +280,8 @@ start_test "test_seeded_check_reports_remnants_and_writes_nothing"
     # Baseline: run --check on this SAME HOME before any remnant exists, so
     # the later rc comparison isolates "did seeding change the exit code"
     # from any unrelated health-check noise a temp HOME might carry (a
-    # comparison across two DIFFERENT homes proves nothing — see
-    # LIGHT_REVIEW_7.md F4).
+    # comparison across two DIFFERENT homes proves nothing, since each
+    # temp HOME's own baseline health-check noise differs).
     clean_rc=0
     env HOME="$seeded_home" PATH="${bindir}:${PATH}" STUB_LOG="${stublog}.clean" \
         "$INSTALL_SH" code --check > /dev/null 2>&1 || clean_rc=$?
@@ -295,9 +297,10 @@ start_test "test_seeded_check_reports_remnants_and_writes_nothing"
         STUB_NPM_HAS_CHUB=1 "$INSTALL_SH" code --check 2>&1)"
     rc=$?
 
-    # Every remnant location named as a warning (manual-command text is
-    # given verbatim in SYSTEMS_PLAN.md's shim sketch, so this is a
-    # behavioral claim, not a guess at implementation wording).
+    # Every remnant location named as a warning — these needles are the
+    # shim's own contractual manual-removal strings (what a user would
+    # copy-paste to remove each remnant by hand), not a guess at
+    # implementation wording.
     for needle in '~/.chub' '@aisuite/chub' '.claude.json' 'settings.json'; do
         if printf '%s' "$output" | grep -qF "$needle"; then
             pass "--check names the '$needle' remnant"
@@ -396,7 +399,7 @@ start_test "test_seeded_non_tty_complete_uninstall_removes_nothing_and_prints_ma
 # one (see the header comment). Planting exactly one kind at a time forces
 # each such guard to see `false` at least once, so each of the three modes
 # below is proven to still complete (rc=0) no matter which single kind is
-# present (LIGHT_REVIEW_7.md F1, F2, F4 items 1-2 and 9).
+# present.
 # -----------------------------------------------------------------------------
 
 # $1 label, $2 seed function name (empty string = no HOME seeding — used for
@@ -404,8 +407,7 @@ start_test "test_seeded_non_tty_complete_uninstall_removes_nothing_and_prints_ma
 # STUB_NPM_HAS_CHUB value, $4 flag (--check or --dry-run), $5 a regex a
 # landmark output line must match to prove the run continued past the
 # legacy-chub block instead of aborting inside it (empty string skips that
-# assertion — dry-run's install_claude.sh-side kinds have no such landmark,
-# see LEARNINGS_7tests.md).
+# assertion — dry-run's install_claude.sh-side kinds have no such landmark).
 #
 # Compares this SAME HOME's exit code before vs after the remnant is seeded,
 # rather than asserting a flat rc==0: a bare temp HOME's `--check`/`--dry-run`
@@ -413,7 +415,7 @@ start_test "test_seeded_non_tty_complete_uninstall_removes_nothing_and_prints_ma
 # (e.g. Praxion's own CLI scripts not being linked into ~/.local/bin/ in a
 # throwaway HOME) — a flat rc==0 would fail on every single-remnant scenario
 # regardless of whether the legacy-chub shim itself works. Same fix as
-# scenario (b.1)'s exit-code comparison; see LIGHT_REVIEW_7.md F4.
+# scenario (b.1)'s exit-code comparison above.
 assert_single_remnant_report_flag_completes() {
     local label="$1" seed_fn="$2" npm_has_chub="$3" flag="$4" landmark="$5"
     local home bindir stublog output rc clean_rc
@@ -561,8 +563,7 @@ assert_single_remnant_interactive_complete_uninstall_completes settings-json-mcp
 # -----------------------------------------------------------------------------
 # Scenario (h): malformed-but-JSON-parseable shapes — `mcpServers: null` and a
 # top-level array — must not crash the probe (Python traceback) or its
-# caller, and must leave the file byte-for-byte unchanged after `--check`
-# (LIGHT_REVIEW_7.md F3).
+# caller, and must leave the file byte-for-byte unchanged after `--check`.
 # -----------------------------------------------------------------------------
 
 assert_odd_json_shape_does_not_crash_check() {
@@ -578,8 +579,7 @@ assert_odd_json_shape_does_not_crash_check() {
     # Baseline: this SAME HOME, before ~/.claude.json holds the odd shape —
     # isolates "did the odd JSON change the exit code" from unrelated
     # environmental health-check noise a bare temp HOME carries (see
-    # assert_single_remnant_report_flag_completes above and
-    # LIGHT_REVIEW_7.md F4).
+    # assert_single_remnant_report_flag_completes above).
     clean_rc=0
     env HOME="$home" PATH="${bindir}:${PATH}" STUB_LOG="${stublog}.clean" \
         "$INSTALL_SH" code --check > /dev/null 2>&1 || clean_rc=$?
@@ -733,11 +733,10 @@ sys.exit(0 if 'chub' not in d.get('mcpServers', {}) else 1)
 # Scenario (g): TTY decline/explicit-answer branches. Scenario (b.3) above
 # only exercises Enter-key defaults; these three script a specific non-default
 # answer at one prompt while defaulting every other, through the same
-# full-remnants seed (LIGHT_REVIEW_7.md F4 items 3-4). Prompt order is
-# claude-json-mcp, settings-json-mcp, chub-home, npm-global — the per-kind-ask
-# design recorded in LEARNINGS_7b.md, and confirmed by the absence of
-# ~/.claude/rules or ~/.local/bin in these temp HOMEs (present, they would add
-# two unrelated prompts ahead of these four).
+# full-remnants seed. Prompt order is claude-json-mcp, settings-json-mcp,
+# chub-home, npm-global — the shim asks per-kind, in that order, and this is
+# confirmed by the absence of ~/.claude/rules or ~/.local/bin in these temp
+# HOMEs (present, they would add two unrelated prompts ahead of these four).
 # -----------------------------------------------------------------------------
 
 start_test "test_interactive_chub_home_explicit_remove"
@@ -865,25 +864,25 @@ start_test "test_install_claude_step_headers_number_contiguously"
 # drops the chub MCP entry with a notice, and a second run's --check is
 # clean. The dangling symlink's name is a fabricated one no
 # shipped skill uses (`zz-removed-skill-fixture`) — NOT `external-api-docs`.
-# Naming it after a still-shipped skill made the scenario silently depend on
-# that skill's deletion (a separate, later plan step): the sweep removed the
-# dangling link correctly, but the pre-existing per-skill reconcile loop that
-# runs immediately after then re-created a link of the same *name*, because
-# it legitimately found a live `skills/external-api-docs/` directory to point
-# it at — so the "was swept and stays swept" assertion below was
-# unsatisfiable regardless of the sweep's own correctness (LIGHT_REVIEW_7.md
-# F5). A name with no currently-shipped counterpart isolates the sweep
-# mechanism from that unrelated reconcile loop.
+# Naming it after a still-shipped skill would make the scenario silently
+# depend on that skill eventually being deleted from the repo: the sweep
+# would remove the dangling link correctly, but the pre-existing per-skill
+# reconcile loop that runs immediately after would re-create a link of the
+# same *name*, because it would legitimately find a live
+# `skills/external-api-docs/` directory to point it at — so the "was swept
+# and stays swept" assertion below would be unsatisfiable regardless of the
+# sweep's own correctness. A name with no currently-shipped counterpart
+# isolates the sweep mechanism from that unrelated reconcile loop.
 #
 # Drives install_cursor.sh DIRECTLY rather than `install.sh cursor <path>`:
 # install.sh's default (no --check/--dry-run/--uninstall) flow runs
 # install_chub_cli/install_scc_cli/install_python_tooling/
 # install_obsidian_deps FOR EVERY MODE, cursor included, before it even
 # delegates — each an interactive `ask()` prompt (or, for Obsidian, a
-# network-touching plugin operation) wholly unrelated to what step 7c
-# changes. install_cursor.sh itself has no prompts and no shared-installer
-# side effects, so it is the actually-hermetic, narrowly-scoped entry point
-# for the Cursor-specific behavior under test. See LEARNINGS_7e.md.
+# network-touching plugin operation) wholly unrelated to the Cursor sweep
+# behavior under test. install_cursor.sh itself has no prompts and no
+# shared-installer side effects, so it is the actually-hermetic,
+# narrowly-scoped entry point for that behavior.
 # -----------------------------------------------------------------------------
 
 start_test "test_cursor_round_trip_sweeps_dangling_symlink_and_converges_clean"
@@ -949,6 +948,116 @@ sys.exit(0 if 'chub' not in d.get('mcpServers', {}) else 1)
         fail "second run's --check still mentions chub: $second_output"
     else
         pass "second run's --check mentions no chub server"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Scenario (i): the install path's drop notice and --check's positive warning
+# both key off the SAME mcp_json_has_chub() probe against a pre-existing
+# mcp.json, but they run at different points in the lifecycle — install
+# rewrites mcp.json wholesale right after warning, --check only reads it — so
+# each needs its own seeded mcp.json to exercise.
+# -----------------------------------------------------------------------------
+
+start_test "test_cursor_install_announces_dropping_a_preexisting_chub_entry"
+{
+    home="$(mktemp -d "${SUITE_TMP}/home.XXXXXX")"
+    target="$(mktemp -d "${SUITE_TMP}/cursor.XXXXXX")"
+    bindir="$(mktemp -d "${SUITE_TMP}/bin.XXXXXX")"
+    make_stub_bin_dir "$bindir"
+    stublog="${SUITE_TMP}/stub-cursor-drop.log"
+    : > "$stublog"
+
+    # Seed a pre-removal mcp.json (chub entry present) before install ever
+    # runs, so the drop-notice branch — which reads mcp.json BEFORE the
+    # install path's wholesale rewrite — sees a chub entry to report.
+    mkdir -p "${target}/.cursor"
+    cat > "${target}/.cursor/mcp.json" <<'JSON'
+{
+  "mcpServers": {
+    "chub": {
+      "command": "npx",
+      "args": ["-y", "@aisuite/chub", "mcp"]
+    }
+  }
+}
+JSON
+
+    output="$(env HOME="$home" PATH="${bindir}:${PATH}" STUB_LOG="$stublog" \
+        "$INSTALL_CURSOR_SH" "$target" 2>&1)"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+        pass "install with a pre-existing chub entry exits 0"
+    else
+        fail "install with a pre-existing chub entry exited $rc: $output"
+    fi
+
+    if printf '%s' "$output" | grep -qi "dropping legacy 'chub'"; then
+        pass "install announces dropping the legacy chub entry"
+    else
+        fail "install did not announce dropping the legacy chub entry: $output"
+    fi
+
+    mcp_json="${target}/.cursor/mcp.json"
+    if python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+sys.exit(0 if 'chub' not in d.get('mcpServers', {}) else 1)
+" "$mcp_json"; then
+        pass "mcp.json no longer carries the chub entry after install"
+    else
+        fail "mcp.json still carries the chub entry after install"
+    fi
+}
+
+start_test "test_cursor_check_warns_on_legacy_chub_entry_without_failing_health"
+{
+    home="$(mktemp -d "${SUITE_TMP}/home.XXXXXX")"
+    target="$(mktemp -d "${SUITE_TMP}/cursor.XXXXXX")"
+    bindir="$(mktemp -d "${SUITE_TMP}/bin.XXXXXX")"
+    make_stub_bin_dir "$bindir"
+    stublog="${SUITE_TMP}/stub-cursor-check-warn.log"
+    : > "$stublog"
+
+    # A clean install first, so every OTHER --check condition (skills,
+    # rules, commands, expected MCP servers) is genuinely healthy — this
+    # isolates the chub warning from unrelated health-check noise.
+    env HOME="$home" PATH="${bindir}:${PATH}" STUB_LOG="$stublog" \
+        "$INSTALL_CURSOR_SH" "$target" > /dev/null 2>&1
+
+    # Inject a chub entry directly into the now-clean mcp.json (not via
+    # install, which would just drop it again) so --check sees one to warn
+    # about, without touching any of the other health-check inputs above.
+    mcp_json="${target}/.cursor/mcp.json"
+    python3 -c "
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d.setdefault('mcpServers', {})['chub'] = {'command': 'npx', 'args': ['-y', '@aisuite/chub', 'mcp']}
+json.dump(d, open(p, 'w'), indent=2)
+" "$mcp_json"
+
+    output="$(env HOME="$home" PATH="${bindir}:${PATH}" STUB_LOG="$stublog" \
+        "$INSTALL_CURSOR_SH" "$target" --check 2>&1)"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+        pass "--check with a legacy chub entry still exits 0 (warning, not failure)"
+    else
+        fail "--check with a legacy chub entry exited $rc: $output"
+    fi
+
+    if printf '%s' "$output" | grep -qi "still has a legacy 'chub'"; then
+        pass "--check names the legacy chub entry as a warning"
+    else
+        fail "--check did not warn about the legacy chub entry: $output"
+    fi
+
+    if printf '%s' "$output" | grep -qi 'All checks passed'; then
+        pass "--check still reports overall health as passed"
+    else
+        fail "--check did not report overall health as passed: $output"
     fi
 }
 

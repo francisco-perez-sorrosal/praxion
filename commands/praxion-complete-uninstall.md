@@ -4,6 +4,7 @@ allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
+<!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence and step 3 below's "legacy remnants" clause. -->
 Remove the system-level symlinks that `/praxion-complete-install` created, and offer to remove leftover state from earlier Praxion versions. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
 
 ## Procedure
@@ -18,7 +19,7 @@ Remove the system-level symlinks that `/praxion-complete-install` created, and o
 
    If the plugin is not installed, report: *"Praxion plugin not found — nothing to uninstall."*
 
-3. **Relay the installer's interactive prompts.** The installer asks the user for consent separately on each removal (rules, scripts, legacy remnants from earlier Praxion versions if present). Do not suppress or auto-answer — each prompt represents a filesystem deletion the user should approve.
+3. **Relay consent, in whichever form the installer gives it.** <!-- LEGACY-CHUB-CLEANUP --> When `install.sh` runs on an interactive terminal, it prompts for consent separately on each removal (rules, scripts, legacy remnants from earlier Praxion versions if present); relay those prompts to the user and do not suppress or auto-answer them — each represents a filesystem deletion the user should approve. When run through this command's Bash tool invocation, stdin is not a TTY, so the installer removes nothing on its own and instead prints the exact manual commands for any remnants it found — relay those printed commands to the user verbatim rather than claiming a prompt appeared.
 
 4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether any legacy remnants were removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall praxion` to fully remove.
 

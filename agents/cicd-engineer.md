@@ -8,7 +8,7 @@ description: >
   performance, harden or review CI/CD security, configure caching, or set up
   deployment automation.
 tools: Read, Write, Edit, Glob, Grep, Bash
-skills: [cicd, external-api-docs]
+skills: [cicd]
 memory: user
 model: sonnet
 effort: high
@@ -42,7 +42,7 @@ Before making changes, gather context:
 4. **Load references on demand** -- load `skills/cicd/references/github-actions.md` for syntax details, `skills/cicd/references/patterns-and-examples.md` for build/test/release workflow templates, `skills/cicd/references/deployment-and-operations.md` for deployment, scheduled-maintenance, and PR-validation templates
 5. **Check for agent projects** -- if the project involves AI agents (agentic SDK dependencies, agent configs), also load `skills/agent-evals/SKILL.md` for eval-specific CI/CD patterns (eval-on-commit, deployment gates, regression tracking)
 6. **Check for ML training projects** -- if the project has `train.py`, `pyproject.toml` declaring `torch`/`jax`/`tensorflow`, or YAML hyperparameter files at repo root, also load `skills/cicd/references/ml-experiment-ci.md` for eval-gated CI patterns (eval-on-commit, checkpoint artifacts, baseline diffing).
-7. **External APIs in CI scope** -- if the workflow exercises external APIs (deployment targets like Railway/Fly/Vercel, auth providers, third-party SDKs), use the `external-api-docs` skill to look up current auth flows, required secrets, rate-limit policies, and webhook signature schemes before designing the job. Stale CI scripts against drifted APIs fail intermittently and mask real regressions. **Close the feedback loop**: if the fetched doc has wrong auth flows, missing rate-limit info, or outdated webhook signatures (the kind of issues that only surface when you try to wire them into CI), submit `chub_feedback` per the skill's Step 5.
+7. **External APIs in CI scope** -- if the workflow exercises external APIs (deployment targets like Railway/Fly/Vercel, auth providers, third-party SDKs), look up current auth flows, required secrets, rate-limit policies, and webhook signature schemes per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before designing the job. Stale CI scripts against drifted APIs fail intermittently and mask real regressions. Record doc/behavior mismatches that only surface when wiring CI (wrong auth flows, outdated webhook signatures) in `LEARNINGS.md`.
 8. **Determine mode** -- new pipeline, optimization, debugging, security review, or migration
 
 ### Phase 2 -- Design or Diagnose (2/6)

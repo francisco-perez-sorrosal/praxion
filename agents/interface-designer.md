@@ -19,7 +19,7 @@ description: >
   for an interface design review, UI/UX sketch, API/tool design, framework
   selection, or error-format / pagination / interaction-model decision.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: [web-ui-design, tui-design, agentic-interface-design, api-design-craft, api-design, external-api-docs, api-documentation]
+skills: [web-ui-design, tui-design, agentic-interface-design, api-design-craft, api-design, api-documentation]
 model: opus
 effort: xhigh
 background: true

@@ -8,7 +8,7 @@ description: >
   Use proactively when the user wants fresh ideas, has no specific task, or when
   project gaps and opportunities should be explored.
 tools: Read, Glob, Grep, Bash, Write, Edit, AskUserQuestion, WebFetch
-skills: [software-planning, external-api-docs, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
+skills: [software-planning, web-ui-design, tui-design, agentic-interface-design, api-design-craft]
 model: opus
 effort: xhigh
 memory: user

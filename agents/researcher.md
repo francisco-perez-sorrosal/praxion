@@ -6,7 +6,7 @@ description: >
   technology, evaluate options, investigate a codebase area, or gather context
   before architectural or implementation decisions.
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, Write, Edit
-skills: [claude-ecosystem, external-api-docs]
+skills: [claude-ecosystem]
 background: true
 model: sonnet
 effort: high
@@ -70,7 +70,7 @@ When the research involves existing code:
 6. **Technical debt** — note any structural issues that could affect the work
 7. **Archived specs** — check `.ai-state/specs/` for behavioral specifications relevant to the research area; these contain prior requirements, traceability, and architectural decisions
 8. **Past decisions** — retrieval-first: prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the research file scope is known; otherwise pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` per scope keyword (tags, affected paths, feature terms) and read only matching rows via `offset`+`limit`. An ungated full `Read` of the index is forbidden except for a genuinely cross-cutting task a keyword scan would miss. When the research area overlaps with past decisions, read the relevant ADR files for context on why prior choices were made
-9. **API version drift** — when research involves external APIs, use the `external-api-docs` skill to check context-hub for current documentation. Compare the documented version against the project's pinned version. Note any drift in the Dependencies section of `RESEARCH_FINDINGS.md` using the `[API VERSION DRIFT]` format. This gives the systems-architect version awareness for design decisions.
+9. **API version drift** — when research involves external APIs, apply the drift check in [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis): compare current official docs against the project's pinned version and note drift in the Dependencies section of `RESEARCH_FINDINGS.md` using the `[API VERSION DRIFT]` format. This gives the systems-architect version awareness for design decisions.
 10. **Dependency version availability** — when research recommends adding a new external dependency (library, SDK, toolchain), verify the latest available version before quoting a version in `RESEARCH_FINDINGS.md`. Training-data cutoffs make remembered version numbers unreliable. Delegate the concrete check to the language's package-management skill (e.g., `python-prj-mgmt` for Python's `pixi search` / `uv pip index versions`, equivalent skills for other ecosystems). Record the confirmed latest version alongside the recommendation; prefer version ranges (`>=X.Y`) over pinned exacts unless a pin is justified. If no language skill is available, fall back to the package registry's web UI or `WebSearch`.
 11. **Architecture context** — check `.ai-state/DESIGN.md` if it exists for design-level architecture context (system structure, component relationships, data flow, and planned components). Optionally check `docs/architecture.md` for code-verified component paths and current file locations -- this developer guide contains only Built components with filesystem-verified paths
 
@@ -80,7 +80,7 @@ Record findings as you go. Be specific: include file paths, line numbers, functi
 
 When the research requires information beyond the codebase:
 
-1. **Check context-hub FIRST for any external API or SDK** — before any WebSearch or WebFetch for external library/API information, use the `external-api-docs` skill (`chub_search`, `chub_get`) to check for curated docs on every external API mentioned in the research scope. This is non-negotiable: it avoids training-data hallucination and silently-stale signatures. When curated docs exist, fetch them first; only fall back to WebSearch when context-hub has no entry. Record what was fetched in the Sources section of `RESEARCH_FINDINGS.md`. **Close the feedback loop**: if during your research you detect drift, errors, missing sections, or failing examples in a fetched doc, submit `chub_feedback` with a concrete comment (per the skill's Step 5 trigger list) before finishing the phase. Silent consumption of flawed docs leaves every future agent with the same stale information.
+1. **Current official docs FIRST for any external API or SDK** — before any open-ended WebSearch about an external library/API, fetch its official docs in the source order of [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) (vendor `llms.txt`/`.md` pages via `WebFetch`, then a user-configured vendor-official docs MCP, the official repo/changelog, and only then `WebSearch`). This is non-negotiable: it avoids training-data hallucination and silently-stale signatures. Record each fetched URL and its fetch date in the Sources section of `RESEARCH_FINDINGS.md`; record doc/behavior mismatches in `LEARNINGS.md`.
 2. **Search for authoritative sources** — official documentation, well-maintained repositories, RFCs, specs
 3. **Evaluate source reliability** — prefer official docs, established projects, and primary sources over blog posts and opinions
 4. **Extract actionable information** — focus on what is directly relevant to the research questions
@@ -89,7 +89,6 @@ When the research requires information beyond the codebase:
    - **Identify the language and ecosystem** — derive from `pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, or equivalent. Do not assume; verify
    - **Name the capability or role** the library serves — be specific (e.g., "async HTTP client with HTTP/2 + connection pooling", not "HTTP library")
    - **Survey at least three candidates** that are *actively maintained* (release within the last ~12 months, healthy issue tracker, non-archived) and *current in the ecosystem*. Populate the candidate set from:
-     - `external-api-docs`/context-hub when applicable (`chub_search` first)
      - The language's official package index (`pypi.org`, `npmjs.com`, `crates.io`, `pkg.go.dev`, etc.) — sort by recent releases / download volume, then read the project README
      - Community curation: `awesome-<lang>` lists, recent conference talks (last 18 months), reputable language-ecosystem newsletters
    - **Confirm latest versions** for every candidate before quoting one — delegate to the language's package-management skill (e.g., `python-prj-mgmt` for Python). Training-data version numbers are unreliable

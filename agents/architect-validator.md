@@ -15,7 +15,6 @@ model: opus
 effort: high
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
-skills: [external-api-docs]
 memory: user
 maxTurns: 80
 background: true

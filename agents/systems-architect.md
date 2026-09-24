@@ -8,7 +8,7 @@ description: >
   analysis, technology selection, or structural assessment of a codebase before
   implementation.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: [claude-ecosystem, external-api-docs, data-structure-design]
+skills: [claude-ecosystem, data-structure-design]
 model: opus
 effort: xhigh
 background: true
@@ -59,7 +59,7 @@ Evaluate the codebase for structural readiness to receive the proposed changes:
 
 **API version drift check:**
 
-When the architecture involves external APIs, use the `external-api-docs` skill to check context-hub for current documentation. Compare the documented API version against the project's dependency version (`pyproject.toml`, `package.json`, etc.). If the project uses an older version than what the curated docs cover, flag the drift in the Risk Assessment (Phase 8) using the `[API VERSION DRIFT]` format defined in the skill. **Close the feedback loop**: if the fetched doc has architectural inaccuracies (wrong auth flows, missing rate-limit policies, outdated endpoint contracts), submit `chub_feedback` per the skill's Step 5 before finalizing the architecture phase.
+When the architecture involves external APIs, verify them against current official docs per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis). Compare the documented API version against the project's dependency version (`pyproject.toml`, `package.json`, etc.). If the project uses an older version than the current docs cover, flag the drift in the Risk Assessment (Phase 8) using the `[API VERSION DRIFT]` format defined there. Record doc/behavior mismatches (wrong auth flows, missing rate-limit policies, outdated endpoint contracts) in `LEARNINGS.md` before finalizing the architecture phase.
 
 **Library version and capability verification:** Any *new* library introduced in this architecture (not already pinned in the project) must be verified for current availability and capability fit before being named in `SYSTEMS_PLAN.md` or an ADR. Training-data cutoffs make remembered version numbers and feature matrices unreliable, and a technology pick built on a hallucinated capability is expensive to unwind at implementation time. Delegate the concrete version-check command to the language's package-management skill (e.g., `python-prj-mgmt` for `pixi search` / `uv pip index versions`). Record the confirmed latest version and any capability caveats alongside the recommendation. See [Cross-Agent Skill Conventions — Library version and capability checks](../rules/swe/swe-agent-coordination-protocol.md#cross-agent-skill-conventions) for the binding rule.
 

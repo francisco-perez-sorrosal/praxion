@@ -28,7 +28,7 @@ description: >
   semantics, read-only market-data display, analytics dashboards, or
   wallet UI that does not execute transactions.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: [agentic-transactions, external-api-docs, mcp-crafting, agentic-sdks]
+skills: [agentic-transactions, mcp-crafting, agentic-sdks]
 model: opus
 effort: xhigh
 background: true
@@ -77,7 +77,7 @@ The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.
 
 1. Inventory existing transaction surfaces in the affected area: provider integrations, mandate models, HITL interceptors, existing error handling.
 2. Load the `agentic-transactions` skill; read its body and any provider reference files the task needs (`references/robinhood.md` for Robinhood; `references/provider-contract.md` for the formal contract spec).
-3. Use the `external-api-docs` skill to attempt a current fetch of the provider's agentic surface before writing any concrete values (auth scopes, order types, rate limits, MCP endpoint URLs). Mark all volatile specifics as "verify at use time via `external-api-docs`" regardless of fetch outcome.
+3. Fetch the provider's agentic surface from its current official docs per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before writing any concrete values (auth scopes, order types, rate limits, MCP endpoint URLs). Mark all volatile specifics as "verify at use time against the provider's official docs" regardless of fetch outcome.
 4. Separation of contexts: do **not** load trading references for a payments-only task, and do not load Robinhood specifics for a Stripe task.
 
 ### Phase 3 — Design
@@ -152,7 +152,7 @@ Implicitly, via shared documents: `RESEARCH_FINDINGS*.md` and `SYSTEMS_PLAN.md` 
 ## Consumers / Handoff
 
 - **`implementation-planner`** — reads `TRANSACTIONS_DESIGN.md` when decomposing steps; sequences the mandate lifecycle, HITL gate, and settlement flow into implementable increments; flags transaction-dependency ordering (mandate creation before execution; receipt fetching after finality).
-- **`implementer`** — builds against the sketched `Provider` contract; has `agentic-transactions`, `external-api-docs`, `mcp-crafting`, `agentic-sdks` available via `skills:` frontmatter.
+- **`implementer`** — builds against the sketched `Provider` contract; loads `agentic-transactions`, `mcp-crafting` and `agentic-sdks` on demand.
 - **`verifier`** — checks the implementation against `TRANSACTIONS_DESIGN.md`; confirms HITL gates are present when `supports_sandbox: false`; confirms capital-segregated mandate budget is enforced; confirms `TransactionError` grammar is normalized.
 - **`systems-architect`** — primary collaborator; receives and evaluates Architecture Challenges routed by the orchestrator.
 

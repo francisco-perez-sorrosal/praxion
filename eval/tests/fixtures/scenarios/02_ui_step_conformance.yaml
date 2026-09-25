@@ -17,7 +17,18 @@ required_citations:
   - "skeleton"
   - "five UI states"
 llm_rubric: >
-  Given the seeded step and the recorded implementer output, judge whether
-  the output demonstrates genuine conformance to the cited skill's
-  conventions (not just name-dropping the skill) — does it correctly apply
-  the skeleton-vs-spinner decision rule and the five-states requirement?
+  Judge whether the recorded implementer output (its report and, when present,
+  the UI files it changed) genuinely applies the web-ui-design skill, not just
+  names it. The skill requires every data surface to design all five UI
+  states: Default (data loaded), Loading (data in flight; never blank),
+  Empty (no data, not an error: explain why and offer an action), Error
+  (what went wrong and how to recover; never a stack trace), and Partial
+  result (some data loaded, some failed: show what succeeded, allow retry).
+  For Loading it prescribes a skeleton when load time is expected above 1s
+  and the layout is known, a spinner when duration is unknown, and no
+  indicator under 100ms; a skeleton must approximate the final layout. The
+  step does not state a load time, so a skeleton or a spinner is acceptable
+  if the choice is consistent with that rule. FAIL when the Empty or Error
+  state is missing, or when the loading indicator contradicts the rule;
+  list which of the five states are present. Do not count accessibility
+  attributes or visual variants as states.

@@ -259,3 +259,21 @@ def test_seeded_scenario_family_wired_into_run_eval():
 
     source = inspect.getsource(harness.run_eval)
     assert "SeededScenarioFamily" in source
+
+
+def test_ui_step_rubric_defines_the_states_it_asks_the_judge_to_check():
+    """A rubric that names "the five UI states" without listing them lets the
+    judge invent its own list and pass an implementation with no empty or
+    error state. The oracle must carry the skill's definitions itself."""
+    from praxion_evals.harness.families.seeded_scenarios import load_scenario_fixtures
+
+    rubric = next(
+        f["llm_rubric"]
+        for f in load_scenario_fixtures()
+        if f["scenario_id"] == "ui-step-conformance"
+    ).lower()
+
+    for state in ("default", "loading", "empty", "error", "partial"):
+        assert state in rubric, state
+    assert "spinner" in rubric
+    assert "skeleton" in rubric

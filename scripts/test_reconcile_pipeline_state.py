@@ -888,5 +888,158 @@ def test_reconcile_never_confirms_a_step_from_a_file_that_only_matches_a_globs_b
     )
 
 
+# --- shared-file attribution: only the earliest declarer gets the evidence --
+
+
+def _seed_repo(repo_root: Path) -> str:
+    """A single-commit repo; returns the seed commit's sha as the diff base."""
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    return _git_capture(["rev-parse", "HEAD"], repo_root)
+
+
+_TWO_STEPS_SHARE_ONE_FILE = (
+    "### Step 1: Build the thing\n**Files**: f.py\n### Step 2: Extend the thing\n**Files**: f.py\n"
+)
+
+
+def test_reconcile_second_declarer_of_a_shared_file_stays_pending_when_only_the_first_is_committed(
+    tmp_path,
+):
+    """td-238(3) through the production call shape: two steps both declare
+    `f.py`; only the earlier step's work is committed and the WIP honestly
+    shows the later step as not started. The later step has no attributable
+    file of its own -- it must stay pending, never verified-complete from a
+    file it never touched."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    _setup(
+        repo_root,
+        "- [x] Step 1: build the thing\n- [ ] Step 2: extend the thing\n",
+        _TWO_STEPS_SHARE_ONE_FILE,
+    )
+    (repo_root / "f.py").write_text("# step 1 work\n", encoding="utf-8")
+    _run_git(["add", "f.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "step 1 work"], repo_root)
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "pending"
+
+
+def test_reconcile_earliest_declarer_absorbs_a_later_declarers_out_of_order_work(tmp_path):
+    """A declared limit of earliest-declarer attribution: plan order is assumed to equal execution order for a shared file. When the
+    real work happens out of order -- the later declarer's agent commits the
+    file first, while the earlier declarer was never touched -- the earlier
+    declarer still absorbs the file as its own attributable evidence and reads
+    verified-complete despite never being worked on, while the step that did
+    the real work has no attributable file of its own and reads unknown. This
+    is a declared limit, not a defect this reconciler guards against: the
+    reversal trigger names it, and the full verifier remains the downstream
+    correctness backstop for exactly this case."""
+    # A unit-level encoding (no real git repo needed): the shared changeset
+    # only reflects that `f.py` changed, never which step's agent wrote it --
+    # so this is exercised through `reconcile()`'s override hooks, the same
+    # production entry point, without the git-repo ceremony this particular
+    # case does not depend on.
+    root = _setup(
+        tmp_path,
+        "- [ ] Step 1: build the thing\n- [x] Step 2: extend the thing\n",
+        _TWO_STEPS_SHARE_ONE_FILE,
+    )
+    out = rps.reconcile(
+        SLUG,
+        root,
+        None,
+        _changed_files_override=["f.py"],
+        _wal_rows_override=[],
+        _test_status_override="green",
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "unknown"
+
+
+def test_reconcile_verifies_two_steps_whose_declared_files_are_never_shared(tmp_path):
+    """Regression lock: attribution only withholds evidence for a genuinely
+    shared file. Two steps with distinct declared files are judged exactly as
+    before attribution landed."""
+    root = _setup(
+        tmp_path,
+        "- [x] Step 1: build a\n- [x] Step 2: build b\n",
+        "### Step 1: Build A\n**Files**: a.py\n### Step 2: Build B\n**Files**: b.py\n",
+    )
+    out = rps.reconcile(
+        SLUG,
+        root,
+        None,
+        _changed_files_override=["a.py", "b.py"],
+        _wal_rows_override=[],
+        _test_status_override="green",
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "verified-complete"
+
+
+# --- letter-suffixed step ids are their own steps, not merged into the parent -
+
+# Verbatim excerpt: `sidecar-placement/sidecar-placement/IMPLEMENTATION_PLAN.md`
+# -- a plan heading and its own `Files:` field, immediately followed by a
+# lettered addendum heading and its own, different `Files:` field.
+_SIDECAR_PLACEMENT_1B_EXCERPT = (
+    "### Step 1: State-repository resolver — mount-aware placement sum type "
+    "[Architecture] [parallel-group: A]\n"
+    "**Files**: `scripts/_state_repo.py`\n"
+    "\n---\n\n"
+    "### Step 1b: State-repository resolver tests [parallel-group: A] [depends-on: none]\n"
+    "**Files**: `scripts/test_state_repo.py`, `.ai-state/TEST_TOPOLOGY.md` (own\n"
+    "`selectors`/`file_dependencies` entry inside `scripts-core`)\n"
+)
+
+
+def test_scan_step_files_keeps_a_lettered_addendum_heading_as_its_own_step(tmp_path):
+    plan_path = tmp_path / "IMPLEMENTATION_PLAN.md"
+    plan_path.write_text(_SIDECAR_PLACEMENT_1B_EXCERPT, encoding="utf-8")
+    files = rps._scan_step_files(plan_path)
+    assert files["Step 1"] == ["scripts/_state_repo.py"]
+    assert files["Step 1b"] == [
+        "scripts/test_state_repo.py",
+        ".ai-state/TEST_TOPOLOGY.md",
+    ]
+
+
+def test_parse_wip_steps_recognizes_a_letter_suffixed_checklist_claim(tmp_path):
+    wip = "- [x] Step 1b: state-repo resolver tests\n- [ ] Step 1: state-repo resolver\n"
+    p = tmp_path / "WIP.md"
+    p.write_text(wip, encoding="utf-8")
+    assert rps._parse_wip_steps(p) == {"Step 1": "PENDING", "Step 1b": "COMPLETE"}
+
+
+def test_reconcile_orders_letter_suffixed_and_multi_digit_steps_in_grammar_order(tmp_path):
+    plan = (
+        "### Step 1: A\n**Files**: a.py\n"
+        "### Step 1b: A tests\n**Files**: b.py\n"
+        "### Step 2: B\n**Files**: c.py\n"
+        "### Step 10: J\n**Files**: d.py\n"
+    )
+    wip = "- [ ] Step 1: a\n- [ ] Step 1b: a tests\n- [ ] Step 2: b\n- [ ] Step 10: j\n"
+    root = _setup(tmp_path, wip, plan)
+    out = rps.reconcile(
+        SLUG,
+        root,
+        None,
+        _changed_files_override=[],
+        _wal_rows_override=[],
+        _test_status_override="absent",
+    )
+    assert [v["step"] for v in out] == ["Step 1", "Step 1b", "Step 2", "Step 10"]
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

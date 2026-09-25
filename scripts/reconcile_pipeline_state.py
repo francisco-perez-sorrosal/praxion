@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
+from _step_schema import STEP_ID_RE, step_id_from_heading, step_sort_key
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -63,10 +64,13 @@ STEP_EXECUTING_AGENT_TYPES = frozenset(
 # WIP progress-line claim markers.
 _COMPLETE_RE = re.compile(r"\[x\]|\[COMPLETE\]", re.IGNORECASE)
 _IN_PROGRESS_RE = re.compile(r"\[IN-PROGRESS\]|\[IMPLEMENTING\]", re.IGNORECASE)
-# A WIP progress entry: "- [x] Step 3 ...", "- [ ] Step 0 (test-engineer): ..."
-_WIP_STEP_RE = re.compile(r"^\s*-\s*\[(?P<box>[ xX])\]\s*(?P<body>.*Step\s+(?P<num>\d+)\b.*)$")
-# An IMPLEMENTATION_PLAN step header: "### Step 3: ..." (capture trailing text).
-_PLAN_STEP_RE = re.compile(r"^#{2,4}\s*Step\s+(?P<num>\d+)\b\s*:?\s*(?P<rest>.*)$")
+# `_step_schema.STEP_ID_RE`, unanchored so it embeds in the pattern below --
+# one grammar, never a second hand-rolled copy.
+_STEP_ID_SHAPE = STEP_ID_RE.pattern.strip("^$")
+# A WIP progress entry: "- [x] Step 3 ...", "- [ ] Step 1b (test-engineer): ..."
+_WIP_STEP_RE = re.compile(
+    rf"^\s*-\s*\[(?P<box>[ xX])\]\s*(?P<body>.*Step\s+(?P<num>{_STEP_ID_SHAPE})\b.*)$"
+)
 # A "**Files**:" field line under a plan step.
 _FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re.IGNORECASE)
 # Pytest summary count tokens (word-boundary — never matches "ModuleNotFoundError").
@@ -142,8 +146,12 @@ def reconcile(
     )
 
     verdicts: list[dict[str, Any]] = []
-    for step_id in sorted(claims, key=_step_sort_key):
-        files = declared_files.get(step_id, [])
+    for step_id in sorted(claims, key=step_sort_key):
+        # Judged over this step's *attributable* files, not its raw declared
+        # list — a file another, earlier step also declares is necessary but
+        # not sufficient evidence for this step (see `attributable`).
+        files = attributable(step_id, declared_files)
+        earlier_declarer = _earliest_declarer(step_id, declared_files) if not files else None
         tier2 = _correlate_agents(files, wal_rows)
         verdicts.append(
             _classify_step(
@@ -153,6 +161,7 @@ def reconcile(
                 changed_files=changed_files,
                 test_status=test_status,
                 tier2=tier2,
+                earlier_declarer=earlier_declarer,
             )
         )
     return verdicts
@@ -163,6 +172,23 @@ def reconcile(
 # ---------------------------------------------------------------------------
 
 
+def _no_attributable_files_reason(claim: str, verdict: str, earlier_declarer: str | None) -> str:
+    """Evidence text when a step has no attributable file -- names the earlier
+    declarer that absorbed it, distinct from a genuinely file-less step."""
+    surfaced = "; surfaced for human verification" if verdict == "unknown" else ""
+    if earlier_declarer:
+        return (
+            f"every declared file is also declared by {earlier_declarer} (earlier) — "
+            f"WIP claim={claim}{surfaced}"
+        )
+    if verdict == "unknown":
+        return (
+            "step declares no Files: and cannot be tied to git changes — "
+            f"WIP claim={claim}{surfaced}"
+        )
+    return "step not started and declares no Files:"
+
+
 def _classify_step(
     *,
     step_id: str,
@@ -171,23 +197,22 @@ def _classify_step(
     changed_files: set[str],
     test_status: str,
     tier2: dict[str, Any],
+    earlier_declarer: str | None = None,
 ) -> dict[str, Any]:
     """Classify one step. Tier-1 (git + tests) is the arbiter — ground truth
-    decides "done," NOT the WIP checkbox (which is Tier-3, validated here)."""
+    decides "done," NOT the WIP checkbox (which is Tier-3, validated here).
+    ``files`` is already the *attributable* set (see ``attributable``);
+    ``earlier_declarer`` names the step that absorbed a shared file, when any.
+    """
     changed = [f for f in files if _path_in_changeset(f, changed_files)]
     unchanged = [f for f in files if f not in changed]
     tier1 = {"files_changed": changed, "files_unchanged": unchanged, "tests": test_status}
 
-    # No declared files → we cannot tie this step to specific ground truth.
-    # Never guess `verified-complete`; degrade to a human-surfaced verdict.
+    # No attributable files → we cannot tie this step to specific ground
+    # truth. Never guess `verified-complete`; degrade to a human-surfaced verdict.
     if not files:
         verdict = "unknown" if claim == "COMPLETE" else "pending"
-        evidence = (
-            "step declares no Files: and cannot be tied to git changes — "
-            f"WIP claim={claim}; surfaced for human verification"
-            if verdict == "unknown"
-            else "step not started and declares no Files:"
-        )
+        evidence = _no_attributable_files_reason(claim, verdict, earlier_declarer)
         return _make_verdict(step_id, claim, verdict, tier1, tier2, evidence, [])
 
     tests_red = test_status == "red"
@@ -386,9 +411,10 @@ def _scan_step_files(path: Path) -> dict[str, list[str]]:
     index = 0
     while index < len(lines):
         line = lines[index]
-        step = _PLAN_STEP_RE.match(line) or _WIP_STEP_RE.match(line)
-        if step:
-            current = f"Step {step.group('num')}"
+        heading_step = step_id_from_heading(line)
+        wip_step = _WIP_STEP_RE.match(line) if heading_step is None else None
+        if heading_step is not None or wip_step:
+            current = heading_step or f"Step {wip_step.group('num')}"
             index += 1
             continue
         fm = _FILES_FIELD_RE.match(line)
@@ -625,10 +651,53 @@ def _path_in_changeset(declared: str, changed_files: set[str]) -> bool:
     return any(_path_match(declared, c) for c in changed_files)
 
 
-def _step_sort_key(step_id: str) -> tuple[int, str]:
-    """Sort 'Step N' numerically."""
-    m = re.search(r"(\d+)", step_id)
-    return (int(m.group(1)) if m else 0, step_id)
+# ---------------------------------------------------------------------------
+# Shared-file attribution — earliest declarer
+# ---------------------------------------------------------------------------
+
+
+def _files_overlap(a: str, b: str) -> bool:
+    """Two declared ``Files:`` entries name the same file. Literal-vs-literal
+    and literal-vs-glob reuse ``_path_match``'s own rules (one path-equivalence
+    definition for the whole module); glob-vs-glob is string equality only —
+    expanding two globs against each other is out of scope (a declared limit).
+    """
+    a_glob = any(ch in a for ch in "*?[")
+    b_glob = any(ch in b for ch in "*?[")
+    if a_glob and b_glob:
+        return a.strip().strip("`") == b.strip().strip("`")
+    if b_glob:
+        a, b = b, a  # `_path_match`'s first argument is the glob side
+    return _path_match(a, b)
+
+
+def attributable(step: str, declared: dict[str, list[str]], sort_key=step_sort_key) -> list[str]:
+    """The declared files of ``step`` that no *earlier* step (by ``sort_key``)
+    also declares. Steps sharing a file are assumed to execute in that order;
+    when real work happens out of order, the earliest declarer still absorbs
+    the file — a declared limit, not a defect this function guards against
+    (see the systems plan's accepted falsifier).
+    """
+    own = declared.get(step, [])
+    earlier_files = [
+        f
+        for other_step, files in declared.items()
+        if sort_key(other_step) < sort_key(step)
+        for f in files
+    ]
+    return [f for f in own if not any(_files_overlap(f, other) for other in earlier_files)]
+
+
+def _earliest_declarer(
+    step: str, declared: dict[str, list[str]], sort_key=step_sort_key
+) -> str | None:
+    """The earliest earlier step that already claims one of ``step``'s files --
+    named in the evidence rather than reporting a shared-only step as file-less."""
+    own = declared.get(step, [])
+    earlier = sorted((s for s in declared if sort_key(s) < sort_key(step)), key=sort_key)
+    return next(
+        (s for s in earlier if any(_files_overlap(f, o) for f in own for o in declared[s])), None
+    )
 
 
 # ---------------------------------------------------------------------------

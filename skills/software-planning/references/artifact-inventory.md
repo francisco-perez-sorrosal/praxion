@@ -121,7 +121,7 @@ Optional/adoption-gated persistent artifacts not in the tree above (created only
 
 | Tier | Location | Documents | Lifetime |
 |------|----------|-----------|----------|
-| Ephemeral | `.ai-work/<task-slug>/` | `TASK_BRIEF.md` — writer: orchestrator at the Intake Clarity Gate (before any agent spawn); readers: researcher + systems-architect (first input — authoritative Intent / Key Signals), implementation-planner (Key Signals → step acceptance tests; Uncertainty Flags → spikes), test-engineer (signals → test nodes), verifier (Key Signals = primary rubric, Health Guards = regression checklist). Captured at Lightweight+ when success is non-obvious; skipped at Direct. Shape + template: `goal-disambiguation` skill | Single pipeline run — Key Signals merged into the archived SPEC / `VERIFICATION_REPORT.md`, then deleted with `.ai-work/` |
+| Ephemeral | `.ai-work/<task-slug>/` | `TASK_BRIEF.md` — writer: orchestrator at the Intake Clarity Gate (before any agent spawn); readers: researcher + systems-architect (first input — authoritative Intent / Key Signals), implementation-planner (Key Signals → step acceptance tests; Uncertainty Flags → spikes), test-engineer (signals → test nodes), verifier (Key Signals = primary rubric, Health Guards = regression checklist). Standard/Full-only, produced by the orchestrator at intake, before the first spawn -- not captured at Lightweight. Shape + template: `goal-disambiguation` skill | Single pipeline run — Key Signals merged into the archived SPEC / `VERIFICATION_REPORT.md`, then deleted with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `CONTEXT_REVIEW.md`, `INTERFACE_DESIGN.md`, `TRANSACTIONS_DESIGN.md`, `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `PROGRESS.md` (hackathon mode only) | Single pipeline run — delete after downstream consumption (merge `VERIFICATION_REPORT.md` patterns into `LEARNINGS.md` first). `INTERFACE_DESIGN.md` (interface-designer pipeline output: interface architecture, framework/paradigm decisions, UI/API sketches, trade-offs, `## Architecture Challenges`) is consumed by planner, implementer, and verifier. `TRANSACTIONS_DESIGN.md` (agentic-transactions-architect pipeline output: provider-contract analysis, mandate/settlement/HITL decisions, trade-offs, `## Architecture Challenges`) is consumed by planner, implementer, and verifier. `REWORK_MANIFEST.md` — writer: verifier (Phase 12.5); reader: main agent; cleanup gated on rework completion. |
 | Ephemeral | `.ai-work/<rework-slug>/` | `VERIFIER_FINDINGS.md` — writer: main agent; reader: `/resume-rework` + spawned session | Worktree-local ephemeral. |
 | Ephemeral | `.ai-work/<task-slug>/` | `PRE_REFACTOR_PLAN.md` — writer: systems-architect (Phase 2.5 outcome `emit-PRE_REFACTOR_PLAN`); readers: orchestrator (parses `## Verifier Bypass Criteria` + `## Loop-Back Conditions`), implementation-planner (steps tagged `[Phase: Refactoring]`), test-engineer (sources characterization-tests from `## Behavior Preservation Contract`), verifier (sources acceptance criteria from `## Acceptance Criteria` in pre-refactor mode) | Single pipeline run — receives a `[CONSUMED]` marker at architect's `post-refactor-adaptation` re-entry; deleted with `.ai-work/` at cleanup |
@@ -134,6 +134,27 @@ Optional/adoption-gated persistent artifacts not in the tree above (created only
 | Permanent | `docs/` | `architecture.md` | Project lifetime — committed to git, derived from `.ai-state/DESIGN.md`, maintained by pipeline agents |
 
 The machine-readable counterpart for the `.ai-work/<slug>/` set (consumed by the doc manifest, dashboard, eval manifest, and precompact hook) is [`scripts/artifact_registry.py`](../../../scripts/artifact_registry.py); drift between its consumers is caught by `scripts/test_artifact_registry.py`.
+
+### Per-tier artifact floor
+
+What a Standard/Full pipeline must produce, and how strictly -- the LLM-readable projection of `scripts/artifact_registry.py`'s `floor(tier)`, drift-guarded by `scripts/test_artifact_registry.py::test_inventory_floor_table_matches_registry_projection` (a table edited by hand without a matching registry change fails that test). `always` = unconditional obligation; `tests-ran` / `sdd-active` = required only when that signal holds (`signal_holds()` against the live `.ai-work/<slug>/` dir); `produced` = declarative, undecidable from files -- informational only, never a missing-FAIL. Full only ever adds obligations, never drops one (`traceability.yml`'s `sdd-active` → `always` promotion is the sole divergence).
+
+| Artifact | Standard | Full |
+|---|---|---|
+| TASK_BRIEF.md | always | always |
+| SYSTEMS_PLAN.md | always | always |
+| IMPLEMENTATION_PLAN.md | always | always |
+| WIP.md | always | always |
+| LEARNINGS.md | always | always |
+| TEST_BASELINE.md | always | always |
+| VERIFICATION_REPORT.md | always | always |
+| TEST_RESULTS.md | tests-ran | tests-ran |
+| traceability.yml | sdd-active | always |
+| RESEARCH_FINDINGS.md | produced | produced |
+| SPEC_DELTA.md | produced | produced |
+| CONTEXT_REVIEW.md | produced | produced |
+| INTERFACE_DESIGN.md | produced | produced |
+| TRANSACTIONS_DESIGN.md | produced | produced |
 
 ## ML/AI Training Extension Artifacts
 

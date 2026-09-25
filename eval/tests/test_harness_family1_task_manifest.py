@@ -6,7 +6,10 @@ and corresponding ``task_artifacts`` verdicts. Mechanical only — no judge.
 
 from __future__ import annotations
 
+import importlib
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,6 +24,57 @@ from praxion_evals.harness.task_manifest import (
     expected_artifacts,
     scan_task_manifest,
 )
+
+# ---------------------------------------------------------------------------
+# task_manifest's Standard/Full sets are DERIVED from scripts/artifact_registry.py's
+# per-tier floor, not hand-maintained. scripts/ sits outside the praxion-evals
+# package (a separate uv project), so it is loaded by path rather than imported
+# as a dependency — mirrors family5_token_budget_stability._load_measure_token_budget.
+# ---------------------------------------------------------------------------
+
+_EVAL_ROOT = Path(__file__).resolve().parents[1]  # eval/tests/ -> eval/
+_REPO_ROOT = _EVAL_ROOT.parent
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+
+def _load_artifact_registry() -> Any:
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    return importlib.import_module("artifact_registry")
+
+
+def test_standard_tier_file_decidable_set_matches_registry_floor_projection():
+    """expected_artifacts(STANDARD) is a derived view of the registry's floor.
+
+    Only file-decidable requirements (always / tests-ran / sdd-active) project
+    into the manifest — 'when produced' entries are declarative (undecidable
+    from files) and the manifest emits nothing for them.
+    """
+    registry = _load_artifact_registry()
+    floor_names = {
+        e.name for e in registry.floor("standard") if e.requirement is not registry.Signal.PRODUCED
+    }
+    manifest_names = {Path(s.path).name for s in expected_artifacts(PipelineTier.STANDARD)}
+    assert manifest_names == floor_names
+
+
+def test_full_tier_file_decidable_set_matches_registry_floor_projection_plus_full_extra():
+    """FULL = the registry's Full floor (file-decidable) plus the eval-local recency extras."""
+    registry = _load_artifact_registry()
+    floor_names = {
+        e.name for e in registry.floor("full") if e.requirement is not registry.Signal.PRODUCED
+    }
+    manifest_names = {Path(s.path).name for s in expected_artifacts(PipelineTier.FULL)}
+    full_extra_names = {"DESIGN.md", "architecture.md"}
+    assert manifest_names == floor_names | full_extra_names
+
+
+def test_standard_tier_includes_task_brief_and_test_baseline():
+    """The registry floor now requires TASK_BRIEF and TEST_BASELINE at Standard-always."""
+    paths = {s.path for s in expected_artifacts(PipelineTier.STANDARD)}
+    assert ".ai-work/{slug}/TASK_BRIEF.md" in paths
+    assert ".ai-work/{slug}/TEST_BASELINE.md" in paths
+
 
 # ---------------------------------------------------------------------------
 # task_manifest module — pure functional tests
@@ -55,25 +109,36 @@ def test_lightweight_tier_is_minimal():
 
 
 def test_lean_run_passes_with_required_present_and_conditionals_inactive(tmp_path: Path):
-    """A standard pipeline with no tests and no SDD: required present, conditionals not penalised."""
+    """A standard pipeline with no tests and no SDD: required present, conditionals not penalised.
+
+    The registry's floor now requires TASK_BRIEF.md and TEST_BASELINE.md unconditionally --
+    TEST_BASELINE.md carries the no-test-target marker, which satisfies its own always-required
+    floor entry (present) while still signalling "no tests ran" for TEST_RESULTS.md's activation.
+    """
     slug = "demo"
     task_dir = tmp_path / ".ai-work" / slug
     task_dir.mkdir(parents=True)
+    registry = _load_artifact_registry()
     standard_required = (
+        "TASK_BRIEF.md",
         "SYSTEMS_PLAN.md",
         "IMPLEMENTATION_PLAN.md",
         "WIP.md",
         "LEARNINGS.md",
+        "TEST_BASELINE.md",
         "VERIFICATION_REPORT.md",
     )
     for fname in standard_required:
-        (task_dir / fname).write_text("x", encoding="utf-8")
+        content = (
+            f"{registry.NO_TEST_TARGET_MARKER} @ abc1234\n" if fname == "TEST_BASELINE.md" else "x"
+        )
+        (task_dir / fname).write_text(content, encoding="utf-8")
 
     by_name = {
         Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
     }
     assert all(by_name[n].verdict == "present" for n in standard_required)
-    # Conditional artifacts are inactive (no TEST_BASELINE, no REQ heading) -> informational, not FAIL.
+    # Conditional artifacts are inactive (no-test-target marker, no REQ heading) -> informational.
     assert by_name["TEST_RESULTS.md"].required is False
     assert by_name["traceability.yml"].required is False
     assert not [v for v in by_name.values() if v.verdict == "missing" and v.required]

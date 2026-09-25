@@ -1,17 +1,28 @@
 """Drift gate for the canonical artifact registry (scripts/artifact_registry.py).
 
-The three hard-coded `.ai-work/<slug>/` artifact lists must agree with the
-registry's projection for their consumer. This test is that gate.
+The dashboard and precompact-hook `.ai-work/<slug>/` artifact lists must agree
+with the registry's projection for their consumer. This test is that gate for
+both of them, plus the registry's own internal self-consistency.
 
 Gate-liveness contract: a gate must be proven to bite on a known-bad input, not
 merely pass on the current good state. The canaries below feed synthetic drifted
 consumer text (a stale `SKILL_GENESIS_REPORT.md`; a dropped required artifact)
 and assert the comparison the live tests make would FAIL — so a future edit that
-re-introduces drift in any of the three consumers turns this suite red.
+re-introduces drift in either consumer turns this suite red.
 
-The dashboard, precompact hook, and eval consumers are parsed from source text
-(no imports), so the gate works uniformly across the hook, the eval package, and
-the TypeScript dashboard module.
+The dashboard and precompact hook consumers are parsed from source text (no
+imports), so the gate works uniformly across the hook and the TypeScript
+dashboard module. The eval package's derivation from the registry's per-tier
+floor is exercised in its own suite
+(eval/tests/test_harness_family1_task_manifest.py) since it imports the
+registry as a package dependency rather than being source-parsed.
+
+Per-tier artifact floor (Tier/Signal/Floor/floor()/signal_holds()): every
+reader of "what must a Standard/Full pipeline produce" derives from one
+registry-owned projection instead of duplicating the list. The tests below
+pin that projection, its monotonicity constructor, the file-decidable signal
+predicates, and the cross-field self-consistency invariants a floor entry
+must satisfy.
 """
 
 from __future__ import annotations
@@ -21,6 +32,8 @@ import re
 import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _REGISTRY_PATH = Path(__file__).resolve().parent / "artifact_registry.py"
@@ -80,18 +93,6 @@ def _precompact_pipeline_docs() -> set[str]:
     return _filenames(_bracketed_block(text, "PIPELINE_DOCS", "[", "]"))
 
 
-def _eval_standard_required() -> set[str]:
-    text = _read("eval/src/praxion_evals/harness/task_manifest.py")
-    block = _bracketed_block(text, "_STANDARD_REQUIRED", "(", ")")
-    return {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
-
-
-def _eval_standard_conditional() -> set[str]:
-    text = _read("eval/src/praxion_evals/harness/task_manifest.py")
-    block = _bracketed_block(text, "_STANDARD_CONDITIONAL", "(", ")")
-    return {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
-
-
 # -- Live drift assertions ----------------------------------------------------
 
 
@@ -103,23 +104,17 @@ def test_precompact_matches_registry_snapshot_set() -> None:
     assert _precompact_pipeline_docs() == registry.snapshot_artifacts()
 
 
-def test_eval_standard_required_matches_registry() -> None:
-    assert _eval_standard_required() == registry.eval_required("standard")
-
-
-def test_eval_standard_conditional_matches_registry() -> None:
-    assert _eval_standard_conditional() == registry.eval_conditional("standard")
-
-
 def test_every_consumer_filename_is_registered() -> None:
     # No consumer may list an artifact the registry does not know — catches the
-    # dead SKILL_GENESIS_REPORT.md class of drift in either direction.
+    # dead SKILL_GENESIS_REPORT.md class of drift in either direction. The eval
+    # consumer moved to a derivation test in
+    # eval/tests/test_harness_family1_task_manifest.py (it now builds its set
+    # from the registry's floor projection rather than a hand-written literal,
+    # so there is nothing left to source-parse here).
     known = registry.all_names()
     for label, names in (
         ("dashboard", _dashboard_workshop()),
         ("precompact", _precompact_pipeline_docs()),
-        ("eval-required", _eval_standard_required()),
-        ("eval-conditional", _eval_standard_conditional()),
     ):
         unknown = names - known
         assert not unknown, f"{label} lists unregistered artifact(s): {sorted(unknown)}"
@@ -147,29 +142,12 @@ def test_canary_missing_required_artifact_would_fail() -> None:
     assert items != registry.dashboard_artifacts()
 
 
-def test_canary_eval_drops_learnings_would_fail() -> None:
-    """If the eval manifest drops a required deliverable, the gate bites."""
-    drifted = '_STANDARD_REQUIRED = (\n  ArtifactSpec(path=".ai-work/{slug}/WIP.md"),\n)'
-    block = _bracketed_block(drifted, "_STANDARD_REQUIRED", "(", ")")
-    items = {Path(m.group(1)).name for m in _PATH_RE.finditer(block)}
-    assert registry.eval_required("standard") - items  # LEARNINGS etc. missing
-    assert items != registry.eval_required("standard")
-
-
 # -- Registry self-consistency ------------------------------------------------
 
 
 def test_registry_names_are_unique() -> None:
     names = [a.name for a in registry.ARTIFACTS]
     assert len(names) == len(set(names))
-
-
-def test_eval_flags_imply_eval_tier() -> None:
-    for a in registry.ARTIFACTS:
-        if a.eval_required or a.eval_conditional:
-            assert a.eval_tier is not None, f"{a.name}: eval flag without eval_tier"
-        # An artifact is required XOR conditional, never both.
-        assert not (a.eval_required and a.eval_conditional), f"{a.name}: required and conditional"
 
 
 # -- Registry declarative spine self-consistency ------------------------------
@@ -297,3 +275,225 @@ def test_canary_bogus_gate_kind_is_rejected() -> None:
     assert kind not in registry._GATE_KINDS, (
         f"'bogus' should never be a valid gate kind; _GATE_KINDS={registry._GATE_KINDS!r}"
     )
+
+
+# -- Per-tier artifact floor ---------------------------------------------------
+# Expected RED against the base (522302ca) registry: `Tier`, `Signal`,
+# `Requirement`, `Floor`, `floor()`, `signal_holds()`, `NO_TEST_TARGET_MARKER`,
+# and the per-`Artifact` `.floor` field do not exist yet — every test below
+# fails with AttributeError until the registry gains them. That is the correct
+# RED state for a not-yet-implemented contract (as opposed to the assertion
+# failures below, which pin behavior against artifacts the registry already
+# self-consistency-tests).
+
+
+def test_floor_standard_matches_the_documented_projection() -> None:
+    """The Standard floor: seven always artifacts, two signal-gated, five when-produced."""
+    entries = {e.name: e.requirement for e in registry.floor("standard")}
+
+    always = {
+        "TASK_BRIEF.md",
+        "SYSTEMS_PLAN.md",
+        "IMPLEMENTATION_PLAN.md",
+        "WIP.md",
+        "LEARNINGS.md",
+        "TEST_BASELINE.md",
+        "VERIFICATION_REPORT.md",
+    }
+    for name in always:
+        assert entries[name] == "always", f"{name}: expected always, got {entries.get(name)!r}"
+
+    assert entries["TEST_RESULTS.md"] == registry.Signal.TESTS_RAN
+    assert entries["traceability.yml"] == registry.Signal.SDD_ACTIVE
+
+    produced = {
+        "RESEARCH_FINDINGS.md",
+        "SPEC_DELTA.md",
+        "CONTEXT_REVIEW.md",
+        "INTERFACE_DESIGN.md",
+        "TRANSACTIONS_DESIGN.md",
+    }
+    for name in produced:
+        assert entries[name] == registry.Signal.PRODUCED, f"{name}: expected 'when produced'"
+
+
+def test_floor_full_promotes_traceability_to_always_and_matches_standard_otherwise() -> None:
+    """Full = Standard with exactly one promotion — no other entry may diverge."""
+    standard = {e.name: e.requirement for e in registry.floor("standard")}
+    full = {e.name: e.requirement for e in registry.floor("full")}
+
+    assert set(full) == set(standard), (
+        "full floor must cover exactly the same artifact names as standard"
+    )
+    assert full["traceability.yml"] == "always"
+    for name, requirement in standard.items():
+        if name == "traceability.yml":
+            continue
+        assert full[name] == requirement, (
+            f"{name}: full requirement {full[name]!r} diverges from standard "
+            f"{requirement!r} outside the documented traceability.yml promotion"
+        )
+
+
+def test_floor_construction_rejects_full_weaker_than_standard() -> None:
+    """A Full requirement weaker than its Standard counterpart is illegal at construction."""
+    with pytest.raises(ValueError, match="weaker"):
+        registry.Floor(standard="always", full=registry.Signal.TESTS_RAN)
+
+
+def test_signal_holds_tests_ran_true_when_baseline_present_without_marker(
+    tmp_path: Path,
+) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "TEST_BASELINE.md").write_text("clean baseline @ abc1234\n", encoding="utf-8")
+    assert registry.signal_holds(registry.Signal.TESTS_RAN, task_dir) is True
+
+
+def test_signal_holds_tests_ran_false_when_baseline_starts_with_no_test_target_marker(
+    tmp_path: Path,
+) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    marker_line = f"{registry.NO_TEST_TARGET_MARKER} @ abc1234\n"
+    (task_dir / "TEST_BASELINE.md").write_text(marker_line, encoding="utf-8")
+    assert registry.signal_holds(registry.Signal.TESTS_RAN, task_dir) is False
+
+
+def test_signal_holds_tests_ran_false_when_baseline_absent(tmp_path: Path) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    assert registry.signal_holds(registry.Signal.TESTS_RAN, task_dir) is False
+
+
+# Fixture bodies for the SDD-activation predicate: the literal shape is the
+# grammar under test, not a citation of any real spec's requirements.
+_PLAN_WITH_REQ_HEADING = (
+    "## Requirements\n### REQ-01: Login works\n"  # id-citation-discipline:ignore
+)
+_PLAN_WITH_REQ_IN_PROSE = (
+    "A config task. No `REQ-NN` block is warranted.\n"  # id-citation-discipline:ignore
+)
+
+
+def test_signal_holds_sdd_active_true_for_numbered_requirement_heading(tmp_path: Path) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "SYSTEMS_PLAN.md").write_text(_PLAN_WITH_REQ_HEADING, encoding="utf-8")
+    assert registry.signal_holds(registry.Signal.SDD_ACTIVE, task_dir) is True
+
+
+def test_signal_holds_sdd_active_false_for_prose_only_mention(tmp_path: Path) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "SYSTEMS_PLAN.md").write_text(_PLAN_WITH_REQ_IN_PROSE, encoding="utf-8")
+    assert registry.signal_holds(registry.Signal.SDD_ACTIVE, task_dir) is False
+
+
+def test_signal_holds_sdd_active_false_when_plan_absent(tmp_path: Path) -> None:
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    assert registry.signal_holds(registry.Signal.SDD_ACTIVE, task_dir) is False
+
+
+def test_signal_holds_produced_is_undecidable_from_files(tmp_path: Path) -> None:
+    """A 'when produced' signal is declarative — the registry never guesses at it."""
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    assert registry.signal_holds(registry.Signal.PRODUCED, task_dir) is None
+
+
+def test_no_test_target_marker_is_documented_in_planner_agent() -> None:
+    """The paired site: the planner must write the exact marker the registry checks for."""
+    text = _read("agents/implementation-planner.md")
+    assert f"{registry.NO_TEST_TARGET_MARKER} @ <sha>" in text
+
+
+def test_task_brief_floor_entry_is_standard_always_and_bound_to_p06() -> None:
+    """TASK_BRIEF's floor entry and its P06 detection gate must never drift apart."""
+    entries = {e.name: e.requirement for e in registry.floor("standard")}
+    assert entries["TASK_BRIEF.md"] == "always"
+    assert registry.by_name("TASK_BRIEF.md").detection_gate == "sentinel:P06"
+
+
+def test_floor_projection_only_returns_registered_artifact_names() -> None:
+    """Canary: floor() output must always be a subset of the registry's known names."""
+    known = registry.all_names()
+    for tier in ("standard", "full"):
+        names = {e.name for e in registry.floor(tier)}
+        unknown = names - known
+        assert not unknown, f"{tier}: floor() named unregistered artifact(s) {sorted(unknown)}"
+
+
+def test_produced_floor_entries_have_a_producer_production_gate() -> None:
+    """A 'when produced' floor entry with no producer:<agent> gate can never be checked."""
+    for a in registry.ARTIFACTS:
+        if a.floor is None:
+            continue
+        for requirement in (a.floor.standard, a.floor.full):
+            if requirement is registry.Signal.PRODUCED:
+                assert a.production_gate.startswith("producer:"), (
+                    f"{a.name}: floor entry is 'when produced' but production_gate="
+                    f"{a.production_gate!r} does not name a producer"
+                )
+
+
+def test_standard_always_floor_entries_have_a_real_production_gate() -> None:
+    """A Standard-always floor entry with a hollow gate has no enforcement mechanism."""
+    gateless = {"none", "deferred"}
+    for a in registry.ARTIFACTS:
+        if a.floor is None or a.floor.standard != "always":
+            continue
+        kind = a.production_gate.split(":")[0]
+        assert kind not in gateless, (
+            f"{a.name}: Standard-always floor entry has ungated production_gate "
+            f"({a.production_gate!r})"
+        )
+
+
+_FLOOR_TABLE_ROW_RE = re.compile(
+    r"^\|\s*([A-Za-z0-9_]+\.(?:md|ya?ml))\s*\|\s*([a-z-]+)\s*\|\s*([a-z-]+)\s*\|\s*$",
+    re.MULTILINE,
+)
+
+
+def _requirement_label(requirement: object) -> str:
+    """'always' stays 'always'; a Signal enum member becomes its string value."""
+    return requirement if isinstance(requirement, str) else requirement.value
+
+
+def test_inventory_floor_table_matches_registry_projection() -> None:
+    """The LLM-readable copy in artifact-inventory.md must equal the registry's own floor.
+
+    Expected table shape (one row per floor artifact, `| name | standard | full |`):
+
+        ### Per-tier artifact floor
+
+        | Artifact | Standard | Full |
+        |---|---|---|
+        | TASK_BRIEF.md | always | always |
+        ...
+    """
+    text = _read("skills/software-planning/references/artifact-inventory.md")
+    assert "### Per-tier artifact floor" in text, (
+        "artifact-inventory.md is missing the '### Per-tier artifact floor' table"
+    )
+    table = text.split("### Per-tier artifact floor", 1)[1]
+    rows = {m.group(1): (m.group(2), m.group(3)) for m in _FLOOR_TABLE_ROW_RE.finditer(table)}
+
+    expected_standard = {
+        e.name: _requirement_label(e.requirement) for e in registry.floor("standard")
+    }
+    expected_full = {e.name: _requirement_label(e.requirement) for e in registry.floor("full")}
+
+    assert set(rows) == set(expected_standard), (
+        f"table artifact set {sorted(rows)} != registry floor projection "
+        f"{sorted(expected_standard)}"
+    )
+    for name, (std_label, full_label) in rows.items():
+        assert std_label == expected_standard[name], (
+            f"{name}: table Standard={std_label!r} != registry {expected_standard[name]!r}"
+        )
+        assert full_label == expected_full[name], (
+            f"{name}: table Full={full_label!r} != registry {expected_full[name]!r}"
+        )

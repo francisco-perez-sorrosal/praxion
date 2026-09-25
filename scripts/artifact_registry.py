@@ -21,8 +21,8 @@ Per-consumer membership is expressed as flags on each `Artifact`:
   in `files.ts` (the renderable/discoverable set).
 - ``snapshot`` — captured by the precompact hook's `PIPELINE_DOCS` (the
   post-compaction orientation set).
-- ``eval_tier`` / ``eval_required`` — the eval task manifest's expected
-  deliverable for a coordination tier.
+- ``floor`` — the per-tier artifact floor (see "Per-tier artifact floor"
+  below): what a Standard/Full pipeline must produce, and how strictly.
 
 Specialty artifacts (roadmap, ML, rework-worktree) are registered for
 completeness with no consumer flags — documented, but not enforced into the
@@ -31,7 +31,11 @@ three core pipeline consumers.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from typing import Literal
 
 # -- Declarative-spine vocabularies -------------------------------------------
 # Each artifact names the gate that makes it exist (`production_gate`) and the
@@ -66,6 +70,126 @@ _CLEANUP_POLICIES: frozenset[str] = frozenset(
 )
 
 
+# -- Per-tier artifact floor ---------------------------------------------------
+# What a Standard/Full pipeline must produce, and how strictly -- the one
+# registry-owned projection every reader derives from instead of duplicating
+# the list. Replaces the correlated eval_tier/eval_required/eval_conditional
+# trio (a Cartesian product whose combinations included impossible states,
+# e.g. eval_required=True with eval_tier=None) with a single `floor` field
+# naming a `Floor`, whose smart constructor makes "Full weaker than Standard"
+# unrepresentable rather than merely undesirable.
+
+
+class Tier(StrEnum):
+    """Coordination-protocol tiers that carry a mechanical artifact floor."""
+
+    STANDARD = "standard"
+    FULL = "full"
+
+
+class Signal(StrEnum):
+    """A conditional floor entry's activation signal.
+
+    ``PRODUCED`` is declarative, not file-decidable: "the producer agent was
+    spawned" is not "the producer ran in its producing role" (a
+    context-engineer invoked as plain executor writes no CONTEXT_REVIEW.md),
+    so `signal_holds` never guesses at it -- it returns `None`.
+    """
+
+    TESTS_RAN = "tests-ran"
+    SDD_ACTIVE = "sdd-active"
+    PRODUCED = "produced"
+
+
+# A floor entry's requirement: unconditional, or gated on a `Signal`.
+Requirement = Literal["always"] | Signal
+
+# The literal a planner writes into TEST_BASELINE.md when a project has no
+# test target, so absence of a real baseline always reads as a defect rather
+# than an unnoticed gap. Paired site: agents/implementation-planner.md.
+NO_TEST_TARGET_MARKER = "no test target"
+
+# A numbered requirement *heading* (the SDD behavioral-spec shape), not a bare
+# mention of one in prose -- a config/infra plan that merely says a REQ block
+# is unwarranted must not read as SDD-active.
+_REQ_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*REQ-\d")
+
+
+def _requirement_strength(requirement: Requirement) -> int:
+    """Total order enforcing Full >= Standard: always > decidable signal > produced."""
+    if requirement == "always":
+        return 2
+    if requirement == Signal.PRODUCED:
+        return 0
+    return 1
+
+
+@dataclass(frozen=True)
+class Floor:
+    """An artifact's per-tier obligation.
+
+    `full` defaults to (never weaker than) `standard` -- the monotonicity
+    invariant a Full pipeline can only add obligations, never drop them.
+    """
+
+    standard: Requirement
+    full: Requirement | None = None
+
+    def __post_init__(self) -> None:
+        effective_full = self.standard if self.full is None else self.full
+        if _requirement_strength(effective_full) < _requirement_strength(self.standard):
+            raise ValueError(
+                f"Full requirement {effective_full!r} is weaker than "
+                f"Standard requirement {self.standard!r}"
+            )
+        if self.full is None:
+            object.__setattr__(self, "full", effective_full)
+
+
+@dataclass(frozen=True)
+class FloorEntry:
+    """One artifact's resolved requirement at a specific tier -- `floor()`'s projection."""
+
+    name: str
+    requirement: Requirement
+
+
+def floor(tier: Tier | str) -> tuple[FloorEntry, ...]:
+    """Every floor-bearing artifact's requirement at `tier`, in registry order."""
+    resolved = Tier(tier)
+    return tuple(
+        FloorEntry(a.name, a.floor.full if resolved is Tier.FULL else a.floor.standard)
+        for a in ARTIFACTS
+        if a.floor is not None
+    )
+
+
+def signal_holds(signal: Signal, task_dir: Path) -> bool | None:
+    """Whether `signal` holds for the pipeline in `task_dir`.
+
+    `None` means undecidable from files (`Signal.PRODUCED`) -- the registry
+    never guesses at a declarative signal.
+    """
+    if signal is Signal.TESTS_RAN:
+        baseline = task_dir / "TEST_BASELINE.md"
+        if not baseline.exists():
+            return False
+        try:
+            text = baseline.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        return not text.startswith(NO_TEST_TARGET_MARKER)
+    if signal is Signal.SDD_ACTIVE:
+        plan = task_dir / "SYSTEMS_PLAN.md"
+        if not plan.exists():
+            return False
+        try:
+            return _REQ_HEADING_RE.search(plan.read_text(encoding="utf-8")) is not None
+        except OSError:
+            return False
+    return None  # Signal.PRODUCED (and any future declarative signal)
+
+
 # -- Model --------------------------------------------------------------------
 
 
@@ -79,9 +203,7 @@ class Artifact:
     activation: str  # always | conditional | specialist | roadmap | ml | rework
     dashboard: bool = False  # dashboard CANONICAL_WORKSHOP_ARTIFACTS (files.ts)
     snapshot: bool = False  # precompact PIPELINE_DOCS
-    eval_tier: str | None = None  # standard | full
-    eval_required: bool = False  # always-required deliverable at eval_tier
-    eval_conditional: bool = False  # required at eval_tier only when its producer ran
+    floor: Floor | None = None  # per-tier artifact floor; None = not floor-bearing
     production_gate: str = "none"  # "<kind>:<ref>" | "none" | "deferred"; kind ∈ _GATE_KINDS
     detection_gate: str = "none"  # "sentinel:<id>" | "none"; kind ∈ _DETECTION_GATE_KINDS
     cleanup_policy: str = "delete"  # ∈ _CLEANUP_POLICIES
@@ -100,6 +222,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        floor=Floor(standard="always"),
         production_gate="producer:orchestrator",
         detection_gate="sentinel:P06",
         cleanup_policy="delete",
@@ -123,6 +246,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         dashboard=True,
         snapshot=True,
+        floor=Floor(standard=Signal.PRODUCED),
         production_gate="producer:researcher",
         cleanup_policy="delete",
         description="Researcher's evidence base.",
@@ -133,6 +257,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
+        floor=Floor(standard=Signal.PRODUCED),
         production_gate="producer:context-engineer",
         cleanup_policy="delete",
         description="Context-engineer's cumulative artifact-health review.",
@@ -144,6 +269,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
+        floor=Floor(standard=Signal.PRODUCED),
         production_gate="producer:interface-designer",
         detection_gate="sentinel:P07",  # challenge-disposition detection
         cleanup_policy="delete",
@@ -156,6 +282,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "specialist",
         dashboard=True,
         snapshot=True,
+        floor=Floor(standard=Signal.PRODUCED),
         production_gate="producer:agentic-transactions-architect",
         detection_gate="sentinel:P07",  # challenge-disposition detection
         cleanup_policy="delete",
@@ -189,8 +316,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_required=True,
+        floor=Floor(standard="always"),
         production_gate="producer:systems-architect",
         cleanup_policy="consume-marker",  # REQ-bearing plan WARNs until its spec is archived
         description="Architect's system plan with acceptance criteria.",
@@ -212,6 +338,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
+        floor=Floor(standard=Signal.PRODUCED),
         production_gate="producer:systems-architect",
         cleanup_policy="delete",
         description="Brownfield behavioral delta from archived specs.",
@@ -223,8 +350,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_required=True,
+        floor=Floor(standard="always"),
         production_gate="producer:implementation-planner",
         cleanup_policy="delete",
         description="Planner's approved step decomposition.",
@@ -236,8 +362,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_required=True,
+        floor=Floor(standard="always"),
         production_gate="producer:implementation-planner",
         cleanup_policy="block-if-active",  # BLOCK while any step box is unchecked
         description="Live execution position.",
@@ -249,8 +374,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_required=True,
+        floor=Floor(standard="always"),
         production_gate="producer:implementation-planner",
         cleanup_policy="consume-marker",  # WARNs until merged to .ai-state/ (verifier harvest)
         description="In-flight learning capture; the bridge to durable intelligence.",
@@ -261,37 +385,34 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "ephemeral",
         "conditional",
         dashboard=True,
-        production_gate="producer:test-engineer",
+        floor=Floor(standard="always"),
+        production_gate="producer:implementation-planner",
         cleanup_policy="delete",
         description="Pre-pipeline failing-test snapshot (verifier regression baseline).",
     ),
     Artifact(
-        # eval: conditionally required — `eval_conditional` at standard, gated by the
-        # task_manifest activation predicate `_tests_ran` (TEST_BASELINE present), so a
-        # no-test run is not penalised for its absence.
+        # Floor: gated on Signal.TESTS_RAN (TEST_BASELINE present without the
+        # NO_TEST_TARGET_MARKER), so a no-test run is not penalised for its absence.
         "TEST_RESULTS.md",
         "ai-work",
         "ephemeral",
         "conditional",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_conditional=True,
+        floor=Floor(standard=Signal.TESTS_RAN),
         production_gate="producer:implementer",
         cleanup_policy="delete",
         description="Test-run evidence handoff to the verifier.",
     ),
     Artifact(
-        # eval: conditionally required — gated by `_sdd_active` (a requirement-id
-        # heading in SYSTEMS_PLAN), so a config/infra pipeline with no requirements
-        # block is not penalised.
+        # Floor: gated on Signal.SDD_ACTIVE (a requirement-id heading in
+        # SYSTEMS_PLAN) at Standard; Full promotes it to an unconditional obligation.
         "traceability.yml",
         "ai-work",
         "ephemeral",
         "conditional",
         dashboard=True,
-        eval_tier="standard",
-        eval_conditional=True,
+        floor=Floor(standard=Signal.SDD_ACTIVE, full="always"),
         production_gate="producer:implementer",
         cleanup_policy="consume-marker",  # WARNs until rendered into the archived spec matrix
         description="In-flight REQ -> tests -> implementation mapping.",
@@ -303,8 +424,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "always",
         dashboard=True,
         snapshot=True,
-        eval_tier="standard",
-        eval_required=True,
+        floor=Floor(standard="always"),
         production_gate="producer:verifier",
         cleanup_policy="consume-marker",  # WARNs until its patterns are folded into LEARNINGS.md
         description="Verifier's quality-gate report.",
@@ -415,16 +535,6 @@ def dashboard_artifacts() -> set[str]:
 def snapshot_artifacts() -> set[str]:
     """Filenames the precompact hook's PIPELINE_DOCS must snapshot."""
     return {a.name for a in ARTIFACTS if a.snapshot}
-
-
-def eval_required(tier: str) -> set[str]:
-    """Filenames the eval task manifest must *always* require for the given tier."""
-    return {a.name for a in ARTIFACTS if a.eval_required and a.eval_tier == tier}
-
-
-def eval_conditional(tier: str) -> set[str]:
-    """Filenames the eval task manifest requires *conditionally* (activation-gated) for the tier."""
-    return {a.name for a in ARTIFACTS if a.eval_conditional and a.eval_tier == tier}
 
 
 def all_names() -> set[str]:

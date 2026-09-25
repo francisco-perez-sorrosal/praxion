@@ -22,6 +22,8 @@ re_affirms: dec-252
 dissent: A one-line Retrospective cell is too coarse a grain for a real learning; if compliance stays near-zero even with the nudge, a dedicated per-session scratch sink was the right sink and this closes the leak on paper only.
 re_affirmed_by:
   - dec-264
+superseded_in_part_by:
+  - dec-draft-e3f0938b
 ---
 
 ## Context

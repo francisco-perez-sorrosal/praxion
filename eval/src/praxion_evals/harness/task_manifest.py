@@ -7,23 +7,44 @@ these specs (via the corpus reader) to verdict each expected deliverable.
 Migrated from the retired ``praxion_evals.behavioral`` package; the corpus
 reader now performs the scan once and surfaces verdicts on the Corpus, so
 Family 1 stays stateless.
+
+The Standard/Full file-decidable sets are *derived* from
+``scripts/artifact_registry.py``'s per-tier floor rather than hand-maintained
+here. ``scripts/`` sits outside this eval package (a separate uv project), so
+it is loaded by path rather than imported as a dependency -- mirrors
+``family5_token_budget_stability._load_measure_token_budget``. Only the
+eval-local FULL extras (architecture-doc recency) and the LIGHTWEIGHT branch
+stay hand-written here; eval-only concerns stay eval-local.
 """
 
 from __future__ import annotations
 
-import re
+import importlib
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from praxion_evals.harness.schemas import TaskArtifactVerdict
 
-# A numbered requirement *heading* (the SDD behavioral-spec shape), not a bare mention
-# of one in prose — so a config/infra plan that merely says it warrants no requirement
-# block does not count as SDD-active.
-_REQ_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*REQ-\d")
+# eval/src/praxion_evals/harness/task_manifest.py -> harness -> praxion_evals -> src -> eval -> repo root
+_EVAL_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = _EVAL_ROOT.parent
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+
+def _load_artifact_registry() -> Any:
+    """Import ``scripts/artifact_registry.py`` as a sibling-safe module.
+
+    ``scripts/`` must be on ``sys.path`` before the import -- the eval
+    project's own package layout is untouched.
+    """
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+    return importlib.import_module("artifact_registry")
 
 
 class PipelineTier(StrEnum):
@@ -56,65 +77,39 @@ class ArtifactSpec:
     activation: Callable[[Path], bool] | None = None
 
 
-# -- Activation predicates (independent signals, never the artifact itself) ----
+# -- Derivation from the registry's per-tier floor -----------------------------
+# Only the file-decidable requirements (always / a Signal) project into the
+# manifest — a 'when produced' floor entry is declarative (undecidable from
+# files; see artifact_registry.signal_holds) and the manifest emits nothing
+# for it, matching the registry's own floor()/signal_holds() contract.
 
 
-def _tests_ran(task_dir: Path) -> bool:
-    """A test step was in scope — the planner captured a pre-pipeline baseline."""
-    return (task_dir / "TEST_BASELINE.md").exists()
+def _activation_for(signal: Any) -> Callable[[Path], bool]:
+    """Wrap a registry `Signal` into the `.ai-work/<slug>/`-relative predicate
+    `ArtifactSpec.activation` expects."""
+
+    def _holds(task_dir: Path) -> bool:
+        return bool(_load_artifact_registry().signal_holds(signal, task_dir))
+
+    return _holds
 
 
-def _sdd_active(task_dir: Path) -> bool:
-    """The pipeline is SDD-tracked — its SYSTEMS_PLAN carries numbered requirement headings."""
-    plan = task_dir / "SYSTEMS_PLAN.md"
-    if not plan.exists():
-        return False
-    try:
-        return _REQ_HEADING_RE.search(plan.read_text(encoding="utf-8")) is not None
-    except OSError:
-        return False
+def _spec_from_floor_entry(entry: Any) -> ArtifactSpec:
+    """Build one file-decidable `ArtifactSpec` from a registry `FloorEntry`."""
+    artifact = _load_artifact_registry().by_name(entry.name)
+    description = artifact.description if artifact is not None else ""
+    path = f".ai-work/{{slug}}/{entry.name}"
+    if entry.requirement == "always":
+        return ArtifactSpec(path=path, description=description)
+    return ArtifactSpec(
+        path=path, description=description, activation=_activation_for(entry.requirement)
+    )
 
 
-_STANDARD_REQUIRED: tuple[ArtifactSpec, ...] = (
-    ArtifactSpec(
-        path=".ai-work/{slug}/SYSTEMS_PLAN.md",
-        description="Architect's system plan with acceptance criteria.",
-    ),
-    ArtifactSpec(
-        path=".ai-work/{slug}/IMPLEMENTATION_PLAN.md",
-        description="Planner's step decomposition.",
-    ),
-    ArtifactSpec(
-        path=".ai-work/{slug}/WIP.md",
-        description="Live execution state.",
-    ),
-    ArtifactSpec(
-        path=".ai-work/{slug}/LEARNINGS.md",
-        description="In-flight learning capture; produced by every pipeline agent.",
-    ),
-    ArtifactSpec(
-        path=".ai-work/{slug}/VERIFICATION_REPORT.md",
-        description="Verifier's post-implementation review.",
-    ),
-)
-# The always-required set above is mirrored by the `eval_required`/`standard`
-# projection in scripts/artifact_registry.py; the conditional set below is mirrored
-# by `eval_conditional`/`standard`. Both are enforced by scripts/test_artifact_registry.py.
-
-# Conditionally-produced deliverables: required only when an *independent* activation
-# signal shows the producing step ran. A lean run (no tests / no SDD) is not penalised.
-_STANDARD_CONDITIONAL: tuple[ArtifactSpec, ...] = (
-    ArtifactSpec(
-        path=".ai-work/{slug}/TEST_RESULTS.md",
-        description="Test-run evidence — required when a test step ran (TEST_BASELINE present).",
-        activation=_tests_ran,
-    ),
-    ArtifactSpec(
-        path=".ai-work/{slug}/traceability.yml",
-        description="REQ→test/impl mapping — required when the pipeline is SDD-tracked.",
-        activation=_sdd_active,
-    ),
-)
+def _file_decidable_floor(tier: str) -> tuple[Any, ...]:
+    """The registry's floor projection at `tier`, excluding undecidable PRODUCED entries."""
+    registry = _load_artifact_registry()
+    return tuple(e for e in registry.floor(tier) if e.requirement is not registry.Signal.PRODUCED)
 
 
 _FULL_EXTRA: tuple[ArtifactSpec, ...] = (
@@ -136,17 +131,21 @@ _FULL_EXTRA: tuple[ArtifactSpec, ...] = (
 def expected_artifacts(tier: PipelineTier = PipelineTier.STANDARD) -> tuple[ArtifactSpec, ...]:
     """Return the ordered artifact specs for the given pipeline tier."""
     if tier is PipelineTier.LIGHTWEIGHT:
-        # Lightweight tier requires only WIP.md; other docs are optional.
+        # Lightweight tier requires only WIP.md; other docs are optional. Lightweight has no
+        # registry floor entry (the floor is Standard/Full-only) -- stays eval-local.
         return (
             ArtifactSpec(
                 path=".ai-work/{slug}/WIP.md",
                 description="Live execution state (lightweight pipelines).",
             ),
         )
-    if tier is PipelineTier.STANDARD:
-        return _STANDARD_REQUIRED + _STANDARD_CONDITIONAL
-    # FULL extends STANDARD with the architecture-doc recency checks.
-    return _STANDARD_REQUIRED + _STANDARD_CONDITIONAL + _FULL_EXTRA
+    registry_tier = "full" if tier is PipelineTier.FULL else "standard"
+    specs = tuple(_spec_from_floor_entry(e) for e in _file_decidable_floor(registry_tier))
+    if tier is PipelineTier.FULL:
+        # FULL extends the registry's Full floor with the architecture-doc recency checks
+        # (eval-local: recency has no registry representation).
+        return specs + _FULL_EXTRA
+    return specs
 
 
 def scan_task_manifest(

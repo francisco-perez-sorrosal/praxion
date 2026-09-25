@@ -8,14 +8,16 @@ rework fixed a bug the other's never got. This module is the single parser
 for all three, so drift becomes structurally impossible: there is nowhere
 left for a second implementation to diverge from.
 
-Each reader keeps its own policy on top of these primitives (the shape
-checker's byte ceiling, the reconciler's per-step status and attribution) --
-this module owns only the shared grammar, not what either reader does with
-it. One exception: `parse_wip_claims` is a pure *parse* of a WIP document's
-three declared claim sources (checklist, status table, heading marker) into
-a claim map -- it stops at "what does the document declare," never touching
-git or a filesystem, so it belongs to the same charter as the rest of this
-module even though only the reconciler currently reads it.
+The charter is *what a step document declares*, read without touching git or
+a filesystem. Beyond the grammar that means two pure readings only the
+reconciler uses today: `parse_wip_claims` (a WIP document's checklist, status
+table and heading markers as a claim map) and `recorded_runs` /
+`step_test_status` (which recorded test run speaks for a step, so the shape
+contract and the status it implies live beside the `Result:` parser). Each
+reader keeps its own policy on top: the shape checker's byte ceiling, and the
+reconciler's arbitration of those claims and statuses against git
+(attribution, verdicts). A switch that only one reader needs belongs in that
+reader, not here.
 
 Stdlib-only and loadable under the ambient interpreter: both readers above it
 are invoked by a slash command or a git hook with a bare `python3`.
@@ -263,7 +265,12 @@ _TABLE_STEP_CELL_RE = re.compile(
 # not recognise is not evidence either way.
 _COMPLETE_WORDS = {"complete", "completed", "done", "green"}
 _IN_PROGRESS_WORDS = {"in-progress", "in progress", "implementing", "running"}
-_PENDING_WORDS = {"pending", "not-started", "not started", "todo", "", "—", "-"}
+_PENDING_WORDS = {"pending", "not-started", "not started", "todo", "—", "-"}
+_STATUS_VOCABULARY = (
+    (_COMPLETE_WORDS, "COMPLETE"),
+    (_IN_PROGRESS_WORDS, "IN-PROGRESS"),
+    (_PENDING_WORDS, "PENDING"),
+)
 # A phrase-terminating delimiter after the leading word: a parenthetical, or a
 # dash *surrounded by whitespace* -- never a bare hyphen, which is part of a
 # vocabulary word itself ("in-progress", "not-started").
@@ -425,19 +432,26 @@ def _table_row_claim(row: list[str], step_col: int, status_col: int) -> tuple[st
 def _table_step_id(cell: str) -> str | None:
     candidate = cell.strip().strip("`*")
     match = _TABLE_STEP_CELL_RE.match(candidate)
-    return f"Step {match.group('id')}" if match else None
+    return f"Step {match.group('id').lower()}" if match else None
 
 
 def _status_word_claim(cell: str) -> Claim:
-    phrase = cell.strip(" \t*`[]").lower()
-    head = _STATUS_PHRASE_SPLIT_RE.split(phrase, maxsplit=1)[0].strip()
-    if head in _COMPLETE_WORDS:
-        return "COMPLETE"
-    if head in _IN_PROGRESS_WORDS:
-        return "IN-PROGRESS"
-    if head in _PENDING_WORDS:
-        return "PENDING"
-    return "AMBIGUOUS"
+    """The claim named by the cell's LEADING status word; trailing prose after
+    it (``[COMPLETE] — merged``, ``complete + follow-up``) never changes it."""
+    head = _STATUS_PHRASE_SPLIT_RE.split(cell.strip().lower(), maxsplit=1)[0]
+    head = head.lstrip(" \t*`[")
+    for words, claim in _STATUS_VOCABULARY:
+        if any(_starts_with_word(head, word) for word in words):
+            return claim
+    return "AMBIGUOUS" if head.strip(" \t*`]") else "PENDING"
+
+
+def _starts_with_word(phrase: str, word: str) -> bool:
+    """``phrase`` opens with ``word`` followed by the end or a non-word character."""
+    if not word or not phrase.startswith(word):
+        return False
+    rest = phrase[len(word) :]
+    return not rest or not (rest[0].isalnum() or rest[0] in "-_")
 
 
 # --- Per-step test evidence: which recorded run speaks for a step ---

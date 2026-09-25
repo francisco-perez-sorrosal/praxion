@@ -325,6 +325,14 @@ def test_a_hash_headed_table_mints_no_claims() -> None:
 _HEADING_CLAIM_EXCERPT = "## Step 1 — script + canaries  `[x]`\n"  # id-citation-discipline:ignore
 
 
+def test_an_upper_case_step_suffix_in_a_table_cell_names_the_lower_case_plan_step() -> None:
+    text = "| Step | Assignee | Status | Files |\n|---|---|---|---|\n| 1B | test-engineer | complete | t.py |\n"
+
+    claims = schema.parse_wip_claims(text)
+
+    assert claims == {"Step 1b": "COMPLETE"}  # id-citation-discipline:ignore
+
+
 def test_heading_with_a_backticked_checkbox_marker_yields_a_claim() -> None:
     claims = schema.parse_wip_claims(_HEADING_CLAIM_EXCERPT)
 
@@ -341,6 +349,10 @@ def test_heading_with_a_backticked_checkbox_marker_yields_a_claim() -> None:
         ("completed", "COMPLETE"),
         ("[COMPLETE]", "COMPLETE"),
         ("complete — merged", "COMPLETE"),
+        ("[COMPLETE] — merged at the batch gate", "COMPLETE"),
+        ("complete + follow-up filed", "COMPLETE"),
+        ("**done**, verified", "COMPLETE"),
+        ("completely rewritten", "AMBIGUOUS"),
     ],
 )
 def test_status_table_word_vocabulary_maps_to_the_documented_claim(

@@ -1630,6 +1630,8 @@ def test_origin_head_branch_wins_over_a_working_fallback_candidate(tmp_path):
 
     repo_root = tmp_path / "repo"
     _run_git(["clone", "-q", str(bare), str(repo_root)], tmp_path)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
     # A local `main` that ALSO resolves -- but to the earlier commit, so the
     # two candidates disagree and whichever wins is directly observable.
     seed_a = _git_capture(["rev-parse", "HEAD~1"], repo_root)

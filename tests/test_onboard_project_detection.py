@@ -25,6 +25,7 @@ subprocess, never edited here).
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -80,14 +81,36 @@ def _team_owned_sidecar_project(root: Path) -> Path:
     return root
 
 
-def run_onboard_check(cwd: Path) -> subprocess.CompletedProcess[str]:
+def _prereq_env(sandbox: Path) -> dict[str, str]:
+    """`check_prereqs` runs before detection: it needs `claude` on PATH and
+    the plugin in the installed registry. Satisfy both in a sandbox (a stub
+    `claude`, a registry under a scratch HOME) — as
+    `scripts/test_onboard_project_placement.py` does — so the verdict never
+    depends on what the host happens to have installed."""
+    bin_dir = sandbox / "bin"
+    bin_dir.mkdir(parents=True)
+    stub = bin_dir / "claude"
+    stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    registry = sandbox / "home" / ".claude" / "plugins" / "installed_plugins.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text(json.dumps({"praxion@bit-agora": {"version": "test"}}), encoding="utf-8")
+    return {
+        **os.environ,
+        **_ISOLATED_GIT_ENV,
+        "HOME": str(sandbox / "home"),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+    }
+
+
+def run_onboard_check(cwd: Path, sandbox: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", str(SCRIPT_UNDER_TEST), "--check", "--json"],
         cwd=cwd,
         capture_output=True,
         text=True,
         timeout=30,
-        env={**os.environ, **_ISOLATED_GIT_ENV},
+        env=_prereq_env(sandbox),
     )
 
 
@@ -100,7 +123,7 @@ def test_a_claude_local_md_only_project_is_classified_partially_managed(tmp_path
     than read as an ordinary git repo Praxion has never touched."""
     project = _team_owned_sidecar_project(tmp_path / "project")
 
-    result = run_onboard_check(project)
+    result = run_onboard_check(project, tmp_path / "sandbox")
 
     assert '"state":"partially-managed"' in result.stdout, (
         "detect_state() did not classify a CLAUDE.local.md-only project as "
@@ -124,7 +147,7 @@ def test_a_plain_git_repo_with_neither_claude_file_is_not_partially_managed(
     _git(project, "add", "README.md")
     _git(project, "commit", "-q", "-m", "seed")
 
-    result = run_onboard_check(project)
+    result = run_onboard_check(project, tmp_path / "sandbox")
 
     assert '"state":"git-no-praxion"' in result.stdout, (
         "a plain git repo with no Agent Pipeline marker anywhere must "

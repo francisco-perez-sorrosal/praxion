@@ -24,6 +24,11 @@ from typing import Any
 from _git_runner import git_output
 
 VERIFIED_COMPLETE = "verified-complete"
+# The reconciler's own "unknown" verdict value -- claimed complete, no
+# attributable ground truth. Named apart from a merely-unreadable world fact
+# elsewhere in the handoff so "step unknown" and "field unreadable" never
+# read as the same concern at a call site.
+VERDICT_UNKNOWN = "unknown"
 
 # Tried in order only when `refs/remotes/origin/HEAD` is unset (no remote, or a
 # clone that never populated it) -- both conventional default-branch names,
@@ -165,8 +170,40 @@ def first_unfinished(verdicts: Sequence[dict[str, Any]]) -> dict[str, Any] | Non
     return next((v for v in verdicts if v.get("verdict") != VERIFIED_COMPLETE), None)
 
 
+def pick_next_step(verdicts: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
+    """The shared next-action picker for the handoff composer's §2 body and
+    its mid-phase boundary default.
+
+    The first verdict that is neither `verified-complete` nor `unknown`.
+    `unknown` means "claimed complete, no attributable ground truth" -- the
+    claimed work is not actionable, only verifiable, so it is skipped here and
+    the caller surfaces it separately. Falls back to the first `unknown`
+    verdict only when every step is verified-complete or unknown -- nothing
+    else is actionable, so naming that step beats naming nothing. Both callers
+    share this function so a mid-phase boundary and the composer's own next
+    action can never name two different steps for the same moment.
+    """
+    for verdict in verdicts:
+        if verdict.get("verdict") not in (VERIFIED_COMPLETE, VERDICT_UNKNOWN):
+            return verdict
+    return next((v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN), None)
+
+
+def render_owed_verification(unknown_verdicts: Sequence[dict[str, Any]]) -> str:
+    """One line naming every `unknown` step: claimed complete, verification owed."""
+    steps = ", ".join(f"`{v.get('step', '?')}`" for v in unknown_verdicts)
+    return (
+        f"Human verification owed: {steps} — claimed complete, no attributable ground truth. "
+        "Verify by hand before treating the claim as fact."
+    )
+
+
 def declared_files(verdict: dict[str, Any] | None) -> list[str]:
-    """A step's declared `Files:`, as the reconciler split them by change state."""
+    """A step's *attributable* `Files:` -- the subset no earlier step also
+    declares -- split by change state (see the reconciler's `attributable`).
+    A file shared with, and absorbed by, an earlier declarer never appears
+    here for a later step, even though that step's plan text still names it.
+    """
     tier1 = (verdict or {}).get("tier1", {})
     return list(tier1.get("files_changed", [])) + list(tier1.get("files_unchanged", []))
 

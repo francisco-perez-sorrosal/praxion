@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Union
 
 GREEN = "green"
 RED = "red"
@@ -81,8 +82,12 @@ class Malformed:
 
 # The three shapes a `Result:` line can take. `parse_result_line` returns
 # `ResultLine | None`, where `None` means "not a Result: line at all" -- a
-# fourth, distinct state from any of these three.
-ResultLine = Counts | NoRun | Malformed
+# fourth, distinct state from any of these three. `typing.Union`, not the
+# `|` operator, because this is a plain runtime assignment (not deferred by
+# `from __future__ import annotations`, which only defers annotations) --
+# `Counts | NoRun | Malformed` would raise a TypeError under the bare
+# `python3` this module's readers are invoked with on stock macOS (3.9).
+ResultLine = Union[Counts, NoRun, Malformed]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 @dataclass(frozen=True)
@@ -246,13 +251,23 @@ _ANCHORED_STEP_RE = re.compile(rf"^Step\s+(?P<id>{_STEP_ID_CORE})\b(?P<body>.*)$
 
 _TABLE_ROW_RE = re.compile(r"^\s*\|(?P<cells>.+)\|\s*$")
 _TABLE_DELIMITER_CELL_RE = re.compile(r":?-+:?")
+# A table's Step cell: a bare id, optionally preceded by "Step " and/or
+# followed by a parenthetical label -- "<id>", "Step <id>" and "<id> (integration
+# checkpoint)" all name the same step.
+_TABLE_STEP_CELL_RE = re.compile(
+    rf"^(?:Step\s+)?(?P<id>{_STEP_ID_CORE})(?:\s*\(.*\))?$", re.IGNORECASE
+)
 
 # The status-word vocabulary a WIP status table may use.
 # Anything else, including "red", is AMBIGUOUS -- a word this vocabulary does
 # not recognise is not evidence either way.
-_COMPLETE_WORDS = {"complete", "done", "green"}
+_COMPLETE_WORDS = {"complete", "completed", "done", "green"}
 _IN_PROGRESS_WORDS = {"in-progress", "in progress", "implementing", "running"}
 _PENDING_WORDS = {"pending", "not-started", "not started", "todo", "", "—", "-"}
+# A phrase-terminating delimiter after the leading word: a parenthetical, or a
+# dash *surrounded by whitespace* -- never a bare hyphen, which is part of a
+# vocabulary word itself ("in-progress", "not-started").
+_STATUS_PHRASE_SPLIT_RE = re.compile(r"\(| — | - ")
 
 Claim = str  # "COMPLETE" | "IN-PROGRESS" | "PENDING" | "AMBIGUOUS"
 
@@ -327,10 +342,12 @@ def _claim_from_checkbox(box: str, body: str) -> Claim:
 
 
 def _heading_claims(text: str) -> list[tuple[str, Claim]]:
-    claims = []
+    claims: list[tuple[str, Claim]] = []
     for line in text.splitlines():
         step_id = step_id_from_heading(line)
-        marker_claim = _heading_marker_claim(line) if step_id is not None else None
+        if step_id is None:
+            continue
+        marker_claim = _heading_marker_claim(line)
         if marker_claim is not None:
             claims.append((step_id, marker_claim))
     return claims
@@ -407,15 +424,95 @@ def _table_row_claim(row: list[str], step_col: int, status_col: int) -> tuple[st
 
 def _table_step_id(cell: str) -> str | None:
     candidate = cell.strip().strip("`*")
-    return f"Step {candidate}" if STEP_ID_RE.match(candidate) else None
+    match = _TABLE_STEP_CELL_RE.match(candidate)
+    return f"Step {match.group('id')}" if match else None
 
 
 def _status_word_claim(cell: str) -> Claim:
-    phrase = cell.split("(", 1)[0].strip(" \t*`").lower()
-    if phrase in _COMPLETE_WORDS:
+    phrase = cell.strip(" \t*`[]").lower()
+    head = _STATUS_PHRASE_SPLIT_RE.split(phrase, maxsplit=1)[0].strip()
+    if head in _COMPLETE_WORDS:
         return "COMPLETE"
-    if phrase in _IN_PROGRESS_WORDS:
+    if head in _IN_PROGRESS_WORDS:
         return "IN-PROGRESS"
-    if phrase in _PENDING_WORDS:
+    if head in _PENDING_WORDS:
         return "PENDING"
     return "AMBIGUOUS"
+
+
+# --- Per-step test evidence: which recorded run speaks for a step ---
+
+# The legacy free-form pytest-summary phrasing -- word-boundary count tokens
+# (never matches "ModuleNotFoundError") -- the fallback for a step block that
+# carries no `Result:` line at all (an old TEST_RESULTS.md never migrated to
+# the dec-386 shape).
+_PYTEST_FAIL_RE = re.compile(r"\b(\d+)\s+(?:failed|errors?)\b", re.IGNORECASE)
+_PYTEST_PASS_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class RecordedRun:
+    """One test-evidence event attributable to a step, in document order.
+
+    ``order`` is the recording's document position (a ``Result:`` line's own
+    line number, or a legacy block's first line) -- it picks a step's
+    *latest* recorded run and, when a step has none of its own, the file's
+    overall latest run (today's global last-line-wins, preserved as the
+    fallback for test-less/status-less steps).
+    """
+
+    order: int
+    step: str | None
+    status: str
+
+
+def recorded_runs(text: str) -> list[RecordedRun]:
+    """Every ``RecordedRun`` in ``text``, in document order.
+
+    A block's own ``Result:`` line(s) are authoritative when present: only a
+    ``Counts`` line carries a status, so a later ``Malformed`` or
+    ``Result: none`` line contributes no evidence and can never launder an
+    earlier red run into a false green. A block with no ``Result:`` line at
+    all falls back to the legacy free-form pytest-summary phrasing, for
+    TEST_RESULTS.md files that never adopted the ``Result:`` convention.
+    """
+    runs: list[RecordedRun] = []
+    for block in split_step_blocks(text):
+        counted = [(n, r) for n, r in block.results if isinstance(r, Counts)]
+        if counted:
+            runs.extend(RecordedRun(n, block.step, r.status) for n, r in counted)
+            continue
+        if block.results:
+            continue  # a Malformed/NoRun line exists -- no legacy fallback here
+        legacy = _legacy_block_status(block.text)
+        if legacy is not None:
+            runs.append(RecordedRun(block.first_line, block.step, legacy))
+    return runs
+
+
+def _legacy_block_status(block_text: str) -> str | None:
+    """A free-form pytest-summary status for a block with no ``Result:`` line."""
+    status = None
+    for line in block_text.splitlines():
+        fail = _PYTEST_FAIL_RE.search(line)
+        if fail and int(fail.group(1)) > 0:
+            status = "red"
+        elif _PYTEST_PASS_RE.search(line):
+            status = "green"
+    return status
+
+
+def step_test_status(step: str, runs: list[RecordedRun]) -> str:
+    """A step's test status: its own latest run -- or, with no own run, the
+    file's overall latest run (today's global fallback, preserved). An own
+    red run is cleared by ANY green run recorded later anywhere in the file;
+    a later red never clears an existing green."""
+    own = [r for r in runs if r.step == step]
+    pool = own or runs
+    if not pool:
+        return "absent"
+    latest = max(pool, key=lambda r: r.order)
+    if latest.status == "green":
+        return "green"
+    superseded = any(r.status == "green" and r.order > latest.order for r in runs)
+    return "green" if superseded else latest.status

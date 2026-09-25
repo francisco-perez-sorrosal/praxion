@@ -39,19 +39,19 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _step_schema import (
-    Counts,
+    RecordedRun,
     checklist_step_id,
     parse_wip_claims,
-    split_step_blocks,
+    recorded_runs,
     step_id_from_heading,
     step_sort_key,
+    step_test_status,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -71,13 +71,6 @@ STEP_EXECUTING_AGENT_TYPES = frozenset(
 
 # A "**Files**:" field line under a plan step.
 _FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re.IGNORECASE)
-# The legacy free-form pytest-summary phrasing -- word-boundary count tokens
-# (never matches "ModuleNotFoundError") -- the fallback for a step block that
-# carries no `Result:` line at all (an old TEST_RESULTS.md never migrated to
-# the dec-386 shape).
-_PYTEST_FAIL_RE = re.compile(r"\b(\d+)\s+(?:failed|errors?)\b", re.IGNORECASE)
-_PYTEST_PASS_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
-
 
 # ---------------------------------------------------------------------------
 # Public entry point — pure, side-effect-free
@@ -134,42 +127,52 @@ def reconcile(
     test_runs = (
         []
         if _test_status_override is not None
-        else _recorded_runs(_read_text(task_dir / "TEST_RESULTS.md"))
+        else recorded_runs(_read_text(task_dir / "TEST_RESULTS.md"))
     )
     wal_rows = (
         _wal_rows_override
         if _wal_rows_override is not None
-        else _read_wal(
-            state_root / ".ai-state" / "observations.jsonl",
-            max_age_days=max_age_days,
-        )
+        else _read_wal(state_root / ".ai-state" / "observations.jsonl", max_age_days=max_age_days)
     )
 
-    verdicts: list[dict[str, Any]] = []
-    for step_id in sorted(claims, key=step_sort_key):
-        # Judged over this step's *attributable* files, not its raw declared
-        # list — a file another, earlier step also declares is necessary but
-        # not sufficient evidence for this step (see `attributable`).
-        files = attributable(step_id, declared_files)
-        earlier_declarers = _earlier_declarers(step_id, declared_files) if not files else []
-        tier2 = _correlate_agents(files, wal_rows)
-        test_status = (
-            _test_status_override
-            if _test_status_override is not None
+    return [
+        _reconcile_step(
+            step_id,
+            claims[step_id],
+            declared_files,
+            changed_files,
+            wal_rows,
+            test_runs,
+            _test_status_override,
+        )
+        for step_id in sorted(claims, key=step_sort_key)
+    ]
+
+
+def _reconcile_step(
+    step_id: str,
+    claim: str,
+    declared_files: dict[str, list[str]],
+    changed_files: set[str],
+    wal_rows: list[dict[str, Any]],
+    test_runs: list[RecordedRun],
+    test_status_override: str | None,
+) -> dict[str, Any]:
+    # `attributable()` files only -- a file another step also declares isn't enough.
+    files = attributable(step_id, declared_files)
+    return _classify_step(
+        step_id=step_id,
+        claim=claim,
+        files=files,
+        changed_files=changed_files,
+        test_status=(
+            test_status_override
+            if test_status_override is not None
             else step_test_status(step_id, test_runs)
-        )
-        verdicts.append(
-            _classify_step(
-                step_id=step_id,
-                claim=claims[step_id],
-                files=files,
-                changed_files=changed_files,
-                test_status=test_status,
-                tier2=tier2,
-                earlier_declarers=earlier_declarers,
-            )
-        )
-    return verdicts
+        ),
+        tier2=_correlate_agents(files, wal_rows),
+        earlier_declarers=_earlier_declarers(step_id, declared_files) if not files else [],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +206,7 @@ def _classify_step(
     changed_files: set[str],
     test_status: str,
     tier2: dict[str, Any],
-    earlier_declarers: list[str] = (),
+    earlier_declarers: list[str] | None = None,
 ) -> dict[str, Any]:
     """Classify one step. Tier-1 (git + tests) is the arbiter — ground truth
     decides "done," NOT the WIP checkbox (which is Tier-3, validated here).
@@ -218,7 +221,7 @@ def _classify_step(
     # truth. Never guess `verified-complete`; degrade to a human-surfaced verdict.
     if not files:
         verdict = "unknown" if claim == "COMPLETE" else "pending"
-        evidence = _no_attributable_files_reason(claim, verdict, earlier_declarers)
+        evidence = _no_attributable_files_reason(claim, verdict, earlier_declarers or [])
         return _make_verdict(step_id, claim, verdict, tier1, tier2, evidence, [])
 
     tests_red = test_status == "red"
@@ -408,14 +411,19 @@ def _scan_step_files(path: Path) -> dict[str, list[str]]:
 
 
 def _collect_files_value(first: str, lines: list[str], index: int) -> tuple[str, int]:
-    """Join a ``Files:`` value with its trailing-comma continuation lines.
+    """Join a ``Files:`` value with its trailing-comma continuation lines,
+    stopping at a step heading or checklist step line even when the current
+    line still ends in a comma -- a plan heading always opens its own step.
 
     Returns the joined value and the index of the first line not consumed.
     """
     parts = [first]
     index += 1
     while parts[-1].rstrip().endswith(",") and index < len(lines):
-        parts.append(lines[index])
+        line = lines[index]
+        if step_id_from_heading(line) is not None or checklist_step_id(line) is not None:
+            break
+        parts.append(line)
         index += 1
     return " ".join(parts), index
 
@@ -466,74 +474,6 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
-
-
-@dataclass(frozen=True)
-class RecordedRun:
-    """One test-evidence event attributable to a step, in document order.
-
-    ``order`` is the recording's document position (a ``Result:`` line's own
-    line number, or a legacy block's first line) -- it picks a step's
-    *latest* recorded run and, when a step has none of its own, the file's
-    overall latest run (today's global last-line-wins, preserved as the
-    fallback for test-less/status-less steps).
-    """
-
-    order: int
-    step: str | None
-    status: str
-
-
-def _recorded_runs(text: str) -> list[RecordedRun]:
-    """Every ``RecordedRun`` in ``text``, in document order.
-
-    A block's own ``Result:`` line(s) are authoritative when present: only a
-    ``Counts`` line carries a status, so a later ``Malformed`` or
-    ``Result: none`` line contributes no evidence and can never launder an
-    earlier red run into a false green. A block with no ``Result:`` line at
-    all falls back to the legacy free-form pytest-summary phrasing, for
-    TEST_RESULTS.md files that never adopted the ``Result:`` convention.
-    """
-    runs: list[RecordedRun] = []
-    for block in split_step_blocks(text):
-        counted = [(n, r) for n, r in block.results if isinstance(r, Counts)]
-        if counted:
-            runs.extend(RecordedRun(n, block.step, r.status) for n, r in counted)
-            continue
-        if block.results:
-            continue  # a Malformed/NoRun line exists -- no legacy fallback here
-        legacy = _legacy_block_status(block.text)
-        if legacy is not None:
-            runs.append(RecordedRun(block.first_line, block.step, legacy))
-    return runs
-
-
-def _legacy_block_status(block_text: str) -> str | None:
-    """A free-form pytest-summary status for a block with no ``Result:`` line."""
-    status = None
-    for line in block_text.splitlines():
-        fail = _PYTEST_FAIL_RE.search(line)
-        if fail and int(fail.group(1)) > 0:
-            status = "red"
-        elif _PYTEST_PASS_RE.search(line):
-            status = "green"
-    return status
-
-
-def step_test_status(step: str, runs: list[RecordedRun]) -> str:
-    """A step's test status: its own latest run -- or, with no own run, the
-    file's overall latest run (today's global fallback, preserved). An own
-    red run is cleared by ANY green run recorded later anywhere in the file;
-    a later red never clears an existing green."""
-    own = [r for r in runs if r.step == step]
-    pool = own or runs
-    if not pool:
-        return "absent"
-    latest = max(pool, key=lambda r: r.order)
-    if latest.status == "green":
-        return "green"
-    superseded = any(r.status == "green" and r.order > latest.order for r in runs)
-    return "green" if superseded else latest.status
 
 
 def _parse_ts(ts: str) -> datetime:
@@ -673,31 +613,31 @@ def _files_overlap(a: str, b: str) -> bool:
     return _path_match(a, b)
 
 
-def attributable(step: str, declared: dict[str, list[str]], sort_key=step_sort_key) -> list[str]:
-    """The declared files of ``step`` that no *earlier* step (by ``sort_key``)
-    also declares. Steps sharing a file are assumed to execute in that order;
-    when real work happens out of order, the earliest declarer still absorbs
-    the file — a declared limit, not a defect this function guards against
-    (see the systems plan's accepted falsifier).
+def attributable(step: str, declared: dict[str, list[str]]) -> list[str]:
+    """The declared files of ``step`` that no *earlier* step (by
+    ``step_sort_key``) also declares. Steps sharing a file are assumed to
+    execute in that order; when real work happens out of order, the earliest
+    declarer still absorbs the file — a declared limit, not a defect this
+    function guards against (see td-255).
     """
     own = declared.get(step, [])
     earlier_files = [
         f
         for other_step, files in declared.items()
-        if sort_key(other_step) < sort_key(step)
+        if step_sort_key(other_step) < step_sort_key(step)
         for f in files
     ]
     return [f for f in own if not any(_files_overlap(f, other) for other in earlier_files)]
 
 
-def _earlier_declarers(
-    step: str, declared: dict[str, list[str]], sort_key=step_sort_key
-) -> list[str]:
+def _earlier_declarers(step: str, declared: dict[str, list[str]]) -> list[str]:
     """Every earlier step that already claims at least one of ``step``'s
     files, earliest first -- named in the evidence so a human can settle
     every shared file, not just whichever was absorbed first."""
     own = declared.get(step, [])
-    earlier = sorted((s for s in declared if sort_key(s) < sort_key(step)), key=sort_key)
+    earlier = sorted(
+        (s for s in declared if step_sort_key(s) < step_sort_key(step)), key=step_sort_key
+    )
     return [s for s in earlier if any(_files_overlap(f, o) for f in own for o in declared[s])]
 
 

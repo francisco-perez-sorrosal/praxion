@@ -1056,6 +1056,57 @@ def test_dirty_file_owned_by_a_completed_step_still_blocks(tmp_path, monkeypatch
     assert "done_thing.py" in stderr
 
 
+def test_dirty_file_shared_with_an_earlier_declarer_still_blocks_readiness(
+    tmp_path, monkeypatch, capsys
+):
+    """A file the current (later-declaring) step shares with an earlier,
+    already-verified-complete step has no *attributable* evidence of its own
+    -- `declared_files()` for the current step reads empty. `step_file_scope`
+    is a union over every dirty non-bookkeeping path, not a first-non-empty
+    chain, so the file is still swept into scope through that catch-all; only
+    its scope-rule label widens from the current-step name to the
+    every-dirty-source-path fallback. This pins that the widened label never
+    costs the block itself."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+
+    shared_file = repo_root / "shared_thing.py"
+    shared_file.write_text("original\n", encoding="utf-8")
+    _run_git(["add", "shared_thing.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    shared_file.write_text("dirtied further\n", encoding="utf-8")
+
+    plan = (
+        "### Step 1: Build the shared thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: shared_thing.py\n"
+        "**Done when**: it works\n\n"
+        "### Step 2: Extend the shared thing\n"  # id-citation-discipline:ignore
+        "**Assignee**: implementer\n"
+        "**Files**: shared_thing.py\n"
+        "**Done when**: it works\n"
+    )
+    wip = (
+        "# WIP\n\n## Progress\n\n"
+        "- [x] Step 1: build the shared thing\n"  # id-citation-discipline:ignore
+        "- [ ] Step 2: extend the shared thing\n"  # id-citation-discipline:ignore
+    )
+    _write_pipeline_docs(repo_root, plan, wip)
+    _seed_quiescent_wal(repo_root)
+
+    monkeypatch.chdir(repo_root)
+    code = compose_handoff.main(
+        [SLUG, "--repo-root", str(repo_root), "--boundary", BOUNDARY_PLAN_TO_IMPL]
+    )
+    assert code == 1
+    stderr = capsys.readouterr().err
+    assert "dirty-step-files" in stderr
+    assert "shared_thing.py" in stderr
+
+
 # --- _handoff_inputs.py's world-read functions, through the real adapters --------
 #
 # Every case below drives its target function through a real repo, a real

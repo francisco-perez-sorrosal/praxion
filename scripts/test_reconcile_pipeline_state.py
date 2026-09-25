@@ -344,14 +344,14 @@ def test_ambiguous_claim_never_false_mismatch(tmp_path):
 #
 # A step with no recorded run of its own takes the file's latest run, so these
 # cases drive that fallback branch directly:
-# `step_test_status(<a step absent from the file>, _recorded_runs(text))`.
+# `step_test_status(<a step absent from the file>, recorded_runs(text))`.
 
 
 def _fallback_status(text: str) -> str:
     """The file's overall latest recorded run, via the production fallback
     path for a step with no own run of its own -- the direct replacement for
     the deleted whole-file reader."""
-    return rps.step_test_status("__no_such_step__", rps._recorded_runs(text))
+    return rps.step_test_status("__no_such_step__", rps.recorded_runs(text))
 
 
 def test_test_status_uses_final_summary():
@@ -816,6 +816,40 @@ def test_scan_step_files_keeps_every_line_of_a_wrapped_trailing_comma_continuati
     ]
 
 
+def test_a_trailing_comma_continuation_never_swallows_a_following_step_heading(tmp_path):
+    """A ``Files:`` line ending in a stray comma must stop gathering
+    continuation lines the moment it meets a step heading -- a plan heading
+    always opens its own step, even when the previous field never closed."""
+    plan_path = tmp_path / "IMPLEMENTATION_PLAN.md"
+    plan_path.write_text(
+        "### Step 1: a\n**Files**: scripts/a.py,\n### Step 2: b\n**Files**: scripts/b.py\n",
+        encoding="utf-8",
+    )
+    files = rps._scan_step_files(plan_path)
+    assert files["Step 1"] == ["scripts/a.py"]
+    assert files["Step 2"] == ["scripts/b.py"]
+
+
+def test_reconcile_never_credits_a_heading_swallowed_continuation_files_step_to_the_earlier_one(
+    tmp_path,
+):
+    """Production-shape regression: with the trailing-comma plan shape above,
+    only Step 2's own file is committed -- Step 1 must not read
+    verified-complete from a file it never declared, and Step 2 must."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = "### Step 1: a\n**Files**: scripts/a.py,\n### Step 2: b\n**Files**: scripts/b.py\n"
+    wip = "- [x] Step 1: a\n- [x] Step 2: b\n"
+    _setup(repo_root, wip, plan)
+    _commit(repo_root, "scripts/b.py", "# b\n")
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "verified-complete"
+
+
 # --- a declared glob matches only under its own directory -------------------
 
 
@@ -1068,6 +1102,28 @@ def test_reconcile_a_table_only_wip_reconciles_instead_of_reporting_no_steps(tmp
     )
     assert out != []
     assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_stale_complete_table_claim_with_no_file_change_reads_mismatch(tmp_path):
+    """A table row claiming a bracketed COMPLETE whose declared file never
+    changed is the truncation signature (ground truth contradicts a finished
+    claim) -- it must read mismatch, not the honest-not-complete-claim
+    pending path, which today's narrower status-table vocabulary produces by
+    misreading `[COMPLETE]` as AMBIGUOUS instead of COMPLETE."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    wip = (
+        "| Step | Assignee | Status | Files |\n"
+        "|---|---|---|---|\n"
+        "| 1 | implementer | [COMPLETE] | f.py |\n"
+    )
+    plan = "### Step 1: Build the thing\n**Files**: f.py\n"
+    _setup(repo_root, wip, plan)
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "mismatch"
 
 
 # --- per-step test status: each step reads its own latest run --------------

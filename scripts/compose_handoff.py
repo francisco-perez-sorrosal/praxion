@@ -75,9 +75,11 @@ from _handoff_inputs import (
     SCOPE_CURRENT_STEP,
     SCOPE_DIRTY_SOURCE,
     SCOPE_UNFINISHED_STEPS,
-    VERIFIED_COMPLETE,
+    VERDICT_UNKNOWN,
     artifact_names,
+    pick_next_step,
     recent_log,
+    render_owed_verification,
     resolve_base_ref,
     step_file_scope,
 )
@@ -166,11 +168,6 @@ BYTE_WARNING_THRESHOLD = 8192
 RECENT_LOG_ADVISORY = "a test run may still be in progress"
 
 MISMATCH = "mismatch"
-# The reconciler's own "unknown" verdict value -- distinct from the module's
-# `UNKNOWN` (a world fact that could not be read), even though both spell the
-# same string. Naming them apart keeps "step unknown" and "field unreadable"
-# from reading as the same concern at a call site.
-VERDICT_UNKNOWN = "unknown"
 
 
 class HandoffError(Exception):
@@ -482,24 +479,6 @@ def _render_state(context: ComposeContext, conflicts: Sequence[dict[str, Any]]) 
     return "\n".join(lines)
 
 
-def _pick_next_step(verdicts: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
-    """The shared next-action picker for `_render_next_action` and `_default_boundary`.
-
-    The first verdict that is neither `verified-complete` nor `unknown`.
-    `unknown` means "claimed complete, no attributable ground truth" — the
-    claimed work is not actionable, only verifiable, so it is skipped here and
-    the caller surfaces it separately. Falls back to the first `unknown`
-    verdict only when every step is verified-complete or unknown — nothing
-    else is actionable, so naming that step beats naming nothing. Both callers
-    share this function so a mid-phase boundary and §2's own next action can
-    never name two different steps for the same moment.
-    """
-    for verdict in verdicts:
-        if verdict.get("verdict") not in (VERIFIED_COMPLETE, VERDICT_UNKNOWN):
-            return verdict
-    return next((v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN), None)
-
-
 def _render_step_action(verdict: dict[str, Any]) -> str:
     files = verdict.get("resume_scope") or verdict.get("tier1", {}).get("files_unchanged", [])
     scope = ", ".join(f"`{path}`" for path in files) or "see the plan's `Files:` field"
@@ -509,20 +488,11 @@ def _render_step_action(verdict: dict[str, Any]) -> str:
     )
 
 
-def _render_owed_verification(unknown_verdicts: Sequence[dict[str, Any]]) -> str:
-    """One line naming every `unknown` step: claimed complete, verification owed."""
-    steps = ", ".join(f"`{v.get('step', '?')}`" for v in unknown_verdicts)
-    return (
-        f"Human verification owed: {steps} — claimed complete, no attributable ground truth. "
-        "Verify by hand before treating the claim as fact."
-    )
-
-
 def _render_next_action(verdicts: Sequence[dict[str, Any]]) -> str:
     if not verdicts:
         return "No tracked steps yet — read `WIP.md` § Next Action and start there."
     unknown = [v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN]
-    nxt = _pick_next_step(verdicts)
+    nxt = pick_next_step(verdicts)
     if nxt is None:
         return (
             "Every tracked step is verified-complete against ground truth. The next action is "
@@ -530,11 +500,11 @@ def _render_next_action(verdicts: Sequence[dict[str, Any]]) -> str:
         )
     if nxt.get("verdict") == VERDICT_UNKNOWN:
         return (
-            f"No step is actionable beyond human verification. {_render_owed_verification(unknown)}"
+            f"No step is actionable beyond human verification. {render_owed_verification(unknown)}"
         )
     lines = [_render_step_action(nxt)]
     if unknown:
-        lines.append(_render_owed_verification(unknown))
+        lines.append(render_owed_verification(unknown))
     return "\n".join(lines)
 
 
@@ -674,7 +644,7 @@ def _read_render_context(
 
 def _default_boundary(verdicts: Sequence[dict[str, Any]]) -> str | None:
     """A mid-phase boundary naming the current step, when none was given."""
-    step = (_pick_next_step(verdicts) or {}).get("step")
+    step = (pick_next_step(verdicts) or {}).get("step")
     return f"{MID_PHASE_PREFIX}{step}" if step else None
 
 

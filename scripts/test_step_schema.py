@@ -10,6 +10,7 @@ twice.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -337,6 +338,9 @@ def test_heading_with_a_backticked_checkbox_marker_yields_a_claim() -> None:
         ("not started", "PENDING"),
         ("—", "PENDING"),
         ("red", "AMBIGUOUS"),
+        ("completed", "COMPLETE"),
+        ("[COMPLETE]", "COMPLETE"),
+        ("complete — merged", "COMPLETE"),
     ],
 )
 def test_status_table_word_vocabulary_maps_to_the_documented_claim(
@@ -353,6 +357,35 @@ def test_status_table_word_vocabulary_maps_to_the_documented_claim(
     assert claims == {"Step 1": expected_claim}  # id-citation-discipline:ignore
 
 
+# Verbatim excerpt: process-economy-p2-10/WIP.md's "Batch 3" table -- every
+# Step cell carries a parenthetical label alongside the bare id.
+_STEP_CELL_WITH_LABEL_EXCERPT = (
+    "| Step | Depends-on | Status |\n"
+    "|---|---|---|\n"
+    "| 12 (integration checkpoint) | 1,2,3,4,5,6,7,8,9,10,11 | complete (orchestrator) |\n"
+    "| 14 (taxonomy refresh) | 12 | complete |\n"
+    "| 16 (run_check_families --table) | 12 | complete (orchestrator: BC05 in digest, "
+    "14 families / 56 checks) |\n"
+    "| 15 (token budget + ratchet) | 12, 14 | complete (orchestrator: 16,639 in-worktree, "
+    "16,569 projected post-merge; ratchet exit 0) |\n"
+    "| 17 (full suite, detached) | 1-16 | complete (4781 passed, 5 skipped, exit 0) |\n"
+    "| 18 (verifier) | 17 | pending |\n"
+)
+
+
+def test_status_table_step_cell_with_a_parenthetical_label_still_yields_a_claim() -> None:
+    claims = schema.parse_wip_claims(_STEP_CELL_WITH_LABEL_EXCERPT)
+
+    assert claims == {  # id-citation-discipline:ignore
+        "Step 12": "COMPLETE",  # id-citation-discipline:ignore
+        "Step 14": "COMPLETE",  # id-citation-discipline:ignore
+        "Step 16": "COMPLETE",  # id-citation-discipline:ignore
+        "Step 15": "COMPLETE",  # id-citation-discipline:ignore
+        "Step 17": "COMPLETE",  # id-citation-discipline:ignore
+        "Step 18": "PENDING",  # id-citation-discipline:ignore
+    }
+
+
 def test_conflicting_claims_from_different_sources_become_ambiguous() -> None:
     text = (
         "- [x] Step 1: build the thing\n"  # id-citation-discipline:ignore
@@ -364,3 +397,34 @@ def test_conflicting_claims_from_different_sources_become_ambiguous() -> None:
     claims = schema.parse_wip_claims(text)
 
     assert claims == {"Step 1": "AMBIGUOUS"}  # id-citation-discipline:ignore
+
+
+# ---------------------------------------------------------------------------
+# Module import on the oldest bare interpreter the readers are invoked with
+# ---------------------------------------------------------------------------
+
+_LEGACY_INTERPRETER = "/usr/bin/python3"
+
+
+@pytest.mark.skipif(
+    not Path(_LEGACY_INTERPRETER).exists(),
+    reason=f"{_LEGACY_INTERPRETER} not present on this machine",
+)
+def test_the_three_step_document_readers_import_under_a_legacy_bare_interpreter() -> None:
+    """All three step-document readers are invoked by a slash command or a
+    git hook with a bare `python3` -- an interpreter this project does not
+    control the version of. A module-level union-type alias evaluated at
+    import time (rather than deferred as a string or annotation-only form)
+    breaks that contract on any interpreter that predates runtime `|` union
+    support, even though the project's own declared floor is newer."""
+    result = subprocess.run(
+        [
+            _LEGACY_INTERPRETER,
+            "-c",
+            f"import sys; sys.path.insert(0, {str(SCRIPT_DIR)!r}); "
+            "import _step_schema, reconcile_pipeline_state, check_test_results_shape",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr

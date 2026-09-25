@@ -4,7 +4,7 @@
 Enforces the fixed green-step shape from
 ``skills/software-planning/references/agent-pipeline-details.md §
 TEST_RESULTS.md Reconciliation``: a green step section (``fail=0``, no
-``error=``>0) carries nothing beyond the command/result/duration/topology
+``error=``>0, ``pass=`` above zero) carries nothing beyond the command/result/duration/topology
 lines -- no notes field, no pasted output. Measured cost: test output read
 back is ~1.5% of what implementers read; the rest is free-form prose this
 gate exists to bound.

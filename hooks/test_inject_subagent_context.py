@@ -77,7 +77,7 @@ def _load_module():
 
 
 # ---------------------------------------------------------------------------
-# stdin payload builders — canonical shapes from SYSTEMS_PLAN.md §Interfaces
+# stdin payload builders — the canonical SubagentStart payload shapes
 # ---------------------------------------------------------------------------
 
 PREAMBLE_MARKER = "[Praxion process active]"

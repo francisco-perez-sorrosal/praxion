@@ -68,7 +68,7 @@ def test_5bt_fires_only_when_mode_is_promote() -> None:
     assert section, "Sub-step 5b.t not documented yet"
     assert re.search(r"\bpromote\b", section, re.IGNORECASE), (
         "Sub-step 5b.t must document firing only when mode=promote "
-        "(SYSTEMS_PLAN.md §Mode x Phase Matrix)"
+        "(the skill's Mode x Phase Matrix)"
     )
 
 

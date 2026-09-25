@@ -2,9 +2,10 @@
 """ID citation discipline checker (inbound isolation).
 
 Scans code files (Python, TS, JS, Rust, Go, etc.) for references to ephemeral
-pipeline identifiers — REQ-*, AC-*, EC-X.X.X, Step N, test_req{NN}_* /
-test_ac{NN}_* function naming, class Test*Req{NN}* / class Test*Ac{NN}*
-class naming, and dec-draft-<hash> citations. Those identifiers live in
+pipeline identifiers — REQ-*, AC-*, EC-X.X.X, Step N, their hyphen-less
+forms, test_req{NN}_* / test_ac{NN}_* function naming, class Test*Req{NN}* /
+class Test*Ac{NN}* class naming, dec-draft-<hash> citations, and section
+citations of pipeline documents (SYSTEMS_PLAN.md § ...). Those identifiers live in
 documents that get deleted with .ai-work/ or renamed at ADR finalize, so
 in-code citations dangle the moment the pipeline cleans up or promotes.
 
@@ -46,6 +47,7 @@ import time
 from pathlib import Path
 
 from _git_runner import run_git
+from artifact_registry import all_names as pipeline_artifact_names
 
 # hooks/_hook_utils.py is a sibling package to this file's own scripts/
 # directory, not on sys.path by default -- add it, mirroring the reverse
@@ -160,6 +162,8 @@ EXCLUDED_PATH_FRAGMENTS = (
     "/venv/",
     "/vendor/",
     "/node_modules/",
+    # Next.js build output: generated bundles, never authored code.
+    "/.next/",
     "/.tox/",
     "/dist/",
     "/build/",
@@ -172,6 +176,27 @@ EXCLUDED_PATH_FRAGMENTS = (
 )
 
 IGNORE_MARKER = "id-citation-discipline:ignore"
+
+
+def _ephemeral_document_stems() -> list[str]:
+    """Stems of the pipeline documents deleted with `.ai-work/`, from the registry.
+
+    A placeholder name (`CONSULT_<discipline>.md`) contributes its literal
+    prefix plus a lowercase kebab slug — the shape discipline names take — so
+    every discipline's consult document is covered while the persistent
+    upper-case ledgers beside them (`CONSULT_LEDGER.md`) are not.
+    """
+    stems = set()
+    for name in pipeline_artifact_names():
+        if not name.endswith(".md"):
+            continue
+        stem = name.removesuffix(".md")
+        if "<" in stem:
+            stems.add(re.escape(stem.split("<", 1)[0]) + r"[a-z][a-z0-9-]*")
+        else:
+            stems.add(re.escape(stem))
+    return sorted(stems)
+
 
 PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
@@ -203,6 +228,21 @@ PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
         re.compile(r"\bP\d+-\d+\b"),
         "milestone criterion id (e.g., P1-14) — an acceptance criterion in a "
         "plan's local numbering, as ephemeral as AC-NN; describe behavior inline",
+    ),
+    (
+        "hyphenless-criterion-id",
+        # AC is bounded to one nonzero digit: sentinel's own check ids are
+        # AC01-AC13, which the rule allows in code, and EC is omitted for the
+        # same reason (EC07).
+        re.compile(r"\b(?:REQ|DS)\d+\b|\bAC[1-9]\b"),
+        "criterion id without its hyphen (e.g., AC7, DS2, REQ10) — the same "
+        "ephemeral plan numbering as AC-NN; describe behavior inline",
+    ),
+    (
+        "ephemeral-doc-section",
+        re.compile(r"\b(?:" + "|".join(_ephemeral_document_stems()) + r")\.md\s*§"),
+        "section citation of a pipeline document (e.g., SYSTEMS_PLAN.md § Interfaces) "
+        "— the document is deleted with .ai-work/; state the constraint inline",
     ),
     (
         "step-ref",

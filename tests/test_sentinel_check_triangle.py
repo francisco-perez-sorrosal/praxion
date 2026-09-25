@@ -24,7 +24,7 @@ Shared row-parsing helpers (`_TABLE_ROW`, `_pass_column`, `_row_pattern`, `SENTI
 totalising pattern scan (which lives in that module and reaches into this one) never
 mistakes a re-exported reference for a pattern this module defines.
 
-Cites: SYSTEMS_PLAN.md § The Extraction Contract; CLAUDE.md§Pragmatism.
+Cites: dec-380 (the sentinel check extraction contract); CLAUDE.md § Pragmatism.
 """
 
 from __future__ import annotations

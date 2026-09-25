@@ -60,7 +60,7 @@ Exit code 2 when the resolved root is a plugin-cache path.
 Invoked by the sentinel's T dimension (`--json`, family-dispatched); also
 runnable standalone.
 
-Cites: SYSTEMS_PLAN.md § The Extraction Contract; CLAUDE.md § Pragmatism.
+Cites: dec-380 (the sentinel check extraction contract); CLAUDE.md § Pragmatism.
 """
 
 from __future__ import annotations

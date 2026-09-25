@@ -2,8 +2,7 @@
 # Tests for scripts/onboard-project -- the unified onboarding entry point.
 #
 # Rewritten from tests/new_project_test.sh (kept as-is until the atomic cut
-# deletes it) for the collapsed one-script contract per
-# INTERFACE_DESIGN.md §2 and SYSTEMS_PLAN.md §Detection Algorithm.
+# deletes it) for the collapsed one-script contract (dec-340).
 #
 # RED-first (BDD/TDD): scripts/onboard-project does not exist yet as of this
 # test's authoring -- every test below is expected to fail with a
@@ -346,7 +345,7 @@ t11_source_no_git_detects_code_no_git() {
 # drift here means the launcher's classification (passed in the seed trailer)
 # and Phase 0's re-detection can disagree on a state name that exists on one
 # side and not the other -- the exact failure the bash/skill split depends on
-# never happening (SYSTEMS_PLAN.md §Detection Algorithm).
+# never happening.
 t12_bash_state_names_agree_with_detection_md() {
     local expected_states="code-no-git empty fully-managed git-no-praxion hackathon-managed partially-managed"
 

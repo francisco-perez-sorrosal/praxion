@@ -1,8 +1,8 @@
 """Behavioral tests for the fingerprint/dedup contract.
 
 `compute_fingerprint` is `sha256(category + normalized_artifact_path +
-normalized_error)` -- SYSTEMS_PLAN.md § Interfaces names this normalization
-"the dedup contract" and Risk Assessment calls it "the primary test target":
+normalized_error)` -- this normalization is the dedup contract and the
+primary test target:
 under-normalization admits duplicate candidates for the same recurring
 defect, over-normalization collapses genuinely distinct defects into one
 fingerprint. Both failure directions are tested explicitly below.

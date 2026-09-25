@@ -1,7 +1,7 @@
 """Behavioral tests for the PENDING.md candidate store.
 
 Covers append/dedup/list/mark-filed against the `### <fp8>` candidate-block
-schema (SYSTEMS_PLAN.md § Interfaces). Every store path lives under pytest's
+schema. Every store path lives under pytest's
 `tmp_path` -- never a committed or gitignored fixture path -- so each test
 starts from a pristine, isolated file and the framework's own cleanup
 guarantees no cross-test state leaks.

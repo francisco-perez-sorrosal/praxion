@@ -67,7 +67,7 @@ under `examined["AC13"]`. AC04 and AC05 findings always carry
 findings living inside a script that otherwise blocks the commit, because a
 stale decision reference or an empty developer guide is real drift but not
 worth reddening every commit over (measured against the live corpus before
-shipping; see `LEARNINGS.md § Step F2`).
+shipping).
 
 **AC03/AC06/AC07 extend `classify()` further, each with its own substrate.**
 Unlike AC04/AC05, these three do not ride AC13's `.c4`-and-DESIGN.md gate:

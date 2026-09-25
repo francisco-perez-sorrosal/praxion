@@ -2,8 +2,7 @@
 
 `render_candidate` projects a stored candidate dict into the fixed eight-
 heading markdown structure that both the machine reporter and a human filing
-manually in the browser share (SYSTEMS_PLAN.md § Interfaces -- "one artifact,
-both entry paths"). `SECTION_HEADINGS`'s exact text/order is also what a
+manually in the browser share -- one artifact, both entry paths. `SECTION_HEADINGS`'s exact text/order is also what a
 sibling template-drift guard (outside this module's scope) checks against
 the shipped issue template, so it is load-bearing beyond this file.
 

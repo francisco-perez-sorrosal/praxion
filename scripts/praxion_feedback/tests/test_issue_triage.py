@@ -1,6 +1,6 @@
 """Behavioral tests for the mechanical §5.2 template validator and dedup-
-signature builder that gates the fixer agent (SYSTEMS_PLAN.md § Architecture
-› Components, workflow step 6: "Mechanical template-validate + dedup").
+signature builder that gates the fixer agent: the workflow's mechanical
+template-validate + dedup step.
 
 `parse_sections` / `missing_required_sections` / `extract_fingerprint` /
 `dedup_signature` all run on the already-sanitized issue body -- deterministic

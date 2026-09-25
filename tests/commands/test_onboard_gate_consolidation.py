@@ -7,7 +7,7 @@ file structurally, matching the precedent set by
 `tests/commands/test_onboard_ci_autofix_install.py`.
 
 `SKILL.md` publishes the 3-gate policy (G1 mode-confirm / G2 build-intent /
-G3 profile) per `INTERFACE_DESIGN.md §3.3`; the old 25-gate-fire surface
+G3 profile) per dec-345; the old 25-gate-fire surface
 (one `AskUserQuestion` pause per phase plus the one-way `Run all rest`
 escape hatch) is retired.
 """
@@ -23,7 +23,7 @@ PHASES_FILES = (
     Path(__file__).parents[2] / "skills" / "onboard-project" / "references" / "phases-optional.md",
 )
 
-# The three surviving gates, per INTERFACE_DESIGN.md §3.3.
+# The three surviving gates, per dec-345.
 _GATE_NAMES = ("mode confirm", "build intent", "profile")
 
 # Interaction machinery that belongs only to the driver (SKILL.md) and
@@ -69,7 +69,7 @@ def test_gate_table_collapses_to_exactly_three_gates() -> None:
     )
     for name in _GATE_NAMES:
         assert re.search(name, section, re.IGNORECASE), (
-            f"Gate policy section must name the '{name}' gate (INTERFACE_DESIGN.md §3.3)"
+            f"Gate policy section must name the '{name}' gate (dec-345)"
         )
 
 
@@ -78,7 +78,7 @@ def test_run_all_rest_escape_hatch_is_retired() -> None:
     assert section, "SKILL.md must carry a gate-policy section"
     assert not re.search(r"run all rest", section, re.IGNORECASE), (
         "The one-way 'Run all rest' escape hatch must be retired -- with three "
-        "gates there is nothing left to escape (INTERFACE_DESIGN.md §3.3)"
+        "gates there is nothing left to escape (dec-345)"
     )
 
 
@@ -100,7 +100,7 @@ def test_g1_mode_confirm_fires_only_on_ambiguous_or_hackathon_detection() -> Non
     assert g1_match, "Gate policy section must document G1"
     g1 = g1_match.group(0)
     assert re.search(r"ambiguous", g1, re.IGNORECASE), (
-        "G1 (Mode confirm) must fire only when detection is ambiguous (INTERFACE_DESIGN.md §3.3)"
+        "G1 (Mode confirm) must fire only when detection is ambiguous (dec-345)"
     )
     assert re.search(r"hackathon", g1, re.IGNORECASE), (
         "G1 (Mode confirm) must also fire when a hackathon/promote state is "

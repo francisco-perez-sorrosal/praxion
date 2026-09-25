@@ -1,6 +1,6 @@
 """Reusable contract assertion for sentinel residual rows.
 
-Binds `SYSTEMS_PLAN.md § The Extraction Contract`'s residual-row shape (Conditional ·
+Binds the sentinel extraction contract's (dec-380) residual-row shape (Conditional ·
 Invocation · Verdict map · Spec pointer) to a machine check, so an extraction step
 cannot silently produce a row that violates its own contract. Each extraction step
 (AC13, DH05, DL06, T03, F11, P03) calls `assert_residual_row_contract` in its own test
@@ -46,7 +46,7 @@ in the sibling `tests/test_sentinel_check_triangle.py`. All three legs are parse
 is hand-maintained, so a row, a registry entry, or a declared check id that loses its
 two partners fails rather than drifting.
 
-Cites: SYSTEMS_PLAN.md § The Extraction Contract; CLAUDE.md§Pragmatism.
+Cites: dec-380 (the sentinel check extraction contract); CLAUDE.md § Pragmatism.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ _TABLE_ROW = re.compile(r"^\|\s*(?P<id>[A-Za-z0-9]+)\s*\|.*\|\s*$", re.M)
 # The Conditional's fixed shape -- a single sentence, `Conditional on <path> present`,
 # optionally qualified by a parenthetical (e.g. "(either lifecycle stage)"), then
 # `; skip with a(n) <D>-dimension INFO note.` -- per the folded-sentence template
-# `SYSTEMS_PLAN.md § The Extraction Contract` now specifies (amended in this commit to
+# the extraction contract (dec-380) now specifies (amended in this commit to
 # match the three live rows, which never wrote the split two-sentence form). An open
 # `.+? present` anchor is *not* a bound: a non-greedy quantifier still backtracks past
 # arbitrary padding to find a later "present", so the path slot needs its own explicit
@@ -120,7 +120,7 @@ _INVOCATION_FLAGS_MAX_CHARS = 20  # every live invocation carries exactly " --js
 # used.
 
 _TP_MAX_CHARS = 10  # every live Tp value is a single letter ("A" or "L" --
-# `SYSTEMS_PLAN.md § The Extraction Contract`'s type column). 10 leaves room for a short
+# the extraction contract's type column, dec-380). 10 leaves room for a short
 # future type code without leaving room for the 900-char padding NEW-2 found ACCEPTED on
 # the unchecked Tp cell.
 
@@ -243,7 +243,7 @@ def _tp_column(row: str) -> str:
     return _row_cells(row)[1]
 
 
-_RULE_MAX_CHARS = 120  # `SYSTEMS_PLAN.md § The Extraction Contract`'s residual row
+_RULE_MAX_CHARS = 120  # the extraction contract's (dec-380) residual row
 # template: "<one-line claim, <=120 chars, unchanged from today>". Measured in
 # characters, per the template's own wording -- unlike the verdict map, no live row sits
 # close enough to the boundary for the chars-vs-bytes distinction to matter (widest live
@@ -272,7 +272,7 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
         f"{check_id}: Pass column does not decompose into the mandated "
         "Conditional? + Invocation + verdict map + Spec pointer shape (or the family "
         "form `Family: `python3 scripts/<name>.py --json`; <verdict map>`), in that "
-        "exact order, with no content left over (SYSTEMS_PLAN.md § The Extraction Contract)"
+        "exact order, with no content left over (the extraction contract, dec-380)"
     )
     verdict = match.group("verdict").strip()
     if pass_column.startswith("Family: "):
@@ -290,8 +290,8 @@ def _verdict_map(pass_column: str, check_id: str, script_name: str) -> str:
 def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name: str) -> None:
     """Assert `check_id`'s row in `sentinel_text` satisfies the Extraction Contract's residual shape.
 
-    Six checks, each binding a live consumer named in `SYSTEMS_PLAN.md § The Extraction
-    Contract`: (a) the row sits under a `### <dimension>` heading and carries the literal
+    Six checks, each binding a live consumer the extraction contract (dec-380)
+    names: (a) the row sits under a `### <dimension>` heading and carries the literal
     `python3 scripts/<script_name>.py` invocation phrase -- the same phrase
     `_delegated_gates`, GL04 (`check_uninvoked_gate`) and GL05 (`check_ambient_import`) all
     key on; (b) the row names its canary sibling, `scripts/test_<script_name>.py`; (c) the
@@ -324,14 +324,14 @@ def assert_residual_row_contract(sentinel_text: str, check_id: str, script_name:
     rule = _rule_column(row)
     assert len(rule) <= _RULE_MAX_CHARS, (
         f"{check_id}: Rule column is {len(rule)} chars, exceeds the {_RULE_MAX_CHARS}-char "
-        "budget (SYSTEMS_PLAN.md § The Extraction Contract's residual row template)"
+        "budget (the extraction contract's residual row template, dec-380)"
     )
 
     verdict_map = _verdict_map(_pass_column(row), check_id, script_name)
     verdict_bytes = len(verdict_map.encode("utf-8"))
     assert verdict_bytes <= _VERDICT_MAP_MAX_BYTES, (
         f"{check_id}: verdict map is {verdict_bytes} bytes, exceeds the "
-        f"{_VERDICT_MAP_MAX_BYTES}-byte budget (SYSTEMS_PLAN.md § The Extraction Contract) "
+        f"{_VERDICT_MAP_MAX_BYTES}-byte budget (the extraction contract, dec-380) "
         "-- discipline that should be a JSON field is still prose"
     )
 
@@ -892,8 +892,8 @@ def test_content_after_spec_pointer_is_rejected() -> None:
 
 def test_reordered_parts_is_rejected() -> None:
     """Canary (dec-378, ordering): parts in any order other than Conditional? +
-    Invocation + verdict map + Spec pointer must fail -- `SYSTEMS_PLAN.md § The
-    Extraction Contract` fixes the order ("Four parts, in this order, and no fifth"),
+    Invocation + verdict map + Spec pointer must fail -- the extraction contract
+    fixes the order ("Four parts, in this order, and no fifth"),
     and the whole-column parse enforces it structurally rather than leaving it
     unasserted.
     """

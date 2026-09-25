@@ -91,7 +91,7 @@ Exit code 2 when the resolved root is a plugin-cache path.
 
 Invoked by the sentinel's P dimension (`--json`); also runnable standalone.
 
-Cites: SYSTEMS_PLAN.md § The Extraction Contract, § Data Structures (`LifecycleReport`).
+Cites: dec-380 (the sentinel check extraction contract).
 """
 
 from __future__ import annotations

@@ -5,9 +5,10 @@ Explicit allowlist -- no heuristics. The list is derived from
 `scripts/query_memory_write_evidence.py` run against the main checkout's WAL:
 keep on any `praxion:*` agent with fewer than 5 recorded spawns (insufficient
 sample) or >=1 recorded memory-write row under either marker filter; drop only
-where spawns >= 5 AND writes == 0 under both filters. See
-`.ai-work/process-economy-phase1/LEARNINGS.md § Decisions Made` for the
-re-add-on-evidence rule.
+where spawns >= 5 AND writes == 0 under both filters. The drop is
+evidence-conditioned, not permanent policy: when a later WAL query shows a
+dropped agent with any recorded memory-write row under either marker filter,
+re-add `memory: user` to that agent's frontmatter.
 
 Idempotent: skips a file that no longer carries a `memory:` line.
 

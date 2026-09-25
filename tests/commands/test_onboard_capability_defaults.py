@@ -5,9 +5,8 @@ invoked from pytest. These tests validate the documented contract by parsing
 the skill file structurally, matching the precedent set by
 `tests/commands/test_onboard_ci_autofix_install.py`.
 
-`SKILL.md` publishes the capability-ID -> phase-id mapping table and the
-Mode x Phase Matrix per `INTERFACE_DESIGN.md §2.3` / `SYSTEMS_PLAN.md
-§Capability IDs`.
+`SKILL.md` publishes the capability-ID -> phase-id mapping table (the
+capability-ID flags are dec-346) and the Mode x Phase Matrix.
 """
 
 from __future__ import annotations
@@ -17,10 +16,10 @@ from pathlib import Path
 
 SKILL_FILE = Path(__file__).parents[2] / "skills" / "onboard-project" / "SKILL.md"
 
-# The eight capability ids, per SYSTEMS_PLAN.md §Capability IDs / INTERFACE_DESIGN.md §2.3.
+# The eight capability ids the skill's mapping table publishes (dec-346).
 CAPABILITY_IDS = ("core", "arch", "quality", "ci", "aac", "ml", "obsidian", "observability")
 
-# Every phase id the Mode x Phase Matrix enumerates (SYSTEMS_PLAN.md §Mode x Phase Matrix).
+# Every phase id the skill's Mode x Phase Matrix enumerates.
 MODE_PHASE_MATRIX_IDS = (
     "0",
     "0s",
@@ -51,7 +50,7 @@ MODE_PHASE_MATRIX_IDS = (
 )
 
 # Two phase ids the vocabulary deliberately leaves unmapped -- they are
-# mode-implied, not user-selectable (SYSTEMS_PLAN.md §Capability IDs note).
+# mode-implied, not user-selectable.
 _NOT_USER_SELECTABLE = ("0", "0s", "5b", "5b.t")
 
 
@@ -80,7 +79,7 @@ def test_capability_id_table_is_published_once_in_skill_md() -> None:
     assert section, (
         "SKILL.md must publish the capability-ID -> phase-id mapping table as "
         "the single join point between the user-facing and internal "
-        "vocabularies (INTERFACE_DESIGN.md §2.3 / dec-345)"
+        "vocabularies (dec-345)"
     )
     for capability_id in CAPABILITY_IDS:
         assert re.search(rf"`{re.escape(capability_id)}`", section), (

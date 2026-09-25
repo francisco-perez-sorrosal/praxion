@@ -388,6 +388,109 @@ def test_scratch_tmp_directory_is_not_scanned_repo_wide(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout
 
 
+# --- hyphen-less criterion ids and ephemeral-document section citations --------
+#
+# Both shapes reached agent-written code during the process-economy programme
+# and were swept by hand because the gate modelled only the dashed forms. The
+# single-digit AC bound is deliberate: sentinel's own check ids are AC01-AC13,
+# which the rule allows in code, so a wider AC pattern would forbid what the
+# rule permits.
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '"""Implements AC7: the report never refuses."""\n',
+        "# the DS2 identity is derived once\n",
+        "# covers REQ10's carry-forward\n",
+    ],
+)
+def test_detects_hyphenless_criterion_id(tmp_path: Path, line: str) -> None:
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(line)
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1, result.stdout
+    assert "[hyphenless-criterion-id]" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        'CHECK_ID = "AC07"\n',
+        "# sentinel AC13 wraps the projection findings\n",
+        "# EC07 guards the generated regions\n",
+    ],
+)
+def test_sentinel_check_ids_are_not_flagged_as_criterion_ids(tmp_path: Path, line: str) -> None:
+    """The rule allows sentinel check ids in code; the gate must not forbid them."""
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(line)
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "# canonical shapes from SYSTEMS_PLAN.md § Interfaces\n",
+        '"""Per INTERFACE_DESIGN.md §2.3, gates fire once."""\n',
+        "# see `LEARNINGS.md § Decisions Made`\n",
+        "# the challenge format in CONSULT_evidence-appraiser.md § Challenges\n",
+    ],
+)
+def test_detects_ephemeral_document_section_citation(tmp_path: Path, line: str) -> None:
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(line)
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 1, result.stdout
+    assert "[ephemeral-doc-section]" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "# rule: CLAUDE.md § Critical conventions\n",
+        '"""Parse the row out of DESIGN.md §1 text."""\n',
+        "# .ai-state/CONSULT_LEDGER.md § Column Definitions\n",
+        'WIP = root / ".ai-work" / slug / "WIP.md"  # the reconciler reads it\n',
+    ],
+)
+def test_persistent_section_citations_and_artifact_readers_are_not_flagged(
+    tmp_path: Path, line: str
+) -> None:
+    """Persistent documents may be cited by section, and code may name an
+    ephemeral file it reads; only a section citation of an ephemeral one dangles."""
+    module = tmp_path / "src" / "module.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(line)
+
+    result = _run(["--files", str(module), "--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_next_build_output_is_not_scanned_repo_wide(tmp_path: Path) -> None:
+    """A Next.js `.next/` build tree is generated output, never authored code."""
+    chunk = tmp_path / "app" / ".next" / "server" / "chunk.js"
+    chunk.parent.mkdir(parents=True)
+    chunk.write_text("// see AC-14\n")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "ok.py").write_text("x = 1\n")
+
+    result = _run(["--repo-root", str(tmp_path)], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stdout
+
+
 # -- Step 12: gate_fire observations -------------------------------------------
 
 

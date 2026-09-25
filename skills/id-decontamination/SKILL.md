@@ -68,6 +68,7 @@ Categorize the hits:
 - **Docstring/comment prefixes** (`"""AC-14: ..."""`, `# REQ-SG-01 — ...`) — bulk prefix removal plus capitalization pass <!-- shipped-artifact-isolation:ignore -->
 - **Parenthetical suffixes** (`describe behavior (REQ-ONBOARD-05)`) — targeted deletion of the parenthetical <!-- shipped-artifact-isolation:ignore -->
 - **Narrative references** (`"per Step 10b"`, `"AC-20 of the concurrency-collab pipeline"`) — targeted rewrites that preserve meaning
+- **Pipeline-document section citations** (`SYSTEMS_PLAN.md § Interfaces`, `INTERFACE_DESIGN.md §2.3`) — cite the finalized `dec-NNN` that carries the same contract, or state the constraint inline; when the cited section held a rule nothing persistent records, inline the rule itself before deleting the pointer <!-- shipped-artifact-isolation:ignore -->
 - **Self-references** (a detector/rule file describing its own patterns) — add an `id-citation-discipline:ignore` marker or add the file to the detector's exemption list
 
 ### Step 2 — Salvage before deletion

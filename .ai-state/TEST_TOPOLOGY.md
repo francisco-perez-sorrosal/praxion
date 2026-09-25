@@ -968,9 +968,11 @@ selectors:
       - "scripts/test_sidecar_render.py"
       - "scripts/test_praxion_sidecar.py"
       - "tests/commands/test_merge_worktree_convergence.py"
+      - "scripts/test_spawn_count.py"
 file_dependencies:
   - "scripts/_git_runner.py"
   - "scripts/mutation_sensor.py"
+  - "scripts/spawn_count.py"
   - "scripts/_sidecar_publish.py"
   - "scripts/_sidecar_mergeback.py"
   - "scripts/_repo_root.py"
@@ -1000,7 +1002,7 @@ expected_runtime_envelope:
   p50_seconds: 2.6
   p95_seconds: 4
 shared_state: tmp_path
-notes: "Small on purpose -- a node for the planner to hang wide boundaries off. sidecar-placement (P1) added _state_repo.py, _sidecar_manifest.py, _sidecar_checks.py, _sidecar_link.py, _sidecar_commit.py, praxion-sidecar and their test files as selectors/file_dependencies for the test-engineer to register in Steps 1b-7b; the integration_boundaries above widen because _state_repo.py is now a dependency of finalize_adrs.py (decision-records) and reconcile_ai_state.py (state-ledgers). Correction (2026-09-13, process-economy-topology reconciliation): the prior version of this note also named reconcile_aac_surfaces.py here by name-pattern guess before the script existed; it imports only _git_runner, not _state_repo, so it carries no scripts-core coupling -- its test (an onboarding-Phase-8b AaC-surface reconciler, unrelated to .ai-state/ reconciliation despite the similar name) now lives in onboarding-contract. This pass also added test_sidecar_convergence.py and test_sidecar_inputs.py (_sidecar_convergence.py, _sidecar_testkit.py, _sidecar_inputs.py) and tests/commands/test_merge_worktree_convergence.py, all orphaned worktree/sidecar test files with no prior selector. process-economy-p3-6-adopt (test-engineer, Steps 2/4): added scripts/mutation_sensor.py and its test scripts/test_mutation_sensor.py -- the per-step mutation sensor derives its `uv run --project` root via `git -C <target-dir> rev-parse --show-toplevel`, the same git-toplevel-resolution role this group already carries for other scripts/ plumbing."
+notes: "Small on purpose -- a node for the planner to hang wide boundaries off. sidecar-placement (P1) added _state_repo.py, _sidecar_manifest.py, _sidecar_checks.py, _sidecar_link.py, _sidecar_commit.py, praxion-sidecar and their test files as selectors/file_dependencies for the test-engineer to register in Steps 1b-7b; the integration_boundaries above widen because _state_repo.py is now a dependency of finalize_adrs.py (decision-records) and reconcile_ai_state.py (state-ledgers). Correction (2026-09-13, process-economy-topology reconciliation): the prior version of this note also named reconcile_aac_surfaces.py here by name-pattern guess before the script existed; it imports only _git_runner, not _state_repo, so it carries no scripts-core coupling -- its test (an onboarding-Phase-8b AaC-surface reconciler, unrelated to .ai-state/ reconciliation despite the similar name) now lives in onboarding-contract. This pass also added test_sidecar_convergence.py and test_sidecar_inputs.py (_sidecar_convergence.py, _sidecar_testkit.py, _sidecar_inputs.py) and tests/commands/test_merge_worktree_convergence.py, all orphaned worktree/sidecar test files with no prior selector. process-economy-p3-6-adopt (test-engineer, Steps 2/4): added scripts/mutation_sensor.py and its test scripts/test_mutation_sensor.py -- the per-step mutation sensor derives its `uv run --project` root via `git -C <target-dir> rev-parse --show-toplevel`, the same git-toplevel-resolution role this group already carries for other scripts/ plumbing. process-economy-d (test-engineer, Step 4, RED): registered scripts/spawn_count.py and scripts/test_spawn_count.py -- the per-slug spawn/resume WAL reader is new scripts/ plumbing with no other group to land in; a planner follow-up (not yet applied) will widen integration_boundaries to include hooks-lifecycle once Step 5/6 land, since spawn_count.py newly depends on hooks/capture_session.py's WAL output shape."
 ```
 
 Nearly every other `scripts/` group imports this plumbing, so a change here

@@ -112,6 +112,12 @@
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/sidecar_autocommit.py",
             "timeout": 13,
             "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/remind_calibration.py",
+            "timeout": 10,
+            "async": false
           }
         ]
       }

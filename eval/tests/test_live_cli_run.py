@@ -74,7 +74,9 @@ def _variant_stub(variant: str, spawn_selection_block: dict[str, object]) -> dic
     }
 
 
-_STUB_ARGS = argparse.Namespace(canary=True, model="opus", effort="medium", k=1, judge=False)
+_STUB_ARGS = argparse.Namespace(
+    canary=True, model="opus", effort="medium", k=1, judge=False, scenario=None
+)
 
 
 # ---------------------------------------------------------------------------

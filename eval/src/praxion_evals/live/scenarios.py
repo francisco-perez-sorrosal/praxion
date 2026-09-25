@@ -489,6 +489,18 @@ def build_lightweight_fix(root: Path, seeded: Seeded) -> None:
     _commit_all(root, {"README.md": "# fixture\n"}, "baseline")
 
 
+# Files a session produces that are not the agent's authored change: tool caches
+# written by the linters and tests the fix runs, and the example manifest the
+# inject_rules SessionStart hook writes into every project it starts in. Grading
+# them made the judge penalise a conformant run for its toolchain.
+_BYPRODUCT_DIRS = frozenset({".ruff_cache", ".pytest_cache", "__pycache__", ".mypy_cache"})
+_HOOK_CREATED_FILES = frozenset({".claude/praxion-rules.yaml.example"})
+
+
+def _is_authored(path: str) -> bool:
+    return path not in _HOOK_CREATED_FILES and _BYPRODUCT_DIRS.isdisjoint(path.split("/"))
+
+
 def capture_lightweight_fix(
     envelope: SessionEnvelope, fs_delta: FsDelta | None, fixture_yaml: Seeded
 ) -> Capture:
@@ -497,10 +509,14 @@ def capture_lightweight_fix(
         return NotElicited(
             reason="no filesystem delta was computed for this session", diagnostics={}
         )
-    paths = fs_delta.changed_paths
+    paths = [path for path in fs_delta.changed_paths if _is_authored(path)]
+    dropped = len(fs_delta.changed_paths) - len(paths)
     if not paths:
-        return NotElicited(reason="no file created or modified", diagnostics={})
-    return Captured(value=list(paths), diagnostics={})
+        return NotElicited(
+            reason="no authored file created or modified",
+            diagnostics={"dropped_byproducts": dropped},
+        )
+    return Captured(value=paths, diagnostics={"dropped_byproducts": dropped})
 
 
 # ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -137,6 +137,13 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "target", nargs="?", default=None, help="git ref, sha, or path; default HEAD"
     )
     parser.add_argument("--k", type=_positive_int, default=DEFAULT_K)
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        choices=list(scenarios.SCENARIOS),
+        default=None,
+        help="run only this scenario (repeatable); default every scenario",
+    )
     parser.add_argument("--canary", action="store_true")
     parser.add_argument("--judge", action="store_true")
     parser.add_argument(
@@ -200,9 +207,14 @@ CANARY_SCENARIOS = ("spawn-selection",)
 
 
 def variant_tasks(
-    fixtures_by_id: Mapping[str, Mapping[str, Any]], k: int, variant: Variant
+    fixtures_by_id: Mapping[str, Mapping[str, Any]],
+    k: int,
+    variant: Variant,
+    scenario_ids: Collection[str] | None = None,
 ) -> list[SessionTask]:
     tasks = build_tasks(fixtures_by_id, k)
+    if scenario_ids is not None:
+        tasks = [t for t in tasks if t.scenario_id in scenario_ids]
     if variant == "canary":
         return [t for t in tasks if t.scenario_id in CANARY_SCENARIOS]
     return tasks
@@ -239,7 +251,9 @@ def _print_dry_run(args: argparse.Namespace, resolved: Path | str) -> None:
     fixtures_by_id = _load_fixtures_by_id()
     for variant in ("head", "canary") if args.canary else ("head",):
         representative = [
-            task for task in variant_tasks(fixtures_by_id, args.k, variant) if task.repeat == 1
+            task
+            for task in variant_tasks(fixtures_by_id, args.k, variant, args.scenario)
+            if task.repeat == 1
         ]
         for task in representative:
             session_root = run_root / f"{variant}-{case_id(task)}"
@@ -310,7 +324,7 @@ def _run_variant(
     if isolation_proof["status"] != "proven":
         return report.variant_record(variant, scenario_copy, isolation_proof, []), ledger
 
-    tasks = variant_tasks(fixtures_by_id, args.k, variant)
+    tasks = variant_tasks(fixtures_by_id, args.k, variant, args.scenario)
     # Namespaced by variant: two variants sharing one `run_root` must never
     # produce the same session-directory name for their first task.
     session_records, ledger = _run_tasks(

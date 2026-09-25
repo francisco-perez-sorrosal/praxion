@@ -152,6 +152,8 @@ def build_output(
             "model": {"requested": args.model, "resolved": _resolved_models(variant_records)},
             "effort": args.effort,
             "k": args.k,
+            # None = every scenario; a list marks a partial run, never a baseline.
+            "scenarios": args.scenario,
             "judge": {"model": "claude-haiku-4-5"} if args.judge else None,
             "spend_usd": ledger.spent_usd if ledger is not None else None,
         },

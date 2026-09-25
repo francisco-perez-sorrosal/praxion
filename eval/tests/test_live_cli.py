@@ -12,6 +12,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 def _init_repo(root: Path) -> None:
     root.mkdir(parents=True)
@@ -117,6 +119,38 @@ def test_canary_variant_runs_only_the_spawn_selection_cases():
     assert {t.scenario_id for t in head_tasks} == set(cli.scenarios.SCENARIOS)
     assert {t.scenario_id for t in canary_tasks} == {"spawn-selection"}
     assert len(canary_tasks) == 5 * 3  # 5 cases x k
+
+
+def test_scenario_filter_restricts_the_run_to_the_named_scenarios():
+    """A targeted re-measure (one scenario after an instrument fix) must not pay
+    for the other four."""
+    from praxion_evals.live import cli
+
+    fixtures_by_id = cli._load_fixtures_by_id()
+    args = cli._parse_args(["--scenario", "lightweight-fix", "--k", "3"])
+
+    tasks = cli.variant_tasks(fixtures_by_id, args.k, "head", args.scenario)
+
+    assert {t.scenario_id for t in tasks} == {"lightweight-fix"}
+    assert len(tasks) == 3
+
+
+def test_scenario_filter_rejects_an_unknown_scenario_id():
+    from praxion_evals.live import cli
+
+    with pytest.raises(SystemExit):
+        cli._parse_args(["--scenario", "lightweight_fix"])
+
+
+def test_no_scenario_filter_keeps_every_scenario():
+    from praxion_evals.live import cli
+
+    fixtures_by_id = cli._load_fixtures_by_id()
+    args = cli._parse_args([])
+
+    tasks = cli.variant_tasks(fixtures_by_id, 1, "head", args.scenario)
+
+    assert {t.scenario_id for t in tasks} == set(cli.scenarios.SCENARIOS)
 
 
 # ---------------------------------------------------------------------------

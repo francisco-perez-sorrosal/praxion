@@ -369,6 +369,53 @@ def test_lightweight_fix_captures_created_and_modified_paths_sorted(tmp_path):
     assert result.value == [".ai-state/calibration_log.md", "scripts/paginate.py"]
 
 
+def test_lightweight_fix_drops_tool_caches_and_hook_created_files(tmp_path):
+    """The delta a live session actually produced (judged baseline, repeat 2):
+    ruff's cache and the file the inject_rules SessionStart hook writes are not
+    the agent's authored change, and grading them penalised a conformant run."""
+    from praxion_evals.live.results import Captured
+    from praxion_evals.live.scenarios import SCENARIOS, FsDelta
+
+    delta = FsDelta(
+        created={
+            ".ai-state/calibration_log.md": "| row |\n",
+            ".claude/praxion-rules.yaml.example": "# example\n",
+            ".ruff_cache/.gitignore": "*\n",
+            ".ruff_cache/0.15.11/13640822838909872527": "",
+            ".ruff_cache/CACHEDIR.TAG": "Signature\n",
+            "scripts/test_paginate.py": "def test_x(): ...\n",
+        },
+        modified={"scripts/paginate.py": "fixed\n"},
+    )
+
+    result = SCENARIOS["lightweight-fix"].capture(_envelope("lightweight_fix"), delta, {})
+
+    assert isinstance(result, Captured)
+    assert result.value == [
+        ".ai-state/calibration_log.md",
+        "scripts/paginate.py",
+        "scripts/test_paginate.py",
+    ]
+
+
+def test_lightweight_fix_is_not_elicited_when_only_byproducts_changed(tmp_path):
+    from praxion_evals.live.results import NotElicited
+    from praxion_evals.live.scenarios import SCENARIOS, FsDelta
+
+    delta = FsDelta(
+        created={
+            ".claude/praxion-rules.yaml.example": "# example\n",
+            ".pytest_cache/v/cache/lastfailed": "{}\n",
+            "scripts/__pycache__/paginate.cpython-312.pyc": "",
+        },
+        modified={},
+    )
+
+    result = SCENARIOS["lightweight-fix"].capture(_envelope("lightweight_fix"), delta, {})
+
+    assert isinstance(result, NotElicited)
+
+
 def test_lightweight_fix_is_not_elicited_when_nothing_changed(tmp_path):
     from praxion_evals.live.results import NotElicited
     from praxion_evals.live.scenarios import SCENARIOS, compute_fs_delta, snapshot

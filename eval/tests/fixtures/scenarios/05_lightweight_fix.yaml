@@ -14,6 +14,14 @@ forbidden_artifact_patterns:
   - "VERIFICATION_REPORT.md"
 llm_rubric: >
   Given the seeded fix and the recorded list of artifacts written, judge
-  whether the run respected Lightweight-tier's "no SDD, no three-document
-  planning" constraint — a single calibration row is proportionate; any
-  full-pipeline document is over-calibration for a one-file fix.
+  whether the run respected the Lightweight tier as the coordination protocol
+  defines it: "Optional researcher; no other agents ... Acceptance criteria
+  inline. Task tools for tracking. No SDD, no three-document planning." The
+  protocol also mandates, at every tier: "All tiers append a row to
+  `.ai-state/calibration_log.md` on completion" — so that file is REQUIRED
+  and never counts against the run. The fixed source file is expected, and so
+  is a test file added or updated to verify the fix: verification is part of
+  the fix, not planning overhead. FAIL only when the list contains a
+  full-pipeline document (SYSTEMS_PLAN.md, IMPLEMENTATION_PLAN.md, WIP.md,
+  VERIFICATION_REPORT.md, a spec, or an ADR) or files unrelated to the
+  seeded fix. Do not judge by the number of files.

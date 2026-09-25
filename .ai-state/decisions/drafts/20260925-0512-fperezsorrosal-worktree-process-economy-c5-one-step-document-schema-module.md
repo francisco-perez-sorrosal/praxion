@@ -67,7 +67,7 @@ stdlib-only, and sits in the underscore-prefixed family alongside `_handoff_inpu
 Both readers import these functions. Policy stays with each reader:
 
 - the gate keeps its byte ceiling and finding kinds, and adds `no-run-over-ceiling`;
-- the reconciler keeps per-step test status, WIP claim sources, `Files:` parsing and attribution.
+- the reconciler keeps per-step test status, `Files:` parsing and attribution; the WIP claim parser (checklist, status table, `[x]` heading) moved into the module when the reconciler reached its size ceiling.
 
 ## Considered Options
 
@@ -98,9 +98,9 @@ Both readers import these functions. Policy stays with each reader:
   a declared block model. The reconciler's latent "count-less `Result:` line reads green" bug
   disappears with the old regex.
 - **Positive.** A letter-suffixed step id is recognised everywhere at once.
-- **Negative.** `check_id_citation_discipline.py` needs the module and its test on its
-  exemption list, with the same rationale as the reconciler: step numbers are input grammar
-  there, not citations.
+- **Neutral.** The module needs no id-citation exemption: its few step-shaped fixture literals
+  carry the same-line escape, so the gate keeps guarding criterion ids there. (An exemption was
+  tried and reverted after it let criterion ids through within one change.)
 - **Negative.** Both topology groups (`state-ledgers`, `repo-gates`) must list the module in
   `file_dependencies`.
 

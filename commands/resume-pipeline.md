@@ -95,7 +95,7 @@ a convenience document from becoming a correctness hazard.
 
    | Verdict | Action |
    |---|---|
-   | `verified-complete`, `needs_mark: true` | **Auto-mark**: flip the step's `WIP.md` checkbox to `- [x]` / `[COMPLETE]` and annotate it (see Audit trail). The work is proven done by ground truth; the dying agent just never recorded it. |
+   | `verified-complete`, `needs_mark: true` | **Auto-mark**: record the step as complete in the `WIP.md` claim source it came from (checkbox `- [x]` / `[COMPLETE]`, status-table cell, or `[x]` heading marker) and annotate it (see Audit trail). The work is proven done by ground truth; the dying agent just never recorded it. |
    | `verified-complete`, `needs_mark: false` | No action — checkbox already correct. |
    | `mismatch` / `partial@<pt>` / `in-flight` | **Auto-resume**: re-spawn the step's agent (the assignee in the step row) scoped to `resume_scope` only, citing the Tier-1 evidence of what is already done. See "Auto-resume contract". |
    | `unknown` | **Surface, do not act.** Report the step + its evidence to the user and stop on that step. |

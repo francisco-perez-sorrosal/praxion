@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +44,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CURRENT_NAMESPACE = "praxion"
 # Assembled, never spelled: a literal here would be found by the scan below.
 RETIRED_NAMESPACE = "i" + "-am"
+# The namespace in use — `<ns>@marketplace`, `<ns>:agent` (or `<ns>:` quoted),
+# `…/<ns>/` cache paths, `plugin_<ns>_` MCP ids, a quoted string literal — never
+# the bare word, which an unrelated operator tool shares and recorded session
+# envelopes carry.
+_USAGE_SUFFIX = r"""(?:[@/_"']|:(?!\s))"""
+_RETIRED_USAGE = re.compile(r"(?<![A-Za-z0-9-])" + re.escape(RETIRED_NAMESPACE) + _USAGE_SUFFIX)
+
+
+def _names_retired_namespace(text: str) -> bool:
+    return _RETIRED_USAGE.search(text) is not None
+
 
 # Live files permitted to name the retired namespace, each with its reason.
 # Deliberately a per-file allowlist rather than a pattern: migration guidance has
@@ -62,11 +74,6 @@ MIGRATION_REFERENCES: dict[str, str] = {
         "shipped commit-gate template must resolve PLUGIN_ROOT via the "
         "pre-rename plugin-cache key too, for the same reason as the Block D "
         "template above (td-145)"
-    ),
-    "scripts/upgrade_project_pins.sh": (
-        "must recognize a pre-rename plugin-cache merge-driver path as "
-        "Praxion-managed, or every pre-rename project's driver registration "
-        "is permanently reported as stale (td-145)"
     ),
     "scripts/test_upgrade_project_pins.py": (
         "fixture input driving the two reconciliation behaviors above: a "
@@ -182,13 +189,41 @@ def test_no_live_surface_carries_the_retired_namespace():
             content = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue  # binary or unreadable; nothing to assert
-        if RETIRED_NAMESPACE in content:
+        if _names_retired_namespace(content):
             offenders.append(rel)
 
     assert not offenders, (
         f"{len(offenders)} live file(s) still carry the retired plugin namespace "
         f"and would silently stop resolving: {sorted(offenders)}"
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"{RETIRED_NAMESPACE}@bit-agora",
+        f"subagent_type: {RETIRED_NAMESPACE}:researcher",
+        f"the `{RETIRED_NAMESPACE}:` prefix",
+        f"plugins/cache/bit-agora/{RETIRED_NAMESPACE}/0.2.0",
+        f"mcp__plugin_{RETIRED_NAMESPACE}_task-chronograph__get_pipeline_status",
+        f'_install_workflow(repo, "{RETIRED_NAMESPACE}")',
+    ],
+)
+def test_every_namespace_usage_form_is_detected(text):
+    assert _names_retired_namespace(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A different tool on the operator's machine shares the word; its
+        # SessionStart output lands verbatim in recorded session envelopes.
+        f'"output":"{RETIRED_NAMESPACE}: this machine resolved to darwin/home"',
+        f"the shell {RETIRED_NAMESPACE} hook completed in 1,278 ms",
+    ],
+)
+def test_prose_sharing_the_word_is_not_a_namespace_usage(text):
+    assert not _names_retired_namespace(text)
 
 
 def test_historical_records_are_left_intact():
@@ -200,7 +235,8 @@ def test_historical_records_are_left_intact():
     preserved = [
         rel
         for rel in _tracked_files()
-        if _is_historical(rel) and RETIRED_NAMESPACE in (REPO_ROOT / rel).read_text(errors="ignore")
+        if _is_historical(rel)
+        and _names_retired_namespace((REPO_ROOT / rel).read_text(errors="ignore"))
     ]
     assert preserved, (
         "no historical record carries the retired namespace -- either history was "
@@ -213,7 +249,7 @@ def test_each_migration_reference_is_still_earning_its_exemption(path, reason):
     """An allowlist entry that no longer applies quietly widens the gate's blind spot."""
     target = REPO_ROOT / path
     assert target.exists(), f"{path} is allowlisted but does not exist ({reason})"
-    assert RETIRED_NAMESPACE in target.read_text(encoding="utf-8"), (
+    assert _names_retired_namespace(target.read_text(encoding="utf-8")), (
         f"{path} no longer names the retired namespace -- drop it from "
         f"MIGRATION_REFERENCES rather than leaving a dead exemption ({reason})"
     )

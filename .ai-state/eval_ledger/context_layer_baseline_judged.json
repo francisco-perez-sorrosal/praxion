@@ -1,0 +1,1608 @@
+{
+  "schema_version": 1,
+  "run": {
+    "started_at": "2026-09-25T02:19:36.456437Z",
+    "finished_at": "2026-09-25T02:40:54.559533Z",
+    "runner": "praxion-evals-live 0.37.0",
+    "complete": true,
+    "model": {
+      "requested": "opus",
+      "resolved": [
+        "claude-opus-5-5"
+      ]
+    },
+    "effort": "medium",
+    "k": 3,
+    "judge": {
+      "model": "claude-haiku-4-5"
+    },
+    "spend_usd": 11.977908299999998
+  },
+  "variants": [
+    {
+      "variant": "head",
+      "target": {
+        "kind": "ref",
+        "ref": "1a6a1e80bac20c1a77fc0e91e511492ba4d4af50",
+        "sha": "1a6a1e80bac20c1a77fc0e91e511492ba4d4af50"
+      },
+      "degradation": null,
+      "isolation_proof": {
+        "status": "proven",
+        "model": "claude-sonnet-5",
+        "markers": {
+          "global_claude_md": "present",
+          "coordination_rule": "present",
+          "plugin_agent": "present",
+          "hook_delivered_rule": "present"
+        },
+        "plugins": [
+          "praxion@inline",
+          "agents-md@builtin",
+          "telemetry@builtin"
+        ],
+        "mcp_servers": [],
+        "auth_source": "ANTHROPIC_API_KEY",
+        "cost_usd": 0.101077
+      },
+      "scenarios": [
+        {
+          "scenario_id": "spawn-selection",
+          "counts": {
+            "pass": 15,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "spawn-selection#1",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "Task description aligns with Direct tier criteria: 'Fix a typo in the README's install command' is a single-file fix in documentation",
+                    "Recorded tier 'direct' matches the expected tier 'direct' as specified in the swe-agent-coordination-protocol.md rubric",
+                    "Recorded agents field is empty array, matching the expected empty agents array",
+                    "The task involves a typo correction, which is explicitly listed as a Direct tier characteristic (typo fixes qualify as single-file documentation changes)",
+                    "No cross-cutting concerns, architectural decisions, or multi-file dependencies are involved"
+                  ],
+                  "cost_usd": 0.253463,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5584,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 261,
+                    "cache_creation": 49647,
+                    "cache_read": 0
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "The task description 'Fix a typo in the README's install command' clearly falls within the Direct tier criteria, which covers single-file fixes, configuration changes, documentation, and typos",
+                    "The recorded tier (direct) matches the expected tier (direct)",
+                    "The recorded agents list is empty [], which matches the expected agents list []",
+                    "All decision components align with the fast-path tier selector rules: this is a typo fix in a documentation file (README), requiring a single-file modification with no cross-cutting concerns or architectural implications"
+                  ],
+                  "cost_usd": 0.201447,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5223,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 353,
+                    "cache_creation": 38427,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "The task involves fixing a single typo in the README's install command, which is precisely the kind of minimal scope work that falls under the 'Direct' tier category",
+                    "The expected tier (direct) matches the recorded tier (direct), indicating correct classification",
+                    "The expected agents (empty list) matches the recorded agents (empty list), confirming no specialized agents were required for this straightforward documentation fix",
+                    "This aligns with the rubric's 'Direct' tier definition which includes single-file fixes and documentation/typo corrections",
+                    "The decision demonstrates proper application of the fast-path tier selector"
+                  ],
+                  "cost_usd": 0.20204200000000003,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6331,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 383,
+                    "cache_creation": 38426,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#2",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "lightweight",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "The task involves renaming one helper function that is used across two sibling test files, which qualifies as a lightweight change according to the rubric",
+                    "Lightweight tier is defined as: 2-3 files with single behavior change. This task affects exactly 2 files (sibling test files) and represents a single, focused behavior (renaming a helper function)",
+                    "The recorded tier matches the expected tier: both specify 'lightweight'",
+                    "The recorded agents match the expected agents: both are empty lists, indicating no specialized agents were required for this change",
+                    "The scope is narrow and well-defined: a single helper function rename with localized impact across two related test files, confirming it does not require cross-cutting or architectural changes that would push it to Standard or higher tiers"
+                  ],
+                  "cost_usd": 0.205057,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7407,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 533,
+                    "cache_creation": 38429,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "lightweight",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "Task description: Rename one helper function used in two sibling test files. This involves modifying 2-3 files (the helper function definition and the test files that use it).",
+                    "Expected tier classification: lightweight - Matches the rubric definition of 'Lightweight: 2-3 files, single behavior'.",
+                    "Recorded tier classification: lightweight - Correctly matches the expected tier classification.",
+                    "Expected agents: empty list - No specialized agents required for a straightforward renaming task.",
+                    "Recorded agents: empty list - Correctly matches the expected empty agent list.",
+                    "The decision is well-calibrated: a helper function rename across a small number of sibling test files is a localized, single-behavior change that fits the lightweight category perfectly.",
+                    "No architectural decisions, cross-cutting concerns, or exploratory work involved - this is a well-scoped refactoring task."
+                  ],
+                  "cost_usd": 0.22154259999999998,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 11614,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 696,
+                    "cache_creation": 39085,
+                    "cache_read": 60868
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "lightweight",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "Task description matches lightweight tier criteria: renaming a helper function affecting 2 files (sibling test files)",
+                    "Recorded tier 'lightweight' aligns with expected tier 'lightweight'",
+                    "Task scope is appropriate for lightweight tier: 2 files affected, single behavior change (function rename)",
+                    "No agents specified in either expected or recorded configuration, which is correct for a straightforward refactoring task",
+                    "Task falls clearly under 'Lightweight' category per protocol: 2-3 files, single behavior"
+                  ],
+                  "cost_usd": 0.203647,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7942,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 462,
+                    "cache_creation": 38431,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#3",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "Tier classification is CORRECT: 'standard' tier is appropriate for a task spanning router, service layer, data model change, and 5 tests with an architectural decision. This falls within the '4-8 files or an architectural decision' criterion.",
+                    "Agent selection shows OVERSTAFFING: The expected tier includes 4 agents (systems-architect, implementation-planner, implementer, verifier) which is appropriate for standard complexity.",
+                    "EXTRA AGENTS ADDED: Three additional agents were included in recorded_agents beyond the expected set: interface-designer, researcher, and test-engineer. While these roles could theoretically provide value for REST endpoint design and testing, they were not specified as necessary for this tier classification.",
+                    "JUSTIFICATION CONCERN: The recorded agent set (7 agents) represents a 75% increase from expected (4 agents), suggesting either scope creep or over-engineering for a 'standard' tier task.",
+                    "REDUNDANCY RISK: test-engineer role overlaps with verifier responsibilities; interface-designer role may be implicit in systems-architect/implementation-planner duties for standard-tier REST endpoint work; researcher role is typically reserved for Spike tier exploratory work.",
+                    "POSITIVE ASPECT: All expected agents are present and no expected agents were omitted, maintaining core coverage of the task requirements."
+                  ],
+                  "cost_usd": 0.22150920000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 10719,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 696,
+                    "cache_creation": 39077,
+                    "cache_read": 60901
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "doc-engineer",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "Task complexity correctly identified as STANDARD tier: spans 4-8 files (router, service layer, data model, 5 tests) and includes architectural decision (resource-modeling).",
+                    "Expected agent roster (4 agents) is appropriate for standard-tier work: systems-architect, implementation-planner, implementer, verifier cover all essential roles.",
+                    "Recorded tier matches expected tier (standard) - no escalation or de-escalation error.",
+                    "Recorded agent count (8 agents) includes 4 expected agents plus 4 additional agents: doc-engineer, interface-designer, researcher, test-engineer.",
+                    "Over-specification concern: Added agents (doc-engineer, interface-designer, researcher) appear to exceed necessary coordination for a single REST endpoint addition. Test-engineer addition is marginally justified but test coverage planning could fall under implementation-planner or verifier.",
+                    "No agent from the expected roster was omitted - this is not a tier selection failure but rather scope creep in team composition.",
+                    "The tier decision itself is sound, but agent coordination is heavier than necessary for the described scope."
+                  ],
+                  "cost_usd": 0.208162,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8478,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 680,
+                    "cache_creation": 38462,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "MATCH: Recorded tier (standard) correctly matches expected tier and rubric criteria - task involves 4-8 files (router, service layer, data model, tests) plus architectural decision (resource-modeling)",
+                    "MISMATCH: Expected agent set includes 4 agents (systems-architect, implementation-planner, implementer, verifier)",
+                    "MISMATCH: Recorded agent set includes 7 agents - the expected 4 plus 3 additional agents (interface-designer, researcher, test-engineer)",
+                    "POTENTIAL OVER-ALLOCATION: Addition of interface-designer, researcher, and test-engineer suggests scope creep or misalignment with tier classification - a standard tier task should not require specialized roles beyond the core coordination team",
+                    "CONCERN: 5 new tests mentioned in task description may justify dedicated test-engineer involvement, but this should be handled within implementer scope for standard-tier tasks",
+                    "CONCERN: interface-designer and researcher roles suggest the task may have hidden complexity or requirements not reflected in the tier assignment"
+                  ],
+                  "cost_usd": 0.206477,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7483,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 596,
+                    "cache_creation": 38461,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#4",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "context-engineer",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "Tier selection is CORRECT: The task involves 11 files across 6 distinct behaviors cutting across multiple subsystems (API, worker, CLI), which clearly falls into the 'Full' tier (9+ files or cross-cutting) as defined in the rubric.",
+                    "Core agent selection is CORRECT: The 5 expected agents (systems-architect, implementation-planner, implementer, test-engineer, verifier) are all present and represent the appropriate specialized roles for a complex, multi-subsystem migration.",
+                    "ADDITIONAL AGENTS INCLUDED: The recorded decision added 3 extra agents not in the expected set: context-engineer, doc-engineer, and researcher. While these additions are not incorrect per se, they exceed the expected team composition.",
+                    "Potential over-staffing concern: Adding context-engineer, doc-engineer, and researcher to an already comprehensive team suggests scope creep or process inflation. These roles may provide value but represent additions beyond the minimum coordination required by the rubric.",
+                    "The 5-agent core team appears sufficient for the scope: systems-architect can drive design, implementation-planner can coordinate the multi-file changes, implementer handles code changes, test-engineer ensures coverage, and verifier validates the migration.",
+                    "No clear justification provided for why the 3 additional agents were necessary given the task description does not explicitly call for exploratory work (which might justify researcher), substantial documentation (which might justify doc-engineer), or unusual context complexity (which might justify context-engineer)."
+                  ],
+                  "cost_usd": 0.207902,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8147,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 666,
+                    "cache_creation": 38466,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "context-engineer",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "Tier selection is CORRECT: The task involves 11 files and 6 distinct behaviors (migration across auth subsystem, API, worker, and CLI), which matches the 'Full: 9+ files or cross-cutting' criterion. The recorded_tier of 'full' aligns perfectly with the rubric.",
+                    "Agent composition shows OVERALLOCATION: The expected team consisted of 5 core agents (systems-architect, implementation-planner, implementer, test-engineer, verifier), which is appropriate for a full-tier architectural migration requiring coordination and comprehensive testing.",
+                    "ADDITIONAL agents recorded: The recorded decision added 3 extra agents (context-engineer, doc-engineer, researcher). While these may provide value for a complex migration, they were not specified in the expected decision.",
+                    "POTENTIAL CONCERNS: (1) The addition of context-engineer and researcher suggests the team may have discovered significant complexity or design uncertainty during execution. (2) The doc-engineer addition indicates substantial documentation requirements, which may suggest the migration wasn't fully scoped or designed upfront. (3) No explicit feedback provided on whether these additional agents improved outcomes or created coordination overhead.",
+                    "MITIGATING FACTORS: For a cross-cutting 11-file migration with 6 behavior changes, additional specialization in documentation and research context may be justified, though it wasn't anticipated in the expected decision."
+                  ],
+                  "cost_usd": 0.208357,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8514,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 689,
+                    "cache_creation": 38465,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "context-engineer",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "Tier classification is correct: The task involves migrating an auth subsystem across 11 files and 6 distinct behaviors, which exceeds the 9+ file threshold for Full tier. The task clearly involves architectural complexity and cross-cutting concerns (API, worker, CLI), properly matching the Full classification.",
+                    "Expected agent roster is appropriate for the tier: Systems architect (design), implementation-planner (coordination), implementer (execution), test-engineer (validation), and verifier (QA) form a solid core team for a Full-tier cross-cutting refactor.",
+                    "Recorded agent roster exceeds expectations: The recorded roster includes 8 agents versus the 5 expected agents. The additions are context-engineer, doc-engineer, and researcher.",
+                    "Justification for additional agents exists: For an 11-file migration with 6 behavioral changes across multiple subsystems, supplementary roles could provide value - context-engineer for understanding existing implementation, doc-engineer for maintaining documentation during refactor, researcher for exploring deprecated session store implications. However, these were not deemed necessary by the fast-path protocol.",
+                    "Potential over-resourcing concern: The task does not explicitly indicate it requires exploratory research (Spike characteristics) or substantial new documentation work that would justify the doc-engineer and researcher roles under a standard Full-tier engagement. This suggests either scope creep or over-estimation of required expertise."
+                  ],
+                  "cost_usd": 0.213957,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 11931,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 969,
+                    "cache_creation": 38465,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#5",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The task is an exploratory investigation with unknown outcome and a defined timeboxing constraint",
+                    "The expected tier assignment is 'spike' which aligns with the rubric category: 'Spike: exploratory, outcome uncertain'",
+                    "The expected agent assignment is 'researcher' which is appropriate for an investigative/exploratory task",
+                    "The recorded tier matches the expected tier: both are 'spike'",
+                    "The recorded agents match the expected agents: both list 'researcher'",
+                    "The task description explicitly indicates exploratory nature ('Investigate whether') and uncertain outcome ('outcome unknown, timeboxed'), which are the defining characteristics of a Spike tier task"
+                  ],
+                  "cost_usd": 0.203812,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6143,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 465,
+                    "cache_creation": 38452,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "Task correctly classified as 'spike' tier: The task is explicitly framed as exploratory with uncertain outcome and is timeboxed, matching the spike tier definition of 'exploratory, outcome uncertain'.",
+                    "Agent selection is appropriate: 'researcher' agent is correctly chosen for an investigation/exploratory task that requires gathering information and understanding potential impacts before implementation.",
+                    "Recorded tier matches expected tier: Both show 'spike', indicating proper alignment with the fast-path tier selector.",
+                    "Recorded agents match expected agents: Both specify 'researcher', confirming correct agent assignment.",
+                    "Task characteristics align with spike definition: The emphasis on 'whether' (conditional investigation), 'outcome unknown', and 'timeboxed' duration all clearly indicate exploratory work unsuitable for immediate implementation tiers."
+                  ],
+                  "cost_usd": 0.20312199999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7731,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 431,
+                    "cache_creation": 38450,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The task is explicitly exploratory in nature ('Investigate whether switching the cache backend would reduce p99 latency') with an unknown outcome ('outcome unknown, timeboxed').",
+                    "The expected tier classification is 'spike' which aligns with the rubric definition for Spike tier: 'exploratory, outcome uncertain'.",
+                    "The recorded tier is 'spike', matching the expected tier exactly.",
+                    "The expected agents list includes 'researcher' which is appropriate for an investigative spike task that requires exploration and analysis rather than implementation.",
+                    "The recorded agents list is ['researcher'], matching the expected agents.",
+                    "All aspects of the decision (tier selection and agent assignment) are consistent with the provided rubric and the task characteristics.",
+                    "No mismatch between expected and recorded classifications."
+                  ],
+                  "cost_usd": 0.20268199999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7512,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 409,
+                    "cache_creation": 38450,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "ui-step-conformance",
+          "counts": {
+            "pass": 0,
+            "fail": 3,
+            "error": 0
+          },
+          "pass_rate": 0.0,
+          "cases": [
+            {
+              "case_id": "ui-step-conformance",
+              "counts": {
+                "pass": 0,
+                "fail": 3,
+                "error": 0
+              },
+              "pass_rate": 0.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "report": "This looks correct. Self-review against the checklist passes: small functions, no deep nesting, no magic values in logic (constant `SKELETON_ROW_COUNT`), discriminated union avoids the illegal-state boolean+data pair, no hidden ambient effects (pure render), tokens over hardcoded colors, `prefers-reduced-motion` respected, no duplication. No tooling (lint/format/type-check/tests) exists in this fixture to run \u2014 noted as a pre-existing gap in `LEARNINGS.md`, out of this step's scope.\n\n**[COMPLETE]** \u2014 Added a synchronous `AdrListState` (`loading`/`ready`) discriminated union to `AdrList.tsx` with an accessible, token-driven skeleton (`AdrList.module.css`, new tokens in `tokens.css`, `prefers-reduced-motion` respected). WIP.md: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-1-15/fixture/.ai-work/ui-step/WIP.md`",
+                    "ui_changes": {
+                      "dashboard_app/src/components/AdrList.module.css": ".skeleton {\n  display: flex;\n  flex-direction: column;\n  gap: var(--space-2);\n}\n\n.skeletonRow {\n  /* Approximates a single line of ADR title text. */\n  height: calc(var(--space-2) * 2);\n  border-radius: var(--radius-1);\n  background: linear-gradient(\n    90deg,\n    var(--color-skeleton-base) 25%,\n    var(--color-skeleton-highlight) 50%,\n    var(--color-skeleton-base) 75%\n  );\n  background-size: 200% 100%;\n  animation: skeleton-pulse var(--duration-skeleton-pulse) ease-in-out infinite;\n}\n\n@keyframes skeleton-pulse {\n  0% {\n    background-position: -200% 0;\n  }\n  100% {\n    background-position: 200% 0;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .skeletonRow {\n    animation: none;\n  }\n}\n\n/* Visually hidden but available to screen readers. */\n.srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border: 0;\n}\n",
+                      "dashboard_app/src/components/AdrList.tsx": "import styles from \"./AdrList.module.css\";\n\nexport interface Adr {\n  id: string;\n  title: string;\n}\n\n/**\n * Discriminated union instead of an `isLoading` + `adrs` pair \u2014 a boolean\n * paired with data would let \"loading\" and \"has adrs\" be true at once,\n * a state the caller (fetching from .ai-state/decisions/) can never\n * legitimately produce.\n */\nexport type AdrListState =\n  | { status: \"loading\" }\n  | { status: \"ready\"; adrs: Adr[] };\n\nconst SKELETON_ROW_COUNT = 4;\n\nexport function AdrList({ state }: { state: AdrListState }) {\n  if (state.status === \"loading\") {\n    return <AdrListSkeleton />;\n  }\n\n  return (\n    <ul>\n      {state.adrs.map((adr) => (\n        <li key={adr.id}>{adr.title}</li>\n      ))}\n    </ul>\n  );\n}\n\n// Renders synchronously with the \"loading\" state \u2014 no timers or async\n// gating here \u2014 so the caller controls the < 100ms budget simply by\n// passing { status: \"loading\" } as the initial render state.\nfunction AdrListSkeleton() {\n  const rows = Array.from({ length: SKELETON_ROW_COUNT });\n\n  return (\n    <div className={styles.skeleton} role=\"status\" aria-live=\"polite\">\n      <span className={styles.srOnly}>Loading decisions\u2026</span>\n      {rows.map((_, index) => (\n        <div key={index} className={styles.skeletonRow} aria-hidden=\"true\" />\n      ))}\n    </div>\n  );\n}\n",
+                      "dashboard_app/src/styles/tokens.css": ":root {\n  --space-2: 8px;\n  --radius-1: 4px;\n  --color-skeleton-base: #e4e4e7;\n  --color-skeleton-highlight: #f4f4f5;\n  --duration-skeleton-pulse: 1500ms;\n}\n\n@media (prefers-color-scheme: dark) {\n  :root {\n    --color-skeleton-base: #3f3f46;\n    --color-skeleton-highlight: #52525b;\n  }\n}\n"
+                    }
+                  },
+                  "findings": [
+                    "Only 2 of 5 required UI states are present: Default (data loaded) and Loading (skeleton). Missing: Empty, Error, and Partial result.",
+                    "The AdrList component handles only the 'loading' and 'ready' states; there is no discriminant for empty data (no ADRs returned), error conditions, or partial load scenarios.",
+                    "The rubric explicitly requires all five states: Default, Loading, Empty (with explanation and action), Error (with recovery path), and Partial result (show succeeded data, allow retry).",
+                    "Loading state is correctly implemented with an accessible skeleton that approximates layout and respects prefers-reduced-motion.",
+                    "Default state (rendering loaded ADRs) is correctly implemented.",
+                    "The discriminated union pattern correctly prevents illegal state combinations (e.g., loading + data), which is a strength, but the union lacks the branches needed for Empty, Error, and Partial result states.",
+                    "Code quality is high (small functions, no magic values, token-driven styling, accessibility attributes), but implementation is incomplete against the web-ui-design skill requirement."
+                  ],
+                  "cost_usd": 0.9764778999999999,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 4108,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 266,
+                    "cache_creation": 991,
+                    "cache_read": 50139
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "report": "Implemented the loading state for the ADR list view.\n\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-2-16/fixture/dashboard_app/src/components/AdrList.tsx` \u2014 `AdrList` now takes a discriminated-union `state: AdrListState` (`loading` | `ready`) instead of a bare `adrs` array, rendering an accessible skeleton (`aria-busy`, `aria-live`, visually-hidden status text) immediately on mount for the loading case.\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-2-16/fixture/dashboard_app/src/styles/tokens.css` \u2014 added `--color-skeleton` token used by the new skeleton rows.\n\nNo package.json/tsconfig/lint config exist in this fixture, so format/lint/type-check/test were not runnable \u2014 noted in `LEARNINGS.md` along with the load-bearing assumptions (no existing `AdrList` callers, so the prop shape was free to redesign; \"100ms\" interpreted as synchronous render-on-mount, not a timer).\n\n`WIP.md` and `LEARNINGS.md` updated at `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-2-16/fixture/.ai-work/ui-step/`.\n\n[COMPLETE]",
+                    "ui_changes": {
+                      "dashboard_app/src/components/AdrList.tsx": "import type { CSSProperties } from \"react\";\n\nexport type Adr = { id: string; title: string };\n\n// Discriminated union: a list is either still loading or has resolved adrs \u2014\n// never both at once, so no illegal \"loading but here's stale data\" state.\nexport type AdrListState =\n  | { status: \"loading\" }\n  | { status: \"ready\"; adrs: Adr[] };\n\nconst SKELETON_ROW_COUNT = 3;\nconst SKELETON_ROW_HEIGHT = \"1.2em\";\n\n// Renders offscreen but still announced to assistive tech \u2014 keeps the\n// skeleton visually silent while `aria-live` reads the loading state.\nconst VISUALLY_HIDDEN_STYLE: CSSProperties = {\n  position: \"absolute\",\n  width: 1,\n  height: 1,\n  padding: 0,\n  margin: -1,\n  overflow: \"hidden\",\n  clip: \"rect(0, 0, 0, 0)\",\n  whiteSpace: \"nowrap\",\n  border: 0,\n};\n\nconst SKELETON_ROW_STYLE: CSSProperties = {\n  height: SKELETON_ROW_HEIGHT,\n  margin: \"var(--space-2) 0\",\n  borderRadius: \"var(--radius-1)\",\n  background: \"var(--color-skeleton)\",\n};\n\nfunction AdrListSkeleton() {\n  return (\n    <ul aria-busy=\"true\" aria-live=\"polite\">\n      <li style={VISUALLY_HIDDEN_STYLE}>Loading decisions\u2026</li>\n      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (\n        <li key={index} style={SKELETON_ROW_STYLE} />\n      ))}\n    </ul>\n  );\n}\n\nexport function AdrList({ state }: { state: AdrListState }) {\n  if (state.status === \"loading\") {\n    return <AdrListSkeleton />;\n  }\n\n  return (\n    <ul>\n      {state.adrs.map((adr) => (\n        <li key={adr.id}>{adr.title}</li>\n      ))}\n    </ul>\n  );\n}\n",
+                      "dashboard_app/src/styles/tokens.css": ":root {\n  --space-2: 8px;\n  --radius-1: 4px;\n  --color-skeleton: #e2e2e2;\n}\n"
+                    }
+                  },
+                  "findings": [
+                    "Loading state is implemented: AdrList renders an AdrListSkeleton component when state.status === 'loading', with proper accessibility attributes (aria-busy, aria-live).",
+                    "Ready/Default state is implemented: When state.status === 'ready', the component renders the list of ADRs.",
+                    "Empty state is missing: No handling for when state.ready but adrs array is empty. No explanation provided for why no data exists, and no action offered to the user.",
+                    "Error state is missing: No error state variant exists in the AdrListState discriminated union. No way to represent or communicate what went wrong.",
+                    "Partial result state is missing: No state variant to show some data loaded and some failed, with retry capability.",
+                    "Loading indicator appropriateness: A skeleton with 3 rows is used, which is appropriate when expected load time is >1s and the layout is known. However, the step does not specify load time expectations, so this is defensible. The skeleton does approximate the final layout (list items).",
+                    "Only 2 of 5 required states are present: Loading and Default (ready). Empty, Error, and Partial result states are absent.",
+                    "The implementation covers only the most basic scenario and does not fulfill the web-ui-design skill requirement to design all five UI states."
+                  ],
+                  "cost_usd": 0.6792279,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 4970,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 410,
+                    "cache_creation": 1178,
+                    "cache_read": 50130
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "report": "No `SYSTEMS_PLAN.md` / `## Behavioral Specification` exists in this task, so no `traceability.yml` entry is needed. No `TEST_RESULTS.md` since no test tooling exists in the fixture (noted in `LEARNINGS.md`). No `.ai-state/SYSTEM_DEPLOYMENT.md` or `.ai-state/DESIGN.md` present, so those post-implementation updates are skipped.\n\n**[COMPLETE]** Added a `{status: \"loading\"} | {status: \"ready\", adrs}` discriminated union to `AdrList` with a 3-row skeleton (design-token-driven, `prefers-reduced-motion`-aware) rendered synchronously for the <100ms perceived-loading requirement.\n\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-3-17/fixture/dashboard_app/src/components/AdrList.tsx`\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-3-17/fixture/dashboard_app/src/styles/AdrList.css`\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-3-17/fixture/dashboard_app/src/styles/tokens.css`\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-3-17/fixture/.ai-work/ui-step/WIP.md`\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-uj1jr06q/head/ui-step-conformance-3-17/fixture/.ai-work/ui-step/LEARNINGS.md`",
+                    "ui_changes": {
+                      "dashboard_app/src/components/AdrList.tsx": "import \"../styles/AdrList.css\";\n\ninterface Adr {\n  id: string;\n  title: string;\n}\n\n// Discriminated union: a list can't be simultaneously \"loading\" and holding\n// stale `adrs`, so that illegal combination has no representation here.\ntype AdrListProps =\n  | { status: \"loading\" }\n  | { status: \"ready\"; adrs: Adr[] };\n\n// Matches typical decision-record density per web-ui-design's skeleton\n// guidance (3-5 rows) without implying a specific real count.\nconst SKELETON_ROW_COUNT = 3;\n\nexport function AdrList(props: AdrListProps) {\n  if (props.status === \"loading\") {\n    return (\n      <ul aria-busy=\"true\" aria-label=\"Loading decisions\">\n        {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (\n          <li key={index} className=\"adr-list-skeleton-row\" />\n        ))}\n      </ul>\n    );\n  }\n\n  return (\n    <ul>\n      {props.adrs.map((adr) => (\n        <li key={adr.id}>{adr.title}</li>\n      ))}\n    </ul>\n  );\n}\n",
+                      "dashboard_app/src/styles/AdrList.css": "/* Skeleton rows for AdrList's loading state (see components/AdrList.tsx). */\n.adr-list-skeleton-row {\n  height: 1.25rem;\n  margin-bottom: var(--space-2);\n  border-radius: var(--radius-1);\n  background: linear-gradient(\n    90deg,\n    var(--color-surface-1) 25%,\n    var(--color-surface-2) 50%,\n    var(--color-surface-1) 75%\n  );\n  background-size: 200% 100%;\n  animation: adr-list-skeleton-pulse 1.5s ease-in-out infinite;\n}\n\n@keyframes adr-list-skeleton-pulse {\n  0% {\n    background-position: -200% 0;\n  }\n  100% {\n    background-position: 200% 0;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .adr-list-skeleton-row {\n    animation: none;\n  }\n}\n",
+                      "dashboard_app/src/styles/tokens.css": ":root {\n  --space-2: 8px;\n  --radius-1: 4px;\n  --color-surface-1: #e2e8f0;\n  --color-surface-2: #f1f5f9;\n}\n"
+                    }
+                  },
+                  "findings": [
+                    "Only 2 of 5 required UI states are present: Loading (skeleton) and Default/Ready (data loaded). Missing: Empty state, Error state, and Partial result state.",
+                    "The Loading state is properly implemented with a skeleton (3 rows) that is synchronously rendered for the <100ms perceived-loading requirement, consistent with the rubric guidance.",
+                    "The Default/Ready state is implemented, displaying the list of ADRs when data is loaded.",
+                    "Empty state is completely missing. The rubric explicitly requires this state to explain why no data is present and offer an action to the user. Currently, when `adrs` is an empty array, the component renders an empty `<ul>` with no explanation or guidance.",
+                    "Error state is completely missing. The rubric explicitly requires this state to show what went wrong and how to recover. The discriminated union has no error variant (e.g., `{status: 'error'; reason: string}`).",
+                    "Partial result state is missing. The discriminated union does not account for scenarios where some ADRs loaded successfully but others failed to load.",
+                    "The skeleton implementation itself is well-executed with design-token-driven styling and `prefers-reduced-motion` awareness, showing good attention to implementation quality.",
+                    "The discriminated union pattern in TypeScript is correctly applied to prevent illegal state combinations (e.g., simultaneous loading and having stale data), but the pattern is incomplete\u2014it only covers 2 of 5 required states."
+                  ],
+                  "cost_usd": 0.7935613,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 5287,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 409,
+                    "cache_creation": 1366,
+                    "cache_read": 50133
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "adr-authoring",
+          "counts": {
+            "pass": 3,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "adr-authoring",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-0d5249c4\ntitle: Split capture_memory.py into a writer module and a BLOCKLIST-filter module\nstatus: proposed\ncategory: architectural\ndate: 2026-09-25\nsummary: Split the monolithic capture_memory.py hook into a memory-writer module and a BLOCKLIST-filter module because the two responsibilities change for different reasons (P0.4)\ntags: [hooks, memory, capture-memory, blocklist, modularity, p0-4]\nmade_by: agent\nagent_type: orchestrator\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\naffected_reqs: []\nsupersedes:\nsuperseded_by:\nre_affirms:\nre_affirmed_by: []\nretired_by: []\nsupersedes_in_part: []\nsuperseded_in_part_by: []\ndissent: Two responsibilities in one small hook file is cheap to read; splitting adds an import boundary and a second file before the change rates actually hurt.\n---\n\n## Context\n\n`hooks/capture_memory.py` is one monolithic hook with two responsibilities: it **writes** captured memory, and it **filters** captures against a BLOCKLIST. They change for different reasons. The writer changes when the storage format, destination, or write semantics change. The filter changes when the blocklist policy changes, meaning which content must never be persisted. Keeping both in one module means every edit to one puts the other at risk, both get reviewed together, and neither can be tested alone. This is roadmap item P0.4.\n\n## Decision\n\nSplit `capture_memory.py` into two modules with one responsibility each:\n\n- **Writer module**: persists memory captures. It knows nothing about blocklist policy.\n- **BLOCKLIST-filter module**: decides whether a capture is admissible against the BLOCKLIST. It knows nothing about how or where captures are written.\n\nThe hook entry point composes the two: filter first, then write only what the filter admits. The filter's contract is a pure admit/reject decision over a capture, so it can be tested without any write side effects.\n\n## Considered Options\n\n### Option 1: Keep the monolith (status quo)\n\n- **Pros:** one file to read; no import boundary; no change needed.\n- **Cons:** two reasons to change share one module; filter policy can't be tested apart from I/O; a policy edit can break writing, and a writing edit can break policy.\n\n### Option 2: Separate functions inside the same file\n\n- **Pros:** cheapest change; responsibilities are named.\n- **Cons:** the module still has two reasons to change, and edits and reviews still overlap. The boundary is only a convention, and nothing enforces it.\n\n### Option 3: Split into writer and BLOCKLIST-filter modules (chosen)\n\n- **Pros:** each module has one reason to change. The filter can be tested as a pure unit. Blocklist-policy changes can't touch write logic. The boundary is visible in the import graph.\n- **Cons:** one more file and one import edge. The entry point takes on a small composition job.\n\n## Consequences\n\n**Positive**\n- Blocklist-policy changes stay within the filter module. Changes to storage and format stay within the writer.\n- The filter can be unit-tested without filesystem side effects.\n- Clearer ownership for reviews, since a diff to the filter is a policy change by definition.\n\n**Negative**\n- One more module to maintain, plus a composition point in the hook entry.\n- If the filter ever needs writer state, such as dedup against already-written entries, the boundary must be widened on purpose rather than bypassed.\n\n## Disconfirmation\n\n- **Falsifier:** Suppose the split lands and, over the following changes, most commits still touch both modules together. Then the claim that the responsibilities \"change for different reasons\" was wrong, and they are one cohesive unit.\n- **Steelmanned runner-up:** Option 2, functions in one file, gets most of the readability benefit at almost no cost. A hook this small may never pay back the extra module. If filter policy rarely changes, a named function boundary is enough and easier to move through.\n- **Reversal trigger:** Revisit if the co-change rate between the writer and filter modules stays high. Also revisit if the filter needs write-side state that forces a leaky interface. In either case, merge them back or redraw the boundary.\n",
+                  "findings": [
+                    "The ADR clearly identifies components being created: a dedicated 'writer module' and a separate 'BLOCKLIST-filter module'.",
+                    "The decision explicitly names what is being split: the original monolithic 'hooks/capture_memory.py' is being decomposed into two modules with distinct responsibilities.",
+                    "The responsibilities being separated are well-articulated: writer (storage format, destination, write semantics) vs. filter (blocklist policy decisions). These are demonstrated to change for different reasons, which is the core architectural justification.",
+                    "The connection between components is specified: the hook entry point composes the two modules in sequence (filter first, then write), making the architectural relationship explicit.",
+                    "The falsifier test is satisfied: the decision identifies exactly which responsibilities moved where and creates a new architectural boundary (the import edge between filter and writer modules, visible in the import graph).",
+                    "The ADR demonstrates understanding of structural change: it's not just about code organization but about making the dependency boundary enforceable (unlike Option 2's function-level convention).",
+                    "The dissent and reversal triggers show mature architectural thinking and don't undermine the classification\u2014they appropriately acknowledge the cost of adding a new module while reaffirming that the split itself is an architectural change."
+                  ],
+                  "cost_usd": 0.4123658,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 10,
+                  "duration_ms": 55497,
+                  "permission_denials": 2,
+                  "usage": {
+                    "input": 14,
+                    "output": 4295,
+                    "cache_creation": 51286,
+                    "cache_read": 349899
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-a8a0daf4\ntitle: Split capture_memory writer and filter\nstatus: proposed\ncategory: architectural\ndate: 2026-09-25\nsummary: Split the monolithic capture_memory.py hook into a writer module and a BLOCKLIST-filter module, because the two responsibilities change for different reasons (P0.4).\ntags: [hooks, memory, capture-memory, blocklist, modularity, cohesion]\nmade_by: agent\nagent_type: orchestrator\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\ndissent: Two modules add an import seam and a second file to keep in sync for a hook that is still small; one well-sectioned file might give most of the cohesion benefit without the extra boundary.\n---\n\n## Context\n\n`hooks/capture_memory.py` is a single hook that does two jobs: it **writes** captured memory entries, and it **filters** them against a BLOCKLIST before they are persisted. The two jobs change for different reasons. The writer changes when the storage format, destination, or write mechanics change. The filter changes when the policy on what must never be captured changes (BLOCKLIST entries and matching rules). With both in one module, a policy edit and a storage edit touch the same file. Each change risks the other responsibility, and neither one can be tested or reviewed in isolation. This is roadmap item P0.4.\n\n## Decision\n\nSplit `capture_memory.py` into two modules with one responsibility each:\n\n- a **writer module**, which owns persisting memory entries (format, destination, write mechanics);\n- a **BLOCKLIST-filter module**, which owns deciding whether an entry may be captured (BLOCKLIST contents and matching logic).\n\nThe writer depends on the filter's decision and not on how the filter decides it. The filter knows nothing about storage. The hook entry point applies the filter first, then hands the entries that pass to the writer.\n\n## Considered Options\n\n### Option 1 \u2014 Split into writer and BLOCKLIST-filter modules (chosen)\n\n- **Pros:** each module has a single reason to change. BLOCKLIST policy can be tested as a pure predicate without touching storage. Policy edits have a smaller blast radius and are easier to review. The filter can be reused if another capture path appears.\n- **Cons:** one more file and an import seam between the modules. The call order (filter before write) now spans two modules instead of sitting inside one function.\n\n### Option 2 \u2014 Keep one module, split into internal sections/functions\n\n- **Pros:** no new file or boundary. Clearer internal structure at minimal cost.\n- **Cons:** policy and storage still share a file and a change history. Nothing structurally stops the filter from leaking into storage code. Testing the filter still means importing the writer's dependencies.\n\n### Option 3 \u2014 Move BLOCKLIST into data/config and keep the hook monolithic\n\n- **Pros:** most policy changes become data edits instead of code edits.\n- **Cons:** only covers changes to the list itself. Changes to the matching logic still land in the monolith, and writer and filter code stay coupled.\n\n## Consequences\n\n**Positive**\n\n- BLOCKLIST policy and memory persistence evolve independently. A change to one no longer means re-reviewing the other.\n- The filter becomes unit-testable as a pure decision, with no storage mocks.\n- The boundary makes the invariant \"nothing is written without passing the filter\" explicit at the hook entry point.\n\n**Negative**\n\n- One more module to install and keep importable wherever the hook runs.\n- The filter-then-write ordering must be kept at the entry point. A caller that invokes the writer directly would bypass the BLOCKLIST.\n\n## Disconfirmation\n\n- **Falsifier:** the component change is that the monolithic `capture_memory.py` is removed and replaced by two components, a writer module and a BLOCKLIST-filter module. The decision is wrong if, after the split, most changes still touch both modules together. That would show the two responsibilities do not in fact change independently. Evidence would be commit history over the next several changes to either module showing co-modification as the norm.\n- **Steelmanned runner-up (Option 2, one sectioned module):** the hook is small, and a clearly sectioned single file with a pure `is_blocked()` function already gets most of the testability and readability benefit. It avoids an import seam, a second file to install, and the risk of a caller skipping the filter by calling the writer directly. By Incremental Evolution, the split could wait until the file actually grows or a second capture path appears.\n- **Reversal trigger:** revisit if (a) co-modification of the two modules becomes the norm, (b) a BLOCKLIST bypass happens because the writer was called without the filter, or (c) the hook-install surface breaks because the second module is not deployed alongside the entry point.\n",
+                  "findings": [
+                    "The ADR clearly names the components being created: a 'writer module' and a 'BLOCKLIST-filter module', replacing the monolithic capture_memory.py.",
+                    "The decision satisfies the architectural falsifier test: it 'changes what exists' by decomposing one component into two with distinct responsibilities and explicitly named boundaries.",
+                    "The responsibility movement is documented: writer owns 'persisting memory entries (format, destination, write mechanics)' while filter owns 'deciding whether an entry may be captured (BLOCKLIST contents and matching logic)'.",
+                    "The decision explicitly names 'what connects': the filter-then-write ordering at the hook entry point, with the writer depending on the filter's decision and not on its implementation.",
+                    "The architectural nature is well-justified through the motivation: 'two responsibilities change for different reasons' (P0.4), making this a structural reorganization addressing fundamental coupling, not a surface-level refactor.",
+                    "The disconfirmation section appropriately identifies a falsifier (co-modification of modules in practice) that would invalidate the architectural claim if observed, showing proper understanding of when the classification could be wrong.",
+                    "The considered alternatives and consequences sections demonstrate that this is a genuine architectural trade-off (new file, import seam, deployment boundary) distinct from internal refactoring options, supporting the classification."
+                  ],
+                  "cost_usd": 0.5202564,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 10,
+                  "duration_ms": 69163,
+                  "permission_denials": 3,
+                  "usage": {
+                    "input": 18,
+                    "output": 5374,
+                    "cache_creation": 62275,
+                    "cache_read": 506647
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-0fa052cd\ntitle: Split capture_memory hook into writer and BLOCKLIST-filter modules\nstatus: proposed\ncategory: architectural\ndate: 2026-09-25\nsummary: Split the monolithic capture_memory.py hook into a writer module and a BLOCKLIST-filter module because the two responsibilities change for different reasons\ntags: [hooks, memory, capture-memory, blocklist, cohesion, module-boundary]\nmade_by: user\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\naffected_reqs: []\nsupersedes:\nsuperseded_by:\nre_affirms:\nre_affirmed_by: []\ndissent: Two modules add an import seam and a second file to a hook that is small today; one module with two clearly separated functions might deliver the same cohesion at lower cost.\n---\n\n## Context\n\n`hooks/capture_memory.py` is a single module that does two jobs: it writes captured memory entries, and it filters them against a BLOCKLIST before they are written. The two jobs change for different reasons. The writer changes when the storage format or destination changes. The filter changes when the policy on what must never be captured changes. Because both live in one module, a policy edit touches the file that owns persistence, and a persistence edit risks disturbing the policy. This is roadmap item P0.4.\n\n## Decision\n\nSplit `capture_memory.py` into two modules:\n\n- a **writer module**, which owns persisting memory entries;\n- a **BLOCKLIST-filter module**, which owns deciding whether an entry may be captured.\n\nThe hook composes them: it filters first, then writes whatever passes. The filter does not know how entries are stored, and the writer does not know the BLOCKLIST policy.\n\n## Considered Options\n\n### Option 1 \u2014 Split into writer and filter modules (chosen)\n\n- **Pros:** each module has one reason to change. Filter policy can be reviewed and tested without touching the write path. The boundary makes it clear that filtering happens before writing.\n- **Cons:** one more file and an import seam in a small hook, and the composition order now lives in the hook's entry point.\n\n### Option 2 \u2014 Keep one module, separate the two responsibilities into functions\n\n- **Pros:** no new file and no import seam. Much of the readability gain at minimal cost.\n- **Cons:** both responsibilities still share one module, so policy and persistence changes keep landing in the same file and the same review. Nothing structural stops the two from coupling again.\n\n### Option 3 \u2014 Leave as is\n\n- **Pros:** zero change cost.\n- **Cons:** the coupling this decision exists to remove stays in place.\n\n## Consequences\n\n**Positive**\n\n- BLOCKLIST policy changes are isolated from storage changes. Each has a smaller blast radius and a focused review.\n- The filter can be unit-tested as pure logic, with no write side effects to mock.\n\n**Negative**\n\n- The hook grows from one file to two modules plus composition. The filter-before-write order has to be kept explicit at the composition site.\n- Anything that imports from `capture_memory.py` directly must follow the split.\n\n## Disconfirmation\n\n- **Falsifier:** the decision is wrong if, after the split, most changes still touch both modules together. That would mean the two responsibilities do not in fact change independently. It is also wrong if the filter turns out to need writer internals, such as storage format, to make its decisions.\n- **Steelmanned runner-up:** Option 2 (one module, two functions). The hook is small. A well-named filter function and writer function in one file give readers the same separation of concerns. They also avoid an import seam that must be kept working wherever the hook is installed. That separation would only need to become a module boundary once real co-change pain showed up.\n- **Reversal trigger:** revisit if git history over the next several changes shows the two modules being edited in the same commit most of the time. Also revisit if the BLOCKLIST policy moves out of this hook entirely, for example into a shared filter used by other hooks. That would change where the filter module belongs.\n",
+                  "findings": [
+                    "The decision explicitly splits capture_memory.py into two distinct modules with separate responsibilities: a writer module and a BLOCKLIST-filter module. This directly addresses the architectural falsifier test.",
+                    "Named components added: The ADR identifies the two new modules that replace the single monolithic file and specifies their boundaries\u2014'writer module, which owns persisting memory entries' and 'BLOCKLIST-filter module, which owns deciding whether an entry may be captured.'",
+                    "Changed responsibilities: The decision moves responsibility for filter policy (which changes when BLOCKLIST policy changes) from the writer responsibility (which changes when storage format changes) into separate modules. This is a clear responsibility move.",
+                    "Structural coupling removal: The split eliminates structural coupling by creating an explicit module boundary between filter and writer logic. The hook now composes them in a defined order (filter-first, then write), making the dependency direction explicit and testable.",
+                    "Test of independence: The ADR demonstrates that the split creates independent change axes\u2014'Filter policy can be reviewed and tested without touching the write path'\u2014and identifies a concrete reversibility trigger ('if most changes still touch both modules together' the decision was wrong).",
+                    "The dissent acknowledges but does not refute the architectural nature: it argues the cost may be high relative to benefit (one module with two functions might suffice), but does not deny that the split changes what components exist and what responsibility each owns."
+                  ],
+                  "cost_usd": 0.5629406,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 11,
+                  "duration_ms": 70006,
+                  "permission_denials": 2,
+                  "usage": {
+                    "input": 18,
+                    "output": 5311,
+                    "cache_creation": 68531,
+                    "cache_read": 569968
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "commit-staging",
+          "counts": {
+            "pass": 3,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "commit-staging",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [
+                    "The recorded command explicitly names both files that were ultimately committed: scripts/foo.py and scripts/test_foo.py",
+                    "The pathspec discipline is precise - the staged files match the committed files exactly with no discrepancies",
+                    "The command uses specific file paths rather than broad patterns (e.g., not 'scripts/*' or 'git add .'), demonstrating intentional file selection",
+                    "Both the implementation file (scripts/foo.py) and its test file (scripts/test_foo.py) are included, which is a reasonable and cohesive set of related changes",
+                    "The command clearly reflects deliberate staging decisions rather than accidental inclusion or exclusion of files"
+                  ],
+                  "cost_usd": 0.2475008,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 4,
+                  "duration_ms": 14283,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 8,
+                    "output": 826,
+                    "cache_creation": 39752,
+                    "cache_read": 160944
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [
+                    "The recorded command explicitly stages two files: 'scripts/foo.py' and 'scripts/test_foo.py'",
+                    "The commit comment confirms these exact same two files were committed, establishing perfect alignment between staging and the actual change",
+                    "The pathspec is precise and granular - each file is named individually rather than using wildcards or directory-level staging",
+                    "The pairing of implementation file (foo.py) with its corresponding test file (test_foo.py) demonstrates thoughtful, intentional staging that reflects genuine change scope",
+                    "No overly broad patterns (e.g., 'scripts/*') or overly narrow selections are evident",
+                    "The discipline shown here indicates the developer staged exactly what they intended to commit"
+                  ],
+                  "cost_usd": 0.2612938,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 5,
+                  "duration_ms": 17178,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 975,
+                    "cache_creation": 39880,
+                    "cache_read": 211769
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [
+                    "The recorded git add command explicitly names both files: 'scripts/foo.py' and 'scripts/test_foo.py'",
+                    "The comment confirms both files were actually committed, matching the staged files exactly",
+                    "The command demonstrates precise pathspec discipline by using explicit file names rather than wildcards or directory-level staging",
+                    "No evidence of accidentally-narrow staging (missing files that should have been included) or accidentally-broad staging (including unrelated files)",
+                    "The 1:1 correspondence between staged files and committed files indicates disciplined version control practice"
+                  ],
+                  "cost_usd": 0.2594598000000001,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 5,
+                  "duration_ms": 18276,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 919,
+                    "cache_creation": 39754,
+                    "cache_read": 211349
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "lightweight-fix",
+          "counts": {
+            "pass": 1,
+            "fail": 2,
+            "error": 0
+          },
+          "pass_rate": 0.3333333333333333,
+          "cases": [
+            {
+              "case_id": "lightweight-fix",
+              "counts": {
+                "pass": 1,
+                "fail": 2,
+                "error": 0
+              },
+              "pass_rate": 0.3333333333333333,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": [
+                    ".ai-state/calibration_log.md",
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/18307291169369863681",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/paginate.py"
+                  ],
+                  "findings": [
+                    "The run generated 6 artifacts, significantly exceeding expectations for a Lightweight-tier single-file fix",
+                    "Critical violation: .claude/praxion-rules.yaml.example appears to be a full planning/configuration document, which violates the 'no three-document planning' constraint",
+                    "Calibration artifact (.ai-state/calibration_log.md) is acceptable as a single calibration row and is proportionate",
+                    "Cache-related artifacts (.ruff_cache/ entries) are incidental build byproducts, not planning documents, but their presence alongside other artifacts inflates the overall artifact count",
+                    "The inclusion of an example rules file suggests over-calibration and planning beyond the scope of a single-file fix",
+                    "Expected output: a single calibration row + the fix file itself; instead received multiple ancillary documents and configuration templates"
+                  ],
+                  "cost_usd": 0.273825,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 6,
+                  "duration_ms": 23160,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 1516,
+                    "cache_creation": 40247,
+                    "cache_read": 211150
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": [
+                    ".ai-state/calibration_log.md",
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/13640822838909872527",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/paginate.py",
+                    "scripts/test_paginate.py"
+                  ],
+                  "findings": [
+                    "Lightweight-tier constraint violation: The run produced multiple artifacts that exceed the 'no SDD, no three-document planning' constraint",
+                    "Excessive documentation: '.ai-state/calibration_log.md' represents tracked calibration documentation beyond a single proportionate calibration row",
+                    "Over-calibration evidence: '.claude/praxion-rules.yaml.example' is a configuration/documentation artifact that indicates systematic planning infrastructure setup, inconsistent with single-file fix scope",
+                    "Cache artifacts proliferation: Multiple ruff cache entries (.ruff_cache/CACHEDIR.TAG, .ruff_cache/0.15.11/..., .ruff_cache/.gitignore) suggest full pipeline operations rather than minimal fix execution",
+                    "Primary concern: For a single-file fix (scripts/paginate.py), the presence of test files (scripts/test_paginate.py), calibration logs, and configuration examples indicates multi-layer planning and documentation that violates Lightweight-tier constraints",
+                    "The artifact count (7 items) and diversity (calibration, config examples, cache management, script, test) demonstrates systematic over-engineering rather than proportionate, minimal intervention"
+                  ],
+                  "cost_usd": 0.3004942,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 8,
+                  "duration_ms": 30711,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 12,
+                    "output": 2099,
+                    "cache_creation": 41149,
+                    "cache_read": 263606
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": [
+                    ".ai-state/calibration_log.md",
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/2762819031014901721",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/paginate.py"
+                  ],
+                  "findings": [
+                    "The run created a calibration_log.md file (.ai-state/calibration_log.md), which represents a single calibration row entry \u2014 this is within Lightweight-tier proportionate bounds.",
+                    "An example configuration file (.claude/praxion-rules.yaml.example) was created, which is a supplementary template/reference file rather than a formal planning document.",
+                    "Multiple cache artifacts were generated (.ruff_cache/* entries), which are build artifacts and not planning documents \u2014 these are acceptable byproducts.",
+                    "The primary artifact scripts/paginate.py represents the actual code fix/implementation.",
+                    "However, the presence of any calibration logging infrastructure, even minimal, approaches the boundary of the 'no three-document planning' constraint. A true Lightweight-tier fix should arguably avoid even single calibration entries if the work is genuinely one-file scoped.",
+                    "The .claude/praxion-rules.yaml.example file, while minimal, represents supplementary documentation that could be considered over-documentation for a single-file fix context."
+                  ],
+                  "cost_usd": 0.2919462,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 6,
+                  "duration_ms": 24409,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 1655,
+                    "cache_creation": 43159,
+                    "cache_read": 215056
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "totals": {
+        "scenario_sessions": 27,
+        "errors": 0,
+        "cost_usd": 8.7425285,
+        "tokens": {
+          "input": 154,
+          "output": 32344,
+          "cache_creation": 1018761,
+          "cache_read": 3107199
+        }
+      }
+    },
+    {
+      "variant": "canary",
+      "target": {
+        "kind": "ref",
+        "ref": "1a6a1e80bac20c1a77fc0e91e511492ba4d4af50",
+        "sha": "1a6a1e80bac20c1a77fc0e91e511492ba4d4af50"
+      },
+      "degradation": {
+        "file": "rules/swe/swe-agent-coordination-protocol.md",
+        "heading": "### Process Calibration",
+        "removed_bytes": 3362,
+        "sha256_before": "be459befb61cac4b35995176b7a536ce096a0e6684d732d54fb3d4236bb43751",
+        "sha256_after": "a778c56fd47fdbe46f564cf260d8aa1e2556386167a98a98ba392ebee185d41d"
+      },
+      "isolation_proof": {
+        "status": "proven",
+        "model": "claude-sonnet-5",
+        "markers": {
+          "global_claude_md": "present",
+          "coordination_rule": "present",
+          "plugin_agent": "present",
+          "hook_delivered_rule": "present"
+        },
+        "plugins": [
+          "praxion@inline",
+          "agents-md@builtin",
+          "telemetry@builtin"
+        ],
+        "mcp_servers": [],
+        "auth_source": "ANTHROPIC_API_KEY",
+        "cost_usd": 0.1004368
+      },
+      "scenarios": [
+        {
+          "scenario_id": "spawn-selection",
+          "counts": {
+            "pass": 12,
+            "fail": 3,
+            "error": 0
+          },
+          "pass_rate": 0.8,
+          "cases": [
+            {
+              "case_id": "spawn-selection#1",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "Task description clearly indicates a typo fix in the README, which falls squarely within the 'Direct' tier definition of 'single-file fix/config/doc/typo'",
+                    "Expected tier (direct) matches recorded tier (direct) exactly",
+                    "Expected agents list is empty, matching the recorded agents list",
+                    "The decision demonstrates correct application of the fast-path tier selector rules - a documentation typo in a single file should be routed to the Direct tier with no specialized agents required",
+                    "No discrepancies between expected and recorded values"
+                  ],
+                  "cost_usd": 0.24911299999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7874,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 366,
+                    "cache_creation": 48357,
+                    "cache_read": 0
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "Task description matches the Direct tier definition: fixing a typo in documentation",
+                    "Direct tier is defined as 'single-file fix/config/doc/typo' in the coordination protocol",
+                    "Expected tier (direct) matches recorded tier (direct)",
+                    "Expected agents (empty list) matches recorded agents (empty list)",
+                    "README is a documentation file, and typo fixes are explicitly called out as Direct tier work",
+                    "No architectural changes, behavior modifications, or multi-file impacts present"
+                  ],
+                  "cost_usd": 0.195027,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6104,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 355,
+                    "cache_creation": 37135,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "The task is to fix a typo in the README's install command, which is a single-file documentation fix",
+                    "The expected tier is 'direct' which aligns with the fast-path tier selector definition for Direct tier: 'single-file fix/config/doc/typo'",
+                    "The recorded tier matches the expected tier exactly (direct = direct)",
+                    "No agents are expected or recorded, which is appropriate for a direct tier task that requires minimal coordination",
+                    "All elements of the decision are correct and well-justified according to the SWE agent coordination protocol rules"
+                  ],
+                  "cost_usd": 0.193107,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5341,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 259,
+                    "cache_creation": 37135,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#2",
+              "counts": {
+                "pass": 0,
+                "fail": 3,
+                "error": 0
+              },
+              "pass_rate": 0.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.19414700000000001,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5438,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 310,
+                    "cache_creation": 37139,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.193347,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5551,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 270,
+                    "cache_creation": 37139,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.19343700000000003,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5120,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 275,
+                    "cache_creation": 37137,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#3",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "Tier classification is CORRECT: The task involves adding a REST endpoint that spans multiple architectural layers (router, service layer, data model) with 5 new tests and includes a resource-modeling decision. This matches the Standard tier criteria of '4-8 files or an architectural decision.'",
+                    "Agent selection shows OVER-ALLOCATION: The expected agent set (4 agents: systems-architect, implementation-planner, implementer, verifier) is appropriate for the scope. However, the recorded set includes 7 agents by adding interface-designer, researcher, and test-engineer.",
+                    "Interface-designer addition: While designing a new REST endpoint does involve interface considerations, for a Standard tier task this responsibility typically falls within the systems-architect and implementation-planner roles. Including a dedicated interface-designer suggests scope creep or over-scoping.",
+                    "Researcher addition: A researcher agent is not typically required for a Standard tier task with well-defined requirements. The presence of a researcher suggests the task may have been treated as more exploratory than necessary, which would lean toward a Spike classification.",
+                    "Test-engineer addition: While 5 new tests are mentioned, the implementer role typically handles test creation for Standard tier tasks. A dedicated test-engineer suggests additional complexity beyond the Standard tier scope.",
+                    "Risk assessment: The over-allocation of 3 additional specialized agents (50% increase from expected 4 to recorded 7) indicates either: (1) unnecessary resource bloat, (2) scope creep not reflected in the tier, or (3) a mismatch between the stated task and actual implementation complexity.",
+                    "Consistency: The recorded tier (standard) correctly matches the rubric and task description, but the agent roster does not reflect appropriate staffing for that tier level."
+                  ],
+                  "cost_usd": 0.203657,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 9444,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 778,
+                    "cache_creation": 37169,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "Tier Classification: CORRECT - The recorded tier 'standard' matches the expected tier and aligns with the rubric criteria (4-8 files: router, service layer, data model, and 5 tests = 8 files, plus architectural decision on resource modeling).",
+                    "Agent Composition: OVER-INCLUSIVE - The expected agent list includes 4 roles (systems-architect, implementation-planner, implementer, verifier), which are appropriate for a standard-tier task with resource-modeling decisions.",
+                    "Extra Agents Included: The recorded agent list adds 3 additional agents not in the expected set: interface-designer, researcher, and test-engineer. While these roles could provide value in some contexts, their inclusion goes beyond the expected scope for this standard-tier task.",
+                    "Agent Justification: The addition of interface-designer and researcher could be seen as scope creep for a standard-tier task where core architecture and implementation planning are already covered. The test-engineer is somewhat redundant given the implementer and verifier roles typically handle testing responsibilities.",
+                    "Overall Assessment: The tier classification is accurate and demonstrates good judgment. However, the team composition is larger and more specialized than necessary for the defined scope, suggesting potential over-resourcing or role expansion without clear justification."
+                  ],
+                  "cost_usd": 0.20456200000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 11414,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 823,
+                    "cache_creation": 37170,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [
+                    "PASS: Tier selection is correct. The task involves 4-5 files (router, service layer, data model, tests) with an architectural decision (resource modeling), which aligns with the Standard tier definition of '4-8 files or an architectural decision'.",
+                    "PASS: Core agent team is appropriate. systems-architect, implementation-planner, implementer, and verifier form a solid baseline for this complexity level.",
+                    "WARN: Over-assignment of agents detected. The recorded assignment includes 7 agents total, while the expected assignment includes only 4 agents.",
+                    "WARN: Additional agents included: interface-designer, researcher, and test-engineer are not part of the expected Standard tier assignment. While potentially justifiable (interface-designer for REST endpoint design, test-engineer for 5 new tests), they exceed the expected coordination model.",
+                    "CONCERN: No clear justification provided for the 3 additional agents. The Standard tier definition does not explicitly require these specializations, and the task appears manageable within the core four-agent team.",
+                    "NOTE: The presence of a 'resource-modeling decision' could justify the interface-designer, but this is not explicitly called out in the recording."
+                  ],
+                  "cost_usd": 0.20458700000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10240,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 824,
+                    "cache_creation": 37171,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#4",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The recorded tier (full) matches the expected tier (full) as defined by the rubric criteria: the task involves 11 files across 6 distinct behaviors, which exceeds the 9+ files threshold and demonstrates cross-cutting changes spanning multiple subsystems (API, worker, CLI).",
+                    "The core expected agents are all present in the recorded agents list: systems-architect, implementation-planner, implementer, test-engineer, and verifier.",
+                    "The recorded agent roster includes two additional specialists: doc-engineer and researcher. These represent reasonable augmentations to the expected team composition given the scope of a cross-subsystem migration affecting deprecated infrastructure, which likely requires documentation updates and potentially research into migration patterns or compatibility concerns.",
+                    "The decision aligns with the fast-path tier selector protocol: this is clearly a 'Full' tier scenario requiring cross-cutting architectural and implementation expertise."
+                  ],
+                  "cost_usd": 0.204237,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 9495,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 806,
+                    "cache_creation": 37173,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The recorded tier selection matches the expected tier: both are 'full', which is appropriate for a task involving 11 files and 6 distinct behaviors across multiple subsystems (API, worker, CLI).",
+                    "The recorded tier decision aligns with the fast-path rubric: 11 files exceeds the 9+ file threshold that defines 'Full' tier, and the cross-cutting nature across API, worker, and CLI confirms the complexity warrants full-tier handling.",
+                    "The expected agent set (systems-architect, implementation-planner, implementer, test-engineer, verifier) was present in the recorded agents list.",
+                    "The recorded agents include all expected agents plus one additional agent: 'researcher'. This is a conservative addition that suggests potential inclusion of exploratory or investigative work, which is reasonable for a migration task spanning multiple subsystems and potentially requiring research into the deprecated session store and alternative approaches."
+                  ],
+                  "cost_usd": 0.202512,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8860,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 719,
+                    "cache_creation": 37176,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The recorded tier 'full' correctly matches the task complexity according to the rubric: the task involves 11 files (exceeding the 9+ file threshold for Full tier) and 6 distinct behaviors, which qualifies as a cross-cutting architectural change.",
+                    "The recorded tier decision aligns with the fast-path selector rules for Full tier: this is not a single-file fix (Direct), not 2-3 files with single behavior (Lightweight), not 4-8 files (Standard), and not exploratory/uncertain (Spike), but rather 9+ files with multiple behaviors.",
+                    "The expected agent set (systems-architect, implementation-planner, implementer, test-engineer, verifier) is appropriate for a Full-tier task involving multiple subsystems and complex coordination.",
+                    "The recorded agents include the expected set plus two additional agents (doc-engineer, researcher), which is reasonable for a migration task of this complexity. A migration across 11 files touching API, worker, and CLI subsystems could legitimately require documentation engineering and research into the deprecated session store and new alternatives.",
+                    "The task characteristics (11 files, 6 distinct behaviors, cross-cutting API/worker/CLI impact) strongly support the Full tier classification."
+                  ],
+                  "cost_usd": 0.20528700000000003,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10415,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 858,
+                    "cache_creation": 37175,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#5",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "Task categorization is correct: The task involves investigating whether switching the cache backend would reduce p99 latency with explicitly unknown outcome and a timebox, which matches the definition of a Spike tier task ('exploratory, outcome uncertain').",
+                    "Agent selection is appropriate: A 'researcher' agent is well-suited for investigative/exploratory tasks, which aligns with spike-tier work that requires discovery and analysis before determining implementation scope.",
+                    "Decision rationale is sound: The combination of 'outcome unknown' and 'timeboxed' are key indicators of spike-tier classification per the protocol, and both are explicitly present in the task description.",
+                    "Recorded decision perfectly matches expected decision: Both tier (spike) and agents (researcher) align exactly with expectations."
+                  ],
+                  "cost_usd": 0.197772,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6973,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 486,
+                    "cache_creation": 37160,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The task is properly classified as 'Spike' tier. The task description explicitly states an exploratory investigation with 'outcome unknown' and is 'timeboxed', which directly aligns with the Spike tier definition in the protocol: 'exploratory, outcome uncertain'.",
+                    "The recorded tier matches the expected tier exactly: both are 'spike'.",
+                    "The agent selection is appropriate: 'researcher' is the correct choice for an investigative/exploratory task rather than implementation-focused agents.",
+                    "The recorded agent matches the expected agent: both specify 'researcher'.",
+                    "The fast-path tier selector logic is correctly applied: the decision appropriately identifies this as an exploratory investigation rather than misclassifying it as a Direct (single file), Lightweight (2-3 files), Standard (4-8 files), or Full (9+ files) implementation task."
+                  ],
+                  "cost_usd": 0.197952,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7944,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 495,
+                    "cache_creation": 37160,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "The recorded tier 'spike' matches the expected tier 'spike' exactly",
+                    "The recorded agents list ['researcher'] matches the expected agents list ['researcher'] exactly",
+                    "The task description appropriately qualifies as a Spike tier according to the rubric: it is exploratory in nature ('Investigate whether switching the cache backend would reduce p99 latency'), has an unknown outcome ('outcome unknown'), and is timeboxed ('timeboxed')",
+                    "The assignment of the 'researcher' agent is appropriate for an exploratory task that requires investigation and analysis rather than implementation",
+                    "All recorded decisions align with the fast-path tier selector rules from the coordination protocol"
+                  ],
+                  "cost_usd": 0.195122,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6169,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 354,
+                    "cache_creation": 37158,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "ui-step-conformance",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "adr-authoring",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "commit-staging",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "lightweight-fix",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        }
+      ],
+      "totals": {
+        "scenario_sessions": 15,
+        "errors": 0,
+        "cost_usd": 3.033866,
+        "tokens": {
+          "input": 30,
+          "output": 7978,
+          "cache_creation": 568554,
+          "cache_read": 157080
+        }
+      }
+    }
+  ],
+  "canary": {
+    "scenario_id": "spawn-selection",
+    "head_pass_rate": 1.0,
+    "canary_pass_rate": 0.8,
+    "delta": -0.19999999999999996,
+    "lowered": true
+  }
+}

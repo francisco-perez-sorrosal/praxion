@@ -360,8 +360,10 @@ t12_bash_state_names_agree_with_detection_md() {
     fi
 
     local doc_states script_states missing_in_script missing_in_doc
-    doc_states="$(grep -oE '\`(empty|hackathon-managed|fully-managed|partially-managed|git-no-praxion|code-no-git)\`' "$DETECTION_DOC" \
-        | tr -d '\`' | sort -u | tr '\n' ' ' | sed 's/ $//')"
+    # Plain backticks: GNU grep reads a backslash-backtick as its
+    # start-of-buffer anchor, so the escaped form matches nothing on Linux.
+    doc_states="$(grep -oE '`(empty|hackathon-managed|fully-managed|partially-managed|git-no-praxion|code-no-git)`' "$DETECTION_DOC" \
+        | tr -d '`' | sort -u | tr '\n' ' ' | sed 's/ $//')"
     script_states="$(grep -oE '(empty|hackathon-managed|fully-managed|partially-managed|git-no-praxion|code-no-git)' "$SCRIPT_UNDER_TEST" \
         | sort -u | tr '\n' ' ' | sed 's/ $//')"
 

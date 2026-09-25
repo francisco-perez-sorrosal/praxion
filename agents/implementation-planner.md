@@ -396,7 +396,7 @@ When the completed feature used a behavioral specification (medium/large task), 
 - Provide each step with: one-sentence description, `Implementation` field, `Done when` field, `Files` field
 - Expect back one of: `[COMPLETE]` (step done, WIP.md updated), `[BLOCKED]` (blocker described with evidence), `[CONFLICT]` (file outside declared set needed, parallel mode only)
 - **Sequential invocation**: invoke one implementer at a time, review result, advance WIP.md, invoke next
-- **Parallel invocation**: invoke implementer + test-engineer concurrently on paired steps in the same parallel group; after both complete, invoke the implementer for the integration checkpoint (run all tests, fix failures)
+- **Paired invocation**: invoke the test-engineer first on each paired step and the implementer only after its RED handshake; after both complete, invoke the implementer for the integration checkpoint (run all tests, fix failures). Different pairs may overlap only on disjoint file sets with pathspec commits
 
 ### With the Test-Engineer
 

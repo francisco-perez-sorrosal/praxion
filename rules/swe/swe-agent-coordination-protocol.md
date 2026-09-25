@@ -24,9 +24,10 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 - Bug fixes: Direct unless 4+ files or structural issue (escalate to Standard). Refactoring: Standard with `[Phase: Refactoring]` delegation to the [refactoring skill](../../skills/refactoring/SKILL.md). Mid-task escalation mirrors Lightweight's: if it grows past a single file plus trivial siblings, or turns structural, stop and re-tier.
 - The SDD skill's [complexity triage](../../skills/spec-driven-development/SKILL.md#complexity-triage) refines specification depth within Standard/Full.
 - All tiers append a row to `.ai-state/calibration_log.md` on completion (keeps calibration accuracy analysis unbiased) and may create ADRs per [adr-conventions.md](adr-conventions.md). Direct tier uses the sanctioned single-line format ([spec](../../skills/spec-driven-development/references/calibration-procedure.md#calibration-log)); `Retrospective` is the micro-capture slot, promotable to ADR/ledger row if substantial.
-- **Lightweight specifics** (acceptance criteria inline, researcher scaffold, no `TEST_RESULTS.md`, architecture-doc update on structural change, mid-task escalation to Standard rather than silent scope-creep): see [tier-templates.md#lightweight-snippet](../../skills/software-planning/references/tier-templates.md#lightweight-snippet).
+- **Lightweight specifics**: [tier-templates.md#lightweight-snippet](../../skills/software-planning/references/tier-templates.md#lightweight-snippet).
+- **Standard/Full envelope**: produce the tier's [artifact floor](../../skills/software-planning/references/artifact-inventory.md#per-tier-artifact-floor); stay within ≤ 8 (Standard) / ≤ 16 (Full) spawns — a resume into a ≥ 250k-token context counts as one. Read `spawn_count.py --slug <slug> --budget <n>` before each spawn and log the tally in the calibration row. Never meet the budget by unpairing a side-effect step or skipping the verifier — stop, then re-tier or split. Writers run in sequence unless file sets are disjoint with pathspec commits. [Procedure](../../skills/software-planning/references/coordination-details.md#spawn-budget).
 
-**Tier Selector (fast path).** Walk top-to-bottom, stop at the first match: **Spike** (exploratory, uncertain) → **Direct** (single-file fix/config/doc/typo) → **Lightweight** (2–3 files, single behavior, clear scope) → **Standard** (4–8 files, or 2–4 behaviors, or an architectural decision) → **Full** (9+ files, or 5+ behaviors, or cross-cutting refactor). For ambiguous cases, use the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring.
+**Tier Selector (fast path).** Stop at the first match in the order Spike → Direct → Lightweight → Standard → Full; any one of a row's Signals qualifies. Ambiguous: the SDD skill's [calibration-procedure.md](../../skills/spec-driven-development/references/calibration-procedure.md) signal scoring.
 
 *Hackathon mode: if a project sets `PRAXION_HACKATHON_MODE=1`, the 5-tier selector above is replaced by the Hackathon Spine — a flexible-entry pipeline the user enters by natural language — see that project's `## Hackathon Mode` CLAUDE.md block for the definition.*
 
@@ -43,9 +44,7 @@ Standard and Full tier pipelines **must** operate in a dedicated worktree to pre
 | Direct, Lightweight, Spike | None — work in the current checkout |
 | Standard, Full | Worktree — main agent calls `EnterWorktree` before spawning any agent |
 
-See [coordination-details.md#pipeline-worktree-lifecycle](../../skills/software-planning/references/coordination-details.md#pipeline-worktree-lifecycle) for the full entry, during-execution, and exit procedures, plus multi-instance guidance.
-
-Native Claude Code worktree isolation refuses `Write`/`Edit` (including through a symlink whose realpath leaves the worktree) that targets outside the session worktree; Bash-path writes are not blocked mechanically and are covered procedurally by pathspec-scoped commits and merge gates verified from the main checkout.
+See [coordination-details.md#pipeline-worktree-lifecycle](../../skills/software-planning/references/coordination-details.md#pipeline-worktree-lifecycle) for the full entry, during-execution, and exit procedures, multi-instance guidance, and the harness's native write isolation.
 
 ### Available Agents
 
@@ -71,7 +70,7 @@ Spawn agents without waiting for the user to ask:
 
 - Complex feature --> `researcher` then `systems-architect` (skip researcher if codebase context suffices)
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
-- Plan ready --> `implementer` + `test-engineer` concurrently (paired steps, disjoint file sets) **at Standard/Full only**; both done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, the implementer's own test sub-step suffices — don't spawn `test-engineer`
+- Plan ready --> `test-engineer` then `implementer` per paired step **at Standard/Full only**; both done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, the implementer's own test sub-step suffices — don't spawn `test-engineer`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
@@ -99,8 +98,8 @@ Agents communicate through shared documents, not direct invocation — see [coor
 | Return contract | A subagent's final message is a **pointer, not a payload**: a terse summary (≤ ~15 lines) + its `.ai-work/<task-slug>/` artifact path — never the artifact body, and the orchestrator never solicits the artifact body inline. The orchestrator delegates for summaries and reads an artifact only when it needs the detail. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#agent-return-contract). |
 | Completion handshake | Trust a subagent return only if it carries a recognized terminal marker (`[COMPLETE]`/`[BLOCKED]`/`[CONFLICT]`/`[PARTIAL]`) **and** the durable artifact agrees (step's `WIP.md` checkbox flipped). A missing or contradicted marker is a **suspected truncation**: do **not** advance and do **not** re-run from scratch — re-derive completion from ground truth (codebase + `git diff` + tests, never the checkboxes), then mark verified-done work complete or re-spawn the unfinished remainder. Operationalized by `scripts/reconcile_pipeline_state.py` + `/resume-pipeline`; every auto-recovery is logged to `RECOVERY_LOG.md` and surfaced to the user. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#completion-handshake-truncation-detection). |
 | Do not skip stages | Research before architecture (unless codebase context suffices); re-invoke upstream when downstream input is incomplete |
-| BDD/TDD execution | Paired implementation + test steps; concurrent on disjoint file sets; tests run until green |
-| Batched improvements | Evaluate independence; execute with maximum parallelism via Classify / Pair-spawn / Sequence / Full-suite-gate procedure |
+| BDD/TDD execution | Paired test + implementation steps, test-first; tests run until green |
+| Batched improvements | Evaluate independence; execute via the Classify / Pair-spawn / Sequence / Full-suite-gate procedure |
 | Context-engineer shadowing | Context artifacts touched → context-engineer shadows researcher/systems-architect, appending to cumulative `CONTEXT_REVIEW.md` — [deep-dive](../../skills/software-planning/references/coordination-details.md#context-engineer-shadowing). |
 | Context-engineer scope | 1 artifact → direct invocation at any stage; 3+ artifacts or restructuring → full pipeline under planner supervision — same deep-dive as above. |
 | Sentinel | Independent of pipeline; reports (`SENTINEL_REPORT_*.md`) public to any agent or user |
@@ -144,6 +143,6 @@ Run agents in the background when their output is not immediately needed. Check 
 
 ### Parallel Execution & Boundary Discipline
 
-Launch independent agents concurrently whenever possible. Each agent has strict boundaries — when an agent encounters work outside its boundary, it flags the need and recommends invoking the appropriate agent.
+Run research, review and consult agents concurrently; writers follow the envelope's sequencing. Each agent has strict boundaries — when an agent encounters work outside its boundary, it flags the need and recommends invoking the appropriate agent.
 
 For detailed tables — boundary discipline, parallel execution, intra-stage parallelism, multi-perspective analysis, context-engineer and doc-engineer engagement, interaction reporting — load the `software-planning` skill's [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md).

@@ -12,7 +12,7 @@ Detailed tables and specifications for the SWE agent coordination pipeline. This
 | Planner | Decomposes and supervises | Redesign |
 | Context Engineer | Manages information architecture, implements context artifacts, shadows research/architecture stages with `CONTEXT_REVIEW.md` | Implement features |
 | Implementer | Implements steps, makes tests pass, fixes broken pre-existing tests | Plan, skip, reorder steps |
-| Test-Engineer | Designs behavioral tests from acceptance criteria, writes test suites concurrently with implementer | Write production code, modify plans |
+| Test-Engineer | Designs behavioral tests from acceptance criteria, writes test suites before the paired implementer (RED first) | Write production code, modify plans |
 | Verifier | Identifies issues, recommends actions | Fix issues |
 | Doc-engineer | Proactively maintains project documentation at pipeline checkpoints and in parallel execution during implementation | Manage context artifacts |
 | Sentinel | Diagnoses and reports across ecosystem | Fix artifacts |

@@ -104,7 +104,7 @@ Task slugs isolate a pipeline's entire working state from other pipelines. When 
 <a id="bdd-tdd-execution"></a>
 ## BDD/TDD Execution
 
-The planner produces paired implementation and test steps. Test-engineers design behavioral tests from the systems plan's acceptance criteria — tests encode **what** the system should do, not **how** it does it. The implementer and test-engineer execute concurrently on disjoint file sets (production code vs test code).
+The planner produces paired implementation and test steps. Test-engineers design behavioral tests from the systems plan's acceptance criteria — tests encode **what** the system should do, not **how** it does it. The pair runs **in sequence, test first**: the test-engineer reports RED, the orchestrator red-checks it, then the implementer spawns on the disjoint production file set.
 
 ### Paired Step Pattern
 
@@ -114,7 +114,7 @@ For each behavior in the acceptance criteria:
 2. **Implementation step** (implementer): write the production code that makes the tests pass.
 3. **Integration checkpoint** (implementer): run the full test suite (new tests + pre-existing tests). Fix all failures — including pre-existing tests broken by the change (boy scout rule).
 
-The test and implementation steps run concurrently because their file sets are disjoint. The integration checkpoint is sequential — it depends on both paired steps completing.
+The test step completes before the implementation step starts. Running them concurrently lets the implementer finish before any RED exists, so the tests never prove they can fail; and two agents that read the spec at the same time can agree on the same misreading. The integration checkpoint depends on both paired steps completing.
 
 ### Fix Cycle
 
@@ -137,12 +137,43 @@ Cross-reference: the `software-planning` skill's "Testing in Plan Steps (BDD/TDD
 
 ## Batched Improvement Execution
 
-When a list of improvements is presented (from sentinel reports, code reviews, analysis, or user requests), the main agent must evaluate their independence and execute with maximum parallelism:
+When a list of improvements is presented (from sentinel reports, code reviews, analysis, or user requests), the main agent must evaluate their independence and execute them within the tier's [spawn budget](#spawn-budget):
 
 1. **Classify** each improvement's file set — identify which improvements touch disjoint files and can run concurrently vs. which overlap and must be sequenced.
-2. **Pair-spawn** an `implementer` + `test-engineer` for each independent improvement, launching as many pairs concurrently as the concurrency limit allows (2-3 pairs). Each pair follows the standard BDD/TDD cycle: implementer writes production code, test-engineer writes tests, run the new tests until green.
+2. **Pair-spawn** a `test-engineer` then an `implementer` for each independent improvement. Independent pairs may overlap (2-3 at most) only when their file sets are disjoint and each commits by pathspec; within a pair the standard BDD/TDD cycle holds — tests RED first, then production code, then the new tests until green.
 3. **Sequence** dependent improvements — when two improvements touch overlapping files, the second pair waits for the first to complete.
 4. **Full suite gate** — after all improvement pairs have completed and their individual tests pass, run the full project test suite once. Fix any regressions before considering the batch done.
+
+<a id="spawn-budget"></a>
+## Spawn Budget
+
+The Standard/Full envelope has two halves: the [artifact floor](artifact-inventory.md#per-tier-artifact-floor) (what the run must produce) and the spawn budget (how many agent contexts it may open). The floor lives in `scripts/artifact_registry.py`; the budget lives here.
+
+| Tier | Budget | Counts as a spawn |
+|------|--------|-------------------|
+| Standard | ≤ 8 | every first start of an agent in this slug, plus every resume into an agent already holding ≥ 250k tokens of context |
+| Full | ≤ 16 | same |
+
+A resume into a small context is free under the count, but it is not free: it is reported separately with its context size, because resumes are where a capped count hides its real cost.
+
+### Reading the count
+
+Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log — the `agent_start` rows whose `project` is the slug — so it counts only this pipeline. A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume. Exit codes: `0` counted (within budget), `1` over budget, `2` count withheld (no log in this checkout, slug not seen yet, or a plugin-cache root) — a withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
+
+### When the next spawn would exceed the budget
+
+Stop at the checkpoint and pick one:
+
+1. **Re-tier** Standard → Full (user-confirmed) when the remaining work is genuinely Full-shaped — cross-cutting, or more behaviours than planned.
+2. **Split** — land and commit the completed work; the remainder becomes a new slug with its own plan and budget.
+
+Cheaper moves that the orchestrator can make without spawning — authoring a mechanical step itself, dropping a shadow whose output is already fixed — are legitimate before either option, provided the step is still reviewed.
+
+Never meet the budget by:
+
+- **unpairing a step that owns an external side effect** (paid API calls, a shipped hook, a published artifact) — the rework it causes lands exactly on the unpaired path;
+- **skipping the verifier**;
+- resuming an exhausted agent to avoid the count — past the heavy-context threshold the resume is counted anyway.
 
 ## Context-Engineer Shadowing
 

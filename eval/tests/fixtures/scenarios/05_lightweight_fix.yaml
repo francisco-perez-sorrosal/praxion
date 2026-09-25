@@ -19,9 +19,10 @@ llm_rubric: >
   inline. Task tools for tracking. No SDD, no three-document planning." The
   protocol also mandates, at every tier: "All tiers append a row to
   `.ai-state/calibration_log.md` on completion" — so that file is REQUIRED
-  and never counts against the run. The fixed source file is expected, and so
-  is a test file added or updated to verify the fix: verification is part of
-  the fix, not planning overhead. FAIL only when the list contains a
+  and never counts against the run. The fixed source file is expected. A test
+  file added or updated to verify the fix is permitted but not required —
+  verification is part of the fix, not planning overhead. FAIL when the
+  calibration row is missing, or when the list contains a
   full-pipeline document (SYSTEMS_PLAN.md, IMPLEMENTATION_PLAN.md, WIP.md,
   VERIFICATION_REPORT.md, a spec, or an ADR) or files unrelated to the
   seeded fix. Do not judge by the number of files.

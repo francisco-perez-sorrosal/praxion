@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-24T19:12:45Z'
+generated_at: '2026-09-25T07:47:05Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -128,7 +128,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-22'
+  last_modified: '2026-09-25'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -514,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-23'
+  last_modified: '2026-09-24'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -545,7 +545,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-24'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-24'
+  last_modified: '2026-09-25'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -561,13 +561,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-23'
+  last_modified: '2026-09-24'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-24'
+  last_modified: '2026-09-25'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2940,11 +2940,17 @@ surfaces:
   title: "Live context-layer scenario runner \u2014 isolated headless sessions produce the seeded scenarios' recorded values"
   last_modified: '2026-09-24'
   renderer: adr_card
+- id: ai-state-decisions-393-one-step-document-schema-module
+  path: .ai-state/decisions/393-one-step-document-schema-module.md
+  type: markdown
+  title: One shared step-document schema module parses the Result line and step blocks for both the TEST_RESULTS shape gate and the pipeline reconciler
+  last_modified: '2026-09-25'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-23'
+  last_modified: '2026-09-24'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3655,6 +3661,7 @@ groups:
   - ai-state-decisions-390-cost-collector-agent-stop-grain
   - ai-state-decisions-391-context-layer-isolation-sandbox-home
   - ai-state-decisions-392-live-context-layer-scenario-runner
+  - ai-state-decisions-393-one-step-document-schema-module
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

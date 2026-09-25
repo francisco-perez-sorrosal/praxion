@@ -1,7 +1,8 @@
 ---
-id: dec-draft-7afa9ce3
+id: dec-393
+draft_id: dec-draft-7afa9ce3
 title: One shared step-document schema module parses the Result line and step blocks for both the TEST_RESULTS shape gate and the pipeline reconciler
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-25
 summary: "A new private stdlib-only sibling, scripts/_step_schema.py, owns the step-id grammar, the step-heading parse, the Result-line contract (Counts | NoRun | Malformed), the TEST_RESULTS step-block splitter and the WIP claim parser (checklist, status table, [x] heading); check_test_results_shape.py and reconcile_pipeline_state.py both import it instead of carrying parallel regexes that had already drifted (td-214). The contract it encodes: pass=0 is never green; preexisting= is additive and never affects status; 'Result: none' declares a no-run block; only step headings open a block."

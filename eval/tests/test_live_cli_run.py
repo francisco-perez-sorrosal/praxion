@@ -139,6 +139,27 @@ def test_eval_log_row_keeps_nine_columns_and_carries_pass_rates_and_verdict_in_n
     assert "lowered=True" in cells[-1]  # the canary verdict, not swallowed
 
 
+def test_eval_log_row_of_a_filtered_run_says_partial_and_names_only_selected(capsys):
+    """A one-scenario re-measure must not read as a full run whose other
+    scenarios all came back null."""
+    import argparse
+
+    from praxion_evals.live import report
+
+    args = argparse.Namespace(**{**vars(_STUB_ARGS), "canary": False, "scenario": ["x"]})
+    head = _variant_stub("head", _spawn_selection_block([(1, 0, 0)] * 5))
+    head["scenarios"].append({"scenario_id": "x", "counts": {}, "pass_rate": 1.0, "cases": []})
+    output = report.build_output(args, "2026-01-01T00:00:00Z", [head])
+
+    report.print_eval_log_row(output, "494dccaa")
+
+    row = next(line for line in capsys.readouterr().out.splitlines() if line.startswith("| "))
+    notes = row.strip("|").split("|")[-1]
+    assert "partial run (x)" in notes
+    assert "x=100%" in notes
+    assert "spawn-selection" not in notes
+
+
 # ---------------------------------------------------------------------------
 # The materialized copy is read-only, and a digest mismatch after a variant
 # turns that variant's sessions into an isolation breach

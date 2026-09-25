@@ -272,9 +272,15 @@ def print_eval_log_row(output: Mapping[str, Any], resolved: Path | str) -> None:
 
 
 def _notes_measurement(output: Mapping[str, Any], head: Mapping[str, Any] | None) -> str:
-    rates = "; ".join(
-        f"{s['scenario_id']}={_pct(s['pass_rate'])}" for s in (head or {}).get("scenarios", [])
-    )
+    selected = output["run"].get("scenarios")
+    scenarios = [
+        s
+        for s in (head or {}).get("scenarios", [])
+        if selected is None or s["scenario_id"] in selected
+    ]
+    rates = "; ".join(f"{s['scenario_id']}={_pct(s['pass_rate'])}" for s in scenarios)
+    if selected is not None:
+        rates = f"partial run ({', '.join(selected)}); {rates}"
     canary = output.get("canary")
     if canary is None:
         return rates

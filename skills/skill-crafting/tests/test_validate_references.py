@@ -742,3 +742,24 @@ def test_emdash_heading_double_hyphen_anchor_not_flagged(tmp_path: Path) -> None
         "Double-hyphen anchor for an em-dash heading is GitHub-correct and "
         f"must not be flagged; got {flagged}"
     )
+
+
+@skip_if_no_validator
+def test_leading_symbol_heading_keeps_its_leading_hyphen_anchor(tmp_path: Path) -> None:
+    """Regression: GitHub never trims hyphens from a slug.
+
+    A heading that opens with a stripped symbol (`## § Guard G1 — x`) keeps
+    the space that followed it, so its GitHub anchor starts with a hyphen:
+    `-guard-g1--x`. Trimming it false-FAILs the correct link.
+    """
+    repo = _copy_fixture_repo(tmp_path)
+    doc = repo / "skills" / "alpha" / "references" / "section-sign.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(
+        "# Doc\n\nSee [§ Guard G1](#-guard-g1--x).\n\n## § Guard G1 — x\n\nbody\n",
+        encoding="utf-8",
+    )
+    result = _run("--all", "--format", "json", repo_root=repo)
+
+    flagged = _findings_for(result, file_suffix="section-sign.md", target_contains="guard-g1--x")
+    assert flagged == [], f"leading-hyphen anchor is GitHub-correct; got {flagged}"

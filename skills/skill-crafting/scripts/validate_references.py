@@ -76,9 +76,13 @@ class RawLink:
 
 
 def github_slug(heading: str) -> str:
-    """GitHub-compatible anchor slug: lowercase, strip punct except -/_, spaces->-."""
+    """GitHub-compatible anchor slug: lowercase, strip punct except -/_, spaces->-.
+
+    No trimming: GitHub keeps the hyphen a leading or trailing stripped symbol
+    leaves behind (`## § Guard` -> `-guard`).
+    """
     s = SLUG_STRIP_RE.sub("", heading.strip().lower())
-    return SLUG_SPACE_RE.sub("-", s).strip("-_")
+    return SLUG_SPACE_RE.sub("-", s)
 
 
 def build_slug_map(headings: list[str]) -> tuple[set[str], set[str]]:

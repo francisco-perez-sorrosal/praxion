@@ -57,7 +57,7 @@ unsafe fn write_at(ptr: *mut u8, offset: usize, value: u8) {
 
 Every `unsafe fn` and `unsafe trait` carries a rustdoc `# Safety` section spelling out the
 invariants the *caller* must uphold — the same C-FAILURE contract covered in
-[error-and-panic.md](error-and-panic.md#doc-comment-error-contract--errors--panics--safety). A
+[error-and-panic.md](error-and-panic.md#doc-comment-error-contract--errors---panics---safety). A
 public `unsafe fn` with no `# Safety` section is an incomplete contract, not merely under-documented.
 
 ### `unsafe_code = "forbid"` — the Two Legitimate Settings

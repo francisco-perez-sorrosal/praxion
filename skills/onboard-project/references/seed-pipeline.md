@@ -285,7 +285,7 @@ Never copy symbol names from this file into generated code — this file deliber
 
 ## §Init idempotency
 
-The seed pipeline appends the same five blocks to `CLAUDE.md` that Phase 6 owns: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. **This is the same write, not a second one** — use [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s classification mechanism verbatim, rather than restating it here: `refresh_claude_blocks.py`'s absent/current/stale/modified classifier for the four refreshable blocks, and an independent heading-grep for Project Essentials (`## Working in this project`).
+The seed pipeline appends the same five blocks to `CLAUDE.md` that Phase 6 owns: §Agent Pipeline Block, §Compaction Guidance Block, §Behavioral Contract Block, §Praxion Process Block, §Project Essentials Block. **This is the same write, not a second one** — use [phases-core.md § Phase 6](phases-core.md#phase-6--claudemd-praxion-blocks)'s classification mechanism verbatim, rather than restating it here: `refresh_claude_blocks.py`'s absent/current/stale/modified classifier for the four refreshable blocks, and an independent heading-grep for Project Essentials (`## Working in this project`).
 
 Re-running the engine in any mode never duplicates a section. If the seed lands all five blocks during greenfield, Phase 6 becomes a complete no-op (every per-block predicate hits) — the smooth-integration contract.
 
@@ -483,7 +483,7 @@ Per-phase predicates that govern §Flow steps. Re-running the seed pipeline on a
 | 5f.4 (architecture.yml) | `test -e .github/workflows/architecture.yml` |
 | 5f.5 (docs/diagrams/.gitkeep) | `test -e docs/diagrams/.gitkeep` OR directory non-empty |
 | 8 (Python `.gitignore` block) | `grep -q '^# Python$' .gitignore` AND each of the four lines (`__pycache__/`, `.venv/`, `*.egg-info/`, `.pytest_cache/`) already present |
-| 10a–10d (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process append) | [phases-core.md § Phase 6](phases-core.md#-phase-6--claudemd-praxion-blocks)'s `refresh_claude_blocks.py` absent/current/stale/modified classifier — no separate heading-grep predicate |
+| 10a–10d (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process append) | [phases-core.md § Phase 6](phases-core.md#phase-6--claudemd-praxion-blocks)'s `refresh_claude_blocks.py` absent/current/stale/modified classifier — no separate heading-grep predicate |
 | 10e (Hackathon Mode append — only when hackathon mode is enabled) | `grep -q '^## Hackathon Mode$' CLAUDE.md` |
 | 10f (Working-in-this-project append) | `grep -q '^## Working in this project$' CLAUDE.md` |
 | 10g (Obsidian Integration append — only when Obsidian integration is enabled) | `grep -q '^## Obsidian Integration$' CLAUDE.md` |

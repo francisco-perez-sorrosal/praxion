@@ -96,7 +96,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 ## §Phase 2 — `.ai-state/` skeleton
 
-**Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`. The three `CONSULT_*.md` skeletons are the one exception to *brief*: the convening instructions cite `<file> § Column Definitions` as the schema, so each file **is** its own schema anchor and must ship with that section complete rather than pointing elsewhere.
+**Canonical schemas.** TECH_DEBT_LEDGER schema (14 row fields + structural `dedup_key`), producer/consumer contracts, and dedup semantics: [`skills/software-planning/references/tech-debt-ledger.md`](../../../skills/software-planning/references/tech-debt-ledger.md) (summary + pointer in `rules/swe/agent-intermediate-documents.md` § `TECH_DEBT_LEDGER.md`). DECISIONS_INDEX format and calibration_log format: `rules/swe/agent-intermediate-documents.md`. The skeletons below are header-only seeds — agents populate rows over time per the canonical contracts. ADR fragment naming and lifecycle live in `rules/swe/adr-conventions.md`. The three `CONSULT_*.md` skeletons are the one exception to *brief*: the convening instructions cite `<file> § Column Definitions` as the schema, so each file **is** its own schema anchor and must ship with that section complete rather than pointing elsewhere.
 
 **Predicate.** Each file's existence is checked individually. Existing files are never overwritten.
 
@@ -116,7 +116,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   ```markdown
   # Tech Debt Ledger
 
-  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel, orchestrator, architect-validator) append rows; consumers update `status` in place. Schema (14 row fields + structural `dedup_key`): [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md).
+  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel, orchestrator, architect-validator) append rows; consumers update `status` in place. Schema (14 row fields + structural `dedup_key`): [`skills/software-planning/references/tech-debt-ledger.md`](../../../skills/software-planning/references/tech-debt-ledger.md).
 
   | id | severity | class | direction | location | goal-ref-type | goal-ref-value | source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |
   |----|----------|-------|-----------|----------|---------------|----------------|--------|------------|-----------|------------|--------|-------------|-------|-----------|
@@ -409,7 +409,7 @@ disable:
 
 The user can then rename `.example` to `.claude/praxion-rules.yaml` and uncomment entries in the `disable:` list to activate them (or keep `.example` for reference and author a fresh `praxion-rules.yaml` from scratch).
 
-See [`docs/rules-taxonomy.md`](../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and disable-list configuration. A project with no `.claude/praxion-rules.yaml` loads all rules identically to the original behavior — backward compatible, opt-out default.
+See [`docs/rules-taxonomy.md`](../../../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and disable-list configuration. A project with no `.claude/praxion-rules.yaml` loads all rules identically to the original behavior — backward compatible, opt-out default.
 
 ## §Phase 5b — Hackathon mode gate
 

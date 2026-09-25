@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -766,6 +767,125 @@ def test_main_reports_no_local_wal_on_stderr_when_absent(tmp_path, capsys, monke
     err = capsys.readouterr().err
     assert "no local WAL" in err
     assert exit_code == 0
+
+
+# --- Files: field admission ignores a trailing parenthetical rationale ------
+
+
+def test_split_files_admits_only_the_declared_path_when_followed_by_a_parenthetical_rationale():
+    """A rationale in parentheses naming an unrelated document must never be
+    read as a second declared file, and the rationale's own trailing token
+    must never survive as a bare fragment either."""
+    assert rps._split_files("scripts/a.py (see .ai-work/x/WIP.md, n/a)") == ["scripts/a.py"]
+
+
+def test_split_files_recognizes_a_bare_none_declaration_with_stray_leading_emphasis():
+    """A ``**Files:** none`` field renders its captured value with a leading
+    ``**`` still attached to the token -- the none/n-a check must strip
+    markdown emphasis before testing, not only surrounding whitespace."""
+    assert rps._split_files("** none") == []
+
+
+def test_split_files_admits_backtick_quoted_comma_separated_paths():
+    assert rps._split_files("`src/a.py`, `src/b.py`") == ["src/a.py", "src/b.py"]
+
+
+def test_split_files_admits_bare_comma_separated_paths():
+    assert rps._split_files("src/a.py, src/b.py") == ["src/a.py", "src/b.py"]
+
+
+def test_split_files_does_not_admit_an_extensionless_top_level_name():
+    """Declared limit: a bare top-level filename with no directory separator
+    and no extension (e.g. ``Makefile``) is never treated as a declared file."""
+    assert rps._split_files("Makefile") == []
+
+
+# --- a wrapped Files: field keeps every trailing-comma continuation line ----
+#
+# Verbatim excerpt of a real harvested plan's Files: field -- roughly 38 of
+# 296 real fields wrap this way, and every continuation line must be gathered
+# before the admission predicate runs, not just the opening line.
+
+_P3_5_WRAPPED_FILES_FIELD = (
+    "**Files**: `scripts/project_metrics/tests/test_cost_collector.py`,\n"
+    "`scripts/project_metrics/tests/fixtures/cost/attributed.jsonl`,\n"
+    "`scripts/project_metrics/tests/fixtures/cost/pre_attribution.jsonl`,\n"
+    "`scripts/project_metrics/tests/fixtures/cost/unparsed.jsonl`,\n"
+    "`scripts/project_metrics/tests/fixtures/cost/parent_sourced_synthetic.jsonl`\n"
+)
+
+
+def test_scan_step_files_keeps_every_line_of_a_wrapped_trailing_comma_continuation(tmp_path):
+    plan_path = tmp_path / "IMPLEMENTATION_PLAN.md"
+    plan_path.write_text("### Step 1: RED\n" + _P3_5_WRAPPED_FILES_FIELD, encoding="utf-8")
+    assert rps._scan_step_files(plan_path)["Step 1"] == [
+        "scripts/project_metrics/tests/test_cost_collector.py",
+        "scripts/project_metrics/tests/fixtures/cost/attributed.jsonl",
+        "scripts/project_metrics/tests/fixtures/cost/pre_attribution.jsonl",
+        "scripts/project_metrics/tests/fixtures/cost/unparsed.jsonl",
+        "scripts/project_metrics/tests/fixtures/cost/parent_sourced_synthetic.jsonl",
+    ]
+
+
+# --- a declared glob matches only under its own directory -------------------
+
+
+def test_path_match_anchored_glob_never_falls_back_to_a_bare_basename_match():
+    """A glob's own trailing ``*`` must not become a wildcard for any filename
+    anywhere in the repo once its directory prefix stops matching."""
+    assert rps._path_match(
+        "eval/tests/fixtures/scenarios/*", "eval/tests/fixtures/scenarios/foo.yaml"
+    )
+    assert not rps._path_match("eval/tests/fixtures/scenarios/*", "unrelated/other/x.py")
+
+
+# --- production call shape: a real git repo drives the same anchored-glob fix -
+
+
+def _run_git(args: list[str], cwd: Path) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def _git_capture(args: list[str], cwd: Path) -> str:
+    completed = subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+    return completed.stdout.strip()
+
+
+def test_reconcile_never_confirms_a_step_from_a_file_that_only_matches_a_globs_basename(tmp_path):
+    """Through ``reconcile()``'s own production call shape, over a real git
+    repo -- not just the ``_path_match`` unit. A step declaring a glob must
+    stay unconfirmed when the only real change lives outside the glob's
+    directory, even though the change's basename incidentally matches ``*``."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _run_git(["init", "-q"], repo_root)
+    _run_git(["config", "user.email", "test@example.com"], repo_root)
+    _run_git(["config", "user.name", "Test User"], repo_root)
+    (repo_root / "README.md").write_text("seed\n", encoding="utf-8")
+    _run_git(["add", "README.md"], repo_root)
+    _run_git(["commit", "-q", "-m", "seed"], repo_root)
+    base_sha = _git_capture(["rev-parse", "HEAD"], repo_root)
+
+    plan = (
+        "### Step 1: Add scenario fixtures\n"
+        "**Files**: eval/tests/fixtures/scenarios/*\n"
+        "**Done when**: fixtures land\n"
+    )
+    _setup(repo_root, "- [x] Step 1: add scenario fixtures\n", plan)
+
+    (repo_root / "unrelated" / "other").mkdir(parents=True)
+    (repo_root / "unrelated" / "other" / "x.py").write_text("# unrelated\n", encoding="utf-8")
+    _run_git(["add", "unrelated/other/x.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "unrelated change"], repo_root)
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    verdict = _verdict_for(out, "Step 1")
+    assert verdict["verdict"] != "verified-complete", (
+        "an unrelated file must not confirm a glob-declared Files: field via "
+        "basename-only fallback matching"
+    )
 
 
 if __name__ == "__main__":

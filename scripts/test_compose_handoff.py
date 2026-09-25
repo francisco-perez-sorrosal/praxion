@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -1894,6 +1895,79 @@ def test_recent_log_skips_a_dangling_symlink_and_reports_the_real_log_behind_it(
     state = _extract_section(result["text"], "§1 State")
     assert "`step-2.log` changed 0s ago" in state
     assert "step-1.log" not in state
+
+
+# --- the next-action picker skips a file-less `unknown` step ----------------
+#
+# A step reconciled to `unknown` means "claimed complete, no attributable
+# ground truth" -- it is not actionable, only verifiable. The picker must
+# never name it as the next action while later work is still actionable, and
+# must surface it separately as human verification owed rather than dropping
+# it silently.
+
+
+def _verdict(step: str, verdict: str, **extra) -> dict:
+    """A minimal verdict dict -- just the fields the next-action picker reads."""
+    return {"step": step, "verdict": verdict, **extra}
+
+
+def test_skips_the_unknown_step_and_lists_it_as_owed_verification_alongside_the_mismatch():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "unknown"),  # id-citation-discipline:ignore
+        _verdict("Step 3", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 4", "mismatch"),  # id-citation-discipline:ignore
+    ]
+    text = compose_handoff._render_next_action(verdicts)
+    assert text.startswith("`Step 4`"), (  # id-citation-discipline:ignore
+        "the file-less unknown step must never be named as next action while a "
+        "mismatch step is still actionable"
+    )
+    assert "Step 2" in text, "the unknown step must still be named"  # id-citation-discipline:ignore
+    assert re.search(r"verif", text, re.IGNORECASE), (
+        "the unknown step must read as verification owed, not as an ordinary next action"
+    )
+
+
+def test_falls_back_to_the_first_unknown_when_nothing_else_is_actionable():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "unknown"),  # id-citation-discipline:ignore
+        _verdict("Step 3", "unknown"),  # id-citation-discipline:ignore
+    ]
+    text = compose_handoff._render_next_action(verdicts)
+    assert "Step 2" in text  # id-citation-discipline:ignore
+    assert re.search(r"verif", text, re.IGNORECASE)
+
+
+def test_reports_the_phase_next_move_when_every_step_is_verified_complete():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "verified-complete"),  # id-citation-discipline:ignore
+    ]
+    text = compose_handoff._render_next_action(verdicts)
+    assert "verified-complete against ground truth" in text
+    assert "Step 1" not in text  # id-citation-discipline:ignore
+    assert "Step 2" not in text  # id-citation-discipline:ignore
+
+
+def test_default_boundary_shares_the_picker_and_skips_an_unknown_step():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "unknown"),  # id-citation-discipline:ignore
+        _verdict("Step 3", "mismatch"),  # id-citation-discipline:ignore
+    ]
+    boundary = compose_handoff._default_boundary(verdicts)
+    assert boundary == f"{compose_handoff.MID_PHASE_PREFIX}Step 3"  # id-citation-discipline:ignore
+
+
+def test_default_boundary_falls_back_to_the_first_unknown_when_it_is_all_that_is_left():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "unknown"),  # id-citation-discipline:ignore
+    ]
+    boundary = compose_handoff._default_boundary(verdicts)
+    assert boundary == f"{compose_handoff.MID_PHASE_PREFIX}Step 2"  # id-citation-discipline:ignore
 
 
 if __name__ == "__main__":

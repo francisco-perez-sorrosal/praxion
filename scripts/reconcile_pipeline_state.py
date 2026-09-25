@@ -370,31 +370,87 @@ def _parse_plan_files(plan_path: Path, wip_path: Path) -> dict[str, list[str]]:
 
 
 def _scan_step_files(path: Path) -> dict[str, list[str]]:
-    """Scan a plan/WIP doc: associate each ``**Files**:`` line with its step."""
+    """Scan a plan/WIP doc: associate each ``**Files**:`` line with its step.
+
+    A ``Files:`` field that wraps mid-value ends its line with a trailing
+    comma; every further line ending in a comma continues the same logical
+    value, so the admission predicate in ``_split_files`` sees the whole
+    declaration rather than losing everything after the wrap.
+    """
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return {}
     result: dict[str, list[str]] = {}
     current: str | None = None
-    for line in lines:
+    index = 0
+    while index < len(lines):
+        line = lines[index]
         step = _PLAN_STEP_RE.match(line) or _WIP_STEP_RE.match(line)
         if step:
             current = f"Step {step.group('num')}"
+            index += 1
             continue
         fm = _FILES_FIELD_RE.match(line)
         if fm and current:
-            result.setdefault(current, []).extend(_split_files(fm.group("files")))
+            value, index = _collect_files_value(fm.group("files"), lines, index)
+            result.setdefault(current, []).extend(_split_files(value))
+            continue
+        index += 1
     return result
 
 
+def _collect_files_value(first: str, lines: list[str], index: int) -> tuple[str, int]:
+    """Join a ``Files:`` value with its trailing-comma continuation lines.
+
+    Returns the joined value and the index of the first line not consumed.
+    """
+    parts = [first]
+    index += 1
+    while parts[-1].rstrip().endswith(",") and index < len(lines):
+        parts.append(lines[index])
+        index += 1
+    return " ".join(parts), index
+
+
+# A field value that, once leading markdown emphasis is stripped, declares no
+# files at all.
+_FILES_NONE_RE = re.compile(r"^(none|n/a)\b", re.IGNORECASE)
+# A path-safe token — letters, digits, the punctuation a path or glob uses.
+_FILE_CANDIDATE_RE = re.compile(r"^[A-Za-z0-9_./*?\[\]-]+$")
+# A parenthetical span in a Files: value is rationale ("(see WIP.md)"), never
+# a path — dropped before tokenizing so its contents can't be mistaken for one.
+_RATIONALE_RE = re.compile(r"\([^)]*\)")
+
+
 def _split_files(raw: str) -> list[str]:
-    """Split a Files: field value into individual paths."""
-    raw = raw.strip().strip("[]`")
-    parts = re.split(r"[,\s]+", raw)
-    return [
-        p.strip().strip("`") for p in parts if p.strip() and "/" in p or p.strip().endswith(".py")
-    ]
+    """Split a ``Files:`` field value into the individual paths it declares.
+
+    A bare ``none``/``n/a`` — after stripping a bolded label's leading ``*``
+    captured along with it — declares zero files. Otherwise: strip
+    parenthetical rationale spans; tokenize on backtick-quoted spans when the
+    value contains any backtick, else on commas/whitespace; admit a candidate
+    only when it looks like a path — path-safe characters, a ``/`` or ``.``
+    somewhere in it, no trailing ``/``, and no pointer into this pipeline's own
+    ``.ai-work/`` bookkeeping (a step may legitimately cite its own artifacts
+    as rationale, but that is not a file it changed).
+    """
+    value = raw.strip().lstrip("*").strip()
+    if _FILES_NONE_RE.match(value):
+        return []
+    value = _RATIONALE_RE.sub(" ", value)
+    tokens = re.findall(r"`([^`]+)`", value) if "`" in value else re.split(r"[,\s]+", value)
+    candidates = (token.strip().strip("`").rstrip(".,;:") for token in tokens)
+    return [c for c in candidates if c and _is_admitted_file(c)]
+
+
+def _is_admitted_file(candidate: str) -> bool:
+    return (
+        bool(_FILE_CANDIDATE_RE.match(candidate))
+        and ("/" in candidate or "." in candidate)
+        and not candidate.endswith("/")
+        and not candidate.startswith(".ai-work/")
+    )
 
 
 def _read_test_status(path: Path) -> str:
@@ -551,11 +607,11 @@ def _path_match(declared: str, candidate: str) -> bool:
     if not d or not c:
         return False
     if any(ch in d for ch in "*?["):
-        return (
-            fnmatch.fnmatch(c, d)
-            or fnmatch.fnmatch(c, "*/" + d)
-            or fnmatch.fnmatch(Path(c).name, Path(d).name)
-        )
+        # Anchored: a glob declaration matches the full candidate path or the
+        # candidate under any leading directory, never a bare basename — a
+        # basename-only fallback here let a declared `dir/*` match any changed
+        # file anywhere in the repo, making glob declarations vacuous evidence.
+        return fnmatch.fnmatch(c, d) or fnmatch.fnmatch(c, "*/" + d)
     return (
         c == d
         or c.endswith("/" + d)

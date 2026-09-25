@@ -25,6 +25,10 @@ allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Task]
 
 Onboard a project to work cleanly with the Praxion plugin (`praxion`) — one phase engine covering all four entry states (`new`, `existing`, `hackathon`, `promote`; see §Mode × Phase Matrix). Detection (§Pre-flight) computes a correct default for nearly everything; the command fires at most three `AskUserQuestion` gates (§Phase Gates) — mode confirm, build intent, and a single capability Profile — rather than pausing once per phase.
 
+Invocation arguments: $ARGUMENTS
+
+Parse the mode and flags from that line, per `argument-hint`; when it is empty, detect the mode (§Pre-flight). (Declaring `arguments:` stops Claude Code from appending the typed input on its own, so the placeholder above is the only way it arrives.)
+
 ## Sections
 
 1. §Pre-flight — repo + plugin detection, no writes

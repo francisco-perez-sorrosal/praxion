@@ -33,6 +33,10 @@ allowed-tools: [Workflow, Read, Glob, Grep, AskUserQuestion]
 
 Runs the honest-uncertainty gate, derives or accepts lenses, pre-flights the target artifacts, launches the fan-out via `Workflow`, and verifies the typed return against disk before reporting. Only a direct `/lens-fanout` invocation reaches this body -- `disable-model-invocation: true` keeps a model from ever choosing to fan out on its own.
 
+Invocation arguments: $ARGUMENTS
+
+Parse the question and flags from that line, per `argument-hint`; when it is empty, ask for the question. (Declaring `arguments:` stops Claude Code from appending the typed input on its own, so the placeholder above is the only way it arrives.)
+
 ## 1. Gate -- honest uncertainty
 
 Before doing anything else, state at least two plausible, genuinely rival answers to the question. If fewer than two rival answers exist, refuse: report which limb of the gate failed (fewer than two plausible paths) and suggest the single-agent research path instead. A fan-out must never manufacture strawmen to justify itself -- this refusal fires before any tool call.

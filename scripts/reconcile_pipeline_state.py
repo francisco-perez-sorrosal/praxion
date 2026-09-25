@@ -46,8 +46,8 @@ from typing import Any
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _step_schema import (
-    STEP_ID_RE,
     Counts,
+    checklist_step_id,
     parse_wip_claims,
     split_step_blocks,
     step_id_from_heading,
@@ -69,14 +69,6 @@ STEP_EXECUTING_AGENT_TYPES = frozenset(
     }
 )
 
-# `_step_schema.STEP_ID_RE`, unanchored so it embeds in the pattern below --
-# one grammar, never a second hand-rolled copy.
-_STEP_ID_SHAPE = STEP_ID_RE.pattern.strip("^$")
-# A WIP progress entry: "- [x] Step 3 ...", "- [ ] Step 1b (test-engineer): ..."
-# (file-scanning only -- claim parsing is `_step_schema.parse_wip_claims`.)
-_WIP_STEP_RE = re.compile(
-    rf"^\s*-\s*\[(?P<box>[ xX])\]\s*(?P<body>.*Step\s+(?P<num>{_STEP_ID_SHAPE})\b.*)$"
-)
 # A "**Files**:" field line under a plan step.
 _FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re.IGNORECASE)
 # The legacy free-form pytest-summary phrasing -- word-boundary count tokens
@@ -159,7 +151,7 @@ def reconcile(
         # list — a file another, earlier step also declares is necessary but
         # not sufficient evidence for this step (see `attributable`).
         files = attributable(step_id, declared_files)
-        earlier_declarer = _earliest_declarer(step_id, declared_files) if not files else None
+        earlier_declarers = _earlier_declarers(step_id, declared_files) if not files else []
         tier2 = _correlate_agents(files, wal_rows)
         test_status = (
             _test_status_override
@@ -174,7 +166,7 @@ def reconcile(
                 changed_files=changed_files,
                 test_status=test_status,
                 tier2=tier2,
-                earlier_declarer=earlier_declarer,
+                earlier_declarers=earlier_declarers,
             )
         )
     return verdicts
@@ -185,14 +177,15 @@ def reconcile(
 # ---------------------------------------------------------------------------
 
 
-def _no_attributable_files_reason(claim: str, verdict: str, earlier_declarer: str | None) -> str:
-    """Evidence text when a step has no attributable file -- names the earlier
-    declarer that absorbed it, distinct from a genuinely file-less step."""
+def _no_attributable_files_reason(claim: str, verdict: str, earlier_declarers: list[str]) -> str:
+    """Evidence text when a step has no attributable file -- names every
+    earlier declarer that absorbed one, distinct from a genuinely file-less
+    step."""
     surfaced = "; surfaced for human verification" if verdict == "unknown" else ""
-    if earlier_declarer:
+    if earlier_declarers:
         return (
-            f"every declared file is also declared by {earlier_declarer} (earlier) — "
-            f"WIP claim={claim}{surfaced}"
+            f"every declared file is also declared by {', '.join(earlier_declarers)} "
+            f"(earlier) — WIP claim={claim}{surfaced}"
         )
     if verdict == "unknown":
         return (
@@ -210,12 +203,12 @@ def _classify_step(
     changed_files: set[str],
     test_status: str,
     tier2: dict[str, Any],
-    earlier_declarer: str | None = None,
+    earlier_declarers: list[str] = (),
 ) -> dict[str, Any]:
     """Classify one step. Tier-1 (git + tests) is the arbiter — ground truth
     decides "done," NOT the WIP checkbox (which is Tier-3, validated here).
     ``files`` is already the *attributable* set (see ``attributable``);
-    ``earlier_declarer`` names the step that absorbed a shared file, when any.
+    ``earlier_declarers`` names every step that absorbed a shared file, when any.
     """
     changed = [f for f in files if _path_in_changeset(f, changed_files)]
     unchanged = [f for f in files if f not in changed]
@@ -225,7 +218,7 @@ def _classify_step(
     # truth. Never guess `verified-complete`; degrade to a human-surfaced verdict.
     if not files:
         verdict = "unknown" if claim == "COMPLETE" else "pending"
-        evidence = _no_attributable_files_reason(claim, verdict, earlier_declarer)
+        evidence = _no_attributable_files_reason(claim, verdict, earlier_declarers)
         return _make_verdict(step_id, claim, verdict, tier1, tier2, evidence, [])
 
     tests_red = test_status == "red"
@@ -394,19 +387,15 @@ def _scan_step_files(path: Path) -> dict[str, list[str]]:
     value, so the admission predicate in ``_split_files`` sees the whole
     declaration rather than losing everything after the wrap.
     """
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return {}
+    lines = _read_text(path).splitlines()
     result: dict[str, list[str]] = {}
     current: str | None = None
     index = 0
     while index < len(lines):
         line = lines[index]
-        heading_step = step_id_from_heading(line)
-        wip_step = _WIP_STEP_RE.match(line) if heading_step is None else None
-        if heading_step is not None or wip_step:
-            current = heading_step or f"Step {wip_step.group('num')}"
+        step_id = step_id_from_heading(line) or checklist_step_id(line)
+        if step_id is not None:
+            current = step_id
             index += 1
             continue
         fm = _FILES_FIELD_RE.match(line)
@@ -532,18 +521,19 @@ def _legacy_block_status(block_text: str) -> str | None:
 
 
 def step_test_status(step: str, runs: list[RecordedRun]) -> str:
-    """A step's test status: its own latest run, or the file's overall latest
-    run when it has none of its own (today's global fallback, preserved)."""
+    """A step's test status: its own latest run -- or, with no own run, the
+    file's overall latest run (today's global fallback, preserved). An own
+    red run is cleared by ANY green run recorded later anywhere in the file;
+    a later red never clears an existing green."""
     own = [r for r in runs if r.step == step]
     pool = own or runs
-    return max(pool, key=lambda r: r.order).status if pool else "absent"
-
-
-def _read_test_status(path: Path) -> str:
-    """The file's overall latest recorded run, ignoring step attribution --
-    kept for callers that want one status for the whole document."""
-    runs = _recorded_runs(_read_text(path))
-    return max(runs, key=lambda r: r.order).status if runs else "absent"
+    if not pool:
+        return "absent"
+    latest = max(pool, key=lambda r: r.order)
+    if latest.status == "green":
+        return "green"
+    superseded = any(r.status == "green" and r.order > latest.order for r in runs)
+    return "green" if superseded else latest.status
 
 
 def _parse_ts(ts: str) -> datetime:
@@ -700,16 +690,15 @@ def attributable(step: str, declared: dict[str, list[str]], sort_key=step_sort_k
     return [f for f in own if not any(_files_overlap(f, other) for other in earlier_files)]
 
 
-def _earliest_declarer(
+def _earlier_declarers(
     step: str, declared: dict[str, list[str]], sort_key=step_sort_key
-) -> str | None:
-    """The earliest earlier step that already claims one of ``step``'s files --
-    named in the evidence rather than reporting a shared-only step as file-less."""
+) -> list[str]:
+    """Every earlier step that already claims at least one of ``step``'s
+    files, earliest first -- named in the evidence so a human can settle
+    every shared file, not just whichever was absorbed first."""
     own = declared.get(step, [])
     earlier = sorted((s for s in declared if sort_key(s) < sort_key(step)), key=sort_key)
-    return next(
-        (s for s in earlier if any(_files_overlap(f, o) for f in own for o in declared[s])), None
-    )
+    return [s for s in earlier if any(_files_overlap(f, o) for f in own for o in declared[s])]
 
 
 # ---------------------------------------------------------------------------

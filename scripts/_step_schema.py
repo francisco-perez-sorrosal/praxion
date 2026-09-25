@@ -278,20 +278,43 @@ def _merge_claim(claims: dict[str, Claim], step: str, claim: Claim) -> None:
         claims[step] = "AMBIGUOUS"
 
 
+def _checklist_box_and_rest(line: str) -> tuple[str, str] | None:
+    """The checkbox letter and the line's remainder past it and any markdown
+    emphasis, or None when ``line`` is not a checklist line at all."""
+    match = _CHECKLIST_BOX_RE.match(line)
+    if match is None:
+        return None
+    return match.group("box"), match.group("rest").lstrip(" \t*`")
+
+
+def checklist_step_id(line: str) -> str | None:
+    """The ``"Step <id>"`` an anchored checklist line claims, or None.
+
+    A checklist line claims a step only when its checkbox is immediately
+    followed by ``Step <id>``, past any bold/backtick emphasis -- a step only
+    mentioned later on the line is not this line's step. Shared by
+    ``parse_wip_claims``'s checklist source and any other reader answering
+    "which step does this checklist line belong to."
+    """
+    parsed = _checklist_box_and_rest(line)
+    if parsed is None:
+        return None
+    step_match = _ANCHORED_STEP_RE.match(parsed[1])
+    return f"Step {step_match.group('id')}" if step_match else None
+
+
 def _checklist_claims(text: str) -> list[tuple[str, Claim]]:
     claims = []
     for line in text.splitlines():
-        box_match = _CHECKLIST_BOX_RE.match(line)
-        if box_match is None:
+        parsed = _checklist_box_and_rest(line)
+        if parsed is None:
             continue
-        rest = box_match.group("rest").lstrip(" \t*`")
+        box, rest = parsed
         step_match = _ANCHORED_STEP_RE.match(rest)
         if step_match is None:
             continue
         step_id = f"Step {step_match.group('id')}"
-        claims.append(
-            (step_id, _claim_from_checkbox(box_match.group("box"), step_match.group("body")))
-        )
+        claims.append((step_id, _claim_from_checkbox(box, step_match.group("body"))))
     return claims
 
 

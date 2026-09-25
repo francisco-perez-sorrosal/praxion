@@ -340,108 +340,104 @@ def test_ambiguous_claim_never_false_mismatch(tmp_path):
     assert _verdict_for(out, "Step 1")["verdict"] != "mismatch"
 
 
-# --- Bug A: test status comes from the FINAL summary, not any occurrence -------
+# --- Bug A: a step with no own run falls back to the file's latest run -----
+#
+# A step with no recorded run of its own takes the file's latest run, so these
+# cases drive that fallback branch directly:
+# `step_test_status(<a step absent from the file>, _recorded_runs(text))`.
 
 
-def test_test_status_uses_final_summary(tmp_path):
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+def _fallback_status(text: str) -> str:
+    """The file's overall latest recorded run, via the production fallback
+    path for a step with no own run of its own -- the direct replacement for
+    the deleted whole-file reader."""
+    return rps.step_test_status("__no_such_step__", rps._recorded_runs(text))
+
+
+def test_test_status_uses_final_summary():
+    text = (
         "## Step 1\nEarly iteration: 3 failed, 50 passed\n"
-        "## Step 2\nFinal run: 3579 passed, 2 skipped in 12.3s\n",
-        encoding="utf-8",
+        "## Step 2\nFinal run: 3579 passed, 2 skipped in 12.3s\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_red_when_final_run_fails(tmp_path):
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text("All passed earlier: 100 passed\nThen: 2 failed, 98 passed\n", encoding="utf-8")
-    assert rps._read_test_status(p) == "red"
+def test_test_status_red_when_final_run_fails():
+    text = "All passed earlier: 100 passed\nThen: 2 failed, 98 passed\n"
+    assert _fallback_status(text) == "red"
 
 
-def test_test_status_green_for_fixed_shape_result_line(tmp_path):
+def test_test_status_green_for_fixed_shape_result_line():
     """A file in the canonical per-step shape (dec-386) whose last section's
     ``Result:`` line reports fail=0 reads as green."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=12 fail=0 skip=0\n"
-        "Duration: 0.5s\n",
-        encoding="utf-8",
+        "Duration: 0.5s\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_red_for_fixed_shape_result_line_with_failures(tmp_path):
+def test_test_status_red_for_fixed_shape_result_line_with_failures():
     """A fixed-shape Result: line with fail=2 reads as red for that line."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=10 fail=2 skip=0\n"
-        "Duration: 0.5s\n",
-        encoding="utf-8",
+        "Duration: 0.5s\n"
     )
-    assert rps._read_test_status(p) == "red"
+    assert _fallback_status(text) == "red"
 
 
-def test_test_status_mixed_shapes_last_fixed_shape_section_wins(tmp_path):
+def test_test_status_mixed_shapes_last_fixed_shape_section_wins():
     """A pytest-style red line followed by a later fixed-shape green section —
     last line wins overall, across shapes."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Early iteration: 3 failed, 50 passed\n"
         "## Step 2\n"  # id-citation-discipline:ignore
-        "Result: pass=53 fail=0 skip=0\n",
-        encoding="utf-8",
+        "Result: pass=53 fail=0 skip=0\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_prose_summary_then_fixed_shape_green_wins(tmp_path):
+def test_test_status_prose_summary_then_fixed_shape_green_wins():
     """A prose line resembling a pytest summary, followed by a fixed-shape
     green section, reads as green — the fixed-shape line is authoritative."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "Historical note: 11 passed / 1 failed in an earlier run\n"
         "## Step 1\n"  # id-citation-discipline:ignore
-        "Result: pass=11 fail=0 skip=0\n",
-        encoding="utf-8",
+        "Result: pass=11 fail=0 skip=0\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_red_for_fixed_shape_all_zero_result_line(tmp_path):
+def test_test_status_red_for_fixed_shape_all_zero_result_line():
     """A fixed-shape Result: line with pass=0 fail=0 skip=0 is a pytest collection
     error (e.g. ModuleNotFoundError above a ### Failures block) rendering exactly
     that all-zero shape — it must read red, never green, since nothing was proven."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=0 fail=0 skip=0\n"
         "Duration: 0.1s\n"
         "### Failures\n"
-        "ModuleNotFoundError: No module named 'missing_thing'\n",
-        encoding="utf-8",
+        "ModuleNotFoundError: No module named 'missing_thing'\n"
     )
-    assert rps._read_test_status(p) == "red"
+    assert _fallback_status(text) == "red"
 
 
-def test_test_status_all_zero_section_then_green_section_last_wins(tmp_path):
+def test_test_status_all_zero_section_then_green_section_last_wins():
     """An all-zero (collection error) fixed-shape section followed by a later
     green fixed-shape section — last line wins, so the file reads green."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Result: pass=0 fail=0 skip=0\n"
         "## Step 2\n"  # id-citation-discipline:ignore
-        "Result: pass=5 fail=0 skip=0\n",
-        encoding="utf-8",
+        "Result: pass=5 fail=0 skip=0\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
 # --- backward compatibility: the optional `Mutation:` step-section line -----
@@ -497,53 +493,47 @@ def _mutation_unavailable_line() -> str:
     return f"Mutation: unavailable reason={reason} ({detail})"
 
 
-def test_test_status_green_with_mutation_survivors_line_matches_shape_without_it(tmp_path):
+def test_test_status_green_with_mutation_survivors_line_matches_shape_without_it():
     """A green fixed-shape section carrying the `survivors=` line at exactly
     its byte cap classifies exactly as it would without the line -- green."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=12 fail=0 skip=0\n"
         "Duration: 0.5s\n"
-        f"{_mutation_survivors_line_at_cap()}\n",
-        encoding="utf-8",
+        f"{_mutation_survivors_line_at_cap()}\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_green_with_mutation_unavailable_line_matches_shape_without_it(tmp_path):
+def test_test_status_green_with_mutation_unavailable_line_matches_shape_without_it():
     """A green fixed-shape section carrying the `unavailable` refusal line
     classifies exactly as it would without the line -- green. A legitimate
     refusal must never read as a failure."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=12 fail=0 skip=0\n"
         "Duration: 0.5s\n"
-        f"{_mutation_unavailable_line()}\n",
-        encoding="utf-8",
+        f"{_mutation_unavailable_line()}\n"
     )
-    assert rps._read_test_status(p) == "green"
+    assert _fallback_status(text) == "green"
 
 
-def test_test_status_red_result_line_wins_regardless_of_mutation_line(tmp_path):
+def test_test_status_red_result_line_wins_regardless_of_mutation_line():
     """Canary: a red Result: line (fail > 0) still classifies red even when a
     Mutation: line is present -- the line must never launder a real failure
     into green, whichever of the two shapes it carries. `survivors=3` and
     `(fn: 2)` must never be read as a passing count by the pytest-count
     regexes this reader also scans for."""
-    p = tmp_path / "TEST_RESULTS.md"
-    p.write_text(
+    text = (
         "## Step 1\n"  # id-citation-discipline:ignore
         "Command: `uv run pytest -q`\n"
         "Result: pass=10 fail=2 skip=0\n"
         "Duration: 0.5s\n"
-        f"{_mutation_survivors_line_at_cap()}\n",
-        encoding="utf-8",
+        f"{_mutation_survivors_line_at_cap()}\n"
     )
-    assert rps._read_test_status(p) == "red"
+    assert _fallback_status(text) == "red"
 
 
 # --- windowed WAL read + cross-boundary recovery (Step 5 / Group B) ----------
@@ -761,7 +751,6 @@ def test_main_reports_no_local_wal_on_stderr_when_absent(tmp_path, capsys, monke
     monkeypatch.setattr(rps, "resolve_repo_root", lambda *_a, **_k: tmp_path)
     monkeypatch.setattr(rps, "is_plugin_cache_path", lambda *_a, **_k: False)
     monkeypatch.setattr(rps, "_git_changed_files", lambda *_a, **_k: {"src/foo.py"})
-    monkeypatch.setattr(rps, "_read_test_status", lambda *_a, **_k: "green")
 
     exit_code = rps.main([SLUG, "--json"])
     err = capsys.readouterr().err
@@ -1092,14 +1081,17 @@ _CORPUS_FIXTURE_PATH = (
 _P3_5_TEST_RESULTS_MD = _CORPUS_FIXTURE_PATH.read_text(encoding="utf-8")
 
 
-def test_reconcile_a_steps_own_red_run_blocks_it_while_a_sibling_steps_own_green_confirms(
+def test_reconcile_a_steps_own_red_run_is_cleared_by_a_later_green_run_elsewhere_in_the_file(
     tmp_path,
 ):
-    """Last-line-wins is gone: the harvested corpus's very last recorded run
-    (near the file's end) is green, but Step 1's own only recorded run is red
-    (``pass=126 fail=1``). Under last-line-wins both steps would read green
-    from the file's tail; per-step status must instead judge Step 1 by its
-    own run and Step 2 by its own (which is genuinely green)."""
+    """Per the spec, an own red run is superseded by ANY green run recorded
+    later in the document -- not only a later run of the same step. Step 1's
+    own only recorded run in the harvested corpus is red (``pass=126
+    fail=1``), but the corpus continues with real green work afterward (Step
+    2's own run among it), so Step 1's red is cleared. This is the spec's own
+    counterexample to a narrower "own green only" reading: a RED
+    test-authoring step whose suite goes red on day one stays confirmable once
+    later work in the same file proves green, rather than reading red forever."""
     repo_root = tmp_path / "repo"
     base_sha = _seed_repo(repo_root)
     plan = "### Step 1: A\n**Files**: a.py\n### Step 2: B\n**Files**: b.py\n"
@@ -1112,8 +1104,42 @@ def test_reconcile_a_steps_own_red_run_blocks_it_while_a_sibling_steps_own_green
     _commit(repo_root, "b.py", "# b\n")
 
     out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
-    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
     assert _verdict_for(out, "Step 2")["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_final_red_block_with_no_later_green_stays_red_while_earlier_steps_confirm(
+    tmp_path,
+):
+    """The spec's own boundary case: a RED test-authoring step recorded
+    before its GREEN implementation partner has landed -- the file's LAST
+    block is genuinely red, with no later green anywhere to supersede it, so
+    it stays red. Earlier steps are unaffected either way: a later red never
+    clears an earlier green, and an earlier own red (Step 1) is still cleared
+    by Step 2's later green, exactly as in the flagship corpus case above."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = (
+        "### Step 1: A\n**Files**: a.py\n"
+        "### Step 2: B\n**Files**: b.py\n"
+        "### Step 3: RED test-authoring\n**Files**: c.py\n"
+    )
+    wip = "- [x] Step 1: a\n- [x] Step 2: b\n- [x] Step 3: red test-authoring\n"
+    _setup(repo_root, wip, plan)
+    test_results = (
+        "## Step 1\nResult: pass=0 fail=5 skip=0\n"
+        "## Step 2\nResult: pass=20 fail=0 skip=0\n"
+        "## Step 3\nResult: pass=0 fail=3 skip=0\n"
+    )
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(test_results, encoding="utf-8")
+    _commit(repo_root, "a.py", "# a\n")
+    _commit(repo_root, "b.py", "# b\n")
+    _commit(repo_root, "c.py", "# c\n")
+
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 3")["verdict"] != "verified-complete"
 
 
 def _reconcile_with_test_results(tmp_path: Path, test_results: str) -> list[dict]:
@@ -1180,6 +1206,96 @@ def test_reconcile_preexisting_failures_never_block_verified_complete(tmp_path):
     test_results = "## Step 1\nResult: pass=10 fail=0 skip=0 preexisting=2\n"
     out = _reconcile_with_test_results(tmp_path, test_results)
     assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
+# --- attribution: pins keeping earliest-declarer safe against re-opening ----
+# --- td-238(3) (both regression locks -- pass on current code) --------------
+
+
+def test_reconcile_a_fix_commit_on_the_earlier_declarer_never_verifies_the_later_declarer(
+    tmp_path,
+):
+    """A rework/fix commit on the shared file, made by the earlier declarer,
+    must not be misread as the later declarer's own work. The later declarer
+    stays pending, never verified-complete, and never gets an unwarranted
+    auto-mark."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = _TWO_STEPS_SHARE_ONE_FILE
+    wip = "- [x] Step 1: build the thing\n- [ ] Step 2: extend the thing\n"
+    _setup(repo_root, wip, plan)
+    (repo_root / "f.py").write_text("# step 1 work\n", encoding="utf-8")
+    _run_git(["add", "f.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "step 1 work"], repo_root)
+    (repo_root / "f.py").write_text("# step 1 work, fixed\n", encoding="utf-8")
+    _run_git(["add", "f.py"], repo_root)
+    _run_git(["commit", "-q", "-m", "step 1 fix"], repo_root)
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    verdict = _verdict_for(out, "Step 2")
+    assert verdict["verdict"] == "pending"
+    assert verdict["needs_mark"] is False
+
+
+def test_reconcile_a_serial_lane_of_four_steps_on_one_file_only_verifies_the_first(tmp_path):
+    """A serial-lane shape (one file edited across several consecutive steps,
+    all committed): only the earliest declarer is confirmable. Every later
+    declarer reads unknown, and the CLI's exit code reflects the owed human
+    verification (2), not a clean recovery-needed (1)."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+
+    plan = (
+        "### Step 1: A\n**Files**: f.py\n"
+        "### Step 2: B\n**Files**: f.py\n"
+        "### Step 3: C\n**Files**: f.py\n"
+        "### Step 4: D\n**Files**: f.py\n"
+    )
+    wip = "- [x] Step 1: a\n- [x] Step 2: b\n- [x] Step 3: c\n- [x] Step 4: d\n"  # id-citation-discipline:ignore
+    _setup(repo_root, wip, plan)
+    _commit(repo_root, "f.py", "# work\n")
+
+    code = rps.main([SLUG, "--repo-root", str(repo_root), "--base-ref", base_sha, "--quiet"])
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "unknown"
+    assert _verdict_for(out, "Step 3")["verdict"] == "unknown"
+    assert _verdict_for(out, "Step 4")["verdict"] == "unknown"
+    assert code == 2
+
+
+# --- The unknown evidence names every earlier declarer, not just one ----
+
+
+def test_unknown_evidence_names_every_earlier_declarer_when_files_are_split_across_two(
+    tmp_path,
+):
+    """A step whose two declared files are absorbed by two *different* earlier
+    steps must have both named in its evidence -- naming only the first found
+    leaves a human reader unable to settle the claim for the other file."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = (
+        "### Step 1: A\n**Files**: a.py\n"
+        "### Step 2: B\n**Files**: b.py\n"
+        "### Step 3: C\n**Files**: a.py, b.py\n"
+    )
+    wip = "- [x] Step 1: a\n- [x] Step 2: b\n- [x] Step 3: c\n"  # id-citation-discipline:ignore
+    _setup(repo_root, wip, plan)
+    _commit(repo_root, "a.py", "# a\n")
+    _commit(repo_root, "b.py", "# b\n")
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    verdict = _verdict_for(out, "Step 3")
+    assert verdict["verdict"] == "unknown"
+    assert "Step 1" in verdict["evidence"]  # id-citation-discipline:ignore
+    assert "Step 2" in verdict["evidence"]  # id-citation-discipline:ignore
 
 
 if __name__ == "__main__":

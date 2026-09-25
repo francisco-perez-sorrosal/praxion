@@ -372,7 +372,7 @@ class TestCoverageTimeoutIsConfigurable:
 
 
 class TestCoverageRefreshStalenessMarking:
-    """AC-10/REQ-10: a refresh that does not produce a trustworthy fresh
+    """A refresh that does not produce a trustworthy fresh
     ``coverage.xml`` must mark the report accordingly -- never silently."""
 
     def test_timed_out_refresh_marks_the_report_stale_with_timed_out_reason(

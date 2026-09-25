@@ -245,7 +245,7 @@ def compute_enum_compliance(repo_root: Path) -> dict[str, object]:
     """Return enum-compliance stats for rows dated on/after ENUM_CUTOFF_DATE.
 
     Rows predating the cutover are exempt -- the enum-first Retrospective
-    convention only binds new rows (dec-draft-3adfda75), mirroring the ADR
+    convention only binds new rows (dec-376), mirroring the ADR
     corpus's clean-cutover precedent at dec-230.
     """
     log_path = repo_root / CALIBRATION_LOG_REL

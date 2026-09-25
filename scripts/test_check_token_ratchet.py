@@ -180,7 +180,7 @@ def test_end_to_end_a_clean_baseline_exits_zero(
     assert gate.main() == 0
 
 
-# -- Step 12: gate_fire observations -------------------------------------------
+# -- gate_fire observations -------------------------------------------------
 #
 # These exercise the `if __name__ == "__main__":` block itself (where the
 # record_gate_fire call site actually lives), via `runpy.run_path` rather than

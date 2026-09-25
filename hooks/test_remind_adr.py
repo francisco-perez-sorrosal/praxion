@@ -162,7 +162,7 @@ def test_malformed_stdin_json_never_raises(tmp_path: Path) -> None:
     )
 
 
-# -- Step 12: gate_fire observations -------------------------------------------
+# -- gate_fire observations -------------------------------------------------
 
 
 def _read_gate_fire_rows(repo: Path) -> list[dict]:

@@ -193,7 +193,7 @@ def test_canary_rotate_at_threshold_zero(tmp_path, monkeypatch):
 
 
 # -- record_gate_fire() --------------------------------------------------------
-# Step 12: the shared helper every commit-gate script calls to record its own
+# The shared helper every commit-gate script calls to record its own
 # pass/warn/block verdict. Covers the helper directly; per-gate call-site
 # wiring (the row actually lands, and a helper exception never changes a
 # gate's exit code) is covered by each gate's own test file.
@@ -211,7 +211,7 @@ def test_record_gate_fire_appends_row_with_expected_fields(tmp_path, monkeypatch
     assert len(rows) == 1
     row = rows[0]
     assert row["event_type"] == "gate_fire"
-    # Both keys carry the same value: `hook` (what Step 8's rollup groups by)
+    # Both keys carry the same value: `hook` (what the gate-fire rollup groups by)
     # and `tool_name` (the field every other observation event carries).
     assert row["hook"] == "check_token_ratchet"
     assert row["tool_name"] == "check_token_ratchet"

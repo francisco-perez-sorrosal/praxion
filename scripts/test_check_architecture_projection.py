@@ -361,7 +361,7 @@ def test_canary_ac05_flags_an_empty_developer_guide(repo: Path) -> None:
     assert ac05[0]["severity"] == "warn"
 
 
-def test_ac04_ignores_a_dec_id_inside_a_fenced_block(repo: Path) -> None:
+def test_ignores_a_dec_id_inside_a_fenced_block(repo: Path) -> None:
     """An illustrative `dec-NNN` inside ``` fences is not a reference (light-review F2, F3);
     the same id outside a fence still must be flagged."""
     _write_rows(repo, ALL_THREE)
@@ -378,7 +378,7 @@ def test_ac04_ignores_a_dec_id_inside_a_fenced_block(repo: Path) -> None:
 
 
 def test_envelope_carries_a_keyed_bound_for_every_check(repo: Path) -> None:
-    """REQ-06 (verifier W-2): the family envelope reproduces a PASS statement per check."""
+    """The family envelope reproduces a PASS statement per check."""
     _write_rows(repo, ALL_THREE)
     report = cap.classify(repo)
     assert set(report["bound"]) == set(cap.CHECK_IDS)
@@ -433,7 +433,7 @@ def test_canary_ac03_warns_when_majority_of_key_files_paths_are_unresolved(repo:
     assert ac03[0]["severity"] == "warn"
 
 
-def test_ac03_below_half_unresolved_does_not_warn(repo: Path) -> None:
+def test_below_half_unresolved_does_not_warn(repo: Path) -> None:
     """Inverse guard: a minority of stale paths is the documented illustrative slack."""
     _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | `ghost/a.py`, `x.md` |\n")
     (repo / "x.md").write_text("real", encoding="utf-8")
@@ -441,7 +441,7 @@ def test_ac03_below_half_unresolved_does_not_warn(repo: Path) -> None:
     assert [f for f in report["findings"] if f["check"] == "AC03"] == []
 
 
-def test_ac03_runs_without_the_c4_model_present(repo: Path) -> None:
+def test_runs_without_the_c4_model_present(repo: Path) -> None:
     """AC03 does not ride AC13's substrate gate -- DESIGN.md alone is enough."""
     (repo / cap._MODEL).unlink()
     _write_rows(repo, "| Skills | `knowledge.skills` | r | Built | `ghost/a.py` |\n")
@@ -462,7 +462,7 @@ def test_canary_ac06_flags_a_row_whose_key_files_anchor_does_not_exist(repo: Pat
     assert ac06[0]["severity"] == "warn"
 
 
-def test_ac06_passes_when_the_anchor_exists(repo: Path) -> None:
+def test_passes_when_the_anchor_exists(repo: Path) -> None:
     (repo / "scripts").mkdir(exist_ok=True)
     (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
     _write_arch_doc(repo, "| Scripts | r | `scripts/foo.py` |\n")
@@ -470,7 +470,7 @@ def test_ac06_passes_when_the_anchor_exists(repo: Path) -> None:
     assert [f for f in report["findings"] if f["check"] == "AC06"] == []
 
 
-def test_ac06_runs_without_design_md_present(repo: Path) -> None:
+def test_runs_without_design_md_present(repo: Path) -> None:
     """AC06 does not ride AC13's substrate gate -- the developer guide alone is enough."""
     (repo / cap._DESIGN).unlink(missing_ok=True)
     _write_arch_doc(repo, "| Ghost Component | r | `ghost-dir/file.py` |\n")
@@ -490,7 +490,7 @@ def test_canary_ac07_flags_an_unresolved_key_files_path(repo: Path) -> None:
     assert ac07[0]["entity"] == "scripts/ghost.py"
 
 
-def test_ac07_passes_when_every_path_resolves(repo: Path) -> None:
+def test_passes_when_every_path_resolves(repo: Path) -> None:
     (repo / "scripts").mkdir(exist_ok=True)
     (repo / "scripts" / "foo.py").write_text("x", encoding="utf-8")
     _write_arch_doc(repo, "| Scripts | r | `scripts/foo.py` |\n")
@@ -498,7 +498,7 @@ def test_ac07_passes_when_every_path_resolves(repo: Path) -> None:
     assert [f for f in report["findings"] if f["check"] == "AC07"] == []
 
 
-def test_ac07_normalizes_a_placeholder_segment_to_a_glob(repo: Path) -> None:
+def test_normalizes_a_placeholder_segment_to_a_glob(repo: Path) -> None:
     """A `<task-slug>`-style placeholder is illustrative, not literal (light-review parity
     with AC04's fenced-block exclusion): a real subdirectory must still satisfy it."""
     (repo / ".ai-work" / "some-task").mkdir(parents=True)

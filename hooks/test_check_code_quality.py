@@ -218,7 +218,7 @@ def test_silently_passes_when_rustfmt_is_unresolvable(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Step 12: gate_fire observations
+# gate_fire observations
 #
 # Requirement 2: one gate_fire row per commit, on both the pass and the block
 # path. Requirement 1: a helper exception must never change the gate's own

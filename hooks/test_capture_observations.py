@@ -580,7 +580,7 @@ class TestObservationsAreSuppressed:
 
 
 class TestReadGrepGlobAreCapturedWithoutContent:
-    """Step 11: Read/Glob/Grep are no longer blocklisted -- they record the
+    """Read/Glob/Grep are no longer blocklisted -- they record the
     path (and, for Grep/Glob, the search/glob pattern) but never file content
     or match text.
     """

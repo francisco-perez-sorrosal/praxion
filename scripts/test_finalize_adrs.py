@@ -2711,7 +2711,7 @@ class TestIdempotentPromotionByDraftId:
             repo_root,
             1,
             "already-promoted",
-            frontmatter_extra={"draft_id": "dec-draft-aaaaaaaa"},
+            frontmatter_extra={"draft_id": "dec-draft-aaaaaaaa"},  # id-citation-discipline:ignore
         )
         fresh = make_draft(repo_root, "20260101-1300", "alice", "main", "fresh-decision")
 

@@ -1,7 +1,7 @@
 """Fitness invariant: `agents/sentinel.md` never grows past its recorded ceiling.
 
 Cites: dec-380 (sentinel check extraction contract) and its re-affirming draft on the
-family-script shape -- acceptance criterion AC-10 of the P2.1 residual pipeline: "the
+family-script shape -- the P2.1 residual pipeline's size criterion: "the
 file never grows against its baseline at any batch boundary". The pipeline's own
 verifier found that gate breached at a committed boundary (093ebdf3, 107,487 B) with
 nothing mechanical to stop it -- the pre-mortem had named exactly this failure and its
@@ -16,8 +16,8 @@ ratchet in the sense of roadmap §9.9: it may go down freely.
 
 from pathlib import Path
 
-# 107,397 B = the file's size at 4ad927f0, the P2.1-residual baseline (AC-10).
-CEILING_BYTES = 107_397  # authorised by: dec-380 / AC-10 of the P2.1 residual pipeline
+# 107,397 B = the file's size at 4ad927f0, the P2.1-residual baseline.
+CEILING_BYTES = 107_397  # authorised by: dec-380
 
 
 def exceeds_ceiling(size: int, ceiling: int = CEILING_BYTES) -> bool:
@@ -29,7 +29,7 @@ def exceeds_ceiling(size: int, ceiling: int = CEILING_BYTES) -> bool:
 def test_sentinel_definition_does_not_exceed_its_byte_ceiling(project_root: Path) -> None:
     size = (project_root / "agents" / "sentinel.md").stat().st_size
     assert not exceeds_ceiling(size), (
-        f"agents/sentinel.md is {size:,} B, over the {CEILING_BYTES:,} B ceiling (AC-10). "
+        f"agents/sentinel.md is {size:,} B, over the {CEILING_BYTES:,} B ceiling. "
         "Offset the growth (a dispatch-table row costs ~110 B; a prose sentence ~350-700 B) "
         "or raise CEILING_BYTES citing the ADR that authorises it."
     )

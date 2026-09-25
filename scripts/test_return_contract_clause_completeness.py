@@ -1,4 +1,4 @@
-"""Canary for the Return-contract row's clause completeness (AC-9).
+"""Canary for the Return-contract row's clause completeness.
 
 The coordination rule's `Return contract` table row is the single source of
 truth for the pointer-not-a-payload convention every subagent's final message

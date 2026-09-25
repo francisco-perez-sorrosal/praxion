@@ -17,7 +17,7 @@ def load_rules_bridge_parsing():
 
 
 def test_extract_summary_pins_to_intro_sentence_for_behavioral_contract_rule():
-    """AC-10: `parse_rule()` on the behavioral-contract rule returns its intro paragraph
+    """`parse_rule()` on the behavioral-contract rule returns its intro paragraph
     verbatim, with no HTML-comment leakage — the property Decision 2 relies on."""
     parser = load_rules_bridge_parsing()
     rule_path = REPO_ROOT / "rules" / "swe" / "agent-behavioral-contract.md"

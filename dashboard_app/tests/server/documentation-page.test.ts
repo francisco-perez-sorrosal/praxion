@@ -1,9 +1,9 @@
 /**
  * Characterization tests for the Documentation page (async Server Component),
- * written BEFORE td-164's extraction (Step 22: `<SurfaceBody>`,
+ * written BEFORE td-164's extraction (`<SurfaceBody>`,
  * `resolveRendererFor`, `<DocumentationEmpty />`, `selectSurface`). These must
  * pass GREEN against the current, unextracted `page.tsx` — they pin today's
- * observable output so Step 22 can prove the extraction is behavior-preserving.
+ * observable output so the extraction can be proven behavior-preserving.
  *
  * Strategy: mock the view-model (`@/server/view-models/documentation`) and the
  * config (`@/lib/config`) to return controlled fixtures, then render the page

@@ -285,7 +285,7 @@ def test_resolves_consumer_repo_root_via_git(tmp_path: Path) -> None:
     )
 
 
-# -- Step 12: gate_fire observations -------------------------------------------
+# -- gate_fire observations -------------------------------------------------
 
 
 def _read_gate_fire_rows(repo: Path) -> list[dict]:

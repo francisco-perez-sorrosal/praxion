@@ -1041,5 +1041,146 @@ def test_reconcile_orders_letter_suffixed_and_multi_digit_steps_in_grammar_order
     assert [v["step"] for v in out] == ["Step 1", "Step 1b", "Step 2", "Step 10"]
 
 
+# --- a table-only WIP reconciles, instead of the pre-claim-source "no WIP" ---
+
+
+def _commit(repo_root: Path, rel_path: str, content: str) -> None:
+    path = repo_root / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    _run_git(["add", rel_path], repo_root)
+    _run_git(["commit", "-q", "-m", f"write {rel_path}"], repo_root)
+
+
+# Verbatim excerpt: sidecar-placement/sidecar-placement's WIP status table.
+_STATUS_TABLE_WIP = (
+    "| Step | Assignee | Status | Files |\n"
+    "|---|---|---|---|\n"
+    "| 1 | implementer | complete (GREEN -- 21 passed; self-review clean) "
+    "| `scripts/_state_repo.py` |\n"
+)
+
+
+def test_reconcile_a_table_only_wip_reconciles_instead_of_reporting_no_steps(tmp_path):
+    """Today ``reconcile()`` returns ``[]`` for a table-only WIP -- its own
+    claim parser recognizes only checklist lines, so a table-only file yields
+    zero claims and the whole reconciliation short-circuits before touching
+    git. Once claim parsing moves to the shared module's three-source reader,
+    a table row is a first-class claim source and the step reconciles like
+    any other."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = "### Step 1: State-repository resolver\n**Files**: scripts/_state_repo.py\n"
+    _setup(repo_root, _STATUS_TABLE_WIP, plan)
+    _commit(repo_root, "scripts/_state_repo.py", "# resolver\n")
+
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert out != []
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
+# --- per-step test status: each step reads its own latest run --------------
+
+_CORPUS_FIXTURE_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "tests"
+    / "fixtures"
+    / "test_results_step_sections_corpus.md"
+)
+_P3_5_TEST_RESULTS_MD = _CORPUS_FIXTURE_PATH.read_text(encoding="utf-8")
+
+
+def test_reconcile_a_steps_own_red_run_blocks_it_while_a_sibling_steps_own_green_confirms(
+    tmp_path,
+):
+    """Last-line-wins is gone: the harvested corpus's very last recorded run
+    (near the file's end) is green, but Step 1's own only recorded run is red
+    (``pass=126 fail=1``). Under last-line-wins both steps would read green
+    from the file's tail; per-step status must instead judge Step 1 by its
+    own run and Step 2 by its own (which is genuinely green)."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = "### Step 1: A\n**Files**: a.py\n### Step 2: B\n**Files**: b.py\n"
+    wip = "- [x] Step 1: a\n- [x] Step 2: b\n"
+    _setup(repo_root, wip, plan)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(
+        _P3_5_TEST_RESULTS_MD, encoding="utf-8"
+    )
+    _commit(repo_root, "a.py", "# a\n")
+    _commit(repo_root, "b.py", "# b\n")
+
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "verified-complete"
+
+
+def _reconcile_with_test_results(tmp_path: Path, test_results: str) -> list[dict]:
+    """One committed file, one step claiming it, a synthetic TEST_RESULTS.md --
+    shared arrangement for the per-step Result-line contract cases below."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = "### Step 1: Build the thing\n**Files**: f.py\n"
+    wip = "- [x] Step 1: build the thing\n"
+    _setup(repo_root, wip, plan)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(test_results, encoding="utf-8")
+    _commit(repo_root, "f.py", "# work\n")
+    return rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+
+
+def test_reconcile_a_later_own_green_run_clears_an_earlier_own_red_run_for_the_same_step(
+    tmp_path,
+):
+    """A second, later step's own red block sits after Step 1's red-then-green
+    pair in document order -- under global last-line-wins this would flip
+    Step 1 to red too, since the file's very last recorded run is red. Per-step
+    status must judge Step 1 only by its own (green) latest run."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = (
+        "### Step 1: Build the thing\n**Files**: f.py\n### Step 2: Build another\n**Files**: g.py\n"
+    )
+    wip = "- [x] Step 1: build the thing\n- [ ] Step 2: build another\n"
+    _setup(repo_root, wip, plan)
+    test_results = (
+        "## Step 1\nResult: pass=5 fail=2 skip=0\n"
+        "## Step 1 (retry)\nResult: pass=10 fail=0 skip=0\n"
+        "## Step 2\nResult: pass=3 fail=1 skip=0\n"
+    )
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(test_results, encoding="utf-8")
+    _commit(repo_root, "f.py", "# work\n")
+
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
+def test_reconcile_an_all_zero_result_line_reads_red_not_a_confirmed_pass(tmp_path):
+    test_results = "## Step 1\nResult: pass=0 fail=0 skip=0\n### Failures\nModuleNotFoundError\n"
+    out = _reconcile_with_test_results(tmp_path, test_results)
+    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+
+
+def test_reconcile_a_later_malformed_result_line_never_clears_an_earlier_red_run(tmp_path):
+    """A ``Result:`` line naming a count in prose rather than
+    ``pass=``/``fail=`` keys is malformed and contributes no evidence -- it
+    must never launder an earlier own red run into a false confirmation."""
+    test_results = "## Step 1\nResult: pass=5 fail=2 skip=0\n## Step 1 (later)\nResult: 23 passed\n"
+    out = _reconcile_with_test_results(tmp_path, test_results)
+    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+
+
+def test_reconcile_a_later_declared_no_run_line_never_clears_an_earlier_red_run(tmp_path):
+    test_results = "## Step 1\nResult: pass=5 fail=2 skip=0\n## Step 1 (later)\nResult: none\n"
+    out = _reconcile_with_test_results(tmp_path, test_results)
+    assert _verdict_for(out, "Step 1")["verdict"] != "verified-complete"
+
+
+def test_reconcile_preexisting_failures_never_block_verified_complete(tmp_path):
+    test_results = "## Step 1\nResult: pass=10 fail=0 skip=0 preexisting=2\n"
+    out = _reconcile_with_test_results(tmp_path, test_results)
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

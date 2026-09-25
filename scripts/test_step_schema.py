@@ -274,3 +274,93 @@ def test_every_result_line_in_a_block_is_collected_in_document_order() -> None:
     line_numbers = [line_no for line_no, _ in blocks[0].results]
     assert line_numbers == sorted(line_numbers)
     assert len(blocks[0].results) == 2
+
+
+# ---------------------------------------------------------------------------
+# parse_wip_claims -- one claim map from every declared WIP claim source
+# (checklist, status table, heading marker), merged with the existing
+# conflicting-claim rule.
+# ---------------------------------------------------------------------------
+
+
+def test_checklist_claim_binds_to_the_immediately_following_step_not_a_later_mention() -> None:
+    text = "- [x] Step 11: finish after Step 10\n"  # id-citation-discipline:ignore
+
+    claims = schema.parse_wip_claims(text)
+
+    assert claims == {"Step 11": "COMPLETE"}  # id-citation-discipline:ignore
+
+
+def test_checklist_line_mentioning_a_step_later_on_yields_no_claim_for_it() -> None:
+    text = "- [x] Failure mode 1: … (Step 6)\n"  # id-citation-discipline:ignore
+
+    assert schema.parse_wip_claims(text) == {}
+
+
+# Verbatim excerpt: sidecar-placement/sidecar-placement's WIP status table.
+_STATUS_TABLE_EXCERPT = (
+    "| Step | Assignee | Status | Files |\n"
+    "|---|---|---|---|\n"
+    "| 1 | implementer | complete (GREEN -- 21 passed; self-review clean) "
+    "| `scripts/_state_repo.py` |\n"
+    "| 1b | test-engineer | complete (RED -- awaiting Step 1) "  # id-citation-discipline:ignore
+    "| `scripts/test_state_repo.py` |\n"
+)
+
+
+def test_status_table_row_yields_a_claim_from_the_leading_status_word() -> None:
+    claims = schema.parse_wip_claims(_STATUS_TABLE_EXCERPT)
+
+    assert claims == {"Step 1": "COMPLETE", "Step 1b": "COMPLETE"}  # id-citation-discipline:ignore
+
+
+def test_a_hash_headed_table_mints_no_claims() -> None:
+    text = "| # | Finding | Status |\n|---|---|---|\n| 1 | some review row | pending |\n"
+
+    assert schema.parse_wip_claims(text) == {}
+
+
+# Verbatim excerpt: process-economy-p2-6/WIP.md's backticked heading marker.
+_HEADING_CLAIM_EXCERPT = "## Step 1 — script + canaries  `[x]`\n"  # id-citation-discipline:ignore
+
+
+def test_heading_with_a_backticked_checkbox_marker_yields_a_claim() -> None:
+    claims = schema.parse_wip_claims(_HEADING_CLAIM_EXCERPT)
+
+    assert claims == {"Step 1": "COMPLETE"}  # id-citation-discipline:ignore
+
+
+@pytest.mark.parametrize(
+    ("status_word", "expected_claim"),
+    [
+        ("in-progress", "IN-PROGRESS"),
+        ("not started", "PENDING"),
+        ("—", "PENDING"),
+        ("red", "AMBIGUOUS"),
+    ],
+)
+def test_status_table_word_vocabulary_maps_to_the_documented_claim(
+    status_word: str, expected_claim: str
+) -> None:
+    text = (
+        "| Step | Assignee | Status | Files |\n"
+        "|---|---|---|---|\n"
+        f"| 1 | implementer | {status_word} | a.py |\n"
+    )
+
+    claims = schema.parse_wip_claims(text)
+
+    assert claims == {"Step 1": expected_claim}  # id-citation-discipline:ignore
+
+
+def test_conflicting_claims_from_different_sources_become_ambiguous() -> None:
+    text = (
+        "- [x] Step 1: build the thing\n"  # id-citation-discipline:ignore
+        "| Step | Assignee | Status | Files |\n"
+        "|---|---|---|---|\n"
+        "| 1 | implementer | pending | a.py |\n"
+    )
+
+    claims = schema.parse_wip_claims(text)
+
+    assert claims == {"Step 1": "AMBIGUOUS"}  # id-citation-discipline:ignore

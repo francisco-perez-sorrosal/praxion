@@ -12,7 +12,7 @@ Reliability hierarchy (the spine):
   Tier 1 (arbiter)        — codebase + `git diff` + `TEST_RESULTS.md` (either
                             the legacy free-form pytest-summary shape or the
                             canonical `Result: pass=<n> fail=<n> skip=<n>`
-                            per-step shape, dec-386 — see `_read_test_status`).
+                            per-step shape, dec-386 — see `step_test_status`).
   Tier 2 (localization)   — `.ai-state/observations.jsonl` (the harness WAL):
                             which agent stopped, where it last wrote. Only ever
                             *adds* a hint; never *overrides* a Tier-1 verdict.
@@ -39,12 +39,20 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
-from _step_schema import STEP_ID_RE, step_id_from_heading, step_sort_key
+from _step_schema import (
+    STEP_ID_RE,
+    Counts,
+    parse_wip_claims,
+    split_step_blocks,
+    step_id_from_heading,
+    step_sort_key,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -61,25 +69,22 @@ STEP_EXECUTING_AGENT_TYPES = frozenset(
     }
 )
 
-# WIP progress-line claim markers.
-_COMPLETE_RE = re.compile(r"\[x\]|\[COMPLETE\]", re.IGNORECASE)
-_IN_PROGRESS_RE = re.compile(r"\[IN-PROGRESS\]|\[IMPLEMENTING\]", re.IGNORECASE)
 # `_step_schema.STEP_ID_RE`, unanchored so it embeds in the pattern below --
 # one grammar, never a second hand-rolled copy.
 _STEP_ID_SHAPE = STEP_ID_RE.pattern.strip("^$")
 # A WIP progress entry: "- [x] Step 3 ...", "- [ ] Step 1b (test-engineer): ..."
+# (file-scanning only -- claim parsing is `_step_schema.parse_wip_claims`.)
 _WIP_STEP_RE = re.compile(
     rf"^\s*-\s*\[(?P<box>[ xX])\]\s*(?P<body>.*Step\s+(?P<num>{_STEP_ID_SHAPE})\b.*)$"
 )
 # A "**Files**:" field line under a plan step.
 _FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re.IGNORECASE)
-# Pytest summary count tokens (word-boundary — never matches "ModuleNotFoundError").
+# The legacy free-form pytest-summary phrasing -- word-boundary count tokens
+# (never matches "ModuleNotFoundError") -- the fallback for a step block that
+# carries no `Result:` line at all (an old TEST_RESULTS.md never migrated to
+# the dec-386 shape).
 _PYTEST_FAIL_RE = re.compile(r"\b(\d+)\s+(?:failed|errors?)\b", re.IGNORECASE)
 _PYTEST_PASS_RE = re.compile(r"\b\d+\s+passed\b", re.IGNORECASE)
-# The fixed per-step shape (dec-386): "Result: pass=<n> fail=<n> skip=<n>".
-_RESULT_LINE_RE = re.compile(r"^Result:\s*.*$")
-_RESULT_FAIL_COUNT_RE = re.compile(r"\b(?:fail|error)=(\d+)")
-_RESULT_PASS_COUNT_RE = re.compile(r"\bpass=(\d+)")
 
 
 # ---------------------------------------------------------------------------
@@ -131,10 +136,13 @@ def reconcile(
         if _changed_files_override is not None
         else _git_changed_files(repo_root, base_ref)
     )
-    test_status = (
-        _test_status_override
+    # A per-step pool: `_test_status_override` (the test hook) still applies
+    # one status to every step, so the pool is left empty on that path --
+    # nothing consults it there.
+    test_runs = (
+        []
         if _test_status_override is not None
-        else _read_test_status(task_dir / "TEST_RESULTS.md")
+        else _recorded_runs(_read_text(task_dir / "TEST_RESULTS.md"))
     )
     wal_rows = (
         _wal_rows_override
@@ -153,6 +161,11 @@ def reconcile(
         files = attributable(step_id, declared_files)
         earlier_declarer = _earliest_declarer(step_id, declared_files) if not files else None
         tier2 = _correlate_agents(files, wal_rows)
+        test_status = (
+            _test_status_override
+            if _test_status_override is not None
+            else step_test_status(step_id, test_runs)
+        )
         verdicts.append(
             _classify_step(
                 step_id=step_id,
@@ -351,34 +364,13 @@ def _correlate_agents(files: list[str], wal_rows: list[dict[str, Any]]) -> dict[
 
 
 def _parse_wip_steps(wip_path: Path) -> dict[str, str]:
-    """Map ``Step N`` -> claim {COMPLETE, IN-PROGRESS, PENDING} from WIP.md."""
+    """Map ``Step N`` -> claim {COMPLETE, IN-PROGRESS, PENDING, AMBIGUOUS} from
+    WIP.md -- a thin reader over the shared three-source claim parser."""
     try:
         content = wip_path.read_text(encoding="utf-8")
     except OSError:
         return {}
-    claims: dict[str, str] = {}
-    for line in content.splitlines():
-        m = _WIP_STEP_RE.match(line)
-        if not m:
-            continue
-        step_id = f"Step {m.group('num')}"
-        body = m.group("body")
-        if m.group("box").lower() == "x" or _COMPLETE_RE.search(body):
-            claim = "COMPLETE"
-        elif _IN_PROGRESS_RE.search(body):
-            claim = "IN-PROGRESS"
-        else:
-            claim = "PENDING"
-        prev = claims.get(step_id)
-        if prev is None:
-            claims[step_id] = claim
-        elif prev != claim and prev != "AMBIGUOUS":
-            # Same step number, conflicting claims (a multi-workstream WIP reuses
-            # "Step N" per workstream). The checkbox cannot be trusted for this
-            # number → mark AMBIGUOUS so Tier-1 ground truth alone decides; never
-            # silently collapse to one workstream's claim.
-            claims[step_id] = "AMBIGUOUS"
-    return claims
+    return parse_wip_claims(content)
 
 
 def _parse_plan_files(plan_path: Path, wip_path: Path) -> dict[str, list[str]]:
@@ -479,59 +471,79 @@ def _is_admitted_file(candidate: str) -> bool:
     )
 
 
-def _read_test_status(path: Path) -> str:
-    """Test status from the FINAL summary line in TEST_RESULTS.md.
-
-    Two summary shapes are recognized, last-line-wins across both: the
-    free-form pytest summary line ("3579 passed", "3 failed") from the legacy
-    accumulating shape, and the fixed ``Result: pass=<n> fail=<n> skip=<n>``
-    line per ``## Step N`` section from the canonical shape (dec-386). An
-    early failure block in a long file does not poison a suite (or a later
-    step) that ends green. Coarse (global, not per-step — that attribution is
-    future work), but the *final* line is the safe signal. `absent` does not
-    block verified-complete (test-less steps are normal).
-    """
+def _read_text(path: Path) -> str:
+    """A file's text, or "" when it does not exist or cannot be read."""
     try:
-        content = path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8")
     except OSError:
-        return "absent"
-    # Match pytest *count* tokens with word boundaries, not bare substrings —
-    # "ModuleNotFoundError"/"KeyError" in prose must not read as a failure.
-    status = "absent"
-    for line in content.splitlines():
-        result = _result_line_status(line)
-        if result is not None:
-            status = result  # a Result: line is authoritative for that line
+        return ""
+
+
+@dataclass(frozen=True)
+class RecordedRun:
+    """One test-evidence event attributable to a step, in document order.
+
+    ``order`` is the recording's document position (a ``Result:`` line's own
+    line number, or a legacy block's first line) -- it picks a step's
+    *latest* recorded run and, when a step has none of its own, the file's
+    overall latest run (today's global last-line-wins, preserved as the
+    fallback for test-less/status-less steps).
+    """
+
+    order: int
+    step: str | None
+    status: str
+
+
+def _recorded_runs(text: str) -> list[RecordedRun]:
+    """Every ``RecordedRun`` in ``text``, in document order.
+
+    A block's own ``Result:`` line(s) are authoritative when present: only a
+    ``Counts`` line carries a status, so a later ``Malformed`` or
+    ``Result: none`` line contributes no evidence and can never launder an
+    earlier red run into a false green. A block with no ``Result:`` line at
+    all falls back to the legacy free-form pytest-summary phrasing, for
+    TEST_RESULTS.md files that never adopted the ``Result:`` convention.
+    """
+    runs: list[RecordedRun] = []
+    for block in split_step_blocks(text):
+        counted = [(n, r) for n, r in block.results if isinstance(r, Counts)]
+        if counted:
+            runs.extend(RecordedRun(n, block.step, r.status) for n, r in counted)
             continue
+        if block.results:
+            continue  # a Malformed/NoRun line exists -- no legacy fallback here
+        legacy = _legacy_block_status(block.text)
+        if legacy is not None:
+            runs.append(RecordedRun(block.first_line, block.step, legacy))
+    return runs
+
+
+def _legacy_block_status(block_text: str) -> str | None:
+    """A free-form pytest-summary status for a block with no ``Result:`` line."""
+    status = None
+    for line in block_text.splitlines():
         fail = _PYTEST_FAIL_RE.search(line)
         if fail and int(fail.group(1)) > 0:
-            status = "red"  # a line reporting >=1 failure/error wins for that line
+            status = "red"
         elif _PYTEST_PASS_RE.search(line):
             status = "green"
     return status
 
 
-def _result_line_status(line: str) -> str | None:
-    """Classify a fixed-shape ``Result: pass=<n> fail=<n> skip=<n>`` line.
+def step_test_status(step: str, runs: list[RecordedRun]) -> str:
+    """A step's test status: its own latest run, or the file's overall latest
+    run when it has none of its own (today's global fallback, preserved)."""
+    own = [r for r in runs if r.step == step]
+    pool = own or runs
+    return max(pool, key=lambda r: r.order).status if pool else "absent"
 
-    Returns "red" when any ``fail=``/``error=`` count on the line is >0, OR
-    when ``pass=0`` with no failure/error recorded either — a pytest
-    collection error (e.g. a missing module, raised above a ``### Failures``
-    block) renders exactly that all-zero shape, and a Tier-1 arbiter must
-    never read "nothing ran" as "everything passed." Returns "green" only
-    when the line matches and reports a nonzero pass count with zero
-    failures/errors, or ``None`` when the line is not a Result: line at all
-    (falls through to pytest-summary matching in the caller).
-    """
-    if not _RESULT_LINE_RE.match(line):
-        return None
-    fail_counts = [int(n) for n in _RESULT_FAIL_COUNT_RE.findall(line)]
-    if any(n > 0 for n in fail_counts):
-        return "red"
-    pass_match = _RESULT_PASS_COUNT_RE.search(line)
-    if pass_match and int(pass_match.group(1)) == 0:
-        return "red"  # nothing proven — treat as red, the safe direction
-    return "green"
+
+def _read_test_status(path: Path) -> str:
+    """The file's overall latest recorded run, ignoring step attribution --
+    kept for callers that want one status for the whole document."""
+    runs = _recorded_runs(_read_text(path))
+    return max(runs, key=lambda r: r.order).status if runs else "absent"
 
 
 def _parse_ts(ts: str) -> datetime:

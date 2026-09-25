@@ -11,7 +11,8 @@ Bash allowlists of its own.
 
 Capture never trusts the model's self-report: ``spawn-selection`` reads
 ``result.structured_output``; ``ui-step-conformance`` reads the subagent's own
-forwarded text (never the orchestrator's relay); ``adr-authoring`` and
+forwarded text (never the orchestrator's relay) plus the UI files it changed;
+``adr-authoring`` and
 ``lightweight-fix`` read a filesystem delta; ``commit-staging`` reads the
 Bash tool_use commands the session actually ran.
 """
@@ -64,7 +65,7 @@ Seeded = Mapping[str, Any]
 @dataclass(frozen=True)
 class FsDelta:
     created: Mapping[str, str]  # relpath -> decoded content ("" when undecodable)
-    modified: tuple[str, ...]  # relpath, sorted
+    modified: Mapping[str, str]  # relpath -> decoded content after the change
 
     @property
     def changed_paths(self) -> tuple[str, ...]:
@@ -92,11 +93,11 @@ def compute_fs_delta(
 ) -> FsDelta:
     """Pure diff of two :func:`snapshot` results — no filesystem access."""
     created = {path: content for path, (_, content) in after.items() if path not in before}
-    modified = tuple(
-        sorted(
-            path for path, (sha, _) in after.items() if path in before and before[path][0] != sha
-        )
-    )
+    modified = {
+        path: content
+        for path, (sha, content) in sorted(after.items())
+        if path in before and before[path][0] != sha
+    }
     return FsDelta(created=created, modified=modified)
 
 
@@ -169,7 +170,7 @@ def capture_spawn_selection(
 
 
 # ---------------------------------------------------------------------------
-# ui-step-conformance — capture from the subagent's own forwarded text
+# ui-step-conformance — the subagent's own forwarded text + its UI changes
 # ---------------------------------------------------------------------------
 
 _SPAWN_IMPLEMENTER_PROMPT = (
@@ -202,14 +203,24 @@ def build_ui_step_conformance(root: Path, seeded: Seeded) -> None:
         {
             ".ai-work/ui-step/IMPLEMENTATION_PLAN.md": f"# Plan: ADR list loading state\n\n{step}",
             ".ai-work/ui-step/WIP.md": f"# WIP\n\n{step}\nStatus: TODO\n",
+            ".ai-work/ui-step/LEARNINGS.md": "# Learnings\n",
         },
     )
+
+
+_UI_SURFACE = "dashboard_app/"
 
 
 def capture_ui_step_conformance(
     envelope: SessionEnvelope, fs_delta: FsDelta | None, fixture_yaml: Seeded
 ) -> Capture:
-    del fs_delta, fixture_yaml
+    """The implementer's report plus every file it changed on the UI surface.
+
+    The return contract keeps the report a terse pointer, so conformance is
+    judged over the code; the report rides along for the judge's context.
+    """
+    del fixture_yaml
+    ui_changes = _ui_changes(fs_delta)
     agent_call = next(
         (
             tool_use
@@ -225,7 +236,7 @@ def capture_ui_step_conformance(
     forwarded = [t for t in envelope.subagent_texts if t.parent_tool_use_id == agent_call.id]
     if forwarded:
         return Captured(
-            value=forwarded[-1].text,
+            value={"report": forwarded[-1].text, "ui_changes": ui_changes},
             diagnostics={"agent_tool_use_id": agent_call.id, "source": "subagent_text"},
         )
     notification = next(
@@ -237,9 +248,27 @@ def capture_ui_step_conformance(
             diagnostics={"agent_tool_use_id": agent_call.id},
         )
     return Captured(
-        value=notification.summary,
+        value={"report": notification.summary, "ui_changes": ui_changes},
         diagnostics={"agent_tool_use_id": agent_call.id, "source": "task_notification"},
     )
+
+
+def _ui_changes(fs_delta: FsDelta | None) -> dict[str, str]:
+    if fs_delta is None:
+        return {}
+    changed = {**fs_delta.created, **fs_delta.modified}
+    return {path: changed[path] for path in sorted(changed) if path.startswith(_UI_SURFACE)}
+
+
+def check_ui_step_conformance(data: Mapping[str, Any]) -> tuple[bool, list[str]]:
+    """Live mechanical gate: the step landed on the UI surface.
+
+    Replaces the frozen fixture's literal-citation check, which graded the
+    report text and so could not pass a contract-conformant terse report.
+    """
+    if data["recorded_output"]["ui_changes"]:
+        return True, []
+    return False, [f"no file under {_UI_SURFACE} changed: the step was not implemented"]
 
 
 # ---------------------------------------------------------------------------
@@ -401,10 +430,10 @@ def commit_fs_delta(fixture_root: Path, baseline_sha: str) -> FsDelta:
     """
     current_sha = _git(fixture_root, "rev-parse", "HEAD").strip()
     if current_sha == baseline_sha:
-        return FsDelta(created={}, modified=())
+        return FsDelta(created={}, modified={})
     diff = _git(fixture_root, "diff", "--name-only", baseline_sha, current_sha)
     paths = [line for line in diff.splitlines() if line]
-    return FsDelta(created=dict.fromkeys(paths, ""), modified=())
+    return FsDelta(created=dict.fromkeys(paths, ""), modified={})
 
 
 def capture_commit_staging(
@@ -491,6 +520,8 @@ class ScenarioSpec:
     json_schema: Mapping[str, Any] | None = None
     forward_subagent_text: bool = False
     requires_structured_output: bool = False
+    # Overrides the frozen family's check when live capture grades a different surface.
+    mechanical_check: Callable[[Mapping[str, Any]], tuple[bool, list[str]]] | None = None
 
 
 SCENARIOS: dict[str, ScenarioSpec] = {
@@ -519,6 +550,7 @@ SCENARIOS: dict[str, ScenarioSpec] = {
             max_budget_usd=3.0,
             allowed_tools=_UI_STEP_ALLOWED_TOOLS,
             forward_subagent_text=True,
+            mechanical_check=check_ui_step_conformance,
         ),
         ScenarioSpec(
             scenario_id="adr-authoring",

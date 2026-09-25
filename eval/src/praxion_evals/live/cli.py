@@ -84,7 +84,7 @@ PREFLIGHT_BUDGET_USD = 1.0
 # Read once, here — the isolation check itself stays pure and takes this in.
 REAL_HOME = Path.home()
 # Scenarios whose ground truth is a filesystem delta rather than the envelope alone.
-_FS_DELTA_SCENARIOS = ("adr-authoring", "lightweight-fix")
+_FS_DELTA_SCENARIOS = ("ui-step-conformance", "adr-authoring", "lightweight-fix")
 # The recorded_* field each non-spawn-selection scenario's graded copy replaces.
 _RECORDED_FIELD = {
     "ui-step-conformance": "recorded_output",
@@ -100,14 +100,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}.")
         return 2
     repo_root = Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    output = _resolve_output(args.output, repo_root)
-    if output.exists() and not args.overwrite:
-        print(f"{output} exists; pass --overwrite to replace it.")
-        return 2
     resolved = _resolve_target_or_head(args.target, repo_root)
     if args.dry_run:
         _print_dry_run(args, resolved)
         return 0
+    output = _resolve_output(args.output, repo_root)
+    if output.exists() and not args.overwrite:
+        print(f"{output} exists; pass --overwrite to replace it.")
+        return 2
     return _run(args, repo_root, resolved, output)
 
 
@@ -547,7 +547,7 @@ def _evaluate(
     if isinstance(capture, NotElicited):
         return capture_to_outcome(capture)
     data = _graded_data(task, fixtures_by_id[task.scenario_id], capture.value)
-    passed, findings = grade_mechanical(data)
+    passed, findings = (spec_def.mechanical_check or grade_mechanical)(data)
     if not passed:
         return Failed(kind="graded", recorded=capture.value, findings=tuple(findings))
     if not args.judge:

@@ -140,6 +140,9 @@ elif schema is not None:
     scenario = f"spawn-selection:{case}"
 elif "Spawn exactly one" in prompt:
     scenario = "ui-step"
+    component = Path("dashboard_app/src/components/AdrList.tsx")
+    if component.exists():
+        component.write_text(component.read_text(encoding="utf-8") + "// loading\n", encoding="utf-8")
     events.append(tool_use("toolu_A", "Agent", {"subagent_type": "praxion:implementer"}))
     events.append({
         "type": "assistant", "parent_tool_use_id": "toolu_A", "subagent_type": "praxion:implementer",

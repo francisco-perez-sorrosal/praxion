@@ -106,7 +106,83 @@ def test_ui_step_conformance_captures_the_subagents_own_forwarded_text():
 
     assert isinstance(result, Captured)
     assert result.diagnostics["source"] == "subagent_text"
-    assert result.value  # the subagent's own forwarded text, non-empty
+    assert result.value["report"]  # the subagent's own forwarded text, non-empty
+    assert result.value["ui_changes"] == {}
+
+
+def test_ui_step_conformance_captures_the_ui_files_the_implementer_changed(tmp_path):
+    """The judge grades the change, not the return summary: the capture
+    carries each changed file under the UI surface with its content, and
+    leaves pipeline bookkeeping (`.ai-work/`) out."""
+    from praxion_evals.live.scenarios import SCENARIOS, compute_fs_delta, snapshot
+
+    root = tmp_path / "fixture"
+    component = root / "dashboard_app" / "src" / "components" / "AdrList.tsx"
+    component.parent.mkdir(parents=True)
+    component.write_text("export function AdrList() {}\n")
+    wip = root / ".ai-work" / "ui-step" / "WIP.md"
+    wip.parent.mkdir(parents=True)
+    wip.write_text("Status: TODO\n")
+    before = snapshot(root)
+    component.write_text("export function AdrList({ state }) { /* loading */ }\n")
+    wip.write_text("Status: COMPLETE\n")
+    delta = compute_fs_delta(before, snapshot(root))
+
+    result = SCENARIOS["ui-step-conformance"].capture(_envelope("ui_step_conformance"), delta, {})
+
+    assert result.value["ui_changes"] == {
+        "dashboard_app/src/components/AdrList.tsx": (
+            "export function AdrList({ state }) { /* loading */ }\n"
+        )
+    }
+
+
+def test_ui_step_conformance_fails_when_no_ui_file_changed():
+    """A `[BLOCKED]` return or a report-only session did not implement the
+    step on the UI surface — the one thing checkable without a judge."""
+    from praxion_evals.live.scenarios import SCENARIOS
+
+    check = SCENARIOS["ui-step-conformance"].mechanical_check
+    assert check is not None
+
+    passed, findings = check({"recorded_output": {"report": "[BLOCKED]", "ui_changes": {}}})
+
+    assert passed is False
+    assert findings == ["no file under dashboard_app/ changed: the step was not implemented"]
+
+
+def test_ui_step_conformance_passes_the_mechanical_gate_on_any_ui_change():
+    """Citations in the report are not required: the return contract keeps
+    the report terse, and conformance is the judge's call over the code."""
+    from praxion_evals.live.scenarios import SCENARIOS
+
+    check = SCENARIOS["ui-step-conformance"].mechanical_check
+    assert check is not None
+    recorded = {"report": "[COMPLETE] done", "ui_changes": {"dashboard_app/a.tsx": "x"}}
+
+    passed, findings = check({"recorded_output": recorded})
+
+    assert passed is True
+    assert findings == []
+
+
+def test_ui_step_conformance_fixture_seeds_the_full_planning_document_set(tmp_path):
+    """A real implementer step always has LEARNINGS.md beside WIP.md and the
+    plan; its absence made the implementer correctly return `[BLOCKED]`."""
+    from praxion_evals.harness.families.seeded_scenarios import load_scenario_fixtures
+    from praxion_evals.live.scenarios import SCENARIOS
+
+    seeded = next(d for d in load_scenario_fixtures() if d["scenario_id"] == "ui-step-conformance")
+    root = tmp_path / "fixture"
+
+    SCENARIOS["ui-step-conformance"].build_fixture(root, seeded)
+
+    step_dir = root / ".ai-work" / "ui-step"
+    assert {p.name for p in step_dir.iterdir()} == {
+        "IMPLEMENTATION_PLAN.md",
+        "WIP.md",
+        "LEARNINGS.md",
+    }
 
 
 def test_ui_step_conformance_is_not_elicited_without_an_implementer_agent_call():
@@ -336,7 +412,7 @@ def test_compute_fs_delta_detects_modification_by_hash_not_by_presence(tmp_path)
     delta = compute_fs_delta(before, snapshot(root))
 
     assert delta.created == {}
-    assert delta.modified == ("a.txt",)
+    assert delta.modified == {"a.txt": "two\n"}
     assert delta.changed_paths == ("a.txt",)
 
 
@@ -462,7 +538,7 @@ def test_commit_staging_catches_a_trap_file_committed_via_a_directory_pathspec()
             "scripts/test_foo.py": "",
             ".ai-state/observations.jsonl": "",
         },
-        modified=(),
+        modified={},
     )
 
     capture = capture_commit_staging(envelope, ground_truth, {})

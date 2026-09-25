@@ -242,6 +242,23 @@ def test_default_output_resolves_under_the_repo_root_not_the_cwd(repo_root):
     assert cli._resolve_output(explicit_args.output, repo_root) == Path("explicit.json")
 
 
+def test_dry_run_ignores_an_existing_output_but_a_real_run_refuses_it(
+    tmp_path, capsys, fake_claude
+):
+    """The default output is the committed baseline, so it always exists: a
+    dry run writes nothing and must still plan, while a real run must not
+    clobber it without `--overwrite`."""
+    from praxion_evals.live import cli
+
+    existing = tmp_path / "baseline.json"
+    existing.write_text("{}\n", encoding="utf-8")
+
+    assert cli.main(["--dry-run", "--output", str(existing)]) == 0
+    assert cli.main(["--output", str(existing)]) == 2
+    assert "pass --overwrite" in capsys.readouterr().out
+    assert fake_claude.calls() == []
+
+
 def test_default_target_resolves_to_head_not_main(monkeypatch, capsys, repo_root, fake_claude):
     """The CLI's own help text and dry-run label say "HEAD", but an unset
     target must actually resolve the checkout's current HEAD commit — not

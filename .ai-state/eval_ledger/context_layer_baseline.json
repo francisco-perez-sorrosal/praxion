@@ -1,0 +1,1337 @@
+{
+  "schema_version": 1,
+  "run": {
+    "started_at": "2026-09-24T19:14:27.717727Z",
+    "finished_at": "2026-09-24T19:31:57.842355Z",
+    "runner": "praxion-evals-live 0.37.0",
+    "complete": true,
+    "model": {
+      "requested": "opus",
+      "resolved": [
+        "claude-opus-5-5"
+      ]
+    },
+    "effort": "medium",
+    "k": 3,
+    "judge": null,
+    "spend_usd": 11.691953900000001
+  },
+  "variants": [
+    {
+      "variant": "head",
+      "target": {
+        "kind": "ref",
+        "ref": "837adbee1cb9053d4ad9da996ab112a0ee83dd57",
+        "sha": "837adbee1cb9053d4ad9da996ab112a0ee83dd57"
+      },
+      "degradation": null,
+      "isolation_proof": {
+        "status": "proven",
+        "model": "claude-sonnet-5",
+        "markers": {
+          "global_claude_md": "present",
+          "coordination_rule": "present",
+          "plugin_agent": "present",
+          "hook_delivered_rule": "present"
+        },
+        "plugins": [
+          "praxion@inline",
+          "agents-md@builtin",
+          "telemetry@builtin"
+        ],
+        "mcp_servers": [],
+        "auth_source": "ANTHROPIC_API_KEY",
+        "cost_usd": 0.10366679999999999
+      },
+      "scenarios": [
+        {
+          "scenario_id": "spawn-selection",
+          "counts": {
+            "pass": 14,
+            "fail": 1,
+            "error": 0
+          },
+          "pass_rate": 0.9333333333333333,
+          "cases": [
+            {
+              "case_id": "spawn-selection#1",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.253318,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5375,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 257,
+                    "cache_creation": 49634,
+                    "cache_read": 0
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.199907,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5763,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 280,
+                    "cache_creation": 38411,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.20923920000000001,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 5822,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 207,
+                    "cache_creation": 38581,
+                    "cache_read": 60851
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#2",
+              "counts": {
+                "pass": 2,
+                "fail": 1,
+                "error": 0
+              },
+              "pass_rate": 0.6666666666666666,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "lightweight",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.21873960000000003,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 11220,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 587,
+                    "cache_creation": 38961,
+                    "cache_read": 60853
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.2194048,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 9915,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 613,
+                    "cache_creation": 38990,
+                    "cache_read": 60854
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "lightweight",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.207597,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8813,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 664,
+                    "cache_creation": 38413,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#3",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.21058700000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10399,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 805,
+                    "cache_creation": 38447,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.20872700000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8928,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 712,
+                    "cache_creation": 38447,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.206372,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 8035,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 595,
+                    "cache_creation": 38444,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#4",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "context-engineer",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.22605180000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 11756,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 888,
+                    "cache_creation": 39218,
+                    "cache_read": 60889
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "context-engineer",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.209877,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 9854,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 769,
+                    "cache_creation": 38449,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.212007,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10842,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 875,
+                    "cache_creation": 38451,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#5",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.20226699999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6808,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 392,
+                    "cache_creation": 38435,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.20391199999999998,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6698,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 474,
+                    "cache_creation": 38436,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.2129792,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 6883,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 353,
+                    "cache_creation": 38744,
+                    "cache_read": 60876
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "ui-step-conformance",
+          "counts": {
+            "pass": 0,
+            "fail": 3,
+            "error": 0
+          },
+          "pass_rate": 0.0,
+          "cases": [
+            {
+              "case_id": "ui-step-conformance",
+              "counts": {
+                "pass": 0,
+                "fail": 3,
+                "error": 0
+              },
+              "pass_rate": 0.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": "**[COMPLETE]** Added an optional `isLoading` prop to `AdrList` (renders an immediate, accessible \"Loading decisions\u2026\" status with no delay, backward-compatible with the existing `adrs`-only call shape).\n\n- `dashboard_app/src/components/AdrList.tsx` (production change)\n- `.ai-work/ui-step/WIP.md` (status \u2192 COMPLETE)\n- `.ai-work/ui-step/LEARNINGS.md` (new \u2014 assumptions, tooling gap noted, decision rationale)\n\nNo format/lint/type-check/test tooling exists anywhere in this fixture (no `package.json`/`tsconfig`/linter/test runner found repo-wide), so those steps were skipped and self-review was done manually; noted in `LEARNINGS.md \u00a7 Gotchas`.",
+                  "findings": [
+                    "recorded_output is missing citation(s): ['web-ui-design', 'skeleton', 'five UI states']"
+                  ],
+                  "cost_usd": 0.7804783999999999,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 4455,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 314,
+                    "cache_creation": 898,
+                    "cache_read": 50119
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": "`LEARNINGS.md` does not exist under `.ai-work/ui-step/` (only `WIP.md` and `IMPLEMENTATION_PLAN.md` are present, and `.ai-state/` is entirely absent from the fixture). Per the required document-read order, `LEARNINGS.md` is mandatory reading before implementation begins, and its absence is a stop condition \u2014 not something to route around by inventing an empty file.\n\nMissing planning document: LEARNINGS.md. Cannot proceed without it.\n\n- `WIP.md` path: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-2-16/fixture/.ai-work/ui-step/WIP.md`\n- `IMPLEMENTATION_PLAN.md` path: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-2-16/fixture/.ai-work/ui-step/IMPLEMENTATION_PLAN.md`\n- Expected (missing) path: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-2-16/fixture/.ai-work/ui-step/LEARNINGS.md`\n\nNo files were modified. `WIP.md` was left untouched (still `Status: TODO`) since I did not begin the write-ahead `[IN-PROGRESS]` marker prior to confirming the planning documents were complete.\n\n**[BLOCKED]** \u2014 `.ai-work/ui-step/LEARNINGS.md` is missing; cannot proceed per the mandatory document-read protocol. The planner (or user) needs to create it (even as an empty template) before I resume this step.",
+                  "findings": [
+                    "recorded_output is missing citation(s): ['web-ui-design', 'skeleton', 'five UI states']"
+                  ],
+                  "cost_usd": 0.4290388,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 2999,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 186,
+                    "cache_creation": 1281,
+                    "cache_read": 50114
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": "**[COMPLETE]** Added a `loading`/`ready` discriminated-union prop contract to `AdrList` (avoids the boolean-blindness illegal state of `loading: true` + populated `adrs`), rendering an accessible spinner (`role=\"status\"`, `aria-live=\"polite\"`, `prefers-reduced-motion` aware) synchronously on the loading branch so it appears within the RAIL 100ms budget \u2014 no fetch/build tooling existed to wire up or run, so verification was a manual read-through against `coding-style.md` and the `web-ui-design`/`data-structure-design` skills.\n\nFiles changed:\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-3-17/fixture/dashboard_app/src/components/AdrList.tsx`\n- `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-3-17/fixture/dashboard_app/src/styles/adr-list.css` (new)\n\nWIP: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-3-17/fixture/.ai-work/ui-step/WIP.md`\nLearnings (assumptions + decisions): `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-live-und5y32j/head/ui-step-conformance-3-17/fixture/.ai-work/ui-step/LEARNINGS.md`",
+                  "findings": [
+                    "recorded_output is missing citation(s): ['skeleton', 'five UI states']"
+                  ],
+                  "cost_usd": 0.9748805999999999,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 1,
+                  "duration_ms": 4499,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 353,
+                    "cache_creation": 1239,
+                    "cache_read": 50110
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "adr-authoring",
+          "counts": {
+            "pass": 3,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "adr-authoring",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-298e7eea\ntitle: Split capture_memory hook into writer and BLOCKLIST-filter modules\nstatus: proposed\ncategory: architectural\ndate: 2026-09-24\nsummary: Split monolithic capture_memory.py into a writer module and a BLOCKLIST-filter module because the two responsibilities change for different reasons (P0.4)\ntags: [hooks, memory, capture-memory, blocklist, modularity, cohesion]\nmade_by: agent\nagent_type: orchestrator\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\ndissent: One small hook is cheaper to read and ship as a single file; a split adds an import seam and a second file before the filter has grown enough to need it\n---\n\n## Context\n\n`hooks/capture_memory.py` is a single hook script that does two jobs: it captures and writes memory entries, and it filters those writes against a BLOCKLIST. The two jobs change for different reasons. The writer changes when the storage format, destination, or capture trigger changes. The filter changes when the policy on what must never be persisted changes. Keeping both in one file couples unrelated edits: every change to blocklist policy touches the writer's file, and the other way round. It also stops the filter from being tested or reviewed by itself. This work is tracked as roadmap item P0.4.\n\n## Decision\n\nSplit `capture_memory.py` into two modules:\n\n- a **writer module** that owns capture and persistence of memory entries;\n- a **BLOCKLIST-filter module** that owns the rule for what is excluded, exposed to the writer through a narrow interface (the writer asks whether an entry is allowed; the filter knows nothing about storage).\n\nThe writer depends on the filter. The filter does not depend on the writer.\n\n## Considered Options\n\n### Option 1 \u2014 Keep the monolith (status quo)\n\n- Pros: one file; no import seam; nothing to migrate.\n- Cons: two reasons to change live in one unit; blocklist policy edits risk the write path; the filter cannot be tested by itself.\n\n### Option 2 \u2014 Separate functions within the same file\n\n- Pros: a smaller change; some separation in the code.\n- Cons: the file still changes for both reasons; the boundary exists only by convention and nothing enforces it; review and ownership are still mixed.\n\n### Option 3 \u2014 Split into writer and BLOCKLIST-filter modules (chosen)\n\n- Pros: each module has one reason to change; the filter can be tested and reviewed by itself; the dependency points one way (writer \u2192 filter); blocklist policy can change without touching the write path.\n- Cons: one more file and an import seam; the hook entry point must wire the two modules together.\n\n## Consequences\n\n- Positive: blocklist policy changes are contained to the filter module, which shrinks the blast radius of each change. The filter gets its own tests. The writer is simpler to follow.\n- Negative: two files to keep in step at the interface. A small amount of wiring code. Anyone who knew the old single file needs to re-learn where things live.\n\n## Disconfirmation\n\n- **Falsifier:** if, after the split, most commits touch both the writer and the filter module together, the two responsibilities do not change independently. In that case the split added a seam without reducing coupling, and the decision was wrong.\n- **Steelmanned runner-up:** Option 2 (separate functions in one file). This gets most of the readability benefit at almost no cost, keeps the hook to one deployable file, and puts off the module boundary until the filter's complexity actually calls for it. That fits Incremental Evolution.\n- **Reversal trigger:** revisit if co-change analysis shows the writer and filter modules being edited in the same commit most of the time, or if the filter shrinks back to a trivial check that does not justify its own module.\n",
+                  "findings": [],
+                  "cost_usd": 0.42451180000000005,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 10,
+                  "duration_ms": 59268,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 16,
+                    "output": 4336,
+                    "cache_creation": 51124,
+                    "cache_read": 410539
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-fe64b423\ntitle: Split capture_memory hook into writer and BLOCKLIST-filter modules\nstatus: proposed\ncategory: architectural\ndate: 2026-09-24\nsummary: Split the monolithic capture_memory.py hook into a memory-writer module and a BLOCKLIST-filter module because the two responsibilities change for different reasons (P0.4)\ntags: [hooks, memory, capture-memory, blocklist, modularity, cohesion]\nmade_by: agent\nagent_type: orchestrator\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\ndissent: Both halves are small and always run together, so two modules add an import boundary and a second file to keep in sync without a measured change-frequency difference to justify it\n---\n\n## Context\n\n`hooks/capture_memory.py` holds two responsibilities in one module: it **writes** captured memory, and it **filters** candidate content against a BLOCKLIST before the write happens. These change for different reasons. The writer changes when the storage format, destination, or write semantics change. The filter changes when the blocklist policy changes (new patterns, new exclusions, tuning false positives). Keeping both in one file means every policy edit touches the writer's module and every storage edit touches the filter's. Their tests stay entangled, and a reader who wants to audit what is excluded has to read past the persistence code to find it. This is roadmap item P0.4.\n\n## Decision\n\nSplit `capture_memory.py` into two modules:\n\n- **Writer module**: owns persisting captured memory. It knows nothing about blocklist policy.\n- **BLOCKLIST-filter module**: owns deciding whether a candidate may be captured. It is a pure predicate/transform over the candidate content and does no I/O.\n\nThe hook entry point composes them: filter first, then write only what passes. The dependency runs one way, from the entry point to both modules. The writer and the filter do not import each other.\n\n## Considered Options\n\n### Option 1: Keep the monolith\n\n- **Pros:** one file; no new import boundary; no migration work.\n- **Cons:** policy and persistence changes keep colliding in one module; the filter cannot be tested without the writer's surroundings; the blocklist is hard to audit on its own.\n\n### Option 2: Split into writer and filter modules (chosen)\n\n- **Pros:** each module has one reason to change; the filter becomes a pure, mock-free unit to test; blocklist policy can be reviewed in isolation; the entry point states the filter-then-write order in one place.\n- **Cons:** one more file and an import boundary; the entry point must keep the filter-before-write order.\n\n### Option 3: Move the BLOCKLIST to a data file, keep one module\n\n- **Pros:** policy edits become data edits and leave the code untouched.\n- **Cons:** only helps when changes are pattern additions. Changes to filter *logic* (matching semantics, redaction versus rejection) still land in the combined module, and writer and filter tests stay coupled.\n\n## Consequences\n\n**Positive**\n- Blocklist policy changes and persistence changes land in separate modules with separate tests.\n- The filter is side-effect-free and can be unit-tested without mocks.\n- The capture pipeline (filter, then write) is explicit at the entry point.\n\n**Negative**\n- One more module to maintain, and one more import boundary in the hook.\n- If the entry point is refactored carelessly, the filter-before-write order could be lost and unfiltered content could be written. The order needs a test.\n\n## Disconfirmation\n\n- **Falsifier:** git history after the split shows the writer and the filter still change together in most commits. That would mean they do not change for different reasons, and the split added a boundary without reducing coupling.\n- **Steelmanned runner-up:** keep the monolith (optionally with the blocklist moved to a data file). The hook is small, both halves always run in sequence, and cohesion arguments about a small file can be ceremony. A single module with clear internal sections gives most of the readability for none of the boundary cost, and it is trivial to split later if the change patterns ever diverge in practice.\n- **Reversal trigger:** revisit if co-change between the two modules stays high over the next several changes, or if a third consumer needs the writer and the filter interleaved in a way the one-way composition cannot express.\n",
+                  "findings": [],
+                  "cost_usd": 0.5458638,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 13,
+                  "duration_ms": 70069,
+                  "permission_denials": 2,
+                  "usage": {
+                    "input": 14,
+                    "output": 5775,
+                    "cache_creation": 70054,
+                    "cache_read": 400189
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": "---\nid: dec-draft-5696cbf8\ntitle: Split capture_memory writer and filter\nstatus: proposed\ncategory: architectural\ndate: 2026-09-24\nsummary: Split the monolithic capture_memory.py hook into a writer module and a BLOCKLIST-filter module, because the two responsibilities change for different reasons (P0.4)\ntags: [hooks, memory, capture-memory, blocklist, modularity, cohesion]\nmade_by: agent\nagent_type: orchestrator\nbranch: main\npipeline_tier: direct\naffected_files:\n  - hooks/capture_memory.py\ndissent: Two modules add an import boundary and a second file to keep in sync for a hook small enough that one well-sectioned file would carry both concerns at lower cost.\n---\n\n## Context\n\n`hooks/capture_memory.py` is a single hook that holds two responsibilities: writing captured memory, and filtering captures against a BLOCKLIST. The two change for different reasons. The writer changes when the storage format or destination changes. The filter changes when the policy for what must never be captured changes. Keeping both in one file means a policy edit reaches into write code and a storage edit reaches into policy code. Each edit carries the other's review and regression risk. Roadmap item P0.4 calls for splitting them.\n\n## Decision\n\nSplit `capture_memory.py` into two modules:\n\n- **Writer module**: persists captured memory. It owns the storage format and destination, and knows nothing about what counts as blocked.\n- **BLOCKLIST-filter module**: decides whether a capture may be written. It owns the BLOCKLIST and matching logic, and knows nothing about how or where memory is stored.\n\nThe hook entry point composes the two: filter first, then write only what passes. The filter exposes a narrow predicate-style interface, so the writer never depends on BLOCKLIST internals.\n\n## Considered Options\n\n### Option 1: Split into writer and filter modules (chosen)\n\n- **Pros:** each module has a single reason to change. BLOCKLIST policy can be reviewed and tested alone, which matters because it is the privacy-relevant surface. Changes stay small.\n- **Cons:** one more file and an import boundary. The filter-before-write order moves into the composing entry point, so it is no longer implicit in one function.\n\n### Option 2: Keep the monolith, separated into internal sections\n\n- **Pros:** no new files or imports. The simplest change for a small hook.\n- **Cons:** the two concerns stay textually coupled. Nothing structural stops write code from reaching into the BLOCKLIST, or the reverse. Filter tests still load the writer's dependencies.\n\n### Option 3: Move the BLOCKLIST to a data/config file and keep the logic in one module\n\n- **Pros:** policy edits (adding entries) become data-only changes.\n- **Cons:** it covers list contents only, not changes to matching logic. The writer and the filtering code are still one module.\n\n## Consequences\n\n**Positive**\n- A BLOCKLIST policy change touches only the filter module. A storage change touches only the writer.\n- The filter can be unit-tested without the write path.\n- Clearer ownership for future changes on either side.\n\n**Negative**\n- A second module, plus an interface between the two, to maintain.\n- The entry point must enforce the filter-then-write order explicitly. If that composition is wrong, blocked content could be written, so the entry point needs a test covering it.\n\n## Disconfirmation\n\n- **Falsifier:** if, after the split, most commits to one module also have to change the other (the two keep changing together), the \"different reasons to change\" premise is wrong and the split added distance without lowering coupling.\n- **Steelmanned runner-up:** Option 2. For a one-file hook, clearly marked sections give most of the readability benefit at no structural cost. Premature module boundaries are ceremony, and the change pattern may never show up in practice.\n- **Reversal trigger:** revisit if co-change analysis of the two modules shows them changing together in most commits over the next several changes. Also revisit if the filter interface keeps widening to expose writer concerns. Either sign means the boundary is in the wrong place.\n",
+                  "findings": [],
+                  "cost_usd": 0.4264244,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 9,
+                  "duration_ms": 55174,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 14,
+                    "output": 4415,
+                    "cache_creation": 53441,
+                    "cache_read": 354317
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "commit-staging",
+          "counts": {
+            "pass": 3,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "commit-staging",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [],
+                  "cost_usd": 0.2597468,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 5,
+                  "duration_ms": 16965,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 936,
+                    "cache_creation": 39744,
+                    "cache_read": 211334
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [],
+                  "cost_usd": 0.2487688,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 4,
+                  "duration_ms": 17117,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 8,
+                    "output": 918,
+                    "cache_creation": 39641,
+                    "cache_read": 160859
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": "git add scripts/foo.py scripts/test_foo.py # committed: scripts/foo.py scripts/test_foo.py",
+                  "findings": [],
+                  "cost_usd": 0.25799340000000004,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 5,
+                  "duration_ms": 17478,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 848,
+                    "cache_creation": 39747,
+                    "cache_read": 211292
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "lightweight-fix",
+          "counts": {
+            "pass": 3,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": 1.0,
+          "cases": [
+            {
+              "case_id": "lightweight-fix",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": [
+                    ".ai-state/calibration_log.md",
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/9985599736929670678",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/paginate.py"
+                  ],
+                  "findings": [],
+                  "cost_usd": 0.36500299999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 9,
+                  "duration_ms": 28885,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 14,
+                    "output": 1868,
+                    "cache_creation": 51875,
+                    "cache_read": 341060
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": [
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/5266177946087556266",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/.pytest_cache/.gitignore",
+                    "scripts/.pytest_cache/CACHEDIR.TAG",
+                    "scripts/.pytest_cache/README.md",
+                    "scripts/.pytest_cache/v/cache/nodeids",
+                    "scripts/paginate.py"
+                  ],
+                  "findings": [],
+                  "cost_usd": 0.24542740000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 5,
+                  "duration_ms": 14511,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 8,
+                    "output": 793,
+                    "cache_creation": 39505,
+                    "cache_read": 160052
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": [
+                    ".ai-state/calibration_log.md",
+                    ".claude/praxion-rules.yaml.example",
+                    ".ruff_cache/.gitignore",
+                    ".ruff_cache/0.15.11/17606491717527072856",
+                    ".ruff_cache/CACHEDIR.TAG",
+                    "scripts/paginate.py"
+                  ],
+                  "findings": [],
+                  "cost_usd": 0.27322060000000004,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 6,
+                  "duration_ms": 20188,
+                  "permission_denials": 1,
+                  "usage": {
+                    "input": 10,
+                    "output": 1493,
+                    "cache_creation": 40221,
+                    "cache_read": 211078
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "totals": {
+        "scenario_sessions": 27,
+        "errors": 0,
+        "cost_usd": 8.4323434,
+        "tokens": {
+          "input": 160,
+          "output": 30706,
+          "cache_creation": 1018831,
+          "cache_read": 3016366
+        }
+      }
+    },
+    {
+      "variant": "canary",
+      "target": {
+        "kind": "ref",
+        "ref": "837adbee1cb9053d4ad9da996ab112a0ee83dd57",
+        "sha": "837adbee1cb9053d4ad9da996ab112a0ee83dd57"
+      },
+      "degradation": {
+        "file": "rules/swe/swe-agent-coordination-protocol.md",
+        "heading": "### Process Calibration",
+        "removed_bytes": 3362,
+        "sha256_before": "be459befb61cac4b35995176b7a536ce096a0e6684d732d54fb3d4236bb43751",
+        "sha256_after": "a778c56fd47fdbe46f564cf260d8aa1e2556386167a98a98ba392ebee185d41d"
+      },
+      "isolation_proof": {
+        "status": "proven",
+        "model": "claude-sonnet-5",
+        "markers": {
+          "global_claude_md": "present",
+          "coordination_rule": "present",
+          "plugin_agent": "present",
+          "hook_delivered_rule": "present"
+        },
+        "plugins": [
+          "praxion@inline",
+          "agents-md@builtin",
+          "telemetry@builtin"
+        ],
+        "mcp_servers": [],
+        "auth_source": "ANTHROPIC_API_KEY",
+        "cost_usd": 0.1003843
+      },
+      "scenarios": [
+        {
+          "scenario_id": "spawn-selection",
+          "counts": {
+            "pass": 10,
+            "fail": 5,
+            "error": 0
+          },
+          "pass_rate": 0.6666666666666666,
+          "cases": [
+            {
+              "case_id": "spawn-selection#1",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.250213,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7596,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 425,
+                    "cache_creation": 48341,
+                    "cache_read": 0
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.19474199999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6728,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 345,
+                    "cache_creation": 37118,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [],
+                  "cost_usd": 0.19464700000000001,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 6527,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 340,
+                    "cache_creation": 37119,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#2",
+              "counts": {
+                "pass": 0,
+                "fail": 3,
+                "error": 0
+              },
+              "pass_rate": 0.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.19471199999999997,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5916,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 342,
+                    "cache_creation": 37124,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.195182,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5928,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 366,
+                    "cache_creation": 37122,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "direct",
+                    "recorded_agents": []
+                  },
+                  "findings": [
+                    "task 'Rename one helper function used in two sibling test files.': recorded_tier='direct' != expected_tier='lightweight'"
+                  ],
+                  "cost_usd": 0.193102,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 5659,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 262,
+                    "cache_creation": 37122,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#3",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.208117,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 11949,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 1005,
+                    "cache_creation": 37153,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.203402,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10181,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 769,
+                    "cache_creation": 37154,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "verifier",
+                      "interface-designer",
+                      "researcher",
+                      "test-engineer"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.202102,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 9035,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 704,
+                    "cache_creation": 37154,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#4",
+              "counts": {
+                "pass": 1,
+                "fail": 2,
+                "error": 0
+              },
+              "pass_rate": 0.3333333333333333,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "task 'Migrate the auth subsystem off a deprecated session store across 11 files and 6 distinct behaviors, cutting across the API, worker, and CLI.': recorded_tier='standard' != expected_tier='full'"
+                  ],
+                  "cost_usd": 0.203992,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10072,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 798,
+                    "cache_creation": 37156,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "fail",
+                  "fail_kind": "graded",
+                  "recorded": {
+                    "recorded_tier": "standard",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [
+                    "task 'Migrate the auth subsystem off a deprecated session store across 11 files and 6 distinct behaviors, cutting across the API, worker, and CLI.': recorded_tier='standard' != expected_tier='full'"
+                  ],
+                  "cost_usd": 0.207737,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10829,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 985,
+                    "cache_creation": 37157,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "full",
+                    "recorded_agents": [
+                      "systems-architect",
+                      "implementation-planner",
+                      "implementer",
+                      "test-engineer",
+                      "verifier",
+                      "doc-engineer",
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.20504699999999998,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 10388,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 850,
+                    "cache_creation": 37159,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            },
+            {
+              "case_id": "spawn-selection#5",
+              "counts": {
+                "pass": 3,
+                "fail": 0,
+                "error": 0
+              },
+              "pass_rate": 1.0,
+              "sessions": [
+                {
+                  "repeat": 1,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.19734700000000002,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7516,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 469,
+                    "cache_creation": 37143,
+                    "cache_read": 11220
+                  }
+                },
+                {
+                  "repeat": 2,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.2068954,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 3,
+                  "duration_ms": 6896,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 6,
+                    "output": 378,
+                    "cache_creation": 37479,
+                    "cache_read": 59582
+                  }
+                },
+                {
+                  "repeat": 3,
+                  "outcome": "pass",
+                  "recorded": {
+                    "recorded_tier": "spike",
+                    "recorded_agents": [
+                      "researcher"
+                    ]
+                  },
+                  "findings": [],
+                  "cost_usd": 0.19832200000000003,
+                  "model_resolved": "claude-opus-5-5",
+                  "num_turns": 2,
+                  "duration_ms": 7960,
+                  "permission_denials": 0,
+                  "usage": {
+                    "input": 2,
+                    "output": 518,
+                    "cache_creation": 37142,
+                    "cache_read": 11220
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "ui-step-conformance",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "adr-authoring",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "commit-staging",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        },
+        {
+          "scenario_id": "lightweight-fix",
+          "counts": {
+            "pass": 0,
+            "fail": 0,
+            "error": 0
+          },
+          "pass_rate": null,
+          "cases": []
+        }
+      ],
+      "totals": {
+        "scenario_sessions": 15,
+        "errors": 0,
+        "cost_usd": 3.0555594,
+        "tokens": {
+          "input": 34,
+          "output": 8556,
+          "cache_creation": 568643,
+          "cache_read": 205442
+        }
+      }
+    }
+  ],
+  "canary": {
+    "scenario_id": "spawn-selection",
+    "head_pass_rate": 0.9333333333333333,
+    "canary_pass_rate": 0.6666666666666666,
+    "delta": -0.2666666666666667,
+    "lowered": true
+  }
+}

@@ -67,7 +67,7 @@ stdlib-only, and sits in the underscore-prefixed family alongside `_handoff_inpu
 Both readers import these functions. Policy stays with each reader:
 
 - the gate keeps its byte ceiling and finding kinds, and adds `no-run-over-ceiling`;
-- the reconciler keeps per-step test status, `Files:` parsing and attribution; the WIP claim parser (checklist, status table, `[x]` heading) moved into the module when the reconciler reached its size ceiling.
+- the reconciler keeps `Files:` parsing, attribution and the arbitration of claims and test statuses against git. When it reached its size ceiling, two pure readings of a step document moved into the module by cohesion: the WIP claim parser (checklist, status table, `[x]` heading) and the per-step test-evidence reader (which recorded run speaks for a step). The charter is "what a step document declares, read without git or a filesystem"; a switch only one reader needs stays in that reader.
 
 ## Considered Options
 

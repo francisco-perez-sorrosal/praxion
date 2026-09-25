@@ -1676,7 +1676,9 @@ class TestUserIdAttribute:
         monkeypatch.setattr(otel_relay, "_git_user_id", lambda _p: "dev@example.com")
         harness.relay.start_session(SESSION_ID, harness.project_dir)
         harness.relay.start_agent("agent-u1", "praxion:researcher", SESSION_ID)
-        harness.relay.end_agent("agent-u1", "", agent_type="praxion:researcher", session_id=SESSION_ID)
+        harness.relay.end_agent(
+            "agent-u1", "", agent_type="praxion:researcher", session_id=SESSION_ID
+        )
         harness.relay.end_session(SESSION_ID)
 
         agent_spans = harness.spans_with_attribute("praxion.agent_type", "researcher")
@@ -2063,7 +2065,9 @@ class TestAgentSummaryRollups:
         harness.relay.record_tool(
             "agent-tu", "Bash", agent_type="praxion:researcher", session_id=SESSION_ID
         )  # duplicate
-        harness.relay.end_agent("agent-tu", "", agent_type="praxion:researcher", session_id=SESSION_ID)
+        harness.relay.end_agent(
+            "agent-tu", "", agent_type="praxion:researcher", session_id=SESSION_ID
+        )
         harness.relay.end_session(SESSION_ID)
 
         summary = harness.spans_named("agent-summary")[-1]
@@ -2075,7 +2079,9 @@ class TestAgentSummaryRollups:
         harness.relay.start_agent("agent-sk", "praxion:researcher", SESSION_ID)
         harness.relay.record_skill("agent-sk", "python-development", session_id=SESSION_ID)
         harness.relay.record_skill("agent-sk", "testing-strategy", session_id=SESSION_ID)
-        harness.relay.end_agent("agent-sk", "", agent_type="praxion:researcher", session_id=SESSION_ID)
+        harness.relay.end_agent(
+            "agent-sk", "", agent_type="praxion:researcher", session_id=SESSION_ID
+        )
         harness.relay.end_session(SESSION_ID)
 
         summary = harness.spans_named("agent-summary")[-1]

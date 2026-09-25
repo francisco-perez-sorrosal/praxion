@@ -56,6 +56,7 @@ import os
 import re
 import shutil
 import sys
+import sysconfig
 from pathlib import Path
 from typing import Any
 
@@ -111,35 +112,65 @@ def _load_yaml(text: str) -> Any:
 # -- Manifest loading ----------------------------------------------------------
 
 
-def _load_manifest(plugin_root: Path) -> list[dict] | None:
-    """Read and parse rules/_manifest.yaml.
+class ManifestUnavailableError(Exception):
+    """The manifest cannot be read, so no hook-delivered rule reaches the session."""
 
-    Returns the list of rule dicts, or None if the manifest is missing/unreadable.
+    def __init__(self, reason: str, fix: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.fix = fix
+
+
+def _load_manifest(plugin_root: Path) -> list[dict]:
+    """Read and parse rules/_manifest.yaml into its list of rule dicts.
+
+    Raises:
+        ManifestUnavailableError: the manifest is missing, unparseable, or malformed.
     """
     manifest_path = plugin_root / "rules" / "_manifest.yaml"
+    reinstall = "Reinstall the Praxion plugin, then start a new session."
     if not manifest_path.exists():
-        print(
-            f"[inject_rules] WARNING: manifest not found at {manifest_path}; "
-            "skipping rule injection",
-            file=sys.stderr,
+        raise ManifestUnavailableError(f"manifest not found at {manifest_path}", reinstall)
+    if yaml is None:
+        raise ManifestUnavailableError(
+            f"the hook interpreter `{sys.executable}` cannot import PyYAML",
+            _pyyaml_fix(sys.executable, externally_managed=_externally_managed()),
         )
-        return None
     try:
         data = _load_yaml(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        print(
-            f"[inject_rules] WARNING: could not parse manifest: {exc}; skipping rule injection",
-            file=sys.stderr,
-        )
-        return None
+        raise ManifestUnavailableError(f"could not parse manifest: {exc}", reinstall) from exc
     rules = data.get("rules", [])
     if not isinstance(rules, list):
-        print(
-            "[inject_rules] WARNING: manifest 'rules' is not a list; skipping rule injection",
-            file=sys.stderr,
-        )
-        return None
+        raise ManifestUnavailableError("manifest 'rules' is not a list", reinstall)
     return rules
+
+
+def _externally_managed() -> bool:
+    """PEP 668: the interpreter's stdlib carries an EXTERNALLY-MANAGED marker."""
+    return (Path(sysconfig.get_path("stdlib")) / "EXTERNALLY-MANAGED").exists()
+
+
+def _pyyaml_fix(executable: str, *, externally_managed: bool) -> str:
+    """The remedy that works for this interpreter — pip refuses a PEP 668 one."""
+    on_path = "put a python3 that has PyYAML (e.g. a virtualenv's bin/) first on PATH"
+    if externally_managed:
+        return f"`{executable}` is externally managed, so pip will refuse; {on_path}, then start a new session."
+    return (
+        f"Install it for that interpreter (`{executable} -m pip install pyyaml`) "
+        f"or {on_path}, then start a new session."
+    )
+
+
+def _report_unavailable(exc: ManifestUnavailableError) -> None:
+    """Log the skip and tell the session — stderr alone reaches neither the
+    model nor the user, so the rules would vanish silently."""
+    print(f"[inject_rules] WARNING: {exc.reason}; skipping rule injection", file=sys.stderr)
+    _emit_additional_context(
+        "## Praxion rule injection skipped\n\n"
+        f"Praxion's hook-delivered rules were NOT loaded this session: {exc.reason}. "
+        f"{exc.fix} Tell the user if their work depends on those conventions."
+    )
 
 
 # -- Project blacklist loading -------------------------------------------------
@@ -550,10 +581,12 @@ def main() -> None:
     plugin_root = _resolve_plugin_root()
     cwd = _resolve_cwd(raw)
 
-    # Locate and parse manifest; missing manifest is non-fatal.
-    rules = _load_manifest(plugin_root)
-    if rules is None:
-        return  # warning already emitted; exit 0 (non-fatal)
+    # Locate and parse manifest; an unavailable manifest is non-fatal but never silent.
+    try:
+        rules = _load_manifest(plugin_root)
+    except ManifestUnavailableError as exc:
+        _report_unavailable(exc)
+        return
 
     # Praxion is active in this project — ensure the user-facing template
     # exists in .claude/ so projects discover the blacklist mechanism

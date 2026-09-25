@@ -933,3 +933,80 @@ def test_no_yaml_leaves_existing_settings_untouched(plugin_root: Path, project_d
         "settings.json content must be byte-identical when no YAML config exists. "
         f"Before: {initial_content!r}\nAfter: {final_content!r}"
     )
+
+
+# ===========================================================================
+# A skipped injection is surfaced to the session, never stderr-only
+# ===========================================================================
+
+
+def test_missing_pyyaml_tells_the_session_rules_were_not_loaded(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    """The first python3 on PATH often lacks PyYAML (PEP 668 system pythons,
+    fresh Homebrew). The skip must reach the session naming the interpreter
+    and the fix — stderr alone is invisible to both the model and the user."""
+    blocked_yaml = (
+        "import runpy, sys; sys.modules['yaml'] = None; "
+        f"sys.path.insert(0, {str(HOOK_SCRIPT.parent)!r}); "
+        f"runpy.run_path({str(HOOK_SCRIPT)!r}, run_name='__main__')"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", blocked_yaml],
+        capture_output=True,
+        text=True,
+        cwd=str(project_dir),
+        env={**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root)},
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    context = _additional_context(result)
+    assert "were NOT loaded" in context
+    assert sys.executable in context
+
+
+def test_missing_manifest_tells_the_session_rules_were_not_loaded(
+    tmp_path: Path, project_dir: Path
+) -> None:
+    empty_plugin_root = tmp_path / "empty_plugin"
+    empty_plugin_root.mkdir()
+
+    result = _run_hook(empty_plugin_root, project_dir)
+
+    assert result.returncode == 0, result.stderr
+    context = _additional_context(result)
+    assert "were NOT loaded" in context
+    assert "manifest not found" in context
+
+
+def _import_hook_module():
+    import importlib.util
+
+    sys.path.insert(0, str(HOOK_SCRIPT.parent))
+    spec = importlib.util.spec_from_file_location("inject_rules_under_test", HOOK_SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_pyyaml_fix_never_suggests_pip_for_an_externally_managed_interpreter() -> None:
+    """PEP 668 interpreters (Homebrew, Debian system python) refuse `pip
+    install`; advising it would dead-end the user on the machines that hit
+    this most."""
+    module = _import_hook_module()
+
+    fix = module._pyyaml_fix("/opt/homebrew/bin/python3", externally_managed=True)
+
+    assert "pip install" not in fix
+    assert "first on PATH" in fix
+
+
+def test_pyyaml_fix_suggests_pip_for_a_pip_managed_interpreter() -> None:
+    module = _import_hook_module()
+
+    fix = module._pyyaml_fix("/usr/local/bin/python3", externally_managed=False)
+
+    assert "`/usr/local/bin/python3 -m pip install pyyaml`" in fix

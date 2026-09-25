@@ -1180,6 +1180,19 @@ check_claude_code() {
     local hooks_json="${SCRIPT_DIR}/hooks/hooks.json"
     if [ -f "$hooks_json" ]; then
         info "Hooks provided by plugin hooks.json"
+        # hooks.json runs the first python3 on PATH; without PyYAML the rule
+        # injection hook skips every hook-delivered rule.
+        local hook_python
+        hook_python="$(command -v python3 || true)"
+        if [ -z "$hook_python" ]; then
+            warn "No python3 on PATH — every plugin hook will fail"
+            healthy=false
+        elif "$hook_python" -c "import yaml" 2>/dev/null; then
+            info "Hook interpreter ${hook_python} imports PyYAML"
+        else
+            warn "Hook interpreter ${hook_python} lacks PyYAML — hook-delivered rules are skipped; put a python3 with PyYAML first on PATH"
+            healthy=false
+        fi
         # Warn if stale hooks remain in settings.json
         local settings_file="${HOME}/.claude/settings.json"
         if [ -f "$settings_file" ] && python3 -c "

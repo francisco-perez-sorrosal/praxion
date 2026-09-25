@@ -9,12 +9,17 @@ lines -- no notes field, no pasted output. Measured cost: test output read
 back is ~1.5% of what implementers read; the rest is free-form prose this
 gate exists to bound.
 
-A file is split into ``## Step N`` sections. Each section is classified from
-its ``Result:`` line: **red** if ``fail=`` or ``error=`` is greater than
-zero, **green** otherwise. A red section is never flagged for size -- failure
-detail (log pointer, ``### Failures`` blocks) is expected there. A green
-section over the byte ceiling, or a section with no parseable ``Result:``
-line, is a finding.
+A file is split into step blocks through the shared ``_step_schema`` module
+-- only a ``#{2,4} Step <id>`` heading opens a block, so a sub-heading (e.g.
+``### Failures``) stays attributed to its parent step, not misread as its own
+section. Each block is classified over **every** ``Result:`` line it
+contains, not just the first: ``empty`` (heading-only, no finding), ``red``
+(any counted line reads red -- exempt from the ceiling, since failure detail
+belongs there), ``green`` (subject to the byte ceiling), ``no-run`` (a
+declared ``Result: none`` -- still ceiling-bounded, but never a
+``missing-result-line`` finding), or ``missing-result-line`` (no ``Result:``
+line at all, or only a malformed one -- the malformation is named in the
+finding detail).
 
 Exit codes: 0 clean, 1 findings found, 2 script error.
 
@@ -28,24 +33,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_CEILING_BYTES = 1024
+from _step_schema import RED as _RED
+from _step_schema import Counts, Malformed, NoRun, StepBlock, split_step_blocks
 
-_SECTION_HEADER_RE = re.compile(r"^## .*$", re.MULTILINE)
-_RESULT_LINE_RE = re.compile(r"^Result:.*$", re.MULTILINE)
-_FAIL_RE = re.compile(r"\bfail=(\d+)")
-_ERROR_RE = re.compile(r"\berror=(\d+)")
+DEFAULT_CEILING_BYTES = 1024
 
 
 @dataclass(frozen=True)
 class Finding:
     file: str
     section: str
-    kind: str  # "green-over-ceiling" | "missing-result-line"
+    kind: str  # "green-over-ceiling" | "no-run-over-ceiling" | "missing-result-line"
     detail: str
     byte_count: int | None = None
     ceiling: int | None = None
@@ -59,35 +61,37 @@ class Finding:
         return d
 
 
-def split_sections(text: str) -> list[str]:
-    """Split on ``^## `` headers; each section runs to the next header or EOF."""
-    starts = [m.start() for m in _SECTION_HEADER_RE.finditer(text)]
-    if not starts:
-        return []
-    boundaries = [*starts, len(text)]
-    return [text[boundaries[i] : boundaries[i + 1]].rstrip() for i in range(len(starts))]
+def _classify_block(block: StepBlock) -> tuple[str, str | None]:
+    """Classify a block over every ``Result:`` line it holds.
+
+    Returns ``(kind, detail)`` where ``kind`` is one of ``empty``, ``red``,
+    ``green``, ``no-run``, ``missing-result-line``; ``detail`` names the
+    malformation when one is what produced ``missing-result-line``, else
+    None. Any counted line reading red wins over a green one in the same
+    block -- td-214's guard against a step reading green from a stale line
+    while a later, red one sits unread.
+    """
+    counts = [line for _, line in block.results if isinstance(line, Counts)]
+    if any(c.status == _RED for c in counts):
+        return "red", None
+    if counts:
+        return "green", None
+
+    noruns = [line for _, line in block.results if isinstance(line, NoRun)]
+    if noruns:
+        return "no-run", None
+
+    malformed = [line for _, line in block.results if isinstance(line, Malformed)]
+    if malformed:
+        return "missing-result-line", malformed[0].reason
+    if _is_heading_only(block):
+        return "empty", None
+    return "missing-result-line", None
 
 
-def section_title(section: str) -> str:
-    header_line = section.splitlines()[0]
-    return header_line[len("## ") :].strip()
-
-
-def classify_result(section: str) -> tuple[str, int | None]:
-    """Return (kind, fail_count) where kind is "red", "green", or "missing-result-line"."""
-    result_match = _RESULT_LINE_RE.search(section)
-    if result_match is None:
-        return "missing-result-line", None
-
-    line = result_match.group(0)
-    fail_match = _FAIL_RE.search(line)
-    if fail_match is None:
-        return "missing-result-line", None
-
-    fail_count = int(fail_match.group(1))
-    error_match = _ERROR_RE.search(line)
-    error_count = int(error_match.group(1)) if error_match else 0
-    return ("red" if fail_count > 0 or error_count > 0 else "green"), fail_count
+def _is_heading_only(block: StepBlock) -> bool:
+    """True when a step block is nothing but its own heading line."""
+    return "\n" not in block.text
 
 
 def find_findings(path: Path, ceiling: int) -> list[Finding]:
@@ -95,36 +99,37 @@ def find_findings(path: Path, ceiling: int) -> list[Finding]:
     display = str(path)
     findings: list[Finding] = []
 
-    for section in split_sections(text):
-        title = section_title(section)
-        kind, _fail_count = classify_result(section)
+    for block in split_step_blocks(text):
+        kind, detail = _classify_block(block)
+
+        if kind in ("empty", "red"):
+            continue  # heading-only and red blocks are never flagged for size
 
         if kind == "missing-result-line":
             findings.append(
                 Finding(
                     file=display,
-                    section=title,
+                    section=block.title,
                     kind="missing-result-line",
-                    detail="no parseable `Result: pass=<n> fail=<n> skip=<n>` line",
+                    detail=detail or "no parseable `Result: pass=<n> fail=<n> skip=<n>` line",
                 )
             )
             continue
 
-        if kind == "red":
-            continue  # red sections carry failure detail; never flagged for size
-
-        byte_count = len(section.encode("utf-8"))
-        if byte_count > ceiling:
-            findings.append(
-                Finding(
-                    file=display,
-                    section=title,
-                    kind="green-over-ceiling",
-                    detail=f"green section is {byte_count} bytes, exceeds ceiling of {ceiling} bytes",
-                    byte_count=byte_count,
-                    ceiling=ceiling,
-                )
+        byte_count = len(block.text.encode("utf-8"))
+        if byte_count <= ceiling:
+            continue
+        finding_kind = "green-over-ceiling" if kind == "green" else "no-run-over-ceiling"
+        findings.append(
+            Finding(
+                file=display,
+                section=block.title,
+                kind=finding_kind,
+                detail=f"{kind} section is {byte_count} bytes, exceeds ceiling of {ceiling} bytes",
+                byte_count=byte_count,
+                ceiling=ceiling,
             )
+        )
 
     return findings
 

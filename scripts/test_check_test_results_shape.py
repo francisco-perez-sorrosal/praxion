@@ -16,6 +16,15 @@ from typing import Any
 
 _SCRIPT_PATH = Path(__file__).resolve().parent / "check_test_results_shape.py"
 
+# The checker imports the shared _step_schema sibling module by bare name
+# (works unmodified under `python3 scripts/check_test_results_shape.py ...`,
+# since a script's own directory is on sys.path there); loading it in
+# isolation via spec_from_file_location needs the same directory added
+# explicitly, or that import resolves nothing.
+sys.path.insert(0, str(_SCRIPT_PATH.parent))
+
+import _step_schema  # noqa: E402
+
 
 def _load_module() -> Any:
     spec = importlib.util.spec_from_file_location("check_test_results_shape", _SCRIPT_PATH)
@@ -317,3 +326,187 @@ def test_missing_file_exits_two(tmp_path: Path) -> None:
     rc = main([str(tmp_path / "does_not_exist.md")])
 
     assert rc == 2, "an unreadable file must exit 2, not be silently skipped"
+
+
+# ---------------------------------------------------------------------------
+# Adoption of the shared _step_schema module: block model, no-run declarations,
+# malformed-line naming, and the live p3-5 corpus (td-236(b): 29 findings -> 6)
+# ---------------------------------------------------------------------------
+
+
+def test_all_zero_counts_above_an_oversized_failures_block_is_still_red(tmp_path: Path) -> None:
+    """td-214: pass=0 fail=0 above a ### Failures sub-heading reads red even
+    when the failure detail alone crosses the byte ceiling -- a red block is
+    exempt from the size check regardless of size, and (since only a step
+    heading opens a block) the oversized sub-heading never becomes its own
+    green or missing section. This is the case that actually distinguishes
+    the fix: a same-size all-zero block with a *small* Failures block reads
+    green under both the old and the new classifier (it never crosses the
+    ceiling either way), so only the oversized case forces the old
+    fail=-only classifier to misread it as green-over-ceiling."""
+    failure_detail = (
+        "Traceback (most recent call last):\n"
+        '  File "tests/test_thing.py", line 42, in test_thing\n'
+        "    assert result == expected\n"
+        "AssertionError: assert None == 'expected value'\n"
+    ) * 15
+    body = (
+        "## Step 1 -- a step\n"  # id-citation-discipline:ignore
+        "\n"
+        "Command: `uv run pytest tests/ -q --tb=short -rf`\n"
+        "Result: pass=0 fail=0 skip=0\n"
+        "\n"
+        "### Failures\n"
+        "\n"
+        f"{failure_detail}"
+    )
+    assert len(body.encode("utf-8")) > DEFAULT_CEILING_BYTES
+
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert findings == []
+    assert main([str(path)]) == 0
+
+    block = _step_schema.split_step_blocks(path.read_text(encoding="utf-8"))[0]
+    kind, _detail = _mod._classify_block(block)
+    assert kind == "red"
+
+
+def test_declared_no_run_block_produces_no_missing_result_line_finding(tmp_path: Path) -> None:
+    """A step block that ran no tests declares Result: none and is exempt from
+    missing-result-line -- but stays bounded by the byte ceiling."""
+    body = (
+        "## Step 1 -- a step\n"  # id-citation-discipline:ignore
+        "\n"
+        "Result: none -- documentation-only step, no tests ran\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert findings == []
+    assert main([str(path)]) == 0
+
+
+def test_declared_no_run_block_over_the_ceiling_is_no_run_over_ceiling(tmp_path: Path) -> None:
+    """A Result: none block cannot dodge the byte bound -- it gets its own
+    finding kind, distinct from green-over-ceiling."""
+    padding = "x" * (DEFAULT_CEILING_BYTES + 1)
+    body = (
+        "## Step 1 -- a step\n"  # id-citation-discipline:ignore
+        "\n"
+        f"Result: none -- {padding}\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert len(findings) == 1
+    assert findings[0].kind == "no-run-over-ceiling"
+    assert main([str(path)]) == 1
+
+
+def test_a_malformed_result_line_names_its_malformation_distinct_from_a_missing_line(
+    tmp_path: Path,
+) -> None:
+    """A malformed Result: line still counts as missing-result-line, but the
+    checker must say *why* -- a repeated/garbled line and a block with no
+    Result: line at all are different problems for a writer to fix, so their
+    finding detail text must differ."""
+    malformed_body = "## Step 1 -- a step\n\nResult: banana\n"  # id-citation-discipline:ignore
+    missing_body = (
+        "## Step 2 -- a step\n\nCommand: `uv run pytest`\n"  # id-citation-discipline:ignore
+    )
+    malformed_path = _write(tmp_path, "malformed.md", malformed_body)
+    missing_path = _write(tmp_path, "missing.md", missing_body)
+
+    malformed_findings = find_findings(malformed_path, DEFAULT_CEILING_BYTES)
+    missing_findings = find_findings(missing_path, DEFAULT_CEILING_BYTES)
+
+    assert malformed_findings[0].kind == "missing-result-line"
+    assert missing_findings[0].kind == "missing-result-line"
+    assert malformed_findings[0].detail != missing_findings[0].detail
+
+
+# ---------------------------------------------------------------------------
+# Live corpus: the harvested pipeline's own TEST_RESULTS.md (td-236(b))
+# ---------------------------------------------------------------------------
+
+_CORPUS_FIXTURE_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "tests"
+    / "fixtures"
+    / "test_results_step_sections_corpus.md"
+)
+_P3_5_TEST_RESULTS_MD = _CORPUS_FIXTURE_PATH.read_text(encoding="utf-8")
+
+
+def test_live_corpus_drops_from_29_findings_to_exactly_6(tmp_path: Path) -> None:
+    """The harvested pipeline's own TEST_RESULTS.md reports 29 findings under
+    the old any-``## ``-heading-is-a-section model, several of which name a
+    sub-heading (Command, Failures, Lint / format, Id-citation discipline,
+    Scope confirmation, Validator outputs, Manual path verification) as the
+    ``section`` -- misreadings of blocks that were never violations. Splitting
+    on step headings alone drops that to the 6 real findings below, and no
+    finding's section is ever a sub-heading title."""
+    path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    kinds_and_sections = sorted((f.kind, f.section) for f in findings)
+    assert kinds_and_sections == sorted(
+        [
+            ("missing-result-line", "Step 6"),  # id-citation-discipline:ignore
+            ("missing-result-line", "Step 12 (doc-engineer)"),  # id-citation-discipline:ignore
+            (
+                "missing-result-line",
+                "Step 13 (health-guards gauntlet, orchestrator)",  # id-citation-discipline:ignore
+            ),
+            (
+                "missing-result-line",
+                "Step 14 (dogfood, orchestrator)",  # id-citation-discipline:ignore
+            ),
+            (
+                "green-over-ceiling",
+                "Step 6 (post-review addendum, F1 fix)",  # id-citation-discipline:ignore
+            ),
+            ("green-over-ceiling", "Step 10"),  # id-citation-discipline:ignore
+        ]
+    )
+
+    sub_heading_titles = {
+        "Command",
+        "Failures",
+        "Lint / format",
+        "Id-citation discipline",
+        "Scope confirmation",
+        "Validator outputs",
+        "Manual path verification",
+    }
+    assert not {f.section for f in findings} & sub_heading_titles
+
+
+def test_live_corpus_green_over_ceiling_byte_counts_match_the_measured_sections(
+    tmp_path: Path,
+) -> None:
+    path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+    by_section = {f.section: f for f in findings if f.kind == "green-over-ceiling"}
+
+    addendum_section = "Step 6 (post-review addendum, F1 fix)"  # id-citation-discipline:ignore
+    final_section = "Step 10"  # id-citation-discipline:ignore
+    assert by_section[addendum_section].byte_count == 3014
+    assert by_section[final_section].byte_count == 1902
+
+
+def test_live_corpus_cli_reports_six_findings_and_exits_one(tmp_path: Path, capsys: Any) -> None:
+    path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
+
+    rc = main([str(path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert rc == 1
+    assert len(payload["findings"]) == 6

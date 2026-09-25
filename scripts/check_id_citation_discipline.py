@@ -134,6 +134,13 @@ EXEMPT_EXACT_PATHS = frozenset(
         # data. Same self-referential exemption as the detector scripts above.
         "scripts/reconcile_pipeline_state.py",
         "scripts/test_reconcile_pipeline_state.py",
+        # The shared step-document grammar module PARSES "Step N" headings
+        # out of WIP.md / IMPLEMENTATION_PLAN.md / TEST_RESULTS.md -- the
+        # step number is its input grammar, not a citation to an ephemeral
+        # spec -- and its tests use "Step 1" as fixture data. Same
+        # self-referential exemption as the reconciler pair above.
+        "scripts/_step_schema.py",
+        "scripts/test_step_schema.py",
     }
 )
 

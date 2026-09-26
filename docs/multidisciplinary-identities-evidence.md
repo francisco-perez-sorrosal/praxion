@@ -1435,6 +1435,34 @@ consult-identity checks ran in CI **only on the PR that introduced them**, never
 class they police. The filter is fixed here; the general shape is the `gate-liveness.md` clause added
 this wave — a correct producer with no named consumer.
 
+### 17.16 The blind second reader — dispositions hold, classification over-matches
+
+> Added 2026-09-26 (process-economy item H). One `opus` verifier per half, each blind to the convener's calls:
+> it read a packet built from the committed ledgers with every disposition, rationale and classification
+> stripped, and was barred from the ledgers and the consult fragments. Dispositions: 10 live `switch-now`
+> rows drawn with seed `20260926`, shuffled among the 6 live deferrals so the sample could not reveal the
+> expected answer. Classification: every challenge whose consult sealed at least one prior (22 after
+> exclusion). One challenge (td-081 `CH-05`) was excluded from both halves because its ledger
+> `decision-at-stake` is a supersession note that discloses its own disposition.
+
+| Measurement | Result | Reading |
+|---|---|---|
+| `switch-now` re-read | **9/10 agree** (Wilson 95% [60%, 98%]); the one disagreement is a downgrade to defer | The convener's acceptances hold up under a blind re-read |
+| Deferral re-read | 1/5 agree; the reader would have switched the other **4** | The convener was *more* conservative than an independent reader |
+| Dismissals | 0 by the convener, **0 by the reader** | §17.4 standing condition (a) is still unmet; a same-family reader cannot break the tie alone |
+| Novel/matched classification | **13/22 agree** (Wilson 95% [39%, 77%]); same prior in 3/3 joint matches | Every one of the 9 disagreements is convener `matched` → reader `novel` |
+| Per-consult novelty, convener vs reader | td-081 4/6 vs 4/6; verify 5/9 vs 9/9; sidecar 1/7 vs 6/7 | Over-matching deflates the recorded novelty rate, as td-102 predicted |
+
+**What it settles.** The "convener never pushes back" reading of the zero-dismissal ledger is not supported:
+where the two readers disagree on dispositions, the convener is the stricter one. The classification defect is
+real and one-directional: it understates what the consultants added, so the novelty series in
+`CONSULT_PRIORS.md` is biased low.
+
+**What it does not settle.** Both readers are the same model family as the consultants, so a shared tendency
+to accept well-formed statistical prose would pass through this audit unseen. The reader judged from the
+one-line claim and its decision (the full challenge text survives for only 2 of 8 consults). The structural
+gap td-102 names, no second reader inside the protocol, is measured here, not closed.
+
 ## 18. Citations
 
 - [Reasoning Models Generate Societies of Thought](https://arxiv.org/html/2601.10825v1) — Kim, Lai, Scherrer, Agüera y Arcas, Evans (arXiv:2601.10825v1, Jan 2026)

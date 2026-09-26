@@ -172,37 +172,44 @@ def _render_report(report: Report, timestamp: str) -> str:
     return "\n".join(lines)
 
 
-def _build_log_row(report: Report, report_path: str) -> str:
-    """Build the frozen-column Markdown table row for the log."""
-    corpus = report.corpus
-    timestamp = _iso_timestamp()
-    auth_route = _detect_auth_route()
-
-    # Derive families label from check names present in the report (best-effort heuristic).
-    # The Report schema does not carry an explicit families field; we infer from check names.
-    family_ids: list[str] = []
-
-    # Simple heuristic: detect family1 and/or family2 from check_name membership
-    adr_checks = {
+# Log label per family, and how to recognise its checks by name. Order is the
+# order families appear in the families cell.
+_FAMILY1_CHECKS = frozenset(
+    {
         "adr_frontmatter_completeness",
         "adr_body_sections",
+        "adr_option_depth",
         "supersession_reciprocity",
         "re_affirmation_reciprocity",
         "spec_traceability_presence",
         "affected_reqs_resolvability",
         "decisions_index_consistency",
+        "task_artifact_manifest",
     }
-    bc_checks = {"bc_section_presence", "bc_tag_scan", "bc_rubric"}
-    check_names = {r.check_name for r in report.check_results}
+)
+_FAMILY_MATCHERS = (
+    ("family1", lambda name: name in _FAMILY1_CHECKS),
+    ("family2", lambda name: name.startswith("bc_")),
+    ("family5", lambda name: name == "token_budget_stability"),
+    ("seeded-scenarios", lambda name: name.startswith("scenario_")),
+)
 
-    if check_names & adr_checks:
-        family_ids.append("family1")
-    if check_names & bc_checks or any("bc_" in n for n in check_names):
-        family_ids.append("family2")
-    if not family_ids:
-        family_ids = ["(none)"]
 
-    families_str = "+".join(family_ids)
+def _families_label(report: Report) -> str:
+    """Name every family that produced at least one check in this report."""
+    names = {r.check_name for r in report.check_results}
+    ran = [label for label, matches in _FAMILY_MATCHERS if any(matches(n) for n in names)]
+    return "+".join(ran) or "(none)"
+
+
+def _build_log_row(report: Report, report_path: str) -> str:
+    """Build the frozen-column Markdown table row for the log."""
+    corpus = report.corpus
+    timestamp = _iso_timestamp()
+    # The route is the one the judge used; a run that called no judge used none,
+    # whatever credentials the environment happens to carry.
+    auth_route = _detect_auth_route() if report.judge_calls else "none"
+    families_str = _families_label(report)
     report_name = Path(report_path).name if report_path else "—"
 
     return (

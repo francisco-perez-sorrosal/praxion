@@ -132,3 +132,60 @@ def test_log_row_renders_unpriced_cell_when_cost_is_none(tmp_path: Path):
     rows = [line for line in log_content.splitlines() if "report-writer-test" in line]
     assert len(rows) == 1
     assert "unpriced" in rows[0]
+
+
+def _mechanical_result(check_name: str):
+    from praxion_evals.harness.schemas import CheckResult
+
+    return CheckResult(
+        check_name=check_name,
+        check_kind="mechanical",
+        verdict="PASS",
+        artifact_path="fake/artifact.md",
+        findings=(),
+        score=-1,
+    )
+
+
+def _log_row(tmp_path: Path, report) -> str:
+    from praxion_evals.harness.report_writer import ReportWriter
+
+    writer = ReportWriter(output_dir=tmp_path)
+    writer.append_log(report, writer.write(report))
+    log_content = (tmp_path / "PRAXION_EVAL_LOG.md").read_text(encoding="utf-8")
+    rows = [line for line in log_content.splitlines() if "report-writer-test" in line]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_log_row_names_no_auth_route_when_no_judge_was_called(tmp_path: Path, monkeypatch):
+    from praxion_evals.harness.schemas import Report
+
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "present-but-unused")
+    report = Report(
+        corpus=_make_corpus(),
+        check_results=(_mechanical_result("adr_body_sections"),),
+        judge_calls=0,
+    )
+
+    cells = [cell.strip() for cell in _log_row(tmp_path, report).strip("|").split("|")]
+
+    assert cells[2] == "none", "a run that called no judge used no auth route"
+
+
+def test_log_row_families_cell_names_every_family_that_ran(tmp_path: Path):
+    from praxion_evals.harness.schemas import Report
+
+    report = Report(
+        corpus=_make_corpus(),
+        check_results=(
+            _mechanical_result("adr_body_sections"),
+            _mechanical_result("bc_section_presence"),
+            _mechanical_result("token_budget_stability"),
+            _mechanical_result("scenario_commit_staging_mechanical"),
+        ),
+    )
+
+    cells = [cell.strip() for cell in _log_row(tmp_path, report).strip("|").split("|")]
+
+    assert cells[3] == "family1+family2+family5+seeded-scenarios"

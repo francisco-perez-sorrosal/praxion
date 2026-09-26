@@ -1,3 +1,47 @@
+## v0.38.0 (2026-09-26)
+
+### Feat
+
+- **consult**: Classify challenges with a blind reader
+- **handoff**: Hand off sessions that ran outside a pipeline
+- **scripts**: Count pipeline spawns and remind at Stop
+- **scripts**: Make the registry own the per-tier artifact floor
+- **scripts**: Share one step-document schema module
+- **gates**: Catch hyphen-less ids and pipeline-doc section citations
+- **eval**: Run the seeded scenarios live with praxion-evals-live
+- **eval**: Build isolated live claude sessions for scenario capture
+
+### Fix
+
+- **eval**: Keep the observations log in the live sandbox
+- **hooks**: Put the ADR and brief reminders in context
+- Name why the cost section has no tables
+- Fail DL06 on ADR frontmatter it cannot parse
+- **hooks**: Remind only projects that keep a calibration log
+- Count every spawn and scope the Stop reminder
+- **scripts**: Read a status cell by its leading word only
+- **scripts**: Close the verifier findings on the step readers
+- **scripts**: Clear a red step by any later green run
+- **scripts**: Keep the id-citation gate on the step schema
+- **scripts**: Read WIP claims and test status per step
+- **scripts**: Attribute shared files and read lettered step ids
+- **scripts**: Tighten Files parsing and the next-action picker
+- **eval**: Stop the lightweight-fix rubric requiring a test
+- **skills**: Deliver typed arguments to lens-fanout and onboard-project
+- **eval**: Mark a filtered live run as partial in its log row
+- **eval**: Grade lightweight-fix on the agent's authored change
+- **hooks**: Tell the session when rule injection is skipped
+- **skills**: Match GitHub's slugs and repair five broken links
+- **eval**: Define the five UI states in the judge's rubric
+- **eval**: Grade the live UI step on the change it made
+- **eval**: Detect only real-HOME reads as isolation breaches
+- **eval**: Make the live runner's paid run trustworthy end to end
+- **eval**: Harden live sessions before the first paid capture
+
+### Refactor
+
+- Split the cost collector by pass
+
 ## v0.37.0 (2026-09-24)
 
 ### Feat

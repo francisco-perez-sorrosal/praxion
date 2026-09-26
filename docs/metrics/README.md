@@ -307,7 +307,7 @@ The composer reads churn from the `git` namespace and complexity from the `lizar
       }, ...
     ]
   },
-  "f12": {
+  "standard_vs_lightweight": {
     "status": "n/a",
     "reason": "<string>"
   }
@@ -320,10 +320,12 @@ The composer reads churn from the `git` namespace and complexity from the `lizar
 
 **Tier join.** `tier` is a leading-token join against `.ai-state/calibration_log.md`: `Resolved` renders the tier name; several disagreeing calibration rows for the same slug render `tier: "ambiguous"` with every disagreeing tier named in `tier_reason`; no calibration row at all renders `tier: "unknown"` with a reason.
 
-**`f12` — the Standard-vs-Lightweight cost cell.** Two shapes sharing no numeric key, so a consumer cannot read a ratio out of an `n/a` cell:
+**Degraded states.** The Markdown `## Cost` section renders one skip marker in place of its tables when the collector was skipped (its resolution reason), errored (its own issues — the provenance guard withholds every total), timed out, or read no raw WAL and so has zero attributed rows: `no reachable WAL (machine-local since dec-377)`, the expected reading on CI and on a fresh clone, where only the committed summary exists. Zero attributed rows beside a reachable WAL are data and still render the tables.
+
+**`standard_vs_lightweight` — the Standard-vs-Lightweight cost cell.** Two shapes sharing no numeric key, so a consumer cannot read a ratio out of an `n/a` cell:
 
 ```json
-"f12": {
+"standard_vs_lightweight": {
   "status":      "rendered",
   "basis":       "tokens_total",
   "standard":    {"n": <int>, "median": <number>},

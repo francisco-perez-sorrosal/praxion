@@ -86,7 +86,7 @@ __all__ = [
     "TierResolved",
     "TierUnknown",
     "build_pipeline_buckets",
-    "compute_f12_cell",
+    "compute_standard_vs_lightweight_cell",
     "dedup_attributed_rows",
     "discover_sources",
     "parse_calibration_log",
@@ -670,7 +670,7 @@ def resolve_tier(
 
 def _flatten_tier(resolution: TierResolved | TierAmbiguous | TierUnknown) -> tuple[str, str | None]:
     """Render a tier-join outcome as the flat `(tier, tier_reason)` pair every
-    downstream consumer (buckets, tables, the F12 cell) reads instead of the
+    downstream consumer (buckets, tables, the Standard-vs-Lightweight cell) reads instead of the
     raw union."""
 
     if isinstance(resolution, TierResolved):
@@ -893,27 +893,27 @@ def _audit_totals(coverage: Coverage, buckets: list[PipelineBucket]) -> list[str
 
 
 # ---------------------------------------------------------------------------
-# F12 cell -- the withheld-verdict shape, and the rendered ratio.
+# Standard-vs-Lightweight cell -- the withheld-verdict shape, and the rendered ratio.
 # ---------------------------------------------------------------------------
 
-_F12_STANDARD_TIER = "Standard"
-_F12_LIGHTWEIGHT_TIER = "Lightweight"
+_STANDARD_TIER = "Standard"
+_LIGHTWEIGHT_TIER = "Lightweight"
 
 
-def compute_f12_cell(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
+def compute_standard_vs_lightweight_cell(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
     """Render `n/a` with a reason unless both tiers have >=1 attributed
     row and the Lightweight median is non-zero; the two shapes share no
     numeric key, so a consumer cannot read a ratio out of an `n/a` cell."""
 
-    standard = [b for b in buckets if b.tier == _F12_STANDARD_TIER and b.attributed_rows > 0]
-    lightweight = [b for b in buckets if b.tier == _F12_LIGHTWEIGHT_TIER and b.attributed_rows > 0]
+    standard = [b for b in buckets if b.tier == _STANDARD_TIER and b.attributed_rows > 0]
+    lightweight = [b for b in buckets if b.tier == _LIGHTWEIGHT_TIER and b.attributed_rows > 0]
 
     if not standard or not lightweight:
         missing = [
             tier
             for tier, present in (
-                (_F12_STANDARD_TIER, standard),
-                (_F12_LIGHTWEIGHT_TIER, lightweight),
+                (_STANDARD_TIER, standard),
+                (_LIGHTWEIGHT_TIER, lightweight),
             )
             if not present
         ]
@@ -924,7 +924,7 @@ def compute_f12_cell(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
     if lightweight_median == 0:
         # Attributed rows do not imply a non-zero total; a zero divisor is a
         # withheld cell with a reason, never a raise.
-        return {"status": "n/a", "reason": f"{_F12_LIGHTWEIGHT_TIER} median is zero tokens"}
+        return {"status": "n/a", "reason": f"{_LIGHTWEIGHT_TIER} median is zero tokens"}
     return {
         "status": "rendered",
         "basis": "tokens_total",
@@ -1222,7 +1222,7 @@ class CostCollector(Collector):
             "agent_types": _agent_type_projection(buckets),
             "unresolved_agent_type_share": unresolved_agent_type_share(official_deduped),
             "coverage": _coverage_to_json(coverage),
-            "f12": compute_f12_cell(buckets),
+            "standard_vs_lightweight": compute_standard_vs_lightweight_cell(buckets),
         }
         status = "partial" if issues else "ok"
         return CollectorResult(status=status, data=data, issues=issues)

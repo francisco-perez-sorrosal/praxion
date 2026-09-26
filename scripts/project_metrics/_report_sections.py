@@ -254,8 +254,15 @@ _COST_TOKEN_COMPONENTS: tuple[str, ...] = (
     "tokens_total",
 )
 
+# Raw WAL source kinds; the committed summary alone never carries attributed rows.
+_COST_WAL_SOURCE_KINDS = frozenset({"wal", "wal-archive"})
+_COST_NO_WAL_REASON = "no reachable WAL (machine-local since dec-377)"
+
 
 def render_cost(report: Report) -> str:
+    marker = _cost_degraded_marker(report)
+    if marker is not None:
+        return "\n".join(["## Cost", "", marker, ""])
     data = _namespace_data(report, "cost")
     lines = [
         "## Cost",
@@ -274,9 +281,40 @@ def render_cost(report: Report) -> str:
     lines.append("")
     lines.extend(_render_cost_agent_type_table(data))
     lines.append("")
-    lines.extend(_render_cost_f12_section(data))
+    lines.extend(_render_cost_standard_vs_lightweight_section(data))
     lines.append("")
     return "\n".join(lines)
+
+
+def _cost_degraded_marker(report: Report) -> str | None:
+    """Return one skip marker when the section has nothing honest to tabulate, else ``None``.
+
+    Four states that would otherwise all render as empty tables: the collector
+    was skipped (its resolution reason), errored (its own issues -- the
+    provenance guard withholds every total), timed out, or ran on a checkout
+    whose only source is the committed summary, which carries no attributed
+    rows by construction (the CI and fresh-clone case). A real zero beside a
+    reachable WAL is data, not a degradation, and still renders its tables.
+    """
+
+    entry = report.collectors.get("cost")
+    avail = getattr(report, "tool_availability", {}).get("cost")
+    if entry is None or isinstance(entry, dict):
+        if avail is not None and avail.status == "unavailable":
+            return unavailable_marker("cost")
+        reason = getattr(avail, "reason", None) or "cost collector did not run"
+        return error_marker(reason)
+    if entry.status == "error":
+        return error_marker("; ".join(entry.issues) or "error")
+    if entry.status == "timeout":
+        return timeout_marker((entry.data or {}).get("timeout_seconds", 0))
+    coverage = (entry.data or {}).get("coverage", {})
+    wal_read = any(
+        source.get("kind") in _COST_WAL_SOURCE_KINDS for source in coverage.get("sources", [])
+    )
+    if coverage.get("attributed_rows") == 0 and not wal_read:
+        return error_marker(_COST_NO_WAL_REASON)
+    return None
 
 
 def _render_cost_basis_line() -> str:
@@ -375,17 +413,17 @@ def _render_cost_unresolved_share_line(data: dict[str, Any]) -> str:
     )
 
 
-def _render_cost_f12_section(data: dict[str, Any]) -> list[str]:
-    f12 = data.get("f12", {})
+def _render_cost_standard_vs_lightweight_section(data: dict[str, Any]) -> list[str]:
+    cell = data.get("standard_vs_lightweight", {})
     lines = ["### Standard vs. Lightweight", ""]
-    if f12.get("status") != "rendered":
-        reason = f12.get("reason", "insufficient attributed rows in one tier")
+    if cell.get("status") != "rendered":
+        reason = cell.get("reason", "insufficient attributed rows in one tier")
         lines.append(f"_n/a {EM_DASH} {reason}_")
         return lines
-    standard = f12.get("standard", {})
-    lightweight = f12.get("lightweight", {})
-    basis = f12.get("basis", "tokens_total")
-    ratio = f12.get("ratio")
+    standard = cell.get("standard", {})
+    lightweight = cell.get("lightweight", {})
+    basis = cell.get("basis", "tokens_total")
+    ratio = cell.get("ratio")
     lines.append(
         f"n={standard.get('n')} Standard vs n={lightweight.get('n')} Lightweight "
         f"(basis: {basis}, ratio: {fmt_float_2(ratio) if ratio is not None else NULL_CELL})."

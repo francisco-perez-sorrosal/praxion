@@ -38,7 +38,7 @@ pinned name was recorded in the pipeline's learnings):
 - ``dedup_attributed_rows(rows) -> tuple[list[AttributedRow], list[str]]``
 
 **Interface pinned by the aggregate-pass extension** (tier join, bucket
-aggregation, coverage guard, F12 cell; the rationale behind each name was
+aggregation, coverage guard, Standard-vs-Lightweight cell; the rationale behind each name was
 recorded in the pipeline's learnings):
 
 - ``TierResolved`` / ``TierAmbiguous`` / ``TierUnknown`` -- frozen dataclasses,
@@ -65,7 +65,7 @@ recorded in the pipeline's learnings):
 - ``_audit_totals(coverage: Coverage, buckets: list[PipelineBucket]) -> list[str]``
   -- the dec-378 executable guard; returns violated-invariant messages, empty
   when consistent.
-- ``compute_f12_cell(buckets: list[PipelineBucket]) -> dict`` -- the two result
+- ``compute_standard_vs_lightweight_cell(buckets: list[PipelineBucket]) -> dict`` -- the two result
   shapes (``{"status": "n/a", "reason": ...}`` /
   ``{"status": "rendered", "basis": "tokens_total", "standard": {...},
   "lightweight": {...}, "ratio": ...}``), sharing no numeric key.
@@ -1463,11 +1463,11 @@ class TestCostCollectorResolve:
 
 
 # ---------------------------------------------------------------------------
-# F12 cell -- the withheld-verdict shape, and the rendered ratio.
+# Standard-vs-Lightweight cell -- the withheld-verdict shape, and the rendered ratio.
 # ---------------------------------------------------------------------------
 
 
-class TestComputeF12Cell:
+class TestComputeStandardVsLightweightCell:
     """Two shapes sharing no numeric key -- a consumer cannot read a
     ratio out of an `n/a` cell.
     """
@@ -1476,7 +1476,9 @@ class TestComputeF12Cell:
         """Attributed rows do not imply a non-zero total; a zero divisor is
         an `n/a` cell with a reason, never a raise."""
 
-        from scripts.project_metrics.collectors.cost_collector import compute_f12_cell
+        from scripts.project_metrics.collectors.cost_collector import (
+            compute_standard_vs_lightweight_cell,
+        )
 
         zero_tokens = {
             "tokens_in": 0,
@@ -1498,14 +1500,16 @@ class TestComputeF12Cell:
             tokens=zero_tokens,
         )
 
-        cell = compute_f12_cell([standard_bucket, lightweight_bucket])
+        cell = compute_standard_vs_lightweight_cell([standard_bucket, lightweight_bucket])
 
         assert cell["status"] == "n/a"
         assert "zero" in cell["reason"].lower(), cell
         assert "ratio" not in cell
 
     def test_renders_na_with_a_reason_when_one_tier_has_zero_attributed_rows(self) -> None:
-        from scripts.project_metrics.collectors.cost_collector import compute_f12_cell
+        from scripts.project_metrics.collectors.cost_collector import (
+            compute_standard_vs_lightweight_cell,
+        )
 
         standard_bucket = _make_pipeline_bucket(
             pipeline_slug="process-economy-p3-2-adopt",
@@ -1520,7 +1524,7 @@ class TestComputeF12Cell:
             },
         )
 
-        cell = compute_f12_cell([standard_bucket])
+        cell = compute_standard_vs_lightweight_cell([standard_bucket])
 
         assert cell["status"] == "n/a"
         assert "lightweight" in cell["reason"].lower()
@@ -1530,7 +1534,9 @@ class TestComputeF12Cell:
     def test_renders_the_ratio_with_both_sample_sizes_and_basis_when_both_tiers_qualify(
         self,
     ) -> None:
-        from scripts.project_metrics.collectors.cost_collector import compute_f12_cell
+        from scripts.project_metrics.collectors.cost_collector import (
+            compute_standard_vs_lightweight_cell,
+        )
 
         standard_bucket_one = _make_pipeline_bucket(
             pipeline_slug="standard-1",
@@ -1569,7 +1575,9 @@ class TestComputeF12Cell:
             },
         )
 
-        cell = compute_f12_cell([standard_bucket_one, standard_bucket_two, lightweight_bucket])
+        cell = compute_standard_vs_lightweight_cell(
+            [standard_bucket_one, standard_bucket_two, lightweight_bucket]
+        )
 
         assert cell["status"] == "rendered"
         assert cell["basis"] == "tokens_total"

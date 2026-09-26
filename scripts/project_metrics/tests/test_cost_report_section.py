@@ -133,7 +133,7 @@ def _grounded_cost_data() -> dict[str, Any]:
         # The live corpus carries zero attributed Lightweight-tier rows
         # today, so the withheld-verdict shape -- not a ratio -- is what a
         # live run actually produces; this fixture mirrors that.
-        "f12": {
+        "standard_vs_lightweight": {
             "status": "n/a",
             "reason": "no attributed rows at tier Lightweight",
         },
@@ -220,7 +220,7 @@ def _two_tier_cost_data() -> dict[str, Any]:
             "duplicates_dropped": 0,
             "sources": [],
         },
-        "f12": {
+        "standard_vs_lightweight": {
             "status": "rendered",
             "basis": "tokens_total",
             "standard": {"n": 2, "median": 1500.0},
@@ -424,3 +424,70 @@ class TestNoRegressionToSiblingContracts:
         source = inspect.getsource(logappend)
         assert '"cost"' not in source
         assert "'cost'" not in source
+
+
+# ---------------------------------------------------------------------------
+# Degraded states -- each renders one skip marker naming its reason, never
+# the empty-table shape a real payload would produce.
+# ---------------------------------------------------------------------------
+
+
+def _degraded_report(entry: Any, availability: Any = None) -> Any:
+    return SimpleNamespace(
+        collectors={"cost": entry},
+        tool_availability={} if availability is None else {"cost": availability},
+    )
+
+
+def _zero_attributed_data(source_kinds: list[str]) -> dict[str, Any]:
+    data = _grounded_cost_data()
+    data["pipelines"], data["tiers"], data["agent_types"] = [], {}, {}
+    data["coverage"] = {
+        **data["coverage"],
+        "attributed_rows": 0,
+        "sources": [{"path": f"/repo/.ai-state/{kind}", "kind": kind} for kind in source_kinds],
+    }
+    return data
+
+
+class TestDegradedStates:
+    def test_skipped_collector_names_the_resolution_reason_instead_of_tables(self) -> None:
+        from scripts.project_metrics._report_sections import render_cost
+
+        reason = "no observability artifacts under .ai-state/"
+        markdown = render_cost(
+            _degraded_report(
+                {"status": "skipped", "reason": "tool_unavailable", "tool": "cost"},
+                SimpleNamespace(status="not_applicable", reason=reason),
+            )
+        )
+
+        assert reason in markdown
+        assert "### Per-pipeline" not in markdown
+
+    def test_error_status_names_the_collector_issue_instead_of_tables(self) -> None:
+        from scripts.project_metrics._report_sections import render_cost
+
+        issue = "provenance guard: attributed totals disagree with the audit census"
+        markdown = render_cost(
+            _degraded_report(CollectorResult(status="error", data={}, issues=[issue]))
+        )
+
+        assert issue in markdown
+        assert "### Per-pipeline" not in markdown
+
+    def test_zero_attributed_rows_without_a_wal_source_names_the_unreachable_wal(self) -> None:
+        from scripts.project_metrics._report_sections import render_cost
+
+        markdown = render_cost(_report(_zero_attributed_data(["summary"])))
+
+        assert "no reachable WAL (machine-local since dec-377)" in markdown
+        assert "### Per-pipeline" not in markdown
+
+    def test_zero_attributed_rows_beside_a_reachable_wal_still_render_the_tables(self) -> None:
+        from scripts.project_metrics._report_sections import render_cost
+
+        markdown = render_cost(_report(_zero_attributed_data(["wal", "summary"])))
+
+        assert "### Per-pipeline" in markdown
+        assert "no reachable WAL" not in markdown

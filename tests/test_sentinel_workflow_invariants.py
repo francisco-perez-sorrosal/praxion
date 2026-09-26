@@ -642,6 +642,196 @@ def test_never_references_track_progress() -> None:
 
 
 # ---------------------------------------------------------------------------
+# (o) Publication is gated on the credential gate, and the flags an attacker or
+# a careless edit would reach for stay closed. The action combines repeated
+# `--allowedTools` flags and keeps the LAST `--settings`, so a single trailing
+# flag can widen the grant or drop every kill switch while each earlier check
+# still sees the original value.
+# ---------------------------------------------------------------------------
+
+CREDENTIAL_GATE_PASSED = "steps.credential_gate.outcome == 'success'"
+JOB_TOKEN = "${{ github.token }}"
+DEFAULT_BRANCH_REF = "${{ github.event.repository.default_branch }}"
+SINGLE_USE_FLAGS = ("--allowedTools", "--allowed-tools", "--disallowedTools", "--settings")
+BANNED_CLAUDE_ARGS = (
+    "--permission-mode",
+    "--mcp-config",
+    "--dangerously-skip-permissions",
+    "bypassPermissions",
+)
+
+
+def _publishing_steps(parsed: dict) -> list[dict]:
+    """Steps that put report content where the public can read it."""
+    return [
+        step
+        for step in _all_steps(parsed)
+        if "upload-artifact" in (step.get("uses") or "")
+        or "GITHUB_STEP_SUMMARY" in (step.get("run") or "")
+    ]
+
+
+def _assert_publication_requires_a_clear_credential_gate(parsed: dict) -> None:
+    gate_ids = [step.get("id") for step in _all_steps(parsed)]
+    assert "credential_gate" in gate_ids, (
+        "The credential gate step must carry `id: credential_gate`"
+    )
+    publishing = _publishing_steps(parsed)
+    assert publishing, "Expected a job-summary step and an upload step"
+    for step in publishing:
+        condition = str(step.get("if") or "")
+        assert CREDENTIAL_GATE_PASSED in condition, (
+            f"Step {step.get('name')!r} publishes report content but runs on "
+            f"`if: {condition}` — it must require `{CREDENTIAL_GATE_PASSED}`, or a "
+            "token-shaped string reaches the public summary and artifact after "
+            "the gate has already failed"
+        )
+
+
+def _assert_github_token_is_the_job_token(parsed: dict) -> None:
+    for step in _action_steps(parsed):
+        assert (step.get("with") or {}).get("github_token") == JOB_TOKEN, (
+            f"`github_token` must be exactly `{JOB_TOKEN}` (the job's contents: read "
+            "token) — any other token, such as a PAT secret, escapes the job's "
+            "permission ceiling"
+        )
+
+
+def _assert_claude_args_flags_are_single_and_unbanned(parsed: dict) -> None:
+    combined = " ".join(_claude_args_blocks(parsed))
+    for flag in SINGLE_USE_FLAGS:
+        count = len(re.findall(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", combined))
+        expected = 0 if flag == "--allowed-tools" else 1
+        assert count == expected, (
+            f"`{flag}` appears {count} times in claude_args (expected {expected}) — "
+            "a repeated grant flag widens the tool set and a later `--settings` "
+            "silently replaces the kill-switch payload"
+        )
+    for banned in BANNED_CLAUDE_ARGS:
+        assert banned not in combined, (
+            f"`{banned}` must never appear in claude_args — it bypasses the tool "
+            "grant or starts MCP servers in the unattended session"
+        )
+
+
+def _assert_setup_uv_cache_is_disabled(parsed: dict) -> None:
+    setup_uv = [s for s in _all_steps(parsed) if "setup-uv" in (s.get("uses") or "")]
+    assert setup_uv, "Expected a setup-uv step"
+    for step in setup_uv:
+        value = (step.get("with") or {}).get("enable-cache")
+        assert value in (False, "false"), (
+            "setup-uv must set `enable-cache: false` — its post-step saves the cache "
+            "after an unrestricted-Bash agent has run, and a write-scoped workflow "
+            "can restore it"
+        )
+
+
+def _assert_no_step_output_is_interpolated_into_a_run_body(parsed: dict) -> None:
+    for step in _all_steps(parsed):
+        run = step.get("run") or ""
+        assert "${{ steps." not in run, (
+            f"Step {step.get('name')!r} interpolates a step output into its `run:` "
+            "script — agent-influenced values (a report filename) must arrive "
+            "through `env:`, never as shell source"
+        )
+
+
+def _assert_checkout_targets_the_default_branch(parsed: dict) -> None:
+    checkouts = [s for s in _all_steps(parsed) if "actions/checkout" in (s.get("uses") or "")]
+    assert checkouts, "Expected an actions/checkout step"
+    for step in checkouts:
+        assert (step.get("with") or {}).get("ref") == DEFAULT_BRANCH_REF, (
+            f"checkout must pin `ref: {DEFAULT_BRANCH_REF}` — a dispatch from a "
+            "feature branch would otherwise audit that branch, not main"
+        )
+
+
+def _mutate_publish_on_always(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _publishing_steps(mutated):
+        step["if"] = "always()"
+    return mutated
+
+
+def _mutate_github_token_to_a_pat(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _action_steps(mutated):
+        step.setdefault("with", {})["github_token"] = "${{ secrets.ADMIN_PAT }}"
+    return mutated
+
+
+def _append_claude_args(suffix: str):
+    def mutate(parsed: dict) -> dict:
+        mutated = copy.deepcopy(parsed)
+        for step in _action_steps(mutated):
+            with_block = step.setdefault("with", {})
+            with_block["claude_args"] = with_block.get("claude_args", "") + suffix
+        return mutated
+
+    return mutate
+
+
+def _mutate_enable_setup_uv_cache(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _all_steps(mutated):
+        if "setup-uv" in (step.get("uses") or ""):
+            step.setdefault("with", {}).pop("enable-cache", None)
+    return mutated
+
+
+def _mutate_interpolate_step_output_into_run(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _all_steps(mutated):
+        if step.get("run"):
+            step["run"] = 'echo "${{ steps.check_reports.outputs.new_report }}"\n' + step["run"]
+            break
+    return mutated
+
+
+def _mutate_drop_checkout_ref(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _all_steps(mutated):
+        if "actions/checkout" in (step.get("uses") or ""):
+            (step.get("with") or {}).pop("ref", None)
+    return mutated
+
+
+def test_publication_requires_a_clear_credential_gate() -> None:
+    _assert_publication_requires_a_clear_credential_gate(_parsed())
+
+
+def test_github_token_is_the_job_token() -> None:
+    _assert_github_token_is_the_job_token(_parsed())
+
+
+def test_claude_args_flags_are_single_and_unbanned() -> None:
+    _assert_claude_args_flags_are_single_and_unbanned(_parsed())
+
+
+def test_setup_uv_cache_is_disabled() -> None:
+    _assert_setup_uv_cache_is_disabled(_parsed())
+
+
+def test_no_step_output_is_interpolated_into_a_run_body() -> None:
+    _assert_no_step_output_is_interpolated_into_a_run_body(_parsed())
+
+
+def test_checkout_targets_the_default_branch() -> None:
+    _assert_checkout_targets_the_default_branch(_parsed())
+
+
+def test_report_check_surfaces_a_non_success_agent_outcome() -> None:
+    step = next(s for s in _all_steps(_parsed()) if s.get("id") == "check_reports")
+    env = step.get("env") or {}
+    assert "${{ steps.sentinel.outcome }}" in env.values(), (
+        "The report check must receive the agent step's outcome — a run cut off "
+        "by the turn cap or the timeout can leave a stub report that would "
+        "otherwise pass silently"
+    )
+    assert "::warning::" in (step.get("run") or "")
+
+
+# ---------------------------------------------------------------------------
 # Mutation canaries — one per workflow-specific security invariant. Each
 # mutation flips the invariant from true to false; the paired predicate must
 # reject the mutated parse. A canary that passes on both the real and the
@@ -674,6 +864,51 @@ MUTATION_CANARIES = [
         _mutate_widen_allowed_tools_beyond_grant,
         _assert_allowed_tools_subset_of_sentinel_grant,
         id="widening_allowed_tools_beyond_the_sentinel_agents_grant",
+    ),
+    pytest.param(
+        _mutate_publish_on_always,
+        _assert_publication_requires_a_clear_credential_gate,
+        id="publishing_after_a_failed_credential_gate",
+    ),
+    pytest.param(
+        _mutate_github_token_to_a_pat,
+        _assert_github_token_is_the_job_token,
+        id="swapping_github_token_for_a_pat",
+    ),
+    pytest.param(
+        _append_claude_args(' --allowed-tools "WebFetch"'),
+        _assert_claude_args_flags_are_single_and_unbanned,
+        id="appending_a_second_allowed_tools_flag",
+    ),
+    pytest.param(
+        _append_claude_args(" --settings '{}'"),
+        _assert_claude_args_flags_are_single_and_unbanned,
+        id="appending_a_trailing_settings_flag",
+    ),
+    pytest.param(
+        _append_claude_args(" --permission-mode bypassPermissions"),
+        _assert_claude_args_flags_are_single_and_unbanned,
+        id="appending_bypass_permissions",
+    ),
+    pytest.param(
+        _append_claude_args(" --mcp-config extra.json"),
+        _assert_claude_args_flags_are_single_and_unbanned,
+        id="appending_an_mcp_config",
+    ),
+    pytest.param(
+        _mutate_enable_setup_uv_cache,
+        _assert_setup_uv_cache_is_disabled,
+        id="re_enabling_the_setup_uv_cache",
+    ),
+    pytest.param(
+        _mutate_interpolate_step_output_into_run,
+        _assert_no_step_output_is_interpolated_into_a_run_body,
+        id="interpolating_a_step_output_into_a_run_body",
+    ),
+    pytest.param(
+        _mutate_drop_checkout_ref,
+        _assert_checkout_targets_the_default_branch,
+        id="dropping_the_checkout_ref",
     ),
 ]
 

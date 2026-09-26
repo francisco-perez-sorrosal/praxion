@@ -1,5 +1,6 @@
 ---
-id: dec-draft-a064b32a
+id: dec-395
+draft_id: dec-draft-a064b32a
 title: Keep WIP.md separate from IMPLEMENTATION_PLAN.md — decline the roadmap's P2.4 merge clause
 status: accepted
 category: behavioral

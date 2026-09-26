@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-26T03:29:00Z'
+generated_at: '2026-09-26T04:08:51Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2952,6 +2952,12 @@ surfaces:
   title: "Encode the per-tier pipeline envelope mechanically \u2014 registry-owned artifact floor, agent_start spawn count with a per-tier budget, model-visible calibration reminder"
   last_modified: '2026-09-25'
   renderer: adr_card
+- id: ai-state-decisions-395-keep-wip-separate-from-implementation-plan
+  path: .ai-state/decisions/395-keep-wip-separate-from-implementation-plan.md
+  type: markdown
+  title: "Keep WIP.md separate from IMPLEMENTATION_PLAN.md \u2014 decline the roadmap's P2.4 merge clause"
+  last_modified: '2026-09-25'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3669,6 +3675,7 @@ groups:
   - ai-state-decisions-392-live-context-layer-scenario-runner
   - ai-state-decisions-393-one-step-document-schema-module
   - ai-state-decisions-394-per-tier-pipeline-envelope
+  - ai-state-decisions-395-keep-wip-separate-from-implementation-plan
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

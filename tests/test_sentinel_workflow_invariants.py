@@ -853,10 +853,15 @@ def _assert_bun_is_installed_without_a_cache(parsed: dict) -> None:
             "setup-bun must set `no-cache: true` — its post-step would otherwise "
             "save a cache after the unrestricted-Bash agent ran"
         )
+    bun_step_ids = {step.get("id") for step in setup_bun}
     for step in _action_steps(parsed):
-        assert (step.get("with") or {}).get("path_to_bun_executable"), (
-            "The action step must receive `path_to_bun_executable`, or the action "
-            "runs its own nested setup-bun with the cache on"
+        bun_path = str((step.get("with") or {}).get("path_to_bun_executable", ""))
+        wired = [f"${{{{ steps.{i}.outputs.bun-path }}}}" for i in bun_step_ids if i]
+        assert bun_path in wired, (
+            f"`path_to_bun_executable` is {bun_path!r} — it must be the explicit "
+            "setup-bun step's `bun-path` output; any other value (a typo'd output "
+            "name resolves to empty) makes the action run its own nested setup-bun "
+            "with the cache on"
         )
 
 
@@ -882,6 +887,13 @@ def _mutate_drop_bun_path(parsed: dict) -> dict:
     mutated = copy.deepcopy(parsed)
     for step in _action_steps(mutated):
         (step.get("with") or {}).pop("path_to_bun_executable", None)
+    return mutated
+
+
+def _mutate_typo_bun_path_output(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _action_steps(mutated):
+        step.setdefault("with", {})["path_to_bun_executable"] = "${{ steps.bun.outputs.bun_path }}"
     return mutated
 
 
@@ -1021,6 +1033,11 @@ MUTATION_CANARIES = [
         _mutate_grant_through_settings,
         _assert_settings_payload_only_sets_kill_switches,
         id="granting_a_tool_through_the_settings_payload",
+    ),
+    pytest.param(
+        _mutate_typo_bun_path_output,
+        _assert_bun_is_installed_without_a_cache,
+        id="miswiring_the_bun_path_output",
     ),
 ]
 

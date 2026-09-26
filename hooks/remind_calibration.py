@@ -21,6 +21,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from _hook_utils import record_gate_fire
@@ -233,6 +234,27 @@ def _calibration_log_changed_vs_head(repo_root: Path) -> bool:
     return result.returncode != 0
 
 
+def _calibration_log_committed_this_session(
+    repo_root: Path, rows: list[dict], session_id: str
+) -> bool:
+    """True when the log's newest commit postdates the session's first WAL row.
+
+    A row appended through a shell (no Edit/Write row names the file) and then
+    committed leaves neither a working-tree diff nor a WAL trace; the commit is
+    the evidence. Any unreadable timestamp or git failure answers False, so the
+    reminder errs toward firing.
+    """
+    starts = [row.get("timestamp") for row in rows if row.get("session_id") == session_id]
+    try:
+        session_start = min(datetime.fromisoformat(ts) for ts in starts if ts)
+        result = run_git(repo_root, "log", "-1", "--format=%cI", "--", CALIBRATION_LOG_REL)
+        committed_at = datetime.fromisoformat(result.stdout.strip())
+    except (ValueError, TypeError, GitUnavailableError):
+        return False
+    # %cI has whole-second precision; WAL timestamps carry microseconds.
+    return committed_at >= session_start.replace(microsecond=0)
+
+
 def _handle_stop(payload: dict) -> None:
     """At most once per session: nudge when work was done but the log was not."""
     if payload.get("stop_hook_active"):
@@ -252,8 +274,10 @@ def _handle_stop(payload: dict) -> None:
         return
     if not any(_is_qualifying_edit_row(row, session_id, repo_root) for row in rows):
         return
-    if _calibration_log_changed_vs_head(repo_root) or _session_touched_calibration_log(
-        rows, session_id
+    if (
+        _calibration_log_changed_vs_head(repo_root)
+        or _session_touched_calibration_log(rows, session_id)
+        or _calibration_log_committed_this_session(repo_root, rows, session_id)
     ):
         return
 

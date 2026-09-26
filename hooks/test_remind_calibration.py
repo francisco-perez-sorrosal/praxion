@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -76,6 +77,24 @@ Append-only tier-selection log. Each Standard/Full pipeline appends one row.
 
 def _git(repo: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+
+
+# Fixture sessions start here; baselines are committed before it, as in real use,
+# so only a commit the test makes afterwards reads as made during the session.
+_SESSION_START = "2026-09-25T10:00:00.000000+00:00"
+_BEFORE_SESSION = "2026-09-20T10:00:00+00:00"
+
+
+def _commit_before_session(repo: Path, message: str) -> None:
+    env = {**os.environ, "GIT_AUTHOR_DATE": _BEFORE_SESSION, "GIT_COMMITTER_DATE": _BEFORE_SESSION}
+    subprocess.run(
+        ["git", "commit", "-m", message],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
 
 
 def _init_repo(path: Path) -> Path:
@@ -119,7 +138,7 @@ def _build_lagging_repo(tmp_path: Path) -> Path:
     _init_repo(repo)
     _write_calibration_log(repo, "2025-01-01")
     _git(repo, "add", ".ai-state")
-    _git(repo, "commit", "-m", "chore: add calibration baseline")
+    _commit_before_session(repo, "chore: add calibration baseline")
     _make_commit(repo, "feat: add authentication service")
     _make_commit(repo, "feat: add payment gateway integration")
     return repo
@@ -429,7 +448,7 @@ def _qualifying_edit_row(session_id: str, path: str = "src/app.py") -> dict:
     """A tool_use WAL row shaped like capture_session.py's real Edit rows -- the kind
     of row the Stop reminder's "this session made a qualifying edit" gate condition reads."""
     return {
-        "timestamp": "2026-09-25T10:00:00.000000+00:00",
+        "timestamp": _SESSION_START,
         "session_id": session_id,
         "agent_type": "main",
         "agent_id": session_id,
@@ -454,7 +473,7 @@ def _build_qualifying_stop_repo(tmp_path: Path, session_id: str) -> Path:
     _init_repo(repo)
     _write_calibration_log(repo, "2026-09-20")
     _git(repo, "add", ".ai-state")
-    _git(repo, "commit", "-m", "chore: add calibration baseline")
+    _commit_before_session(repo, "chore: add calibration baseline")
     _write_wal_row(repo, _qualifying_edit_row(session_id))
     return repo
 
@@ -578,7 +597,7 @@ class TestStopTimeCalibrationReminder:
         _init_repo(repo)
         _write_calibration_log(repo, "2026-09-20")
         _git(repo, "add", ".ai-state")
-        _git(repo, "commit", "-m", "chore: add calibration baseline")
+        _commit_before_session(repo, "chore: add calibration baseline")
         # Deliberately no WAL row at all for this session.
 
         result = _run_stop_hook(_stop_payload(session_id, repo), repo)
@@ -601,6 +620,27 @@ class TestStopTimeCalibrationReminder:
 
         assert result.returncode == 0
         assert _additional_context(result) == ""
+
+    def test_silent_when_calibration_log_was_committed_this_session(self, tmp_path: Path) -> None:
+        """A row appended outside Edit/Write (e.g. a shell heredoc) and then committed
+        leaves no working-tree diff and no WAL row naming the file; the commit itself,
+        made after the session's first row, is the evidence the session calibrated."""
+        session_id = "stop-sess-committed-row"
+        repo = _build_qualifying_stop_repo(tmp_path, session_id)
+        log_path = repo / ".ai-state" / "calibration_log.md"
+        log_path.write_text(
+            log_path.read_text(encoding="utf-8") + "| extra | committed | row |\n",
+            encoding="utf-8",
+        )
+        _git(repo, "add", ".ai-state/calibration_log.md")
+        _git(repo, "commit", "-m", "chore(state): calibrate the session")
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert result.returncode == 0
+        assert _additional_context(result) == "", (
+            "a calibration row committed during the session must suppress the reminder"
+        )
 
     def test_fires_at_most_once_per_session(self, tmp_path: Path) -> None:
         """A second Stop in the SAME session must not re-fire, even though every other
@@ -626,7 +666,7 @@ def _build_managed_repo_without_edits(tmp_path: Path) -> Path:
     _init_repo(repo)
     _write_calibration_log(repo, "2026-09-20")
     _git(repo, "add", ".ai-state")
-    _git(repo, "commit", "-m", "chore: add calibration baseline")
+    _commit_before_session(repo, "chore: add calibration baseline")
     return repo
 
 
@@ -696,7 +736,7 @@ class TestStopReminderOverRecordedPathShapes:
         _init_repo(repo)
         (repo / "README.md").write_text("# repo\n", encoding="utf-8")
         _git(repo, "add", "README.md")
-        _git(repo, "commit", "-m", "chore: initial")
+        _commit_before_session(repo, "chore: initial")
         (repo / ".ai-state").mkdir()
         _write_wal_row(repo, _qualifying_edit_row(session_id, str(repo / "src" / "app.py")))
 

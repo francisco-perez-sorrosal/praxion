@@ -74,6 +74,7 @@ Probes settled the telemetry grain: `agent_stop` rows are dominated by unannounc
 - Standard runs that skipped TASK_BRIEF or TEST_BASELINE now FAIL the eval manifest (both were already mandated in prose).
 - Managed projects still get no mechanical per-run floor completeness check (the eval package is Praxion-side).
 - A reminded session pays one extra continuation turn; an interactive session may be reminded before it is done (bounded to once).
+- The Stop reminder learns that a session edited files from the observations log, so it is inert wherever that log is absent or observability is disabled — including the live eval sandbox, whose before/after runs therefore could not measure it (4/5 rows in both arms; the remedy is verified by unit tests over real Stop payloads and the documented Stop contract, not by a live effect).
 
 **Open question for the D2 Spike (out of scope here):** the floor keeps `WIP.md` as its own required artifact. Should `WIP.md`'s checkboxes merge into `IMPLEMENTATION_PLAN.md` (roadmap P2.4)? The Spike must establish that a merged plan lowers per-run artifact cost without degrading its ~50 load-bearing readers (the dec-393 reconciler, handoff composition, dashboard view-models, compaction hooks, eval manifest, planner/implementer/test-engineer agents, shipped onboarding content) before any design work.
 

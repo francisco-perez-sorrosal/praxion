@@ -1,7 +1,8 @@
 ---
-id: dec-draft-e3f0938b
+id: dec-394
+draft_id: dec-draft-e3f0938b
 title: Encode the per-tier pipeline envelope mechanically — registry-owned artifact floor, agent_start spawn count with a per-tier budget, model-visible calibration reminder
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-25
 summary: The Standard/Full artifact floor becomes a monotone `floor` field on each artifact-registry row that the eval manifest derives from; a new stdlib `scripts/spawn_count.py` counts spawns and light/heavy resumes per slug from agent_start rows so the coordination rule can budget Standard ≤ 8 / Full ≤ 16; the calibration reminder moves to a once-per-session Stop-time additionalContext.

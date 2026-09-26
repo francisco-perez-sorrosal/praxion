@@ -23,7 +23,7 @@ dissent: A one-line Retrospective cell is too coarse a grain for a real learning
 re_affirmed_by:
   - dec-264
 superseded_in_part_by:
-  - dec-draft-e3f0938b
+  - dec-394
 ---
 
 ## Context

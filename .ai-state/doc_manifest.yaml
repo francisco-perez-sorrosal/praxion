@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-26T04:08:51Z'
+generated_at: '2026-09-26T15:39:34Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -410,7 +410,7 @@ surfaces:
   path: docs/metrics/README.md
   type: markdown
   title: "Project Metrics \u2014 Storage Schema and Consumption Reference"
-  last_modified: '2026-09-22'
+  last_modified: '2026-09-25'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -437,7 +437,7 @@ surfaces:
   path: docs/multidisciplinary-identities-evidence.md
   type: markdown
   title: "Multidisciplinary Identities \u2014 Evidence Dossier"
-  last_modified: '2026-08-07'
+  last_modified: '2026-09-25'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -2958,6 +2958,12 @@ surfaces:
   title: "Keep WIP.md separate from IMPLEMENTATION_PLAN.md \u2014 decline the roadmap's P2.4 merge clause"
   last_modified: '2026-09-25'
   renderer: adr_card
+- id: ai-state-decisions-396-architecture-views-met-by-projection-check
+  path: .ai-state/decisions/396-architecture-views-met-by-projection-check.md
+  type: markdown
+  title: Architecture views (roadmap P2.9, D4) are met by the id-bound projection check; the per-subsystem partition is declined
+  last_modified: '2026-09-26'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3676,6 +3682,7 @@ groups:
   - ai-state-decisions-393-one-step-document-schema-module
   - ai-state-decisions-394-per-tier-pipeline-envelope
   - ai-state-decisions-395-keep-wip-separate-from-implementation-plan
+  - ai-state-decisions-396-architecture-views-met-by-projection-check
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

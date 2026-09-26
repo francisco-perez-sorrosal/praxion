@@ -1,5 +1,6 @@
 ---
-id: dec-draft-c9daa73a
+id: dec-396
+draft_id: dec-draft-c9daa73a
 title: Architecture views (roadmap P2.9, D4) are met by the id-bound projection check; the per-subsystem partition is declined
 status: accepted
 category: behavioral

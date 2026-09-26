@@ -1,13 +1,11 @@
 """Structural invariant tests for the scheduled sentinel workflow.
 
-`.github/workflows/sentinel.yml` does not exist yet — these tests define the
-security envelope the writer must satisfy when building the weekly (plus
+These tests define the security envelope `.github/workflows/sentinel.yml`
+must satisfy when building the weekly (plus
 on-demand) run of the read-only ecosystem-quality auditor against `main`, with
 a public-repo artifact as its only externally visible output. Every test reads
-the file lazily (inside the function body, not at module import time) so
-collection succeeds before the file exists; running this module now is
-expected to fail on the missing-file path — never with an import error at
-collection time.
+the file lazily (inside the function body, not at module import time), so a
+missing workflow fails the tests rather than their collection.
 
 Scope note: this suite verifies structure — parsed YAML shape, string/regex
 presence of required steps, permission grants, and banned patterns. It cannot
@@ -539,9 +537,9 @@ def test_checkout_step_disables_persisted_credentials() -> None:
     for step in checkout_steps:
         with_block = step.get("with") or {}
         assert with_block.get("persist-credentials") is False, (
-            "`actions/checkout` must set `persist-credentials: false` — "
-            "otherwise the job's token lands in `.git/config`, readable by the "
-            "agent step's unrestricted Bash grant"
+            "`actions/checkout` must set `persist-credentials: false` — the "
+            "pinned action's agent mode still rewrites the remote URL with the "
+            "contents: read job token, but checkout must not add a second copy"
         )
 
 
@@ -832,6 +830,105 @@ def test_report_check_surfaces_a_non_success_agent_outcome() -> None:
 
 
 # ---------------------------------------------------------------------------
+# (p) No cache the agent can poison, a settings payload that only sets kill
+# switches, and a state patch that reaches the artifact. The pinned action
+# installs Bun through a nested setup-bun whose post-step saves a cache after
+# the agent ran, under a key the write-scoped autofix workflows share; the
+# workflow installs Bun itself with the cache off and hands the action the
+# binary, which skips the nested install.
+# ---------------------------------------------------------------------------
+
+SETUP_BUN_SHA = "0c5077e51419868618aeaa5fe8019c62421857d6"  # oven-sh/setup-bun v2.2.0
+STATE_PATCH = "/tmp/sentinel-state.patch"
+
+
+def _assert_bun_is_installed_without_a_cache(parsed: dict) -> None:
+    setup_bun = [s for s in _all_steps(parsed) if "oven-sh/setup-bun" in (s.get("uses") or "")]
+    assert setup_bun, "Expected an explicit setup-bun step before the agent step"
+    for step in setup_bun:
+        assert step["uses"].split("@", 1)[1] == SETUP_BUN_SHA, (
+            "setup-bun must use the same commit the pinned action nests"
+        )
+        assert (step.get("with") or {}).get("no-cache") in (True, "true"), (
+            "setup-bun must set `no-cache: true` — its post-step would otherwise "
+            "save a cache after the unrestricted-Bash agent ran"
+        )
+    for step in _action_steps(parsed):
+        assert (step.get("with") or {}).get("path_to_bun_executable"), (
+            "The action step must receive `path_to_bun_executable`, or the action "
+            "runs its own nested setup-bun with the cache on"
+        )
+
+
+def _assert_settings_payload_only_sets_kill_switches(parsed: dict) -> None:
+    payload = _settings_json(parsed)
+    assert set(payload) == {"env"}, (
+        f"The `--settings` payload carries {sorted(payload)} — only `env` is allowed; "
+        "a `permissions` key grants tools beyond agents/sentinel.md without a prompt"
+    )
+    extra = set(payload["env"]) - set(KILL_SWITCH_FLAGS)
+    assert not extra, f"The `--settings` env sets {sorted(extra)}, which are not kill switches"
+
+
+def _mutate_enable_setup_bun_cache(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _all_steps(mutated):
+        if "oven-sh/setup-bun" in (step.get("uses") or ""):
+            step.setdefault("with", {}).pop("no-cache", None)
+    return mutated
+
+
+def _mutate_drop_bun_path(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _action_steps(mutated):
+        (step.get("with") or {}).pop("path_to_bun_executable", None)
+    return mutated
+
+
+def _mutate_grant_through_settings(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for step in _action_steps(mutated):
+        with_block = step.get("with") or {}
+        with_block["claude_args"] = with_block.get("claude_args", "").replace(
+            "--settings '{", '--settings \'{"permissions":{"allow":["WebFetch"]},', 1
+        )
+    return mutated
+
+
+def test_bun_is_installed_without_a_cache() -> None:
+    _assert_bun_is_installed_without_a_cache(_parsed())
+
+
+def test_settings_payload_only_sets_kill_switches() -> None:
+    _assert_settings_payload_only_sets_kill_switches(_parsed())
+
+
+def test_state_patch_is_built_from_the_log_and_ledger_and_uploaded() -> None:
+    steps = _all_steps(_parsed())
+    patch_step = next(s for s in steps if s.get("id") == "patch")
+    run = patch_step.get("run") or ""
+    assert STATE_PATCH in run
+    lost_otherwise = (
+        "The state patch must carry the log row and any ledger rows the sentinel "
+        "appended — they are lost otherwise, since nothing is committed back"
+    )
+    assert "SENTINEL_LOG.md" in run, lost_otherwise
+    assert "TECH_DEBT_LEDGER.md" in run, lost_otherwise
+    upload = next(s for s in steps if "upload-artifact" in (s.get("uses") or ""))
+    assert STATE_PATCH in str((upload.get("with") or {}).get("path", ""))
+
+
+def test_report_check_keeps_the_last_new_report() -> None:
+    step = next(s for s in _all_steps(_parsed()) if s.get("id") == "check_reports")
+    run = step.get("run") or ""
+    assert "tail -n 1 /tmp/new-reports.txt" in run, (
+        "When the sentinel mints a second report it orphans the first; the "
+        "completed report is the later file, so the check must keep the last one"
+    )
+    assert "head -n 1 /tmp/new-reports.txt" not in run
+
+
+# ---------------------------------------------------------------------------
 # Mutation canaries — one per workflow-specific security invariant. Each
 # mutation flips the invariant from true to false; the paired predicate must
 # reject the mutated parse. A canary that passes on both the real and the
@@ -909,6 +1006,21 @@ MUTATION_CANARIES = [
         _mutate_drop_checkout_ref,
         _assert_checkout_targets_the_default_branch,
         id="dropping_the_checkout_ref",
+    ),
+    pytest.param(
+        _mutate_enable_setup_bun_cache,
+        _assert_bun_is_installed_without_a_cache,
+        id="re_enabling_the_setup_bun_cache",
+    ),
+    pytest.param(
+        _mutate_drop_bun_path,
+        _assert_bun_is_installed_without_a_cache,
+        id="letting_the_action_install_its_own_bun",
+    ),
+    pytest.param(
+        _mutate_grant_through_settings,
+        _assert_settings_payload_only_sets_kill_switches,
+        id="granting_a_tool_through_the_settings_payload",
     ),
 ]
 

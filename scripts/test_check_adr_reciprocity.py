@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import check_adr_reciprocity as car
+import pytest
 
 
 def _adr(root: Path, n: int, *, extra_fields: dict | None = None) -> Path:
@@ -185,7 +186,8 @@ def test_missing_decisions_directory_is_a_skip_not_a_finding(tmp_path: Path) -> 
     assert report["findings"] == []
 
 
-def test_unreadable_frontmatter_is_withheld_not_raised(tmp_path: Path) -> None:
+def test_unreadable_frontmatter_is_withheld_and_reported_as_a_fail(tmp_path: Path) -> None:
+    """A record the reader cannot parse cannot be cross-referenced -- never a silent green."""
     d = tmp_path / ".ai-state" / "decisions"
     d.mkdir(parents=True)
     (d / "001-broken.md").write_text("not frontmatter at all\n", encoding="utf-8")
@@ -193,7 +195,29 @@ def test_unreadable_frontmatter_is_withheld_not_raised(tmp_path: Path) -> None:
     report = car.classify(tmp_path)
 
     assert report["withheld"]
-    assert report["findings"] == []
+    assert [f["severity"] for f in report["findings"]] == ["fail"]
+    assert "001-broken.md" in report["findings"][0]["message"]
+
+
+def test_check_flag_fails_on_a_draft_whose_summary_yaml_rejects(tmp_path: Path) -> None:
+    """The production shape: an unquoted colon-space inside `summary:` in a drafts/ fragment."""
+    pytest.importorskip("yaml")
+    _adr(tmp_path, 1)
+    drafts = tmp_path / ".ai-state" / "decisions" / "drafts"
+    drafts.mkdir()
+    (drafts / "20260926-0000-user-main-bad.md").write_text(
+        "---\nid: dec-draft-deadbeef\ntitle: Bad\nstatus: proposed\n"  # id-citation-discipline:ignore
+        "summary: This summary has a colon: space inside it\nsupersedes: dec-001\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+    rc = subprocess.run(
+        [sys.executable, str(Path(car.__file__)), "--check", "--repo-root", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert rc.returncode == 1
+    assert "20260926-0000-user-main-bad.md" in rc.stderr
 
 
 # -- CLI contract ----------------------------------------------------------------

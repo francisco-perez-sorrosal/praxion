@@ -41,11 +41,15 @@ already builds -- a dangling cross-stage pointer (the target file itself
 absent) is DL04's mixed-pointer WARN, not this check's; a target that exists,
 in either stage, is simply checked for its back-link like any other.
 
-A target this check cannot resolve (the id is unknown, or its frontmatter
-would not parse) is silently skipped rather than flagged -- that is DL04's
-job (a dangling pointer) or a `withheld` entry (unreadable frontmatter), and
-double-reporting the same gap under two checks would make the two dimensions'
-findings drift only through this list ever changing width.
+A target this check cannot resolve (an unknown id) is silently skipped
+rather than flagged -- a dangling pointer is DL04's job, and double-reporting
+the same gap under two checks would make the two dimensions' findings drift
+only through this list ever changing width. A record whose frontmatter will
+not parse is different: it is listed in `withheld` AND reported as a `fail`
+finding, because a decision the reader cannot parse cannot be cross-referenced
+-- withholding it silently turned a broken record into a clean DL06 run.
+Declared limit: without PyYAML the lenient fallback parser reads such a record,
+so the finding appears only where PyYAML is importable.
 
 Reuses `query_adrs.py`'s frontmatter-loading primitives (`_FRONTMATTER_RE`,
 `_try_import_yaml`, `_parse_frontmatter_fallback`) and its scalar-or-list
@@ -80,6 +84,7 @@ from query_adrs import (
 SCRIPT_DIR = Path(__file__).resolve().parent
 CHECK_ID = "DL06"
 SEVERITY = "warn"
+UNREADABLE_SEVERITY = "fail"
 
 logger = logging.getLogger("check_adr_reciprocity")
 
@@ -161,6 +166,19 @@ def _finding(source: _AdrEdges, target_id: str, forward: str, backward: str) -> 
     }
 
 
+def _unreadable_finding(withheld_entry: str) -> dict:
+    name = withheld_entry.split(":", 1)[0]
+    return {
+        "check": CHECK_ID,
+        "severity": UNREADABLE_SEVERITY,
+        "entity": name,
+        "message": (
+            f"{name}: frontmatter unreadable -- its relations cannot be cross-referenced; "
+            "quote any scalar containing ': ' (e.g. `summary:`)"
+        ),
+    }
+
+
 def find_missing_reciprocals(records: list[_AdrEdges]) -> list[dict]:
     """One WARN per relation field whose reciprocal back-link is missing.
 
@@ -202,7 +220,8 @@ def classify(repo_root: Path) -> dict:
             continue
         records.append(edges)
 
-    findings = find_missing_reciprocals(records)
+    findings = [_unreadable_finding(entry) for entry in withheld]
+    findings.extend(find_missing_reciprocals(records))
     return {
         "check": CHECK_ID,
         "skipped": None,
@@ -265,8 +284,8 @@ def _format_human(report: dict) -> str:
     findings = report["findings"]
     if not findings:
         return f"check_adr_reciprocity: no DL06 violations across {report['examined']['records']} ADRs."
-    lines = [f"DL06 WARN ({len(findings)} missing back-link(s)):"]
-    lines.extend(f"  - {f['message']}" for f in findings)
+    lines = [f"DL06 ({len(findings)} finding(s)):"]
+    lines.extend(f"  - [{f['severity'].upper()}] {f['message']}" for f in findings)
     return "\n".join(lines)
 
 

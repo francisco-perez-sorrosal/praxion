@@ -16,6 +16,7 @@ When a decision-making agent (systems-architect, implementation-planner) records
 6. **Record the decision** in `LEARNINGS.md ### Decisions Made` citing `(dec-draft-<hash>)`. Finalize rewrites this reference too.
 7. **Write the `## Disconfirmation` body block** when `category: architectural`. Three sub-items are required: (a) **Falsifier** — what evidence would make this decision wrong; (b) **Steelmanned runner-up** — the strongest case for the next-best option; (c) **Reversal trigger** — the future signal that should prompt revisiting. Set `dissent:` in frontmatter to a one-line summary of the strongest objection. This block attacks the chosen option and is always-on for architectural decisions; it is not optional.
 8. **Do not** manually invoke any index-regeneration script — `DECISIONS_INDEX.md` regenerates automatically at finalize.
+9. **Default to one ADR per pipeline** — the load-bearing decision. Record the rest in `LEARNINGS.md ### Decisions Made` (and the tech-debt ledger when they leave debt); a second fragment needs a second decision that changes a different component or contract.
 
 **`affected_files` names durable, committed paths only.** Never an `.ai-work/<task-slug>/` artifact (gitignored, deleted at pipeline cleanup) and never a path *shape* containing a placeholder such as `<slug>`. `.ai-state/` paths — archived specs, ledgers, sibling decisions — are durable and remain valid. If the decision's evidence lives only in a pipeline document, cite the decision's rationale in prose instead: an entry that cannot resolve is worse than no entry, because it reads as a reference while being invisible to every consumer that resolves the field. Verify each path exists before writing it; prefer omitting the field to padding it with plausible-looking paths. `affected_files` never cites `.ai-work/`, `tmp/`, or `.claude/worktrees/` paths; cite the persistent artifact the ephemeral document informed. `scripts/adr_health.py` flags such entries as `ephemeral-path`.
 
@@ -55,7 +56,7 @@ The frontmatter schema is shared between draft and finalized ADRs (summary and t
 | `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` / `retired` |
 | `category` | string | Yes | `architectural` / `behavioral` / `implementation` / `configuration` |
 | `date` | string | Yes | ISO 8601 date (`YYYY-MM-DD`) |
-| `summary` | string | Yes | One-line description for index and scanning |
+| `summary` | string | Yes | One-line description for index and scanning — double-quote it when it contains `: ` (an unquoted colon-space fails YAML parsing and the reciprocity gate reports the record unreadable) |
 | `tags` | list | Yes | Lowercase topic tags for filtering |
 | `made_by` | string | Yes | `agent` / `user` |
 | `agent_type` | string | When agent | Which agent (e.g., `systems-architect`, `orchestrator`) |
@@ -260,6 +261,8 @@ Ask what fraction of the old record's *decision content* the new record actually
 ## Finalize at Merge-to-Main
 
 At merge-to-main, the post-merge finalize step promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records. The protocol is **idempotent** (running twice on the same state is a no-op), so duplicated invocations from the post-merge hook + `/merge-worktree` command are safe. Agents do not run finalize manually.
+
+The finalize pipeline and the four relation protocols are **feature-complete**: new ADR-economy work goes to the read path (`query_adrs.py`) and authoring discipline, not to new lifecycle states or relation fields.
 
 The full step sequence:
 

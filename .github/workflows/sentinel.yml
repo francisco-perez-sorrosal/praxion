@@ -246,7 +246,14 @@ jobs:
             echo
             echo "## Log row"
             echo '```'
-            grep '^+|' /tmp/sentinel-state.patch | grep -v '^+++' | sed 's/^+//' | head -n 5 || echo "(no new SENTINEL_LOG.md or ledger row)"
+            # Only the log's own diff: ledger rows would crowd the row out, and
+            # an explicit test keeps the fallback independent of pipefail.
+            log_row=$(git diff -U0 -- .ai-state/sentinel_reports/SENTINEL_LOG.md | sed -n 's/^+|/|/p')
+            if [ -n "${log_row}" ]; then
+              printf '%s\n' "${log_row}"
+            else
+              echo "(no new SENTINEL_LOG.md row)"
+            fi
             echo '```'
             echo "## Ledger check (advisory)"
             echo '```'

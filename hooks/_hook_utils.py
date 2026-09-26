@@ -93,6 +93,7 @@ def record_gate_fire(
     reason: str = "",
     *,
     session_id: str = "",
+    project_dir: Path | None = None,
 ) -> None:
     """Append a `gate_fire` observation recording one commit-gate's verdict.
 
@@ -123,10 +124,12 @@ def record_gate_fire(
     hook in this codebase falls back when no parsed payload `cwd` is in
     scope: the process's own working directory. Gate scripts run with the
     target project as the process cwd (git invokes `PreToolUse` hooks that
-    way), so this is not a degraded case here -- it is the normal one.
+    way), so this is not a degraded case here -- it is the normal one. A caller
+    that already resolved the repo root (a Stop hook whose session may run from a
+    subdirectory) passes ``project_dir`` so the row lands where it will be read.
     """
     try:
-        ai_state_dir = Path(os.getcwd()) / ".ai-state"
+        ai_state_dir = (project_dir or Path(os.getcwd())) / ".ai-state"
         if not ai_state_dir.exists():
             return
         observation = {

@@ -617,3 +617,72 @@ class TestStopTimeCalibrationReminder:
         assert _additional_context(second) == "", (
             "a second Stop in the same session must not re-fire the reminder"
         )
+
+
+def _build_managed_repo_without_edits(tmp_path: Path) -> Path:
+    """A managed repo (committed calibration log) with an empty observations log."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _write_calibration_log(repo, "2026-09-20")
+    _git(repo, "add", ".ai-state")
+    _git(repo, "commit", "-m", "chore: add calibration baseline")
+    return repo
+
+
+class TestStopReminderOverRecordedPathShapes:
+    """The capture hooks record absolute file paths, and a session may run from a
+    subdirectory of the repo -- the reminder must hold under both production shapes."""
+
+    def test_fires_for_an_absolute_path_to_a_source_file(self, tmp_path: Path) -> None:
+        session_id = "stop-sess-abs-source"
+        repo = _build_managed_repo_without_edits(tmp_path)
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(repo / "src" / "app.py")))
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert _additional_context(result) != "", "an absolute source path is a real edit"
+
+    def test_silent_when_the_only_edit_is_an_absolute_path_under_ai_work(
+        self, tmp_path: Path
+    ) -> None:
+        session_id = "stop-sess-abs-scratch"
+        repo = _build_managed_repo_without_edits(tmp_path)
+        scratch = repo / ".ai-work" / "some-task" / "notes.md"
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(scratch)))
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert _additional_context(result) == "", (
+            "edits confined to excluded directories must not trigger the reminder, "
+            "whether the path was recorded relative or absolute"
+        )
+
+    def test_fires_once_when_the_session_runs_from_a_subdirectory(self, tmp_path: Path) -> None:
+        session_id = "stop-sess-subdir"
+        repo = _build_qualifying_stop_repo(tmp_path, session_id)
+        subdir = repo / "src"
+        subdir.mkdir(exist_ok=True)
+
+        first = _run_stop_hook(_stop_payload(session_id, subdir), subdir)
+        second = _run_stop_hook(_stop_payload(session_id, subdir), subdir)
+
+        assert _additional_context(first) != "", "the first Stop must fire from a subdirectory"
+        assert _additional_context(second) == "", (
+            "the once-per-session marker must land where the next Stop reads it"
+        )
+
+    def test_fires_when_the_recorded_path_goes_through_a_symlinked_repo_alias(
+        self, tmp_path: Path
+    ) -> None:
+        session_id = "stop-sess-symlink"
+        repo = _build_managed_repo_without_edits(tmp_path)
+        alias = tmp_path / "alias"
+        alias.symlink_to(repo, target_is_directory=True)
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(alias / "src" / "app.py")))
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert _additional_context(result) != "", (
+            "a path recorded through a symlinked alias of the repo is still an edit in it"
+        )

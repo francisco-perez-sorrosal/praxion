@@ -175,11 +175,11 @@ Design behavioral tests before implementation steps. The systems plan's acceptan
 
 **Paired step structure:**
 
-For each implementation step that needs testing, create two steps in the same parallel group:
-- **Step N** `[parallel-group: X]`: Implementation step (assignee: `implementer`, files: production code)
-- **Step N+1** `[parallel-group: X]`: Test step (assignee: `test-engineer`, files: test code)
+For each implementation step that needs testing, create two steps, test first:
+- **Step N**: Test step (assignee: `test-engineer`, files: test code)
+- **Step N+1** `[depends-on: N]`: Implementation step (assignee: `implementer`, files: production code)
 
-The test step's `Testing` field references the acceptance criteria it validates. The test-engineer designs tests from the behavioral spec, not from the production code — because the production code does not exist yet when both start concurrently.
+The test step's `Testing` field references the acceptance criteria it validates. The test-engineer designs tests from the behavioral spec, not from the production code — the production code does not exist yet, because the implementer starts only after the test step reports RED.
 
 **Paired BDD/TDD ordering — test-engineer spawns first:**
 

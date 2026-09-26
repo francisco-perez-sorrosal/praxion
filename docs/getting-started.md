@@ -110,7 +110,7 @@ The planner reads `SYSTEMS_PLAN.md` and writes three documents:
 - `.ai-work/<task-slug>/WIP.md` — tracks the current step, status, and blockers
 - `.ai-work/<task-slug>/LEARNINGS.md` — initialized for capturing discoveries during implementation
 
-Steps are paired: each implementation step has a matching test step. The planner assigns them to run concurrently on disjoint file sets (production code vs test code).
+Steps are paired: each implementation step has a matching test step on a disjoint file set (test code vs production code). The test step runs first and must fail before the implementation step starts.
 
 ### Step 5: Implementation (implementer + test-engineer + doc-engineer)
 

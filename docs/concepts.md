@@ -77,7 +77,7 @@ For complex features, agents form a pipeline where each stage's output feeds the
 2. **researcher** -- explores the codebase, evaluates technologies, gathers external information
 3. **systems-architect** -- produces system design with trade-off analysis and behavioral specifications
 4. **implementation-planner** -- decomposes the design into small, incremental steps
-5. **implementer + test-engineer** -- execute steps in parallel on disjoint file sets (production code vs. test code); **doc-engineer** updates documentation when the planner assigns doc steps
+5. **test-engineer then implementer** -- each paired step runs test-first on disjoint file sets (test code, then production code once the tests are RED); **doc-engineer** updates documentation when the planner assigns doc steps
 6. **verifier** -- reviews the implementation against acceptance criteria
 
 Supporting agents operate alongside the pipeline: **context-engineer** (manages context artifacts), **sentinel** (independent ecosystem health audits), **skill-genesis** (harvests patterns into reusable artifacts), **cicd-engineer** (CI/CD pipeline design).

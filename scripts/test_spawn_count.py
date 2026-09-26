@@ -84,11 +84,13 @@ _ROW_RESUME_START = (
     '"file_paths": [], "outcome": null, "classification": null, '
     '"agent_type_source": "payload", "start_correlation": "not-applicable"}'
 )
+# Verbatim except agent_type/summary: the recorded row predates the plugin rename and
+# carried the retired namespace; the count ignores agent_type, so it is normalized.
 _ROW_OTHER_PROJECT_START = (
     '{"timestamp": "2026-08-13T07:04:24.695942+00:00", "session_id": '
-    '"84edfc44-9ae8-45aa-86c2-bdbcff41aaf9", "agent_type": "i-am:context-engineer", '
+    '"84edfc44-9ae8-45aa-86c2-bdbcff41aaf9", "agent_type": "praxion:context-engineer", '
     '"agent_id": "adeee2949176052ca", "project": "deep-fix-round", "event_type": '
-    '"agent_start", "tool_name": null, "summary": "Agent started: i-am:context-engineer", '
+    '"agent_start", "tool_name": null, "summary": "Agent started: praxion:context-engineer", '
     '"file_paths": [], "outcome": null, "classification": null}'
 )
 
@@ -288,7 +290,7 @@ def test_verdict_is_indeterminate_when_an_unsized_resume_would_push_past_budget(
         spawn_count.AgentTally(
             agent_id=f"a{i}", agent_type="praxion:implementer", spawned_at="t0", resumes=()
         )
-        for i in range(5)
+        for i in range(4)
     ) + (
         spawn_count.AgentTally(
             agent_id="resumed",
@@ -300,9 +302,50 @@ def test_verdict_is_indeterminate_when_an_unsized_resume_would_push_past_budget(
 
     result = spawn_count.verdict(tallies, budget=5, threshold=250_000)
 
+    assert result.charged == 5, "every first start is a definite spawn, resumed or not"
     assert result.label == "indeterminate", (
         f"an unsized resume must never read as 'within'; got {result.label!r}"
     )
+
+
+def _agents_with_one_unsized_resume(spawn_count, count: int) -> tuple:
+    plain = tuple(
+        spawn_count.AgentTally(
+            agent_id=f"a{i}", agent_type="praxion:implementer", spawned_at="t0", resumes=()
+        )
+        for i in range(count - 1)
+    )
+    resumed = spawn_count.AgentTally(
+        agent_id="resumed",
+        agent_type="praxion:implementer",
+        spawned_at="t0",
+        resumes=(spawn_count.Resume(at="t1", context_tokens=None),),
+    )
+    return (*plain, resumed)
+
+
+def test_an_unsized_resume_never_hides_its_agents_spawn() -> None:
+    """Budget-many agents, one of them resumed unsized: the spawns alone meet the budget."""
+    import spawn_count
+
+    result = spawn_count.verdict(
+        _agents_with_one_unsized_resume(spawn_count, 8), budget=8, threshold=250_000
+    )
+
+    assert result.charged == 8
+    assert result.label == "indeterminate"
+
+
+def test_spawns_past_budget_read_over_even_with_an_unsized_resume() -> None:
+    """Nine spawns against eight is over, whatever the unsized resume turns out to be."""
+    import spawn_count
+
+    result = spawn_count.verdict(
+        _agents_with_one_unsized_resume(spawn_count, 9), budget=8, threshold=250_000
+    )
+
+    assert result.charged == 9
+    assert result.label == "over"
 
 
 def test_verdict_is_no_budget_label_when_budget_is_none() -> None:

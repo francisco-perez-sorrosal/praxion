@@ -17,12 +17,9 @@ when the last assistant turn at/before the resume timestamp carries
 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` at or above
 `--heavy-context` (default 250,000), `light` below it, `unsized` when unknown.
 
-Budget verdict: a tally whose resumes are ALL resolved contributes its spawn to the
-definite `charged` count, plus every heavy resume. A tally with >=1 unsized resume
-instead folds its WHOLE contribution into the pending `unsized` pool -- partitioning
-definite-vs-pending by agent (not by resume event) is what lets the borderline check
-express "could still turn out over" without tracking which agents span both buckets.
-`within` needs `charged <= budget` AND `charged + unsized <= budget`; `over` is
+Budget verdict: `charged` is every spawn (a first start is always definite) plus every
+heavy resume; unsized resumes form the pending pool, each of which could still turn
+out heavy. `within` needs `charged + unsized <= budget`; `over` is
 `charged > budget`; `indeterminate` is the remainder; `no-budget` when `--budget` is
 omitted. Exit 0 for within/indeterminate/no-budget, 1 for over, 2 for withheld
 (`wal-absent`, `slug-unseen`, `plugin-cache-root`).
@@ -136,23 +133,17 @@ def classify_resume(context_tokens: int | None, threshold: int) -> str:
 
 def verdict(tallies: tuple[AgentTally, ...], budget: int | None, threshold: int) -> Verdict:
     """Compute the budget verdict for `tallies` at `threshold` against `budget`."""
-    resumes_light = resumes_heavy = resumes_unsized = 0
-    definite_spawns = 0
-    for agent_tally in tallies:
-        tally_has_unsized = False
-        for resume in agent_tally.resumes:
-            classification = classify_resume(resume.context_tokens, threshold)
-            if classification == "heavy":
-                resumes_heavy += 1
-            elif classification == "light":
-                resumes_light += 1
-            else:
-                resumes_unsized += 1
-                tally_has_unsized = True
-        if not tally_has_unsized:
-            definite_spawns += 1
+    classifications = [
+        classify_resume(resume.context_tokens, threshold)
+        for agent_tally in tallies
+        for resume in agent_tally.resumes
+    ]
+    resumes_light = classifications.count("light")
+    resumes_heavy = classifications.count("heavy")
+    resumes_unsized = classifications.count("unsized")
 
-    charged = definite_spawns + resumes_heavy
+    # Every first start is a definite spawn; only an unsized resume is uncertain.
+    charged = len(tallies) + resumes_heavy
     if budget is None:
         label = "no-budget"
     elif charged > budget:

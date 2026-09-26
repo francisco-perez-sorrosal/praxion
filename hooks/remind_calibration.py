@@ -182,17 +182,27 @@ def _read_wal_rows(obs_path: Path) -> list[dict]:
     return rows
 
 
-def _is_excluded_path(path: str) -> bool:
-    normalized = path.lstrip("./")
-    return any(normalized.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES)
+def _is_excluded_path(path: str, repo_root: Path) -> bool:
+    """True for bookkeeping directories and for files outside this repo.
+
+    The capture hooks record absolute paths; a relative one is taken as repo-relative.
+    """
+    candidate = Path(path)
+    if candidate.is_absolute():
+        try:
+            candidate = candidate.resolve().relative_to(repo_root.resolve())
+        except ValueError:
+            return True
+    relative = candidate.as_posix().removeprefix("./")
+    return any(relative.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES)
 
 
-def _is_qualifying_edit_row(row: dict, session_id: str) -> bool:
+def _is_qualifying_edit_row(row: dict, session_id: str, repo_root: Path) -> bool:
     if row.get("session_id") != session_id or row.get("event_type") != "tool_use":
         return False
     if row.get("tool_name") not in _QUALIFYING_TOOL_NAMES:
         return False
-    return any(not _is_excluded_path(p) for p in row.get("file_paths") or [])
+    return any(not _is_excluded_path(p, repo_root) for p in row.get("file_paths") or [])
 
 
 def _already_reminded_this_session(rows: list[dict], session_id: str) -> bool:
@@ -239,7 +249,7 @@ def _handle_stop(payload: dict) -> None:
     rows = _read_wal_rows(obs_path)
     if _already_reminded_this_session(rows, session_id):
         return
-    if not any(_is_qualifying_edit_row(row, session_id) for row in rows):
+    if not any(_is_qualifying_edit_row(row, session_id, repo_root) for row in rows):
         return
     if _calibration_log_changed_vs_head(repo_root) or _session_touched_calibration_log(
         rows, session_id
@@ -253,7 +263,7 @@ def _handle_stop(payload: dict) -> None:
         "row before ending -- the Retrospective cell doubles as the micro-capture slot.",
     )
     try:
-        record_gate_fire(STOP_HOOK_NAME, "warn", session_id=session_id)
+        record_gate_fire(STOP_HOOK_NAME, "warn", session_id=session_id, project_dir=repo_root)
     except Exception:
         pass
 

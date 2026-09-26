@@ -10,6 +10,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `commit_gate.sh` | PreToolUse (Bash) | stdin (JSON payload) | None | None | Fail-open (exit 0) |
 | `check_code_quality.py` | PreToolUse (Bash, commit-gated) | stdin, staged files via `git diff` | Staged files via `git add` | None | Fail-open (exit 0), blocks on unfixable violations (exit 2) |
 | `adr_reminder.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload), `.ai-state/decisions/` (file listing) | None | None | Fail-open (exit 0) |
+| `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
 

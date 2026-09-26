@@ -12,6 +12,7 @@ See also: [`pr-conventions.md`](pr-conventions.md) for PR workflow, merge policy
 - One logical change per commit — avoid mixing unrelated changes
 - Prefer small, focused commits over large sweeping ones
 - Separate refactoring from behavior changes into distinct commits
+- Batch `.ai-state/` bookkeeping into one `chore(state)` commit per boundary (merge, push, session end); hook leftovers (finalize outputs, ledger moves, summary tail) ride the next state commit, never their own
 - ML experiment branches (`experiment/<run-tag>`, `exp/<run-tag>`) use extended commit semantics — a kept training run is the commit unit. Path-scoped in [`ml/experiment-commit-conventions.md`](../../ml/experiment-commit-conventions.md), loaded on training files.
 
 ### Staging Discipline

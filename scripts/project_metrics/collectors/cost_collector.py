@@ -10,6 +10,34 @@ bucket list that every per-pipeline/per-tier/per-agent-type table projects
 from, re-derives its own totals before publishing them, and exposes the
 `CostCollector` class the runner registers (the aggregate pass).
 
+The four-way honesty classification (`Provenance`, `_classify`,
+`_partition_provenance`), `AttributedRow`'s shape, the low-level
+source-discovery seam, the streaming JSONL reader and the dedup core live in
+`cost_collector_read.py`; the tier join in `cost_collector_tier.py`; the JSON
+projections in `cost_collector_report.py`. All are re-exported from here.
+
+Patch seams (why some read-pass code is defined here)
+-----------------------------------------------------
+Tests monkeypatch names on *this* module object. A bare-name call resolves
+through the calling function's own defining module, so a caller that must
+observe a patch has to be defined here, not in a sibling that imports the
+same object. Three callers are pinned for that reason:
+
+- `_attributed_from_row` calls `_classify` -- the fault-injection test
+  replaces `_classify` and expects the guard to reject the result.
+- `discover_sources` calls `_resolve_main_checkout` -- `TestDiscoverSources`
+  asserts on the patched checkout, and the fault-injection and
+  production-wiring tests patch it only to stay off real git. Moved, the
+  first would fail loudly; the others would keep passing while shelling out
+  to `git rev-parse`, which is the silent half of the hazard.
+- `dedup_attributed_rows` and `_independent_audit_census` call
+  `_dedup_by_agent_id` -- the miscounted-dedup test replaces it and expects
+  the guard to catch the misreport. Its fixture reaches only the census;
+  keeping both callers here keeps the patch reaching the official path too.
+
+Moving any of these to a sibling module is a behaviour change for the test
+suite even when every test still passes.
+
 Guard independence (see `_audit_totals` below)
 ------------------------------------------------
 The aggregate pass re-derives its own provenance counts through
@@ -22,21 +50,6 @@ agree on every row (one simply wraps the other), so the guard is silent.
 Only when something replaces the `_classify` symbol specifically -- the
 attack the guard exists to catch -- do the two counts diverge, because the
 census path never went through the replaced symbol to begin with.
-
-Four-way honesty partition (see `_classify` below)
----------------------------------------------------
-An `agent_stop` row's token fields mean different things depending on when it
-was written. Before a fix to the write-ahead hook, `tokens_in`/`tokens_out`/
-`cache_read`/`cache_create` held the *parent session's* cumulative usage --
-not the reporting agent's own. After the fix, a `usage_source` key marks which
-transcript the numbers came from. Rows written before the fix simply lack the
-key entirely -- so the honest population is identified by presence of
-`usage_source == "subagent-transcript"` together with at least one readable
-token field, and the partition between "old, unmarked" rows and "new, but
-every field degraded to null" rows is made by whether the row carries any
-token field at all. A token field that is present but unreadable (a string,
-an infinity) quarantines its row as `unparsed` on both the read path and the
-census, so an understated total can never be published as an honest one.
 
 Source discovery (see `discover_sources` below)
 -------------------------------------------------
@@ -54,16 +67,11 @@ identical source set.
 from __future__ import annotations
 
 import dataclasses
-import json
-import re
 import statistics
-import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import StrEnum
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 from scripts.project_metrics.collectors.base import (
     Available,
@@ -73,6 +81,35 @@ from scripts.project_metrics.collectors.base import (
     NotApplicable,
     ResolutionEnv,
     ResolutionResult,
+)
+from scripts.project_metrics.collectors.cost_collector_read import (
+    AttributedRow,
+    Provenance,
+    SourceRef,
+    _classify,
+    _dedup_by_agent_id,
+    _is_int_coercible,
+    _mtime_iso,
+    _partition_provenance,
+    _read_summary_rows,
+    _resolve_main_checkout,
+    read_agent_stop_rows,
+)
+from scripts.project_metrics.collectors.cost_collector_report import (
+    _accumulate_tokens,
+    _agent_type_projection,
+    _bucket_to_json,
+    _coverage_to_json,
+    _empty_token_totals,
+    _tier_projection,
+)
+from scripts.project_metrics.collectors.cost_collector_tier import (
+    TierAmbiguous,
+    TierResolved,
+    TierUnknown,
+    _flatten_tier,
+    parse_calibration_log,
+    resolve_tier,
 )
 
 __all__ = [
@@ -97,15 +134,9 @@ __all__ = [
     "unresolved_agent_type_share",
 ]
 
-_T = TypeVar("_T")
-
 # ---------------------------------------------------------------------------
 # Tunables and named constants.
 # ---------------------------------------------------------------------------
-
-# Mirrors git_collector.py's own subprocess-timeout pattern: a single, bounded
-# `git rev-parse` call must never hang this collector.
-_GIT_SUBPROCESS_TIMEOUT_SECONDS: float = 10.0
 
 _WAL_FILENAME = "observations.jsonl"
 _WAL_ARCHIVE_FILENAME = "observations.jsonl.1"
@@ -118,128 +149,10 @@ _SOURCE_KIND_WAL = "wal"
 _SOURCE_KIND_WAL_ARCHIVE = "wal-archive"
 _SOURCE_KIND_SUMMARY = "summary"
 
-_AGENT_STOP_EVENT_TYPE = "agent_stop"
-
-# The two honest-provenance marker values a post-fix row can carry. A row
-# lacking the `usage_source` key entirely is the pre-fix population these
-# values do not apply to -- see the module docstring's honesty partition.
-_USAGE_SOURCE_SUBAGENT_TRANSCRIPT = "subagent-transcript"
-_USAGE_SOURCE_PARENT_TRANSCRIPT = "parent-transcript"
-
-# The token-shaped fields whose presence distinguishes a row that at least
-# tried to carry usage data from one that carries none at all -- and whose
-# readability (int-coercible) decides whether the row can enter a total.
-_TOKEN_FIELDS: tuple[str, ...] = ("tokens_in", "tokens_out", "cache_read", "cache_create")
-
 
 # ---------------------------------------------------------------------------
-# Provenance classification -- the four-way honesty partition.
+# AttributedRow construction -- the sole `_classify`-observing call site.
 # ---------------------------------------------------------------------------
-
-
-class Provenance(StrEnum):
-    """The four populations an `agent_stop` row can belong to.
-
-    A closed set, not a bare string, so every consumer of a classified row
-    can exhaustively match on it rather than re-testing string equality.
-    """
-
-    ATTRIBUTED = "attributed"
-    PARENT_SOURCED = "parent-sourced"
-    PRE_ATTRIBUTION = "pre-attribution"
-    UNPARSED = "unparsed"
-
-
-def _is_int_coercible(value: object) -> bool:
-    try:
-        int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
-        return False
-    return True
-
-
-def _has_any_token_field(row: dict) -> bool:
-    """True when at least one token field is present and non-null."""
-
-    return any(row.get(field) is not None for field in _TOKEN_FIELDS)
-
-
-def _has_unreadable_token_field(row: dict) -> bool:
-    """True when a present token field holds a value no total can absorb
-    (`"n/a"`, `Infinity`, a list) -- such a row is quarantined by name
-    rather than entering a total understated."""
-
-    return any(
-        row.get(field) is not None and not _is_int_coercible(row.get(field))
-        for field in _TOKEN_FIELDS
-    )
-
-
-def _classify(row: dict) -> Provenance:
-    """Sole entry point the read pass uses to build attributed rows.
-
-    A thin, patchable wrapper over `_partition_provenance` -- deliberately
-    kept as a separate name (rather than inlining the partition here) so the
-    aggregate pass's guard can call the partition logic directly, bypassing
-    this exact symbol. See the module docstring's "Guard independence" note.
-    """
-
-    return _partition_provenance(row)
-
-
-def _partition_provenance(row: dict) -> Provenance:
-    """The four-way honesty partition -- see the module docstring.
-
-    Partitions first on **absence** of the `usage_source` key, never on its
-    value: absence is the marker for the pre-fix population. A row that
-    carries the key with a value other than the two honest markers (e.g.
-    `None`, written when a post-fix row's usage extraction fully failed) has
-    no honest attribution to report and is classified `UNPARSED` -- as does
-    a row carrying the honest marker over four null usage fields, which has
-    nothing to attribute and must not enter a total as a zero-token row, and
-    a row whose token field holds a value no total can absorb, which would
-    otherwise enter a total understated with nothing in the report saying so.
-    """
-
-    readable = _has_any_token_field(row) and not _has_unreadable_token_field(row)
-    if "usage_source" not in row:
-        return Provenance.PRE_ATTRIBUTION if readable else Provenance.UNPARSED
-
-    usage_source = row.get("usage_source")
-    if usage_source == _USAGE_SOURCE_SUBAGENT_TRANSCRIPT:
-        return Provenance.ATTRIBUTED if readable else Provenance.UNPARSED
-    if usage_source == _USAGE_SOURCE_PARENT_TRANSCRIPT:
-        return Provenance.PARENT_SOURCED
-    return Provenance.UNPARSED
-
-
-# ---------------------------------------------------------------------------
-# AttributedRow -- the only representation of the honest population.
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class AttributedRow:
-    """One honestly-attributed `agent_stop` row.
-
-    Every numeric field is coerced at construction (see
-    `_attributed_from_row`) -- a downstream consumer never has to re-check
-    for `None`.
-    """
-
-    agent_id: str
-    session_id: str
-    pipeline_slug: str
-    agent_type: str
-    agent_type_source: str
-    model: str
-    tokens_in: int
-    tokens_out: int
-    cache_read: int
-    cache_create: int
-    duration_ms: int
-    timestamp: str
-    source_path: str
 
 
 def _coerce_numeric(value: object) -> int:
@@ -262,6 +175,9 @@ def _attributed_from_row(row: dict, source_path: str) -> AttributedRow | None:
 
     Returns `None` for every row that does not classify `ATTRIBUTED` --
     callers never need to classify a row themselves before calling this.
+
+    Defined here, not in `cost_collector_read.py`: its bare `_classify`
+    call is a patch seam (module docstring, "Patch seams").
     """
 
     if _classify(row) is not Provenance.ATTRIBUTED:
@@ -284,69 +200,35 @@ def _attributed_from_row(row: dict, source_path: str) -> AttributedRow | None:
     )
 
 
-# ---------------------------------------------------------------------------
-# SourceRef -- one discovered WAL/archive/summary file.
-# ---------------------------------------------------------------------------
+def dedup_attributed_rows(
+    rows: Sequence[AttributedRow],
+) -> tuple[list[AttributedRow], list[str]]:
+    """Keep exactly one row per `agent_id`.
 
+    Pure over an already-ordered sequence -- source order, then file order
+    within a source, is the sequence's own order; no separate ordering
+    parameter is needed. Within one file, a later row for the same
+    `agent_id` replaces the earlier one (last-in-file wins), even when the
+    two rows carry different payloads -- a same-`agent_id` repeat is
+    assumed to be a re-write of the same event, not two independent
+    contributions. Across files, the first file to have contributed a row
+    for an `agent_id` keeps it; a later file's row for the same id is
+    recorded in `duplicate_agent_ids`, never merged or summed.
 
-@dataclass(frozen=True)
-class SourceRef:
-    """One file `discover_sources` found on disk.
-
-    `lines_scanned`/`agent_stop_rows`/`attributed_rows` start at `0` here --
-    discovery only locates files, it does not read them. The aggregate pass
-    populates these via `dataclasses.replace` once the read pass has run.
+    Defined here, not in `cost_collector_read.py`: its bare
+    `_dedup_by_agent_id` call is a patch seam (module docstring, "Patch
+    seams").
     """
 
-    path: str
-    kind: str
-    checkout: str
-    mtime_iso: str
-    lines_scanned: int
-    agent_stop_rows: int
-    attributed_rows: int
-
-
-def _mtime_iso(path: Path) -> str:
-    return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+    deduped, duplicate_agent_ids, _dropped_count = _dedup_by_agent_id(
+        rows, agent_id_of=lambda row: row.agent_id, source_path_of=lambda row: row.source_path
+    )
+    return deduped, duplicate_agent_ids
 
 
 # ---------------------------------------------------------------------------
-# Source discovery -- the injectable git seam plus the enumeration itself.
+# Source discovery -- the enumeration entry point over the injectable git seam.
 # ---------------------------------------------------------------------------
-
-
-def _resolve_main_checkout(repo_root: str) -> tuple[str | None, str | None]:
-    """Resolve the main checkout's root directory via `git rev-parse`.
-
-    `--git-common-dir` reports the shared `.git` directory every worktree of
-    a repository points at; its parent directory is the main checkout's own
-    root. Returns `(main_checkout, None)` on success or `(None, reason)` on
-    any failure -- a bounded, injectable seam so `discover_sources`'s tests
-    never shell out to real git.
-    """
-
-    try:
-        completed = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_GIT_SUBPROCESS_TIMEOUT_SECONDS,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        return None, f"git rev-parse failed: {exc!r}"
-
-    if completed.returncode != 0:
-        reason = completed.stderr.strip() or "git rev-parse exited non-zero"
-        return None, reason
-
-    common_dir = completed.stdout.strip()
-    if not common_dir:
-        return None, "git rev-parse returned no output"
-
-    return str(Path(common_dir).parent), None
 
 
 def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
@@ -361,6 +243,10 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     A file is only included when it exists; de-duplication is by resolved
     path, so a checkout that happens to equal `repo_root` (or one already
     seen under another name) contributes its files exactly once.
+
+    Defined here, not in `cost_collector_read.py`: its bare
+    `_resolve_main_checkout` call is a patch seam (module docstring,
+    "Patch seams").
     """
 
     issues: list[str] = []
@@ -412,293 +298,8 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# Streaming reader -- one source file at a time, line-by-line.
-# ---------------------------------------------------------------------------
-
-
-def _stream_jsonl(path: str) -> tuple[list[dict], int, str | None]:
-    """Stream one JSONL file, returning parsed object rows, a malformed-line
-    skip count, and a fatal reason when the file itself cannot be read.
-
-    Shared by `read_agent_stop_rows` (which further filters to `agent_stop`
-    events) and `_read_summary_rows` (which does not filter at all) -- both
-    need the identical missing/malformed-file degradation, streamed
-    line-by-line (never `read_text()`) for a file that can grow large. A
-    malformed line is skipped, never fatal to the rest of the scan: the WAL
-    is append-only and live, so a torn trailing line while a session runs is
-    a normal state, not corruption of the rows before it.
-    """
-
-    file_path = Path(path)
-    if not file_path.is_file():
-        return [], 0, f"missing source file: {path}"
-
-    rows: list[dict] = []
-    skipped = 0
-    try:
-        with open(file_path, encoding="utf-8", errors="replace") as handle:
-            for raw_line in handle:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    skipped += 1
-                    continue
-                if isinstance(row, dict):
-                    rows.append(row)
-    except OSError as exc:
-        return [], 0, f"unreadable source {path}: {exc}"
-
-    return rows, skipped, None
-
-
-def _skip_issue(skipped: int, path: str) -> str:
-    noun = "line" if skipped == 1 else "lines"
-    return f"skipped {skipped} malformed {noun} in {path}"
-
-
-def read_agent_stop_rows(path: str) -> tuple[list[dict], str | None]:
-    """Stream one source file, returning its `agent_stop` rows.
-
-    Every skip is counted into the named issue so the reader sees a partial
-    file as partial. A missing or unreadable file degrades to zero rows with
-    a named issue.
-    """
-
-    rows, skipped, fatal = _stream_jsonl(path)
-    if fatal is not None:
-        return [], fatal
-    agent_stop_rows = [row for row in rows if row.get("event_type") == _AGENT_STOP_EVENT_TYPE]
-    if skipped:
-        return agent_stop_rows, _skip_issue(skipped, path)
-    return agent_stop_rows, None
-
-
-def _read_summary_rows(path: str) -> tuple[list[dict], str | None]:
-    """Stream one committed session-summary file, returning every row.
-
-    Unlike `read_agent_stop_rows`, no `event_type` filter applies -- a
-    summary row is a different shape entirely (one row per session, not per
-    agent-stop event). Degradation rules are otherwise identical.
-    """
-
-    rows, skipped, fatal = _stream_jsonl(path)
-    if fatal is not None:
-        return [], fatal
-    if skipped:
-        return rows, _skip_issue(skipped, path)
-    return rows, None
-
-
-# ---------------------------------------------------------------------------
-# Dedup -- last-in-file, first-across-files, by agent_id.
-# ---------------------------------------------------------------------------
-
-
-def _dedup_by_agent_id(
-    items: Sequence[_T],
-    agent_id_of: Callable[[_T], str],
-    source_path_of: Callable[[_T], str],
-) -> tuple[list[_T], list[str], int]:
-    """Shared last-in-file/first-across-file dedup core.
-
-    Generalised over an item-shape-agnostic pair of accessors so both the
-    read pass's `AttributedRow` dedup and the aggregate pass's independent,
-    provenance-agnostic dedup (see `_audit_totals`'s guard) apply the exact
-    same rule -- a genuine divergence between the two is then only possible
-    when the classification feeding them differs, never when the dedup
-    algorithm itself does.
-
-    Returns `(deduped, duplicate_agent_ids, dropped_count)`. `dropped_count`
-    is this call's own arithmetic (`len(items) - len(deduped)`), returned
-    alongside the deduped list rather than recomputed by the caller from
-    before/after lengths -- a caller-side recompute would just re-measure
-    whatever this function actually returned and could never expose a bug
-    in the function itself; the aggregate pass's guard needs a figure that
-    is genuinely this function's own claim, not a tautological echo of it.
-    """
-
-    winners: dict[str, _T] = {}
-    first_seen_order: list[str] = []
-    duplicate_agent_ids: list[str] = []
-    already_recorded: set[str] = set()
-
-    for item in items:
-        agent_id = agent_id_of(item)
-        existing = winners.get(agent_id)
-        if existing is None:
-            winners[agent_id] = item
-            first_seen_order.append(agent_id)
-            continue
-        if source_path_of(existing) == source_path_of(item):
-            winners[agent_id] = item  # last-in-file wins
-            continue
-        if agent_id not in already_recorded:
-            duplicate_agent_ids.append(agent_id)
-            already_recorded.add(agent_id)
-        # Cross-file repeat: the earlier file's item already in `winners` stays.
-
-    deduped = [winners[agent_id] for agent_id in first_seen_order]
-    return deduped, duplicate_agent_ids, len(items) - len(deduped)
-
-
-def dedup_attributed_rows(
-    rows: Sequence[AttributedRow],
-) -> tuple[list[AttributedRow], list[str]]:
-    """Keep exactly one row per `agent_id`.
-
-    Pure over an already-ordered sequence -- source order, then file order
-    within a source, is the sequence's own order; no separate ordering
-    parameter is needed. Within one file, a later row for the same
-    `agent_id` replaces the earlier one (last-in-file wins), even when the
-    two rows carry different payloads -- a same-`agent_id` repeat is
-    assumed to be a re-write of the same event, not two independent
-    contributions. Across files, the first file to have contributed a row
-    for an `agent_id` keeps it; a later file's row for the same id is
-    recorded in `duplicate_agent_ids`, never merged or summed.
-    """
-
-    deduped, duplicate_agent_ids, _dropped_count = _dedup_by_agent_id(
-        rows, agent_id_of=lambda row: row.agent_id, source_path_of=lambda row: row.source_path
-    )
-    return deduped, duplicate_agent_ids
-
-
-# ---------------------------------------------------------------------------
-# Tier join -- resolving a pipeline slug to a calibration-log tier.
-# ---------------------------------------------------------------------------
-
-# The calibration log is a pipe-table; columns are positional, matching
-# `scripts/state_ledger_schema.py`'s own registration of this file.
-_CALIBRATION_TASK_COLUMN = 1
-_CALIBRATION_ACTUAL_TIER_COLUMN = 4
-_CALIBRATION_MIN_COLUMNS = 5
-
-_TIER_TOKEN_PATTERN = re.compile(r"[A-Za-z]+")
-_KNOWN_TIERS = frozenset({"Direct", "Lightweight", "Standard", "Full", "Spike"})
-
-
-@dataclass(frozen=True)
-class TierResolved:
-    """One row, or several agreeing rows, name the same tier."""
-
-    tier: str
-    rows: int
-
-
-@dataclass(frozen=True)
-class TierAmbiguous:
-    """Several calibration rows for the same slug disagree on tier.
-
-    A silent first-wins pick would fabricate a tier -- every disagreeing
-    tier is listed, never just the first one seen.
-    """
-
-    tiers: list[str]
-    rows: int
-
-
-@dataclass(frozen=True)
-class TierUnknown:
-    """No calibration row joins this slug, or its tier cell does not parse."""
-
-    reason: str
-
-
-def _calibration_row_cells(line: str) -> list[str] | None:
-    """Split one pipe-table line into stripped cells, or `None` when the
-    line is not a table row at all."""
-
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        return None
-    return [cell.strip() for cell in stripped.strip("|").split("|")]
-
-
-def parse_calibration_log(path: str) -> dict[str, list[str]]:
-    """Build the slug -> tier-tokens index from `.ai-state/calibration_log.md`.
-
-    The slug is the Task cell's first whitespace-delimited token (the only
-    rule that holds uniformly across every observed row shape -- a
-    sub-step qualifier after `/` or free prose after an em-dash both leave
-    the pipeline slug as the leading token). The tier is the Actual Tier
-    cell's leading alphabetic run, lower-cased comparisons never needed
-    since the log itself capitalizes tier names consistently.
-    """
-
-    index: dict[str, list[str]] = {}
-    # `errors="replace"` matches the WAL reader and the producing hook: one
-    # bad byte degrades one cell, never the whole index.
-    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
-        cells = _calibration_row_cells(line)
-        if cells is None or len(cells) < _CALIBRATION_MIN_COLUMNS:
-            continue
-        task_cell = cells[_CALIBRATION_TASK_COLUMN]
-        if task_cell.lower() == "task" or set(task_cell) <= {"-"}:
-            continue  # header or separator row
-        tokens = task_cell.split()
-        if not tokens:
-            continue
-        slug = tokens[0]
-        match = _TIER_TOKEN_PATTERN.match(cells[_CALIBRATION_ACTUAL_TIER_COLUMN])
-        if match is None:
-            continue
-        index.setdefault(slug, []).append(match.group(0))
-    return index
-
-
-def resolve_tier(
-    slug: str, tier_index: dict[str, list[str]]
-) -> TierResolved | TierAmbiguous | TierUnknown:
-    """Join `slug` to a tier -- never a function, so three outcomes exist."""
-
-    raw_tiers = tier_index.get(slug)
-    if not raw_tiers:
-        return TierUnknown(reason="no-calibration-row")
-
-    known_tiers = [tier for tier in raw_tiers if tier in _KNOWN_TIERS]
-    if not known_tiers:
-        return TierUnknown(reason="unparsable-tier-cell")
-
-    unique_tiers = sorted(set(known_tiers))
-    if len(unique_tiers) == 1:
-        return TierResolved(tier=unique_tiers[0], rows=len(known_tiers))
-    return TierAmbiguous(tiers=unique_tiers, rows=len(known_tiers))
-
-
-def _flatten_tier(resolution: TierResolved | TierAmbiguous | TierUnknown) -> tuple[str, str | None]:
-    """Render a tier-join outcome as the flat `(tier, tier_reason)` pair every
-    downstream consumer (buckets, tables, the Standard-vs-Lightweight cell) reads instead of the
-    raw union."""
-
-    if isinstance(resolution, TierResolved):
-        return resolution.tier, None
-    if isinstance(resolution, TierAmbiguous):
-        return "ambiguous", ", ".join(resolution.tiers)
-    return "unknown", resolution.reason
-
-
-# ---------------------------------------------------------------------------
 # Pipeline bucket aggregation -- one bucket list, three projections.
 # ---------------------------------------------------------------------------
-
-_TOKEN_COMPONENT_KEYS: tuple[str, ...] = ("tokens_in", "tokens_out", "cache_read", "cache_create")
-
-
-def _empty_token_totals() -> dict[str, int]:
-    totals = dict.fromkeys(_TOKEN_COMPONENT_KEYS, 0)
-    totals["tokens_total"] = 0
-    return totals
-
-
-def _accumulate_tokens(totals: dict[str, int], row: AttributedRow) -> None:
-    totals["tokens_in"] += row.tokens_in
-    totals["tokens_out"] += row.tokens_out
-    totals["cache_read"] += row.cache_read
-    totals["cache_create"] += row.cache_create
-    totals["tokens_total"] += row.tokens_in + row.tokens_out + row.cache_read + row.cache_create
 
 
 @dataclass(frozen=True)
@@ -951,75 +552,6 @@ def _load_tier_index(repo_root: str, issues: list[str]) -> dict[str, list[str]]:
         return {}
 
 
-def _bucket_to_json(bucket: PipelineBucket) -> dict[str, Any]:
-    return {
-        "pipeline_slug": bucket.pipeline_slug,
-        "tier": bucket.tier,
-        "tier_reason": bucket.tier_reason,
-        "attributed_rows": bucket.attributed_rows,
-        "sessions": bucket.sessions,
-        "models": sorted(bucket.models),
-        "tokens": dict(bucket.tokens),
-        "by_agent_type": {
-            agent_type: dict(tokens) for agent_type, tokens in bucket.by_agent_type.items()
-        },
-    }
-
-
-def _tier_projection(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
-    """The per-tier table -- a fold over the same buckets, grouped by
-    `tier` instead of `pipeline_slug`."""
-
-    projection: dict[str, dict[str, Any]] = {}
-    for bucket in buckets:
-        entry = projection.setdefault(
-            bucket.tier, {"attributed_rows": 0, "tokens": _empty_token_totals(), "pipelines": []}
-        )
-        entry["attributed_rows"] += bucket.attributed_rows
-        for key in entry["tokens"]:
-            entry["tokens"][key] += bucket.tokens[key]
-        entry["pipelines"].append(bucket.pipeline_slug)
-    return projection
-
-
-def _agent_type_projection(buckets: Sequence[PipelineBucket]) -> dict[str, Any]:
-    """The per-agent-type table -- a fold over the same buckets, grouped by
-    `agent_type` instead of `pipeline_slug`."""
-
-    projection: dict[str, dict[str, int]] = {}
-    for bucket in buckets:
-        for agent_type, tokens in bucket.by_agent_type.items():
-            entry = projection.setdefault(agent_type, _empty_token_totals())
-            for key in entry:
-                entry[key] += tokens[key]
-    return projection
-
-
-def _coverage_to_json(coverage: Coverage) -> dict[str, Any]:
-    return {
-        "attributed_rows": coverage.attributed_rows,
-        "total_agent_stop_rows": coverage.total_agent_stop_rows,
-        "quarantine": dict(coverage.quarantine),
-        "duplicate_agent_ids": list(coverage.duplicate_agent_ids),
-        "sessions_durable": coverage.sessions_durable,
-        "sessions_with_slug": coverage.sessions_with_slug,
-        "sessions_slug_unknown": coverage.sessions_slug_unknown,
-        "duplicates_dropped": coverage.duplicates_dropped,
-        "sources": [
-            {
-                "path": source.path,
-                "kind": source.kind,
-                "checkout": source.checkout,
-                "mtime_iso": source.mtime_iso,
-                "lines_scanned": source.lines_scanned,
-                "agent_stop_rows": source.agent_stop_rows,
-                "attributed_rows": source.attributed_rows,
-            }
-            for source in coverage.sources
-        ],
-    }
-
-
 def _read_all_sources(
     sources: Sequence[SourceRef],
 ) -> tuple[list[tuple[dict, str]], list[dict], list[SourceRef], list[str]]:
@@ -1086,7 +618,9 @@ def _independent_audit_census(
     `duplicates_dropped` sums each provenance class's own dedup-reported
     drop count (`_dedup_by_agent_id`'s third return value) -- not a
     recompute from list lengths, so it stays a genuinely independent
-    witness of what the dedup step actually did.
+    witness of what the dedup step actually did. Its bare
+    `_dedup_by_agent_id` call is a patch seam (module docstring, "Patch
+    seams").
     """
 
     by_provenance: dict[Provenance, list[tuple[str, str]]] = {p: [] for p in Provenance}

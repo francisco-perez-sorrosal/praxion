@@ -33,12 +33,21 @@
 #     claude-code-action pin is the same one the autofix workflows already
 #     use (td-057 lockstep), and the checkout/setup-uv pins match
 #     audits.yml's.
-#   - `actions/checkout` sets `persist-credentials: false` — the token never
-#     lands in `.git/config`, readable by the agent step's Bash grant.
+#   - `actions/checkout` sets `persist-credentials: false`, but in agent mode
+#     the pinned action rewrites `remote.origin.url` with the job token, so
+#     the agent's Bash can read a `contents: read` token. That token can
+#     read this public repo and nothing more.
+#   - Checkout pins `ref:` to the default branch, so a dispatch from a
+#     feature branch still audits `main`.
+#   - setup-uv's cache is off: its post-step would save a cache after an
+#     unrestricted-Bash agent ran, and a write-scoped workflow could restore
+#     it.
 #   - Nothing the agent writes is committed. A credential-pattern gate runs
-#     BEFORE the report and state patch are uploaded as a public workflow
-#     artifact (the repo is public) — a token-shaped string fails the job
-#     first.
+#     before anything is published; the job summary and the artifact (the
+#     repo is public) both require the gate's success, so a token-shaped
+#     string publishes nothing. The gate reports counts, never the matches.
+#   - Step outputs reach `run:` scripts through `env:` only, never as shell
+#     source (a report filename is agent-influenced).
 #   - Accepted residual (see the ADR): unrestricted Bash means a prompt
 #     injection landed on `main` could still read `/proc/<ppid>/environ` and
 #     exfiltrate over the network. Same class the autofix workflows already
@@ -68,6 +77,7 @@ jobs:
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -75,6 +85,7 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
           python-version: "3.13"
+          enable-cache: false
 
       - name: Install dependencies
         run: uv sync
@@ -134,7 +145,12 @@ jobs:
       - name: Check for a new sentinel report
         id: check_reports
         if: always()
+        env:
+          SENTINEL_OUTCOME: ${{ steps.sentinel.outcome }}
         run: |
+          if [ "${SENTINEL_OUTCOME}" != "success" ]; then
+            echo "::warning::The sentinel step ended '${SENTINEL_OUTCOME}' (turn cap, timeout, or error) - any report below may be the incomplete first-phase stub."
+          fi
           ls .ai-state/sentinel_reports/SENTINEL_REPORT_*.md 2>/dev/null | sort > /tmp/reports-after.txt || true
           comm -13 /tmp/reports-before.txt /tmp/reports-after.txt > /tmp/new-reports.txt || true
           new_count=$(wc -l < /tmp/new-reports.txt | tr -d ' ')
@@ -155,21 +171,23 @@ jobs:
       - name: Build the state patch (log row, ledger rows, new report)
         id: patch
         if: always()
+        env:
+          new_report: ${{ steps.check_reports.outputs.new_report }}
         run: |
           : > /tmp/sentinel-state.patch
-          new_report="${{ steps.check_reports.outputs.new_report }}"
           if [ -z "${new_report}" ]; then
             echo "[sentinel] no new report — nothing to patch"
             exit 0
           fi
           git diff -- .ai-state/sentinel_reports/SENTINEL_LOG.md .ai-state/TECH_DEBT_LEDGER.md >> /tmp/sentinel-state.patch || true
-          git diff --no-index /dev/null "${new_report}" >> /tmp/sentinel-state.patch || true
+          git diff --no-index -- /dev/null "${new_report}" >> /tmp/sentinel-state.patch || true
 
       - name: Credential gate (fail before anything reaches the public artifact)
         id: credential_gate
         if: always()
+        env:
+          new_report: ${{ steps.check_reports.outputs.new_report }}
         run: |
-          new_report="${{ steps.check_reports.outputs.new_report }}"
           targets=()
           [ -n "${new_report}" ] && [ -f "${new_report}" ] && targets+=("${new_report}")
           [ -s /tmp/sentinel-state.patch ] && targets+=(/tmp/sentinel-state.patch)
@@ -177,17 +195,31 @@ jobs:
             echo "[sentinel] nothing to scan for credentials"
             exit 0
           fi
-          if grep -EnH 'sk-ant-[A-Za-z0-9_-]{8,}|gh[opsru]_[A-Za-z0-9]{20,}' "${targets[@]}"; then
-            echo "::error::A credential-shaped string was found in the report or state patch — failing before publish or upload."
+          # Count only: printing the matching lines would put the secret in
+          # the public job log. grep exits 1 on no match and 2 on an error;
+          # an error fails the gate closed.
+          set +e
+          hits=$(grep -Ec -- 'sk-ant-[A-Za-z0-9_-]{8,}|gh[opsru]_[A-Za-z0-9]{20,}' "${targets[@]}")
+          rc=$?
+          set -e
+          if [ "${rc}" -ge 2 ]; then
+            echo "::error::The credential scan itself failed (grep exit ${rc}) - failing closed."
+            exit 1
+          fi
+          if [ "${rc}" -eq 0 ]; then
+            echo "::error::A credential-shaped string was found (per-file line counts below; lines withheld) - nothing is published."
+            printf '%s\n' "${hits}"
             exit 1
           fi
           echo "[sentinel] credential gate clear"
 
       - name: Publish job summary (grade, recommendations, envelope evidence)
-        if: always()
+        if: always() && steps.credential_gate.outcome == 'success'
+        env:
+          new_report: ${{ steps.check_reports.outputs.new_report }}
+          exec_file: ${{ steps.sentinel.outputs.execution_file }}
         run: |
           {
-            new_report="${{ steps.check_reports.outputs.new_report }}"
             if [ -n "${new_report}" ] && [ -f "${new_report}" ]; then
               if grep -q '^## Ecosystem Health' "${new_report}" && grep -q '^### Recommended Actions' "${new_report}"; then
                 awk '/^## Ecosystem Health/,0' "${new_report}"
@@ -205,9 +237,11 @@ jobs:
             echo '```'
             echo "## Envelope evidence (advisory)"
             wal_present="no"
-            [ -f .ai-state/observations.jsonl ] && wal_present="yes"
+            if [ -f .ai-state/observations.jsonl ]; then
+              wal_present="yes"
+              echo "::warning::The observation WAL exists after the run - the --settings kill switches did not reach the hooks." >&2
+            fi
             echo "- observation WAL present: ${wal_present}"
-            exec_file="${{ steps.sentinel.outputs.execution_file }}"
             if [ -n "${exec_file}" ] && [ -f "${exec_file}" ]; then
               uv run python3 -c "import json,sys; lines=[json.loads(l) for l in open(sys.argv[1],encoding='utf-8') if l.strip()]; init=next((e for e in lines if isinstance(e,dict) and e.get('type')=='system' and e.get('subtype')=='init'),None); print('- mcp_servers: ' + str(init.get('mcp_servers',[]) if init else 'no init message found'))" "${exec_file}" || echo "- mcp_servers: (could not parse execution file)"
             else
@@ -216,7 +250,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload sentinel report and state patch
-        if: always()
+        if: always() && steps.credential_gate.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: sentinel-report-${{ github.run_id }}

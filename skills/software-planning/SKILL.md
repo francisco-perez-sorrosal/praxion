@@ -151,7 +151,7 @@ Each step MUST:
 
 ## Testing in Plan Steps (BDD/TDD)
 
-**Behavioral tests first.** Tests are designed from the acceptance criteria in the systems plan — they encode what the system should do, not how it does it. The test-engineer and implementer work concurrently on paired steps with disjoint file sets.
+**Behavioral tests first.** Tests are designed from the acceptance criteria in the systems plan — they encode what the system should do, not how it does it. On each paired step the test-engineer runs first and reports RED, then the implementer works on the disjoint production file set.
 
 **Paired step pattern:**
 1. **Test step** (test-engineer): design behavioral tests from acceptance criteria

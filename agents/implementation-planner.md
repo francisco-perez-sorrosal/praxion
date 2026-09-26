@@ -183,7 +183,7 @@ The test step's `Testing` field references the acceptance criteria it validates.
 
 **Paired BDD/TDD ordering — test-engineer spawns first:**
 
-Within a paired parallel group, always spawn the test-engineer *one Agent tool call ahead* of the implementer — not in the same tool-use block. Even though the steps share a `[parallel-group: X]` tag, the invocation order is test-engineer → then implementer. Rationale: when both spawn simultaneously, the implementer routinely commits production code before the test-engineer's first `pytest` run, so tests validate existing code rather than shaping the interface. The shaping property of TDD is lost.
+On each paired step, spawn the test-engineer first and the implementer only after its RED handshake — never in the same tool-use block. The implementation step carries `[depends-on: N]` on its test step, so the order is test-engineer → then implementer. Rationale: when both spawn simultaneously, the implementer routinely commits production code before the test-engineer's first `pytest` run, so tests validate existing code rather than shaping the interface. The shaping property of TDD is lost.
 
 Include in the test-engineer's prompt:
 

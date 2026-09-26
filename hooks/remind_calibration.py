@@ -242,7 +242,8 @@ def _handle_stop(payload: dict) -> None:
         return
 
     repo_root = git_toplevel_from_cwd()
-    if repo_root is None or not (repo_root / ".ai-state").is_dir():
+    # Only projects that keep a calibration log are asked to append to it.
+    if repo_root is None or not (repo_root / CALIBRATION_LOG_REL).is_file():
         return
 
     obs_path = repo_root / ".ai-state" / "observations.jsonl"

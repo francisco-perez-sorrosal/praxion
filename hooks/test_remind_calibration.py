@@ -686,3 +686,35 @@ class TestStopReminderOverRecordedPathShapes:
         assert _additional_context(result) != "", (
             "a path recorded through a symlinked alias of the repo is still an edit in it"
         )
+
+    def test_silent_in_a_project_that_keeps_no_calibration_log(self, tmp_path: Path) -> None:
+        """A project with a .ai-state/ directory but no calibration log is not asked to
+        append to a file it does not keep."""
+        session_id = "stop-sess-no-log"
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _init_repo(repo)
+        (repo / "README.md").write_text("# repo\n", encoding="utf-8")
+        _git(repo, "add", "README.md")
+        _git(repo, "commit", "-m", "chore: initial")
+        (repo / ".ai-state").mkdir()
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(repo / "src" / "app.py")))
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert _additional_context(result) == ""
+
+    def test_silent_when_the_session_already_wrote_and_committed_the_row(
+        self, tmp_path: Path
+    ) -> None:
+        """A row appended and committed this session leaves no diff against HEAD; the
+        session's own edit of the log is what proves the row was written."""
+        session_id = "stop-sess-committed-row"
+        repo = _build_managed_repo_without_edits(tmp_path)
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(repo / "src" / "app.py")))
+        log = repo / ".ai-state" / "calibration_log.md"
+        _write_wal_row(repo, _qualifying_edit_row(session_id, str(log)))
+
+        result = _run_stop_hook(_stop_payload(session_id, repo), repo)
+
+        assert _additional_context(result) == ""

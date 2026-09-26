@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-26T19:28:04Z'
+generated_at: '2026-09-26T21:46:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -56,7 +56,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-24'
+  last_modified: '2026-09-26'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -378,7 +378,7 @@ surfaces:
   path: docs/independent-analysis/process-economy-roadmap.md
   type: markdown
   title: "Praxion Process Economy \u2014 Best-in-Class Against Modern Agentic Pipelines by Spending Less"
-  last_modified: '2026-09-06'
+  last_modified: '2026-09-26'
   diataxis: explanation
   audience: architect / maintainer
   renderer: explanation_shell
@@ -545,7 +545,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -2976,6 +2976,12 @@ surfaces:
   title: Blind-reader classification of consult challenges (td-102)
   last_modified: '2026-09-26'
   renderer: adr_card
+- id: ai-state-decisions-399-scheduled-sentinel-workflow
+  path: .ai-state/decisions/399-scheduled-sentinel-workflow.md
+  type: markdown
+  title: The sentinel runs weekly in its own read-only, secret-scoped workflow; its outputs leave as a public artifact and a state patch, never a commit
+  last_modified: '2026-09-26'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3697,6 +3703,7 @@ groups:
   - ai-state-decisions-396-architecture-views-met-by-projection-check
   - ai-state-decisions-397-sandbox-keeps-the-observations-log
   - ai-state-decisions-398-blind-consult-classification
+  - ai-state-decisions-399-scheduled-sentinel-workflow
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-30fe8cb6
+id: dec-399
+draft_id: dec-draft-30fe8cb6
 title: The sentinel runs weekly in its own read-only, secret-scoped workflow; its outputs leave as a public artifact and a state patch, never a commit
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-26
 summary: "A new .github/workflows/sentinel.yml (schedule + workflow_dispatch) runs praxion:sentinel via the audited claude-code-action pin with --plugin-dir ., as a main-thread --agent. It carries --max-turns 150 and an explicit sonnet model, and its tool grant equals agents/sentinel.md's. The job has contents:read, no id-token, and passes github_token, so the action cannot mint a write-capable Claude-App token. The OAuth secret appears on one step, with subprocess env scrub on. Plugin MCP servers are off via --strict-mcp-config. Side-effect and context hooks are silenced through --settings env, because project settings pin PRAXION_DISABLE_OBSERVABILITY=0. The agent writes normally; a post-step uploads the report plus an appliable state patch after a no-report failure check and a credential-pattern gate. audits.yml stays model-free and secret-free."

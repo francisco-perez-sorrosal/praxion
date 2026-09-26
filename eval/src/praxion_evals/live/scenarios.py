@@ -494,7 +494,17 @@ def build_lightweight_fix(root: Path, seeded: Seeded) -> None:
 # inject_rules SessionStart hook writes into every project it starts in. Grading
 # them made the judge penalise a conformant run for its toolchain.
 _BYPRODUCT_DIRS = frozenset({".ruff_cache", ".pytest_cache", "__pycache__", ".mypy_cache"})
-_HOOK_CREATED_FILES = frozenset({".claude/praxion-rules.yaml.example"})
+_HOOK_CREATED_FILES = frozenset(
+    {
+        ".claude/praxion-rules.yaml.example",
+        # The observations log the sandbox now keeps (td-258): the hooks' record
+        # of the session, not the agent's change.
+        ".ai-state/observations.jsonl",
+        ".ai-state/observations.jsonl.1",
+        ".ai-state/observations.lock",
+        ".ai-state/observations_summary.jsonl",
+    }
+)
 
 
 def _is_authored(path: str) -> bool:

@@ -405,6 +405,10 @@ def test_lightweight_fix_is_not_elicited_when_only_byproducts_changed(tmp_path):
     delta = FsDelta(
         created={
             ".claude/praxion-rules.yaml.example": "# example\n",
+            ".ai-state/observations.jsonl": "{}\n",
+            ".ai-state/observations.jsonl.1": "{}\n",
+            ".ai-state/observations.lock": "",
+            ".ai-state/observations_summary.jsonl": "{}\n",
             ".pytest_cache/v/cache/lastfailed": "{}\n",
             "scripts/__pycache__/paginate.cpython-312.pyc": "",
         },

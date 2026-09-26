@@ -54,11 +54,14 @@ PASS_THROUGH_KEYS = (
 )
 
 # Side-effect-only hooks off through their own kill switches (one would relink
-# the real ~/.claude; another writes a WAL into the fixture and posts events),
-# plus harness noise. Context-injecting hooks stay on: they are the layer under test.
+# the real ~/.claude; another would post chronograph events), plus harness noise.
+# Context-injecting hooks stay on: they are the layer under test. The
+# observations log stays ON -- it lands in the throwaway fixture, and hooks that
+# qualify a session from it (the Stop-time calibration reminder) are otherwise
+# unmeasurable; only its network half is off.
 FIXED_SWITCHES = {
     "PRAXION_DISABLE_AUTO_COMPLETE": "1",
-    "PRAXION_DISABLE_OBSERVABILITY": "1",
+    "PRAXION_DISABLE_EVENT_POSTING": "1",
     "PRAXION_DISABLE_HOOK_CHAIN_HEAL": "1",
     "PRAXION_DISABLE_SIDECAR_AUTOCOMMIT": "1",
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",

@@ -14,6 +14,7 @@ pipeline_tier: standard
 affected_files:
   - eval/src/praxion_evals/live/session.py
   - eval/src/praxion_evals/live/materialize.py
+superseded_in_part_by: [dec-draft-f3bc0103]
 ---
 
 ## Context

@@ -11,7 +11,7 @@ import subprocess
 import sys
 import urllib.request
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _hook_utils import DISABLE_EVENT_POSTING, DISABLE_OBSERVABILITY, is_disabled
 
 # `PROGRESS.md` is written by the orchestrator alone, and only in hackathon
 # mode; pipeline agents report through their terminal marker and `WIP.md`
@@ -587,7 +587,7 @@ def _build_events(data):
 
 
 def main():
-    if is_disabled(DISABLE_OBSERVABILITY):
+    if is_disabled(DISABLE_OBSERVABILITY) or is_disabled(DISABLE_EVENT_POSTING):
         return
     try:
         data = json.loads(sys.stdin.read())

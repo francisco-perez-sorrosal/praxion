@@ -825,6 +825,12 @@ class TestMainWiring:
         monkeypatch.setenv("PRAXION_DISABLE_OBSERVABILITY", "1")
         assert _drive_main(hook, {"hook_event_name": "SessionStart"}, monkeypatch) == []
 
+    def test_event_posting_opt_out_posts_nothing_with_observability_on(self, hook, monkeypatch):
+        monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
+        monkeypatch.setenv("PRAXION_DISABLE_EVENT_POSTING", "1")
+        monkeypatch.setenv("CHRONOGRAPH_PORT", "9999")
+        assert _drive_main(hook, {"hook_event_name": "SessionStart"}, monkeypatch) == []
+
     def test_malformed_stdin_posts_nothing_and_does_not_raise(self, hook, monkeypatch):
         monkeypatch.delenv("PRAXION_DISABLE_OBSERVABILITY", raising=False)
         assert _drive_main(hook, None, monkeypatch, raw="{{{ not json") == []

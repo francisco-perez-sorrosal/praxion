@@ -26,6 +26,11 @@ from pathlib import Path
 
 DISABLE_OBSERVABILITY = "PRAXION_DISABLE_OBSERVABILITY"
 
+# Narrower: silences only send_event.py's chronograph POSTs while the local
+# observations log keeps being written -- what an isolated sandbox needs when a
+# hook under test reads that log.
+DISABLE_EVENT_POSTING = "PRAXION_DISABLE_EVENT_POSTING"
+
 _TRUTHY = frozenset({"1", "true", "yes"})
 
 # -- Observability WAL size threshold for rotation ----------------------------

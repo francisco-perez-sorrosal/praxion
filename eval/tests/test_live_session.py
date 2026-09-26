@@ -262,7 +262,7 @@ def test_build_env_sets_the_side_effect_kill_switches_and_harness_noise_flags():
 
     for key in (
         "PRAXION_DISABLE_AUTO_COMPLETE",
-        "PRAXION_DISABLE_OBSERVABILITY",
+        "PRAXION_DISABLE_EVENT_POSTING",
         "PRAXION_DISABLE_HOOK_CHAIN_HEAL",
         "PRAXION_DISABLE_SIDECAR_AUTOCOMMIT",
         "CLAUDE_CODE_DISABLE_AUTO_MEMORY",
@@ -270,6 +270,21 @@ def test_build_env_sets_the_side_effect_kill_switches_and_harness_noise_flags():
         "PYTHONDONTWRITEBYTECODE",
     ):
         assert env[key] == "1", f"{key} must be set to '1'"
+
+
+def test_build_env_leaves_the_observations_log_on():
+    """Hooks that qualify a session from the observations log (the Stop-time
+    calibration reminder) are measurable only if the sandbox writes that log;
+    the network half of observability stays off through its own switch."""
+    from praxion_evals.live.session import build_env
+
+    env = build_env(
+        Path("/tmp/run/session-1"),
+        {"PATH": "/usr/bin", "PRAXION_DISABLE_OBSERVABILITY": "1"},
+    )
+
+    assert "PRAXION_DISABLE_OBSERVABILITY" not in env
+    assert env["PRAXION_DISABLE_EVENT_POSTING"] == "1"
 
 
 # ---------------------------------------------------------------------------

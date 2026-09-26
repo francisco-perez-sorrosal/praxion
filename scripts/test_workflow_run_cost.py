@@ -125,11 +125,14 @@ def _run_dir(home, project_root, session, wf_id):
 def _write_journal(run_dir, agents):
     """The launched/started[/result] triad per agent, keyed by `type` as
     the harness writes it. An agent dict with `"result": False` gets no
-    result event -- a started-but-never-resulted roster entry."""
+    result event -- a started-but-never-resulted roster entry. The
+    `launched` record is bare (`{"type": "launched"}`, no `"key"`) --
+    matching the harness's own shape (see `journal_golden.jsonl`), not an
+    invented one; nothing reads a `"key"` off a `launched` record."""
     records = []
     for i, agent in enumerate(agents):
         key = f"call_{i}"
-        records.append({"type": "launched", "key": key})
+        records.append({"type": "launched"})
         records.append(
             {
                 "type": "started",

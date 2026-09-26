@@ -1,0 +1,5 @@
+{"type":"launched"}
+{"type":"started","key":"v2:78c5e746c214b35b537a7afaa3ee6d79916a78712064cad77a14f161be046f9b","agentId":"a7065c7bcb9c98b45","label":"probe:hooks","phase":"Probe"}
+{"type":"started","key":"v2:f22cd79471c63423509f9df7bef9812869860f3e1b43067870c2ab00688e8edb","agentId":"a7be5ed2ac3f45a30","label":"probe:scripts","phase":"Probe"}
+{"type":"result","key":"v2:f22cd79471c63423509f9df7bef9812869860f3e1b43067870c2ab00688e8edb","agentId":"a7be5ed2ac3f45a30","result":{"files":["_handoff_inputs.py","_handoff_readiness.py"],"count":2}}
+{"type":"result","key":"v2:78c5e746c214b35b537a7afaa3ee6d79916a78712064cad77a14f161be046f9b","agentId":"a7065c7bcb9c98b45","result":{"files":["send_event.py","capture_session.py"],"count":2}}

@@ -134,7 +134,9 @@ def _write_journal(run_dir, agents):
     records = []
     for i, agent in enumerate(agents):
         key = f"call_{i}"
-        records.append({"type": "launched", "key": key})
+        # Bare -- no "key" -- matching the harness's own shape (see
+        # `journal_golden.jsonl`); nothing reads a "key" off a `launched` record.
+        records.append({"type": "launched"})
         records.append(
             {
                 "type": "started",
@@ -698,3 +700,42 @@ def test_absolute_fragment_path_in_the_journal_still_matches_a_relative_quote(
     assert [
         (f["agent_id"], f["sibling_agent_id"], f["needle_kind"]) for f in report["findings"]
     ] == [(econ["agent_id"], port["agent_id"], "fragment_path")]
+
+
+# --------------------------------------------------------------------------- #
+# fixture-shape guard -- this file's own `_write_journal` must not drift from
+# the harness's real journal shape (`journal_golden.jsonl`, td-232); a fixture
+# writer that invents an extra key would keep this suite green while every
+# live run's journal looked different.
+# --------------------------------------------------------------------------- #
+_GOLDEN_JOURNAL = (
+    Path(__file__).resolve().parent / "test_fixtures" / "workflow_run" / "journal_golden.jsonl"
+)
+
+
+def _per_type_key_sets(records):
+    grouped: dict[str, set] = {}
+    for record in records:
+        grouped.setdefault(record["type"], set()).update(record.keys())
+    return grouped
+
+
+def test_write_journal_emits_records_whose_per_type_key_set_matches_the_golden_harness_journal(
+    tmp_path,
+):
+    """The golden fixture is the sole source of truth for the harness's own
+    journal shape -- never hand-transcribed a second time here."""
+    golden_records = [
+        json.loads(line) for line in _GOLDEN_JOURNAL.read_text(encoding="utf-8").splitlines()
+    ]
+    expected = _per_type_key_sets(golden_records)
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write_journal(run_dir, [dict(a) for a in _DEFAULT_AGENTS])
+    written_records = [
+        json.loads(line)
+        for line in (run_dir / "journal.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert _per_type_key_sets(written_records) == expected

@@ -419,8 +419,10 @@ repos:
       # skill edit on backlog. Matches the F11/T03/P03 precedent.
       - id: staleness-markers
         name: Skill staleness markers (advisory)
-        entry: python3 scripts/check_staleness_markers.py --repo-root .
-        language: system
+        entry: python scripts/check_staleness_markers.py --repo-root .
+        # language: python (not system) -- reads YAML; see rules-manifest-drift.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '^(skills/.*/(SKILL\.md|references/.*\.md|contexts/.*\.md)|scripts/check_staleness_markers\.py)$'
         pass_filenames: false
 
@@ -453,8 +455,10 @@ repos:
       # precedent. Scoped to the substrate the five checks read.
       - id: state-corpus
         name: .ai-state decision/spec/calibration corpus (advisory)
-        entry: python3 scripts/check_state_corpus.py --repo-root .
-        language: system
+        entry: python scripts/check_state_corpus.py --repo-root .
+        # language: python (not system) -- reads YAML; see rules-manifest-drift.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '^(\.ai-state/(decisions/.*|specs/.*|calibration_log\.md)|scripts/check_state_corpus\.py)$'
         pass_filenames: false
 
@@ -527,8 +531,10 @@ repos:
       # would let a consumer drift edit land silently.
       - id: behavioral-contract
         name: Behavioral contract (advisory)
-        entry: python3 scripts/check_behavioral_contract.py --repo-root .
-        language: system
+        entry: python scripts/check_behavioral_contract.py --repo-root .
+        # language: python (not system) -- reads YAML; see rules-manifest-drift.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '^(rules/swe/agent-behavioral-contract\.md|agents/[^/]+\.md|skills/code-review/references/report-template\.md|scripts/check_behavioral_contract\.py|claude/canonical-blocks/behavioral-contract\.md|skills/onboard-project/references/claude-md-blocks\.md|README\.md|codex/config/AGENTS\.md\.tmpl|AGENTS\.md)$'
         pass_filenames: false
 
@@ -550,8 +556,10 @@ repos:
       # and blocks, this owns presence/shape and reports.
       - id: artifact-conformance
         name: Artifact conformance (advisory)
-        entry: python3 scripts/check_artifact_conformance.py --repo-root .
-        language: system
+        entry: python scripts/check_artifact_conformance.py --repo-root .
+        # language: python (not system) -- reads YAML; see rules-manifest-drift.
+        language: python
+        additional_dependencies: ['pyyaml']
         files: '^(skills/.*/SKILL\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.claude-plugin/plugin\.json|scripts/check_artifact_conformance\.py)$'
         pass_filenames: false
 

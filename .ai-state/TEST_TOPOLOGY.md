@@ -842,6 +842,7 @@ selectors:
       - "tests/test_issue_intake_assessment_invariants.py"
       - "tests/test_labels_manifest.py"
       - "tests/test_labels_reconcile_workflow.py"
+      - "tests/test_sentinel_workflow_invariants.py"
 file_dependencies:
   - ".github/workflows/*.yml"
   - ".github/labels.yml"

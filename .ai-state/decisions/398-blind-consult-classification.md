@@ -1,7 +1,8 @@
 ---
-id: dec-draft-8f0e1c8f
+id: dec-398
+draft_id: dec-draft-8f0e1c8f
 title: Blind-reader classification of consult challenges (td-102)
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-26
 summary: "Move novel/matched classification of consult challenges from the convener to a blind second reader, recorded verbatim; the classification regime is derived from timestamp vs. a boundary header, never a stored column"

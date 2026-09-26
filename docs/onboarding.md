@@ -124,7 +124,7 @@ Claude: Before I build, here's how this works:
           • researcher — explores docs, libraries, external APIs
           • systems-architect — module shape, dependency direction
           • implementation-planner — decomposes into small steps
-          • implementer + test-engineer — code + tests in parallel
+          • test-engineer → implementer — tests first, then code
           • verifier — checks acceptance criteria
         You speak English, Claude delegates. No /command memorization required.
 

@@ -572,7 +572,7 @@ For the full doc-engineer engagement table (stage → role → trigger), see [ag
 <a id="parallel-execution-fragments"></a>
 ## Parallel Execution Fragment Files
 
-When agents run concurrently within a pipeline (e.g., implementer + test-engineer on paired steps, or a batched-improvement group), each concurrent agent writes to a scoped fragment file instead of the canonical document. All fragments live in the same task-scoped directory as the canonical.
+When agents run concurrently within a pipeline (e.g., independent test/implementation pairs overlapping on disjoint file sets, or a batched-improvement group -- within one pair the test step always runs first), each concurrent agent writes to a scoped fragment file instead of the canonical document. All fragments live in the same task-scoped directory as the canonical.
 
 ### Canonical vs Fragment Pattern
 

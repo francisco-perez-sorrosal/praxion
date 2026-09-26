@@ -2062,6 +2062,21 @@ CLASSIFICATION_ROW_FIELDS: tuple[str, ...] = (
 # so the two can never silently drift apart.
 SEAL_BOUNDARY = "2026-07-31T03:00:00Z"
 
+# The blind-classification regime boundary, pinned here for the same reason:
+# moving the file's header line earlier would silently relabel convener-made
+# rows as blind-classified, so the header must equal this constant.
+BLIND_CLASSIFICATION_BOUNDARY = "2026-09-26T00:00:00Z"
+
+# td-102: the blind-classification regime boundary is a second, independent
+# header line -- never a stored per-row column (a stored
+# `classified-by` column was rejected: it would violate the append-only gate). Deliberately its own regex, not a reuse of
+# _SERIES_BEGINS_RE: that sibling's .search() silently takes the first match
+# and has no duplicate-header guard, which is exactly the defect this new
+# check must not repeat (see the canary below).
+_BLIND_CLASSIFICATION_BEGINS_RE = re.compile(
+    r"^\*\*Blind classification begins\*\*:\s*(\S+)", re.MULTILINE
+)
+
 # Placeholder concern values a shallow lens pass or a rushed convener might
 # write instead of a substantive one -- compared lowercased so "TBD"/"N/A"
 # also match.
@@ -2150,6 +2165,63 @@ def check_seal_boundary_matches_gate_constant(priors_text: str) -> str | None:
         return "no '**Series begins**:' header line found in CONSULT_PRIORS.md"
     if found != SEAL_BOUNDARY:
         return f"series boundary header {found!r} does not match gate constant {SEAL_BOUNDARY!r}"
+    return None
+
+
+def parse_blind_classification_boundary(priors_text: str) -> str | None:
+    """Return the ISO timestamp in the file's `**Blind classification
+    begins**:` line, or None.
+
+    Mirrors parse_series_boundary's `.search()`-first-match shape -- this
+    helper is for extracting a single value once the caller has already
+    established uniqueness elsewhere (it does not itself guard against a
+    duplicated header; check_blind_classification_boundary_is_well_formed
+    below does that with its own `.findall()`)."""
+    match = _BLIND_CLASSIFICATION_BEGINS_RE.search(priors_text)
+    return match.group(1) if match else None
+
+
+def check_blind_classification_boundary_is_well_formed(priors_text: str) -> str | None:
+    """Return a failure string unless `**Blind classification begins**:`
+    appears exactly once, its value is a well-formed ISO-8601 UTC timestamp,
+    and that instant is not earlier than SEAL_BOUNDARY.
+
+    No mechanical check can prove any individual `## Challenge Classification`
+    row was actually classified by a blind reader rather than the convener --
+    the table carries no per-row marker by design (a stored `classified-by` column was rejected because it would violate the priors
+    file's append-only gate). This function only proves the boundary header
+    itself is well-formed and correctly ordered relative to the series
+    boundary; the header and the surrounding protocol prose are the whole
+    contract for which regime produced a given row.
+    """
+    matches = _BLIND_CLASSIFICATION_BEGINS_RE.findall(priors_text)
+    if not matches:
+        return "no '**Blind classification begins**:' header line found in CONSULT_PRIORS.md"
+    if len(matches) > 1:
+        return (
+            "'**Blind classification begins**:' header line appears "
+            f"{len(matches)} times, expected exactly 1"
+        )
+    boundary = matches[0]
+    if not _TIMESTAMP_RE.match(boundary):
+        return f"blind-classification boundary {boundary!r} is not a well-formed ISO-8601 UTC timestamp"
+    if boundary < SEAL_BOUNDARY:
+        return (
+            f"blind-classification boundary {boundary!r} is earlier than the series "
+            f"boundary {SEAL_BOUNDARY!r}"
+        )
+    return None
+
+
+def check_blind_boundary_matches_gate_constant(priors_text: str) -> str | None:
+    """Return a failure string unless the file's `**Blind classification
+    begins**:` header equals BLIND_CLASSIFICATION_BOUNDARY."""
+    boundary = parse_blind_classification_boundary(priors_text)
+    if boundary != BLIND_CLASSIFICATION_BOUNDARY:
+        return (
+            f"blind-classification header {boundary!r} does not equal the gate "
+            f"constant {BLIND_CLASSIFICATION_BOUNDARY!r} -- moving it relabels rows"
+        )
     return None
 
 
@@ -3566,6 +3638,123 @@ def test_the_real_priors_series_boundary_matches_the_gate_constant(project_root:
     assert result is None, result
 
 
+# ---------------------------------------------------------------------------
+# td-102: blind-classification boundary header (`**Blind classification
+# begins**:`). Regime is derived at read time from a row's timestamp against
+# this header -- never a stored per-row column.
+# ---------------------------------------------------------------------------
+
+
+def test_flags_a_priors_file_with_no_blind_classification_begins_header() -> None:
+    """Canary: a priors text with no '**Blind classification begins**:'
+    header line is flagged -- the check must not pass silently on absence."""
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n"
+        f"{_PRIOR_HEADER_ROW}\n{_PRIOR_SEPARATOR_ROW}\n\n"
+        f"{_CLASSIFICATION_HEADER_ROW}\n{_CLASSIFICATION_SEPARATOR_ROW}\n"
+    )
+    result = check_blind_classification_boundary_is_well_formed(priors_text)
+    assert result is not None, (
+        "check_blind_classification_boundary_is_well_formed must flag a priors file with no "
+        "'**Blind classification begins**:' header line; got None"
+    )
+
+
+def test_flags_a_duplicated_blind_classification_begins_header() -> None:
+    """Canary: the header line appears twice. The existing '**Series
+    begins**:' sibling's parse_series_boundary uses .search(), which silently
+    takes the first match and has no duplicate-header guard at all -- the new
+    check must .findall() and assert exactly one match, naming the count."""
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n"
+        "**Blind classification begins**: 2026-09-26T00:00:00Z\n"
+        "**Blind classification begins**: 2026-09-27T00:00:00Z\n"
+    )
+    result = check_blind_classification_boundary_is_well_formed(priors_text)
+    assert result is not None, (
+        "check_blind_classification_boundary_is_well_formed must flag a priors file where the "
+        "'**Blind classification begins**:' header line appears more than once; got None"
+    )
+    assert "2" in result, f"failure must name the match count; got: {result!r}"
+
+
+def test_flags_a_malformed_blind_classification_boundary_timestamp() -> None:
+    """Canary: the header is present exactly once but its value is not a
+    well-formed ISO-8601 UTC timestamp (missing time component)."""
+    malformed_value = "2026-09-26"
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n"
+        f"**Blind classification begins**: {malformed_value}\n"
+    )
+    result = check_blind_classification_boundary_is_well_formed(priors_text)
+    assert result is not None, (
+        "check_blind_classification_boundary_is_well_formed must flag a malformed boundary "
+        "timestamp; got None"
+    )
+    assert malformed_value in result, f"failure must name the malformed value; got: {result!r}"
+
+
+def test_flags_a_blind_classification_boundary_earlier_than_the_series_boundary() -> None:
+    """Canary: the header is well-formed ISO-8601 UTC but its instant precedes
+    SEAL_BOUNDARY -- a blind-classification regime cannot begin before the
+    series itself does."""
+    earlier_boundary = "2026-07-01T00:00:00Z"
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n"
+        f"**Blind classification begins**: {earlier_boundary}\n"
+    )
+    result = check_blind_classification_boundary_is_well_formed(priors_text)
+    assert result is not None, (
+        "check_blind_classification_boundary_is_well_formed must flag a blind-classification "
+        "boundary earlier than the series boundary; got None"
+    )
+    assert earlier_boundary in result, f"failure must name the found value; got: {result!r}"
+    assert SEAL_BOUNDARY in result, f"failure must name the series boundary; got: {result!r}"
+
+
+def test_accepts_a_well_formed_blind_classification_boundary_after_the_series_boundary() -> None:
+    """Inverse guard: a header present exactly once, valid ISO-8601 UTC, at or
+    after SEAL_BOUNDARY -- must pass with no failure."""
+    later_boundary = "2026-09-26T00:00:00Z"
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n**Blind classification begins**: {later_boundary}\n"
+    )
+    result = check_blind_classification_boundary_is_well_formed(priors_text)
+    assert result is None, f"expected no failure for a well-formed boundary; got: {result!r}"
+
+
+def test_both_boundary_headers_coexist_without_cross_contamination() -> None:
+    """Guard (WIP.md pre-mortem item 2): when both '**Series begins**:' and
+    '**Blind classification begins**:' headers are present in the same file,
+    each parser must read only its own line -- neither header may leak into
+    the other's parsed value."""
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n\n"
+        "**Blind classification begins**: 2026-09-26T00:00:00Z\n"
+    )
+    assert parse_series_boundary(priors_text) == SEAL_BOUNDARY, (
+        "parse_series_boundary must keep reading its own header line when the new "
+        "'**Blind classification begins**:' header line is also present"
+    )
+    assert parse_blind_classification_boundary(priors_text) == "2026-09-26T00:00:00Z", (
+        "parse_blind_classification_boundary must read its own header line, not the "
+        "'**Series begins**:' one, when both are present"
+    )
+
+
+def test_the_real_priors_blind_classification_boundary_is_well_formed(project_root: Path) -> None:
+    """The blind-classification boundary invariant, exercised against the
+    real, shipped .ai-state/CONSULT_PRIORS.md (skips cleanly if the file does
+    not exist yet)."""
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.is_file():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    result = check_blind_classification_boundary_is_well_formed(
+        priors_path.read_text(encoding="utf-8")
+    )
+    assert result is None, result
+
+
 def test_no_data_row_outside_the_priors_tables(project_root: Path) -> None:
     """The real, shipped .ai-state/CONSULT_PRIORS.md carries no stray data
     row outside either parsed table (skips cleanly if the file does not
@@ -3795,4 +3984,22 @@ def test_the_live_fragment_witness_agrees_with_the_recorded_seal_witness(
         pytest.skip(f"{triple!r} has no recorded seal-witness yet")
     seal_witness = matching[0][classification_index["seal-witness"]]
     result = check_fragment_witness_agrees(fragment_text, seal_witness)
+    assert result is None, result
+
+
+def test_flags_a_blind_boundary_moved_away_from_the_gate_constant() -> None:
+    """Canary: a header moved earlier (which would relabel convener rows as
+    blind-classified) is flagged even though it is well-formed and ordered."""
+    priors_text = (
+        f"**Series begins**: {SEAL_BOUNDARY}\n**Blind classification begins**: {SEAL_BOUNDARY}\n"
+    )
+    assert check_blind_classification_boundary_is_well_formed(priors_text) is None
+    assert check_blind_boundary_matches_gate_constant(priors_text) is not None
+
+
+def test_the_real_priors_blind_boundary_matches_the_gate_constant(project_root: Path) -> None:
+    priors_path = project_root / ".ai-state" / "CONSULT_PRIORS.md"
+    if not priors_path.exists():
+        pytest.skip("CONSULT_PRIORS.md does not exist yet")
+    result = check_blind_boundary_matches_gate_constant(priors_path.read_text(encoding="utf-8"))
     assert result is None, result

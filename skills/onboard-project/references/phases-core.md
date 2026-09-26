@@ -155,7 +155,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
   **Predicate (skip if present).** Each file is checked individually with `test -e`. An existing file is never overwritten — it already holds committed observations, and these ledgers are append-only.
 
-  **Action.** For each of the three missing files, write the skeleton below verbatim. Header-only — **never seed an example row.** These files are read as data series; a fabricated row is indistinguishable from an observation and permanently contaminates every count computed over them.
+  **Action.** For each of the three missing files, write the skeleton below verbatim. Header-only — **never seed an example row.** These files are read as data series; a fabricated row is indistinguishable from an observation and permanently contaminates every count computed over them. One line is not literal: `.ai-state/CONSULT_PRIORS.md`'s `**Blind classification begins**:` line carries the placeholder `YYYY-MM-DDTHH:MM:SSZ` — substitute the onboarding run's own current UTC timestamp for it before writing the file, exactly as other onboarding phases substitute their own placeholders at write time.
 
   `.ai-state/CONSULT_LEDGER.md`:
   ```markdown
@@ -213,6 +213,10 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   Append-only, two tables written at two moments. **Single writer: the convener.** The consultant never writes this file and never reads it — it is the convener's compressed statement of the concerns it already held about the very draft the consultant's independent first round is kept away from, which is what makes "did the consult surface anything new?" answerable at all.
 
   `## Sealed Priors` is written **and committed before the spawn** — the seal is the commit, not the working-tree write. `## Challenge Classification` is written at disposition time, alongside that consult's `CONSULT_LEDGER.md` rows.
+
+  **Blind classification begins**: YYYY-MM-DDTHH:MM:SSZ
+
+  Challenge classification for consults at or after this instant is made by a blind second reader (a `general-purpose` agent, spawned at `opus`) rather than by the convener; the convener records the reader's `novel`/`matched` call verbatim, in the same `## Challenge Classification` table below, and never overrides it. The table's shape does not change — there is no per-row marker of which regime produced a given row, so no mechanical check can prove any individual row was blind-classified. This boundary and this paragraph are the contract. The convener records no view of its own: the reader's call is the record. The packet carries each challenge's full text with its `Disposition:` and `Rationale:` lines removed.
 
   **Append new rows as the last row of the table they belong to — never after a prose section.** No row is ever edited or deleted.
 

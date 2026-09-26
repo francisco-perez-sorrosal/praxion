@@ -19,6 +19,17 @@ Consults timestamped before that instant are exempt: no consult before it was se
 and none can be retro-classified without inventing the very record this file exists to
 fix. The exemption is by construction -- there is no skip-list.
 
+**Blind classification begins**: 2026-09-26T00:00:00Z
+
+Challenge classification for consults at or after this instant is made by a blind second
+reader (a `general-purpose` agent, spawned at `opus`) rather than by the convener; the
+convener records the reader's `novel`/`matched` call verbatim, in the same
+`## Challenge Classification` table below, and never overrides it. The table's shape does not
+change -- there is no per-row marker of which regime produced a given row, so no mechanical
+check can prove any individual row was blind-classified. This boundary and this paragraph are
+the contract. The convener records no view of its own: the reader's call is the record. The packet
+carries each challenge's full text with its `Disposition:` and `Rationale:` lines removed.
+
 **Append new rows as the last row of the table they belong to** (the two `| ... |` tables
 below, each ending just before the next `##` heading) -- never after a prose section.
 This file is append-only -- no row is ever edited or deleted. A Round-3 loop-back
@@ -197,6 +208,12 @@ which is canaried against a worked example showing the pooled and per-consult
 readings diverging. If this shell recipe and that function ever disagree, the
 function is correct and this block is stale.
 
+Per-consult novelty rates are comparable only **within one classification regime**:
+everything before **Blind classification begins** was classified by the convener itself,
+everything at or after it by a blind second reader. A rate computed across that boundary
+mixes two different measurement instruments and must not be read as one continuous series
+-- report and compare rates within a regime, never pooled across it.
+
 ## Named consumer
 
 The novelty rate computed from this file **is** the estimand of the lens-versus-consultant
@@ -213,7 +230,7 @@ criterion already records.
 
 ## What is not recorded here
 
-Four scope limits, so the file is never read as more instrumented than it is:
+Five scope limits, so the file is never read as more instrumented than it is:
 
 1. Consults **not convened** after a lens pass leave no row and no trace. The ordering
    constraint (decide → seal → spawn) is the only mitigation; it is a convention, not a gate.
@@ -223,6 +240,9 @@ Four scope limits, so the file is never read as more instrumented than it is:
    well-formed and resolvable*, never that it is *right*. Its correction mechanism is that
    a stranger can read the prior and the challenge and disagree.
 4. No consult before the series boundary is classified, and none will be retro-classified.
+5. Rows before **Blind classification begins** were classified by the convener itself (the
+   historical regime item 3 above describes); they are never retro-classified, and no row
+   anywhere in this file carries a marker of which regime produced it.
 
 ## Single Writer
 

@@ -59,7 +59,6 @@ def _per_type_key_sets(records: list[dict]) -> dict[str, set]:
 
 # --------------------------------------------------------------------------- #
 # golden-fixture integrity + read_journal / _write_journal shape-compat
-# (KS-1, KS-2)
 # --------------------------------------------------------------------------- #
 def test_golden_journal_fixture_sha256_matches_its_recorded_provenance():
     """A pre-commit whitespace/EOF fixer, or an editor re-save, would

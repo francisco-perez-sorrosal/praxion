@@ -21,7 +21,7 @@ Patch seams (why some read-pass code is defined here)
 Tests monkeypatch names on *this* module object. A bare-name call resolves
 through the calling function's own defining module, so a caller that must
 observe a patch has to be defined here, not in a sibling that imports the
-same object. Three callers are pinned for that reason:
+same object. Four callers are pinned for that reason:
 
 - `_attributed_from_row` calls `_classify` -- the fault-injection test
   replaces `_classify` and expects the guard to reject the result.

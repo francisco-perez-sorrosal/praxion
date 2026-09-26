@@ -12,7 +12,7 @@ only -- safe to commit.
 - **Byte size**: 740
 - **sha256**: `457e707a53ef4309a97904a46d45c4d0f3cb87f676448b560cbc453c51d9878b`
 
-A test in `scripts/test_workflow_run_cost_worldread.py` asserts the committed
+A test in `scripts/test_workflow_run_cost_fixtures.py` asserts the committed
 fixture's sha256 still equals the value recorded above -- a tripwire against a
 pre-commit whitespace/EOF fixer or an editor re-save silently breaking
 byte-identity with the source run.

@@ -13,12 +13,9 @@ The session-scoped autouse fixture runs before any test reads a fixture
 path, so per-test ``(path / ".git").is_dir()`` guards see the rebuilt
 state immediately.
 
-**Cost collector: shared row fixtures** (moved here from
-``test_cost_collector.py`` when that file split into
-``test_cost_collector_read.py`` / ``test_cost_collector_aggregate.py`` /
-``test_cost_collector_collector.py`` — genuinely cross-file, since both the
-read-pass tests and ``TestCostCollectorFaultInjection`` in the
-collector-wiring file consume them):
+**Cost collector: shared row fixtures** (cross-file: both the read-pass
+tests and ``TestCostCollectorFaultInjection`` in the collector-wiring file
+consume them):
 
 - ``attributed.jsonl`` -- **verbatim**, one real ``agent_stop`` row copied
   byte-for-byte from

@@ -2,10 +2,8 @@
 `_transcript_stats`, the windowing trio (`_parse_ts`/`_run_window`/`_within`),
 and `render_list_table` (td-226).
 
-Split out of `test_workflow_run_cost.py` on purpose: that file is already at
-925 lines (over `coding-style.md`'s 800-line file-size ceiling, a pre-existing
-condition predating this pipeline's own changes -- see LEARNINGS.md), so new
-coverage lands here instead of growing it further.
+Kept apart from `test_workflow_run_cost.py`, which is over `coding-style.md`'s
+800-line file-size ceiling, so new coverage lands here instead of growing it.
 
 Every fixture here is built entirely in `tmp_path` -- no dependency on
 `scripts/test_fixtures/` on disk -- deliberately, so this file (unlike its
@@ -91,12 +89,25 @@ def test_read_wal_keeps_the_last_agent_stop_row_and_ignores_unrelated_or_unlabel
     tmp_path, monkeypatch, capsys
 ):
     project_root, wf_id, agent = _single_agent_run(tmp_path, monkeypatch, wal_rows=[])
-    stale = base._wal_agent_stop(agent["agent_id"], tokens_in=1, tokens_out=1, duration_ms=1_000)
+    stale = base._wal_agent_stop(
+        agent["agent_id"],
+        tokens_in=1,
+        tokens_out=1,
+        cache_read=1,
+        cache_create=1,
+        model="stale-model",
+        duration_ms=1_000,
+        usage_source="parent-transcript",
+        timestamp=base._RUN_START,
+    )
     fresh = base._wal_agent_stop(
         agent["agent_id"],
         tokens_in=agent["peak_context"],
         tokens_out=agent["output_tokens"],
+        cache_read=333,
+        cache_create=444,
         duration_ms=9_000,
+        timestamp=base._RUN_END,
     )
     noise_event = {"event_type": "session_start", "agent_id": agent["agent_id"], "tokens_out": 42}
     no_agent_id = {"event_type": "agent_stop", "tokens_out": 42}
@@ -106,9 +117,11 @@ def test_read_wal_keeps_the_last_agent_stop_row_and_ignores_unrelated_or_unlabel
 
     row = report["agents"][0]
     # Only `fresh`'s tokens_out matches the transcript -- if `stale` had won
-    # instead, this would read "differ" and duration_ms would be 1_000.
+    # instead, this would read "differ". The `wal` object is a reported
+    # figure set, so every field is pinned, each distinct from `stale`'s.
     assert row["wal_agreement"] == "agree"
-    assert row["wal"]["duration_ms"] == 9_000
+    assert row["wal"] == {key: fresh[key] for key in row["wal"]}
+    assert set(row["wal"]) == set(fresh) - {"event_type", "agent_id"}
 
 
 # --------------------------------------------------------------------------- #

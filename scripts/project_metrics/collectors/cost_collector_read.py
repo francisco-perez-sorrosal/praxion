@@ -3,9 +3,11 @@
 Companion module to `cost_collector.py`: the four-way honesty classification,
 `AttributedRow`'s shape, the low-level source-discovery seam, the streaming
 JSONL reader, and the last-in-file/first-across-file dedup core
-(`_dedup_by_agent_id`). Split out of
-`cost_collector.py` purely for module size -- every name here is imported
-back into `cost_collector.py` and re-exported from its `__all__` unchanged.
+(`_dedup_by_agent_id`). Split out of `cost_collector.py` for module size;
+the names the entry module and its tests use are imported back there and
+its `__all__` is unchanged. Private helpers used only here (`_stream_jsonl`,
+`_skip_issue`, the token-field predicates) are not imported back, so a
+patch on `cost_collector` cannot reach them -- patch them here.
 
 `discover_sources`, `_attributed_from_row` and `dedup_attributed_rows` stay
 in `cost_collector.py` -- see that module's "Patch seams" section.

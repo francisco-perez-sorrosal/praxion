@@ -3,7 +3,9 @@
 
 PreToolUse hook that checks staged files for architectural changes (CLAUDE.md,
 agents, skills, rules, commands, hooks, workflows) and emits a warning if no
-ADR file in .ai-state/decisions/ was modified in the same session.
+ADR file in .ai-state/decisions/ was modified in the same session. The warning is
+emitted as `hookSpecificOutput.additionalContext` on stdout -- stderr at exit 0
+never reaches the model.
 
 Pure file-path matching -- no LLM calls, no API keys required.
 Follows fail-open: always exits 0 (never blocks commits).
@@ -43,9 +45,16 @@ ADR_DIRECTORY = os.path.join(".ai-state", "decisions")
 _COMPILED_PATTERNS = None
 
 
-def _log(msg):
-    """Log to stderr (visible to both Claude and user)."""
-    print(f"{PREFIX} {msg}", file=sys.stderr)
+def _emit(message: str) -> None:
+    """Print the PreToolUse additionalContext payload the model actually sees.
+
+    Stderr at exit 0 goes to the debug log only and never reaches the model.
+    """
+    print(
+        json.dumps(
+            {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": message}}
+        )
+    )
 
 
 def _staged_files():
@@ -181,9 +190,11 @@ def _check_and_warn() -> str:
         return "pass"
 
     # Architectural files changed without an ADR
-    _log("Architectural files modified without an ADR.")
-    _log(f"  Changed: {', '.join(architectural_files)}")
-    _log("  Consider creating one in .ai-state/decisions/")
+    _emit(
+        f"{PREFIX} Architectural files modified without an ADR. "
+        f"Changed: {', '.join(architectural_files)}. "
+        "Consider creating one in .ai-state/decisions/."
+    )
     return "warn"
 
 

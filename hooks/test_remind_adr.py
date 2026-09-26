@@ -3,12 +3,14 @@
 Gate-liveness contract (rules/swe/gate-liveness.md): this is a CODE gate advising on
 missing ADRs when architectural files are committed. It ships a canary -- a test that
 stages a known-architectural file (rules/x.md) with no companion ADR staged and asserts
-the reminder fires on stderr -- proving the gate is not merely a no-op that always
+the reminder reaches the model -- proving the gate is not merely a no-op that always
 passes on the current good state.
 
 Contract under test (hooks/remind_adr.py): the hook reads a stdin JSON payload shaped
 like tool_input.command, checks staged files (git diff --cached --name-only) against
-ARCHITECTURAL_PATTERNS, and emits a stderr [adr-reminder] warning only when
+ARCHITECTURAL_PATTERNS, and emits an [adr-reminder] warning as
+`hookSpecificOutput.additionalContext` on stdout (stderr at exit 0 never reaches the
+model -- td-263) only when
 architectural files are staged AND no .ai-state/decisions/*.md file is staged (or was
 committed at HEAD). It always exits 0 (fail-open -- never blocks a commit).
 
@@ -93,6 +95,15 @@ def _run_hook_raw_stdin(raw_input: str, cwd: Path) -> subprocess.CompletedProces
     )
 
 
+def _context(stdout: str) -> str:
+    """The additionalContext the model sees, or "" when the hook printed nothing."""
+    if not stdout.strip():
+        return ""
+    output = json.loads(stdout)
+    assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+    return output["hookSpecificOutput"]["additionalContext"]
+
+
 # -- Tests ----------------------------------------------------------------------
 
 
@@ -113,13 +124,14 @@ def test_flags_architectural_change_without_adr(tmp_path: Path) -> None:
     result = _run_hook('git commit -m "docs: add rule"', repo)
 
     assert result.returncode == 0, "the hook must always exit 0 (fail-open, advisory-only)"
-    assert result.stderr.strip() != "", (
-        "an architectural file staged without an ADR must produce a stderr reminder"
+    context = _context(result.stdout)
+    assert "[adr-reminder]" in context, (
+        "an architectural file staged without an ADR must reach the model as additionalContext"
     )
-    assert "[adr-reminder]" in result.stderr
-    assert "rules/x.md" in result.stderr, (
-        f"the reminder must name the changed architectural file; got stderr={result.stderr!r}"
+    assert "rules/x.md" in context, (
+        f"the reminder must name the changed architectural file; got {context!r}"
     )
+    assert result.stderr == "", "stderr at exit 0 never reaches the model"
 
 
 def test_silent_when_adr_staged_alongside_architectural_change(tmp_path: Path) -> None:
@@ -138,9 +150,9 @@ def test_silent_when_adr_staged_alongside_architectural_change(tmp_path: Path) -
     result = _run_hook('git commit -m "docs: add rule with ADR"', repo)
 
     assert result.returncode == 0
-    assert result.stderr.strip() == "", (
+    assert result.stdout == "", (
         "an architectural change with a companion staged ADR must not trigger the "
-        f"reminder; got stderr={result.stderr!r}"
+        f"reminder; got stdout={result.stdout!r}"
     )
 
 

@@ -165,14 +165,13 @@ def test_remind_adr_warns_for_staged_architectural_file_when_flag_unset(
     monkeypatch.chdir(repo)
     module = _load_hook("remind_adr")
 
-    _run_hook_capture(module, _commit_payload("git commit -m 'change agent'"))
+    output = _run_hook_capture(module, _commit_payload("git commit -m 'change agent'"))
 
-    # remind_adr writes its advisory to stderr; capsys captures it because the
-    # hook prints to the real sys.stderr (not patched by _run_hook_capture).
-    stderr = capsys.readouterr().err
-    assert "[adr-reminder]" in stderr, (
+    # remind_adr emits its advisory as PreToolUse additionalContext on stdout --
+    # stderr at exit 0 never reaches the model.
+    assert "[adr-reminder]" in output, (
         "With the flag unset and an architectural file staged without an ADR, "
-        f"remind_adr must emit its advisory. Got stderr: {stderr!r}"
+        f"remind_adr must emit its advisory. Got stdout: {output!r}"
     )
 
 
@@ -195,11 +194,10 @@ def test_remind_adr_silent_for_non_architectural_file_when_flag_unset(
     monkeypatch.chdir(tmp_path)
     module = _load_hook("remind_adr")
 
-    _run_hook_capture(module, _commit_payload("git commit -m 'add notes'"))
+    output = _run_hook_capture(module, _commit_payload("git commit -m 'add notes'"))
 
-    stderr = capsys.readouterr().err
-    assert "[adr-reminder]" not in stderr, (
-        f"A non-architectural staged file must not trigger the ADR advisory. Got stderr: {stderr!r}"
+    assert "[adr-reminder]" not in output, (
+        f"A non-architectural staged file must not trigger the ADR advisory. Got stdout: {output!r}"
     )
 
 
@@ -209,12 +207,11 @@ def test_remind_adr_silent_for_non_commit_command_when_flag_unset(tmp_path, monk
     monkeypatch.chdir(repo)
     module = _load_hook("remind_adr")
 
-    _run_hook_capture(module, _commit_payload("git status"))
+    output = _run_hook_capture(module, _commit_payload("git status"))
 
-    stderr = capsys.readouterr().err
-    assert "[adr-reminder]" not in stderr, (
+    assert "[adr-reminder]" not in output, (
         "remind_adr must only act on `git commit` commands. "
-        f"Got stderr for `git status`: {stderr!r}"
+        f"Got stdout for `git status`: {output!r}"
     )
 
 
@@ -236,12 +233,11 @@ def test_remind_adr_silent_for_staged_architectural_file_when_hackathon_on(
     monkeypatch.setenv(HACKATHON_FLAG, "1")
     module = _load_hook("remind_adr")
 
-    _run_hook_capture(module, _commit_payload("git commit -m 'change agent'"))
+    output = _run_hook_capture(module, _commit_payload("git commit -m 'change agent'"))
 
-    stderr = capsys.readouterr().err
-    assert "[adr-reminder]" not in stderr, (
+    assert "[adr-reminder]" not in output, (
         "With PRAXION_HACKATHON_MODE=1, remind_adr must emit no advisory even "
-        f"when an architectural file is staged without an ADR. Got: {stderr!r}"
+        f"when an architectural file is staged without an ADR. Got: {output!r}"
     )
 
 

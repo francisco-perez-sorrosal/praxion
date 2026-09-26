@@ -4,8 +4,9 @@ spawned without an Intake Clarity Gate brief.
 
 PreToolUse(Agent|Task) hook. Fires when the orchestrator spawns a
 brief-consuming pipeline stage carrying a `Task slug: <slug>` in its prompt
-while `.ai-work/<slug>/TASK_BRIEF.md` does not exist, and writes one advisory
-line to stderr.
+while `.ai-work/<slug>/TASK_BRIEF.md` does not exist, and emits one advisory as
+`hookSpecificOutput.additionalContext` on stdout (stderr at exit 0 goes to the
+debug log only and never reaches the model).
 
 Why an advisory and not a gate. The obligation is unconditional at
 Standard/Full but nothing intervened at the moment it applied, so it lapsed
@@ -17,10 +18,11 @@ moment of the lapse. This hook is that nudge and nothing more.
 
 Advisory by construction, three independent ways:
 
-  * It never writes stdout. That makes it structurally incapable of emitting
-    `updatedInput` and contending with `inject_subagent_context.py`, the
-    single updatedInput emitter registered on this same matcher. Two emitters
-    for one spawn was a real defect once; this hook cannot reintroduce it.
+  * Its stdout carries `additionalContext` and nothing else -- never
+    `updatedInput`, so it cannot contend with `inject_subagent_context.py`,
+    the single updatedInput emitter registered on this same matcher. Two
+    emitters for one spawn was a real defect once; this hook cannot
+    reintroduce it.
   * It exits 0 unconditionally. The harness treats any PreToolUse exit other
     than 2 as approval, so the spawn always proceeds -- including when the
     hook itself errors.
@@ -56,7 +58,7 @@ SUBPROCESS_TIMEOUT_SECONDS = 3
 # consumes it too, but a reminder at verification time cannot be acted on --
 # the brief seeds the rubric that pass is already applying. The implementer
 # and test-engineer fan out N-wide on one plan, so reminding there would emit
-# N stderr lines for a single lapse. These two stages are the earliest
+# N advisories for a single lapse. These two stages are the earliest
 # deterministic Standard/Full signal and the last point where writing the
 # brief still changes a downstream artifact.
 BRIEF_CONSUMING_STAGES = frozenset(
@@ -71,9 +73,16 @@ BRIEF_CONSUMING_STAGES = frozenset(
 TASK_SLUG_RE = re.compile(r"Task slug:\s*`?([A-Za-z0-9][A-Za-z0-9._-]*)`?")
 
 
-def _log(msg: str) -> None:
-    """Write the advisory to stderr. stdout stays empty -- see module docstring."""
-    print(f"{PREFIX} {msg}", file=sys.stderr)
+def _emit(message: str) -> None:
+    """Print the PreToolUse additionalContext payload the model actually sees.
+
+    Stderr at exit 0 goes to the debug log only and never reaches the model.
+    """
+    print(
+        json.dumps(
+            {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": message}}
+        )
+    )
 
 
 def _normalize_stage(subagent_type: str) -> str:
@@ -130,8 +139,8 @@ def _process(payload: dict) -> None:
     if (root / ".ai-work" / slug / "TASK_BRIEF.md").exists():
         return
 
-    _log(
-        f".ai-work/{slug}/TASK_BRIEF.md is missing while spawning `{stage}`. "
+    _emit(
+        f"{PREFIX} .ai-work/{slug}/TASK_BRIEF.md is missing while spawning `{stage}`. "
         "The Intake Clarity Gate requires it at Standard/Full before the first "
         "agent spawn -- it seeds every downstream stage and the verifier's "
         "rubric. Write it now (Intent / Key Signals / Health Guards / "

@@ -583,6 +583,26 @@ def test_report_check_step_runs_always_and_has_an_exit_path() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "token",
+    [
+        "sk-ant-api03-" + "A" * 40,
+        "ghp_" + "B" * 36,
+        "ghs_" + "C" * 36,
+        "github_pat_" + "D" * 22 + "_" + "E" * 59,
+    ],
+    ids=["anthropic", "github_classic", "github_app", "github_fine_grained"],
+)
+def test_credential_gate_pattern_matches_each_token_family(token: str) -> None:
+    gate = next(s for s in _all_steps(_parsed()) if s.get("id") == "credential_gate")
+    match = re.search(r"grep -Ec -- '([^']+)'", gate.get("run") or "")
+    assert match, "The credential gate must scan with `grep -Ec -- '<pattern>'`"
+    assert re.search(match.group(1), token), (
+        f"The credential gate's pattern misses a {token[:12]}… token — it would "
+        "publish that secret in the public artifact"
+    )
+
+
 def test_credential_gate_precedes_the_upload_step() -> None:
     steps = _all_steps(_parsed())
     gate_idx: int | None = None

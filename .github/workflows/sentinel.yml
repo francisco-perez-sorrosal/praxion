@@ -212,7 +212,7 @@ jobs:
           # the public job log. grep exits 1 on no match and 2 on an error;
           # an error fails the gate closed.
           set +e
-          hits=$(grep -Ec -- 'sk-ant-[A-Za-z0-9_-]{8,}|gh[opsru]_[A-Za-z0-9]{20,}' "${targets[@]}")
+          hits=$(grep -Ec -- 'sk-ant-[A-Za-z0-9_-]{8,}|gh[opsru]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,}' "${targets[@]}")
           rc=$?
           set -e
           if [ "${rc}" -ge 2 ]; then

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-26T15:39:34Z'
+generated_at: '2026-09-26T18:17:20Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -32,7 +32,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-09-08'
+  last_modified: '2026-09-26'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -128,7 +128,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -461,7 +461,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-09-08'
+  last_modified: '2026-09-26'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -514,7 +514,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -561,13 +561,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2932,7 +2932,7 @@ surfaces:
   path: .ai-state/decisions/391-context-layer-isolation-sandbox-home.md
   type: markdown
   title: Context-layer isolation for live eval sessions via a per-session sandbox HOME and config dir, allowlisted env and --plugin-dir
-  last_modified: '2026-09-24'
+  last_modified: '2026-09-26'
   renderer: adr_card
 - id: ai-state-decisions-392-live-context-layer-scenario-runner
   path: .ai-state/decisions/392-live-context-layer-scenario-runner.md
@@ -2964,11 +2964,17 @@ surfaces:
   title: Architecture views (roadmap P2.9, D4) are met by the id-bound projection check; the per-subsystem partition is declined
   last_modified: '2026-09-26'
   renderer: adr_card
+- id: ai-state-decisions-397-sandbox-keeps-the-observations-log
+  path: .ai-state/decisions/397-sandbox-keeps-the-observations-log.md
+  type: markdown
+  title: The live eval sandbox keeps the observations log and silences only chronograph event posting
+  last_modified: '2026-09-26'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-26'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3683,6 +3689,7 @@ groups:
   - ai-state-decisions-394-per-tier-pipeline-envelope
   - ai-state-decisions-395-keep-wip-separate-from-implementation-plan
   - ai-state-decisions-396-architecture-views-met-by-projection-check
+  - ai-state-decisions-397-sandbox-keeps-the-observations-log
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

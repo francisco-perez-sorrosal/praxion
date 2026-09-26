@@ -1,7 +1,8 @@
 ---
-id: dec-draft-f3bc0103
+id: dec-397
+draft_id: dec-draft-f3bc0103
 title: The live eval sandbox keeps the observations log and silences only chronograph event posting
-status: proposed
+status: accepted
 category: implementation
 date: 2026-09-26
 summary: "Live eval sessions stop setting PRAXION_DISABLE_OBSERVABILITY and set a new, narrower PRAXION_DISABLE_EVENT_POSTING instead, so the observations log is written into the throwaway fixture while send_event.py still posts nothing; the log's four files are excluded from recorded paths. Without the log, any hook that qualifies a session from it (the Stop-time calibration reminder) could not fire in the sandbox, so its before/after pair measured nothing."

@@ -297,23 +297,25 @@ Phase 0 first and whole (one to two weeks of Lightweight tasks; P0.7 is the sing
 
 ## 8. Quality metrics
 
-| Metric | Now | After Phase 1 | Target (Phase 2–3) | How measured |
-|---|---|---|---|---|
-| Governed always-loaded tokens | 24,542 (98.2%) | ~13,500 (54%) | ≤ 15,000 with a growth check | `measure_token_budget.py` |
-| True always-resident incl. listing | ~41,300 | ~27,700 | ≤ 25,000 | P0.2 second line item |
-| 30-day growth of the always-loaded set | +43 tok/day | — | ≤ 0 net per quarter | P0.2 ratchet |
-| Skills with a visible description in a 200k-window session | ~22 of 62 | — | 62 of 62 | `/skill-doctor`; P1.12 check |
-| Resident context per Standard pipeline (6 spawns) | 422,499 | 281,432 | ≤ 250,000 | context-review method; P0.4 actuals |
-| Spawns per Standard pipeline | 28–48 observed | — | ≤ 8 (Full ≤ 16) | P0.4/P0.5 summary rows |
-| Mandated artifacts at Standard | 19 named | 18 | 6 | artifact inventory |
-| Commits touching only `.ai-state/` | 53.1% | — | < 25% | `git log --name-only` |
-| ADRs per week / `architectural` share | 11.7 / 68% | — | rate the read path absorbs; share = falsifier pass rate | `adr_health.py`; re-affirmation count |
-| Calibration rows with a non-`correct` enum | 0 / 85 | — | non-zero, written by the verifier | P0.6 |
-| Gate fire/block events observable | 0 | — | every gate | P0.4 `gate_fire` rows |
-| Agent spawns with tokens/duration/model | 0 / 3,492 | — | 100% | P0.4 |
-| `sentinel.md` tokens | 31,971 | 31,971 | ≤ 14,000 | `wc -c` / tokenizer |
-| Skill-genesis proposals dispositioned | 0 / 15 | — | all, within one cadence | P2.7 |
-| Verifier PASS rate; light-review catch rate | evidenced, uncounted | — | unchanged or better while the above fall | P0.7 baseline; calibration enum |
+| Metric | Now | After Phase 1 | At close, 2026-09-26 | Target (Phase 2–3) | How measured |
+|---|---|---|---|---|---|
+| Governed always-loaded tokens | 24,542 (98.2%) | ~13,500 (54%) | 16,660 (66.6%) — not met | ≤ 15,000 with a growth check | `measure_token_budget.py` |
+| True always-resident incl. listing | ~41,300 | ~27,700 | 25,903 (listing 9,243) — not met | ≤ 25,000 | P0.2 second line item |
+| 30-day growth of the always-loaded set | +43 tok/day | — | −661 tokens over 19 days of samples (−35/day) — met | ≤ 0 net per quarter | P0.2 ratchet baseline samples (the ratchet's own delta stays null until 30 days of samples exist) |
+| Skills with a visible description in a 200k-window session | ~22 of 62 | — | not re-measured; listing 9,243 tokens vs the 2,000-token cap (4.6×), unchanged since P1.12 — not met | 62 of 62 | `/skill-doctor`; P1.12 check |
+| Resident context per Standard pipeline (6 spawns) | 422,499 | 281,432 | 410,394 for K's 6 spawns (68.4k first-turn context each) — not met | ≤ 250,000 | first-turn usage in the subagent transcripts (harness-reported; includes the system prompt and tool schemas) |
+| Spawns per Standard pipeline | 28–48 observed | — | 5–6 charged under dec-394 (K 6, td102 5); 8 plus resumes before it (C5, D) — met | ≤ 8 (Full ≤ 16) | calibration rows; `spawn_count.py` |
+| Mandated artifacts at Standard | 19 named | 18 | 14 named, 7 always + 7 on signal — not met | 6 | `artifact_registry.floor("standard")` |
+| Commits touching only `.ai-state/` | 53.1% | — | 36.5% over 30 days (249/682); 45.8% (11/24) since the F rule — not met | < 25% | `git log --no-merges --name-only` |
+| ADRs per week / `architectural` share | 11.7 / 68% | — | ~8 / 52% (23 ADRs, dec-376..398, in the programme window) | rate the read path absorbs; share = falsifier pass rate | ADR frontmatter `date` and `category` |
+| Calibration rows with a non-`correct` enum | 0 / 85 | — | 18 / 64 since 2026-09-07 (15 under, 3 over) — met | non-zero, written by the verifier | P0.6 |
+| Gate fire/block events observable | 0 | — | 1,395 rows from 6 gates in the surviving WAL — met for gates that emit | every gate | P0.4 `gate_fire` rows |
+| Agent spawns with tokens/duration/model | 0 / 3,492 | — | WAL: 51 of 524 `agent_stop` rows since 2026-09-18 (td-212's unresolved rows are most of the rest); transcripts: 25 of 25 spawns across C5, D, K, td102 — not met in the WAL | 100% | P0.4; subagent transcripts |
+| `sentinel.md` tokens | 31,971 | 31,971 | 25,489 — not met | ≤ 14,000 | tokenizer (`count_tokens`) |
+| Skill-genesis proposals dispositioned | 0 / 15 | — | 0 / 86 across 16 reports; item I never ran — not met | all, within one cadence | `SKILL_GENESIS_LOG.md` |
+| Verifier PASS rate; light-review catch rate | evidenced, uncounted | — | first-pass PASS in 2 of 15 programme pipelines; the other 13 FAILed and were reworked to PASS WITH FINDINGS before merge; light-review catches not totalled | unchanged or better while the above fall | harvested `VERIFICATION_REPORT.md` verdicts |
+
+Method notes at close. The WAL is lossy for history: rotation keeps one archive (`observations.jsonl.1`), and a removed worktree takes its WAL with it, so WAL counts are floors. The pipeline sessions' subagent transcripts survive under the main checkout's project directory and were used instead where they could answer. Claude Code keeps transcripts for about 30 days, so any 60-day transcript window really starts on 2026-08-30. J's skill-usage re-measure over those transcripts: 28 model `Skill` calls and 2 user invocations; 33 of 63 skills were never loaded, counting subagent preloads.
 
 ## 9. Guiding principles for execution
 

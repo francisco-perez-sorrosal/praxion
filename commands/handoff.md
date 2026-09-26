@@ -1,14 +1,14 @@
 ---
-description: "Compose the pipeline's HANDOFF.md at a phase boundary so the next window inherits position, constraints and corrections."
+description: "Compose HANDOFF.md at a pipeline boundary or a session's end so the next window inherits position, constraints and corrections."
 allowed-tools: [Read, Edit, Glob, Grep, Bash(compose_handoff.py:*), Bash(python3:*), Bash(git:*)]
-argument-hint: "<task-slug> [--boundary <enum>] [--dry-run] [--force]"
+argument-hint: "<task-slug> [--session] [--boundary <enum>] [--dry-run] [--force]"
 disable-model-invocation: true
 ---
 
 ## Help
 
 ```
-/handoff — write the cross-window handoff for a pipeline
+/handoff — write the cross-window handoff for a pipeline or a session
 
 USAGE
   /handoff <task-slug> [options]
@@ -19,15 +19,24 @@ USAGE
   step's declared files are dirty — a handoff composed over a half-finished tree
   presents a false position with the authority of a generated document.
 
+  --session hands off work that ran outside a pipeline (no WIP.md): the
+  mechanical half is the repository's position — branch, HEAD, upstream,
+  dirty paths, worktrees, commits since the last handoff — and §2 is yours.
+
+  Every run ends with a continuation prompt to paste into the next window.
+
 EXAMPLES
   /handoff auth-flow --boundary planning-to-implementation
   /handoff auth-flow --dry-run                       # compose, show, write nothing
   /handoff auth-flow --force                         # write over a refusal, on the record
+  /handoff my-programme --session                    # no pipeline: hand off the session
 
 OPTIONS
   --boundary <enum>  research-to-architecture | architecture-to-planning |
                      planning-to-implementation | implementation-to-verification |
                      mid-phase:<step-id>   (default: mid-phase at the current step)
+  --session          no pipeline: compose from the repository position;
+                     boundary is session:<label> (default: session:<today>)
   --dry-run          compose and print the report; write no file
   --force            compose despite a refusal; stamps `readiness: overridden`
   --help, -h         show this help
@@ -37,7 +46,8 @@ EXIT CODES
   1   refused — not ready: a spawn is in flight or step files are dirty. Nothing
       was written and the previous handoff, if any, is untouched. Clear the named
       condition and re-run, or pass --force to write over it on the record.
-  2   nothing to compose: no pipeline for that slug (no .ai-work/<slug>/WIP.md)
+  2   nothing to compose: no pipeline for that slug (no .ai-work/<slug>/WIP.md);
+      for work outside a pipeline, re-run with --session
   3   error: unparseable existing handoff, unknown boundary, bad slug, plugin-cache path
 ```
 
@@ -49,15 +59,19 @@ so no flag will help; check the slug. `3` means the composer could not do its jo
 ## Arguments
 
 `$ARGUMENTS` holds the invocation. Parse it as: the first non-flag token is the **task slug**
-(required), plus the optional `--boundary <enum>`, `--dry-run` and `--force` documented above.
+(required), plus the optional `--session`, `--boundary <enum>`, `--dry-run` and `--force`
+documented above.
 
 - **Non-empty** — the slug names the pipeline: `<worktree_root>/.ai-work/<slug>/`. The boundary
   names *which* transition this handoff records; it is a closed enum, so an unrecognized value is
   an error rather than a free-text note. Omit it and the composer names the current step's
-  mid-phase position.
+  mid-phase position. With `--session` the slug names the session's own directory
+  (`.ai-work/<slug>/`, created if absent) and the boundary is `session:<label>`: a new label
+  starts a new window's §2–§3, the same label keeps them.
 - **Empty (no slug)** — do not guess. Writing a handoff under a slug the user never named puts a
   false document in another pipeline's directory. List the slugs under `<worktree_root>/.ai-work/`
-  that have a `WIP.md`, ask for one, and exit 3.
+  that have a `WIP.md`, ask for one, and exit 3. When there are none, say so and offer
+  `/handoff <name> --session`, naming the directory of the last session handoff if one exists.
 
 ## Why this exists
 
@@ -83,16 +97,18 @@ mechanized claim about what the outgoing window knew).
    `python3 scripts/compose_handoff.py` instead:
    ```
    compose_handoff.py <slug> --repo-root <worktree_root> \
-     [--boundary <enum>] [--dry-run] [--force] --json
+     [--session] [--boundary <enum>] [--dry-run] [--force] --json
    ```
    Read the exit code first, then the JSON report (`path`, `boundary`, `input_state`,
-   `byte_count`, `over_8kib`, `conflicts`).
+   `byte_count`, `over_8kib`, `conflicts`, `continuation_prompt`).
    - **Exit 1** — report the named conditions and their remedies to the user verbatim and
      stop. Do not re-run with `--force` on your own initiative: the override records a
      non-quiescent tree into the artifact and is the user's call.
    - **Exit 2 or 3** — report per **Error grammar** below and stop.
 3. **Fill the judgement sections.** Open the written file and replace each
    `_[to fill at the checkpoint]_` placeholder that is still present:
+   - **Next action** (`--session` only) — what the next window should do first, and why.
+     In a pipeline handoff this section is computed from the reconciler, never filled.
    - **Decisions & assumptions in force** — the checkpoint digest's *delta* since the last
      handoff, plus any draft decision ids. Reset at every new boundary; do not re-paste
      what an earlier boundary already carried.
@@ -108,8 +124,10 @@ mechanized claim about what the outgoing window knew).
    Leave them exactly as they are unless the user changed the instruction — a reflowed
    constraint is a changed constraint.
 4. **Report** the path, the boundary, the number of disagreements with ground truth, and
-   whether the size advisory fired. Then tell the user the next window starts with
-   `/resume-pipeline <slug>`.
+   whether the size advisory fired. Then give the user the report's `continuation_prompt`
+   verbatim in a fenced block — the message to paste into the next window. It points at the
+   handoff rather than restating it, and ends in `/resume-pipeline <slug>` for a pipeline or
+   in §2 Next action for a session.
 
 ## --dry-run mode
 
@@ -137,7 +155,8 @@ override in the artifact.
 **Exit 2 — no pipeline for the slug:**
 ```
 Nothing to compose: no WIP.md at .ai-work/<slug>/WIP.md under this worktree.
-To fix: confirm the task slug, or run from the worktree holding the pipeline.
+To fix: confirm the task slug, run from the worktree holding the pipeline, or
+re-run with --session to hand off work that ran outside a pipeline.
 ```
 
 **Exit 3 — unparseable existing handoff:**
@@ -151,5 +170,6 @@ To fix: repair the file by hand, or move it aside and re-run.
 ```
 Cannot compose: no task slug. Pipelines with a WIP.md under this worktree:
   <slug>  (<N> steps, last modified <date>)
-To fix: re-run as /handoff <task-slug>.
+To fix: re-run as /handoff <task-slug>, or /handoff <name> --session when the work
+ran outside a pipeline.
 ```

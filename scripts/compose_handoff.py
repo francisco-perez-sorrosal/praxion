@@ -83,6 +83,7 @@ from _handoff_inputs import (
     resolve_base_ref,
     step_file_scope,
 )
+from _handoff_prompt import continuation_prompt
 
 # The readiness gate lives in its own module; these names are re-exported here
 # so `compose_handoff.readiness` stays the one public entry point callers and
@@ -139,6 +140,8 @@ FIXED_BOUNDARIES: tuple[str, ...] = (
     "implementation-to-verification",
 )
 MID_PHASE_PREFIX = "mid-phase:"
+# Session handoffs (`--session`, `_handoff_session.py`) name their window with this prefix.
+SESSION_PREFIX = "session:"
 
 # `Ready` and `Overridden` are distinct states rather than a boolean plus a
 # note, because the next window's correct behaviour differs between them.
@@ -285,6 +288,7 @@ def compose(
         "conflicts": conflicts,
         "input_state": state.value,
         "boundary": boundary,
+        "continuation_prompt": continuation_prompt(slug, repo_root, session=False),
     }
 
 
@@ -296,7 +300,8 @@ def compose(
 def _is_known_boundary(boundary: str) -> bool:
     if boundary in FIXED_BOUNDARIES:
         return True
-    return boundary.startswith(MID_PHASE_PREFIX) and len(boundary) > len(MID_PHASE_PREFIX)
+    prefix = next((p for p in (MID_PHASE_PREFIX, SESSION_PREFIX) if boundary.startswith(p)), None)
+    return prefix is not None and len(boundary) > len(prefix)
 
 
 def _require_known_boundary(boundary: str) -> None:
@@ -678,6 +683,10 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = Path(resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR))
     if is_plugin_cache_path(repo_root):
         return _fail("refusing to run against a plugin-cache path; pass --repo-root")
+    if args.session:  # deferred: the session module imports this one
+        from _handoff_session import main_session
+
+        return main_session(args, repo_root)
 
     task_dir = repo_root / ".ai-work" / args.slug
     if not (task_dir / "WIP.md").is_file():
@@ -725,6 +734,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--force", action="store_true", help="compose over a blocked readiness verdict"
     )
     parser.add_argument("--json", action="store_true", help="emit the composition report as JSON")
+    parser.add_argument(
+        "--session", action="store_true", help="hand off work that ran outside a pipeline"
+    )
     return parser.parse_args(argv)
 
 
@@ -757,6 +769,7 @@ def _report(args: argparse.Namespace, handoff_path: Path, result: dict[str, Any]
                     "over_8kib": result["over_8kib"],
                     "conflicts": result["conflicts"],
                     "dry_run": args.dry_run,
+                    "continuation_prompt": result["continuation_prompt"],
                 },
                 indent=2,
             )
@@ -767,6 +780,7 @@ def _report(args: argparse.Namespace, handoff_path: Path, result: dict[str, Any]
         f"compose_handoff: {verb} {handoff_path} — {result['byte_count']} judgement bytes, "
         f"{len(result['conflicts'])} disagreement(s) with ground truth"
     )
+    print(f"\nContinue in the next window with:\n\n{result['continuation_prompt']}")
 
 
 def _fail(message: str) -> int:

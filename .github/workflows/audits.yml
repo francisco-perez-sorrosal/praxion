@@ -1,7 +1,8 @@
 # Scheduled audits — the mechanical, model-free half of Praxion's audit set
 # (process-economy P3.3, lane 1). The sentinel (the one audit that needs a
-# model) stays interactive by user decision (2026-09-19, option D); this
-# workflow only reports its age.
+# model) now runs on its own weekly schedule (`.github/workflows/sentinel.yml`,
+# process-economy P3.3 lane 2); this workflow only reports the age of the
+# newest *committed* `SENTINEL_LOG.md` row.
 #
 # What runs, weekly and on demand:
 #   1. `/project-metrics` (python -m scripts.project_metrics --mechanical-only)
@@ -84,19 +85,20 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           uv run python scripts/check_state_ledgers.py --check
 
-      - name: Sentinel age (advisory — the sentinel stays interactive)
+      - name: Sentinel age (advisory — see .github/workflows/sentinel.yml)
         run: |
           uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import datetime, re
           from pathlib import Path
+          heading = "## Sentinel age (committed rows only — scheduled runs are in sentinel.yml's own run history and artifacts)"
           rows = [l for l in Path(".ai-state/sentinel_reports/SENTINEL_LOG.md").read_text().splitlines() if re.match(r"\| 20\d\d-", l)]
           if not rows:
-              print("## Sentinel age\nno SENTINEL_LOG.md rows")
+              print(f"{heading}\nno SENTINEL_LOG.md rows")
               raise SystemExit
           last = rows[-1].split("|")[1].strip()[:10]
           age = (datetime.date.today() - datetime.date.fromisoformat(last)).days
-          flag = " — over 14 days, run the sentinel in a session" if age > 14 else ""
-          print(f"## Sentinel age\nnewest SENTINEL_LOG.md row: {last} ({age} days ago){flag}")
+          flag = " — over 14 days: run the sentinel in a session, or adopt the newest Scheduled-sentinel artifact" if age > 14 else ""
+          print(f"{heading}\nnewest SENTINEL_LOG.md row: {last} ({age} days ago){flag}")
           PY
 
       - name: Configure git identity

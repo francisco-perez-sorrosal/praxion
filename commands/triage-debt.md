@@ -188,33 +188,43 @@ then proves cross-file uniqueness. **If `--check` exits non-zero, stop and repor
 is left exactly as `--backfill` wrote it (never rolled back), and the failing rows are named for
 the user.
 
-Then look for a realign that moved a row onto a closed finding's key:
+Then look for a realign that moved a row onto another row's key. Only a realign whose stamp
+carries `from <old-base-key>` moved its key; one that rewrote notes alone kept the peers its
+judge already saw, so leave it out:
 
 ```
-ledger_health.py --digest --ids <realigned ids>
+ledger_health.py --digest --ids <ids of realigns stamped `from <old-base-key>`>
 ```
 
 Read each row's `context.same_base_peers`: every row, in either file, that shares its base key,
 listed whatever the row's window. Do not read `possible-duplicate` evidence for this — a judged
-row's evidence drops a peer filed before its stamp, so a realign onto an old key never shows
-there. Every peer whose status is `resolved` or `wontfix` is a **possible recurrence**: the
-realigned row now has the base key of a finding already closed. Bring each pair to the user, one
-at a time, with both rows, and apply only what they choose — nothing by default:
+row's evidence drops a closed peer filed before its stamp, so a realign onto an old key never
+shows there. Each peer is one of two things, and each pair goes to the user, one at a time, with
+both rows — apply only what they choose, nothing by default:
 
-- **Keep the realign** — nothing more to write.
-- **Re-open the closed peer and fold this row into it** — the lifecycle's re-open on recurrence
-  (`tech-debt-ledger.md § Lifecycle conventions`). It is the one row move this command makes,
-  and it runs only here, after every stamp above is written, so no stamp in the run cites the
-  peer where it used to be:
-  1. Cut the peer's row from the file that holds it and append it to `TECH_DEBT_LEDGER.md` with
-     `status: open`, `resolved-by` empty, `last-seen: <today>`, and
-     `` // recurrence: re-opened <today>`` appended to its `notes`.
-  2. Fold the realigned row into it by the `merged` path of step 1 — the absorbed row's stamp
-     only (the re-opened peer carries the recurrence note instead of a survivor stamp), checked
-     through `--stamp-file` first. If the check refuses, put the peer back as it was and report
-     the pair instead.
-  3. Run `check_state_ledgers.py --backfill` and then `--check` again, under the same
-     stop-and-report rule.
+- A peer whose status is `open` or `in-flight` is a **duplicate the realign just made**: both
+  rows are live under one key. Put it to the user as a merge proposal, and on their choice of
+  survivor apply it by the `merged` path of step 1 — both stamps checked through
+  `--stamp-file` before either is written, then `check_state_ledgers.py --backfill` and
+  `--check` again under the same stop-and-report rule. If they keep both rows apart, write
+  nothing: the probe goes on reporting the pair as `possible-duplicate` until a later run judges
+  the realigned row again.
+- A peer whose status is `resolved` or `wontfix` is a **possible recurrence**: the realigned row
+  now has the base key of a finding already closed. The choice:
+  - **Keep the realign** — nothing more to write.
+  - **Re-open the closed peer and fold this row into it** — the lifecycle's re-open on recurrence
+    (`tech-debt-ledger.md § Lifecycle conventions`). It is the one row move this command makes,
+    and it runs only here, after every stamp above is written, so no stamp in the run cites the
+    peer where it used to be:
+    1. Cut the peer's row from the file that holds it and append it to `TECH_DEBT_LEDGER.md` with
+       `status: open`, `resolved-by` empty, `last-seen: <today>`, and
+       `` // recurrence: re-opened <today>`` appended to its `notes`.
+    2. Fold the realigned row into it by the `merged` path of step 1 — the absorbed row's stamp
+       only (the re-opened peer carries the recurrence note instead of a survivor stamp), checked
+       through `--stamp-file` first. If the check refuses, put the peer back as it was and report
+       the pair instead.
+    3. Run `check_state_ledgers.py --backfill` and then `--check` again, under the same
+       stop-and-report rule.
 
 ### 5. Report
 
@@ -228,8 +238,8 @@ Report to the user:
 - which rows were skipped at §4 (malformed stamp, unresolved anchor) and why;
 - which rows were **re-keyed** by `--backfill` (their `dedup_key` changed because their `notes`
   changed);
-- which realigned rows now share a base key with a resolved or `wontfix` row, and the user's
-  choice for each;
+- which realigned rows now share a base key with another row — a live duplicate or a closed
+  finding — and the user's choice for each;
 - the escalation list's location and count.
 
 **Propose, never run, a `chore(state)` commit** covering the ledger pair's edits. Do not commit

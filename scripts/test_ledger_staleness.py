@@ -18,6 +18,7 @@ from pathlib import Path
 import ledger_health
 import ledger_snapshot
 from _ledger_triage_testkit import IDENTITY, git_ok, one_row_repo, tombstone_row
+from ledger_delta import DuplicatePeer
 
 SCRIPT_PATH = Path(__file__).resolve().parent / "ledger_health.py"
 LEDGER = Path(".ai-state") / "TECH_DEBT_LEDGER.md"
@@ -253,6 +254,48 @@ def _add_peer(repo_root: Path, first_seen: str, status: str = "open") -> None:
     _commit(repo_root, f"chore(state): file td-903 ({status})")
 
 
+def _stamp_peer(repo_root: Path, verdict: str) -> None:
+    """Judge td-903 against the current HEAD, the same way `_stamp` judges td-902."""
+    stamp = f"[triage 2026-09-27 @{_head(repo_root)}] {verdict}"
+    ledger = repo_root / LEDGER
+    ledger.write_text(
+        ledger.read_text().replace(" | 111111111111 |", f" // {stamp} | 111111111111 |")
+    )
+    _commit(repo_root, "chore(state): triage td-903")
+
+
+def test_a_realign_that_moves_a_row_onto_a_live_row_key_never_goes_quiet(tmp_path: Path) -> None:
+    """Both rows judged in one run, one realigned onto the other's key: the peer was filed
+    before either stamp, so only the key move itself can surface the duplicate it made."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01")
+    _stamp_peer(repo_root, "kept: scripts/x.py:1 holds")
+    _stamp(repo_root, "realigned from 37b588259209: the premise named scripts/old.py")
+
+    peers = [signal for signal in _delta(repo_root).signals if isinstance(signal, DuplicatePeer)]
+    assert [(peer.peer_id, peer.peer_status) for peer in peers] == [("td-903", "open")]
+
+
+def test_a_realign_that_kept_its_key_stays_quiet_beside_a_peer_it_already_had(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01")
+    _stamp_peer(repo_root, "kept: scripts/x.py:1 holds")
+    _stamp(repo_root, "realigned: the premise named scripts/old.py")
+
+    assert "possible-duplicate" not in _classes(repo_root)
+
+
+def test_a_realign_that_moves_a_row_onto_a_closed_row_key_stays_quiet(tmp_path: Path) -> None:
+    """A closed peer is a possible recurrence the apply step already put to the user."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01", "resolved")
+    _stamp(repo_root, "realigned from 37b588259209: the premise named scripts/old.py")
+
+    assert "possible-duplicate" not in _classes(repo_root)
+
+
 def test_a_merge_survivor_stamped_after_its_absorbed_peer_goes_quiet(tmp_path: Path) -> None:
     repo_root = one_row_repo(tmp_path, "Premise.", ())
     _add_peer(repo_root, "2026-01-01")
@@ -304,6 +347,31 @@ def test_the_recurrence_read_lists_a_same_key_peer_the_window_drops(tmp_path: Pa
 
     assert row["context"]["same_base_peers"] == [{"id": "td-903", "status": "resolved"}]
     assert "possible-duplicate" not in row["candidate_classes"]
+
+
+def test_the_apply_step_puts_a_live_peer_of_a_key_moving_realign_to_the_user(
+    tmp_path: Path,
+) -> None:
+    """The apply step reads the realign's same-base peers and brings a live one to the user as
+    the duplicate the realign made, not only a closed one as a recurrence."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01")
+    _stamp_peer(repo_root, "kept: scripts/x.py:1 holds")
+    _stamp(repo_root, "realigned from 37b588259209: the premise named scripts/old.py")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--digest", "--ids", "td-902"]
+        + ["--repo-root", str(repo_root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (row,) = json.loads(result.stdout)["rows"]
+    command = (SCRIPT_PATH.parents[1] / "commands" / "triage-debt.md").read_text()
+    apply_step = command.split("### 4. Apply", 1)[1].split("### 5. Report", 1)[0]
+
+    assert row["context"]["same_base_peers"] == [{"id": "td-903", "status": "open"}]
+    assert "possible-duplicate" in row["candidate_classes"]
+    assert "`open` or `in-flight`" in apply_step
 
 
 # -- A stamp that cannot be trusted resurfaces the row, never silences it -------------------

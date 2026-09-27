@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from typing import assert_never
+from typing import assert_never, get_args
 
 from adr_health import _EPHEMERAL_ROOTS, _SHAPE, _deletion_date, _matches_shape, _rename_target
 from ledger_delta import (
     STAMP_PREFIX,
     ActiveRow,
+    ActiveStatus,
     AdrGoal,
     Anchor,
     Anchored,
@@ -406,17 +407,20 @@ def _duplicates(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> list
     A usably judged row (`AnchorWindow`) counts a same-base peer only when the
     peer was filed after the stamp: one the judge already had in front of it --
     the row a merge absorbed, an old resolved twin -- is not news. A peer whose
-    `first-seen` cannot be read cannot be placed, so it still counts.
+    `first-seen` cannot be read cannot be placed, so it still counts. So does an
+    active peer of a row whose latest stamp moved its key: the move itself made
+    the pair, whenever the peer was filed, and nothing else would ever show it.
     """
-    since = (
-        row.stamp.stamp.date
-        if isinstance(window, AnchorWindow) and isinstance(row.stamp, Judged)
-        else None
-    )
+    judged = row.stamp.stamp if isinstance(row.stamp, Judged) else None
+    since = judged.date if isinstance(window, AnchorWindow) and judged else None
+    moved = judged is not None and judged.outcome == "realigned" and judged.prior_key is not None
     same_base = [
         peer
         for peer, first_seen in _same_base_peers(snapshot, row)
-        if since is None or first_seen is None or first_seen > since
+        if since is None
+        or first_seen is None
+        or first_seen > since
+        or (moved and peer.peer_status in get_args(ActiveStatus))
     ]
     return same_base + _refiled_after_realign(snapshot, row)
 

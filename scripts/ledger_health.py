@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -51,6 +52,7 @@ from typing import Literal, assert_never
 from _git_runner import GitUnavailableError, run_git
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from ledger_delta import (
+    STAMP_PREFIX,
     ActiveRow,
     AdrGoal,
     AnchorWindow,
@@ -72,6 +74,7 @@ from ledger_delta import (
     NoWindow,
     OtherGoal,
     PathCause,
+    PathRef,
     RelatedDecision,
     RowDelta,
     SelfAmended,
@@ -81,11 +84,14 @@ from ledger_delta import (
     TriageStamp,
     Unjudged,
     Withheld,
+    cite_path,
 )
 from ledger_snapshot import (
     StateSnapshot,
     discard_recurrences,
     gather,
+    in_tree,
+    parse_locations,
     parse_stamp,
     row_delta,
     signal_class_name,
@@ -128,6 +134,8 @@ INDEX_SCHEMA = "ledger-triage-index/1"
 RELATED_DECISIONS_CAP = 5
 DETAIL_LIMIT = 280  # characters of a quoted notes segment in one evidence detail
 SHORT_SHA_LENGTH = 12
+# A cite's trailing line or line range: `path:12`, `path:12-30`.
+_LINE_SUFFIX = re.compile(r":(\d+)(?:-(\d+))?$")
 
 
 @dataclass(frozen=True)
@@ -165,7 +173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (OSError, UnicodeDecodeError) as exc:
             print(f"error: could not read --notes-file {args.notes_file}: {exc}", file=sys.stderr)
             return 2
-        return _report_stamp_check(snapshot, args.row, args.check_stamp, notes)
+        return _report_stamp_check(snapshot, args.row, args.check_stamp, notes, args.location)
 
     assessments = assess(snapshot)
     ids = tuple(part.strip() for part in (args.ids or "").split(",") if part.strip())
@@ -206,6 +214,10 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--row", help="the td-NNN id the --check-stamp stamp is for")
     parser.add_argument(
+        "--location",
+        help="the new location cell a realign writes: every path must be tracked at HEAD",
+    )
+    parser.add_argument(
         "--notes-file",
         type=Path,
         help="a file holding the notes the stamp is appended to, when the apply step rewrites "
@@ -217,6 +229,8 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         parser.error("--check-stamp and --row go together")
     if args.notes_file is not None and args.check_stamp is None:
         parser.error("--notes-file goes with --check-stamp")
+    if args.location is not None and args.check_stamp is None:
+        parser.error("--location goes with --check-stamp")
     return args
 
 
@@ -226,8 +240,14 @@ def _read_notes(path: Path) -> str:
     return text.removesuffix("\n").removesuffix("\r")
 
 
-def _report_stamp_check(snapshot: StateSnapshot, row_id: str, stamp: str, notes: str | None) -> int:
-    reasons = stamp_refusals(snapshot, row_id, stamp, notes)
+def _report_stamp_check(
+    snapshot: StateSnapshot,
+    row_id: str,
+    stamp: str,
+    notes: str | None,
+    location: str | None,
+) -> int:
+    reasons = stamp_refusals(snapshot, row_id, stamp, notes, location)
     for reason in reasons:
         print(f"refused: {reason}")
     if not reasons:
@@ -236,14 +256,21 @@ def _report_stamp_check(snapshot: StateSnapshot, row_id: str, stamp: str, notes:
 
 
 def stamp_refusals(
-    snapshot: StateSnapshot, row_id: str, stamp: str, notes: str | None = None
+    snapshot: StateSnapshot,
+    row_id: str,
+    stamp: str,
+    notes: str | None = None,
+    location: str | None = None,
 ) -> list[str]:
     """Why `stamp` must not be written onto `row_id`; empty when it may.
 
     The grammar proves an anchor is shaped right; this proves the write is sound:
     the stamp reads back as the row's latest judgment once appended to `notes` (the
     row's current notes unless the apply step rewrites them), and every anchor it
-    cites is real at HEAD. The row itself must be active.
+    cites is real at HEAD. The row itself must be active. A rewrite -- new `notes`,
+    a new `location` -- must keep every segment and earlier stamp, and name only
+    paths HEAD tracks: nothing later would catch a mistyped location, since it is
+    absent from every anchor tree the row is judged against from then on.
     """
     rows: dict[str, ActiveRow] = {row.id: row for row in snapshot.active_rows}
     if row_id not in rows:
@@ -256,9 +283,55 @@ def stamp_refusals(
     if notes is not None and ("\n" in notes or "\r" in notes):
         return ["the rewritten notes must be one line: a table cell cannot hold a newline"]
     base_notes = rows[row_id].notes if notes is None else notes
-    return _cell_refusals(base_notes, stamp, parsed) + _anchor_refusals(
-        snapshot, snapshot.git, row_id, parsed
+    rewrite = (_segment_refusals(rows[row_id].notes, notes) if notes is not None else []) + (
+        _location_refusals(snapshot, snapshot.git, location) if location is not None else []
     )
+    return (
+        rewrite
+        + _cell_refusals(base_notes, stamp, parsed)
+        + _anchor_refusals(snapshot, snapshot.git, row_id, parsed)
+    )
+
+
+def _segment_refusals(current: str, rewritten: str) -> list[str]:
+    """A realign rewrites stale citations in place; it never drops, adds or edits a
+    segment's place in the history, and never touches an earlier stamp."""
+    before, after = split_segments(current), split_segments(rewritten)
+    stamps_before = [seg for seg in before if seg.startswith(STAMP_PREFIX)]
+    stamps_after = [seg for seg in after if seg.startswith(STAMP_PREFIX)]
+    if len(before) == len(after) and stamps_before == stamps_after:
+        return []
+    return [
+        f"the rewritten notes must keep all {len(before)} segments and every earlier "
+        "stamp byte for byte"
+    ]
+
+
+def _location_refusals(snapshot: StateSnapshot, git: GitFacts, cell: str) -> list[str]:
+    reasons = []
+    for ref in parse_locations(cell):
+        if not isinstance(ref, PathRef) or not in_tree(git.head_tree, ref.path):
+            reasons.append(f"new location {ref.raw} is not tracked at HEAD")
+        elif past_end := _past_end(snapshot.repo_root, ref.raw, ref.path):
+            reasons.append(past_end)
+    return reasons
+
+
+def _past_end(repo_root: Path, cite: str, path: str) -> str | None:
+    """Why `cite` names a line its file at HEAD does not have; None when it does not
+    name a line, or the line exists, or `path` is not a file HEAD can show."""
+    found = _LINE_SUFFIX.search(cite)
+    if found is None:
+        return None
+    try:
+        shown = run_git(repo_root, "cat-file", "-p", f"HEAD:{path}")
+    except GitUnavailableError:
+        return None
+    if shown.returncode != 0:
+        return None
+    length = len(shown.stdout.splitlines())
+    last = int(found[2] or found[1])
+    return None if last <= length else f"{cite} is past the end of {path} ({length} lines at HEAD)"
 
 
 def _cell_refusals(notes: str, stamp: str, parsed: TriageStamp) -> list[str]:
@@ -300,6 +373,11 @@ def _anchor_refusals(
     paths = set(anchors["path"]) | ({stamp.evidence_path} if stamp.evidence_path else set())
     reasons += [
         f"{path} is not tracked at HEAD" for path in sorted(paths) if path not in git.head_tree
+    ]
+    reasons += [
+        past_end
+        for cite in sorted(set(anchors["line"]))
+        if (past_end := _past_end(snapshot.repo_root, cite, cite_path(cite)))
     ]
     reasons += [
         f"{dec} is not a finalized decision"

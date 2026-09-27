@@ -182,12 +182,12 @@ def _path_fate(
     history never tracked.
     """
     git = snapshot.git
-    if path in snapshot.present_paths or (git and _in_tree(git.head_tree, path)):
+    if path in snapshot.present_paths or (git and in_tree(git.head_tree, path)):
         return None
     if git is None:
         return ("unclassified", None, None)
     target = _rename_target(path, git.renames)
-    if target and _in_tree(git.head_tree, target):
+    if target and in_tree(git.head_tree, target):
         return ("renamed", target, None)
     deleted = _deletion_date(path, git.deletions)
     if deleted:
@@ -206,7 +206,7 @@ def _unique_suffix_match(tree: frozenset[str], path: str) -> bool:
     return sum(1 for entry in tree if entry.endswith(suffix)) == 1
 
 
-def _in_tree(tree: frozenset[str], path: str) -> bool:
+def in_tree(tree: frozenset[str], path: str) -> bool:
     if path in tree:
         return True
     prefix = path.rstrip("/") + "/"
@@ -228,7 +228,7 @@ def _already_gone_at_anchor(window: Window, path: str) -> bool:
     check is prefix-aware, as at HEAD: the tree lists files, so a directory
     is present when anything beneath it is.
     """
-    return isinstance(window, AnchorWindow) and not _in_tree(window.tree, path)
+    return isinstance(window, AnchorWindow) and not in_tree(window.tree, path)
 
 
 def _location_decay(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> list[LocationDecay]:

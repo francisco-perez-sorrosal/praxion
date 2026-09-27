@@ -85,6 +85,7 @@ from ledger_delta import (
 )
 from ledger_delta_signals import (
     discard_recurrences,
+    in_tree,
     notes_path_citations,
     row_delta,
 )
@@ -115,6 +116,8 @@ __all__ = [
     "TriageStamp",
     "discard_recurrences",
     "gather",
+    "in_tree",
+    "parse_locations",
     "parse_rows",
     "parse_stamp",
     "row_delta",
@@ -180,7 +183,7 @@ _CHECKABLE_ANCHORS = (_LINE_CITE, _DEC_TOKEN, _TD_TOKEN, _SHA)
 
 
 def stamp_anchors(text: str) -> Mapping[str, tuple[str, ...]]:
-    """Every checkable anchor a stamp's text cites, by kind: path, dec, td, sha.
+    """Every checkable anchor a stamp's text cites, by kind: path, dec, td, sha, line.
 
     The grammar only proves an anchor is *shaped* right; the apply step resolves
     each one against the repository before the stamp is written.
@@ -190,6 +193,7 @@ def stamp_anchors(text: str) -> Mapping[str, tuple[str, ...]]:
         "dec": tuple(_DEC_TOKEN.findall(text)),
         "td": tuple(_TD_TOKEN.findall(text)),
         "sha": tuple(_SHA.findall(text)),
+        "line": tuple(_LINE_CITE.findall(text)),  # as written: path plus line
     }
 
 
@@ -275,7 +279,7 @@ def stamp_state(segments: tuple[str, ...]) -> StampState:
     return Unjudged()
 
 
-def _parse_locations(cell: str) -> tuple[LocationRef, ...]:
+def parse_locations(cell: str) -> tuple[LocationRef, ...]:
     refs: list[LocationRef] = []
     for part in (piece.strip() for piece in cell.split(",")):
         if not part:
@@ -360,7 +364,7 @@ def _parse_active(row: DataRow, key: KeyFacts) -> ActiveRow:
     segments = split_segments(notes)
     goal = _parse_goal(row.value("goal-ref-type"), row.value("goal-ref-value"))
     first_seen = parse_iso_date(row.value("first-seen"))
-    refs = _parse_locations(row.value("location"))
+    refs = parse_locations(row.value("location"))
     return ActiveRow(
         id=row_id,
         status="open" if row.value("status") == "open" else "in-flight",
@@ -389,7 +393,7 @@ def _parse_terminal(row: DataRow, key: KeyFacts) -> TerminalPeer:
         status="resolved" if row.value("status") == "resolved" else "wontfix",
         klass=row.value("class"),
         base_key=key.base,
-        locations=_parse_locations(row.value("location")),
+        locations=parse_locations(row.value("location")),
         first_seen=parse_iso_date(row.value("first-seen")),
         last_seen=parse_iso_date(row.value("last-seen")),
         stamp=stamp_state(split_segments(row.value("notes"))),

@@ -183,7 +183,7 @@ def _refusals(repo_root: Path, row_id: str, text: str) -> list[str]:
 
 
 def test_a_stamp_whose_anchors_all_resolve_may_be_written(base_repo: Path) -> None:
-    assert _refusals(base_repo, "td-270", "kept: scripts/check_gate_liveness.py:10 holds") == []
+    assert _refusals(base_repo, "td-270", "kept: scripts/check_gate_liveness.py:1 holds") == []
 
 
 def test_a_discard_citing_a_decision_that_does_not_exist_is_refused(base_repo: Path) -> None:
@@ -202,7 +202,7 @@ def test_a_merge_into_a_resolved_row_is_refused(base_repo: Path) -> None:
 
 
 def test_a_stamp_for_a_row_that_is_not_active_is_refused(base_repo: Path) -> None:
-    (reason,) = _refusals(base_repo, "td-095", "kept: scripts/check_gate_liveness.py:10 holds")
+    (reason,) = _refusals(base_repo, "td-095", "kept: scripts/check_gate_liveness.py:1 holds")
     assert "not an active row" in reason
 
 
@@ -288,7 +288,7 @@ def test_a_stamp_anchored_to_a_commit_head_cannot_reach_is_refused(
     base_repo: Path, anchor: str
 ) -> None:
     sha = _side_branch_commit(base_repo) if anchor == "side" else anchor
-    stamp = _stamp_at(sha, "kept: scripts/check_gate_liveness.py:10 holds")
+    stamp = _stamp_at(sha, "kept: scripts/check_gate_liveness.py:1 holds")
 
     code, out = _check(base_repo, "td-270", stamp)
 
@@ -373,6 +373,48 @@ def test_a_discard_still_resolves_every_anchor_it_cites(tmp_path: Path) -> None:
 
     assert code == 1
     assert "scripts/old.py" in out
+
+
+def test_a_realign_onto_a_location_head_does_not_track_is_refused(tmp_path: Path) -> None:
+    """A mistyped new location is absent from every later anchor tree, so no run would ever
+    flag it: the check is the only place it can be caught."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise named scripts/x.py")
+
+    code, out = _check(repo_root, "td-902", stamp, "--location", "scripts/y.py, scripts/typo.py")
+
+    assert code == 1
+    assert "scripts/typo.py" in out
+    assert _check(repo_root, "td-902", stamp, "--location", "scripts/y.py:1, scripts/")[0] == 0
+
+
+def test_a_cited_line_past_the_end_of_its_file_is_refused(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    head = _head_sha(repo_root)
+
+    code, out = _check(repo_root, "td-902", _stamp_at(head, "kept: scripts/x.py:99 holds"))
+
+    assert code == 1
+    assert "scripts/x.py:99" in out
+    assert _check(repo_root, "td-902", _stamp_at(head, "kept: scripts/x.py:1 holds"))[0] == 0
+
+
+def test_rewritten_notes_must_keep_every_segment_and_earlier_stamp(tmp_path: Path) -> None:
+    earlier = "[triage 2026-09-01 @abc1234def56] kept: scripts/x.py:1 ok"
+    repo_root = one_row_repo(tmp_path, f"Premise. // Amended. // {earlier}", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise")
+    kept_all, dropped, edited = (
+        f"Premise now. // Amended. // {earlier}",
+        f"Premise now. // {earlier}",
+        f"Premise now. // Amended. // {earlier} and more",
+    )
+
+    def check(notes: str) -> int:
+        path = tmp_path / "notes.txt"
+        path.write_text(notes)
+        return _check(repo_root, "td-902", stamp, "--notes-file", str(path))[0]
+
+    assert (check(kept_all), check(dropped), check(edited)) == (0, 1, 1)
 
 
 # -- Stamp check: a row tombstoned earlier in the same run is still a ledger row --------------

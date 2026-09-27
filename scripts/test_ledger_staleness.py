@@ -18,7 +18,7 @@ from pathlib import Path
 import ledger_health
 import ledger_snapshot
 from _ledger_triage_testkit import IDENTITY, git_ok, one_row_repo, tombstone_row
-from ledger_delta import DuplicatePeer
+from ledger_delta import DuplicatePeer, RowDelta
 
 SCRIPT_PATH = Path(__file__).resolve().parent / "ledger_health.py"
 LEDGER = Path(".ai-state") / "TECH_DEBT_LEDGER.md"
@@ -76,7 +76,7 @@ def _row_citing_dec_010(tmp_path: Path, status: str, extra: str = "") -> Path:
     return repo_root
 
 
-def _delta(repo_root: Path) -> ledger_snapshot.RowDelta:
+def _delta(repo_root: Path) -> RowDelta:
     snapshot = ledger_snapshot.gather(repo_root)
     (row,) = [row for row in snapshot.active_rows if row.id == "td-902"]
     return ledger_snapshot.row_delta(snapshot, row)

@@ -12,6 +12,8 @@ branch: worktree-wal-modes-core
 pipeline_tier: standard
 affected_files:
   - hooks/capture_session.py
+  - hooks/_observation_log/reader.py
+  - hooks/_observation_log/registry.py
   - scripts/check_agent_lifecycle_pairing.py
   - scripts/workflow_run_cost.py
   - scripts/project_metrics/collectors/cost_collector_read.py
@@ -39,11 +41,17 @@ The intake proposed collapsing helpers into a per-session count on the `session_
 
 1. **Writer.** On SubagentStop, `capture_session` computes the existing verdict unchanged. When the verdict is `unobserved-agent`, the payload carries `transcript_path` and `session_id`, and the agent has no transcript of its own (neither the sibling `agent-<id>.jsonl` nor a Workflow-run copy), it writes a `helper_stop` row with exactly `timestamp`, `session_id`, `agent_id`, `project`, `event_type` and `log_mode`, and scans no transcript. In every other case, including when the check cannot run or the own transcript exists, it writes today's `agent_stop` row unchanged, verdict and usage included.
 2. **Every recording mode.** `helper_stop` is recorded in `full` and `standard`. It is not a mode question.
-3. **Reader upcast.** The log reader presents a legacy `agent_stop` row whose `start_correlation` is `unobserved-agent` and whose `usage_source` is neither `subagent-transcript` nor `parent-transcript` as `helper_stop`. Every consumer then sees one helper representation across old and new rows.
+3. **Reader upcast.** The log reader presents a legacy `agent_stop` row as `helper_stop`, cut to the six `helper_stop` keys, when all four hold: the row has no `log_mode` key, so it was written before this change; its `start_correlation` is `unobserved-agent`; its `usage_source` is neither `subagent-transcript` nor `parent-transcript`; and none of its token fields (`tokens_in`, `tokens_out`, `cache_read`, `cache_create`) is set. Every row the writer now appends carries `log_mode`, so an `agent_stop` the writer deliberately kept is never relabelled.
+
+   The rule is deliberately conservative, so it covers only part of the legacy helper population. In main's log on 2026-09-27 (23,818 rows, 4,073 `agent_stop`), it upcasts 288 rows, and none of their `agent_id`s appears in any other row, so it has no false positives. About 3,710 legacy helper stops exist, and two shapes stay `agent_stop`:
+   - **274 parent-contaminated helpers** (2026-09-08 to 2026-09-14). They self-report `unobserved-agent` and carry token counts but no `usage_source` key: the stop path of that period summed the parent transcript's usage onto the helper's row, and 270 of them carry the parent's model. The token clause keeps them because, with no source label, their counts cannot be told from real usage.
+   - **3,145 pre-split helpers** (2026-08-07 to 2026-09-06), stamped `unobserved-start` with `agent_type: unknown` and no usage, whose `agent_id` appears in no other row. They were written before dec-370's `unobserved-agent` verdict reached the hooks.
+
+   All 3,419 sit in the `.1` archive, outside every active-only reader and the reconciler's 7-day window, and they leave the log at the next rotation. Until then, readers of `.1`, such as the cost collector, still see them as `agent_stop`.
 4. **Consumers.**
    - P03 pairs on `helper_stop` rows and classifies unmatched ones exactly as it classified a stop self-reporting `unobserved-agent`, so its JSON envelope keys and counts are unchanged.
    - `workflow_run_cost.py` lists `helper_stop` rows in its `unobserved` section as before.
-   - The cost collector's `agent_stop` census stops counting helpers, old and new alike. This is a deliberate correction: the helpers were already classified unparsed and never entered a total.
+   - The cost collector's `agent_stop` census stops counting new helper stops and the legacy ones the upcast recognizes. This is a deliberate correction: those helpers were already classified `unparsed` and never entered a total. The two residual shapes in Decision 3 stay in the census, quarantined (`pre-attribution` for the 274 token-bearing rows, `unparsed` for the rest), until they rotate out, so no token total is inflated.
 
 ## Considered Options
 
@@ -71,7 +79,7 @@ The intake proposed collapsing helpers into a per-session count on the `session_
 - P03 needs no instruction change.
 
 **Negative**
-- The cost collector's reported `total_agent_stop_rows` and quarantine counts drop, retroactively (via the upcast) over the whole readable log. Anyone comparing a metrics report across the change sees a step.
+- The cost collector's reported `total_agent_stop_rows` and quarantine counts drop retroactively, via the upcast, by the legacy helper stops it recognizes (288 in main's log on 2026-09-27). Anyone comparing a metrics report across the change sees a step.
 - The helper test depends on the harness keeping helper transcripts absent and the sibling path stable. If that changes, the conservative fallback writes today's `agent_stop`, degrading to current behaviour rather than losing data.
 
 ## Prior Decision

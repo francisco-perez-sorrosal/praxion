@@ -22,6 +22,9 @@ Output modes:
     --digest   one `ledger-triage-digest/1` JSON envelope for a judge: every
                selected row with the row verbatim, its key facts, its evidence
                and context kept apart, and what was withheld and why
+    --index    the same envelope with the selected ids in rank order instead of
+               the row bodies: what a run fans out to judges, each of which then
+               asks for its own batch with `--digest --ids`
 
 Selection: candidates only, unless `--all` (every active row, candidates
 first) or `--ids td-NNN[,td-NNN]`; `--class <name>` keeps rows carrying that
@@ -121,6 +124,7 @@ _TD07_BOUND = (
 _TD07_SEVERITY: Mapping[Tier, str] = {"strong": "warn", "medium": "info"}
 
 DIGEST_SCHEMA = "ledger-triage-digest/1"
+INDEX_SCHEMA = "ledger-triage-index/1"
 RELATED_DECISIONS_CAP = 5
 DETAIL_LIMIT = 280  # characters of a quoted notes segment in one evidence detail
 SHORT_SHA_LENGTH = 12
@@ -169,6 +173,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(render_td07(snapshot, assessments), indent=2))
     elif args.digest:
         print(json.dumps(render_digest(snapshot, assessments, selected, _utc_now()), indent=2))
+    elif args.index:
+        print(json.dumps(render_index(snapshot, assessments, selected, _utc_now()), indent=2))
     else:
         print(render_summary(snapshot, assessments, selected))
     return 0
@@ -176,10 +182,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Tech-debt ledger triage probe (advisory).")
-    parser.add_argument("--digest", action="store_true", help="emit the judge digest as JSON")
-    parser.add_argument(
-        "--json", action="store_true", help="emit the sentinel TD07 family envelope"
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--digest", action="store_true", help="emit the judge digest as JSON")
+    mode.add_argument(
+        "--index", action="store_true", help="emit the digest envelope with ids, not row bodies"
     )
+    mode.add_argument("--json", action="store_true", help="emit the sentinel TD07 family envelope")
     parser.add_argument("--all", action="store_true", help="every active row, candidates first")
     parser.add_argument("--ids", help="comma-separated td-NNN ids to report")
     parser.add_argument(
@@ -408,8 +416,24 @@ def render_digest(
     generated_at: str,
 ) -> dict:
     """The `ledger-triage-digest/1` envelope: additive-only within the version."""
+    envelope = _envelope(snapshot, assessments, generated_at)
+    return {"schema": DIGEST_SCHEMA, **envelope, "rows": [_row_digest(item) for item in selected]}
+
+
+def render_index(
+    snapshot: StateSnapshot,
+    assessments: list[Assessment],
+    selected: list[Assessment],
+    generated_at: str,
+) -> dict:
+    """The digest's envelope with the selected ids in rank order: a few hundred bytes where
+    the digest of a whole ledger runs to hundreds of kilobytes."""
+    envelope = _envelope(snapshot, assessments, generated_at)
+    return {"schema": INDEX_SCHEMA, **envelope, "ids": [item.row.id for item in selected]}
+
+
+def _envelope(snapshot: StateSnapshot, assessments: list[Assessment], generated_at: str) -> dict:
     return {
-        "schema": DIGEST_SCHEMA,
         "head": snapshot.head,
         "anchor": snapshot.anchor,
         "generated_at": generated_at,
@@ -425,7 +449,6 @@ def render_digest(
             "candidates": sum(item.is_candidate for item in assessments),
             "unparseable": len(snapshot.unparseable),
         },
-        "rows": [_row_digest(item) for item in selected],
         "discard_recurred": _discard_recurred(snapshot),
     }
 

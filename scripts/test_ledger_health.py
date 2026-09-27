@@ -341,3 +341,22 @@ def test_a_survivor_stamp_citing_a_row_merged_earlier_in_the_run_is_accepted(
     survivor = _stamp_at(head, "kept: hooks/remind_calibration.py:1 holds, absorbed td-264")
 
     assert _check(base_repo, "td-257", survivor) == (0, "ok\n")
+
+
+# -- Index: the ids a run fans out, without the row bodies -----------------------------------
+
+
+def test_the_index_lists_the_digest_rows_ids_in_rank_order_without_their_bodies(
+    base_repo: Path,
+) -> None:
+    result = _run("--index", "--all", "--repo-root", str(base_repo))
+    assert result.returncode == 0, result.stderr
+    index, digest = json.loads(result.stdout), _digest(base_repo, "--all")
+
+    assert index["ids"] == [row["id"] for row in digest["rows"]]
+    assert "rows" not in index
+    assert (index["anchor"], index["examined"]) == (digest["anchor"], digest["examined"])
+
+
+def test_the_index_and_the_digest_are_exclusive_output_modes(base_repo: Path) -> None:
+    assert _run("--index", "--digest", "--repo-root", str(base_repo)).returncode == 2

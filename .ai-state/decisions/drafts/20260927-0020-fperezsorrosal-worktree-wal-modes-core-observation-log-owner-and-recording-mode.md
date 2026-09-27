@@ -11,17 +11,19 @@ agent_type: systems-architect
 branch: worktree-wal-modes-core
 pipeline_tier: standard
 affected_files:
+  - hooks/_observation_log/
   - hooks/_hook_utils.py
   - hooks/capture_observations.py
   - hooks/capture_session.py
   - hooks/measure_context_surface.py
   - hooks/remind_calibration.py
-  - hooks/send_event.py
   - scripts/spawn_count.py
   - scripts/reconcile_pipeline_state.py
   - scripts/_handoff_readiness.py
   - scripts/check_agent_lifecycle_pairing.py
+  - scripts/check_gate_liveness.py
   - scripts/context_baseline.py
+  - scripts/project_metrics/collectors/cost_collector.py
   - scripts/project_metrics/collectors/cost_collector_read.py
   - scripts/workflow_run_cost.py
   - scripts/query_memory_write_evidence.py
@@ -44,19 +46,19 @@ The observation log (`.ai-state/observations.jsonl`, gitignored, rotated at 10 M
 
 ## Decision
 
-**1. One owner package, `hooks/_observation_log/`.** Every writer builds its row and calls the package's writer; every code reader calls the package's reader. `_hook_utils.record_gate_fire` moves into the writer and is re-exported, so the six gate call sites keep their import. The package has four modules:
+**1. One owner package, `hooks/_observation_log/`.** Every writer builds its row and calls the package's writer; every code reader calls the package's reader. `record_gate_fire` moves into the writer. `_hook_utils.record_gate_fire` stays as a thin forwarding wrapper that imports the writer when it is called, not when `_hook_utils` loads, so the six gate call sites keep their import and a module that imports `_hook_utils` only for `is_disabled` (`send_event.py`) never loads the package. The package has four modules:
 
 | Module | Responsibility |
 |---|---|
 | `modes.py` | Resolves the mode from an env mapping; a pure function |
 | `registry.py` | Recording classes, fields, per-mode recording, consumer contracts |
 | `writer.py` | The only append path: mode gate, `log_mode` stamp, lock, rotation |
-| `reader.py` | The only read path: segments, streamed reads with named degradation, bounded tail, legacy upcast |
+| `reader.py` | The only read path: segments, per-segment reads with named degradation, bounded tail, legacy upcast |
 
 **2. Recording modes over recording classes.** Three classes write `event_type: tool_use`: `TOOL_FILE_CHANGE` (Write / Edit / MultiEdit / NotebookEdit, any agent), `TOOL_FIRST_OF_SUBAGENT`, and `TOOL_OTHER`.
 - `full` records every class. This is today's behaviour.
 - `standard` records every class except `TOOL_OTHER`.
-- `off` records nothing, including `gate_fire`.
+- `off` appends nothing through the writer, including `gate_fire`. (`/resume-pipeline`'s prose-written `recovery` row bypasses the writer; see *Not in this decision*.)
 - The rule `standard` follows: a class is recorded if a built consumer needs it at `standard`, or it is a session-grain measurement series a decision established (`skill_activation`, `compaction`, `context_surface_measurement`). Per-tool-call rows are recorded only where a consumer needs them.
 - Measured effect: `standard` keeps 18% of `tool_use` rows and 39% of log bytes, so a 10 MiB rotation holds about 2.5–2.8× more history. The log hooks are async, so no latency claim is made.
 
@@ -66,7 +68,7 @@ The observation log (`.ai-state/observations.jsonl`, gitignored, rotated at 10 M
 
 **4. Transport (Q4).** A new settings-`env` key, `PRAXION_OBSERVATION_LOG=full|standard|off`, governs only the log. Precedence, highest first:
 1. `PRAXION_DISABLE_OBSERVABILITY` truthy means `off`. It stays the umbrella that also silences chronograph posting, `notify_bg_session_state` and the context measurement, exactly as today. The sentinel CI's `--settings` override and the hackathon template's `"1"` therefore keep working unedited.
-2. A valid `PRAXION_OBSERVATION_LOG` value is used as given.
+2. A valid `PRAXION_OBSERVATION_LOG` value, matched case-insensitively, is used.
 3. An invalid non-empty value means `full`, recorded as `log_mode_source: invalid-setting`, so a typo never loses evidence.
 4. **(User decision, 2026-09-26)** An explicitly falsy `PRAXION_DISABLE_OBSERVABILITY` (`"0"`, which onboarding writes into managed projects) is neutral: it means "not disabled" and resolves to the default, `standard`. The rejected alternative mapped it to `full`, which would have kept the new default from reaching almost every onboarded project. `PRAXION_OBSERVATION_LOG=full` is the per-project escape hatch, and the release notes name it.
 5. Otherwise, `standard`.
@@ -75,8 +77,8 @@ The observation log (`.ai-state/observations.jsonl`, gitignored, rotated at 10 M
 
 **6. Consumer contracts are tests.** The registry declares every consumer (code or prompt), the recording classes and fields it needs, and its minimum mode. Three test gates, each with a canary:
 - **Consumer-contract test:** fails when `standard` stops recording something a `min_mode: standard` consumer declared.
-- **Writer-truth test:** drives every writer in every mode and fails when output disagrees with the registry, including an unregistered `event_type`.
-- **Private-reader test:** fails when a Python module outside the package and its named file-level allowlist references the log's filename, and requires every reader importer to be a declared consumer.
+- **Writer-truth test:** drives every writer in every mode and fails when a row is written that the registry does not record in that mode (or is dropped when it does), when an emitted `event_type` is unregistered, or when a row carries a field its class does not declare.
+- **Private-reader test:** fails when a Python module outside the package and its named file-level allowlist references the log's filename, or when the non-test modules importing the reader differ from the code consumers the registry declares.
 
 **7. Sentinel P04** judges `standard` rows on its write-surface half only, and states that its grant half needs `full`. The harness enforces `tools:` grants for plugin agents, so that half is a backstop.
 
@@ -88,7 +90,7 @@ Activation: fired — structural (≈15 production files across hooks, scripts a
 
 ### Option 1: Owner package with registry, modes, writer and reader (chosen)
 
-- **Pros:** one enforcement point for mode, stamping, rotation and locking, so the `record_gate_fire` class of leak cannot recur. The registry is checked against the code that consults it. Readers cannot drift. The retention pipeline changes one place. Readers never import `fcntl`, and the per-tool-call path never imports the reader.
+- **Pros:** one enforcement point for mode, stamping, rotation and locking, so the `record_gate_fire` class of leak cannot recur. The registry is checked against the code that consults it. Readers cannot drift. The retention pipeline changes one place. Readers never import `fcntl`. The per-tool-call path does load the reader, for the log's filename (`writer.py` imports `LOG_FILENAME` from it), but the reader is stdlib-only and imports nothing the hot path forbids.
 - **Cons:** five new files; a migration touching every reader in one pipeline; a new subpackage the plugin must ship.
 
 ### Option 2: Shared reader only, with a mode check in each writer

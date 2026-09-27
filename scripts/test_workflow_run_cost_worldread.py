@@ -23,6 +23,7 @@ convention as the sibling files in this directory.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -122,6 +123,42 @@ def test_read_wal_keeps_the_last_agent_stop_row_and_ignores_unrelated_or_unlabel
     assert row["wal_agreement"] == "agree"
     assert row["wal"] == {key: fresh[key] for key in row["wal"]}
     assert set(row["wal"]) == set(fresh) - {"event_type", "agent_id"}
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores file permission bits; chmod 0o000 would not actually block the read",
+)
+def test_exits_2_with_wal_unreadable_reason_when_wal_is_unreadable(tmp_path, monkeypatch, capsys):
+    """An unreadable WAL must not read as `wal-missing` (every agent silently
+    `wal-missing`) -- it must refuse with its own named reason, exit 2, and
+    publish no report on stdout."""
+    project_root, wf_id, _agent = _single_agent_run(tmp_path, monkeypatch)
+    wal_path = project_root / ".ai-state" / "observations.jsonl"
+    wal_path.chmod(0o000)
+    try:
+        exit_code, captured = base._run_cli(
+            ["--run", wf_id, "--project-root", str(project_root), "--json"], capsys
+        )
+    finally:
+        wal_path.chmod(0o644)
+
+    assert exit_code == 2
+    assert "wal-unreadable" in captured.err
+    assert captured.out == ""
+
+
+def test_every_agent_reads_wal_missing_when_wal_is_simply_absent(tmp_path, monkeypatch, capsys):
+    """Inverse guard: a WAL that was never written stays non-fatal -- the run
+    still succeeds, and every agent's `wal_agreement` reads `wal-missing`."""
+    project_root, wf_id, agent = _single_agent_run(tmp_path, monkeypatch, wal_rows=[])
+    (project_root / ".ai-state" / "observations.jsonl").unlink()
+
+    exit_code, _captured, report = base._run_json(project_root, wf_id, capsys)
+
+    assert exit_code == 0
+    assert report["agents"][0]["agent_id"] == agent["agent_id"]
+    assert all(row["wal_agreement"] == "wal-missing" for row in report["agents"])
 
 
 # --------------------------------------------------------------------------- #

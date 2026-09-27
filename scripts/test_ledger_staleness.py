@@ -169,6 +169,20 @@ def test_a_successor_already_in_the_anchor_tree_stays_quiet_whatever_its_date(
     assert "decision-drift" not in _classes(repo_root)
 
 
+def test_a_supersession_recorded_after_the_stamp_onto_a_successor_it_held_resurfaces_the_row(
+    tmp_path: Path,
+) -> None:
+    """Both decisions were accepted at the anchor; the edge between them was written later."""
+    repo_root = _row_citing_dec_010(tmp_path, "accepted")
+    _write_adr(repo_root, "011-new.md", "dec-011", "accepted")
+    _commit(repo_root, "docs: dec-011")
+    _stamp(repo_root)
+    _write_adr(repo_root, "010-old.md", "dec-010", "superseded", "superseded_by: dec-011\n")
+    _commit(repo_root, "docs: record that dec-011 supersedes dec-010")
+
+    assert "decision-drift" in _classes(repo_root)
+
+
 def test_a_superseding_decision_on_the_location_merged_after_the_stamp_resurfaces_the_row(
     tmp_path: Path,
 ) -> None:

@@ -306,19 +306,22 @@ def _change_seen_at_anchor(
 ) -> bool:
     """True when a judged row's anchor already held this decision change.
 
-    With a successor, the change is the successor's arrival
-    (`_predates_anchor`). Without one -- a rejection, or a status set with no
-    edge -- the change is an edit to the cited file itself, so it is in the
-    window iff a commit in `anchor..HEAD` touched that file. A cited file the
-    project does not track cannot be placed and stays unwindowed.
+    The change is in the window when the cited file itself was edited in
+    `anchor..HEAD` -- a rejection, a status set with no edge, or an edge
+    recorded after the fact onto a successor the anchor already held. With a
+    successor, it is also in the window when the successor arrived after the
+    anchor (`_predates_anchor`). A cited file the project does not track
+    cannot be placed by its own history, so only the successor can place it;
+    with neither, it stays unwindowed.
     """
     if not isinstance(window, AnchorWindow):
         return False
+    tracked = _tracked(snapshot, cited.path)
+    if tracked and any(cited.path in commit.paths for commit in window.commits):
+        return False
     if successor is not None:
         return _predates_anchor(snapshot, window, successor)
-    if not _tracked(snapshot, cited.path):
-        return False
-    return not any(cited.path in commit.paths for commit in window.commits)
+    return tracked
 
 
 def _predates_anchor(snapshot: StateSnapshot, window: AnchorWindow, facts: DecisionFacts) -> bool:

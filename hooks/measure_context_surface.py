@@ -21,7 +21,6 @@ Disabled by PRAXION_DISABLE_OBSERVABILITY (shared with capture_session).
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import sys
@@ -36,6 +35,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled  # noqa: E402
+from _observation_log import writer  # noqa: E402
+from _observation_log.registry import EventClass  # noqa: E402
 
 # -- Observation emission -----------------------------------------------------
 
@@ -46,26 +47,6 @@ def _build_summary(tokens: int, bytes_: int, file_count: int, basis: str) -> str
         f"Always-loaded surface: {tokens:,} tokens "
         f"({bytes_:,} bytes) across {file_count} files [{basis}]"
     )
-
-
-def _append_observation(obs_path: Path, observation: dict) -> None:
-    """Append a single observation to JSONL with exclusive locking.
-
-    Mirrors the locking pattern in `capture_session.py` so concurrent hook
-    invocations across worktrees serialize cleanly through the same lock file.
-    """
-    obs_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = obs_path.parent / "observations.lock"
-    lock_path.touch(exist_ok=True)
-
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        try:
-            with open(obs_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(observation, separators=(",", ":")) + "\n")
-                f.flush()
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
 
 
 def main() -> None:
@@ -121,7 +102,7 @@ def main() -> None:
         "classification": None,
     }
 
-    _append_observation(ai_state_dir / "observations.jsonl", observation)
+    writer.record(ai_state_dir, EventClass.CONTEXT_SURFACE, observation)
 
 
 if __name__ == "__main__":

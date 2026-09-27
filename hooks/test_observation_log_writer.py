@@ -1,5 +1,5 @@
-"""RED-first skeleton: the writer-truth test (REQ-18) and the `standard`-mode
-row-classification skeleton (REQ-06, REQ-07, REQ-08).
+"""The writer records exactly what the registry says, and `standard` mode
+classifies tool-call rows.
 
 The writer-truth tests drive `writer.record_tool_call` across every `Mode`
 with a distinct row shape and assert the writer's *actual* output (a row
@@ -11,20 +11,16 @@ ignoring the kill switch entirely -- must fail this test.
 The classification tests assert `record_tool_call`'s classify-and-decide is a
 pure function of (row, mode, marker_present): file-changing and
 first-of-subagent tool calls, and Skill calls, are written in `standard`; a
-later non-file-changing call from an already-seen subagent is not (REQ-06).
-`full` writes every non-blocklisted call regardless of classification
-(REQ-08). Any failure to create the first-call marker must still leave the
-row written -- at-least-once, never zero (REQ-07, DS-6).
-
-Import target does not exist yet: `hooks._observation_log.writer` (and its
-siblings `registry`, `modes`). This file is RED by ModuleNotFoundError until
-Step 3 lands the owner package, and the classification tests stay RED by
-assertion failure until Step 6 lands `standard` differentiation.
+later non-file-changing call from an already-seen subagent is not.
+`full` writes every non-blocklisted call regardless of classification. Any
+failure to create the first-call marker must still leave the row written --
+at-least-once, never zero.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from hooks._observation_log import registry, writer
@@ -78,7 +74,7 @@ def test_canary_a_writer_that_ignores_the_registry_is_caught(tmp_path: Path, mon
     )
 
 
-# -- standard-mode row classification (REQ-06, REQ-07, REQ-08) --------------------
+# -- standard-mode row classification -----------------------------------------------
 
 
 def test_standard_mode_writes_file_changing_and_first_of_subagent_and_skill_but_not_a_later_other_call(
@@ -144,7 +140,7 @@ def test_full_mode_writes_every_non_blocklisted_tool_call_regardless_of_classifi
 def test_unwritable_marker_directory_still_writes_the_first_call_row(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """REQ-07 / DS-6: append-then-mark ordering means any OSError on the
+    """Append-then-mark ordering means any OSError on the
     marker path must still leave the row written -- at-least-once, never
     absent, even when the marker cannot be created at all.
     """
@@ -166,3 +162,83 @@ def test_unwritable_marker_directory_still_writes_the_first_call_row(
     rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
 
     assert len(rows) == 1, "an unwritable marker directory must never cost the row itself"
+
+
+# -- Rotation (moved verbatim from hooks/test_hook_utils.py with the writer) ----
+
+
+def test_rotate_triggers_at_threshold(tmp_path, monkeypatch):
+    """When the active file exceeds the size threshold, append_observation
+    renames it to <obs_path>.1 and the new row lands in a fresh active file."""
+    obs_path = tmp_path / "observations.jsonl"
+    obs_path.write_text('{"existing":"row"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(writer, "OBSERVATIONS_MAX_BYTES", 1)
+    writer.append_observation(obs_path, {"event": "new"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert rotated.exists(), "original obs file must be renamed to .1 after threshold breach"
+    active_lines = obs_path.read_text(encoding="utf-8").splitlines()
+    assert len(active_lines) == 1, "active file must hold exactly the new row after rotation"
+    assert "new" in active_lines[0], "new row must appear in the fresh active file"
+
+
+def test_rotate_below_threshold_no_rotate(tmp_path):
+    """A single append that keeps the file below the default (large) threshold
+    must not create a .1 rotation file."""
+    obs_path = tmp_path / "observations.jsonl"
+
+    writer.append_observation(obs_path, {"event": "tiny"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert not rotated.exists(), "no .1 rotation file must exist when below the threshold"
+
+
+def test_rotate_swallows_oserror(tmp_path, monkeypatch):
+    """When os.replace raises OSError during rotation, append_observation must
+    not propagate the exception and must still write the observation."""
+    obs_path = tmp_path / "observations.jsonl"
+    obs_path.write_text('{"existing":"row"}\n', encoding="utf-8")
+    monkeypatch.setattr(writer, "OBSERVATIONS_MAX_BYTES", 1)
+
+    def _fail_replace(*args, **kwargs):
+        raise OSError("forced rename failure")
+
+    monkeypatch.setattr(os, "replace", _fail_replace)
+
+    writer.append_observation(obs_path, {"event": "swallowed"})
+
+    content = obs_path.read_text(encoding="utf-8")
+    assert "swallowed" in content, "observation must be written even when os.replace fails"
+
+
+def test_append_observation_uses_fcntl_lock(tmp_path):
+    """append_observation must use the observations.lock file so that concurrent
+    callers are safely serialized; the observation must also be written."""
+    obs_path = tmp_path / "observations.jsonl"
+
+    writer.append_observation(obs_path, {"event": "lock_check", "value": 42})
+
+    lock_path = obs_path.parent / "observations.lock"
+    assert lock_path.exists(), "lock file must exist after append_observation"
+    content = obs_path.read_text(encoding="utf-8")
+    assert "lock_check" in content, "observation must be written to the active file"
+
+
+def test_canary_rotate_at_threshold_zero(tmp_path, monkeypatch):
+    """Gate-liveness canary: with OBSERVATIONS_MAX_BYTES=0 every existing file
+    satisfies the rotation condition (size >= 0). After append_observation the
+    original file must be at <obs_path>.1.
+
+    This canary must go RED if rotation is ever silently removed."""
+    obs_path = tmp_path / "observations.jsonl"
+    obs_path.touch()
+
+    monkeypatch.setattr(writer, "OBSERVATIONS_MAX_BYTES", 0)
+    writer.append_observation(obs_path, {"event": "canary"})
+
+    rotated = Path(str(obs_path) + ".1")
+    assert rotated.exists(), (
+        "rotation canary FAILED: <obs_path>.1 must exist when threshold is 0 "
+        "— rotation is either absent or misconditioned"
+    )

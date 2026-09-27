@@ -1,18 +1,11 @@
-"""RED-first skeleton: the private-reader test (REQ-19).
+"""The observation log has no private readers.
 
-DS-3's second invariant: the set of code consumers of the log equals the set
+The registry's invariant: the set of code consumers of the log equals the set
 of non-test modules importing `_observation_log.reader`. This test scans the
 repo for any `.py` file -- outside the owner package and a named allowlist --
 whose source references the log filename literal
 (`reader.LOG_FILENAME`) directly, which is exactly how a reader could bypass
 the owner package undetected.
-
-Import target does not exist yet: `hooks._observation_log.reader`. This file
-is RED by ModuleNotFoundError until Step 3 lands the owner package. Note that
-even after Step 3 lands, the real assertion stays red until Steps 4-5
-migrate every private reader listed in `SYSTEMS_PLAN.md`'s per-reader
-migration map -- that transition (ImportError -> real findings -> clean) is
-expected and is not a defect in this test.
 """
 
 from __future__ import annotations
@@ -26,16 +19,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 OWNER_PACKAGE_PREFIX = "hooks/_observation_log/"
 
-# Per SYSTEMS_PLAN.md § Architecture "Not migrated" list -- each has its own
-# named reason there (whole-file rewrite with a dedup key, a .gitattributes
-# string, a hook-byproduct file list, and the liveness checker itself).
+# Modules that name the log file without reading its rows, so they
+# legitimately stay outside the owner reader.
 ALLOWLIST = frozenset(
     {
-        "scripts/merge_driver_observations.py",
-        "scripts/reconcile_ai_state.py",
-        "scripts/_sidecar_init.py",
-        "eval/src/praxion_evals/live/scenarios.py",
-        "scripts/check_gate_liveness.py",
+        "scripts/merge_driver_observations.py",  # whole-file merge with a dedup key
+        "scripts/reconcile_ai_state.py",  # whole-file merge with a dedup key
+        "scripts/_sidecar_init.py",  # writes the .gitattributes string
+        "eval/src/praxion_evals/live/scenarios.py",  # hook-byproduct file list
+        "scripts/check_gate_liveness.py",  # the liveness checker itself
     }
 )
 

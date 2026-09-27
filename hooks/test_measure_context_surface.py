@@ -161,7 +161,9 @@ class TestMeasurementParity:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         captured: list[dict] = []
-        monkeypatch.setattr(m, "_append_observation", lambda _path, obs: captured.append(obs))
+        monkeypatch.setattr(
+            m.writer, "record", lambda _dir, _event_class, row, **_kw: captured.append(row)
+        )
 
         payload = {
             "hook_event_name": "SessionStart",
@@ -183,40 +185,57 @@ class TestMeasurementParity:
         assert sorted(observation["file_paths"]) == sorted(gate_report["files"])
 
 
-class TestPrivateAppenderCharacterization:
-    """Pins `_append_observation`'s current write surface, before Step 4
-    deletes it in favor of `writer.record` (which gains rotation). Today this
-    is a **second writer implementation**: it appends under the same
-    exclusive-lock discipline as `capture_session.py`, but never rotates --
-    even a file already well past the 10 MiB rotation threshold used
-    elsewhere just keeps growing.
+class TestWritesThroughTheOwnerWriter:
+    """The measurement row goes through the observation log's owner writer,
+    not a private appender: it rotates like every other writer and appends
+    after existing rows under the shared lock. Before the owner package, this
+    hook carried its own non-rotating appender, so the log could grow past
+    the rotation threshold unchecked.
     """
 
-    def test_never_rotates_regardless_of_existing_file_size(self, tmp_path: Path) -> None:
+    def _run_session_start(self, project: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
-        obs_path = tmp_path / "observations.jsonl"
-        # Exceeds the 10 MiB OBSERVATIONS_MAX_BYTES rotation threshold used by
-        # capture_session.py's append_observation -- this appender has no
-        # knowledge of that constant at all.
-        obs_path.write_text("x" * (11 * 1024 * 1024) + "\n", encoding="utf-8")
-        size_before = obs_path.stat().st_size
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        (project / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
+        payload = {
+            "hook_event_name": "SessionStart",
+            "cwd": str(project),
+            "session_id": "owner-writer",
+            "agent_type": "main",
+        }
+        monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
+        return m
 
-        m._append_observation(obs_path, {"event_type": "context_surface_measurement"})
+    def test_rotates_an_oversized_log_like_every_other_writer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs_path = ai_state / "observations.jsonl"
+        obs_path.write_text('{"event_type":"tool_use"}\n', encoding="utf-8")
+        m = self._run_session_start(tmp_path, monkeypatch)
+        monkeypatch.setattr(m.writer, "OBSERVATIONS_MAX_BYTES", 1)
 
-        assert not (tmp_path / "observations.jsonl.1").exists(), (
-            "the private appender must not rotate today -- pinning the gap Step 4 closes"
-        )
-        assert obs_path.stat().st_size > size_before, "the new row must still be appended"
+        m.main()
 
-    def test_appends_one_json_line_with_exclusive_locking(self, tmp_path: Path) -> None:
-        m = _load_module()
-        obs_path = tmp_path / "observations.jsonl"
+        assert (ai_state / "observations.jsonl.1").exists(), "the oversized log must rotate"
+        rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+        assert [r["event_type"] for r in rows] == ["context_surface_measurement"]
 
-        m._append_observation(obs_path, {"event_type": "context_surface_measurement", "n": 1})
-        m._append_observation(obs_path, {"event_type": "context_surface_measurement", "n": 2})
+    def test_appends_after_existing_rows_under_the_shared_lock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs_path = ai_state / "observations.jsonl"
+        obs_path.write_text('{"event_type":"tool_use"}\n', encoding="utf-8")
+        m = self._run_session_start(tmp_path, monkeypatch)
 
-        lines = obs_path.read_text(encoding="utf-8").splitlines()
-        assert [json.loads(line)["n"] for line in lines] == [1, 2]
+        m.main()
+
+        rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+        assert [r["event_type"] for r in rows] == ["tool_use", "context_surface_measurement"]
+        assert (ai_state / "observations.lock").exists(), "the append must take the shared lock"
 
 
 class _StringIO:

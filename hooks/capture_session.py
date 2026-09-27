@@ -169,13 +169,26 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
+from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _observation_log import writer
+from _observation_log.registry import EventClass
 
 EVENT_MAP = {
     "SessionStart": "session_start",
     "Stop": "session_stop",
     "SubagentStart": "agent_start",
     "SubagentStop": "agent_stop",
+}
+
+# The `event_type` string this hook builds, mapped onto the owner package's
+# recording class -- the same class the registry's `standard`/`full`/`off`
+# table is keyed by. A stop's `helper_stop` branch (a later step) is written
+# directly under `EventClass.HELPER_STOP` and never goes through this map.
+_EVENT_CLASS_BY_TYPE = {
+    "session_start": EventClass.SESSION_START,
+    "session_stop": EventClass.SESSION_STOP,
+    "agent_start": EventClass.AGENT_START,
+    "agent_stop": EventClass.AGENT_STOP,
 }
 
 # A compaction is not a lifecycle event and is deliberately absent from
@@ -1002,8 +1015,10 @@ def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
         if not start_row_seen or _stop_row_exists(obs_path, task_id):
             continue
         resolved_type, source = resolve_agent_type({}, "agent_stop", agent_type)
-        append_observation(
-            obs_path, build_suspension_stop(payload, task_id, kind, resolved_type, source)
+        writer.record(
+            obs_path.parent,
+            EventClass.AGENT_STOP,
+            build_suspension_stop(payload, task_id, kind, resolved_type, source),
         )
 
 
@@ -1045,11 +1060,11 @@ def main() -> None:
     # lifecycle row to build -- see the module docstring's `compaction` row
     # section. Past the guard above, every remaining event has an event_type.
     if hook_event == POST_COMPACT_HOOK_EVENT:
-        append_observation(obs_path, build_compaction_observation(payload))
+        writer.record(ai_state_dir, EventClass.COMPACTION, build_compaction_observation(payload))
         return
 
     observation = build_observation(payload, event_type, obs_path)
-    append_observation(obs_path, observation)
+    writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[event_type], observation)
     if event_type == "session_stop":
         _record_suspended_subagent_stops(obs_path, payload)
         try:

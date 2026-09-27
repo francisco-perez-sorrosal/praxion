@@ -19,7 +19,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
+from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _observation_log import writer
 
 # Tools that generate too much noise to capture. Read/Glob/Grep are
 # deliberately absent -- they are recorded (path + pattern only, never file
@@ -219,9 +220,8 @@ def main() -> None:
     if not ai_state_dir.exists():
         return  # graceful degradation
 
-    obs_path = ai_state_dir / "observations.jsonl"
     observation = build_observation(payload)
-    append_observation(obs_path, observation)
+    writer.record_tool_call(ai_state_dir, observation, is_subagent=bool(payload.get("agent_id")))
 
 
 if __name__ == "__main__":

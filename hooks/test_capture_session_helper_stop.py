@@ -1,18 +1,10 @@
-"""RED-first skeleton: the `helper_stop` four-quadrant test (REQ-11, REQ-12).
+"""Harness helper stops become slim `helper_stop` rows.
 
 Four quadrants over (prior WAL row for the agent Y/N) x (agent's own
 transcript exists Y/N): only "no prior row AND no own transcript" writes the
-slim `helper_stop` row (DS-5's exact five-key shape); every other quadrant
-writes today's `agent_stop` row unchanged (REQ-12's conservative fallback).
-
-Import target does not exist yet: `hooks._observation_log.registry`. This
-file is RED by ModuleNotFoundError until Step 3 lands the owner package, and
-by AttributeError (`EventClass.HELPER_STOP` unregistered) even after that,
-until Step 7 lands the stop-path branch in `capture_session.py`.
-
-Written from `SYSTEMS_PLAN.md`'s DS-5 and REQ-11/REQ-12 text, not from
-`capture_session.py`'s current stop-path implementation -- which has no
-helper_stop branch at all today and always writes `agent_stop`.
+slim `helper_stop` row with its exact five-key shape; every other quadrant
+writes the full `agent_stop` row unchanged -- the conservative fallback, so a
+real agent is never mistaken for a helper.
 """
 
 from __future__ import annotations
@@ -24,6 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from hooks._observation_log.registry import EventClass
 
 HOOKS_DIR = Path(__file__).resolve().parent

@@ -467,7 +467,17 @@ def test_hooks_share_one_observation_log_writer_copy(tmp_path, monkeypatch):
 
 _OWNER_PACKAGE_PREFIX = "hooks/_observation_log/"
 _TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|conftest)\.py$")
-_EXCLUDED_DIR_MARKERS = (".venv/", "/plugins/cache/", "/.claude/worktrees/", "/node_modules/")
+# `.ai-work/` and `tmp/` are gitignored scratch space (pipeline notes, probe copies
+# of hooks/): a local checkout carries them and CI does not. td-273 tracks
+# replacing this walk with a `git ls-files` lister shared by both scans.
+_EXCLUDED_DIR_MARKERS = (
+    ".venv/",
+    "/plugins/cache/",
+    "/.claude/worktrees/",
+    "/node_modules/",
+    "/.ai-work/",
+    "/tmp/",
+)
 _WRITER_IMPORT_RE = re.compile(r"_observation_log(\.writer\b|\s+import\s+[^\n#]*\bwriter\b)")
 
 

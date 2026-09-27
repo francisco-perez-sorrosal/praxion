@@ -405,12 +405,18 @@ def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules(
     interpreter's `sys.modules`. The log directory exists, so the drive
     reaches the marker digest and the append rather than failing at the
     directory stat.
+
+    Measured against a baseline of the standard-library modules the path
+    imports anyway: on Python 3.12, `import pathlib` alone loads
+    `urllib.parse`, so an absolute check fails there and passes on 3.13.
     """
     ai_state_dir = tmp_path / ".ai-state"
     ai_state_dir.mkdir()
     script = (
         "import sys\n"
+        "import fcntl, hashlib, json, os\n"
         "from pathlib import Path\n"
+        "baseline = set(sys.modules)\n"
         "from hooks._observation_log import writer\n"
         "writer.record_tool_call(\n"
         "    Path(sys.argv[1]),\n"
@@ -419,7 +425,7 @@ def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules(
         "    env={'PRAXION_OBSERVATION_LOG': 'standard', 'TMPDIR': sys.argv[2]},\n"
         ")\n"
         f"banned = {_BANNED_HOT_PATH_MODULES!r}\n"
-        "hit = sorted(m for m in sys.modules if m.split('.')[0] in banned)\n"
+        "hit = sorted(m for m in set(sys.modules) - baseline if m.split('.')[0] in banned)\n"
         "print(','.join(hit))\n"
     )
     result = subprocess.run(

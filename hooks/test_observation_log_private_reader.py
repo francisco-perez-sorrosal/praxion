@@ -55,7 +55,17 @@ _COMPANION_MODULES = {
 
 # Test modules and pytest conftest files are test support, not consumers.
 _TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|conftest)\.py$")
-_EXCLUDED_DIR_MARKERS = (".venv/", "/plugins/cache/", "/.claude/worktrees/", "/node_modules/")
+# `.ai-work/` and `tmp/` are gitignored scratch space (pipeline notes, probe copies
+# of hooks/): a local checkout carries them and CI does not. td-273 tracks
+# replacing this walk with a `git ls-files` lister shared by both scans.
+_EXCLUDED_DIR_MARKERS = (
+    ".venv/",
+    "/plugins/cache/",
+    "/.claude/worktrees/",
+    "/node_modules/",
+    "/.ai-work/",
+    "/tmp/",
+)
 
 
 def _candidate_modules(root: Path) -> Iterator[tuple[str, Path]]:

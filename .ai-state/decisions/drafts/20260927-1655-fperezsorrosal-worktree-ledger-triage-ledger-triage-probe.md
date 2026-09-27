@@ -53,17 +53,32 @@ Add four connected components. None of them changes the ledger schema, the `dedu
 2. **`scripts/ledger_health.py`, the probe.** It is advisory and never edits; exit 0 always. It separates *evidence*
    from *context*.
    - **Evidence** (enough to make a row a candidate): a cited decision now terminal or narrowed; location decay
-     (renamed, deleted or vanished); an unresolvable `adr` goal link; a later code-touching commit naming the td id; a
-     shared base key or a re-file after a repurpose; a later notes amendment. For judged rows it adds a moved
-     keep-evidence file, a new superseding ADR on the row's files, an unusable judgment, and a discard that recurred.
+     (renamed, deleted or vanished); a **notes citation decay** (a backticked path or `path:line` cite in the row's
+     notes that no longer resolves at HEAD, filtered for lazy/ephemeral shapes — same oracle set as location decay);
+     an unresolvable `adr` goal link; a later code-touching commit naming the td id; a shared base key or a re-file
+     after a realignment; a later notes amendment. For judged rows it adds a moved keep-evidence file, a new
+     superseding ADR on the row's files, an unusable judgment, and a discard that recurred.
    - **Context** (never enough on its own): file overlap, churn and age.
    - It withholds any class whose oracle is unavailable, with a named reason. It emits the TD07 family envelope and
      per-row judge digests (`ledger-triage-digest/1`).
 3. **Sentinel TD07.** A read-only family row that surfaces candidates and writes no ledger row.
-4. **`/triage-debt`.** It runs the probe, has the judge re-probe each digest, proposes keep / repurpose / discard /
-   merge, and applies only the outcomes the user confirms. Each outcome is recorded as a stamp in the notes cell,
-   `[triage YYYY-MM-DD @<anchor>] <outcome>: …`. After applying, it runs `check_state_ledgers.py --backfill` and then
-   `--check`, and stops if the check fails.
+4. **`/triage-debt`.** It runs the probe and, for a full sweep (`--all`), fans the per-row digests out to judge
+   subagents in batches; each judge re-probes its digests and proposes an outcome — **kept**, **realigned** (rewrite
+   location/notes/severity to the current state, prior premise kept in the stamp), **discarded** or **merged**
+   (only when the judge's own re-probe cites a `file:line` at HEAD, a named decision, or a named state change — the
+   **discard confidence gate**; any judgment short of that, including any "not worth doing" call, is **escalated**
+   instead, with no stamp and no ledger edit) — and merges the batch proposals into **one** confirmation table for
+   the kept/realigned/discard/merge outcomes. The command applies only what the user confirms, writes
+   `TRIAGE_ESCALATIONS.md` for the escalated rows as a separate user discussion, and records each applied outcome as
+   a stamp in the notes cell, `[triage YYYY-MM-DD @<anchor>] <outcome>: …`. After applying, it runs
+   `check_state_ledgers.py --backfill` and then `--check`, and stops if the check fails. Judges never edit the
+   ledger; only the command's apply step does.
+
+**First triage in scope.** Building the tooling is not the deliverable on its own — after this branch's verifier
+passes and it merges to `main`, the orchestrator runs `/triage-debt --all` over every active row on `main`, under a
+separate task slug and spawn budget, applies the confirmed kept/realigned/discard/merge outcomes in one
+`chore(state)` commit, and brings the escalated rows to the user. This pipeline builds the mechanism; the first real
+triage is its first use, not a follow-up task.
 
 The stamp anchor is the merge-base of HEAD and the default branch. A judged row resurfaces only when its
 `anchor..HEAD` window shows a change of the kinds listed under evidence.
@@ -99,7 +114,7 @@ A `/triage-debt` sweep over all rows, each with a light digest.
 
 - **Pro:** kept `dedup_key` stable for discriminated rows on keep.
 - **Con:** a schema change against the registry, the finalize field order and every writer's prose, or a formula
-  change that couples identity to a notes micro-grammar. Neither helps repurpose, discard, merge, or other notes edits
+  change that couples identity to a notes micro-grammar. Neither helps realign, discard, merge, or other notes edits
   (rework suffix, recurrence note). Rejected in favour of the ledger's own `--backfill` + `--check`, which is fail-closed at
   pre-commit.
 
@@ -108,9 +123,15 @@ A `/triage-debt` sweep over all rows, each with a light digest.
 **Positive**
 
 - The ledger gains a premise-level health check to complement TD05's discipline checks.
-- `wontfix` gets criteria. Repurpose gets a path that keeps the row's id and records its prior shape.
+- `wontfix` gets criteria. Realignment (formerly "repurpose") gets a path that keeps the row's id
+  and records its prior shape.
 - One reader serves the sentinel, the command and tests.
 - No shipped finalize behaviour changes fleet-wide.
+- Value judgments ("is this still worth doing") never silently become discards — the discard
+  confidence gate routes anything short of re-probed evidence to `escalated`, a user checkpoint
+  rather than a ledger edit.
+- The ledger actually gets triaged: the first `/triage-debt --all` sweep runs immediately
+  post-merge over every active row, not as a deferred follow-up.
 
 **Negative**
 
@@ -122,7 +143,7 @@ A `/triage-debt` sweep over all rows, each with a light digest.
 
 ## Disconfirmation
 
-- **Falsifier.** This decision is wrong if, after the first two real triages, most confirmed discards or repurposes
+- **Falsifier.** This decision is wrong if, after the first two real triages, most confirmed discards or realignments
   came from rows the probe did *not* flag (found only under `--all`), or if most flagged rows are judged `kept` with
   evidence unrelated to their flagged class. Either would mean the evidence/context split selects no better than
   chance and Option A should replace it.

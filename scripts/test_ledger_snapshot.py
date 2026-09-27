@@ -470,3 +470,140 @@ def test_a_relative_single_directory_mention_is_not_a_repo_citation(tmp_path: Pa
 def test_a_resolving_citation_does_not_fire(tmp_path: Path) -> None:
     repo_root = _one_row_repo(tmp_path, "See `docs/guide.md:3`.", ("docs/guide.md",))
     assert _citation_decays(repo_root) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "not worth doing as of 20260927",
+        "saves 1000000 tokens, not worth it",
+        "cost-benefit ratio 3.5:1 against doing it",
+        "no longer relevant (see e.g. the v1.2:3 notes)",
+    ],
+)
+def test_numbers_dates_and_ratios_are_not_checkable_discard_anchors(text: str) -> None:
+    """A plain number is not a commit and a ratio is not a `path:line`; a discard
+    resting on either is a value judgment for the user, not a stamp."""
+    segment = f"[triage 2026-09-27 @9ad0e205] discarded: {text}"
+    assert isinstance(ledger_snapshot.parse_stamp(segment), ledger_snapshot.StampMalformed)
+
+
+# -- `cited-by-commit`: filing and rebases are not work on the row --------------------------
+
+_AS_T = ("-c", "user.email=t@t.t", "-c", "user.name=t")
+
+
+def _commit_all(repo_root: Path, message: str, authored: str) -> None:
+    git_ok(repo_root, "add", "-A")
+    git_ok(repo_root, *_AS_T, "commit", "-q", "--date", authored, "-m", message)
+
+
+def _cited_by_commit(repo_root: Path) -> list:
+    snapshot = ledger_snapshot.gather(repo_root)
+    delta = ledger_snapshot.row_delta(snapshot, _row(snapshot, "td-902"))
+    return [s for s in delta.signals if ledger_snapshot.signal_class_name(s) == "cited-by-commit"]
+
+
+def test_the_commit_that_filed_a_row_never_counts_as_work_on_it(tmp_path: Path) -> None:
+    """Filed a day after first-seen and touching one code file: still bookkeeping."""
+    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    ledger = repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md"
+    ledger.write_text(ledger.read_text() + "\n")
+    (repo_root / "scripts" / "x.py").write_text("changed\n")
+    _commit_all(repo_root, "chore(state): file td-902", "2026-01-02T12:00:00")
+
+    assert _cited_by_commit(repo_root) == []
+
+
+def test_a_rebased_commit_is_dated_by_its_author_not_its_committer(tmp_path: Path) -> None:
+    """Authored on the filing day; only the committer date (today) is later."""
+    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    (repo_root / "scripts" / "x.py").write_text("changed\n")
+    _commit_all(repo_root, "fix: part of td-902", "2026-01-01T12:00:00")
+
+    assert _cited_by_commit(repo_root) == []
+
+
+def test_a_later_code_commit_naming_the_row_is_evidence(tmp_path: Path) -> None:
+    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    (repo_root / "scripts" / "x.py").write_text("changed\n")
+    _commit_all(repo_root, "fix: part of td-902", "2026-02-01T12:00:00")
+
+    (signal,) = _cited_by_commit(repo_root)
+    assert signal.subject == "fix: part of td-902"
+
+
+# -- A failed history read withholds; it never reads as an empty history ------------------
+
+_FAILING_GIT = """#!/bin/sh
+for arg in "$@"; do
+  case "$arg" in --diff-filter=R|--name-only) echo "shim: refused" >&2; exit 128;; esac
+done
+exec "{real}" "$@"
+"""
+
+
+def test_a_failed_history_read_withholds_instead_of_reading_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the rename and commit reads failing, a move must not be reported as a
+    deletion and an untouched-looking row must not read as clean."""
+    import shutil
+
+    repo_root = _one_row_repo(
+        tmp_path, "Parser lives at `scripts/old_parser.py:12`.", ("scripts/old_parser.py",)
+    )
+    git_ok(repo_root, "mv", "scripts/old_parser.py", "scripts/new_parser.py")
+    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "mv")
+    shim_dir = tmp_path / "shim"
+    shim_dir.mkdir()
+    shim = shim_dir / "git"
+    shim.write_text(_FAILING_GIT.replace("{real}", shutil.which("git") or "git"))
+    shim.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shim_dir}:{__import__('os').environ['PATH']}")
+
+    snapshot = ledger_snapshot.gather(repo_root)
+
+    assert "read failed" in (snapshot.oracles["git-history"] or "")
+    assert "cited-by-commit" in {w.class_name for w in snapshot.withheld}
+    (decay,) = _citation_decays(repo_root)
+    assert decay.cause == "unclassified"
+
+
+# -- `citation-decay`: shorthands, parent paths and dead rename targets --------------------
+
+
+def test_a_shorthand_for_a_file_that_exists_is_not_decay(tmp_path: Path) -> None:
+    repo_root = _one_row_repo(
+        tmp_path, "Not filed: `project_metrics/cli.py`.", ("scripts/project_metrics/cli.py",)
+    )
+    assert _citation_decays(repo_root) == []
+
+
+def test_a_parent_relative_cite_is_not_a_repo_citation(tmp_path: Path) -> None:
+    repo_root = _one_row_repo(tmp_path, "Compare `../sibling/other.md`.", ())
+    assert _citation_decays(repo_root) == []
+
+
+def test_a_rename_whose_target_was_later_deleted_reports_the_deletion(tmp_path: Path) -> None:
+    repo_root = _one_row_repo(tmp_path, "See `scripts/a_mod.py:3`.", ("scripts/a_mod.py",))
+    git_ok(repo_root, "mv", "scripts/a_mod.py", "scripts/b_mod.py")
+    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "mv")
+    git_ok(repo_root, "rm", "-q", "scripts/b_mod.py")
+    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "rm")
+
+    (decay,) = _citation_decays(repo_root)
+    assert decay.cause != "renamed"
+
+
+# -- Notes segments ------------------------------------------------------------------------
+
+
+def test_a_separator_quoted_in_backticks_is_content_not_an_amendment() -> None:
+    notes = "Row renders as `a // b // c` in the table."
+    assert ledger_snapshot.split_segments(notes) == (notes,)
+
+
+def test_an_unbalanced_backtick_never_hides_a_later_stamp() -> None:
+    notes = "Stray ` tick // [triage 2026-09-27 @9ad0e205] kept: scripts/x.py:1 holds"
+    assert ledger_snapshot.split_segments(notes)[-1].startswith("[triage ")

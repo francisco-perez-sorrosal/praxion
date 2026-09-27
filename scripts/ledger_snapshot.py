@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """State-snapshot reader for the tech-debt ledger: what moved since a row was filed.
 
 A ledger row is a claim about the project as it stood on the day it was written.
@@ -39,7 +38,7 @@ from datetime import date
 from pathlib import Path
 from typing import assert_never
 
-from _git_runner import git_output
+from _git_runner import GitUnavailableError, git_output, run_git
 from adr_health import (
     build_deletion_index,
     build_rename_index,
@@ -112,6 +111,7 @@ __all__ = [
     "parse_stamp",
     "row_delta",
     "signal_class_name",
+    "split_segments",
 ]
 
 # -- Row grammar ---------------------------------------------------------------
@@ -148,9 +148,12 @@ _OUTCOMES: Mapping[str, Outcome] = {
     "discarded": "discarded",
     "merged": "merged",
 }
-_LINE_CITE = re.compile(r"(?:[\w.-]+/)*[\w-][\w.-]*\.\w+:\d+")
-# A sha must carry a digit, or English words spelled in hex ("defaced") would pass.
-_SHA = re.compile(r"\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
+# The extension must start with a letter, so a ratio ("3.5:1") or a version ("v1.2:3")
+# is never read as a `path:line`.
+_LINE_CITE = re.compile(r"(?:[\w.-]+/)*[\w-][\w.-]*\.[A-Za-z]\w*:\d+")
+# A sha must carry both a digit and a hex letter: English words spelled in hex
+# ("defaced") and plain numbers ("20260927", "1000000") are not commits.
+_SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")
 # What makes a discard checkable: a location, a decision, a row, or a commit.
 _CHECKABLE_ANCHORS = (_LINE_CITE, _DEC_TOKEN, _TD_TOKEN, _SHA)
 
@@ -196,6 +199,30 @@ def _path_token(token: str) -> str | None:
     """The path a `kept` stamp's first token names, or None when it names none."""
     path = cite_path(token)
     return path if "/" in path or "." in path else None
+
+
+def split_segments(notes: str) -> tuple[str, ...]:
+    """Split a notes cell on its ` // ` separator, never inside a backtick span.
+
+    A quoted separator (a table row, an escape example) is content, not an amendment.
+    An unbalanced backtick would hide every later separator -- stamps included -- so
+    such a cell falls back to the plain split.
+    """
+    if notes.count("`") % 2:
+        return tuple(notes.split(_SEGMENT_SEPARATOR))
+    segments, start, in_code = [], 0, False
+    index = 0
+    while index < len(notes):
+        if notes[index] == "`":
+            in_code = not in_code
+        elif not in_code and notes.startswith(_SEGMENT_SEPARATOR, index):
+            segments.append(notes[start:index])
+            index += len(_SEGMENT_SEPARATOR)
+            start = index
+            continue
+        index += 1
+    segments.append(notes[start:])
+    return tuple(segments)
 
 
 def _stamp_state(segments: tuple[str, ...]) -> StampState:
@@ -291,7 +318,7 @@ def _key_facts(row: DataRow, resolved: Mapping[str, str], blocked: Mapping[str, 
 def _parse_active(row: DataRow, key: KeyFacts) -> ActiveRow:
     row_id = TdId(row.row_id)
     notes = row.value("notes")
-    segments = tuple(notes.split(_SEGMENT_SEPARATOR))
+    segments = split_segments(notes)
     goal = _parse_goal(row.value("goal-ref-type"), row.value("goal-ref-value"))
     first_seen = parse_iso_date(row.value("first-seen"))
     refs = _parse_locations(row.value("location"))
@@ -325,7 +352,7 @@ def _parse_terminal(row: DataRow, key: KeyFacts) -> TerminalPeer:
         base_key=key.base,
         locations=_parse_locations(row.value("location")),
         last_seen=parse_iso_date(row.value("last-seen")),
-        stamp=_stamp_state(tuple(row.value("notes").split(_SEGMENT_SEPARATOR))),
+        stamp=_stamp_state(split_segments(row.value("notes"))),
     )
 
 
@@ -374,9 +401,7 @@ _EDGE_FIELDS = (
     "supersedes_in_part",
 )
 _RECORD_SEPARATOR, _FIELD_SEPARATOR = "\x1e", "\x1f"
-_COMMIT_FORMAT = (
-    f"--format={_RECORD_SEPARATOR}%H{_FIELD_SEPARATOR}%cs{_FIELD_SEPARATOR}%B{_FIELD_SEPARATOR}"
-)
+_COMMIT_FORMAT = f"--format={_RECORD_SEPARATOR}%H{_FIELD_SEPARATOR}%as{_FIELD_SEPARATOR}%B{_FIELD_SEPARATOR}"  # author date: a rebase or merge moves the committer date past a row's filing day
 
 
 def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
@@ -388,12 +413,12 @@ def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
     specs = [spec for spec in LEDGERS if spec.dedup_namespace == TECH_DEBT_NAMESPACE]
     active, terminal, unparseable = parse_rows([parse_ledger(repo_root, spec) for spec in specs])
     decisions = _load_decisions(repo_root)
-    has_history = history_available(repo_root)
     windows = [row.first_seen for row in active if row.first_seen is not None]
-    git = _gather_git(repo_root, min(windows) if windows else None) if has_history else None
+    git, history_gap = _gather_history(repo_root, min(windows) if windows else None)
+    has_history = git is not None
     lazy_shapes = load_expected_absent_shapes(repo_root)
     oracles: dict[Oracle, str | None] = {
-        "git-history": None if has_history else "no git history, or a shallow clone",
+        "git-history": history_gap,
         "adr-corpus": None if decisions else "no parseable ADR under .ai-state/decisions/",
         "lifecycle-table": None if lazy_shapes is not None else "artifact-inventory.md unreadable",
     }
@@ -465,23 +490,38 @@ def _frontmatter(path: Path, yaml_module) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _gather_git(repo_root: Path, since: date | None) -> GitFacts:
-    """Four whole-repository history reads; never one per row."""
-    tree = git_output(repo_root, "ls-tree", "-r", "--name-only", "HEAD") or ""
-    return GitFacts(
-        head_tree=frozenset(tree.splitlines()),
-        renames=build_rename_index(repo_root),
-        deletions=build_deletion_index(repo_root),
-        commits=_commit_index(repo_root, since) if since is not None else (),
-    )
+def _gather_history(repo_root: Path, since: date | None) -> tuple[GitFacts | None, str | None]:
+    """Four whole-repository history reads; never one per row.
+
+    Returns the facts, or None plus the reason when any read fails: a failed read is
+    an unanswered oracle, never an empty history (a failed rename index would turn
+    every move into a deletion, a failed log would read every row as untouched).
+    """
+    if not history_available(repo_root):
+        return None, "no git history, or a shallow clone"
+    tree = git_output(repo_root, "ls-tree", "-r", "--name-only", "HEAD")
+    renames = build_rename_index(repo_root, strict=True)
+    deletions = build_deletion_index(repo_root, strict=True)
+    commits = _commit_index(repo_root, since) if since is not None else ()
+    if tree is None or renames is None or deletions is None or commits is None:
+        reads = {"tree": tree, "renames": renames, "deletions": deletions, "commits": commits}
+        failed = ", ".join(name for name, value in reads.items() if value is None)
+        return None, f"git history read failed: {failed}"
+    facts = GitFacts(frozenset(tree.splitlines()), renames, deletions, commits)
+    return facts, None
 
 
-def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...]:
-    out = git_output(
-        repo_root, "log", f"--since={since.isoformat()}", _COMMIT_FORMAT, "--name-only", "HEAD"
-    )
+def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...] | None:
+    try:
+        result = run_git(
+            repo_root, "log", f"--since={since.isoformat()}", _COMMIT_FORMAT, "--name-only", "HEAD"
+        )
+    except GitUnavailableError:
+        return None
+    if result.returncode != 0:
+        return None
     commits = []
-    for record in (out or "").split(_RECORD_SEPARATOR):
+    for record in result.stdout.split(_RECORD_SEPARATOR):
         fields = record.split(_FIELD_SEPARATOR)
         if len(fields) != 4:
             continue

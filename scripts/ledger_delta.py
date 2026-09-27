@@ -34,6 +34,7 @@ Oracle = Literal["git-history", "adr-corpus", "lifecycle-table"]
 
 STAMP_PREFIX = "[triage "
 _STATE_ROOT = ".ai-state/"
+_LEDGER_FILES = frozenset({".ai-state/TECH_DEBT_LEDGER.md", ".ai-state/TECH_DEBT_RESOLVED.md"})
 # Frontmatter edges by which a decision narrows or replaces an earlier one.
 _CHANGING_EDGES = ("supersedes", "supersedes_in_part")
 
@@ -415,8 +416,10 @@ def _path_fate(
         return None
     if git is None:
         return ("unclassified", None, None)
+    if _unique_suffix_match(git.head_tree, path):
+        return None  # a shorthand for a file that exists, e.g. `cli.py` for `scripts/.../cli.py`
     target = _rename_target(path, git.renames)
-    if target:
+    if target and _in_tree(git.head_tree, target):
         return ("renamed", target, None)
     deleted = _deletion_date(path, git.deletions)
     if deleted:
@@ -426,6 +429,11 @@ def _path_fate(
         if snapshot.lazy_shapes is not None
         else ("unclassified", None, None)
     )
+
+
+def _unique_suffix_match(tree: frozenset[str], path: str) -> bool:
+    suffix = "/" + path.rstrip("/")
+    return sum(1 for entry in tree if entry.endswith(suffix)) == 1
 
 
 def _in_tree(tree: frozenset[str], path: str) -> bool:
@@ -474,7 +482,7 @@ def notes_path_citations(notes: str) -> tuple[tuple[str, str], ...]:
         path = cite_path(cite)
         if cite in cites or not _PATH_SHAPE.match(path) or _SHAPE.search(path):
             continue
-        if path.startswith(("~", "/")) or "://" in cite or path.startswith(_EPHEMERAL_ROOTS):
+        if path.startswith(("~", "/", "..")) or "://" in cite or path.startswith(_EPHEMERAL_ROOTS):
             continue
         cites[cite] = path
     return tuple(cites.items())
@@ -522,13 +530,24 @@ def _cited_by_commit(
 ) -> list[CitedByCommit]:
     if snapshot.git is None or not isinstance(window, FirstSeenWindow):
         return []
+    naming = [commit for commit in snapshot.git.commits if row.id in commit.td_ids]
+    filing = _filing_commit(naming)
     return [
         CitedByCommit(commit.sha, commit.date, commit.subject)
-        for commit in snapshot.git.commits
-        if row.id in commit.td_ids
+        for commit in naming
+        if commit is not filing
         and commit.date > window.start
         and any(not path.startswith(_STATE_ROOT) for path in commit.paths)
     ]
+
+
+def _filing_commit(naming: list[Commit]) -> Commit | None:
+    """The oldest commit that names the row and touches a ledger file: the one that filed it.
+
+    Filing is bookkeeping, not work on the row, even when the same commit edits code.
+    """
+    filed = [commit for commit in naming if any(p in _LEDGER_FILES for p in commit.paths)]
+    return filed[-1] if filed else None  # commits are newest first
 
 
 def _duplicates(snapshot: StateSnapshot, row: ActiveRow) -> list[DuplicatePeer]:

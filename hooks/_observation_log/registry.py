@@ -52,19 +52,19 @@ class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ target
 
 # One entry per class: the ``event_type`` it writes, the producing hook or
 # script (documentation only), the modes it is recorded in, and the fields
-# its row declares. `standard` does not yet narrow anything below (every
-# class is recorded in both `full` and `standard`, matching today's
-# behavior) -- the recording-policy step differentiates `TOOL_OTHER` out of
-# `standard` once the classifier can tell it apart from the other two
-# tool_use classes.
+# its row declares. `TOOL_OTHER` is the one class `standard` narrows out --
+# a later, non-file-changing, non-first tool call from a subagent already
+# seen in this log -- because it is the only class with no `min_mode:
+# standard` consumer. Every other class is recorded in both `full` and
+# `standard`.
 EventSpec = namedtuple("EventSpec", ("event_type", "writer", "modes", "fields"))
 
 _FULL_AND_STANDARD = frozenset({Mode.FULL, Mode.STANDARD})
 _EVERY_MODE = frozenset(Mode)  # RECOVERY bypasses the writer -- never gated.
 
 # Every lifecycle row (session/agent start/stop) shares this envelope; a stop
-# adds usage fields, and only session_start additionally carries
-# `log_mode_source` once a later step stamps it.
+# adds usage fields, and session_start additionally carries `log_mode_source`
+# (see `_SESSION_START_FIELDS` below).
 _LIFECYCLE_FIELDS = (
     "timestamp",
     "session_id",
@@ -79,7 +79,12 @@ _LIFECYCLE_FIELDS = (
     "classification",
     "agent_type_source",
     "start_correlation",
+    "log_mode",
 )
+# session_start is the one row every reader can rely on to name *why* the
+# process resolved the mode it did -- every other lifecycle row only carries
+# the mode itself.
+_SESSION_START_FIELDS = _LIFECYCLE_FIELDS + ("log_mode_source",)
 _AGENT_STOP_USAGE_FIELDS = (
     "stop_source",
     "tokens_in",
@@ -108,12 +113,13 @@ _TOOL_USE_FIELDS = (
     "trace_id",
     "span_id",
     "parent_span_id",
+    "log_mode",
 )
 
 EVENTS = MappingProxyType(
     {
         EventClass.SESSION_START: EventSpec(
-            "session_start", "capture_session", _FULL_AND_STANDARD, _LIFECYCLE_FIELDS
+            "session_start", "capture_session", _FULL_AND_STANDARD, _SESSION_START_FIELDS
         ),
         EventClass.SESSION_STOP: EventSpec(
             "session_stop", "capture_session", _FULL_AND_STANDARD, _LIFECYCLE_FIELDS
@@ -131,7 +137,7 @@ EVENTS = MappingProxyType(
             "helper_stop",
             "capture_session",
             _FULL_AND_STANDARD,
-            ("timestamp", "session_id", "agent_id", "project", "event_type"),
+            ("timestamp", "session_id", "agent_id", "project", "event_type", "log_mode"),
         ),
         EventClass.TOOL_FILE_CHANGE: EventSpec(
             "tool_use", "capture_observations", _FULL_AND_STANDARD, _TOOL_USE_FIELDS
@@ -140,7 +146,7 @@ EVENTS = MappingProxyType(
             "tool_use", "capture_observations", _FULL_AND_STANDARD, _TOOL_USE_FIELDS
         ),
         EventClass.TOOL_OTHER: EventSpec(
-            "tool_use", "capture_observations", _FULL_AND_STANDARD, _TOOL_USE_FIELDS
+            "tool_use", "capture_observations", frozenset({Mode.FULL}), _TOOL_USE_FIELDS
         ),
         EventClass.SKILL_ACTIVATION: EventSpec(
             "skill_activation",
@@ -152,7 +158,7 @@ EVENTS = MappingProxyType(
             "compaction",
             "capture_session",
             _FULL_AND_STANDARD,
-            ("event_type", "timestamp", "session_id", "trigger", "summary_bytes"),
+            ("event_type", "timestamp", "session_id", "trigger", "summary_bytes", "log_mode"),
         ),
         EventClass.CONTEXT_SURFACE: EventSpec(
             "context_surface_measurement",
@@ -170,13 +176,23 @@ EVENTS = MappingProxyType(
                 "file_paths",
                 "outcome",
                 "classification",
+                "log_mode",
             ),
         ),
         EventClass.GATE_FIRE: EventSpec(
             "gate_fire",
             "record_gate_fire",
             _FULL_AND_STANDARD,
-            ("timestamp", "session_id", "event_type", "hook", "tool_name", "outcome", "reason"),
+            (
+                "timestamp",
+                "session_id",
+                "event_type",
+                "hook",
+                "tool_name",
+                "outcome",
+                "reason",
+                "log_mode",
+            ),
         ),
         EventClass.RECOVERY: EventSpec(
             "recovery",

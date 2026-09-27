@@ -21,10 +21,24 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 from hooks._observation_log import registry, writer
 from hooks._observation_log.modes import Mode
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _marker_tmp(tmp_path: Path) -> Path:
+    """A per-test temp dir for first-call markers -- never the real host
+    ``/tmp``, which the writer falls back to only when ``env`` carries no
+    ``TMPDIR``/``TEMP``/``TMP`` key at all.
+    """
+    marker_dir = tmp_path / "marker-tmp"
+    marker_dir.mkdir(exist_ok=True)
+    return marker_dir
 
 
 def _write_and_read(
@@ -33,7 +47,10 @@ def _write_and_read(
     ai_state_dir = tmp_path / mode.value / ".ai-state"
     ai_state_dir.mkdir(parents=True, exist_ok=True)
     writer.record_tool_call(
-        ai_state_dir, row, is_subagent=is_subagent, env={"PRAXION_OBSERVATION_LOG": mode.value}
+        ai_state_dir,
+        row,
+        is_subagent=is_subagent,
+        env={"PRAXION_OBSERVATION_LOG": mode.value, "TMPDIR": str(_marker_tmp(tmp_path))},
     )
     obs_path = ai_state_dir / "observations.jsonl"
     if not obs_path.exists():
@@ -82,7 +99,7 @@ def test_standard_mode_writes_file_changing_and_first_of_subagent_and_skill_but_
 ) -> None:
     ai_state_dir = tmp_path / "standard-classify" / ".ai-state"
     ai_state_dir.mkdir(parents=True)
-    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value}
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(_marker_tmp(tmp_path))}
 
     # First tool call of a subagent, not file-changing: written (TOOL_FIRST_OF_SUBAGENT).
     writer.record_tool_call(
@@ -121,7 +138,7 @@ def test_full_mode_writes_every_non_blocklisted_tool_call_regardless_of_classifi
 ) -> None:
     ai_state_dir = tmp_path / "full-classify" / ".ai-state"
     ai_state_dir.mkdir(parents=True)
-    env = {"PRAXION_OBSERVATION_LOG": Mode.FULL.value}
+    env = {"PRAXION_OBSERVATION_LOG": Mode.FULL.value, "TMPDIR": str(_marker_tmp(tmp_path))}
 
     for _ in range(3):
         writer.record_tool_call(
@@ -137,9 +154,7 @@ def test_full_mode_writes_every_non_blocklisted_tool_call_regardless_of_classifi
     assert len(rows) == 3, "full mode must write every tool call, not just each subagent's first"
 
 
-def test_unwritable_marker_directory_still_writes_the_first_call_row(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_unwritable_marker_directory_still_writes_the_first_call_row(tmp_path: Path) -> None:
     """Append-then-mark ordering means any OSError on the
     marker path must still leave the row written -- at-least-once, never
     absent, even when the marker cannot be created at all.
@@ -149,19 +164,91 @@ def test_unwritable_marker_directory_still_writes_the_first_call_row(
     unwritable_tmp = tmp_path / "no-write-tmp"
     unwritable_tmp.mkdir()
     unwritable_tmp.chmod(0o500)  # read+execute only: marker creation must fail with OSError
-    monkeypatch.setenv("TMPDIR", str(unwritable_tmp))
 
     writer.record_tool_call(
         ai_state_dir,
         {"tool_name": "Read", "file_paths": [], "agent_id": "agent-race"},
         is_subagent=True,
-        env={"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value},
+        env={"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(unwritable_tmp)},
     )
 
     obs_path = ai_state_dir / "observations.jsonl"
     rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
 
     assert len(rows) == 1, "an unwritable marker directory must never cost the row itself"
+
+
+def test_a_pre_existing_marker_for_a_different_log_does_not_suppress_this_logs_first_call(
+    tmp_path: Path,
+) -> None:
+    """The marker key includes the log directory's identity (device+inode),
+    not just the agent_id -- a marker already created for one project's log
+    must never suppress a same-named agent's first-call row in a different
+    project's log.
+    """
+    marker_tmp = _marker_tmp(tmp_path)
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(marker_tmp)}
+
+    other_ai_state_dir = tmp_path / "other-project" / ".ai-state"
+    other_ai_state_dir.mkdir(parents=True)
+    writer.record_tool_call(
+        other_ai_state_dir,
+        {"tool_name": "Read", "file_paths": [], "agent_id": "shared-agent-id"},
+        is_subagent=True,
+        env=env,
+    )
+    assert len(list(marker_tmp.iterdir())) == 1, (
+        "fixture assumption: the first call left exactly one marker behind"
+    )
+
+    this_ai_state_dir = tmp_path / "this-project" / ".ai-state"
+    this_ai_state_dir.mkdir(parents=True)
+    writer.record_tool_call(
+        this_ai_state_dir,
+        {"tool_name": "Read", "file_paths": [], "agent_id": "shared-agent-id"},
+        is_subagent=True,
+        env=env,
+    )
+
+    obs_path = this_ai_state_dir / "observations.jsonl"
+    rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(rows) == 1, (
+        "a marker created for a different log's identity must not suppress "
+        "this log's own first-call row"
+    )
+
+
+def test_a_losing_first_call_marker_race_does_not_raise_or_lose_the_row(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Two of a subagent's "first" calls racing to create the marker: the
+    loser's O_CREAT|O_EXCL raises FileExistsError, which must be swallowed
+    -- the row it guards was already appended before the marker create was
+    even attempted.
+    """
+    ai_state_dir = tmp_path / "race" / ".ai-state"
+    ai_state_dir.mkdir(parents=True)
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(_marker_tmp(tmp_path))}
+
+    real_open = os.open
+
+    def _racing_open(path, flags, *args, **kwargs):
+        if flags & os.O_EXCL:
+            raise FileExistsError("simulated concurrent winner")
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", _racing_open)
+
+    writer.record_tool_call(
+        ai_state_dir,
+        {"tool_name": "Read", "file_paths": [], "agent_id": "racer"},
+        is_subagent=True,
+        env=env,
+    )
+
+    obs_path = ai_state_dir / "observations.jsonl"
+    rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(rows) == 1, "a losing marker-create race must never cost the row itself"
 
 
 # -- Rotation (moved verbatim from hooks/test_hook_utils.py with the writer) ----
@@ -241,4 +328,99 @@ def test_canary_rotate_at_threshold_zero(tmp_path, monkeypatch):
     assert rotated.exists(), (
         "rotation canary FAILED: <obs_path>.1 must exist when threshold is 0 "
         "— rotation is either absent or misconditioned"
+    )
+
+
+# -- log_mode / log_mode_source stamping ----------------------------------------
+
+
+def test_every_recorded_row_carries_the_resolved_log_mode(tmp_path: Path) -> None:
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+
+    written = writer.record(
+        ai_state_dir,
+        registry.EventClass.AGENT_START,
+        {"event_type": "agent_start", "agent_id": "a1"},
+        env={"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value},
+    )
+
+    obs_path = ai_state_dir / "observations.jsonl"
+    rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
+    assert written is True
+    assert rows[0]["log_mode"] == "standard"
+
+
+def test_only_session_start_carries_log_mode_source(tmp_path: Path) -> None:
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value}
+
+    writer.record(
+        ai_state_dir, registry.EventClass.SESSION_START, {"event_type": "session_start"}, env=env
+    )
+    writer.record(
+        ai_state_dir, registry.EventClass.AGENT_START, {"event_type": "agent_start"}, env=env
+    )
+
+    obs_path = ai_state_dir / "observations.jsonl"
+    rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
+    session_start, agent_start = rows
+    assert session_start["log_mode_source"] == "setting"
+    assert "log_mode_source" not in agent_start
+
+
+def test_record_never_mutates_the_callers_row(tmp_path: Path) -> None:
+    """`record` must stamp a copy -- the caller's own dict is untouched, so a
+    caller that reuses or logs the row afterward never sees a value it never
+    put there."""
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+    row = {"event_type": "agent_start"}
+
+    writer.record(
+        ai_state_dir,
+        registry.EventClass.AGENT_START,
+        row,
+        env={"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value},
+    )
+
+    assert row == {"event_type": "agent_start"}, "the caller's row dict must not be mutated"
+
+
+# -- hot-path import constraint --------------------------------------------------
+
+_BANNED_HOT_PATH_MODULES = ("dataclasses", "typing", "inspect", "tempfile", "subprocess", "urllib")
+
+
+def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules() -> None:
+    """`capture_observations.py`'s per-tool-call path -- import through a
+    full `record_tool_call` drive, including the marker-classification
+    branch -- must never pull in any of these modules into a fresh
+    interpreter's `sys.modules`.
+    """
+    script = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from hooks._observation_log import writer\n"
+        "writer.record_tool_call(\n"
+        "    Path('/nonexistent-praxion-ai-state-dir'),\n"
+        "    {'tool_name': 'Read', 'file_paths': [], 'agent_id': 'x'},\n"
+        "    is_subagent=True,\n"
+        "    env={'PRAXION_OBSERVATION_LOG': 'standard'},\n"
+        ")\n"
+        f"banned = {_BANNED_HOT_PATH_MODULES!r}\n"
+        "hit = sorted(m for m in sys.modules if m.split('.')[0] in banned)\n"
+        "print(','.join(hit))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "", (
+        f"tool-call writer path imported banned hot-path modules: {result.stdout.strip()}"
     )

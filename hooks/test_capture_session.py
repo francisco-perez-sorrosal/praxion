@@ -1896,6 +1896,48 @@ class TestBuildSessionSummary:
 
         assert summary["models"] == ["claude-opus-5", "claude-sonnet-5"]
 
+    def test_log_mode_defaults_to_full_when_the_caller_names_no_mode(self) -> None:
+        module = _load_module()
+
+        summary = module.build_session_summary(
+            [], {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["log_mode"] == "full"
+
+    def test_log_mode_carries_the_callers_named_mode(self) -> None:
+        module = _load_module()
+
+        summary = module.build_session_summary(
+            [], {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.STANDARD
+        )
+
+        assert summary["log_mode"] == "standard"
+
+    def test_tool_calls_by_tool_is_present_in_full_mode(self) -> None:
+        module = _load_module()
+        rows = [_wal_row(event_type="tool_use", tool_name="Write")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.FULL
+        )
+
+        assert summary["tool_calls_by_tool"] == {"Write": 1}
+
+    def test_tool_calls_by_tool_is_omitted_outside_full_mode(self) -> None:
+        """`standard` drops most tool_use rows, so a per-tool breakdown built
+        from what little survives would misrepresent this session's actual
+        tool usage -- the key must be absent, not a partial or empty dict a
+        reader could mistake for "no tool calls ran"."""
+        module = _load_module()
+        rows = [_wal_row(event_type="tool_use", tool_name="Write")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.STANDARD
+        )
+
+        assert "tool_calls_by_tool" not in summary
+
 
 class TestPipelineSlugSharedHelper:
     """RED: `build_session_summary` does not yet emit `pipeline_slug`.

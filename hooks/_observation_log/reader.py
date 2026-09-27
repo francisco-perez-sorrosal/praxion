@@ -146,9 +146,11 @@ def upcast(row: dict) -> dict:
 def recorded_mode(row: dict) -> Mode:
     """The ``Mode`` a row was written under.
 
-    A missing ``log_mode`` key -- every row predating this package, and
-    every row until a later step starts stamping it -- reads as ``FULL``,
-    matching today's un-differentiated behavior.
+    Every row `writer.record`/`record_tool_call` appends now carries
+    ``log_mode``. A missing key -- every row predating this package, plus
+    the prose-written `recovery` rows that bypass the writer entirely --
+    reads as ``FULL``, matching the un-differentiated behavior those rows
+    were always recorded under.
     """
     try:
         return Mode(row.get("log_mode", Mode.FULL.value))

@@ -18,6 +18,7 @@ or ``urllib``.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 from collections.abc import Mapping
@@ -86,33 +87,113 @@ def record(
 ) -> bool:
     """Append ``row`` under ``event_class`` when the resolved mode allows it.
 
+    Every appended row is stamped with ``log_mode``; a ``SESSION_START`` row
+    additionally carries ``log_mode_source``, so a reader can tell "the
+    fleet default" apart from "this project opted in explicitly" apart from
+    "a typo fell back to full" for the one row per session that needs to say
+    so. ``row`` itself is never mutated -- the stamped copy is what gets
+    appended.
+
     Fail-open: any exception degrades to "not written" rather than
     propagating. Returns whether the row was actually appended.
     """
     try:
-        mode, _source = resolve_mode(env)
+        mode, source = resolve_mode(env)
         if not registry.records(event_class, mode):
             return False
-        append_observation(ai_state_dir / LOG_FILENAME, row)
+        stamped = {**row, "log_mode": mode.value}
+        if event_class is EventClass.SESSION_START:
+            stamped["log_mode_source"] = source.value
+        append_observation(ai_state_dir / LOG_FILENAME, stamped)
         return True
     except Exception:
         return False
 
 
-def _classify(row: dict) -> EventClass:
-    """Coarse tool-call classification.
+def _classify(row: dict, *, marker_present: bool) -> EventClass:
+    """Pure tool-call classification: (row, marker_present) -> EventClass.
 
-    Skill calls and file-changing tool calls are already distinguishable and
-    the registry records them identically to every other tool call for now
-    (`full` and `standard` both record every class), so this coarseness has
-    no observable effect yet. The first-of-subagent distinction needs the
-    per-subagent first-call marker file, which `standard` mode introduces.
+    A ``Skill`` call is always ``SKILL_ACTIVATION``; a file-changing tool is
+    always ``TOOL_FILE_CHANGE``, regardless of the marker. Otherwise,
+    ``marker_present`` being False means this is the first recorded call for
+    this (log, subagent) pair -- ``TOOL_FIRST_OF_SUBAGENT`` -- and every
+    later call from that same subagent, or any main-agent call that is
+    neither Skill nor file-changing, is ``TOOL_OTHER``. The main agent is
+    never "first of a subagent" -- its caller passes ``marker_present=True``
+    unconditionally, since that concept does not apply to it.
     """
     if row.get("tool_name") == "Skill":
         return EventClass.SKILL_ACTIVATION
     if row.get("tool_name") in FILE_CHANGING_TOOLS:
         return EventClass.TOOL_FILE_CHANGE
+    if not marker_present:
+        return EventClass.TOOL_FIRST_OF_SUBAGENT
     return EventClass.TOOL_OTHER
+
+
+# Prefix for the first-call marker's filename -- an empty file per (log
+# directory identity, agent_id), see `_first_call_marker_path`.
+_MARKER_PREFIX = "praxion-observation-log-first-call-"
+
+
+def _marker_dir(env: Mapping[str, str]) -> Path:
+    """The user temp directory, resolved without importing ``tempfile`` --
+    this module sits on the per-tool-call hot path, which must not import it.
+    """
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        value = env.get(key)
+        if value:
+            return Path(value)
+    return Path("/tmp")
+
+
+def _first_call_marker_path(ai_state_dir: Path, agent_id: str, env: Mapping[str, str]) -> Path:
+    """The marker file for one (log directory, subagent) pair.
+
+    Keyed by the log directory's device+inode, not its path, so two
+    worktrees -- or the same project moved or renamed -- never collide or
+    alias onto the same marker.
+    """
+    stat = ai_state_dir.stat()
+    key = f"{stat.st_dev}:{stat.st_ino}:{agent_id}"
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return _marker_dir(env) / f"{_MARKER_PREFIX}{digest}"
+
+
+def _first_call_marker_present(
+    ai_state_dir: Path, agent_id: str, env: Mapping[str, str]
+) -> tuple[bool, Path | None]:
+    """Whether this subagent's first-call marker already exists, and the
+    path to create it at.
+
+    Any failure to resolve or read the marker -- an unresolvable temp
+    directory, a ``.ai-state`` directory ``stat`` cannot reach -- degrades to
+    "not present, no path": biased toward the more-inclusive
+    ``TOOL_FIRST_OF_SUBAGENT`` classification (recorded in every mode) over
+    the pickier ``TOOL_OTHER`` (dropped in `standard`), so an agent that did
+    something is never read as one that did nothing.
+    """
+    try:
+        marker_path = _first_call_marker_path(ai_state_dir, agent_id, env)
+        return marker_path.exists(), marker_path
+    except OSError:
+        return False, None
+
+
+def _create_first_call_marker(marker_path: Path) -> None:
+    """Create the marker, ignoring a losing race and any other OSError.
+
+    Called only after the row it marks has already been appended
+    (append-then-mark): a crash, a race between two "first" calls for the
+    same subagent, or an unwritable marker directory can only ever cost a
+    duplicate ``TOOL_FIRST_OF_SUBAGENT`` classification on this subagent's
+    next call, never a missing row.
+    """
+    try:
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        os.close(os.open(str(marker_path), os.O_CREAT | os.O_EXCL, 0o600))
+    except OSError:
+        pass
 
 
 def record_tool_call(
@@ -124,11 +205,30 @@ def record_tool_call(
 ) -> bool:
     """Classify one tool-call row and record it if the registry allows it.
 
-    ``is_subagent`` is accepted now to match the stable call signature but is
-    not yet consulted -- the first-of-subagent marker and its classification
-    branch land in a later step, once `standard` narrows what it keeps.
+    A subagent's marker is checked before the row is classified, and created
+    -- only if this call turned out to be the first -- after the row is
+    appended, never before. That ordering is what makes the marker an
+    at-least-once signal: whatever goes wrong with the marker, the row it
+    would have gated is already written.
+
+    Fail-open like every other function here: any exception degrades to
+    "not written" rather than propagating.
     """
-    return record(ai_state_dir, _classify(row), row, env=env)
+    try:
+        if is_subagent:
+            marker_present, marker_path = _first_call_marker_present(
+                ai_state_dir, str(row.get("agent_id", "")), env
+            )
+        else:
+            marker_present, marker_path = True, None
+
+        event_class = _classify(row, marker_present=marker_present)
+        written = record(ai_state_dir, event_class, row, env=env)
+        if written and marker_path is not None and not marker_present:
+            _create_first_call_marker(marker_path)
+        return written
+    except Exception:
+        return False
 
 
 def record_gate_fire(

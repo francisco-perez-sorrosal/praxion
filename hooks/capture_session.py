@@ -172,6 +172,7 @@ from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
 from _observation_log import reader, writer
+from _observation_log.modes import Mode, resolve_mode
 from _observation_log.registry import EventClass
 
 EVENT_MAP = {
@@ -751,7 +752,9 @@ def _tokens_by_agent_type(rows: list[dict]) -> dict[str, dict[str, int]]:
     return totals
 
 
-def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str) -> dict:
+def build_session_summary(
+    session_rows: list[dict], payload: dict, ended_at: str, *, mode: Mode = Mode.FULL
+) -> dict:
     """Assemble one committed summary row from this session's local WAL rows.
 
     ``session_rows`` is every raw-WAL row already filtered to this
@@ -765,7 +768,11 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
     function is needed once that field exists. ``pipeline_slug`` is additive
     and present only when ``payload`` carries a ``cwd`` -- a legacy payload
     without one yields a row with no ``pipeline_slug`` key at all, matching
-    how a WAL row's own ``project`` field is derived.
+    how a WAL row's own ``project`` field is derived. ``mode`` names the
+    recording mode this session ran under and is carried on the row as
+    ``log_mode``; ``tool_calls_by_tool`` is a per-tool breakdown of every
+    tool call, which only ``full`` records, so it is present only then --
+    a ``standard`` reader must not read its absence as "no tool calls ran."
     """
     session_id = payload.get("session_id", "")
     timestamps = [str(r["timestamp"]) for r in session_rows if r.get("timestamp")]
@@ -783,8 +790,8 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
         "session_id": session_id,
         "started_at": started_at,
         "ended_at": ended_at,
+        "log_mode": mode.value,
         "spawns_by_agent_type": _count_by(session_rows, _SPAWN_EVENT_TYPE, "agent_type"),
-        "tool_calls_by_tool": _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name"),
         "tokens_by_agent_type": _tokens_by_agent_type(session_rows),
         "duration_ms": _duration_ms(started_at, ended_at),
         "models": models,
@@ -794,6 +801,8 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
         # that work land, so it says so rather than implying completeness.
         "complete": started_agent_ids.issubset(stopped_agent_ids),
     }
+    if mode is Mode.FULL:
+        summary["tool_calls_by_tool"] = _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name")
     # Additive-only: a legacy payload with no cwd omits the key entirely
     # rather than fabricating a slug from a meaningless default -- a reader
     # of an older committed row treats a missing key as "not derivable",
@@ -1034,7 +1043,10 @@ def main() -> None:
                 for r in reader.read_rows(ai_state_dir, archives=False)
                 if r.get("session_id") == session_id
             ]
-            summary_row = build_session_summary(session_rows, payload, observation["timestamp"])
+            mode, _source = resolve_mode(os.environ)
+            summary_row = build_session_summary(
+                session_rows, payload, observation["timestamp"], mode=mode
+            )
             _upsert_session_summary(ai_state_dir / SUMMARY_FILENAME, summary_row)
         except Exception:
             # The summary is a rollup, not the ground truth (the raw WAL

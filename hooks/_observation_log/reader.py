@@ -59,31 +59,39 @@ def read_segment(path: Path) -> SegmentRead:
     reason. A line that fails to parse as a JSON object is counted into
     ``malformed_lines`` by its 1-based line number and excluded from
     ``rows`` -- never silently dropped, never fatal to the rest of the read.
+
+    A line is what text-mode file iteration yields, never `str.splitlines()`,
+    which also breaks at U+0085, U+2028, U+2029 and other separators a
+    JSON-valid row may carry raw. Memory is bounded by the longest line.
     """
+    rows: list[dict] = []
+    malformed: list[int] = []
     try:
         # errors="replace": a torn multi-byte sequence must cost one malformed
         # line, never the whole segment (strict decoding raises ValueError).
-        text = path.read_text(encoding="utf-8", errors="replace")
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line_no, line in enumerate(handle, start=1):
+                if not line.strip():
+                    continue
+                row = _parse_row(line)
+                if row is None:
+                    malformed.append(line_no)
+                else:
+                    rows.append(upcast(row))
     except FileNotFoundError:
         return SegmentRead(path=path, rows=(), malformed_lines=(), error="missing")
     except OSError as exc:
         return SegmentRead(path=path, rows=(), malformed_lines=(), error=f"unreadable: {exc}")
-
-    rows: list[dict] = []
-    malformed: list[int] = []
-    for line_no, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            malformed.append(line_no)
-            continue
-        if isinstance(row, dict):
-            rows.append(upcast(row))
-        else:
-            malformed.append(line_no)
     return SegmentRead(path=path, rows=tuple(rows), malformed_lines=tuple(malformed), error=None)
+
+
+def _parse_row(line: str) -> dict | None:
+    """The JSON object ``line`` holds, or ``None`` when it holds none."""
+    try:
+        row = json.loads(line)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return row if isinstance(row, dict) else None
 
 
 def read_rows(ai_state_dir: Path, *, archives: bool = False) -> list[dict]:
@@ -147,18 +155,26 @@ def upcast(row: dict) -> dict:
     """Normalize a legacy row shape to its current equivalent.
 
     The single place a legacy shape is ever normalized, so every reader sees
-    one vocabulary. Today there is one rule: an `agent_stop` row written
-    before `helper_stop` existed, self-reporting `start_correlation:
-    unobserved-agent` and carrying no usage at all, was a harness helper
-    call, not an agent -- it is presented as the slim `helper_stop` row the
-    stop path now writes directly. Any other row passes through unchanged.
+    one vocabulary. Only legacy rows -- those without a `log_mode` key -- are
+    candidates: every row the owner writer appends carries that key and was
+    classified at write time, so it passes through unchanged, including an
+    `unobserved-agent` stop with no usage whose own transcript exists.
+
+    Today there is one rule: a legacy `agent_stop` row self-reporting
+    `start_correlation: unobserved-agent` and carrying no usage at all was a
+    harness helper call, not an agent -- it is presented as the slim
+    `helper_stop` row the stop path now writes directly. Any other row
+    passes through unchanged.
 
     "No usage at all" means no transcript `usage_source` *and* no token
-    field populated: rows written before `usage_source` existed carry real
-    token counts with no source label, and those are agents.
+    field populated. A legacy row with token counts but no source label
+    stays `agent_stop`: such rows are helpers carrying the parent session's
+    cumulative usage, but their content cannot tell them from a real agent
+    whose start went unobserved, so the rule stays conservative.
     """
     if (
-        row.get("event_type") == "agent_stop"
+        "log_mode" not in row
+        and row.get("event_type") == "agent_stop"
         and row.get("start_correlation") == "unobserved-agent"
         and row.get("usage_source") not in _TRANSCRIPT_USAGE_SOURCES
         and all(row.get(field) is None for field in _TOKEN_FIELDS)

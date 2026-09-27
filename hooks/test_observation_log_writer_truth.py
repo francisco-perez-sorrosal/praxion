@@ -568,9 +568,17 @@ def test_canary_writer_ignoring_mode_flags_every_step(tmp_path, monkeypatch):
     ctx = _prepare(tmp_path, monkeypatch, "off")
     cs = ctx["cs"]
     modes_mod = importlib.import_module("_observation_log.modes")
-    monkeypatch.setattr(
-        cs.writer, "resolve_mode", lambda env: (modes_mod.Mode.FULL, modes_mod.ModeSource.SETTING)
-    )
+
+    def ignore_mode(env):
+        return modes_mod.Mode.FULL, modes_mod.ModeSource.SETTING
+
+    # The recording path reads the mode in three places: the writer, and the two
+    # hooks that return before any work under `off`. Patching only the writer
+    # would leave those early returns in charge, so the steps they own could
+    # never show a mismatch.
+    monkeypatch.setattr(cs.writer, "resolve_mode", ignore_mode)
+    monkeypatch.setattr(cs, "resolve_mode", ignore_mode)
+    monkeypatch.setattr(ctx["hooks"]["measure_context_surface"], "resolve_mode", ignore_mode)
 
     outcomes = _run_scenario(
         hooks=ctx["hooks"],

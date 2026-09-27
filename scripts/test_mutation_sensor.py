@@ -999,6 +999,60 @@ class TestZeroMutantsRefusal:
 # ---------------------------------------------------------------------------
 
 
+class TestIncompleteRunsAndUnwritableTargets:
+    """A count not known to be complete is never published, and every failure
+    exits through the refusal line -- never a traceback and exit 1."""
+
+    def test_a_run_mutmut_reports_as_interrupted_refuses(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        stats = dict(CICD_STATS_FIXTURE, check_was_interrupted_by_user=True)
+        plan = _success_plan()
+        plan["export-cicd-stats"] = {"write": {"mutants/mutmut-cicd-stats.json": json.dumps(stats)}}
+        _install_fake_uv(monkeypatch, plan)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        _assert_refusal(rc, captured, "run-failed")
+        assert "survivors=" not in captured.out
+
+    def test_an_unwritable_config_refuses_instead_of_raising(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        _install_fake_uv(monkeypatch, _success_plan())
+
+        def _read_only(*args, **kwargs):
+            raise PermissionError("read-only file system")
+
+        monkeypatch.setattr(ms, "_write_pyproject", _read_only)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        _assert_refusal(rc, capsys.readouterr(), "run-failed")
+
+    def test_a_failed_cleanup_warns_on_stderr_without_changing_the_outcome(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        d = _flat_git_dir(tmp_path)
+        _install_fake_uv(monkeypatch, _success_plan())
+
+        def _cannot_remove(path, *args, **kwargs):
+            raise PermissionError(f"cannot remove {path}")
+
+        monkeypatch.setattr(ms.shutil, "rmtree", _cannot_remove)
+
+        rc = ms.main(["--targets", str(d / "mod.py"), "--tests", str(d / "test_mod.py")])
+
+        captured = capsys.readouterr()
+        assert rc == 0, captured.err
+        assert "survivors=" in captured.out
+        assert "cleanup could not remove" in captured.err, captured.err
+        assert "mutants" in captured.err, captured.err
+
+
 class TestSegfaultCountsAsInconclusive:
     def test_a_segfaulting_mutant_completes_the_run_and_counts_as_inconclusive(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

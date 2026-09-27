@@ -505,6 +505,10 @@ def _build_ran(
         raise ValueError(f"mutmut-cicd-stats.json missing key(s): {', '.join(sorted(missing))}")
     if "total" not in stats:
         raise ValueError("mutmut-cicd-stats.json missing key: total")
+    if stats.get("check_was_interrupted_by_user"):
+        # mutmut stopped before finishing: the histogram covers only part of the
+        # mutants, so publishing it would state an incomplete count as complete.
+        raise ValueError("mutmut reports the run was interrupted; counts are incomplete")
     total = int(stats["total"])
     if total == 0:
         # A vacuous green: mutmut generated no mutants at all for these targets
@@ -525,12 +529,27 @@ def _build_ran(
 def _cleanup(target_dir: Path, pyproject_path: Path | None) -> None:
     """Runs on every exit path from `_run_mutmut` -- success, refusal, timeout,
     or an unhandled exception -- so no sensor residue can be swept into a
-    commit by a careless whole-tree stage."""
+    commit by a careless whole-tree stage.
+
+    A removal that fails is named on stderr so the residue is visible; it never
+    changes the exit code -- this is a sensor, not a gate.
+    """
     if pyproject_path is not None and pyproject_path.exists():
-        pyproject_path.unlink()
+        try:
+            pyproject_path.unlink()
+        except OSError as exc:
+            print(
+                f"mutation_sensor: cleanup could not remove {pyproject_path}: {exc}",
+                file=sys.stderr,
+            )
     mutants_dir = target_dir / "mutants"
     if mutants_dir.exists():
-        shutil.rmtree(mutants_dir, ignore_errors=True)
+        try:
+            shutil.rmtree(mutants_dir)
+        except OSError as exc:
+            print(
+                f"mutation_sensor: cleanup could not remove {mutants_dir}: {exc}", file=sys.stderr
+            )
 
 
 def _charge_budget(elapsed_since: float, timeout: float, stage: str) -> float | Refused:
@@ -567,7 +586,10 @@ def _run_mutmut(
 
         target_names = [Path(t).name for t in targets]
         test_names = [Path(t).name for t in tests]
-        pyproject_path = _write_pyproject(target_dir, target_names, test_names, debug=debug)
+        try:
+            pyproject_path = _write_pyproject(target_dir, target_names, test_names, debug=debug)
+        except OSError as exc:
+            return Refused(ReasonCode.RUN_FAILED, f"cannot write the mutmut config: {exc}")
 
         remaining = next_remaining("bootstrap probe")
         if isinstance(remaining, Refused):

@@ -30,7 +30,7 @@ which is the merge-base when the probe runs on the default branch.
 
 Advisory by construction: reads the ledger pair, the ADR corpus and git history,
 writes nothing, and exits 0 whatever it finds. Exit 2 only on a script error --
-an unreadable ledger file or a plugin-cache repo root -- with the cause on stderr.
+an unreadable ledger or ADR file, or a plugin-cache repo root -- with the cause on stderr.
 """
 
 from __future__ import annotations
@@ -121,7 +121,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         snapshot = gather(repo_root)
     except (OSError, UnicodeDecodeError) as exc:
         print(
-            f"error: could not read the tech-debt ledger under {repo_root}: {exc}", file=sys.stderr
+            f"error: could not read the ledger pair or an ADR under {repo_root}: {exc}",
+            file=sys.stderr,
         )
         return 2
 
@@ -164,7 +165,7 @@ def assess(snapshot: StateSnapshot) -> list[Assessment]:
     for row in snapshot.active_rows:
         delta = row_delta(snapshot, row)
         classes = tuple(dict.fromkeys(signal_class_name(signal) for signal in delta.signals))
-        tiers = [CLASS_POLICY[name] for name in classes]
+        tiers: list[Tier] = [CLASS_POLICY[name] for name in classes]
         tier = min(tiers, key=_TIER_ORDER.__getitem__) if tiers else None
         assessments.append(Assessment(row, delta, classes, tier))
     return sorted(assessments, key=_rank_key)

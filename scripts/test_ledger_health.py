@@ -151,3 +151,15 @@ def test_missing_adr_corpus_reports_corpus_scope_withheld(tmp_path: Path) -> Non
     }
     assert "decision-drift" in corpus_withheld
     assert "goal-link-unresolved" in corpus_withheld
+
+
+# -- Script errors -------------------------------------------------------------------
+
+
+def test_plugin_cache_repo_root_is_refused_with_exit_two(tmp_path: Path) -> None:
+    """An installed plugin's cache is never a project to probe."""
+    cache_root = tmp_path / "plugins" / "cache" / "owner" / "praxion" / "1.0.0"
+    cache_root.mkdir(parents=True)
+    result = _run("--digest", "--repo-root", str(cache_root))
+    assert result.returncode == 2
+    assert "plugin-cache" in result.stderr

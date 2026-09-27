@@ -5,8 +5,8 @@ and the ADR corpus once, into the frozen types defined here. This module does no
 I/O: `row_delta(snapshot, row)` computes one row's signals and context from the
 snapshot alone, so every signal is testable against a hand-built snapshot.
 
-Consumers import the reader's public surface from `ledger_snapshot`, which
-re-exports what they need from here.
+Callers take the entry points (`gather`, `row_delta`) from `ledger_snapshot` and
+the types from here.
 """
 
 from __future__ import annotations
@@ -225,8 +225,8 @@ class Commit:
 @dataclass(frozen=True)
 class GitFacts:
     head_tree: frozenset[str]
-    renames: Mapping[str, str]
-    deletions: Mapping[str, str]
+    renames: dict[str, str]  # adr_health's index shape; never mutated
+    deletions: dict[str, str]
     commits: tuple[Commit, ...]  # newest first
 
 

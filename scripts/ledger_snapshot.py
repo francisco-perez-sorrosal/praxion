@@ -9,8 +9,11 @@ premise, plus context that never counts as a signal.
 
 Two halves, split on the effect boundary:
 
-    gather(repo_root) -> StateSnapshot     the only function that reads the world
-    row_delta(snapshot, row) -> RowDelta   pure; every signal is computed here
+    gather(repo_root) -> StateSnapshot     here; the only function that reads the world
+    row_delta(snapshot, row) -> RowDelta   `ledger_delta.py`; pure, every signal lives there
+
+This module is the reader's public surface: it re-exports `row_delta` and
+`signal_class_name` from its pure core, whose types callers import directly.
 
 The reader decides nothing about candidacy -- which signals count as evidence and
 how they rank is `ledger_health.py`'s policy. What the reader *does* own is which
@@ -379,7 +382,7 @@ _COMMIT_FORMAT = (
 def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
     """Read the ledger pair, the ADR corpus and git history once; never write.
 
-    Raises `OSError` / `UnicodeDecodeError` when a ledger file exists but cannot be
+    Raises `OSError` / `UnicodeDecodeError` when a ledger or ADR file exists but cannot be
     read -- the probe's one script error. Every other gap is an oracle withheld.
     """
     specs = [spec for spec in LEDGERS if spec.dedup_namespace == TECH_DEBT_NAMESPACE]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-run cost reader over a Workflow-tool run directory: joins
 `journal.jsonl` (the roster) -> `agent-<id>.meta.json` -> `agent-<id>.jsonl`
-(the transcript) -> `.ai-state/observations.jsonl` `agent_stop` WAL rows ->
+(the transcript) -> the observation log's `agent_stop` WAL rows ->
 the main-session transcript, all keyed by `agent_id`, never by position or
 label. A **measurement instrument**, not a gate: it always exits 0 once a run
 is found and read, however its `wal_agreement` verdicts land -- a
@@ -61,6 +61,11 @@ from pathlib import Path
 import _workflow_run as wr
 from _repo_root import git_toplevel_from_cwd
 
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
 
 # --------------------------------------------------------------------------- #
 # I/O layer
@@ -95,7 +100,7 @@ def load(
         )
 
     meta = {agent_id: wr.read_meta(wr.agent_meta_path(run_dir, agent_id)) for agent_id in roster}
-    wal_rows = _read_wal(project_root / ".ai-state" / "observations.jsonl")
+    wal_rows = _read_wal(reader.log_path(project_root / ".ai-state"))
     window = _run_window(transcripts)
     unobserved_ids = sorted(
         agent_id
@@ -179,7 +184,7 @@ def _read_wal(wal_path: Path) -> dict[str, dict]:
     duration_ms, usage_source, timestamp}` from `agent_stop` WAL rows. The last row for
     a given `agent_id` wins when several exist."""
     rows: dict[str, dict] = {}
-    for record in wr.iter_transcript_records(wal_path):
+    for record in reader.read_segment(wal_path).rows:
         if record.get("event_type") != "agent_stop":
             continue
         agent_id = record.get("agent_id")

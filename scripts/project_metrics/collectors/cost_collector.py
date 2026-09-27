@@ -1,7 +1,7 @@
 """Cost collector -- read pass plus aggregate pass.
 
-This module reads the observability write-ahead log (`.ai-state/observations.jsonl`
-and its `.1` rotation archive) plus the committed per-session summary rollup
+This module reads the observability write-ahead log (the observation log
+under `.ai-state/` and its `.1` rotation archive) plus the committed per-session summary rollup
 across the main checkout and every sibling worktree, classifies each
 `agent_stop` row by how honestly its token usage was attributed, and
 de-duplicates the honest population by `agent_id` (the read pass). It then
@@ -73,6 +73,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from hooks._observation_log import reader
 from scripts.project_metrics.collectors.base import (
     Available,
     CollectionContext,
@@ -138,8 +139,8 @@ __all__ = [
 # Tunables and named constants.
 # ---------------------------------------------------------------------------
 
-_WAL_FILENAME = "observations.jsonl"
-_WAL_ARCHIVE_FILENAME = "observations.jsonl.1"
+_WAL_FILENAME = reader.LOG_FILENAME
+_WAL_ARCHIVE_FILENAME = f"{reader.LOG_FILENAME}.1"
 _SUMMARY_FILENAME = "observations_summary.jsonl"
 _CALIBRATION_LOG_FILENAME = "calibration_log.md"
 

@@ -56,6 +56,11 @@ from pathlib import Path
 
 from _repo_root import git_toplevel_from_cwd
 
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
 # The model's context window -- a fixed constant, never a CLI-supplied value
 # (D1: Praxion ships no threshold, so there is nothing to make configurable).
 _WINDOW_TOKENS = 1_000_000
@@ -120,21 +125,14 @@ def _subagent_transcript_paths(transcripts_dir: Path) -> list[Path]:
 
 
 def _agent_types_from_wal(wal_path: Path) -> dict[str, str]:
-    """`agent_id -> agent_type` from `agent_start` WAL rows (join key for
-    subagent transcripts, which carry the id in their filename)."""
-    id2type: dict[str, str] = {}
-    if not wal_path.exists():
-        return id2type
-    for line in wal_path.read_text(encoding="utf-8").splitlines():
-        if '"agent_start"' not in line:
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if row.get("event_type") == "agent_start" and row.get("agent_id"):
-            id2type[row["agent_id"]] = row.get("agent_type")
-    return id2type
+    """`agent_id -> agent_type` from `agent_start` rows in the active log
+    segment (join key for subagent transcripts, which carry the id in their
+    filename). A missing segment yields no rows."""
+    return {
+        row["agent_id"]: row.get("agent_type")
+        for row in reader.read_segment(wal_path).rows
+        if row.get("event_type") == "agent_start" and row.get("agent_id")
+    }
 
 
 def _classify_from_prompt(first_prompt: str) -> str:
@@ -278,8 +276,7 @@ def load(project_root: Path) -> list[dict]:
     Impure: the only function in this module that touches the filesystem.
     """
     transcripts_dir = _transcripts_dir(project_root)
-    wal_path = project_root / ".ai-state" / "observations.jsonl"
-    id2type = _agent_types_from_wal(wal_path)
+    id2type = _agent_types_from_wal(reader.log_path(project_root / ".ai-state"))
 
     rows: list[dict] = []
     for path in _subagent_transcript_paths(transcripts_dir):

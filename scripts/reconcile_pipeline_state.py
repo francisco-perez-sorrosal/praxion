@@ -13,9 +13,10 @@ Reliability hierarchy (the spine):
                             the legacy free-form pytest-summary shape or the
                             canonical `Result: pass=<n> fail=<n> skip=<n>`
                             per-step shape, dec-386 — see `step_test_status`).
-  Tier 2 (localization)   — `.ai-state/observations.jsonl` (the harness WAL):
-                            which agent stopped, where it last wrote. Only ever
-                            *adds* a hint; never *overrides* a Tier-1 verdict.
+  Tier 2 (localization)   — the observation log (the harness WAL, owned by
+                            `_observation_log`): which agent stopped, where it
+                            last wrote. Only ever *adds* a hint; never
+                            *overrides* a Tier-1 verdict.
   Tier 3 (never trusted)  — the `WIP.md` checkbox itself, validated here.
 
 Entry point: ``reconcile(slug, repo_root, base_ref) -> list[verdict]`` is a pure,
@@ -55,6 +56,11 @@ from _step_schema import (
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
 # Only step-executing agent types can be correlated to a WIP step verdict;
 # research / doc / context agents touch files for other reasons.
@@ -132,7 +138,7 @@ def reconcile(
     wal_rows = (
         _wal_rows_override
         if _wal_rows_override is not None
-        else _read_wal(state_root / ".ai-state" / "observations.jsonl", max_age_days=max_age_days)
+        else _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
     )
 
     return [
@@ -308,7 +314,7 @@ def _make_verdict(
 
 
 # ---------------------------------------------------------------------------
-# Tier-2 correlation — observations.jsonl WAL, file-containment first
+# Tier-2 correlation — observation-log WAL, file-containment first
 # ---------------------------------------------------------------------------
 
 
@@ -491,44 +497,30 @@ def _parse_ts(ts: str) -> datetime:
         return datetime.fromtimestamp(0, timezone.utc)
 
 
-def _parse_jsonl(path: Path) -> list[dict[str, Any]]:
-    """Parse a JSONL file into a list of dicts; tolerate partial lines and OSError."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    rows: list[dict[str, Any]] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rows.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue  # a truncated final line never corrupts the read
-    return rows
-
-
 def _read_wal(
     obs_path: Path,
     *,
     max_age_days: int = 7,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Read observations.jsonl (active) + optional rotated .1 segment within a window.
+    """Read the active observation log + optional rotated archive segment
+    within a window.
 
     Active-file rows are retained unconditionally — the active file is
     size-bounded by rotation, so a current-session row with a malformed/missing
     timestamp must still reach correlation (pre-mortem scenario 6).
 
-    The .1 segment is included only when its mtime falls within max_age_days,
-    and its rows are additionally timestamp-filtered to the same window.
-    Malformed timestamps in the segment parse as epoch → outside any window → pruned.
+    The archive segment is included only when its mtime falls within
+    max_age_days, and its rows are additionally timestamp-filtered to the
+    same window. Malformed timestamps in the segment parse as epoch →
+    outside any window → pruned. Malformed/non-object lines in either
+    segment are skipped by ``reader.read_segment``, never fatal to the rest
+    of the read.
     """
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=max_age_days)
 
-    active_rows = _parse_jsonl(obs_path)
+    active_rows = list(reader.read_segment(obs_path).rows)
 
     seg_path = Path(str(obs_path) + ".1")
     seg_rows: list[dict[str, Any]] = []
@@ -536,7 +528,9 @@ def _read_wal(
         seg_mtime = datetime.fromtimestamp(seg_path.stat().st_mtime, timezone.utc)
         if seg_mtime >= cutoff:
             seg_rows = [
-                r for r in _parse_jsonl(seg_path) if _parse_ts(r.get("timestamp", "")) >= cutoff
+                r
+                for r in reader.read_segment(seg_path).rows
+                if _parse_ts(r.get("timestamp", "")) >= cutoff
             ]
     except OSError:
         pass  # segment absent or unreadable → skip silently
@@ -693,7 +687,7 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     state_root = Path(args.worktree_root).resolve() if args.worktree_root else repo_root
 
-    if not args.quiet and not (state_root / ".ai-state" / "observations.jsonl").exists():
+    if not args.quiet and not reader.log_path(state_root / ".ai-state").exists():
         sys.stderr.write(
             "reconcile_pipeline_state: no local WAL -- Tier-2 correlation skipped, "
             "Tier-1 (git diff + tests) verdicts unaffected\n"

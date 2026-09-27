@@ -4,10 +4,10 @@ This module never imports ``fcntl`` -- readers run on hosts (a script driven
 from CI, a sentinel batch run) where the writer's exclusive-lock guarantee
 does not apply and does not need to.
 
-Nothing here is wired to a consumer yet -- migrating every reader onto these
-functions is a later step's job. This step establishes the functions
-themselves against the interfaces `SYSTEMS_PLAN.md` specifies, so that
-migration is a mechanical swap rather than new design.
+Every code reader of the log goes through these functions; a module that
+names the log file directly instead is caught by
+`hooks/test_observation_log_private_reader.py`. Segment discovery lives in
+`segments()` alone, so a future retention policy extends one function.
 """
 
 from __future__ import annotations
@@ -61,7 +61,9 @@ def read_segment(path: Path) -> SegmentRead:
     ``rows`` -- never silently dropped, never fatal to the rest of the read.
     """
     try:
-        text = path.read_text(encoding="utf-8")
+        # errors="replace": a torn multi-byte sequence must cost one malformed
+        # line, never the whole segment (strict decoding raises ValueError).
+        text = path.read_text(encoding="utf-8", errors="replace")
     except FileNotFoundError:
         return SegmentRead(path=path, rows=(), malformed_lines=(), error="missing")
     except OSError as exc:

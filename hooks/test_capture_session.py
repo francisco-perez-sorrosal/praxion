@@ -480,10 +480,10 @@ class TestWalBackfill:
         whole = obs_path.read_text(encoding="utf-8")
         window = len(whole.splitlines()[-1]) + 10  # slices into the first record
 
-        lines = module._tail_lines(obs_path, max_bytes=window)
+        rows = module.reader.tail_rows(obs_path, window)
 
-        assert len(lines) == 1
-        assert json.loads(lines[0])["agent_type"] == "praxion:implementer"
+        assert len(rows) == 1
+        assert rows[0]["agent_type"] == "praxion:implementer"
 
     def test_tail_window_larger_than_the_file_keeps_every_line(self, project: Path) -> None:
         module = _load_module()
@@ -491,7 +491,7 @@ class TestWalBackfill:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_id="a"), _wal_row(agent_id="b")],
         )
-        assert len(module._tail_lines(obs_path, max_bytes=1_000_000)) == 2
+        assert len(module.reader.tail_rows(obs_path, 1_000_000)) == 2
 
     def test_backfill_never_reads_the_rotation_archive(self, project: Path) -> None:
         """Characterization: the stop-path backfill lookup is scoped to the

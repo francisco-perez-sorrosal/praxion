@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 from _hook_utils import record_gate_fire
+from _observation_log import reader
 
 # Locate the sibling `scripts/` directory to import in-process. This is
 # *plugin-internal code location* -- finding this hook's own sibling module inside
@@ -162,27 +163,6 @@ def _check_and_warn(repo_root: Path) -> tuple[str, str]:
 # -- Stop-time reminder ---------------------------------------------------------------
 
 
-def _read_wal_rows(obs_path: Path) -> list[dict]:
-    """Read every JSONL row from a session-scoped WAL, skipping malformed lines."""
-    if not obs_path.exists():
-        return []
-    try:
-        text = obs_path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    rows = []
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if isinstance(row, dict):
-            rows.append(row)
-    return rows
-
-
 def _is_excluded_path(path: str, repo_root: Path) -> bool:
     """True for bookkeeping directories and for files outside this repo.
 
@@ -268,8 +248,8 @@ def _handle_stop(payload: dict) -> None:
     if repo_root is None or not (repo_root / CALIBRATION_LOG_REL).is_file():
         return
 
-    obs_path = repo_root / ".ai-state" / "observations.jsonl"
-    rows = _read_wal_rows(obs_path)
+    ai_state_dir = repo_root / ".ai-state"
+    rows = reader.read_rows(ai_state_dir, archives=False)
     if _already_reminded_this_session(rows, session_id):
         return
     if not any(_is_qualifying_edit_row(row, session_id, repo_root) for row in rows):

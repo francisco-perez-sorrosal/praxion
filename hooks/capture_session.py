@@ -6,7 +6,8 @@ Exit 0 unconditionally.
 
 Why the agent_type resolution below exists
 ------------------------------------------
-`.ai-state/observations.jsonl` is the recovery write-ahead log designated by
+The observation log (owned by `_observation_log`, rooted under `.ai-state/`)
+is the recovery write-ahead log designated by
 dec-248, and its job is to *localize* a truncated pipeline step: which agent
 stopped, and where it last wrote. A row that cannot name its agent cannot
 localize anything.
@@ -170,7 +171,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
-from _observation_log import writer
+from _observation_log import reader, writer
 from _observation_log.registry import EventClass
 
 EVENT_MAP = {
@@ -265,7 +266,7 @@ _GATE_FIRE_EVENT_TYPE = "gate_fire"
 # "unresolved" and "unobserved-start", never a guess. Both fallbacks name a
 # non-observation for exactly this reason; neither claims the row is not there.
 #
-# The lookup deliberately does NOT follow rotation into observations.jsonl.1.
+# The lookup deliberately does NOT follow rotation into the archived segment.
 # Reading a 10 MiB predecessor on a hot hook path would buy a case that has not
 # been observed: every stop measured across a rotation boundary arrived with its
 # agent_type already populated, and the *reader* side already stitches both
@@ -274,61 +275,29 @@ _GATE_FIRE_EVENT_TYPE = "gate_fire"
 BACKFILL_TAIL_BYTES = 512 * 1024
 
 
-def _tail_lines(obs_path: Path, max_bytes: int | None = None) -> list[str]:
-    """Return the last complete JSONL lines of ``obs_path``.
-
-    Reads at most ``max_bytes`` from the end, defaulting to
-    ``BACKFILL_TAIL_BYTES`` resolved at call time so the bound stays a single
-    tunable (a signature default would freeze the value at import). When the
-    window starts mid-file the first line may be a fragment, so it is
-    discarded. Any OSError (missing file, unreadable path) degrades to an empty
-    list -- the caller then reports the agent type as unresolved and the start
-    as unobserved rather than failing the hook.
-    """
-    if max_bytes is None:
-        max_bytes = BACKFILL_TAIL_BYTES
-    try:
-        with open(obs_path, "rb") as handle:
-            handle.seek(0, os.SEEK_END)
-            size = handle.tell()
-            window = min(size, max_bytes)
-            handle.seek(size - window)
-            chunk = handle.read(window)
-    except OSError:
-        return []
-    lines = chunk.decode("utf-8", errors="replace").splitlines()
-    if window < size and lines:
-        lines = lines[1:]  # drop the fragment the window cut in half
-    return lines
-
-
 def lookup_prior_agent(obs_path: Path | None, agent_id: str) -> tuple[str, bool, bool]:
     """Return ``(recovered_agent_type, start_row_seen, any_row_seen)`` for ``agent_id``.
 
-    One newest-first pass over the WAL tail answers all three questions the
-    stop path asks, so recording the correlation costs no extra read. The
-    recovered type is the most recent usable one ("" when the agent has no
-    earlier row -- the measured reality for the orphaned-stop class, reported
-    rather than papered over); ``start_row_seen`` is True only for an actual
+    One newest-first pass over ``reader.tail_rows``' bounded window
+    (``BACKFILL_TAIL_BYTES``) answers all three questions the stop path asks,
+    so recording the correlation costs no extra read. The recovered type is
+    the most recent usable one ("" when the agent has no earlier row -- the
+    measured reality for the orphaned-stop class, reported rather than
+    papered over); ``start_row_seen`` is True only for an actual
     ``agent_start`` row, never for a ``tool_use`` row that merely names the
     same agent; ``any_row_seen`` is True for *any* row naming this agent_id,
     which is what separates a genuinely unannounced agent (nothing at all)
     from a start that was merely dropped (a ``tool_use`` row survives it).
 
-    The scan ends early once a start row settles all three answers.
+    The scan ends early once a start row settles all three answers. Malformed
+    or torn lines are already excluded by ``reader.tail_rows``.
     """
     if not agent_id or obs_path is None:
         return "", False, False
     recovered = ""
     any_row_seen = False
-    for line in reversed(_tail_lines(obs_path)):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue  # a torn tail line from a concurrent append
-        if not isinstance(row, dict) or row.get("agent_id") != agent_id:
+    for row in reversed(reader.tail_rows(obs_path, BACKFILL_TAIL_BYTES)):
+        if row.get("agent_id") != agent_id:
             continue
         any_row_seen = True
         if not recovered:
@@ -723,10 +692,11 @@ def build_compaction_observation(payload: dict) -> dict:
 def _read_jsonl_rows(path: Path) -> list[dict]:
     """Return every parsable JSON object in a JSONL file, one per line.
 
-    Used both for the full-session WAL scan below and for reading the
-    existing summary rows before an upsert. Any OSError (missing file -- the
-    fresh-clone shape P0.5 creates for the raw WAL) degrades to an empty
-    list; a torn or malformed line is skipped rather than raised.
+    Used for reading the existing committed summary rows before an upsert --
+    a distinct, non-rotating file from the observation log, so it keeps its
+    own private reader rather than going through ``reader.read_rows``. Any
+    OSError (missing file) degrades to an empty list; a torn or malformed
+    line is skipped rather than raised.
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -977,18 +947,8 @@ def _stop_row_exists(obs_path: Path, agent_id: str) -> bool:
     second Stop reporting the same still-open notification must not
     double-write once an earlier Stop already recorded it.
     """
-    for line in _tail_lines(obs_path):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if (
-            isinstance(row, dict)
-            and row.get("agent_id") == agent_id
-            and row.get("event_type") == "agent_stop"
-        ):
+    for row in reader.tail_rows(obs_path, BACKFILL_TAIL_BYTES):
+        if row.get("agent_id") == agent_id and row.get("event_type") == "agent_stop":
             return True
     return False
 
@@ -1054,7 +1014,7 @@ def main() -> None:
     ai_state_dir = _resolve_ai_state_dir(payload)
     if ai_state_dir is None:
         return  # graceful degradation
-    obs_path = ai_state_dir / "observations.jsonl"
+    obs_path = reader.log_path(ai_state_dir)
 
     # Dispatched ahead of the lifecycle path because a compaction has no
     # lifecycle row to build -- see the module docstring's `compaction` row
@@ -1070,7 +1030,9 @@ def main() -> None:
         try:
             session_id = payload.get("session_id", "")
             session_rows = [
-                r for r in _read_jsonl_rows(obs_path) if r.get("session_id") == session_id
+                r
+                for r in reader.read_rows(ai_state_dir, archives=False)
+                if r.get("session_id") == session_id
             ]
             summary_row = build_session_summary(session_rows, payload, observation["timestamp"])
             _upsert_session_summary(ai_state_dir / SUMMARY_FILENAME, summary_row)

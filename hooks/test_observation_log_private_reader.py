@@ -31,7 +31,8 @@ ALLOWLIST = frozenset(
     }
 )
 
-_TEST_FILE_RE = re.compile(r"(^|/)test_[^/]+\.py$")
+# Test modules and pytest conftest files are test support, not consumers.
+_TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|conftest)\.py$")
 _EXCLUDED_DIR_MARKERS = (".venv/", "/plugins/cache/", "/.claude/worktrees/", "/node_modules/")
 
 

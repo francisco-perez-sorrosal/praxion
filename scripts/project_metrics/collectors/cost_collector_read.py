@@ -39,6 +39,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar
 
+from hooks._observation_log import reader
+
 _T = TypeVar("_T")
 
 # Mirrors git_collector.py's own subprocess-timeout pattern: a single, bounded
@@ -244,9 +246,10 @@ def _stream_jsonl(path: str) -> tuple[list[dict], int, str | None]:
     """Stream one JSONL file, returning parsed object rows, a malformed-line
     skip count, and a fatal reason when the file itself cannot be read.
 
-    Shared by `read_agent_stop_rows` (which further filters to `agent_stop`
-    events) and `_read_summary_rows` (which does not filter at all) -- both
-    need the identical missing/malformed-file degradation, streamed
+    Reads the committed session-summary file, which is not the observation
+    log and so stays outside the log's owner reader (log segments go through
+    `reader.read_segment`). Missing/malformed-file degradation matches it,
+    streamed
     line-by-line (never `read_text()`) for a file that can grow large. A
     malformed line is skipped, never fatal to the rest of the scan: the WAL
     is append-only and live, so a torn trailing line while a session runs is
@@ -291,10 +294,15 @@ def read_agent_stop_rows(path: str) -> tuple[list[dict], str | None]:
     a named issue.
     """
 
-    rows, skipped, fatal = _stream_jsonl(path)
-    if fatal is not None:
-        return [], fatal
-    agent_stop_rows = [row for row in rows if row.get("event_type") == _AGENT_STOP_EVENT_TYPE]
+    if not Path(path).is_file():
+        return [], f"missing source file: {path}"
+    segment = reader.read_segment(Path(path))
+    if segment.error is not None:
+        return [], f"unreadable source {path}: {segment.error.removeprefix('unreadable: ')}"
+    skipped = len(segment.malformed_lines)
+    agent_stop_rows = [
+        row for row in segment.rows if row.get("event_type") == _AGENT_STOP_EVENT_TYPE
+    ]
     if skipped:
         return agent_stop_rows, _skip_issue(skipped, path)
     return agent_stop_rows, None

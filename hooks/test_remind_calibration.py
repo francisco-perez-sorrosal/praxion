@@ -663,10 +663,11 @@ class TestStopTimeCalibrationReminder:
 
 
 class TestStopReaderCharacterization:
-    """Pins `_read_wal_rows`'s current read surface before it migrates onto
-    `reader.read_rows`: malformed lines are skipped without raising, only the
-    active WAL segment is read (rotation archives are never opened), and a
-    missing WAL degrades to an empty list rather than an error.
+    """Pins the Stop path's read surface, now `reader.read_rows(archives=False)`:
+    malformed lines are skipped without raising, only the active WAL segment is
+    read (rotation archives are never opened), and a missing WAL degrades to an
+    empty list rather than an error. Migrated from the hook's own
+    now-deleted `_read_wal_rows` -- same assertions, new call target.
     """
 
     def test_malformed_and_blank_lines_are_skipped_not_raised(self, tmp_path: Path) -> None:
@@ -682,7 +683,7 @@ class TestStopReaderCharacterization:
             encoding="utf-8",
         )
 
-        rows = module._read_wal_rows(obs_path)
+        rows = module.reader.read_rows(tmp_path, archives=False)
 
         assert rows == [well_formed]
 
@@ -699,7 +700,7 @@ class TestStopReaderCharacterization:
             encoding="utf-8",
         )
 
-        rows = module._read_wal_rows(obs_path)
+        rows = module.reader.read_rows(tmp_path, archives=False)
 
         assert len(rows) == 1
         assert rows[0]["tool_name"] == "Write"
@@ -707,7 +708,7 @@ class TestStopReaderCharacterization:
     def test_missing_wal_returns_no_rows(self, tmp_path: Path) -> None:
         module = _load_module()
 
-        assert module._read_wal_rows(tmp_path / "observations.jsonl") == []
+        assert module.reader.read_rows(tmp_path, archives=False) == []
 
 
 def _build_managed_repo_without_edits(tmp_path: Path) -> Path:

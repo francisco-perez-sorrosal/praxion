@@ -86,7 +86,8 @@ Invocation:
     check_agent_lifecycle_pairing.py --repo-root DIR  # operate on another checkout (tests)
 
 Exit code: 0 by default (advisory). With --check, 1 when >=1 WARN finding is
-present. Always 0 when the observation log is absent.
+present. Always 0 when the observation log is absent or unreachable
+(`skipped.reason: reader-unreachable`) -- a skip is not a WARN.
 Exit code 2 when the resolved root is a plugin-cache path.
 
 Invoked by the sentinel's P dimension (`--json`); also runnable standalone.
@@ -216,13 +217,14 @@ def _row_from(raw: dict) -> _Row:
     )
 
 
-def _read_rows(obs_path: Path) -> tuple[list[_Row], list[str]]:
-    """Return `(rows, withheld)` for every line in `obs_path`.
+def _read_rows(segment: reader.SegmentRead) -> tuple[list[_Row], list[str]]:
+    """Project an already-read `segment` into `(rows, withheld)`.
 
     A line that fails to parse is counted into `withheld` (naming its line
     number) and excluded from every other count -- never silently dropped.
+    Assumes the caller has already handled `segment.error`: this function
+    only ever sees a segment that read cleanly.
     """
-    segment = reader.read_segment(obs_path)
     rows = [_row_from(raw) for raw in segment.rows]
     withheld = [
         f"line {line_no}: unparseable JSONL record, excluded" for line_no in segment.malformed_lines
@@ -382,7 +384,11 @@ def classify(repo_root: Path) -> dict:
     if not obs_path.is_file():
         return _skipped_report("substrate-absent", str(obs_path))
 
-    rows, withheld = _read_rows(obs_path)
+    segment = reader.read_segment(obs_path)
+    if segment.error is not None:
+        return _skipped_report("reader-unreachable", str(obs_path), detail=segment.error)
+
+    rows, withheld = _read_rows(segment)
     if not rows:
         return _empty_report(withheld, excluded_in_flight_session=None)
 
@@ -459,10 +465,20 @@ def _empty_report(withheld: list[str], excluded_in_flight_session: str | None) -
     }
 
 
-def _skipped_report(reason: str, path: str) -> dict:
+def _skipped_report(reason: str, path: str, *, detail: str | None = None) -> dict:
+    """Build the `skipped` tagged-union envelope (dec-380).
+
+    `detail` is present only for `reader-unreachable`, where it carries the
+    reader's `SegmentRead.error` verbatim -- never reworded, so the reader
+    stays the only place that names the error. `substrate-absent` carries no
+    `detail` key.
+    """
+    skipped = {"reason": reason, "path": path}
+    if detail is not None:
+        skipped["detail"] = detail
     return {
         "check": CHECK_ID,
-        "skipped": {"reason": reason, "path": path},
+        "skipped": skipped,
         "examined": None,
         "findings": [],
         "info": {},
@@ -500,7 +516,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _format_human(report: dict) -> str:
     if report["skipped"] is not None:
-        return f"check_agent_lifecycle_pairing: skipped ({report['skipped']['reason']})"
+        reason = report["skipped"]["reason"]
+        detail = report["skipped"].get("detail")
+        suffix = f": {detail}" if detail else ""
+        return f"check_agent_lifecycle_pairing: skipped ({reason}{suffix})"
     findings = report["findings"]
     if not findings:
         return (

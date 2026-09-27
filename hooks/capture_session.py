@@ -170,7 +170,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
 from _observation_log import reader, writer
 from _observation_log.modes import Mode, resolve_mode
 from _observation_log.registry import EventClass
@@ -1042,7 +1041,10 @@ def _resolve_ai_state_dir(payload: dict) -> Path | None:
 
 
 def main() -> None:
-    if is_disabled(DISABLE_OBSERVABILITY):
+    # `off` (either spelling) records nothing -- the log and the committed
+    # summary alike -- so it returns before reading anything at all.
+    mode, _source = resolve_mode(os.environ)
+    if mode is Mode.OFF:
         return
 
     try:
@@ -1073,9 +1075,7 @@ def main() -> None:
 
     observation = build_observation(payload, event_type, obs_path)
     writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[observation["event_type"]], observation)
-    mode, _source = resolve_mode(os.environ)
-    # `off` records nothing -- the committed summary included, not just the log.
-    if event_type == "session_stop" and mode is not Mode.OFF:
+    if event_type == "session_stop":
         _record_suspended_subagent_stops(obs_path, payload)
         try:
             session_id = payload.get("session_id", "")

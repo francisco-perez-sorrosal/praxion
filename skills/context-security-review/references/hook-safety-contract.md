@@ -13,6 +13,9 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
+| `capture_observations.py` | PostToolUse (all tools; a fixed noise blocklist is skipped) | stdin (JSON payload), `.ai-state/` (existence + `stat`), `$TMPDIR` first-call markers (existence) | Observation log (`.ai-state/observations.jsonl`, its `.1` rotation archive, `.ai-state/observations.lock`); empty `0o600` digest-named first-call markers under `$TMPDIR` | None | Fail-open (exit 0), async |
+| `capture_session.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostCompact | stdin (JSON payload), observation-log tail, session and subagent transcripts (usage fields only), `.ai-state/observations_summary.jsonl` | Observation log (as above); committed `.ai-state/observations_summary.jsonl` (+ `.ai-state/observations_summary.lock`, transient `.tmp` sibling) | None | Fail-open (exit 0), async |
+| `measure_context_surface.py` | SessionStart | stdin (JSON payload), always-loaded surface (project and `~/.claude` `CLAUDE.md` + unscoped rules, `settings.json` excludes, rules manifest), `ANTHROPIC_API_KEY` | Observation log (as above) -- one measurement row | `api.anthropic.com` token-count endpoint, only when `ANTHROPIC_API_KEY` is set | Fail-open (exit 0), async |
 
 ## Individual Hook Contracts
 
@@ -150,11 +153,82 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Never modifies pipeline documents (read-only access)
 - Never blocks compaction (exit 0 unconditionally)
 
+### `capture_observations.py`
+
+**Purpose**: Append one observation row per completed tool call to the local observation log, classified by pattern matching (no LLM calls).
+
+**Reads**:
+- stdin: JSON hook payload (tool_name, tool_input, tool_response error/additionalContext, session_id, agent_id, agent_type, cwd)
+- `.ai-state/` directory: existence check and `stat` (device + inode key the first-call marker)
+- `$TMPDIR` first-call marker: existence check, subagent calls only
+- Environment: `PRAXION_DISABLE_OBSERVABILITY`, `PRAXION_OBSERVATION_LOG` (recording mode), `TMPDIR` / `TEMP` / `TMP`
+
+**Writes**:
+- `.ai-state/observations.jsonl` -- one appended JSON line per recorded call, mode-gated
+- `.ai-state/observations.jsonl.1` -- rotation archive; the active log is renamed onto it at 10 MiB
+- `.ai-state/observations.lock` -- empty `fcntl` lock file
+- `<tmp>/praxion-observation-log-first-call-<16 hex>` -- first-call marker: empty, created `O_CREAT | O_EXCL` with mode `0o600`; `<tmp>` is the first of `TMPDIR`, `TEMP`, `TMP`, else `/tmp` (created if absent); the name is a SHA-256 digest of the `.ai-state/` device, inode and agent id. Created only after a subagent's first tool-use row (or a file-changing one) has been written; never for the main agent, never in `off` mode
+
+**External contact**:
+- None
+
+**Guarantees NOT to do**:
+- Never contacts any network endpoint
+- Never records file contents or tool output -- rows carry tool-input fragments truncated to 200 characters (Bash description or command text, file paths, Agent description or prompt preview, query / pattern / url values)
+- Never redacts secrets from those fragments -- the raw log and its archive are local-only (gitignored), never committed
+- Never writes marker content, and never opens or follows a pre-existing path at the marker location (`O_EXCL`)
+- Never deletes its markers -- they are left to the OS temp-directory reaper
+- Never blocks agent execution (async; exit 0 unconditionally)
+
+### `capture_session.py`
+
+**Purpose**: Record session, subagent and compaction lifecycle rows in the observation log, and upsert a per-session rollup into a committed summary file at every Stop.
+
+**Reads**:
+- stdin: JSON hook payload (hook_event_name, session_id, agent_id, agent_type, description, transcript_path, trigger, compact_summary length, cwd)
+- Observation log: a bounded tail (512 KiB) for agent-type backfill and start pairing; at Stop, the current segment's rows for this session
+- Transcripts: the Stop payload's `transcript_path` tail (1 MiB) for suspended-subagent notifications; at SubagentStop, the subagent's own transcript (parent transcript as fallback), streamed for usage, model and timestamps only
+- `.ai-state/observations_summary.jsonl` (to upsert)
+- Environment: `PRAXION_DISABLE_OBSERVABILITY`, `PRAXION_OBSERVATION_LOG`
+
+**Writes**:
+- `.ai-state/observations.jsonl`, its `.1` rotation archive, and `.ai-state/observations.lock` -- as for `capture_observations.py`: lifecycle rows, helper-stop rows, compaction rows, and backfilled stop rows for suspended subagents
+- `.ai-state/observations_summary.jsonl` -- **committed**; one aggregate row per session, rewritten atomically via a `.tmp` sibling under `.ai-state/observations_summary.lock`; skipped in `off` mode
+
+**External contact**:
+- None
+
+**Guarantees NOT to do**:
+- Never contacts any network endpoint
+- Never copies transcript or compaction-summary text into any row -- a compaction row records only the summary's length
+- Never writes anything but aggregates to the committed summary (counts, token sums, model names, timestamps, pipeline slug) -- no commands, paths or summaries
+- Never blocks agent execution (async; exit 0 unconditionally)
+
+### `measure_context_surface.py`
+
+**Purpose**: At session start, measure the always-loaded context surface and record it as one observation row.
+
+**Reads**:
+- stdin: JSON hook payload (hook_event_name, session_id, agent_id, agent_type, cwd)
+- The always-loaded surface, via the sibling `scripts/measure_token_budget.py` (imported through `sys.path`): project `CLAUDE.md` and unscoped rules, `~/.claude/CLAUDE.md` and unscoped `~/.claude/rules/**`, `claudeMdExcludes` from project and user `settings.json`, the rules manifest and the hook-delivered rules it names
+- Environment: `PRAXION_DISABLE_OBSERVABILITY`, `PRAXION_OBSERVATION_LOG`, `ANTHROPIC_API_KEY`, `CLAUDE_PLUGIN_ROOT`
+
+**Writes**:
+- `.ai-state/observations.jsonl`, its `.1` rotation archive, and `.ai-state/observations.lock` -- one measurement row (token and byte counts, basis, measured file paths)
+
+**External contact**:
+- Only when `ANTHROPIC_API_KEY` is set: HTTPS POST to `https://api.anthropic.com/v1/messages/count_tokens`, carrying the concatenated always-loaded text and the key. Without a key, or on any network error, it falls back to a local byte-ratio estimate
+
+**Guarantees NOT to do**:
+- Never contacts any endpoint other than the fixed token-count URL, and never contacts it without `ANTHROPIC_API_KEY`
+- Never writes the token-budget baseline (that is the commit-gate ratchet's)
+- Never blocks the session (async; exit 0 unconditionally)
+
 ## Verification Guidance
 
 When reviewing a PR that modifies hooks, verify against these contracts:
 
-1. **New external endpoints**: Any URL that is not `localhost` or `127.0.0.1` is a FAIL
+1. **New external endpoints**: Any URL that is not `localhost` or `127.0.0.1` is a FAIL unless that hook's contract lists it under "External contact" (today only `measure_context_surface.py`'s token-count call)
 2. **New file reads**: Compare against the "Reads" section -- new file access outside the documented scope is suspicious
 3. **New file writes**: Compare against the "Writes" section -- new file writes are suspicious
 4. **Removed fail-open**: Removing `exit 0` or bare `except` patterns that ensure fail-open behavior is a WARN

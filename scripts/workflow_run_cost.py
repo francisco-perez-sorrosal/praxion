@@ -83,10 +83,10 @@ def load(
     """Resolve one run and read every file its cost report joins against.
 
     Impure: the only function in this module that touches the filesystem.
-    Raises `wr.WorkflowRunError` for any of the five named failure classes
+    Raises `wr.WorkflowRunError` for any of the six named failure classes
     (`run-not-found`, `run-ambiguous`, `journal-unreadable`, `run-empty`,
-    `transcripts-missing`) -- a silent zero-agent report is the one failure
-    mode a measurement instrument must not have.
+    `transcripts-missing`, `wal-unreadable`) -- a silent zero-agent report is
+    the one failure mode a measurement instrument must not have.
     """
     resolved = wr.resolve_run(transcripts_dir, run_arg)
     run_dir = resolved["run_dir"]
@@ -186,9 +186,18 @@ def _read_wal(wal_path: Path) -> dict[str, dict]:
     """`agent_id -> {tokens_in, tokens_out, cache_read, cache_create, model,
     duration_ms, usage_source, timestamp}` from `agent_stop` and `helper_stop` WAL rows
     (a helper's usage fields are all None). The last row for a given `agent_id` wins when
-    several exist."""
+    several exist.
+
+    A missing WAL degrades to `{}`, matching every agent's `wal_agreement` to
+    `wal-missing` -- unchanged behaviour. An unreadable WAL (permissions,
+    I/O error) instead raises `wr.WorkflowRunError("wal-unreadable", ...)`:
+    an empty dict here is indistinguishable from "no agent wrote a stop row",
+    which would silently misreport every agent as unobserved."""
+    segment = reader.read_segment(wal_path)
+    if segment.error not in (None, "missing"):
+        raise wr.WorkflowRunError("wal-unreadable", f"{wal_path}: {segment.error}")
     rows: dict[str, dict] = {}
-    for record in reader.read_segment(wal_path).rows:
+    for record in segment.rows:
         if record.get("event_type") not in _STOP_EVENT_TYPES:
             continue
         agent_id = record.get("agent_id")

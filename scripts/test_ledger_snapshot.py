@@ -98,7 +98,8 @@ def test_td156_is_a_documented_mechanical_miss_not_a_candidate(base_repo: Path) 
 
     This is not a bug: the `self-amended` signal is structural (a
     non-stamp segment count), and td-156 was never re-amended. `--all`
-    (the first real triage) is what recovers rows like this, per A5.
+    is what recovers rows like this: the first real triage, with nothing
+    stamped yet, judges every row rather than only the candidates.
     """
     delta = _delta_for(base_repo, "td-156")
     assert _evidence_classes(delta) == set()

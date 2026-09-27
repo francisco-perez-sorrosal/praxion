@@ -615,7 +615,7 @@ def _range_commit_index(repo_root: Path, since_sha: str) -> tuple[Commit, ...] |
     return _parse_commit_records(result.stdout)
 
 
-# -- Anchors: the stamp-with sha (A3) and every distinct row-stamp anchor -----------------
+# -- Anchors: the stamp-with sha and every distinct row-stamp anchor ----------------------
 
 
 def _default_branch(repo_root: Path) -> str | None:
@@ -633,7 +633,11 @@ def _default_branch(repo_root: Path) -> str | None:
 
 
 def _resolve_merge_base(repo_root: Path) -> str | None:
-    """`git merge-base HEAD <default-branch>` (A3): on the default branch this is HEAD."""
+    """`git merge-base HEAD <default-branch>`: on the default branch this is HEAD.
+
+    On a triage branch it is the branch point, a sha that survives a squash
+    or rebase of that branch, so a stamp anchored to it stays resolvable.
+    """
     branch = _default_branch(repo_root)
     return git_output(repo_root, "merge-base", "HEAD", branch) if branch else None
 

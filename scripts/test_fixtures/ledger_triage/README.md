@@ -22,7 +22,7 @@ base key: class=`coverage-gap`, location=`scripts/check_gate_liveness.py`,
 direction=`code-to-goals`, goal-ref-type=`code-quality`), td-261 (present
 for corpus realism; not a ground-truth peer).
 
-**Ground truth** (`SYSTEMS_PLAN.md § Acceptance Criteria` AC-02/AC-03/AC-04):
+**Ground truth** (what the reader must report over this fixture):
 
 - Candidates, `self-amended`: td-064, td-086, td-088, td-162, td-186,
   td-211, td-213.
@@ -51,12 +51,12 @@ live statuses/edges as of `cac1ba2e`):
 | `366-sidecar-state-mount-worktree.md` | dec-366 | accepted | `supersedes_in_part: dec-364` |
 | `375-seal-witness-none-tombstone-exemption.md` | dec-375 | accepted | `supersedes_in_part: dec-310` |
 | `387-intentional-compaction-handoff.md` | dec-387 | accepted | — |
-| `394-per-tier-pipeline-envelope.md` | dec-394 | accepted | `supersedes_in_part: dec-261`; `affected_files` includes `hooks/remind_calibration.py` — overlaps td-257/td-264/td-261's location, context-only (REQ-04) |
+| `394-per-tier-pipeline-envelope.md` | dec-394 | accepted | `supersedes_in_part: dec-261`; `affected_files` includes `hooks/remind_calibration.py` — overlaps td-257/td-264/td-261's location, context-only (file overlap is never evidence) |
 
 `dec-374`, `dec-261` are cited only as successor/superseded ids in the
 stubs above — no file for them exists in this fixture, which is correct:
 a notes citation to an id absent from the corpus is ignored, never flagged
-(`SYSTEMS_PLAN.md § Data Structures` DS-1, `DecisionCitation`).
+(a `DecisionCitation` with no matching decision carries no evidence).
 
 **Location paths must be stubbed as real files** in the `tmp_path` git repo
 a test builds around this fixture — every `location` cell across both

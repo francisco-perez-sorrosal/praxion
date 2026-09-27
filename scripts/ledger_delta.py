@@ -340,8 +340,9 @@ class EvidenceMoved:
 
 @dataclass(frozen=True)
 class SupersedingDecisionOnLocation:
-    """Judged rows only (A2): a decision new since the anchor supersedes,
-    narrows or retires another decision and overlaps this row's location."""
+    """Judged rows only: a decision new since the anchor supersedes or narrows
+    another decision and overlaps this row's location -- read from the new
+    decision's own edges, so a change to any decision counts, cited or not."""
 
     dec_id: str
     edges: tuple[str, ...]

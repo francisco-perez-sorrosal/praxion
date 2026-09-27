@@ -279,9 +279,12 @@ def notes_path_citations(notes: str) -> tuple[tuple[str, str], ...]:
 def _decision_drift(
     snapshot: StateSnapshot, row: ActiveRow, window: Window
 ) -> list[CitedDecisionChanged]:
-    """A judged row's window only gates this when the successor's own date is
-    known: an unknown-date successor stays unwindowed rather than silently
-    dropped, since "cannot place it in the window" is not "did not move"."""
+    """A cited decision that was superseded, retired, rejected or narrowed.
+
+    A judged row's window drops the change only when the anchor provably saw
+    it (`_change_seen_at_anchor`); a change that cannot be placed stays
+    unwindowed, since "cannot place it in the window" is not "did not move".
+    """
     drifts = []
     for citation in row.cited_decisions:
         facts = snapshot.decisions.get(citation.dec_id)
@@ -290,15 +293,53 @@ def _decision_drift(
             continue
         kind, by = change
         successor = snapshot.decisions.get(by[0]) if by else None
-        event_at = parse_iso_date(successor.date) if successor else None
-        if (
-            isinstance(window, AnchorWindow)
-            and event_at is not None
-            and event_at <= window.anchor.date
-        ):
+        if _change_seen_at_anchor(snapshot, window, facts, successor):
             continue
+        event_at = parse_iso_date(successor.date) if successor else None
         drifts.append(CitedDecisionChanged(citation.dec_id, citation.via, kind, by, event_at))
     return drifts
+
+
+def _change_seen_at_anchor(
+    snapshot: StateSnapshot,
+    window: Window,
+    cited: DecisionFacts,
+    successor: DecisionFacts | None,
+) -> bool:
+    """True when a judged row's anchor already held this decision change.
+
+    With a successor, the change is the successor's arrival
+    (`_predates_anchor`). Without one -- a rejection, or a status set with no
+    edge -- the change is an edit to the cited file itself, so it is in the
+    window iff a commit in `anchor..HEAD` touched that file. A cited file the
+    project does not track cannot be placed and stays unwindowed.
+    """
+    if not isinstance(window, AnchorWindow):
+        return False
+    if successor is not None:
+        return _predates_anchor(snapshot, window, successor)
+    if not _tracked(snapshot, cited.path):
+        return False
+    return not any(cited.path in commit.paths for commit in window.commits)
+
+
+def _predates_anchor(snapshot: StateSnapshot, window: AnchorWindow, facts: DecisionFacts) -> bool:
+    """True when this decision already existed at the anchor.
+
+    Tree membership decides: an ADR drafted before a triage and merged after
+    it carries a `date` on or before the anchor, yet its file is absent from
+    the anchor's tree, so the judge never saw it. The `date` is only the
+    fallback for a decision whose file the project does not track (an
+    uncommitted draft, a state directory kept outside the repository).
+    """
+    if _tracked(snapshot, facts.path):
+        return facts.path in window.tree
+    event_at = parse_iso_date(facts.date)
+    return event_at is not None and event_at <= window.anchor.date
+
+
+def _tracked(snapshot: StateSnapshot, path: str | None) -> bool:
+    return path is not None and snapshot.git is not None and path in snapshot.git.head_tree
 
 
 def _decision_change(facts: DecisionFacts) -> tuple[DecisionChange, tuple[str, ...]] | None:
@@ -429,17 +470,14 @@ def _evidence_moved(row: ActiveRow, window: Window) -> list[EvidenceMoved]:
 def _superseding_on_location(
     snapshot: StateSnapshot, row: ActiveRow, window: Window
 ) -> list[SupersedingDecisionOnLocation]:
-    """Judged rows only (A2): a decision new since the anchor that supersedes
-    or narrows another decision and overlaps this row's location.
+    """Judged rows only: a decision new since the anchor that supersedes or
+    narrows another decision and overlaps this row's location.
 
-    "New since the anchor" is approximated by the decision's own `date`
-    postdating the anchor's commit date, rather than by tree membership: ADR
-    files are effectively append-only once filed, so a file-membership check
-    against the anchor tree would answer the same question at a much higher
-    cost (a repo-relative path per decision this design does not otherwise
-    track). Retirement has no forward `retires` edge on the new decision's
-    own frontmatter to read -- only `_CHANGING_EDGES` (`supersedes` /
-    `supersedes_in_part`) are checkable from this side; a declared limit.
+    "New since the anchor" is `_predates_anchor`'s tree-membership answer,
+    not the decision's `date`. Retirement has no forward `retires` edge on
+    the new decision's own frontmatter to read -- only `_CHANGING_EDGES`
+    (`supersedes` / `supersedes_in_part`) are checkable from this side; a
+    declared limit.
     """
     if not isinstance(window, AnchorWindow) or not snapshot.decisions:
         return []
@@ -451,8 +489,7 @@ def _superseding_on_location(
         edges = tuple(f"{field}:{dec}" for field in _CHANGING_EDGES for dec in facts.edges[field])
         if not edges:
             continue
-        fact_date = parse_iso_date(facts.date)
-        if fact_date is None or fact_date <= window.anchor.date:
+        if _predates_anchor(snapshot, window, facts):
             continue
         matched = tuple(
             path
@@ -460,7 +497,8 @@ def _superseding_on_location(
             if any(paths_match(path, entry) for entry in facts.affected_files)
         )
         if matched:
-            found.append(SupersedingDecisionOnLocation(facts.dec_id, edges, matched, fact_date))
+            event_at = parse_iso_date(facts.date)
+            found.append(SupersedingDecisionOnLocation(facts.dec_id, edges, matched, event_at))
     return found
 
 

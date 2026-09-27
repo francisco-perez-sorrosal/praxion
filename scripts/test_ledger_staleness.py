@@ -141,6 +141,62 @@ def test_a_kept_row_on_a_directory_that_still_exists_stays_quiet(tmp_path: Path)
     assert _classes(repo_root) == set()
 
 
+def test_a_successor_merged_after_the_stamp_resurfaces_the_row_whatever_its_date(
+    tmp_path: Path,
+) -> None:
+    """Drafted before the triage, merged after it: its `date` predates the anchor, but its
+    file is absent from the anchor tree, so the judge never saw it."""
+    repo_root = _row_citing_dec_010(tmp_path, "accepted")
+    _stamp(repo_root)
+    _write_adr(repo_root, "010-old.md", "dec-010", "superseded", "superseded_by: dec-011\n")
+    _write_adr(repo_root, "011-new.md", "dec-011", "accepted", "supersedes: dec-010\n")
+    _commit(repo_root, "docs: supersede dec-010")
+
+    assert "CitedDecisionChanged" in _signal_types(repo_root)
+
+
+def test_a_successor_already_in_the_anchor_tree_stays_quiet_whatever_its_date(
+    tmp_path: Path,
+) -> None:
+    repo_root = _row_citing_dec_010(tmp_path, "superseded", "superseded_by: dec-011\n")
+    (repo_root / ".ai-state" / "decisions" / "011-new.md").write_text(
+        "---\nid: dec-011\ntitle: T\nstatus: accepted\ndate: 2099-01-01\n"
+        "supersedes: dec-010\n---\n\nB.\n"
+    )
+    _commit(repo_root, "docs: dec-011")
+    _stamp(repo_root)
+
+    assert "decision-drift" not in _classes(repo_root)
+
+
+def test_a_superseding_decision_on_the_location_merged_after_the_stamp_resurfaces_the_row(
+    tmp_path: Path,
+) -> None:
+    repo_root = _stamped_repo(tmp_path)
+    extra = "supersedes: dec-001\naffected_files:\n  - scripts/x.py\n"
+    _write_adr(repo_root, "002-new.md", "dec-002", "accepted", extra)
+    _commit(repo_root, "docs: supersede dec-001")
+
+    assert "SupersedingDecisionOnLocation" in _signal_types(repo_root)
+
+
+def test_a_citation_rejected_before_the_stamp_stays_quiet(tmp_path: Path) -> None:
+    """A rejection has no successor to place in time; the cited file's own history does."""
+    repo_root = _row_citing_dec_010(tmp_path, "rejected")
+    _stamp(repo_root)
+
+    assert "decision-drift" not in _classes(repo_root)
+
+
+def test_a_citation_rejected_after_the_stamp_resurfaces_the_row(tmp_path: Path) -> None:
+    repo_root = _row_citing_dec_010(tmp_path, "accepted")
+    _stamp(repo_root)
+    _write_adr(repo_root, "010-old.md", "dec-010", "rejected")
+    _commit(repo_root, "docs: reject dec-010")
+
+    assert "decision-drift" in _classes(repo_root)
+
+
 def test_a_later_decision_superseding_another_on_the_location_resurfaces_the_row(
     tmp_path: Path,
 ) -> None:

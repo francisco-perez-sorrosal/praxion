@@ -515,6 +515,7 @@ def _load_decisions(repo_root: Path) -> Mapping[str, DecisionFacts]:
             summary=str(data.get("summary", "")).strip(),
             affected_files=tuple(_as_list(data.get("affected_files"))),
             edges={field: tuple(_as_list(data.get(field))) for field in _EDGE_FIELDS},
+            path=path.relative_to(repo_root).as_posix(),
         )
     return facts
 

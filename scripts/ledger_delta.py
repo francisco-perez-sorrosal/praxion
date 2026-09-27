@@ -233,6 +233,9 @@ class DecisionFacts:
     summary: str
     affected_files: tuple[str, ...]
     edges: Mapping[str, tuple[str, ...]]  # frontmatter edge field -> ids
+    # The ADR file, repo-relative: whether it sits in an anchor's tree is what
+    # places the decision before or after a judgment. None when unknown.
+    path: str | None = None
 
 
 @dataclass(frozen=True)

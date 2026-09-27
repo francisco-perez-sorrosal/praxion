@@ -41,6 +41,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -385,6 +386,57 @@ def iter_code_files(repo_root: Path) -> list[Path]:
 
 _COMMIT_ALL_FLAG = re.compile(r"(?:^|\s)(?:-a|--all|-[a-zA-Z]*a[a-zA-Z]*)(?:\s|$)")
 
+# Shell operators that separate the commands of one Bash call.
+_COMMAND_SEPARATOR = re.compile(r"&&|\|\||;|\n")
+# `git add` flags that stage every change in the working tree; `:/` is the
+# pathspec for the repository root, so it matches them from any subdirectory.
+_ADD_WHOLE_TREE = frozenset({"-A", "--all"})
+
+
+def _same_call_add_pathspecs(command: str) -> list[str] | None:
+    """Pathspecs a `git add` earlier in the same Bash call will stage.
+
+    The PreToolUse hook fires before any command in the call runs, so a file
+    that `git add x && git commit` stages is not in the index yet and a
+    staged-set scope would miss it. Returns the pathspecs named by every
+    `git add` that precedes the first `git commit` (``[":/"]``, the repository
+    root, for `-A`/`--all`), or ``None`` when no such `git add` exists. A
+    `git add` after the commit stages nothing the commit records, so it is
+    ignored.
+    """
+    pathspecs: list[str] = []
+    found = False
+    for segment in _COMMAND_SEPARATOR.split(command):
+        try:
+            tokens = shlex.split(segment)
+        except ValueError:
+            continue
+        if tokens[:2] == ["git", "commit"]:
+            break
+        if tokens[:2] != ["git", "add"]:
+            continue
+        found = True
+        args = tokens[2:]
+        if any(arg in _ADD_WHOLE_TREE for arg in args):
+            pathspecs.append(":/")
+        pathspecs.extend(arg for arg in args if not arg.startswith("-"))
+    return pathspecs if found else None
+
+
+def _pathspec_changed_names(cwd: Path, pathspecs: list[str]) -> list[str]:
+    """Repo-relative names of modified or untracked files matching ``pathspecs``,
+    resolved from ``cwd`` the way the `git add` itself would resolve them."""
+    names: list[str] = []
+    changed = _git(cwd, "diff", "--name-only", "--diff-filter=ACMR", "-z", "--", *pathspecs)
+    untracked = _git(
+        cwd, "ls-files", "--others", "--exclude-standard", "-z", "--full-name", "--", *pathspecs
+    )
+    if changed is not None:
+        names.extend(n for n in changed.stdout.split("\0") if n)
+    if untracked is not None:
+        names.extend(n for n in untracked.stdout.split("\0") if n)
+    return names
+
 
 _GIT_RETRIES = 3
 _GIT_RETRY_SLEEP = 0.1
@@ -470,6 +522,9 @@ def hook_scope_files(
     names = _git_changed_names(repo_root, "--cached")
     if _COMMIT_ALL_FLAG.search(command):
         names.extend(_git_changed_names(repo_root))
+    pathspecs = _same_call_add_pathspecs(command)
+    if pathspecs:
+        names.extend(_pathspec_changed_names(cwd, pathspecs))
     return repo_root, [repo_root / name for name in dict.fromkeys(names)]
 
 

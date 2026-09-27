@@ -109,6 +109,16 @@ repos:
         exclude: '/tests/fixtures/'
         pass_filenames: true
 
+      # Block A2 — inbound id-citation discipline, at commit time. The PreToolUse
+      # commit gate runs before anything in the Bash call, so it cannot see the
+      # final staged set; this layer receives the true staged files. The script
+      # re-filters them to code surfaces and applies its own exemptions.
+      - id: id-citation-discipline
+        name: ID citation discipline
+        entry: python3 scripts/check_id_citation_discipline.py --repo-root . --files
+        language: system
+        pass_filenames: true
+
       # Block B — canonical-block sync. Whole-repo --check; fires only when a
       # canonical block or one of its registered consumers (BLOCKS in
       # sync_canonical_blocks.py: the onboarding skill's consolidated

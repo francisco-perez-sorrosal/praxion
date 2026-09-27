@@ -271,3 +271,58 @@ def test_full_scan_still_reports_violations_in_the_corpus(tmp_path: Path) -> Non
     assert result.returncode == 1, result.stdout + result.stderr
     assert "src/bad.py" in result.stdout
     assert "scanned 2 code file(s)" in result.stdout
+
+
+# -- a `git add` earlier in the same Bash call ---------------------------------
+# The PreToolUse hook fires before any command in the call runs, so a file the
+# call itself stages is not in the index yet. The scope must include it anyway.
+
+
+def test_hook_mode_includes_a_file_staged_by_a_git_add_in_the_same_call(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _write(tmp_path, "src/seed.py", CLEAN_LINE)
+    _commit_all(tmp_path)
+    _write(tmp_path, "src/bad.py", VIOLATING_LINE)
+
+    result = _run_hook(tmp_path, 'git add src/bad.py && git commit -m "add bad"')
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "src/bad.py" in result.stdout
+
+
+def test_hook_mode_includes_every_change_a_same_call_git_add_all_stages(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _write(tmp_path, "src/seed.py", CLEAN_LINE)
+    _commit_all(tmp_path)
+    _write(tmp_path, "src/untracked_bad.py", VIOLATING_LINE)
+
+    result = _run_hook(tmp_path, 'git add -A && git commit -q -m "everything"')
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "src/untracked_bad.py" in result.stdout
+
+
+def test_a_git_add_after_the_commit_does_not_widen_the_scope(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _write(tmp_path, "src/seed.py", CLEAN_LINE)
+    _commit_all(tmp_path)
+    _write(tmp_path, "src/later.py", VIOLATING_LINE)
+
+    result = _run_hook(tmp_path, 'git commit --allow-empty -m "first" && git add src/later.py')
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_the_pre_commit_config_runs_the_checker_on_the_staged_files() -> None:
+    """The commit-time layer: pre-commit hands the checker the true staged set,
+    which no same-call command ordering can hide."""
+    import yaml
+
+    config = yaml.safe_load((PROJECT_ROOT / ".pre-commit-config.yaml").read_text())
+    hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", [])]
+    matching = [h for h in hooks if "check_id_citation_discipline.py" in str(h.get("entry", ""))]
+
+    assert len(matching) == 1, "exactly one pre-commit hook must run the id-citation checker"
+    hook = matching[0]
+    assert "--files" in hook["entry"]
+    assert hook.get("pass_filenames", True) is True

@@ -1,0 +1,486 @@
+#!/usr/bin/env python3
+"""State-snapshot reader for the tech-debt ledger: what moved since a row was filed.
+
+A ledger row is a claim about the project as it stood on the day it was written.
+This module reads the *current* project state once -- the ledger pair, the ADR
+corpus, git history -- into an immutable `StateSnapshot`, then computes, per
+active row, a `RowDelta`: the signals that the state has moved against the row's
+premise, plus context that never counts as a signal.
+
+Two halves, split on the effect boundary:
+
+    gather(repo_root) -> StateSnapshot     the only function that reads the world
+    row_delta(snapshot, row) -> RowDelta   pure; every signal is computed here
+
+The reader decides nothing about candidacy -- which signals count as evidence and
+how they rank is `ledger_health.py`'s policy. What the reader *does* own is which
+signals it can compute honestly. Every class that depends on an oracle (git
+history, the ADR corpus, the lifecycle table) is **withheld with a named reason**
+when that oracle cannot answer, never defaulted: without git, a missing path is
+`unclassified`, not `vanished`, because "the index did not answer" is not "the
+file is gone" (the `adr_health.py` discipline, whose indexes this reuses).
+
+File overlap between a row's location and an ADR's `affected_files` is context
+only (`RelatedDecision`). Measured on the live ledger it links half the active
+rows, live ones included, so it can select context but must never make a row a
+candidate.
+
+Stdlib only: the sentinel runs the probe on top of this with a bare `python3`.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Mapping
+from datetime import date
+from pathlib import Path
+from typing import assert_never
+
+from _git_runner import git_output
+from adr_health import (
+    build_deletion_index,
+    build_rename_index,
+    history_available,
+    load_expected_absent_shapes,
+)
+from ledger_delta import (
+    STAMP_PREFIX,
+    ActiveRow,
+    AdrGoal,
+    Commit,
+    DecisionCitation,
+    DecisionFacts,
+    DraftGoal,
+    GitFacts,
+    GoalRef,
+    Judged,
+    KeyFacts,
+    KeyStatus,
+    LocationRef,
+    MalformedGoal,
+    NoGoal,
+    OpaqueRef,
+    Oracle,
+    OtherGoal,
+    Outcome,
+    PathRef,
+    StampMalformed,
+    StampState,
+    StateSnapshot,
+    TdId,
+    TerminalPeer,
+    TriageStamp,
+    Unjudged,
+    UnparseableRow,
+    Withheld,
+    cite_path,
+    parse_iso_date,
+    row_delta,
+    signal_class_name,
+)
+from query_adrs import (
+    _FRONTMATTER_RE,
+    _as_list,
+    _parse_frontmatter_fallback,
+    _try_import_yaml,
+    discover_adr_files,
+)
+from state_ledger_schema import (
+    LEDGERS,
+    TECH_DEBT_NAMESPACE,
+    DataRow,
+    ParsedLedger,
+    collision_blocked_ids,
+    compute_dedup_key,
+    dedup_rows,
+    parse_ledger,
+    resolve_dedup_keys,
+)
+
+# The reader's public surface: the shell's own entry points plus the pure core's.
+__all__ = [
+    "CLASS_ORACLES",
+    "StampMalformed",
+    "StateSnapshot",
+    "TriageStamp",
+    "gather",
+    "parse_rows",
+    "parse_stamp",
+    "row_delta",
+    "signal_class_name",
+]
+
+# -- Row grammar ---------------------------------------------------------------
+
+_ACTIVE_STATUSES: frozenset[str] = frozenset({"open", "in-flight"})
+_TERMINAL_STATUSES: frozenset[str] = frozenset({"resolved", "wontfix"})
+_OTHER_GOAL_KINDS: frozenset[str] = frozenset({"spec-req", "architecture", "claude-md"})
+_TD_ID = re.compile(r"^td-\d{3,}$")
+_TD_TOKEN = re.compile(r"\btd-\d{3,}\b")
+_DEC_ID = re.compile(r"^dec-\d{3,}$")
+_DEC_TOKEN = re.compile(r"\bdec-\d{3,}\b")
+_SEGMENT_SEPARATOR = " // "
+
+# Which oracle each withholdable class needs. A `:cause` suffix names a sub-class:
+# a missing path is still reported without git, only its `vanished` verdict is not.
+CLASS_ORACLES: Mapping[str, tuple[Oracle, ...]] = {
+    "location-decay:vanished": ("git-history", "lifecycle-table"),
+    "citation-decay:vanished": ("git-history", "lifecycle-table"),
+    "cited-by-commit": ("git-history",),
+    "decision-drift": ("adr-corpus",),
+    "goal-link-unresolved": ("adr-corpus",),
+}
+
+# -- Triage stamp grammar -----------------------------------------------------------
+# Paired site: the grammar line in skills/software-planning/references/tech-debt-ledger.md
+# § Triage. Change both together; a test parses that section's example stamps with this.
+_STAMP = re.compile(
+    r"^\[triage (?P<date>\d{4}-\d{2}-\d{2}) @(?P<anchor>[0-9a-f]{7,40})\] "
+    r"(?P<outcome>[a-z]+)(?: from (?P<prior>[0-9a-f]{12}))?(?P<sep>:| into) (?P<text>\S.*)$"
+)
+_OUTCOMES: Mapping[str, Outcome] = {
+    "kept": "kept",
+    "realigned": "realigned",
+    "discarded": "discarded",
+    "merged": "merged",
+}
+_LINE_CITE = re.compile(r"(?:[\w.-]+/)*[\w-][\w.-]*\.\w+:\d+")
+# A sha must carry a digit, or English words spelled in hex ("defaced") would pass.
+_SHA = re.compile(r"\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
+# What makes a discard checkable: a location, a decision, a row, or a commit.
+_CHECKABLE_ANCHORS = (_LINE_CITE, _DEC_TOKEN, _TD_TOKEN, _SHA)
+
+# -- Boundary parsing ----------------------------------------------------------------------
+
+
+def parse_stamp(segment: str, segment_index: int = 0) -> TriageStamp | StampMalformed:
+    """Parse one notes segment into a stamp; anything off-grammar is `StampMalformed`.
+
+    A `discarded` stamp must carry a checkable anchor -- a `path:line`, a decision,
+    a row id or a commit sha -- so a bare "no longer relevant" can never be written
+    as a verdict: that judgment belongs to the user, not to the stamp.
+    """
+    malformed = StampMalformed(raw=segment, segment_index=segment_index)
+    found = _STAMP.match(segment.strip())
+    if found is None or "|" in segment:
+        return malformed
+    try:
+        stamped = date.fromisoformat(found["date"])
+    except ValueError:
+        return malformed
+    outcome, prior, text = found["outcome"], found["prior"], found["text"]
+    if prior is not None and outcome != "realigned":
+        return malformed
+    evidence_path = _path_token(text.split()[0]) if outcome == "kept" else None
+    match (outcome, found["sep"]):
+        case ("kept", ":"):
+            valid = evidence_path is not None
+        case ("realigned", ":"):
+            valid = True
+        case ("discarded", ":"):
+            valid = any(pattern.search(text) for pattern in _CHECKABLE_ANCHORS)
+        case ("merged", " into"):
+            valid = _TD_ID.match(text.strip()) is not None
+        case _:
+            valid = False
+    if not valid:
+        return malformed
+    return TriageStamp(stamped, found["anchor"], _OUTCOMES[outcome], text, evidence_path, prior)
+
+
+def _path_token(token: str) -> str | None:
+    """The path a `kept` stamp's first token names, or None when it names none."""
+    path = cite_path(token)
+    return path if "/" in path or "." in path else None
+
+
+def _stamp_state(segments: tuple[str, ...]) -> StampState:
+    """The row's latest stamp-shaped segment wins (finalize concatenates notes)."""
+    for index in range(len(segments) - 1, -1, -1):
+        if segments[index].startswith(STAMP_PREFIX):
+            parsed = parse_stamp(segments[index], index)
+            if isinstance(parsed, StampMalformed):
+                return parsed
+            return Judged(stamp=parsed, segment_index=index)
+    return Unjudged()
+
+
+def _parse_locations(cell: str) -> tuple[LocationRef, ...]:
+    refs: list[LocationRef] = []
+    for part in (piece.strip() for piece in cell.split(",")):
+        if not part:
+            continue
+        path = re.sub(r":\d+(?:-\d+)?$", "", part)
+        refs.append(PathRef(path, part) if "/" in path or "." in path else OpaqueRef(part))
+    return tuple(refs)
+
+
+def _parse_goal(kind: str, value: str) -> GoalRef:
+    if kind == "code-quality":
+        return NoGoal() if not value else MalformedGoal(kind, value, "code-quality-with-value")
+    if kind == "adr":
+        if value.startswith("dec-draft-"):
+            return DraftGoal(value)
+        if _DEC_ID.match(value):
+            return AdrGoal(value)
+        return MalformedGoal(kind, value, "adr-value-not-dec-id")
+    if kind in _OTHER_GOAL_KINDS:
+        return OtherGoal(kind, value) if value else MalformedGoal(kind, value, "empty-value")
+    return MalformedGoal(kind, value, "off-enum-kind")
+
+
+def _citations(goal: GoalRef, notes: str) -> tuple[DecisionCitation, ...]:
+    cited = [DecisionCitation(goal.dec_id, "goal-ref")] if isinstance(goal, AdrGoal) else []
+    seen = {citation.dec_id for citation in cited}
+    for dec_id in _DEC_TOKEN.findall(notes):
+        if dec_id not in seen:
+            seen.add(dec_id)
+            cited.append(DecisionCitation(dec_id, "notes"))
+    return tuple(cited)
+
+
+def _row_scope_withheld(
+    row_id: str, goal: GoalRef, first_seen: date | None, refs: tuple[LocationRef, ...]
+) -> tuple[Withheld, ...]:
+    """Classes this one row cannot be judged on, and why."""
+    withheld: list[Withheld] = []
+    match goal:
+        case OtherGoal(kind=kind):
+            withheld.append(
+                _row_withheld("goal-link-unresolved", f"goal-oracle-unsupported:{kind}", row_id)
+            )
+        case MalformedGoal(reason=reason):
+            withheld.append(
+                _row_withheld("goal-link-unresolved", f"goal-ref-malformed:{reason}", row_id)
+            )
+        case NoGoal() | AdrGoal() | DraftGoal():
+            pass
+        case _:
+            assert_never(goal)
+    if first_seen is None:
+        withheld.append(_row_withheld("cited-by-commit", "first-seen-malformed", row_id))
+    for ref in refs:
+        if isinstance(ref, OpaqueRef):
+            withheld.append(_row_withheld("location-decay", f"opaque-location:{ref.raw}", row_id))
+    return tuple(withheld)
+
+
+def _row_withheld(class_name: str, reason: str, row_id: str) -> Withheld:
+    return Withheld(class_name, reason, "row", (row_id,))
+
+
+def _key_facts(row: DataRow, resolved: Mapping[str, str], blocked: Mapping[str, str]) -> KeyFacts:
+    written, base = row.value("dedup_key"), compute_dedup_key(row)
+    correct = resolved.get(row.row_id, base)
+    status: KeyStatus
+    if row.row_id in blocked:
+        status = "collision-blocked"
+    elif written != correct:
+        status = "nonconforming"
+    elif correct != base:
+        status = "discriminated"
+    else:
+        status = "plain"
+    return KeyFacts(written=written, base=base, resolved=correct, status=status)
+
+
+def _parse_active(row: DataRow, key: KeyFacts) -> ActiveRow:
+    row_id = TdId(row.row_id)
+    notes = row.value("notes")
+    segments = tuple(notes.split(_SEGMENT_SEPARATOR))
+    goal = _parse_goal(row.value("goal-ref-type"), row.value("goal-ref-value"))
+    first_seen = parse_iso_date(row.value("first-seen"))
+    refs = _parse_locations(row.value("location"))
+    return ActiveRow(
+        id=row_id,
+        status="open" if row.value("status") == "open" else "in-flight",
+        klass=row.value("class"),
+        severity=row.value("severity"),
+        owner_role=row.value("owner-role"),
+        direction=row.value("direction"),
+        source=row.value("source"),
+        locations=refs,
+        goal=goal,
+        first_seen=first_seen,
+        last_seen=parse_iso_date(row.value("last-seen")),
+        notes=notes,
+        segments=segments,
+        stamp=_stamp_state(segments),
+        cited_decisions=_citations(goal, notes),
+        key=key,
+        row_withheld=_row_scope_withheld(row_id, goal, first_seen, refs),
+        line_no=row.line_no,
+    )
+
+
+def _parse_terminal(row: DataRow, key: KeyFacts) -> TerminalPeer:
+    return TerminalPeer(
+        id=TdId(row.row_id),
+        status="resolved" if row.value("status") == "resolved" else "wontfix",
+        klass=row.value("class"),
+        base_key=key.base,
+        locations=_parse_locations(row.value("location")),
+        last_seen=parse_iso_date(row.value("last-seen")),
+        stamp=_stamp_state(tuple(row.value("notes").split(_SEGMENT_SEPARATOR))),
+    )
+
+
+def _unparseable_reason(row: DataRow, legal: frozenset[str]) -> str | None:
+    if row.table is None:
+        return "outside-table"
+    if len(row.cells) != len(row.table.columns):
+        return f"field-count:{len(row.cells)}"
+    if not _TD_ID.match(row.row_id):
+        return "malformed-id"
+    if row.value("status") not in legal:
+        return f"status:{row.value('status')}"
+    return None
+
+
+def parse_rows(
+    parsed: list[ParsedLedger],
+) -> tuple[tuple[ActiveRow, ...], tuple[TerminalPeer, ...], tuple[UnparseableRow, ...]]:
+    """Ledger pair -> typed rows, once. The first ledger is active, the second terminal."""
+    rows = dedup_rows(parsed)
+    resolved, blocked = resolve_dedup_keys(rows), collision_blocked_ids(parsed)
+    active: list[ActiveRow] = []
+    terminal: list[TerminalPeer] = []
+    unparseable: list[UnparseableRow] = []
+    for ledger, legal in zip(parsed, (_ACTIVE_STATUSES, _TERMINAL_STATUSES), strict=True):
+        for row in ledger.rows:
+            reason = _unparseable_reason(row, legal)
+            if reason is not None:
+                unparseable.append(UnparseableRow(row.row_id, row.line_no, reason))
+                continue
+            key = _key_facts(row, resolved, blocked)
+            if legal is _ACTIVE_STATUSES:
+                active.append(_parse_active(row, key))
+            else:
+                terminal.append(_parse_terminal(row, key))
+    return tuple(active), tuple(terminal), tuple(unparseable)
+
+
+# -- Gather: the only reads of the world ------------------------------------------------
+
+_EDGE_FIELDS = (
+    "superseded_by",
+    "retired_by",
+    "superseded_in_part_by",
+    "supersedes",
+    "supersedes_in_part",
+)
+_RECORD_SEPARATOR, _FIELD_SEPARATOR = "\x1e", "\x1f"
+_COMMIT_FORMAT = (
+    f"--format={_RECORD_SEPARATOR}%H{_FIELD_SEPARATOR}%cs{_FIELD_SEPARATOR}%B{_FIELD_SEPARATOR}"
+)
+
+
+def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
+    """Read the ledger pair, the ADR corpus and git history once; never write.
+
+    Raises `OSError` / `UnicodeDecodeError` when a ledger file exists but cannot be
+    read -- the probe's one script error. Every other gap is an oracle withheld.
+    """
+    specs = [spec for spec in LEDGERS if spec.dedup_namespace == TECH_DEBT_NAMESPACE]
+    active, terminal, unparseable = parse_rows([parse_ledger(repo_root, spec) for spec in specs])
+    decisions = _load_decisions(repo_root)
+    has_history = history_available(repo_root)
+    windows = [row.first_seen for row in active if row.first_seen is not None]
+    git = _gather_git(repo_root, min(windows) if windows else None) if has_history else None
+    lazy_shapes = load_expected_absent_shapes(repo_root)
+    oracles: dict[Oracle, str | None] = {
+        "git-history": None if has_history else "no git history, or a shallow clone",
+        "adr-corpus": None if decisions else "no parseable ADR under .ai-state/decisions/",
+        "lifecycle-table": None if lazy_shapes is not None else "artifact-inventory.md unreadable",
+    }
+    return StateSnapshot(
+        repo_root=repo_root,
+        today=today or date.today(),
+        head=git_output(repo_root, "rev-parse", "HEAD") if has_history else None,
+        active_rows=active,
+        terminal_peers=terminal,
+        unparseable=unparseable,
+        decisions=decisions,
+        git=git,
+        lazy_shapes=tuple(lazy_shapes) if lazy_shapes is not None else None,
+        oracles=oracles,
+        withheld=_corpus_withheld(oracles),
+    )
+
+
+def _corpus_withheld(oracles: Mapping[Oracle, str | None]) -> tuple[Withheld, ...]:
+    """Every class whose oracle cannot answer, derived from `CLASS_ORACLES`."""
+    withheld = []
+    for class_name, needs in CLASS_ORACLES.items():
+        reasons = [f"{oracle}: {oracles[oracle]}" for oracle in needs if oracles[oracle]]
+        if reasons:
+            withheld.append(Withheld(class_name, "; ".join(reasons), "corpus", ()))
+    return tuple(withheld)
+
+
+def _load_decisions(repo_root: Path) -> Mapping[str, DecisionFacts]:
+    yaml_module = _try_import_yaml()
+    facts: dict[str, DecisionFacts] = {}
+    for path in discover_adr_files(repo_root):
+        data = _frontmatter(path, yaml_module)
+        dec_id = str(data.get("id", "")).strip() if data else ""
+        if not data or not dec_id:
+            continue
+        facts[dec_id] = DecisionFacts(
+            dec_id=dec_id,
+            status=str(data.get("status", "")).strip(),
+            date=str(data.get("date", "")).strip(),
+            title=str(data.get("title", "")).strip(),
+            summary=str(data.get("summary", "")).strip(),
+            affected_files=tuple(_as_list(data.get("affected_files"))),
+            edges={field: tuple(_as_list(data.get(field))) for field in _EDGE_FIELDS},
+        )
+    return facts
+
+
+def _frontmatter(path: Path, yaml_module) -> dict | None:
+    """One ADR's frontmatter mapping through `query_adrs`'s parse dispatch, or None."""
+    found = _FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
+    if not found:
+        return None
+    if yaml_module is None:
+        data = _parse_frontmatter_fallback(found.group(1), path)
+    else:
+        try:
+            data = yaml_module.safe_load(found.group(1))
+        except yaml_module.YAMLError:
+            data = None
+    return data if isinstance(data, dict) else None
+
+
+def _gather_git(repo_root: Path, since: date | None) -> GitFacts:
+    """Four whole-repository history reads; never one per row."""
+    tree = git_output(repo_root, "ls-tree", "-r", "--name-only", "HEAD") or ""
+    return GitFacts(
+        head_tree=frozenset(tree.splitlines()),
+        renames=build_rename_index(repo_root),
+        deletions=build_deletion_index(repo_root),
+        commits=_commit_index(repo_root, since) if since is not None else (),
+    )
+
+
+def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...]:
+    out = git_output(
+        repo_root, "log", f"--since={since.isoformat()}", _COMMIT_FORMAT, "--name-only", "HEAD"
+    )
+    commits = []
+    for record in (out or "").split(_RECORD_SEPARATOR):
+        fields = record.split(_FIELD_SEPARATOR)
+        if len(fields) != 4:
+            continue
+        sha, day, body, paths = fields
+        commits.append(
+            Commit(
+                sha=sha.strip(),
+                date=date.fromisoformat(day.strip()),
+                subject=body.strip().splitlines()[0] if body.strip() else "",
+                td_ids=frozenset(_TD_TOKEN.findall(body)),
+                paths=tuple(line for line in paths.splitlines() if line.strip()),
+            )
+        )
+    return tuple(commits)

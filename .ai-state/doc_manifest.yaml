@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-27T08:39:26Z'
+generated_at: '2026-09-27T22:15:58Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -474,7 +474,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-07-01'
+  last_modified: '2026-09-27'
   renderer: default_markdown
   surfaces_referenced:
   - claude
@@ -545,7 +545,7 @@ surfaces:
   path: .ai-state/TEST_TOPOLOGY.md
   type: markdown
   title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-design
@@ -561,7 +561,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2805,7 +2805,7 @@ surfaces:
   path: .ai-state/decisions/370-wal-lifecycle-suspension-stops-and-helper-verdict.md
   type: markdown
   title: The WAL closes subagent lifecycles the harness never reports, and names unannounced helpers
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-371-ac12-bidirectional-traceability-unadopted
   path: .ai-state/decisions/371-ac12-bidirectional-traceability-unadopted.md
@@ -2994,11 +2994,17 @@ surfaces:
   title: The observation log gets one owner package and three registry-driven recording modes
   last_modified: '2026-09-27'
   renderer: adr_card
+- id: ai-state-decisions-402-ledger-triage-probe
+  path: .ai-state/decisions/402-ledger-triage-probe.md
+  type: markdown
+  title: "State-aware tech-debt triage \u2014 a snapshot reader, an advisory ledger_health probe, sentinel TD07 and /triage-debt, anchored by notes-cell triage stamps"
+  last_modified: '2026-09-27'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3718,6 +3724,7 @@ groups:
   - ai-state-decisions-399-scheduled-sentinel-workflow
   - ai-state-decisions-400-harness-helper-stops-become-helper-stop
   - ai-state-decisions-401-observation-log-owner-and-recording-mode
+  - ai-state-decisions-402-ledger-triage-probe
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

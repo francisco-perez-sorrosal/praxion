@@ -1,7 +1,8 @@
 ---
-id: dec-draft-e7fcbfcc
+id: dec-402
+draft_id: dec-draft-e7fcbfcc
 title: State-aware tech-debt triage — a snapshot reader, an advisory ledger_health probe, sentinel TD07 and /triage-debt, anchored by notes-cell triage stamps
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-27
 summary: "Add a state-snapshot reader and an advisory ledger_health probe that select ledger triage candidates from precise evidence only (never file overlap or age), surface them via sentinel TD07, and feed per-row JSON digests to a /triage-debt command whose verdicts are recorded as sha-anchored stamps in the notes cell"

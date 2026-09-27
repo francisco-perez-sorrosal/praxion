@@ -304,9 +304,15 @@ def _guarded_imports(tree: ast.Module) -> set[int]:
 
 
 def _local_module(module: str, entry: Path, root: Path) -> Path | None:
-    """Resolve a dotted module name to a file in this repo, or None."""
+    """Resolve a dotted module name to a file in this repo, or None.
+
+    `hooks/` is a resolution base because scripts put it on `sys.path` to
+    import the hook modules and packages they share (the observation-log
+    owner package among them); those ship with the gate like any sibling,
+    and are followed transitively like one.
+    """
     relative = Path(*module.split("."))
-    for base in (entry.parent, root):
+    for base in (entry.parent, root, root / "hooks"):
         for candidate in (base / relative.with_suffix(".py"), base / relative / "__init__.py"):
             if candidate.is_file():
                 return candidate

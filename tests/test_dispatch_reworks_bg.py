@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import textwrap
 from pathlib import Path
@@ -136,10 +137,25 @@ _STUB_CLAUDE_TEMPLATE = textwrap.dedent("""\
                 ;;
         esac
     done
+    # Like the real binary, consume whatever stdin it inherits: a dispatcher
+    # that feeds its row loop through stdin loses every later row to this.
+    cat > /dev/null
+    # Record the argument vector, one argument per line, when asked.
+    if [ -n "${STUB_ARGS_LOG:-}" ]; then
+        printf '%s\\n' "$@" >> "$STUB_ARGS_LOG"
+        printf -- '--\\n' >> "$STUB_ARGS_LOG"
+    fi
+    NAME=""
+    PREV=""
+    for arg in "$@"; do
+        [ "$PREV" = "--name" ] && NAME="$arg"
+        PREV="$arg"
+    done
     # 8-hex-char ID from the stub's PID: distinct per invocation, POSIX sh.
     ID=$(printf "%08x" $$)
     printf "Starting background service\\xe2\\x80\\xa6\\n"
-    printf "backgrounded \\xc2\\xb7 %s\\n" "$ID"
+    # The current shape names the session after the id: `backgrounded · <id> · <name>`.
+    printf "backgrounded \\xc2\\xb7 %s \\xc2\\xb7 %s\\n" "$ID" "$NAME"
     printf "  claude agents             list sessions\\n"
     printf "  claude attach %s    open in this terminal\\n" "$ID"
     printf "  claude logs %s      show recent output\\n" "$ID"
@@ -787,3 +803,66 @@ def test_dispatch_writes_one_marker_per_row(tmp_path, tmp_path_factory):
         for d in wt_dirs:
             if d.exists() and not any(d.iterdir()):
                 d.rmdir()
+
+
+# ---------------------------------------------------------------------------
+# The three defects of the first live run: stdin, command namespace, session id
+# ---------------------------------------------------------------------------
+
+
+def _dispatch(tmp_path, tmp_path_factory, names, *, args_log=None):
+    wt_dirs = [make_worktree_dir(n) for n in names]
+    stub_dir = tmp_path_factory.mktemp("stub_bin")
+    env = make_stub_claude(stub_dir, home=tmp_path)
+    if args_log is not None:
+        env["STUB_ARGS_LOG"] = str(args_log)
+    manifest = make_manifest(tmp_path, [{"worktree_name": n} for n in names])
+    try:
+        return subprocess.run(
+            [str(SCRIPT), "--bg", "--manifest", str(manifest)],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+        )
+    finally:
+        for d in wt_dirs:
+            if d.exists() and not any(d.iterdir()):
+                d.rmdir()
+
+
+def test_every_row_dispatches_when_claude_consumes_its_stdin(tmp_path, tmp_path_factory):
+    """The real `claude --bg` reads the stdin it inherits; inside a `while read`
+    loop that is the row list, so every row after the first was lost."""
+    names = ["bg-stdin-row-a", "bg-stdin-row-b", "bg-stdin-row-c"]
+
+    result = _dispatch(tmp_path, tmp_path_factory, names)
+
+    assert result.returncode == 0, result.stderr
+    assert "Dispatched 3 rework session(s)" in result.stdout, result.stdout
+
+
+def test_sessions_start_with_the_plugin_namespaced_resume_command(tmp_path, tmp_path_factory):
+    """A plugin-installed session resolves only `/praxion:resume-rework`; the bare
+    `/resume-rework` left every session idle at 'Unknown command'."""
+    args_log = tmp_path / "claude-args.log"
+
+    result = _dispatch(tmp_path, tmp_path_factory, ["bg-namespace-row"], args_log=args_log)
+
+    assert result.returncode == 0, result.stderr
+    argv = args_log.read_text(encoding="utf-8").splitlines()
+    assert "/praxion:resume-rework" in argv, argv
+    assert "/resume-rework" not in argv, argv
+
+
+def test_session_id_is_read_from_the_id_field_not_the_trailing_name(tmp_path, tmp_path_factory):
+    """`backgrounded · <id> · <name>`: the last field is now the session name."""
+    name = "bg-id-field-row"
+
+    result = _dispatch(tmp_path, tmp_path_factory, [name])
+
+    assert result.returncode == 0, result.stderr
+    peek_lines = [line for line in result.stdout.splitlines() if "claude logs" in line]
+    assert len(peek_lines) == 1, result.stdout
+    session_id = peek_lines[0].split("claude logs", 1)[1].strip()
+    assert re.fullmatch(r"[0-9a-f]{8}", session_id), peek_lines[0]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dispatch-reworks — fan out /resume-rework into all rework worktrees
+# dispatch-reworks — fan out /praxion:resume-rework into all rework worktrees
 #
 # Reads REWORK_MANIFEST.md (auto-discovered from the project root or passed via
 # --manifest), parses rows via scripts/rework_manifest.py:parse_json_blocks(),
@@ -12,7 +12,7 @@
 # Two dispatch modes (mutually exclusive):
 #   --bg          Run each rework as a headless claude --bg session (default).
 #   --terminals   Open one external terminal window per rework worktree with
-#                 /resume-rework pre-filled; user presses Enter to start each.
+#                 /praxion:resume-rework pre-filled; user presses Enter to start each.
 #
 # Note: --bg starts N parallel sessions, each consuming API quota.
 #       Budget accordingly for large manifests (N > 3).
@@ -46,12 +46,12 @@ show_usage() {
 Usage: dispatch-reworks [--bg | --terminals] [--dry-run] [--manifest <path>]
        dispatch-reworks --help
 
-Fan out /resume-rework into all rework worktrees from REWORK_MANIFEST.md.
+Fan out /praxion:resume-rework into all rework worktrees from REWORK_MANIFEST.md.
 
 OPTIONS
   --bg                  Start each rework as a headless background session via
                         claude --bg (default mode when neither flag is given).
-  --terminals           Open one terminal window per worktree with /resume-rework
+  --terminals           Open one terminal window per worktree with /praxion:resume-rework
                         pre-filled; press Enter in each window to start.
   --dry-run             Print the dispatch plan; exit 0 without firing.
   --manifest <path>     Explicit path to REWORK_MANIFEST.md (skip auto-discovery).
@@ -260,6 +260,10 @@ if [ -z "$VALID_ROWS" ]; then
     die "$EXIT_GENERAL" "No valid worktree directories found. Check .claude/worktrees/ exists and manifest rows are correct."
 fi
 
+# The slash command each rework session starts with. Plugin-installed sessions
+# resolve plugin commands only under the plugin namespace.
+RESUME_COMMAND="/praxion:resume-rework"
+
 # --- URL encoding helper -----------------------------------------------------
 
 url_encode() {
@@ -274,11 +278,11 @@ if "$DRY_RUN"; then
     while IFS=$'\t' read -r WT_NAME WT_PATH; do
         [ -z "$WT_NAME" ] && continue
         if [ "$MODE" = "bg" ]; then
-            printf "would dispatch: bg · %s · cd %s && claude --bg \"/resume-rework\" --name \"rework: %s\"\n" \
-                "$WT_NAME" "$WT_PATH" "$WT_NAME"
+            printf "would dispatch: bg · %s · cd %s && claude --bg \"%s\" --name \"rework: %s\"\n" \
+                "$WT_NAME" "$WT_PATH" "$RESUME_COMMAND" "$WT_NAME"
         else
             ENC_CWD="$(url_encode "$WT_PATH")"
-            printf "would dispatch: terminals · %s · open \"claude-cli://open?cwd=%s&q=%%2Fresume-rework\"\n" \
+            printf "would dispatch: terminals · %s · open \"claude-cli://open?cwd=%s&q=%%2Fpraxion%%3Aresume-rework\"\n" \
                 "$WT_NAME" "$ENC_CWD"
         fi
     done <<EOF
@@ -314,25 +318,26 @@ dispatch_bg() {
 
         local bg_output
         local dispatch_exit=0
-        bg_output="$(cd "$WT_PATH" && claude --bg "/resume-rework" --name "rework: $WT_NAME" 2>&1)" \
+        bg_output="$(cd "$WT_PATH" && claude --bg "$RESUME_COMMAND" --name "rework: $WT_NAME" < /dev/null 2>&1)" \
             || dispatch_exit=$?
 
         if [ "$dispatch_exit" -ne 0 ]; then
             printf "dispatch-reworks: warning: dispatch failed for '%s' (exit %d):\n" \
                 "$WT_NAME" "$dispatch_exit" >&2
             printf "%s\n" "$bg_output" | sed 's/^/  /' >&2
-            printf "  To retry: cd %s && claude --bg \"/resume-rework\" --name \"rework: %s\"\n" \
-                "$WT_PATH" "$WT_NAME" >&2
+            printf "  To retry: cd %s && claude --bg \"%s\" --name \"rework: %s\" < /dev/null\n" \
+                "$WT_PATH" "$RESUME_COMMAND" "$WT_NAME" >&2
             failed=$((failed + 1))
             continue
         fi
 
-        # Extract the session ID from the "backgrounded · <id>" line.
-        # The middle dot (·) is a multi-byte UTF-8 character that grep -oE handles
-        # inconsistently across locales.  Extracting the last field ($NF) on the
-        # "backgrounded" line is locale-safe and handles any future format changes.
+        # Extract the session ID from the "backgrounded · <id> · <name>" line.
+        # The id is the first whitespace-separated token after "backgrounded" and
+        # its middle dot; the name that follows may contain spaces, so the last
+        # field is not the id. Comparing tokens avoids locale-dependent handling
+        # of the multi-byte middle dot.
         local session_id
-        session_id="$(printf "%s" "$bg_output" | grep 'backgrounded' | awk '{print $NF}' || true)"
+        session_id="$(printf "%s" "$bg_output" | grep '^backgrounded' | awk '{print $3}' || true)"
 
         if [ -z "$session_id" ]; then
             # claude --bg output format may have changed; fall back to "unknown".
@@ -419,7 +424,7 @@ dispatch_terminals() {
 
         local enc_cwd
         enc_cwd="$(url_encode "$WT_PATH")"
-        local url="claude-cli://open?cwd=${enc_cwd}&q=%2Fresume-rework"
+        local url="claude-cli://open?cwd=${enc_cwd}&q=%2Fpraxion%3Aresume-rework"
 
         local open_exit=0
         open "$url" 2>/dev/null || open_exit=$?

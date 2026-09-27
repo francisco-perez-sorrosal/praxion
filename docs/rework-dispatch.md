@@ -47,7 +47,7 @@ The dispatcher is small but load-bearing — it is the *only* user touchpoint in
 | Mode | Command | What you see | Cost per dispatch |
 |---|---|---|---|
 | **Default headless** (`--bg`) | `scripts/dispatch-reworks` | N session IDs printed with `claude logs <id>` / `claude stop <id>` hints; fresh Cursor pane runs `claude agents` for the unified dashboard; macOS notifications on completion | **O(1)** — one monitoring pane opened once, scales regardless of N |
-| **Visible terminals** (`--terminals`) | `scripts/dispatch-reworks --terminals` | N external terminal windows open with `claude` pre-staged and `/resume-rework` pre-typed | **O(N)** — one Enter keypress per window |
+| **Visible terminals** (`--terminals`) | `scripts/dispatch-reworks --terminals` | N external terminal windows open with `claude` pre-staged and `/praxion:resume-rework` pre-typed | **O(N)** — one Enter keypress per window |
 | **Preview only** (`--dry-run`) | `scripts/dispatch-reworks --dry-run` (combinable with `--terminals`) | The dispatch plan as `would dispatch: <mode> · <worktree-name> · <command shape>` per row | Zero sessions spawned |
 
 > [!TIP]
@@ -118,12 +118,12 @@ scripts/dispatch-reworks --terminals
 
 - has `cwd` set to the correct rework worktree
 - is running an interactive `claude` session
-- has `/resume-rework` pre-typed in the prompt box
+- has `/praxion:resume-rework` pre-typed (the plugin namespace is required: a plugin-installed session does not resolve the bare `/resume-rework`) in the prompt box
 
 **Step 4**. Press **Enter** in each window to start the rework. Yes, one keypress per window — the `claude-cli://` deep link does not auto-submit prompts by design (this is an upstream security posture, not something Praxion can route around).
 
 > [!WARNING]
-> If you're smoke-testing the dispatcher against a synthetic manifest, **do not press Enter in those test windows** — the `/resume-rework` slash command will run for real if you do. Close the test windows manually instead.
+> If you're smoke-testing the dispatcher against a synthetic manifest, **do not press Enter in those test windows** — the `/praxion:resume-rework` slash command will run for real if you do. Close the test windows manually instead.
 
 ## Monitoring
 

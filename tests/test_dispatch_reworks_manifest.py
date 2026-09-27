@@ -326,7 +326,7 @@ def test_bg_dry_run_two_rows_prints_two_lines(tmp_path):
 
 def test_bg_dry_run_line_format_contains_expected_fields(tmp_path):
     """Each --bg --dry-run line must contain the mode, worktree name, claude --bg,
-    /resume-rework, and --name "rework: <name>".
+    /praxion:resume-rework, and --name "rework: <name>".
     """
     name = "fix-session-leak-bg"
     wt_dir = make_worktree_dir(name)
@@ -344,7 +344,9 @@ def test_bg_dry_run_line_format_contains_expected_fields(tmp_path):
         assert "bg" in line, f"Mode 'bg' missing from line: {line!r}"
         assert name in line, f"Worktree name '{name}' missing from line: {line!r}"
         assert "claude --bg" in line, f"'claude --bg' missing from line: {line!r}"
-        assert '"/resume-rework"' in line, f"'/resume-rework' missing from line: {line!r}"
+        assert '"/praxion:resume-rework"' in line, (
+            f"'/praxion:resume-rework' missing from line: {line!r}"
+        )
         assert f'"rework: {name}"' in line, (
             f"'rework: {name}' missing from --name value in line: {line!r}"
         )
@@ -471,7 +473,7 @@ def test_terminals_dry_run_url_encodes_spaces_in_path(tmp_path):
 
 
 def test_terminals_dry_run_encodes_resume_rework_as_percent2F(tmp_path):  # noqa: N802 — 2F is hex; lowercasing would misname the byte being asserted
-    """The /resume-rework query parameter must be encoded as %2Fresume-rework in the URL."""
+    """The /praxion:resume-rework query parameter must be URL-encoded as %2Fpraxion%3Aresume-rework."""
     name = "fix-resume-enc"
     wt_dir = make_worktree_dir(name)
     try:
@@ -483,8 +485,8 @@ def test_terminals_dry_run_encodes_resume_rework_as_percent2F(tmp_path):  # noqa
         ]
         assert dispatch_lines, "Expected at least one dispatch line"
         line = dispatch_lines[0]
-        assert "%2Fresume-rework" in line, (
-            f"Expected encoded '/resume-rework' (%2Fresume-rework) in line: {line!r}"
+        assert "%2Fpraxion%3Aresume-rework" in line, (
+            f"Expected encoded '/praxion:resume-rework' (%2Fpraxion%3Aresume-rework) in line: {line!r}"
         )
     finally:
         if wt_dir.exists() and not any(wt_dir.iterdir()):

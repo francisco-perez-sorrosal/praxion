@@ -33,13 +33,45 @@ def _head(repo_root: Path) -> str:
     return git_ok(repo_root, "rev-parse", "--short=12", "HEAD").stdout.strip()
 
 
-def _stamped_repo(tmp_path: Path, verdict: str = "kept: scripts/x.py:1 holds") -> Path:
-    """td-902 judged against the seed commit, the stamp itself committed on top."""
-    repo_root = one_row_repo(tmp_path, "Premise.", ())
+KEPT = "kept: scripts/x.py:1 holds"
+
+
+def _stamp(repo_root: Path, verdict: str = KEPT) -> None:
+    """Judge td-902 against the current HEAD and commit the stamp on top."""
     stamp = f"[triage 2026-09-27 @{_head(repo_root)}] {verdict}"
     ledger = repo_root / LEDGER
-    ledger.write_text(ledger.read_text().replace("| Premise. |", f"| Premise. // {stamp} |"))
+    ledger.write_text(
+        ledger.read_text().replace(" | 000000000000 |", f" // {stamp} | 000000000000 |")
+    )
     _commit(repo_root, "chore(state): triage td-902")
+
+
+def _stamped_repo(tmp_path: Path, verdict: str = KEPT) -> Path:
+    """td-902 judged against the seed commit, the stamp itself committed on top."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _stamp(repo_root, verdict)
+    return repo_root
+
+
+def _relocate(repo_root: Path, location: str) -> None:
+    ledger = repo_root / LEDGER
+    ledger.write_text(ledger.read_text().replace("| scripts/x.py |", f"| {location} |"))
+    _commit(repo_root, f"chore(state): relocate td-902 to {location}")
+
+
+def _write_adr(repo_root: Path, name: str, dec_id: str, status: str, extra: str = "") -> None:
+    """An ADR dated long before any anchor: only its tree membership places it in time."""
+    decisions = repo_root / ".ai-state" / "decisions"
+    decisions.mkdir(parents=True, exist_ok=True)
+    (decisions / name).write_text(
+        f"---\nid: {dec_id}\ntitle: T\nstatus: {status}\ndate: 2026-01-01\n{extra}---\n\nB.\n"
+    )
+
+
+def _row_citing_dec_010(tmp_path: Path, status: str, extra: str = "") -> Path:
+    repo_root = one_row_repo(tmp_path, "Premise per dec-010.", ())
+    _write_adr(repo_root, "010-old.md", "dec-010", status, extra)
+    _commit(repo_root, "docs: dec-010")
     return repo_root
 
 
@@ -51,6 +83,10 @@ def _delta(repo_root: Path) -> ledger_snapshot.RowDelta:
 
 def _classes(repo_root: Path) -> set[str]:
     return {ledger_snapshot.signal_class_name(signal) for signal in _delta(repo_root).signals}
+
+
+def _signal_types(repo_root: Path) -> set[str]:
+    return {type(signal).__name__ for signal in _delta(repo_root).signals}
 
 
 # -- A judged row whose window has not moved stays quiet ----------------------------------
@@ -83,6 +119,26 @@ def test_deleting_the_location_after_the_stamp_resurfaces_the_row(tmp_path: Path
     _commit(repo_root, "chore: remove x")
 
     assert "location-decay" in _classes(repo_root)
+
+
+def test_deleting_a_directory_location_after_the_stamp_resurfaces_the_row(tmp_path: Path) -> None:
+    """Git lists files, never directories: the anchor tree holds `scripts/pkg/a.py`, not
+    `scripts/pkg/`, and the directory must still count as present at the anchor."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/pkg/a.py",))
+    _relocate(repo_root, "scripts/pkg/")
+    _stamp(repo_root)
+    git_ok(repo_root, "rm", "-r", "-q", "scripts/pkg")
+    _commit(repo_root, "chore: remove pkg")
+
+    assert "location-decay" in _classes(repo_root)
+
+
+def test_a_kept_row_on_a_directory_that_still_exists_stays_quiet(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/pkg/a.py",))
+    _relocate(repo_root, "scripts/pkg/")
+    _stamp(repo_root)
+
+    assert _classes(repo_root) == set()
 
 
 def test_a_later_decision_superseding_another_on_the_location_resurfaces_the_row(

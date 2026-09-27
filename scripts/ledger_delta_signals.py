@@ -224,11 +224,13 @@ def _already_gone_at_anchor(window: Window, path: str) -> bool:
 
     Only `AnchorWindow` can answer this (it carries the anchor's tree); a
     `FirstSeenWindow`/`NoWindow` row has no such tree and is always probed in
-    full -- unjudged rows carry no "since when" to gate on. Q2(a): a judged
-    row's location-decay only resurfaces when the path moved *since* the
-    anchor, not for a decay that already held when it was judged.
+    full -- unjudged rows carry no "since when" to gate on. A judged row's
+    location or citation decay only resurfaces when the path moved *since*
+    the anchor, not for a decay that already held when it was judged. The
+    check is prefix-aware, as at HEAD: the tree lists files, so a directory
+    is present when anything beneath it is.
     """
-    return isinstance(window, AnchorWindow) and path not in window.tree
+    return isinstance(window, AnchorWindow) and not _in_tree(window.tree, path)
 
 
 def _location_decay(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> list[LocationDecay]:

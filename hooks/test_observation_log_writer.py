@@ -393,28 +393,34 @@ def test_record_never_mutates_the_callers_row(tmp_path: Path) -> None:
 _BANNED_HOT_PATH_MODULES = ("dataclasses", "typing", "inspect", "tempfile", "subprocess", "urllib")
 
 
-def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules() -> None:
+def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules(
+    tmp_path: Path,
+) -> None:
     """`capture_observations.py`'s per-tool-call path -- import through a
     full `record_tool_call` drive, including the marker-classification
     branch -- must never pull in any of these modules into a fresh
-    interpreter's `sys.modules`.
+    interpreter's `sys.modules`. The log directory exists, so the drive
+    reaches the marker digest and the append rather than failing at the
+    directory stat.
     """
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
     script = (
         "import sys\n"
         "from pathlib import Path\n"
         "from hooks._observation_log import writer\n"
         "writer.record_tool_call(\n"
-        "    Path('/nonexistent-praxion-ai-state-dir'),\n"
+        "    Path(sys.argv[1]),\n"
         "    {'tool_name': 'Read', 'file_paths': [], 'agent_id': 'x'},\n"
         "    is_subagent=True,\n"
-        "    env={'PRAXION_OBSERVATION_LOG': 'standard'},\n"
+        "    env={'PRAXION_OBSERVATION_LOG': 'standard', 'TMPDIR': sys.argv[2]},\n"
         ")\n"
         f"banned = {_BANNED_HOT_PATH_MODULES!r}\n"
         "hit = sorted(m for m in sys.modules if m.split('.')[0] in banned)\n"
         "print(','.join(hit))\n"
     )
     result = subprocess.run(
-        [sys.executable, "-c", script],
+        [sys.executable, "-c", script, str(ai_state_dir), str(_marker_tmp(tmp_path))],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
@@ -424,3 +430,59 @@ def test_the_tool_call_writer_path_never_imports_the_banned_hot_path_modules() -
     assert result.stdout.strip() == "", (
         f"tool-call writer path imported banned hot-path modules: {result.stdout.strip()}"
     )
+    assert (ai_state_dir / "observations.jsonl").exists(), (
+        "the drive must reach the append, or the import check covered nothing"
+    )
+
+
+# -- first-call marker: which rows consume it, and when --------------------------
+
+
+def test_a_subagent_whose_first_call_is_a_skill_still_gets_a_tool_use_row(
+    tmp_path: Path,
+) -> None:
+    """A Skill row is not `tool_use`, so it must not consume the first-call
+    marker: the subagent's next non-file call is still its first tool call,
+    and the lifecycle check needs that row to tell a running agent from one
+    that died on arrival."""
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(_marker_tmp(tmp_path))}
+    skill = {"tool_name": "Skill", "file_paths": [], "agent_id": "sub-s"}
+    read = {"tool_name": "Read", "file_paths": ["a.py"], "agent_id": "sub-s"}
+
+    writer.record_tool_call(ai_state_dir, skill, is_subagent=True, env=env)
+    writer.record_tool_call(ai_state_dir, read, is_subagent=True, env=env)
+
+    rows = _read_rows(ai_state_dir)
+    assert [r["tool_name"] for r in rows] == ["Skill", "Read"]
+
+
+def test_the_marker_is_never_set_when_the_row_it_marks_was_not_written(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Append-then-mark: a failed append must leave no marker behind, or the
+    subagent's next call would be dropped as a later call with no first-call
+    row ever written."""
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+    marker_tmp = _marker_tmp(tmp_path)
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(marker_tmp)}
+
+    def _failing_append(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(writer, "append_observation", _failing_append)
+    writer.record_tool_call(
+        ai_state_dir,
+        {"tool_name": "Read", "file_paths": [], "agent_id": "sub-a"},
+        is_subagent=True,
+        env=env,
+    )
+
+    assert list(marker_tmp.iterdir()) == [], "a marker was set for a row that was never written"
+
+
+def _read_rows(ai_state_dir: Path) -> list[dict]:
+    obs_path = ai_state_dir / "observations.jsonl"
+    return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]

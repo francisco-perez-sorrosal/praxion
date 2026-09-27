@@ -35,9 +35,9 @@ class Mode(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ targets 3.9+
 class ModeSource(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ targets 3.9+
     """Why ``resolve_mode`` returned the ``Mode`` it did.
 
-    Stamped onto every ``session_start`` row as ``log_mode_source`` (a later
-    step's job) so a reader can tell "the fleet default" apart from "this
-    project opted in explicitly" apart from "a typo fell back to full".
+    Stamped onto every ``session_start`` row as ``log_mode_source`` so a
+    reader can tell "the fleet default" apart from "this project opted in
+    explicitly" apart from "a typo fell back to full".
     """
 
     DEFAULT = "default"
@@ -53,7 +53,8 @@ def resolve_mode(env: Mapping[str, str]) -> tuple[Mode, ModeSource]:
 
     1. The legacy switch (``PRAXION_DISABLE_OBSERVABILITY``) is truthy ->
        ``OFF`` / ``LEGACY_DISABLE``.
-    2. ``PRAXION_OBSERVATION_LOG`` names a valid mode -> that mode, as given.
+    2. ``PRAXION_OBSERVATION_LOG`` names a valid mode, case-insensitively ->
+       that mode.
     3. ``PRAXION_OBSERVATION_LOG`` is set but names no valid mode -> ``FULL``
        / ``INVALID_SETTING`` (a typo fails open toward more data, not less).
     4. Otherwise -- including an explicitly falsy legacy switch, which is
@@ -64,7 +65,7 @@ def resolve_mode(env: Mapping[str, str]) -> tuple[Mode, ModeSource]:
     if legacy in _TRUTHY:
         return Mode.OFF, ModeSource.LEGACY_DISABLE
 
-    raw = env.get(SETTING, "").strip()
+    raw = env.get(SETTING, "").strip().lower()
     if not raw:
         return Mode.STANDARD, ModeSource.DEFAULT
     try:

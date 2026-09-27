@@ -184,6 +184,16 @@ class TestSkillActivationMergeSurvival:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _full_mode_with_private_marker_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests pin how capture builds each row, which is `full`-mode
+    behaviour; `standard`'s classification is covered by the writer's own
+    tests. The private TMPDIR keeps first-call markers out of the host's
+    real temp directory."""
+    monkeypatch.setenv("PRAXION_OBSERVATION_LOG", "full")
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+
+
 @pytest.fixture
 def isolated_project(tmp_path: Path) -> Path:
     """A throwaway project root carrying a real `.ai-state/` directory.

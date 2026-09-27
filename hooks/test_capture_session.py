@@ -2022,6 +2022,23 @@ class TestSessionSummaryUpsert:
         assert len(rows) == 1
         assert rows[0]["session_id"] == "sess-1"
 
+    @pytest.mark.parametrize("setting", ["off", "OFF"])
+    def test_off_mode_writes_neither_the_log_nor_the_committed_summary(
+        self, setting: str, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+        monkeypatch.setenv("PRAXION_OBSERVATION_LOG", setting)
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert not summary_path.exists(), "off must not write the committed summary"
+        assert not (project / ".ai-state" / "observations.jsonl").exists()
+
     def test_second_stop_in_same_session_updates_not_appends(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

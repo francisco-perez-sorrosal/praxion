@@ -1034,7 +1034,9 @@ def main() -> None:
 
     observation = build_observation(payload, event_type, obs_path)
     writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[event_type], observation)
-    if event_type == "session_stop":
+    mode, _source = resolve_mode(os.environ)
+    # `off` records nothing -- the committed summary included, not just the log.
+    if event_type == "session_stop" and mode is not Mode.OFF:
         _record_suspended_subagent_stops(obs_path, payload)
         try:
             session_id = payload.get("session_id", "")
@@ -1043,7 +1045,6 @@ def main() -> None:
                 for r in reader.read_rows(ai_state_dir, archives=False)
                 if r.get("session_id") == session_id
             ]
-            mode, _source = resolve_mode(os.environ)
             summary_row = build_session_summary(
                 session_rows, payload, observation["timestamp"], mode=mode
             )

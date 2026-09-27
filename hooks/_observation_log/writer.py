@@ -135,6 +135,12 @@ def _classify(row: dict, *, marker_present: bool) -> EventClass:
 # directory identity, agent_id), see `_first_call_marker_path`.
 _MARKER_PREFIX = "praxion-observation-log-first-call-"
 
+# The classes whose row is a `tool_use` row -- the only rows that may set the
+# first-call marker.
+_MARKER_CONSUMING_CLASSES = frozenset(
+    {EventClass.TOOL_FIRST_OF_SUBAGENT, EventClass.TOOL_FILE_CHANGE}
+)
+
 
 def _marker_dir(env: Mapping[str, str]) -> Path:
     """The user temp directory, resolved without importing ``tempfile`` --
@@ -224,7 +230,15 @@ def record_tool_call(
 
         event_class = _classify(row, marker_present=marker_present)
         written = record(ai_state_dir, event_class, row, env=env)
-        if written and marker_path is not None and not marker_present:
+        # Only a `tool_use` row may consume the marker: a Skill call writes a
+        # `skill_activation` row, which the lifecycle check does not count as
+        # evidence that the agent ran a tool.
+        if (
+            written
+            and marker_path is not None
+            and not marker_present
+            and event_class in _MARKER_CONSUMING_CLASSES
+        ):
             _create_first_call_marker(marker_path)
         return written
     except Exception:

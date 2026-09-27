@@ -4,7 +4,7 @@ title: The observation log gets one owner package and three registry-driven reco
 status: proposed
 category: architectural
 date: 2026-09-27
-summary: "A new hooks/_observation_log/ package (modes, registry, writer, reader) becomes the only write and read path for .ai-state/observations.jsonl; recording modes full / standard (default) / off are declared per recording class in the registry, every row carries log_mode, consumers declare their needs as tested contracts, and the fleet meaning of an explicit PRAXION_DISABLE_OBSERVABILITY=0 is pending the user's decision"
+summary: "A new hooks/_observation_log/ package (modes, registry, writer, reader) becomes the only write and read path for .ai-state/observations.jsonl; recording modes full / standard (default) / off are declared per recording class in the registry, every row carries log_mode, consumers declare their needs as tested contracts, and an explicit PRAXION_DISABLE_OBSERVABILITY=0 is neutral and resolves to standard (user decision 2026-09-26)"
 tags: [observability, observations-jsonl, hooks, wal, recording-modes, registry, consumer-contracts, td-261]
 made_by: agent
 agent_type: systems-architect
@@ -68,7 +68,7 @@ The observation log (`.ai-state/observations.jsonl`, gitignored, rotated at 10 M
 1. `PRAXION_DISABLE_OBSERVABILITY` truthy means `off`. It stays the umbrella that also silences chronograph posting, `notify_bg_session_state` and the context measurement, exactly as today. The sentinel CI's `--settings` override and the hackathon template's `"1"` therefore keep working unedited.
 2. A valid `PRAXION_OBSERVATION_LOG` value is used as given.
 3. An invalid non-empty value means `full`, recorded as `log_mode_source: invalid-setting`, so a typo never loses evidence.
-4. **(Pending the user's decision)** An explicitly falsy `PRAXION_DISABLE_OBSERVABILITY` (`"0"`, which onboarding writes into managed projects) means either `standard` (recommended: `"0"` means "not disabled") or `full` (preserves today's behaviour for the onboarded fleet).
+4. **(User decision, 2026-09-26)** An explicitly falsy `PRAXION_DISABLE_OBSERVABILITY` (`"0"`, which onboarding writes into managed projects) is neutral: it means "not disabled" and resolves to the default, `standard`. The rejected alternative mapped it to `full`, which would have kept the new default from reaching almost every onboarded project. `PRAXION_OBSERVATION_LOG=full` is the per-project escape hatch, and the release notes name it.
 5. Otherwise, `standard`.
 
 **5. Rows declare their mode.** Every appended row carries `log_mode`; the `session_start` row also carries `log_mode_source`. A row without `log_mode` predates modes and reads as `full`. The committed per-session summary carries `log_mode` and omits `tool_calls_by_tool` outside `full`, where the count would be partial.
@@ -118,7 +118,7 @@ Activation: fired — structural (≈15 production files across hooks, scripts a
 - P04's grant half is no longer auditable in the default mode.
 - The committed summary's `tool_calls_by_tool` disappears outside `full`.
 - A temp-directory marker is the log's first out-of-log state.
-- Under the recommended Q3 answer, every onboarded project changes recording granularity at the next plugin release. That is a fleet behaviour change, which is why that clause waits for the user.
+- Every onboarded project changes recording granularity at the next plugin release. That is a fleet behaviour change the user approved on 2026-09-26; the release notes name the `full` escape hatch.
 
 ## Disconfirmation
 

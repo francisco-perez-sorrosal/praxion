@@ -11,6 +11,11 @@ agent_type: systems-architect
 branch: worktree-ledger-triage
 pipeline_tier: standard
 affected_files:
+  - scripts/ledger_snapshot.py
+  - scripts/ledger_delta.py
+  - scripts/ledger_delta_signals.py
+  - scripts/ledger_health.py
+  - commands/triage-debt.md
   - skills/software-planning/references/tech-debt-ledger.md
   - agents/sentinel.md
   - tests/test_sentinel_row_contract.py

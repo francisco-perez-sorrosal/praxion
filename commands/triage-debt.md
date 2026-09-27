@@ -51,14 +51,7 @@ Read the envelope before anything else:
 
 If `rows` is empty, say so and stop. There is nothing to judge.
 
-**Branch preflight.** The digest's `anchor` is `HEAD`, which only stands in for a proper
-merge-base anchor while this command runs on the repository's default branch — the anchor-window
-staleness detector (a later increment of this triage loop) resolves the anchor as
-`git merge-base HEAD <default-branch>` instead. Determine the default branch
-(`git remote show origin` if a remote exists, else assume the current branch is it) and compare
-against `git branch --show-current`. If they differ, **refuse to apply** and say why: a stamp
-written from a non-default branch would dangle the moment that branch is squashed or rebased.
-Gathering and judging may still proceed — only the apply step (§4) is gated.
+**Anchor.** The digest's `anchor` is the merge-base of `HEAD` with the local default branch — `HEAD` itself when you run on that branch. Stamp with it verbatim. Run on the default branch when you can: a stamp anchored to a branch point is still valid after the branch merges, but its window then starts before the branch's own work, so the next run may resurface rows that branch already moved.
 
 ### 2. Judge — fan out to batches, never edit anything
 

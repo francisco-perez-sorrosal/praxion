@@ -571,6 +571,35 @@ def test_a_shorthand_for_a_file_that_exists_is_not_decay(tmp_path: Path) -> None
     assert _citation_decays(repo_root) == []
 
 
+def test_a_renamed_cite_shadowed_by_a_same_suffix_copy_still_names_its_rename(
+    tmp_path: Path,
+) -> None:
+    """A recorded rename outranks the shorthand heuristic: a fixture copy ending in the
+    same path is not the file the row cites."""
+    shadow = "eval/fixture_repos/demo/hooks/capture_memory.py"
+    repo_root = one_row_repo(
+        tmp_path, "Hook at `hooks/capture_memory.py`.", ("hooks/capture_memory.py", shadow)
+    )
+    git_ok(repo_root, "mv", "hooks/capture_memory.py", "hooks/capture_observations.py")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "mv")
+
+    (decay,) = _citation_decays(repo_root)
+    assert (decay.cause, decay.target) == ("renamed", "hooks/capture_observations.py")
+
+
+def test_a_deleted_location_shadowed_by_a_same_suffix_copy_still_decays(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ("eval/fixtures/scripts/x.py",))
+    git_ok(repo_root, "rm", "-q", "scripts/x.py")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "rm")
+
+    snapshot = ledger_snapshot.gather(repo_root)
+    delta = ledger_snapshot.row_delta(snapshot, _row(snapshot, "td-902"))
+    (decay,) = [
+        s for s in delta.signals if ledger_snapshot.signal_class_name(s) == "location-decay"
+    ]
+    assert decay.cause == "deleted"
+
+
 def test_a_parent_relative_cite_is_not_a_repo_citation(tmp_path: Path) -> None:
     repo_root = one_row_repo(tmp_path, "Compare `../sibling/other.md`.", ())
     assert _citation_decays(repo_root) == []

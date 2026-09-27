@@ -175,20 +175,27 @@ def _judgment_unusable(row: ActiveRow, git: GitFacts | None) -> list[JudgmentUnu
 def _path_fate(
     snapshot: StateSnapshot, path: str
 ) -> tuple[PathCause, str | None, date | None] | None:
-    """None when `path` resolves (on disk or at HEAD); else why it does not."""
+    """None when `path` resolves (on disk or at HEAD); else why it does not.
+
+    The exact-path rename and deletion indexes are recorded facts about this
+    very path, so they are consulted before the shorthand heuristic: a
+    same-suffix copy elsewhere (a fixture repo mirroring real paths) must not
+    hide a real move or removal. The shorthand match only answers for a path
+    history never tracked.
+    """
     git = snapshot.git
     if path in snapshot.present_paths or (git and _in_tree(git.head_tree, path)):
         return None
     if git is None:
         return ("unclassified", None, None)
-    if _unique_suffix_match(git.head_tree, path):
-        return None  # a shorthand for a file that exists, e.g. `cli.py` for `scripts/.../cli.py`
     target = _rename_target(path, git.renames)
     if target and _in_tree(git.head_tree, target):
         return ("renamed", target, None)
     deleted = _deletion_date(path, git.deletions)
     if deleted:
         return ("deleted", None, parse_iso_date(deleted))
+    if _unique_suffix_match(git.head_tree, path):
+        return None  # a shorthand for a file that exists, e.g. `cli.py` for `scripts/.../cli.py`
     return (
         ("vanished", None, None)
         if snapshot.lazy_shapes is not None

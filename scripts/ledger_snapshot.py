@@ -127,6 +127,10 @@ __all__ = [
 
 _ACTIVE_STATUSES: frozenset[str] = frozenset({"open", "in-flight"})
 _TERMINAL_STATUSES: frozenset[str] = frozenset({"resolved", "wontfix"})
+# Legal statuses per file, in `LEDGERS` order. A terminal row may still sit in the
+# active file: it migrates to the resolved file only at the next on-main commit, so
+# between a triage write and that commit it is a terminal peer, not a malformed row.
+_FILE_STATUSES = (_ACTIVE_STATUSES | _TERMINAL_STATUSES, _TERMINAL_STATUSES)
 _OTHER_GOAL_KINDS: frozenset[str] = frozenset({"spec-req", "architecture", "claude-md"})
 _TD_ID = re.compile(r"^td-\d{3,}$")
 _TD_TOKEN = re.compile(r"\btd-\d{3,}\b")
@@ -398,20 +402,20 @@ def _unparseable_reason(row: DataRow, legal: frozenset[str]) -> str | None:
 def parse_rows(
     parsed: list[ParsedLedger],
 ) -> tuple[tuple[ActiveRow, ...], tuple[TerminalPeer, ...], tuple[UnparseableRow, ...]]:
-    """Ledger pair -> typed rows, once. The first ledger is active, the second terminal."""
+    """Ledger pair -> typed rows, once, routed by each row's own status."""
     rows = dedup_rows(parsed)
     resolved, blocked = resolve_dedup_keys(rows), collision_blocked_ids(parsed)
     active: list[ActiveRow] = []
     terminal: list[TerminalPeer] = []
     unparseable: list[UnparseableRow] = []
-    for ledger, legal in zip(parsed, (_ACTIVE_STATUSES, _TERMINAL_STATUSES), strict=True):
+    for ledger, legal in zip(parsed, _FILE_STATUSES, strict=True):
         for row in ledger.rows:
             reason = _unparseable_reason(row, legal)
             if reason is not None:
                 unparseable.append(UnparseableRow(row.row_id, row.line_no, reason))
                 continue
             key = _key_facts(row, resolved, blocked)
-            if legal is _ACTIVE_STATUSES:
+            if row.value("status") in _ACTIVE_STATUSES:
                 active.append(_parse_active(row, key))
             else:
                 terminal.append(_parse_terminal(row, key))

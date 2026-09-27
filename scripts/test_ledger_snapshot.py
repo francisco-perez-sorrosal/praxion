@@ -31,7 +31,13 @@ from pathlib import Path
 
 import ledger_snapshot
 import pytest
-from _ledger_triage_testkit import IDENTITY, build_fixture_repo, git_ok, one_row_repo
+from _ledger_triage_testkit import (
+    IDENTITY,
+    build_fixture_repo,
+    git_ok,
+    one_row_repo,
+    tombstone_row,
+)
 
 # `base_repo` / `td264_post_rebase_repo` are pytest fixtures from `conftest.py`
 # (no import needed -- pytest auto-discovers them by parameter name).
@@ -197,6 +203,20 @@ def test_gather_leaves_ledger_files_byte_identical(base_repo: Path) -> None:
     ledger_snapshot.gather(base_repo)
     after = (ledger_path.read_bytes(), resolved_path.read_bytes())
     assert before == after
+
+
+def test_a_terminal_row_not_yet_migrated_out_of_the_active_file_is_a_terminal_peer(
+    base_repo: Path,
+) -> None:
+    """`wontfix` in the active file is the legal state between a triage write and the
+    finalize migration, so a later stamp in the same run can still cite the row."""
+    tombstone_row(base_repo, "td-264", "[triage 2026-09-27 @9ad0e205] merged into td-257")
+
+    snapshot = ledger_snapshot.gather(base_repo)
+
+    assert "td-264" in {peer.id for peer in snapshot.terminal_peers}
+    assert "td-264" not in {row.id_raw for row in snapshot.unparseable}
+    assert "td-264" not in {row.id for row in snapshot.active_rows}
 
 
 # -- Withheld canaries, one per oracle -----------------------------------

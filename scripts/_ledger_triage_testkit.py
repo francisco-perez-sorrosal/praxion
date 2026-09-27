@@ -172,3 +172,16 @@ def one_row_repo(tmp_path: Path, notes: str, files: tuple[str, ...]) -> Path:
     git_ok(repo_root, "add", "-A")
     git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "seed")
     return repo_root
+
+
+def tombstone_row(repo_root: Path, row_id: str, stamp: str) -> None:
+    """Apply a merge or discard the way `/triage-debt` does, before finalize migrates it:
+    `status: wontfix` in place in the active file, the stamp appended to `notes`."""
+    ledger = repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md"
+    lines = ledger.read_text().splitlines(keepends=True)
+    (index,) = [i for i, line in enumerate(lines) if line.startswith(f"| {row_id} |")]
+    cells = lines[index].split("|")
+    cells[12] = " wontfix "
+    cells[14] = f" {cells[14].strip()} // {stamp} "
+    lines[index] = "|".join(cells)
+    ledger.write_text("".join(lines))

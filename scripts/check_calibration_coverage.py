@@ -6,7 +6,7 @@ but runs standalone too — no sentinel infrastructure required.
 
 A calibration row in `.ai-state/calibration_log.md` anchors what the latest calibrated
 task was. If task-completing commits of any tier (Direct through Full — see
-`_PIPELINE_PREFIXES`, excluding release/bookkeeping commits in `_EXCLUDED_PREFIXES`)
+`_TASK_SUBJECT`, excluding release/bookkeeping commits in `_EXCLUDED_PREFIXES`)
 have landed in git since that anchor, the project has uncalibrated task work. This
 script counts those commits and flags under-coverage when the count reaches
 `K_COMMITS` (default: 2).
@@ -85,25 +85,29 @@ CHECK_IDS: tuple[str, ...] = ("CA02", "CA03")
 
 CALIBRATION_LOG_REL = ".ai-state/calibration_log.md"
 
-# Prefixes that signal a task-completing commit, of any tier (Direct through Full).
-_PIPELINE_PREFIXES = (
-    "feat:",
-    "fix:",
-    "docs:",
-    "refactor:",
-    "test:",
-    "perf:",
-    "style:",
-    "build:",
-    "ci:",
-    "revert:",
-    "chore:",
+# Conventional-Commits types that signal a task-completing commit, of any tier
+# (Direct through Full). A subject counts when it opens with one of these types,
+# an optional `(scope)` and an optional `!`, then `:` -- so `fix:`,
+# `fix(scripts):` and `feat!:` all count, while `fixup!` and `testing:` do not.
+_PIPELINE_TYPES = (
+    "feat",
+    "fix",
+    "docs",
+    "refactor",
+    "test",
+    "perf",
+    "style",
+    "build",
+    "ci",
+    "revert",
+    "chore",
 )
+_TASK_SUBJECT = re.compile(rf"^(?:{'|'.join(_PIPELINE_TYPES)})(?:\([^)]*\))?!?:")
 
-# Prefixes excluded from the count even though they match _PIPELINE_PREFIXES —
-# release automation (bump:) and ADR-finalize bookkeeping (chore(finalize)) are not
-# task-completing work.
-_EXCLUDED_PREFIXES = ("bump:", "chore(finalize)")
+# Prefixes excluded from the count even though they match a task type —
+# release automation (bump:), ADR-finalize bookkeeping (chore(finalize)) and the
+# per-boundary .ai-state/ state commit (chore(state)) are not task-completing work.
+_EXCLUDED_PREFIXES = ("bump:", "chore(finalize)", "chore(state)")
 
 # Threshold: uncalibrated pipeline-commit count that triggers under-coverage.
 K_COMMITS = 2
@@ -156,10 +160,11 @@ def _pipeline_commits_since(repo_root: Path, since: str) -> int:
     """Count task-completing commits reachable from HEAD that post-date `since`.
 
     Uses `git log --oneline --since=<date>` then filters by commit message prefix.
-    Commits whose first line starts with a prefix in `_PIPELINE_PREFIXES`
-    (case-sensitive) count as task-completing work of any tier — except commits
-    starting with a prefix in `_EXCLUDED_PREFIXES` (`bump:`, `chore(finalize)`),
-    which are release automation or ADR-finalize bookkeeping, never task work.
+    Commits whose first line matches `_TASK_SUBJECT` (a type in
+    `_PIPELINE_TYPES`, optional scope and `!`, case-sensitive) count as
+    task-completing work of any tier — except commits starting with a prefix in
+    `_EXCLUDED_PREFIXES` (`bump:`, `chore(finalize)`, `chore(state)`), which are
+    release automation or bookkeeping, never task work.
     """
     output = _git(repo_root, "log", "--oneline", f"--since={since}")
     if not output:
@@ -173,7 +178,7 @@ def _pipeline_commits_since(repo_root: Path, since: str) -> int:
         message = parts[1].strip()
         if any(message.startswith(prefix) for prefix in _EXCLUDED_PREFIXES):
             continue
-        if any(message.startswith(prefix) for prefix in _PIPELINE_PREFIXES):
+        if _TASK_SUBJECT.match(message):
             count += 1
     return count
 

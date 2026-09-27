@@ -228,6 +228,62 @@ def test_excludes_bump_and_chore_finalize_commits(
     )
 
 
+def test_counts_scoped_conventional_commit_subjects(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`fix(scripts):` and `feat!:` are task commits exactly like `fix:`; a
+    bare-prefix match missed about 40% of real task commits."""
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2025-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+    _make_commit(tmp_path, "fix(scripts): repair the prefix matcher")
+    _make_commit(tmp_path, "feat!: drop the legacy flag")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 1, "two scoped task commits must trigger under-coverage"
+
+
+def test_excludes_state_bookkeeping_commits(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`chore(state):` batches `.ai-state/` bookkeeping per boundary; like
+    `chore(finalize)` it is never task-completing work."""
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2025-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+    _make_commit(tmp_path, "chore(state): record the session summary tail")
+    _make_commit(tmp_path, "chore(state): finalize dec-999")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 0, "chore(state) commits must not count as task work"
+
+
+def test_a_type_that_only_shares_a_prefix_is_not_a_task_commit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`fixup!` and `testing:` are not `fix` or `test`; matching stops at the type."""
+    _init_repo(tmp_path)
+    _write_calibration_log(tmp_path, "2025-01-01")
+    _git(tmp_path, "add", ".ai-state")
+    _git(tmp_path, "commit", "-m", "chore: add calibration baseline")
+    _make_commit(tmp_path, "fixup! fix(scripts): repair the prefix matcher")
+    _make_commit(tmp_path, "testing: scratch")
+
+    mod = _load_module()
+    with pytest.raises(SystemExit) as exc:
+        mod.main(["--repo-root", str(tmp_path), "--check"])
+
+    assert exc.value.code == 0, "near-miss types must not count"
+
+
 def test_runs_to_verdict_without_sentinel(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

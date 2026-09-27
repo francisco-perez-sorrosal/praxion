@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from _git_runner import GitUnavailableError, run_git  # noqa: E402 (after sys.path injection)
 from _repo_root import git_toplevel_from_cwd  # noqa: E402
 from check_calibration_coverage import (  # noqa: E402
+    _EXCLUDED_PREFIXES,
     CALIBRATION_LOG_REL,
     K_COMMITS,
     compute_coverage,
@@ -54,10 +55,9 @@ _EXCLUDED_PATH_PREFIXES = (".ai-state/", ".ai-work/", ".claude/")
 # Matches the -m "<message>" or -m '<message>' argument of a pending commit.
 _COMMIT_MESSAGE_RE = re.compile(r"""-m\s+(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""")
 
-# Release automation (bump:) and ADR-finalize bookkeeping (chore(finalize)) are
-# not task-completing work -- mirrors _EXCLUDED_PREFIXES in
-# check_calibration_coverage.py.
-_EXCLUDED_MESSAGE_PREFIXES = ("bump:", "chore(finalize)")
+# Release automation and bookkeeping commits are not task-completing work. Imported,
+# not copied, so the reminder and the coverage count exclude the same commits.
+_EXCLUDED_MESSAGE_PREFIXES = _EXCLUDED_PREFIXES
 
 PREFIX = "[calibration-reminder]"
 SUBPROCESS_TIMEOUT_SECONDS = 5
@@ -88,7 +88,7 @@ def _pending_commit_message(command):
 
 
 def _is_excluded_commit(message):
-    """True if the pending commit message is release automation or finalize bookkeeping."""
+    """True if the pending commit message is release automation or bookkeeping."""
     return any(message.startswith(prefix) for prefix in _EXCLUDED_MESSAGE_PREFIXES)
 
 

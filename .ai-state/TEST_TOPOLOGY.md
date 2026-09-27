@@ -405,6 +405,7 @@ selectors:
       - "scripts/test_finalize_tech_debt_ledger.py"
       - "scripts/test_ledger_snapshot.py"
       - "scripts/test_ledger_health.py"
+      - "scripts/test_ledger_staleness.py"
       - "scripts/test_triage_write_protocol.py"
       - "scripts/test_merge_driver_observations.py"
       - "scripts/test_prune_reports.py"
@@ -420,6 +421,10 @@ selectors:
 file_dependencies:
   - "scripts/check_state_ledgers.py"
   - "scripts/state_ledger_schema.py"
+  - "scripts/ledger_snapshot.py"
+  - "scripts/ledger_delta.py"
+  - "scripts/ledger_delta_signals.py"
+  - "scripts/ledger_health.py"
   - "scripts/finalize_tech_debt_ledger.py"
   - "scripts/reconcile_ai_state.py"
   - "scripts/reconcile_pipeline_state.py"

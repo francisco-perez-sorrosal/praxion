@@ -121,6 +121,8 @@ __all__ = [
     "signal_class_name",
     "split_segments",
     "stamp_anchors",
+    "stamp_state",
+    "with_stamp",
 ]
 
 # -- Row grammar ---------------------------------------------------------------
@@ -256,7 +258,13 @@ def split_segments(notes: str) -> tuple[str, ...]:
     return tuple(segments)
 
 
-def _stamp_state(segments: tuple[str, ...]) -> StampState:
+def with_stamp(notes: str, stamp: str) -> str:
+    """The notes cell once `stamp` is appended as its newest segment -- the one shape
+    the triage apply step writes."""
+    return f"{notes}{_SEGMENT_SEPARATOR}{stamp}" if notes.strip() else stamp
+
+
+def stamp_state(segments: tuple[str, ...]) -> StampState:
     """The row's latest stamp-shaped segment wins (finalize concatenates notes)."""
     for index in range(len(segments) - 1, -1, -1):
         if segments[index].startswith(STAMP_PREFIX):
@@ -367,7 +375,7 @@ def _parse_active(row: DataRow, key: KeyFacts) -> ActiveRow:
         last_seen=parse_iso_date(row.value("last-seen")),
         notes=notes,
         segments=segments,
-        stamp=_stamp_state(segments),
+        stamp=stamp_state(segments),
         cited_decisions=_citations(goal, notes),
         key=key,
         row_withheld=_row_scope_withheld(row_id, goal, first_seen, refs),
@@ -383,7 +391,7 @@ def _parse_terminal(row: DataRow, key: KeyFacts) -> TerminalPeer:
         base_key=key.base,
         locations=_parse_locations(row.value("location")),
         last_seen=parse_iso_date(row.value("last-seen")),
-        stamp=_stamp_state(split_segments(row.value("notes"))),
+        stamp=stamp_state(split_segments(row.value("notes"))),
     )
 
 

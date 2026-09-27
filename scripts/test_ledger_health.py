@@ -25,7 +25,13 @@ from pathlib import Path
 import ledger_health
 import ledger_snapshot
 import pytest
-from _ledger_triage_testkit import build_fixture_repo
+from _ledger_triage_testkit import (
+    IDENTITY,
+    build_fixture_repo,
+    git_ok,
+    one_row_repo,
+    tombstone_row,
+)
 
 # `base_repo` is a pytest fixture from `conftest.py` (no import needed --
 # pytest auto-discovers it by parameter name).
@@ -169,12 +175,11 @@ def test_plugin_cache_repo_root_is_refused_with_exit_two(tmp_path: Path) -> None
 
 # -- Stamp check: shape is not enough, every anchor must resolve ---------------------------
 
-_STAMP = "[triage 2026-09-27 @9ad0e205c05f] "
 
-
-def _refusals(repo_root: Path, row_id: str, text: str, commits: bool = True) -> list[str]:
+def _refusals(repo_root: Path, row_id: str, text: str) -> list[str]:
     snapshot = ledger_snapshot.gather(repo_root)
-    return ledger_health.stamp_refusals(snapshot, row_id, _STAMP + text, lambda _r, _s: commits)
+    stamp = _stamp_at(_head_sha(repo_root), text)
+    return ledger_health.stamp_refusals(snapshot, row_id, stamp)
 
 
 def test_a_stamp_whose_anchors_all_resolve_may_be_written(base_repo: Path) -> None:
@@ -191,11 +196,6 @@ def test_a_row_cannot_anchor_its_own_discard(base_repo: Path) -> None:
     assert any("own stamp" in reason for reason in reasons)
 
 
-def test_a_discard_citing_an_unreachable_commit_is_refused(base_repo: Path) -> None:
-    (reason,) = _refusals(base_repo, "td-270", "discarded: fixed by c95a9e96", commits=False)
-    assert "c95a9e96" in reason
-
-
 def test_a_merge_into_a_resolved_row_is_refused(base_repo: Path) -> None:
     reasons = _refusals(base_repo, "td-270", "merged into td-095")
     assert any("survivor" in reason for reason in reasons)
@@ -207,21 +207,137 @@ def test_a_stamp_for_a_row_that_is_not_active_is_refused(base_repo: Path) -> Non
 
 
 def test_the_stamp_check_cli_exits_one_on_refusal_and_zero_when_clean(base_repo: Path) -> None:
-    root = ("--repo-root", str(base_repo))
-    clean = _run(
-        *root,
-        "--row",
-        "td-270",
-        "--check-stamp",
-        _STAMP + "kept: scripts/check_gate_liveness.py:1 ok",
+    head = _head_sha(base_repo)
+    clean = _check(
+        base_repo, "td-270", _stamp_at(head, "kept: scripts/check_gate_liveness.py:1 ok")
     )
-    refused = _run(
-        *root, "--row", "td-270", "--check-stamp", _STAMP + "discarded: moot per dec-999"
-    )
-    assert (clean.returncode, clean.stdout.strip()) == (0, "ok")
-    assert refused.returncode == 1
-    assert "dec-999" in refused.stdout
+    refused = _check(base_repo, "td-270", _stamp_at(head, "discarded: moot per dec-999"))
+    assert clean == (0, "ok\n")
+    assert refused[0] == 1
+    assert "dec-999" in refused[1]
 
 
 def test_check_stamp_without_a_row_is_a_usage_error() -> None:
-    assert _run("--check-stamp", _STAMP + "kept: a/b.py:1 ok").returncode == 2
+    assert _run("--check-stamp", "[triage 2026-09-27 @9ad0e205] kept: a/b.py:1 ok").returncode == 2
+
+
+# -- Stamp check: every anchor is resolved against HEAD, through the real git adapters --------
+
+
+def _head_sha(repo_root: Path) -> str:
+    return git_ok(repo_root, "rev-parse", "HEAD").stdout.strip()
+
+
+def _stamp_at(sha: str, text: str) -> str:
+    return f"[triage 2026-09-27 @{sha}] {text}"
+
+
+def _check(repo_root: Path, row_id: str, stamp: str, *extra: str) -> tuple[int, str]:
+    result = _run("--repo-root", str(repo_root), "--row", row_id, "--check-stamp", stamp, *extra)
+    return result.returncode, result.stdout
+
+
+def _side_branch_commit(repo_root: Path) -> str:
+    """A commit on a branch that was never merged: it exists, but HEAD cannot reach it."""
+    git_ok(repo_root, "checkout", "-q", "-b", "side")
+    (repo_root / "side.txt").write_text("side\n")
+    git_ok(repo_root, "add", "side.txt")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "side work")
+    sha = _head_sha(repo_root)
+    git_ok(repo_root, "checkout", "-q", "main")
+    return sha
+
+
+def test_a_discard_citing_a_gitignored_file_is_refused_though_it_exists_on_disk(
+    base_repo: Path,
+) -> None:
+    (base_repo / ".gitignore").write_text(".ai-work/\n")
+    git_ok(base_repo, "add", ".gitignore")
+    git_ok(base_repo, *IDENTITY, "commit", "-q", "-m", "ignore scratch")
+    survey = base_repo / ".ai-work" / "run" / "DEBT_TRIAGE.md"
+    survey.parent.mkdir(parents=True)
+    survey.write_text("line\n" * 20)
+    stamp = _stamp_at(_head_sha(base_repo), "discarded: stale per .ai-work/run/DEBT_TRIAGE.md:12")
+
+    code, out = _check(base_repo, "td-270", stamp)
+
+    assert code == 1
+    assert ".ai-work/run/DEBT_TRIAGE.md" in out
+
+
+def test_a_discard_citing_a_commit_on_an_unmerged_branch_is_refused(base_repo: Path) -> None:
+    side = _side_branch_commit(base_repo)
+    stamp = _stamp_at(_head_sha(base_repo), f"discarded: fixed by {side}")
+
+    code, out = _check(base_repo, "td-270", stamp)
+
+    assert code == 1
+    assert side in out
+
+
+def test_a_discard_citing_an_ancestor_commit_is_accepted(base_repo: Path) -> None:
+    head = _head_sha(base_repo)
+    assert _check(base_repo, "td-270", _stamp_at(head, f"discarded: fixed by {head}")) == (
+        0,
+        "ok\n",
+    )
+
+
+@pytest.mark.parametrize("anchor", ["side", "deadbeef1234"])
+def test_a_stamp_anchored_to_a_commit_head_cannot_reach_is_refused(
+    base_repo: Path, anchor: str
+) -> None:
+    sha = _side_branch_commit(base_repo) if anchor == "side" else anchor
+    stamp = _stamp_at(sha, "kept: scripts/check_gate_liveness.py:10 holds")
+
+    code, out = _check(base_repo, "td-270", stamp)
+
+    assert code == 1
+    assert sha in out
+
+
+# -- Stamp check: the cell the stamp produces must read back as that judgment ---------------
+
+
+def test_a_stamp_carrying_a_segment_separator_is_refused(base_repo: Path) -> None:
+    stamp = _stamp_at(_head_sha(base_repo), "realigned: the premise said a // b")
+
+    code, out = _check(base_repo, "td-270", stamp)
+
+    assert code == 1
+    assert "notes" in out
+
+
+def test_a_stamp_an_unbalanced_backtick_in_the_notes_would_hide_is_refused(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise about `x.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "kept: scripts/x.py:1 holds for `x")
+
+    code, _ = _check(repo_root, "td-902", stamp)
+
+    assert code == 1
+
+
+def test_a_realign_is_checked_against_the_notes_it_rewrites(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise about `x.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise named `x")
+
+    assert _check(repo_root, "td-902", stamp)[0] == 1
+    assert _check(repo_root, "td-902", stamp, "--notes", "Premise about scripts/x.py.") == (
+        0,
+        "ok\n",
+    )
+
+
+# -- Stamp check: a row tombstoned earlier in the same run is still a ledger row --------------
+
+
+def test_a_survivor_stamp_citing_a_row_merged_earlier_in_the_run_is_accepted(
+    base_repo: Path,
+) -> None:
+    head = _head_sha(base_repo)
+    tombstone_row(base_repo, "td-264", _stamp_at(head, "merged into td-257"))
+    survivor = _stamp_at(head, "kept: hooks/remind_calibration.py:1 holds, absorbed td-264")
+
+    assert _check(base_repo, "td-257", survivor) == (0, "ok\n")

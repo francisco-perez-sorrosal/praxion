@@ -44,11 +44,8 @@ import pytest
 HOOKS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = HOOKS_DIR.parent
 
-# The one function every writer entry point funnels through, whatever path
-# it took to get there (`record`, `record_tool_call`, `record_gate_fire`).
-DRIVERS = ("capture_session", "capture_observations", "measure_context_surface", "record_gate_fire")
-
-# One scenario step: `driver` names which of DRIVERS executes it; `payload`
+# One scenario step: `driver` names the writer entry point that executes it
+# (a hook module, or `record_gate_fire`); `payload`
 # holds the event-specific keys (merged over the base session/cwd/transcript
 # payload for hook drivers, or passed as kwargs for `record_gate_fire`);
 # `expected` is the tuple of `Expect` this step should produce, in order.
@@ -63,13 +60,13 @@ Expect = namedtuple("Expect", ("event_class", "absent_ok"))
 Expect.__new__.__defaults__ = (frozenset(),)
 
 Violation = namedtuple("Violation", ("step", "kind", "detail"))
-VIOLATION_KINDS = ("unregistered", "written-mismatch", "undeclared", "declared-but-absent")
 
 # The suspension `agent_stop` (a Stop-time transcript backfill, not a real
 # SubagentStop delivery) never has a subagent transcript to sum usage from,
 # so it lacks the seven usage fields every other `agent_stop` row carries.
-# Consumers already read them with `.get()` -- see capture_session.py's
-# module docstring, "agent_stop usage-field changeover" section.
+# Consumers already read them with `.get()` -- see
+# scripts/project_metrics/collectors/cost_collector.py and
+# scripts/workflow_run_cost.py.
 _SUSPENSION_ABSENT_OK = frozenset(
     {
         "tokens_in",

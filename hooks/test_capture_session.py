@@ -955,6 +955,75 @@ class TestMainContract:
 
         assert not (project / ".ai-state" / "observations.jsonl").exists()
 
+    @pytest.mark.parametrize(
+        "off_env",
+        [
+            {"PRAXION_OBSERVATION_LOG": "off"},
+            {"PRAXION_OBSERVATION_LOG": "OFF"},
+            {"PRAXION_DISABLE_OBSERVABILITY": "1"},
+        ],
+        ids=["new-key", "new-key-upper", "legacy-switch"],
+    )
+    @pytest.mark.parametrize(
+        ("hook_event", "spy_target"),
+        [
+            ("SubagentStop", "lookup_prior_agent"),
+            ("SubagentStop", "_sum_subagent_transcript"),
+            ("Stop", "_read_transcript_tail"),
+        ],
+    )
+    def test_off_mode_does_no_reads_either_spelling(
+        self,
+        project: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        off_env: dict,
+        hook_event: str,
+        spy_target: str,
+    ) -> None:
+        """`off` returns before any log or transcript read; the `standard`
+        control on the same payload must hit the spy, so an empty call list
+        proves the early return rather than a spy off the path."""
+        module = _load_module()
+        calls: list[str] = []
+
+        class SpyHitError(Exception):
+            pass
+
+        def spy(*_args: object, **_kwargs: object) -> None:
+            calls.append(spy_target)
+            raise SpyHitError(spy_target)
+
+        monkeypatch.setattr(module, spy_target, spy)
+        transcript = project / "sess-1.jsonl"
+        transcript.write_text("", encoding="utf-8")
+        payload = _stop_payload(
+            project, hook_event_name=hook_event, transcript_path=str(transcript)
+        )
+        if hook_event == "SubagentStop":
+            # A real agent's own transcript keeps the control on the agent_stop path.
+            own = project / "sess-1" / "subagents" / "agent-agent-orphan.jsonl"
+            own.parent.mkdir(parents=True)
+            own.write_text("", encoding="utf-8")
+        else:
+            del payload["agent_id"]
+
+        for key in ("PRAXION_OBSERVATION_LOG", "PRAXION_DISABLE_OBSERVABILITY"):
+            monkeypatch.delenv(key, raising=False)
+        for key, value in off_env.items():
+            monkeypatch.setenv(key, value)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+        module.main()
+
+        assert calls == []
+        assert not (project / ".ai-state" / "observations.jsonl").exists()
+        assert not (project / ".ai-state" / module.SUMMARY_FILENAME).exists()
+
+        for key in off_env:
+            monkeypatch.delenv(key)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+        with pytest.raises(SpyHitError):
+            module.main()
+
     def test_malformed_stdin_writes_nothing_and_does_not_raise(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

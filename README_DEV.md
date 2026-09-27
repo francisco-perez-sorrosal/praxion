@@ -225,7 +225,7 @@ Codex uses the same `env` shape in `.codex/praxion/settings.json`, so the same f
 
 The recording table itself is `hooks/_observation_log/registry.py`: each event class, its fields, the modes that record it, and the consumers that need it. A consumer-contract test fails if `standard` stops recording something a declared consumer needs.
 
-The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`. To disable every Praxion hook at once, disable the plugin itself in `enabledPlugins`.
+The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`, except the observation-log hooks, which read `PRAXION_DISABLE_OBSERVABILITY` through `resolve_mode` in `hooks/_observation_log/modes.py`, where it wins over `PRAXION_OBSERVATION_LOG`. To disable every Praxion hook at once, disable the plugin itself in `enabledPlugins`.
 
 ## Working on this Repo
 

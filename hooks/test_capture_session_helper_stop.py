@@ -4,7 +4,9 @@ Four quadrants over (prior WAL row for the agent Y/N) x (agent's own
 transcript exists Y/N): only "no prior row AND no own transcript" writes the
 slim `helper_stop` row with its exact five-key shape; every other quadrant
 writes the full `agent_stop` row unchanged -- the conservative fallback, so a
-real agent is never mistaken for a helper.
+real agent is never mistaken for a helper. "Own transcript exists" has a
+Workflow variant: a Workflow-spawned agent's transcript sits under its run
+directory, and that too keeps the full row.
 """
 
 from __future__ import annotations
@@ -154,3 +156,24 @@ def test_prior_row_and_own_transcript_both_exist_writes_agent_stop_unchanged(
 
     rows = _read_wal(project)
     assert rows[-1]["event_type"] == "agent_stop"
+
+
+def test_no_prior_row_but_workflow_run_transcript_exists_writes_agent_stop_unchanged(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    session_id, agent_id = "sess-5", "agent-workflow"
+    payload = _stop_payload(project, agent_id, session_id)
+    # A Workflow-spawned agent's transcript lives under its run directory,
+    # not beside the parent's: no prior WAL row, no sibling own-transcript.
+    run_transcript = (
+        project / session_id / "subagents" / "workflows" / "wf_run" / f"agent-{agent_id}.jsonl"
+    )
+    run_transcript.parent.mkdir(parents=True)
+    run_transcript.write_text("", encoding="utf-8")
+
+    _run_stop(module, payload, monkeypatch)
+
+    rows = _read_wal(project)
+    assert len(rows) == 1
+    assert rows[0]["event_type"] == "agent_stop"

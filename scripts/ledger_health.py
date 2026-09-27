@@ -160,7 +160,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     if args.check_stamp is not None:
-        return _report_stamp_check(snapshot, args.row, args.check_stamp, args.notes)
+        try:
+            notes = _read_notes(args.notes_file) if args.notes_file else None
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"error: could not read --notes-file {args.notes_file}: {exc}", file=sys.stderr)
+            return 2
+        return _report_stamp_check(snapshot, args.row, args.check_stamp, notes)
 
     assessments = assess(snapshot)
     ids = tuple(part.strip() for part in (args.ids or "").split(",") if part.strip())
@@ -201,16 +206,24 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--row", help="the td-NNN id the --check-stamp stamp is for")
     parser.add_argument(
-        "--notes",
-        help="the notes the stamp is appended to, when the apply step rewrites them (a realign); "
-        "defaults to the row's current notes",
+        "--notes-file",
+        type=Path,
+        help="a file holding the notes the stamp is appended to, when the apply step rewrites "
+        "them (a realign); defaults to the row's current notes. A file, never an argument: "
+        "notes are repository text, and shell quoting would change the bytes the write uses",
     )
     args = parser.parse_args(argv)
     if (args.check_stamp is None) != (args.row is None):
         parser.error("--check-stamp and --row go together")
-    if args.notes is not None and args.check_stamp is None:
-        parser.error("--notes goes with --check-stamp")
+    if args.notes_file is not None and args.check_stamp is None:
+        parser.error("--notes-file goes with --check-stamp")
     return args
+
+
+def _read_notes(path: Path) -> str:
+    """The notes exactly as the write will use them, less the file's own final newline."""
+    text = path.read_text(encoding="utf-8")
+    return text.removesuffix("\n").removesuffix("\r")
 
 
 def _report_stamp_check(snapshot: StateSnapshot, row_id: str, stamp: str, notes: str | None) -> int:
@@ -240,6 +253,8 @@ def stamp_refusals(
         return ["malformed stamp (see tech-debt-ledger.md § Triage for the grammar)"]
     if snapshot.git is None:
         return ["no git history here, so no anchor can be checked at HEAD"]
+    if notes is not None and ("\n" in notes or "\r" in notes):
+        return ["the rewritten notes must be one line: a table cell cannot hold a newline"]
     base_notes = rows[row_id].notes if notes is None else notes
     return _cell_refusals(base_notes, stamp, parsed) + _anchor_refusals(
         snapshot, snapshot.git, row_id, parsed

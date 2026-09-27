@@ -323,11 +323,34 @@ def test_a_realign_is_checked_against_the_notes_it_rewrites(tmp_path: Path) -> N
     repo_root = one_row_repo(tmp_path, "Premise about `x.", ())
     stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise named `x")
 
+    notes = tmp_path / "notes.txt"
+    notes.write_text("Premise about scripts/x.py.\n")
+
     assert _check(repo_root, "td-902", stamp)[0] == 1
-    assert _check(repo_root, "td-902", stamp, "--notes", "Premise about scripts/x.py.") == (
-        0,
-        "ok\n",
-    )
+    assert _check(repo_root, "td-902", stamp, "--notes-file", str(notes)) == (0, "ok\n")
+
+
+def test_rewritten_notes_reach_the_check_byte_for_byte_from_a_file(tmp_path: Path) -> None:
+    """Repo notes carry apostrophes and shell syntax; a file hands them over unquoted."""
+    repo_root = one_row_repo(tmp_path, "Premise about `x.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise named `x")
+    notes = tmp_path / "notes.txt"
+    notes.write_text("It's `$(rm -rf ~)` in scripts/x.py; don't run it.\n")
+
+    assert _check(repo_root, "td-902", stamp, "--notes-file", str(notes)) == (0, "ok\n")
+
+
+def test_rewritten_notes_spanning_lines_are_refused(tmp_path: Path) -> None:
+    """A table cell is one line: a newline inside the notes would split the row."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise")
+    notes = tmp_path / "notes.txt"
+    notes.write_text("First line.\nSecond line.\n")
+
+    code, out = _check(repo_root, "td-902", stamp, "--notes-file", str(notes))
+
+    assert code == 1
+    assert "one line" in out
 
 
 def test_a_realign_premise_is_history_so_its_stale_anchors_are_not_resolved(

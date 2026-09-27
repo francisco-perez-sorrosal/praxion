@@ -138,11 +138,15 @@ Apply only confirmed outcomes, one row at a time. For each:
 2. **Check the stamp before writing it** — its grammar, the cell it produces, and every anchor it cites:
 
    ```
-   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>' [--notes '<rewritten notes>']
+   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>' [--notes-file <path>]
    ```
 
-   Pass `--notes` for a `realigned` row — the check appends the stamp to the notes the write
-   will leave, which for a realign are the rewritten ones, not the row's current notes.
+   For a `realigned` row, write the rewritten notes to a file under
+   `.ai-work/triage-debt-<run-id>/` with the `Write` tool and pass `--notes-file` — the check
+   appends the stamp to the notes the write will leave, which for a realign are the rewritten
+   ones, not the row's current notes. Never pass notes as a shell argument: they are repository
+   text, full of apostrophes and backticks, and shell quoting changes the bytes. The write in
+   step 3 uses that same file's content, so the cell is exactly what was checked.
 
    Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp; a stamp
    that, appended to the notes, does not read back as the row's latest judgment (a ` // ` inside

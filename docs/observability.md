@@ -123,7 +123,8 @@ chronograph-ctl logs     # Tail the log file
 | `PHOENIX_ENDPOINT` | `http://localhost:6006/v1/traces` | Chronograph's OTLP export target |
 | `OTEL_ENABLED` | `false` | Set to `true` to enable trace export |
 | `CHRONOGRAPH_STRIP_LLM_ATTRS` | *(unset)* | Set to `1` to suppress `llm.*` span attributes (token counts, model, system, provider). Structural telemetry unaffected. |
-| `PRAXION_DISABLE_OBSERVABILITY` | *(unset)* | Set to `1` to stop hooks from posting events entirely. Telemetry goes dark until unset. |
+| `PRAXION_DISABLE_OBSERVABILITY` | *(unset)* | Set to `1` to stop hooks from posting events and to turn the local observation log off. Telemetry goes dark until unset. |
+| `PRAXION_OBSERVATION_LOG` | `standard` | How much the local observation log records: `standard`, `full` (every tool call) or `off`. See `README_DEV.md` § Observation-log recording mode. |
 
 ### Privacy and cost knobs
 

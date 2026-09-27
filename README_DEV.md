@@ -198,7 +198,7 @@ Four env-var flags let a downstream project disable Praxion hooks that cost toke
 
 | Flag | What it disables | When to use |
 |------|------------------|-------------|
-| `PRAXION_DISABLE_OBSERVABILITY` | `send_event.py`, `capture_session.py`, `capture_observations.py` | Disables chronograph telemetry and `observations.jsonl` writes. Zero prompt-token impact; saves process-spawn time and local I/O. |
+| `PRAXION_DISABLE_OBSERVABILITY` | `send_event.py`, `capture_session.py`, `capture_observations.py`, `measure_context_surface.py`, `notify_bg_session_state.py`, gate verdict rows | Disables chronograph telemetry and every observation-log write (the log's `off` mode, which wins over `PRAXION_OBSERVATION_LOG`). An explicit `"0"` is neutral: the log runs its default mode. Zero prompt-token impact; saves process-spawn time and local I/O. |
 | `PRAXION_DISABLE_EVENT_POSTING` | `send_event.py` only | Disables chronograph telemetry POSTs while `observations.jsonl` keeps being written. The live eval sandbox sets it. |
 | `PRAXION_DISABLE_PROCESS_INJECT` | `inject_process_framing.py` (UserPromptSubmit) | Disables the compact process-framing reminder that reinforces the tier selector and behavioral contract. No prompt-token impact; use when you want Codex or Claude to stay silent on that reminder. |
 | `PRAXION_DISABLE_RULE_INJECTION` | `inject_rules.py` (SessionStart) | Escape hatch for the per-project rules disable mechanism. Skips the hook entirely, so the 2 hook-deliver rules (`agent-model-routing`, `vcs/git-conventions`) are absent from `additionalContext` AND no `claudeMdExcludes` reconciliation runs — existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled. Use when debugging the hook, or when a project wants hook-deliver rules out of all sessions without authoring a per-project disable list. See `docs/rules-taxonomy.md`. |
@@ -210,6 +210,20 @@ Example `.claude/settings.json` for a project that wants Praxion skills/agents b
 ```
 
 Codex uses the same `env` shape in `.codex/praxion/settings.json`, so the same flags work there without touching `.claude/settings.json`.
+
+### Observation-log recording mode
+
+`PRAXION_OBSERVATION_LOG` sets how much the observation log (`.ai-state/observations.jsonl`) records. The value is read case-insensitively; an unrecognized value falls back to `full`, so a typo keeps evidence rather than losing it.
+
+| Mode | Records | Use |
+|------|---------|-----|
+| `standard` *(default)* | Session and agent lifecycle, gate verdicts, compactions, context measurements, Skill calls, every file-changing tool call, and each subagent's first tool call. Harness helper stops are slim `helper_stop` rows. | Everything Praxion's own readers need, with about 2.5× more history per rotation than `full`. |
+| `full` | Everything `standard` records plus every other tool call. | The sentinel's P04 tool-grant half, or any local tooling that reads Read/Bash/Grep rows. |
+| `off` | Nothing, including the committed session summary. | Throwaway sandboxes. `PRAXION_DISABLE_OBSERVABILITY=1` also selects it. |
+
+**Upgrade note:** `standard` is the default from this release on, including for projects whose settings carry `PRAXION_DISABLE_OBSERVABILITY: "0"` (which onboarding writes). A project that relied on every tool call being logged restores it with `{ "env": { "PRAXION_OBSERVATION_LOG": "full" } }`. Every row carries `log_mode`, so a reader can tell "not recorded in this mode" from "did not happen". The modes change background CPU and disk use, not the latency you wait on: the log's hooks already run async.
+
+The recording table itself is `hooks/_observation_log/registry.py`: each event class, its fields, the modes that record it, and the consumers that need it. A consumer-contract test fails if `standard` stops recording something a declared consumer needs.
 
 The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`. To disable every Praxion hook at once, disable the plugin itself in `enabledPlugins`.
 

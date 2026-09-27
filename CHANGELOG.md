@@ -1,3 +1,63 @@
+## v0.39.0 (2026-09-27)
+
+### Feat
+
+- Add an --index mode that lists the probe's selected ids
+- Register TD07 and document triage staleness
+- Resurface a triaged row only when its window moves
+- Resolve every triage stamp anchor before it is written
+- Ship the /triage-debt command over the ledger triage probe
+- Add the advisory ledger triage probe
+- Add the state-snapshot reader for ledger triage
+- Record harness helper stops as slim helper_stop rows
+- Record a standard observation log by default
+- add the scheduled sentinel workflow
+
+### Fix
+
+- Read a top-level dotfile cite in a triage stamp
+- Refuse a table delimiter in rewritten notes before the write
+- Keep surfacing a live row a realign moved another row onto
+- Take the stamp to check from a file, never a shell argument
+- Place a supersession recorded late by the cited decision's own edits
+- Check a realign's new location and kept segments before the write
+- Read a realign's rewritten notes from a file, not a shell argument
+- Resolve only the anchor of a realign stamp, not its premise
+- Let a judged row's old same-key peers go quiet
+- Count a later commit that amends the row as work on it
+- Place decision changes by the anchor tree, not the ADR date
+- Resurface a judged row whose directory location was deleted
+- Consult rename and deletion records before the shorthand match
+- Resolve every stamp anchor at HEAD and check the cell it produces
+- Read a terminal row still in the active ledger as a terminal peer
+- Harden the triage probe's anchors and history reads
+- Keep the ledger snapshot reader off PATH
+- Type-check the ledger triage reader and refuse plugin-cache roots
+- Close three gaps in the mutation sensor's refusal paths
+- Find git hooks from a linked worktree in the readiness check
+- Name an unreadable observation log in three readers
+- Count scoped commit subjects in calibration coverage
+- Bound the commit gate's token-count calls to its hook budget
+- Make dispatch-reworks start every rework session
+- **gates**: Catch ID citations staged in the same call as the commit
+- **hooks**: Return before any work when the log is off
+- surface the observation-log reader's error instead of a silent empty read
+- Upcast only legacy rows and stream segment reads
+- **gates**: Resolve hooks/ packages as first-party in GL05
+- Close three gaps in the standard observation log
+- **eval**: Label eval log rows by what the run actually did
+- **ci**: Catch fine-grained GitHub tokens in the sentinel gate
+- **pre-commit**: Run the YAML-reading hooks with PyYAML
+- **hooks**: Count a committed calibration row at Stop
+- **ci**: Show the sentinel's log row from the log diff alone
+- **ci**: Stop the sentinel's Bun install from saving a cache
+- **ci**: Publish the sentinel report only past a clear gate
+
+### Refactor
+
+- Read the observation log through its owner reader
+- Route every observation-log write through one owner
+
 ## v0.38.0 (2026-09-26)
 
 ### Feat

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -95,6 +96,18 @@ def test_script_carries_the_executable_bit() -> None:
     shipped `/triage-debt` command finds this script on `PATH`."""
     assert SCRIPT_PATH.exists(), f"expected {SCRIPT_PATH} to exist"
     assert os.access(SCRIPT_PATH, os.X_OK), f"{SCRIPT_PATH} is missing its executable bit"
+
+
+def test_the_scripts_catalog_names_every_flag_the_probe_accepts() -> None:
+    """Agents read the catalog, not `--help`: a flag it omits is never used, and one it still
+    names after removal is passed and fails."""
+    flags = set(re.findall(r"--[a-z][a-z-]+", _run("--help").stdout)) - {"--help"}
+    catalog = (SCRIPT_PATH.parent / "CLAUDE.md").read_text()
+    (entry,) = [line for line in catalog.splitlines() if line.startswith("- `ledger_health.py`")]
+    named = set(re.findall(r"--[a-z][a-z-]+", entry))
+
+    assert flags <= named, sorted(flags - named)
+    assert named <= flags, sorted(named - flags)
 
 
 # -- Digest contract --------------------------------------------

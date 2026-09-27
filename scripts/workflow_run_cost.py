@@ -66,6 +66,9 @@ from _repo_root import git_toplevel_from_cwd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
+# A helper's stop has its own slim row type; both kinds feed the unobserved section.
+_STOP_EVENT_TYPES = frozenset({"agent_stop", "helper_stop"})
+
 
 # --------------------------------------------------------------------------- #
 # I/O layer
@@ -181,11 +184,12 @@ def _transcript_stats(path: Path) -> dict | None:
 
 def _read_wal(wal_path: Path) -> dict[str, dict]:
     """`agent_id -> {tokens_in, tokens_out, cache_read, cache_create, model,
-    duration_ms, usage_source, timestamp}` from `agent_stop` WAL rows. The last row for
-    a given `agent_id` wins when several exist."""
+    duration_ms, usage_source, timestamp}` from `agent_stop` and `helper_stop` WAL rows
+    (a helper's usage fields are all None). The last row for a given `agent_id` wins when
+    several exist."""
     rows: dict[str, dict] = {}
     for record in reader.read_segment(wal_path).rows:
-        if record.get("event_type") != "agent_stop":
+        if record.get("event_type") not in _STOP_EVENT_TYPES:
             continue
         agent_id = record.get("agent_id")
         if not agent_id:

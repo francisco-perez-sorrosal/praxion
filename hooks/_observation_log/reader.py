@@ -132,14 +132,40 @@ def tail_rows(path: Path, max_bytes: int) -> list[dict]:
     return rows
 
 
+# A stop whose usage came from either transcript belongs to a real agent,
+# whatever its correlation verdict says.
+_TRANSCRIPT_USAGE_SOURCES = frozenset({"subagent-transcript", "parent-transcript"})
+
+# Usage fields a stop row fills from a transcript.
+_TOKEN_FIELDS = ("tokens_in", "tokens_out", "cache_read", "cache_create")
+
+# The keys a `helper_stop` row carries; an upcast legacy row is cut to these.
+_HELPER_STOP_KEYS = ("timestamp", "session_id", "agent_id", "project", "event_type", "log_mode")
+
+
 def upcast(row: dict) -> dict:
     """Normalize a legacy row shape to its current equivalent.
 
-    Identity passthrough for now -- this package's evolution contract names
-    this function as the single place a legacy shape ever gets normalized
-    (today, none exist); the first real upcast (a legacy helper `agent_stop`
-    row presenting as `helper_stop`) lands in a later step.
+    The single place a legacy shape is ever normalized, so every reader sees
+    one vocabulary. Today there is one rule: an `agent_stop` row written
+    before `helper_stop` existed, self-reporting `start_correlation:
+    unobserved-agent` and carrying no usage at all, was a harness helper
+    call, not an agent -- it is presented as the slim `helper_stop` row the
+    stop path now writes directly. Any other row passes through unchanged.
+
+    "No usage at all" means no transcript `usage_source` *and* no token
+    field populated: rows written before `usage_source` existed carry real
+    token counts with no source label, and those are agents.
     """
+    if (
+        row.get("event_type") == "agent_stop"
+        and row.get("start_correlation") == "unobserved-agent"
+        and row.get("usage_source") not in _TRANSCRIPT_USAGE_SOURCES
+        and all(row.get(field) is None for field in _TOKEN_FIELDS)
+    ):
+        helper = {key: row[key] for key in _HELPER_STOP_KEYS if key in row}
+        helper["event_type"] = "helper_stop"
+        return helper
     return row
 
 

@@ -184,13 +184,14 @@ EVENT_MAP = {
 
 # The `event_type` string this hook builds, mapped onto the owner package's
 # recording class -- the same class the registry's `standard`/`full`/`off`
-# table is keyed by. A stop's `helper_stop` branch (a later step) is written
-# directly under `EventClass.HELPER_STOP` and never goes through this map.
+# table is keyed by. Keyed by the built row's own `event_type`, so a stop
+# that `build_observation` turned into a `helper_stop` records as one.
 _EVENT_CLASS_BY_TYPE = {
     "session_start": EventClass.SESSION_START,
     "session_stop": EventClass.SESSION_STOP,
     "agent_start": EventClass.AGENT_START,
     "agent_stop": EventClass.AGENT_STOP,
+    "helper_stop": EventClass.HELPER_STOP,
 }
 
 # A compaction is not a lifecycle event and is deliberately absent from
@@ -644,6 +645,13 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
     )
     agent_type, agent_type_source = resolve_agent_type(payload, event_type, backfilled)
     cwd = payload.get("cwd", ".")
+    start_correlation = resolve_start_correlation(event_type, start_row_seen, any_row_seen)
+    if (
+        event_type == "agent_stop"
+        and start_correlation == CORRELATION_UNOBSERVED_AGENT
+        and _has_no_own_transcript(payload)
+    ):
+        return build_helper_stop(payload)
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
@@ -657,12 +665,43 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
         "outcome": None,
         "classification": None,
         "agent_type_source": agent_type_source,
-        "start_correlation": resolve_start_correlation(event_type, start_row_seen, any_row_seen),
+        "start_correlation": start_correlation,
     }
     if event_type == "agent_stop":
         row["stop_source"] = STOP_SOURCE_HOOK
         row.update(_sum_subagent_transcript(payload))
     return row
+
+
+def _has_no_own_transcript(payload: dict) -> bool:
+    """True only when the own-transcript check can run and finds nothing.
+
+    An agent the harness gave a transcript -- as an Agent-tool sibling file
+    or under a Workflow run directory -- is a real agent whatever the log
+    saw. When the payload lacks the ids the check keys on, the answer is
+    False, so an unanswerable check keeps the full ``agent_stop`` row.
+    """
+    own_path = _subagent_own_transcript_path(payload)
+    if not own_path:
+        return False
+    return not Path(own_path).is_file() and not _workflow_agent_transcript_path(payload)
+
+
+def build_helper_stop(payload: dict) -> dict:
+    """The slim row for a harness helper call's stop.
+
+    A helper has no start row, no prior row of any kind and no transcript,
+    so there is no usage to recover and no agent type to resolve: the row
+    names only when and where it stopped (dec-370 records helpers as their
+    own class; this is that class's own row type).
+    """
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": payload.get("session_id", ""),
+        "agent_id": resolve_agent_id(payload),
+        "project": _pipeline_slug(payload.get("cwd", ".")),
+        "event_type": "helper_stop",
+    }
 
 
 def build_compaction_observation(payload: dict) -> dict:
@@ -1033,7 +1072,7 @@ def main() -> None:
         return
 
     observation = build_observation(payload, event_type, obs_path)
-    writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[event_type], observation)
+    writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[observation["event_type"]], observation)
     mode, _source = resolve_mode(os.environ)
     # `off` records nothing -- the committed summary included, not just the log.
     if event_type == "session_stop" and mode is not Mode.OFF:

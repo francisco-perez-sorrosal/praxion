@@ -372,3 +372,36 @@ def test_missing_capture_session_exits_with_remedy_not_a_bare_traceback(tmp_path
     assert "Traceback (most recent call last)" not in rc.stderr
     assert "capture_session is not importable" in rc.stderr
     assert sys.executable in rc.stderr
+
+
+# -- Helper stops: the slim row reports exactly as the legacy row did --------------
+
+
+def _legacy_helper(agent_id: str) -> dict:
+    return _row("agent_stop", agent_id, agent_type="unknown", start_correlation="unobserved-agent")
+
+
+def _slim_helper(agent_id: str) -> dict:
+    return {
+        "event_type": "helper_stop",
+        "agent_id": agent_id,
+        "session_id": "s1",
+        "timestamp": _POST_BASELINE,
+        "project": "repo",
+    }
+
+
+def test_slim_helper_stops_report_identically_to_legacy_helper_stops(tmp_path: Path) -> None:
+    """A log whose helpers are slim `helper_stop` rows yields the same P03
+    envelope as one whose helpers are legacy `agent_stop` rows."""
+    tail = [_row("agent_start", "later", session_id="s2")]
+    legacy_root = tmp_path / "legacy"
+    slim_root = tmp_path / "slim"
+    _write_wal(legacy_root, [_legacy_helper("h1"), _legacy_helper("h2"), *tail])
+    _write_wal(slim_root, [_legacy_helper("h1"), _slim_helper("h2"), *tail])
+
+    legacy_report = clp.classify(legacy_root)
+    slim_report = clp.classify(slim_root)
+
+    assert slim_report == legacy_report
+    assert slim_report["info"]["unmatched_stops"]["unobserved-agent"] == ["h1", "h2"]

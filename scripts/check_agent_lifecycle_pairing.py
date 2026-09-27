@@ -148,6 +148,7 @@ AGENTS_DIR_REL = "agents"
 
 _START_EVENT = "agent_start"
 _STOP_EVENT = "agent_stop"
+_HELPER_STOP_EVENT = "helper_stop"
 _TOOL_EVENT = "tool_use"
 
 # The date the main-agent Stop hook began synthesizing a stop for a
@@ -194,8 +195,16 @@ def _row_from(raw: dict) -> _Row:
     reading `agent_id`/`agent_type` directly -- a written row is exactly the
     payload shape those resolvers accept, so this stays correct if a future
     row omits a field the raw-dict read would have silently returned "" for.
+
+    A `helper_stop` row is projected onto the stop it replaced: a stop
+    self-reporting `unobserved-agent`, so helpers keep landing in the same
+    `unmatched_stops` class whether the log recorded them before or after
+    the slim row existed.
     """
     event_type = str(raw.get("event_type") or "")
+    start_correlation = raw.get("start_correlation") or None
+    if event_type == _HELPER_STOP_EVENT:
+        event_type, start_correlation = _STOP_EVENT, CORRELATION_UNOBSERVED_AGENT
     agent_type, _source = resolve_agent_type(raw, event_type)
     return _Row(
         event_type=event_type,
@@ -203,7 +212,7 @@ def _row_from(raw: dict) -> _Row:
         agent_type=agent_type,
         session_id=str(raw.get("session_id") or ""),
         timestamp=_parse_timestamp(raw.get("timestamp")),
-        start_correlation=raw.get("start_correlation") or None,
+        start_correlation=start_correlation,
     )
 
 

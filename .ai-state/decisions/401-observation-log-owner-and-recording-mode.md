@@ -1,7 +1,8 @@
 ---
-id: dec-draft-78362649
+id: dec-401
+draft_id: dec-draft-78362649
 title: The observation log gets one owner package and three registry-driven recording modes
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-27
 summary: "A new hooks/_observation_log/ package (modes, registry, writer, reader) becomes the only write and read path for .ai-state/observations.jsonl; recording modes full / standard (default) / off are declared per recording class in the registry, every row carries log_mode, consumers declare their needs as tested contracts, and an explicit PRAXION_DISABLE_OBSERVABILITY=0 is neutral and resolves to standard (user decision 2026-09-26)"

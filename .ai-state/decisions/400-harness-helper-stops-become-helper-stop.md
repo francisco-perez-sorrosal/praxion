@@ -1,7 +1,8 @@
 ---
-id: dec-draft-2b4320a6
+id: dec-400
+draft_id: dec-draft-2b4320a6
 title: Harness helper stops are written as their own slim helper_stop event, not as agent_stop rows
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-27
 summary: "A SubagentStop with no prior log row and no own transcript is written as a slim helper_stop row (no agent_type, no usage, no transcript scan) in every recording mode; the log reader presents legacy agent_stop rows self-reporting unobserved-agent with no usage as helper_stop; P03's envelope and the unobserved-agent vocabulary are unchanged; narrows dec-370's representation of the helper class"

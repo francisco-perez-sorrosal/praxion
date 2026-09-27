@@ -15,7 +15,7 @@ affected_files:
   - hooks/test_capture_session.py
   - agents/sentinel.md
 affected_reqs: []
-superseded_in_part_by: [dec-draft-2b4320a6]
+superseded_in_part_by: [dec-400]
 dissent: "The turn-limit notification is harness prose with no published contract; parsing it couples a durable ledger to wording that can change silently, and a harness-side SubagentStop-on-suspension would make the whole mechanism unnecessary."
 ---
 

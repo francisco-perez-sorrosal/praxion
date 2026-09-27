@@ -112,6 +112,50 @@ class TestMainEntry:
         m.main()
         assert not (ai_state / "observations.jsonl").exists()
 
+    @pytest.mark.parametrize(
+        "off_env",
+        [{"PRAXION_OBSERVATION_LOG": "off"}, {"PRAXION_DISABLE_OBSERVABILITY": "1"}],
+        ids=["new-key", "legacy-switch"],
+    )
+    def test_off_mode_never_measures_either_spelling(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, off_env: dict
+    ):
+        """`off` returns before `measure()` (and so before `count_tokens`); the
+        unset control must hit the spy, so an empty call list proves the
+        early return rather than a spy off the path."""
+        m = _load_module()
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        # Unset: a mis-bound spy falls through to the offline estimate, never the network.
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        calls: list[Path] = []
+
+        class SpyHitError(Exception):
+            pass
+
+        def spy(root: Path, **_kwargs: object) -> dict:
+            calls.append(root)
+            raise SpyHitError(str(root))
+
+        monkeypatch.setattr(mtb, "measure", spy)
+        payload = {"hook_event_name": "SessionStart", "cwd": str(tmp_path), "session_id": "x"}
+
+        for key in ("PRAXION_OBSERVATION_LOG", "PRAXION_DISABLE_OBSERVABILITY"):
+            monkeypatch.delenv(key, raising=False)
+        for key, value in off_env.items():
+            monkeypatch.setenv(key, value)
+        self._stub_stdin(payload, monkeypatch)
+        m.main()
+
+        assert calls == []
+        assert not (ai_state / "observations.jsonl").exists()
+
+        for key in off_env:
+            monkeypatch.delenv(key)
+        self._stub_stdin(payload, monkeypatch)
+        with pytest.raises(SpyHitError):
+            m.main()
+
     def test_malformed_stdin_does_not_crash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         monkeypatch.setattr(sys, "stdin", _StringIO("not-json{"))

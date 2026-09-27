@@ -1356,3 +1356,31 @@ def test_unknown_evidence_names_every_earlier_declarer_when_files_are_split_acro
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+# -- An unreadable log is reported, not read as empty (td-276) --------------------
+# The log is only a Tier-2 localization hint, so reconciliation still proceeds;
+# the error must reach the operator instead of silently removing the hint.
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a chmod-000 file")
+def test_read_wal_reports_an_unreadable_active_log(tmp_path: Path, capsys) -> None:
+    state = tmp_path / ".ai-state"
+    state.mkdir()
+    obs_path = state / "observations.jsonl"
+    obs_path.write_text(json.dumps({"event_type": "agent_stop", "agent_id": "a"}) + "\n")
+    obs_path.chmod(0o000)
+    try:
+        rows = rps._read_wal(obs_path, max_age_days=7, now=_NOW)
+    finally:
+        obs_path.chmod(0o644)
+
+    assert rows == []
+    assert "wal-unreadable" in capsys.readouterr().err
+
+
+def test_read_wal_is_silent_when_the_log_is_simply_absent(tmp_path: Path, capsys) -> None:
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert rows == []
+    assert "wal-unreadable" not in capsys.readouterr().err

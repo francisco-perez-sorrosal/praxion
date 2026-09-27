@@ -34,6 +34,7 @@ lands it.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -605,3 +606,22 @@ def test_no_context_flag_forces_unsized_even_with_a_heavy_transcript_available(
     data = json.loads(result.stdout)
     assert data["resumes"]["unsized"] == 1
     assert data["resumes"]["heavy"] == 0
+
+
+# -- An unreadable log withholds; it is never read as an empty one (td-276) ------
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a chmod-000 file")
+def test_withholds_on_an_unreadable_wal(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_wal(repo, dot1_lines=[], live_lines=[_ROW_FIRST_START])
+    live = repo / ".ai-state" / "observations.jsonl"
+    live.chmod(0o000)
+    try:
+        result = _run_cli(["--slug", "praxion", "--repo-root", str(repo), "--json"], cwd=_REPO_ROOT)
+    finally:
+        live.chmod(0o644)
+
+    assert result.returncode == 2, result.stdout
+    assert "wal-unreadable" in result.stderr

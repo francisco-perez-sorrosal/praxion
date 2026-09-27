@@ -44,8 +44,15 @@ KEEP_MIN_SPAWNS = 5
 
 
 def iter_rows(wal_path: Path):
-    """Every parseable row of the one log segment at ``wal_path``."""
-    yield from reader.read_segment(wal_path).rows
+    """Every parseable row of the one log segment at ``wal_path``.
+
+    Raises OSError when the segment exists but cannot be read, so an
+    unreadable log is never tallied as an empty one.
+    """
+    segment = reader.read_segment(wal_path)
+    if segment.error is not None and segment.error != "missing":
+        raise OSError(segment.error)
+    yield from segment.rows
 
 
 def query(wal_path: Path) -> dict[str, dict]:
@@ -97,7 +104,11 @@ def main() -> int:
         print(f"WAL not found at {wal_path}", flush=True)
         return 1
 
-    result = query(wal_path)
+    try:
+        result = query(wal_path)
+    except OSError as exc:
+        print(f"WAL unreadable at {wal_path}: {exc}", flush=True)
+        return 1
     header = f"{'agent_type':<45} {'spawns':>7} {'agent-memory':>13} {'/memory/':>9}  decision"
     print(header)
     print("-" * len(header))

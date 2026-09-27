@@ -520,7 +520,7 @@ def _read_wal(
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=max_age_days)
 
-    active_rows = list(reader.read_segment(obs_path).rows)
+    active_rows = list(_read_segment_or_warn(obs_path).rows)
 
     seg_path = Path(str(obs_path) + ".1")
     seg_rows: list[dict[str, Any]] = []
@@ -529,13 +529,31 @@ def _read_wal(
         if seg_mtime >= cutoff:
             seg_rows = [
                 r
-                for r in reader.read_segment(seg_path).rows
+                for r in _read_segment_or_warn(seg_path).rows
                 if _parse_ts(r.get("timestamp", "")) >= cutoff
             ]
     except OSError:
         pass  # segment absent or unreadable → skip silently
 
     return active_rows + seg_rows
+
+
+def _read_segment_or_warn(path: Path) -> reader.SegmentRead:
+    """Read one log segment; name an unreadable one on stderr.
+
+    The log is only a Tier-2 localization hint, so reconciliation proceeds
+    without it -- but an unreadable log must not pass for an empty one, or
+    the missing hint looks like \"no agent touched these files\". An absent
+    segment is a normal state and stays silent.
+    """
+    segment = reader.read_segment(path)
+    if segment.error is not None and segment.error != "missing":
+        print(
+            f"reconcile_pipeline_state: wal-unreadable: {path}: {segment.error}; "
+            "Tier-2 localization hints are unavailable",
+            file=sys.stderr,
+        )
+    return segment
 
 
 def _git_changed_files(repo_root: Path, base_ref: str | None) -> set[str]:

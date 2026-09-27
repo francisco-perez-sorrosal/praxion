@@ -170,13 +170,19 @@ def verdict(tallies: tuple[AgentTally, ...], budget: int | None, threshold: int)
 # -- I/O shell ---------------------------------------------------------------------------
 
 
+class _WalUnreadableError(Exception):
+    """A log segment exists but could not be read (permissions, I/O)."""
+
+
 def _read_wal_rows(repo_root: Path) -> tuple[list[Path], list[dict], int]:
     """Read the rotated archive segment then the active observation log.
 
     Returns (files_that_existed, parsed_rows, rows_skipped). A missing file is
     silently skipped -- withholding on a totally absent WAL is the caller's job. A
     malformed/non-dict line is skipped and counted, never treated as a reason to
-    zero the whole run.
+    zero the whole run. A segment that exists but cannot be read raises
+    `_WalUnreadableError`: counting spawns over a partial log would under-report
+    the budget, so the caller withholds instead.
     """
     state_dir = repo_root / ".ai-state"
     existing = list(reader.segments(state_dir, archives=True))
@@ -184,6 +190,8 @@ def _read_wal_rows(repo_root: Path) -> tuple[list[Path], list[dict], int]:
     skipped = 0
     for path in existing:
         segment = reader.read_segment(path)
+        if segment.error is not None:
+            raise _WalUnreadableError(f"{path}: {segment.error}")
         rows.extend(segment.rows)
         skipped += len(segment.malformed_lines)
     return existing, rows, skipped
@@ -336,7 +344,11 @@ def _run(args: argparse.Namespace) -> int:
     if is_plugin_cache_path(repo_root):
         _fail("plugin-cache-root", f"refusing to operate on a plugin-cache path: {repo_root}")
         return 2
-    sources, all_rows, rows_skipped = _read_wal_rows(repo_root)
+    try:
+        sources, all_rows, rows_skipped = _read_wal_rows(repo_root)
+    except _WalUnreadableError as exc:
+        _fail("wal-unreadable", str(exc))
+        return 2
     if not sources:
         _fail("wal-absent", f"no observation log found under {repo_root} (checked .ai-state/).")
         return 2

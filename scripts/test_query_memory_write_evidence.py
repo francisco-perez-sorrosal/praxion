@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
@@ -132,3 +135,25 @@ def test_query_over_an_empty_wal_returns_no_agents(tmp_path: Path) -> None:
     wal_path = _write_wal(tmp_path / "observations.jsonl", [])
 
     assert qmwe.query(wal_path) == {}
+
+
+# --------------------------------------------------------------------------- #
+# An unreadable log is a named failure, never an empty tally (td-276)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a chmod-000 file")
+def test_main_exits_1_naming_an_unreadable_wal(tmp_path: Path, monkeypatch, capsys) -> None:
+    wal_path = _write_wal(
+        tmp_path / "observations.jsonl",
+        [{"agent_type": "praxion:implementer", "event_type": "agent_start"}],
+    )
+    wal_path.chmod(0o000)
+    monkeypatch.setattr(sys, "argv", ["query_memory_write_evidence", "--wal", str(wal_path)])
+    try:
+        code = qmwe.main()
+    finally:
+        wal_path.chmod(0o644)
+
+    assert code == 1
+    assert "unreadable" in capsys.readouterr().out

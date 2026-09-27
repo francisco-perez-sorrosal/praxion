@@ -154,8 +154,8 @@ Apply only confirmed outcomes, one row at a time. For each:
    it, or a backtick left unbalanced); an `@anchor` or cited commit that is not an ancestor of
    `HEAD`; a cited path (or a `kept` stamp's evidence path) not tracked at `HEAD` — a file that
    is only on disk, gitignored scratch included, is not evidence; a cited line past the end of
-   its file; a new location path not tracked at `HEAD`; rewritten notes that drop, add or
-   reorder a segment or change an earlier stamp; a `dec-NNN` that is not a
+   its file; a new location path not tracked at `HEAD`; rewritten notes that drop or add
+   a segment or change an earlier stamp; a `dec-NNN` that is not a
    finalized decision; a `td-NNN` that is not a ledger row or is the row itself; a merge that
    names no other active row as survivor; or a row that is not active. A `realigned` stamp's
    text is the premise it replaced, stale by definition, so only its `@anchor` is resolved.

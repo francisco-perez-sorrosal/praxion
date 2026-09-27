@@ -409,3 +409,64 @@ def test_stamps_without_a_checkable_anchor_or_legal_outcome_are_malformed(segmen
     """a discard must cite a path:line, dec-NNN, td-NNN or commit sha;
     `repurposed` is not an outcome after the north-star amendment."""
     assert isinstance(ledger_snapshot.parse_stamp(segment), ledger_snapshot.StampMalformed)
+
+
+# -- `citation-decay`: realignment input and relative mentions ----------------------------
+
+_LEDGER_HEADER = (
+    "# Technical Debt Ledger\n\n**Schema**: 14 row fields + 1 structural `dedup_key`.\n\n"
+    "| id | severity | class | direction | location | goal-ref-type | goal-ref-value | "
+    "source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |\n"
+    "|----|----------|-------|-----------|----------|---------------|----------------|"
+    "--------|------------|-----------|-----------|--------|-------------|-------|-----------|\n"
+)
+
+
+def _one_row_repo(tmp_path: Path, notes: str, files: tuple[str, ...]) -> Path:
+    """A committed repo holding `files` and one open row `td-902` with `notes`."""
+    repo_root = tmp_path / "repo"
+    (repo_root / ".ai-state").mkdir(parents=True)
+    git_ok(repo_root, "init", "-q", "-b", "main")
+    row = (
+        "| td-902 | suggested | other | code-to-goals | scripts/x.py | code-quality |  | "
+        f"verifier | 2026-01-01 | 2026-01-01 | implementer | open |  | {notes} | 000000000000 |\n"
+    )
+    (repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md").write_text(_LEDGER_HEADER + row)
+    (repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md").write_text(_LEDGER_HEADER)
+    for rel in ("scripts/x.py", *files):
+        (repo_root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo_root / rel).write_text("stub\n")
+    git_ok(repo_root, "add", "-A")
+    git_ok(repo_root, "-c", "user.email=t@t.t", "-c", "user.name=t", "commit", "-q", "-m", "seed")
+    return repo_root
+
+
+def _citation_decays(repo_root: Path) -> list:
+    snapshot = ledger_snapshot.gather(repo_root)
+    delta = ledger_snapshot.row_delta(snapshot, _row(snapshot, "td-902"))
+    return [s for s in delta.signals if ledger_snapshot.signal_class_name(s) == "citation-decay"]
+
+
+def test_citation_to_a_renamed_file_names_its_current_path(tmp_path: Path) -> None:
+    """The stale cite arrives with the path to realign it to."""
+    repo_root = _one_row_repo(
+        tmp_path, "Parser lives at `scripts/old_parser.py:12`.", ("scripts/old_parser.py",)
+    )
+    git_ok(repo_root, "mv", "scripts/old_parser.py", "scripts/new_parser.py")
+    git_ok(repo_root, "-c", "user.email=t@t.t", "-c", "user.name=t", "commit", "-q", "-m", "mv")
+
+    (decay,) = _citation_decays(repo_root)
+    assert decay.cite == "scripts/old_parser.py:12"
+    assert decay.cause == "renamed"
+    assert decay.target == "scripts/new_parser.py"
+
+
+def test_a_relative_single_directory_mention_is_not_a_repo_citation(tmp_path: Path) -> None:
+    """`references/` names a directory relative to something unnamed -- not a repo path."""
+    repo_root = _one_row_repo(tmp_path, "Move the table into `references/`.", ())
+    assert _citation_decays(repo_root) == []
+
+
+def test_a_resolving_citation_does_not_fire(tmp_path: Path) -> None:
+    repo_root = _one_row_repo(tmp_path, "See `docs/guide.md:3`.", ("docs/guide.md",))
+    assert _citation_decays(repo_root) == []

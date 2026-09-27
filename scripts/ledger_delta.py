@@ -41,7 +41,8 @@ _CHANGING_EDGES = ("supersedes", "supersedes_in_part")
 _BACKTICK_SPAN = re.compile(r"`([^`\n]+)`")
 _BARE_LINE_CITE = re.compile(r"(?<![\w/.`-])((?:[\w.-]+/)+[\w.-]+\.\w+):\d+(?:-\d+)?")
 _CITE_SUFFIX = re.compile(r"(?::\d+(?:-\d+)?|::[\w.]+|#.*|§.*)$")
-_PATH_SHAPE = re.compile(r"^(?:[\w.@+-]+/)+(?:[\w@+-][\w.@+-]*\.\w+)?$")
+# At least two components: a lone `references/` is relative to some unnamed directory.
+_PATH_SHAPE = re.compile(r"^[\w.@+-]+/(?:[\w.@+-]+/)*(?:[\w@+-][\w.@+-]*\.\w+|[\w.@+-]+/)$")
 
 
 def cite_path(cite: str) -> str:
@@ -240,6 +241,7 @@ class StateSnapshot:
     decisions: Mapping[str, DecisionFacts]
     git: GitFacts | None
     lazy_shapes: tuple[str, ...] | None
+    present_paths: frozenset[str]  # every referenced path found on disk, checked by the shell
     oracles: Mapping[Oracle, str | None]  # None == available, else the withheld reason
     withheld: tuple[Withheld, ...]
 
@@ -409,7 +411,7 @@ def _path_fate(
 ) -> tuple[PathCause, str | None, date | None] | None:
     """None when `path` resolves (on disk or at HEAD); else why it does not."""
     git = snapshot.git
-    if (snapshot.repo_root / path).exists() or (git and _in_tree(git.head_tree, path)):
+    if path in snapshot.present_paths or (git and _in_tree(git.head_tree, path)):
         return None
     if git is None:
         return ("unclassified", None, None)

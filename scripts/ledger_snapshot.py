@@ -74,6 +74,7 @@ from ledger_delta import (
     UnparseableRow,
     Withheld,
     cite_path,
+    notes_path_citations,
     parse_iso_date,
     row_delta,
     signal_class_name,
@@ -403,9 +404,17 @@ def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
         decisions=decisions,
         git=git,
         lazy_shapes=tuple(lazy_shapes) if lazy_shapes is not None else None,
+        present_paths=_present_paths(repo_root, active),
         oracles=oracles,
         withheld=_corpus_withheld(oracles),
     )
+
+
+def _present_paths(repo_root: Path, rows: tuple[ActiveRow, ...]) -> frozenset[str]:
+    """Which of the rows' location and notes-cited paths exist on disk right now."""
+    referenced = {ref.path for row in rows for ref in row.locations if isinstance(ref, PathRef)}
+    referenced |= {path for row in rows for _, path in notes_path_citations(row.notes)}
+    return frozenset(path for path in referenced if (repo_root / path).exists())
 
 
 def _corpus_withheld(oracles: Mapping[Oracle, str | None]) -> tuple[Withheld, ...]:

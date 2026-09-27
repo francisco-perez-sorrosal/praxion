@@ -144,3 +144,31 @@ def build_fixture_repo(tmp_path: Path, variant: str = "base") -> Path:
     git_ok(repo_root, "add", "-A")
     git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "seed ledger-triage fixture")
     return repo_root
+
+
+_LEDGER_HEADER = (
+    "# Technical Debt Ledger\n\n**Schema**: 14 row fields + 1 structural `dedup_key`.\n\n"
+    "| id | severity | class | direction | location | goal-ref-type | goal-ref-value | "
+    "source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |\n"
+    "|----|----------|-------|-----------|----------|---------------|----------------|"
+    "--------|------------|-----------|-----------|--------|-------------|-------|-----------|\n"
+)
+
+
+def one_row_repo(tmp_path: Path, notes: str, files: tuple[str, ...]) -> Path:
+    """A committed repo holding `files` and one open row `td-902` with `notes`."""
+    repo_root = tmp_path / "repo"
+    (repo_root / ".ai-state").mkdir(parents=True)
+    git_ok(repo_root, "init", "-q", "-b", "main")
+    row = (
+        "| td-902 | suggested | other | code-to-goals | scripts/x.py | code-quality |  | "
+        f"verifier | 2026-01-01 | 2026-01-01 | implementer | open |  | {notes} | 000000000000 |\n"
+    )
+    (repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md").write_text(_LEDGER_HEADER + row)
+    (repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md").write_text(_LEDGER_HEADER)
+    for rel in ("scripts/x.py", *files):
+        (repo_root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo_root / rel).write_text("stub\n")
+    git_ok(repo_root, "add", "-A")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "seed")
+    return repo_root

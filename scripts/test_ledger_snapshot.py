@@ -31,7 +31,7 @@ from pathlib import Path
 
 import ledger_snapshot
 import pytest
-from _ledger_triage_testkit import build_fixture_repo, git_ok
+from _ledger_triage_testkit import IDENTITY, build_fixture_repo, git_ok, one_row_repo
 
 # `base_repo` / `td264_post_rebase_repo` are pytest fixtures from `conftest.py`
 # (no import needed -- pytest auto-discovers them by parameter name).
@@ -413,33 +413,6 @@ def test_stamps_without_a_checkable_anchor_or_legal_outcome_are_malformed(segmen
 
 # -- `citation-decay`: realignment input and relative mentions ----------------------------
 
-_LEDGER_HEADER = (
-    "# Technical Debt Ledger\n\n**Schema**: 14 row fields + 1 structural `dedup_key`.\n\n"
-    "| id | severity | class | direction | location | goal-ref-type | goal-ref-value | "
-    "source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |\n"
-    "|----|----------|-------|-----------|----------|---------------|----------------|"
-    "--------|------------|-----------|-----------|--------|-------------|-------|-----------|\n"
-)
-
-
-def _one_row_repo(tmp_path: Path, notes: str, files: tuple[str, ...]) -> Path:
-    """A committed repo holding `files` and one open row `td-902` with `notes`."""
-    repo_root = tmp_path / "repo"
-    (repo_root / ".ai-state").mkdir(parents=True)
-    git_ok(repo_root, "init", "-q", "-b", "main")
-    row = (
-        "| td-902 | suggested | other | code-to-goals | scripts/x.py | code-quality |  | "
-        f"verifier | 2026-01-01 | 2026-01-01 | implementer | open |  | {notes} | 000000000000 |\n"
-    )
-    (repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md").write_text(_LEDGER_HEADER + row)
-    (repo_root / ".ai-state" / "TECH_DEBT_RESOLVED.md").write_text(_LEDGER_HEADER)
-    for rel in ("scripts/x.py", *files):
-        (repo_root / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo_root / rel).write_text("stub\n")
-    git_ok(repo_root, "add", "-A")
-    git_ok(repo_root, "-c", "user.email=t@t.t", "-c", "user.name=t", "commit", "-q", "-m", "seed")
-    return repo_root
-
 
 def _citation_decays(repo_root: Path) -> list:
     snapshot = ledger_snapshot.gather(repo_root)
@@ -449,7 +422,7 @@ def _citation_decays(repo_root: Path) -> list:
 
 def test_citation_to_a_renamed_file_names_its_current_path(tmp_path: Path) -> None:
     """The stale cite arrives with the path to realign it to."""
-    repo_root = _one_row_repo(
+    repo_root = one_row_repo(
         tmp_path, "Parser lives at `scripts/old_parser.py:12`.", ("scripts/old_parser.py",)
     )
     git_ok(repo_root, "mv", "scripts/old_parser.py", "scripts/new_parser.py")
@@ -463,12 +436,12 @@ def test_citation_to_a_renamed_file_names_its_current_path(tmp_path: Path) -> No
 
 def test_a_relative_single_directory_mention_is_not_a_repo_citation(tmp_path: Path) -> None:
     """`references/` names a directory relative to something unnamed -- not a repo path."""
-    repo_root = _one_row_repo(tmp_path, "Move the table into `references/`.", ())
+    repo_root = one_row_repo(tmp_path, "Move the table into `references/`.", ())
     assert _citation_decays(repo_root) == []
 
 
 def test_a_resolving_citation_does_not_fire(tmp_path: Path) -> None:
-    repo_root = _one_row_repo(tmp_path, "See `docs/guide.md:3`.", ("docs/guide.md",))
+    repo_root = one_row_repo(tmp_path, "See `docs/guide.md:3`.", ("docs/guide.md",))
     assert _citation_decays(repo_root) == []
 
 
@@ -490,12 +463,10 @@ def test_numbers_dates_and_ratios_are_not_checkable_discard_anchors(text: str) -
 
 # -- `cited-by-commit`: filing and rebases are not work on the row --------------------------
 
-_AS_T = ("-c", "user.email=t@t.t", "-c", "user.name=t")
-
 
 def _commit_all(repo_root: Path, message: str, authored: str) -> None:
     git_ok(repo_root, "add", "-A")
-    git_ok(repo_root, *_AS_T, "commit", "-q", "--date", authored, "-m", message)
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "--date", authored, "-m", message)
 
 
 def _cited_by_commit(repo_root: Path) -> list:
@@ -506,7 +477,7 @@ def _cited_by_commit(repo_root: Path) -> list:
 
 def test_the_commit_that_filed_a_row_never_counts_as_work_on_it(tmp_path: Path) -> None:
     """Filed a day after first-seen and touching one code file: still bookkeeping."""
-    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
     ledger = repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md"
     ledger.write_text(ledger.read_text() + "\n")
     (repo_root / "scripts" / "x.py").write_text("changed\n")
@@ -517,7 +488,7 @@ def test_the_commit_that_filed_a_row_never_counts_as_work_on_it(tmp_path: Path) 
 
 def test_a_rebased_commit_is_dated_by_its_author_not_its_committer(tmp_path: Path) -> None:
     """Authored on the filing day; only the committer date (today) is later."""
-    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
     (repo_root / "scripts" / "x.py").write_text("changed\n")
     _commit_all(repo_root, "fix: part of td-902", "2026-01-01T12:00:00")
 
@@ -525,7 +496,7 @@ def test_a_rebased_commit_is_dated_by_its_author_not_its_committer(tmp_path: Pat
 
 
 def test_a_later_code_commit_naming_the_row_is_evidence(tmp_path: Path) -> None:
-    repo_root = _one_row_repo(tmp_path, "Premise.", ())
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
     (repo_root / "scripts" / "x.py").write_text("changed\n")
     _commit_all(repo_root, "fix: part of td-902", "2026-02-01T12:00:00")
 
@@ -550,11 +521,11 @@ def test_a_failed_history_read_withholds_instead_of_reading_empty(
     deletion and an untouched-looking row must not read as clean."""
     import shutil
 
-    repo_root = _one_row_repo(
+    repo_root = one_row_repo(
         tmp_path, "Parser lives at `scripts/old_parser.py:12`.", ("scripts/old_parser.py",)
     )
     git_ok(repo_root, "mv", "scripts/old_parser.py", "scripts/new_parser.py")
-    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "mv")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "mv")
     shim_dir = tmp_path / "shim"
     shim_dir.mkdir()
     shim = shim_dir / "git"
@@ -574,23 +545,23 @@ def test_a_failed_history_read_withholds_instead_of_reading_empty(
 
 
 def test_a_shorthand_for_a_file_that_exists_is_not_decay(tmp_path: Path) -> None:
-    repo_root = _one_row_repo(
+    repo_root = one_row_repo(
         tmp_path, "Not filed: `project_metrics/cli.py`.", ("scripts/project_metrics/cli.py",)
     )
     assert _citation_decays(repo_root) == []
 
 
 def test_a_parent_relative_cite_is_not_a_repo_citation(tmp_path: Path) -> None:
-    repo_root = _one_row_repo(tmp_path, "Compare `../sibling/other.md`.", ())
+    repo_root = one_row_repo(tmp_path, "Compare `../sibling/other.md`.", ())
     assert _citation_decays(repo_root) == []
 
 
 def test_a_rename_whose_target_was_later_deleted_reports_the_deletion(tmp_path: Path) -> None:
-    repo_root = _one_row_repo(tmp_path, "See `scripts/a_mod.py:3`.", ("scripts/a_mod.py",))
+    repo_root = one_row_repo(tmp_path, "See `scripts/a_mod.py:3`.", ("scripts/a_mod.py",))
     git_ok(repo_root, "mv", "scripts/a_mod.py", "scripts/b_mod.py")
-    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "mv")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "mv")
     git_ok(repo_root, "rm", "-q", "scripts/b_mod.py")
-    git_ok(repo_root, *_AS_T, "commit", "-q", "-m", "rm")
+    git_ok(repo_root, *IDENTITY, "commit", "-q", "-m", "rm")
 
     (decay,) = _citation_decays(repo_root)
     assert decay.cause != "renamed"

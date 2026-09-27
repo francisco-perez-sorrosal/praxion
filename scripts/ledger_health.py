@@ -50,15 +50,18 @@ from _repo_root import is_plugin_cache_path, resolve_repo_root
 from ledger_delta import (
     ActiveRow,
     AdrGoal,
+    AnchorWindow,
     CitationDecay,
     CitedByCommit,
     CitedDecisionChanged,
     DraftGoal,
     DuplicatePeer,
+    EvidenceMoved,
     FirstSeenWindow,
     GoalLinkUnresolved,
     GoalRef,
     Judged,
+    JudgmentUnusable,
     LocationDecay,
     MalformedGoal,
     NoGoal,
@@ -70,11 +73,13 @@ from ledger_delta import (
     SelfAmended,
     Signal,
     StampMalformed,
+    SupersedingDecisionOnLocation,
     Unjudged,
     Withheld,
 )
 from ledger_snapshot import (
     StateSnapshot,
+    discard_recurrences,
     gather,
     parse_stamp,
     row_delta,
@@ -96,8 +101,19 @@ CLASS_POLICY: Mapping[str, Tier] = {
     "cited-by-commit": "strong",
     "possible-duplicate": "strong",
     "self-amended": "medium",
+    "evidence-moved": "medium",
+    "judgment-unusable": "strong",
 }
 _TIER_ORDER: Mapping[Tier, int] = {"strong": 0, "medium": 1}
+
+CHECK_ID = "TD07"
+_TD07_BOUND = (
+    "TD07 clean means no active tech-debt row carries evidence that the project state "
+    "moved past its premise since it was filed or last triaged; WARN per strong-tier "
+    "candidate, INFO per medium-tier one. Advisory: it recommends /triage-debt and "
+    "never writes a ledger row."
+)
+_TD07_SEVERITY: Mapping[Tier, str] = {"strong": "warn", "medium": "info"}
 
 DIGEST_SCHEMA = "ledger-triage-digest/1"
 RELATED_DECISIONS_CAP = 5
@@ -144,7 +160,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"note: not an active row: {', '.join(unknown)}", file=sys.stderr)
     selected = select(assessments, ids=ids, every_row=args.all, only_class=args.only)
 
-    if args.digest:
+    if args.json:
+        print(json.dumps(render_td07(snapshot, assessments), indent=2))
+    elif args.digest:
         print(json.dumps(render_digest(snapshot, assessments, selected, _utc_now()), indent=2))
     else:
         print(render_summary(snapshot, assessments, selected))
@@ -154,6 +172,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Tech-debt ledger triage probe (advisory).")
     parser.add_argument("--digest", action="store_true", help="emit the judge digest as JSON")
+    parser.add_argument(
+        "--json", action="store_true", help="emit the sentinel TD07 family envelope"
+    )
     parser.add_argument("--all", action="store_true", help="every active row, candidates first")
     parser.add_argument("--ids", help="comma-separated td-NNN ids to report")
     parser.add_argument(
@@ -248,10 +269,18 @@ def assess(snapshot: StateSnapshot) -> list[Assessment]:
     for row in snapshot.active_rows:
         delta = row_delta(snapshot, row)
         classes = tuple(dict.fromkeys(signal_class_name(signal) for signal in delta.signals))
-        tiers: list[Tier] = [CLASS_POLICY[name] for name in classes]
+        tiers: list[Tier] = [_signal_tier(signal) for signal in delta.signals]
         tier = min(tiers, key=_TIER_ORDER.__getitem__) if tiers else None
         assessments.append(Assessment(row, delta, classes, tier))
     return sorted(assessments, key=_rank_key)
+
+
+def _signal_tier(signal: Signal) -> Tier:
+    """A superseding decision that merely overlaps a judged row's files is a reason to
+    re-judge, not a contradiction, so it ranks below the class's other basis."""
+    if isinstance(signal, SupersedingDecisionOnLocation):
+        return "medium"
+    return CLASS_POLICY[signal_class_name(signal)]
 
 
 def _rank_key(item: Assessment) -> tuple[int, int, str]:
@@ -274,6 +303,60 @@ def select(
     return chosen
 
 
+# -- TD07: the sentinel family envelope ------------------------------------------------
+
+
+def render_td07(snapshot: StateSnapshot, assessments: list[Assessment]) -> dict:
+    """One finding per candidate row; a withheld oracle is a finding, never silence."""
+    candidates = [item for item in assessments if item.tier is not None]
+    findings = [_td07_finding(item) for item in candidates]
+    findings += [
+        {
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": entry.class_name,
+            "kind": "triage-withheld",
+            "message": entry.reason,
+        }
+        for entry in snapshot.withheld
+    ]
+    findings += [
+        {
+            "check": CHECK_ID,
+            "severity": "warn",
+            "entity": recurred["id"],
+            "kind": "discard-recurred",
+            "message": f"discarded on {recurred['discarded_on']}, re-detected by {recurred['last_seen']}",
+        }
+        for recurred in _discard_recurred(snapshot)
+    ]
+    return {
+        "check": CHECK_ID,
+        "skipped": None,
+        "examined": {
+            "active": len(assessments),
+            "candidates": len(candidates),
+            "judged": sum(isinstance(item.row.stamp, Judged) for item in assessments),
+            "by_class": dict(Counter(name for item in candidates for name in item.classes)),
+            "unparseable": len(snapshot.unparseable),
+        },
+        "findings": findings,
+        "info": {"anchor": snapshot.anchor, "recommend": "/triage-debt"},
+        "bound": _TD07_BOUND,
+    }
+
+
+def _td07_finding(item: Assessment) -> dict:
+    first = _evidence(item.delta.signals[0])
+    return {
+        "check": CHECK_ID,
+        "severity": _TD07_SEVERITY[item.tier or "medium"],
+        "entity": item.row.id,
+        "kind": item.classes[0],
+        "message": first["detail"],
+    }
+
+
 # -- Digest ----------------------------------------------------------------------------
 
 
@@ -287,7 +370,7 @@ def render_digest(
     return {
         "schema": DIGEST_SCHEMA,
         "head": snapshot.head,
-        "anchor": snapshot.head,
+        "anchor": snapshot.anchor,
         "generated_at": generated_at,
         "oracles": {
             name: {"state": "available"}
@@ -302,7 +385,19 @@ def render_digest(
             "unparseable": len(snapshot.unparseable),
         },
         "rows": [_row_digest(item) for item in selected],
+        "discard_recurred": _discard_recurred(snapshot),
     }
+
+
+def _discard_recurred(snapshot: StateSnapshot) -> list[dict]:
+    return [
+        {
+            "id": peer.id,
+            "discarded_on": found.stamp_date.isoformat(),
+            "last_seen": found.last_seen.isoformat(),
+        }
+        for peer, found in discard_recurrences(snapshot)
+    ]
 
 
 def _row_digest(item: Assessment) -> dict:
@@ -360,6 +455,8 @@ def _judgment(item: Assessment) -> dict:
     match window:
         case FirstSeenWindow(start=start):
             window_cell = {"kind": "first-seen", "start": start.isoformat()}
+        case AnchorWindow(anchor=anchor):
+            window_cell = {"kind": "anchor", "start": anchor.date.isoformat(), "sha": anchor.sha}
         case NoWindow(reason=reason):
             window_cell = {"kind": "none", "reason": reason}
         case _:
@@ -406,9 +503,24 @@ def _basis_detail_event(signal: Signal) -> tuple[str, str, date | None]:
         case CitedByCommit(sha=sha, event_at=event_at, subject=subject):
             return ("commit", f"{sha[:SHORT_SHA_LENGTH]} {subject}", event_at)
         case DuplicatePeer(peer_id=peer_id, peer_status=status, basis=basis):
-            return (basis, f"{peer_id} ({status}) has the same base dedup key", None)
+            shared = (
+                "the same base dedup key"
+                if basis == "same-base-key"
+                else "the base key this row was realigned from"
+            )
+            return (basis, f"{peer_id} ({status}) has {shared}", None)
         case SelfAmended(segments=segments):
             return ("notes-segment", _clip(" // ".join(segments)), None)
+        case EvidenceMoved(path=path, commits=commits, latest_sha=latest):
+            detail = f"kept evidence {path} changed in {commits} commit(s) since the stamp"
+            return ("evidence-moved", f"{detail}, latest {latest[:SHORT_SHA_LENGTH]}", None)
+        case SupersedingDecisionOnLocation(
+            dec_id=dec_id, edges=edges, matched_paths=paths, event_at=event_at
+        ):
+            detail = f"{dec_id} ({', '.join(edges)}) is new since the stamp and touches "
+            return ("superseding-decision-on-location", detail + ", ".join(paths), event_at)
+        case JudgmentUnusable(reason=reason, detail=detail):
+            return (reason, f"the last triage stamp is unusable ({reason}): {detail}", None)
         case _:
             assert_never(signal)
 

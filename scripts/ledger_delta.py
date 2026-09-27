@@ -1,9 +1,13 @@
-"""Pure core of the tech-debt ledger reader: typed rows, the snapshot, the per-row delta.
+"""Typed rows and the state snapshot for the tech-debt ledger reader.
 
-`ledger_snapshot.py` is the imperative shell -- it parses the ledger and reads git
-and the ADR corpus once, into the frozen types defined here. This module does no
-I/O: `row_delta(snapshot, row)` computes one row's signals and context from the
-snapshot alone, so every signal is testable against a hand-built snapshot.
+`ledger_snapshot.py` is the imperative shell -- it parses the ledger and reads the
+ADR corpus and version-control history once, into the frozen types defined here.
+`ledger_delta_signals.py` is the pure computation core: `row_delta(snapshot, row)`
+computes one row's signals and context from a `StateSnapshot` alone, so every
+signal is testable against a hand-built snapshot with no I/O. This module carries
+neither shell nor computation -- only the schema both share, plus the handful of
+parsing primitives (`cite_path`, `parse_iso_date`) small enough to travel with the
+types they parse into.
 
 Callers take the entry points (`gather`, `row_delta`) from `ledger_snapshot` and
 the types from here.
@@ -18,9 +22,6 @@ from datetime import date
 from pathlib import Path
 from typing import Literal, NewType, assert_never
 
-from adr_health import _EPHEMERAL_ROOTS, _SHAPE, _deletion_date, _matches_shape, _rename_target
-from query_adrs import paths_match
-
 # -- Closed vocabularies ---------------------------------------------------------
 
 TdId = NewType("TdId", str)
@@ -33,17 +34,11 @@ DecisionChange = Literal["superseded", "retired", "rejected", "narrowed"]
 Oracle = Literal["git-history", "adr-corpus", "lifecycle-table"]
 
 STAMP_PREFIX = "[triage "
-_STATE_ROOT = ".ai-state/"
-_LEDGER_FILES = frozenset({".ai-state/TECH_DEBT_LEDGER.md", ".ai-state/TECH_DEBT_RESOLVED.md"})
-# Frontmatter edges by which a decision narrows or replaces an earlier one.
-_CHANGING_EDGES = ("supersedes", "supersedes_in_part")
 
 # -- Notes citations ------------------------------------------------------------------
-_BACKTICK_SPAN = re.compile(r"`([^`\n]+)`")
-_BARE_LINE_CITE = re.compile(r"(?<![\w/.`-])((?:[\w.-]+/)+[\w.-]+\.\w+):\d+(?:-\d+)?")
+# `_BACKTICK_SPAN` / `_BARE_LINE_CITE` / `_PATH_SHAPE` (the citation-*finding* patterns)
+# live in `ledger_delta_signals.py`, next to `notes_path_citations`, their only reader.
 _CITE_SUFFIX = re.compile(r"(?::\d+(?:-\d+)?|::[\w.]+|#.*|§.*)$")
-# At least two components: a lone `references/` is relative to some unnamed directory.
-_PATH_SHAPE = re.compile(r"^[\w.@+-]+/(?:[\w.@+-]+/)*(?:[\w@+-][\w.@+-]*\.\w+|[\w.@+-]+/)$")
 
 
 def cite_path(cite: str) -> str:
@@ -145,6 +140,32 @@ StampState = Unjudged | Judged | StampMalformed
 
 
 @dataclass(frozen=True)
+class Anchored:
+    """A stamp's `@<sha>` is an ancestor of HEAD: `sha` and its commit date."""
+
+    sha: str
+    date: date
+
+
+@dataclass(frozen=True)
+class Unanchored:
+    """A stamp's `@<sha>` could not be resolved against HEAD, and why."""
+
+    sha: str
+    reason: Literal["unknown-object", "not-ancestor"]
+
+
+@dataclass(frozen=True)
+class AnchorWithheld:
+    """No git history to resolve a stamp anchor against."""
+
+    reason: str
+
+
+Anchor = Anchored | Unanchored | AnchorWithheld
+
+
+@dataclass(frozen=True)
 class KeyFacts:
     written: str
     base: str
@@ -229,6 +250,9 @@ class GitFacts:
     renames: dict[str, str]  # adr_health's index shape; never mutated
     deletions: dict[str, str]
     commits: tuple[Commit, ...]  # newest first
+    merge_base: str | None  # merge-base(HEAD, default branch): the digest's stamp-with anchor
+    anchors: Mapping[str, Anchor]  # every distinct stamp `@<sha>` among Judged rows, resolved once
+    anchor_windows: Mapping[str, AnchorWindow]  # one entry per `Anchored` sha in `anchors`
 
 
 @dataclass(frozen=True)
@@ -236,6 +260,7 @@ class StateSnapshot:
     repo_root: Path
     today: date
     head: str | None
+    anchor: str | None  # `git.merge_base`, falling back to `head`; None when git is unavailable
     active_rows: tuple[ActiveRow, ...]
     terminal_peers: tuple[TerminalPeer, ...]
     unparseable: tuple[UnparseableRow, ...]
@@ -293,12 +318,47 @@ class CitedByCommit:
 class DuplicatePeer:
     peer_id: str
     peer_status: str
-    basis: Literal["same-base-key"]
+    basis: Literal["same-base-key", "refiled-after-realign"]
 
 
 @dataclass(frozen=True)
 class SelfAmended:
     segments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EvidenceMoved:
+    """`kept` only: the stamp's own evidence file was touched in the anchor window."""
+
+    path: str
+    commits: int
+    latest_sha: str
+
+
+@dataclass(frozen=True)
+class SupersedingDecisionOnLocation:
+    """Judged rows only (A2): a decision new since the anchor supersedes,
+    narrows or retires another decision and overlaps this row's location."""
+
+    dec_id: str
+    edges: tuple[str, ...]
+    matched_paths: tuple[str, ...]
+    event_at: date | None
+
+
+@dataclass(frozen=True)
+class JudgmentUnusable:
+    reason: Literal["malformed", "unanchored", "outcome-status-mismatch"]
+    detail: str
+
+
+@dataclass(frozen=True)
+class DiscardRecurred:
+    """Terminal `wontfix` peers only: a discarded stamp whose row's `last-seen`
+    moved later -- a producer silently absorbed a recurrence into the tombstone."""
+
+    stamp_date: date
+    last_seen: date
 
 
 Signal = (
@@ -309,17 +369,25 @@ Signal = (
     | CitedByCommit
     | DuplicatePeer
     | SelfAmended
+    | EvidenceMoved
+    | SupersedingDecisionOnLocation
+    | JudgmentUnusable
 )
 
 
 def signal_class_name(signal: Signal) -> str:
-    """The class name the digest and the probe's policy table key on."""
+    """The class name the digest and the probe's policy table key on.
+
+    `SupersedingDecisionOnLocation` shares `decision-drift`'s class name with
+    `CitedDecisionChanged` -- they are the same evidence class at two tiers,
+    distinguished by basis in the rendered detail, not by class name.
+    """
     match signal:
         case LocationDecay():
             return "location-decay"
         case CitationDecay():
             return "citation-decay"
-        case CitedDecisionChanged():
+        case CitedDecisionChanged() | SupersedingDecisionOnLocation():
             return "decision-drift"
         case GoalLinkUnresolved():
             return "goal-link-unresolved"
@@ -329,6 +397,10 @@ def signal_class_name(signal: Signal) -> str:
             return "possible-duplicate"
         case SelfAmended():
             return "self-amended"
+        case EvidenceMoved():
+            return "evidence-moved"
+        case JudgmentUnusable():
+            return "judgment-unusable"
         case _:
             assert_never(signal)
 
@@ -361,11 +433,26 @@ class FirstSeenWindow:
 
 
 @dataclass(frozen=True)
+class AnchorWindow:
+    """A `Judged` + `Anchored` row's window: `anchor..HEAD`, not `first-seen..HEAD`.
+
+    `tree` is the anchor commit's own tree (what existed *then*, so a new
+    superseding ADR or a since-deleted location can be told apart from one
+    that was already gone). `commits` is `rev-list anchor..HEAD`, one read
+    shared by every windowed signal for this anchor -- never a per-row call.
+    """
+
+    anchor: Anchored
+    tree: frozenset[str]
+    commits: tuple[Commit, ...]
+
+
+@dataclass(frozen=True)
 class NoWindow:
     reason: str
 
 
-Window = FirstSeenWindow | NoWindow
+Window = FirstSeenWindow | AnchorWindow | NoWindow
 
 
 @dataclass(frozen=True)
@@ -375,238 +462,3 @@ class RowDelta:
     signals: tuple[Signal, ...]
     context: RowContext
     row_withheld: tuple[Withheld, ...]
-
-
-# -- The pure delta ------------------------------------------------------------------------
-
-
-def row_delta(snapshot: StateSnapshot, row: ActiveRow) -> RowDelta:
-    """Every signal and every piece of context for one row, over the row's window.
-
-    The window is chosen first and handed to each windowed signal; no signal
-    function reads the row's stamp to pick its own.
-    """
-    window: Window = (
-        FirstSeenWindow(row.first_seen) if row.first_seen else NoWindow("first-seen-malformed")
-    )
-    signals: tuple[Signal, ...] = (
-        *_location_decay(snapshot, row),
-        *_citation_decay(snapshot, row),
-        *_decision_drift(snapshot, row),
-        *_goal_link(snapshot, row),
-        *_cited_by_commit(snapshot, row, window),
-        *_duplicates(snapshot, row),
-        *_self_amended(row),
-    )
-    return RowDelta(
-        row_id=row.id,
-        window=window,
-        signals=signals,
-        context=_context(snapshot, row, window),
-        row_withheld=row.row_withheld,
-    )
-
-
-def _path_fate(
-    snapshot: StateSnapshot, path: str
-) -> tuple[PathCause, str | None, date | None] | None:
-    """None when `path` resolves (on disk or at HEAD); else why it does not."""
-    git = snapshot.git
-    if path in snapshot.present_paths or (git and _in_tree(git.head_tree, path)):
-        return None
-    if git is None:
-        return ("unclassified", None, None)
-    if _unique_suffix_match(git.head_tree, path):
-        return None  # a shorthand for a file that exists, e.g. `cli.py` for `scripts/.../cli.py`
-    target = _rename_target(path, git.renames)
-    if target and _in_tree(git.head_tree, target):
-        return ("renamed", target, None)
-    deleted = _deletion_date(path, git.deletions)
-    if deleted:
-        return ("deleted", None, parse_iso_date(deleted))
-    return (
-        ("vanished", None, None)
-        if snapshot.lazy_shapes is not None
-        else ("unclassified", None, None)
-    )
-
-
-def _unique_suffix_match(tree: frozenset[str], path: str) -> bool:
-    suffix = "/" + path.rstrip("/")
-    return sum(1 for entry in tree if entry.endswith(suffix)) == 1
-
-
-def _in_tree(tree: frozenset[str], path: str) -> bool:
-    if path in tree:
-        return True
-    prefix = path.rstrip("/") + "/"
-    return any(entry.startswith(prefix) for entry in tree)
-
-
-def _is_lazy(snapshot: StateSnapshot, path: str) -> bool:
-    return any(_matches_shape(path, shape) for shape in snapshot.lazy_shapes or ())
-
-
-def _location_decay(snapshot: StateSnapshot, row: ActiveRow) -> list[LocationDecay]:
-    decays = []
-    for ref in row.locations:
-        if not isinstance(ref, PathRef) or _is_lazy(snapshot, ref.path):
-            continue
-        fate = _path_fate(snapshot, ref.path)
-        if fate is not None:
-            decays.append(LocationDecay(ref.path, *fate))
-    return decays
-
-
-def _citation_decay(snapshot: StateSnapshot, row: ActiveRow) -> list[CitationDecay]:
-    decays = []
-    for cite, path in notes_path_citations(row.notes):
-        if _is_lazy(snapshot, path):
-            continue
-        fate = _path_fate(snapshot, path)
-        if fate is not None:
-            decays.append(CitationDecay(cite, path, *fate))
-    return decays
-
-
-def notes_path_citations(notes: str) -> tuple[tuple[str, str], ...]:
-    """(cite as written, repo path) for every backticked path and bare `path:line`.
-
-    Ephemeral roots, home-relative and absolute paths, URLs and placeholder shapes
-    are not claims about this repository's tree, so they are never cited paths.
-    """
-    candidates = [span.strip() for span in _BACKTICK_SPAN.findall(notes)]
-    candidates += [found.group(0) for found in _BARE_LINE_CITE.finditer(notes)]
-    cites: dict[str, str] = {}
-    for cite in candidates:
-        path = cite_path(cite)
-        if cite in cites or not _PATH_SHAPE.match(path) or _SHAPE.search(path):
-            continue
-        if path.startswith(("~", "/", "..")) or "://" in cite or path.startswith(_EPHEMERAL_ROOTS):
-            continue
-        cites[cite] = path
-    return tuple(cites.items())
-
-
-def _decision_drift(snapshot: StateSnapshot, row: ActiveRow) -> list[CitedDecisionChanged]:
-    drifts = []
-    for citation in row.cited_decisions:
-        facts = snapshot.decisions.get(citation.dec_id)
-        change = _decision_change(facts) if facts else None
-        if facts is None or change is None:
-            continue
-        kind, by = change
-        successor = snapshot.decisions.get(by[0]) if by else None
-        event_at = parse_iso_date(successor.date) if successor else None
-        drifts.append(CitedDecisionChanged(citation.dec_id, citation.via, kind, by, event_at))
-    return drifts
-
-
-def _decision_change(facts: DecisionFacts) -> tuple[DecisionChange, tuple[str, ...]] | None:
-    if facts.status == "superseded":
-        return ("superseded", facts.edges["superseded_by"])
-    if facts.status == "retired":
-        return ("retired", facts.edges["retired_by"])
-    if facts.status == "rejected":
-        return ("rejected", ())
-    narrowed = facts.edges["superseded_in_part_by"]
-    return ("narrowed", narrowed) if narrowed else None
-
-
-def _goal_link(snapshot: StateSnapshot, row: ActiveRow) -> list[GoalLinkUnresolved]:
-    if not snapshot.decisions:
-        return []
-    match row.goal:
-        case AdrGoal(dec_id=dec_id) if dec_id not in snapshot.decisions:
-            return [GoalLinkUnresolved(dec_id, "absent")]
-        case DraftGoal(draft_id=draft_id):
-            return [GoalLinkUnresolved(draft_id, "draft-id")]
-        case _:
-            return []
-
-
-def _cited_by_commit(
-    snapshot: StateSnapshot, row: ActiveRow, window: Window
-) -> list[CitedByCommit]:
-    if snapshot.git is None or not isinstance(window, FirstSeenWindow):
-        return []
-    naming = [commit for commit in snapshot.git.commits if row.id in commit.td_ids]
-    filing = _filing_commit(naming)
-    return [
-        CitedByCommit(commit.sha, commit.date, commit.subject)
-        for commit in naming
-        if commit is not filing
-        and commit.date > window.start
-        and any(not path.startswith(_STATE_ROOT) for path in commit.paths)
-    ]
-
-
-def _filing_commit(naming: list[Commit]) -> Commit | None:
-    """The oldest commit that names the row and touches a ledger file: the one that filed it.
-
-    Filing is bookkeeping, not work on the row, even when the same commit edits code.
-    """
-    filed = [commit for commit in naming if any(p in _LEDGER_FILES for p in commit.paths)]
-    return filed[-1] if filed else None  # commits are newest first
-
-
-def _duplicates(snapshot: StateSnapshot, row: ActiveRow) -> list[DuplicatePeer]:
-    peers = [(other.id, other.status, other.key.base) for other in snapshot.active_rows]
-    peers += [(peer.id, peer.status, peer.base_key) for peer in snapshot.terminal_peers]
-    return [
-        DuplicatePeer(peer_id, status, "same-base-key")
-        for peer_id, status, base in peers
-        if base == row.key.base and peer_id != row.id
-    ]
-
-
-def _self_amended(row: ActiveRow) -> list[SelfAmended]:
-    """Non-stamp segments written after the latest usable judgment.
-
-    Unjudged (or unusably judged): the first segment is the filing, so any later
-    one is an amendment. Judged: every non-stamp segment after the stamp is.
-    """
-    start = row.stamp.segment_index + 1 if isinstance(row.stamp, Judged) else 1
-    later = tuple(
-        segment
-        for index, segment in enumerate(row.segments)
-        if index >= start and not segment.startswith(STAMP_PREFIX)
-    )
-    return [SelfAmended(later)] if later else []
-
-
-def _context(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> RowContext:
-    paths = [ref.path for ref in row.locations if isinstance(ref, PathRef)]
-    related = [
-        _related(facts, paths)
-        for facts in snapshot.decisions.values()
-        if any(paths_match(path, entry) for path in paths for entry in facts.affected_files)
-    ]
-    related.sort(key=lambda decision: (decision.date, decision.dec_id), reverse=True)
-    start = window.start if isinstance(window, FirstSeenWindow) else None
-    churn = [
-        commit.date
-        for commit in (snapshot.git.commits if snapshot.git else ())
-        if (start is None or commit.date > start)
-        and any(paths_match(path, touched) for path in paths for touched in commit.paths)
-    ]
-    quiet = (snapshot.today - row.last_seen).days if row.last_seen else None
-    return RowContext(tuple(related), len(churn), max(churn, default=None), quiet)
-
-
-def _related(facts: DecisionFacts, paths: list[str]) -> RelatedDecision:
-    edges = tuple(f"{field}:{dec}" for field, ids in facts.edges.items() for dec in ids)
-    matched = tuple(
-        path for path in paths if any(paths_match(path, entry) for entry in facts.affected_files)
-    )
-    changes_prior = any(facts.edges[field] for field in _CHANGING_EDGES)
-    return RelatedDecision(
-        facts.dec_id,
-        facts.status,
-        facts.date,
-        facts.title,
-        facts.summary,
-        edges,
-        matched,
-        changes_prior,
-    )

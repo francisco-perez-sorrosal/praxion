@@ -49,6 +49,9 @@ from ledger_delta import (
     STAMP_PREFIX,
     ActiveRow,
     AdrGoal,
+    Anchor,
+    Anchored,
+    AnchorWindow,
     Commit,
     DecisionCitation,
     DecisionFacts,
@@ -72,14 +75,18 @@ from ledger_delta import (
     TdId,
     TerminalPeer,
     TriageStamp,
+    Unanchored,
     Unjudged,
     UnparseableRow,
     Withheld,
     cite_path,
-    notes_path_citations,
     parse_iso_date,
-    row_delta,
     signal_class_name,
+)
+from ledger_delta_signals import (
+    discard_recurrences,
+    notes_path_citations,
+    row_delta,
 )
 from query_adrs import (
     _FRONTMATTER_RE,
@@ -106,6 +113,7 @@ __all__ = [
     "StampMalformed",
     "StateSnapshot",
     "TriageStamp",
+    "discard_recurrences",
     "gather",
     "parse_rows",
     "parse_stamp",
@@ -134,6 +142,10 @@ CLASS_ORACLES: Mapping[str, tuple[Oracle, ...]] = {
     "cited-by-commit": ("git-history",),
     "decision-drift": ("adr-corpus",),
     "goal-link-unresolved": ("adr-corpus",),
+    # Without git, a Judged row's anchor cannot be resolved at all -- this is
+    # a corpus-wide withhold rather than a per-row `JudgmentUnusable` signal,
+    # so a missing oracle never flags every stamped row.
+    "judgment-unusable:unanchored": ("git-history",),
 }
 
 # -- Triage stamp grammar -----------------------------------------------------------
@@ -429,7 +441,10 @@ def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
     active, terminal, unparseable = parse_rows([parse_ledger(repo_root, spec) for spec in specs])
     decisions = _load_decisions(repo_root)
     windows = [row.first_seen for row in active if row.first_seen is not None]
-    git, history_gap = _gather_history(repo_root, min(windows) if windows else None)
+    stamp_shas = frozenset(
+        row.stamp.stamp.anchor for row in active if isinstance(row.stamp, Judged)
+    )
+    git, history_gap = _gather_history(repo_root, min(windows) if windows else None, stamp_shas)
     has_history = git is not None
     lazy_shapes = load_expected_absent_shapes(repo_root)
     oracles: dict[Oracle, str | None] = {
@@ -437,10 +452,12 @@ def gather(repo_root: Path, today: date | None = None) -> StateSnapshot:
         "adr-corpus": None if decisions else "no parseable ADR under .ai-state/decisions/",
         "lifecycle-table": None if lazy_shapes is not None else "artifact-inventory.md unreadable",
     }
+    head = git_output(repo_root, "rev-parse", "HEAD") if has_history else None
     return StateSnapshot(
         repo_root=repo_root,
         today=today or date.today(),
-        head=git_output(repo_root, "rev-parse", "HEAD") if has_history else None,
+        head=head,
+        anchor=(git.merge_base if git else None) or head,
         active_rows=active,
         terminal_peers=terminal,
         unparseable=unparseable,
@@ -505,12 +522,17 @@ def _frontmatter(path: Path, yaml_module) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _gather_history(repo_root: Path, since: date | None) -> tuple[GitFacts | None, str | None]:
-    """Four whole-repository history reads; never one per row.
+def _gather_history(
+    repo_root: Path, since: date | None, stamp_shas: frozenset[str]
+) -> tuple[GitFacts | None, str | None]:
+    """Four whole-repository history reads plus the anchor machinery; never one per row.
 
-    Returns the facts, or None plus the reason when any read fails: a failed read is
-    an unanswered oracle, never an empty history (a failed rename index would turn
-    every move into a deletion, a failed log would read every row as untouched).
+    Returns the facts, or None plus the reason when any of the four core reads fails:
+    a failed read is an unanswered oracle, never an empty history (a failed rename
+    index would turn every move into a deletion, a failed log would read every row
+    as untouched). The merge-base and per-anchor reads are additive on top of an
+    already-successful core read, so their own failure degrades only the anchors
+    that depend on them (see `_resolve_stamp_anchors`), never the whole snapshot.
     """
     if not history_available(repo_root):
         return None, "no git history, or a shallow clone"
@@ -522,21 +544,23 @@ def _gather_history(repo_root: Path, since: date | None) -> tuple[GitFacts | Non
         reads = {"tree": tree, "renames": renames, "deletions": deletions, "commits": commits}
         failed = ", ".join(name for name, value in reads.items() if value is None)
         return None, f"git history read failed: {failed}"
-    facts = GitFacts(frozenset(tree.splitlines()), renames, deletions, commits)
+    merge_base = _resolve_merge_base(repo_root)
+    anchors, anchor_windows = _resolve_stamp_anchors(repo_root, stamp_shas)
+    facts = GitFacts(
+        frozenset(tree.splitlines()),
+        renames,
+        deletions,
+        commits,
+        merge_base,
+        anchors,
+        anchor_windows,
+    )
     return facts, None
 
 
-def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...] | None:
-    try:
-        result = run_git(
-            repo_root, "log", f"--since={since.isoformat()}", _COMMIT_FORMAT, "--name-only", "HEAD"
-        )
-    except GitUnavailableError:
-        return None
-    if result.returncode != 0:
-        return None
+def _parse_commit_records(stdout: str) -> tuple[Commit, ...]:
     commits = []
-    for record in result.stdout.split(_RECORD_SEPARATOR):
+    for record in stdout.split(_RECORD_SEPARATOR):
         fields = record.split(_FIELD_SEPARATOR)
         if len(fields) != 4:
             continue
@@ -551,3 +575,92 @@ def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...] | None:
             )
         )
     return tuple(commits)
+
+
+def _commit_index(repo_root: Path, since: date) -> tuple[Commit, ...] | None:
+    try:
+        result = run_git(
+            repo_root, "log", f"--since={since.isoformat()}", _COMMIT_FORMAT, "--name-only", "HEAD"
+        )
+    except GitUnavailableError:
+        return None
+    if result.returncode != 0:
+        return None
+    return _parse_commit_records(result.stdout)
+
+
+def _range_commit_index(repo_root: Path, since_sha: str) -> tuple[Commit, ...] | None:
+    """`rev-list`-equivalent commit log for `since_sha..HEAD`: one read per distinct anchor."""
+    try:
+        result = run_git(
+            repo_root, "log", f"{since_sha}..HEAD", _COMMIT_FORMAT, "--name-only", "HEAD"
+        )
+    except GitUnavailableError:
+        return None
+    if result.returncode != 0:
+        return None
+    return _parse_commit_records(result.stdout)
+
+
+# -- Anchors: the stamp-with sha (A3) and every distinct row-stamp anchor -----------------
+
+
+def _default_branch(repo_root: Path) -> str | None:
+    """The local default branch when it exists, else its remote-tracking ref.
+
+    Local first: unpushed commits on the default branch are still the state a triage
+    on that branch judges against, so the merge-base there must be HEAD itself.
+    """
+    ref = git_output(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD")
+    candidates = [ref.removeprefix("refs/remotes/origin/")] if ref else []
+    for name in [*candidates, "main", "master"]:
+        if git_output(repo_root, "rev-parse", "--verify", f"refs/heads/{name}") is not None:
+            return name
+    return ref
+
+
+def _resolve_merge_base(repo_root: Path) -> str | None:
+    """`git merge-base HEAD <default-branch>` (A3): on the default branch this is HEAD."""
+    branch = _default_branch(repo_root)
+    return git_output(repo_root, "merge-base", "HEAD", branch) if branch else None
+
+
+def _reachability(repo_root: Path, sha: str) -> Anchor:
+    """Is `sha` an ancestor of HEAD? One `merge-base --is-ancestor` call, then its date."""
+    try:
+        check = run_git(repo_root, "merge-base", "--is-ancestor", sha, "HEAD")
+    except GitUnavailableError:
+        return Unanchored(sha, "unknown-object")
+    if check.returncode == 1:
+        return Unanchored(sha, "not-ancestor")
+    if check.returncode != 0:
+        return Unanchored(sha, "unknown-object")
+    commit_date = git_output(repo_root, "show", "-s", "--format=%as", sha)
+    parsed = parse_iso_date(commit_date) if commit_date else None
+    return Anchored(sha, parsed) if parsed else Unanchored(sha, "unknown-object")
+
+
+def _resolve_stamp_anchors(
+    repo_root: Path, shas: frozenset[str]
+) -> tuple[dict[str, Anchor], dict[str, AnchorWindow]]:
+    """Per distinct stamp anchor: one reachability check, then (when reachable) one
+    `ls-tree` and one `rev-list anchor..HEAD` -- never per row.
+
+    A failed tree or commit read downgrades an otherwise-reachable anchor to
+    `Unanchored` rather than silently building a window from partial data --
+    the same "withhold, never read empty" discipline `_gather_history` already
+    applies to the four corpus-wide indexes.
+    """
+    anchors: dict[str, Anchor] = {}
+    windows: dict[str, AnchorWindow] = {}
+    for sha in sorted(shas):
+        anchor = _reachability(repo_root, sha)
+        if isinstance(anchor, Anchored):
+            tree = git_output(repo_root, "ls-tree", "-r", "--name-only", sha)
+            range_commits = _range_commit_index(repo_root, sha)
+            if tree is None or range_commits is None:
+                anchor = Unanchored(sha, "unknown-object")
+            else:
+                windows[sha] = AnchorWindow(anchor, frozenset(tree.splitlines()), range_commits)
+        anchors[sha] = anchor
+    return anchors, windows

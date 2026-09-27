@@ -3,9 +3,11 @@
 This package is the *only* writer and the *only* reader of
 ``.ai-state/observations.jsonl``: every hook that appends a row, and every
 script or hook that reads one back, does so through ``writer.py`` /
-``reader.py`` respectively. Nothing outside this package should reference the
-log's filename directly -- ``hooks/test_observation_log_private_reader.py``
-enforces that as a totalising check.
+``reader.py`` respectively. Outside a short allowlist of whole-file tools
+(merge drivers, reconciliation), no module names the log's filename directly,
+and every module importing the reader is a declared consumer in
+``registry.CONSUMERS`` -- ``hooks/test_observation_log_private_reader.py``
+enforces both.
 
 Modules, in dependency order:
 

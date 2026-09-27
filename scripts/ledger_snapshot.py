@@ -390,6 +390,7 @@ def _parse_terminal(row: DataRow, key: KeyFacts) -> TerminalPeer:
         klass=row.value("class"),
         base_key=key.base,
         locations=_parse_locations(row.value("location")),
+        first_seen=parse_iso_date(row.value("first-seen")),
         last_seen=parse_iso_date(row.value("last-seen")),
         stamp=stamp_state(split_segments(row.value("notes"))),
     )

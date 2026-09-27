@@ -17,7 +17,7 @@ from pathlib import Path
 
 import ledger_health
 import ledger_snapshot
-from _ledger_triage_testkit import IDENTITY, git_ok, one_row_repo
+from _ledger_triage_testkit import IDENTITY, git_ok, one_row_repo, tombstone_row
 
 SCRIPT_PATH = Path(__file__).resolve().parent / "ledger_health.py"
 LEDGER = Path(".ai-state") / "TECH_DEBT_LEDGER.md"
@@ -217,6 +217,79 @@ def test_a_later_decision_superseding_another_on_the_location_resurfaces_the_row
     (item,) = [a for a in ledger_health.assess(snapshot) if a.row.id == "td-902"]
     assert "decision-drift" in item.classes
     assert item.tier == "medium"
+
+
+# -- A same-key peer counts only when it was filed after the stamp ---------------------------
+
+
+def _add_peer(repo_root: Path, first_seen: str, status: str = "open") -> None:
+    """td-903: td-902's twin (same base key) filed on `first_seen`, in the file its status
+    belongs to. Its written key differs so `_stamp`'s cell rewrite touches only td-902."""
+    ledger = repo_root / (LEDGER if status in ("open", "in-flight") else RESOLVED)
+    (twin,) = [line for line in (repo_root / LEDGER).read_text().splitlines() if "td-902" in line]
+    cells = twin.split("|")
+    cells[1], cells[9], cells[10], cells[12] = (
+        " td-903 ",
+        f" {first_seen} ",
+        f" {first_seen} ",
+        f" {status} ",
+    )
+    cells[14], cells[15] = " Twin premise. ", " 111111111111 "
+    ledger.write_text(ledger.read_text() + "|".join(cells) + "\n")
+    _commit(repo_root, f"chore(state): file td-903 ({status})")
+
+
+def test_a_merge_survivor_stamped_after_its_absorbed_peer_goes_quiet(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01")
+    tombstone_row(
+        repo_root, "td-903", f"[triage 2026-09-27 @{_head(repo_root)}] merged into td-902"
+    )
+    _stamp(repo_root, "kept: scripts/x.py:1 holds, absorbed td-903")
+
+    assert "possible-duplicate" not in _classes(repo_root)
+
+
+def test_a_kept_row_whose_same_key_peer_was_resolved_before_the_stamp_goes_quiet(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01", "resolved")
+    _stamp(repo_root)
+
+    assert "possible-duplicate" not in _classes(repo_root)
+
+
+def test_a_same_key_peer_filed_after_the_stamp_resurfaces_the_row(tmp_path: Path) -> None:
+    repo_root = _stamped_repo(tmp_path)
+    _add_peer(repo_root, "2026-10-01")
+
+    assert "possible-duplicate" in _classes(repo_root)
+
+
+def test_an_unjudged_row_still_reports_an_old_same_key_peer(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01", "resolved")
+
+    assert "possible-duplicate" in _classes(repo_root)
+
+
+def test_the_recurrence_read_lists_a_same_key_peer_the_window_drops(tmp_path: Path) -> None:
+    """The realign-recurrence check reads every same-base peer, whatever the window says."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _add_peer(repo_root, "2026-01-01", "resolved")
+    _stamp(repo_root, "realigned: the premise named scripts/old.py")
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--digest", "--ids", "td-902"]
+        + ["--repo-root", str(repo_root)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (row,) = json.loads(result.stdout)["rows"]
+
+    assert row["context"]["same_base_peers"] == [{"id": "td-903", "status": "resolved"}]
+    assert "possible-duplicate" not in row["candidate_classes"]
 
 
 # -- A stamp that cannot be trusted resurfaces the row, never silences it -------------------

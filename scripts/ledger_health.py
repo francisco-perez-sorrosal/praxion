@@ -613,6 +613,10 @@ def _context(delta: RowDelta) -> dict:
             "latest": _iso(delta.context.churn_latest),
         },
         "quiet_days": delta.context.quiet_days,
+        "same_base_peers": [
+            {"id": peer.peer_id, "status": peer.peer_status}
+            for peer in delta.context.same_base_peers
+        ],
     }
 
 

@@ -154,9 +154,10 @@ Apply only confirmed outcomes, one row at a time. For each:
 3. **Write the edit** to whichever file (`TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`)
    currently holds the row — `status` and `notes` only, plus `location` / `class` / `severity` /
    `goal-ref-value` for a `realigned` row. The `notes` cell becomes exactly
-   `<notes> // <stamp>`, the shape step 2 checked. Never append a new row, and never move one: a
-   row set to `wontfix` stays where it is until finalize migrates it at the next on-main commit,
-   and a later stamp in the same run may still cite it.
+   `<notes> // <stamp>`, the shape step 2 checked. Never append a new row, and never move one
+   here — the recurrence re-open below is the only move: a row set to `wontfix` stays where it
+   is until finalize migrates it at the next on-main commit, and a later stamp in the same run
+   may still cite it.
 
 After every row that could be applied has been applied, run, in order, from the project root:
 
@@ -173,16 +174,33 @@ then proves cross-file uniqueness. **If `--check` exits non-zero, stop and repor
 is left exactly as `--backfill` wrote it (never rolled back), and the failing rows are named for
 the user.
 
-Then look for a realign that moved a row onto a resolved finding's key:
+Then look for a realign that moved a row onto a closed finding's key:
 
 ```
-ledger_health.py --digest --ids <realigned ids> --class possible-duplicate
+ledger_health.py --digest --ids <realigned ids>
 ```
 
-Every `possible-duplicate` evidence entry whose peer is `resolved` or `wontfix` is a **possible
-recurrence**: the realigned row now has the base key of a finding already closed. Bring each to
-the user with both rows and let them choose — keep the realign, or re-open the resolved peer and
-fold this row into it. Never choose for them.
+Read each row's `context.same_base_peers`: every row, in either file, that shares its base key,
+listed whatever the row's window. Do not read `possible-duplicate` evidence for this — a judged
+row's evidence drops a peer filed before its stamp, so a realign onto an old key never shows
+there. Every peer whose status is `resolved` or `wontfix` is a **possible recurrence**: the
+realigned row now has the base key of a finding already closed. Bring each pair to the user, one
+at a time, with both rows, and apply only what they choose — nothing by default:
+
+- **Keep the realign** — nothing more to write.
+- **Re-open the closed peer and fold this row into it** — the lifecycle's re-open on recurrence
+  (`tech-debt-ledger.md § Lifecycle conventions`). It is the one row move this command makes,
+  and it runs only here, after every stamp above is written, so no stamp in the run cites the
+  peer where it used to be:
+  1. Cut the peer's row from the file that holds it and append it to `TECH_DEBT_LEDGER.md` with
+     `status: open`, `resolved-by` empty, `last-seen: <today>`, and
+     `` // recurrence: re-opened <today>`` appended to its `notes`.
+  2. Fold the realigned row into it by the `merged` path of step 1 — the absorbed row's stamp
+     only (the re-opened peer carries the recurrence note instead of a survivor stamp), checked
+     with `--check-stamp` first. If the check refuses, put the peer back as it was and report
+     the pair instead.
+  3. Run `check_state_ledgers.py --backfill` and then `--check` again, under the same
+     stop-and-report rule.
 
 ### 5. Report
 

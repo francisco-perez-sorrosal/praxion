@@ -210,6 +210,7 @@ class TerminalPeer:
     klass: str
     base_key: str
     locations: tuple[LocationRef, ...]
+    first_seen: date | None
     last_seen: date | None
     stamp: StampState
 
@@ -429,6 +430,9 @@ class RowContext:
     churn_commits: int
     churn_latest: date | None
     quiet_days: int | None
+    # Every same-base-key peer in either file, never windowed: what a realign landed on,
+    # whether or not the peer is still evidence against a judged row.
+    same_base_peers: tuple[DuplicatePeer, ...]
 
 
 @dataclass(frozen=True)

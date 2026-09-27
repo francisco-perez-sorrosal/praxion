@@ -91,7 +91,7 @@ def row_delta(snapshot: StateSnapshot, row: ActiveRow) -> RowDelta:
         *_superseding_on_location(snapshot, row, window),
         *_goal_link(snapshot, row),
         *_cited_by_commit(snapshot, row, window),
-        *_duplicates(snapshot, row),
+        *_duplicates(snapshot, row, window),
         *_self_amended(row),
         *_evidence_moved(row, window),
         *_judgment_unusable(row, snapshot.git),
@@ -395,19 +395,40 @@ def _cited_by_commit(
     ]
 
 
-def _duplicates(snapshot: StateSnapshot, row: ActiveRow) -> list[DuplicatePeer]:
+def _duplicates(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> list[DuplicatePeer]:
     """Same-base-key peers (either file), plus -- for a `realigned` row whose
     stamp names a prior key -- any active peer filed at that prior key after
     the realign: a producer re-filing the shape this row moved away from.
+
+    A usably judged row (`AnchorWindow`) counts a same-base peer only when the
+    peer was filed after the stamp: one the judge already had in front of it --
+    the row a merge absorbed, an old resolved twin -- is not news. A peer whose
+    `first-seen` cannot be read cannot be placed, so it still counts.
     """
-    peers = [(other.id, other.status, other.key.base) for other in snapshot.active_rows]
-    peers += [(peer.id, peer.status, peer.base_key) for peer in snapshot.terminal_peers]
+    since = (
+        row.stamp.stamp.date
+        if isinstance(window, AnchorWindow) and isinstance(row.stamp, Judged)
+        else None
+    )
     same_base = [
-        DuplicatePeer(peer_id, status, "same-base-key")
-        for peer_id, status, base in peers
-        if base == row.key.base and peer_id != row.id
+        peer
+        for peer, first_seen in _same_base_peers(snapshot, row)
+        if since is None or first_seen is None or first_seen > since
     ]
     return same_base + _refiled_after_realign(snapshot, row)
+
+
+def _same_base_peers(
+    snapshot: StateSnapshot, row: ActiveRow
+) -> list[tuple[DuplicatePeer, date | None]]:
+    """Every other row, in either file, sharing this row's base key -- with its filing date."""
+    peers = [(o.id, o.status, o.key.base, o.first_seen) for o in snapshot.active_rows]
+    peers += [(p.id, p.status, p.base_key, p.first_seen) for p in snapshot.terminal_peers]
+    return [
+        (DuplicatePeer(peer_id, status, "same-base-key"), first_seen)
+        for peer_id, status, base, first_seen in peers
+        if base == row.key.base and peer_id != row.id
+    ]
 
 
 def _refiled_after_realign(snapshot: StateSnapshot, row: ActiveRow) -> list[DuplicatePeer]:
@@ -546,7 +567,8 @@ def _context(snapshot: StateSnapshot, row: ActiveRow, window: Window) -> RowCont
         and any(paths_match(path, touched) for path in paths for touched in commit.paths)
     ]
     quiet = (snapshot.today - row.last_seen).days if row.last_seen else None
-    return RowContext(tuple(related), len(churn), max(churn, default=None), quiet)
+    peers = tuple(peer for peer, _ in _same_base_peers(snapshot, row))
+    return RowContext(tuple(related), len(churn), max(churn, default=None), quiet, peers)
 
 
 def _related(facts: DecisionFacts, paths: list[str]) -> RelatedDecision:

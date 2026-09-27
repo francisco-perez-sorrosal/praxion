@@ -232,13 +232,16 @@ def history_available(repo_root: Path) -> bool:
     return (_git(repo_root, "rev-parse", "--is-shallow-repository") or "").strip() != "true"
 
 
-def build_deletion_index(repo_root: Path) -> dict[str, str]:
+def build_deletion_index(repo_root: Path, *, strict: bool = False) -> dict[str, str] | None:
     """Map deleted path -> ISO date of the commit that deleted it (most recent).
 
     One git call for the whole repository. Per-path `git log` would be ~1,400
-    subprocesses on a corpus this size.
+    subprocesses on a corpus this size. With `strict`, a failed read returns None
+    instead of an empty index, so a caller can withhold rather than read "no deletions".
     """
     out = _git(repo_root, "log", "--diff-filter=D", "--name-only", "--format=%cI", "--no-renames")
+    if out is None and strict:
+        return None
     index: dict[str, str] = {}
     date = ""
     for line in (out or "").splitlines():
@@ -252,9 +255,14 @@ def build_deletion_index(repo_root: Path) -> dict[str, str]:
     return index
 
 
-def build_rename_index(repo_root: Path) -> dict[str, str]:
-    """Map old path -> newest known new path, following rename chains."""
+def build_rename_index(repo_root: Path, *, strict: bool = False) -> dict[str, str] | None:
+    """Map old path -> newest known new path, following rename chains.
+
+    With `strict`, a failed read returns None instead of an empty index.
+    """
     out = _git(repo_root, "log", "--diff-filter=R", "-M", "--name-status", "--format=")
+    if out is None and strict:
+        return None
     direct: dict[str, str] = {}
     for line in (out or "").splitlines():
         parts = line.split("\t")
@@ -727,8 +735,8 @@ def classify(repo_root: Path) -> dict:
     adrs = sorted(decisions_dir.glob("[0-9]*.md"))
 
     have_history = history_available(repo_root)
-    deletions = build_deletion_index(repo_root) if have_history else {}
-    renames = build_rename_index(repo_root) if have_history else {}
+    deletions = (build_deletion_index(repo_root) or {}) if have_history else {}
+    renames = (build_rename_index(repo_root) or {}) if have_history else {}
     lazy_shapes = load_expected_absent_shapes(repo_root)
     withheld = _withheld_reasons(have_history, lazy_shapes)
 

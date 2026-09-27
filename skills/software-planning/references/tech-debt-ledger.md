@@ -207,4 +207,72 @@ Populate `location`, dates, `notes` (one sentence + why-filed), and remaining sc
 | `first-seen` / `last-seen` | today on creation |
 | `notes` | one sentence citing user direction, defer rationale, or scope-gap reason |
 
+## Triage
+
+A read-only probe (`scripts/ledger_health.py`, over the state-snapshot reader `scripts/ledger_snapshot.py`) computes, for each active row, the delta between the project state the row was filed against and the state now. The [`/triage-debt`](../../../commands/triage-debt.md) command judges the probe's candidates and records the verdict as a dated, anchored **stamp** appended to the row's `notes` cell. Triage never adds a schema field and never appends a row — it edits `status` and `notes` (plus `location` / `class` / `severity` / `goal-ref-value` on a realign) on rows that already exist.
+
+### Outcomes
+
+| Outcome | Meaning | Ledger effect |
+|---------|---------|----------------|
+| `kept` | The row's premise still holds at the anchor; nothing in its window moved it. | Append a `kept` stamp. No other field changes. |
+| `realigned` | Still applicable and worth doing, but its location, notes citations, or severity drifted from the current state. | Rewrite `location` / `class` / `severity` / `goal-ref-value` / `notes` to the current state; append a `realigned` stamp naming the prior premise. |
+| `discarded` | The premise is refuted by the current state — a named decision or a named state change moots it. | Set `status: wontfix`; append a `discarded` stamp naming the refuting decision or change. |
+| `merged` | The row duplicates a surviving peer. | Set `status: wontfix` on the absorbed row and append a `merged into td-NNN` stamp; append a `kept … absorbed td-XXX` stamp to the survivor. |
+| `escalated` | The subject moved so far that a rewrite needs a judgment call, or the only open question is whether it is still worth doing. | **No ledger write.** Recorded only in the run's `TRIAGE_ESCALATIONS.md`, so the row stays unjudged and resurfaces on the next run. |
+
+`discarded`, `merged`, and `realigned` are irreversible only in the loose sense that the ledger schema makes every status update reversible by a later triage; a `wontfix` tombstone that recurs is caught by the producer re-detection protocol (§ Lifecycle conventions), not overwritten silently.
+
+### Stamp grammar
+
+One ` // `-separated `notes` segment, matched at its start:
+
+```
+[triage YYYY-MM-DD @<anchor>] <outcome>[ from <prior-base-key>]: <text>
+[triage YYYY-MM-DD @<anchor>] merged into td-NNN
+```
+
+- `<anchor>` is a commit sha, 7–40 lowercase hex characters — the sha a judge stamps with, taken from the probe digest's `anchor` field.
+- `<outcome>` is one of `kept` / `realigned` / `discarded` / `merged`. `escalated` never produces a stamp.
+- `from <prior-base-key>` (a 12-hex-character `dedup_key` base) is legal only on `realigned`, and only required when the base key actually changed — a realign that keeps the same class/location/direction/goal-ref does not carry it.
+- `<text>` is outcome-shaped: `kept` requires a leading `file[:line]` evidence token; `realigned` accepts free text (the prior premise); `merged` requires exactly `td-NNN`; `discarded` requires a **checkable anchor** (below).
+- The segment must contain no `|` — the ledger's own table delimiter.
+
+**Paired site** (gate-liveness two-site rule): the regex constant lives in `scripts/ledger_snapshot.py` as `_STAMP`; change both together.
+
+Example stamps (each must parse under the grammar above):
+
+- `[triage 2026-09-27 @9ad0e205] kept: scripts/ledger_health.py:120 the probe still reads this path`
+- `[triage 2026-09-27 @9ad0e205] realigned from a1b2c3d4e5f6: the check moved to scripts/ledger_health.py`
+- `[triage 2026-09-27 @9ad0e205] discarded: scripts/old_probe.py:12 was deleted, and its check moved into ledger_health.py`
+- `[triage 2026-09-27 @9ad0e205] merged into td-095`
+
+### The discard anchor rule
+
+A `discarded` stamp is rejected (`StampMalformed`) unless its text carries at least one checkable anchor: a `path:line` citation, a `dec-NNN`, a `td-NNN`, or a commit sha (7–40 hex characters, containing both a digit and a hex letter so an all-decimal token or an English word spelled in hex is never mistaken for one). This is the code-level backstop behind the discard confidence gate in [`/triage-debt`](../../../commands/triage-debt.md): a judge may only propose `discarded` when its own re-probe cites a concrete anchor, and any value judgment short of that — including any "not worth doing" verdict — is `escalated`, never `discarded`. The gate checks the *shape* of the anchor, not that it resolves; `/triage-debt`'s apply step additionally resolves each anchor against the live snapshot before writing (the `dec-NNN` exists in the corpus, the `td-NNN` is a ledger row and not the row itself, every sha — the stamp's own `@anchor` included — is an ancestor of HEAD, every cited path is tracked in the HEAD tree) and refuses to write a stamp whose anchor does not resolve. A file that exists only on disk — gitignored scratch such as a triage survey under `.ai-work/` — and a commit on an unmerged branch are not evidence.
+
+### Write protocol: `--backfill` then `--check`, always
+
+Every triage write — `kept`, `realigned`, `discarded`, or `merged` — is a `notes` edit, and any `notes` edit on a **discriminated** row (§ Schema's collision discriminator) changes that row's `dedup_key`, because the discriminated key hashes `sha1(notes)[:8]`. This is not triage-specific: the rework-worktree suffix, the recurrence suffix, and the finalize-time notes concatenation all trip the same hazard. So after applying confirmed outcomes, `/triage-debt` **always** runs, in order:
+
+```
+check_state_ledgers.py --backfill
+check_state_ledgers.py --check
+```
+
+Both are on `PATH` after the Praxion installer; from a Praxion checkout without it, run them as
+`python3 scripts/check_state_ledgers.py`.
+
+`--backfill` recomputes every row's `dedup_key` against the current schema formula (including the discriminator), and `--check` then proves cross-file uniqueness. A non-zero `--check` stops the command and is reported — the ledger is left as `--backfill` wrote it, never rolled back. Skipping `--backfill` on a discriminated row's edit produces a blocking `dedup-mismatch`; running it first leaves `--check` clean. A plain (non-colliding) row's key never depends on `notes`, so the same edit needs no backfill at all — `check_state_ledgers.py --check` stays clean either way.
+
+### Realigned re-key semantics
+
+A `realigned` outcome that changes `class` / `location` / `direction` / `goal-ref-value` recomputes the row's **base** `dedup_key` (already documented under § Lifecycle conventions: "Reclassification recomputes `dedup_key`"). The stamp's `from <prior-base-key>` clause preserves the *old* base key so a later producer re-filing the row's original shape is caught as a `possible-duplicate` (basis `refiled-after-realign`) rather than silently re-opening a stale finding. When the new base key equals a closed row's, the row's digest lists the pair under `context.same_base_peers`, which is never windowed — `/triage-debt` checks its realigned rows for exactly that after applying, surfaces each hit as a possible recurrence, and lets the user choose between re-opening the closed peer and keeping the realign. As evidence, a same-base peer counts against a judged row only when it was filed after the stamp, so a merge survivor, or a row kept beside an old resolved twin, stays quiet.
+
+### Staleness and TD07
+
+A stamp anchors the row to the commit it was judged against: the merge-base of `HEAD` with the local default branch, which is `HEAD` itself on that branch. From then on the row's evidence is computed over `anchor..HEAD` only, so a judged row stays quiet until something it depends on moves: its location or a notes-cited path disappears, a decision it cites changes, a commit names it, its `kept` evidence file is edited, or a new decision that supersedes another touches its files (the last is medium tier: a reason to re-judge, not a contradiction). A stamp that is malformed, anchored to a commit this repository cannot reach, or says `discarded`/`merged` on a row that is still active resurfaces the row as `judgment-unusable`; without git it is withheld, never flagged. A `wontfix` row whose `discarded` stamp predates a later `last-seen` is reported as `discard-recurred` — a producer re-detected it and the tombstone absorbed the recurrence.
+
+The sentinel's **TD07** family check runs `python3 scripts/ledger_health.py --json` and reports each candidate (WARN strong tier, INFO medium tier) and each withheld class (WARN), recommending `/triage-debt`. It writes no ledger row.
+
 **Consumer-only (not new rows).** Rework worktree creation: flip linked `td-NNN` rows `open → in-flight` with `notes` suffix `// in-flight via rework worktree <name>` (notes-field linkage — no schema change). Pre-refactor mini-pipeline completion: flip affected rows `in-flight → resolved`. These are in-place status updates on existing rows, not producer appends.

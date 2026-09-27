@@ -188,6 +188,7 @@ Surfaces grounded debt — problems anchored in current source code with respect
 | TD04 | L | p95 complexity crossings | Read `METRICS_REPORT_*.md` `lizard` / `complexipy` namespaces; for each file crossing the project complexity p95 threshold, write one row per § Producer overlays → **sentinel** → TD04 |
 | TD05 | L | Ledger status-update discipline | Read `.ai-state/TECH_DEBT_LEDGER.md` (active) and `.ai-state/TECH_DEBT_RESOLVED.md` (terminal, may be absent); flag (a) `status = resolved` rows in RESOLVED.md missing `resolved-by`, (b) `status = in-flight` rows in LEDGER.md older than 30 days, (c) `owner-role = unassigned` rows in LEDGER.md older than 7 days. Surface findings in the Tech-Debt Findings report subsection at WARN severity. **Never writes ledger rows** |
 | TD06 | A | Metrics report still describes current HEAD | Family: `python3 scripts/check_metrics_freshness.py --json`; WARN per `check: "TD06"` finding — `examined.status` is `stale` or `withheld` is non-empty; every `examined.hotspots_touched` path is barred from TD01 filing until re-verified. **Writes no `td-NNN` row** — TD06 gates TD01, it does not file. |
+| TD07 | A | Active ledger rows whose premise the project state may have moved past | Family: `python3 scripts/ledger_health.py --json`; WARN per strong-tier `check: "TD07"` finding, INFO per medium-tier, WARN per withheld class; recommend `/triage-debt`. Writes no `td-NNN` row. |
 
 ### Test Topology (TT)
 
@@ -462,6 +463,7 @@ Run every `A` row: the family scripts first (table below), then the remaining sc
 | the gate scripts (`scripts/*.py`) · `.pre-commit-config.yaml` | `python3 scripts/check_gate_liveness.py --json` | GL02 GL04 GL05 GL06 |
 | `.ai-state/DESIGN.md` · `.ai-state/decisions/` | `python3 scripts/check_design_checkpoint.py --json` | AC14 |
 | `.ai-state/metrics_reports/` | `python3 scripts/check_metrics_freshness.py --json` | TD06 |
+| `.ai-state/TECH_DEBT_LEDGER.md` | `python3 scripts/ledger_health.py --json` | TD07 |
 | `.ai-state/calibration_log.md` | `python3 scripts/check_calibration_coverage.py --json` | CA02 CA03 |
 | `.ai-state/doc_manifest.yaml` | `python3 scripts/check_doc_manifest_freshness.py --json` | F11 |
 | `.ai-state/observations.jsonl` | `python3 scripts/check_agent_lifecycle_pairing.py --json` | P03 |

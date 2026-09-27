@@ -151,7 +151,8 @@ Apply only confirmed outcomes, one row at a time. For each:
    exactly what was checked. Pass `--location` with the new `location` cell whenever a realign
    changes it — a location cell is paths only.
 
-   Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp; a stamp
+   Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a stamp or rewritten notes
+   that span lines or carry a `|` (a table cell holds neither); a malformed stamp; a stamp
    that, appended to the notes, does not read back as the row's latest judgment (a ` // ` inside
    it, or a backtick left unbalanced); an `@anchor` or cited commit that is not an ancestor of
    `HEAD`; a cited path (or a `kept` stamp's evidence path) not tracked at `HEAD` — a file that

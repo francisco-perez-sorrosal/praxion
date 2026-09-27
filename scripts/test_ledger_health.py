@@ -401,6 +401,19 @@ def test_rewritten_notes_spanning_lines_are_refused(tmp_path: Path) -> None:
     assert "one line" in out
 
 
+def test_rewritten_notes_carrying_the_table_delimiter_are_refused(tmp_path: Path) -> None:
+    """A `|` inside the notes splits the row into one cell too many once it is written."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise")
+    notes = tmp_path / "notes.txt"
+    notes.write_text("Premise a | b.\n")
+
+    code, out = _check(repo_root, "td-902", stamp, "--notes-file", str(notes))
+
+    assert code == 1
+    assert "|" in out
+
+
 def test_a_realign_premise_is_history_so_its_stale_anchors_are_not_resolved(
     tmp_path: Path,
 ) -> None:

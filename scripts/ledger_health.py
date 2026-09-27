@@ -277,8 +277,8 @@ def stamp_refusals(
     rows: dict[str, ActiveRow] = {row.id: row for row in snapshot.active_rows}
     if row_id not in rows:
         return [f"{row_id} is not an active row"]
-    if one_line := _one_line_refusals(stamp=stamp, notes=notes):
-        return one_line
+    if unwritable := _cell_text_refusals(stamp=stamp, notes=notes):
+        return unwritable
     parsed = parse_stamp(stamp)
     if isinstance(parsed, StampMalformed):
         return ["malformed stamp (see tech-debt-ledger.md § Triage for the grammar)"]
@@ -295,12 +295,18 @@ def stamp_refusals(
     )
 
 
-def _one_line_refusals(**texts: str | None) -> list[str]:
-    """A table cell is one line: a newline inside the text would split the row."""
+def _cell_text_refusals(**texts: str | None) -> list[str]:
+    """Text a table cell cannot hold: a newline splits the row into two lines, a `|` into
+    one cell too many -- and either only shows once the row is written."""
+    present = {name: text for name, text in texts.items() if text is not None}
     return [
         f"the {name} must be one line: a table cell cannot hold a newline"
-        for name, text in texts.items()
-        if text is not None and ("\n" in text or "\r" in text)
+        for name, text in present.items()
+        if "\n" in text or "\r" in text
+    ] + [
+        f"the {name} must not carry a `|`: it is the table's cell delimiter"
+        for name, text in present.items()
+        if "|" in text
     ]
 
 

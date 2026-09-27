@@ -125,29 +125,33 @@ Apply only confirmed outcomes, one row at a time. For each:
    - `merged`: set `status: wontfix` on the absorbed row, append
      `` // [triage <today> @<anchor>] merged into <survivor-id>``; append
      `` // [triage <today> @<anchor>] kept: <evidence> absorbed <absorbed-id>`` to the survivor.
-2. **Validate the stamp parses.** Run it through the grammar's own parser before writing:
-   `python3 -c "import sys; sys.path.insert(0, 'scripts'); from ledger_snapshot import parse_stamp, StampMalformed; r = parse_stamp('''<stamp text>'''); sys.exit(1 if isinstance(r, StampMalformed) else 0)"`.
-   A non-zero exit means the stamp is malformed — skip this row, report it, and do not write it.
-3. **Resolve every anchor the stamp cites**, before writing — a stamp that merely *shapes* like
-   it has a checkable anchor is not the same as one that does:
-   - a `dec-NNN` token must exist in `.ai-state/decisions/` (a finalized record, not a draft);
-   - a `td-NNN` token must exist in the ledger pair and must not be the row's own id;
-   - a commit sha must be reachable from `HEAD` (`git cat-file -e <sha>^{commit}`);
-   - a `kept` stamp's `file:line` path must exist at `HEAD`.
-   A stamp whose anchor does not resolve is refused — skip this row, report it, and do not
-   write it. This is the code-level backstop behind the discard confidence gate: the judge's
-   confidence and the user's confirmation are necessary, but a dangling anchor is refused
-   regardless of either.
-4. **Write the edit** to whichever file (`TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`)
+2. **Check the stamp before writing it** — grammar first, then every anchor it cites:
+
+   ```
+   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>'
+   ```
+
+   Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp, a
+   `dec-NNN` that is not a finalized decision, a `td-NNN` that is not a ledger row or is the row
+   itself, a commit not reachable here, a cited path (or a `kept` stamp's evidence path) missing
+   at `HEAD`, a merge that names no other active row as survivor, or a row that is not active.
+   A refused stamp is never written: skip the row and report the reasons. This is the
+   code-level backstop behind the discard confidence gate — the judge's confidence and the
+   user's confirmation are necessary, but a stamp that merely *shapes* like it cites something
+   checkable is refused regardless of either.
+3. **Write the edit** to whichever file (`TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`)
    currently holds the row — `status` and `notes` only, plus `location` / `class` / `severity` /
    `goal-ref-value` for a `realigned` row. Never append a new row.
 
 After every row that could be applied has been applied, run, in order, from the project root:
 
 ```
-scripts/check_state_ledgers.py --backfill
-scripts/check_state_ledgers.py --check
+check_state_ledgers.py --backfill
+check_state_ledgers.py --check
 ```
+
+Both tools are on `PATH` after the Praxion installer; from a Praxion checkout without it, run
+them as `python3 scripts/<tool>`.
 
 `--backfill` re-keys any row whose `notes` edit changed a discriminated `dedup_key`; `--check`
 then proves cross-file uniqueness. **If `--check` exits non-zero, stop and report** — the ledger

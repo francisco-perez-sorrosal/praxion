@@ -112,6 +112,7 @@ __all__ = [
     "row_delta",
     "signal_class_name",
     "split_segments",
+    "stamp_anchors",
 ]
 
 # -- Row grammar ---------------------------------------------------------------
@@ -158,6 +159,20 @@ _SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")
 _CHECKABLE_ANCHORS = (_LINE_CITE, _DEC_TOKEN, _TD_TOKEN, _SHA)
 
 # -- Boundary parsing ----------------------------------------------------------------------
+
+
+def stamp_anchors(text: str) -> Mapping[str, tuple[str, ...]]:
+    """Every checkable anchor a stamp's text cites, by kind: path, dec, td, sha.
+
+    The grammar only proves an anchor is *shaped* right; the apply step resolves
+    each one against the repository before the stamp is written.
+    """
+    return {
+        "path": tuple(cite_path(found) for found in _LINE_CITE.findall(text)),
+        "dec": tuple(_DEC_TOKEN.findall(text)),
+        "td": tuple(_TD_TOKEN.findall(text)),
+        "sha": tuple(_SHA.findall(text)),
+    }
 
 
 def parse_stamp(segment: str, segment_index: int = 0) -> TriageStamp | StampMalformed:

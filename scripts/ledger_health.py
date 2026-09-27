@@ -39,12 +39,13 @@ import argparse
 import json
 import sys
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal, assert_never
 
+from _git_runner import GitUnavailableError, run_git
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from ledger_delta import (
     ActiveRow,
@@ -72,7 +73,14 @@ from ledger_delta import (
     Unjudged,
     Withheld,
 )
-from ledger_snapshot import StateSnapshot, gather, row_delta, signal_class_name
+from ledger_snapshot import (
+    StateSnapshot,
+    gather,
+    parse_stamp,
+    row_delta,
+    signal_class_name,
+    stamp_anchors,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -126,6 +134,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
 
+    if args.check_stamp is not None:
+        return _report_stamp_check(snapshot, args.row, args.check_stamp)
+
     assessments = assess(snapshot)
     ids = tuple(part.strip() for part in (args.ids or "").split(",") if part.strip())
     unknown = sorted(set(ids) - {item.row.id for item in assessments})
@@ -149,7 +160,79 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--class", dest="only", choices=sorted(CLASS_POLICY), help="keep rows with this class"
     )
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--check-stamp",
+        metavar="STAMP",
+        help="validate one stamp for --row before it is written: grammar, then every anchor",
+    )
+    parser.add_argument("--row", help="the td-NNN id the --check-stamp stamp is for")
+    args = parser.parse_args(argv)
+    if (args.check_stamp is None) != (args.row is None):
+        parser.error("--check-stamp and --row go together")
+    return args
+
+
+def _report_stamp_check(snapshot: StateSnapshot, row_id: str, stamp: str) -> int:
+    reasons = stamp_refusals(snapshot, row_id, stamp, _commit_exists)
+    for reason in reasons:
+        print(f"refused: {reason}")
+    if not reasons:
+        print("ok")
+    return 1 if reasons else 0
+
+
+def _commit_exists(repo_root: Path, sha: str) -> bool:
+    try:
+        return run_git(repo_root, "cat-file", "-e", f"{sha}^{{commit}}").returncode == 0
+    except GitUnavailableError:
+        return False
+
+
+def stamp_refusals(
+    snapshot: StateSnapshot,
+    row_id: str,
+    stamp: str,
+    commit_exists: Callable[[Path, str], bool],
+) -> list[str]:
+    """Why `stamp` must not be written onto `row_id`; empty when it may.
+
+    The grammar proves an anchor is shaped right; this proves it is real: a cited
+    decision is in the corpus, a cited row exists and is not the stamped row, a
+    cited commit is reachable, a cited path exists at HEAD. A merge must name a
+    live survivor. The row itself must be active.
+    """
+    active = {row.id for row in snapshot.active_rows}
+    if row_id not in active:
+        return [f"{row_id} is not an active row"]
+    parsed = parse_stamp(stamp)
+    if isinstance(parsed, StampMalformed):
+        return ["malformed stamp (see tech-debt-ledger.md § Triage for the grammar)"]
+    known_rows = active | {peer.id for peer in snapshot.terminal_peers}
+    anchors = stamp_anchors(parsed.text)
+    paths = set(anchors["path"]) | ({parsed.evidence_path} if parsed.evidence_path else set())
+    reasons = [
+        f"{path} does not exist at HEAD" for path in sorted(paths) if not _at_head(snapshot, path)
+    ]
+    reasons += [
+        f"{dec} is not a finalized decision"
+        for dec in anchors["dec"]
+        if dec not in snapshot.decisions
+    ]
+    reasons += [f"{td} is not a ledger row" for td in anchors["td"] if td not in known_rows]
+    reasons += [f"{row_id} cannot anchor its own stamp" for td in anchors["td"] if td == row_id]
+    reasons += [
+        f"{sha} is not a commit reachable here"
+        for sha in anchors["sha"]
+        if not commit_exists(snapshot.repo_root, sha)
+    ]
+    if parsed.outcome == "merged" and not set(anchors["td"]) & (active - {row_id}):
+        reasons.append("a merge must name another active row as its survivor")
+    return reasons
+
+
+def _at_head(snapshot: StateSnapshot, path: str) -> bool:
+    tree = snapshot.git.head_tree if snapshot.git else frozenset()
+    return path in tree or (snapshot.repo_root / path).exists()
 
 
 def _utc_now() -> str:

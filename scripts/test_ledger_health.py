@@ -22,6 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import ledger_health
+import ledger_snapshot
 import pytest
 from _ledger_triage_testkit import build_fixture_repo
 
@@ -163,3 +165,63 @@ def test_plugin_cache_repo_root_is_refused_with_exit_two(tmp_path: Path) -> None
     result = _run("--digest", "--repo-root", str(cache_root))
     assert result.returncode == 2
     assert "plugin-cache" in result.stderr
+
+
+# -- Stamp check: shape is not enough, every anchor must resolve ---------------------------
+
+_STAMP = "[triage 2026-09-27 @9ad0e205c05f] "
+
+
+def _refusals(repo_root: Path, row_id: str, text: str, commits: bool = True) -> list[str]:
+    snapshot = ledger_snapshot.gather(repo_root)
+    return ledger_health.stamp_refusals(snapshot, row_id, _STAMP + text, lambda _r, _s: commits)
+
+
+def test_a_stamp_whose_anchors_all_resolve_may_be_written(base_repo: Path) -> None:
+    assert _refusals(base_repo, "td-270", "kept: scripts/check_gate_liveness.py:10 holds") == []
+
+
+def test_a_discard_citing_a_decision_that_does_not_exist_is_refused(base_repo: Path) -> None:
+    (reason,) = _refusals(base_repo, "td-270", "discarded: made moot by dec-999")
+    assert "dec-999" in reason
+
+
+def test_a_row_cannot_anchor_its_own_discard(base_repo: Path) -> None:
+    reasons = _refusals(base_repo, "td-270", "discarded: duplicate of td-270")
+    assert any("own stamp" in reason for reason in reasons)
+
+
+def test_a_discard_citing_an_unreachable_commit_is_refused(base_repo: Path) -> None:
+    (reason,) = _refusals(base_repo, "td-270", "discarded: fixed by c95a9e96", commits=False)
+    assert "c95a9e96" in reason
+
+
+def test_a_merge_into_a_resolved_row_is_refused(base_repo: Path) -> None:
+    reasons = _refusals(base_repo, "td-270", "merged into td-095")
+    assert any("survivor" in reason for reason in reasons)
+
+
+def test_a_stamp_for_a_row_that_is_not_active_is_refused(base_repo: Path) -> None:
+    (reason,) = _refusals(base_repo, "td-095", "kept: scripts/check_gate_liveness.py:10 holds")
+    assert "not an active row" in reason
+
+
+def test_the_stamp_check_cli_exits_one_on_refusal_and_zero_when_clean(base_repo: Path) -> None:
+    root = ("--repo-root", str(base_repo))
+    clean = _run(
+        *root,
+        "--row",
+        "td-270",
+        "--check-stamp",
+        _STAMP + "kept: scripts/check_gate_liveness.py:1 ok",
+    )
+    refused = _run(
+        *root, "--row", "td-270", "--check-stamp", _STAMP + "discarded: moot per dec-999"
+    )
+    assert (clean.returncode, clean.stdout.strip()) == (0, "ok")
+    assert refused.returncode == 1
+    assert "dec-999" in refused.stdout
+
+
+def test_check_stamp_without_a_row_is_a_usage_error() -> None:
+    assert _run("--check-stamp", _STAMP + "kept: a/b.py:1 ok").returncode == 2

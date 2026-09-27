@@ -642,3 +642,11 @@ def test_a_separator_quoted_in_backticks_is_content_not_an_amendment() -> None:
 def test_an_unbalanced_backtick_never_hides_a_later_stamp() -> None:
     notes = "Stray ` tick // [triage 2026-09-27 @9ad0e205] kept: scripts/x.py:1 holds"
     assert ledger_snapshot.split_segments(notes)[-1].startswith("[triage ")
+
+
+def test_a_top_level_dotfile_cite_keeps_its_leading_dot() -> None:
+    """`.pre-commit-config.yaml:24` names the dotfile, not `pre-commit-config.yaml`."""
+    anchors = ledger_snapshot.stamp_anchors(
+        "kept: .pre-commit-config.yaml:24 still lacks the exclude"
+    )
+    assert anchors["path"] == (".pre-commit-config.yaml",)

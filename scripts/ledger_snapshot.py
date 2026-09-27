@@ -172,7 +172,7 @@ _OUTCOMES: Mapping[str, Outcome] = {
 }
 # The extension must start with a letter, so a ratio ("3.5:1") or a version ("v1.2:3")
 # is never read as a `path:line`.
-_LINE_CITE = re.compile(r"(?:[\w.-]+/)*[\w-][\w.-]*\.[A-Za-z]\w*:\d+")
+_LINE_CITE = re.compile(r"(?:[\w.-]+/)*\.?[\w-][\w.-]*\.[A-Za-z]\w*:\d+")
 # A sha must carry both a digit and a hex letter: English words spelled in hex
 # ("defaced") and plain numbers ("20260927", "1000000") are not commits.
 _SHA = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")

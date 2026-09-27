@@ -99,6 +99,10 @@ and only after the user confirms.
 ### 3. Merge and confirm
 
 Read every `TRIAGE_PROPOSALS_<batch>.md` fragment and merge them into one pass over all rows.
+Batches are cut by rank, so two rows of one duplicate pair can land in different batches: flag
+every row that more than one proposal names — a merge survivor another batch discards, merges or
+realigns, or two rows merged into each other — and put both proposals in front of the user as
+one conflict. Apply neither until the user picks one.
 
 Present **one confirmation table** covering bucket 1 (`discarded` / `merged`) and bucket 2
 (`realigned`) proposals — one row per proposal, with the evidence visible next to the outcome so

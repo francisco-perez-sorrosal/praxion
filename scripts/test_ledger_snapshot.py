@@ -495,15 +495,29 @@ def _cited_by_commit(repo_root: Path) -> list:
     return [s for s in delta.signals if ledger_snapshot.signal_class_name(s) == "cited-by-commit"]
 
 
-def test_the_commit_that_filed_a_row_never_counts_as_work_on_it(tmp_path: Path) -> None:
-    """Filed a day after first-seen and touching one code file: still bookkeeping."""
-    repo_root = one_row_repo(tmp_path, "Premise.", ())
+def _touch_code_and_ledger(repo_root: Path) -> None:
     ledger = repo_root / ".ai-state" / "TECH_DEBT_LEDGER.md"
     ledger.write_text(ledger.read_text() + "\n")
     (repo_root / "scripts" / "x.py").write_text("changed\n")
-    _commit_all(repo_root, "chore(state): file td-902", "2026-01-02T12:00:00")
+
+
+def test_the_commit_that_filed_a_row_never_counts_as_work_on_it(tmp_path: Path) -> None:
+    """Authored on first-seen and touching one code file: the window starts after it."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _touch_code_and_ledger(repo_root)
+    _commit_all(repo_root, "chore(state): file td-902", "2026-01-01T12:00:00")
 
     assert _cited_by_commit(repo_root) == []
+
+
+def test_a_later_commit_touching_code_and_the_ledger_is_evidence(tmp_path: Path) -> None:
+    """A partial fix that also amends the row is work on it, not a second filing."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    _touch_code_and_ledger(repo_root)
+    _commit_all(repo_root, "fix: part of td-902, row amended", "2026-01-02T12:00:00")
+
+    (signal,) = _cited_by_commit(repo_root)
+    assert signal.subject == "fix: part of td-902, row amended"
 
 
 def test_a_rebased_commit_is_dated_by_its_author_not_its_committer(tmp_path: Path) -> None:

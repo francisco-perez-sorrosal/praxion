@@ -27,7 +27,6 @@ from ledger_delta import (
     CitationDecay,
     CitedByCommit,
     CitedDecisionChanged,
-    Commit,
     DecisionChange,
     DecisionFacts,
     DiscardRecurred,
@@ -62,7 +61,6 @@ from ledger_delta import (
 from query_adrs import paths_match
 
 _STATE_ROOT = ".ai-state/"
-_LEDGER_FILES = frozenset({".ai-state/TECH_DEBT_LEDGER.md", ".ai-state/TECH_DEBT_RESOLVED.md"})
 # Frontmatter edges by which a decision narrows or replaces an earlier one.
 _CHANGING_EDGES = ("supersedes", "supersedes_in_part")
 
@@ -368,12 +366,15 @@ def _goal_link(snapshot: StateSnapshot, row: ActiveRow) -> list[GoalLinkUnresolv
 def _cited_by_commit(
     snapshot: StateSnapshot, row: ActiveRow, window: Window
 ) -> list[CitedByCommit]:
-    """Commits naming this row, in whichever window applies.
+    """Commits naming this row and touching a non-state path, in whichever window applies.
 
     `AnchorWindow.commits` is already `anchor..HEAD` (one read shared by every
     row anchored to that sha), so no further date filter is needed there; a
     `FirstSeenWindow` still filters `snapshot.git.commits` (the corpus-wide,
-    `since`-bounded index) by `commit.date > window.start`.
+    `since`-bounded index) by `commit.date > window.start`. That author-date
+    bound is also what excludes the filing commit, authored on `first-seen`:
+    a later commit that amends the row while changing code is work on it,
+    whatever else it touches.
     """
     if snapshot.git is None:
         return []
@@ -386,22 +387,12 @@ def _cited_by_commit(
             return []
         case _:
             assert_never(window)
-    naming = [commit for commit in pool if row.id in commit.td_ids]
-    filing = _filing_commit(naming)
     return [
         CitedByCommit(commit.sha, commit.date, commit.subject)
-        for commit in naming
-        if commit is not filing and any(not path.startswith(_STATE_ROOT) for path in commit.paths)
+        for commit in pool
+        if row.id in commit.td_ids
+        and any(not path.startswith(_STATE_ROOT) for path in commit.paths)
     ]
-
-
-def _filing_commit(naming: list[Commit]) -> Commit | None:
-    """The oldest commit that names the row and touches a ledger file: the one that filed it.
-
-    Filing is bookkeeping, not work on the row, even when the same commit edits code.
-    """
-    filed = [commit for commit in naming if any(p in _LEDGER_FILES for p in commit.paths)]
-    return filed[-1] if filed else None  # commits are newest first
 
 
 def _duplicates(snapshot: StateSnapshot, row: ActiveRow) -> list[DuplicatePeer]:

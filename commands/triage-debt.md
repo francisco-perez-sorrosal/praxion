@@ -21,7 +21,7 @@ as a candidate.
 |------|-------------|
 | `--all` | Judge every active row, not just candidates. Use for a first sweep — before anything is stamped, the mechanical recall is not 100%, so rows the probe misses still need a human pass. |
 | `--ids <td-NNN,...>` | Judge only the named rows, ignoring candidacy. |
-| `--limit <n>` | Judge at most `n` rows, in the probe's own rank order (strong tier first). Useful for a first pass over a large ledger; re-running picks up where the limit stopped. |
+| `--limit <n>` | Judge at most `n` rows, in the probe's own rank order (strong tier first). Useful for a first pass over a large ledger. A re-run does **not** resume where the limit stopped: escalated, unconfirmed and refused rows stay unjudged and rank first again, and under `--all` stamped rows are selected again too — pass `--ids` to move on to the rows behind them. |
 
 An unrecognised flag is an error to surface, not something to drop silently.
 
@@ -32,14 +32,18 @@ An unrecognised flag is an error to surface, not something to drop silently.
 Run the probe from the project root:
 
 ```
-ledger_health.py --digest [--all] [--ids <ids>]
+ledger_health.py --index [--all] [--ids <ids>]
 ```
 
 The Praxion installer links it onto `PATH`; if it is not found, fall back to
 `python3 scripts/ledger_health.py` from a Praxion checkout and mention that the installer has
-not been run. `--limit` is not a probe flag — after the digest returns, keep only the first `n`
-rows in `rows[]` (the probe already ranks strong tier before medium, and each tier by
-evidence count).
+not been run.
+
+`--index` returns the digest's envelope with the selected row ids, in rank order, in place of
+the row bodies. **Never read the row digests here**: a whole ledger's digest runs to hundreds of
+kilobytes, and each judge fetches only its own batch (§2). `--limit` is not a probe flag — keep
+only the first `n` entries of `ids` (the probe already ranks strong tier before medium, and each
+tier by evidence count).
 
 Read the envelope before anything else:
 
@@ -49,19 +53,24 @@ Read the envelope before anything else:
   scope before seeing a single proposal.
 - **`anchor`** — capture it; every stamp this run writes carries it.
 
-If `rows` is empty, say so and stop. There is nothing to judge.
+If `ids` is empty, say so and stop. There is nothing to judge.
 
-**Anchor.** The digest's `anchor` is the merge-base of `HEAD` with the local default branch — `HEAD` itself when you run on that branch. Stamp with it verbatim. Run on the default branch when you can: a stamp anchored to a branch point is still valid after the branch merges, but its window then starts before the branch's own work, so the next run may resurface rows that branch already moved.
+**Anchor.** The envelope's `anchor` is the merge-base of `HEAD` with the local default branch — `HEAD` itself when you run on that branch. Stamp with it verbatim. Run on the default branch when you can: a stamp anchored to a branch point is still valid after the branch merges, but its window then starts before the branch's own work, so the next run may resurface rows that branch already moved.
 
 ### 2. Judge — fan out to batches, never edit anything
 
-Split `rows[]` into batches of about 10. Spawn one judge subagent per batch (`Task`, model
-`sonnet`), passing that batch's row digests verbatim plus the instructions below. Each judge:
+Split `ids` into batches of about 10. **Before spawning, check the split**: the union of the
+batches must equal `ids` exactly — no id dropped, none repeated (under `--all` with no `--limit`,
+that is `examined.active` ids). Spawn one judge subagent per batch (`Task`, model `sonnet`),
+passing its batch ids, the run's `anchor`, and the instructions below. Each judge:
 
-1. **Re-probes independently.** For every row, read the cited `file:line`s at `HEAD`, the
+1. **Reads its own batch** with `ledger_health.py --digest --ids <its batch ids>`, and stops and
+   reports instead of judging if the digest's `anchor` differs from the run's (`HEAD` moved under
+   the run) or its `rows` do not carry exactly its batch ids.
+2. **Re-probes independently.** For every row, read the cited `file:line`s at `HEAD`, the
    named ADRs, and any cited commits. A judge proposes from what it verifies now, not from the
    digest's `evidence` array alone — the digest is a pointer to what to check, not a verdict.
-2. **Proposes exactly one outcome per row**, from the bucket vocabulary in
+3. **Proposes exactly one outcome per row**, from the bucket vocabulary in
    `tech-debt-ledger.md § Triage`:
    - **`discarded`** or **`merged`** (bucket 1) — only when the re-probe itself refutes the
      row's premise: a `file:line` at `HEAD` that contradicts it, a named decision, or a named
@@ -70,16 +79,19 @@ Split `rows[]` into batches of about 10. Spawn one judge subagent per batch (`Ta
      Value judgments belong to the user, never the judge.
    - **`realigned`** (bucket 2) — the row is still applicable and worth doing, but its location,
      notes citations, or severity drifted. Propose the new field values (`location` / `class` /
-     `severity` / `goal-ref-value`) and the prior premise to keep in the stamp.
+     `severity` / `goal-ref-value` / `notes`) and the prior premise to keep in the stamp. The new
+     `notes` rewrite each stale citation the `citation-decay` evidence names to its current path
+     (the evidence carries it when the rename index knows one) and keep every other segment,
+     earlier stamps included, verbatim.
    - **`escalated`** (bucket 3) — the subject moved so far that a rewrite needs a judgment call,
      or the only open question is whether the row is still worth doing. No ledger write; this is
      a recommendation for the user, not a verdict.
    - **`kept`** (bucket 4, implicit) — the row's premise still holds. The evidence, if any, does
      not survive re-probing.
-3. **Writes `.ai-work/triage-debt-<run-id>/TRIAGE_PROPOSALS_<batch>.md`** (never the ledger):
+4. **Writes `.ai-work/triage-debt-<run-id>/TRIAGE_PROPOSALS_<batch>.md`** (never the ledger):
    one entry per row with `id`, `bucket`, `outcome`, the evidence (`file:line`, decision id, or
-   state-change description) that justifies it, the proposed new cell values when `realigned`,
-   and a one-sentence rationale.
+   state-change description) that justifies it, the proposed new cell values (`notes` included)
+   when `realigned`, and a one-sentence rationale.
 
 Judges never touch `.ai-state/TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`. Only §4 does,
 and only after the user confirms.
@@ -109,32 +121,42 @@ Apply only confirmed outcomes, one row at a time. For each:
 1. **Build the stamp** per the grammar in `tech-debt-ledger.md § Triage`, using the anchor
    captured in §1:
    - `kept`: append `` // [triage <today> @<anchor>] kept: <file:line> <why>``.
-   - `realigned`: rewrite `location` / `class` / `severity` / `goal-ref-value` to the proposed
-     values, keep `id` and `first-seen` unchanged, append
-     `` // [triage <today> @<anchor>] realigned from <old-base-key>: <prior premise>`` — the
-     `from <old-base-key>` clause only when the base key actually changed.
+   - `realigned`: rewrite `location` / `class` / `severity` / `goal-ref-value` / `notes` to the
+     proposed values, keep `id` and `first-seen` unchanged, append
+     `` // [triage <today> @<anchor>] realigned from <old-base-key>: <prior premise>`` to the
+     rewritten `notes` — the `from <old-base-key>` clause only when the base key actually changed.
    - `discarded`: set `status: wontfix`, append
      `` // [triage <today> @<anchor>] discarded: <the decision or state change>``.
-   - `merged`: set `status: wontfix` on the absorbed row, append
-     `` // [triage <today> @<anchor>] merged into <survivor-id>``; append
-     `` // [triage <today> @<anchor>] kept: <evidence> absorbed <absorbed-id>`` to the survivor.
-2. **Check the stamp before writing it** — grammar first, then every anchor it cites:
+   - `merged`: two stamps — `` // [triage <today> @<anchor>] kept: <evidence> absorbed <absorbed-id>``
+     on the survivor, and `` // [triage <today> @<anchor>] merged into <survivor-id>`` plus
+     `status: wontfix` on the absorbed row. Check **both** (step 2) before writing either, and
+     skip both if either is refused; then write the survivor's first.
+2. **Check the stamp before writing it** — its grammar, the cell it produces, and every anchor it cites:
 
    ```
-   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>'
+   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>' [--notes '<rewritten notes>']
    ```
 
-   Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp, a
-   `dec-NNN` that is not a finalized decision, a `td-NNN` that is not a ledger row or is the row
-   itself, a commit not reachable here, a cited path (or a `kept` stamp's evidence path) missing
-   at `HEAD`, a merge that names no other active row as survivor, or a row that is not active.
+   Pass `--notes` for a `realigned` row — the check appends the stamp to the notes the write
+   will leave, which for a realign are the rewritten ones, not the row's current notes.
+
+   Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp; a stamp
+   that, appended to the notes, does not read back as the row's latest judgment (a ` // ` inside
+   it, or a backtick left unbalanced); an `@anchor` or cited commit that is not an ancestor of
+   `HEAD`; a cited path (or a `kept` stamp's evidence path) not tracked at `HEAD` — a file that
+   is only on disk, gitignored scratch included, is not evidence; a `dec-NNN` that is not a
+   finalized decision; a `td-NNN` that is not a ledger row or is the row itself; a merge that
+   names no other active row as survivor; or a row that is not active.
    A refused stamp is never written: skip the row and report the reasons. This is the
    code-level backstop behind the discard confidence gate — the judge's confidence and the
    user's confirmation are necessary, but a stamp that merely *shapes* like it cites something
    checkable is refused regardless of either.
 3. **Write the edit** to whichever file (`TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`)
    currently holds the row — `status` and `notes` only, plus `location` / `class` / `severity` /
-   `goal-ref-value` for a `realigned` row. Never append a new row.
+   `goal-ref-value` for a `realigned` row. The `notes` cell becomes exactly
+   `<notes> // <stamp>`, the shape step 2 checked. Never append a new row, and never move one: a
+   row set to `wontfix` stays where it is until finalize migrates it at the next on-main commit,
+   and a later stamp in the same run may still cite it.
 
 After every row that could be applied has been applied, run, in order, from the project root:
 
@@ -151,6 +173,17 @@ then proves cross-file uniqueness. **If `--check` exits non-zero, stop and repor
 is left exactly as `--backfill` wrote it (never rolled back), and the failing rows are named for
 the user.
 
+Then look for a realign that moved a row onto a resolved finding's key:
+
+```
+ledger_health.py --digest --ids <realigned ids> --class possible-duplicate
+```
+
+Every `possible-duplicate` evidence entry whose peer is `resolved` or `wontfix` is a **possible
+recurrence**: the realigned row now has the base key of a finding already closed. Bring each to
+the user with both rows and let them choose — keep the realign, or re-open the resolved peer and
+fold this row into it. Never choose for them.
+
 ### 5. Report
 
 Write `.ai-work/triage-debt-<run-id>/TRIAGE_ESCALATIONS.md`: every bucket-3 (`escalated`) row,
@@ -163,6 +196,8 @@ Report to the user:
 - which rows were skipped at §4 (malformed stamp, unresolved anchor) and why;
 - which rows were **re-keyed** by `--backfill` (their `dedup_key` changed because their `notes`
   changed);
+- which realigned rows now share a base key with a resolved or `wontfix` row, and the user's
+  choice for each;
 - the escalation list's location and count.
 
 **Propose, never run, a `chore(state)` commit** covering the ledger pair's edits. Do not commit

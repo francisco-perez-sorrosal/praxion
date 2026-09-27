@@ -249,22 +249,25 @@ Example stamps (each must parse under the grammar above):
 
 ### The discard anchor rule
 
-A `discarded` stamp is rejected (`StampMalformed`) unless its text carries at least one checkable anchor: a `path:line` citation, a `dec-NNN`, a `td-NNN`, or a commit sha (7–40 hex characters, containing both a digit and a hex letter so an all-decimal token or an English word spelled in hex is never mistaken for one). This is the code-level backstop behind the discard confidence gate in [`/triage-debt`](../../../commands/triage-debt.md): a judge may only propose `discarded` when its own re-probe cites a concrete anchor, and any value judgment short of that — including any "not worth doing" verdict — is `escalated`, never `discarded`. The gate checks the *shape* of the anchor, not that it resolves; `/triage-debt`'s apply step additionally resolves each anchor against the live snapshot before writing (the `dec-NNN` exists in the corpus, the `td-NNN` exists and is not the row itself, the sha is reachable, the path exists at HEAD) and refuses to write a stamp whose anchor does not resolve.
+A `discarded` stamp is rejected (`StampMalformed`) unless its text carries at least one checkable anchor: a `path:line` citation, a `dec-NNN`, a `td-NNN`, or a commit sha (7–40 hex characters, containing both a digit and a hex letter so an all-decimal token or an English word spelled in hex is never mistaken for one). This is the code-level backstop behind the discard confidence gate in [`/triage-debt`](../../../commands/triage-debt.md): a judge may only propose `discarded` when its own re-probe cites a concrete anchor, and any value judgment short of that — including any "not worth doing" verdict — is `escalated`, never `discarded`. The gate checks the *shape* of the anchor, not that it resolves; `/triage-debt`'s apply step additionally resolves each anchor against the live snapshot before writing (the `dec-NNN` exists in the corpus, the `td-NNN` is a ledger row and not the row itself, every sha — the stamp's own `@anchor` included — is an ancestor of HEAD, every cited path is tracked in the HEAD tree) and refuses to write a stamp whose anchor does not resolve. A file that exists only on disk — gitignored scratch such as a triage survey under `.ai-work/` — and a commit on an unmerged branch are not evidence.
 
 ### Write protocol: `--backfill` then `--check`, always
 
 Every triage write — `kept`, `realigned`, `discarded`, or `merged` — is a `notes` edit, and any `notes` edit on a **discriminated** row (§ Schema's collision discriminator) changes that row's `dedup_key`, because the discriminated key hashes `sha1(notes)[:8]`. This is not triage-specific: the rework-worktree suffix, the recurrence suffix, and the finalize-time notes concatenation all trip the same hazard. So after applying confirmed outcomes, `/triage-debt` **always** runs, in order:
 
 ```
-scripts/check_state_ledgers.py --backfill
-scripts/check_state_ledgers.py --check
+check_state_ledgers.py --backfill
+check_state_ledgers.py --check
 ```
+
+Both are on `PATH` after the Praxion installer; from a Praxion checkout without it, run them as
+`python3 scripts/check_state_ledgers.py`.
 
 `--backfill` recomputes every row's `dedup_key` against the current schema formula (including the discriminator), and `--check` then proves cross-file uniqueness. A non-zero `--check` stops the command and is reported — the ledger is left as `--backfill` wrote it, never rolled back. Skipping `--backfill` on a discriminated row's edit produces a blocking `dedup-mismatch`; running it first leaves `--check` clean. A plain (non-colliding) row's key never depends on `notes`, so the same edit needs no backfill at all — `check_state_ledgers.py --check` stays clean either way.
 
 ### Realigned re-key semantics
 
-A `realigned` outcome that changes `class` / `location` / `direction` / `goal-ref-value` recomputes the row's **base** `dedup_key` (already documented under § Lifecycle conventions: "Reclassification recomputes `dedup_key`"). The stamp's `from <prior-base-key>` clause preserves the *old* base key so a later producer re-filing the row's original shape is caught as a `possible-duplicate` (basis `refiled-after-realign`) rather than silently re-opening a stale finding. When the new base key collides with a RESOLVED row's key, `--check` reports a discrimination on write — `/triage-debt` surfaces that as a possible recurrence and lets the user choose between re-opening the RESOLVED peer and keeping the realign.
+A `realigned` outcome that changes `class` / `location` / `direction` / `goal-ref-value` recomputes the row's **base** `dedup_key` (already documented under § Lifecycle conventions: "Reclassification recomputes `dedup_key`"). The stamp's `from <prior-base-key>` clause preserves the *old* base key so a later producer re-filing the row's original shape is caught as a `possible-duplicate` (basis `refiled-after-realign`) rather than silently re-opening a stale finding. When the new base key equals a RESOLVED row's, the probe reports the pair as `possible-duplicate` (basis `same-base-key`) — `/triage-debt` checks its realigned rows for exactly that after applying, surfaces each hit as a possible recurrence, and lets the user choose between re-opening the RESOLVED peer and keeping the realign.
 
 ### Staleness and TD07
 

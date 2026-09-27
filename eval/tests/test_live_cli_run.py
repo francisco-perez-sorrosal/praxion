@@ -296,13 +296,26 @@ def test_default_target_resolves_to_head_not_main(monkeypatch, capsys, repo_root
     head_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=True
     ).stdout.strip()
-    main_sha = subprocess.run(
-        ["git", "rev-parse", "main"], cwd=repo_root, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    # CI checkouts of a PR ref don't always create a local `main` branch
+    # (only `origin/main` is fetched), so fall back to the remote ref.
+    main_ref = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", "main"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if main_ref.returncode != 0:
+        main_ref = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", "origin/main"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+    main_sha = main_ref.stdout.strip()
 
     assert exit_code == 0
     assert head_sha in printed
-    if head_sha != main_sha:
+    if main_sha and head_sha != main_sha:
         assert main_sha not in printed
 
 

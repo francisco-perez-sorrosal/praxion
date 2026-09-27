@@ -1,12 +1,15 @@
 """The writer records exactly what the registry says, and `standard` mode
 classifies tool-call rows.
 
-The writer-truth tests drive `writer.record_tool_call` across every `Mode`
-with a distinct row shape and assert the writer's *actual* output (a row
-written or not) agrees with `registry.records(event_class, mode)` for the
-class that row shape classifies as. A writer whose output disagrees with the
-registry -- the defect class `record_gate_fire` demonstrates today by
-ignoring the kill switch entirely -- must fail this test.
+These are unit-level checks against `record()`/`record_tool_call` in
+isolation, against the *package* copy of `_observation_log`: they drive
+`writer.record_tool_call` across every `Mode` with a distinct row shape and
+assert the writer's *actual* output (a row written or not) agrees with
+`registry.records(event_class, mode)` for the class that row shape
+classifies as. A writer whose output disagrees with the registry -- the
+defect class `record_gate_fire` demonstrates today by ignoring the kill
+switch entirely -- must fail this test. The end-to-end gate that drives every
+real hook writer in-process is `test_observation_log_writer_truth.py`.
 
 The classification tests assert `record_tool_call`'s classify-and-decide is a
 pure function of (row, mode, marker_present): file-changing and

@@ -330,6 +330,28 @@ def test_a_realign_is_checked_against_the_notes_it_rewrites(tmp_path: Path) -> N
     )
 
 
+def test_a_realign_premise_is_history_so_its_stale_anchors_are_not_resolved(
+    tmp_path: Path,
+) -> None:
+    """A realign keeps the premise it replaced: the path it quoted is gone by definition,
+    and a dedup key in it is shaped like a sha. Only the stamp's own anchor must resolve."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    premise = "realigned from 37b588259209: cited scripts/old.py:4 under key 37b588259209"
+
+    assert _check(repo_root, "td-902", _stamp_at(_head_sha(repo_root), premise)) == (0, "ok\n")
+    assert _check(repo_root, "td-902", _stamp_at("deadbeef1234", premise))[0] == 1
+
+
+def test_a_discard_still_resolves_every_anchor_it_cites(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "discarded: moot, see scripts/old.py:4")
+
+    code, out = _check(repo_root, "td-902", stamp)
+
+    assert code == 1
+    assert "scripts/old.py" in out
+
+
 # -- Stamp check: a row tombstoned earlier in the same run is still a ledger row --------------
 
 

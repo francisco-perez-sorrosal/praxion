@@ -269,14 +269,20 @@ def _anchor_refusals(
 ) -> list[str]:
     """Every anchor resolved against HEAD: a path tracked in its tree (a file merely on
     disk may be gitignored scratch), a commit HEAD reaches (an object on an unmerged
-    branch is not history), a finalized decision, a ledger row other than this one."""
+    branch is not history), a finalized decision, a ledger row other than this one.
+
+    A `realigned` stamp's text is the premise it replaced -- history, whose citations
+    are stale by definition -- so only its own `@anchor` is resolved.
+    """
+    reasons = []
+    if not _reaches_head(snapshot.repo_root, stamp.anchor):
+        reasons.append(f"the stamp's anchor {stamp.anchor} is not a commit HEAD reaches")
+    if stamp.outcome == "realigned":
+        return reasons
     active = {row.id for row in snapshot.active_rows}
     known_rows = active | {peer.id for peer in snapshot.terminal_peers}
     anchors = stamp_anchors(stamp.text)
     paths = set(anchors["path"]) | ({stamp.evidence_path} if stamp.evidence_path else set())
-    reasons = []
-    if not _reaches_head(snapshot.repo_root, stamp.anchor):
-        reasons.append(f"the stamp's anchor {stamp.anchor} is not a commit HEAD reaches")
     reasons += [
         f"{path} is not tracked at HEAD" for path in sorted(paths) if path not in git.head_tree
     ]

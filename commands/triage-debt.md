@@ -150,7 +150,8 @@ Apply only confirmed outcomes, one row at a time. For each:
    `HEAD`; a cited path (or a `kept` stamp's evidence path) not tracked at `HEAD` — a file that
    is only on disk, gitignored scratch included, is not evidence; a `dec-NNN` that is not a
    finalized decision; a `td-NNN` that is not a ledger row or is the row itself; a merge that
-   names no other active row as survivor; or a row that is not active.
+   names no other active row as survivor; or a row that is not active. A `realigned` stamp's
+   text is the premise it replaced, stale by definition, so only its `@anchor` is resolved.
    A refused stamp is never written: skip the row and report the reasons. This is the
    code-level backstop behind the discard confidence gate — the judge's confidence and the
    user's confirmation are necessary, but a stamp that merely *shapes* like it cites something

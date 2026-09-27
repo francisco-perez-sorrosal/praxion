@@ -112,6 +112,50 @@ class TestMainEntry:
         m.main()
         assert not (ai_state / "observations.jsonl").exists()
 
+    @pytest.mark.parametrize(
+        "off_env",
+        [{"PRAXION_OBSERVATION_LOG": "off"}, {"PRAXION_DISABLE_OBSERVABILITY": "1"}],
+        ids=["new-key", "legacy-switch"],
+    )
+    def test_off_mode_never_measures_either_spelling(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, off_env: dict
+    ):
+        """`off` returns before `measure()` (and so before `count_tokens`); the
+        unset control must hit the spy, so an empty call list proves the
+        early return rather than a spy off the path."""
+        m = _load_module()
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        # Unset: a mis-bound spy falls through to the offline estimate, never the network.
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        calls: list[Path] = []
+
+        class SpyHitError(Exception):
+            pass
+
+        def spy(root: Path, **_kwargs: object) -> dict:
+            calls.append(root)
+            raise SpyHitError(str(root))
+
+        monkeypatch.setattr(mtb, "measure", spy)
+        payload = {"hook_event_name": "SessionStart", "cwd": str(tmp_path), "session_id": "x"}
+
+        for key in ("PRAXION_OBSERVATION_LOG", "PRAXION_DISABLE_OBSERVABILITY"):
+            monkeypatch.delenv(key, raising=False)
+        for key, value in off_env.items():
+            monkeypatch.setenv(key, value)
+        self._stub_stdin(payload, monkeypatch)
+        m.main()
+
+        assert calls == []
+        assert not (ai_state / "observations.jsonl").exists()
+
+        for key in off_env:
+            monkeypatch.delenv(key)
+        self._stub_stdin(payload, monkeypatch)
+        with pytest.raises(SpyHitError):
+            m.main()
+
     def test_malformed_stdin_does_not_crash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         m = _load_module()
         monkeypatch.setattr(sys, "stdin", _StringIO("not-json{"))
@@ -161,7 +205,9 @@ class TestMeasurementParity:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         captured: list[dict] = []
-        monkeypatch.setattr(m, "_append_observation", lambda _path, obs: captured.append(obs))
+        monkeypatch.setattr(
+            m.writer, "record", lambda _dir, _event_class, row, **_kw: captured.append(row)
+        )
 
         payload = {
             "hook_event_name": "SessionStart",
@@ -181,6 +227,59 @@ class TestMeasurementParity:
         assert f"({gate_report['bytes']:,} bytes)" in observation["summary"]
         assert len(observation["file_paths"]) == len(gate_report["files"])
         assert sorted(observation["file_paths"]) == sorted(gate_report["files"])
+
+
+class TestWritesThroughTheOwnerWriter:
+    """The measurement row goes through the observation log's owner writer,
+    not a private appender: it rotates like every other writer and appends
+    after existing rows under the shared lock. Before the owner package, this
+    hook carried its own non-rotating appender, so the log could grow past
+    the rotation threshold unchecked.
+    """
+
+    def _run_session_start(self, project: Path, monkeypatch: pytest.MonkeyPatch):
+        m = _load_module()
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        (project / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
+        payload = {
+            "hook_event_name": "SessionStart",
+            "cwd": str(project),
+            "session_id": "owner-writer",
+            "agent_type": "main",
+        }
+        monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
+        return m
+
+    def test_rotates_an_oversized_log_like_every_other_writer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs_path = ai_state / "observations.jsonl"
+        obs_path.write_text('{"event_type":"tool_use"}\n', encoding="utf-8")
+        m = self._run_session_start(tmp_path, monkeypatch)
+        monkeypatch.setattr(m.writer, "OBSERVATIONS_MAX_BYTES", 1)
+
+        m.main()
+
+        assert (ai_state / "observations.jsonl.1").exists(), "the oversized log must rotate"
+        rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+        assert [r["event_type"] for r in rows] == ["context_surface_measurement"]
+
+    def test_appends_after_existing_rows_under_the_shared_lock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ai_state = tmp_path / ".ai-state"
+        ai_state.mkdir()
+        obs_path = ai_state / "observations.jsonl"
+        obs_path.write_text('{"event_type":"tool_use"}\n', encoding="utf-8")
+        m = self._run_session_start(tmp_path, monkeypatch)
+
+        m.main()
+
+        rows = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+        assert [r["event_type"] for r in rows] == ["tool_use", "context_surface_measurement"]
+        assert (ai_state / "observations.lock").exists(), "the append must take the shared lock"
 
 
 class _StringIO:

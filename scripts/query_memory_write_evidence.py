@@ -11,9 +11,10 @@ separately, per the plan's evidence requirement:
   (a) file_paths containing "agent-memory" (the subagent memory dir)
   (b) file_paths containing "/memory/"     (the harness auto-memory dir)
 
-Always queries the MAIN checkout's WAL (`/Users/fperez/dev/praxion/.ai-state/observations.jsonl`)
-by absolute path -- a pipeline worktree's own WAL starts empty and would
-silently produce a false "zero signal" for every agent type.
+Always queries the MAIN checkout's observation log (under
+`/Users/fperez/dev/praxion/.ai-state/`) by absolute path -- a pipeline
+worktree's own log starts empty and would silently produce a false
+"zero signal" for every agent type.
 
 Usage:
     python3 scripts/query_memory_write_evidence.py [--wal PATH]
@@ -22,11 +23,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
+import sys
 from collections import Counter
 from pathlib import Path
 
-MAIN_WAL_DEFAULT = "/Users/fperez/dev/praxion/.ai-state/observations.jsonl"
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
+MAIN_WAL_DEFAULT = str(reader.log_path(Path("/Users/fperez/dev/praxion/.ai-state")))
 AGENT_PREFIX = "praxion:"
 MARKER_A = "agent-memory"
 MARKER_B = "/memory/"
@@ -38,15 +44,8 @@ KEEP_MIN_SPAWNS = 5
 
 
 def iter_rows(wal_path: Path):
-    with wal_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-            except json.JSONDecodeError:
-                continue
+    """Every parseable row of the one log segment at ``wal_path``."""
+    yield from reader.read_segment(wal_path).rows
 
 
 def query(wal_path: Path) -> dict[str, dict]:
@@ -89,7 +88,7 @@ def main() -> int:
     parser.add_argument(
         "--wal",
         default=MAIN_WAL_DEFAULT,
-        help="path to observations.jsonl (default: main checkout)",
+        help="path to the observation log (default: main checkout)",
     )
     args = parser.parse_args()
 

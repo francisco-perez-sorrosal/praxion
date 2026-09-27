@@ -38,10 +38,13 @@ from _script_cli import configure_logging
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
 # Default resume-classification boundary (input + cache-read + cache-creation tokens).
 HEAVY_CONTEXT_DEFAULT = 250_000
-
-WAL_FILENAMES = ("observations.jsonl.1", "observations.jsonl")  # rotation order
 
 
 # -- Pure core ------------------------------------------------------------------------
@@ -168,7 +171,7 @@ def verdict(tallies: tuple[AgentTally, ...], budget: int | None, threshold: int)
 
 
 def _read_wal_rows(repo_root: Path) -> tuple[list[Path], list[dict], int]:
-    """Read `.ai-state/observations.jsonl.1` then `.ai-state/observations.jsonl`.
+    """Read the rotated archive segment then the active observation log.
 
     Returns (files_that_existed, parsed_rows, rows_skipped). A missing file is
     silently skipped -- withholding on a totally absent WAL is the caller's job. A
@@ -176,30 +179,13 @@ def _read_wal_rows(repo_root: Path) -> tuple[list[Path], list[dict], int]:
     zero the whole run.
     """
     state_dir = repo_root / ".ai-state"
-    existing: list[Path] = []
+    existing = list(reader.segments(state_dir, archives=True))
     rows: list[dict] = []
     skipped = 0
-    for name in WAL_FILENAMES:
-        candidate = state_dir / name
-        if not candidate.exists():
-            continue
-        existing.append(candidate)
-        try:
-            raw_lines = candidate.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            continue
-        for line in raw_lines:
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except (json.JSONDecodeError, TypeError):
-                skipped += 1
-                continue
-            if isinstance(row, dict):
-                rows.append(row)
-            else:
-                skipped += 1
+    for path in existing:
+        segment = reader.read_segment(path)
+        rows.extend(segment.rows)
+        skipped += len(segment.malformed_lines)
     return existing, rows, skipped
 
 
@@ -352,7 +338,7 @@ def _run(args: argparse.Namespace) -> int:
         return 2
     sources, all_rows, rows_skipped = _read_wal_rows(repo_root)
     if not sources:
-        _fail("wal-absent", f"no .ai-state/observations.jsonl[.1] found under {repo_root}.")
+        _fail("wal-absent", f"no observation log found under {repo_root} (checked .ai-state/).")
         return 2
     projects_seen = sorted({row.get("project") for row in all_rows if row.get("project")})
     if args.slug not in projects_seen:

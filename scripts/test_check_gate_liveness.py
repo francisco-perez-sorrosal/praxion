@@ -247,6 +247,27 @@ def test_a_sibling_module_is_not_mistaken_for_a_package(tmp_path: Path) -> None:
     assert gl.check_ambient_import(tmp_path) == []
 
 
+def test_a_stdlib_package_under_hooks_is_first_party(tmp_path: Path) -> None:
+    """Scripts put `hooks/` on `sys.path`; a package there ships with the gate."""
+    _write(tmp_path, "scripts/check_thing.py", "from _shared_log import reader\n")
+    _write(tmp_path, "hooks/_shared_log/__init__.py", "")
+    _write(tmp_path, "hooks/_shared_log/reader.py", "import json\n")
+    _invokes(tmp_path, "scripts/check_thing.py")
+    assert gl.check_ambient_import(tmp_path) == []
+
+
+def test_canary_a_third_party_import_inside_a_hooks_package_is_still_flagged(
+    tmp_path: Path,
+) -> None:
+    """Resolving `hooks/` must follow into it, never excuse what it imports."""
+    _write(tmp_path, "scripts/check_thing.py", "import _shared_log\n")
+    _write(tmp_path, "hooks/_shared_log/__init__.py", "import yaml\n")
+    _invokes(tmp_path, "scripts/check_thing.py")
+    findings = gl.check_ambient_import(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_thing.py"]
+    assert "yaml" in findings[0]["evidence"]
+
+
 def test_an_invocation_that_resolves_its_own_interpreter_is_out_of_scope(
     tmp_path: Path,
 ) -> None:

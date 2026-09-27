@@ -480,10 +480,10 @@ class TestWalBackfill:
         whole = obs_path.read_text(encoding="utf-8")
         window = len(whole.splitlines()[-1]) + 10  # slices into the first record
 
-        lines = module._tail_lines(obs_path, max_bytes=window)
+        rows = module.reader.tail_rows(obs_path, window)
 
-        assert len(lines) == 1
-        assert json.loads(lines[0])["agent_type"] == "praxion:implementer"
+        assert len(rows) == 1
+        assert rows[0]["agent_type"] == "praxion:implementer"
 
     def test_tail_window_larger_than_the_file_keeps_every_line(self, project: Path) -> None:
         module = _load_module()
@@ -491,7 +491,34 @@ class TestWalBackfill:
             project / ".ai-state" / "observations.jsonl",
             [_wal_row(agent_id="a"), _wal_row(agent_id="b")],
         )
-        assert len(module._tail_lines(obs_path, max_bytes=1_000_000)) == 2
+        assert len(module.reader.tail_rows(obs_path, 1_000_000)) == 2
+
+    def test_backfill_never_reads_the_rotation_archive(self, project: Path) -> None:
+        """Characterization: the stop-path backfill lookup is scoped to the
+        active segment only. A row for the queried agent_id sitting in
+        `observations.jsonl.1` must stay invisible to `lookup_prior_agent` --
+        this is a stated boundary (module docstring's BACKFILL_TAIL_BYTES
+        comment), not an oversight, and must survive the reader migration
+        unchanged.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        archive_path = project / ".ai-state" / "observations.jsonl.1"
+        archive_path.write_text(
+            json.dumps(
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:researcher", agent_id="agent-1"
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        obs_path.write_text("", encoding="utf-8")  # active segment freshly rotated, empty
+
+        _, start_seen, any_seen = module.lookup_prior_agent(obs_path, "agent-1")
+
+        assert start_seen is False
+        assert any_seen is False
 
 
 # ---------------------------------------------------------------------------
@@ -927,6 +954,75 @@ class TestMainContract:
         module.main()
 
         assert not (project / ".ai-state" / "observations.jsonl").exists()
+
+    @pytest.mark.parametrize(
+        "off_env",
+        [
+            {"PRAXION_OBSERVATION_LOG": "off"},
+            {"PRAXION_OBSERVATION_LOG": "OFF"},
+            {"PRAXION_DISABLE_OBSERVABILITY": "1"},
+        ],
+        ids=["new-key", "new-key-upper", "legacy-switch"],
+    )
+    @pytest.mark.parametrize(
+        ("hook_event", "spy_target"),
+        [
+            ("SubagentStop", "lookup_prior_agent"),
+            ("SubagentStop", "_sum_subagent_transcript"),
+            ("Stop", "_read_transcript_tail"),
+        ],
+    )
+    def test_off_mode_does_no_reads_either_spelling(
+        self,
+        project: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        off_env: dict,
+        hook_event: str,
+        spy_target: str,
+    ) -> None:
+        """`off` returns before any log or transcript read; the `standard`
+        control on the same payload must hit the spy, so an empty call list
+        proves the early return rather than a spy off the path."""
+        module = _load_module()
+        calls: list[str] = []
+
+        class SpyHitError(Exception):
+            pass
+
+        def spy(*_args: object, **_kwargs: object) -> None:
+            calls.append(spy_target)
+            raise SpyHitError(spy_target)
+
+        monkeypatch.setattr(module, spy_target, spy)
+        transcript = project / "sess-1.jsonl"
+        transcript.write_text("", encoding="utf-8")
+        payload = _stop_payload(
+            project, hook_event_name=hook_event, transcript_path=str(transcript)
+        )
+        if hook_event == "SubagentStop":
+            # A real agent's own transcript keeps the control on the agent_stop path.
+            own = project / "sess-1" / "subagents" / "agent-agent-orphan.jsonl"
+            own.parent.mkdir(parents=True)
+            own.write_text("", encoding="utf-8")
+        else:
+            del payload["agent_id"]
+
+        for key in ("PRAXION_OBSERVATION_LOG", "PRAXION_DISABLE_OBSERVABILITY"):
+            monkeypatch.delenv(key, raising=False)
+        for key, value in off_env.items():
+            monkeypatch.setenv(key, value)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+        module.main()
+
+        assert calls == []
+        assert not (project / ".ai-state" / "observations.jsonl").exists()
+        assert not (project / ".ai-state" / module.SUMMARY_FILENAME).exists()
+
+        for key in off_env:
+            monkeypatch.delenv(key)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+        with pytest.raises(SpyHitError):
+            module.main()
 
     def test_malformed_stdin_writes_nothing_and_does_not_raise(
         self, project: Path, monkeypatch: pytest.MonkeyPatch
@@ -1869,6 +1965,48 @@ class TestBuildSessionSummary:
 
         assert summary["models"] == ["claude-opus-5", "claude-sonnet-5"]
 
+    def test_log_mode_defaults_to_full_when_the_caller_names_no_mode(self) -> None:
+        module = _load_module()
+
+        summary = module.build_session_summary(
+            [], {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00"
+        )
+
+        assert summary["log_mode"] == "full"
+
+    def test_log_mode_carries_the_callers_named_mode(self) -> None:
+        module = _load_module()
+
+        summary = module.build_session_summary(
+            [], {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.STANDARD
+        )
+
+        assert summary["log_mode"] == "standard"
+
+    def test_tool_calls_by_tool_is_present_in_full_mode(self) -> None:
+        module = _load_module()
+        rows = [_wal_row(event_type="tool_use", tool_name="Write")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.FULL
+        )
+
+        assert summary["tool_calls_by_tool"] == {"Write": 1}
+
+    def test_tool_calls_by_tool_is_omitted_outside_full_mode(self) -> None:
+        """`standard` drops most tool_use rows, so a per-tool breakdown built
+        from what little survives would misrepresent this session's actual
+        tool usage -- the key must be absent, not a partial or empty dict a
+        reader could mistake for "no tool calls ran"."""
+        module = _load_module()
+        rows = [_wal_row(event_type="tool_use", tool_name="Write")]
+
+        summary = module.build_session_summary(
+            rows, {"session_id": "sess-1"}, "2026-08-06T18:05:00+00:00", mode=module.Mode.STANDARD
+        )
+
+        assert "tool_calls_by_tool" not in summary
+
 
 class TestPipelineSlugSharedHelper:
     """RED: `build_session_summary` does not yet emit `pipeline_slug`.
@@ -1952,6 +2090,23 @@ class TestSessionSummaryUpsert:
         rows = _read_summary(summary_path)
         assert len(rows) == 1
         assert rows[0]["session_id"] == "sess-1"
+
+    @pytest.mark.parametrize("setting", ["off", "OFF"])
+    def test_off_mode_writes_neither_the_log_nor_the_committed_summary(
+        self, setting: str, project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        summary_path = project / ".ai-state" / module.SUMMARY_FILENAME
+        monkeypatch.setenv("PRAXION_OBSERVATION_LOG", setting)
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(project)},
+            monkeypatch,
+        )
+
+        assert not summary_path.exists(), "off must not write the committed summary"
+        assert not (project / ".ai-state" / "observations.jsonl").exists()
 
     def test_second_stop_in_same_session_updates_not_appends(
         self, project: Path, monkeypatch: pytest.MonkeyPatch

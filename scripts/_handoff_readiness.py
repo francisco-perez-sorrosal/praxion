@@ -44,16 +44,17 @@ above it is invoked by a slash command with a bare `python3`.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from _git_runner import run_git
 
-# `_parse_jsonl` is imported rather than re-written: a second JSONL reader for
-# the same WAL would be free to disagree with the reconciler's about partial
-# lines, which is exactly the drift this gate exists to catch.
-from reconcile_pipeline_state import _parse_jsonl
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
 READY, BLOCKED, OVERRIDDEN = "ready", "blocked", "overridden"
 
@@ -63,7 +64,8 @@ DIRTY_STEP_FILES = "dirty-step-files"
 REMEDIES = {
     SPAWN_IN_FLIGHT: "wait for the running subagent to return, then re-run",
     WAL_UNREADABLE: (
-        "check `.ai-state/observations.jsonl`; pass --force only if you know no subagent is running"
+        "check the observation log under .ai-state/; pass --force only if you "
+        "know no subagent is running"
     ),
     DIRTY_STEP_FILES: (
         "commit these paths by pathspec, or revert them, then re-run (step-owned paths first)"
@@ -72,8 +74,6 @@ REMEDIES = {
 
 WAL_AGENT_START = "agent_start"
 WAL_AGENT_STOP = "agent_stop"
-
-OBSERVATIONS_WAL = Path(".ai-state") / "observations.jsonl"
 
 # A porcelain record is two status columns, a space, then the path -- positions,
 # not fields, which is why the raw output is parsed and never a stripped copy.
@@ -136,7 +136,7 @@ def session_wal_rows(repo_root: Path) -> list[dict[str, Any]]:
     "I could not look" is the gate's job, and this function must not disguise
     the second as the first.
     """
-    rows = [row for row in _parse_jsonl(repo_root / OBSERVATIONS_WAL) if isinstance(row, dict)]
+    rows = reader.read_rows(repo_root / ".ai-state", archives=False)
     session_id = next((r.get("session_id") for r in reversed(rows) if r.get("session_id")), None)
     if session_id is None:
         return []

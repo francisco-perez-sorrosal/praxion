@@ -659,6 +659,58 @@ class TestStopTimeCalibrationReminder:
         )
 
 
+# -- Stop reader characterization (pre-migration baseline) --------------------
+
+
+class TestStopReaderCharacterization:
+    """Pins the Stop path's read surface, now `reader.read_rows(archives=False)`:
+    malformed lines are skipped without raising, only the active WAL segment is
+    read (rotation archives are never opened), and a missing WAL degrades to an
+    empty list rather than an error. Migrated from the hook's own
+    now-deleted `_read_wal_rows` -- same assertions, new call target.
+    """
+
+    def test_malformed_and_blank_lines_are_skipped_not_raised(self, tmp_path: Path) -> None:
+        module = _load_module()
+        obs_path = tmp_path / "observations.jsonl"
+        well_formed = {"session_id": "s1", "event_type": "tool_use", "tool_name": "Edit"}
+        obs_path.write_text(
+            "not-json{{{\n"
+            "\n"
+            + json.dumps(well_formed)
+            + "\n"
+            + '{"session_id": "s1", "event_type": "tool_use", "tool_na',  # torn tail line
+            encoding="utf-8",
+        )
+
+        rows = module.reader.read_rows(tmp_path, archives=False)
+
+        assert rows == [well_formed]
+
+    def test_reads_only_the_active_segment_not_the_rotation_archive(self, tmp_path: Path) -> None:
+        module = _load_module()
+        obs_path = tmp_path / "observations.jsonl"
+        archive_path = tmp_path / "observations.jsonl.1"
+        archive_path.write_text(
+            json.dumps({"session_id": "s1", "event_type": "tool_use", "tool_name": "Edit"}) + "\n",
+            encoding="utf-8",
+        )
+        obs_path.write_text(
+            json.dumps({"session_id": "s1", "event_type": "tool_use", "tool_name": "Write"}) + "\n",
+            encoding="utf-8",
+        )
+
+        rows = module.reader.read_rows(tmp_path, archives=False)
+
+        assert len(rows) == 1
+        assert rows[0]["tool_name"] == "Write"
+
+    def test_missing_wal_returns_no_rows(self, tmp_path: Path) -> None:
+        module = _load_module()
+
+        assert module.reader.read_rows(tmp_path, archives=False) == []
+
+
 def _build_managed_repo_without_edits(tmp_path: Path) -> Path:
     """A managed repo (committed calibration log) with an empty observations log."""
     repo = tmp_path / "repo"

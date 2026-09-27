@@ -17,11 +17,13 @@ exactly one bucket) rather than by eyeballing individual counts.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import check_agent_lifecycle_pairing as clp
+import pytest
 
 _POST_BASELINE = "2026-09-06T00:00:00+00:00"
 _PRE_BASELINE = "2026-09-01T00:00:00+00:00"
@@ -70,6 +72,57 @@ def test_missing_observations_file_is_a_skip_not_a_finding(tmp_path: Path) -> No
     assert report["skipped"] is not None
     assert report["skipped"]["reason"] == "substrate-absent"
     assert report["findings"] == []
+
+
+# -- Reader unreachable (unlike absent) --------------------------------------------
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores file permission bits; chmod 0o000 would not actually block the read",
+)
+def test_unreadable_observations_file_is_reader_unreachable_not_empty(tmp_path: Path) -> None:
+    """An unreadable log must not read as a clean, empty history -- it must
+    name the reader's own error, distinct from `substrate-absent`, in both
+    the in-process envelope and the CLI's `--json`/human/exit-code surface,
+    with and without `--check` (a skip is not a WARN)."""
+    obs_path = _write_wal(tmp_path, [_row("agent_start", "a1")])
+    obs_path.chmod(0o000)
+    try:
+        report = clp.classify(tmp_path)
+
+        assert report["skipped"] == {
+            "reason": "reader-unreachable",
+            "path": str(obs_path),
+            "detail": report["skipped"]["detail"],
+        }
+        assert report["skipped"]["detail"].startswith("unreadable:")
+        assert report["examined"] is None
+        assert report["findings"] == []
+        assert report["info"] == {}
+        assert report["withheld"] == []
+
+        script = str(Path(clp.__file__))
+        json_rc = subprocess.run(
+            [sys.executable, script, "--json", "--repo-root", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert json_rc.returncode == 0
+        assert json.loads(json_rc.stdout)["skipped"]["reason"] == "reader-unreachable"
+
+        checked_rc = subprocess.run(
+            [sys.executable, script, "--check", "--repo-root", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert checked_rc.returncode == 0
+        assert "reader-unreachable" in checked_rc.stdout
+        assert "unreadable:" in checked_rc.stdout
+    finally:
+        obs_path.chmod(0o644)
 
 
 # -- Pairing is on agent_id, never agent_type --------------------------------------
@@ -372,3 +425,36 @@ def test_missing_capture_session_exits_with_remedy_not_a_bare_traceback(tmp_path
     assert "Traceback (most recent call last)" not in rc.stderr
     assert "capture_session is not importable" in rc.stderr
     assert sys.executable in rc.stderr
+
+
+# -- Helper stops: the slim row reports exactly as the legacy row did --------------
+
+
+def _legacy_helper(agent_id: str) -> dict:
+    return _row("agent_stop", agent_id, agent_type="unknown", start_correlation="unobserved-agent")
+
+
+def _slim_helper(agent_id: str) -> dict:
+    return {
+        "event_type": "helper_stop",
+        "agent_id": agent_id,
+        "session_id": "s1",
+        "timestamp": _POST_BASELINE,
+        "project": "repo",
+    }
+
+
+def test_slim_helper_stops_report_identically_to_legacy_helper_stops(tmp_path: Path) -> None:
+    """A log whose helpers are slim `helper_stop` rows yields the same P03
+    envelope as one whose helpers are legacy `agent_stop` rows."""
+    tail = [_row("agent_start", "later", session_id="s2")]
+    legacy_root = tmp_path / "legacy"
+    slim_root = tmp_path / "slim"
+    _write_wal(legacy_root, [_legacy_helper("h1"), _legacy_helper("h2"), *tail])
+    _write_wal(slim_root, [_legacy_helper("h1"), _slim_helper("h2"), *tail])
+
+    legacy_report = clp.classify(legacy_root)
+    slim_report = clp.classify(slim_root)
+
+    assert slim_report == legacy_report
+    assert slim_report["info"]["unmatched_stops"]["unobserved-agent"] == ["h1", "h2"]

@@ -6,7 +6,8 @@ Exit 0 unconditionally.
 
 Why the agent_type resolution below exists
 ------------------------------------------
-`.ai-state/observations.jsonl` is the recovery write-ahead log designated by
+The observation log (owned by `_observation_log`, rooted under `.ai-state/`)
+is the recovery write-ahead log designated by
 dec-248, and its job is to *localize* a truncated pipeline step: which agent
 stopped, and where it last wrote. A row that cannot name its agent cannot
 localize anything.
@@ -169,13 +170,27 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _hook_utils import DISABLE_OBSERVABILITY, append_observation, is_disabled
+from _observation_log import reader, writer
+from _observation_log.modes import Mode, resolve_mode
+from _observation_log.registry import EventClass
 
 EVENT_MAP = {
     "SessionStart": "session_start",
     "Stop": "session_stop",
     "SubagentStart": "agent_start",
     "SubagentStop": "agent_stop",
+}
+
+# The `event_type` string this hook builds, mapped onto the owner package's
+# recording class -- the same class the registry's `standard`/`full`/`off`
+# table is keyed by. Keyed by the built row's own `event_type`, so a stop
+# that `build_observation` turned into a `helper_stop` records as one.
+_EVENT_CLASS_BY_TYPE = {
+    "session_start": EventClass.SESSION_START,
+    "session_stop": EventClass.SESSION_STOP,
+    "agent_start": EventClass.AGENT_START,
+    "agent_stop": EventClass.AGENT_STOP,
+    "helper_stop": EventClass.HELPER_STOP,
 }
 
 # A compaction is not a lifecycle event and is deliberately absent from
@@ -252,7 +267,7 @@ _GATE_FIRE_EVENT_TYPE = "gate_fire"
 # "unresolved" and "unobserved-start", never a guess. Both fallbacks name a
 # non-observation for exactly this reason; neither claims the row is not there.
 #
-# The lookup deliberately does NOT follow rotation into observations.jsonl.1.
+# The lookup deliberately does NOT follow rotation into the archived segment.
 # Reading a 10 MiB predecessor on a hot hook path would buy a case that has not
 # been observed: every stop measured across a rotation boundary arrived with its
 # agent_type already populated, and the *reader* side already stitches both
@@ -261,61 +276,29 @@ _GATE_FIRE_EVENT_TYPE = "gate_fire"
 BACKFILL_TAIL_BYTES = 512 * 1024
 
 
-def _tail_lines(obs_path: Path, max_bytes: int | None = None) -> list[str]:
-    """Return the last complete JSONL lines of ``obs_path``.
-
-    Reads at most ``max_bytes`` from the end, defaulting to
-    ``BACKFILL_TAIL_BYTES`` resolved at call time so the bound stays a single
-    tunable (a signature default would freeze the value at import). When the
-    window starts mid-file the first line may be a fragment, so it is
-    discarded. Any OSError (missing file, unreadable path) degrades to an empty
-    list -- the caller then reports the agent type as unresolved and the start
-    as unobserved rather than failing the hook.
-    """
-    if max_bytes is None:
-        max_bytes = BACKFILL_TAIL_BYTES
-    try:
-        with open(obs_path, "rb") as handle:
-            handle.seek(0, os.SEEK_END)
-            size = handle.tell()
-            window = min(size, max_bytes)
-            handle.seek(size - window)
-            chunk = handle.read(window)
-    except OSError:
-        return []
-    lines = chunk.decode("utf-8", errors="replace").splitlines()
-    if window < size and lines:
-        lines = lines[1:]  # drop the fragment the window cut in half
-    return lines
-
-
 def lookup_prior_agent(obs_path: Path | None, agent_id: str) -> tuple[str, bool, bool]:
     """Return ``(recovered_agent_type, start_row_seen, any_row_seen)`` for ``agent_id``.
 
-    One newest-first pass over the WAL tail answers all three questions the
-    stop path asks, so recording the correlation costs no extra read. The
-    recovered type is the most recent usable one ("" when the agent has no
-    earlier row -- the measured reality for the orphaned-stop class, reported
-    rather than papered over); ``start_row_seen`` is True only for an actual
+    One newest-first pass over ``reader.tail_rows``' bounded window
+    (``BACKFILL_TAIL_BYTES``) answers all three questions the stop path asks,
+    so recording the correlation costs no extra read. The recovered type is
+    the most recent usable one ("" when the agent has no earlier row -- the
+    measured reality for the orphaned-stop class, reported rather than
+    papered over); ``start_row_seen`` is True only for an actual
     ``agent_start`` row, never for a ``tool_use`` row that merely names the
     same agent; ``any_row_seen`` is True for *any* row naming this agent_id,
     which is what separates a genuinely unannounced agent (nothing at all)
     from a start that was merely dropped (a ``tool_use`` row survives it).
 
-    The scan ends early once a start row settles all three answers.
+    The scan ends early once a start row settles all three answers. Malformed
+    or torn lines are already excluded by ``reader.tail_rows``.
     """
     if not agent_id or obs_path is None:
         return "", False, False
     recovered = ""
     any_row_seen = False
-    for line in reversed(_tail_lines(obs_path)):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue  # a torn tail line from a concurrent append
-        if not isinstance(row, dict) or row.get("agent_id") != agent_id:
+    for row in reversed(reader.tail_rows(obs_path, BACKFILL_TAIL_BYTES)):
+        if row.get("agent_id") != agent_id:
             continue
         any_row_seen = True
         if not recovered:
@@ -661,6 +644,13 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
     )
     agent_type, agent_type_source = resolve_agent_type(payload, event_type, backfilled)
     cwd = payload.get("cwd", ".")
+    start_correlation = resolve_start_correlation(event_type, start_row_seen, any_row_seen)
+    if (
+        event_type == "agent_stop"
+        and start_correlation == CORRELATION_UNOBSERVED_AGENT
+        and _has_no_own_transcript(payload)
+    ):
+        return build_helper_stop(payload)
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
@@ -674,12 +664,43 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
         "outcome": None,
         "classification": None,
         "agent_type_source": agent_type_source,
-        "start_correlation": resolve_start_correlation(event_type, start_row_seen, any_row_seen),
+        "start_correlation": start_correlation,
     }
     if event_type == "agent_stop":
         row["stop_source"] = STOP_SOURCE_HOOK
         row.update(_sum_subagent_transcript(payload))
     return row
+
+
+def _has_no_own_transcript(payload: dict) -> bool:
+    """True only when the own-transcript check can run and finds nothing.
+
+    An agent the harness gave a transcript -- as an Agent-tool sibling file
+    or under a Workflow run directory -- is a real agent whatever the log
+    saw. When the payload lacks the ids the check keys on, the answer is
+    False, so an unanswerable check keeps the full ``agent_stop`` row.
+    """
+    own_path = _subagent_own_transcript_path(payload)
+    if not own_path:
+        return False
+    return not Path(own_path).is_file() and not _workflow_agent_transcript_path(payload)
+
+
+def build_helper_stop(payload: dict) -> dict:
+    """The slim row for a harness helper call's stop.
+
+    A helper has no start row, no prior row of any kind and no transcript,
+    so there is no usage to recover and no agent type to resolve: the row
+    names only when and where it stopped (dec-370 records helpers as their
+    own class; this is that class's own row type).
+    """
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": payload.get("session_id", ""),
+        "agent_id": resolve_agent_id(payload),
+        "project": _pipeline_slug(payload.get("cwd", ".")),
+        "event_type": "helper_stop",
+    }
 
 
 def build_compaction_observation(payload: dict) -> dict:
@@ -710,10 +731,11 @@ def build_compaction_observation(payload: dict) -> dict:
 def _read_jsonl_rows(path: Path) -> list[dict]:
     """Return every parsable JSON object in a JSONL file, one per line.
 
-    Used both for the full-session WAL scan below and for reading the
-    existing summary rows before an upsert. Any OSError (missing file -- the
-    fresh-clone shape P0.5 creates for the raw WAL) degrades to an empty
-    list; a torn or malformed line is skipped rather than raised.
+    Used for reading the existing committed summary rows before an upsert --
+    a distinct, non-rotating file from the observation log, so it keeps its
+    own private reader rather than going through ``reader.read_rows``. Any
+    OSError (missing file) degrades to an empty list; a torn or malformed
+    line is skipped rather than raised.
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -768,7 +790,9 @@ def _tokens_by_agent_type(rows: list[dict]) -> dict[str, dict[str, int]]:
     return totals
 
 
-def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str) -> dict:
+def build_session_summary(
+    session_rows: list[dict], payload: dict, ended_at: str, *, mode: Mode = Mode.FULL
+) -> dict:
     """Assemble one committed summary row from this session's local WAL rows.
 
     ``session_rows`` is every raw-WAL row already filtered to this
@@ -782,7 +806,11 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
     function is needed once that field exists. ``pipeline_slug`` is additive
     and present only when ``payload`` carries a ``cwd`` -- a legacy payload
     without one yields a row with no ``pipeline_slug`` key at all, matching
-    how a WAL row's own ``project`` field is derived.
+    how a WAL row's own ``project`` field is derived. ``mode`` names the
+    recording mode this session ran under and is carried on the row as
+    ``log_mode``; ``tool_calls_by_tool`` is a per-tool breakdown of every
+    tool call, which only ``full`` records, so it is present only then --
+    a ``standard`` reader must not read its absence as "no tool calls ran."
     """
     session_id = payload.get("session_id", "")
     timestamps = [str(r["timestamp"]) for r in session_rows if r.get("timestamp")]
@@ -800,8 +828,8 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
         "session_id": session_id,
         "started_at": started_at,
         "ended_at": ended_at,
+        "log_mode": mode.value,
         "spawns_by_agent_type": _count_by(session_rows, _SPAWN_EVENT_TYPE, "agent_type"),
-        "tool_calls_by_tool": _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name"),
         "tokens_by_agent_type": _tokens_by_agent_type(session_rows),
         "duration_ms": _duration_ms(started_at, ended_at),
         "models": models,
@@ -811,6 +839,8 @@ def build_session_summary(session_rows: list[dict], payload: dict, ended_at: str
         # that work land, so it says so rather than implying completeness.
         "complete": started_agent_ids.issubset(stopped_agent_ids),
     }
+    if mode is Mode.FULL:
+        summary["tool_calls_by_tool"] = _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name")
     # Additive-only: a legacy payload with no cwd omits the key entirely
     # rather than fabricating a slug from a meaningless default -- a reader
     # of an older committed row treats a missing key as "not derivable",
@@ -964,18 +994,8 @@ def _stop_row_exists(obs_path: Path, agent_id: str) -> bool:
     second Stop reporting the same still-open notification must not
     double-write once an earlier Stop already recorded it.
     """
-    for line in _tail_lines(obs_path):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if (
-            isinstance(row, dict)
-            and row.get("agent_id") == agent_id
-            and row.get("event_type") == "agent_stop"
-        ):
+    for row in reader.tail_rows(obs_path, BACKFILL_TAIL_BYTES):
+        if row.get("agent_id") == agent_id and row.get("event_type") == "agent_stop":
             return True
     return False
 
@@ -1002,8 +1022,10 @@ def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
         if not start_row_seen or _stop_row_exists(obs_path, task_id):
             continue
         resolved_type, source = resolve_agent_type({}, "agent_stop", agent_type)
-        append_observation(
-            obs_path, build_suspension_stop(payload, task_id, kind, resolved_type, source)
+        writer.record(
+            obs_path.parent,
+            EventClass.AGENT_STOP,
+            build_suspension_stop(payload, task_id, kind, resolved_type, source),
         )
 
 
@@ -1019,7 +1041,10 @@ def _resolve_ai_state_dir(payload: dict) -> Path | None:
 
 
 def main() -> None:
-    if is_disabled(DISABLE_OBSERVABILITY):
+    # `off` (either spelling) records nothing -- the log and the committed
+    # summary alike -- so it returns before reading anything at all.
+    mode, _source = resolve_mode(os.environ)
+    if mode is Mode.OFF:
         return
 
     try:
@@ -1039,25 +1064,29 @@ def main() -> None:
     ai_state_dir = _resolve_ai_state_dir(payload)
     if ai_state_dir is None:
         return  # graceful degradation
-    obs_path = ai_state_dir / "observations.jsonl"
+    obs_path = reader.log_path(ai_state_dir)
 
     # Dispatched ahead of the lifecycle path because a compaction has no
     # lifecycle row to build -- see the module docstring's `compaction` row
     # section. Past the guard above, every remaining event has an event_type.
     if hook_event == POST_COMPACT_HOOK_EVENT:
-        append_observation(obs_path, build_compaction_observation(payload))
+        writer.record(ai_state_dir, EventClass.COMPACTION, build_compaction_observation(payload))
         return
 
     observation = build_observation(payload, event_type, obs_path)
-    append_observation(obs_path, observation)
+    writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[observation["event_type"]], observation)
     if event_type == "session_stop":
         _record_suspended_subagent_stops(obs_path, payload)
         try:
             session_id = payload.get("session_id", "")
             session_rows = [
-                r for r in _read_jsonl_rows(obs_path) if r.get("session_id") == session_id
+                r
+                for r in reader.read_rows(ai_state_dir, archives=False)
+                if r.get("session_id") == session_id
             ]
-            summary_row = build_session_summary(session_rows, payload, observation["timestamp"])
+            summary_row = build_session_summary(
+                session_rows, payload, observation["timestamp"], mode=mode
+            )
             _upsert_session_summary(ai_state_dir / SUMMARY_FILENAME, summary_row)
         except Exception:
             # The summary is a rollup, not the ground truth (the raw WAL

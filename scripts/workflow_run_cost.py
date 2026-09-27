@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-run cost reader over a Workflow-tool run directory: joins
 `journal.jsonl` (the roster) -> `agent-<id>.meta.json` -> `agent-<id>.jsonl`
-(the transcript) -> `.ai-state/observations.jsonl` `agent_stop` WAL rows ->
+(the transcript) -> the observation log's `agent_stop` WAL rows ->
 the main-session transcript, all keyed by `agent_id`, never by position or
 label. A **measurement instrument**, not a gate: it always exits 0 once a run
 is found and read, however its `wal_agreement` verdicts land -- a
@@ -61,6 +61,14 @@ from pathlib import Path
 import _workflow_run as wr
 from _repo_root import git_toplevel_from_cwd
 
+# hooks/_observation_log is a sibling package to this file's own scripts/
+# directory -- both live one level under the repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
+# A helper's stop has its own slim row type; both kinds feed the unobserved section.
+_STOP_EVENT_TYPES = frozenset({"agent_stop", "helper_stop"})
+
 
 # --------------------------------------------------------------------------- #
 # I/O layer
@@ -75,10 +83,10 @@ def load(
     """Resolve one run and read every file its cost report joins against.
 
     Impure: the only function in this module that touches the filesystem.
-    Raises `wr.WorkflowRunError` for any of the five named failure classes
+    Raises `wr.WorkflowRunError` for any of the six named failure classes
     (`run-not-found`, `run-ambiguous`, `journal-unreadable`, `run-empty`,
-    `transcripts-missing`) -- a silent zero-agent report is the one failure
-    mode a measurement instrument must not have.
+    `transcripts-missing`, `wal-unreadable`) -- a silent zero-agent report is
+    the one failure mode a measurement instrument must not have.
     """
     resolved = wr.resolve_run(transcripts_dir, run_arg)
     run_dir = resolved["run_dir"]
@@ -95,7 +103,7 @@ def load(
         )
 
     meta = {agent_id: wr.read_meta(wr.agent_meta_path(run_dir, agent_id)) for agent_id in roster}
-    wal_rows = _read_wal(project_root / ".ai-state" / "observations.jsonl")
+    wal_rows = _read_wal(reader.log_path(project_root / ".ai-state"))
     window = _run_window(transcripts)
     unobserved_ids = sorted(
         agent_id
@@ -176,11 +184,21 @@ def _transcript_stats(path: Path) -> dict | None:
 
 def _read_wal(wal_path: Path) -> dict[str, dict]:
     """`agent_id -> {tokens_in, tokens_out, cache_read, cache_create, model,
-    duration_ms, usage_source, timestamp}` from `agent_stop` WAL rows. The last row for
-    a given `agent_id` wins when several exist."""
+    duration_ms, usage_source, timestamp}` from `agent_stop` and `helper_stop` WAL rows
+    (a helper's usage fields are all None). The last row for a given `agent_id` wins when
+    several exist.
+
+    A missing WAL degrades to `{}`, matching every agent's `wal_agreement` to
+    `wal-missing` -- unchanged behaviour. An unreadable WAL (permissions,
+    I/O error) instead raises `wr.WorkflowRunError("wal-unreadable", ...)`:
+    an empty dict here is indistinguishable from "no agent wrote a stop row",
+    which would silently misreport every agent as unobserved."""
+    segment = reader.read_segment(wal_path)
+    if segment.error not in (None, "missing"):
+        raise wr.WorkflowRunError("wal-unreadable", f"{wal_path}: {segment.error}")
     rows: dict[str, dict] = {}
-    for record in wr.iter_transcript_records(wal_path):
-        if record.get("event_type") != "agent_stop":
+    for record in segment.rows:
+        if record.get("event_type") not in _STOP_EVENT_TYPES:
             continue
         agent_id = record.get("agent_id")
         if not agent_id:

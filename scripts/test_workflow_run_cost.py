@@ -537,6 +537,22 @@ def test_unobserved_helper_stops_are_reported_separately_and_never_merged_into_a
     assert report["unobserved"][0]["kind"] == "unobserved-helper"
 
 
+def test_a_slim_helper_stop_row_is_reported_as_an_unobserved_helper(tmp_path, monkeypatch, capsys):
+    project_root, wf_id = _standard_run(tmp_path, monkeypatch)
+    wal_path = project_root / ".ai-state" / "observations.jsonl"
+    existing = [json.loads(line) for line in wal_path.read_text(encoding="utf-8").splitlines()]
+    timestamp = _wal_agent_stop("helper-slim", tokens_in=0, tokens_out=0)["timestamp"]
+    existing.append(
+        {"event_type": "helper_stop", "agent_id": "helper-slim", "timestamp": timestamp}
+    )
+    _write_wal(project_root, existing)
+
+    _, _, report = _run_json(project_root, wf_id, capsys)
+
+    assert [row["agent_id"] for row in report["unobserved"]] == ["helper-slim"]
+    assert report["unobserved"][0]["kind"] == "unobserved-helper"
+
+
 # --------------------------------------------------------------------------- #
 # (d) orchestrator section
 # --------------------------------------------------------------------------- #

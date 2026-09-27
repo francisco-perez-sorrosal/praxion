@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """P03: every `agent_start` that ran has a matching `agent_stop`.
 
-Reads `.ai-state/observations.jsonl` (JSONL, one record per line) and pairs
+Reads the observation log under `.ai-state/` (JSONL, one record per line) and pairs
 `event_type: agent_start` with `event_type: agent_stop` **on `agent_id`** --
 the only field that identifies a single spawn. Pairing on `agent_type` is the
 trap this check exists to avoid: concurrent instances share a type, so one
@@ -86,7 +86,8 @@ Invocation:
     check_agent_lifecycle_pairing.py --repo-root DIR  # operate on another checkout (tests)
 
 Exit code: 0 by default (advisory). With --check, 1 when >=1 WARN finding is
-present. Always 0 when `.ai-state/observations.jsonl` is absent.
+present. Always 0 when the observation log is absent or unreachable
+(`skipped.reason: reader-unreachable`) -- a skip is not a WARN.
 Exit code 2 when the resolved root is a plugin-cache path.
 
 Invoked by the sentinel's P dimension (`--json`); also runnable standalone.
@@ -136,17 +137,19 @@ except ImportError as exc:
         "e.g. `uv run python scripts/check_agent_lifecycle_pairing.py`."
     )
 
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 CHECK_ID = "P03"
 SEVERITY = "warn"
 
-# Relative to repo_root -- the WAL this check reads.
-OBSERVATIONS_REL = ".ai-state/observations.jsonl"
+AI_STATE_REL = ".ai-state"
 AGENTS_DIR_REL = "agents"
 
 _START_EVENT = "agent_start"
 _STOP_EVENT = "agent_stop"
+_HELPER_STOP_EVENT = "helper_stop"
 _TOOL_EVENT = "tool_use"
 
 # The date the main-agent Stop hook began synthesizing a stop for a
@@ -186,21 +189,23 @@ def _parse_timestamp(value: object) -> datetime | None:
         return None
 
 
-def _parse_line(line: str) -> _Row | None:
-    """Parse one JSONL line into a `_Row`, or None if malformed/not a dict.
+def _row_from(raw: dict) -> _Row:
+    """Project one parsed log row onto the fields this check reads.
 
     Reuses the WAL's own `resolve_agent_id`/`resolve_agent_type` rather than
     reading `agent_id`/`agent_type` directly -- a written row is exactly the
     payload shape those resolvers accept, so this stays correct if a future
     row omits a field the raw-dict read would have silently returned "" for.
+
+    A `helper_stop` row is projected onto the stop it replaced: a stop
+    self-reporting `unobserved-agent`, so helpers keep landing in the same
+    `unmatched_stops` class whether the log recorded them before or after
+    the slim row existed.
     """
-    try:
-        raw = json.loads(line)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(raw, dict):
-        return None
     event_type = str(raw.get("event_type") or "")
+    start_correlation = raw.get("start_correlation") or None
+    if event_type == _HELPER_STOP_EVENT:
+        event_type, start_correlation = _STOP_EVENT, CORRELATION_UNOBSERVED_AGENT
     agent_type, _source = resolve_agent_type(raw, event_type)
     return _Row(
         event_type=event_type,
@@ -208,26 +213,22 @@ def _parse_line(line: str) -> _Row | None:
         agent_type=agent_type,
         session_id=str(raw.get("session_id") or ""),
         timestamp=_parse_timestamp(raw.get("timestamp")),
-        start_correlation=raw.get("start_correlation") or None,
+        start_correlation=start_correlation,
     )
 
 
-def _read_rows(obs_path: Path) -> tuple[list[_Row], list[str]]:
-    """Return `(rows, withheld)` for every line in `obs_path`.
+def _read_rows(segment: reader.SegmentRead) -> tuple[list[_Row], list[str]]:
+    """Project an already-read `segment` into `(rows, withheld)`.
 
     A line that fails to parse is counted into `withheld` (naming its line
     number) and excluded from every other count -- never silently dropped.
+    Assumes the caller has already handled `segment.error`: this function
+    only ever sees a segment that read cleanly.
     """
-    rows: list[_Row] = []
-    withheld: list[str] = []
-    for line_no, line in enumerate(obs_path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            continue
-        row = _parse_line(line)
-        if row is None:
-            withheld.append(f"line {line_no}: unparseable JSONL record, excluded")
-            continue
-        rows.append(row)
+    rows = [_row_from(raw) for raw in segment.rows]
+    withheld = [
+        f"line {line_no}: unparseable JSONL record, excluded" for line_no in segment.malformed_lines
+    ]
     return rows, withheld
 
 
@@ -379,11 +380,15 @@ def _classify_unmatched_stops(unmatched: list[_Row], any_row_seen: set[str]) -> 
 
 def classify(repo_root: Path) -> dict:
     """Build the canonical envelope: the `LifecycleReport` for the full WAL."""
-    obs_path = repo_root / OBSERVATIONS_REL
+    obs_path = reader.log_path(repo_root / AI_STATE_REL)
     if not obs_path.is_file():
         return _skipped_report("substrate-absent", str(obs_path))
 
-    rows, withheld = _read_rows(obs_path)
+    segment = reader.read_segment(obs_path)
+    if segment.error is not None:
+        return _skipped_report("reader-unreachable", str(obs_path), detail=segment.error)
+
+    rows, withheld = _read_rows(segment)
     if not rows:
         return _empty_report(withheld, excluded_in_flight_session=None)
 
@@ -460,10 +465,20 @@ def _empty_report(withheld: list[str], excluded_in_flight_session: str | None) -
     }
 
 
-def _skipped_report(reason: str, path: str) -> dict:
+def _skipped_report(reason: str, path: str, *, detail: str | None = None) -> dict:
+    """Build the `skipped` tagged-union envelope (dec-380).
+
+    `detail` is present only for `reader-unreachable`, where it carries the
+    reader's `SegmentRead.error` verbatim -- never reworded, so the reader
+    stays the only place that names the error. `substrate-absent` carries no
+    `detail` key.
+    """
+    skipped = {"reason": reason, "path": path}
+    if detail is not None:
+        skipped["detail"] = detail
     return {
         "check": CHECK_ID,
-        "skipped": {"reason": reason, "path": path},
+        "skipped": skipped,
         "examined": None,
         "findings": [],
         "info": {},
@@ -501,7 +516,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _format_human(report: dict) -> str:
     if report["skipped"] is not None:
-        return f"check_agent_lifecycle_pairing: skipped ({report['skipped']['reason']})"
+        reason = report["skipped"]["reason"]
+        detail = report["skipped"].get("detail")
+        suffix = f": {detail}" if detail else ""
+        return f"check_agent_lifecycle_pairing: skipped ({reason}{suffix})"
     findings = report["findings"]
     if not findings:
         return (

@@ -16,12 +16,13 @@ Future context audits become data-driven instead of one-off `wc` exercises:
 - Did B-tier extractions actually reduce per-session bytes? (compare over time)
 - Is the budget drifting toward the 25k guardrail? (trend analysis)
 
-Disabled by PRAXION_DISABLE_OBSERVABILITY (shared with capture_session).
+Skipped whenever the observation log would not record its row: under
+PRAXION_OBSERVATION_LOG=off, or the legacy PRAXION_DISABLE_OBSERVABILITY switch
+(which resolves to off) -- before measuring, so no count_tokens call is made.
 """
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import sys
@@ -35,7 +36,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # cross-directory import precedent as hooks/remind_calibration.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled  # noqa: E402
+from _observation_log import registry, writer  # noqa: E402
+from _observation_log.modes import resolve_mode  # noqa: E402
+from _observation_log.registry import EventClass  # noqa: E402
 
 # -- Observation emission -----------------------------------------------------
 
@@ -48,28 +51,11 @@ def _build_summary(tokens: int, bytes_: int, file_count: int, basis: str) -> str
     )
 
 
-def _append_observation(obs_path: Path, observation: dict) -> None:
-    """Append a single observation to JSONL with exclusive locking.
-
-    Mirrors the locking pattern in `capture_session.py` so concurrent hook
-    invocations across worktrees serialize cleanly through the same lock file.
-    """
-    obs_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = obs_path.parent / "observations.lock"
-    lock_path.touch(exist_ok=True)
-
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        try:
-            with open(obs_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(observation, separators=(",", ":")) + "\n")
-                f.flush()
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-
-
 def main() -> None:
-    if is_disabled(DISABLE_OBSERVABILITY):
+    # Asks the registry rather than testing for `off`: this hook's only output
+    # is one CONTEXT_SURFACE row, so it measures exactly when that row is kept.
+    mode, _source = resolve_mode(os.environ)
+    if not registry.records(EventClass.CONTEXT_SURFACE, mode):
         return
 
     try:
@@ -121,7 +107,7 @@ def main() -> None:
         "classification": None,
     }
 
-    _append_observation(ai_state_dir / "observations.jsonl", observation)
+    writer.record(ai_state_dir, EventClass.CONTEXT_SURFACE, observation)
 
 
 if __name__ == "__main__":

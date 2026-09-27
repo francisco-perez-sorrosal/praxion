@@ -35,8 +35,11 @@ from __future__ import annotations
 import importlib
 import inspect
 import json
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
@@ -314,3 +317,98 @@ def test_no_transcripts_found_warns_on_stderr_and_exits_2(tmp_path, monkeypatch,
     report = json.loads(captured.out)
     assert report["sessions"] == 0
     assert report["subagents"] == 0
+
+
+# --------------------------------------------------------------------------- #
+# _agent_types_from_wal -- characterization (pre-migration baseline)
+# --------------------------------------------------------------------------- #
+
+
+def test_agent_types_from_wal_skips_malformed_lines_not_raised(tmp_path):
+    wal_path = tmp_path / "observations.jsonl"
+    wal_path.write_text(
+        "not-json{{{\n"
+        + json.dumps({"event_type": "agent_start", "agent_id": "a1", "agent_type": "implementer"})
+        + "\n"
+        + '{"event_type": "agent_start", "agent_id": "a2", "agent_ty',  # torn tail line
+        encoding="utf-8",
+    )
+
+    result = ctx._agent_types_from_wal(wal_path)
+
+    assert result == {"a1": "implementer"}
+
+
+def test_agent_types_from_wal_reads_only_the_active_segment(tmp_path):
+    wal_path = tmp_path / "observations.jsonl"
+    archive_path = tmp_path / "observations.jsonl.1"
+    archive_path.write_text(
+        json.dumps(
+            {"event_type": "agent_start", "agent_id": "archived", "agent_type": "researcher"}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wal_path.write_text(
+        json.dumps({"event_type": "agent_start", "agent_id": "active", "agent_type": "implementer"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = ctx._agent_types_from_wal(wal_path)
+
+    assert result == {"active": "implementer"}
+
+
+def test_agent_types_from_wal_returns_empty_for_a_missing_wal(tmp_path):
+    assert ctx._agent_types_from_wal(tmp_path / "observations.jsonl") == {}
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores file permission bits; chmod 0o000 would not actually block the read",
+)
+def test_agent_types_from_wal_raises_wal_unreadable_for_an_unreadable_wal(tmp_path):
+    """Unlike a missing WAL (empty `{}`, non-fatal), an unreadable one must
+    not silently degrade -- degrading here would relabel every subagent's
+    percentile bucket instead of naming the read failure."""
+    wal_path = tmp_path / "observations.jsonl"
+    wal_path.write_text(
+        json.dumps({"event_type": "agent_start", "agent_id": "a1", "agent_type": "implementer"})
+        + "\n",
+        encoding="utf-8",
+    )
+    wal_path.chmod(0o000)
+    try:
+        with pytest.raises(ctx._WalUnreadableError):
+            ctx._agent_types_from_wal(wal_path)
+    finally:
+        wal_path.chmod(0o644)
+
+
+def test_main_exits_2_with_wal_unreadable_reason_for_an_unreadable_wal(
+    tmp_path, monkeypatch, capsys
+):
+    """`main()`'s CLI contract: an unreadable WAL exits 2 with the named
+    reason on stderr and no report on stdout -- distinct from the missing-WAL
+    case, which proceeds and prints a report."""
+    monkeypatch.setattr(ctx.Path, "home", lambda: tmp_path / "home")
+    project_root = tmp_path / "project"
+    ai_state = project_root / ".ai-state"
+    ai_state.mkdir(parents=True)
+    wal_path = ai_state / "observations.jsonl"
+    wal_path.write_text(
+        json.dumps({"event_type": "agent_start", "agent_id": "a1", "agent_type": "implementer"})
+        + "\n",
+        encoding="utf-8",
+    )
+    wal_path.chmod(0o000)
+    try:
+        exit_code = ctx.main(["--project-root", str(project_root), "--json"])
+    finally:
+        wal_path.chmod(0o644)
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "wal-unreadable" in captured.err
+    assert captured.out == ""

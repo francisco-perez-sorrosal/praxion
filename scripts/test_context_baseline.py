@@ -314,3 +314,48 @@ def test_no_transcripts_found_warns_on_stderr_and_exits_2(tmp_path, monkeypatch,
     report = json.loads(captured.out)
     assert report["sessions"] == 0
     assert report["subagents"] == 0
+
+
+# --------------------------------------------------------------------------- #
+# _agent_types_from_wal -- characterization (pre-migration baseline)
+# --------------------------------------------------------------------------- #
+
+
+def test_agent_types_from_wal_skips_malformed_lines_not_raised(tmp_path):
+    wal_path = tmp_path / "observations.jsonl"
+    wal_path.write_text(
+        "not-json{{{\n"
+        + json.dumps({"event_type": "agent_start", "agent_id": "a1", "agent_type": "implementer"})
+        + "\n"
+        + '{"event_type": "agent_start", "agent_id": "a2", "agent_ty',  # torn tail line
+        encoding="utf-8",
+    )
+
+    result = ctx._agent_types_from_wal(wal_path)
+
+    assert result == {"a1": "implementer"}
+
+
+def test_agent_types_from_wal_reads_only_the_active_segment(tmp_path):
+    wal_path = tmp_path / "observations.jsonl"
+    archive_path = tmp_path / "observations.jsonl.1"
+    archive_path.write_text(
+        json.dumps(
+            {"event_type": "agent_start", "agent_id": "archived", "agent_type": "researcher"}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    wal_path.write_text(
+        json.dumps({"event_type": "agent_start", "agent_id": "active", "agent_type": "implementer"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = ctx._agent_types_from_wal(wal_path)
+
+    assert result == {"active": "implementer"}
+
+
+def test_agent_types_from_wal_returns_empty_for_a_missing_wal(tmp_path):
+    assert ctx._agent_types_from_wal(tmp_path / "observations.jsonl") == {}

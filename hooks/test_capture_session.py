@@ -493,6 +493,33 @@ class TestWalBackfill:
         )
         assert len(module._tail_lines(obs_path, max_bytes=1_000_000)) == 2
 
+    def test_backfill_never_reads_the_rotation_archive(self, project: Path) -> None:
+        """Characterization: the stop-path backfill lookup is scoped to the
+        active segment only. A row for the queried agent_id sitting in
+        `observations.jsonl.1` must stay invisible to `lookup_prior_agent` --
+        this is a stated boundary (module docstring's BACKFILL_TAIL_BYTES
+        comment), not an oversight, and must survive the reader migration
+        unchanged.
+        """
+        module = _load_module()
+        obs_path = project / ".ai-state" / "observations.jsonl"
+        archive_path = project / ".ai-state" / "observations.jsonl.1"
+        archive_path.write_text(
+            json.dumps(
+                _wal_row(
+                    event_type="agent_start", agent_type="praxion:researcher", agent_id="agent-1"
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        obs_path.write_text("", encoding="utf-8")  # active segment freshly rotated, empty
+
+        _, start_seen, any_seen = module.lookup_prior_agent(obs_path, "agent-1")
+
+        assert start_seen is False
+        assert any_seen is False
+
 
 # ---------------------------------------------------------------------------
 # Start/stop correlation — a stop says whether its start was ever observed

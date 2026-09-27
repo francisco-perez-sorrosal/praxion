@@ -183,6 +183,42 @@ class TestMeasurementParity:
         assert sorted(observation["file_paths"]) == sorted(gate_report["files"])
 
 
+class TestPrivateAppenderCharacterization:
+    """Pins `_append_observation`'s current write surface, before Step 4
+    deletes it in favor of `writer.record` (which gains rotation). Today this
+    is a **second writer implementation**: it appends under the same
+    exclusive-lock discipline as `capture_session.py`, but never rotates --
+    even a file already well past the 10 MiB rotation threshold used
+    elsewhere just keeps growing.
+    """
+
+    def test_never_rotates_regardless_of_existing_file_size(self, tmp_path: Path) -> None:
+        m = _load_module()
+        obs_path = tmp_path / "observations.jsonl"
+        # Exceeds the 10 MiB OBSERVATIONS_MAX_BYTES rotation threshold used by
+        # capture_session.py's append_observation -- this appender has no
+        # knowledge of that constant at all.
+        obs_path.write_text("x" * (11 * 1024 * 1024) + "\n", encoding="utf-8")
+        size_before = obs_path.stat().st_size
+
+        m._append_observation(obs_path, {"event_type": "context_surface_measurement"})
+
+        assert not (tmp_path / "observations.jsonl.1").exists(), (
+            "the private appender must not rotate today -- pinning the gap Step 4 closes"
+        )
+        assert obs_path.stat().st_size > size_before, "the new row must still be appended"
+
+    def test_appends_one_json_line_with_exclusive_locking(self, tmp_path: Path) -> None:
+        m = _load_module()
+        obs_path = tmp_path / "observations.jsonl"
+
+        m._append_observation(obs_path, {"event_type": "context_surface_measurement", "n": 1})
+        m._append_observation(obs_path, {"event_type": "context_surface_measurement", "n": 2})
+
+        lines = obs_path.read_text(encoding="utf-8").splitlines()
+        assert [json.loads(line)["n"] for line in lines] == [1, 2]
+
+
 class _StringIO:
     """Minimal stdin stub — sys.stdin.read() returns the captured string."""
 

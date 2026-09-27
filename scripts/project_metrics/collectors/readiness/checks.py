@@ -19,6 +19,7 @@ import os
 import tomllib
 from pathlib import Path
 
+from scripts.install_git_hooks import hooks_dir_for
 from scripts.project_metrics._path_filter import DEFAULT_EXCLUDED_DIRS, is_excluded_path
 from scripts.project_metrics.collectors.base import CollectionContext
 
@@ -587,12 +588,15 @@ def _has_installed_git_hooks(repo_root: Path) -> bool:
     """Return True when project-managed git hooks are installed.
 
     Looks for a tracked ``.githooks`` directory or installed hook scripts in
-    ``.git/hooks`` that are not the default ``.sample`` files git ships.
+    the repository's hooks directory that are not the default ``.sample``
+    files git ships. The hooks directory resolves through the git common
+    directory (``install_git_hooks.hooks_dir_for``), never ``repo_root/.git``:
+    in a linked worktree ``.git`` is a file, and pipelines run in worktrees.
     """
 
     if (repo_root / ".githooks").is_dir():
         return True
-    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir = hooks_dir_for(repo_root)
     if not hooks_dir.is_dir():
         return False
     return any(

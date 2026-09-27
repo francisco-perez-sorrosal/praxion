@@ -169,6 +169,37 @@ def test_git_hooks_detects_installed_hook(tmp_path: Path) -> None:
     assert checks.has_git_hooks(_ctx(tmp_path), _facts(tmp_path)) is True
 
 
+def test_git_hooks_are_found_from_a_linked_worktree(tmp_path: Path) -> None:
+    """In a linked worktree `.git` is a file; the hooks live in the common git
+    directory. Standard and Full pipelines always run in one."""
+    import subprocess
+
+    main = tmp_path / "main"
+    main.mkdir()
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(main), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git(
+        "-c",
+        "user.email=t@example.invalid",
+        "-c",
+        "user.name=t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "c",
+    )
+    (main / ".git" / "hooks" / "pre-commit").write_text("#!/bin/sh\n", encoding="utf-8")
+    worktree = tmp_path / "wt"
+    git("worktree", "add", "-q", str(worktree))
+
+    assert (worktree / ".git").is_file(), "fixture must be a linked worktree"
+    assert checks.has_git_hooks(_ctx(worktree), _facts(worktree)) is True
+
+
 # ---------------------------------------------------------------------------
 # Determinism — facts derivation is byte-identical across calls.
 # ---------------------------------------------------------------------------

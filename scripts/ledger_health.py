@@ -167,13 +167,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
 
-    if args.check_stamp is not None:
+    if args.stamp_file is not None:
         try:
-            notes = _read_notes(args.notes_file) if args.notes_file else None
+            stamp = _read_cell_text(args.stamp_file)
+            notes = _read_cell_text(args.notes_file) if args.notes_file else None
         except (OSError, UnicodeDecodeError) as exc:
-            print(f"error: could not read --notes-file {args.notes_file}: {exc}", file=sys.stderr)
+            print(f"error: could not read --stamp-file / --notes-file: {exc}", file=sys.stderr)
             return 2
-        return _report_stamp_check(snapshot, args.row, args.check_stamp, notes, args.location)
+        return _report_stamp_check(snapshot, args.row, stamp, notes, args.location)
 
     assessments = assess(snapshot)
     ids = tuple(part.strip() for part in (args.ids or "").split(",") if part.strip())
@@ -208,11 +209,13 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
     parser.add_argument(
-        "--check-stamp",
-        metavar="STAMP",
-        help="validate one stamp for --row before it is written: grammar, then every anchor",
+        "--stamp-file",
+        type=Path,
+        help="a file holding one stamp for --row, validated before it is written: grammar, "
+        "then every anchor. A file, never an argument: a stamp quotes repository text, and a "
+        "quote closed early on a shell line runs whatever backtick span follows it",
     )
-    parser.add_argument("--row", help="the td-NNN id the --check-stamp stamp is for")
+    parser.add_argument("--row", help="the td-NNN id the --stamp-file stamp is for")
     parser.add_argument(
         "--location",
         help="the new location cell a realign writes: every path must be tracked at HEAD",
@@ -221,21 +224,20 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--notes-file",
         type=Path,
         help="a file holding the notes the stamp is appended to, when the apply step rewrites "
-        "them (a realign); defaults to the row's current notes. A file, never an argument: "
-        "notes are repository text, and shell quoting would change the bytes the write uses",
+        "them (a realign); defaults to the row's current notes",
     )
     args = parser.parse_args(argv)
-    if (args.check_stamp is None) != (args.row is None):
-        parser.error("--check-stamp and --row go together")
-    if args.notes_file is not None and args.check_stamp is None:
-        parser.error("--notes-file goes with --check-stamp")
-    if args.location is not None and args.check_stamp is None:
-        parser.error("--location goes with --check-stamp")
+    if (args.stamp_file is None) != (args.row is None):
+        parser.error("--stamp-file and --row go together")
+    if args.notes_file is not None and args.stamp_file is None:
+        parser.error("--notes-file goes with --stamp-file")
+    if args.location is not None and args.stamp_file is None:
+        parser.error("--location goes with --stamp-file")
     return args
 
 
-def _read_notes(path: Path) -> str:
-    """The notes exactly as the write will use them, less the file's own final newline."""
+def _read_cell_text(path: Path) -> str:
+    """A cell's text exactly as the write will use it, less the file's own final newline."""
     text = path.read_text(encoding="utf-8")
     return text.removesuffix("\n").removesuffix("\r")
 
@@ -275,13 +277,13 @@ def stamp_refusals(
     rows: dict[str, ActiveRow] = {row.id: row for row in snapshot.active_rows}
     if row_id not in rows:
         return [f"{row_id} is not an active row"]
+    if one_line := _one_line_refusals(stamp=stamp, notes=notes):
+        return one_line
     parsed = parse_stamp(stamp)
     if isinstance(parsed, StampMalformed):
         return ["malformed stamp (see tech-debt-ledger.md § Triage for the grammar)"]
     if snapshot.git is None:
         return ["no git history here, so no anchor can be checked at HEAD"]
-    if notes is not None and ("\n" in notes or "\r" in notes):
-        return ["the rewritten notes must be one line: a table cell cannot hold a newline"]
     base_notes = rows[row_id].notes if notes is None else notes
     rewrite = (_segment_refusals(rows[row_id].notes, notes) if notes is not None else []) + (
         _location_refusals(snapshot, snapshot.git, location) if location is not None else []
@@ -291,6 +293,15 @@ def stamp_refusals(
         + _cell_refusals(base_notes, stamp, parsed)
         + _anchor_refusals(snapshot, snapshot.git, row_id, parsed)
     )
+
+
+def _one_line_refusals(**texts: str | None) -> list[str]:
+    """A table cell is one line: a newline inside the text would split the row."""
+    return [
+        f"the {name} must be one line: a table cell cannot hold a newline"
+        for name, text in texts.items()
+        if text is not None and ("\n" in text or "\r" in text)
+    ]
 
 
 def _segment_refusals(current: str, rewritten: str) -> list[str]:

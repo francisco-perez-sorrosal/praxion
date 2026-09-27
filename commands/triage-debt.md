@@ -138,16 +138,18 @@ Apply only confirmed outcomes, one row at a time. For each:
 2. **Check the stamp before writing it** — its grammar, the cell it produces, and every anchor it cites:
 
    ```
-   ledger_health.py --row <td-NNN> --check-stamp '<stamp text>' [--notes-file <path>] [--location '<new location>']
+   ledger_health.py --row <td-NNN> --stamp-file <path> [--notes-file <path>] [--location '<new location>']
    ```
 
-   For a `realigned` row, write the rewritten notes to a file under
-   `.ai-work/triage-debt-<run-id>/` with the `Write` tool and pass `--notes-file` — the check
-   appends the stamp to the notes the write will leave, which for a realign are the rewritten
-   ones, not the row's current notes. Never pass notes as a shell argument: they are repository
-   text, full of apostrophes and backticks, and shell quoting changes the bytes. The write in
-   step 3 uses that same file's content, so the cell is exactly what was checked. Pass
-   `--location` with the new `location` cell whenever a realign changes it.
+   Write the stamp, one line, to a file under `.ai-work/triage-debt-<run-id>/` with the `Write`
+   tool and pass its path as `--stamp-file`. For a `realigned` row, write the rewritten notes to
+   a second file the same way and pass `--notes-file` — the check appends the stamp to the notes
+   the write will leave, which for a realign are the rewritten ones, not the row's current notes.
+   **Never put a stamp or notes on a shell command line**, quoted or not: both are repository
+   text, full of apostrophes and backtick spans, and a quote closed early runs the span that
+   follows it as a command. The write in step 3 uses those same files' content, so the cell is
+   exactly what was checked. Pass `--location` with the new `location` cell whenever a realign
+   changes it — a location cell is paths only.
 
    Exit 0 prints `ok`. Exit 1 prints one `refused:` line per problem — a malformed stamp; a stamp
    that, appended to the notes, does not read back as the row's latest judgment (a ` // ` inside
@@ -209,7 +211,7 @@ at a time, with both rows, and apply only what they choose — nothing by defaul
      `` // recurrence: re-opened <today>`` appended to its `notes`.
   2. Fold the realigned row into it by the `merged` path of step 1 — the absorbed row's stamp
      only (the re-opened peer carries the recurrence note instead of a survivor stamp), checked
-     with `--check-stamp` first. If the check refuses, put the peer back as it was and report
+     through `--stamp-file` first. If the check refuses, put the peer back as it was and report
      the pair instead.
   3. Run `check_state_ledgers.py --backfill` and then `--check` again, under the same
      stop-and-report rule.

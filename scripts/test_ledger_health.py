@@ -217,8 +217,52 @@ def test_the_stamp_check_cli_exits_one_on_refusal_and_zero_when_clean(base_repo:
     assert "dec-999" in refused[1]
 
 
-def test_check_stamp_without_a_row_is_a_usage_error() -> None:
-    assert _run("--check-stamp", "[triage 2026-09-27 @9ad0e205] kept: a/b.py:1 ok").returncode == 2
+def test_a_stamp_file_without_a_row_is_a_usage_error(tmp_path: Path) -> None:
+    stamp = tmp_path / "stamp.txt"
+    stamp.write_text("[triage 2026-09-27 @9ad0e205] kept: a/b.py:1 ok\n")
+    assert _run("--stamp-file", str(stamp)).returncode == 2
+
+
+# -- Stamp check: the stamp arrives in a file, never as a shell argument -------------------
+
+
+def test_the_stamp_is_never_taken_as_a_shell_argument(base_repo: Path) -> None:
+    """Ledger text quoted into a shell line can close its quote early and run a backtick span."""
+    stamp = _stamp_at(_head_sha(base_repo), "kept: scripts/check_gate_liveness.py:1 ok")
+    result = _run("--repo-root", str(base_repo), "--row", "td-270", "--check-stamp", stamp)
+    assert result.returncode == 2
+
+
+def test_a_stamp_with_apostrophes_and_backtick_spans_reaches_the_check_byte_for_byte(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    premise = "realigned: it's `uv run pre-commit run --all-files` in `$(rm -rf ~)`, don't"
+    assert _check(repo_root, "td-902", _stamp_at(_head_sha(repo_root), premise)) == (0, "ok\n")
+
+
+def test_a_stamp_file_spanning_lines_is_refused(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "kept: scripts/x.py:1 holds\nsecond line")
+
+    code, out = _check(repo_root, "td-902", stamp)
+
+    assert code == 1
+    assert "one line" in out
+
+
+def test_an_unreadable_stamp_file_is_a_script_error(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    missing = str(tmp_path / "absent.txt")
+    result = _run("--repo-root", str(repo_root), "--row", "td-902", "--stamp-file", missing)
+    assert result.returncode == 2
+    assert "--stamp-file" in result.stderr
+
+
+def test_the_command_passes_every_stamp_through_a_file() -> None:
+    command = (SCRIPT_PATH.parents[1] / "commands" / "triage-debt.md").read_text()
+    assert "--stamp-file" in command
+    assert "--check-stamp" not in command
 
 
 # -- Stamp check: every anchor is resolved against HEAD, through the real git adapters --------
@@ -233,7 +277,11 @@ def _stamp_at(sha: str, text: str) -> str:
 
 
 def _check(repo_root: Path, row_id: str, stamp: str, *extra: str) -> tuple[int, str]:
-    result = _run("--repo-root", str(repo_root), "--row", row_id, "--check-stamp", stamp, *extra)
+    """Check `stamp` the way the apply step does: written to a file, handed over by path."""
+    stamp_file = repo_root.parent / "stamp.txt"
+    stamp_file.write_text(stamp + "\n")
+    args = ("--repo-root", str(repo_root), "--row", row_id, "--stamp-file", str(stamp_file))
+    result = _run(*args, *extra)
     return result.returncode, result.stdout
 
 

@@ -955,3 +955,58 @@ def test_basis_mismatch_against_the_frozen_ceiling_skips_the_comparison(
 
     assert payload["examined"]["listing_ceiling"] is None
     assert not any(f["entity"] == "listing surface" for f in payload["findings"])
+
+
+# -- The commit gate must fit its hook budget (td-185) -------------------------
+
+_HOOK_BUDGET_SECONDS = 20  # check_token_ratchet.py's PreToolUse timeout in hooks/hooks.json
+
+
+def _gate_repo(root: Path) -> Path:
+    (root / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
+    baseline = root / ".ai-state" / "token_budget_baseline.json"
+    _seed_baseline(baseline, listing_ceiling=999_999, samples=[])
+    return baseline
+
+
+def test_the_ratchets_network_calls_fit_the_commit_hook_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every `git commit` runs `ratchet()` inside a 20s hook; its token-count
+    calls must be bounded so that even all of them timing out fits that budget."""
+    baseline = _gate_repo(tmp_path)
+    mtb.count_tokens.cache_clear()
+    timeouts: list[float] = []
+
+    def _record(request: object, timeout: float) -> object:
+        timeouts.append(timeout)
+        raise TimeoutError("slow endpoint")
+
+    monkeypatch.setattr(mtb.urllib.request, "urlopen", _record)
+    try:
+        mtb.ratchet(tmp_path, api_key="key", baseline_path=baseline, today=_TODAY)
+    finally:
+        mtb.count_tokens.cache_clear()
+
+    assert timeouts, "the ratchet must still attempt a real count when a key is set"
+    assert sum(timeouts) < _HOOK_BUDGET_SECONDS, timeouts
+
+
+def test_a_timed_out_count_falls_back_to_the_labelled_estimate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = _gate_repo(tmp_path)
+    mtb.count_tokens.cache_clear()
+
+    def _time_out(request: object, timeout: float) -> object:
+        raise TimeoutError("slow endpoint")
+
+    monkeypatch.setattr(mtb.urllib.request, "urlopen", _time_out)
+    try:
+        result = mtb.ratchet(tmp_path, api_key="key", baseline_path=baseline, today=_TODAY)
+    finally:
+        mtb.count_tokens.cache_clear()
+
+    assert result.get("skipped") is not True, result
+    samples = json.loads(baseline.read_text())["samples"]
+    assert "estimate" in samples[-1]["basis"], samples[-1]

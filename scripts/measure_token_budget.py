@@ -96,6 +96,10 @@ _MEASURED_ON = "2026-08-05"
 _COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens"
 _MODEL = "claude-sonnet-4-5"
 _TIMEOUT = 60
+# The commit gate runs `ratchet()` inside a 20s PreToolUse hook and makes two
+# sequential token-count calls; each gets this bound so both together fit.
+# A timeout falls back to the labelled bytes/3.6 estimate, never a stall.
+_GATE_TIMEOUT = 5
 
 _BASELINE_SCHEMA = 1
 _BASELINE_RELATIVE_PATH = (".ai-state", "token_budget_baseline.json")
@@ -333,7 +337,7 @@ def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list
 
 
 @functools.lru_cache(maxsize=32)
-def count_tokens(text: str, api_key: str) -> int | None:
+def count_tokens(text: str, api_key: str, timeout: float = _TIMEOUT) -> int | None:
     """Real token count, or None when the API is unreachable.
 
     Memoized per `(text, api_key)`: a process that ends up asking for the
@@ -345,13 +349,9 @@ def count_tokens(text: str, api_key: str) -> int | None:
     one: the governed-rules corpus (`measure()`) and the listing-description
     corpus (`measure_listing()`) are disjoint text, so each still needs its
     own call -- there is no shared substring to memoize across them. Both
-    share this module's 60s socket `_TIMEOUT` and both run inside
-    `check_token_ratchet.py`'s 20s PreToolUse hook timeout
-    (`hooks/hooks.json`); a slow or degraded endpoint can still exceed that
-    20s budget across the two sequential calls. This cache guards against
-    redundant re-tokenization of identical text, not against API latency --
-    if endpoint latency becomes an operational problem, shorten `_TIMEOUT`
-    for that call site instead.
+    run inside `check_token_ratchet.py`'s 20s PreToolUse hook timeout
+    (`hooks/hooks.json`), so `ratchet()` passes `_GATE_TIMEOUT` rather than
+    the 60s default: both calls timing out still fit the hook budget.
     """
     request = urllib.request.Request(  # noqa: S310 - fixed https endpoint
         _COUNT_TOKENS_URL,
@@ -365,19 +365,19 @@ def count_tokens(text: str, api_key: str) -> int | None:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
             return int(json.loads(response.read())["input_tokens"])
     except (urllib.error.URLError, OSError, KeyError, ValueError, TimeoutError):
         return None
 
 
-def measure(repo_root: Path, *, api_key: str | None = None) -> dict:
+def measure(repo_root: Path, *, api_key: str | None = None, timeout: float = _TIMEOUT) -> dict:
     """Measure the always-loaded surface. Never raises on a missing key."""
     files = always_loaded_files(repo_root)
     blob = "\n".join(f.read_text(encoding="utf-8") for f in files)
     chars = len(blob.encode("utf-8"))
 
-    tokens = count_tokens(blob, api_key) if api_key else None
+    tokens = count_tokens(blob, api_key, timeout) if api_key else None
     measured = tokens is not None
     if not measured:
         tokens = round(chars / _FALLBACK_DIVISOR)
@@ -449,7 +449,9 @@ def _extract_description(frontmatter: str) -> str:
 _DISABLE_MODEL_INVOCATION_RE = re.compile(r"^disable-model-invocation:\s*true\s*$", re.M)
 
 
-def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
+def measure_listing(
+    repo_root: Path, *, api_key: str | None = None, timeout: float = _TIMEOUT
+) -> dict:
     """Measure the listing surface as the model sees it: `description:` frontmatter only,
     minus entries `disable-model-invocation: true` removes outright.
 
@@ -473,7 +475,7 @@ def measure_listing(repo_root: Path, *, api_key: str | None = None) -> dict:
     blob = "\n".join(descriptions)
     chars = len(blob.encode("utf-8"))
 
-    tokens = count_tokens(blob, api_key) if api_key else None
+    tokens = count_tokens(blob, api_key, timeout) if api_key else None
     measured = tokens is not None
     if not measured:
         tokens = round(chars / _FALLBACK_DIVISOR)
@@ -538,7 +540,7 @@ def ratchet(
     path = baseline_path or repo_root.joinpath(*_BASELINE_RELATIVE_PATH)
     today = today or date.today()
 
-    governed = measure(repo_root, api_key=api_key)
+    governed = measure(repo_root, api_key=api_key, timeout=_GATE_TIMEOUT)
     if not governed["files"]:
         return _ratchet_skip("the governed file set is empty")
 
@@ -546,7 +548,7 @@ def ratchet(
     if baseline is None:
         return _ratchet_skip(f"no baseline file at {path}")
 
-    listing = measure_listing(repo_root, api_key=api_key)
+    listing = measure_listing(repo_root, api_key=api_key, timeout=_GATE_TIMEOUT)
     updated = _append_sample(
         baseline,
         today=today,

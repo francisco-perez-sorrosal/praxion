@@ -1,6 +1,6 @@
 # Praxion Onboarding — CLAUDE.md Canonical Blocks
 
-The 8 canonical `CLAUDE.md` block bodies installed by `skills/onboard-project/SKILL.md` and its phase files. Source of truth for `scripts/sync_canonical_blocks.py`.
+The 9 canonical `CLAUDE.md` block bodies installed by `skills/onboard-project/SKILL.md` and its phase files. Source of truth for `scripts/sync_canonical_blocks.py`.
 
 ## §Agent Pipeline Block
 
@@ -251,6 +251,26 @@ You'll most often be asked to:
 ```
 
 The fenced content above is a **template** — Phase 6 appends it and then fills the `<placeholders>` from the project's config (see §Phase 6 Action step 3); in `new` mode the seed pipeline fills them at scaffold time. The fence is kept byte-identical to `claude/canonical-blocks/project-essentials.md` by `scripts/sync_canonical_blocks.py`; the `<placeholders>` are intentional and must survive the sync.
+
+**Item 2 has two fills.** When the `tests` capability is selected, fill `<test command>` with a pointer, not a command: `Tests — the selected run, then the full run, per ## Testing` (the `## Testing` block below names both). Otherwise fill it with the detected test command per the stack-command resolution, as for the other items. Either way the item never dangles: the pointer is written only when the block it points to is installed in the same run.
+
+## §Testing Block
+
+<!-- canonical-source: claude/canonical-blocks/testing.md — edit the canonical file, then run: python3 scripts/sync_canonical_blocks.py --write -->
+
+```markdown
+## Testing
+
+Tests are selected from the change, never listed by hand: a resolver derives the tests a diff needs from the test layout, imports, path literals, and `tests/declared-deps.toml` — and widens to the full suite whenever it cannot account for a changed file.
+
+- **Layout** — `<layout>`: `<source file>` is tested by `<test file>`.
+- **Selected run** (after every change): `/test`, or `resolve_test_scope.py --changed-from <base branch> | sh -e`.
+- **Full run** (before handing work off; CI runs it on every push): `<full run>`.
+- **Non-code dependencies** — when a test reads a file no code names (a fixture, a generated artifact), declare the pair in `tests/declared-deps.toml`; a change to that file then selects the test.
+- **Outer loop is read-only** — the implementer runs `tests/acceptance/` and `tests/e2e/` but never edits them; a failing outer-loop test is fixed in production code or raised with its author.
+```
+
+This block is installed into the user project's `CLAUDE.md` (or the file Phase 6's placement lookup resolves) by the `tests` capability, once, after sub-step 8e.13 — never refreshed. It is guarded by `grep -q '^## Testing$' CLAUDE.md`. Fill its placeholders from what the run detected: `<layout>` → `co-located` (tests beside the source) or `mirrored` (a `tests/` tree mirroring the source tree), with `<source file>` / `<test file>` one real pair from the repo; `<base branch>` → the default branch; `<full run>` → the full-suite command (per kept stack, joined with `; ` when the project has more than one). The fence is kept byte-identical to `claude/canonical-blocks/testing.md` by `scripts/sync_canonical_blocks.py`; the `<placeholders>` are intentional and must survive the sync.
 
 ## §Obsidian Integration Block
 

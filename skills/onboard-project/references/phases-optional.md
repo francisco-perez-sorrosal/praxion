@@ -645,4 +645,6 @@ After writing, apply the `{{`-survivor self-check from that same section to both
 
 Print: `8e.13: .github/workflows/test.yml + .github/workflows/test-scheduled.yml installed (full parallel suite with a <floor>% coverage floor; weekly flaky/large/selection-audit/slow-test job)`, or a per-workflow variant when one was individually skipped.
 
-**Verification handoff.** Phase 9 lists every file staged by sub-steps 8e.10–8e.13. The first push runs `test.yml`; the scheduled job first runs on its weekly cron, or on demand via `workflow_dispatch`.
+**Testing block.** After 8e.13, append the `## Testing` block per [claude-md-blocks.md § Testing Block](claude-md-blocks.md) (guarded by `grep -q '^## Testing$'`; installed once, never refreshed), filling its placeholders from what this run detected.
+
+**Verification handoff.** Phase 9 lists every file staged by sub-steps 8e.10–8e.13 and the `## Testing` block. The first push runs `test.yml`; the scheduled job first runs on its weekly cron, or on demand via `workflow_dispatch`.

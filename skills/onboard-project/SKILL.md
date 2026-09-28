@@ -1,6 +1,6 @@
 ---
 name: onboard-project
-description: "Bring a project into the Praxion ecosystem: detect state and install the managed-project contract (gitignore block, .ai-state/ skeleton, git hooks, merge drivers, settings toggles, CLAUDE.md blocks) plus optional tiers (architecture, code-quality, CI autofix, Architecture-as-Code, ML, Obsidian). Four modes: new, existing, hackathon, promote. Safe to re-run; nothing is committed."
+description: "Bring a project into the Praxion ecosystem: detect state and install the managed-project contract (gitignore block, .ai-state/ skeleton, git hooks, merge drivers, settings toggles, CLAUDE.md blocks) plus optional tiers (architecture, code-quality, test baseline, CI autofix, Architecture-as-Code, ML, Obsidian). Four modes: new, existing, hackathon, promote. Safe to re-run; nothing is committed."
 when_to_use: >
   Invoked by the user via /praxion:onboard-project, or handed off from the
   scripts/onboard-project entry script. Never auto-invoked.
@@ -10,7 +10,7 @@ arguments:
     description: "Entry mode: new | existing | hackathon | promote. Omit to auto-detect from directory state."
     required: false
   with:
-    description: "Comma-separated capability IDs to install: arch, quality, ci, aac, ml, obsidian, observability."
+    description: "Comma-separated capability IDs to install: arch, quality, tests, ci, aac, ml, obsidian, observability."
     required: false
   without:
     description: "Comma-separated capability IDs to skip. Applied after --with."
@@ -42,7 +42,7 @@ Parse the mode and flags from that line, per `argument-hint`; when it is empty, 
 
 - [references/phases-core.md](references/phases-core.md) -- always-on phase bodies: 0.5, 1, 2, 3, 4, 5, 5b, 6, 7, 9
 - [references/phases-optional.md](references/phases-optional.md) -- opt-in phase bodies: 8, 8b, 8c, 8d, 8e
-- [references/claude-md-blocks.md](references/claude-md-blocks.md) -- the 7 canonical `CLAUDE.md` block bodies
+- [references/claude-md-blocks.md](references/claude-md-blocks.md) -- the 9 canonical `CLAUDE.md` block bodies
 - [references/seed-pipeline.md](references/seed-pipeline.md) -- greenfield-only seed-pipeline content (from the retired `/new-project` command)
 
 ## §Pre-flight
@@ -109,7 +109,7 @@ Execute these phases in order. Each phase honors §Idempotency Predicates — re
 | 8b | AaC tier install — fence seed, `fitness/` scaffold, golden-rule Block D, `architecture.yml` workflow, `docs/diagrams/` scaffold | `aac` not selected in the Profile (G3); or per-sub-step predicates (see §Phase 8b) |
 | 8c | ML/AI training scaffold — experiment tracking config, checkpoint `.gitignore` block, GPU budget declaration, `program.md` template, mode callout | No ML signals detected AND `ml` not selected in the Profile (G3); per-sub-step predicates (see §Phase 8c) |
 | 8d | Obsidian integration — `.gitignore` Obsidian block, verify `obsidian@obsidian-skills` plugin install, `CLAUDE.md` Obsidian Integration block, `settings.json` deny entries | `obsidian` not selected in the Profile (G3); per-sub-step predicates (see §Phase 8d) |
-| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config + dependency-scanning config + ci-autofix caller/policy installed from canonical assets (never overwriting existing config) | `quality`/`ci` not selected in the Profile (G3); per-sub-step predicates (see §Phase 8e) |
+| 8e | Code-quality baseline — universal `.editorconfig` + pre-commit config + `CONTRIBUTING.md` + per-detected-stack linter/formatter/type-check config + dependency-scanning config + ci-autofix caller/policy; test baseline — parallel, coverage-off runner config + `tests/acceptance/` and `tests/e2e/` + `tests/declared-deps.toml` + test and scheduled workflows + the `## Testing` `CLAUDE.md` block — all installed from canonical assets (never overwriting existing config) | `quality`/`ci`/`tests` not selected in the Profile (G3); per-sub-step predicates (see §Phase 8e); `grep -q '^## Testing$' CLAUDE.md` for the block |
 | 9 | Print summary + stage modified files (no commit) | None — terminal phase |
 
 ## §Capability IDs — the user-facing vocabulary
@@ -122,6 +122,7 @@ Phase identifiers stay verbatim **internally** — the `## §Phase N` headings i
 | `observability` | `5` | On — the `PRAXION_DISABLE_*` toggle written by Phase 5's observability sub-step |
 | `arch` | `8` | On; off if `.ai-state/DESIGN.md` or `docs/architecture.md` already exists |
 | `quality` | `8e.1, 8e.2, 8e.3, 8e.4, 8e.5, 8e.6, 8e.7` | On; off if no stack detected |
+| `tests` | `8e.10, 8e.11, 8e.12, 8e.13` | On in `new` mode; off in `existing` mode (opt in with `--with tests` or the Profile); on under `--profile all`. Under sidecar placement its tracked files are share-gated and its workflows dropped |
 | `ci` | `8e.8, 8e.9` | Off by default — the only capability with out-of-band prerequisites (two `gh secret set` calls); on only under `--profile all` |
 | `aac` | `8b` | Off; on under `--profile all` |
 | `ml` | `8c` | On iff ML signals detected (§Pre-flight step 4b) |
@@ -150,6 +151,7 @@ Four modes over one phase engine: `new` (empty dir, seeded via [references/seed-
 | 8d (`obsidian`) | dflt = detection | dflt = detection | skip |
 | 8e.1–8e.7 (`quality`) | dflt = stack detected | dflt = stack detected | skip |
 | 8e.8–8e.9 (`ci`) | dflt-N | dflt-N | skip |
+| 8e.10–8e.13 (`tests`) | dflt-Y | dflt-N | skip |
 | 9 (`core`) | run | run | run |
 
 ¹ The `0s` seed pipeline's own architect step already writes `.ai-state/DESIGN.md` + `docs/architecture.md`, so `arch`'s default-derivation rule (off when either file exists) makes this skip mechanical, not hardcoded.

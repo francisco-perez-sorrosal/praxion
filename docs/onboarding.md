@@ -33,7 +33,7 @@ One phase engine, parameterized by mode, installs a fixed end-state contract ont
 | `.git/hooks/{pre-commit,post-merge,post-commit,post-checkout}` | id-citation discipline gate + the finalize chain (ADR promotion, tech-debt dedupe, squash-safety warning) |
 | `.claude/settings.json` toggles + `permissions.allow` baseline | Observability opt-in/out; the standing grant that keeps subagent `.ai-work/` writes from stalling on an unanswerable permission prompt |
 | Four canonical `CLAUDE.md` blocks (Agent Pipeline, Compaction Guidance, Behavioral Contract, Praxion Process) + Project Essentials | The always-loaded context that makes every future Claude Code session Praxion-aware |
-| *Opt-in*: architecture baseline, code-quality baseline, CI autofix, Architecture-as-Code tier, ML/AI conventions, Obsidian integration | Selected via the capability Profile (§Pick your entry) |
+| *Opt-in*: architecture baseline, code-quality baseline, test baseline, CI autofix, Architecture-as-Code tier, ML/AI conventions, Obsidian integration | Selected via the capability Profile (§Pick your entry) |
 
 Nothing is ever committed. Every phase stages its own changes; you review and commit with `/co`.
 
@@ -88,6 +88,7 @@ Phase identifiers are preserved verbatim from the two prior surfaces — `0.5, 1
 | `5b` / `5b.t` | `5b`, `5b.t` | six hackathon artifacts / their removal | `PRAXION_HACKATHON_MODE` key presence; teardown fires only under `promote` | `5b`: `hackathon`; `5b.t`: `promote` |
 | `arch` | `8` | `.ai-state/DESIGN.md`, `docs/architecture.md` | Either file exists → skip | `new` (mechanically skipped — the seed pipeline already wrote them), `existing` (default-on) |
 | `quality` | `8e.1`–`8e.7` | `.editorconfig`, pre-commit config, per-stack linter/formatter/type config, `CONTRIBUTING.md` | Per-sub-step file/config presence | `new`, `existing` (default = stack detected) |
+| `tests` | `8e.10`–`8e.13` | parallel, coverage-off runner config; `tests/acceptance/` + `tests/e2e/` with ownership READMEs; empty `tests/declared-deps.toml`; `test.yml` (full suite, ratchet coverage floor) + `test-scheduled.yml` (weekly flaky/`large`/selection-audit/slow-test job); the `## Testing` `CLAUDE.md` block | Per-sub-step file/config presence; `## Testing` heading for the block | `new` (default-on), `existing` (opt-in: `--with tests`), `--profile all` |
 | `ci` | `8e.8`, `8e.9` | CI-autofix + cross-model-review + label-reconcile callers | Per-sub-step | opt-in only (`--profile all` or explicit `--with ci`) |
 | `aac` | `8b` | `fitness/` scaffold, golden-rule pre-commit block, `architecture.yml` workflow, `docs/diagrams/` | Per-sub-step | opt-in only |
 | `ml` | `8c` | `program.md`, `.ai-state/experiments/`, checkpoint `.gitignore` block, `.ai-state/gpu_budget.yaml` | Per-sub-step; whole phase skipped if no ML signals and not selected | default-on when ML signals detected |
@@ -153,7 +154,7 @@ Claude: Generated onboarding_for_mushi_busy_ppl.md (trail map for busy people).
 
 ### `existing` — retrofit
 
-The default flow, and the common case: `.gitignore`, `.ai-state/`, `.gitattributes`/hooks, settings, `CLAUDE.md` blocks land on an already-populated repo, plus the architecture baseline (delegates to `systems-architect` in baseline-audit mode) and stack-detected quality tooling. Opt-in tiers you can add explicitly with `--with`:
+The default flow, and the common case: `.gitignore`, `.ai-state/`, `.gitattributes`/hooks, settings, `CLAUDE.md` blocks land on an already-populated repo, plus the architecture baseline (delegates to `systems-architect` in baseline-audit mode) and stack-detected quality tooling. Opt-in tiers you can add explicitly with `--with` — including `tests`, which a `new` project gets by default but an existing one must ask for, since its runner config and CI already belong to the team:
 
 ```bash
 onboard-project --with aac,ci --without obsidian
@@ -261,7 +262,7 @@ docs/architecture.md
 | Class | Capabilities | Behavior |
 |---|---|---|
 | **local** | `core`, `observability`, `arch` (with `docs/architecture.md` shared by default), `aac`, `ml` | Every tracked artifact redirects into the sidecar; the project repo sees nothing new (or, for `arch`, exactly the one shared doc) |
-| **share-gated** | `quality`, `obsidian` | These write ordinary tracked hygiene files (`.editorconfig`, `.pre-commit-config.yaml`, `.obsidian/app.json` pins). Never silent: the operator sees the exact file list and confirms, or declines and proposes them to the team as a normal PR |
+| **share-gated** | `quality`, `obsidian`, `tests` | These write ordinary tracked hygiene files (`.editorconfig`, `.pre-commit-config.yaml`, `.obsidian/app.json` pins, the pytest runner block, `tests/declared-deps.toml`). Never silent: the operator sees the exact file list and confirms, or declines and proposes them to the team as a normal PR. `tests`' two workflows are dropped, as `aac`'s `architecture.yml` is |
 | **unavailable** | `ci` | `.github/workflows/*` and friends are GitHub-visible by construction — there is no invisible variant. Refused with a one-line reason naming the local hook chain as the closest equivalent |
 
 **What `git status` shows afterwards.** Nothing — and that is the point:

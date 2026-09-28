@@ -502,7 +502,7 @@ Every writer above — this phase, §Phase 5b, §Phase 8d, and `/upgrade-project
    - The §Project Essentials Block verbatim, appended at the end of the file with one blank line separating from preceding content (guarded by the `## Working in this project` predicate above)
 
 3. **Fill the §Project Essentials Block placeholders** (skip this step whenever the predicate above skipped the Project Essentials append — the block is already present and presumably already filled).
-   - Replace `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` per [shared-procedures.md § Stack command resolution](shared-procedures.md#-stack-command-resolution) (includes the Rust branch).
+   - Replace `<typecheck command>` / `<test command>` / `<lint command>` / `<build command>` per [shared-procedures.md § Stack command resolution](shared-procedures.md#-stack-command-resolution) (includes the Rust branch). When the `tests` capability is selected in this run, `<test command>` instead gets the pointer to the `## Testing` block that §Phase 8e installs (see [claude-md-blocks.md § Project Essentials Block](claude-md-blocks.md), "Item 2 has two fills").
    - Replace `<list 3–5 of this project's most common task intents>` with a ≤5-bullet list of what an agent is most often asked to do here, derived from the codebase shape and the README.
 
 ## §Phase 7 — Companion CLIs (advisory)

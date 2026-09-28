@@ -11,13 +11,31 @@ capability-ID flags are dec-346) and the Mode x Phase Matrix.
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import subprocess
 from pathlib import Path
 
-SKILL_FILE = Path(__file__).parents[2] / "skills" / "onboard-project" / "SKILL.md"
+import pytest
 
-# The eight capability ids the skill's mapping table publishes (dec-346).
-CAPABILITY_IDS = ("core", "arch", "quality", "ci", "aac", "ml", "obsidian", "observability")
+REPO_ROOT = Path(__file__).parents[2]
+SKILL_FILE = REPO_ROOT / "skills" / "onboard-project" / "SKILL.md"
+CLAUDE_MD_BLOCKS = REPO_ROOT / "skills" / "onboard-project" / "references" / "claude-md-blocks.md"
+ONBOARD_SCRIPT = REPO_ROOT / "scripts" / "onboard-project"
+
+# The nine capability ids the skill's mapping table publishes (dec-346).
+CAPABILITY_IDS = (
+    "core",
+    "arch",
+    "quality",
+    "tests",
+    "ci",
+    "aac",
+    "ml",
+    "obsidian",
+    "observability",
+)
 
 # Every phase id the skill's Mode x Phase Matrix enumerates.
 MODE_PHASE_MATRIX_IDS = (
@@ -46,6 +64,10 @@ MODE_PHASE_MATRIX_IDS = (
     "8e.7",
     "8e.8",
     "8e.9",
+    "8e.10",
+    "8e.11",
+    "8e.12",
+    "8e.13",
     "9",
 )
 
@@ -165,3 +187,122 @@ def test_capability_to_phase_mapping_is_a_total_function_over_the_matrix() -> No
         f"Phase id(s) mapped to more than one capability: {ambiguous} -- the "
         "mapping must be unambiguous (each phase belongs to exactly one capability)"
     )
+
+
+def test_tests_defaults_on_in_new_mode_only_and_under_profile_all() -> None:
+    section = _capability_table_section()
+    row_match = re.search(r"`tests`.*", section)
+    assert row_match, "Capability table must have a `tests` row"
+    row = row_match.group(0)
+    assert re.search(r"\bon\b[^|]*`new`", row, re.IGNORECASE), (
+        "`tests` must default on in `new` mode"
+    )
+    assert re.search(r"\boff\b[^|]*`existing`", row, re.IGNORECASE), (
+        "`tests` must default off in `existing` mode"
+    )
+    assert "--with tests" in row, "`tests` must name its `--with tests` opt-in"
+    assert re.search(r"profile.{0,10}all", row, re.IGNORECASE), (
+        "`tests` must be included under `--profile all`"
+    )
+
+
+# -- Project Essentials item 2: two fills, neither dangling ------------------
+
+
+def _project_essentials_note() -> str:
+    text = CLAUDE_MD_BLOCKS.read_text(encoding="utf-8")
+    match = re.search(
+        r"^## §Project Essentials Block\n(.*?)(?=^## §)", text, re.DOTALL | re.MULTILINE
+    )
+    assert match, "claude-md-blocks.md must carry a §Project Essentials Block section"
+    return match.group(1)
+
+
+def test_project_essentials_test_item_points_to_testing_when_tests_is_selected() -> None:
+    note = _project_essentials_note()
+    assert re.search(r"`tests` capability is selected[^.]*`<test command>`[^.]*## Testing", note), (
+        "When `tests` is selected, item 2 (`<test command>`) must be filled with a "
+        "pointer to the `## Testing` block"
+    )
+
+
+def test_project_essentials_test_item_keeps_the_detected_command_otherwise() -> None:
+    note = _project_essentials_note()
+    assert re.search(r"Otherwise fill it with the detected test command", note), (
+        "Without `tests`, item 2 must keep today's detected-command fill"
+    )
+
+
+def test_testing_block_is_registered_but_not_refreshable() -> None:
+    text = CLAUDE_MD_BLOCKS.read_text(encoding="utf-8")
+    assert "<!-- canonical-source: claude/canonical-blocks/testing.md" in text
+    assert re.search(r"```markdown\n## Testing\n", text), "the synced `## Testing` fence is missing"
+    assert "never refreshed" in text
+
+
+# -- scripts/onboard-project resolves the `tests` default per mode -----------
+
+_ISOLATED_GIT_ENV = {
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_SYSTEM": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
+
+
+def _resolved_capabilities(tmp_path: Path, cwd: Path, *args: str) -> set[str]:
+    home = tmp_path / "home"
+    plugins = home / ".claude" / "plugins"
+    plugins.mkdir(parents=True, exist_ok=True)
+    # The script refuses to onboard without an installed plugin entry.
+    (plugins / "installed_plugins.json").write_text(
+        json.dumps({"praxion@bit-agora": {"version": "test"}}), encoding="utf-8"
+    )
+    env = {**os.environ, "HOME": str(home), **_ISOLATED_GIT_ENV}
+    result = subprocess.run(
+        ["bash", str(ONBOARD_SCRIPT), "--no-launch", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        env=env,
+    )
+    match = re.search(r"^# Capabilities: (.*)$", result.stdout, re.MULTILINE)
+    assert match, f"no resolved capability line (rc={result.returncode}):\n{result.stderr}"
+    return set(match.group(1).split(","))
+
+
+@pytest.fixture
+def existing_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "existing"
+    repo.mkdir()
+    subprocess.run(
+        ["git", "init", "-q", "."],
+        cwd=repo,
+        check=True,
+        env={**os.environ, **_ISOLATED_GIT_ENV},
+    )
+    (repo / "README.md").write_text("existing project\n", encoding="utf-8")
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("args", "expect_tests"),
+    [
+        ((), False),
+        (("--with", "tests"), True),
+        (("--profile", "all"), True),
+        (("--profile", "all", "--without", "tests"), False),
+    ],
+)
+def test_existing_mode_tests_capability_is_opt_in(
+    tmp_path: Path, existing_repo: Path, args: tuple[str, ...], expect_tests: bool
+) -> None:
+    capabilities = _resolved_capabilities(tmp_path, existing_repo, *args)
+    assert ("tests" in capabilities) is expect_tests, capabilities
+
+
+def test_new_mode_tests_capability_defaults_on(tmp_path: Path) -> None:
+    capabilities = _resolved_capabilities(
+        tmp_path, tmp_path, "fresh-app", "--yes", "--editor", "none"
+    )
+    assert "tests" in capabilities, capabilities

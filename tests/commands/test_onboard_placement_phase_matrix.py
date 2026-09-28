@@ -262,7 +262,7 @@ def test_phase_9_corrects_the_git_status_verification_expectation(core_text: str
 # -- phases-optional.md: capability × placement table -----------------------
 
 EXPECTED_LOCAL_CAPABILITIES = ("core", "observability", "arch", "ml")
-EXPECTED_SHARE_GATED_CAPABILITIES = ("quality", "obsidian")
+EXPECTED_SHARE_GATED_CAPABILITIES = ("quality", "obsidian", "tests")
 EXPECTED_UNAVAILABLE_CAPABILITIES = ("ci",)
 EXPECTED_SHADOWED_CAPABILITIES = ("aac",)
 
@@ -318,6 +318,21 @@ def test_phases_optional_names_the_share_gated_file_lists_for_quality_and_obsidi
         "phases-optional.md must name the share-gated class explicitly for "
         "`quality` and `obsidian` — offered with the exact tracked-file list "
         "named, confirmed or declined, never written silently."
+    )
+
+
+def test_tests_capability_is_share_gated_with_its_workflows_dropped_under_sidecar(
+    optional_text: str,
+) -> None:
+    # `tests` is a substring of half the file, so the class list above cannot
+    # pin it -- the capability's own table row must carry both halves.
+    row = re.search(r"^\| `tests` .*$", optional_text, re.MULTILINE)
+    assert row, "phases-optional.md's capability x placement table has no `tests` row"
+    lowered = row.group(0).lower()
+    assert "share-gated" in lowered, "`tests`' tracked files must be share-gated under sidecar"
+    assert "dropped" in lowered, "`tests`' GitHub workflows must be dropped under sidecar"
+    assert "workflows are github-visible" in optional_text.lower(), (
+        "sub-step 8e.13 must skip its workflows by name under sidecar placement"
     )
 
 

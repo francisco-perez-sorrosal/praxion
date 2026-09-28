@@ -20,7 +20,8 @@
 # (a private fork, or an org Actions allowlist without the hub on it), the job
 # warns and skips the audit only; every test step still runs and still counts.
 # The job goes red on a failure that survives one rerun, a failing `large` test,
-# or a selection miss; a failure that passes on rerun is reported as flaky.
+# a selection miss, or a flaky test (one that failed, then passed on rerun) —
+# the audit exits non-zero on the last two.
 # Delete this comment after tailoring.
 
 name: Test (scheduled)
@@ -106,7 +107,7 @@ jobs:
           echo ".praxion-hub/" >> .git/info/exclude
           last_green="$(gh run list --workflow test-scheduled.yml --status success \
             --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
-          args=(--junit junit.xml --slow 20)
+          args=(--junit junit.xml --slow 20 --repo-root .)
           if [ -f rerun.xml ]; then args+=(--rerun rerun.xml); fi
           if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
           python3 .praxion-hub/scripts/audit_tests.py "${args[@]}"
@@ -195,7 +196,7 @@ jobs:
           echo ".praxion-hub/" >> .git/info/exclude
           last_green="$(gh run list --workflow test-scheduled.yml --status success \
             --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
-          args=(--junit junit.xml --slow 20)
+          args=(--junit junit.xml --slow 20 --repo-root .)
           if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
           python3 .praxion-hub/scripts/audit_tests.py "${args[@]}"
 

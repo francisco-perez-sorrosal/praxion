@@ -112,6 +112,7 @@ BLOCKS: dict[str, BlockSpec] = {
     "praxion-process": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "hackathon-mode": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "project-essentials": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
+    "testing": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "obsidian-integration": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "sidecar-placement": BlockSpec(consumers=_ONBOARDING_CONSUMERS),
     "commit-process": BlockSpec(

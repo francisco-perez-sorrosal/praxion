@@ -159,6 +159,8 @@ CAPABILITIES
                  settings, CLAUDE.md blocks, manifest
   arch           architecture baseline (.ai-state/DESIGN.md, docs/architecture.md)
   quality        editorconfig, linters, pre-commit, type config, CONTRIBUTING
+  tests          parallel test runner, outer-loop test dirs, test + scheduled CI
+                 workflows, ## Testing block (default on for new projects only)
   ci             CI autofix + cross-model review + label reconcile (needs 2 GitHub secrets)
   aac            Architecture-as-Code tier (fitness/, fences, workflow, diagrams)
   ml             ML/AI training conventions (auto-enabled when ML signals are detected)
@@ -516,20 +518,29 @@ capability_list_contains() {
     esac
 }
 
+# `tests` is the one mode-dependent default: a new project gets the test
+# baseline from its first commit; an existing one opts in, because its runner
+# config and CI are already the team's.
 default_capabilities_for_profile() {
-    case "$1" in
+    local profile="$1" mode="$2"
+    case "$profile" in
         minimal)  printf 'core' ;;
-        all)      printf 'core arch quality ci aac ml obsidian observability' ;;
-        standard) printf 'core arch quality observability' ;;
+        all)      printf 'core arch quality tests ci aac ml obsidian observability' ;;
+        standard)
+            if [ "$mode" = "new" ]; then
+                printf 'core arch quality tests observability'
+            else
+                printf 'core arch quality observability'
+            fi ;;
         *)
-            printf 'Usage error: --profile must be one of minimal|standard|all (got: %s)\n' "$1" >&2
+            printf 'Usage error: --profile must be one of minimal|standard|all (got: %s)\n' "$profile" >&2
             exit "$EXIT_USAGE" ;;
     esac
 }
 
 resolve_capabilities() {
-    local base result item tok kept with_list without_list
-    base="$(default_capabilities_for_profile "$PROFILE")"
+    local mode="$1" base result item tok kept with_list without_list
+    base="$(default_capabilities_for_profile "$PROFILE" "$mode")"
     result="$base"
 
     if [ -n "$CAPABILITIES_WITH" ]; then
@@ -885,7 +896,7 @@ main() {
     fi
 
     mode="$(resolve_mode "$state")"
-    CAPABILITIES="$(spaced_to_csv "$(resolve_capabilities)")"
+    CAPABILITIES="$(spaced_to_csv "$(resolve_capabilities "$mode")")"
 
     # Before any detection side effect (scaffold, --check, hand-off): the
     # placement x mode legality gate, the composition rules, and (on a legal

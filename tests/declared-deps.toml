@@ -1,0 +1,863 @@
+# Non-code test dependencies the test selector cannot derive from layout,
+# imports or path literals -- seeded (2026-09-28) from `.ai-state/TEST_TOPOLOGY.md`'s
+# non-`.py` `file_dependencies`, mapped to each contributing group's
+# `pytest-globs` selectors, then pruned empirically: for each seeded entry,
+# `python3 scripts/resolve_test_scope.py --changed <sample-path> --json` was
+# run with no declared-deps file present (the "remove it" baseline) against a
+# representative tracked file per `paths` glob; every group's test list had
+# at least one test unreachable via layout/import/path-literal alone, so
+# every entry below survived the prune (none of TEST_TOPOLOGY.md's non-code
+# file_dependencies were fully redundant with the other three sources --
+# expected, since a markdown/config/shell file has no Python module identity
+# for layout or import to see, and only some are literally quoted in test
+# source). Entries sharing an identical owning-group set were merged into one
+# `[[dep]]` (same `tests` union, combined `paths`) to avoid restating the same
+# test list once per file.
+# Contract: Praxion's testing-strategy skill, test-selection reference.
+#
+# Two entry kinds. Add one only when the selection audit reports a miss, or when
+# a new test reads a file no code path names:
+#
+#   [[dep]]
+#   paths = ["data/schemas/*.json"]    # repo-relative globs (** crosses dirs)
+#   tests = ["tests/test_schemas.py"]  # repo-relative test files or globs
+#   why   = "loads every schema by directory scan"
+#
+#   [[inert]]
+#   paths = ["docs/archive/**"]
+#   why   = "frozen material; no test reads it"
+schema = 1
+
+
+[[dep]]
+paths = [
+  ".claude-plugin/plugin.json",
+]
+tests = [
+  "fitness/**",
+  "hooks/**",
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_hook_installation.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_export_codex_agents.py",
+  "scripts/test_export_codex_command_skills.py",
+  "scripts/test_export_codex_pipeline_adapter.py",
+  "scripts/test_export_codex_rules_bridge.py",
+  "scripts/test_export_codex_skills.py",
+  "scripts/test_install_codex.py",
+  "scripts/test_install_dev_link.py",
+  "scripts/test_install_git_hooks.py",
+  "scripts/test_manage_codex_mcp.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_rules_bridge_parsing.py",
+  "scripts/test_run_check_families.py",
+  "scripts/test_upgrade_project_pins.py",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_notify_bg_session_state.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness, hooks-lifecycle, install-and-export, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .claude-plugin/plugin.json:42/49"
+
+[[dep]]
+paths = [
+  ".github/autofix-policy.yml",
+  ".github/labels.yml",
+]
+tests = [
+  "scripts/test_check_release_staleness.py",
+  "scripts/test_context_baseline.py",
+  "scripts/test_onboard_placement_composition_agreement.py",
+  "scripts/test_onboard_project_placement.py",
+  "scripts/test_reconcile_aac_surfaces.py",
+  "scripts/test_self_healing_metrics.py",
+  "tests/commands/test_onboard_block_mechanism.py",
+  "tests/commands/test_onboard_capability_defaults.py",
+  "tests/commands/test_onboard_ci_autofix_install.py",
+  "tests/commands/test_onboard_consult_ledgers_install.py",
+  "tests/commands/test_onboard_gate_consolidation.py",
+  "tests/commands/test_onboard_hackathon_teardown.py",
+  "tests/commands/test_onboard_labels_install.py",
+  "tests/commands/test_onboard_permissions_allow_install.py",
+  "tests/commands/test_onboard_placement_phase_matrix.py",
+  "tests/commands/test_onboard_praxion_feedback_install.py",
+  "tests/commands/test_onboard_principles_install.py",
+  "tests/commands/test_onboard_seed_signal_agreement.py",
+  "tests/commands/test_upgrade_labels_baseline.py",
+  "tests/commands/test_upgrade_project_command.py",
+  "tests/consumer_layout/**",
+  "tests/test_architecture_gate_canary.py",
+  "tests/test_ci_autofix_dogfooding_parity.py",
+  "tests/test_ci_autofix_hub_contract.py",
+  "tests/test_ci_autofix_hub_finalize.py",
+  "tests/test_ci_autofix_hub_js_runner.py",
+  "tests/test_ci_autofix_hub_pm_install.py",
+  "tests/test_ci_autofix_hub_surfaces.py",
+  "tests/test_ci_autofix_policy_template_schema.py",
+  "tests/test_cross_model_review_dogfooding_parity.py",
+  "tests/test_cross_model_review_hub_invariants.py",
+  "tests/test_cross_model_review_verdict_parser.py",
+  "tests/test_finalize_adrs_workflow_invariants.py",
+  "tests/test_issue_autofix_workflow_invariants.py",
+  "tests/test_issue_intake_assessment_invariants.py",
+  "tests/test_labels_manifest.py",
+  "tests/test_labels_reconcile_workflow.py",
+  "tests/test_onboard_project_detection.py",
+  "tests/test_retired_onboarding_surfaces.py",
+  "tests/test_sentinel_workflow_invariants.py",
+  "tests/test_sentinel_workflow_publication_invariants.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows, onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/autofix-policy.yml:33/41, .github/labels.yml:38/41"
+
+[[dep]]
+paths = [
+  ".github/workflows/*.yml",
+  "commands/release.md",
+  "skills/versioning/**",
+]
+tests = [
+  "scripts/test_check_release_staleness.py",
+  "scripts/test_context_baseline.py",
+  "scripts/test_self_healing_metrics.py",
+  "tests/test_architecture_gate_canary.py",
+  "tests/test_ci_autofix_dogfooding_parity.py",
+  "tests/test_ci_autofix_hub_contract.py",
+  "tests/test_ci_autofix_hub_finalize.py",
+  "tests/test_ci_autofix_hub_js_runner.py",
+  "tests/test_ci_autofix_hub_pm_install.py",
+  "tests/test_ci_autofix_hub_surfaces.py",
+  "tests/test_ci_autofix_policy_template_schema.py",
+  "tests/test_cross_model_review_dogfooding_parity.py",
+  "tests/test_cross_model_review_hub_invariants.py",
+  "tests/test_cross_model_review_verdict_parser.py",
+  "tests/test_finalize_adrs_workflow_invariants.py",
+  "tests/test_issue_autofix_workflow_invariants.py",
+  "tests/test_issue_intake_assessment_invariants.py",
+  "tests/test_labels_manifest.py",
+  "tests/test_labels_reconcile_workflow.py",
+  "tests/test_sentinel_workflow_invariants.py",
+  "tests/test_sentinel_workflow_publication_invariants.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/workflows/*.yml:20/21, commands/release.md:21/21, skills/versioning/**:20/21"
+
+[[dep]]
+paths = [
+  ".github/workflows/ci-autofix.yml",
+  ".github/workflows/cross-model-review.yml",
+  ".github/workflows/labels-reconcile.yml",
+  "claude/project-baseline/**",
+  "commands/new-project.md",
+  "commands/onboard-project.md",
+  "commands/upgrade-project.md",
+  "new_project.sh",
+  "scripts/onboard-project",
+  "scripts/onboard_placement.sh",
+  "skills/onboard-project/SKILL.md",
+  "skills/onboard-project/references/*.md",
+]
+tests = [
+  "scripts/test_onboard_placement_composition_agreement.py",
+  "scripts/test_onboard_project_placement.py",
+  "scripts/test_reconcile_aac_surfaces.py",
+  "tests/commands/test_onboard_block_mechanism.py",
+  "tests/commands/test_onboard_capability_defaults.py",
+  "tests/commands/test_onboard_ci_autofix_install.py",
+  "tests/commands/test_onboard_consult_ledgers_install.py",
+  "tests/commands/test_onboard_gate_consolidation.py",
+  "tests/commands/test_onboard_hackathon_teardown.py",
+  "tests/commands/test_onboard_labels_install.py",
+  "tests/commands/test_onboard_permissions_allow_install.py",
+  "tests/commands/test_onboard_placement_phase_matrix.py",
+  "tests/commands/test_onboard_praxion_feedback_install.py",
+  "tests/commands/test_onboard_principles_install.py",
+  "tests/commands/test_onboard_seed_signal_agreement.py",
+  "tests/commands/test_upgrade_labels_baseline.py",
+  "tests/commands/test_upgrade_project_command.py",
+  "tests/consumer_layout/**",
+  "tests/test_onboard_project_detection.py",
+  "tests/test_retired_onboarding_surfaces.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/workflows/ci-autofix.yml:19/20, .github/workflows/cross-model-review.yml:19/20, .github/workflows/labels-reconcile.yml:19/20, claude/project-baseline/**:20/20, commands/new-project.md:19/20, commands/onboard-project.md:19/20, commands/upgrade-project.md:18/20, new_project.sh:19/20, scripts/onboard-project:5/20, scripts/onboard_placement.sh:19/20, skills/onboard-project/SKILL.md:16/20, skills/onboard-project/references/*.md:19/20"
+
+[[dep]]
+paths = [
+  ".pre-commit-config.yaml",
+  "claude/aac-templates/**",
+]
+tests = [
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_run_check_families.py",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .pre-commit-config.yaml:27/34, claude/aac-templates/**:34/34"
+
+[[dep]]
+paths = [
+  "agents/*.md",
+]
+tests = [
+  "fitness/**",
+  "scripts/test_apply_skill_description_diet.py",
+  "scripts/test_artifact_registry.py",
+  "scripts/test_build_doc_manifest.py",
+  "scripts/test_canonical_block_identity.py",
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_doc_manifest_freshness.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_hackathon_graduation.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_lens_isolation.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_specialist_dispositions.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_check_token_ratchet.py",
+  "scripts/test_claude_to_agents.py",
+  "scripts/test_list_harvest_sources.py",
+  "scripts/test_measure_token_budget.py",
+  "scripts/test_parse_pre_refactor_yaml.py",
+  "scripts/test_refresh_claude_blocks.py",
+  "scripts/test_regenerate_rules_manifest.py",
+  "scripts/test_render_claude_md.py",
+  "scripts/test_resolve_test_scope.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_run_check_families.py",
+  "scripts/test_strip_progress_mandate.py",
+  "scripts/test_sync_canonical_blocks.py",
+  "tests/agents/**",
+  "tests/commands/test_resume_rework.py",
+  "tests/orchestration/**",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_checkpoint_digest.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_dispatch_reworks_bg.py",
+  "tests/test_dispatch_reworks_manifest.py",
+  "tests/test_hackathon_mode.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+  "tests/test_skill_genesis_agent.py",
+  "tests/test_skill_genesis_command.py",
+  "tests/test_skill_genesis_review.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, architecture-fitness, knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: agents/*.md:41/64"
+
+[[dep]]
+paths = [
+  "claude/canonical-blocks/*.md",
+]
+tests = [
+  "scripts/test_apply_skill_description_diet.py",
+  "scripts/test_artifact_registry.py",
+  "scripts/test_build_doc_manifest.py",
+  "scripts/test_canonical_block_identity.py",
+  "scripts/test_check_doc_manifest_freshness.py",
+  "scripts/test_check_hackathon_graduation.py",
+  "scripts/test_check_lens_isolation.py",
+  "scripts/test_check_release_staleness.py",
+  "scripts/test_check_specialist_dispositions.py",
+  "scripts/test_check_token_ratchet.py",
+  "scripts/test_claude_to_agents.py",
+  "scripts/test_context_baseline.py",
+  "scripts/test_list_harvest_sources.py",
+  "scripts/test_measure_token_budget.py",
+  "scripts/test_onboard_placement_composition_agreement.py",
+  "scripts/test_onboard_project_placement.py",
+  "scripts/test_parse_pre_refactor_yaml.py",
+  "scripts/test_reconcile_aac_surfaces.py",
+  "scripts/test_refresh_claude_blocks.py",
+  "scripts/test_regenerate_rules_manifest.py",
+  "scripts/test_render_claude_md.py",
+  "scripts/test_resolve_test_scope.py",
+  "scripts/test_self_healing_metrics.py",
+  "scripts/test_strip_progress_mandate.py",
+  "scripts/test_sync_canonical_blocks.py",
+  "tests/agents/**",
+  "tests/commands/test_onboard_block_mechanism.py",
+  "tests/commands/test_onboard_capability_defaults.py",
+  "tests/commands/test_onboard_ci_autofix_install.py",
+  "tests/commands/test_onboard_consult_ledgers_install.py",
+  "tests/commands/test_onboard_gate_consolidation.py",
+  "tests/commands/test_onboard_hackathon_teardown.py",
+  "tests/commands/test_onboard_labels_install.py",
+  "tests/commands/test_onboard_permissions_allow_install.py",
+  "tests/commands/test_onboard_placement_phase_matrix.py",
+  "tests/commands/test_onboard_praxion_feedback_install.py",
+  "tests/commands/test_onboard_principles_install.py",
+  "tests/commands/test_onboard_seed_signal_agreement.py",
+  "tests/commands/test_resume_rework.py",
+  "tests/commands/test_upgrade_labels_baseline.py",
+  "tests/commands/test_upgrade_project_command.py",
+  "tests/consumer_layout/**",
+  "tests/orchestration/**",
+  "tests/test_architecture_gate_canary.py",
+  "tests/test_checkpoint_digest.py",
+  "tests/test_ci_autofix_dogfooding_parity.py",
+  "tests/test_ci_autofix_hub_contract.py",
+  "tests/test_ci_autofix_hub_finalize.py",
+  "tests/test_ci_autofix_hub_js_runner.py",
+  "tests/test_ci_autofix_hub_pm_install.py",
+  "tests/test_ci_autofix_hub_surfaces.py",
+  "tests/test_ci_autofix_policy_template_schema.py",
+  "tests/test_cross_model_review_dogfooding_parity.py",
+  "tests/test_cross_model_review_hub_invariants.py",
+  "tests/test_cross_model_review_verdict_parser.py",
+  "tests/test_dispatch_reworks_bg.py",
+  "tests/test_dispatch_reworks_manifest.py",
+  "tests/test_finalize_adrs_workflow_invariants.py",
+  "tests/test_hackathon_mode.py",
+  "tests/test_issue_autofix_workflow_invariants.py",
+  "tests/test_issue_intake_assessment_invariants.py",
+  "tests/test_labels_manifest.py",
+  "tests/test_labels_reconcile_workflow.py",
+  "tests/test_onboard_project_detection.py",
+  "tests/test_retired_onboarding_surfaces.py",
+  "tests/test_sentinel_workflow_invariants.py",
+  "tests/test_sentinel_workflow_publication_invariants.py",
+  "tests/test_skill_genesis_agent.py",
+  "tests/test_skill_genesis_command.py",
+  "tests/test_skill_genesis_review.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, ci-workflows, knowledge-projection, onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/canonical-blocks/*.md:59/70"
+
+[[dep]]
+paths = [
+  "claude/config/**",
+  "codex/config/**",
+  "install.sh",
+  "install_claude.sh",
+  "install_codex.sh",
+  "install_cursor.sh",
+  "lib/install_shared.sh",
+  "scripts/assets/praxion-hook-wrapper.sh.tmpl",
+  "scripts/upgrade_project_pins.sh",
+]
+tests = [
+  "scripts/test_check_hook_installation.py",
+  "scripts/test_export_codex_agents.py",
+  "scripts/test_export_codex_command_skills.py",
+  "scripts/test_export_codex_pipeline_adapter.py",
+  "scripts/test_export_codex_rules_bridge.py",
+  "scripts/test_export_codex_skills.py",
+  "scripts/test_install_codex.py",
+  "scripts/test_install_dev_link.py",
+  "scripts/test_install_git_hooks.py",
+  "scripts/test_manage_codex_mcp.py",
+  "scripts/test_rules_bridge_parsing.py",
+  "scripts/test_upgrade_project_pins.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [install-and-export] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/config/**:12/12, codex/config/**:11/12, install.sh:12/12, install_claude.sh:11/12, install_codex.sh:11/12, install_cursor.sh:12/12, lib/install_shared.sh:12/12, scripts/assets/praxion-hook-wrapper.sh.tmpl:11/12, scripts/upgrade_project_pins.sh:11/12"
+
+[[dep]]
+paths = [
+  "claude/config/CLAUDE.md",
+  "claude/config/CLAUDE.md.tmpl",
+  "docs/**/*.md",
+  "scripts/skill_description_diet.yaml",
+]
+tests = [
+  "scripts/test_apply_skill_description_diet.py",
+  "scripts/test_artifact_registry.py",
+  "scripts/test_build_doc_manifest.py",
+  "scripts/test_canonical_block_identity.py",
+  "scripts/test_check_doc_manifest_freshness.py",
+  "scripts/test_check_token_ratchet.py",
+  "scripts/test_claude_to_agents.py",
+  "scripts/test_measure_token_budget.py",
+  "scripts/test_refresh_claude_blocks.py",
+  "scripts/test_regenerate_rules_manifest.py",
+  "scripts/test_render_claude_md.py",
+  "scripts/test_strip_progress_mandate.py",
+  "scripts/test_sync_canonical_blocks.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [knowledge-projection] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/config/CLAUDE.md:3/13, claude/config/CLAUDE.md.tmpl:12/13, docs/**/*.md:9/13, scripts/skill_description_diet.yaml:12/13"
+
+[[dep]]
+paths = [
+  "commands/*.md",
+]
+tests = [
+  "scripts/test_apply_skill_description_diet.py",
+  "scripts/test_artifact_registry.py",
+  "scripts/test_build_doc_manifest.py",
+  "scripts/test_canonical_block_identity.py",
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_doc_manifest_freshness.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_check_token_ratchet.py",
+  "scripts/test_claude_to_agents.py",
+  "scripts/test_measure_token_budget.py",
+  "scripts/test_refresh_claude_blocks.py",
+  "scripts/test_regenerate_rules_manifest.py",
+  "scripts/test_render_claude_md.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_run_check_families.py",
+  "scripts/test_strip_progress_mandate.py",
+  "scripts/test_sync_canonical_blocks.py",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/*.md:26/47"
+
+[[dep]]
+paths = [
+  "commands/report-praxion-issue.md",
+]
+tests = [
+  "scripts/praxion_feedback/tests/**",
+  "scripts/test_report_praxion_issue.py",
+  "scripts/test_report_praxion_issue_command.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [praxion-feedback] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/report-praxion-issue.md:2/3"
+
+[[dep]]
+paths = [
+  "commands/resume-rework.md",
+  "commands/skill-genesis-review.md",
+  "commands/skill-genesis.md",
+  "rules/swe/swe-agent-coordination-protocol.md",
+  "scripts/dispatch-reworks",
+  "skills/software-planning/references/*.md",
+]
+tests = [
+  "scripts/test_check_hackathon_graduation.py",
+  "scripts/test_check_lens_isolation.py",
+  "scripts/test_check_specialist_dispositions.py",
+  "scripts/test_list_harvest_sources.py",
+  "scripts/test_parse_pre_refactor_yaml.py",
+  "scripts/test_resolve_test_scope.py",
+  "tests/agents/**",
+  "tests/commands/test_resume_rework.py",
+  "tests/orchestration/**",
+  "tests/test_checkpoint_digest.py",
+  "tests/test_dispatch_reworks_bg.py",
+  "tests/test_dispatch_reworks_manifest.py",
+  "tests/test_hackathon_mode.py",
+  "tests/test_skill_genesis_agent.py",
+  "tests/test_skill_genesis_command.py",
+  "tests/test_skill_genesis_review.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/resume-rework.md:15/16, commands/skill-genesis-review.md:15/16, commands/skill-genesis.md:13/16, rules/swe/swe-agent-coordination-protocol.md:15/16, scripts/dispatch-reworks:14/16, skills/software-planning/references/*.md:16/16"
+
+[[dep]]
+paths = [
+  "fitness/import-linter.cfg",
+]
+tests = [
+  "fitness/**",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: fitness/import-linter.cfg:1/1"
+
+[[dep]]
+paths = [
+  "hooks/*.sh",
+  "hooks/hooks.json",
+]
+tests = [
+  "hooks/**",
+  "tests/test_notify_bg_session_state.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [hooks-lifecycle] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: hooks/*.sh:2/2, hooks/hooks.json:2/2"
+
+[[dep]]
+paths = [
+  "pyproject.toml",
+]
+tests = [
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_release_staleness.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_context_baseline.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_run_check_families.py",
+  "scripts/test_self_healing_metrics.py",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_architecture_gate_canary.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_ci_autofix_dogfooding_parity.py",
+  "tests/test_ci_autofix_hub_contract.py",
+  "tests/test_ci_autofix_hub_finalize.py",
+  "tests/test_ci_autofix_hub_js_runner.py",
+  "tests/test_ci_autofix_hub_pm_install.py",
+  "tests/test_ci_autofix_hub_surfaces.py",
+  "tests/test_ci_autofix_policy_template_schema.py",
+  "tests/test_cross_model_review_dogfooding_parity.py",
+  "tests/test_cross_model_review_hub_invariants.py",
+  "tests/test_cross_model_review_verdict_parser.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_finalize_adrs_workflow_invariants.py",
+  "tests/test_issue_autofix_workflow_invariants.py",
+  "tests/test_issue_intake_assessment_invariants.py",
+  "tests/test_labels_manifest.py",
+  "tests/test_labels_reconcile_workflow.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+  "tests/test_sentinel_workflow_invariants.py",
+  "tests/test_sentinel_workflow_publication_invariants.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: pyproject.toml:55/55"
+
+[[dep]]
+paths = [
+  "rules/**/*.md",
+  "skills/**/*.md",
+]
+tests = [
+  "fitness/**",
+  "scripts/test_apply_skill_description_diet.py",
+  "scripts/test_artifact_registry.py",
+  "scripts/test_build_doc_manifest.py",
+  "scripts/test_canonical_block_identity.py",
+  "scripts/test_check_aac_golden_rule.py",
+  "scripts/test_check_agent_lifecycle_pairing.py",
+  "scripts/test_check_agent_prompt_size.py",
+  "scripts/test_check_agent_shared_blocks.py",
+  "scripts/test_check_architecture_projection.py",
+  "scripts/test_check_artifact_conformance.py",
+  "scripts/test_check_behavioral_contract.py",
+  "scripts/test_check_commit_msg_authorship.py",
+  "scripts/test_check_doc_manifest_freshness.py",
+  "scripts/test_check_frontmatter_parses.py",
+  "scripts/test_check_gate_liveness.py",
+  "scripts/test_check_html_authorship.py",
+  "scripts/test_check_p06_task_brief.py",
+  "scripts/test_check_path_resolution.py",
+  "scripts/test_check_paths_syntax.py",
+  "scripts/test_check_registry_projection.py",
+  "scripts/test_check_ruff_pin_drift.py",
+  "scripts/test_check_sentinel_self_audit.py",
+  "scripts/test_check_shipped_artifact_isolation.py",
+  "scripts/test_check_squash_safety.py",
+  "scripts/test_check_staleness_markers.py",
+  "scripts/test_check_template_mirrors.py",
+  "scripts/test_check_test_results_shape.py",
+  "scripts/test_check_token_ratchet.py",
+  "scripts/test_claude_to_agents.py",
+  "scripts/test_measure_token_budget.py",
+  "scripts/test_refresh_claude_blocks.py",
+  "scripts/test_regenerate_rules_manifest.py",
+  "scripts/test_render_claude_md.py",
+  "scripts/test_return_contract_clause_completeness.py",
+  "scripts/test_run_check_families.py",
+  "scripts/test_strip_progress_mandate.py",
+  "scripts/test_sync_canonical_blocks.py",
+  "tests/test_aac_fence_validator.py",
+  "tests/test_agent_frontmatter_plugin_compat.py",
+  "tests/test_check_id_citation_discipline.py",
+  "tests/test_check_id_citation_discipline_hook_mode.py",
+  "tests/test_declared_arguments_reach_the_body.py",
+  "tests/test_plugin_namespace_invariants.py",
+  "tests/test_pre_commit_onboarding_regex.py",
+  "tests/test_sentinel_check_triangle.py",
+  "tests/test_sentinel_row_contract.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness, knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/**/*.md:25/48, skills/**/*.md:25/48"
+
+[[dep]]
+paths = [
+  "rules/swe/adr-conventions.md",
+  "scripts/finalize_chain.sh",
+  "skills/software-planning/references/adr-authoring-protocols.md",
+  "skills/spec-driven-development/**/*.md",
+]
+tests = [
+  "scripts/test_adr_health.py",
+  "scripts/test_check_adr_frontmatter_promotion.py",
+  "scripts/test_check_adr_reciprocity.py",
+  "scripts/test_check_design_checkpoint.py",
+  "scripts/test_check_spec_archival_gap.py",
+  "scripts/test_check_spec_drift.py",
+  "scripts/test_check_state_corpus.py",
+  "scripts/test_finalize_adrs.py",
+  "scripts/test_finalize_chain.py",
+  "scripts/test_query_adrs.py",
+  "scripts/test_regenerate_adr_index.py",
+  "scripts/test_regenerate_specs_index.py",
+  "scripts/test_validate_adr_references.py",
+  "tests/test_adr_frontmatter_parseable.py",
+  "tests/test_criteria_spec_eval.py",
+  "tests/test_sh07_sentinel.py",
+  "tests/test_spec_drift.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [decision-records] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/swe/adr-conventions.md:16/17, scripts/finalize_chain.sh:16/17, skills/software-planning/references/adr-authoring-protocols.md:16/17, skills/spec-driven-development/**/*.md:12/17"
+
+[[dep]]
+paths = [
+  "rules/swe/agent-intermediate-documents.md",
+]
+tests = [
+  "scripts/test_check_calibration_coverage.py",
+  "scripts/test_check_hackathon_graduation.py",
+  "scripts/test_check_lens_isolation.py",
+  "scripts/test_check_specialist_dispositions.py",
+  "scripts/test_check_state_ledgers.py",
+  "scripts/test_clean_work_safety.py",
+  "scripts/test_compose_handoff.py",
+  "scripts/test_finalize_tech_debt_ledger.py",
+  "scripts/test_handoff_session.py",
+  "scripts/test_ledger_health.py",
+  "scripts/test_ledger_snapshot.py",
+  "scripts/test_ledger_staleness.py",
+  "scripts/test_list_harvest_sources.py",
+  "scripts/test_merge_driver_observations.py",
+  "scripts/test_parse_pre_refactor_yaml.py",
+  "scripts/test_prune_reports.py",
+  "scripts/test_reconcile_ai_state.py",
+  "scripts/test_reconcile_pipeline_state.py",
+  "scripts/test_resolve_test_scope.py",
+  "scripts/test_step_schema.py",
+  "scripts/test_triage_write_protocol.py",
+  "tests/agents/**",
+  "tests/commands/test_resume_rework.py",
+  "tests/orchestration/**",
+  "tests/test_append_eval_log.py",
+  "tests/test_checkpoint_digest.py",
+  "tests/test_dispatch_reworks_bg.py",
+  "tests/test_dispatch_reworks_manifest.py",
+  "tests/test_disposition_vocabulary.py",
+  "tests/test_hackathon_mode.py",
+  "tests/test_principles_loader.py",
+  "tests/test_run_store_backend.py",
+  "tests/test_skill_genesis_agent.py",
+  "tests/test_skill_genesis_command.py",
+  "tests/test_skill_genesis_review.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, state-ledgers] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/swe/agent-intermediate-documents.md:32/35"
+
+[[dep]]
+paths = [
+  "scripts/git-finalize-hook.sh",
+]
+tests = [
+  "scripts/test_adr_health.py",
+  "scripts/test_check_adr_frontmatter_promotion.py",
+  "scripts/test_check_adr_reciprocity.py",
+  "scripts/test_check_design_checkpoint.py",
+  "scripts/test_check_hook_installation.py",
+  "scripts/test_check_spec_archival_gap.py",
+  "scripts/test_check_spec_drift.py",
+  "scripts/test_check_state_corpus.py",
+  "scripts/test_export_codex_agents.py",
+  "scripts/test_export_codex_command_skills.py",
+  "scripts/test_export_codex_pipeline_adapter.py",
+  "scripts/test_export_codex_rules_bridge.py",
+  "scripts/test_export_codex_skills.py",
+  "scripts/test_finalize_adrs.py",
+  "scripts/test_finalize_chain.py",
+  "scripts/test_install_codex.py",
+  "scripts/test_install_dev_link.py",
+  "scripts/test_install_git_hooks.py",
+  "scripts/test_manage_codex_mcp.py",
+  "scripts/test_query_adrs.py",
+  "scripts/test_regenerate_adr_index.py",
+  "scripts/test_regenerate_specs_index.py",
+  "scripts/test_rules_bridge_parsing.py",
+  "scripts/test_upgrade_project_pins.py",
+  "scripts/test_validate_adr_references.py",
+  "tests/test_adr_frontmatter_parseable.py",
+  "tests/test_criteria_spec_eval.py",
+  "tests/test_sh07_sentinel.py",
+  "tests/test_spec_drift.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [decision-records, install-and-export] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: scripts/git-finalize-hook.sh:26/29"
+
+[[dep]]
+paths = [
+  "scripts/praxion-sidecar",
+]
+tests = [
+  "scripts/test__git_runner.py",
+  "scripts/test_mutation_sensor.py",
+  "scripts/test_onboard_placement_composition_agreement.py",
+  "scripts/test_onboard_project_placement.py",
+  "scripts/test_praxion_sidecar.py",
+  "scripts/test_reconcile_aac_surfaces.py",
+  "scripts/test_repo_root.py",
+  "scripts/test_sidecar_checks.py",
+  "scripts/test_sidecar_commit.py",
+  "scripts/test_sidecar_convergence.py",
+  "scripts/test_sidecar_identity.py",
+  "scripts/test_sidecar_inputs.py",
+  "scripts/test_sidecar_link.py",
+  "scripts/test_sidecar_manifest.py",
+  "scripts/test_sidecar_mount.py",
+  "scripts/test_sidecar_render.py",
+  "scripts/test_spawn_count.py",
+  "scripts/test_state_repo.py",
+  "tests/commands/test_merge_worktree_convergence.py",
+  "tests/commands/test_onboard_block_mechanism.py",
+  "tests/commands/test_onboard_capability_defaults.py",
+  "tests/commands/test_onboard_ci_autofix_install.py",
+  "tests/commands/test_onboard_consult_ledgers_install.py",
+  "tests/commands/test_onboard_gate_consolidation.py",
+  "tests/commands/test_onboard_hackathon_teardown.py",
+  "tests/commands/test_onboard_labels_install.py",
+  "tests/commands/test_onboard_permissions_allow_install.py",
+  "tests/commands/test_onboard_placement_phase_matrix.py",
+  "tests/commands/test_onboard_praxion_feedback_install.py",
+  "tests/commands/test_onboard_principles_install.py",
+  "tests/commands/test_onboard_seed_signal_agreement.py",
+  "tests/commands/test_upgrade_labels_baseline.py",
+  "tests/commands/test_upgrade_project_command.py",
+  "tests/consumer_layout/**",
+  "tests/test_onboard_project_detection.py",
+  "tests/test_retired_onboarding_surfaces.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [onboarding-contract, scripts-core] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: scripts/praxion-sidecar:33/36"
+
+[[dep]]
+paths = [
+  "skills/agent-evals/references/run-ledger-schema.md",
+  "skills/software-planning/references/disposition-vocabulary.md",
+  "skills/software-planning/references/project-principles.md",
+  "skills/software-planning/references/tech-debt-ledger.md",
+]
+tests = [
+  "scripts/test_check_calibration_coverage.py",
+  "scripts/test_check_state_ledgers.py",
+  "scripts/test_clean_work_safety.py",
+  "scripts/test_compose_handoff.py",
+  "scripts/test_finalize_tech_debt_ledger.py",
+  "scripts/test_handoff_session.py",
+  "scripts/test_ledger_health.py",
+  "scripts/test_ledger_snapshot.py",
+  "scripts/test_ledger_staleness.py",
+  "scripts/test_merge_driver_observations.py",
+  "scripts/test_prune_reports.py",
+  "scripts/test_reconcile_ai_state.py",
+  "scripts/test_reconcile_pipeline_state.py",
+  "scripts/test_step_schema.py",
+  "scripts/test_triage_write_protocol.py",
+  "tests/test_append_eval_log.py",
+  "tests/test_disposition_vocabulary.py",
+  "tests/test_principles_loader.py",
+  "tests/test_run_store_backend.py",
+]
+why = "retired TEST_TOPOLOGY.md group(s) [state-ledgers] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: skills/agent-evals/references/run-ledger-schema.md:17/19, skills/software-planning/references/disposition-vocabulary.md:18/19, skills/software-planning/references/project-principles.md:19/19, skills/software-planning/references/tech-debt-ledger.md:17/19"

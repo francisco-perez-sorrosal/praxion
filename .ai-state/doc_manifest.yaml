@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-28T15:50:28Z'
+generated_at: '2026-09-28T15:51:15Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -1076,43 +1076,43 @@ surfaces:
   path: .ai-state/decisions/085-lightweight-tier-activation-policy.md
   type: markdown
   title: Test-topology protocol does not activate at Lightweight tier; escalation path is the sole exit
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-086-parallel-unsafe-and-marker-conflicts
   path: .ai-state/decisions/086-parallel-unsafe-and-marker-conflicts.md
   type: markdown
   title: "Parallel-unsafe groups isolate at runner level; kebab-id \u2192 snake_case marker form; reserved-name set"
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-087-pilot-strategy-trunk-only-then-defer-behavioral-pilot
   path: .ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md
   type: markdown
   title: "Pilot strategy \u2014 trunk-only at this pipeline; defer behavioral pilot to first consumer project"
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-088-runtime-envelope-opt-in-policy
   path: .ai-state/decisions/088-runtime-envelope-opt-in-policy.md
   type: markdown
   title: expected_runtime_envelope is opt-in at M1 and M2; required from M3 (sentinel TT04 activation)
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-089-selector-manual-justification-format
   path: .ai-state/decisions/089-selector-manual-justification-format.md
   type: markdown
   title: selector=manual justification is a closed enum with an "other" escape hatch
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-090-topology-regeneration-cadence
   path: .ai-state/decisions/090-topology-regeneration-cadence.md
   type: markdown
   title: Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-091-test-partitioning-typed-pluggable-identifier-registry
   path: .ai-state/decisions/091-test-partitioning-typed-pluggable-identifier-registry.md
   type: markdown
   title: Typed-pluggable-identifier registries (selector_strategy and parallel_runner) as the trunk's language-additive primitive
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-092-retire-roadmap-living-document
   path: .ai-state/decisions/092-retire-roadmap-living-document.md
@@ -1718,25 +1718,25 @@ surfaces:
   path: .ai-state/decisions/192-growth-trigger-thresholds.md
   type: markdown
   title: "Test-topology growth-trigger thresholds \u2014 two-factor gate with calibratable values"
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-193-test-topology-m2-activation
   path: .ai-state/decisions/193-test-topology-m2-activation.md
   type: markdown
   title: "Test-topology M2 \u2014 behavioral agent wiring plus advisory growth trigger"
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-194-verifier-tier-appropriateness
   path: .ai-state/decisions/194-verifier-tier-appropriateness.md
   type: markdown
   title: Verifier validates scoped-test tier-appropriateness as a document cross-check, not a re-run
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-195-sequential-group-ordering
   path: .ai-state/decisions/195-sequential-group-ordering.md
   type: markdown
   title: 'Sequential group ordering for test-topology activation: trunk-first, then agents in parallel'
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-196-cli-allowlist-policy
   path: .ai-state/decisions/196-cli-allowlist-policy.md
@@ -1778,7 +1778,7 @@ surfaces:
   path: .ai-state/decisions/202-register-python-topology-selectors.md
   type: markdown
   title: "Register Python selector & parallel-runner identifiers in the test-topology registries (M1\u2192M2 for Python)"
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: adr_card
 - id: ai-state-decisions-203-sentinel-t03-threshold-exception
   path: .ai-state/decisions/203-sentinel-t03-threshold-exception.md
@@ -3021,7 +3021,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3089,18 +3089,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-09-14'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.json
-  type: json
-  title: METRICS_REPORT_2026-08-05_22-03-40.json
-  last_modified: '2026-08-05'
-  renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-07_07-41-41.json
-  type: json
-  title: METRICS_REPORT_2026-08-07_07-41-41.json
-  last_modified: '2026-08-07'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-25_04-25-13.json
   type: json
@@ -3155,18 +3143,12 @@ surfaces:
   title: METRICS_REPORT_2026-09-23_16-09-26.json
   last_modified: '2026-09-23'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-05_22-03-40.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-08-05'
-  renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-07_07-41-41.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-08-07'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-28_13-00-11.json
+  type: json
+  title: METRICS_REPORT_2026-09-28_13-00-11.json
+  last_modified: '2026-09-28'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-25_04-25-13.md
   type: markdown
@@ -3220,6 +3202,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-09-23'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-28_13-00-11.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-09-28'
   renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
@@ -3751,10 +3739,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
-  - ai-state-metrics-reports-metrics-report-2026-08-05-22-03-40
-  - ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
-  - ai-state-metrics-reports-metrics-report-2026-08-07-07-41-41
   - ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   - ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
@@ -3773,6 +3757,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   - ai-state-metrics-reports-metrics-report-2026-09-23-16-09-26
   - ai-state-metrics-reports-metrics-report-2026-09-23-16-09-26
+  - ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
+  - ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
   - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27

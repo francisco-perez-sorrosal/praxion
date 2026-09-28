@@ -262,7 +262,7 @@ class TestCanonicalSchemaAnchor:
         assert "## Producer overlays" in text
         assert "### verifier (Phase 5 / 5.5)" in text
         assert "### architect-validator (Phase 7)" in text
-        assert "### sentinel (TD01–TD04, TT04, EC07)" in text
+        assert "### sentinel (TD01–TD04, EC07)" in text
         assert "### orchestrator (main agent)" in text
 
     def test_sentinel_td_checks_reference_producer_overlay(self) -> None:

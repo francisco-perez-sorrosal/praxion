@@ -110,17 +110,39 @@ class AuditedFailure:
 # --- JUnit parsing -------------------------------------------------------------
 
 
-def _nodeid(testcase: ElementTree.Element) -> tuple[str, str]:
+def _split_classname(classname: str, known_files: frozenset[str] | None) -> tuple[str, list[str]]:
+    """(file, classes) for a junit `classname` such as `scripts.test_x.TestFoo`.
+
+    pytest writes the module path and any enclosing test classes as one dotted
+    name, so the file is the longest dotted prefix that names a real `.py` file.
+    Without a file list, the whole name is taken as the module (no classes).
+    """
+    parts = classname.split(".")
+    if known_files is not None:
+        for cut in range(len(parts), 0, -1):
+            candidate = "/".join(parts[:cut]) + ".py"
+            if candidate in known_files:
+                return candidate, parts[cut:]
+    return "/".join(parts) + ".py", []
+
+
+def _nodeid(
+    testcase: ElementTree.Element, known_files: frozenset[str] | None = None
+) -> tuple[str, str]:
     """(nodeid, file) for one `<testcase>`, from its `file`/`classname`/`name`."""
     name = testcase.get("name", "")
     file = testcase.get("file") or ""
+    classes: list[str] = []
+    classname = testcase.get("classname", "")
+    if classname:
+        module_file, classes = _split_classname(classname, known_files)
+        file = file or module_file
     if not file:
-        classname = testcase.get("classname", "")
-        file = f"{classname.replace('.', '/')}.py" if classname else ""
-    return (f"{file}::{name}" if file else name), file
+        return name, file
+    return "::".join([file, *classes, name]), file
 
 
-def parse_junit(path: Path) -> dict[str, JunitCase]:
+def parse_junit(path: Path, known_files: frozenset[str] | None = None) -> dict[str, JunitCase]:
     """Every test case in a junit XML file, keyed by nodeid, with its duration."""
     try:
         tree = ElementTree.parse(path)
@@ -128,12 +150,12 @@ def parse_junit(path: Path) -> dict[str, JunitCase]:
         raise AuditError(f"cannot parse {path}: {exc}") from exc
     cases: dict[str, JunitCase] = {}
     for testcase in tree.getroot().iter("testcase"):
-        nodeid, file = _nodeid(testcase)
+        nodeid, file = _nodeid(testcase, known_files)
         cases[nodeid] = JunitCase(nodeid, file, float(testcase.get("time", 0.0)))
     return cases
 
 
-def failing_cases(path: Path) -> dict[str, JunitCase]:
+def failing_cases(path: Path, known_files: frozenset[str] | None = None) -> dict[str, JunitCase]:
     """Nodeids with a `<failure>` or `<error>` child -- the run's red cases."""
     try:
         tree = ElementTree.parse(path)
@@ -143,7 +165,7 @@ def failing_cases(path: Path) -> dict[str, JunitCase]:
     for testcase in tree.getroot().iter("testcase"):
         if testcase.find("failure") is None and testcase.find("error") is None:
             continue
-        nodeid, file = _nodeid(testcase)
+        nodeid, file = _nodeid(testcase, known_files)
         failed[nodeid] = JunitCase(nodeid, file, float(testcase.get("time", 0.0)))
     return failed
 
@@ -285,15 +307,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else EXIT_ERROR
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
+    known = frozenset(repo_files(repo_root))
     try:
-        cases = failing_cases(Path(args.junit))
-        rerun_cases = failing_cases(Path(args.rerun)) if args.rerun else None
+        cases = failing_cases(Path(args.junit), known)
+        rerun_cases = failing_cases(Path(args.rerun), known) if args.rerun else None
     except AuditError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR
     resolution, files = _resolve_change(args, repo_root)
     audited = audit(cases, rerun_cases, resolution, frozenset(files))
-    slow = slow_tests(parse_junit(Path(args.junit)), args.slow) if args.slow else []
+    slow = slow_tests(parse_junit(Path(args.junit), known), args.slow) if args.slow else []
     change_desc = resolution.changed.source if resolution is not None else None
     payload = to_payload(args.junit, args.rerun, change_desc, audited, slow)
     if args.json:

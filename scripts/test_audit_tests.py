@@ -246,3 +246,20 @@ def test_human_output_prints_missed_count(tmp_path: Path, base_repo: Path, capsy
     at.main(["--repo-root", str(base_repo), "--junit", str(junit), "--changed", "pkg/foo.py"])
     out = capsys.readouterr().out
     assert "missed=1" in out
+
+
+def test_a_class_based_test_keeps_its_module_file(tmp_path: Path) -> None:
+    """pytest folds enclosing classes into `classname`; the file is the real module."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        '<testsuites><testsuite name="pytest">'
+        '<testcase classname="scripts.test_x.TestFoo" name="test_a" time="0.1">'
+        '<failure message="boom"/></testcase>'
+        "</testsuite></testsuites>",
+        encoding="utf-8",
+    )
+
+    failed = at.failing_cases(junit, frozenset({"scripts/test_x.py"}))
+
+    assert list(failed) == ["scripts/test_x.py::TestFoo::test_a"]
+    assert failed["scripts/test_x.py::TestFoo::test_a"].file == "scripts/test_x.py"

@@ -543,7 +543,7 @@ The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't
 - `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts.
 - `commands/praxion-complete-install.md` — optional slash command for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT`, runs the cache's `install.sh code --check`, and prints `install.sh code --complete-install` for the user to run in their own terminal — the Bash tool has no TTY to answer the installer's consent prompts.
 
-The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninstall`) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.
+The inverse pair (`complete_uninstall_from_plugin()`, run through the command `/praxion-complete-uninstall` prints) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.
 
 ### Two install modes coexist
 
@@ -551,7 +551,7 @@ The inverse pair (`complete_uninstall_from_plugin()` + `/praxion-complete-uninst
 |---|---|---|---|---|
 | **Clone-based (full)** | `./install.sh code` | Local checkout | Local checkout | One-step installer; no follow-up needed |
 | **Marketplace (plugin only)** | `claude plugin install praxion@bit-agora` | Plugin cache | Plugin cache via auto-completion hook | Auto-completes on first session (no manual step required) |
-| **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: re-invoke for reconfiguration/recovery/re-link |
+| **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: prints the terminal command for reconfiguration/recovery/re-link |
 
 For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wrapper around `claude --plugin-dir`) to launch a session that loads the plugin directly from the working tree — see [Session-scoped local testing](#session-scoped-local-testing).
 
@@ -559,14 +559,14 @@ For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wr
 
 `claude plugin update praxion` replaces the cache directory entirely. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old cache version. Refresh by either:
 - Start a fresh Claude Code session (triggers auto-completion automatically), OR
-- Explicitly run `/praxion-complete-install` to re-link against the new version, OR
+- Explicitly run `/praxion-complete-install` and then, in your own terminal, the command it prints to re-link against the new version, OR
 - For clone-based installs: run `./install.sh code --relink`
 
 No automatic refresh hook exists today because Claude Code doesn't expose a PostPluginUpdate event — filed as a watch-item for when that API lands.
 
 ### Uninstall ordering
 
-Always run `/praxion-complete-uninstall` **before** `claude plugin uninstall praxion`. Reversing the order leaves dangling symlinks pointing at a deleted cache directory. The complete-uninstall still cleans them up correctly in that case (filter by `target begins with ${CLAUDE_PLUGIN_ROOT}` — absent target doesn't matter, the link itself gets removed), but the right-order path avoids the intermediate broken state.
+Always run the `install.sh code --complete-uninstall` command that `/praxion-complete-uninstall` prints — in your own terminal — **before** `claude plugin uninstall praxion`. Reversing the order deletes the cache, including that `install.sh`, and leaves dangling symlinks pointing at the deleted directory. The complete-uninstall logic would still remove them (it filters by `target begins with ${CLAUDE_PLUGIN_ROOT}`; an absent target doesn't matter), but only a clone-based `./install.sh` is left to run it, so the right-order path is the one to document.
 
 ## Quality Evals
 

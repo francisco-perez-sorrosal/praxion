@@ -854,7 +854,7 @@ PYEOF
 # Detects and offers to remove context-hub (chub) MCP entries that earlier
 # Praxion versions wrote into Claude Code's own config files. Remove this
 # function, its helpers, and every call site together; see the tech-debt row
-# whose dedup_key is "legacy-chub-cleanup-shim". Do not cite ADR ids here.
+# td-285 in .ai-state/TECH_DEBT_LEDGER.md. Do not cite ADR ids here.
 # =============================================================================
 
 # Prints "present", "absent", or "unparseable" for whether $1's mcpServers

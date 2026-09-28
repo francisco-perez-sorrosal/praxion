@@ -224,9 +224,9 @@ claude plugin install praxion@bit-agora --scope user
 
 Praxion auto-completes setup on the first Claude Code session — rules are symlinked to `~/.claude/rules/`, CLI scripts to `~/.local/bin/`, no manual step required. `claude plugin install` fetches the full repo at the marketplace-pinned tag into `~/.claude/plugins/cache/`; auto-completion symlinks from that cache without cloning or network access.
 
-**After plugin updates** — `claude plugin update praxion` leaves existing symlinks pointing at the old version. Start a fresh session (auto-completion refreshes them) or run `/praxion-complete-install`.
+**After plugin updates** — `claude plugin update praxion` leaves existing symlinks pointing at the old version. Start a fresh session (auto-completion refreshes them) or run `/praxion-complete-install` and then, in your own terminal, the command it prints.
 
-**Uninstall order** — run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall praxion`. The reverse order leaves dangling symlinks (still cleanable by `/praxion-complete-uninstall`).
+**Uninstall order** — run `/praxion-complete-uninstall` and then, in your own terminal, the `install.sh … --complete-uninstall` command it prints — **before** `claude plugin uninstall praxion`. The reverse order deletes that cached `install.sh` along with the plugin and leaves dangling symlinks in `~/.claude/rules/` and `~/.local/bin/` to remove by hand.
 
 To reconfigure personal settings or recover from corruption, `/praxion-complete-install` checks the current state, then hands you the exact command to run in your own terminal — where the underlying `install.sh --complete-install` is idempotent and prompts before each system-level change.
 

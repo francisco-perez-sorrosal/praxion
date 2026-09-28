@@ -32,7 +32,7 @@ MUTATING_FLAGS = ("--complete-install", "--complete-uninstall", "--uninstall")
 
 # The stable phrase both the command bodies and the README rows must use to
 # tell the user the mutating command runs on their side, not the assistant's.
-# The implementer must match this exact substring (case-insensitive).
+# Both command bodies and both README rows carry this exact substring (case-insensitive).
 TERMINAL_HANDOFF_PHRASE = "own terminal"
 
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)

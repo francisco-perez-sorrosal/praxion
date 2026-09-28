@@ -1,48 +1,25 @@
 ---
-description: Auto-detect test framework and run tests
+description: Run the tests a change needs, derived from layout, imports, path literals and the declared list
 argument-hint: "[path|all]"
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
-Detect the project's test framework automatically and run tests. Load the [testing-strategy](../skills/testing-strategy/SKILL.md) skill for strategic guidance on test design and architecture decisions.
+Run tests via the derived-selection resolver, `resolve_test_scope.py`. Load the [testing-strategy](../skills/testing-strategy/SKILL.md) skill for strategic guidance on test design and architecture decisions; runner and framework detection live inside the resolver's own inventory module, never re-derived here.
 
 ## Process
 
-1. **Detect test framework and project runner** from project config files. Always run tests through the project's package/environment manager — never invoke test frameworks directly.
+1. **Resolve the scope** from `$ARGUMENTS`:
 
-   **Runner detection** (check in order, use first match):
-
-   | Signal | Runner | Example |
-   |---|---|---|
-   | `pixi.toml` or `[tool.pixi]` in `pyproject.toml` | `pixi run` | `pixi run pytest` |
-   | `uv.lock` or `[tool.uv]` in `pyproject.toml` | `uv run` | `uv run pytest` |
-   | `pyproject.toml` exists (no pixi/uv) | `python -m` | `python -m pytest` |
-   | `pnpm-lock.yaml` | `pnpm exec` | `pnpm exec jest` |
-   | `yarn.lock` | `yarn` | `yarn jest` |
-   | `package-lock.json` or `package.json` | `npx` | `npx jest` |
-   | `Cargo.toml` | `cargo` | `cargo test` |
-   | `go.mod` | `go` | `go test ./...` |
-
-   **Framework detection** (after runner is determined):
-
-   | Config Signal | Framework |
+   | `$ARGUMENTS` | Resolver flag |
    |---|---|
-   | `pyproject.toml` with `[tool.pytest.ini_options]` or `pytest` in dependencies | pytest |
-   | `package.json` with `vitest` in devDependencies | Vitest |
-   | `package.json` with `jest` in devDependencies | Jest |
-   | `Cargo.toml` | cargo test (built-in) |
-   | `go.mod` | go test (built-in) |
+   | (none) | working tree (no flag) |
+   | a path | `--changed <path>` |
+   | `all` | `--full` |
 
-   If no framework is detected, report what was checked and ask the user which framework to use.
+   Invoke `resolve_test_scope.py [flags] --json` — on `PATH` via `install_claude.sh` in any project; Praxion self-host: `python3 scripts/resolve_test_scope.py [flags] --json`.
 
-2. **Determine scope** from `$ARGUMENTS`:
+2. **Run the emitted invocations.** For each entry in the JSON `pockets[]`, `cd` to `invocations[].cwd` and run `invocations[].argv` with failures-first flags appended: `-q --tb=short -rf` for pytest, each other runner's quiet-with-failure-list equivalent (e.g. `--reporter=default` for vitest/jest, plain output for `cargo test`/`go test`). A pocket whose `selection` is `nothing` runs nothing.
 
-   - **No argument**: Run tests on files changed since last commit. Use `git diff --name-only HEAD` to find changed files, then filter for test file patterns (`test_*`, `*_test.*`, `*_spec.*`, files under `tests/`). If no changed test files are found, report that and suggest running with `all`.
-   - **A path**: Run tests in that file or directory.
-   - **`all`**: Run the full test suite with no path filtering.
+   When `decision` is `"widened"`, report every `widen[].reason`/`detail` before running — a widened run means every affected pocket runs its full suite, not a narrower one. A change the resolver cannot account for widens; it never narrows.
 
-3. **Run tests** using the detected framework with appropriate flags:
-   - **Changed files / path scope**: verbose output, fail-fast (`-x` for pytest, `--bail` for Jest, etc.) for quick feedback
-   - **`all` scope**: verbose output, full run (no fail-fast), show complete results
-
-4. **Report results**: Show pass/fail counts, list failing test names, and for failures suggest likely causes or point to the relevant test output.
+3. **Report results**: pass/fail counts per pocket, failing test names, and for a failure point at the relevant output rather than pasting the full run inline.

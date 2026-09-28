@@ -1,0 +1,342 @@
+# Scheduled test-health loop — the weekly watcher over the suite itself:
+# flaky tests, `large` tests, selection misses, and the slowest tests. Mirrors
+# `claude/project-baseline/tests/test-scheduled.yml.tmpl` (the shipped
+# onboarding template) adapted to Praxion's own four pockets, dogfooding the
+# same shape a managed project installs.
+#
+# Praxion self-hosts `scripts/audit_tests.py` and `scripts/resolve_test_scope.py`
+# directly — unlike a managed project's installed copy, no hub sparse-checkout
+# step is needed here; the checkout already has both.
+#
+# Per pocket: full suite (junit) -> one rerun of just the failures (flaky
+# classification) -> `-m large` (exit code 5, "no tests collected", counts as
+# a pass) -> the selection audit against the diff since this workflow's last
+# green run -> a top-20 slow-test report. The job goes red on a failure that
+# survives the rerun, a failing `large` test, a selection miss, or a flaky
+# test — the audit exits non-zero on the last two.
+#
+# task-chronograph-mcp's `large` tests (test_phoenix_diagnostic.py) need a
+# live Phoenix daemon this runner does not have (td-289) and are excluded by
+# name rather than run-and-fail; every other pocket carries no `large` tests
+# today, so their `-m large` step is expected to exit 5 (pass).
+#
+# Known limitation: `audit_tests.py`'s change-set is always repo-root-relative
+# (git normalizes paths regardless of invocation cwd), but a pocket other than
+# `.` reports junit `classname` relative to ITS OWN pytest rootdir (no pocket
+# prefix), since each non-root pocket carries its own `pyproject.toml`. The
+# root pocket's audit is exact; the eval/chronograph pockets' audits are
+# best-effort (a real regression there still fails the job on the plain
+# rerun-survives check — only the *audit*'s attribution is coarser).
+#
+# Actions are SHA-pinned per security convention (dec-024).
+
+name: Test (scheduled)
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"  # weekly, Monday 05:17 UTC — off the top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read  # find this workflow's last green run for the audit's diff
+
+concurrency:
+  group: test-scheduled
+  cancel-in-progress: false
+
+jobs:
+  health-root:
+    name: Test health (root)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Full suite (parallel)
+        id: full
+        continue-on-error: true
+        run: uv run --frozen pytest --junitxml=junit.xml
+
+      - name: Rerun failures once (flaky or broken)
+        id: rerun
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        run: uv run --frozen pytest --last-failed --junitxml=rerun.xml
+
+      - name: Large tests (live external services)
+        id: large
+        continue-on-error: true
+        # The last -m wins over the runner config's -m 'not large'. Exit code
+        # 5 means no test in this pocket carries the marker, which is a pass.
+        run: |
+          set +e
+          uv run --frozen pytest -m large
+          rc=$?
+          if [ "$rc" -eq 5 ]; then rc=0; fi
+          exit "$rc"
+
+      - name: Audit selection, flakiness and slow tests
+        run: |
+          last_green="$(gh run list --workflow "Test (scheduled)" --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20 --repo-root .)
+          if [ -f rerun.xml ]; then args+=(--rerun rerun.xml); fi
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-root
+          path: |
+            junit.xml
+            rerun.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+          RERUN: ${{ steps.rerun.outcome }}
+          LARGE: ${{ steps.large.outcome }}
+        run: |
+          status=0
+          if [ "$RERUN" = "failure" ]; then
+            echo "::error::Tests still fail after one rerun - see rerun.xml."; status=1
+          elif [ "$FULL" = "failure" ]; then
+            echo "::warning::Tests failed once and passed on rerun - flaky, see junit.xml."
+          fi
+          if [ "$LARGE" = "failure" ]; then
+            echo "::error::Large tests failed."; status=1
+          fi
+          exit "$status"
+
+  health-eval:
+    name: Test health (eval)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv (manages Python 3.13)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: eval
+        run: uv sync
+
+      - name: Full suite
+        id: full
+        continue-on-error: true
+        working-directory: eval
+        run: uv run pytest --junitxml=junit.xml
+
+      - name: Rerun failures once (flaky or broken)
+        id: rerun
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        working-directory: eval
+        run: uv run pytest --last-failed --junitxml=rerun.xml
+
+      - name: Large tests (live external services)
+        id: large
+        continue-on-error: true
+        working-directory: eval
+        run: |
+          set +e
+          uv run pytest -m large
+          rc=$?
+          if [ "$rc" -eq 5 ]; then rc=0; fi
+          exit "$rc"
+
+      - name: Audit selection, flakiness and slow tests
+        working-directory: eval
+        run: |
+          last_green="$(gh run list --workflow "Test (scheduled)" --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20 --repo-root ..)
+          if [ -f rerun.xml ]; then args+=(--rerun rerun.xml); fi
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 ../scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-eval
+          path: |
+            eval/junit.xml
+            eval/rerun.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+          RERUN: ${{ steps.rerun.outcome }}
+          LARGE: ${{ steps.large.outcome }}
+        run: |
+          status=0
+          if [ "$RERUN" = "failure" ]; then
+            echo "::error::Tests still fail after one rerun - see rerun.xml."; status=1
+          elif [ "$FULL" = "failure" ]; then
+            echo "::warning::Tests failed once and passed on rerun - flaky, see junit.xml."
+          fi
+          if [ "$LARGE" = "failure" ]; then
+            echo "::error::Large tests failed."; status=1
+          fi
+          exit "$status"
+
+  health-chronograph:
+    name: Test health (task-chronograph-mcp)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv (manages Python 3.13)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: task-chronograph-mcp
+        run: uv sync
+
+      - name: Full suite
+        id: full
+        continue-on-error: true
+        working-directory: task-chronograph-mcp
+        run: uv run pytest --junitxml=junit.xml
+
+      - name: Rerun failures once (flaky or broken)
+        id: rerun
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        working-directory: task-chronograph-mcp
+        run: uv run pytest --last-failed --junitxml=rerun.xml
+
+      # No "large tests" step here: task-chronograph-mcp's only `large`
+      # suite (test_phoenix_diagnostic.py) needs a live Phoenix daemon this
+      # runner does not have. td-289 tracks fixing the diagnostic query;
+      # until then, running it here would fail permanently by construction,
+      # not by regression, which the risk table calls out by name.
+
+      - name: Audit selection, flakiness and slow tests
+        working-directory: task-chronograph-mcp
+        run: |
+          last_green="$(gh run list --workflow "Test (scheduled)" --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20 --repo-root ..)
+          if [ -f rerun.xml ]; then args+=(--rerun rerun.xml); fi
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 ../scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-chronograph
+          path: |
+            task-chronograph-mcp/junit.xml
+            task-chronograph-mcp/rerun.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+          RERUN: ${{ steps.rerun.outcome }}
+        run: |
+          if [ "$RERUN" = "failure" ]; then
+            echo "::error::Tests still fail after one rerun - see rerun.xml."; exit 1
+          elif [ "$FULL" = "failure" ]; then
+            echo "::warning::Tests failed once and passed on rerun - flaky, see junit.xml."
+          fi
+
+  health-dashboard:
+    name: Test health (dashboard)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: dashboard_app
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm (version from packageManager field)
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6
+        with:
+          package_json_file: dashboard_app/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: dashboard_app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Full suite
+        id: full
+        continue-on-error: true
+        run: pnpm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+
+      - name: Audit selection and slow tests
+        run: |
+          last_green="$(gh run list --workflow "Test (scheduled)" --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20 --repo-root ..)
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 ../scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-dashboard
+          path: dashboard_app/junit.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+        run: |
+          if [ "$FULL" = "failure" ]; then
+            echo "::error::The full suite failed - see junit.xml."; exit 1
+          fi

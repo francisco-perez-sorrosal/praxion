@@ -12,7 +12,8 @@
 # (P2 — designed, not yet built), as does `safety.auto_commit_tiers`. See
 # `claude/project-baseline/ci-autofix/autofix-policy.yml.tmpl` for the full schema.
 
-watched_workflows: [Test, Architecture]  # Documentary only — the caller's own
+watched_workflows: [Test, Architecture, "Test (scheduled)"]  # Documentary only
+                                          # — the caller's own
                                           # on.workflow_run.workflows is the
                                           # GHA-required static literal and is
                                           # authoritative. Keep this list in

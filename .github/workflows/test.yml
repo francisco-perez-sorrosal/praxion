@@ -54,7 +54,15 @@ jobs:
 
       - name: Pytest
         working-directory: ${{ matrix.project }}
-        run: uv run pytest
+        run: uv run pytest --junitxml=junit.xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: junit-${{ matrix.project }}
+          path: ${{ matrix.project }}/junit.xml
+          if-no-files-found: warn
 
   test-root:
     # Strict since 2026-07-16 after one observed green report-only run
@@ -130,6 +138,7 @@ jobs:
           uv run --frozen pytest
           --cov --cov-config=pyproject.toml --cov-report=xml
           --cov-report=term-missing --cov-fail-under=80
+          --junitxml=junit.xml
 
       - name: Shell test suites
         # `tests/*.sh` are bash suites that pytest cannot collect, so nothing
@@ -181,12 +190,14 @@ jobs:
           grep -h '^\[SKIP\]' "${logdir}"/*.log 2>/dev/null \
             | sed 's/^/::notice::shell suite skip: /' || true
 
-      - name: Upload coverage artifact
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: root-coverage
-          path: coverage.xml
+          path: |
+            coverage.xml
+            junit.xml
           if-no-files-found: warn
 
   test-dashboard:
@@ -229,7 +240,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Vitest
-        run: pnpm test
+        run: pnpm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: junit-dashboard
+          path: dashboard_app/junit.xml
+          if-no-files-found: warn
 
   validate-context-artifacts:
     # Strict since 2026-07-16 (ROADMAP item 1.1). Soft-launched 2026-04

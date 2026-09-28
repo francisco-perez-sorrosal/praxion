@@ -40,7 +40,7 @@ INSTALLED_CALLER_FILE = PROJECT_ROOT / ".github" / "workflows" / "ci-autofix.yml
 # Praxion's own install-time values — exactly what `/onboard-project` would
 # substitute into this template for Praxion itself (caller #1, dogfooding).
 _RENDER_SUBSTITUTIONS = {
-    "{{WATCHED_WORKFLOWS}}": '"Test", "Architecture"',
+    "{{WATCHED_WORKFLOWS}}": '"Test", "Architecture", "Test (scheduled)"',
     "{{PRAXION_HUB}}": "francisco-perez-sorrosal/praxion",
     # The SHA's actual value is irrelevant to this suite: the whole `uses:`
     # line is the one documented, tolerated divergence. Any

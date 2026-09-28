@@ -39,7 +39,7 @@ name: CI Autofix
 
 on:
   workflow_run:
-    workflows: ["Test", "Architecture"]
+    workflows: ["Test", "Architecture", "Test (scheduled)"]
     types: [completed]
 
 permissions: {}  # least-privilege; the job below adds only what the hub needs

@@ -23,10 +23,67 @@ Language-independent testing knowledge for making strategic testing decisions: w
 - [references/python-testing.md](references/python-testing.md) -- advanced pytest patterns: conftest architecture, hypothesis property-based testing, fixture composition, coverage strategy, plugin ecosystem
 - [references/typescript-testing.md](references/typescript-testing.md) -- TypeScript testing patterns with Vitest and Jest, type-safe mocking, integration testing
 - [references/rust-testing.md](references/rust-testing.md) -- Rust testing with the built-in test framework, proptest, and integration patterns
-- [references/test-topology.md](references/test-topology.md) -- language-agnostic test topology schema: trunk schema fields, identifier registries (selector_strategy, parallel_runner), tier vocabulary, closure semantics, document conventions, growth-trigger policy (advisory adoption thresholds), and `/refresh-topology --init` and default-refresh paths
+- [references/test-selection.md](references/test-selection.md) -- the derived test-selection contract: the four edge sources and union semantics, widening triggers, the ecosystem dispatcher matrix, the declared-list format, the selection-audit protocol, and the operational copy of the five-loop table
 - [references/gate-canaries.md](references/gate-canaries.md) -- how to author the canary that proves a CODE gate bites: the negative-case contract, naming + co-location convention, a worked example, and how canary coverage is enforced (companion to the `gate-liveness` rule)
 
 Additional language references are added here without changes to this file's body.
+
+## The Ten Principles
+
+1. Every feedback loop has a latency budget.
+2. Make the whole cheap before making it selective.
+3. Parallel-safety is a property of every test, enforced by running parallel.
+4. Selection is derived from the code, never hand-kept, and unmapped widens.
+5. Scope and size are two separate axes: scope says who designs a test, size says when it runs.
+6. Beyond the unit level, tests are designed independently of the design; the implementer runs outer-loop tests, never edits them.
+7. Structure communicates, tooling computes.
+8. Measurement is periodic, not a side effect, and a coverage floor is a ratchet, not a target.
+9. Flakiness is a defect with an owner: no local retries, CI reruns only to classify, and a ledger row.
+10. Test output is an interface for agents: failures first, bounded, no noise.
+
+Every other testing artifact in this project -- the conventions rule, the per-language references, agent prompts, onboarding templates -- conforms to these ten principles. When a document seems to contradict one of them, the document is wrong.
+
+## Organization
+
+Two independent axes classify every test. Conflating them is the most common source of contradictory testing advice.
+
+**Scope** -- who designs the test, and where it lives:
+
+| Scope | Owner | Lives in |
+|---|---|---|
+| Unit | Implementer | Inner-loop convention (co-located with source, or the project's declared test directory) |
+| Internal integration | Implementer (needs the design) | Inner-loop convention |
+| Boundary integration (CLI, HTTP, file format, DB, public library API) | Test-engineer, acceptance mode | `tests/acceptance/` |
+| Acceptance | Test-engineer, acceptance mode | `tests/acceptance/` |
+| End-to-end | Test-engineer, acceptance mode | `tests/e2e/` |
+
+**Size** -- when the test runs, independent of who designed it:
+
+| Size | Meaning |
+|---|---|
+| Small | In-process; no subprocess, no network, no real filesystem beyond a temp dir |
+| Medium | Subprocess, local files, git, localhost |
+| Large | Live external services -- the only marker, deselected by default |
+
+**Layout**: tests follow the project's declared convention (co-located sibling or a central `tests/` mirror) -- see [testing-conventions.md](../../rules/swe/testing-conventions.md). Praxion itself mixes both: co-located in `scripts/`/`hooks/`, mirrored under `tests/`.
+
+## Ownership
+
+**Inner loop** (unit, internal integration): owned and edited by the implementer, alongside the production code.
+
+**Outer loop** (boundary integration, acceptance, end-to-end): designed by the test-engineer in `tests/acceptance/` and `tests/e2e/`. These directories are **read-only for the implementer** -- the implementer runs outer-loop tests but never edits them, so acceptance criteria stay independent of the implementation that must satisfy them (Principle 6).
+
+## The Five Loops
+
+| Loop | Trigger | What runs |
+|---|---|---|
+| Inner | Every implementer step and `/test` | Derived selection of the working-tree change |
+| Phase checkpoint | A step the planner marks as closing a phase | Selection over the union of changes since the pipeline base |
+| Integration checkpoint | The pipeline's final step | Full suite; on failure, the audit against the pipeline diff |
+| Pre-merge CI | Push / PR | Full parallel suite, coverage ratchet, junit artifact |
+| Scheduled | Weekly cron + dispatch | Full suite, one rerun to classify flaky failures, `large` tests, slow-test report |
+
+See [references/test-selection.md](references/test-selection.md) for the operational copy of this table (exact commands per loop), the resolver's algorithm, and the audit protocol.
 
 ## Gotchas
 
@@ -141,7 +198,7 @@ Name tests after the behavior they specify, not the method they call. A reader s
 
 ### Organizing Test Files
 
-- **Mirror production structure** -- tests for `payments/refund_policy.py` live in `tests/payments/test_refund_policy.py`.
+- **Follow the project's declared convention** (see Organization above) -- co-located sibling (`payments/test_refund_policy.py`) or mirrored under a central `tests/` directory (`tests/payments/test_refund_policy.py`). Whichever convention the project has chosen, keep the mapping from source file to test file predictable.
 - **DAMP over DRY** -- duplicate setup when it makes a test readable in isolation. Extract shared *mechanics* (builders, custom assertions) into helpers, but keep the *scenario* inline.
 - **Shared fixtures** -- place reusable fixtures in the nearest common ancestor directory. Avoid global fixtures that every test inherits but few use.
 - **Test utilities** -- when helper functions grow beyond a few lines, extract them into a `tests/helpers/` or `tests/support/` directory. Do not put test utilities in production code.

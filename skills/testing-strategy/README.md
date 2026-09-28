@@ -25,7 +25,7 @@ Trigger explicitly by mentioning "testing-strategy skill" or referencing it by n
 | `references/python-testing.md` | Advanced pytest patterns: conftest architecture, hypothesis, fixture composition, markers, coverage |
 | `references/typescript-testing.md` | TypeScript testing patterns with Vitest and Jest, type-safe mocking, integration testing |
 | `references/rust-testing.md` | Rust testing with the built-in test framework, proptest, and integration patterns |
-| `references/test-topology.md` | Language-agnostic test topology schema: group schema, tier vocabulary, identifier registries |
+| `references/test-selection.md` | Derived test-selection contract: the four edge sources, widening triggers, ecosystem dispatch, the declared-list format, the selection-audit protocol |
 | `references/gate-canaries.md` | How to author canary tests that prove a CODE gate bites (negative-case contract) |
 | `README.md` | This file -- overview and usage guide |
 

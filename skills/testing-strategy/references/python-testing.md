@@ -260,16 +260,15 @@ Set `asyncio_mode = "auto"` in `[tool.pytest.ini_options]` so all `async def tes
 
 ## pyproject.toml Configuration
 
-Beyond the basics in [python-development](../../python-development/references/testing-and-tooling.md), consider these advanced options:
+Beyond the basics in [python-development](../../python-development/references/testing-and-tooling.md), consider these advanced options alongside the `addopts` shown above:
 
 ```toml
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers -n auto --dist load -m 'not large' --tb=short"
 asyncio_mode = "auto"
 filterwarnings = ["error", "ignore::DeprecationWarning:third_party_lib.*"]
 ```
 
-- `-ra`: Summary of all non-passing tests at the end
+- `-ra` (in `addopts` above): Summary of all non-passing tests at the end
 - `filterwarnings = ["error"]`: Surfaces deprecation warnings before they become breaking changes
 
 ## What This Reference Does NOT Cover
@@ -282,7 +281,7 @@ filterwarnings = ["error", "ignore::DeprecationWarning:third_party_lib.*"]
 
 ## Select · Parallelize · Fall Back
 
-**Select**: `python3 scripts/resolve_test_scope.py --json` derives the changed-path selection from four edge sources (layout, import, path-literal, declared) and emits the exact invocation, including the runner prefix. See [test-selection.md](test-selection.md) for the full contract.
+**Select**: `resolve_test_scope.py --json` (on PATH via `install_claude.sh`; `python3 scripts/resolve_test_scope.py` in the Praxion self-host checkout) derives the changed-path selection from four edge sources (layout, import, path-literal, declared) and emits the exact invocation, including the runner prefix. See [test-selection.md](test-selection.md) for the full contract.
 
 **Parallelize**: `pytest-xdist` runs by default (`-n auto --dist load`). A selection at or below the serial threshold (~20 estimated tests) is invoked with `-n 0` to skip worker start-up. Debug a single test with `-n 0` -- never `-p no:xdist`, which errors once `-n auto` is already active in `addopts`.
 

@@ -166,7 +166,7 @@ Build test data with intent. Every value in a test fixture should be there for a
 Coverage is a discovery tool, not a quality metric.
 
 - **Use coverage to find untested code paths** -- particularly branches in complex logic, error handlers, and edge cases. Low coverage in a critical module is a signal. High coverage in a trivial module is noise.
-- **Do not set coverage targets as gates.** A 90% target incentivizes testing boilerplate. A 60% codebase with mutation-tested critical paths is healthier than a 95% codebase with assertion-free tests.
+- **The CI floor is a ratchet against regression, never a target.** CI gates on a line-coverage floor (`--cov-fail-under`) so coverage cannot silently drop -- raise the floor only as measured coverage rises, never lower it to go green. Chasing the floor upward for its own sake (testing boilerplate to hit a round number) is the failure mode the ratchet framing guards against: a 60% codebase with mutation-tested critical paths is healthier than a 95% codebase with assertion-free tests.
 - **Mutation testing** is the better proxy -- it verifies that tests actually detect code changes. If removing a line or flipping a condition does not fail any test, the test suite has a gap regardless of line coverage. For Python projects, the per-step opt-in sensor operationalizing this is documented in [python-testing.md § Mutation Sensor (Per-Step)](references/python-testing.md#mutation-sensor-per-step).
 - **Exclude what does not benefit from testing** -- framework boilerplate, generated code, thin wrappers, CLI entry points. Configure exclusions explicitly rather than writing hollow tests to satisfy a metric.
 

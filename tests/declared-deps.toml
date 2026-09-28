@@ -83,7 +83,7 @@ tests = [
   "tests/test_sentinel_check_triangle.py",
   "tests/test_sentinel_row_contract.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness, hooks-lifecycle, install-and-export, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .claude-plugin/plugin.json:42/49"
+why = "the plugin manifest declaring every shipped agent, skill, command and hook; the fitness and repo-gate checks (frontmatter, prompt size, shared blocks, registry projection, path resolution) read it to validate that declared inventory against what is actually on disk"
 
 [[dep]]
 paths = [
@@ -133,7 +133,7 @@ tests = [
   "tests/test_sentinel_workflow_invariants.py",
   "tests/test_sentinel_workflow_publication_invariants.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows, onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/autofix-policy.yml:33/41, .github/labels.yml:38/41"
+why = "the autofix trigger policy and label taxonomy the ci-autofix and labels-reconcile workflows enforce; the onboarding-install and workflow tests read both files' content to check what gets installed or reconciled into a managed project"
 
 [[dep]]
 paths = [
@@ -164,7 +164,7 @@ tests = [
   "tests/test_sentinel_workflow_invariants.py",
   "tests/test_sentinel_workflow_publication_invariants.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/workflows/*.yml:20/21, commands/release.md:21/21, skills/versioning/**:20/21"
+why = "the CI workflow definitions, the release-cut procedure they gate, and the versioning skill's conventions; the workflow-invariant and release-staleness tests parse the workflow YAML and the release runbook to check pin discipline, permissions and the release process they describe"
 
 [[dep]]
 paths = [
@@ -203,7 +203,7 @@ tests = [
   "tests/test_onboard_project_detection.py",
   "tests/test_retired_onboarding_surfaces.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .github/workflows/ci-autofix.yml:19/20, .github/workflows/cross-model-review.yml:19/20, .github/workflows/labels-reconcile.yml:19/20, claude/project-baseline/**:20/20, commands/new-project.md:19/20, commands/onboard-project.md:19/20, commands/upgrade-project.md:18/20, new_project.sh:19/20, scripts/onboard-project:5/20, scripts/onboard_placement.sh:19/20, skills/onboard-project/SKILL.md:16/20, skills/onboard-project/references/*.md:19/20"
+why = "the onboarding installer's script, templates, and the command/skill docs `/onboard-project` and `/new-project` execute or reference; the onboarding placement and capability-install tests run the installer against scratch repos and assert the files it reads and places match these sources"
 
 [[dep]]
 paths = [
@@ -245,7 +245,7 @@ tests = [
   "tests/test_sentinel_check_triangle.py",
   "tests/test_sentinel_row_contract.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: .pre-commit-config.yaml:27/34, claude/aac-templates/**:34/34"
+why = "the pre-commit hook wiring and the shipped Architecture-as-Code templates; the repo-gate and template-mirror tests parse the pre-commit config for hook registration and diff the templates against their installed copies"
 
 [[dep]]
 paths = [
@@ -316,7 +316,7 @@ tests = [
   "tests/test_skill_genesis_command.py",
   "tests/test_skill_genesis_review.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, architecture-fitness, knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: agents/*.md:41/64"
+why = "every shipped agent prompt; the fitness and gate-check tests (prompt size, shared blocks, lifecycle pairing, behavioral contract, frontmatter) and the orchestration tests that dispatch agents read the live prompt files to validate their shape and content"
 
 [[dep]]
 paths = [
@@ -394,7 +394,7 @@ tests = [
   "tests/test_skill_genesis_command.py",
   "tests/test_skill_genesis_review.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, ci-workflows, knowledge-projection, onboarding-contract] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/canonical-blocks/*.md:59/70"
+why = "the single-sourced CLAUDE.md block content that onboarding and sync tooling embed into managed projects; the canonical-block identity, doc-manifest and onboarding tests read these source blocks to check they stay byte-identical to their embedded copies"
 
 [[dep]]
 paths = [
@@ -422,7 +422,7 @@ tests = [
   "scripts/test_rules_bridge_parsing.py",
   "scripts/test_upgrade_project_pins.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [install-and-export] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/config/**:12/12, codex/config/**:11/12, install.sh:12/12, install_claude.sh:11/12, install_codex.sh:11/12, install_cursor.sh:12/12, lib/install_shared.sh:12/12, scripts/assets/praxion-hook-wrapper.sh.tmpl:11/12, scripts/upgrade_project_pins.sh:11/12"
+why = "the installer scripts and the per-tool config trees `install_claude.sh`/`install_codex.sh`/`install_cursor.sh` place; the install-and-export tests run these scripts against scratch homes and assert the files and symlinks they produce"
 
 [[dep]]
 paths = [
@@ -446,7 +446,7 @@ tests = [
   "scripts/test_strip_progress_mandate.py",
   "scripts/test_sync_canonical_blocks.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [knowledge-projection] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: claude/config/CLAUDE.md:3/13, claude/config/CLAUDE.md.tmpl:12/13, docs/**/*.md:9/13, scripts/skill_description_diet.yaml:12/13"
+why = "the rendered CLAUDE.md, its template, the doc corpus, and the skill-description trimming config that the doc-manifest and token-budget checks measure; those tests read this content directly to compute the token budget and doc-manifest freshness"
 
 [[dep]]
 paths = [
@@ -500,7 +500,7 @@ tests = [
   "tests/test_sentinel_check_triangle.py",
   "tests/test_sentinel_row_contract.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/*.md:26/47"
+why = "every shipped slash command; the fitness and gate-check tests (frontmatter, shared blocks, path resolution) and the doc-projection tests that render command catalogs read the live command files"
 
 [[dep]]
 paths = [
@@ -511,7 +511,7 @@ tests = [
   "scripts/test_report_praxion_issue.py",
   "scripts/test_report_praxion_issue_command.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [praxion-feedback] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/report-praxion-issue.md:2/3"
+why = "the `/report-praxion-issue` command doc that drives the praxion-feedback pipeline; its tests read the command doc to check the flow it documents matches the feedback scripts it invokes"
 
 [[dep]]
 paths = [
@@ -540,7 +540,7 @@ tests = [
   "tests/test_skill_genesis_command.py",
   "tests/test_skill_genesis_review.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: commands/resume-rework.md:15/16, commands/skill-genesis-review.md:15/16, commands/skill-genesis.md:13/16, rules/swe/swe-agent-coordination-protocol.md:15/16, scripts/dispatch-reworks:14/16, skills/software-planning/references/*.md:16/16"
+why = "the rework and skill-genesis command docs, the coordination-protocol rule they implement, and the `dispatch-reworks` script; the orchestration tests read these to check the rework and skill-genesis flows they document"
 
 [[dep]]
 paths = [
@@ -549,7 +549,7 @@ paths = [
 tests = [
   "fitness/**",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: fitness/import-linter.cfg:1/1"
+why = "the import-linter contract enforcing module-boundary rules; the fitness suite reads it directly to run and interpret the architecture-boundary check"
 
 [[dep]]
 paths = [
@@ -560,7 +560,7 @@ tests = [
   "hooks/**",
   "tests/test_notify_bg_session_state.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [hooks-lifecycle] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: hooks/*.sh:2/2, hooks/hooks.json:2/2"
+why = "the shell hook scripts and their lifecycle registration manifest; the hooks test suite and the bg-session notifier read both to verify a hook is wired to the event it claims and behaves as registered"
 
 [[dep]]
 paths = [
@@ -622,7 +622,7 @@ tests = [
   "tests/test_sentinel_workflow_invariants.py",
   "tests/test_sentinel_workflow_publication_invariants.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [ci-workflows, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: pyproject.toml:55/55"
+why = "the root Python project config (tool pins, markers, addopts, pytest-cov settings); the repo-gate and CI-workflow-invariant tests read it to check tool version pins and config values match what CI enforces"
 
 [[dep]]
 paths = [
@@ -678,7 +678,7 @@ tests = [
   "tests/test_sentinel_check_triangle.py",
   "tests/test_sentinel_row_contract.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [architecture-fitness, knowledge-projection, repo-gates] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/**/*.md:25/48, skills/**/*.md:25/48"
+why = "every rule and skill file; the fitness, knowledge-projection and repo-gate tests (staleness markers, token budget, template mirrors, id-citation discipline) read this corpus directly to validate its content and structure"
 
 [[dep]]
 paths = [
@@ -706,7 +706,7 @@ tests = [
   "tests/test_sh07_sentinel.py",
   "tests/test_spec_drift.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [decision-records] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/swe/adr-conventions.md:16/17, scripts/finalize_chain.sh:16/17, skills/software-planning/references/adr-authoring-protocols.md:16/17, skills/spec-driven-development/**/*.md:12/17"
+why = "the ADR authoring conventions and the finalize script that promotes drafts to numbered records; the decision-records tests read these to check the finalize, index and reciprocity behavior they specify"
 
 [[dep]]
 paths = [
@@ -749,7 +749,7 @@ tests = [
   "tests/test_skill_genesis_command.py",
   "tests/test_skill_genesis_review.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [agent-orchestration, state-ledgers] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: rules/swe/agent-intermediate-documents.md:32/35"
+why = "the rule defining `.ai-state`/`.ai-work` document conventions the ledger and orchestration scripts implement; those tests read it to check their schemas and paths still match what the rule specifies"
 
 [[dep]]
 paths = [
@@ -786,7 +786,7 @@ tests = [
   "tests/test_sh07_sentinel.py",
   "tests/test_spec_drift.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [decision-records, install-and-export] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: scripts/git-finalize-hook.sh:26/29"
+why = "the post-merge hook that promotes ADR drafts and runs the finalize chain; the decision-records and install-and-export tests exercise it directly, as a subprocess or via its installed symlink"
 
 [[dep]]
 paths = [
@@ -830,7 +830,7 @@ tests = [
   "tests/test_onboard_project_detection.py",
   "tests/test_retired_onboarding_surfaces.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [onboarding-contract, scripts-core] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: scripts/praxion-sidecar:33/36"
+why = "the sidecar CLI managing a project's `.ai-state` mirror repo; the sidecar and onboarding tests drive it as a subprocess against scratch repos to check its commands' behavior"
 
 [[dep]]
 paths = [
@@ -860,4 +860,4 @@ tests = [
   "tests/test_principles_loader.py",
   "tests/test_run_store_backend.py",
 ]
-why = "retired TEST_TOPOLOGY.md group(s) [state-ledgers] declared these paths as file_dependencies; empirically verified missing/wanted (unreachable via layout/import/path-literal, resolve_test_scope.py baseline) per representative sample: skills/agent-evals/references/run-ledger-schema.md:17/19, skills/software-planning/references/disposition-vocabulary.md:18/19, skills/software-planning/references/project-principles.md:19/19, skills/software-planning/references/tech-debt-ledger.md:17/19"
+why = "the schema and vocabulary reference docs the ledger and eval scripts implement; the state-ledger tests read these to check the schemas and enums they parse still match what the docs specify"

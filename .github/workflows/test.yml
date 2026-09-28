@@ -240,7 +240,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Vitest
-        run: pnpm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+        run: pnpm exec vitest run --reporter=default --reporter=junit --outputFile.junit=junit.xml
 
       - name: Upload test report
         if: always()

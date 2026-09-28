@@ -65,6 +65,18 @@ def test_no_large_tests_counts_as_a_pass(job_id: str) -> None:
     assert '"$rc" -eq 5' in text, "pytest exit 5 (no tests collected) must not fail the job"
 
 
+def test_dashboard_job_produces_junit_via_vitest_run() -> None:
+    # `pnpm test -- <flags>` runs the `package.json` "test" script (`vitest run`)
+    # with the flags appended as its OWN argv, not vitest's — vitest silently
+    # ignores everything after its own `--` and writes no junit file, so the
+    # audit step downstream fails closed on a missing file. `pnpm exec vitest
+    # run <flags>` invokes the runner directly, so the flags land on vitest.
+    text = _run_text(_workflow()["jobs"]["health-dashboard"])
+    assert "pnpm exec vitest run" in text, "must invoke the runner directly"
+    assert "pnpm test --" not in text, "pnpm test -- swallows its own flags"
+    assert "--outputFile.junit=junit.xml" in text
+
+
 def test_every_action_is_sha_pinned() -> None:
     for job in _workflow()["jobs"].values():
         for step in job["steps"]:

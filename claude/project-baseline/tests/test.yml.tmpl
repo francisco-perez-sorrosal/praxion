@@ -51,11 +51,18 @@ jobs:
       - name: Full suite (parallel) with the coverage floor
         # Coverage is requested here, not in the runner config's addopts: it is
         # the backstop's measurement, and pytest-cov combines the xdist workers.
-        run: >-
-          {{FULL_TEST_COMMAND}}
-          --cov --cov-report=xml --cov-report=term
-          --cov-fail-under={{COVERAGE_FLOOR}}
-          --junitxml=junit.xml
+        # Exit code 5 means no tests were collected yet (a brand-new project) --
+        # that is a pass, not a coverage-floor failure. Once real tests exist,
+        # pytest exits normally and the floor applies.
+        run: |
+          set +e
+          {{FULL_TEST_COMMAND}} \
+            --cov --cov-report=xml --cov-report=term \
+            --cov-fail-under={{COVERAGE_FLOOR}} \
+            --junitxml=junit.xml
+          rc=$?
+          if [ "$rc" -eq 5 ]; then rc=0; fi
+          exit "$rc"
 
       - name: Upload test reports
         if: always()

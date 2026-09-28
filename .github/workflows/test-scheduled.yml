@@ -314,7 +314,7 @@ jobs:
       - name: Full suite
         id: full
         continue-on-error: true
-        run: pnpm test -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+        run: pnpm exec vitest run --reporter=default --reporter=junit --outputFile.junit=junit.xml
 
       - name: Audit selection and slow tests
         run: |

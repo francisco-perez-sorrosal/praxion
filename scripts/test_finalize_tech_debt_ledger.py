@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import fcntl
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -1099,3 +1100,25 @@ class TestPairIdempotency:
 
         assert ledger_path.read_bytes() == ledger_after_first
         assert resolved_path.read_bytes() == resolved_after_first
+
+
+def test_onboarding_ledger_seed_links_the_schema_like_the_seeder_does():
+    """Both writers of a ledger header link the schema from `.ai-state/`.
+
+    The onboarding seed template is written to `<project>/.ai-state/`, so its
+    schema link resolves from there, exactly as the header this script writes
+    does. A link written relative to phases-core.md itself would be wrong in
+    every file the template produces.
+    """
+    seeder_links = re.findall(
+        r"\]\(([^)]*tech-debt-ledger\.md)\)", finalize_td.DEFAULT_RESOLVED_HEADER
+    )
+    template = (REPO_ROOT / "skills/onboard-project/references/phases-core.md").read_text(
+        encoding="utf-8"
+    )
+    seed_line = next(line for line in template.splitlines() if "Living, append-only ledger" in line)
+    template_links = re.findall(r"\]\(([^)]*tech-debt-ledger\.md)\)", seed_line)
+
+    assert seeder_links
+    assert template_links
+    assert template_links == seeder_links

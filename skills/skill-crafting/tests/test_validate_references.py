@@ -763,3 +763,60 @@ def test_leading_symbol_heading_keeps_its_leading_hyphen_anchor(tmp_path: Path) 
 
     flagged = _findings_for(result, file_suffix="section-sign.md", target_contains="guard-g1--x")
     assert flagged == [], f"leading-hyphen anchor is GitHub-correct; got {flagged}"
+
+
+_INDENTED_FENCE_DOC = (
+    "# Doc\n\n"
+    "1. Write this template into the target project:\n\n"
+    "   ```markdown\n"
+    "   ## Phantom heading\n\n"
+    "   Schema: [ledger](../skills/nowhere/ledger.md)\n"
+    "   ```\n\n"
+    "See [phantom](#phantom-heading) and [gone](does-not-exist.md).\n"
+)
+
+
+@skip_if_no_validator
+def test_link_inside_an_indented_fence_is_not_validated(tmp_path: Path) -> None:
+    """A fence nested in a list item is still a code block, not prose.
+
+    Seed templates live in indented fences and carry links relative to where
+    they are written, not to the file that holds them; checking those links
+    against the host file forces templates to ship wrong paths.
+    """
+    repo = _copy_fixture_repo(tmp_path)
+    doc = repo / "skills" / "alpha" / "references" / "indented-fence.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(_INDENTED_FENCE_DOC, encoding="utf-8")
+    result = _run("--all", "--format", "json", repo_root=repo)
+
+    flagged = _findings_for(result, file_suffix="indented-fence.md", target_contains="nowhere")
+    assert flagged == [], f"link inside an indented fence must be skipped; got {flagged}"
+
+
+@skip_if_no_validator
+def test_heading_inside_an_indented_fence_is_not_an_anchor(tmp_path: Path) -> None:
+    repo = _copy_fixture_repo(tmp_path)
+    doc = repo / "skills" / "alpha" / "references" / "indented-fence.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(_INDENTED_FENCE_DOC, encoding="utf-8")
+    result = _run("--all", "--format", "json", repo_root=repo)
+
+    flagged = _findings_for(
+        result, file_suffix="indented-fence.md", target_contains="phantom-heading"
+    )
+    assert flagged, "a heading inside a fence is code, so linking to it must be flagged"
+
+
+@skip_if_no_validator
+def test_links_after_an_indented_fence_closes_are_still_validated(tmp_path: Path) -> None:
+    repo = _copy_fixture_repo(tmp_path)
+    doc = repo / "skills" / "alpha" / "references" / "indented-fence.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(_INDENTED_FENCE_DOC, encoding="utf-8")
+    result = _run("--all", "--format", "json", repo_root=repo)
+
+    flagged = _findings_for(
+        result, file_suffix="indented-fence.md", target_contains="does-not-exist"
+    )
+    assert flagged, "the indented fence must close; the broken link after it must be flagged"

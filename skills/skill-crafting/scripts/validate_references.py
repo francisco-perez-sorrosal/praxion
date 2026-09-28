@@ -42,7 +42,10 @@ INLINE_IGNORE_MARKER = "<!-- validate-references:ignore -->"
 INLINE_LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 REF_DEF_RE = re.compile(r"^\s{0,3}\[([^\]]+)\]:\s*(\S+)")
 HEADING_RE = re.compile(r"^(#+)\s+(.+?)\s*$")
-CODE_FENCE_RE = re.compile(r"^(```|~~~)")
+# Fences may be indented: a code block nested in a list item (seed templates,
+# numbered procedures) is still code, and its links are written for wherever
+# the block ends up, not for this file.
+CODE_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 EXPLICIT_ANCHOR_RE = re.compile(r"\s*\{#([^}]+)\}\s*$")
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 LINK_TITLE_RE = re.compile(r'^(\S+)(?:\s+".*")?$')

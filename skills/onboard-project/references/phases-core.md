@@ -116,7 +116,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
   ```markdown
   # Tech Debt Ledger
 
-  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel, orchestrator, architect-validator) append rows; consumers update `status` in place. Schema (14 row fields + structural `dedup_key`): [`skills/software-planning/references/tech-debt-ledger.md`](../../../skills/software-planning/references/tech-debt-ledger.md).
+  Living, append-only ledger of grounded debt findings. Producers (verifier, sentinel, orchestrator, architect-validator) append rows; consumers update `status` in place. Schema (14 row fields + structural `dedup_key`): [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md).
 
   | id | severity | class | direction | location | goal-ref-type | goal-ref-value | source | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key |
   |----|----------|-------|-----------|----------|---------------|----------------|--------|------------|-----------|------------|--------|-------------|-------|-----------|

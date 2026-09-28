@@ -1,0 +1,217 @@
+# Canonical Praxion baseline scheduled test-health workflow — the weekly loop
+# that watches the suite itself: flaky tests, `large` tests, selection misses,
+# and the slowest tests.
+#
+# Single source of truth for the installable scheduled workflow. The
+# /onboard-project `tests` capability (sub-step 8e.13) installs this as
+# `.github/workflows/test-scheduled.yml` when that file does not already exist —
+# never overwriting an existing one. It KEEPS the PYTHON job only when Python is
+# detected and the JS/TS job only when package.json is present, stripping each
+# non-applicable stack block before writing. Placeholders filled at install time:
+#   {{FULL_TEST_COMMAND}} — the kept block's full-suite command, as in test.yml
+#     (the JS/TS block assumes vitest for its junit reporter flags).
+#   {{PRAXION_HUB}}       — the hub's owner/repo (francisco-perez-sorrosal/praxion).
+#   {{HUB_SHA}}           — the hub's commit SHA, resolved at install time to a
+#     real 40-hex value — never a placeholder or a mutable tag/branch.
+#
+# The selection audit is a stdlib script that lives in the hub, so each job
+# sparse-checks out the hub's `scripts/` at the pinned SHA — after the test runs,
+# so the hub's own tests are never collected. When the hub cannot be fetched
+# (a private fork, or an org Actions allowlist without the hub on it), the job
+# warns and skips the audit only; every test step still runs and still counts.
+# The job goes red on a failure that survives one rerun, a failing `large` test,
+# or a selection miss; a failure that passes on rerun is reported as flaky.
+# Delete this comment after tailoring.
+
+name: Test (scheduled)
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"  # weekly, Monday 05:17 UTC — off the top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read  # find this workflow's last green run for the audit's diff
+
+concurrency:
+  group: test-scheduled
+  cancel-in-progress: false
+
+jobs:
+  # --- PYTHON (keep iff Python detected) --------------------------------------
+  health-python:
+    name: Test health (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+
+      - name: Full suite (parallel)
+        id: full
+        continue-on-error: true
+        run: >-
+          {{FULL_TEST_COMMAND}}
+          --junitxml=junit.xml
+
+      - name: Rerun failures once (flaky or broken)
+        id: rerun
+        if: steps.full.outcome == 'failure'
+        continue-on-error: true
+        run: >-
+          {{FULL_TEST_COMMAND}}
+          --last-failed --junitxml=rerun.xml
+
+      - name: Large tests (live external services)
+        id: large
+        continue-on-error: true
+        # The last `-m` wins over the runner config's `-m 'not large'`. Exit
+        # code 5 means no test carries the marker, which is a pass.
+        run: |
+          set +e
+          {{FULL_TEST_COMMAND}} -m large
+          rc=$?
+          if [ "$rc" -eq 5 ]; then rc=0; fi
+          exit "$rc"
+
+      - name: Fetch the Praxion audit scripts (pinned)
+        id: hub
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: "{{PRAXION_HUB}}"
+          ref: "{{HUB_SHA}}"
+          path: .praxion-hub
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Warn when the hub is unreachable
+        if: steps.hub.outcome != 'success'
+        run: >-
+          echo "::warning::Could not fetch {{PRAXION_HUB}} at {{HUB_SHA}} (private
+          fork or Actions allowlist?). Skipping the selection audit only."
+
+      - name: Audit selection, flakiness and slow tests
+        if: steps.hub.outcome == 'success'
+        # The exclude keeps the fetched scripts out of the audit's changed set.
+        run: |
+          echo ".praxion-hub/" >> .git/info/exclude
+          last_green="$(gh run list --workflow test-scheduled.yml --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20)
+          if [ -f rerun.xml ]; then args+=(--rerun rerun.xml); fi
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 .praxion-hub/scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-python
+          path: |
+            junit.xml
+            rerun.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+          RERUN: ${{ steps.rerun.outcome }}
+          LARGE: ${{ steps.large.outcome }}
+        run: |
+          status=0
+          if [ "$RERUN" = "failure" ]; then
+            echo "::error::Tests still fail after one rerun - see rerun.xml."; status=1
+          elif [ "$FULL" = "failure" ]; then
+            echo "::warning::Tests failed once and passed on rerun - flaky, see junit.xml."
+          fi
+          if [ "$LARGE" = "failure" ]; then
+            echo "::error::Large tests failed."; status=1
+          fi
+          exit "$status"
+
+  # --- JS/TS (keep iff package.json present) ----------------------------------
+  health-js:
+    name: Test health (JS/TS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout (full history for the audit's diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7
+        with:
+          node-version: "lts/*"
+
+      - name: Install dependencies (package manager from the lockfile)
+        run: |
+          corepack enable
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then yarn install --frozen-lockfile
+          else npm ci
+          fi
+
+      - name: Full suite
+        id: full
+        continue-on-error: true
+        run: >-
+          {{FULL_TEST_COMMAND}}
+          --reporter=default --reporter=junit --outputFile.junit=junit.xml
+
+      - name: Fetch the Praxion audit scripts (pinned)
+        id: hub
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: "{{PRAXION_HUB}}"
+          ref: "{{HUB_SHA}}"
+          path: .praxion-hub
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Warn when the hub is unreachable
+        if: steps.hub.outcome != 'success'
+        run: >-
+          echo "::warning::Could not fetch {{PRAXION_HUB}} at {{HUB_SHA}} (private
+          fork or Actions allowlist?). Skipping the selection audit only."
+
+      - name: Audit selection and slow tests
+        if: steps.hub.outcome == 'success'
+        run: |
+          echo ".praxion-hub/" >> .git/info/exclude
+          last_green="$(gh run list --workflow test-scheduled.yml --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)"
+          args=(--junit junit.xml --slow 20)
+          if [ -n "$last_green" ]; then args+=(--changed-from "$last_green"); fi
+          python3 .praxion-hub/scripts/audit_tests.py "${args[@]}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: test-health-js
+          path: junit.xml
+          if-no-files-found: warn
+
+      - name: Verdict
+        if: always()
+        env:
+          FULL: ${{ steps.full.outcome }}
+        run: |
+          if [ "$FULL" = "failure" ]; then
+            echo "::error::The full suite failed - see junit.xml."; exit 1
+          fi

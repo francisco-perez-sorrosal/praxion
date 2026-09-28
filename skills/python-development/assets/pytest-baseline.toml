@@ -1,0 +1,27 @@
+# Canonical Praxion pytest baseline — a parallel, coverage-off test runner.
+#
+# Single source of truth for the Python test-runner baseline. /onboard-project
+# Phase 8e appends this [tool.pytest.ini_options] block to a project's
+# pyproject.toml when no pytest configuration exists yet (no
+# [tool.pytest.ini_options], pytest.ini, or [pytest] in tox.ini/setup.cfg) —
+# never overwriting an existing config. Needs the `pytest` and `pytest-xdist`
+# dev dependencies; CI's coverage floor also needs `pytest-cov`.
+#
+# PARALLEL BY DEFAULT. Every run spreads tests over all cores with pytest-xdist
+# (`load` distribution balances uneven test files). Running parallel always is
+# what keeps tests hermetic: a test that shares a fixed path or global state
+# fails on the developer's machine, not first in CI. Debug a single test with
+# `-n 0` (required for --pdb).
+#
+# COVERAGE IS NOT IN THE DEFAULT RUN. Coverage is a periodic measurement, taken
+# by CI (`--cov --cov-fail-under=<floor>`), not an inner-loop cost: instrumenting
+# every scoped run slows it and overwrites coverage.xml with a partial number.
+#
+# `large` tests need live external services (daemons, network) and are
+# deselected by default; run them with `-m large` (the last `-m` wins).
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
+markers = [
+    "large: needs live external services (daemons, network); deselected by default, run with -m large",
+]

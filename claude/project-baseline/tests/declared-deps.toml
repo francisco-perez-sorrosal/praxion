@@ -1,0 +1,17 @@
+# Non-code test dependencies the test selector cannot derive from layout,
+# imports or path literals: a fixture no module names, a generated file a test
+# reads by convention. Any change to this file runs the full suite.
+# Contract: Praxion's testing-strategy skill, test-selection reference.
+#
+# Two entry kinds. Add one only when the selection audit reports a miss, or when
+# a new test reads a file no code path names:
+#
+#   [[dep]]
+#   paths = ["data/schemas/*.json"]    # repo-relative globs (** crosses dirs)
+#   tests = ["tests/test_schemas.py"]  # repo-relative test files or globs
+#   why   = "loads every schema by directory scan"
+#
+#   [[inert]]
+#   paths = ["docs/archive/**"]
+#   why   = "frozen material; no test reads it"
+schema = 1

@@ -13,7 +13,7 @@ affected_files:
   - skills/testing-strategy/references/test-topology.md
   - agents/sentinel.md
 re_affirmed_by: [dec-193]
-retired_by: [dec-draft-40ba0ce1]
+retired_by: [dec-406]
 ---
 
 ## Context
@@ -108,4 +108,4 @@ The decision is highly reversible per direction:
 
 None.
 
-**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — when and how `.ai-state/TEST_TOPOLOGY.md` regenerates (human-initiated or sentinel-triggered, never automatically per-pipeline) — no longer has an artifact to regenerate: there is no persisted topology file, no `/refresh-topology` command, and no section ownership to protect from an automatic regenerator. Selection is derived fresh on every call instead of cached and periodically reconciled. What would have to return for this decision to matter again: a future persisted, human-maintained selection artifact that again needs a regeneration-cadence rule to prevent an automatic process from overwriting human sections.
+**Retired by `dec-406`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — when and how `.ai-state/TEST_TOPOLOGY.md` regenerates (human-initiated or sentinel-triggered, never automatically per-pipeline) — no longer has an artifact to regenerate: there is no persisted topology file, no `/refresh-topology` command, and no section ownership to protect from an automatic regenerator. Selection is derived fresh on every call instead of cached and periodically reconciled. What would have to return for this decision to matter again: a future persisted, human-maintained selection artifact that again needs a regeneration-cadence rule to prevent an automatic process from overwriting human sections.

@@ -14,7 +14,7 @@ affected_files:
   - skills/testing-strategy/references/python-testing.md
 re_affirmed_by:
   - dec-202
-superseded_by: dec-draft-40ba0ce1
+superseded_by: dec-406
 ---
 
 ## Context

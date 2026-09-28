@@ -1,7 +1,8 @@
 ---
-id: dec-draft-057153ec
+id: dec-408
+draft_id: dec-draft-057153ec
 title: Testing philosophy — ten principles, scope × size axes, outer/inner-loop ownership, five feedback loops
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-28
 summary: "testing-strategy opens with ten ordered principles. Scope and size are separate axes. Tests beyond the unit level belong to the outer loop and are read-only for the implementer. Five named loops (inner, phase, integration, pre-merge, scheduled) each have one defined test set. Coverage is a periodic measurement whose CI floor is a ratchet, not a target."

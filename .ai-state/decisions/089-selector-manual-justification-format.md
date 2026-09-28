@@ -14,7 +14,7 @@ affected_files:
   - skills/software-planning/SKILL.md
   - skills/software-planning/references/document-templates.md
   - agents/verifier.md
-superseded_by: dec-draft-40ba0ce1
+superseded_by: dec-406
 ---
 
 ## Context

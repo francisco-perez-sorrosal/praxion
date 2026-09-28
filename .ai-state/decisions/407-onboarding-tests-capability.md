@@ -1,7 +1,8 @@
 ---
-id: dec-draft-dce28525
+id: dec-407
+draft_id: dec-draft-dce28525
 title: Onboarding gains a `tests` capability that ships a parallel, coverage-off test baseline with derived selection from day one
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-28
 summary: "A new onboarding capability `tests` (Phase 8e.10-8e.13, default on in new mode, opt-in for existing) installs a parallel, coverage-off runner config; tests/acceptance/ and tests/e2e/ with ownership READMEs; an empty tests/declared-deps.toml; a test CI workflow (full parallel suite with a ratchet coverage floor) and a scheduled workflow (large tests, audit, flaky and slow reports); and a `## Testing` canonical block. There is no topology file and no adoption threshold."
@@ -30,7 +31,7 @@ Managed projects receive Praxion's testing philosophy (skills, rules) and its do
 - no layout scaffold;
 - no coverage configuration beyond a default that puts `--cov` in the inner loop.
 
-Before this change the only test content in the onboarding blocks was a `<test command>` placeholder in Project Essentials. The topology adoption path required a growth trigger that cannot fire, and `/refresh-topology --init` needed four or more Built components. Derived selection (dec-draft-40ba0ce1) removes both prerequisites, so selection can work in a project from its first commit.
+Before this change the only test content in the onboarding blocks was a `<test command>` placeholder in Project Essentials. The topology adoption path required a growth trigger that cannot fire, and `/refresh-topology --init` needed four or more Built components. Derived selection (dec-406) removes both prerequisites, so selection can work in a project from its first commit.
 
 ## Decision
 

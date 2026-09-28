@@ -12,7 +12,7 @@ pipeline_tier: standard
 affected_files:
   - skills/testing-strategy/references/test-topology.md
   - rules/swe/swe-agent-coordination-protocol.md
-superseded_by: dec-draft-40ba0ce1
+superseded_by: dec-406
 ---
 
 ## Context

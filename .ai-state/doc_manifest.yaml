@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-28T05:28:36Z'
+generated_at: '2026-09-28T15:50:28Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -41,7 +41,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-09-20'
+  last_modified: '2026-09-28'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -450,7 +450,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -503,7 +503,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -530,19 +530,11 @@ surfaces:
   - ai-state-decisions-127-pipeline-dashboard-dashboard-port-allocation
   - ai-state-decisions-128-pipeline-dashboard-dashboard-process-model
   - ai-state-decisions-225-remove-in-house-memory-subsystem
-- id: ai-state-test-topology
-  path: .ai-state/TEST_TOPOLOGY.md
-  type: markdown
-  title: "Test Topology \u2014 Praxion"
-  last_modified: '2026-09-27'
-  renderer: default_markdown
-  surfaces_referenced:
-  - ai-state-design
 - id: ai-state-tech-debt-ledger
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -556,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1084,43 +1076,43 @@ surfaces:
   path: .ai-state/decisions/085-lightweight-tier-activation-policy.md
   type: markdown
   title: Test-topology protocol does not activate at Lightweight tier; escalation path is the sole exit
-  last_modified: '2026-05-08'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-086-parallel-unsafe-and-marker-conflicts
   path: .ai-state/decisions/086-parallel-unsafe-and-marker-conflicts.md
   type: markdown
   title: "Parallel-unsafe groups isolate at runner level; kebab-id \u2192 snake_case marker form; reserved-name set"
-  last_modified: '2026-05-08'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-087-pilot-strategy-trunk-only-then-defer-behavioral-pilot
   path: .ai-state/decisions/087-pilot-strategy-trunk-only-then-defer-behavioral-pilot.md
   type: markdown
   title: "Pilot strategy \u2014 trunk-only at this pipeline; defer behavioral pilot to first consumer project"
-  last_modified: '2026-08-04'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-088-runtime-envelope-opt-in-policy
   path: .ai-state/decisions/088-runtime-envelope-opt-in-policy.md
   type: markdown
   title: expected_runtime_envelope is opt-in at M1 and M2; required from M3 (sentinel TT04 activation)
-  last_modified: '2026-05-08'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-089-selector-manual-justification-format
   path: .ai-state/decisions/089-selector-manual-justification-format.md
   type: markdown
   title: selector=manual justification is a closed enum with an "other" escape hatch
-  last_modified: '2026-05-08'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-090-topology-regeneration-cadence
   path: .ai-state/decisions/090-topology-regeneration-cadence.md
   type: markdown
   title: Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline
-  last_modified: '2026-05-19'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-091-test-partitioning-typed-pluggable-identifier-registry
   path: .ai-state/decisions/091-test-partitioning-typed-pluggable-identifier-registry.md
   type: markdown
   title: Typed-pluggable-identifier registries (selector_strategy and parallel_runner) as the trunk's language-additive primitive
-  last_modified: '2026-05-23'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-092-retire-roadmap-living-document
   path: .ai-state/decisions/092-retire-roadmap-living-document.md
@@ -1726,25 +1718,25 @@ surfaces:
   path: .ai-state/decisions/192-growth-trigger-thresholds.md
   type: markdown
   title: "Test-topology growth-trigger thresholds \u2014 two-factor gate with calibratable values"
-  last_modified: '2026-05-19'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-193-test-topology-m2-activation
   path: .ai-state/decisions/193-test-topology-m2-activation.md
   type: markdown
   title: "Test-topology M2 \u2014 behavioral agent wiring plus advisory growth trigger"
-  last_modified: '2026-05-19'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-194-verifier-tier-appropriateness
   path: .ai-state/decisions/194-verifier-tier-appropriateness.md
   type: markdown
   title: Verifier validates scoped-test tier-appropriateness as a document cross-check, not a re-run
-  last_modified: '2026-05-19'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-195-sequential-group-ordering
   path: .ai-state/decisions/195-sequential-group-ordering.md
   type: markdown
   title: 'Sequential group ordering for test-topology activation: trunk-first, then agents in parallel'
-  last_modified: '2026-05-19'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-196-cli-allowlist-policy
   path: .ai-state/decisions/196-cli-allowlist-policy.md
@@ -1786,7 +1778,7 @@ surfaces:
   path: .ai-state/decisions/202-register-python-topology-selectors.md
   type: markdown
   title: "Register Python selector & parallel-runner identifiers in the test-topology registries (M1\u2192M2 for Python)"
-  last_modified: '2026-05-23'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-203-sentinel-t03-threshold-exception
   path: .ai-state/decisions/203-sentinel-t03-threshold-exception.md
@@ -3007,6 +2999,24 @@ surfaces:
   title: Praxion's suite runs parallel by default and measures coverage only at the backstop
   last_modified: '2026-09-27'
   renderer: adr_card
+- id: ai-state-decisions-406-derived-test-selection-retires-topology
+  path: .ai-state/decisions/406-derived-test-selection-retires-topology.md
+  type: markdown
+  title: Derived test selection with a selection audit replaces the hand-maintained test topology
+  last_modified: '2026-09-28'
+  renderer: adr_card
+- id: ai-state-decisions-407-onboarding-tests-capability
+  path: .ai-state/decisions/407-onboarding-tests-capability.md
+  type: markdown
+  title: Onboarding gains a `tests` capability that ships a parallel, coverage-off test baseline with derived selection from day one
+  last_modified: '2026-09-28'
+  renderer: adr_card
+- id: ai-state-decisions-408-testing-philosophy-principles-and-loops
+  path: .ai-state/decisions/408-testing-philosophy-principles-and-loops.md
+  type: markdown
+  title: "Testing philosophy \u2014 ten principles, scope \xD7 size axes, outer/inner-loop ownership, five feedback loops"
+  last_modified: '2026-09-28'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3734,6 +3744,9 @@ groups:
   - ai-state-decisions-403-legacy-context-hub-cleanup-shim
   - ai-state-decisions-404-retire-context-hub-and-external-api-docs
   - ai-state-decisions-405-parallel-suite-coverage-at-the-backstop
+  - ai-state-decisions-406-derived-test-selection-retires-topology
+  - ai-state-decisions-407-onboarding-tests-capability
+  - ai-state-decisions-408-testing-philosophy-principles-and-loops
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3784,7 +3797,6 @@ groups:
   - ai-state-system-deployment
   - ai-state-tech-debt-ledger
   - ai-state-tech-debt-resolved
-  - ai-state-test-topology
   - ai-state-upstream-issues
   - changelog
   - claude

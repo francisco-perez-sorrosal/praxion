@@ -22,7 +22,7 @@ affected_files:
   - commands/refresh-topology.md
   - claude/config/CLAUDE.md.tmpl
   - rules/swe/agent-intermediate-documents.md
-retired_by: [dec-draft-40ba0ce1]
+retired_by: [dec-406]
 ---
 
 ## Context
@@ -84,4 +84,4 @@ Use three sequential parallel groups:
 
 ## Prior Decision
 
-**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the step-ordering plan for rolling the test-topology M2 activation (`dec-193`) out across `test-topology.md` and six agent prompts — was itself a plan for work whose target decision (`dec-193`) is now retired in full. There is no longer a topology-activation rollout to order steps for. What would have to return for this decision to matter again: a future multi-agent trunk-then-leaves rollout of comparable shape, which could reference this record's parallel-group pattern as precedent even though its specific subject does not return.
+**Retired by `dec-406`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the step-ordering plan for rolling the test-topology M2 activation (`dec-193`) out across `test-topology.md` and six agent prompts — was itself a plan for work whose target decision (`dec-193`) is now retired in full. There is no longer a topology-activation rollout to order steps for. What would have to return for this decision to matter again: a future multi-agent trunk-then-leaves rollout of comparable shape, which could reference this record's parallel-group pattern as precedent even though its specific subject does not return.

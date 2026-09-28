@@ -1,7 +1,8 @@
 ---
-id: dec-draft-40ba0ce1
+id: dec-406
+draft_id: dec-draft-40ba0ce1
 title: Derived test selection with a selection audit replaces the hand-maintained test topology
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-28
 summary: "resolve_test_scope.py derives tests from four edge sources (layout, a stdlib-ast import graph, path literals, and a small declared list at tests/declared-deps.toml), and dispatches other ecosystems to their native tools. Anything unmapped widens to the full suite. audit_tests.py turns full-run failures into miss records, and GL07 flags uncollected test files. TEST_TOPOLOGY.md, the test-topology trunk, /refresh-topology, check_topology_conformance.py, _topology_yaml.py and the TT01-TT07 checks are removed."

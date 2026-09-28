@@ -13,7 +13,7 @@ affected_files:
   - skills/testing-strategy/references/test-topology.md
   - skills/testing-strategy/references/python-testing.md
   - agents/sentinel.md
-superseded_by: dec-draft-40ba0ce1
+superseded_by: dec-406
 ---
 
 ## Context

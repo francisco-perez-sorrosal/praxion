@@ -15,7 +15,7 @@ affected_files:
   - agents/systems-architect.md
   - skills/testing-strategy/references/test-topology.md
 affected_reqs: [REQ-01, REQ-02, REQ-04, REQ-18]
-retired_by: [dec-draft-40ba0ce1]
+retired_by: [dec-406]
 ---
 
 ## Context
@@ -80,4 +80,4 @@ This ADR refines `dec-193` (test-topology M2 activation), which established the 
 
 ## Prior Decision
 
-**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the numeric thresholds (90 s runtime, 4 Built components, 200 tests) gating an advisory proposal to adopt a topology — has no adoption step to gate: derived selection works from day one in any project, with no file to adopt and therefore no growth trigger to calibrate. What would have to return for this decision to matter again: a future persisted selection or organization artifact that is opt-in past a size threshold rather than active unconditionally.
+**Retired by `dec-406`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the numeric thresholds (90 s runtime, 4 Built components, 200 tests) gating an advisory proposal to adopt a topology — has no adoption step to gate: derived selection works from day one in any project, with no file to adopt and therefore no growth trigger to calibrate. What would have to return for this decision to matter again: a future persisted selection or organization artifact that is opt-in past a size threshold rather than active unconditionally.

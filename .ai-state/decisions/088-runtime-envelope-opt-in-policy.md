@@ -13,7 +13,7 @@ affected_reqs: []
 affected_files:
   - skills/testing-strategy/references/test-topology.md
   - agents/sentinel.md
-retired_by: [dec-draft-40ba0ce1]
+retired_by: [dec-406]
 ---
 
 ## Context
@@ -89,4 +89,4 @@ Easily reversible. If M3 reveals the requirement is too aggressive (e.g., too ma
 
 None.
 
-**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — whether `expected_runtime_envelope` is optional pre-M3 and required from M3, enforced by sentinel check TT04 — no longer has a schema to attach to: `TEST_TOPOLOGY.md`'s group schema, and TT04 itself, are both removed. Selection is derived per call with no cached runtime envelope. What would have to return for this decision to matter again: a future persisted selection artifact that tracks per-group runtime data and needs an opt-in-then-required rollout policy for that field.
+**Retired by `dec-406`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — whether `expected_runtime_envelope` is optional pre-M3 and required from M3, enforced by sentinel check TT04 — no longer has a schema to attach to: `TEST_TOPOLOGY.md`'s group schema, and TT04 itself, are both removed. Selection is derived per call with no cached runtime envelope. What would have to return for this decision to matter again: a future persisted selection artifact that tracks per-group runtime data and needs an opt-in-then-required rollout policy for that field.

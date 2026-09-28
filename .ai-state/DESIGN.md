@@ -581,7 +581,7 @@ Inline `dec-NNN` references in this document's component, interface, and constra
 
 ## 9. Test Selection and Feedback Loops
 
-<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-09-28 by systems-architect (test-refresh-core: the hand-maintained test topology is retired in favour of derived selection; decisions dec-draft-057153ec, dec-draft-40ba0ce1, dec-draft-dce28525, rewritten to dec-NNN at finalize) -->
+<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-09-28 by systems-architect (test-refresh-core: the hand-maintained test topology is retired in favour of derived selection; decisions dec-408, dec-406, dec-407, rewritten to dec-NNN at finalize) -->
 <!-- Architect-facing design target. Status values follow §3: Designed = specified by the
      test-refresh-core pipeline, not yet on disk; Deprecated = on disk, scheduled for removal
      by the same pipeline. For the developer-facing code-verified view, see docs/architecture.md §9. -->
@@ -594,7 +594,7 @@ The doctrine lives in `skills/testing-strategy/SKILL.md`. It consists of ten ord
 - **Size** decides when a test runs. `small` tests run in-process. `medium` tests use a subprocess, git or localhost. `large` tests need live services; `large` is the only marker, and those tests are deselected by default.
 - **Ownership.** Beyond the unit level, tests are designed independently of the design, and the implementer never edits outer-loop tests.
 
-Test selection is **derived from the code, never hand-kept**. Anything the derivation cannot account for widens the run to the full suite, and a full-suite run always backs up the selection (dec-084, kept). Decisions: `dec-draft-057153ec` (philosophy), `dec-draft-40ba0ce1` (derived selection; retires the topology) and `dec-draft-dce28525` (the onboarding `tests` capability).
+Test selection is **derived from the code, never hand-kept**. Anything the derivation cannot account for widens the run to the full suite, and a full-suite run always backs up the selection (dec-084, kept). Decisions: `dec-408` (philosophy), `dec-406` (derived selection; retires the topology) and `dec-407` (the onboarding `tests` capability).
 
 ### 9.2 Artifact Map
 
@@ -608,7 +608,7 @@ Test selection is **derived from the code, never hand-kept**. Anything the deriv
 | Collection gate | GL07 in `scripts/check_gate_liveness.py` | Built | A test file that no runner collects is a gate that never fires. Replaces TT07 and is portable |
 | Scheduled loop | `.github/workflows/test-scheduled.yml` | Built | `large` tests, audit, flaky and slow reports. Watched by ci-autofix |
 | Onboarding `tests` capability | `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Built | Parallel, coverage-off runner config, outer-loop directories, declared list, test and scheduled workflows, `## Testing` block |
-| Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | Removed | Replaced by the rows above. Their ADRs are superseded or retired per `dec-draft-40ba0ce1` |
+| Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | Removed | Replaced by the rows above. Their ADRs are superseded or retired per `dec-406` |
 
 ### 9.3 The Five Loops
 

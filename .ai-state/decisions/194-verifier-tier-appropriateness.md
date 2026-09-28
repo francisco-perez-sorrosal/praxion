@@ -13,7 +13,7 @@ pipeline_tier: full
 affected_files:
   - agents/verifier.md
 affected_reqs: [REQ-14, REQ-15]
-superseded_by: dec-draft-40ba0ce1
+superseded_by: dec-406
 ---
 
 ## Context

@@ -51,18 +51,21 @@ jobs:
       - name: Full suite (parallel) with the coverage floor
         # Coverage is requested here, not in the runner config's addopts: it is
         # the backstop's measurement, and pytest-cov combines the xdist workers.
-        # Exit code 5 means no tests were collected yet (a brand-new project) --
-        # that is a pass, not a coverage-floor failure. Once real tests exist,
-        # pytest exits normally and the floor applies.
+        # A brand-new project has no tests yet. Collection alone tells us so
+        # (exit 5); with a coverage floor pytest would report exit 1 instead,
+        # so the check runs first and the floor applies only once tests exist.
         run: |
           set +e
+          {{FULL_TEST_COMMAND}} --collect-only -q -n 0 > /dev/null
+          if [ "$?" -eq 5 ]; then
+            echo "No tests collected yet; the coverage floor applies once tests exist."
+            exit 0
+          fi
+          set -e
           {{FULL_TEST_COMMAND}} \
             --cov --cov-report=xml --cov-report=term \
             --cov-fail-under={{COVERAGE_FLOOR}} \
             --junitxml=junit.xml
-          rc=$?
-          if [ "$rc" -eq 5 ]; then rc=0; fi
-          exit "$rc"
 
       - name: Upload test reports
         if: always()

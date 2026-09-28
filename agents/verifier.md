@@ -263,17 +263,7 @@ When tests exist or are expected:
    - A step tagged `mutation: on` whose section carries **no** `Mutation:` line at all → `WARN`, advisory during rollout, mirroring the missing-`TEST_RESULTS.md` disposition in step 1 above.
 
    Golden bad-case: a tagged step's `Mutation:` line reads `survivors=1 mutants=40 (subprocess_call: 1)` where `subprocess_call` is a world-read function — this WARN fires in Phase 10, naming `subprocess_call` and filing the `TECH_DEBT_LEDGER` row.
-
-#### Topology tier-appropriateness (when steps carried `Tests:` fields)
-
-When the pipeline's `IMPLEMENTATION_PLAN.md` steps include any `Tests:` fields, perform a document cross-check — do not run tests:
-
-1. For each step with a `Tests:` field: read `.ai-state/TEST_TOPOLOGY.md` and map the step's `Files` to topology groups via each group's `file_dependencies` field.
-2. If the step's `Files` span components belonging to more than one group but the step declared `tier=step` (single-group, no closure), emit a `WARN`: "Step <N>: Files touch groups [<group-ids>] but declared tier=step (no closure). Scoped run may have missed cross-group regressions. Recommend re-running at tier=phase or higher."
-3. A step that declared `selector=manual` and includes a justification `reason` is not a finding — the manual escape hatch is correctly invoked.
-4. When no step carried a `Tests:` field, skip this sub-step silently (the topology protocol was not active for this pipeline).
-
-This is a document cross-check only. The verifier does not re-run tests to confirm coverage.
+9. **Audit closure check** (integration-checkpoint steps only) — when a step's `TEST_RESULTS.md` section carries an `Audit: missed=<n>` line with `n > 0`, confirm the diff closed each missed case (the missing edge was added) before treating the step as done; an unresolved `missed` count is a `FAIL`.
 
 #### Loading and invoking the `test-coverage` skill (permission, not obligation)
 

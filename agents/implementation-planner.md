@@ -119,13 +119,9 @@ When a parallel group adds, removes, or renames files, introduces new APIs, or c
 - Doc steps target documentation files only (disjoint with production and test code)
 - Skip the doc step when changes are internal with no documentation impact
 
-**Test-topology `Tests:` field (when the project has a populated `.ai-state/TEST_TOPOLOGY.md`):**
+**`Tests:` field:**
 
-For each implementation step, add a `Tests:` field naming the topology group ids the step's `Files` affect and an execution tier — `step` for a single-group change, `phase` for a change spanning a group plus its declared boundaries. The closing integration-checkpoint step always uses `tier=pipeline` (full suite). The `Tests:` field schema and the `selector=manual` justification enum live in `skills/testing-strategy/references/test-topology.md` §"Document Conventions". When the project has no topology, omit the field — its absence means "full suite," today's default.
-
-**Test-topology `integration_boundaries` ownership:**
-
-You own the per-group `integration_boundaries` field in `TEST_TOPOLOGY.md`. When step decomposition reveals a step that bridges two groups not already linked, add the missing group id to the relevant group's `integration_boundaries`. Do not edit the `## Subsystems` table (architect-owned) or the per-group definitions (test-engineer-owned).
+A step's `Tests:` field is optional and override-only — canonical schema in `skills/software-planning/references/document-templates.md`. Its absence means the implementer derives the selection from the step's changed files; add the field only to force `full` or name explicit paths, each with a reason.
 
 **Deployment step annotations:**
 

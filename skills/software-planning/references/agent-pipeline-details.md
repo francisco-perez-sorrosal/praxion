@@ -289,16 +289,13 @@ Status: in-progress
 Command: `<runner> pytest <scope> -q --tb=short -rf`
 Result: pass=<n> fail=<n> skip=<n>
 Duration: <s>s
-Tier: <step|phase|pipeline>                      # optional topology lines
-Groups: [<group_id>, ...]
-Parallelism: <parallel-safe | sequential | mixed>
-Per-group results:
-  <group_id>: pass=N fail=N skip=N duration=<s>
+Selection: derived files=<n> | widened reason=<r> | override <full|paths> reason="<text>"   # optional
+Audit: missed=<n> flaky=<n>                                                                  # optional, integration checkpoints only
 Mutation: survivors=<n> mutants=<m> [inconclusive=<n>] targets=[<a.py>, …] (<fn>: <k>, …[, +<j> more])
 Mutation: unavailable reason=<code> (<detail>)          # the two Mutation: shapes -- exactly one, never both
 ```
 
-Green (`fail=0`, no `error=`>0, and `pass=` above zero): nothing after the lines above — no notes field, no coverage summary (coverage lives in `coverage.xml`, not the section) — **except the optional `Mutation:` line**, the one field a green section may still carry. It appears only on a step tagged `mutation: on` (see [`decomposition-guide.md § Step Risk Tagging`](decomposition-guide.md#step-risk-tagging)), copied **verbatim** from the runner's own stdout — never re-rendered by the writing agent — in one of the two shapes above: a `survivors=` reading or an `unavailable reason=` refusal. A refusal is not a failure and never flips the section red; it is recorded so the reason for the missing reading is visible rather than silent. The line is additive-only (appended after `Duration:` and any topology lines, never reordering or renaming existing fields) and hard-capped by the runner itself so it can never push a green section over the shape checker's byte ceiling. Red: same header lines, then `Log: .ai-work/<task-slug>/logs/step-<N>.log` and one `### Failures` block per failing test (test id, message, short traceback). The `Tier`/`Groups`/`Parallelism`/`Per-group results` lines are optional and backward-compatible — omit when the step carries no `Tests:` field; include when topology data is available so sentinel TT04 has per-group data.
+Green (`fail=0`, no `error=`>0, and `pass=` above zero): nothing after the lines above — no notes field, no coverage summary (coverage lives in `coverage.xml`, not the section) — **except the optional `Selection:`/`Audit:`/`Mutation:` lines**, the fields a green section may still carry. `Mutation:` appears only on a step tagged `mutation: on` (see [`decomposition-guide.md § Step Risk Tagging`](decomposition-guide.md#step-risk-tagging)), copied **verbatim** from the runner's own stdout — never re-rendered by the writing agent — in one of the two shapes above: a `survivors=` reading or an `unavailable reason=` refusal. A refusal is not a failure and never flips the section red; it is recorded so the reason for the missing reading is visible rather than silent. Each optional line is additive-only (appended after `Duration:`, never reordering or renaming existing fields) and hard-capped so it can never push a green section over the shape checker's byte ceiling. Red: same header lines, then `Log: .ai-work/<task-slug>/logs/step-<N>.log` and one `### Failures` block per failing test (test id, message, short traceback). The `Selection:` and `Audit:` lines are optional and backward-compatible — omit when not applicable; include `Selection:` when the resolver ran and `Audit:` at integration checkpoints so the audit's `missed`/`flaky` counts are visible for the verifier's closure check.
 
 **Reading contract** (one shared parser serves the shape checker and the pipeline reconciler, so the two cannot read the same line differently):
 
@@ -330,7 +327,6 @@ Green (`fail=0`, no `error=`>0, and `pass=` above zero): nothing after the lines
 | `specs/SPEC_*.md` | None — unique feature-name + date filenames | Git merge handles distinct file additions natively |
 | `SYSTEM_DEPLOYMENT.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer/cicd-owned sections manually |
 | `DESIGN.md` | Low — single evolving file, section ownership prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins for architect-owned sections; review implementer-owned sections manually |
-| `TEST_TOPOLOGY.md` | Low — section ownership (architect / test-engineer / planner) prevents concurrent edits | Standard git merge. If conflict, later worktree's version wins per section; section ownership rules apply. Group splits and merges require an ADR; group-level additions are append-only. |
 | `docs/architecture.md` | Low — developer-facing, derived from `.ai-state/DESIGN.md` | Standard git merge. Developer doc is regenerable from architect doc + filesystem verification. If conflict, prefer later version (freshest data) and re-verify paths against disk |
 
 **Automated reconciliation:** Three layers of protection:

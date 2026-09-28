@@ -14,7 +14,7 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 **Assignee**: implementer
 **Implementation**: What code will we write?
 **Files**: [production files]
-**Tests:** groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>   # schema in test-topology.md §"Document Conventions"; only when the project has a populated TEST_TOPOLOGY.md
+**Tests:** full — <reason> | <path> [<path> ...] — <reason>   # optional, override-only — see below
 **Done when**: How do we know it's complete?
 
 ### Step 2: Design behavioral tests for [acceptance criteria] [parallel-group: A]
@@ -42,6 +42,13 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 **Implementation**: ...
 **Done when**: ...
 ```
+
+**`Tests:` field — canonical schema.** Optional and override-only on every step. Absence means the implementer derives the test scope from the step's changed files (`resolve_test_scope.py`, see `skills/testing-strategy/references/test-selection.md`). When present, it is one of two sum-type variants, each carrying a free-text reason:
+
+- `full — <reason>` — force the full suite for this step.
+- `<path> [<path> ...] — <reason>` — force these explicit paths, bypassing derivation.
+
+There is no `groups=`/`tier=`/`selector=` schema — that topology-era field retired with the hand-maintained topology. This is the single canonical statement of the `Tests:` field; other references (`SKILL.md`, `agent-pipeline-details.md`) point here rather than restate it.
 
 ## WIP.md Structure
 
@@ -81,9 +88,9 @@ Step N of M: [Description]
 
 [Optional: Brief notes about current work]
 
-Tests: groups=[<group_id>, ...] tier=<step|phase|pipeline> selector=<auto|manual>
-(Optional. Absence means topology protocol inactive — full suite runs. Mirrors the
-**Tests**: field in IMPLEMENTATION_PLAN.md. See `skills/testing-strategy/references/test-topology.md`.)
+Tests: full — <reason> | <path> [<path> ...] — <reason>
+(Optional, override-only — mirrors the plan step's `Tests:` field. See the
+canonical schema above.)
 ```
 
 ### Parallel Mode
@@ -196,12 +203,12 @@ Resume [Feature Name] (task slug: <slug>) — read `.ai-work/<slug>/WIP.md` and 
 
 **Next action**: <WIP.md Next Action field, verbatim>
 
-**Verify it worked by**: <the acceptance criterion or test command for the current step — from TASK_BRIEF.md Key Signals or IMPLEMENTATION_PLAN.md's Tests: field>
+**Verify it worked by**: <the acceptance criterion or test command for the current step — from TASK_BRIEF.md Key Signals, the resolver's derived selection, or an explicit IMPLEMENTATION_PLAN.md Tests: override>
 ```
 
 **Rules:**
 
-- **`Verify it worked by` is mandatory whenever a source for it exists** (`TASK_BRIEF.md` Key Signals or the plan's `Tests:` field) — never skip composing it just because it's inconvenient. A handoff prompt that drops an available verification path reintroduces the exact ambiguity `goal-disambiguation` exists to prevent, one session later with less context to catch it.
+- **`Verify it worked by` is mandatory whenever a source for it exists** (`TASK_BRIEF.md` Key Signals, the resolver's derived selection, or the plan's `Tests:` override) — never skip composing it just because it's inconvenient. A handoff prompt that drops an available verification path reintroduces the exact ambiguity `goal-disambiguation` exists to prevent, one session later with less context to catch it.
 - **Omit fields with no source rather than inventing content.** When `TASK_BRIEF.md` is absent (Direct/Lightweight tier, no pipeline), compose from `WIP.md` and conversational context alone; do not fabricate a Goal, Key Signal, or verification path that was never captured. This rule governs every field equally — `Verify it worked by` included — the "mandatory" clause above is about not skipping an available source, not about guaranteeing the field always appears.
 - **This is a template, not a command.** Compose it inline when a user asks to continue elsewhere — it does not require its own pipeline document or tooling to exist.
 
@@ -245,6 +252,6 @@ After learnings are merged, delete all planning documents (see [agent intermedia
 
 The canonical `TEST_RESULTS.md` schema (section headers, pass/fail/skip counts, failure blocks, coverage, fragment naming) is defined in [`agent-pipeline-details.md`](agent-pipeline-details.md) under `### TEST_RESULTS.md Reconciliation`.
 
-**Test-topology optional fields**: when a step has a `Tests:` field activating the topology protocol, the `TEST_RESULTS.md` step section may include additional topology lines after the standard counts. These lines are optional and backward-compatible — see `agent-pipeline-details.md` for the extended schema.
+**Selection/Audit optional fields**: the `TEST_RESULTS.md` step section may include an optional `Selection:` line (derived / widened / override) and, for integration-checkpoint steps, an `Audit:` line — see `agent-pipeline-details.md` for the schema.
 
-**Mutation optional field**: a step tagged `mutation: on` may carry one additional `Mutation:` line after the topology lines, even in an otherwise-green section — the line shape, placement rule, and byte cap live solely in `agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`; this bullet is a pointer, not a restatement.
+**Mutation optional field**: a step tagged `mutation: on` may carry one additional `Mutation:` line after those, even in an otherwise-green section — the line shape, placement rule, and byte cap live solely in `agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`; this bullet is a pointer, not a restatement.

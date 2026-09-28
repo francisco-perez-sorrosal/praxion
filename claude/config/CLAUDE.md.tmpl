@@ -60,7 +60,7 @@ Use subagents liberally to keep the main context window clean — one focus per 
 
 **Match response weight to task scale.** A typo fix doesn't need a pipeline. A one-line bug doesn't need a researcher. Use the full machinery for multi-step, multi-file, architecturally significant work — and work directly for quick lookups, single changes, and obvious fixes.
 
-**Test topology.** With a populated `.ai-state/TEST_TOPOLOGY.md`, the implementation-planner adds `Tests:` fields to steps and the implementer runs scoped test invocations — speeding the inner loop. If the sentinel or systems-architect flags topology readiness (no topology, or growth thresholds crossed), surface `/refresh-topology --init`. Full protocol: `skills/testing-strategy`.
+**Test selection.** The implementer derives the test scope for a step from `resolve_test_scope.py`; a plan step's `Tests:` field is override-only. Full protocol: `skills/testing-strategy`.
 
 ## The Behavioral Contract
 

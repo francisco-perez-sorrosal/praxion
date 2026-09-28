@@ -15,7 +15,7 @@ The developer guide is derived from the architect doc — it is a code-verified 
 
 Both documents use the same 8 sections (Overview, System Context, Components, Interfaces, Data Flow, Dependencies, Constraints, Decisions). The differences are in framing and content policy:
 
-**Section 3 is two-tier in both documents.** `### 3a. Structural components` holds one row per `component` element in the LikeC4 model, capped at the 10-12 nodes the L1 diagram allows; `### 3b. Capabilities` holds cross-cutting features and loops composed from those blocks, which own no single directory and no model element. The tiers exist because a merged table grows with every shipped feature until it silently contradicts the diagram above it and can no longer be reconciled against the model. Checks that read *components* — `TEST_TOPOLOGY.md`'s `subsystems`, sentinel TT01/TT06, AC06 — resolve against 3a only.
+**Section 3 is two-tier in both documents.** `### 3a. Structural components` holds one row per `component` element in the LikeC4 model, capped at the 10-12 nodes the L1 diagram allows; `### 3b. Capabilities` holds cross-cutting features and loops composed from those blocks, which own no single directory and no model element. The tiers exist because a merged table grows with every shipped feature until it silently contradicts the diagram above it and can no longer be reconciled against the model. Checks that read *components* — AC06 — resolve against 3a only.
 
 | Dimension | `.ai-state/DESIGN.md` | `docs/architecture.md` |
 |-----------|----------------------------|------------------------|

@@ -125,8 +125,7 @@ views {
      Keep them apart from the first row. A single merged table grows without bound as
      features land, until the table silently contradicts the diagram above it -- and
      nothing can be reconciled against the model any more. Consumers that read
-     *components* (TEST_TOPOLOGY.md `subsystems`, sentinel TT01/TT06, AC06) resolve
-     against 3a only. -->
+     *components* (AC06) resolve against 3a only. -->
 
 ### 3a. Structural components
 

@@ -35,6 +35,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import tomllib
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -339,6 +340,10 @@ POCKET_CONFIG_FILES: dict[str, frozenset[str]] = {
 
 _SKIP_DIRS = frozenset({"node_modules", "__pycache__", "venv", "target", "dist", "build"})
 
+# Tracked plus untracked, non-ignored: the file set every consumer of this
+# inventory agrees on, so a test the resolver sees is the one GL07 judges.
+INVENTORY_GIT_ARGS = ("ls-files", "--cached", "--others", "--exclude-standard")
+
 
 @dataclass(frozen=True)
 class Pocket:
@@ -348,6 +353,28 @@ class Pocket:
     runner_prefix: tuple[str, ...]
     collection: CollectionScope
     xdist: bool = False
+
+
+def project_files(root: Path) -> list[str]:
+    """What the project owns under `root`: git's tracked plus untracked, non-ignored
+    files -- the resolver's inventory. Outside a git work tree, the filesystem walk.
+
+    A scratch copy under a gitignored directory is not the project's; judging it
+    would fail a check on files nobody ships.
+    """
+    try:
+        result = subprocess.run(
+            ["git", *INVENTORY_GIT_ARGS, "-z"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return list(walk_files(root))
+    if result.returncode != 0:
+        return list(walk_files(root))
+    return [path for path in result.stdout.split("\0") if path]
 
 
 def walk_files(root: Path) -> Iterable[str]:

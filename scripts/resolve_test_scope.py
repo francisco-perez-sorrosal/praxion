@@ -4,11 +4,13 @@
     python3 scripts/resolve_test_scope.py [--changed PATH ... | --changed-from REF | --full]
                                           [--json] [--repo-root DIR]
 
-Input is exactly one mode: explicit paths, `REF...HEAD` plus untracked files,
-the full suite, or (no mode) the working tree -- the tracked diff against
-`HEAD` plus untracked files. Untracked files always count as changed: a new
-source file is invisible to `git diff`, and omitting it would under-select
-exactly when the blast radius is least known.
+Input is exactly one mode: explicit paths, the branch diff `REF...HEAD` plus
+the working tree, the full suite, or (no mode) the working tree alone -- the
+tracked diff against `HEAD` plus untracked files. Untracked files always count
+as changed: a new source file is invisible to `git diff`, and omitting it would
+under-select exactly when the blast radius is least known. Renames are split
+into the old path (deleted) and the new one (added), and a deleted file is
+never emitted as a test target -- its surviving dependents are.
 
 The flow: changed set -> global widen triggers -> partition by pocket (the
 longest matching root) -> Python derivation (`_python_selection`) or the
@@ -98,6 +100,7 @@ from _python_selection import (  # noqa: E402
 )
 from _repo_root import resolve_repo_root  # noqa: E402
 from _test_inventory import (  # noqa: E402
+    INVENTORY_GIT_ARGS,
     POCKET_CONFIG_FILES,
     CollectionScope,
     Pocket,
@@ -258,9 +261,10 @@ def resolve(repo_root: Path, changed: ChangedSet, files: Sequence[str]) -> Resol
         detail = "changed path(s) reach no test and are not non-source"
         widen = (Widen(REASON_UNMAPPED, escaping, detail), *config_widen.values())
         return _all_full(changed, widen, ignored, pockets)
-    results, native_widen = _per_pocket(
-        repo_root, pockets, changed.paths, derivation.tests, config_widen
-    )
+    # A deleted test still accounts for its own change (it is `mapped`), but a
+    # runner handed a missing path fails the whole command.
+    surviving = tuple(t for t in derivation.tests if (repo_root / t.path).is_file())
+    results, native_widen = _per_pocket(repo_root, pockets, changed.paths, surviving, config_widen)
     return Resolution(changed, (*config_widen.values(), *native_widen), ignored, results)
 
 
@@ -458,7 +462,7 @@ def _git_ignored(paths: Sequence[str], repo_root: Path) -> tuple[str, ...]:
 
 def repo_files(repo_root: Path) -> list[str]:
     """Tracked plus untracked, non-ignored files."""
-    return _git_paths(["ls-files", "--cached", "--others", "--exclude-standard"], repo_root)
+    return _git_paths(list(INVENTORY_GIT_ARGS), repo_root)
 
 
 def changed_paths(args: argparse.Namespace, repo_root: Path) -> ChangedSet:
@@ -467,14 +471,27 @@ def changed_paths(args: argparse.Namespace, repo_root: Path) -> ChangedSet:
     if args.changed:
         normalized = {_normalize(path, repo_root) for path in args.changed}
         return ChangedSet(tuple(sorted(normalized)), SOURCE_EXPLICIT)
-    untracked = _git_paths(["ls-files", "--others", "--exclude-standard"], repo_root)
+    # The working tree always counts: a branch diff alone would report "nothing
+    # to run" for an edit not yet committed -- the most common moment to ask.
+    changed = {*_git_diff_names(["HEAD"], repo_root), *_git_untracked(repo_root)}
+    source = SOURCE_WORKING_TREE
     if args.changed_from:
-        diff = _git_paths(["diff", "--name-only", f"{args.changed_from}...HEAD"], repo_root)
-        source = f"git-diff:{args.changed_from}...HEAD"
-    else:
-        diff = _git_paths(["diff", "--name-only", "HEAD"], repo_root)
-        source = SOURCE_WORKING_TREE
-    return ChangedSet(tuple(sorted(set(diff) | set(untracked))), source)
+        changed |= set(_git_diff_names([f"{args.changed_from}...HEAD"], repo_root))
+        source = f"git-diff:{args.changed_from}...HEAD+{SOURCE_WORKING_TREE}"
+    return ChangedSet(tuple(sorted(changed)), source)
+
+
+def _git_diff_names(revisions: list[str], repo_root: Path) -> list[str]:
+    """Changed paths, a rename counted as its old path deleted plus its new one added.
+
+    Rename detection would hide the old path, and a test still reading it is
+    exactly the one the rename breaks.
+    """
+    return _git_paths(["diff", "--name-only", "--no-renames", *revisions], repo_root)
+
+
+def _git_untracked(repo_root: Path) -> list[str]:
+    return _git_paths(["ls-files", "--others", "--exclude-standard"], repo_root)
 
 
 def _normalize(raw: str, repo_root: Path) -> str:
@@ -593,7 +610,11 @@ def _build_parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--changed", nargs="+", action="extend", metavar="PATH", help="explicit paths"
     )
-    mode.add_argument("--changed-from", metavar="REF", help="REF...HEAD plus untracked files")
+    mode.add_argument(
+        "--changed-from",
+        metavar="REF",
+        help="REF...HEAD plus uncommitted edits and untracked files",
+    )
     mode.add_argument("--full", action="store_true", help="the full suite for every pocket")
     parser.add_argument("--json", action="store_true", help="emit the schema-2 object")
     parser.add_argument("--repo-root", help="repo root override")

@@ -202,6 +202,76 @@ def test_go_selects_the_changed_package_and_its_dependents(
     assert set(result.argv[2:]) == {"example.com/a", "example.com/b"}
 
 
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_changed_non_module_widens_a_module_graph_pocket(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary: a fixture read through `fs` is outside the module graph, so a
+    related-tests run would find nothing and exit 0 -- a silent all-clear."""
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select(framework, tmp_path, (), ("src/foo.ts", "test/fixtures/data.json"))
+    assert isinstance(result, native.Widen)
+    assert result.reason == native.REASON_UNMAPPED
+    assert "test/fixtures/data.json" in result.detail
+
+
+def _go_select(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, listing: str, *paths: str):
+    _stub(tmp_path / "bin", "go", stdout=listing % {"root": tmp_path})
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    return native.select("go", tmp_path, (), paths)
+
+
+_GO_LIST_WITH_TEST_IMPORT = (
+    _GO_LIST
+    + """
+{"ImportPath": "example.com/c", "Dir": "%(root)s/c", "Deps": [],
+ "TestImports": ["example.com/b"]}
+{"ImportPath": "example.com/d", "Dir": "%(root)s/d", "Deps": [],
+ "XTestImports": ["example.com/a"]}"""
+)
+
+
+def test_go_selects_a_package_whose_tests_alone_import_the_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary: `Deps` omits test-only imports, so `c` (its `_test.go` imports
+    `b`, which depends on `a`) and `d` (an external test importing `a`) would be missed."""
+    result = _go_select(tmp_path, monkeypatch, _GO_LIST_WITH_TEST_IMPORT, "a/main.go")
+    assert isinstance(result, native.Selected)
+    assert set(result.argv[2:]) == {f"example.com/{name}" for name in "abcd"}
+
+
+def test_go_a_testdata_change_selects_its_enclosing_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _go_select(tmp_path, monkeypatch, _GO_LIST, "a/testdata/case.json")
+    assert isinstance(result, native.Selected)
+    assert set(result.argv[2:]) == {"example.com/a", "example.com/b"}
+
+
+def test_go_a_change_outside_every_package_widens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary: an empty seed would hand `go test` no package, and it would test
+    only the current directory's."""
+    result = _go_select(tmp_path, monkeypatch, _GO_LIST, "a/main.go", "tools/gen.sh")
+    assert isinstance(result, native.Widen)
+    assert result.reason == native.REASON_UNMAPPED
+    assert "tools/gen.sh" in result.detail
+
+
+def test_cargo_a_change_outside_every_crate_widens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub(tmp_path / "bin", "cargo", stdout=_CARGO_METADATA % {"root": tmp_path})
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select("cargo", tmp_path, (), ("crate-b/src/lib.rs", "scripts/release.sh"))
+    assert isinstance(result, native.Widen)
+    assert result.reason == native.REASON_UNMAPPED
+    assert "scripts/release.sh" in result.detail
+
+
 def test_go_tool_failure_widens(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -211,3 +281,12 @@ def test_go_tool_failure_widens(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     _prepend_path(monkeypatch, bin_dir)
     result = native.select("go", tmp_path, (), ("a/main.go",))
     assert result == native.Widen(native.REASON_TOOL_UNAVAILABLE, "`go list` failed")
+
+
+def test_go_a_nested_package_owns_its_files_over_a_root_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listing = """{"ImportPath": "example.com", "Dir": "%(root)s", "Deps": []}
+{"ImportPath": "example.com/a", "Dir": "%(root)s/a", "Deps": []}"""
+    result = _go_select(tmp_path, monkeypatch, listing, "a/testdata/case.json")
+    assert result == native.Selected(("go", "test", "example.com/a"))

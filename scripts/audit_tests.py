@@ -14,20 +14,26 @@ pocket anyway), `missed` (the narrow run would have missed it -- a resolver
 gap), or `unattributable` (no change set was given, or the failing test's own
 file is untracked).
 
-A `missed` failure's `suggested_edge` names every changed path as the entry to
-add to `tests/declared-deps.toml`: selection is a union of sources, so if the
-full changed set didn't connect to the test, no single path in it did either --
-the whole set is exactly what the graph failed to connect.
+A `missed` failure's `suggested_edge` is a shortlist for a
+`tests/declared-deps.toml` entry: selection is a union of sources, so if the
+full changed set didn't connect to the test, no single path in it did either.
+The shortlist keeps at most five changed paths that still exist and are not
+tests, data files ahead of code and nearer directories first; a human picks
+the one the test actually reads.
 
 Persistence is deliberately not a new `.ai-state` file: a record lands in the
 integration checkpoint's `TEST_RESULTS.md` `Audit:` line, the scheduled
 workflow's job summary, or a human's terminal. The closing commit -- the added
 edge -- is the durable record.
 
-`test`/`file` are read from junit's own `file`/`classname` attributes (pytest's
-`xunit2` junit family emits both); a class-scoped test's reconstructed nodeid
-(`file::name`, dropping the class segment) is an approximation this codebase's
-dominant function-level test style rarely exercises.
+`test`/`file` come from each `<testcase>`'s `classname` and `name`. pytest's
+junit carries no `file` attribute by default, so the file is rebuilt from the
+dotted `classname` (`scripts.test_x.TestFoo`): the longest dotted prefix that
+names a real `.py` file, with the rest as enclosing classes. A `file` attribute,
+when a reporter does write one, wins. Two consequences: a pocket with its own
+rootdir writes pocket-relative classnames, so audit its junit with `--repo-root`
+set to that pocket; and vitest writes file paths as classnames, so a JavaScript
+pocket's junit is always `unattributable`.
 
 Exit codes: `0` no `missed`/`flaky` failures; `1` at least one; `2` usage or a
 junit file that will not parse.
@@ -49,7 +55,7 @@ from xml.etree import ElementTree
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _repo_root import resolve_repo_root  # noqa: E402
-from _test_inventory import pocket_of  # noqa: E402
+from _test_inventory import is_any_test_file, pocket_of  # noqa: E402
 from resolve_test_scope import (  # noqa: E402
     Full,
     Native,
@@ -72,6 +78,11 @@ SELECTION_WIDENED = "widened"
 SELECTION_MISSED = "missed"
 SELECTION_UNATTRIBUTABLE = "unattributable"
 SELECTION_NA = "n/a"
+
+# A declared-deps entry a reviewer can judge names a handful of paths, not a
+# pipeline's whole change set.
+SUGGESTED_EDGE_LIMIT = 5
+CODE_SUFFIXES = (".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go", ".java", ".kt")
 
 EXIT_OK = 0
 EXIT_FINDINGS = 1
@@ -196,7 +207,29 @@ def _selection(
             t.path == file for t in result.selection.tests
         ):
             return SELECTION_SELECTED, None
-    return SELECTION_MISSED, SuggestedEdge(resolution.changed.paths, (file,))
+    candidates = edge_candidates(resolution.changed.paths, file, tracked)
+    return SELECTION_MISSED, SuggestedEdge(candidates, (file,)) if candidates else None
+
+
+def edge_candidates(changed: Sequence[str], test: str, tracked: frozenset[str]) -> tuple[str, ...]:
+    """The few changed paths most likely to be the dependency the graph missed.
+
+    Only paths that still exist and are not tests can be a declared dependency.
+    Data files rank ahead of code (an import edge would already have connected
+    code), then the ones sharing more directories with the test.
+    """
+    viable = [p for p in changed if p in tracked and not is_any_test_file(p)]
+    ranked = sorted(viable, key=lambda p: (p.endswith(CODE_SUFFIXES), -_shared_dirs(p, test), p))
+    return tuple(ranked[:SUGGESTED_EDGE_LIMIT])
+
+
+def _shared_dirs(path: str, test: str) -> int:
+    shared = 0
+    for mine, theirs in zip(path.split("/")[:-1], test.split("/")[:-1], strict=False):
+        if mine != theirs:
+            break
+        shared += 1
+    return shared
 
 
 def audit(

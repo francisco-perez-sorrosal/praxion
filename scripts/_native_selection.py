@@ -27,7 +27,10 @@ widen with `no-adapter`; the `rdeps` recipe is documented for a human to run
 by hand. A recognized framework whose tool is missing from `PATH` widens with
 `tool-unavailable` instead of raising -- exactly like an unmapped Python path,
 a native pocket the resolver cannot account for runs in full, never in
-silence.
+silence. For the same reason a changed path the adapter cannot place widens
+with `unmapped-path`: a non-module file for vitest/jest (their graph follows
+imports, so a fixture read at run time reaches no test), a file outside every
+crate for cargo, a file outside every package for go.
 
 Contract: `skills/testing-strategy/references/test-selection.md`.
 Stdlib-only: it runs under a bare `python3` (gate-liveness GL05).
@@ -44,6 +47,24 @@ from pathlib import Path
 
 REASON_TOOL_UNAVAILABLE = "tool-unavailable"
 REASON_NO_ADAPTER = "no-adapter"
+# The resolver's own code for a changed path nothing accounts for.
+REASON_UNMAPPED = "unmapped-path"
+
+# What a module-graph tool (vitest `related`, jest `--findRelatedTests`) can
+# trace. Anything else -- a fixture read through `fs`, a JSON config -- is
+# invisible to it, and it reports "no related tests" with exit 0.
+_JS_MODULE_SUFFIXES = (
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".mts",
+    ".cts",
+    ".vue",
+    ".svelte",
+)
 
 
 @dataclass(frozen=True)
@@ -138,15 +159,27 @@ def _reverse_closure(edges: dict[str, list[str]], seed: set[str]) -> set[str]:
     return closure
 
 
+def _unmapped(paths: Sequence[str], why: str) -> Widen | None:
+    """A widen naming `paths`, or None when there are none."""
+    if not paths:
+        return None
+    return Widen(REASON_UNMAPPED, f"{why}: {', '.join(paths)}")
+
+
+def _module_graph_only(paths: tuple[str, ...]) -> Widen | None:
+    outside = [p for p in paths if not p.endswith(_JS_MODULE_SUFFIXES)]
+    return _unmapped(outside, "not a module the related-tests graph can trace")
+
+
 # --- Self-computing adapters: the tool's own flag walks its dependency graph ---
 
 
 def _vitest(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:
-    return Selected((*prefix, "vitest", "related", *paths, "--run"))
+    return _module_graph_only(paths) or Selected((*prefix, "vitest", "related", *paths, "--run"))
 
 
 def _jest(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:
-    return Selected((*prefix, "jest", "--findRelatedTests", *paths))
+    return _module_graph_only(paths) or Selected((*prefix, "jest", "--findRelatedTests", *paths))
 
 
 def _maven(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:
@@ -188,6 +221,9 @@ def _cargo(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) ->
         for pkg in metadata.get("packages", [])
         if pkg["id"] in workspace
     }
+    orphans = [p for p in paths if not any(_under(p, d) for d in crate_dir.values())]
+    if widen := _unmapped(orphans, "outside every workspace crate"):
+        return widen
     seed = {
         crate for crate, directory in crate_dir.items() if any(_under(p, directory) for p in paths)
     }
@@ -208,14 +244,36 @@ def _go(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Na
         pkg["ImportPath"]: {
             "dir": Path(pkg["Dir"]).resolve().relative_to(pocket_dir).as_posix(),
             "deps": set(pkg.get("Deps", ())),
+            "test_imports": {*pkg.get("TestImports", ()), *pkg.get("XTestImports", ())},
         }
         for pkg in _json_objects(listing)
         if "ImportPath" in pkg and "Dir" in pkg
     }
-    seed = {path for path, pkg in packages.items() if any(_dirname(p) == pkg["dir"] for p in paths)}
+    owners = {p: _enclosing_package(p, packages) for p in paths}
+    orphans = [p for p, owner in owners.items() if owner is None]
+    if widen := _unmapped(orphans, "outside every package"):
+        return widen
+    seed = {owner for owner in owners.values() if owner is not None}
     # `Deps` is already the full transitive closure, so one pass finds every dependent.
-    affected = seed | {path for path, pkg in packages.items() if pkg["deps"] & seed}
+    built = seed | {path for path, pkg in packages.items() if pkg["deps"] & seed}
+    # `Deps` leaves out what only `_test.go` files import; those imports are
+    # direct, and one hop onto the built closure reaches every such test.
+    affected = built | {path for path, pkg in packages.items() if pkg["test_imports"] & built}
     return Selected((*prefix, "go", "test", *sorted(affected)))
+
+
+def _enclosing_package(path: str, packages: dict[str, dict]) -> str | None:
+    """The package whose directory most closely encloses `path` (`testdata/`, embeds)."""
+    enclosing = [
+        (_depth(pkg["dir"]), import_path)
+        for import_path, pkg in packages.items()
+        if _under(_dirname(path), pkg["dir"])
+    ]
+    return max(enclosing)[1] if enclosing else None
+
+
+def _depth(directory: str) -> int:
+    return 0 if directory in ("", ".") else directory.count("/") + 1
 
 
 _BUILDERS: dict[str, Callable[[Path, tuple[str, ...], tuple[str, ...]], Native]] = {

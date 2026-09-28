@@ -169,6 +169,42 @@ def test_canary_a_missed_failure_exits_nonzero_with_a_suggested_edge(
     assert exit_code == at.EXIT_FINDINGS
 
 
+def test_the_suggested_edge_is_a_short_ranked_list_of_surviving_non_test_paths(
+    tmp_path: Path, base_repo: Path, capsys
+) -> None:
+    """A whole pipeline's change set is not a usable declared-deps entry: the edge
+    keeps a few existing, non-test candidates, data files ahead of code."""
+    (base_repo / "pkg" / "test_foo.py").write_text(
+        'DATA = "data/*.json"\n\n\ndef test_value():\n    assert DATA\n', encoding="utf-8"
+    )
+    (base_repo / "data").mkdir()
+    for index in range(1, 7):
+        (base_repo / "data" / f"{index}.json").write_text("{}\n", encoding="utf-8")
+    _git(base_repo, "add", "-A")
+    _git(base_repo, "commit", "-qm", "data read by a glob")
+    changed = [f"data/{index}.json" for index in range(7)]  # data/0.json does not exist
+    junit = _junit(tmp_path, "run.xml", _failing_case("pkg/test_bar.py"))
+
+    exit_code, payload = _run(
+        capsys,
+        base_repo,
+        "--junit",
+        str(junit),
+        "--changed",
+        *changed,
+        "pkg/foo.py",
+        "pkg/test_foo.py",
+    )
+
+    failure = payload["failures"][0]
+    assert failure["selection"] == "missed"
+    assert failure["suggested_edge"] == {
+        "paths": [f"data/{index}.json" for index in range(1, 6)],
+        "tests": ["pkg/test_bar.py"],
+    }
+    assert exit_code == at.EXIT_FINDINGS
+
+
 def test_a_failure_the_graph_reaches_is_selected(tmp_path: Path, base_repo: Path, capsys) -> None:
     junit = _junit(tmp_path, "run.xml", _failing_case("pkg/test_foo.py"))
     exit_code, payload = _run(capsys, base_repo, "--junit", str(junit), "--changed", "pkg/foo.py")

@@ -12,6 +12,7 @@ correctly wired gate would make the whole dimension untrustworthy on first use.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -488,6 +489,34 @@ def test_a_non_python_pocket_test_file_is_trivially_collected(tmp_path: Path) ->
     _write(tmp_path, "app/package.json", "{}")
     _write(tmp_path, "app/src/foo.test.ts", "test('x', () => {});\n")
     assert gl.check_uncollected_test(tmp_path) == []
+
+
+def _git_init(root: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True)
+
+
+def test_a_gitignored_test_file_is_not_the_projects_to_judge(tmp_path: Path) -> None:
+    """Inverse guard: a scratch copy under a gitignored directory is not a file
+    the project ships, so a local run over a checkout holding one stays green."""
+    _git_init(tmp_path)
+    _pytest_ini(tmp_path)
+    _write(tmp_path, ".gitignore", "tmp/\n")
+    _write(tmp_path, "tests/test_real.py", "def test_ok():\n    pass\n")
+    _write(tmp_path, "tmp/disarm/test_copy.py", "def test_dead():\n    pass\n")
+    assert gl.check_uncollected_test(tmp_path) == []
+
+
+def test_canary_flags_an_untracked_but_unignored_test_file_in_a_git_repo(
+    tmp_path: Path,
+) -> None:
+    """A canary: an untracked file git does not ignore is about to be committed,
+    so it is judged exactly like a tracked one."""
+    _git_init(tmp_path)
+    _pytest_ini(tmp_path)
+    _write(tmp_path, "tests/test_real.py", "def test_ok():\n    pass\n")
+    _write(tmp_path, "scripts/test_orphan.py", "def test_dead():\n    pass\n")
+    findings = gl.check_uncollected_test(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/test_orphan.py"]
 
 
 def test_the_live_repo_collects_every_test_file() -> None:

@@ -227,3 +227,125 @@ def test_conflicting_input_modes_exit_with_a_usage_error(base_repo: Path) -> Non
     exit_code = rts.main(["--repo-root", str(base_repo), "--changed", "pkg/foo.py", "--full"])
 
     assert exit_code == 2
+
+
+# -- Renames, deletions and uncommitted edits --------------------------------
+
+
+def _selected_paths(payload: dict) -> set[str]:
+    return {t["path"] for pocket in payload["pockets"] for t in pocket["tests"]}
+
+
+def _invocation_args(payload: dict) -> list[str]:
+    return [
+        arg
+        for pocket in payload["pockets"]
+        for invocation in pocket["invocations"]
+        for arg in invocation["argv"]
+    ]
+
+
+def _add_literal_reader(repo: Path, name: str, literal: str) -> None:
+    (repo / "tests" / name).write_text(
+        f'TARGET = "{literal}"\n\n\ndef test_reads():\n    assert TARGET\n', encoding="utf-8"
+    )
+
+
+@pytest.fixture
+def rename_repo(base_repo: Path) -> Path:
+    """`config/a.yaml` plus a test that reads it by path, both committed."""
+    (base_repo / "config").mkdir()
+    (base_repo / "config" / "a.yaml").write_text("key: 1\n", encoding="utf-8")
+    _add_literal_reader(base_repo, "test_reads_config.py", "config/a.yaml")
+    _git(base_repo, "add", "-A")
+    _git(base_repo, "commit", "-qm", "add config and its reader")
+    return base_repo
+
+
+def _assert_old_path_reader_covered(payload: dict) -> None:
+    assert "config/a.yaml" in payload["changed"]["paths"]
+    assert "config/b.yaml" in payload["changed"]["paths"]
+    covered = "tests/test_reads_config.py" in _selected_paths(payload)
+    assert covered or payload["decision"] == "widened", payload
+
+
+def test_a_staged_rename_counts_the_old_path_as_changed(
+    rename_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _git(rename_repo, "mv", "config/a.yaml", "config/b.yaml")
+
+    exit_code, payload = _run(capsys, rename_repo)
+
+    assert exit_code == 0
+    _assert_old_path_reader_covered(payload)
+
+
+def test_a_committed_rename_counts_the_old_path_as_changed(
+    rename_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    base_sha = _git_output(rename_repo, "rev-parse", "HEAD")
+    _git(rename_repo, "mv", "config/a.yaml", "config/b.yaml")
+    _git(rename_repo, "commit", "-qm", "rename config")
+
+    exit_code, payload = _run(capsys, rename_repo, "--changed-from", base_sha)
+
+    assert exit_code == 0
+    _assert_old_path_reader_covered(payload)
+
+
+def test_changed_from_includes_uncommitted_edits_to_tracked_files(
+    base_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    base_sha = _git_output(base_repo, "rev-parse", "HEAD")
+    (base_repo / "pkg" / "foo.py").write_text("value = 5\n", encoding="utf-8")
+
+    exit_code, payload = _run(capsys, base_repo, "--changed-from", base_sha)
+
+    assert exit_code == 0
+    assert "pkg/foo.py" in payload["changed"]["paths"]
+    assert payload["decision"] == "selected"
+    assert "pkg/test_foo.py" in _selected_paths(payload)
+
+
+@pytest.fixture
+def deletion_repo(base_repo: Path) -> Path:
+    """`pkg/foo.py` with its layout test plus a second test reading it by path;
+    the declared list names only the survivor, so deleting the pair leaves it valid."""
+    _add_literal_reader(base_repo, "test_reads_foo.py", "pkg/foo.py")
+    (base_repo / "tests" / "declared-deps.toml").write_text(
+        "schema = 1\n\n"
+        "[[dep]]\n"
+        'paths = [".ai-state/decisions/*.md"]\n'
+        'tests = ["tests/test_reads_foo.py"]\n'
+        'why = "decision records feed the reader test"\n',
+        encoding="utf-8",
+    )
+    _git(base_repo, "add", "-A")
+    _git(base_repo, "commit", "-qm", "add a reader of foo")
+    return base_repo
+
+
+def test_a_deleted_test_file_is_never_emitted_as_a_target(
+    deletion_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _git(deletion_repo, "rm", "-q", "pkg/test_foo.py")
+
+    exit_code, payload = _run(capsys, deletion_repo)
+
+    assert exit_code == 0
+    assert "pkg/test_foo.py" in payload["changed"]["paths"]
+    assert payload["decision"] == "nothing-to-run", payload
+    assert not any("test_foo.py" in arg for arg in _invocation_args(payload))
+
+
+def test_a_deleted_source_selects_its_surviving_tests_only(
+    deletion_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    _git(deletion_repo, "rm", "-q", "pkg/foo.py", "pkg/test_foo.py")
+
+    exit_code, payload = _run(capsys, deletion_repo)
+
+    assert exit_code == 0
+    assert payload["decision"] == "selected", payload
+    assert _selected_paths(payload) == {"tests/test_reads_foo.py"}
+    assert not any("test_foo.py" in arg for arg in _invocation_args(payload))

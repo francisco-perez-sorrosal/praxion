@@ -63,7 +63,7 @@ from _test_inventory import (  # noqa: E402
     discover_pockets,
     is_any_test_file,
     pocket_of,
-    walk_files,
+    project_files,
     workflow_collection_scope,
 )
 
@@ -590,10 +590,11 @@ def check_uncollected_test(root: Path) -> list[dict]:
     so only Python pockets carry real precision; a test file outside every
     pocket is flagged directly.
     """
-    pockets = discover_pockets(root)
+    files = project_files(root)
+    pockets = discover_pockets(root, files)
     workflows = workflow_collection_scope(root / _WORKFLOWS_DIR)
     findings: list[dict] = []
-    for path in sorted(walk_files(root)):
+    for path in sorted(files):
         if not is_any_test_file(path) or _is_fixture_tree(path):
             continue
         pocket = pocket_of(path, pockets)

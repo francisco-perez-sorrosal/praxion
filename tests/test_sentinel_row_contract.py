@@ -931,10 +931,6 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("SH01", "check_state_corpus"),
     ("SH02", "check_state_corpus"),
     ("CA01", "check_state_corpus"),
-    ("TT01", "check_topology_conformance"),
-    ("TT02", "check_topology_conformance"),
-    ("TT05", "check_topology_conformance"),
-    ("TT06", "check_topology_conformance"),
     ("HK01", "check_hackathon_graduation"),
     ("V01", "check_sentinel_self_audit"),
     ("V02", "check_sentinel_self_audit"),
@@ -948,6 +944,7 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("GL04", "check_gate_liveness"),
     ("GL05", "check_gate_liveness"),
     ("GL06", "check_gate_liveness"),
+    ("GL07", "check_gate_liveness"),
     ("AC14", "check_design_checkpoint"),
     ("TD06", "check_metrics_freshness"),
     ("RD01", "check_readiness_feedback"),
@@ -994,7 +991,6 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("SH07", "check_spec_drift"),
     ("P08", "clean_work_safety"),
     ("T02", "measure_token_budget"),
-    ("TT07", "check_topology_conformance"),
     ("TD07", "ledger_health"),
 ]
 

@@ -171,9 +171,11 @@ def test_canary_lazy_artifact_absence_is_expected(repo: Path) -> None:
     This is the class the user's own objection identified: Praxion has no
     deployments, managed projects do -- absence downstream proves nothing.
     """
-    _inventory(repo / adr_health._INVENTORY, lazy_artifact=".ai-state/TEST_TOPOLOGY.md")
-    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
-    assert _classes(adr_health.classify(repo))[".ai-state/TEST_TOPOLOGY.md"] == "lazy-artifact"
+    _inventory(repo / adr_health._INVENTORY, lazy_artifact=".ai-state/LANDSCAPE_WATCHLIST.md")
+    _adr(repo, 1, files=[".ai-state/LANDSCAPE_WATCHLIST.md"])
+    assert (
+        _classes(adr_health.classify(repo))[".ai-state/LANDSCAPE_WATCHLIST.md"] == "lazy-artifact"
+    )
 
 
 # -- History classes -----------------------------------------------------------
@@ -642,11 +644,11 @@ def test_canary_unparseable_inventory_withholds_the_lazy_class(
     inv = repo / adr_health._INVENTORY
     inv.parent.mkdir(parents=True, exist_ok=True)
     inv.write_text("the table format changed and no rows parse\n", encoding="utf-8")
-    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
+    _adr(repo, 1, files=[".ai-state/LANDSCAPE_WATCHLIST.md"])
     report = adr_health.classify(repo)
     assert any("could not parse" in w for w in report["withheld"])
-    assert _classes(report)[".ai-state/TEST_TOPOLOGY.md"] == "unclassified"
-    assert _dispositions(report)[".ai-state/TEST_TOPOLOGY.md"] == "none"
+    assert _classes(report)[".ai-state/LANDSCAPE_WATCHLIST.md"] == "unclassified"
+    assert _dispositions(report)[".ai-state/LANDSCAPE_WATCHLIST.md"] == "none"
 
 
 def test_canary_a_withheld_class_never_re_emerges_as_a_retirement_candidate(
@@ -663,7 +665,7 @@ def test_canary_a_withheld_class_never_re_emerges_as_a_retirement_candidate(
     inv = repo / adr_health._INVENTORY
     inv.parent.mkdir(parents=True, exist_ok=True)
     inv.write_text("no rows parse\n", encoding="utf-8")
-    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md", "never-existed.py"])
+    _adr(repo, 1, files=[".ai-state/LANDSCAPE_WATCHLIST.md", "never-existed.py"])
     report = adr_health.classify(repo)
     assert report["withheld"], "precondition: the oracle must be unavailable"
     assert [f for f in report["decay_findings"] if f["disposition"] == "retire-candidate"] == []
@@ -680,14 +682,14 @@ def test_lifecycle_oracle_resolves_from_the_plugin_when_the_project_has_none(
     where that is invisible.
     """
     plugin = tmp_path / "plugin"
-    _inventory(plugin / adr_health._INVENTORY, lazy_artifact=".ai-state/TEST_TOPOLOGY.md")
+    _inventory(plugin / adr_health._INVENTORY, lazy_artifact=".ai-state/LANDSCAPE_WATCHLIST.md")
     monkeypatch.setattr(adr_health, "SCRIPT_DIR", plugin / "scripts")
-    _adr(repo, 1, files=[".ai-state/TEST_TOPOLOGY.md"])
+    _adr(repo, 1, files=[".ai-state/LANDSCAPE_WATCHLIST.md"])
 
     report = adr_health.classify(repo)
 
     assert report["withheld"] == []
-    assert _classes(report)[".ai-state/TEST_TOPOLOGY.md"] == "lazy-artifact"
+    assert _classes(report)[".ai-state/LANDSCAPE_WATCHLIST.md"] == "lazy-artifact"
 
 
 def test_a_project_table_wins_over_the_plugin_copy(repo: Path, tmp_path: Path, monkeypatch) -> None:

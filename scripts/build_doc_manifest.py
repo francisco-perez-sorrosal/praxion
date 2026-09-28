@@ -95,7 +95,6 @@ _ROOT_SURFACES = [
 _AI_STATE_FILES = [
     "DESIGN.md",
     "SYSTEM_DEPLOYMENT.md",
-    "TEST_TOPOLOGY.md",
     "TECH_DEBT_LEDGER.md",
     "TECH_DEBT_RESOLVED.md",
     "calibration_log.md",

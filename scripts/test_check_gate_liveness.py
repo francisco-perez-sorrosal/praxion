@@ -430,6 +430,77 @@ def test_the_live_repo_discards_no_gate_verdict() -> None:
     )
 
 
+# -- GL07: uncollected-test ----------------------------------------------------
+
+
+def _pytest_ini(root: Path, testpaths: str = "tests") -> None:
+    _write(root, "pyproject.toml", f'[tool.pytest.ini_options]\ntestpaths = ["{testpaths}"]\n')
+
+
+def test_canary_flags_a_test_file_outside_every_collection_scope(tmp_path: Path) -> None:
+    """A canary: a test file the pocket's own `testpaths` does not reach, and no
+    CI workflow names either -- it never runs, however correct its assertions."""
+    _pytest_ini(tmp_path)
+    _write(tmp_path, "tests/test_real.py", "def test_ok():\n    pass\n")
+    _write(tmp_path, "scripts/test_orphan.py", "def test_dead():\n    pass\n")
+    findings = gl.check_uncollected_test(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/test_orphan.py"]
+    assert findings[0]["check"] == "GL07"
+    assert findings[0]["kind"] == "uncollected-test"
+
+
+def test_canary_flags_a_test_file_with_no_enclosing_pocket(tmp_path: Path) -> None:
+    """A canary: no `pyproject.toml`/`package.json`/etc. anywhere means no pocket
+    vouches for the file at all -- the same dead-end as an unreachable `testpaths`."""
+    _write(tmp_path, "scripts/test_orphan.py", "def test_dead():\n    pass\n")
+    findings = gl.check_uncollected_test(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/test_orphan.py"]
+
+
+def test_a_test_file_inside_testpaths_is_not_flagged(tmp_path: Path) -> None:
+    """The inverse guard: a test file the pocket's own `testpaths` reaches stays silent."""
+    _pytest_ini(tmp_path)
+    _write(tmp_path, "tests/test_real.py", "def test_ok():\n    pass\n")
+    assert gl.check_uncollected_test(tmp_path) == []
+
+
+def test_a_test_file_covered_by_a_ci_workflow_literal_is_not_flagged(tmp_path: Path) -> None:
+    """A path/glob literal a CI workflow hands a runner is the second collection source."""
+    _pytest_ini(tmp_path)
+    _write(tmp_path, "fitness/test_extra.py", "def test_ok():\n    pass\n")
+    _write(tmp_path, ".github/workflows/ci.yml", "run: pytest fitness/\n")
+    assert gl.check_uncollected_test(tmp_path) == []
+
+
+def test_a_fixture_repo_tree_is_exempt_from_uncollected_test(tmp_path: Path) -> None:
+    """Inverse guard: a nested fixture-project tree an eval scenario copies wholesale
+    as input data is not a dead gate merely because it follows a test-naming shape."""
+    _pytest_ini(tmp_path)
+    _write(
+        tmp_path, "eval/fixture_repos/demo/scripts/test_paginate.py", "def test_ok():\n    pass\n"
+    )
+    assert gl.check_uncollected_test(tmp_path) == []
+
+
+def test_a_non_python_pocket_test_file_is_trivially_collected(tmp_path: Path) -> None:
+    """Inverse guard: a native-ecosystem pocket has no parsed config here, so every
+    file under its root is collected -- matching `resolve_test_scope.py::_is_runnable`."""
+    _write(tmp_path, "app/package.json", "{}")
+    _write(tmp_path, "app/src/foo.test.ts", "test('x', () => {});\n")
+    assert gl.check_uncollected_test(tmp_path) == []
+
+
+def test_the_live_repo_collects_every_test_file() -> None:
+    """The named consumer for `uncollected-test`: this repo's own pockets and CI
+    workflows must reach every test file it ships, or this check is the next
+    instance of the defect class it exists to catch."""
+    repo_root = Path(__file__).resolve().parents[1]
+    findings = gl.check_uncollected_test(repo_root)
+    assert findings == [], "a test file no pocket or workflow would collect:\n" + "\n".join(
+        f"  - {f['file']}" for f in findings
+    )
+
+
 def test_check_ids_matches_the_kind_map() -> None:
     """`CHECK_IDS` is declared as a literal (the triangle test requires it);
     this is the guard against it silently drifting from `_CHECK_ID_BY_KIND`.

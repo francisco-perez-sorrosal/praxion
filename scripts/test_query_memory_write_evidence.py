@@ -1,8 +1,8 @@
 """Tests for query_memory_write_evidence.py -- characterization baseline.
 
 No test file existed for this reader before this one (flagged in
-LEARNINGS.md: an orphan for the test-topology's coverage invariant -- neither
-a registered group nor a prior test exists). `iter_rows` pins the current
+LEARNINGS.md: an orphan under the old hand-kept test map -- no test
+existed for it). `iter_rows` pins the current
 JSONL-parsing surface (malformed lines skipped, no rotation-archive handling
 at all -- the script reads exactly the path it is given) before it migrates
 onto `reader.read_segment(path)` in a later step. `query()` pins the

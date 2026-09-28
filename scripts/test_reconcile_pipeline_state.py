@@ -1012,7 +1012,7 @@ def test_reconcile_verifies_two_steps_whose_declared_files_are_never_shared(tmp_
 
 # --- letter-suffixed step ids are their own steps, not merged into the parent -
 
-# Verbatim excerpt: `sidecar-placement/sidecar-placement/IMPLEMENTATION_PLAN.md`
+# Adapted from `sidecar-placement/sidecar-placement/IMPLEMENTATION_PLAN.md`
 # -- a plan heading and its own `Files:` field, immediately followed by a
 # lettered addendum heading and its own, different `Files:` field.
 _SIDECAR_PLACEMENT_1B_EXCERPT = (
@@ -1021,8 +1021,8 @@ _SIDECAR_PLACEMENT_1B_EXCERPT = (
     "**Files**: `scripts/_state_repo.py`\n"
     "\n---\n\n"
     "### Step 1b: State-repository resolver tests [parallel-group: A] [depends-on: none]\n"
-    "**Files**: `scripts/test_state_repo.py`, `.ai-state/TEST_TOPOLOGY.md` (own\n"
-    "`selectors`/`file_dependencies` entry inside `scripts-core`)\n"
+    "**Files**: `scripts/test_state_repo.py`, `tests/declared-deps.toml` (own\n"
+    "`[[dep]]` entry for the resolver fixtures)\n"
 )
 
 
@@ -1033,7 +1033,7 @@ def test_scan_step_files_keeps_a_lettered_addendum_heading_as_its_own_step(tmp_p
     assert files["Step 1"] == ["scripts/_state_repo.py"]
     assert files["Step 1b"] == [
         "scripts/test_state_repo.py",
-        ".ai-state/TEST_TOPOLOGY.md",
+        "tests/declared-deps.toml",
     ]
 
 

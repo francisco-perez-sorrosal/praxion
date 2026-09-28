@@ -41,7 +41,7 @@ This is a *clarification* of the existing consumer contract — not a schema cha
 |-------|------|-----------|-------|
 | `id` | string | `td-NNN` zero-padded sequence | Stable across status updates; assigned at write time by next-available-NNN scan |
 | `severity` | enum | `critical` \| `important` \| `suggested` | Aligned with sentinel severity tiering |
-| `class` | enum | `duplication` \| `complexity` \| `dead-code` \| `drift` \| `stale-todo` \| `coverage-gap` \| `cyclic-dep` \| `topology-drift` \| `token-budget` \| `other` | `other` is an escape hatch — propose a new enum value when `other` rows exceed 5. Re-classify into a named class when notes match (e.g., test-topology staleness → `topology-drift`; always-loaded budget cut → `token-budget`); recompute `dedup_key` on reclassification |
+| `class` | enum | `duplication` \| `complexity` \| `dead-code` \| `drift` \| `stale-todo` \| `coverage-gap` \| `cyclic-dep` \| `topology-drift` (retired — no producer; the value stays in the enum only so RESOLVED.md rows filed before the test-topology retirement stay schema-valid) \| `token-budget` \| `other` | `other` is an escape hatch — propose a new enum value when `other` rows exceed 5. Re-classify into a named class when notes match (e.g., always-loaded budget cut → `token-budget`); recompute `dedup_key` on reclassification |
 | `direction` | enum | `code-to-goals` \| `goals-to-code` | The two debt directions in the operating definition |
 | `location` | list | Affected file paths + optional `:start-end` line ranges | One path per list entry; ranges use `path/to/file.py:42-58` syntax |
 | `goal-ref-type` | enum | `adr` \| `spec-req` \| `architecture` \| `claude-md` \| `code-quality` | `code-quality` covers universal engineering principles with no Praxion-specific anchor |
@@ -147,7 +147,7 @@ Field definitions, enums, and `dedup_key` live in § Schema above. Each writer p
 | `status` | `open` |
 | `notes` | one-line context |
 
-### sentinel (TD01–TD04, TT04, EC07)
+### sentinel (TD01–TD04, EC07)
 
 **When to write.** Repo-wide audit signals from `.ai-state/metrics_reports/METRICS_REPORT_*.md` and targeted dimension checks — not per-change verification (verifier) or per-PR structural drift (architect-validator):
 
@@ -157,10 +157,9 @@ Field definitions, enums, and `dedup_key` live in § Schema above. Each writer p
 | TD02 | `pydeps.cyclic_sccs` (SCC size > 1) | TD02 |
 | TD03 | `coverage` namespace (module below project floor; default 70%) | TD03 |
 | TD04 | `lizard` / `complexipy` p95 complexity crossings | TD04 |
-| TT04 | per-group P95 > 1.5× declared `expected_runtime_envelope` for ≥ 3 consecutive reports | TT04 |
 | EC07 | `scripts/check_aac_golden_rule.py --mode=audit` important-severity findings | EC07 |
 
-TD05 audits ledger discipline only — **never writes rows**. TT03 reads `topology-drift` counts but does not write.
+TD05 audits ledger discipline only — **never writes rows**.
 
 **Policies (all sentinel writes).**
 
@@ -176,7 +175,6 @@ TD05 audits ledger discipline only — **never writes rows**. TT03 reads `topolo
 | TD02 | `cyclic-dep` | `important` | `implementation-planner` |
 | TD03 | `coverage-gap` | per finding impact | `test-engineer` |
 | TD04 | `complexity` | per finding impact | `implementer` |
-| TT04 | `topology-drift` | `important` | `implementation-planner` |
 | EC07 | `drift` | `important` | `implementer` |
 
 Populate `location`, dates, `notes` (one sentence + why-filed), and remaining schema fields per § Schema.

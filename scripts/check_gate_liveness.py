@@ -5,7 +5,7 @@ Cites: rules/swe/gate-liveness.md — a gate is a claim that it catches a defect
 class and must be proven to bite. This detector is itself a gate, so it ships with
 canaries (scripts/test_check_gate_liveness.py).
 
-Four checks from one `--json` run, each routed to a sentinel dimension:
+Five checks from one `--json` run, each routed to a sentinel dimension:
 
     forbidden-pattern  GL02  a scan for a pattern another rule forbids there,
                              so it can never match
@@ -14,11 +14,15 @@ Four checks from one `--json` run, each routed to a sentinel dimension:
                              cannot load it
     discarded-verdict  GL06  a gate whose findings exit code the surface it is
                              registered on structurally cannot transmit
+    uncollected-test   GL07  a test file no configured runner would ever
+                             collect -- a gate that never fires because
+                             nothing runs it at all
 
-The last three are the same clause — *existence is not operation* — asked three
-ways: is it called, can it load, is its verdict read? Each failure is invisible
-from the gate's own passing tests, because each lives in the wiring rather than
-in the gate.
+The middle three are the same clause — *existence is not operation* — asked
+three ways: is it called, can it load, is its verdict read? Each failure is
+invisible from the gate's own passing tests, because each lives in the wiring
+rather than in the gate. GL07 asks the same question one level earlier: does
+the test even run.
 
 `discarded-verdict`'s named consumer per the rule's clause-6 requirement is the
 GL06 row in the sentinel catalogue's dispatch table (`agents/sentinel.md`), plus
@@ -33,7 +37,10 @@ mechanically-detectable contradiction. Use the proof that matches the gate.
 
 Stdlib-only, which this file has a specific reason to stay: it is itself
 invoked through the ambient interpreter, so a third-party import here would make
-it the first finding of its own `ambient-import` check.
+it the first finding of its own `ambient-import` check. `uncollected-test`
+imports the sibling `_test_inventory` module (also stdlib-only) rather than
+re-deriving pytest's `testpaths`/`python_files` resolution a second time —
+the same collection-scope precision `resolve_test_scope.py` depends on.
 
 Invoked by the sentinel's GL dimension (`--json`); also runnable standalone.
 Exit code: 1 when findings exist, 0 when clean — so it doubles as a commit gate.
@@ -49,6 +56,16 @@ import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _test_inventory import (  # noqa: E402
+    discover_pockets,
+    is_any_test_file,
+    pocket_of,
+    walk_files,
+    workflow_collection_scope,
+)
 
 # Files that legitimately *describe* forbidden patterns as teaching material
 # (the defining rules, this detector's own docs/tests). Matched against the
@@ -79,6 +96,7 @@ _CHECK_ID_BY_KIND: dict[str, str] = {
     "uninvoked-gate": "GL04",
     "ambient-import": "GL05",
     "discarded-verdict": "GL06",
+    "uncollected-test": "GL07",
 }
 
 # Declared as a literal, not derived from `_CHECK_ID_BY_KIND.values()`: the
@@ -86,7 +104,7 @@ _CHECK_ID_BY_KIND: dict[str, str] = {
 # this declaration with `ast.literal_eval` and rejects any computed
 # expression. `test_check_ids_matches_the_kind_map` below is the guard against
 # the two drifting apart.
-CHECK_IDS: tuple[str, ...] = ("GL02", "GL04", "GL05", "GL06")
+CHECK_IDS: tuple[str, ...] = ("GL02", "GL04", "GL05", "GL06", "GL07")
 
 
 def _finding(kind: str, **fields: object) -> dict:
@@ -539,11 +557,74 @@ def check_discarded_verdict(root: Path) -> list[dict]:
     return findings
 
 
+# Fixture-project trees: nested fake repos an eval scenario copies wholesale as
+# input data and never executes in place. A file inside one that happens to
+# follow a test-naming convention is the fixture's own content, not a dead
+# gate -- the same shape id-citation-discipline already carves an exemption
+# for at `/tests/fixtures/` and `/test_fixtures/` (`EXCLUDED_PATH_FRAGMENTS`
+# in `check_id_citation_discipline.py`), one directory name over.
+_FIXTURE_TREE_FRAGMENTS = ("/fixture_repos/",)
+_WORKFLOWS_DIR = ".github/workflows"
+
+
+def _is_fixture_tree(path: str) -> bool:
+    return any(fragment in f"/{path}" for fragment in _FIXTURE_TREE_FRAGMENTS)
+
+
+def check_uncollected_test(root: Path) -> list[dict]:
+    """GL07: a test file no pocket's pytest config or CI workflow literal would collect.
+
+    Existence is not operation one level earlier than GL04-06: those ask
+    whether a *gate* runs; this asks whether a *test* does. A file that follows
+    a test-naming convention but sits outside every pocket's `testpaths` x
+    `python_files` scope and every CI workflow's literal invocation is exactly
+    as dead as a gate nothing calls -- its assertions, however correct, never
+    execute.
+
+    Reuses `_test_inventory`'s collection-scope machinery -- the same
+    `pocket.collection` / `workflow_collection_scope` precision
+    `resolve_test_scope.py::_is_runnable` relies on to decide which tests a
+    change reaches -- rather than re-deriving pytest's `testpaths`/
+    `python_files` resolution a second time. Non-Python pockets get a
+    whole-subtree glob there (no parser here reads `vitest`/`cargo` config),
+    so only Python pockets carry real precision; a test file outside every
+    pocket is flagged directly.
+    """
+    pockets = discover_pockets(root)
+    workflows = workflow_collection_scope(root / _WORKFLOWS_DIR)
+    findings: list[dict] = []
+    for path in sorted(walk_files(root)):
+        if not is_any_test_file(path) or _is_fixture_tree(path):
+            continue
+        pocket = pocket_of(path, pockets)
+        collected = pocket is not None and (
+            pocket.ecosystem != "python" or pocket.collection.covers(path)
+        )
+        if collected or workflows.covers(path):
+            continue
+        findings.append(
+            _finding(
+                "uncollected-test",
+                severity="fail",
+                file=path,
+                line=1,
+                evidence=path,
+                why=(
+                    "no pocket's pytest testpaths/python_files configuration and no CI "
+                    "workflow literal would ever collect this test file — it never runs, "
+                    "however correct its assertions are"
+                ),
+            )
+        )
+    return findings
+
+
 _CHECKS: dict[str, Callable[[Path], list[dict]]] = {
     "forbidden-pattern": check_forbidden_pattern,
     "uninvoked-gate": check_uninvoked_gate,
     "ambient-import": check_ambient_import,
     "discarded-verdict": check_discarded_verdict,
+    "uncollected-test": check_uncollected_test,
 }
 
 _BOUND = {
@@ -551,6 +632,7 @@ _BOUND = {
     "GL04": "GL04 clean means every check_*/validate_* gate and hook guard has a caller.",
     "GL05": "GL05 clean means every ambient-invoked gate loads under the ambient interpreter.",
     "GL06": "GL06 clean means every hook's findings exit reaches a blocking decision.",
+    "GL07": "GL07 clean means every test file sits in some pocket's or workflow's collection scope.",
 }
 
 
@@ -590,7 +672,9 @@ def classify(root: Path, selected: dict[str, Callable[[Path], list[dict]]] | Non
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Gate Liveness detector (GL02/GL04/GL05/GL06).")
+    parser = argparse.ArgumentParser(
+        description="Gate Liveness detector (GL02/GL04/GL05/GL06/GL07)."
+    )
     parser.add_argument(
         "--check",
         choices=[*_CHECKS, "all"],

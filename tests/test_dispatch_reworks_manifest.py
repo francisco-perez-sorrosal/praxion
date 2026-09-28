@@ -9,12 +9,13 @@ All tests run with --dry-run so no real claude --bg or open invocations fire.
 Design note: because the script resolves the main worktree root via
 `git worktree list --porcelain`, tests that exercise the dispatch loop (the
 worktree-existence check and dry-run print) must construct worktree directories
-under the real main worktree root (or trick the script into accepting a
-synthesised path). The approach chosen here:
+under the main worktree root the script resolves. The approach chosen here:
+  - Run the script from a throwaway git repository per test, so that root is
+    the test's own (see _isolated_project_root).
   - Inject a synthetic REWORK_MANIFEST.md via --manifest.
-  - Create the expected worktree directory under the real .claude/worktrees/ so
-    the existence check passes, OR rely on the skip-and-warn behavior for rows
-    whose directory does not exist.
+  - Create the expected worktree directory under that repository's
+    .claude/worktrees/ so the existence check passes, OR rely on the
+    skip-and-warn behavior for rows whose directory does not exist.
   - Tests that only check exit codes and stderr messages do not need worktrees.
 """
 
@@ -22,8 +23,11 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import textwrap
 from pathlib import Path
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -34,19 +38,20 @@ SCRIPT = REPO_ROOT / "scripts" / "dispatch-reworks"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SAMPLE_MANIFEST = FIXTURES / "rework_manifest_sample.md"
 
-# The script resolves PROJECT_ROOT via `git worktree list --porcelain` (first
-# line = main checkout).  When tests run from a linked worktree the main checkout
-# is a different path.  We derive it once at module load so worktree-creation
-# helpers can target the right directory.
-_MAIN_WORKTREE_ROOT = Path(
-    subprocess.check_output(
-        ["git", "worktree", "list", "--porcelain"],
-        cwd=str(REPO_ROOT),
-        text=True,
-    )
-    .splitlines()[0]
-    .split(" ", 1)[1]
-)
+# Each test runs the script inside its own throwaway git repository. The
+# script resolves PROJECT_ROOT via `git worktree list --porcelain` from its
+# cwd, so every .claude/worktrees/<name> directory a test creates lands in
+# that repository: never in the real checkout, and never shared with a test
+# running concurrently under pytest-xdist (two tests here reuse the same
+# worktree names). Replaced per test by the autouse fixture below.
+_MAIN_WORKTREE_ROOT = Path("/nonexistent-project-root")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_project_root(tmp_path_factory, monkeypatch):
+    root = tmp_path_factory.mktemp("project").resolve()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "_MAIN_WORKTREE_ROOT", root)
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +66,7 @@ def run_script(*args: str, cwd: Path | None = None) -> subprocess.CompletedProce
         cmd,
         capture_output=True,
         text=True,
-        cwd=str(cwd or REPO_ROOT),
+        cwd=str(cwd or _MAIN_WORKTREE_ROOT),
     )
 
 
@@ -103,12 +108,10 @@ def make_manifest(tmp_path: Path, rows: list[dict]) -> Path:
 
 
 def make_worktree_dir(name: str) -> Path:
-    """Create (or confirm) the expected worktree directory under the main checkout.
+    """Create (or confirm) the expected worktree directory under the test's project root.
 
     The script resolves PROJECT_ROOT via `git worktree list --porcelain` (first
     line = main checkout) and constructs paths as <main>/.claude/worktrees/<name>.
-    When running from a linked worktree, REPO_ROOT != main root; we use
-    _MAIN_WORKTREE_ROOT so the directories the script checks actually exist.
     Returns the created path for cleanup.
     """
     wt_dir = _MAIN_WORKTREE_ROOT / ".claude" / "worktrees" / name
@@ -400,7 +403,7 @@ def test_bg_dry_run_does_not_start_claude_process(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--dry-run", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, f"Expected exit 0. stderr: {result.stderr!r}"

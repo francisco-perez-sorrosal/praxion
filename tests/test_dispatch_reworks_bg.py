@@ -26,8 +26,11 @@ import json
 import os
 import re
 import subprocess
+import sys
 import textwrap
 from pathlib import Path
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -36,18 +39,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "dispatch-reworks"
 
-# The script resolves PROJECT_ROOT via `git worktree list --porcelain` (first
-# line = main checkout).  When tests run from a linked worktree the main
-# checkout path differs from the linked worktree.  Derive once at module load.
-_MAIN_WORKTREE_ROOT = Path(
-    subprocess.check_output(
-        ["git", "worktree", "list", "--porcelain"],
-        cwd=str(REPO_ROOT),
-        text=True,
-    )
-    .splitlines()[0]
-    .split(" ", 1)[1]
-)
+# Each test runs the script inside its own throwaway git repository. The
+# script resolves PROJECT_ROOT via `git worktree list --porcelain` from its
+# cwd, so every .claude/worktrees/<name> directory a test creates lands in
+# that repository: never in the real checkout, and never shared with a test
+# running concurrently under pytest-xdist (two tests here reuse the same
+# worktree names). Replaced per test by the autouse fixture below.
+_MAIN_WORKTREE_ROOT = Path("/nonexistent-project-root")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_project_root(tmp_path_factory, monkeypatch):
+    root = tmp_path_factory.mktemp("project").resolve()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "_MAIN_WORKTREE_ROOT", root)
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +66,7 @@ def run_script(*args: str, env: dict | None = None) -> subprocess.CompletedProce
         [str(SCRIPT), *args],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT),
+        cwd=str(_MAIN_WORKTREE_ROOT),
         env=env or os.environ.copy(),
     )
 
@@ -100,7 +105,7 @@ def make_manifest(tmp_path: Path, rows: list[dict]) -> Path:
 
 
 def make_worktree_dir(name: str) -> Path:
-    """Create (or confirm) the expected worktree directory under the main checkout."""
+    """Create (or confirm) the expected worktree directory under the test's project root."""
     wt_dir = _MAIN_WORKTREE_ROOT / ".claude" / "worktrees" / name
     wt_dir.mkdir(parents=True, exist_ok=True)
     return wt_dir
@@ -230,7 +235,7 @@ def test_one_row_manifest_dispatches_one_session(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -257,7 +262,7 @@ def test_two_row_manifest_dispatches_two_sessions(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -290,7 +295,7 @@ def test_three_row_manifest_preserves_row_order(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -330,7 +335,7 @@ def test_two_rows_produce_distinct_session_ids(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -397,7 +402,7 @@ def test_session_id_not_extracted_from_word_backgrounded(tmp_path, tmp_path_fact
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -454,7 +459,7 @@ def test_session_id_containing_bac_extracted_correctly(tmp_path, tmp_path_factor
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -486,7 +491,7 @@ def test_closing_summary_contains_claude_agents_line(tmp_path, tmp_path_factory)
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, f"Expected exit 0. stderr: {result.stderr!r}"
@@ -514,7 +519,7 @@ def test_closing_summary_contains_osascript_hook_note(tmp_path, tmp_path_factory
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, f"Expected exit 0. stderr: {result.stderr!r}"
@@ -542,7 +547,7 @@ def test_per_session_hints_use_exact_format(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, f"Expected exit 0. stderr: {result.stderr!r}"
@@ -592,7 +597,7 @@ def test_stub_failure_for_one_row_continues_remaining(tmp_path, tmp_path_factory
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         # At least one row succeeded → exit 0.
@@ -637,7 +642,7 @@ def test_all_rows_fail_exits_non_zero(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode != 0, (
@@ -670,7 +675,7 @@ def test_claude_not_on_path_exits_non_zero(tmp_path):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=minimal_env,
         )
         assert result.returncode != 0, (
@@ -731,7 +736,7 @@ def test_dispatch_writes_marker_file_with_worktree_name(tmp_path, tmp_path_facto
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, (
@@ -783,7 +788,7 @@ def test_dispatch_writes_one_marker_per_row(tmp_path, tmp_path_factory):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
         assert result.returncode == 0, f"Expected exit 0. stderr={result.stderr!r}"
@@ -822,7 +827,7 @@ def _dispatch(tmp_path, tmp_path_factory, names, *, args_log=None):
             [str(SCRIPT), "--bg", "--manifest", str(manifest)],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT),
+            cwd=str(_MAIN_WORKTREE_ROOT),
             env=env,
         )
     finally:

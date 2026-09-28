@@ -119,14 +119,17 @@ jobs:
         # precondition so the tier cannot stop running without saying so.
         run: command -v jq
 
-      - name: Pytest (tests/ + scripts/ + hooks/)
-        # One measured run over all three paths -- `hooks` is in `testpaths` as
-        # of 2026-08-06, which retired the separate `pytest hooks/ --no-cov`
-        # step that used to sit here. That step ran the hook suites but threw
-        # their coverage away, so the canonical measurement reported hook
-        # modules understated or not at all. See the pyproject `testpaths`
-        # comment for why the fix had to live there rather than in this file.
-        run: uv run --frozen pytest --cov-fail-under=80
+      - name: Pytest (tests/ + scripts/ + hooks/ + skills/)
+        # One measured run over every `testpaths` entry -- `hooks` joined on
+        # 2026-08-06 (retiring a separate `--no-cov` step that threw hook
+        # coverage away), `skills` on 2026-09-27. Parallel via pyproject
+        # addopts (`-n auto`); pytest-cov combines the workers' data.
+        # Coverage is requested HERE, not in addopts: it is the backstop's
+        # measurement, and the default local run stays uninstrumented.
+        run: >-
+          uv run --frozen pytest
+          --cov --cov-config=pyproject.toml --cov-report=xml
+          --cov-report=term-missing --cov-fail-under=80
 
       - name: Shell test suites
         # `tests/*.sh` are bash suites that pytest cannot collect, so nothing

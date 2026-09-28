@@ -66,6 +66,7 @@ dev = [
     # because a floating local side is the defect, not a stale pin.
     # scripts/check_ruff_pin_drift.py enforces the equality.
     "ruff==0.15.22",
+    "pytest-xdist>=3.8.0",
 ]
 
 # --- test-coverage skill: default Python coverage config -------------------
@@ -90,8 +91,23 @@ dev = [
 # exercises the real `__main__` fail-open guard while staying measurable (see
 # skills/testing-strategy/references/python-testing.md). Subprocess tests remain
 # valuable as end-to-end contract proof; they just do not count toward coverage.
-# --cov-config stays pinned so every invocation cwd resolves this exact file.
-addopts = "--cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-missing"
+#
+# COVERAGE IS NOT IN THE DEFAULT RUN (test-suite-refresh, 2026-09-27). It is a
+# periodic measurement, taken by CI (`--cov ... --cov-fail-under`) and by the
+# canonical coverage target, which `/project-metrics --refresh-coverage` and
+# `/project-coverage` discover from the [tool.coverage.*] sections below and
+# invoke as `pytest --cov --cov-report=xml`. In the default run it cost ~1.8x on
+# in-process slices, overwrote coverage.xml with a partial measurement on every
+# scoped run, and pushed a coverage table into the tail agents read.
+#
+# PARALLEL BY DEFAULT. Every run spreads tests over all cores (pytest-xdist,
+# `load` distribution: it beat `loadfile` and `worksteal` here because one
+# 109-test sidecar file would otherwise pin a single worker). Running parallel
+# always is what keeps tests hermetic -- a test that shares a fixed path or
+# global state fails here, not in CI. Debug a single test with `-p no:xdist`
+# (needed for --pdb). `large` tests (live external services) are deselected;
+# run them with `-m large`.
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
 # `hooks` joined `tests`/`scripts` on 2026-08-06. It was previously excluded and
 # invoked as a separate `pytest hooks/ --no-cov` CI step, which made the canonical
 # coverage measurement blind to all 41 hook modules: only the handful that
@@ -101,15 +117,11 @@ addopts = "--cov --cov-config=pyproject.toml --cov-report=xml --cov-report=term-
 # 65.8% against 89.9%). Understated modules are read back by the metrics report's
 # per-module rollup and filed as tech-debt rows, so the exclusion manufactured
 # debt findings against well-tested code.
-#
-# Fixing this in CI alone would not have worked. The coverage artifact the metrics
-# report consumes is produced by the project's canonical coverage target -- which
-# is discovered from THIS pytest-cov config and runs wherever the report is
-# generated, usually a developer's machine. The measurement has to be correct in
-# the default invocation or it is not correct where it is read.
-testpaths = ["tests", "scripts", "hooks"]
+# `skills` joined on 2026-09-27: skills/skill-crafting/tests/ (43 tests) had run
+# nowhere -- outside testpaths and invoked by no CI job.
+testpaths = ["tests", "scripts", "hooks", "skills"]
 markers = [
-    "slow: marks tests that invoke real pip/venv operations (deselect with -m 'not slow')",
+    "large: needs live external services (daemons, network); deselected by default, run with -m large",
 ]
 # Repo root on sys.path so tests can import `scripts.project_metrics.*`
 # without requiring PYTHONPATH to be set by the invoker. scripts/ is not

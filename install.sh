@@ -485,8 +485,9 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
                the surfaces the plugin mechanism does not cover natively.
                Prompts before each system-level change. Also offers to
                remove leftover context-hub state from earlier Praxion
-               versions. Reachable via /praxion-complete-install inside a
-               Claude Code session. Only valid with 'code'.
+               versions. Printed by /praxion-complete-install inside a
+               Claude Code session for you to run in your own terminal.
+               Only valid with 'code'.
   --complete-uninstall
                Reverse of --complete-install: remove the rule/script
                symlinks that point at the plugin cache. Plugin body is

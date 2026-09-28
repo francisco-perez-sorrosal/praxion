@@ -32,8 +32,8 @@ Reusable slash commands for AI coding assistants. Each `.md` file becomes a `/co
 | `/release` | Bump version, update changelog, and create a release tag |
 | `/report-praxion-issue` | File a Praxion-origin `ecosystem-defect` issue on the Praxion repo from a captured healing-sidecar candidate — HITL-gated (never auto-files), category taxonomy `hooks\|blocks\|agents\|scripts\|skills` |
 | `/report-upstream` | File a well-formed bug report on an upstream open-source project |
-| `/praxion-complete-install` | Reconfigure or recover a marketplace-installed Praxion setup — symlink rules and CLI scripts, and offer to remove leftover state from earlier Praxion versions <!-- LEGACY-CHUB-CLEANUP --> |
-| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — remove rule/script symlinks and offer to remove leftover state from earlier Praxion versions; plugin body is preserved <!-- LEGACY-CHUB-CLEANUP --> |
+| `/praxion-complete-install` | Reconfigure or recover a marketplace-installed Praxion setup — checks its state, then hands you the exact command to run in your own terminal to symlink rules and CLI scripts and remove leftover state from earlier Praxion versions, if any <!-- LEGACY-CHUB-CLEANUP --> |
+| `/praxion-complete-uninstall` | Reverse `/praxion-complete-install` — checks its state, then hands you the exact command to run in your own terminal to remove rule/script symlinks and leftover state from earlier Praxion versions, if any; plugin body is preserved <!-- LEGACY-CHUB-CLEANUP --> |
 | `/review-interface` | Run an interface design review on a file, PR, branch, or named surface via the interface-designer agent |
 | `/review-pr` | Code review a pull request |
 | `/dispatch-reworks` | Fan out `/resume-rework` into every rework worktree from `REWORK_MANIFEST.md` — background sessions by default, `--terminals` for visible windows |

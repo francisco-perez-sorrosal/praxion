@@ -228,7 +228,7 @@ Praxion auto-completes setup on the first Claude Code session — rules are syml
 
 **Uninstall order** — run `/praxion-complete-uninstall` **first**, then `claude plugin uninstall praxion`. The reverse order leaves dangling symlinks (still cleanable by `/praxion-complete-uninstall`).
 
-To reconfigure personal settings or recover from corruption, `/praxion-complete-install` is idempotent and prompts before each system-level change.
+To reconfigure personal settings or recover from corruption, `/praxion-complete-install` checks the current state, then hands you the exact command to run in your own terminal — where the underlying `install.sh --complete-install` is idempotent and prompts before each system-level change.
 
 </details>
 

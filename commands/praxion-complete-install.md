@@ -1,39 +1,45 @@
 ---
-description: Reconfigure or recover a marketplace-installed Praxion setup — symlink rules and CLI scripts, and offer to remove leftover state from earlier Praxion versions. Optional (auto-completes on first session).
+description: Reconfigure or recover a marketplace-installed Praxion setup — check its state, then hand you the exact command to run in your own terminal to symlink rules and CLI scripts (and remove leftover state from earlier Praxion versions, if any). Optional (auto-completes on first session).
 allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
 Most users will not need this command — Praxion auto-completes the setup on your first Claude Code session. Use this command only if auto-install was disabled (`PRAXION_DISABLE_AUTO_COMPLETE=1`), to reconfigure personal settings, or to recover from a corrupted install state.
 
-<!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence and steps 3 below's "legacy remnants" clause. -->
-The plugin body is already present; this command adds or refreshes the system-level surfaces the plugin mechanism does not cover natively: rules (auto-loaded by Claude Code globally) and CLI scripts on `$PATH`. It also offers to remove leftover state from earlier Praxion versions, if any is found.
+<!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence and step 3 below's "legacy remnants" clause. -->
+The plugin body is already present; this command checks the system-level surfaces the plugin mechanism does not cover natively — rules (auto-loaded by Claude Code globally) and CLI scripts on `$PATH` — then hands you the exact `install.sh` command that adds or refreshes them, including removing leftover state from earlier Praxion versions if any is found, for you to run in your own terminal.
 
 ## Procedure
 
 1. **Resolve the plugin root.** Use the `CLAUDE_PLUGIN_ROOT` environment variable if set; otherwise locate the cached plugin directory at `~/.claude/plugins/cache/bit-agora/praxion/*/`.
 
-2. **Invoke the installer's complete-install mode:**
-
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --complete-install
-   ```
-
    If neither resolution succeeds (plugin not installed), report: *"Praxion plugin not found. Run `claude plugin install praxion@bit-agora` first."*
 
-3. **Relay consent, in whichever form the installer gives it.** <!-- LEGACY-CHUB-CLEANUP --> When `install.sh` runs on an interactive terminal, it prompts for consent separately on each system-level change (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions); relay those prompts to the user and do not suppress, skip, or auto-answer them. When run through this command's Bash tool invocation, stdin is not a TTY, so the installer cannot ask its first prompt and exits there without changing anything. In that case, give the user the exact resolved command to run in their own terminal, where every prompt can be answered, rather than claiming a prompt appeared.
+2. **Run the read-only health check:**
 
-4. **Summarize the outcome** once the installer exits: which surfaces were linked, which were skipped, and whether a new Claude Code session is needed to pick up the rules (always yes if rules were linked).
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --check
+   ```
+
+   Summarize what it reports: which rules and scripts are linked or missing, plus any leftover legacy remnants it warns about. `--check` is read-only — it never prompts and never writes.
+
+3. **Hand the user the exact command to run in their own terminal:** <!-- LEGACY-CHUB-CLEANUP -->
+
+   ```text
+   "<resolved-plugin-root>/install.sh" code --complete-install
+   ```
+
+   Substitute `<resolved-plugin-root>` with the path resolved in step 1. Each change this makes (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions) is consent-gated behind its own prompt, and those prompts need an interactive terminal to answer. This command's own Bash tool invocation has no TTY, so running `--complete-install` from here would abort at the first prompt (stdin EOF), possibly after partial setup — never run it yourself; only run `--check`.
 
 ## Idempotence
 
-The underlying operations are idempotent — running this command a second time is safe. Existing symlinks are replaced in place.
+The underlying operations are idempotent — running the printed command a second time is safe. Existing symlinks are replaced in place.
 
 ## Reversal
 
-To undo what this command did, run `/praxion-complete-uninstall` (or equivalently `install.sh code --complete-uninstall`). The plugin body itself is preserved; remove it separately with `claude plugin uninstall praxion`.
+To undo what the printed command sets up, run `/praxion-complete-uninstall` (or equivalently `install.sh code --complete-uninstall`, in your own terminal). The plugin body itself is preserved; remove it separately with `claude plugin uninstall praxion`.
 
 ## When to use this vs. `./install.sh code`
 
-- **`/praxion-complete-install`** — you installed via the marketplace (`claude plugin install praxion@bit-agora`) and don't have a local Praxion checkout. This command finds the plugin in its cache and finishes the setup from there.
-- **`./install.sh code`** — you cloned Praxion. Run the full installer directly; `--complete-install` is unnecessary because the regular install flow already covers these surfaces.
+- **`/praxion-complete-install`** — you installed via the marketplace (`claude plugin install praxion@bit-agora`) and don't have a local Praxion checkout. This command finds the plugin in its cache and gives you the command to finish the setup from there.
+- **`./install.sh code`** — you cloned Praxion. Run the full installer directly in your terminal; `--complete-install` is unnecessary because the regular install flow already covers these surfaces.

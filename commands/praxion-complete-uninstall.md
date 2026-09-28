@@ -1,27 +1,33 @@
 ---
-description: Reverse /praxion-complete-install — remove rule/script symlinks and offer to remove leftover state from earlier Praxion versions. Plugin body is preserved.
+description: Reverse /praxion-complete-install — check its state, then hand you the exact command to run in your own terminal to remove rule/script symlinks (and leftover state from earlier Praxion versions, if any). Plugin body is preserved.
 allowed-tools: [Bash]
 disable-model-invocation: true
 ---
 
 <!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence and step 3 below's "legacy remnants" clause. -->
-Remove the system-level symlinks that `/praxion-complete-install` created, and offer to remove leftover state from earlier Praxion versions. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
+Check the system-level symlinks that `/praxion-complete-install` created, then hand you the exact `install.sh` command to remove them — including any leftover state from earlier Praxion versions — for you to run in your own terminal. The plugin body stays installed — run `claude plugin uninstall praxion` separately if you want to remove it too.
 
 ## Procedure
 
 1. **Resolve the plugin root.** Use `CLAUDE_PLUGIN_ROOT` if set; otherwise locate `~/.claude/plugins/cache/bit-agora/praxion/*/`.
 
-2. **Invoke the installer's complete-uninstall mode:**
-
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --complete-uninstall
-   ```
-
    If the plugin is not installed, report: *"Praxion plugin not found — nothing to uninstall."*
 
-3. **Relay consent, in whichever form the installer gives it.** <!-- LEGACY-CHUB-CLEANUP --> When `install.sh` runs on an interactive terminal, it prompts for consent separately on each removal (rules, scripts, legacy remnants from earlier Praxion versions if present); relay those prompts to the user and do not suppress or auto-answer them — each represents a filesystem deletion the user should approve. When run through this command's Bash tool invocation, stdin is not a TTY, so the installer cannot ask its first prompt and exits there without changing anything. In that case, give the user the exact resolved command to run in their own terminal, where every prompt can be answered, rather than claiming a prompt appeared.
+2. **Run the read-only health check:**
 
-4. **Summarize the outcome**: how many rule symlinks were removed, how many script symlinks, and whether any legacy remnants were removed. Remind the user that the plugin body itself is untouched and requires `claude plugin uninstall praxion` to fully remove.
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --check
+   ```
+
+   Summarize what it reports: which rule and script symlinks point at the plugin cache and would be removed, plus any leftover legacy remnants it warns about. `--check` is read-only — it never prompts and never writes.
+
+3. **Hand the user the exact command to run in their own terminal:** <!-- LEGACY-CHUB-CLEANUP -->
+
+   ```text
+   "<resolved-plugin-root>/install.sh" code --complete-uninstall
+   ```
+
+   Substitute `<resolved-plugin-root>` with the path resolved in step 1. Each removal (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions) is consent-gated behind its own prompt, and those prompts need an interactive terminal to answer. This command's own Bash tool invocation has no TTY, so running `--complete-uninstall` from here would abort at the first prompt (stdin EOF), possibly after partial setup — never run it yourself; only run `--check`.
 
 ## Safety
 
@@ -29,4 +35,4 @@ Only symlinks that **point at the plugin cache** (`${CLAUDE_PLUGIN_ROOT}/...`) a
 
 ## Idempotence
 
-Safe to re-run. After the first run, subsequent runs find nothing to remove and exit cleanly.
+Safe to re-run. After the first run of the printed command, subsequent runs find nothing to remove and exit cleanly.

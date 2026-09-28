@@ -158,14 +158,14 @@ A resume into a small context is free under the count, but it is not free: it is
 
 ### Reading the count
 
-Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log — the `agent_start` rows whose `project` is the slug — so it counts only this pipeline. A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume. Exit codes: `0` counted (within budget), `1` over budget, `2` count withheld (no log in this checkout, slug not seen yet, or a plugin-cache root) — a withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
+Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log — the `agent_start` rows whose `project` is the slug — so it counts only this pipeline. A row's `project` is the name of the directory its session ran in, so **a slug is its worktree's name**; the count sees no other. A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume. Exit codes: `0` counted (within budget), `1` over budget, `2` count withheld (no log in this checkout, slug not seen yet, or a plugin-cache root) — a withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
 
 ### When the next spawn would exceed the budget
 
 Stop at the checkpoint and pick one:
 
 1. **Re-tier** Standard → Full (user-confirmed) when the remaining work is genuinely Full-shaped — cross-cutting, or more behaviours than planned.
-2. **Split** — land and commit the completed work; the remainder becomes a new slug with its own plan and budget.
+2. **Split** — land and commit the completed work; the remainder becomes a new slug with its own plan and budget, in its own worktree named for that slug. Branch it from the parent's tip (`git worktree add .claude/worktrees/<new-slug> -b worktree-<new-slug> <parent-branch>`), enter it with `EnterWorktree(path=…)`, and read the count there. A split that keeps working in the parent's worktree is still counted under the parent's slug, and its own slug reads `slug-unseen`.
 
 Cheaper moves that the orchestrator can make without spawning — authoring a mechanical step itself, dropping a shadow whose output is already fixed — are legitimate before either option, provided the step is still reviewed.
 

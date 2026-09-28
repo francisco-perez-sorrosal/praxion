@@ -447,6 +447,24 @@ def test_withholds_on_unseen_slug_and_names_projects_it_did_see(tmp_path: Path) 
     assert "deep-fix-round" in result.stderr
 
 
+def test_unseen_slug_explains_that_a_slug_is_its_worktree_name(tmp_path: Path) -> None:
+    """A slug is the directory its sessions ran in, so the withheld count says so.
+
+    A pipeline split that keeps working in its parent's worktree records every
+    row under the parent's name; the new slug then reads unseen while its
+    spawns silently charge the parent. The message must point at that cause.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write_wal(repo, dot1_lines=[_ROW_FIRST_START], live_lines=[])
+
+    result = _run_cli(["--slug", "praxion-split", "--repo-root", str(repo)], cwd=_REPO_ROOT)
+
+    assert result.returncode == 2
+    assert "worktree" in result.stderr
+    assert "praxion" in result.stderr
+
+
 def test_refuses_a_plugin_cache_repo_root(tmp_path: Path) -> None:
     """A plugin-cache root is refused (exit 2) -- mirrors the existing scripts/ convention."""
     cache_root = tmp_path / "plugins" / "cache" / "some-owner" / "praxion" / "0.1.0"

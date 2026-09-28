@@ -355,7 +355,13 @@ def _run(args: argparse.Namespace) -> int:
     projects_seen = sorted({row.get("project") for row in all_rows if row.get("project")})
     if args.slug not in projects_seen:
         seen = ", ".join(projects_seen) if projects_seen else "(none)"
-        _fail("slug-unseen", f"slug {args.slug!r} not seen in the WAL. Projects observed: {seen}.")
+        _fail(
+            "slug-unseen",
+            f"slug {args.slug!r} not seen in the WAL. Projects observed: {seen}. A row's "
+            "project is the directory its session ran in, so a slug is its worktree's name: "
+            "a split pipeline still working in its parent's worktree is counted under the "
+            "parent's slug.",
+        )
         return 2
 
     scoped_rows = [row for row in all_rows if row.get("project") == args.slug]

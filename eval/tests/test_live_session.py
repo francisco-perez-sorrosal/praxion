@@ -547,7 +547,7 @@ def test_check_isolation_breaches_when_only_an_mcp_server_leaked():
     server started — that alone is a breach."""
     from praxion_evals.live.session import check_isolation
 
-    envelope = _preflight_with_init(mcp_servers=({"name": "chub", "source": "user"},))
+    envelope = _preflight_with_init(mcp_servers=({"name": "stray-user-mcp", "source": "user"},))
 
     assert check_isolation(envelope, _PREFLIGHT_COPY_ROOT) is False
 
@@ -598,14 +598,14 @@ def test_session_error_turns_a_stream_without_init_into_a_typed_isolation_error(
 def test_session_error_names_the_leaked_mcp_server():
     from praxion_evals.live.session import SessionRun, session_error
 
-    envelope = _preflight_with_init(mcp_servers=({"name": "chub", "source": "user"},))
+    envelope = _preflight_with_init(mcp_servers=({"name": "stray-user-mcp", "source": "user"},))
     run = SessionRun(stdout="", stderr="", exit_code=0)
 
     error = session_error(envelope, run, _PREFLIGHT_COPY_ROOT)
 
     assert error is not None
     assert error.kind == "isolation_breach"
-    assert "chub" in error.detail
+    assert "stray-user-mcp" in error.detail
 
 
 def test_session_error_is_none_for_a_clean_isolated_session():

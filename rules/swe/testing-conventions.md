@@ -38,6 +38,12 @@ Each test runs independently. No shared mutable state between tests. No ordering
 - No database records or files left behind for other tests to consume
 - No assumptions about which test ran before or after
 
+**Parallel safety is enforced by running in parallel, not by declaring it.** There is no marker or per-test flag asserting a test is safe for concurrent execution — the suite runs parallel by default, and a test that shares mutable state fails there, not in a separate serial pass. `large` (see Markers below) is the only marker this convention requires.
+
+### Markers
+
+`large` (live external services) is the only marker required by this convention; it is deselected by default and run explicitly (`-m large`). No other marker convention (e.g., a general "integration" marker) is required or enforced here.
+
 ### Determinism
 
 Tests produce the same result on every run, regardless of time, timezone, or environment.
@@ -99,7 +105,6 @@ Mock at system boundaries: external APIs, databases, file systems, network calls
 - Never mock the unit under test
 - Never mock internal implementation details (private methods, internal data structures)
 - Prefer fakes (in-memory implementations) over mocks when the boundary has complex behavior
-- Integration tests that hit real external systems must be explicitly marked (e.g., `@pytest.mark.integration` in pytest, test file naming convention in other frameworks)
 
 ### No Logic in Tests
 
@@ -142,8 +147,8 @@ Include assertion messages when the failure output alone would be ambiguous.
 
 ### Test File Organization
 
-Test files mirror the source structure they test.
+Layout follows the project's declared convention -- co-located sibling (`src/module/handler.py` → `src/module/test_handler.py`) or mirrored under a central `tests/` directory (`src/module/handler.py` → `tests/module/test_handler.py`). Praxion itself uses both: co-located for CODE gates (see [gate-canaries.md](../../skills/testing-strategy/references/gate-canaries.md)), mirrored under `tests/` elsewhere. Whichever convention a project has chosen, apply it consistently rather than mixing at random.
 
-- `src/module/handler.py` → `tests/module/test_handler.py`
 - Shared fixtures live in the framework's fixture sharing mechanism (e.g., `conftest.py` in pytest, setup files in Jest) at the appropriate scope level
 - Test utilities and custom assertions live in `tests/helpers/` or `tests/support/`, never in production code
+- `tests/acceptance/` and `tests/e2e/` are **read-only for the implementer** -- these directories hold outer-loop tests designed independently of the implementation (test-engineer, acceptance mode). The implementer runs them but never edits them.

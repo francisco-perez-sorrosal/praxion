@@ -68,7 +68,10 @@ warn_unused_configs = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-ra -q --strict-markers"
+# Parallel by default (pytest-xdist); `large` (live external services) is the
+# only marker, deselected by default. Debug a single test with `-n 0`, never
+# `-p no:xdist` (it errors once xdist is already active via `-n auto`).
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
 
 [tool.coverage.run]
 source = ["src"]

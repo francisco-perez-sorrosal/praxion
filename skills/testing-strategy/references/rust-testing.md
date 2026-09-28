@@ -533,44 +533,10 @@ cargo tarpaulin --out xml      # Cobertura XML for CI
 
 ---
 
-## Test Topology — Rust Leaf
+## Select · Parallelize · Fall Back
 
-This section is the Rust leaf for the language-agnostic test topology protocol defined in [`references/test-topology.md`](test-topology.md). The trunk defines the group schema, tier vocabulary, identifier registries, and closure semantics. This leaf provides the concrete Cargo/nextest wiring: selector strategy identifiers, parallel runner identifiers, and the `shared_fixture_scope` mapping.
+**Select**: the resolver dispatches a Rust pocket to `cargo metadata` to find changed crates and their dependents -- Rust is not derived the way Python is; it is handed to its own native tool. See [test-selection.md § Ecosystem Dispatch](test-selection.md#ecosystem-dispatch) for the current dispatch table.
 
-**Read the trunk first** if you are unfamiliar with the protocol. This section does not repeat trunk definitions — it only extends them.
+**Parallelize**: `cargo-nextest`'s process-per-test isolation (`cargo nextest run --test-threads=N`) is the safer default wherever it is on the toolchain — a panicking or leaking test cannot corrupt another's state. Projects without `cargo-nextest` fall back to plain `cargo test -- --test-threads=N` (all tests share one process; the flag only changes thread count, not isolation). In both cases, `cargo test --doc` must run as a separate invocation -- nextest cannot execute doc-tests (see the doc-test gotcha above).
 
-### Defaults
-
-- **Registered selector strategies** (Registry 1): `cargo-test-filters` (plain `cargo test`), `nextest-filters` (`cargo-nextest`, once adopted).
-- **Registered parallel runners** (Registry 2): `cargo-test-jobs` (`cargo test -- --test-threads=N`), `nextest-threads` (`cargo nextest run --test-threads=N`).
-- **Recommended default**: `nextest-filters` + `nextest-threads` for any workspace with `cargo-nextest` on the toolchain — nextest's process-per-test isolation (see "Test Runners: `cargo test` vs `cargo-nextest`" above) makes it the safer parallel default, mirroring the Python leaf's `pytest-xdist-loadfile` recommendation. Projects that have not adopted `cargo-nextest` fall back to `cargo-test-filters` + `cargo-test-jobs` (plain `cargo test`).
-- **In both cases, `cargo test --doc` must run as a separate invocation** — nextest cannot execute doc-tests (see the doc-test gotcha above). This is not optional: a group's runner invocation is incomplete without it whenever the group covers a library with a documented public API.
-- **`shared_fixture_scope` mapping**: see table below. Rust's built-in test framework (`libtest`) has no fixture-scope system comparable to pytest's; scopes are approximated via `OnceLock`/`static` initialization patterns, documented per-value below.
-
-### Registry 1 — Selector Strategy Identifiers (Rust)
-
-These two identifiers are **registered** by this leaf in the trunk's Selector Strategy Registry (Registry 1) — they are live, not indicative, and may be used in populated `TEST_TOPOLOGY.md` files.
-
-| Identifier | Cargo invocation | Argument shape |
-|-----------|------------------|----------------|
-| `cargo-test-filters` | `cargo test <args>` | List of 1+ filter strings; each is passed positionally and matched by substring against the fully-qualified test name (`module::tests::test_name`). Multiple entries are unioned (a test matching any filter runs). |
-| `nextest-filters` | `cargo nextest run <args>` | List of 1+ filter strings, same substring-match semantics as `cargo-test-filters` for parity. For expression-based selection (by binary, package, or attribute) nextest also has its own `-E '<filterset-expr>'` DSL — verify the current filterset syntax against `cargo nextest run --help` for the installed version before relying on it in CI, since nextest is under active development. |
-
-### Registry 2 — Parallel Runner Identifiers (Rust)
-
-These two identifiers are **registered** by this leaf in the trunk's Parallel Runner Registry (Registry 2) — they are live, not indicative.
-
-| Identifier | Concrete invocation | When to use |
-|-----------|--------------------|-----------|
-| `cargo-test-jobs` | `cargo test -- --test-threads=N` (omit `N` for the libtest default, the host's CPU count) | Small crates, or projects that have not adopted `cargo-nextest`. libtest still runs every test inside one shared process — this flag only changes thread count, not isolation. |
-| `nextest-threads` | `cargo nextest run --test-threads=N` | **Recommended default** wherever `cargo-nextest` is on the toolchain. Each test runs in its own process, so a panicking or leaking test cannot corrupt another's state — a stronger isolation guarantee than `cargo-test-jobs`'s thread-level parallelism alone. Verify the current flag name against `cargo nextest run --help` for the installed nextest version before relying on it in CI. |
-
-### shared_fixture_scope — Mapping to Rust Idioms
-
-| Trunk value | Rust idiom | Notes |
-|------------|-----------|-------|
-| `none` | No shared state; each `#[test]` builds and tears down everything itself | Simplest, always safe under any parallel runner |
-| `per-test` | A local `setup()` helper function called at the top of each `#[test]` | Default; conceptually similar to pytest's `function` scope, but `libtest` has no fixture-injection mechanism — the call is explicit in the test body |
-| `per-file` | `#[cfg(test)] mod tests { static SHARED: std::sync::OnceLock<T> = std::sync::OnceLock::new(); }`, initialized once per test binary | For `tests/*.rs` integration tests, each file already compiles to its own binary (see "The Three Compilation Situations" above), so `per-file` and `per-process` collapse to the same mechanism there |
-| `per-process` | A crate-level `static` guarded by `OnceLock`/`Mutex`, initialized once per test binary process | Distinguishes from `per-file` mainly for inline `#[cfg(test)] mod tests` within one library's test binary, where multiple modules share the same process |
-| `per-suite` | A cross-binary lock (e.g., the `fd-lock` crate, or a lock file under a shared temp path) guarding a marker file | Required because `tests/*.rs` files and doc-tests are **separate OS processes** — an in-process `OnceLock` cannot coordinate across them. Mirrors the Python leaf's filelock-based session-fixture recipe. Groups with `parallel_safe: false` do not need this; they run sequentially with exclusive access. |
+**Fall back**: when the resolver has no adapter or `cargo`/`cargo nextest` is not on `PATH`, the Rust pocket widens to its full suite (`no-adapter` / `tool-unavailable`) rather than guessing at crate dependents.

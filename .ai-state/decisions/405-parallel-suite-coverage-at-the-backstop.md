@@ -73,3 +73,7 @@ The root suite (5,547 tests) ran serially, with pytest-cov forced on every invoc
     - `--pdb` and single-test debugging need `-p no:xdist`.
     - Four chronograph diagnostics are out of the default run until td-289 is fixed.
 - The broader test-selection and topology changes, including superseding dec-086's runner-level isolation, are decided separately by the test-suite-refresh architecture.
+
+## Erratum
+
+The debug escape cited above and in Consequences as `-p no:xdist` is incorrect under this ADR's own `addopts`: `-n auto --dist load` is already active, and `-p no:xdist` errors when xdist is already loaded. The correct debug escape is `-n 0`. Corrected 2026-09-27 by the test-suite-refresh pipeline; no semantic change to the decision.

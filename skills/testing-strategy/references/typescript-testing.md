@@ -378,4 +378,12 @@ coverage: {
 - **Mock cleanup**: Call `vi.restoreAllMocks()` in `afterEach` to prevent mock state from leaking between tests. Or set `mockReset: true` in config.
 - **Type narrowing in assertions**: `expect(value).toBeDefined()` does not narrow the TypeScript type. Use a type guard or `assert` for subsequent typed access.
 - **Test file location**: Vitest defaults to `**/*.test.ts`. Jest defaults to `**/__tests__/**` and `**/*.test.ts`. Ensure config matches your convention.
+
+## Select · Parallelize · Fall Back
+
+**Select**: the resolver dispatches a TypeScript/JS pocket to the project's own test runner -- `vitest related <paths>` or `jest --findRelatedTests <paths>` -- rather than deriving an import graph itself. See [test-selection.md § Ecosystem Dispatch](test-selection.md#ecosystem-dispatch) for the current dispatch table.
+
+**Parallelize**: both Vitest and Jest parallelize by default (worker threads / workers); no extra flag is required for a derived selection.
+
+**Fall back**: when neither `vitest` nor `jest` is discoverable on the pocket (missing config, missing binary), the pocket widens to its full suite (`no-adapter` / `tool-unavailable`) rather than guessing at import relationships.
 - **Async test timeout**: Default timeout is 5 seconds (Vitest) or 5 seconds (Jest). Integration tests may need longer: set `testTimeout` in config or per-test with `it("name", async () => {}, 30_000)`.

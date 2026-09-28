@@ -9,7 +9,7 @@ This reference does **not** install `pytest-cov` or any other tool. The project 
 Probe these sources in order and stop at the first hit. Each check is a simple filesystem or file-content test — the skill does not execute anything during probing.
 
 1. **Pixi tasks** — look for a coverage-oriented task in `pixi.toml` under `[tasks]` (commonly named `coverage`, `test-coverage`, `cov`, or similar). If present, invoke via `pixi run <task-name>`. Pixi projects almost always pin the correct invocation here, and running through pixi guarantees the project's environment is active.
-2. **`pytest-cov` config in `pyproject.toml`** — check for either `[tool.pytest.ini_options]` with `addopts` containing `--cov`, or an equivalent `[tool.coverage.run]` / `[tool.coverage.report]` block. If present, invoke plain `pytest` — the flags are already picked up from config, and this is the most common canonical target for Python projects using `uv` or plain `pytest`.
+2. **`pytest-cov` config in `pyproject.toml`** — check for either `[tool.pytest.ini_options]` with `addopts` containing `--cov`, or an equivalent `[tool.coverage.run]` / `[tool.coverage.report]` block with coverage deliberately kept out of `addopts` (the default config block below takes this shape — coverage is a periodic measurement, not a default-run side effect). If `addopts` already contains `--cov`, invoke plain `pytest` — the flags are picked up from config. Otherwise invoke `pytest --cov --cov-report=xml`, since a bare `pytest` would measure nothing without the flag.
 3. **Raw `pytest --cov` fallback** — if `pytest-cov` is importable (detectable by a `pytest-cov` entry under `[dependency-groups]`, `[tool.poetry.group.dev.dependencies]`, `[project.optional-dependencies]`, a `requirements*.txt`, or `uv.lock` / `poetry.lock`) but no config block exists, fall back to `pytest --cov=<package>` where `<package>` is derived from `[project].name` or the top-level source directory. This is a best-effort branch — emit a clear message that no config was found and a bare flag was used.
 4. **Makefile target** — if a `Makefile` exists with a target named `coverage`, `test-coverage`, or `cov`, invoke via `make <target>`. This is the lowest-precedence branch because it often shells out to a non-Python build system and the exact behavior is project-specific.
 
@@ -44,7 +44,10 @@ Copy the block below into the project's `pyproject.toml`. When present, `pytest`
 # so downstream tooling finds it at the first-candidate path.
 
 [tool.pytest.ini_options]
-addopts = "--cov --cov-report=xml --cov-report=term-missing"
+# Coverage is a periodic measurement, not a default-run side effect (testing-strategy
+# skill, Principle 8) -- invoke it explicitly: `pytest --cov --cov-report=xml
+# --cov-report=term-missing`. addopts deliberately carries no `--cov` flag so the
+# default run stays fast and coverage.xml is written only by deliberate measurements.
 testpaths = ["tests", "scripts"]
 # Repo root on sys.path so tests can import source modules without requiring
 # PYTHONPATH to be set by the invoker. Harmless for projects whose package is

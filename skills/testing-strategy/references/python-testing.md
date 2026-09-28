@@ -127,18 +127,16 @@ def test_full_pipeline(): ...
 def test_database_roundtrip(): ...
 ```
 
-Run by marker: `<runner> pytest -m "not slow"`, `<runner> pytest -m "integration or smoke"`.
+Run by marker: `<runner> pytest -m "not large"`, `<runner> pytest -m "large"`.
 
-Enforce registration to catch typos:
+Enforce registration to catch typos. `large` (live external services, deselected by default) is the only marker this project's own convention requires -- see [testing-conventions.md](../../../rules/swe/testing-conventions.md):
 
 ```toml
 [tool.pytest.ini_options]
 markers = [
-    "slow: deselect with '-m \"not slow\"'",
-    "integration: requires external services",
-    "smoke: critical path verification",
+    "large: live external services; deselected by default, run with '-m large'",
 ]
-addopts = "--strict-markers"
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
 ```
 
 ## Property-Based Testing with Hypothesis
@@ -266,7 +264,7 @@ Beyond the basics in [python-development](../../python-development/references/te
 
 ```toml
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --tb=short"
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large' --tb=short"
 asyncio_mode = "auto"
 filterwarnings = ["error", "ignore::DeprecationWarning:third_party_lib.*"]
 ```
@@ -282,161 +280,10 @@ filterwarnings = ["error", "ignore::DeprecationWarning:third_party_lib.*"]
 
 ---
 
-## Test Topology — Python Leaf
+## Select · Parallelize · Fall Back
 
-This section is the Python leaf for the language-agnostic test topology protocol defined in [`references/test-topology.md`](test-topology.md). The trunk defines the group schema, tier vocabulary, identifier registries, and closure semantics. This leaf provides the concrete pytest wiring: selector strategy identifiers, parallel runner identifiers, scope mapping, marker registration, and runner invocation examples.
+**Select**: `python3 scripts/resolve_test_scope.py --json` derives the changed-path selection from four edge sources (layout, import, path-literal, declared) and emits the exact invocation, including the runner prefix. See [test-selection.md](test-selection.md) for the full contract.
 
-**Read the trunk first** if you are unfamiliar with the protocol. This section does not repeat trunk definitions — it only extends them.
+**Parallelize**: `pytest-xdist` runs by default (`-n auto --dist load`). A selection at or below the serial threshold (~20 estimated tests) is invoked with `-n 0` to skip worker start-up. Debug a single test with `-n 0` -- never `-p no:xdist`, which errors once `-n auto` is already active in `addopts`.
 
-### Registry 1 — Selector Strategy Identifiers (Python)
-
-These three identifiers are **registered** by this leaf in the trunk's Selector Strategy Registry (Registry 1) — they are live, not indicative, and may be used in populated `TEST_TOPOLOGY.md` files. Each maps the abstract `strategy` value in a group's `selectors` entry to a concrete pytest invocation.
-
-| Identifier | Pytest invocation | Argument shape |
-|-----------|------------------|----------------|
-| `pytest-globs` | `<runner> pytest <args>` | List of file path or glob strings (e.g., `["tests/memory_mcp/", "tests/hooks/"]`) |
-| `pytest-markers` | `<runner> pytest -m "<m1> or <m2> or ..."` | List of snake_case marker name strings (e.g., `["memory_store_core", "hooks_inject_memory"]`) |
-| `pytest-keywords` | `<runner> pytest -k "<expr>"` | A keyword expression string (e.g., `"memory and not slow"`) — use for ad-hoc filtering; prefer `pytest-markers` for declared groups |
-
-**Argument-shape edge cases (contract):**
-
-- `pytest-globs` — `arg` is a list of 1+ path/glob strings; an empty list is invalid (a group must select at least one path). Multiple entries are passed positionally and unioned by pytest (all paths run). No `pyproject.toml` marker registration is required.
-- `pytest-markers` — `arg` is a list of 1+ snake_case marker names; an empty list is invalid. The runner OR-joins the entries into one expression: a single entry `["x"]` materializes as `-m "x"`; two entries `["x","y"]` materialize as `-m "x or y"`. Every marker must be registered in the pocket's `pyproject.toml` (see §"Marker Registration Recipe") or `--strict-markers` fails collection.
-- `pytest-keywords` — `arg` is a single keyword expression **string**, not a list; an empty string is invalid. The string is passed verbatim to `-k`.
-
-`pytest-keywords` is optional within the Python leaf; it requires no pyproject marker registration. Use it only for transient or debug-scope selections where a named marker would be premature. For declared topology groups, always prefer `pytest-markers`.
-
-### Registry 2 — Parallel Runner Identifiers (Python)
-
-These two identifiers are **registered** by this leaf in the trunk's Parallel Runner Registry (Registry 2) — they are live, not indicative.
-
-| Identifier | Concrete invocation | When to use |
-|-----------|--------------------|-----------|
-| `pytest-xdist-loadfile` | `<runner> pytest -n auto --dist loadfile` | **Recommended default** for parallel-safe groups. Workers are assigned whole files; file-scoped fixture state is stable across tests in the same file. Preferred when groups have `shared_fixture_scope: per-file` or narrower. |
-| `pytest-xdist-load` | `<runner> pytest -n auto --dist load` | Load-balanced distribution. Less robust when tests in the same file share fixture state. Use only when groups have `shared_fixture_scope: none` or `per-test`. |
-
-**Recommended default: `pytest-xdist-loadfile`.** Loadfile is the safer default because it keeps every test in a file on one worker, so file-scoped (and narrower) fixture state never has to cross a worker boundary — the most common cause of flaky parallel runs. Choose `pytest-xdist-load` only when you have measured that a group's tests share no per-file fixture state and load-balancing meaningfully improves wall-clock time. The trunk's `none` identifier (sequential, no parallel runner) covers `parallel_safe: false` groups — these groups are never passed to xdist.
-
-### shared_fixture_scope — Mapping to pytest Scope Keywords
-
-| Trunk value | pytest scope | Notes |
-|------------|-------------|-------|
-| `none` | (no shared fixture) | All fixtures are function-scoped or inline; no setup cost across tests |
-| `per-test` | `function` | Default pytest scope; setup and teardown for each test case |
-| `per-file` | `module` | Runs once per test file; stable for loadfile distribution |
-| `per-process` | `class` | Runs once per test class; use carefully — tests in different classes within the same file still share this state across a worker |
-| `per-suite` | `session` | Runs once for the entire test session; requires filelock for xdist safety (see §filelock recipe below) |
-
-### Marker Registration Recipe
-
-Each group that uses a `pytest-markers` selector must be declared in the pocket's `pyproject.toml`. Without this, `--strict-markers` (enabled globally across pockets) will fail loudly on unregistered markers — which is the desired signal that a group was added to `TEST_TOPOLOGY.md` without updating the pyproject.
-
-```toml
-[tool.pytest.ini_options]
-addopts = "--strict-markers"
-markers = [
-    "memory_store_core: tests for the memory store core subsystem",
-    "hooks_inject_memory: tests for the memory injection hooks",
-]
-```
-
-One `markers` entry per group id. The description after the colon is free-form prose for documentation purposes. `--strict-markers` is already enabled in Praxion's pockets via the global `addopts` setting; an unregistered marker is an immediate test collection failure, not a silent skip.
-
-### Kebab → snake_case Mapping Rule
-
-Group ids in `TEST_TOPOLOGY.md` are kebab-case (e.g., `memory-store-core`). The pytest marker form substitutes each `-` with `_` (e.g., `memory_store_core`). The mapping is mechanical:
-
-```
-kebab-id:    memory-store-core
-marker form: memory_store_core
-```
-
-This one-way transformation is required because pytest marker names must be valid Python identifiers (PEP 8), which do not allow hyphens. The kebab id is the canonical topology identity; the snake_case form is only used in pytest invocations, pyproject marker declarations, and `TEST_TOPOLOGY.md` `selectors` entries where `strategy: pytest-markers` is specified.
-
-### Reserved Name Set
-
-The following names must not be used as group `id` values in `TEST_TOPOLOGY.md`. After kebab → snake_case transformation, none may collide with an entry in this set.
-
-**Built-in pytest markers** (reserved at the runner level):
-
-- `parametrize` — built-in parametrize decorator
-- `skipif` — built-in conditional skip
-- `xfail` — built-in expected failure
-- `usefixtures` — built-in fixture applicator
-- `xdist_group` — pytest-xdist worker grouping marker
-- `parallel_unsafe` — placeholder reserved for future topology tooling
-
-**Tier keywords** (reserved at the trunk protocol level; no leaf extension needed):
-
-- `unit`, `integration`, `contract`, `e2e`
-
-If your group id would produce a snake_case marker that collides with any of the above, rename the group id. Sentinel check TT05 enforces this constraint.
-
-### Parallel-Unsafe Group Runner Separation
-
-When a step's `Tests:` field includes groups with `parallel_safe: false`, those groups must run in a separate sequential pytest invocation, isolated from the parallel-safe groups. Never mix safe and unsafe groups in the same `-n auto` invocation.
-
-```bash
-# Parallel-safe groups (run these first to pay xdist startup cost up front)
-uv run pytest -m "memory_store_core or hooks_inject_memory" -n auto --dist loadfile
-
-# Parallel-unsafe groups (sequential, isolated)
-uv run pytest -m "project_metrics_fixture_rebuild" -n 0
-```
-
-The `-n 0` flag disables xdist entirely for the unsafe invocation. Results from both invocations are aggregated into a single `TEST_RESULTS.md` block per step.
-
-### filelock-Based Session-Fixture Recipe
-
-Groups with `shared_fixture_scope: per-suite` and `parallel_safe: true` need a filelock to ensure the session-scoped setup runs exactly once across all xdist workers. Without the lock, multiple workers may race to run the session fixture concurrently, causing corruption or redundant initialization.
-
-The pattern (from `scripts/project_metrics/tests/conftest.py:26-49`):
-
-```python
-import pytest
-from filelock import FileLock
-from pathlib import Path
-
-@pytest.fixture(scope="session", autouse=True)
-def _rebuild_shared_resource(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Run expensive session-scoped setup exactly once across all xdist workers.
-
-    Uses a file lock so the first worker to acquire it performs the build;
-    subsequent workers wait and then skip the redundant rebuild.
-    """
-    root_tmp = tmp_path_factory.getbasetemp().parent
-    lock_path = root_tmp / "shared_resource.lock"
-    with FileLock(str(lock_path)):
-        marker = root_tmp / "shared_resource.done"
-        if not marker.exists():
-            # Perform expensive one-time setup here
-            _do_expensive_setup()
-            marker.touch()
-```
-
-`filelock` is a `pytest-xdist` dependency — it is available in any project that uses xdist. The `tmp_path_factory.getbasetemp().parent` path is a shared directory accessible across all workers in the same pytest session.
-
-Groups with `parallel_safe: false` do not need the filelock pattern — they run sequentially and have exclusive access to any shared state.
-
-### Invocation Example
-
-A concrete implementer/test-engineer invocation for a single group:
-
-```bash
-uv run pytest -m "memory_store_core" -n auto --dist loadfile
-```
-
-This materializes the `memory-store-core` group (kebab id in `TEST_TOPOLOGY.md`) using the `pytest-markers` selector strategy and the `pytest-xdist-loadfile` parallel runner.
-
-### Worked pyproject.toml Snippet
-
-```toml
-[tool.pytest.ini_options]
-addopts = "-ra --strict-markers --tb=short"
-markers = [
-    "memory_store_core: memory store persistence and retrieval",
-    "observation_pipeline: observation ingestion and search pipeline",
-]
-```
-
-Replace the placeholder group ids with the snake_case forms of your topology groups. One entry per group that uses a `pytest-markers` selector. Groups that use `pytest-globs` selectors do not require a marker registration entry.
+**Fall back**: an unmapped path, a change to the resolver itself, the declared-deps file, or a pocket's runner config, or a resolver exit code of `2`, all widen to the full suite (the pocket, or every pocket for a repo-level widen) -- see `test-selection.md`'s widen-reason table. `large` (live external services) is the only marker this convention requires; it is deselected by default (`-m 'not large'`) and run explicitly with `-m large`.

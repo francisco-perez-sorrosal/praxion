@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-28T02:57:57Z'
+generated_at: '2026-09-28T05:28:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-27'
+  last_modified: '2026-09-28'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -3001,6 +3001,12 @@ surfaces:
   title: Retire context-hub and the external-api-docs skill; fold a provider-neutral current-docs protocol into software-planning
   last_modified: '2026-09-27'
   renderer: adr_card
+- id: ai-state-decisions-405-parallel-suite-coverage-at-the-backstop
+  path: .ai-state/decisions/405-parallel-suite-coverage-at-the-backstop.md
+  type: markdown
+  title: Praxion's suite runs parallel by default and measures coverage only at the backstop
+  last_modified: '2026-09-27'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3727,6 +3733,7 @@ groups:
   - ai-state-decisions-402-ledger-triage-probe
   - ai-state-decisions-403-legacy-context-hub-cleanup-shim
   - ai-state-decisions-404-retire-context-hub-and-external-api-docs
+  - ai-state-decisions-405-parallel-suite-coverage-at-the-backstop
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

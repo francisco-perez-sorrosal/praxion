@@ -36,7 +36,10 @@ packages = ["src/task_chronograph_mcp"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers -m 'not large'"
+# `large` = needs live external services (a running Phoenix daemon). Out of the
+# default run by design; run them with `uv run pytest -m large`.
+markers = ["large: needs live external services; deselected by default (run with -m large)"]
 asyncio_mode = "auto"
 
 [tool.ruff]

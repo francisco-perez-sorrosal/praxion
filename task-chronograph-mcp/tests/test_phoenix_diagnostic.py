@@ -126,6 +126,7 @@ def unique_project():
     _delete_project(name)
 
 
+@pytest.mark.large
 @pytest.mark.skipif(not _phoenix_available(), reason="Phoenix not running on localhost:6006")
 class TestPhoenixDiagnostic:
     """Diagnostic tests against real Phoenix to find tracing issues."""

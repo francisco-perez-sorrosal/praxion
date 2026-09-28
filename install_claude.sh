@@ -457,10 +457,30 @@ install_praxion_pre_commit() {
 # Plugin installation
 # =============================================================================
 
+# Prints the version directory the plugin registry says is installed (a
+# user-scope entry first, else the first entry), or nothing.
+plugin_installed_path() {
+    local reg="${HOME}/.claude/plugins/installed_plugins.json"
+    [ -f "$reg" ] || return 0
+    python3 - "$reg" "${PLUGIN_NAME}@${MARKETPLACE_NAME}" <<'PYEOF' 2>/dev/null || true
+import json, sys
+try:
+    entries = json.load(open(sys.argv[1])).get("plugins", {}).get(sys.argv[2], [])
+except (OSError, ValueError, AttributeError):
+    sys.exit(0)
+entries = sorted((e for e in entries if isinstance(e, dict)), key=lambda e: e.get("scope") != "user")
+if entries and entries[0].get("installPath"):
+    print(entries[0]["installPath"])
+PYEOF
+}
+
+# Claude Code stamps every superseded cached version with .orphaned_at, so a
+# marker anywhere else in the cache is normal. Only the installed version's
+# directory decides whether the plugin loads.
 plugin_is_orphaned() {
-    local marker
-    marker=$(find "$PLUGIN_CACHE_DIR" -name '.orphaned_at' 2>/dev/null | head -1)
-    [ -n "$marker" ]
+    local path
+    path="$(plugin_installed_path)"
+    [ -n "$path" ] && [ -f "${path}/.orphaned_at" ]
 }
 
 plugin_is_installed() {
@@ -511,13 +531,6 @@ EOF
     local scope
     if [ "$REPLY" -eq 1 ]; then scope="user"; else scope="project"; fi
 
-    # Remove orphan marker if present
-    if [ -d "$PLUGIN_CACHE_DIR" ] && plugin_is_orphaned; then
-        step "Removing orphan marker from previous installation..."
-        find "$PLUGIN_CACHE_DIR" -name '.orphaned_at' -delete 2>/dev/null
-        info "Orphan marker removed"
-    fi
-
     # Register marketplace + install
     step "Registering marketplace..."
     claude plugin marketplace add "$MARKETPLACE_SOURCE" 2>/dev/null || true
@@ -525,6 +538,15 @@ EOF
     step "Installing ${PLUGIN_NAME} (${scope} scope)..."
     if ! claude plugin install "${PLUGIN_NAME}@${MARKETPLACE_NAME}" --scope "$scope" 2>&1; then
         fail "Plugin installation failed"
+    fi
+
+    # A reinstall can reuse a version directory Claude Code marked orphaned
+    # when it was uninstalled. Clear the marker on the installed version only;
+    # markers on superseded versions are Claude Code's own bookkeeping.
+    if plugin_is_orphaned; then
+        step "Removing orphan marker from the installed version..."
+        rm -f "$(plugin_installed_path)/.orphaned_at"
+        info "Orphan marker removed"
     fi
 
     # Verify
@@ -847,7 +869,8 @@ PYEOF
 # Hooks were previously installed into ~/.claude/settings.json by this script.
 # Since Claude Code auto-loads hooks from installed plugins, the plugin's
 # hooks.json (hooks/hooks.json) is now the single authority.
-# The installer only cleans up stale hooks from settings.json if present.
+# --uninstall removes those stale entries, and only those (lib/settings_hooks.py
+# owns the rule for which entries are Praxion's).
 
 # =============================================================================
 # LEGACY-CHUB-CLEANUP — transitional. Praxion no longer installs context-hub.
@@ -1194,15 +1217,11 @@ check_claude_code() {
             warn "Hook interpreter ${hook_python} lacks PyYAML — hook-delivered rules are skipped; put a python3 with PyYAML first on PATH"
             healthy=false
         fi
-        # Warn if stale hooks remain in settings.json
+        # Warn only about hooks earlier Praxion versions registered in
+        # settings.json; other entries in that key are the user's or another tool's.
         local settings_file="${HOME}/.claude/settings.json"
-        if [ -f "$settings_file" ] && python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    s = json.load(f)
-sys.exit(0 if 'hooks' in s else 1)
-" "$settings_file" 2>/dev/null; then
-            warn "Stale hooks in settings.json — remove the 'hooks' key to prevent double-firing"
+        if [ -f "$settings_file" ] && python3 "${SCRIPT_DIR}/lib/settings_hooks.py" check "$settings_file" 2>/dev/null; then
+            warn "Stale Praxion hooks in settings.json double-fire with the plugin's — delete the entries that run .claude-plugin/hooks/ scripts (./install.sh code --uninstall removes only those)"
         fi
     else
         warn "Plugin hooks.json not found at ${hooks_json}"
@@ -1328,19 +1347,14 @@ uninstall_claude_code() {
     # Remove new-project entry (lives at repo root, not scripts/)
     remove_stale_new_project_symlink
 
-    # Remove hooks from settings.json
+    # Remove only the hooks earlier Praxion versions registered in
+    # settings.json; the user's own and other tools' hooks there stay.
     local settings_file="${HOME}/.claude/settings.json"
     if [ -f "$settings_file" ]; then
-        python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    s = json.load(f)
-if 'hooks' in s:
-    del s['hooks']
-    with open(sys.argv[1], 'w') as f:
-        json.dump(s, f, indent=2)
-        f.write('\n')
-" "$settings_file" 2>/dev/null && info "Hooks removed from settings.json" || true
+        local hooks_result
+        if hooks_result="$(python3 "${SCRIPT_DIR}/lib/settings_hooks.py" remove "$settings_file" 2>/dev/null)"; then
+            info "settings.json: ${hooks_result}"
+        fi
     fi
 
     # LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state

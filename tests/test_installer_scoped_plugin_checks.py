@@ -34,7 +34,7 @@ HELPER = REPO_ROOT / "lib" / "settings_hooks.py"
 INSTALL_CLAUDE = REPO_ROOT / "install_claude.sh"
 
 PRAXION_CMD = "python3 /Users/someone/praxion/.claude-plugin/hooks/send_event.py"
-FOREIGN_CMD = "/Users/someone/.claude/hooks/i-am/audit-log.sh"
+FOREIGN_CMD = "/Users/someone/.claude/hooks/other-tool/audit-log.sh"
 
 
 def _load_helper():
@@ -54,7 +54,7 @@ def _foreign_only() -> dict:
         "theme": "dark",
         "hooks": {
             "PreToolUse": [_group(FOREIGN_CMD, matcher="Bash")],
-            "SessionStart": [_group("/Users/someone/.claude/hooks/i-am/session-start.sh")],
+            "SessionStart": [_group("/Users/someone/.claude/hooks/other-tool/session-start.sh")],
         },
     }
 

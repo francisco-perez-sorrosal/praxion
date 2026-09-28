@@ -694,3 +694,27 @@ class TestFlagSingleInvocationPerRun:
             "A failing refresh must not be retried; "
             f"got {mocks.refresh_coverage.call_count} invocations."
         )
+
+
+class TestDiscoverCoverageTargetArgv:
+    """The pyproject probe must yield an invocation that actually measures coverage."""
+
+    def test_addopts_with_cov_runs_plain_pytest(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.cli import _discover_coverage_target
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.pytest.ini_options]\naddopts = "--cov --cov-report=xml"\n'
+        )
+        argv = _discover_coverage_target(tmp_path)
+        assert argv is not None
+        assert argv[-1] == "pytest"
+
+    def test_coverage_section_without_addopts_cov_passes_the_flags(self, tmp_path: Path) -> None:
+        from scripts.project_metrics.cli import _discover_coverage_target
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.pytest.ini_options]\naddopts = "-ra"\n\n[tool.coverage.run]\nbranch = true\n'
+        )
+        argv = _discover_coverage_target(tmp_path)
+        assert argv is not None
+        assert argv[-2:] == ["--cov", "--cov-report=xml"], argv

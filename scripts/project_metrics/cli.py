@@ -319,8 +319,10 @@ def _discover_coverage_target(repo_root: Path) -> list[str] | None:
 
     1. A pixi task named ``coverage`` / ``test-coverage`` / ``cov``.
     2. A ``pyproject.toml`` with ``[tool.pytest.ini_options].addopts``
-       containing ``--cov``, or a ``[tool.coverage.run]`` /
-       ``[tool.coverage.report]`` block — invoke plain ``pytest``.
+       containing ``--cov`` — invoke plain ``pytest``; or a
+       ``[tool.coverage.run]`` / ``[tool.coverage.report]`` block with
+       coverage kept out of ``addopts`` — invoke ``pytest --cov
+       --cov-report=xml``, since plain ``pytest`` would measure nothing.
     3. ``pytest-cov`` declared anywhere in the project's dependency manifest
        (PEP 735 groups, poetry groups, optional-dependencies, requirements
        files, uv/poetry lockfiles) — fallback to bare ``pytest --cov=<pkg>``.
@@ -332,7 +334,10 @@ def _discover_coverage_target(repo_root: Path) -> list[str] | None:
         return ["pixi", "run", pixi_task]
 
     if _probe_pyproject_has_pytest_cov_config(repo_root):
-        return _pytest_invocation(repo_root)
+        argv = _pytest_invocation(repo_root)
+        if not _probe_pyproject_addopts_has_cov(repo_root):
+            argv.extend(["--cov", "--cov-report=xml"])
+        return argv
 
     if _probe_pytest_cov_dependency(repo_root):
         package = _infer_package_name(repo_root)
@@ -406,6 +411,28 @@ def _probe_pixi_coverage_task(repo_root: Path) -> str | None:
         if re.search(rf"(?m)^\s*{re.escape(candidate)}\s*=", tasks_block):
             return candidate
     return None
+
+
+def _probe_pyproject_addopts_has_cov(repo_root: Path) -> bool:
+    """Return True when ``[tool.pytest.ini_options].addopts`` carries ``--cov``.
+
+    Projects that keep coverage out of the default test run (the
+    test-coverage skill's recommended config) have coverage sections but no
+    ``--cov`` in ``addopts``; their coverage target must pass the flags itself.
+    """
+
+    pyproject = repo_root / "pyproject.toml"
+    if not pyproject.is_file():
+        return False
+    try:
+        text = pyproject.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    ini_block = _extract_toml_section(text, "tool.pytest.ini_options")
+    if ini_block is None:
+        return False
+    addopts_match = re.search(r"(?m)^\s*addopts\s*=\s*(.+)$", ini_block)
+    return bool(addopts_match and "--cov" in addopts_match.group(1))
 
 
 def _probe_pyproject_has_pytest_cov_config(repo_root: Path) -> bool:

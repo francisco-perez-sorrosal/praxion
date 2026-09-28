@@ -32,7 +32,7 @@ Unmapped is not silently narrow — a changed path that reaches no test, is not 
 | `tool-unavailable` | The ecosystem's own tool is not on `PATH` |
 | `full-requested` | `--full` was passed explicitly |
 
-A repo-level widen (`unmapped-path`, `selector-changed`, `declared-deps-*`) forces every pocket to `full`. A pocket-level widen (`pocket-config-changed`, `no-adapter`, `tool-unavailable`) forces only that pocket.
+A repo-level widen (`selector-changed`, `declared-deps-*`, and `unmapped-path` for a path a Python pocket owns) forces every pocket to `full`. A pocket-level widen (`pocket-config-changed`, `no-adapter`, `tool-unavailable`, and `unmapped-path` for a path outside a native pocket's module graph, crate or package) forces only that pocket.
 
 Non-source paths (git-ignored, root narrative files, or an explicit `[[inert]]` entry) are exempted from ever triggering `unmapped-path` — each exemption is reported in `ignored_non_source`, auditable rather than an opaque allowlist.
 
@@ -77,7 +77,7 @@ A missing tool or a missing adapter widens only that pocket (`tool-unavailable` 
 
 ## Input Modes and Output Contract
 
-Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD` plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`).
+Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD`, plus uncommitted changes to tracked files, plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`). A rename counts as both its old and its new path, and a deleted file is never emitted as a test target (a deleted source still selects its surviving tests).
 
 ```json
 {

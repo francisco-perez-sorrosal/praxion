@@ -106,6 +106,19 @@ def test_green_section_at_fixed_shape_passes(tmp_path: Path) -> None:
     assert rc == 0, "a fixed-shape green section must exit 0"
 
 
+def test_green_integration_checkpoint_with_an_audit_line_passes(tmp_path: Path) -> None:
+    """The integration checkpoint records the selection audit on its green run.
+
+    `Audit: missed=<n> flaky=<n>` is part of the fixed shape for that step, so
+    the byte-bounded green section must still accept it.
+    """
+    body = _fixed_shape_green(padding="Audit: missed=0 flaky=0\n")
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    assert main([str(path)]) == 0
+    assert find_findings(path, DEFAULT_CEILING_BYTES) == []
+
+
 def test_large_red_section_is_not_flagged(tmp_path: Path) -> None:
     """A 5 KB red section (fail > 0) is never flagged for size."""
     failure_block = "### Failures\n" + ("some failure detail line\n" * 200)  # ~5 KB

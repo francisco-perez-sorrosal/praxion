@@ -162,27 +162,33 @@ Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](../.ai-
 ## 9. Test Selection
 
 <!-- Developer-facing navigation guide. Components named in this section have been verified
-     against the codebase. The test-refresh-core pipeline is replacing the test topology with
-     derived selection; the rows below mark what is on disk today. The design target (including
-     components not yet built) lives in .ai-state/DESIGN.md §9.
+     against the codebase. The design target and rationale live in .ai-state/DESIGN.md §9.
      Last verified against code: 2026-09-28. -->
 
 ### 9.1 Where to find what
 
 | You want to... | Look at | Status |
 |---|---|---|
-| Resolve which tests a change needs | `scripts/resolve_test_scope.py` | Built — **being rewritten** from a topology reader into derived selection (layout, imports, path literals, declared list) |
-| Read the testing doctrine | `skills/testing-strategy/SKILL.md` | Built — being rewritten (ten principles, scope × size, loop table) |
-| See Praxion's test-group topology | `.ai-state/TEST_TOPOLOGY.md` | **Deprecated** — removed by test-refresh-core; nothing will read it |
-| Read the topology schema | `skills/testing-strategy/references/test-topology.md` | **Deprecated** — replaced by `references/test-selection.md` |
-| Refresh a topology | `commands/refresh-topology.md` | **Deprecated** — retired with no replacement (selection is derived) |
-| Check topology conformance | `scripts/check_topology_conformance.py` (sentinel TT01–TT07) | **Deprecated** — replaced by GL07 in `scripts/check_gate_liveness.py` |
+| Read the testing doctrine (ten principles, scope × size, ownership, the five loops) | `skills/testing-strategy/SKILL.md` | Built |
+| Read the selection contract (sources, widening, ecosystem dispatch, audit) | `skills/testing-strategy/references/test-selection.md` | Built |
+| Resolve which tests a change needs | `scripts/resolve_test_scope.py` (`--changed`, `--changed-from`, `--full`, `--json`); private `_test_inventory.py`, `_declared_deps.py`, `_python_selection.py`, `_native_selection.py` | Built |
+| Declare a non-code dependency the resolver cannot see | `tests/declared-deps.toml` | Built |
+| Run the derived selection interactively | `/test` (`commands/test.md`) | Built |
+| Audit a run: selection misses, flaky tests, slowest tests | `scripts/audit_tests.py` | Built |
+| Find a test file no runner collects | GL07 in `scripts/check_gate_liveness.py` (sentinel family row) | Built |
+| Run the scheduled health loop | `.github/workflows/test-scheduled.yml` (weekly + dispatch) | Built |
 | Run tests in parallel | `pyproject.toml` `addopts` (`-n auto --dist load -m 'not large'`, dec-405) | Built |
+| Ship the same shape to a managed project | onboarding `tests` capability: `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Built |
+
+The hand-kept test topology (`.ai-state/TEST_TOPOLOGY.md`, its schema reference, `/refresh-topology`, `check_topology_conformance.py` and sentinel TT01–TT07) was removed; selection is derived.
 
 ### 9.2 Caveats developers should know
 
 - To debug a single test, use `-n 0`. `-p no:xdist` fails with `unrecognized arguments: -n --dist` because `addopts` carries `-n auto`.
-- Coverage is not in the default run. CI requests it explicitly with `--cov-fail-under=80`.
+- Coverage is not in the default run. CI requests it explicitly with `--cov-fail-under=80`; `/project-metrics --refresh-coverage` passes `--cov` itself.
+- Every selected test carries `via` (layout, import, path-literal, declared) and `because` (the changed file) in `--json`, so a surprising selection can be traced.
+- A change the resolver cannot map, a change to the resolver itself, and a bad declared list all widen to the full suite. It never narrows.
+- The resolver parses every tracked `.py` file; a selection takes about 2 s.
 
 For the design rationale and the target component set, see [`.ai-state/DESIGN.md` §9](../.ai-state/DESIGN.md#9-test-selection-and-feedback-loops).
 

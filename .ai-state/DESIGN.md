@@ -600,15 +600,15 @@ Test selection is **derived from the code, never hand-kept**. Anything the deriv
 
 | Artifact | Path | Status | Purpose |
 |---|---|---|---|
-| Doctrine | `skills/testing-strategy/SKILL.md` | Designed (rewrite) | Ten principles, Organization (scope × size, layout), Ownership, five-loop table, coverage policy |
-| Selection contract | `skills/testing-strategy/references/test-selection.md` | Designed | Four edge sources as a union, widening triggers, the ecosystem dispatch matrix (Python, TS, Rust, Go, JVM, nx/turbo/pants/bazel), declared-list format, audit protocol |
-| Resolver | `scripts/resolve_test_scope.py` + private `_test_inventory.py`, `_declared_deps.py`, `_python_selection.py`, `_native_selection.py` | Designed (rewrite of a Built script) | Changed paths → per-pocket selection. For Python: layout, stdlib-`ast` import and path-literal edges, and declared edges. Other ecosystems go to their native tool. Unmapped paths widen. Tiny Python selections run with `-n 0`. JSON schema 2 |
-| Declared list | `tests/declared-deps.toml` (in-repo, not `.ai-state/`) | Designed | `[[dep]]` / `[[inert]]` sum type holding only the non-code edges derivation cannot see. Any change widens |
-| Suite auditor | `scripts/audit_tests.py` | Designed | junit in, records out: selection `missed` / `selected` / `widened`, flaky classification from one rerun, slow top-N |
-| Collection gate | GL07 in `scripts/check_gate_liveness.py` | Designed | A test file that no runner collects is a gate that never fires. Replaces TT07 and is portable |
-| Scheduled loop | `.github/workflows/test-scheduled.yml` | Designed | `large` tests, audit, flaky and slow reports. Watched by ci-autofix |
-| Onboarding `tests` capability | `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Designed | Parallel, coverage-off runner config, outer-loop directories, declared list, test and scheduled workflows, `## Testing` block |
-| Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | **Deprecated** (removed by test-refresh-core) | Replaced by the rows above. Their ADRs are superseded or retired per `dec-draft-40ba0ce1` |
+| Doctrine | `skills/testing-strategy/SKILL.md` | Built | Ten principles, Organization (scope × size, layout), Ownership, five-loop table, coverage policy |
+| Selection contract | `skills/testing-strategy/references/test-selection.md` | Built | Four edge sources as a union, widening triggers, the ecosystem dispatch matrix (Python, TS, Rust, Go, JVM, nx/turbo/pants/bazel), declared-list format, audit protocol |
+| Resolver | `scripts/resolve_test_scope.py` + private `_test_inventory.py`, `_declared_deps.py`, `_python_selection.py`, `_native_selection.py` | Built | Changed paths → per-pocket selection. For Python: layout, stdlib-`ast` import and path-literal edges, and declared edges. Other ecosystems go to their native tool. Unmapped paths widen. Tiny Python selections run with `-n 0`. JSON schema 2 |
+| Declared list | `tests/declared-deps.toml` (in-repo, not `.ai-state/`) | Built | `[[dep]]` / `[[inert]]` sum type holding only the non-code edges derivation cannot see. Any change widens |
+| Suite auditor | `scripts/audit_tests.py` | Built | junit in, records out: selection `missed` / `selected` / `widened`, flaky classification from one rerun, slow top-N |
+| Collection gate | GL07 in `scripts/check_gate_liveness.py` | Built | A test file that no runner collects is a gate that never fires. Replaces TT07 and is portable |
+| Scheduled loop | `.github/workflows/test-scheduled.yml` | Built | `large` tests, audit, flaky and slow reports. Watched by ci-autofix |
+| Onboarding `tests` capability | `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Built | Parallel, coverage-off runner config, outer-loop directories, declared list, test and scheduled workflows, `## Testing` block |
+| Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | Removed | Replaced by the rows above. Their ADRs are superseded or retired per `dec-draft-40ba0ce1` |
 
 ### 9.3 The Five Loops
 

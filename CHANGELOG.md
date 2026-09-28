@@ -1,3 +1,10 @@
+## v0.40.2 (2026-09-28)
+
+### Fix
+
+- **planning**: give a split pipeline its own worktree
+- **skills**: read indented code fences as code in link checks
+
 ## v0.40.1 (2026-09-28)
 
 ### Fix

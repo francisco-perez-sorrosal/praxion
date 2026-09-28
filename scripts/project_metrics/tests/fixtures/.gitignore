@@ -6,3 +6,4 @@ empty_repo/
 single_author_repo/
 coupling_repo/
 minimal_stdlib_repo/
+.build.lock

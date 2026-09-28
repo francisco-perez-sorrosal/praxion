@@ -43,6 +43,7 @@ module -- only to fixtures declared in ``conftest.py``.
 
 from __future__ import annotations
 
+import fcntl
 import json
 from pathlib import Path
 from typing import Any
@@ -51,31 +52,39 @@ import pytest
 
 from scripts.project_metrics.tests.fixtures import build_fixtures
 
+_FIXTURE_REPOS = (
+    "minimal_repo",
+    "empty_repo",
+    "single_author_repo",
+    "coupling_repo",
+    "minimal_stdlib_repo",
+)
+
+
+def _fixtures_built(fixtures_dir: Path) -> bool:
+    return all((fixtures_dir / name / ".git").is_dir() for name in _FIXTURE_REPOS)
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _rebuild_git_fixtures() -> None:
-    """Build the four fixture repos once per test session.
+    """Build the five fixture repos once, however many workers start at once.
 
-    Idempotent: each repo directory is removed and reinitialized, so stale
-    state from a prior run cannot leak into the current session. Scoped to
-    ``session`` because building all four repos takes <1s and the contents
-    never vary within a run.
+    Every pytest-xdist worker runs its own session, so on a cold checkout
+    (CI's starting state) several workers reach this fixture together. The
+    repos live at fixed paths that 11 test modules read, so the build is
+    serialized with an exclusive ``flock`` and re-checked under the lock:
+    the first worker builds, the rest wait and then find the repos present.
+    Without the lock the workers race inside ``build_all`` and fail with
+    ``FileExistsError`` (615 errors measured on 2026-09-27).
     """
 
     fixtures_dir = Path(build_fixtures.__file__).resolve().parent
-    minimal = fixtures_dir / "minimal_repo"
-    # Quick short-circuit if all five already exist from a prior invocation
-    # in the same directory (e.g., developer ran build_fixtures.py manually
-    # before running pytest). Re-running is safe but wastes ~0.5s.
-    if (
-        minimal.joinpath(".git").is_dir()
-        and (fixtures_dir / "empty_repo" / ".git").is_dir()
-        and (fixtures_dir / "single_author_repo" / ".git").is_dir()
-        and (fixtures_dir / "coupling_repo" / ".git").is_dir()
-        and (fixtures_dir / "minimal_stdlib_repo" / ".git").is_dir()
-    ):
+    if _fixtures_built(fixtures_dir):
         return
-    build_fixtures.build_all()
+    with open(fixtures_dir / ".build.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not _fixtures_built(fixtures_dir):
+            build_fixtures.build_all()
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,7 @@ id: dec-348
 title: Skill wrapper remains the primary context-hub integration — re-affirmed against doc drift
 status: retired
 retired_by:
-  - dec-draft-2a6891c5
+  - dec-404
 category: architectural
 date: 2026-08-31
 summary: The 2026-08-30 still-current audit challenged dec-001 because skill text asserts an MCP-primary posture; code inspection shows the decision holds — re-affirmed, with the skill's false installer claim fixed as a doc bug
@@ -51,4 +51,4 @@ Negative: none material; the doc fix is one sentence.
 
 dec-001 (2026-03-31) chose a skill wrapper over bundling an MCP server in `plugin.json`. A future supersession would require: a demonstrated activation-failure pattern of the opt-in skill, or an ecosystem shift making MCP registration cost-free (lazy server startup in the host), or context-hub dropping its CLI surface.
 
-**Retirement (2026-09-24).** Retired by dec-draft-2a6891c5, together with the dec-001 it re-affirmed: context-hub and the `external-api-docs` skill were removed, so there is no longer an integration style to re-affirm. One fact the Falsifier above missed — `install_claude.sh::prompt_chub_mcp` did write `mcpServers.chub` into `~/.claude.json` — no longer matters. The question returns only if a third-party docs registry is re-adopted.
+**Retirement (2026-09-24).** Retired by dec-404, together with the dec-001 it re-affirmed: context-hub and the `external-api-docs` skill were removed, so there is no longer an integration style to re-affirm. One fact the Falsifier above missed — `install_claude.sh::prompt_chub_mcp` did write `mcpServers.chub` into `~/.claude.json` — no longer matters. The question returns only if a third-party docs registry is re-adopted.

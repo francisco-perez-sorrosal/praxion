@@ -1,7 +1,8 @@
 ---
-id: dec-draft-2a6891c5
+id: dec-404
+draft_id: dec-draft-2a6891c5
 title: Retire context-hub and the external-api-docs skill; fold a provider-neutral current-docs protocol into software-planning
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-24
 summary: "Deletes the external-api-docs skill, its docs page and every context-hub (chub) install path. The methodology that never depended on chub is folded into one ~35-line section, software-planning/references/cross-agent-skill-conventions.md § Current docs for external APIs: source order (official docs, llms.txt/.md first, via WebFetch or else a bounded Bash curl), version-drift detection, token hygiene, trust, and mismatches recorded in LEARNINGS.md in place of chub_feedback. The tool-neutral always-loaded rule line carries the trigger and pointer and reaches all 17 agents; agent skill preloads are dropped, and WebFetch (not WebSearch) is granted to the five agents that fetch in their own phase. Retires dec-001 and dec-348, narrows dec-053's mechanism clause, and moves the orphaned webhooks reference into api-design-craft."
@@ -62,7 +63,7 @@ A reach defect was also found. `cross-agent-skill-conventions.md` claimed to be 
    - `docs/external-api-docs.md`
    - every chub install path in `install.sh`, `install_claude.sh`, `install_cursor.sh` and `cursor/config/`
 
-   Transitional cleanup of existing installs is decided separately in dec-draft-218ce4c9.
+   Transitional cleanup of existing installs is decided separately in dec-403.
 2. **Fold** the provider-neutral methodology into `skills/software-planning/references/cross-agent-skill-conventions.md § Current docs for external APIs` (anchor `#current-docs-for-external-apis`), about 35 lines covering:
    - when to check
    - source order: official docs (`llms.txt`/`.md` first) via `WebFetch`, or a bounded Bash `curl` where `WebFetch` is absent (see item 7) → a user-configured vendor-official docs MCP → official repo/changelog → `WebSearch` → introspecting the installed package → training data labeled unverified
@@ -152,7 +153,7 @@ This decision's action removes the subject of **dec-001** (skill wrapper as the 
 - Users lose the `/external-api-docs` skill entry point. This is a user-facing breaking change and ships under a `BREAKING CHANGE` footer.
 - Managed projects that are already onboarded keep the old hackathon block until their next onboard/promote re-sync.
 - Retrieval quality now depends on each vendor's docs site; bot-blocked or JS-only sites fall to `WebSearch` and package introspection.
-- Existing installs carry chub state until the transitional cleanup (dec-draft-218ce4c9) offers its removal.
+- Existing installs carry chub state until the transitional cleanup (dec-403) offers its removal.
 
 ## Disconfirmation
 

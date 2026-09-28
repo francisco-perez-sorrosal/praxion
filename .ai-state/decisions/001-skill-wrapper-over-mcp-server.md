@@ -3,7 +3,7 @@ id: dec-001
 title: "Skill wrapper as primary context-hub integration"
 status: retired
 retired_by:
-  - dec-draft-2a6891c5
+  - dec-404
 category: architectural
 date: "2026-03-31"
 summary: "Use a skill wrapper for context-hub integration instead of bundling an MCP server in plugin.json"
@@ -59,4 +59,4 @@ A skill that wraps context-hub CLI invocations, loaded on demand by agents.
 
 ## Prior Decision
 
-Retired by dec-draft-2a6891c5 (2026-09-24). The decision's subject — *how* Praxion integrates context-hub (skill wrapper vs. bundled MCP server) — no longer exists: context-hub and the `external-api-docs` skill were removed, and current-API-docs verification became a provider-neutral protocol in `skills/software-planning/references/cross-agent-skill-conventions.md`, which needs no integration component at all. For the record, the installer *did* write an MCP entry (`mcpServers.chub` in `~/.claude.json`, via `install_claude.sh::prompt_chub_mcp`) alongside the skill wrapper, so the "skill wrapper, no MCP server" posture held for `plugin.json` only. This decision would matter again only if Praxion re-adopted a third-party docs registry with both an MCP and a skill surface.
+Retired by dec-404 (2026-09-24). The decision's subject — *how* Praxion integrates context-hub (skill wrapper vs. bundled MCP server) — no longer exists: context-hub and the `external-api-docs` skill were removed, and current-API-docs verification became a provider-neutral protocol in `skills/software-planning/references/cross-agent-skill-conventions.md`, which needs no integration component at all. For the record, the installer *did* write an MCP entry (`mcpServers.chub` in `~/.claude.json`, via `install_claude.sh::prompt_chub_mcp`) alongside the skill wrapper, so the "skill wrapper, no MCP server" posture held for `plugin.json` only. This decision would matter again only if Praxion re-adopted a third-party docs registry with both an MCP and a skill surface.

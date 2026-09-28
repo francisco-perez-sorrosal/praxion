@@ -1,7 +1,8 @@
 ---
-id: dec-draft-218ce4c9
+id: dec-403
+draft_id: dec-draft-218ce4c9
 title: One-release, consent-gated legacy context-hub cleanup shim in each installer
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-24
 summary: "Each installer detects only the context-hub (chub) state that its own past code wrote. install.sh handles the global @aisuite/chub npm package and ~/.chub/, install_claude.sh handles mcpServers.chub/context-hub in ~/.claude.json and the legacy ~/.claude/settings.json, and install_cursor.sh handles the chub key in mcp.json. A closed report|offer mode drives it. --check and --dry-run report without writing and never flip health. Install, --complete-install, --uninstall and --complete-uninstall offer per-remnant removal on a TTY only, ~/.chub/ defaults to keep, non-TTY runs remove nothing and print manual commands, and a clean machine prints nothing. The shim carries the LEGACY-CHUB-CLEANUP marker and a tech-debt row for bounded removal. The SessionStart auto-complete hook never calls it."
@@ -22,7 +23,7 @@ dissent: "An ~80-line transitional shim across three installers adds branching t
 
 ## Context
 
-dec-draft-2a6891c5 removes context-hub from Praxion. Earlier Praxion installers wrote state outside the repo:
+dec-404 removes context-hub from Praxion. Earlier Praxion installers wrote state outside the repo:
 
 - a global npm package (`@aisuite/chub`)
 - `~/.chub/config.yaml`

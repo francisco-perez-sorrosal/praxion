@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-27T22:15:58Z'
+generated_at: '2026-09-28T02:57:57Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-09-13'
+  last_modified: '2026-09-27'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -19,7 +19,6 @@ surfaces:
   - docs-concepts
   - docs-cursor-compat
   - docs-decision-tracking
-  - docs-external-api-docs
   - docs-getting-started
   - docs-ml-training-onramp
   - docs-multi-session
@@ -32,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -56,13 +55,13 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-09-18'
+  last_modified: '2026-09-27'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -81,7 +80,6 @@ surfaces:
   - docs-cursor-compat
   - docs-decision-tracking
   - docs-diagrams-readme
-  - docs-external-api-docs
   - docs-getting-started
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
@@ -120,7 +118,7 @@ surfaces:
   path: docs/architecture-diagrams.md
   type: markdown
   title: Architecture Diagrams
-  last_modified: '2026-06-20'
+  last_modified: '2026-09-27'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -315,26 +313,17 @@ surfaces:
   - docs-rework-dispatch
   - docs-skill-genesis
   - docs-spec-driven-development
-- id: docs-external-api-docs
-  path: docs/external-api-docs.md
-  type: markdown
-  title: External API Documentation
-  last_modified: '2026-06-25'
-  diataxis: how-to
-  audience: developer
-  renderer: how_to_shell
 - id: docs-getting-started
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-09-25'
+  last_modified: '2026-09-27'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
   surfaces_referenced:
   - docs-architecture
   - docs-claude-ecosystem-learning-resources
-  - docs-external-api-docs
   - docs-onboarding
   - docs-spec-driven-development
   - readme
@@ -461,7 +450,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-09-26'
+  last_modified: '2026-09-27'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -531,7 +520,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-09-07'
+  last_modified: '2026-09-27'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -591,7 +580,7 @@ surfaces:
   path: .ai-state/decisions/001-skill-wrapper-over-mcp-server.md
   type: markdown
   title: Skill wrapper as primary context-hub integration
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-002-otel-relay-architecture
   path: .ai-state/decisions/002-otel-relay-architecture.md
@@ -903,7 +892,7 @@ surfaces:
   path: .ai-state/decisions/053-prompt-over-template-greenfield-scaffold.md
   type: markdown
   title: Prompt-over-template discipline for greenfield project scaffolding
-  last_modified: '2026-08-30'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-054-separate-new-cc-project-from-install
   path: .ai-state/decisions/054-separate-new-cc-project-from-install.md
@@ -2673,7 +2662,7 @@ surfaces:
   path: .ai-state/decisions/348-reaffirm-context-hub-skill-wrapper.md
   type: markdown
   title: "Skill wrapper remains the primary context-hub integration \u2014 re-affirmed against doc drift"
-  last_modified: '2026-08-31'
+  last_modified: '2026-09-27'
   renderer: adr_card
 - id: ai-state-decisions-349-supersede-dashboard-claude-md-placement
   path: .ai-state/decisions/349-supersede-dashboard-claude-md-placement.md
@@ -3000,6 +2989,18 @@ surfaces:
   title: "State-aware tech-debt triage \u2014 a snapshot reader, an advisory ledger_health probe, sentinel TD07 and /triage-debt, anchored by notes-cell triage stamps"
   last_modified: '2026-09-27'
   renderer: adr_card
+- id: ai-state-decisions-403-legacy-context-hub-cleanup-shim
+  path: .ai-state/decisions/403-legacy-context-hub-cleanup-shim.md
+  type: markdown
+  title: One-release, consent-gated legacy context-hub cleanup shim in each installer
+  last_modified: '2026-09-27'
+  renderer: adr_card
+- id: ai-state-decisions-404-retire-context-hub-and-external-api-docs
+  path: .ai-state/decisions/404-retire-context-hub-and-external-api-docs.md
+  type: markdown
+  title: Retire context-hub and the external-api-docs skill; fold a provider-neutral current-docs protocol into software-planning
+  last_modified: '2026-09-27'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3285,7 +3286,6 @@ groups:
   label: How-to guides
   surface_ids:
   - docs-cursor-compat
-  - docs-external-api-docs
   - docs-observability
   - docs-onboarding
   - docs-skill-genesis
@@ -3725,6 +3725,8 @@ groups:
   - ai-state-decisions-400-harness-helper-stops-become-helper-stop
   - ai-state-decisions-401-observation-log-owner-and-recording-mode
   - ai-state-decisions-402-ledger-triage-probe
+  - ai-state-decisions-403-legacy-context-hub-cleanup-shim
+  - ai-state-decisions-404-retire-context-hub-and-external-api-docs
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

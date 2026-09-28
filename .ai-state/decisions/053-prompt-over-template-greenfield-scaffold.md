@@ -26,7 +26,7 @@ affected_reqs:
   - REQ-ONBOARD-20
   - REQ-ONBOARD-26
 superseded_in_part_by:
-  - dec-draft-2a6891c5
+  - dec-404
 ---
 
 ## Context

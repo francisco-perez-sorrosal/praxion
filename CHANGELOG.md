@@ -1,3 +1,9 @@
+## v0.40.1 (2026-09-28)
+
+### Fix
+
+- **install**: judge only Praxion's own cache entry and hooks
+
 ## v0.40.0 (2026-09-28)
 
 ### BREAKING CHANGE

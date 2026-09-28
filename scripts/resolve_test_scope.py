@@ -85,6 +85,10 @@ from _declared_deps import (  # noqa: E402
     parse,
     validate_against_inventory,
 )
+from _native_selection import ADAPTERS as _NATIVE_ADAPTERS  # noqa: E402
+from _native_selection import Selected as _NativeSelected  # noqa: E402
+from _native_selection import Widen as _NativeWiden  # noqa: E402
+from _native_selection import select as _select_native  # noqa: E402
 from _python_selection import (  # noqa: E402
     Derivation,
     SelectedTest,
@@ -297,7 +301,7 @@ def _per_pocket(
         else:
             own_paths = [p for p in paths if pocket_of(p, pockets) == pocket]
             own_paths += [t.path for t in own_tests]
-            selection, widen = _native_selection(pocket, tuple(dict.fromkeys(own_paths)))
+            selection, widen = _native_selection(repo_root, pocket, tuple(dict.fromkeys(own_paths)))
             results.append(PocketResult(pocket, selection))
             widens.extend(widen)
     return tuple(results), tuple(widens)
@@ -313,16 +317,20 @@ def _python_selection(
 
 
 def _native_selection(
-    pocket: Pocket, paths: tuple[str, ...]
+    repo_root: Path, pocket: Pocket, paths: tuple[str, ...]
 ) -> tuple[Selection, tuple[Widen, ...]]:
-    """Hand a non-Python pocket's changed paths to its ecosystem's own tool.
-
-    No adapter exists yet, so a touched pocket runs in full.
-    """
+    """Hand a non-Python pocket's changed paths to its ecosystem's own tool."""
     if not paths:
         return Nothing(), ()
-    detail = f"no selection adapter for the {pocket.framework} pocket at {pocket.root}"
-    return Full(), (Widen(REASON_NO_ADAPTER, paths, detail),)
+    relative = tuple(_pocket_relative(p, pocket.root) for p in paths)
+    outcome = _select_native(
+        pocket.framework, repo_root / pocket.root, pocket.runner_prefix, relative
+    )
+    if isinstance(outcome, _NativeSelected):
+        return Native(outcome.argv), ()
+    assert isinstance(outcome, _NativeWiden)
+    detail = f"{outcome.detail} for the {pocket.framework} pocket at {pocket.root}"
+    return Full(), (Widen(outcome.reason, paths, detail),)
 
 
 def _all_full(
@@ -504,11 +512,17 @@ def _pocket_payload(result: PocketResult) -> dict[str, object]:
     return {
         "root": pocket.root,
         "ecosystem": pocket.ecosystem,
-        "adapter": "python-derived" if pocket.ecosystem == "python" else "none",
+        "adapter": _adapter_name(pocket),
         "selection": _selection_name(selection),
         "tests": [{"path": t.path, "via": t.via, "because": t.because} for t in tests],
         "invocations": [{"cwd": pocket.root, "argv": list(argv)} for argv in _invocations(result)],
     }
+
+
+def _adapter_name(pocket: Pocket) -> str:
+    if pocket.ecosystem == "python":
+        return "python-derived"
+    return pocket.framework if pocket.framework in _NATIVE_ADAPTERS else "none"
 
 
 def _selection_name(selection: Selection) -> str:

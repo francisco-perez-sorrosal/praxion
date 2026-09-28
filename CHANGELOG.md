@@ -1,3 +1,36 @@
+## v0.40.0 (2026-09-28)
+
+### BREAKING CHANGE
+
+- the external-api-docs skill (/praxion:external-api-docs) and the
+context-hub (chub) CLI/MCP install are removed. Agents now verify external APIs
+against official docs (llms.txt/.md first) per software-planning's cross-agent
+conventions. Existing installs: run ./install.sh code in your own terminal
+to remove leftover context-hub state with consent; ~/.chub is kept unless
+you choose otherwise. Managed projects pick up the new
+hackathon-mode block on their next onboard/promote run.
+
+### Feat
+
+- **skills**: retire the external-api-docs skill and context-hub integration
+- **install**: replace context-hub install paths with a consent-gated legacy cleanup
+- **onboarding**: discover SDK surfaces through the current-docs protocol
+- **conventions**: add a provider-neutral current external API docs protocol
+
+### Fix
+
+- **commands**: hand /praxion-complete-* off to the terminal
+- **conventions**: make the curl fallback create its target directory
+- **security**: record the current-docs WebFetch grants in the permission baseline
+- **install**: make the legacy cleanup self-describing and fully findable
+- **agents**: give fetching agents a working path to current API docs
+- **install**: route --complete-uninstall without running the shared installers
+
+### Refactor
+
+- **skills**: repoint cross-references to the current-docs protocol and move webhooks into api-design-craft
+- **agents**: point agents at the current-docs protocol and drop the external-api-docs preload
+
 ## v0.39.0 (2026-09-27)
 
 ### Feat

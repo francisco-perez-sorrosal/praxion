@@ -1,7 +1,7 @@
 ---
 id: dec-091
 title: Typed-pluggable-identifier registries (selector_strategy and parallel_runner) as the trunk's language-additive primitive
-status: accepted
+status: superseded
 category: architectural
 date: 2026-04-28
 summary: Two trunk-owned registries (selector_strategy and parallel_runner) hosted as Markdown tables in the test-topology trunk reference; new language leaves register additional rows without modifying the trunk schema, satisfying the "additive at the leaves" constraint.
@@ -14,6 +14,7 @@ affected_files:
   - skills/testing-strategy/references/python-testing.md
 re_affirmed_by:
   - dec-202
+superseded_by: dec-draft-40ba0ce1
 ---
 
 ## Context

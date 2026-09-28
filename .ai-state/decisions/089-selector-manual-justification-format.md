@@ -1,7 +1,7 @@
 ---
 id: dec-089
 title: selector=manual justification is a closed enum with an "other" escape hatch
-status: accepted
+status: superseded
 category: implementation
 date: 2026-04-28
 summary: When the implementation-planner overrides auto-derived group selection (selector=manual), the step body includes a one-line justification drawn from a closed enum (scope-mismatch, cross-pocket-bridge, topology-stale, tier-escalation-debug, other) plus an optional free-form note when "other". This makes manual-override frequency parseable for future sentinel checks while preserving an escape hatch for unexpected reasons.
@@ -14,6 +14,7 @@ affected_files:
   - skills/software-planning/SKILL.md
   - skills/software-planning/references/document-templates.md
   - agents/verifier.md
+superseded_by: dec-draft-40ba0ce1
 ---
 
 ## Context

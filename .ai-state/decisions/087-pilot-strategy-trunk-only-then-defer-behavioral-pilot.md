@@ -1,7 +1,7 @@
 ---
 id: dec-087
 title: Pilot strategy — trunk-only at this pipeline; defer behavioral pilot to first consumer project
-status: accepted
+status: retired
 category: architectural
 date: 2026-04-28
 summary: Land the test-topology trunk artifacts (schema, sentinel dimension, ledger class, document conventions) without activating any behavioral pilot in Praxion; the first behavioral pilot occurs in the first consumer project that adopts the protocol.
@@ -15,6 +15,7 @@ affected_files:
   - agents/sentinel.md
   - rules/swe/agent-intermediate-documents.md
   - .github/workflows/test.yml
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -112,3 +113,5 @@ The 8 memory-mcp test failures, if resolved on a separate pipeline before any co
 ## Prior Decision
 
 None — this is a new decision, not a supersession.
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — whether to pilot the test-topology trunk behaviorally inside Praxion or defer that pilot to the first consumer project — presupposed a topology trunk to pilot. The trunk itself (`.ai-state/TEST_TOPOLOGY.md`, `test-topology.md`, the pilot/activation machinery) is removed, so there is no longer a pilot question to answer either way. What would have to return for this decision to matter again: a future hand-maintained, per-project topology artifact requiring an explicit "pilot here vs. defer" call — not the case for a derived, per-call selection mechanism with no adoption step.

@@ -1,7 +1,7 @@
 ---
 id: dec-202
 title: Register Python selector & parallel-runner identifiers in the test-topology registries (M1→M2 for Python)
-status: accepted
+status: retired
 category: architectural
 date: 2026-05-23
 summary: Promote the five Python test-topology identifiers (pytest-globs/markers/keywords selectors; pytest-xdist-loadfile/load parallel runners) from indicative to registered in the trunk registries, completing M2 for Python consumer projects.
@@ -14,6 +14,7 @@ affected_files:
   - skills/testing-strategy/references/test-topology.md
   - skills/testing-strategy/references/python-testing.md
 re_affirms: dec-091
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -87,6 +88,8 @@ One identifier whose arg is an arbitrary pytest CLI fragment.
 - The list-vs-string asymmetry between `pytest-keywords` and the other selectors is locked in (intentional; mirrors pytest's CLI).
 
 **Scope note:** dec-087's pilot deferral is unchanged — Praxion still does not populate its own `TEST_TOPOLOGY.md`. This decision makes the registries usable by consumers; it does not activate a Praxion-internal pilot.
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision registered five typed `{strategy, arg}` selector rows (`pytest-globs`, `pytest-keywords`, `pytest-nodeids`, `loadfile`, `all`) in the registry dec-091 established. dec-091 itself is superseded — language additivity now comes from per-ecosystem native-tool adapters inside the resolver, not typed registries — so the registry these five rows lived in is abolished along with them; Python selection is instead derived directly from layout, import, path-literal and declared edges, with no selector-string vocabulary at all. This is transitive retirement (through dec-091's supersession), not a direct answer to a different question. What would have to return for this decision to matter again: a future registry-based selector mechanism for Python that again needs named, typed selector primitives — the `loadfile` default it registered was already reversed by dec-405 independently of this retirement.
 
 ## Prior Decision
 

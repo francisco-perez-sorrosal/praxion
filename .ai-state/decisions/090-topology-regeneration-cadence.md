@@ -1,7 +1,7 @@
 ---
 id: dec-090
 title: Topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline
-status: accepted
+status: retired
 category: behavioral
 date: 2026-04-28
 summary: TEST_TOPOLOGY.md is not regenerated automatically at any pipeline boundary. Refresh is initiated by the user via a future /refresh-topology command, or triggered by the sentinel when 3+ topology-drift ledger rows accumulate. Per-pipeline regeneration would obliterate section ownership and produce a topology diff on every PR.
@@ -13,6 +13,7 @@ affected_files:
   - skills/testing-strategy/references/test-topology.md
   - agents/sentinel.md
 re_affirmed_by: [dec-193]
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -106,3 +107,5 @@ The decision is highly reversible per direction:
 ## Prior Decision
 
 None.
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — when and how `.ai-state/TEST_TOPOLOGY.md` regenerates (human-initiated or sentinel-triggered, never automatically per-pipeline) — no longer has an artifact to regenerate: there is no persisted topology file, no `/refresh-topology` command, and no section ownership to protect from an automatic regenerator. Selection is derived fresh on every call instead of cached and periodically reconciled. What would have to return for this decision to matter again: a future persisted, human-maintained selection artifact that again needs a regeneration-cadence rule to prevent an automatic process from overwriting human sections.

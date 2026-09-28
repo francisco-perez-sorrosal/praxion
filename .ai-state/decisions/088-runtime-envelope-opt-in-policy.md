@@ -1,7 +1,7 @@
 ---
 id: dec-088
 title: expected_runtime_envelope is opt-in at M1 and M2; required from M3 (sentinel TT04 activation)
-status: accepted
+status: retired
 category: behavioral
 date: 2026-04-28
 summary: The per-group expected_runtime_envelope (p50/p95 wall-clock seconds) is optional at M1 and M2; sentinel TT04 (runtime drift) self-deactivates when fewer than 7 metrics reports with per-group data exist; the field becomes required at M3 when TT04 is the load-bearing refactor trigger.
@@ -13,6 +13,7 @@ affected_reqs: []
 affected_files:
   - skills/testing-strategy/references/test-topology.md
   - agents/sentinel.md
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -87,3 +88,5 @@ Easily reversible. If M3 reveals the requirement is too aggressive (e.g., too ma
 ## Prior Decision
 
 None.
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — whether `expected_runtime_envelope` is optional pre-M3 and required from M3, enforced by sentinel check TT04 — no longer has a schema to attach to: `TEST_TOPOLOGY.md`'s group schema, and TT04 itself, are both removed. Selection is derived per call with no cached runtime envelope. What would have to return for this decision to matter again: a future persisted selection artifact that tracks per-group runtime data and needs an opt-in-then-required rollout policy for that field.

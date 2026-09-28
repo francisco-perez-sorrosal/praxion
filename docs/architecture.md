@@ -159,61 +159,32 @@ System constraints (performance, compatibility, technical, behavioral, architect
 
 Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](../.ai-state/decisions/). The canonical, auto-generated cross-reference is [`DECISIONS_INDEX.md`](../.ai-state/decisions/DECISIONS_INDEX.md). For design-target rationale, see [`.ai-state/DESIGN.md`](../.ai-state/DESIGN.md) — this developer guide intentionally does not summarize decisions inline.
 
-## 9. Test Topology
+## 9. Test Selection
 
 <!-- Developer-facing navigation guide. Components named in this section have been verified
-     against the codebase. Rows whose Status names a per-project opt-in are not on disk
-     here — consumer projects create them, Praxion does not.
-     For design rationale and ADR cross-references, see .ai-state/DESIGN.md §9.
-     Last verified against code: 2026-05-19. -->
+     against the codebase. The test-refresh-core pipeline is replacing the test topology with
+     derived selection; the rows below mark what is on disk today. The design target (including
+     components not yet built) lives in .ai-state/DESIGN.md §9.
+     Last verified against code: 2026-09-28. -->
 
 ### 9.1 Where to find what
 
-The test-topology subsystem lets each implementation step run only the tests covering its affected subsystems plus their integration boundaries. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from a per-project topology declaration. At M2 the six pipeline agents are wired to author and honor the topology when a project has one.
-
 | You want to... | Look at | Status |
 |---|---|---|
-| Read the language-agnostic schema | `skills/testing-strategy/references/test-topology.md` | Built |
-| Read the Python-specific tooling concretization | `skills/testing-strategy/references/python-testing.md` (test-topology section) | Built |
-| Read the growth-trigger policy and `--init` path | `skills/testing-strategy/references/test-topology.md` §"Growth-Trigger Policy" | Built (M2) |
-| See whether your project has populated its topology | `.ai-state/TEST_TOPOLOGY.md` (per-project) | Opt-in per project — Praxion deliberately does not populate its own |
-| Read the sentinel checks for topology health | `agents/sentinel.md` `### Test Topology (TT)` (TT01–TT06) | Built |
-| See the debt class for topology drift | `rules/swe/agent-intermediate-documents.md` (`class` enum) | Built (`topology-drift`) |
-| Add a Tests: field to a step in your IMPLEMENTATION_PLAN.md | `skills/software-planning/SKILL.md` step schema | Built |
-| Create or refresh a project's topology | `commands/refresh-topology.md` (`--init` / default) | Built (M2) |
+| Resolve which tests a change needs | `scripts/resolve_test_scope.py` | Built — **being rewritten** from a topology reader into derived selection (layout, imports, path literals, declared list) |
+| Read the testing doctrine | `skills/testing-strategy/SKILL.md` | Built — being rewritten (ten principles, scope × size, loop table) |
+| See Praxion's test-group topology | `.ai-state/TEST_TOPOLOGY.md` | **Deprecated** — removed by test-refresh-core; nothing will read it |
+| Read the topology schema | `skills/testing-strategy/references/test-topology.md` | **Deprecated** — replaced by `references/test-selection.md` |
+| Refresh a topology | `commands/refresh-topology.md` | **Deprecated** — retired with no replacement (selection is derived) |
+| Check topology conformance | `scripts/check_topology_conformance.py` (sentinel TT01–TT07) | **Deprecated** — replaced by GL07 in `scripts/check_gate_liveness.py` |
+| Run tests in parallel | `pyproject.toml` `addopts` (`-n auto --dist load -m 'not large'`, dec-405) | Built |
 
-### 9.2 Activation status in Praxion
+### 9.2 Caveats developers should know
 
-Praxion ships the schema, conventions, agent wiring, and the `/refresh-topology` command, but does **not** populate `.ai-state/TEST_TOPOLOGY.md` for itself — Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the behavioral pilot is deliberately deferred to the first consumer project that crosses the gate. A consumer project that adopts the praxion plugin and grows past the thresholds runs `/refresh-topology --init` to create its topology.
+- To debug a single test, use `-n 0`. `-p no:xdist` fails with `unrecognized arguments: -n --dist` because `addopts` carries `-n auto`.
+- Coverage is not in the default run. CI requests it explicitly with `--cov-fail-under=80`.
 
-For Praxion development today, this means:
-
-- The implementer continues to run the project's default test command (`uv run pytest` or `cd <pocket> && uv run pytest`) per pocket. The `Tests:` step-schema field is not emitted in Praxion plans because Praxion has no populated topology.
-- Sentinel TT01–TT05 self-deactivate (no `.ai-state/TEST_TOPOLOGY.md` to check). TT06 (advisory growth trigger) is evaluated but does not fire — Praxion's runtime is below threshold.
-- The systems-architect's Phase 2 topology-readiness check is evaluated but does not fire.
-- The full-suite integration checkpoint at the end of each pipeline remains today's behavior.
-
-### 9.3 Adding a new language leaf (procedure)
-
-If a future contributor extends the test-topology to a new language (Go, TypeScript, Rust, etc.), the procedure is purely additive:
-
-1. Create `skills/testing-strategy/references/<language>-testing.md` (or extend an existing language reference).
-2. In the trunk reference (`skills/testing-strategy/references/test-topology.md`), append rows to the two registry tables:
-   - `selector_strategy` — at minimum one identifier (e.g., `go-test-packages`) with its argument shape.
-   - `parallel_runner` — at minimum one identifier (e.g., `go-test-parallel`) with its concrete invocation.
-3. Document the leaf's `shared_fixture_scope` mapping (which language-framework scope keyword maps to each of `none / per-test / per-file / per-process / per-suite`).
-4. Provide a worked invocation example.
-
-No edits to the trunk schema, the sentinel TT01–TT06 wording, the closure semantics, or any agent definition are required. The hypothetical Go module worked example in the trunk reference (`skills/testing-strategy/references/test-topology.md` §"Go Module — Portability Proof") is the proof artifact.
-
-### 9.4 Caveats developers should know
-
-- **Marker name shape**: when a project does populate the topology and its language leaf is Python, group ids in `TEST_TOPOLOGY.md` are kebab-case (`memory-store-core`) but the corresponding pytest marker is snake_case (`memory_store_core`). The kebab → snake mapping is mechanical (`-` → `_`).
-- **Reserved marker names**: do NOT use `parametrize`, `skipif`, `usefixtures`, `xfail`, `xdist_group`, `parallel_unsafe`, or any of `unit / integration / contract / e2e` as group ids — they collide with built-in or reserved markers. Sentinel TT05 enforces this.
-- **`integration_boundaries` are one-hop**: a `phase`-tier selection runs the named groups plus their direct boundary neighbors, not the transitive closure. The `pipeline`-tier (full suite) covers the transitive case.
-- **Lightweight tier**: the protocol does NOT activate at Lightweight tier. Lightweight tasks run today's default test command. If a Lightweight task grows beyond 3 files, escalate to Standard rather than half-engaging the topology.
-
-For the design rationale behind any of the above, see [`.ai-state/DESIGN.md` §9](../.ai-state/DESIGN.md#9-test-topology).
+For the design rationale and the target component set, see [`.ai-state/DESIGN.md` §9](../.ai-state/DESIGN.md#9-test-selection-and-feedback-loops).
 
 ## 10. Pipeline Feedback Loops
 

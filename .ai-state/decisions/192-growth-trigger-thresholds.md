@@ -1,7 +1,7 @@
 ---
 id: dec-192
 title: Test-topology growth-trigger thresholds — two-factor gate with calibratable values
-status: accepted
+status: retired
 category: configuration
 date: 2026-05-19
 summary: The advisory growth trigger fires on a two-factor gate — primary signal is full-suite wall-clock runtime, co-factor is structural feasibility (Built-component count plus a test-count floor). Starting values are 90 s runtime, 4 Built components, 200 tests, all recorded as explicitly calibratable guesses.
@@ -15,6 +15,7 @@ affected_files:
   - agents/systems-architect.md
   - skills/testing-strategy/references/test-topology.md
 affected_reqs: [REQ-01, REQ-02, REQ-04, REQ-18]
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -76,3 +77,7 @@ Use the number of declared subsystems rather than a raw test count as the co-fac
 ## Relationship to the M2 Activation Decision
 
 This ADR refines `dec-193` (test-topology M2 activation), which established the two-factor-gate *shape* and named the growth-trigger homes but explicitly left the threshold *values* for the architect to finalize. This ADR fixes those values. No supersession relationship is recorded: the M2 decision's structural content (agent wiring, growth-trigger homes, re-affirmations) remains fully authoritative; this ADR only makes its "thresholds TBD" placeholder concrete. The two are co-authored in the same pipeline and stand together — the values here are expected to be re-tuned independently of the structural decision, which is why they live in a separate `configuration`-category ADR.
+
+## Prior Decision
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the numeric thresholds (90 s runtime, 4 Built components, 200 tests) gating an advisory proposal to adopt a topology — has no adoption step to gate: derived selection works from day one in any project, with no file to adopt and therefore no growth trigger to calibrate. What would have to return for this decision to matter again: a future persisted selection or organization artifact that is opt-in past a size threshold rather than active unconditionally.

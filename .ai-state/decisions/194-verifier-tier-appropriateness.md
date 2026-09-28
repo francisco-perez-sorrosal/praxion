@@ -1,7 +1,7 @@
 ---
 id: dec-194
 title: Verifier validates scoped-test tier-appropriateness as a document cross-check, not a re-run
-status: accepted
+status: superseded
 category: behavioral
 date: 2026-05-19
 summary: "The verifier checks that each topology-scoped step's declared Tests tier was consistent with the breadth of subsystems the step touched, by cross-referencing the step's file footprint against TEST_TOPOLOGY.md — a document/diff check, not a test re-execution. Mismatches produce a WARN."
@@ -13,6 +13,7 @@ pipeline_tier: full
 affected_files:
   - agents/verifier.md
 affected_reqs: [REQ-14, REQ-15]
+superseded_by: dec-draft-40ba0ce1
 ---
 
 ## Context

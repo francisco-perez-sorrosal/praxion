@@ -103,8 +103,7 @@ every capability cluster title before you open one.
      from Mermaid, which rules/writing/diagram-conventions.md explicitly exempts LikeC4 and D2
      from — they manage complexity through nesting and per-view scoping rather than a count.
 
-     Consumers that read *components* — TEST_TOPOLOGY.md's `subsystems` field, sentinel
-     TT01/TT06, AC06 — resolve against THIS subsection only. -->
+     Consumers that read *components* — sentinel AC06 — resolve against THIS subsection only. -->
 
 | Component | Element | Responsibility | Status | Key Files (illustrative) |
 |-----------|---------|---------------|--------|--------------------------|
@@ -579,68 +578,50 @@ Architectural decisions are recorded as ADRs in [`.ai-state/decisions/`](decisio
 
 Inline `dec-NNN` references in this document's component, interface, and constraint rows are the sole architectural cross-references — sentinel AC04 validates that they resolve. `dec-draft-<hash>` references are transient (in-flight pipeline only) and are rewritten to `dec-NNN` at merge-to-main.
 
-## 9. Test Topology
+## 9. Test Selection and Feedback Loops
 
-<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-05-19 by systems-architect -->
-<!-- Architect-facing design-target view of the test-topology subsystem. The artifact at
-     .ai-state/TEST_TOPOLOGY.md is created on first-write by whichever agent populates the first group;
-     this section names ownership boundaries, sentinel/ledger integration, and ADR cross-references.
-     For the developer-facing code-verified view, see docs/architecture.md §9. -->
+<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-09-28 by systems-architect (test-refresh-core: the hand-maintained test topology is retired in favour of derived selection; decisions dec-draft-057153ec, dec-draft-40ba0ce1, dec-draft-dce28525, rewritten to dec-NNN at finalize) -->
+<!-- Architect-facing design target. Status values follow §3: Designed = specified by the
+     test-refresh-core pipeline, not yet on disk; Deprecated = on disk, scheduled for removal
+     by the same pipeline. For the developer-facing code-verified view, see docs/architecture.md §9. -->
 
 ### 9.1 Purpose
 
-The test-topology subsystem makes test selection and execution a first-class concern of the agent pipeline. It declares **what** tests cover **which** subsystems, **how** they execute (parallel-safe, fixture scope, runtime envelope), and **which integration boundaries** they cross. Three execution tiers (`step` / `phase` / `pipeline`) and a sentinel-driven refactor trigger emerge from this declaration.
+The doctrine lives in `skills/testing-strategy/SKILL.md`. It consists of ten ordered principles, two separate axes and an ownership rule:
 
-The subsystem is **language-agnostic at the trunk** and **per-language at the leaves** — see ADR `dec-091` for the registry primitive that makes this true.
+- **Scope** decides who designs a test. The implementer owns unit and internal-integration tests. The test-engineer, in acceptance mode, owns boundary, acceptance and end-to-end tests under `tests/acceptance/` and `tests/e2e/`.
+- **Size** decides when a test runs. `small` tests run in-process. `medium` tests use a subprocess, git or localhost. `large` tests need live services; `large` is the only marker, and those tests are deselected by default.
+- **Ownership.** Beyond the unit level, tests are designed independently of the design, and the implementer never edits outer-loop tests.
+
+Test selection is **derived from the code, never hand-kept**. Anything the derivation cannot account for widens the run to the full suite, and a full-suite run always backs up the selection (dec-084, kept). Decisions: `dec-draft-057153ec` (philosophy), `dec-draft-40ba0ce1` (derived selection; retires the topology) and `dec-draft-dce28525` (the onboarding `tests` capability).
 
 ### 9.2 Artifact Map
 
-| Artifact | Path | Status | Owner | Purpose |
-|---|---|---|---|---|
-| Trunk reference | `skills/testing-strategy/references/test-topology.md` | Designed (this pipeline) | testing-strategy skill maintainer | Schema, identifier registries, document conventions, refactor-trigger semantics |
-| Python leaf | `skills/testing-strategy/references/python-testing.md` (extension) | Designed (this pipeline) | testing-strategy skill maintainer | pytest-globs, pytest-markers registry rows; xdist scheduler; filelock recipe; pyproject snippet |
-| Project topology | `.ai-state/TEST_TOPOLOGY.md` | **Planned** (no population in Praxion per ADR `dec-087`) | systems-architect (Subsystems table) + test-engineer (groups) + implementation-planner (per-pipeline integration_boundaries) | Per-project populated topology; first consumer project's M2 pipeline creates it |
-| Sentinel TT family | `agents/sentinel.md` Check Catalog `### Test Topology (TT)` | Built | sentinel agent maintainer | TT01 subsystem cross-ref, TT02 selector-strategy, TT03 drift accumulation, TT04 envelope drift, TT05 marker-id consistency, TT06 advisory growth trigger |
-| Tech-debt class | `rules/swe/agent-intermediate-documents.md` `class` enum row | Built | rule maintainer | `topology-drift` value; producer = sentinel; owner-role = implementation-planner |
-| Document-schema additions | `IMPLEMENTATION_PLAN.md` `**Tests:**` field; `WIP.md` `Tests:`; `TEST_RESULTS.md` `Tier:` `Groups:` `Parallelism:` `Per-group results:` lines | Built | software-planning skill + agent-pipeline-details reference maintainer | Optional additive fields; absence preserves today's full-suite behavior |
-| Agent behavioral wiring | `agents/{systems-architect,implementation-planner,implementer,test-engineer,verifier,sentinel}.md` conditional clauses | Built (M2 wiring) | each agent's maintainer | Each agent authors or honors `TEST_TOPOLOGY.md` / the `Tests:` field when a project has a populated topology; gated on file presence |
-| Refresh command | `commands/refresh-topology.md` | Built (M2) | command maintainer | `--init` creates a topology (spawns architect + test-engineer); default mode runs the drift-response refresh (spawns implementation-planner) |
+| Artifact | Path | Status | Purpose |
+|---|---|---|---|
+| Doctrine | `skills/testing-strategy/SKILL.md` | Designed (rewrite) | Ten principles, Organization (scope × size, layout), Ownership, five-loop table, coverage policy |
+| Selection contract | `skills/testing-strategy/references/test-selection.md` | Designed | Four edge sources as a union, widening triggers, the ecosystem dispatch matrix (Python, TS, Rust, Go, JVM, nx/turbo/pants/bazel), declared-list format, audit protocol |
+| Resolver | `scripts/resolve_test_scope.py` + private `_test_inventory.py`, `_declared_deps.py`, `_python_selection.py`, `_native_selection.py` | Designed (rewrite of a Built script) | Changed paths → per-pocket selection. For Python: layout, stdlib-`ast` import and path-literal edges, and declared edges. Other ecosystems go to their native tool. Unmapped paths widen. Tiny Python selections run with `-n 0`. JSON schema 2 |
+| Declared list | `tests/declared-deps.toml` (in-repo, not `.ai-state/`) | Designed | `[[dep]]` / `[[inert]]` sum type holding only the non-code edges derivation cannot see. Any change widens |
+| Suite auditor | `scripts/audit_tests.py` | Designed | junit in, records out: selection `missed` / `selected` / `widened`, flaky classification from one rerun, slow top-N |
+| Collection gate | GL07 in `scripts/check_gate_liveness.py` | Designed | A test file that no runner collects is a gate that never fires. Replaces TT07 and is portable |
+| Scheduled loop | `.github/workflows/test-scheduled.yml` | Designed | `large` tests, audit, flaky and slow reports. Watched by ci-autofix |
+| Onboarding `tests` capability | `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Designed | Parallel, coverage-off runner config, outer-loop directories, declared list, test and scheduled workflows, `## Testing` block |
+| Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | **Deprecated** (removed by test-refresh-core) | Replaced by the rows above. Their ADRs are superseded or retired per `dec-draft-40ba0ce1` |
 
-### 9.3 Section Ownership (per `.ai-state/TEST_TOPOLOGY.md`)
+### 9.3 The Five Loops
 
-When a project populates the topology, the file's sections are governed by section ownership:
-
-| Section | Owner | Edit conditions |
+| Loop | What runs | Owner |
 |---|---|---|
-| `## 2. Subsystems` (cross-reference table) | systems-architect | Updated when `.ai-state/DESIGN.md` §3 components change |
-| `## 3. Groups` per-group YAML blocks | test-engineer | Updated when test code is added/refactored within an existing group |
-| Per-group `integration_boundaries` field | implementation-planner | Updated during a pipeline when a step crosses a previously-undeclared bridge |
-| `## 1. Overview` metadata | systems-architect | Updated alongside Subsystems table |
+| Inner | Derived selection of the working-tree change | Implementer, `/test` |
+| Phase checkpoint | Selection over the pipeline-base diff (a safe superset of the phase's union) | Implementer at planner-marked phase ends |
+| Integration checkpoint | Full suite (dec-084). On failure, the audit runs against the pipeline diff, and misses are closed in-pipeline | Implementer. The verifier confirms each miss is closed |
+| Pre-merge CI | Full parallel suite plus `--cov-fail-under=80` (a ratchet, not a target) plus a junit artifact | `.github/workflows/test.yml` |
+| Scheduled | Full suite, one rerun to classify flaky failures, `large` per pocket, audit of real failures against the diff since the last green run, slow top-20 | `.github/workflows/test-scheduled.yml` |
 
-### 9.4 Cross-References
+### 9.4 Boundaries
 
-- **Components (§3)** — every `subsystems` value in `TEST_TOPOLOGY.md` resolves to a `Status: Built` component in this document's §3 (sentinel TT01 enforces).
-- **Constraints (§7)** — the four-behavior contract row applies to test-topology agents; the "no leaf code in trunk artifacts" rule from `HANDOFF_CONSTRAINTS.md` is registered as an additional behavioral expectation in the trunk reference file.
-- **Decisions (§8)** — eight test-topology ADRs (`dec-091`, `dec-088`, `dec-086`, `dec-084`, `dec-089`, `dec-085`, `dec-090`, `dec-087`) — each row appears in §8 above.
-
-### 9.5 Trunk / Leaf Boundary
-
-The architect's primary structural commitment, restated:
-
-- **Trunk** owns the schema fields, the `tier` vocabulary, the `integration_boundaries` closure semantics (one-hop), the registries' existence and shape, the document conventions (`Tests:` field, `TEST_RESULTS.md` extension), the sentinel TT01–TT05 wording, the tech-debt-ledger `topology-drift` class.
-- **Leaves** own the registered identifier rows (e.g., Python's `pytest-globs`, `pytest-markers`, `pytest-xdist-loadfile`), the marker registration recipe (Python: pyproject markers list), the parallel runner's concrete invocation, and any per-language helper recipes (Python: `filelock` for session fixtures).
-
-A new language leaf is purely additive: a new reference file, new registry rows, no trunk modifications. The hypothetical Go module worked example in `.ai-work/test-partitioning/SYSTEMS_PLAN.md` is the proof.
-
-### 9.6 Activation State
-
-At this milestone (**M2 — behavioral activation**, post-this-pipeline), the test-topology subsystem is both structurally complete and behaviorally wired, while remaining behaviorally inert *in Praxion itself*:
-
-- All trunk and leaf artifacts exist (`Built`).
-- Sentinel TT01–TT06 dimensions are defined (`Built`). TT01–TT05 self-deactivate when `.ai-state/TEST_TOPOLOGY.md` does not exist; **TT06** (advisory growth trigger) is the deliberate exception — it is evaluated *because* the file is absent and fires only when the two-factor growth gate is crossed.
-- The six pipeline agents are wired (`Built`, M2): the systems-architect, implementation-planner, implementer, test-engineer, verifier, and sentinel each carry a conditional clause that authors or honors the topology when a project has a populated `TEST_TOPOLOGY.md`. Every clause is gated on file presence — a topology-less project (including Praxion) sees no behavior change.
-- `/refresh-topology` exists (`Built`, M2): `--init` creates a topology; default mode runs the drift-response refresh.
-- The advisory growth trigger (sentinel TT06 + architect Phase 2) proposes adoption when a project grows past the calibrated thresholds — but never auto-creates a topology.
-- No populated `.ai-state/TEST_TOPOLOGY.md` exists in Praxion (`Planned`). Praxion's ~35 s test fleet is below the growth-trigger thresholds, and the pilot deferral is re-affirmed — the first real behavioral pilot happens in a consumer project that crosses the gate.
-
-This state (Built schema + Built agent wiring + Planned Praxion activation) is the load-bearing record. M2 made the protocol *usable* by any consumer project; it did not make Praxion a pilot. Future agents must not confuse "the agents can use this protocol" with "Praxion uses this protocol."
+- **Derivation and dispatch.** Praxion derives a selection itself only where no native tool exists, which today means Python. Every other ecosystem is dispatched to its own tool. A missing tool widens that pocket.
+- **Stdlib only.** The resolver is invoked by a bare `python3` in agent prose and as a `~/.local/bin` symlink in managed projects. It stays stdlib-only (GL05) and does not use grimp.
+- **Plan override.** The plan's `Tests:` field is override-only: `full` or explicit paths, plus a free-text reason. Omitting it means derived selection.
+- **Coverage** is a periodic measurement (CI and the canonical coverage target, per dec-067), never an inner-loop side effect.

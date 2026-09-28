@@ -1,7 +1,7 @@
 ---
 id: dec-193
 title: Test-topology M2 — behavioral agent wiring plus advisory growth trigger
-status: re-affirmation
+status: retired
 category: architectural
 date: 2026-05-19
 summary: "Ship M2 of the test-topology protocol — wire all pipeline agents to author and honor TEST_TOPOLOGY.md and the per-step Tests field, add an advisory growth trigger in the sentinel and the systems-architect, and ship the /refresh-topology command. Re-affirms dec-090 (no automatic per-pipeline regeneration); dec-087's pilot deferral remains in force, unchanged by this decision."
@@ -24,6 +24,7 @@ affected_files:
   - claude/config/CLAUDE.md
   - rules/swe/agent-intermediate-documents.md
 affected_reqs: [REQ-01, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-16, REQ-17]
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -95,3 +96,5 @@ Populate Praxion's own `TEST_TOPOLOGY.md` and let the pipeline exercise the wiri
 **dec-087 (pilot strategy — trunk-only, defer behavioral pilot)** remains in force — unchanged by this decision, and not formally re-affirmed: dec-087 was not re-opened or challenged here, only its scope boundary restated. dec-087 deferred the behavioral pilot to "the first consumer project." This task builds the *capability* that deferral presupposed — it does not start a Praxion pilot. Praxion still ships no populated `TEST_TOPOLOGY.md`. The evidence that would justify revisiting the pilot deferral: a Praxion-internal subsystem set whose isolated test runtime grew past the adoption thresholds — not the case today (~35 s fleet).
 
 **dec-090 (topology regeneration is human-initiated or sentinel-triggered, never automatic per-pipeline)** is re-affirmed, not superseded. The M2 growth trigger is advisory and the `/refresh-topology` command is the sole mutation path; no per-pipeline auto-regeneration is introduced. The `--init` mode is an *addition* to the regeneration model (an initial-creation path the cadence decision did not enumerate), consistent with its core principle that section ownership must never be obliterated by an automatic regenerator. The evidence that would justify a future supersession: a demonstrated need for automatic per-pipeline regeneration that does not destroy section ownership — no such mechanism exists or is proposed.
+
+**Retired in full by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). None of this decision's clauses survives unchanged: the six-agent behavioral wiring, the advisory growth trigger, and `/refresh-topology` all named a topology artifact and an adoption threshold that no longer exist — selection is derived from day one, with no file to adopt and no growth gate to cross. This is retirement, not supersession, because the later decision does not choose a different agent-wiring shape or trigger threshold; it removes the topology those choices were about. What would have to return for this decision to matter again: a future persisted, per-project selection artifact that again needs multi-agent behavioral wiring and a size-gated adoption trigger.

@@ -1,7 +1,7 @@
 ---
 id: dec-195
 title: "Sequential group ordering for test-topology activation: trunk-first, then agents in parallel"
-status: accepted
+status: retired
 category: implementation
 date: "2026-05-19"
 summary: "S7 (test-topology.md trunk) must land before all agent edits; S11 (agent-intermediate-documents rule) is parallel-safe with S7; agents S1-S6 can parallelize after S7."
@@ -22,6 +22,7 @@ affected_files:
   - commands/refresh-topology.md
   - claude/config/CLAUDE.md.tmpl
   - rules/swe/agent-intermediate-documents.md
+retired_by: [dec-draft-40ba0ce1]
 ---
 
 ## Context
@@ -80,3 +81,7 @@ Use three sequential parallel groups:
   prerequisites. Acceptable — the delay is at most the longest Group B task minus the S8 duration.
 - **Risk accepted:** If one Group B agent reports `[BLOCKED]` or `[CONFLICT]`, the others continue; the
   planner handles the failure at the coherence review step (after all Group B tasks report).
+
+## Prior Decision
+
+**Retired by `dec-draft-40ba0ce1`** (Derived test selection with a selection audit replaces the hand-maintained test topology). This decision's subject — the step-ordering plan for rolling the test-topology M2 activation (`dec-193`) out across `test-topology.md` and six agent prompts — was itself a plan for work whose target decision (`dec-193`) is now retired in full. There is no longer a topology-activation rollout to order steps for. What would have to return for this decision to matter again: a future multi-agent trunk-then-leaves rollout of comparable shape, which could reference this record's parallel-group pattern as precedent even though its specific subject does not return.

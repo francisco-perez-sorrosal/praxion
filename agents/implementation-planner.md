@@ -35,6 +35,7 @@ Determine what you have to work with. The **task slug** (provided in your prompt
 3. **Check for RESEARCH_FINDINGS.md** — read for codebase context and technical details
 4. **Check for CONTEXT_REVIEW.md** — if present, read the accumulated context engineering review (research-stage and architecture-stage sections) for artifact dependency ordering, placement recommendations, and spec compliance notes
 5. **Check for specialist design inputs** — read every specialist artifact present in `.ai-work/<task-slug>/` as authoritative input: `INTERFACE_DESIGN.md` (framework/paradigm decisions, UI/UX and API/tool sketches from the `interface-designer`), `TRANSACTIONS_DESIGN.md` (provider-contract and HITL spend-gating decisions from the `agentic-transactions-architect`), and any `CONSULT_<discipline>.md` (adversarial challenges from a `discipline-consultant` — **only the convener's recorded dispositions bind you**; a `switch-now` disposition may reshape ordering, an undispositioned challenge is an incomplete consult to flag, not an instruction to follow). Each may also carry challenges and ordering recommendations; sequence steps that consume these designs after any steps that establish their prerequisites (e.g., design-token scale before component steps; RFC 9457 error responder before endpoint steps)
+5a. **Check for `ACCEPTANCE_TESTS.md`** — the outer-loop design from the acceptance-design stage ([procedure](../skills/software-planning/references/coordination-details.md#acceptance-design-stage)). Read `## Scenarios` (the test nodes you assign to steps), `## Boundary Assumptions` (interfaces the drivers presuppose) and `## Spec Questions` (an unresolved one is the orchestrator's to route, never yours to answer). A `**Stage:** skipped — <reason>` form means there is no outer loop to wire
 6. **Check for existing IMPLEMENTATION_PLAN.md / WIP.md / LEARNINGS.md** — you may be resuming, not starting fresh
 7. **Check past decisions** — consult `.ai-state/decisions/DECISIONS_INDEX.md` for prior ADRs whose `affected_files` or `tags` overlap with the current task. Prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the step's file scope is known; otherwise the index grows unbounded, so **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`), then the full ADR files for relevant matches. Prior decisions may constrain decomposition choices (e.g., a past decision to use a specific tool or pattern).
 8. **Verify the architecture is sufficient (handoff completeness gate)** — before decomposing, confirm `SYSTEMS_PLAN.md` carries enough design detail to plan against. Check:
@@ -42,6 +43,7 @@ Determine what you have to work with. The **task slug** (provided in your prompt
    - Does the architecture name the specific files/modules to be created or modified?
    - Is there a `## Codebase Readiness` (or equivalent) section noting structural issues or prerequisites?
    - Are ordering constraints between components stated where they exist?
+   - At Standard/Full, with a Behavioral Specification present: does `ACCEPTANCE_TESTS.md` exist (a skipped form counts) with no `withheld` scenario? Bad-case: a spec with an `### Observable Surface` and no artifact, or a scenario marked `withheld`
 
    If any answer is NO, stop and emit `[BLOCKED: INCOMPLETE_ARCHITECTURE]` listing the specific gaps, and recommend re-invoking the systems-architect. Do not decompose against an under-specified plan — it produces vague or invented steps whose defects surface only at verification, where they are far more expensive to fix.
 9. **External API detection** — scan the `SYSTEMS_PLAN.md` Architecture section and `RESEARCH_FINDINGS.md` Dependencies section for external APIs, SDKs, or third-party integrations (Stripe, OpenAI, Anthropic, AWS, Railway, Supabase, etc.). For each one, the plan must include (or reference) a step that verifies current endpoint signatures and auth flows per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before writing integration code. This is cheaper than catching drift at verification time. When drift exists (documented version ≠ pinned version), plan the implementation step against the pinned version, not the documented one. When research surfaced doc/behavior mismatches, note them on the relevant integration step so the implementer records them in `LEARNINGS.md`.
@@ -148,69 +150,28 @@ Before marking steps as parallel, verify **file disjointness**: no two steps in 
 
 Apply the step size heuristics from the software-planning skill. Quick test: if a step has multiple "and"s, involves more than 3-5 files, or requires multiple commits, break it down further.
 
-### Phase 4 — Test-First Design (BDD/TDD)
+### Phase 4 — Test Ownership and Outer-Loop Wiring (BDD/TDD)
 
-Design behavioral tests before implementation steps. The systems plan's acceptance criteria are the source of truth for what the system should do — tests encode those behaviors.
+Tests run in two loops — procedure in [`coordination-details.md § BDD/TDD Execution`](../skills/software-planning/references/coordination-details.md#bddtdd-execution) and [§ Acceptance-Design Stage](../skills/software-planning/references/coordination-details.md#acceptance-design-stage). The **outer loop** (`ACCEPTANCE_TESTS.md` and its RED tests under `tests/acceptance/` and `tests/e2e/`) is already designed and is read-only for implementers. The **inner loop** is implementer-owned: each implementation step writes its own failing unit tests first and records the `tests:` entries. Plan no test-engineer step for unit tests by default.
 
-**For each implementation step, decide whether it needs a paired test step:**
+**Add a paired test-engineer step (test first) only when** the step carries risky logic or business rules, needs property or contract tests, fixes a bug needing a regression test, or the architect flagged missing coverage. Skip it for simple wiring, config, framework-provided behavior and code to be deleted soon.
 
-**Create a paired test step when:**
-
-- The step implements behavioral acceptance criteria from `SYSTEMS_PLAN.md`
-- Complex algorithms or business logic
-- Critical user flows or integration points
-- Edge cases in important features
-- Fixing bugs (regression tests)
-- The architect flagged missing test coverage
-
-**Skip the paired test step when:**
-
-- Obvious code with no logic (simple wiring, config)
-- Framework-provided functionality
-- Code that will be deleted soon
-
-**Paired step structure:**
-
-For each implementation step that needs testing, create two steps, test first:
-- **Step N**: Test step (assignee: `test-engineer`, files: test code)
-- **Step N+1** `[depends-on: N]`: Implementation step (assignee: `implementer`, files: production code)
-
-The test step's `Testing` field references the acceptance criteria it validates. The test-engineer designs tests from the behavioral spec, not from the production code — the production code does not exist yet, because the implementer starts only after the test step reports RED.
-
-**Paired BDD/TDD ordering — test-engineer spawns first:**
-
-On each paired step, spawn the test-engineer first and the implementer only after its RED handshake — never in the same tool-use block. The implementation step carries `[depends-on: N]` on its test step, so the order is test-engineer → then implementer. Rationale: when both spawn simultaneously, the implementer routinely commits production code before the test-engineer's first `pytest` run, so tests validate existing code rather than shaping the interface. The shaping property of TDD is lost.
-
-Include in the test-engineer's prompt:
+**Paired structure:** Step N is the test step (assignee `test-engineer`, test files); Step N+1 `[depends-on: N]` is the implementation step (assignee `implementer`, production files). The test step's `Testing` field references the acceptance criteria and REQ IDs it validates. Spawn the implementer only after the test-engineer's RED handshake and never in the same tool-use block, so the tests shape the interface. Include in the test-engineer's prompt:
 
 > "Write a failing-test skeleton first: imports of the yet-unimplemented module plus one assertion per behavioral requirement. Expect `ImportError` / `ModuleNotFoundError` / `NameError` on first run — that is the correct RED state. Do NOT read the production code. Write `TEST_RESULTS.md` with the RED confirmation before fleshing out further assertions. A GREEN result on first run in concurrent mode is a Register Objection — flag it and stop."
 
-Only after the test-engineer reports the RED handshake (skeleton committed, `TEST_RESULTS.md` shows failure mode consistent with missing production code) do you spawn the implementer — and the test-engineer/implementer pairing stays sequential past this point too, not concurrent: the implementer's spawn is the next Agent tool call, on its own, never issued alongside a still-running test-engineer. The implementer writes production code against the already-committed RED tests and reports before any further test-engineer work in this pairing resumes; both steps' outcomes converge at the integration checkpoint. (A `[parallel-group: X]` tag that also carries a doc-engineer step is unaffected by this — see Parallel batch supervision below for the disjointness/commit discipline that governs genuinely concurrent batches.)
+**Outer-loop wiring** (each rule carries its golden bad-case, per `rules/swe/gate-liveness.md`):
 
-**Triple step structure (with doc step):**
+- **Driver-binding step first** — when a Boundary Assumption in `ACCEPTANCE_TESTS.md` is unbound, add a `test-engineer` step for driver files only, ordered before any production step. Bad-case: an unbound assumption with a production step ahead of its binding step.
+- **`**Read-only**:` field** — every implementer step that turns outer-loop tests green lists those nodes there (schema: [`document-templates.md`](../skills/software-planning/references/document-templates.md)) and edits no outer-loop file; keep it off `Files`. Each scenario node appears in exactly one step's field. Bad-case: a scenario node in no step's field, or in two.
 
-When a parallel group has documentation impact, add a third step:
-- **Step N** `[parallel-group: X]`: Implementation step (assignee: `implementer`, files: production code)
-- **Step N+1** `[parallel-group: X]`: Test step (assignee: `test-engineer`, files: test code)
-- **Step N+2** `[parallel-group: X]`: Doc step (assignee: `doc-engineer`, files: documentation files)
+**Triple step structure (with doc step):** when a parallel group has documentation impact, add a doc step (assignee `doc-engineer`, documentation files) with a `Documentation` field naming the READMEs, catalogs or architecture docs to update. Implementation, test and doc steps in one `[parallel-group: X]` have disjoint file sets by construction.
 
-The doc step's `Documentation` field describes which READMEs, catalogs, or architecture docs need updating and why. File sets are disjoint by construction (production code / test code / documentation files).
+**Project Principles threading (when `.ai-state/principles.yaml` was loaded in Phase 1b):** compare each step's `Files` against each principle's `scope` glob; append the `statement` of every matching principle to that step's `Done when` and record its `id` in `WIP.md` for the step, so compliance is part of the implementer's self-review. Out-of-scope principles are silently omitted.
 
-**Project Principles threading (when `.ai-state/principles.yaml` was loaded in Phase 1b):**
+**Requirement traceability threading:** when `SYSTEMS_PLAN.md` has a `## Behavioral Specification` with REQ IDs, each step's `Testing` field names the REQ IDs it validates (e.g., "Validates REQ-01, REQ-03"). Test-engineer and implementer record test-to-REQ and implementation-to-REQ mappings in `.ai-work/<task-slug>/traceability.yml` (fragments in parallel mode); you reconcile them at batch merge and render the final YAML into the archived SPEC's matrix at feature end. **REQ/AC IDs never appear in code, test names, docstrings, or comments** — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the traceability YAML carries them.
 
-For each step, compare the step's `Files` field against each principle's `scope` glob. Applicable principles — those whose scope matches at least one file — should have their `statement` appended to that step's `Done when` / acceptance criteria and their `id` recorded in `WIP.md` for the step. This makes principle compliance part of the implementer's own self-review checklist, not just the verifier's gate. Out-of-scope principles (no file match) are silently omitted.
-
-**Requirement traceability threading:**
-
-When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs, thread those IDs into paired test steps. Each test step's `Testing` field must reference the specific requirement IDs it validates (e.g., "Validates REQ-01, REQ-03"). The test-engineer and implementer then record the test-to-REQ and implementation-to-REQ mappings in `.ai-work/<task-slug>/traceability.yml` (or fragment files in parallel mode). You reconcile fragments at batch merge and render the final YAML into the archived SPEC's matrix at feature end. **REQ/AC IDs never appear in code, test names, docstrings, or comments** — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Pipeline documents (`IMPLEMENTATION_PLAN.md` Testing fields, `traceability.yml`, archived SPEC matrices) carry the traceability; source files stay ID-free.
-
-**Post-completion integration:**
-
-After both paired steps complete, add an integration checkpoint:
-- Run the full test suite (new + pre-existing tests)
-- If new tests fail against the new implementation, the implementer adjusts production code
-- If pre-existing tests broke, the implementer fixes them (boy scout rule)
-- Iterate until all tests pass
+**Post-completion integration:** after both paired steps complete, add an integration checkpoint: run the full suite (new + pre-existing), have the implementer adjust production code for new-test failures and fix broken pre-existing tests (boy scout rule), and iterate until green. Outer-loop nodes whose owning step has not run report `pending`, never failure.
 
 ### Phase 4b — Step Risk Tagging and Intra-Step Review Annotation
 
@@ -275,17 +236,19 @@ Complete the planning documents:
 **traceability.yml** — when `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section, initialize an empty traceability file at `.ai-work/<task-slug>/traceability.yml`:
 
 ```yaml
-# Traceability map: REQ IDs to tests and implementation.
-# Populated by test-engineer (tests:) and implementer (implementation:) as steps complete.
+# Traceability map: REQ IDs to tests, outer-loop acceptance nodes and implementation.
+# Populated by test-engineer (tests:), implementer (implementation:) and the planner (acceptance:).
 # Parallel mode writes fragment files (traceability_test-engineer.yml, traceability_implementer.yml)
-# that the planner reconciles at batch merge (per-REQ union of tests and implementation arrays).
+# that the planner reconciles at batch merge (per-REQ union of every list-valued key).
 # Rendered into the archived SPEC's matrix at feature end; then deleted with .ai-work/.
 requirements: {}
 ```
 
 This file is the single source of truth for REQ-to-test-to-implementation mapping during the pipeline. Code and tests must never embed REQ/AC IDs — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md). Skip initialization entirely when no `## Behavioral Specification` exists (Direct/Lightweight/Spike tier).
 
-**TEST_BASELINE.md** — before any implementation step runs, capture the pre-pipeline test state. The codebase is still unchanged at this point: run the project's canonical test target once and write the failing test node IDs plus the base commit SHA to `.ai-work/<task-slug>/TEST_BASELINE.md` (a clean suite records `clean baseline @ <sha>`). The verifier's Phase 10 reads this to separate regressions (this pipeline's fault — `FAIL`) from pre-existing failures (fixed in scope or ledgered as `td-NNN`) — without it, "pre-existing" is an unverifiable claim. When the project has no test target, do not skip the file: write the literal `no test target @ <sha>` instead — the registry's `TESTS_RAN` signal (`scripts/artifact_registry.py::signal_holds`) matches this exact marker to distinguish "no tests ran" from "the baseline was never captured," so absence of the file always reads as a defect. For ML-training pipelines whose suite is a training run, record the baseline metric instead per the metric-threshold model.
+**Seed `acceptance:`** — you are its only writer. Copy each requirement's scenario node ids from `ACCEPTANCE_TESTS.md § Scenarios` into that REQ's `acceptance:` list at initialization, and re-sync after a Spec Question amends a scenario. A file without `acceptance:` stays valid (skipped stage). Bad-case: a requirement with scenarios in the artifact and an empty `acceptance:` list.
+
+**TEST_BASELINE.md** — before any implementation step runs, capture the pre-pipeline test state. The codebase is still unchanged at this point: run the project's canonical test target once and write the failing test node IDs plus the base commit SHA to `.ai-work/<task-slug>/TEST_BASELINE.md` (a clean suite records `clean baseline @ <sha>`). Exclude this pipeline's own outer-loop nodes (the RED files under `tests/acceptance/` and `tests/e2e/` that the acceptance-design stage committed): they are pending targets, not pre-existing failures. The verifier's Phase 10 reads this to separate regressions (this pipeline's fault — `FAIL`) from pre-existing failures (fixed in scope or ledgered as `td-NNN`) — without it, "pre-existing" is an unverifiable claim. When the project has no test target, do not skip the file: write the literal `no test target @ <sha>` instead — the registry's `TESTS_RAN` signal (`scripts/artifact_registry.py::signal_holds`) matches this exact marker to distinguish "no tests ran" from "the baseline was never captured," so absence of the file always reads as a defect. For ML-training pipelines whose suite is a training run, record the baseline metric instead per the metric-threshold model.
 
 **ADR write protocol:** When you document a significant decision in `LEARNINGS.md ### Decisions Made` (using the draft id: `**[implementation-planner] [Decision title] (dec-draft-<hash>)**: ...`), also create a draft ADR fragment. Finalize rewrites draft ids to `dec-NNN` at merge-to-main.
 
@@ -301,7 +264,7 @@ See the [ADR conventions rule](../rules/swe/adr-conventions.md) for the file-for
 
 After the plan is approved and implementation begins, the implementation planner can be re-invoked to supervise execution.
 
-**Checkpoint reviews:** At defined milestones (after phases, after critical steps), compare codebase state against planned steps. When a `## Behavioral Specification` exists, include a spec coverage check at checkpoints — read `.ai-work/<task-slug>/traceability.yml` (merging any `traceability_*.yml` fragments) and surface every REQ whose `tests:` list is empty or absent as UNTESTED, so untested requirements appear at the checkpoint rather than at verification time. Do **not** grep test files for REQ-derived names: `id-citation-discipline` forbids REQ identifiers in test names, so the traceability YAML — not the code — is the source of truth for coverage.
+**Checkpoint reviews:** At defined milestones (after phases, after critical steps), compare codebase state against planned steps. When a `## Behavioral Specification` exists, include a spec coverage check at checkpoints — read `.ai-work/<task-slug>/traceability.yml` (merging any `traceability_*.yml` fragments) and surface every REQ whose `tests:` and `acceptance:` lists are both empty or absent as UNTESTED (a requirement proven only by outer-loop nodes is tested), so untested requirements appear at the checkpoint rather than at verification time. Bad-case: a REQ with neither list flagged as tested, or one with only `acceptance:` flagged UNTESTED. Do **not** grep test files for REQ-derived names: `id-citation-discipline` forbids REQ identifiers in test names, so the traceability YAML — not the code — is the source of truth for coverage.
 
 **Deviation detection:** For each planned step, assess:
 
@@ -360,8 +323,8 @@ When the completed feature used a behavioral specification (medium/large task), 
 
 1. Create `.ai-state/specs/` directory if it does not exist
 2. Extract the `## Behavioral Specification` from `SYSTEMS_PLAN.md`
-3. **Render the traceability matrix**: read `.ai-work/<task-slug>/traceability.yml`, merge any un-reconciled fragments (`traceability_*.yml`) via per-REQ union of `tests` and `implementation` arrays, and render the result as a Markdown table (columns: Requirement | Test(s) | Implementation | Status). Status derives from `TEST_RESULTS.md` — PASS if tests passed, FAIL if failed, UNTESTED if the YAML lists no `tests:` for a REQ.
-   - **Self-test before archiving**: the rendered matrix must have at least one data row — for a code feature, at least one REQ with a `tests:` entry; for a context-artifact feature, at least one REQ with an `implementation:` entry. An empty matrix means `traceability.yml` was never populated during the pipeline. Do not archive a hollow spec silently: emit a `[WARNING: EMPTY TRACEABILITY MATRIX]` naming the REQs with no evidence, and resolve (populate the YAML, or confirm the feature genuinely had no traceable units) before allowing cleanup in step 7.
+3. **Render the traceability matrix**: read `.ai-work/<task-slug>/traceability.yml`, merge any un-reconciled fragments (`traceability_*.yml`) via per-REQ union of every list-valued key (`tests`, `acceptance`, `implementation`), and render the result as a Markdown table (columns: Requirement | Test(s) | Implementation | Status; `Test(s)` lists `tests` plus `acceptance` nodes). Status derives from `TEST_RESULTS.md` — PASS if tests passed, FAIL if failed, UNTESTED if the YAML lists neither `tests:` nor `acceptance:` for a REQ.
+   - **Self-test before archiving**: the rendered matrix must have at least one data row — for a code feature, at least one REQ with a `tests:` or `acceptance:` entry; for a context-artifact feature, at least one REQ with an `implementation:` entry. An empty matrix means `traceability.yml` was never populated during the pipeline. Do not archive a hollow spec silently: emit a `[WARNING: EMPTY TRACEABILITY MATRIX]` naming the REQs with no evidence, and resolve (populate the YAML, or confirm the feature genuinely had no traceable units) before allowing cleanup in step 7.
 4. Extract the `Decisions Made` entries from `LEARNINGS.md`
 5. Write `SPEC_<feature-name>_YYYY-MM-DD.md` to `.ai-state/specs/` using the persistent spec template from the `spec-driven-development` skill, with the rendered matrix in the `## Traceability` section
 6. Cross-reference ADR files in `.ai-state/decisions/` covering the feature period against the archived spec's `## Key Decisions`. Note any decisions in ADR files that are missing from the spec, or vice versa.
@@ -389,14 +352,15 @@ When the completed feature used a behavioral specification (medium/large task), 
 
 ### With the Implementer
 
-- Provide each step with: one-sentence description, `Implementation` field, `Done when` field, `Files` field
+- Provide each step with: one-sentence description, `Implementation` field, `Done when` field, `Files` field, and the `Read-only` field when the step turns outer-loop tests green
 - Expect back one of: `[COMPLETE]` (step done, WIP.md updated), `[BLOCKED]` (blocker described with evidence), `[CONFLICT]` (file outside declared set needed, parallel mode only)
 - **Sequential invocation**: invoke one implementer at a time, review result, advance WIP.md, invoke next
-- **Paired invocation**: invoke the test-engineer first on each paired step and the implementer only after its RED handshake; after both complete, invoke the implementer for the integration checkpoint (run all tests, fix failures). Different pairs may overlap only on disjoint file sets with pathspec commits
+- **Paired invocation** (when a step is paired): invoke the test-engineer first and the implementer only after its RED handshake; after both complete, invoke the implementer for the integration checkpoint (run all tests, fix failures). Different pairs may overlap only on disjoint file sets with pathspec commits
+- **Mismatch with an outer-loop test**: the implementer stops with `[BLOCKED]` and a Spec Question instead of editing the test; you do not route it — the orchestrator does
 
 ### With the Test-Engineer
 
-- Provide each test step with: acceptance criteria references from `SYSTEMS_PLAN.md`, behavioral expectations, `Files` field (test files only)
+- Provide each test step with: acceptance criteria references from `SYSTEMS_PLAN.md`, behavioral expectations, `Files` field (test files only; driver files only for a driver-binding step, which names the Boundary Assumption it binds)
 - Test-engineers design tests from the behavioral spec — they do not need to see production code first
 - Expect back one of: `[COMPLETE]` (tests written and runnable), `[BLOCKED]`, `[CONFLICT]`
 - Tests are expected to fail initially — they pass once the implementer's production code lands and the integration checkpoint runs

@@ -24,17 +24,20 @@ Agents communicate through shared documents in `.ai-work/` (ephemeral) and `.ai-
 
 ## Architect Invocation Modes
 
-The `systems-architect` agent supports three invocation modes, signaled by an explicit `Mode: <name>` directive in the spawn prompt (no frontmatter, no marker file). Phase 1 (Input Assessment) detects the directive on intake. When updating `agents/systems-architect.md`, preserve compatibility with all three modes.
+The `systems-architect` agent supports four invocation modes, signaled by an explicit `Mode: <name>` directive in the spawn prompt (no frontmatter, no marker file). Phase 1 (Input Assessment) detects the directive on intake. When updating `agents/systems-architect.md`, preserve compatibility with all four modes.
 
 | Mode | Trigger | Phase 2.5 behavior | Output |
 |---|---|---|---|
 | `feature` (default — no directive needed) | Standard/Full pipeline with feature scope | Always runs | `SYSTEMS_PLAN.md` + optional `PRE_REFACTOR_PLAN.md` |
+| `spec` | Standard/Full pipeline, first architect spawn, before acceptance design; also the resume that answers a specification Spec Question (`coordination-details.md § Acceptance-Design Stage`) | SKIP (no design yet) | The spec sections of `SYSTEMS_PLAN.md` (other required headings `[pending: design phase]`) + `SPEC_EXTRACT.md` via `extract_spec.py`; NO `PRE_REFACTOR_PLAN.md` |
 | `baseline-audit` | Onboarding Phase 8 (`skills/onboard-project`, capability `arch`); `new` mode's seed pipeline (Phase 0s) invokes the same agent with full feature scope in greenfield mode (baseline-audit is the existing-project counterpart) | SKIP (no feature → no pre-refactor) | `.ai-state/DESIGN.md` + `docs/architecture.md`; NO `SYSTEMS_PLAN.md`, NO `PRE_REFACTOR_PLAN.md` |
 | `post-refactor-adaptation` | Orchestrator re-invocation after a pre-refactor mini-pipeline completes AND a `PRE_REFACTOR_PLAN.md` exists under the task slug's `.ai-work/<task-slug>/` | SKIP (recursion guard — prevents a second mini-pipeline) | Updated `SYSTEMS_PLAN.md` (re-read Components / Data Flow / Interfaces against the refactored code); `[CONSUMED]` marker appended to the existing `PRE_REFACTOR_PLAN.md` |
 
 **Paired site — update both in the same commit.** The `Output` column above is authoritative on *whether* a mode writes a `SYSTEMS_PLAN.md`; `agents/systems-architect.md § Phase 10` is the single source of truth for *which `##` sections that document must carry*. Neither restates the other. **The section schema binds the path, not the author**: anything written to `.ai-work/<task-slug>/SYSTEMS_PLAN.md` uses those headings, including a plan the orchestrator authors directly in a no-fan-out run where the architect is never spawned. A bespoke schema under the canonical filename is a silent handoff failure — downstream consumers grep for the headings and report the document empty.
 
 ### Anti-instructions per mode
+
+**`spec`**: design-free requirement text (no components, files, libraries or mechanisms), no Phase 2 onward, no Phase 2.5, no `.ai-state/DESIGN.md`, `docs/architecture.md` or ADR drafts, no `PRE_REFACTOR_PLAN.md`; done only when `extract_spec.py <task-slug>` exits 0. The `feature` resume that follows reads `ACCEPTANCE_TESTS.md` and answers Spec Questions in requirement text only.
 
 **`baseline-audit`**: no `SYSTEMS_PLAN.md`, no `PRE_REFACTOR_PLAN.md`, no Phase 2.5, no invented components (every diagram node + table row must be code-verified), no L2 detail, no source edits.
 

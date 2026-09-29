@@ -18,7 +18,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Create or update `docs/architecture.md` (developer-facing navigation guide, Built components only)"
 - If deployment is in scope: "Create or update `.ai-state/SYSTEM_DEPLOYMENT.md`"
 - If pre-refactor sub-pipeline outcome (Phase 2.5 emits `emit-PRE_REFACTOR_PLAN`): "Create or update `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md`"
-- If `Mode: spec` (Standard/Full spec phase): "Write only the spec sections of `SYSTEMS_PLAN.md` — requirement text free of design vocabulary — and run `extract_spec.py <task-slug>` until it exits 0; do not touch `.ai-state/DESIGN.md`, `docs/architecture.md` or ADR drafts". On the later `Mode: feature` resume: "Read `ACCEPTANCE_TESTS.md`; answer Spec Questions by amending requirement text only" ([procedure](#acceptance-design-stage))
+- If `Mode: spec` (Standard/Full spec phase): "Write only the spec sections of `SYSTEMS_PLAN.md` — requirement text free of design vocabulary — and run `extract_spec.py <task-slug>` until it exits 0; do not touch `.ai-state/DESIGN.md`, `docs/architecture.md` or ADR drafts". Round-0 Spec Questions are answered by a `Mode: spec` resume before design ("amend requirement text only, rerun `extract_spec.py`"). On the later `Mode: feature` resume: "Read `ACCEPTANCE_TESTS.md`; answer only Spec Questions raised late by amending requirement text" ([procedure](#acceptance-design-stage))
 
 **implementation-planner** — always include in prompt:
 - "Produce `IMPLEMENTATION_PLAN.md`, `WIP.md`, and `LEARNINGS.md` at `.ai-work/<task-slug>/`"
@@ -191,11 +191,11 @@ A pure function of the path; the first match wins, so every path lands in exactl
 
 1. *outer-loop driver*: under `tests/acceptance/` or `tests/e2e/`, inside a `drivers/` directory
 2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`
-3. *inner-loop test*: the test-file globs of `rules/swe/testing-conventions.md` (`tests/**`, `test_*`, `*_test.*`, `*_spec.*`, `*.test.{ts,js}`, `*.spec.{ts,js}`, `conftest.py`)
+3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file under a `tests/`, `test/`, `spec/` or `__tests__/` directory. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production
 4. *state/doc*: `.ai-state/**`, `docs/**`
 5. *production*: everything else — in Praxion this includes agent, skill, rule and command Markdown, because they are the product
 
-The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a class-5 path. The AD commit must be strictly earlier; afterwards a scenario file changes only under a `Resolved in:` sha, and a driver file changes only in a test-only commit from a planned binding step.
+The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a class-5 path. The AD commit must be strictly earlier; afterwards any change to an outer-loop file (scenario or driver) belongs to a commit tied to an answered Spec Question (`Resolved in:` sha) or to a planned driver-binding step, and an outer-loop file that first appears after the first production commit is such a change. The Base commit is the one the orchestrator recorded at the Gate.
 
 ### Spec-Question Routing
 
@@ -209,7 +209,7 @@ The **first production commit** is the earliest commit in `<Base commit>..HEAD` 
 |---|---|
 | Direct, Spike | None added. A bug fix still writes its failing regression test first |
 | Lightweight | Temporal-only: the orchestrator commits failing tests before any code — no stage, no `ACCEPTANCE_TESTS.md`. See `tier-templates.md § Lightweight Snippet` |
-| Standard, Full | The full stage. Skippable only through the **skipped form** of `ACCEPTANCE_TESTS.md` (`**Stage:** skipped — <specific reason>`, all five sections kept), e.g. every deliverable is a Markdown prompt with no drivable boundary. A generic reason is a verifier WARN. The orchestrator may write the skipped form itself without spawning — the schema binds the path, not the author |
+| Standard, Full | The full stage, when `SYSTEMS_PLAN.md` carries `### Observable Surface` (the spec-mode marker). A pipeline that started before the stage existed records the skipped form with the reason "predates the acceptance-design stage" and is not failed for it. Skippable only through the **skipped form** of `ACCEPTANCE_TESTS.md` (`**Stage:** skipped — <specific reason>`, all five sections kept), e.g. every deliverable is a Markdown prompt with no drivable boundary. A generic reason is a verifier WARN. The orchestrator may write the skipped form itself without spawning — the schema binds the path, not the author |
 
 ### Spawn Accounting, Routing and Commits
 
@@ -223,9 +223,9 @@ The **first production commit** is the earliest commit in `<Base commit>..HEAD` 
 When a list of improvements is presented (from sentinel reports, code reviews, analysis, or user requests), the main agent must evaluate their independence and execute them within the tier's [spawn budget](#spawn-budget):
 
 1. **Classify** each improvement's file set — identify which improvements touch disjoint files and can run concurrently vs. which overlap and must be sequenced.
-2. **Pair-spawn** a `test-engineer` then an `implementer` for each independent improvement. Independent pairs may overlap (2-3 at most) only when their file sets are disjoint and each commits by pathspec; within a pair the standard BDD/TDD cycle holds — tests RED first, then production code, then the new tests until green.
+2. **Spawn** an `implementer` per independent improvement, who owns its unit tests; pair a `test-engineer` first only when the [optional pairing](#paired-step-pattern-optional) criteria hold. Independent spawns may overlap (2-3 at most) only when their file sets are disjoint and each commits by pathspec; within a pair the BDD/TDD cycle holds — tests RED first, then production code, then the new tests until green.
 3. **Sequence** dependent improvements — when two improvements touch overlapping files, the second pair waits for the first to complete.
-4. **Full suite gate** — after all improvement pairs have completed and their individual tests pass, run the full project test suite once. Fix any regressions before considering the batch done.
+4. **Full suite gate** — after all improvements have completed and their individual tests pass, run the full project test suite once. Fix any regressions before considering the batch done.
 
 <a id="spawn-budget"></a>
 ## Spawn Budget

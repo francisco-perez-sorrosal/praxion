@@ -111,7 +111,7 @@ Status values: `PASS` (test exists and passes), `FAIL` (test fails or implementa
 
 ## Traceability Threading
 
-REQ IDs flow through the pipeline in six stages via an **external two-layer mechanism** — ephemeral YAML during the pipeline, persistent matrix in the archived SPEC afterward. **IDs never appear in code, test names, docstrings, or comments** (see [`rules/swe/id-citation-discipline.md`](../../rules/swe/id-citation-discipline.md)).
+REQ IDs flow through the pipeline in five stages via an **external two-layer mechanism** — ephemeral YAML during the pipeline, persistent matrix in the archived SPEC afterward. **IDs never appear in code, test names, docstrings, or comments** (see [`rules/swe/id-citation-discipline.md`](../../rules/swe/id-citation-discipline.md)).
 
 ```text
 1. Architect creates    --> REQ-01..REQ-NN in SYSTEMS_PLAN.md Behavioral Specification
@@ -119,13 +119,13 @@ REQ IDs flow through the pipeline in six stages via an **external two-layer mech
                             initializes .ai-work/<slug>/traceability.yml, seeding each
                             REQ's `acceptance:` from ACCEPTANCE_TESTS.md (the acceptance
                             designer never touches traceability.yml)
-3. Test-engineer writes --> tests with behavioral names; appends REQ-to-test entries
-                            to traceability.yml (or traceability_test-engineer.yml fragment)
-4. Implementer writes   --> production code with behavioral names; appends REQ-to-impl
-                            entries to traceability.yml (or traceability_implementer.yml fragment)
-5. Verifier produces    --> Traceability matrix in VERIFICATION_REPORT.md by reading
+3. Implementer writes   --> unit tests and production code with behavioral names; appends
+                            REQ-to-test and REQ-to-impl entries to traceability.yml (or
+                            traceability_implementer.yml fragment); a paired test-engineer
+                            may append REQ-to-test entries (traceability_test-engineer.yml)
+4. Verifier produces    --> Traceability matrix in VERIFICATION_REPORT.md by reading
                             the YAML + TEST_RESULTS.md (never by grepping code)
-6. Planner archives     --> Renders YAML into archived SPEC's matrix at feature end;
+5. Planner archives     --> Renders YAML into archived SPEC's matrix at feature end;
                             .ai-work/ cleanup then deletes the YAML
 ```
 
@@ -152,7 +152,7 @@ requirements:
 
 Absent `tests:` list (or empty list) means UNTESTED, unless `acceptance:` is non-empty (see Union coverage above). Absent `acceptance:` is valid and changes nothing. Absent `implementation:` list means no implementation yet (pre-integration). An absent REQ key entirely means neither test nor implementation exists for that REQ.
 
-**Parallel fragments**: `traceability_implementer.yml`, `traceability_test-engineer.yml`. Reconciliation is a per-REQ merge of every list-valued key (`tests`, `implementation`, `acceptance`) — no conflicts by construction because the writers own disjoint fields within each REQ key. The implementation-planner performs the merge at batch completion.
+**Parallel fragments**: `traceability_implementer.yml`, `traceability_test-engineer.yml`. Reconciliation is a per-REQ merge of every list-valued key (`tests`, `implementation`, `acceptance`) — no conflicts by construction because the union is per key, whichever writer appended it. The implementation-planner performs the merge at batch completion.
 
 ### Bidirectional REQ↔Architectural-Element Traceability
 

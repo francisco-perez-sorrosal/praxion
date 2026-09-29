@@ -41,7 +41,7 @@ Example (architect → planner): `<task-slug>` = `payment-api`, `<tier>` = `Stan
 
 ## Full-Tier Parallel Scaffold (implementer ∥ test-engineer)
 
-Use when the planner assigns an optional paired step (risky logic, property or contract tests) with disjoint file sets. Spawn both instances in the same turn; each receives the same slug but distinct step numbers and fragment files.
+Use when the planner assigns an optional paired step (risky logic, property or contract tests) with disjoint file sets. Spawn the test-engineer first and the implementer once its RED is confirmed (never in the same tool-use block); each receives the same slug but distinct step numbers and fragment files.
 
 ```markdown
 You are the <agent-role> for the `<task-slug>` pipeline (tier: Full).

@@ -169,9 +169,9 @@ Tests run in two loops — procedure in [`coordination-details.md § BDD/TDD Exe
 
 **Project Principles threading (when `.ai-state/principles.yaml` was loaded in Phase 1b):** compare each step's `Files` against each principle's `scope` glob; append the `statement` of every matching principle to that step's `Done when` and record its `id` in `WIP.md` for the step, so compliance is part of the implementer's self-review. Out-of-scope principles are silently omitted.
 
-**Requirement traceability threading:** when `SYSTEMS_PLAN.md` has a `## Behavioral Specification` with REQ IDs, each step's `Testing` field names the REQ IDs it validates (e.g., "Validates REQ-01, REQ-03"). Test-engineer and implementer record test-to-REQ and implementation-to-REQ mappings in `.ai-work/<task-slug>/traceability.yml` (fragments in parallel mode); you reconcile them at batch merge and render the final YAML into the archived SPEC's matrix at feature end. **REQ/AC IDs never appear in code, test names, docstrings, or comments** — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the traceability YAML carries them.
+**Requirement traceability threading:** when `SYSTEMS_PLAN.md` has a `## Behavioral Specification` with REQ IDs, each step's `Testing` field names the REQ IDs it validates (e.g., "Validates REQ-01, REQ-03"). The implementer records test-to-REQ and implementation-to-REQ mappings (a paired test-engineer may add `tests:`) in `.ai-work/<task-slug>/traceability.yml` (fragments in parallel mode); you reconcile them at batch merge and render the final YAML into the archived SPEC's matrix at feature end. **REQ/AC IDs never appear in code, test names, docstrings, or comments** — see [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the traceability YAML carries them.
 
-**Post-completion integration:** after both paired steps complete, add an integration checkpoint: run the full suite (new + pre-existing), have the implementer adjust production code for new-test failures and fix broken pre-existing tests (boy scout rule), and iterate until green. Outer-loop nodes whose owning step has not run report `pending`, never failure.
+**Post-completion integration:** after both paired steps complete, add an integration checkpoint: run the full suite (new + pre-existing), have the implementer adjust production code for new-test failures and fix broken pre-existing tests (boy scout rule, never the outer loop: see [Fix Cycle](../skills/software-planning/references/coordination-details.md#fix-cycle)), and iterate until green. Outer-loop nodes whose owning step has not run report `pending`, never failure.
 
 ### Phase 4b — Step Risk Tagging and Intra-Step Review Annotation
 
@@ -237,7 +237,7 @@ Complete the planning documents:
 
 ```yaml
 # Traceability map: REQ IDs to tests, outer-loop acceptance nodes and implementation.
-# Populated by test-engineer (tests:), implementer (implementation:) and the planner (acceptance:).
+# Populated by the implementer (tests:, implementation:; a paired test-engineer may add tests:) and the planner (acceptance:).
 # Parallel mode writes fragment files (traceability_test-engineer.yml, traceability_implementer.yml)
 # that the planner reconciles at batch merge (per-REQ union of every list-valued key).
 # Rendered into the archived SPEC's matrix at feature end; then deleted with .ai-work/.

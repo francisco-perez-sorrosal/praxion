@@ -15,14 +15,14 @@ PraxionOrchestrationPipeline: {
   Architect: {
     label: "Systems Architect"
   }
+  Test_engineer: {
+    label: "Test Engineer"
+  }
   Planner: {
     label: "Implementation Planner"
   }
   Implementer: {
     label: "Implementer"
-  }
-  Test_engineer: {
-    label: "Test Engineer"
   }
   Doc_engineer: {
     label: "Doc Engineer"
@@ -37,17 +37,23 @@ PraxionOrchestrationDoc_idea: {
 PraxionOrchestrationDoc_research: {
   label: "RESEARCH_FINDINGS.md"
 }
+PraxionOrchestrationDoc_spec_extract: {
+  label: "SPEC_EXTRACT.md"
+}
 PraxionOrchestrationDoc_systems: {
   label: "SYSTEMS_PLAN.md"
+}
+PraxionOrchestrationDoc_acceptance: {
+  label: "ACCEPTANCE_TESTS.md"
 }
 PraxionOrchestrationDoc_impl_plan: {
   label: "IMPLEMENTATION_PLAN.md"
 }
-PraxionOrchestrationDoc_learnings: {
-  label: "LEARNINGS.md"
-}
 PraxionOrchestrationDoc_test: {
   label: "TEST_RESULTS.md"
+}
+PraxionOrchestrationDoc_learnings: {
+  label: "LEARNINGS.md"
 }
 PraxionOrchestrationDoc_wip: {
   label: "WIP.md"
@@ -68,6 +74,11 @@ PraxionOrchestrationPipeline.Promethean -> PraxionOrchestrationDoc_idea: "writes
 PraxionOrchestrationDoc_idea -> PraxionOrchestrationPipeline.Researcher: "reads"
 PraxionOrchestrationPipeline.Researcher -> PraxionOrchestrationDoc_research: "[...]"
 PraxionOrchestrationDoc_research -> PraxionOrchestrationPipeline.Architect: "[...]"
+PraxionOrchestrationPipeline.Architect -> PraxionOrchestrationDoc_spec_extract: "writes spec extract"
+PraxionOrchestrationDoc_spec_extract -> PraxionOrchestrationPipeline.Test_engineer: "reads"
+PraxionOrchestrationPipeline.Test_engineer -> PraxionOrchestrationDoc_acceptance: "writes"
+PraxionOrchestrationDoc_acceptance -> PraxionOrchestrationPipeline.Architect: "reads"
+PraxionOrchestrationDoc_acceptance -> PraxionOrchestrationPipeline.Planner: "reads"
 PraxionOrchestrationPipeline.Architect -> PraxionOrchestrationDoc_systems: "[...]"
 PraxionOrchestrationDoc_systems -> PraxionOrchestrationPipeline.Planner: "reads"
 PraxionOrchestrationPipeline.Planner -> PraxionOrchestrationDoc_impl_plan: "writes"

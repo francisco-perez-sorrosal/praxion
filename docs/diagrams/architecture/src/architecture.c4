@@ -186,6 +186,7 @@ model {
     orchestration.pipeline.architect  -> orchestration.doc_spec_extract "writes spec extract" { #forward }
     orchestration.doc_spec_extract    -> orchestration.pipeline.test_engineer "reads" { #forward }
     orchestration.pipeline.test_engineer -> orchestration.doc_acceptance "writes" { #forward }
+    orchestration.doc_acceptance      -> orchestration.pipeline.architect "reads" { #forward }
     orchestration.doc_acceptance      -> orchestration.pipeline.planner "reads" { #forward }
     orchestration.doc_systems         -> orchestration.pipeline.planner "reads" { #forward }
     orchestration.pipeline.planner    -> orchestration.doc_impl_plan   "writes" { #forward }
@@ -328,6 +329,8 @@ views {
       praxion.orchestration.pipeline.verifier,
       praxion.orchestration.doc_idea,
       praxion.orchestration.doc_research,
+      praxion.orchestration.doc_spec_extract,
+      praxion.orchestration.doc_acceptance,
       praxion.orchestration.doc_systems,
       praxion.orchestration.doc_impl_plan,
       praxion.orchestration.doc_wip,

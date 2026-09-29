@@ -1,3 +1,24 @@
+## v0.42.0 (2026-09-29)
+
+### Feat
+
+- **rules**: State the acceptance-design stage order
+- **agents**: Verify acceptance independence
+- **agents**: Plan from design plus acceptance tests
+- **agents**: Add the architect spec mode
+- **agents**: Give the implementer the unit tests
+- **agents**: Add the test-engineer acceptance-design mode
+- **spec-drift**: Count acceptance edges as dependents
+- **registry**: Register the spec extract and acceptance tests
+- **scripts**: Add extract_spec.py spec extractor
+
+### Fix
+
+- **agents**: Require a recorded skip for older pipelines
+- **agents**: Tighten acceptance-independence checks
+- **scripts**: Find qualified Key Signals headings
+- **tests**: Make two tests hold on clean CI runners
+
 ## v0.41.0 (2026-09-29)
 
 ### Feat

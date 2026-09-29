@@ -42,6 +42,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 | Scenario | Agent | Override | Rationale |
 |----------|-------|----------|-----------|
 | Intra-step pair-review (`Mode: light-review`) | `verifier` | `sonnet` | Step-scoped diff review only; not a whole-pipeline quality gate. Sanctioned per-spawn override below the `opus` floor. |
+| Acceptance design (`Mode: acceptance-design`, resumes included) | `test-engineer` | `opus` | Independent outer-loop design from the spec alone is a judgment-heavy, one-shot task whose quality bounds every later gate. Sanctioned per-spawn override above the `sonnet` frontmatter floor: the upward mirror of the `verifier` light-review row. |
 
 ## Quality-Cliff Guards
 

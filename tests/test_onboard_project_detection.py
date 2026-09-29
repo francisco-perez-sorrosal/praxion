@@ -103,9 +103,11 @@ def _prereq_env(sandbox: Path) -> dict[str, str]:
     }
 
 
-def run_onboard_check(cwd: Path, sandbox: Path) -> subprocess.CompletedProcess[str]:
+def run_onboard_check(
+    cwd: Path, sandbox: Path, bash: str = "bash"
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["bash", str(SCRIPT_UNDER_TEST), "--check", "--json"],
+        [bash, str(SCRIPT_UNDER_TEST), "--check", "--json"],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -152,5 +154,24 @@ def test_a_plain_git_repo_with_neither_claude_file_is_not_partially_managed(
     assert '"state":"git-no-praxion"' in result.stdout, (
         "a plain git repo with no Agent Pipeline marker anywhere must "
         f"resolve to git-no-praxion, not be swept into partially-managed. "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+
+
+@pytest.mark.skipif(not SCRIPT_UNDER_TEST.exists(), reason="scripts/onboard-project not found")
+@pytest.mark.skipif(not Path("/bin/bash").exists(), reason="no /bin/bash on this host")
+def test_onboarding_runs_under_the_system_bash(tmp_path: Path) -> None:
+    """macOS ships bash 3.2 as /bin/bash, which treats an empty array's
+    "${arr[@]}" as unbound under `set -u`. A PATH without a newer bash runs
+    onboarding there, and a plain run (no --shadow/--share) must still reach
+    detection instead of aborting."""
+    project = tmp_path / "project"
+    project.mkdir(parents=True)
+    _git(project, "init", "-q")
+
+    result = run_onboard_check(project, tmp_path / "sandbox", bash="/bin/bash")
+
+    assert "unbound variable" not in result.stderr, result.stderr
+    assert '"state":"git-no-praxion"' in result.stdout, (
         f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )

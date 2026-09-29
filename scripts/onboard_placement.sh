@@ -23,6 +23,10 @@
 # straight through. Only the checks `praxion-sidecar init` never sees (no
 # --placement sidecar given at all; the in-repo/sidecar mode legality;
 # re-onboarding a project that already picked sidecar) live here.
+#
+# SHADOW_PATHS / SHARE_PATHS are usually empty, and macOS's stock bash 3.2
+# treats "${arr[@]}" of an empty array as unbound under `set -u`; every
+# expansion therefore uses the ${arr[@]+"${arr[@]}"} guard.
 
 readonly _PLACEMENT_UNAVAILABLE_CI="CI workflows are GitHub-visible by construction"
 
@@ -46,8 +50,8 @@ _placement_validate_composition() {
             exit "$EXIT_USAGE" ;;
     esac
     local shadowed shared
-    for shadowed in "${SHADOW_PATHS[@]}"; do
-        for shared in "${SHARE_PATHS[@]}"; do
+    for shadowed in ${SHADOW_PATHS[@]+"${SHADOW_PATHS[@]}"}; do
+        for shared in ${SHARE_PATHS[@]+"${SHARE_PATHS[@]}"}; do
             if [ "$shadowed" = "$shared" ]; then
                 printf 'Usage error: %s was passed to both --shadow and --share. Each path has exactly one intent.\n' "$shadowed" >&2
                 exit "$EXIT_USAGE"
@@ -84,7 +88,7 @@ _placement_claude_md_tracked() {
 
 _placement_all_paths() {
     printf '%s\n' .ai-state CLAUDE.md CLAUDE.local.md .claude/settings.local.json \
-        docs/architecture.md "${SHADOW_PATHS[@]}" "${SHARE_PATHS[@]}" | sort -u
+        docs/architecture.md ${SHADOW_PATHS[@]+"${SHADOW_PATHS[@]}"} ${SHARE_PATHS[@]+"${SHARE_PATHS[@]}"} | sort -u
 }
 
 # Echoes shadow|share|untouched for PATH under TARGET, mirroring
@@ -101,8 +105,8 @@ _placement_intent_of() {
             if _placement_claude_md_tracked "$target"; then intent=untouched; else intent=shadow; fi ;;
         *) intent=shadow ;;
     esac
-    for p in "${SHARE_PATHS[@]}"; do [ "$p" = "$path" ] && intent=share; done
-    for p in "${SHADOW_PATHS[@]}"; do [ "$p" = "$path" ] && intent=shadow; done
+    for p in ${SHARE_PATHS[@]+"${SHARE_PATHS[@]}"}; do [ "$p" = "$path" ] && intent=share; done
+    for p in ${SHADOW_PATHS[@]+"${SHADOW_PATHS[@]}"}; do [ "$p" = "$path" ] && intent=shadow; done
     printf '%s' "$intent"
 }
 
@@ -172,8 +176,8 @@ _placement_delegate_init() {
     sidecar_cli="$(dirname "$0")/praxion-sidecar"
     local -a init_args=(init)
     local p
-    for p in "${SHADOW_PATHS[@]}"; do init_args+=(--shadow "$p"); done
-    for p in "${SHARE_PATHS[@]}"; do init_args+=(--share "$p"); done
+    for p in ${SHADOW_PATHS[@]+"${SHADOW_PATHS[@]}"}; do init_args+=(--shadow "$p"); done
+    for p in ${SHARE_PATHS[@]+"${SHARE_PATHS[@]}"}; do init_args+=(--share "$p"); done
     [ "$QUIET" -eq 1 ] && init_args+=(--quiet)
     (cd "$target" && "$sidecar_cli" "${init_args[@]}") || rc=$?
     [ "$rc" -eq 0 ] || exit "$rc"

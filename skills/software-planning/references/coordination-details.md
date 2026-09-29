@@ -18,24 +18,32 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Create or update `docs/architecture.md` (developer-facing navigation guide, Built components only)"
 - If deployment is in scope: "Create or update `.ai-state/SYSTEM_DEPLOYMENT.md`"
 - If pre-refactor sub-pipeline outcome (Phase 2.5 emits `emit-PRE_REFACTOR_PLAN`): "Create or update `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md`"
+- If `Mode: spec` (Standard/Full spec phase): "Write only the spec sections of `SYSTEMS_PLAN.md` — requirement text free of design vocabulary — and run `extract_spec.py <task-slug>` until it exits 0; do not touch `.ai-state/DESIGN.md`, `docs/architecture.md` or ADR drafts". On the later `Mode: feature` resume: "Read `ACCEPTANCE_TESTS.md`; answer Spec Questions by amending requirement text only" ([procedure](#acceptance-design-stage))
 
 **implementation-planner** — always include in prompt:
 - "Produce `IMPLEMENTATION_PLAN.md`, `WIP.md`, and `LEARNINGS.md` at `.ai-work/<task-slug>/`"
 - "Read the `SYSTEMS_PLAN.md` at `.ai-work/<task-slug>/` for input"
 - "If step decomposition reveals structural gaps not captured in the systems plan: update `.ai-state/DESIGN.md` and `docs/architecture.md` before implementation begins"
-- If `SYSTEMS_PLAN.md` carries a `## Behavioral Specification` (Standard/Full): "Initialize `.ai-work/<task-slug>/traceability.yml`; give every step that implements or tests a REQ an explicit owner for its `implementation:` and `tests:` arrays (the test-engineer when one is paired, otherwise the implementer's own test sub-step — the implementer's default protocol leaves `tests:` to the test-engineer, so an unpaired plan must say so); add a reconciliation step that merges any `traceability_*.yml` fragments into the single file before the verifier runs — the verifier FAILs on a missing merged file or on a REQ with an empty `tests:` array"
+- If `SYSTEMS_PLAN.md` carries a `## Behavioral Specification` (Standard/Full): "Initialize `.ai-work/<task-slug>/traceability.yml`; give every step that implements or tests a REQ an explicit owner for its `implementation:` and `tests:` arrays (the implementer by default, the test-engineer only on an optional paired step); seed each REQ's `acceptance:` array from `ACCEPTANCE_TESTS.md § Scenarios`; add a reconciliation step that merges any `traceability_*.yml` fragments into the single file (per-REQ union of every list-valued key) before the verifier runs — the verifier FAILs on a missing merged file or on a REQ whose `tests:` and `acceptance:` arrays are both empty"
+- If `ACCEPTANCE_TESTS.md` exists: "Read it with `SYSTEMS_PLAN.md`; put a driver-binding step before any production step for each unbound Boundary Assumption; name each implementer step's outer-loop targets in its `**Read-only**:` field, each scenario node in exactly one step; block on a `withheld` scenario" ([procedure](#acceptance-design-stage))
 
 **implementer** — always include in prompt:
 - "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`"
 - "Update `WIP.md` with completion status"
 - "If structural changes: update `.ai-state/DESIGN.md` and `docs/architecture.md` (Post-implementation updates)"
 - "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per the canonical schema in [agent-pipeline-details.md](agent-pipeline-details.md)"
+- "Write the step's unit and internal-integration tests; run the outer-loop tests named in its `**Read-only**:` field and edit none — on a mismatch with the spec, stop `[BLOCKED]` with a Spec Question"
+
+**test-engineer** — always include in prompt:
+- Paired mode (optional test step or driver-binding step): "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`; design tests from the acceptance criteria in `SYSTEMS_PLAN.md`; report RED; a driver-binding step edits driver files only"
+- `Mode: acceptance-design` (Standard/Full): the prompt carries **only** the task slug, the Base commit sha and the path of `SPEC_EXTRACT.md` — never `SYSTEMS_PLAN.md`, the brief or any design path. "Produce `ACCEPTANCE_TESTS.md` at `.ai-work/<task-slug>/` and RED tests under `tests/acceptance/` and `tests/e2e/`; read only the allowed input classes; do not commit". Spawn with `model: opus`; a Spec-Question resume names the regenerated extract and the open question ids ([procedure](#acceptance-design-stage))
 
 **verifier** — always include in prompt:
 - "Produce `VERIFICATION_REPORT.md` at `.ai-work/<task-slug>/`"
 - "Verify against acceptance criteria in the `SYSTEMS_PLAN.md`"
 - "Check `.ai-state/DESIGN.md` design coherence (Phase 8) and `docs/architecture.md` code accuracy (Phase 9)"
 - "Read `TEST_RESULTS.md` at `.ai-work/<task-slug>/` for test outcomes (missing file → WARN, not FAIL)"
+- If `ACCEPTANCE_TESTS.md` exists (Standard/Full): "Run the Acceptance Independence checks — declared sources against the allowed input classes, extract freshness, commit order, `acceptance:` coverage" ([procedure](#acceptance-design-stage))
 
 <a id="pipeline-worktree-lifecycle"></a>
 ## Agent Roster
@@ -56,7 +64,7 @@ Path prefix signals lifecycle: `.ai-work/<slug>/` ephemeral, `.ai-state/` perman
 | `implementation-planner` | → Delegation Checklists | Yes |
 | `context-engineer` | Audit report + artifact changes, `.ai-work/<slug>/CONTEXT_REVIEW.md` (shadowing) | Yes |
 | `implementer` | → Delegation Checklists | Yes |
-| `test-engineer` | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired) | Yes |
+| `test-engineer` | Test code + `.ai-work/<slug>/WIP.md` update + `.ai-work/<slug>/TEST_RESULTS.md` (canonical when paired); in acceptance-design mode `.ai-work/<slug>/ACCEPTANCE_TESTS.md` + outer-loop tests | Yes |
 | `verifier` | → Delegation Checklists | Yes |
 | `doc-engineer` | Doc report or file fixes | Yes |
 | `sentinel` | `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md`, `.ai-state/sentinel_reports/SENTINEL_LOG.md` | Yes |
@@ -104,36 +112,111 @@ Task slugs isolate a pipeline's entire working state from other pipelines. When 
 <a id="bdd-tdd-execution"></a>
 ## BDD/TDD Execution
 
-The planner produces paired implementation and test steps. Test-engineers design behavioral tests from the systems plan's acceptance criteria — tests encode **what** the system should do, not **how** it does it. The pair runs **in sequence, test first**: the test-engineer reports RED, the orchestrator red-checks it, then the implementer spawns on the disjoint production file set.
+Tests run in two loops. The **outer loop** — tests above the unit level (acceptance, boundary integration, end-to-end) — is designed from the spec alone, before the design and the plan exist, and is **read-only for the implementer** ([Acceptance-Design Stage](#acceptance-design-stage)). The **inner loop** — unit and internal-integration tests — is written by the implementer, test first, inside each step. Tests encode **what** the system should do, not **how** it does it.
 
-### Paired Step Pattern
+### Outer Loop
 
-For each behavior in the acceptance criteria:
+The acceptance designer's tests are committed RED before any production change. Each implementer step names the outer-loop nodes it must turn green in a `**Read-only**:` field; the implementer runs them and edits no file under `tests/acceptance/` or `tests/e2e/`. A node whose owning step has not run yet is reported as `pending=<n>`, never as a failure; `pending` is zero at the final integration checkpoint.
+
+### Inner Loop
+
+Within each step the implementer writes a failing unit test, then the code that passes it, and records the `tests:` traceability entries. No test-engineer is spawned for this by default.
+
+### Paired Step Pattern (optional)
+
+Pair a test-engineer step ahead of an implementer step when the step carries risky logic, needs property or contract tests, or needs a driver bound to a real interface (driver files only). For each paired behavior:
 
 1. **Test step** (test-engineer): design behavioral tests from the acceptance criterion. Tests must fail before the implementation exists.
 2. **Implementation step** (implementer): write the production code that makes the tests pass.
-3. **Integration checkpoint** (implementer): run the full test suite (new tests + pre-existing tests). Fix all failures — including pre-existing tests broken by the change (boy scout rule).
+3. **Integration checkpoint** (implementer): run the full test suite (new tests + pre-existing tests) and apply the Fix Cycle.
 
 The test step completes before the implementation step starts. Running them concurrently lets the implementer finish before any RED exists, so the tests never prove they can fail; and two agents that read the spec at the same time can agree on the same misreading. The integration checkpoint depends on both paired steps completing.
 
 ### Fix Cycle
 
-When tests fail after both paired steps complete:
+When tests fail at an integration checkpoint:
 
-1. Run the full test suite. Classify failures: new-test failures (implementation gap) vs pre-existing-test failures (regression introduced by the change).
-2. For new-test failures: the implementer updates production code until the tests pass. The test-engineer does not modify tests to accommodate buggy production code.
-3. For pre-existing-test failures (boy scout rule): the implementer fixes the pre-existing tests that the change broke, even if the tests predate the step. Leaving broken tests in the suite is never acceptable.
-4. Iterate until all tests pass. If an acceptance criterion genuinely cannot be met without changing the test, escalate to the planner — do not silently weaken the test.
+1. Run the full test suite. Classify failures: outer-loop (under `tests/acceptance/` or `tests/e2e/`), new inner-loop tests (implementation gap), and pre-existing tests (regression introduced by the change).
+2. For new-test failures: the implementer updates production code until the tests pass. A test-engineer never modifies tests to accommodate buggy production code.
+3. For pre-existing-test failures (boy scout rule): the implementer fixes the pre-existing tests that the change broke, even if the tests predate the step. This excludes the outer loop, which the implementer never edits, and excludes `pending` outer-loop nodes, which are not failures. Leaving broken tests in the suite is never acceptable.
+4. For an outer-loop failure that production code cannot satisfy without contradicting the spec: stop and route it as a Spec Question ([late path](#spec-question-routing)). Never edit, skip, xfail or weaken the test or its driver.
+5. Iterate until all tests pass. Any other test that genuinely cannot be satisfied without changing the test escalates to the planner — do not silently weaken it.
 
-### When to Skip
+### When to Pair
 
-The planner may skip paired test steps when:
-
-- Code is obvious wiring or configuration with no logic.
-- Framework-provided functionality (e.g., default CRUD behavior that the framework already tests).
-- Code that will be deleted in a later step of the same plan.
+Skip the paired test step for obvious wiring or configuration with no logic, framework-provided functionality, and code deleted later in the same plan. The inner-loop test the implementer writes still applies wherever the step carries logic.
 
 Cross-reference: the `software-planning` skill's "Testing in Plan Steps (BDD/TDD)" section covers the decision framework for when to pair tests with implementation.
+
+<a id="acceptance-design-stage"></a>
+## Acceptance-Design Stage
+
+At Standard and Full tier the outer loop is designed by the test-engineer in `Mode: acceptance-design`, between the architect's spec phase and its design phase. This section is the **authoritative** procedure and the authoritative input sets; `agents/test-engineer.md` carries the operational copy and `agents/verifier.md` names the input classes only.
+
+### Stage Order
+
+1. **Spec phase.** `systems-architect` in `Mode: spec` writes `## Goal`, `## Acceptance Criteria` and `## Behavioral Specification` (with `### Observable Surface`) into `SYSTEMS_PLAN.md`; every other required heading reads `[pending: design phase]`. It runs `extract_spec.py <slug>` until exit 0, which writes `.ai-work/<task-slug>/SPEC_EXTRACT.md`.
+2. **Gate.** The orchestrator runs `extract_spec.py <slug> --check` (exit 0 required) and records `HEAD` as the **Base commit**. Nothing tracked may change before this point: the researcher and the spec-mode architect write only under `.ai-work/`, so no design text exists anywhere the designer could read.
+3. **Acceptance design.** `test-engineer` in `Mode: acceptance-design`, spawned at `opus`, writes `ACCEPTANCE_TESTS.md` and RED tests under `tests/acceptance/` and `tests/e2e/` (drivers under a `drivers/` directory inside them).
+4. **AD commit.** The orchestrator commits the outer-loop files, test-only, by explicit pathspec.
+5. **Spec-Question round.** At most one, only when `## Spec Questions` is non-empty ([routing](#spec-question-routing)).
+6. **Design phase.** `systems-architect` resumes in `Mode: feature` (Phases 2–10) and reads `ACCEPTANCE_TESTS.md`: each Boundary Assumption is a consumer-driven contract that the design satisfies or challenges in `## Architecture`. The interface-designer and context-engineer architecture-stage shadows run as usual.
+7. **Planning and execution.** The planner reads `SYSTEMS_PLAN.md` and `ACCEPTANCE_TESTS.md`. Driver-binding steps (test-engineer, driver files only) precede any production step when a Boundary Assumption is unbound. Implementer steps follow, then the verifier.
+
+### Allowed and Forbidden Inputs
+
+Closed classes, so the Sources Read audit is a set-membership check.
+
+| Class | Allowed input |
+|---|---|
+| A1 spec | `.ai-work/<task-slug>/SPEC_EXTRACT.md`, the only spec input. It embeds the Key Signals, so `TASK_BRIEF.md` is not needed |
+| A2 public contract | `### Public Contract` subsections of `.ai-work/<task-slug>/INTERFACE_DESIGN.md`, when present |
+| A3 base commit | Repository files as of the Base commit: public entry points (CLI usage, command docs, routes, public API signatures, file-format docs), existing tests, manifests and runner config, archived specs under `.ai-state/specs/`. Read with `git show <base>:<path>`, or from the working tree when `git diff --quiet <base> -- <path>` holds |
+
+**Forbidden** — everything else, named explicitly so the audit is mechanical:
+
+- in `.ai-work/<task-slug>/`: `TASK_BRIEF.md` (it carries scope and design hints), `SYSTEMS_PLAN.md`, `SPEC_DELTA.md`, `RESEARCH_FINDINGS.md`, `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`, `CONTEXT_REVIEW.md`, `TRANSACTIONS_DESIGN.md`, `CONSULT_*.md`, `PRE_REFACTOR_PLAN.md`, `traceability.yml`, and `INTERFACE_DESIGN.md` outside `### Public Contract`;
+- `.ai-state/decisions/drafts/`;
+- any working-tree file that differs from the Base commit.
+
+Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** this section is authoritative; `agents/test-engineer.md` carries the operational copy (agents must be self-contained); `agents/verifier.md` carries the three class names only. A note at each site names the other two.
+
+### Sources Read Audit
+
+`ACCEPTANCE_TESTS.md` lists every input under `## Sources Read` (the extract with its digest, plus each A2 or A3 file with the reason it was read). The verifier fails the audit when the list is empty, lacks the extract, or names anything outside A1–A3.
+
+### Path Classes and the First Production Commit
+
+A pure function of the path; the first match wins, so every path lands in exactly one class:
+
+1. *outer-loop driver*: under `tests/acceptance/` or `tests/e2e/`, inside a `drivers/` directory
+2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`
+3. *inner-loop test*: the test-file globs of `rules/swe/testing-conventions.md` (`tests/**`, `test_*`, `*_test.*`, `*_spec.*`, `*.test.{ts,js}`, `*.spec.{ts,js}`, `conftest.py`)
+4. *state/doc*: `.ai-state/**`, `docs/**`
+5. *production*: everything else — in Praxion this includes agent, skill, rule and command Markdown, because they are the product
+
+The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a class-5 path. The AD commit must be strictly earlier; afterwards a scenario file changes only under a `Resolved in:` sha, and a driver file changes only in a test-only commit from a planned binding step.
+
+### Spec-Question Routing
+
+- **Round 0 (before design).** The orchestrator reads `## Spec Questions` after the acceptance-design return. An intent question goes to the user; a specification question (ambiguous requirement wording) goes to the architect (resume, `Mode: spec`), which answers by amending requirement text only — never design text — and reruns `extract_spec.py`. The test-engineer resumes, re-reads the extract, turns `withheld` scenarios into executable ones and sets the question's `Resolution:`. The orchestrator commits, still before any production commit.
+- **One round.** A question still open afterwards, or a new one the second pass raises, is escalated to the user at the architecture phase-transition checkpoint; the provisional scenario stands unless the user overrides it. There is no second automatic round.
+- **Late path (implementation time).** An implementer whose due outer-loop test cannot pass without contradicting the spec reports `[BLOCKED]` with the Spec Question (test node, requirement, conflict) in its return and under `WIP.md § Blockers`. Routing is as in round 0, but the architect's context is likely heavy, so expect a charged resume. The test-engineer resume records the question as raised by the implementer and fixes the scenario or confirms it; the orchestrator commits and records the commit sha as `Resolved in:`. A mismatch that is really a *design* change (a renamed flag, say) is not a Spec Question: the planner adds a driver-binding step.
+
+### Tiers
+
+| Tier | Behavior |
+|---|---|
+| Direct, Spike | None added. A bug fix still writes its failing regression test first |
+| Lightweight | Temporal-only: the orchestrator commits failing tests before any code — no stage, no `ACCEPTANCE_TESTS.md`. See `tier-templates.md § Lightweight Snippet` |
+| Standard, Full | The full stage. Skippable only through the **skipped form** of `ACCEPTANCE_TESTS.md` (`**Stage:** skipped — <specific reason>`, all five sections kept), e.g. every deliverable is a Markdown prompt with no drivable boundary. A generic reason is a verifier WARN. The orchestrator may write the skipped form itself without spawning — the schema binds the path, not the author |
+
+### Spawn Accounting, Routing and Commits
+
+- **Count, don't credit.** The acceptance designer is a charged spawn under the unchanged budgets ([Spawn Budget](#spawn-budget)). The offset is structural: unit tests moved to the implementer, so a plan no longer spends one test-engineer spawn per behavioral step.
+- **Resumes.** The architect's spec-to-design resume and Spec-Question resumes are free while the resumed context is below the heavy-context threshold, and are reported with their context size. A lost resume that forces a fresh `Mode: feature` spawn is charged.
+- **Routing.** Every acceptance-design spawn, resumes included, passes `model: opus` per spawn ([model routing policy](../../agent-crafting/references/model-routing-policy.md)); the agent's frontmatter tier is only the floor.
+- **Commit ownership.** The agents never commit. The orchestrator commits the outer-loop files by explicit pathspec in a test-only commit whose subject says so. A project whose pre-commit hook runs the test suite must exempt `tests/acceptance/` and `tests/e2e/` from it (their tests are RED by design); bypassing the hook with `--no-verify` is never silent — say so at the next checkpoint.
 
 ## Batched Improvement Execution
 
@@ -155,6 +238,8 @@ The Standard/Full envelope has two halves: the [artifact floor](artifact-invento
 | Full | ≤ 16 | same |
 
 A resume into a small context is free under the count, but it is not free: it is reported separately with its context size, because resumes are where a capped count hides its real cost.
+
+The [acceptance-design stage](#acceptance-design-stage) is a charged first start under the unchanged budgets, and so is a fresh `Mode: feature` architect spawn forced by a lost resume.
 
 ### Reading the count
 
@@ -611,24 +696,25 @@ Fragment files are deleted after a successful merge. For the full per-document-t
 This is the canonical ASCII depiction of the Praxion agent coordination pipeline. Extracted from the `swe-agent-coordination-protocol` rule to reduce always-loaded context while keeping the diagram on-demand for readers who want it.
 
 ```text
-promethean --> researcher ---------> systems-architect --> implementation-planner --+--> implementer    --+--> verifier
-              + context-engineer     + context-engineer    |                        |                     |
-                (shadow)               (shadow)            |                       +--> test-engineer  --+
-                                                           |                        |
-                                                           |                       +--> doc-engineer   --+
-                                                           |                            (when assigned)
-                                                           |
-                                                           +--> [Phase 2.5 emits PRE_REFACTOR_PLAN.md]
-                                                                |  same-worktree mini-pipeline:
-                                                                +--> test-engineer (characterization-first) --> implementer --> orchestrator-mediated verifier-vs-loopback
-                                                                                                                                 (one-pass; re-entry via post-refactor-adaptation mode)
-                                                                     sentinel (independent audit)
+promethean --> researcher ---------> systems-architect --> test-engineer ------> systems-architect --> implementation-planner --+--> implementer    --+--> verifier
+              + context-engineer     + context-engineer    (acceptance-design)   + context-engineer    |                        |                     |
+                (shadow)               (shadow)            opus, RED tests       + interface-designer  |                       +--> test-engineer  --+
+                                     [Mode: spec]                                [Mode: feature]       |                        |
+                                                                                                       |                       +--> doc-engineer   --+
+                                                                                                       |                            (when assigned)
+                                                                                                       |
+                                                                                                       +--> [Phase 2.5 emits PRE_REFACTOR_PLAN.md]
+                                                                                                            |  same-worktree mini-pipeline:
+                                                                                                            +--> test-engineer (characterization-first) --> implementer --> orchestrator-mediated verifier-vs-loopback
+                                                                                                                                                                             (one-pass; re-entry via post-refactor-adaptation mode)
+                                                                                                                 sentinel (independent audit)
 ```
 
 **Reading the diagram:**
 
 - Left-to-right arrows are pipeline handoffs via shared documents in `.ai-work/<task-slug>/`
 - `+ context-engineer (shadow)` indicates the context-engineer runs in parallel with that stage, appending to `CONTEXT_REVIEW.md`
+- The first `systems-architect` is the **spec phase** (`Mode: spec`), the `test-engineer` after it is **acceptance design** (`Mode: acceptance-design`, `opus`), and the second `systems-architect` is the **design phase** (`Mode: feature`, a resume of the first). No design text exists while acceptance design runs; see [Acceptance-Design Stage](#acceptance-design-stage). Skipped at Direct, Lightweight and Spike tiers, and through the skipped form of `ACCEPTANCE_TESTS.md` when the stage does not apply
 - `sentinel (independent audit)` is not part of the pipeline chain — it is a standalone read-only auditor invokable at any time
 - The parallel-implementer / test-engineer / doc-engineer group operates on disjoint file sets per BDD/TDD execution rules
 - The pre-refactor sub-pipeline branch (rooted at the architect's Phase 2.5) runs in the same worktree and rejoins the main flow at the verifier-or-loopback decision; deep-dive in [Pre-Refactor Sub-Pipeline & the Verifier-vs-Loopback Decision](#pre-refactor-sub-pipeline--the-verifier-vs-loopback-decision)

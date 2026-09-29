@@ -257,7 +257,19 @@ def _resolved_capabilities(tmp_path: Path, cwd: Path, *args: str) -> set[str]:
     (plugins / "installed_plugins.json").write_text(
         json.dumps({"praxion@bit-agora": {"version": "test"}}), encoding="utf-8"
     )
-    env = {**os.environ, "HOME": str(home), **_ISOLATED_GIT_ENV}
+    # ...and without a `claude` executable on PATH (absent on CI runners);
+    # `--no-launch` never calls it, so a no-op stub is enough.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    stub = bin_dir / "claude"
+    stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        **_ISOLATED_GIT_ENV,
+    }
     result = subprocess.run(
         ["bash", str(ONBOARD_SCRIPT), "--no-launch", *args],
         cwd=cwd,

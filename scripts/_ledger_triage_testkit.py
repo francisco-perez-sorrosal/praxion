@@ -113,6 +113,18 @@ def stub_locations(repo_root: Path) -> None:
             target.write_text("stub\n", encoding="utf-8")
 
 
+def _init_repo(repo_root: Path) -> None:
+    """`git init` with background maintenance off.
+
+    Git may start detached auto-maintenance after a commit; it writes
+    `.git/maintenance.lock` while a test is already deleting `.git`, which
+    fails the deletion under parallel load (seen on CI runners).
+    """
+    git_ok(repo_root, "init", "-q", "-b", "main")
+    git_ok(repo_root, "config", "maintenance.auto", "false")
+    git_ok(repo_root, "config", "gc.auto", "0")
+
+
 def build_fixture_repo(tmp_path: Path, variant: str = "base") -> Path:
     """A real, committed git repo seeded from the frozen `variant/` fixture.
 
@@ -126,7 +138,7 @@ def build_fixture_repo(tmp_path: Path, variant: str = "base") -> Path:
 
     repo_root = tmp_path / f"repo-{variant}"
     repo_root.mkdir(parents=True)
-    git_ok(repo_root, "init", "-q", "-b", "main")
+    _init_repo(repo_root)
     git_ok(repo_root, "config", "user.email", "test@example.com")
     git_ok(repo_root, "config", "user.name", "Test")
 
@@ -159,7 +171,7 @@ def one_row_repo(tmp_path: Path, notes: str, files: tuple[str, ...]) -> Path:
     """A committed repo holding `files` and one open row `td-902` with `notes`."""
     repo_root = tmp_path / "repo"
     (repo_root / ".ai-state").mkdir(parents=True)
-    git_ok(repo_root, "init", "-q", "-b", "main")
+    _init_repo(repo_root)
     row = (
         "| td-902 | suggested | other | code-to-goals | scripts/x.py | code-quality |  | "
         f"verifier | 2026-01-01 | 2026-01-01 | implementer | open |  | {notes} | 000000000000 |\n"

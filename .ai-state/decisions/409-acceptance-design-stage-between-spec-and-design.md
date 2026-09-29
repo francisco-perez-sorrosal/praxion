@@ -1,7 +1,8 @@
 ---
-id: dec-draft-752d9a05
+id: dec-409
+draft_id: dec-draft-752d9a05
 title: Independent acceptance-test design runs between the architect's spec phase and its design phase
-status: proposed
+status: accepted
 category: architectural
 date: 2026-09-28
 summary: "A new test-engineer mode, acceptance-design (Opus), designs acceptance, boundary-integration and end-to-end tests from a linted spec extract (new scripts/extract_spec.py → SPEC_EXTRACT.md) after the architect's new spec mode and before its design phase, so no new design exists when the tests are designed; the implementer takes over unit tests; the planner plans from the design plus ACCEPTANCE_TESTS.md."

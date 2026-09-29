@@ -1,7 +1,8 @@
 ---
-id: dec-draft-93cfaad9
+id: dec-410
+draft_id: dec-draft-93cfaad9
 title: Outer-loop reverse barrier and provenance without a hook — driver layer, owning steps, pending accounting, verifier history checks
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-28
 summary: "Outer-loop tests split into scenario files and a drivers/ layer; each scenario test has one owning plan step (a new Read-only field) and failing tests owned by a later step are reported as pending= rather than fail=; the planner projects ACCEPTANCE_TESTS.md scenarios into a new additive acceptance: traceability key and coverage reads tests ∪ acceptance; the verifier proves declared sources, commit order (outer-loop tests before the first production commit) and coverage from the artifact and git history."
@@ -25,7 +26,7 @@ affected_reqs: [REQ-11, REQ-12, REQ-13, REQ-14, REQ-15, REQ-19]
 
 ## Context
 
-dec-draft-752d9a05 places independent acceptance design before planning. The user ruled out a blocking hook for now (decision 6: contract plus verifiable provenance first) and fixed three enforcement surfaces:
+dec-409 places independent acceptance design before planning. The user ruled out a blocking hook for now (decision 6: contract plus verifiable provenance first) and fixed three enforcement surfaces:
 
 - a `## Sources Read` section;
 - a verifier check that outer-loop tests were committed before any production code;

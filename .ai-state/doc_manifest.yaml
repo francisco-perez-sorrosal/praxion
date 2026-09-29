@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-09-28T15:51:15Z'
+generated_at: '2026-09-29T14:34:21Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-09-28'
+  last_modified: '2026-09-29'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-09-28'
+  last_modified: '2026-09-29'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-09-28'
+  last_modified: '2026-09-29'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3017,6 +3017,18 @@ surfaces:
   title: "Testing philosophy \u2014 ten principles, scope \xD7 size axes, outer/inner-loop ownership, five feedback loops"
   last_modified: '2026-09-28'
   renderer: adr_card
+- id: ai-state-decisions-409-acceptance-design-stage-between-spec-and-design
+  path: .ai-state/decisions/409-acceptance-design-stage-between-spec-and-design.md
+  type: markdown
+  title: Independent acceptance-test design runs between the architect's spec phase and its design phase
+  last_modified: '2026-09-29'
+  renderer: adr_card
+- id: ai-state-decisions-410-outer-loop-provenance-and-reverse-barrier
+  path: .ai-state/decisions/410-outer-loop-provenance-and-reverse-barrier.md
+  type: markdown
+  title: "Outer-loop reverse barrier and provenance without a hook \u2014 driver layer, owning steps, pending accounting, verifier history checks"
+  last_modified: '2026-09-29'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3735,6 +3747,8 @@ groups:
   - ai-state-decisions-406-derived-test-selection-retires-topology
   - ai-state-decisions-407-onboarding-tests-capability
   - ai-state-decisions-408-testing-philosophy-principles-and-loops
+  - ai-state-decisions-409-acceptance-design-stage-between-spec-and-design
+  - ai-state-decisions-410-outer-loop-provenance-and-reverse-barrier
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

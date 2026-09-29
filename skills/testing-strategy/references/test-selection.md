@@ -107,6 +107,19 @@ A plan step's `Tests:` field, when present, overrides the derived selection: `Te
 
 `audit_tests.py` closes the loop between "what did selection run" and "what should have run": given a junit file with failures and the change set that produced it, it classifies each failure as `selected`, `widened`, `missed`, or `unattributable`, names a `suggested_edge` for every `missed`, and exits `1` when anything is missed. With a rerun junit file, a failure that flips to pass is classified `flaky` instead of `real`. `--slow N` reports the top-N slowest tests. This is the mechanism that lets selection stay derived rather than hand-audited — a miss is a concrete, closeable finding, not a vague worry about coverage.
 
+## Selection-Size Baseline
+
+Measured 2026-09-29 on Praxion itself: the resolver at `90cbdc2a` run over the change sets of the 50 preceding non-merge commits, root pocket only. The corpus is 267 test files. The dependency graph is today's, not the graph as it stood at each commit.
+
+| Measure | Value |
+|---|---|
+| Widened to the full suite | 9 of 50 commits (18%) |
+| Median / p90 selection, narrow runs only (41) | 96 / 197 files (36% / 74%) |
+| Median / p90 selection, widened runs counted as 267 | 120 / 267 files (45% / 100%) |
+| Edge attribution across narrow selections | path-literal 63%, declared 33%, import 4% |
+
+The refresh plan's risk trigger ("restrict production path-literal edges if the median selection exceeds 25% of the corpus") **fires**: the narrow median is 36%. Removing path-literal edges would drop at most 44 files from the median narrow selection, roughly 19% of the corpus. That is an upper bound, because `via` names only the first source that connects a test, so some of those files are also reached through a declared edge. Re-measure with the same method before and after any change to the edge sources.
+
 ## The Five Loops — Operational Copy
 
 The doctrine copy of this table lives in [SKILL.md § The Five Loops](../SKILL.md#the-five-loops). This copy adds the exact command per loop.

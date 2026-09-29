@@ -10,14 +10,14 @@ Read the canonical traceability source for a feature's behavioral specification 
 
 1. **Locate the spec and traceability source** based on pipeline state:
    - If `$ARGUMENTS` points to an archived SPEC (`.ai-state/specs/SPEC_*.md`), read its `## Traceability` section directly — this is the frozen post-archive state.
-   - Otherwise, look for `.ai-work/<task-slug>/SYSTEMS_PLAN.md` across task-scoped subdirectories (most recently modified if multiple exist). The traceability source is `.ai-work/<task-slug>/traceability.yml` in the same task directory. In parallel mode, read both `traceability_implementer.yml` and `traceability_test-engineer.yml` and merge per-REQ (tests and implementation arrays union).
+   - Otherwise, look for `.ai-work/<task-slug>/SYSTEMS_PLAN.md` across task-scoped subdirectories (most recently modified if multiple exist). The traceability source is `.ai-work/<task-slug>/traceability.yml` in the same task directory. In parallel mode, read both `traceability_implementer.yml` and `traceability_test-engineer.yml` and merge per-REQ (union of every list-valued key: `tests`, `implementation`, `acceptance`).
    - If neither an archived SPEC nor an active pipeline with `SYSTEMS_PLAN.md` can be found, report "No behavioral specification found" and stop.
 
 2. **Extract REQ IDs** from the spec (archived or in-flight): find all `### REQ-NN:` headings in the `## Behavioral Specification` (or `## Requirements`) section. For each, extract the ID and title.
 
 3. **Read traceability**:
    - **Archived mode**: parse the `## Traceability` Markdown table from the archived SPEC; each row gives the REQ, test(s), implementation, and status.
-   - **In-flight mode**: parse the YAML `requirements:` mapping. For each REQ key, read `tests:` (list of `<file>::<func>` entries; empty or absent means UNTESTED) and `implementation:` (list of `<file>::<func>` entries; empty or absent means no implementation yet).
+   - **In-flight mode**: parse the YAML `requirements:` mapping. For each REQ key, read `tests:` and `acceptance:` (outer-loop nodes; optional, absent is valid), both lists of `<file>::<func>` entries, and `implementation:` (empty or absent means no implementation yet). A REQ counts as tested when `tests:` and `acceptance:` together are non-empty (union coverage: `skills/spec-driven-development/SKILL.md`, "Union coverage").
 
 4. **Output the coverage table**:
 
@@ -34,10 +34,12 @@ Read the canonical traceability source for a feature's behavioral specification 
 ```
 
 Status values:
-- **COVERED** — both `tests:` and `implementation:` populated in `traceability.yml`, or PASS in the archived SPEC matrix
-- **UNTESTED** — `implementation:` populated but `tests:` empty/absent
-- **MISSING** — neither populated; REQ is not yet started
-- **TEST-ONLY** — `tests:` populated but `implementation:` empty (TDD in progress, pre-integration)
+Below, "tested" means `tests:` or `acceptance:` is non-empty. The `Tests` cell lists the nodes of both keys.
+
+- **COVERED** — tested and `implementation:` populated in `traceability.yml`, or PASS in the archived SPEC matrix
+- **UNTESTED** — `implementation:` populated but neither `tests:` nor `acceptance:` has an entry
+- **MISSING** — nothing populated; REQ is not yet started
+- **TEST-ONLY** — tested but `implementation:` empty (TDD in progress, pre-integration)
 
 5. **Flag gaps**: If any requirement is UNTESTED or MISSING, list it as an action item:
    - "REQ-02: needs test coverage — add a behavioral test and record the mapping in `traceability.yml`"

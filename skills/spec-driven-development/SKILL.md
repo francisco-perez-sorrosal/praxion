@@ -77,6 +77,12 @@ The `and` clause is optional -- omit it when no precondition is needed. The `so 
 - **Not EARS** -- EARS behavior type classifications (ubiquitous, event-driven, state-driven) add formalism the ecosystem does not need. The structured fields capture the same information without requiring classification knowledge.
 - **Not Given/When/Then** -- GWT couples to BDD test frameworks (Behave, Cucumber) that may not match the project's test stack. The `so that` clause serves the same purpose as GWT's `Then` without implying a specific test runner.
 
+**Requirement text is design-free.** Write what an outside observer sees, in plain words: no code spans, file paths, module or function names, flags, or type names. Whoever designs tests from the spec alone (`Mode: acceptance-design`) reads it through `scripts/extract_spec.py`, which lints exactly this; its docstring is the only home of the lint rules.
+
+### Observable Surface
+
+A `### Observable Surface` subsection under `## Behavioral Specification` declares the names a requirement may cite because they are already public or fixed by the user: an existing command, a shipped file, a user-stated flag. A name the architect would invent stays out of the spec. Format: [references/spec-format-guide.md](references/spec-format-guide.md#observable-surface).
+
 --> See [references/spec-format-guide.md](references/spec-format-guide.md) for full examples, edge cases, and detailed format comparisons.
 
 ## Requirement ID Conventions
@@ -99,6 +105,8 @@ The `and` clause is optional -- omit it when no precondition is needed. The `so 
 
 Status values: `PASS` (test exists and passes), `FAIL` (test fails or implementation missing), `UNTESTED` (no test recorded in `traceability.yml` for this requirement).
 
+**Union coverage.** A requirement counts as tested when `tests` and `acceptance` together are non-empty: a requirement proven only by outer-loop tests is tested, and one with `tests` only is unchanged. The matrix header stays as shown; the `Test(s)` cell lists both kinds of node. `/sdd-coverage`, the verifier, the planner's checkpoints and archival status all classify on this union, stated here once.
+
 **Mid-flight coverage**: The `/sdd-coverage` command reads `traceability.yml` (during pipeline) or the archived SPEC's matrix (post-archive) and produces this table at any time during development — not just at verification. The test-engineer also includes a coverage check when reporting step completion. Use these to catch gaps early rather than discovering them at the verifier stage.
 
 ## Traceability Threading
@@ -108,7 +116,9 @@ REQ IDs flow through the pipeline in six stages via an **external two-layer mech
 ```text
 1. Architect creates    --> REQ-01..REQ-NN in SYSTEMS_PLAN.md Behavioral Specification
 2. Planner threads      --> "Validates REQ-01, REQ-03" in test step Testing fields;
-                            initializes empty .ai-work/<slug>/traceability.yml
+                            initializes .ai-work/<slug>/traceability.yml, seeding each
+                            REQ's `acceptance:` from ACCEPTANCE_TESTS.md (the acceptance
+                            designer never touches traceability.yml)
 3. Test-engineer writes --> tests with behavioral names; appends REQ-to-test entries
                             to traceability.yml (or traceability_test-engineer.yml fragment)
 4. Implementer writes   --> production code with behavioral names; appends REQ-to-impl
@@ -129,6 +139,8 @@ requirements:
     tests:
       - tests/auth/test_session.py::test_expired_token_returns_401
       - tests/auth/test_session.py::test_grace_period_allows_refresh
+    acceptance:   # outer-loop test nodes; writer: the planner, seeded from ACCEPTANCE_TESTS.md
+      - tests/acceptance/test_sessions.py::test_expired_session_is_refused
     implementation:
       - src/auth/session.py::validate()
       - src/auth/session.py::refresh_grace_period()
@@ -138,9 +150,9 @@ requirements:
       - src/auth/audit.py::log_attempt()
 ```
 
-Absent `tests:` list (or empty list) means UNTESTED. Absent `implementation:` list means no implementation yet (pre-integration). An absent REQ key entirely means neither test nor implementation exists for that REQ.
+Absent `tests:` list (or empty list) means UNTESTED, unless `acceptance:` is non-empty (see Union coverage above). Absent `acceptance:` is valid and changes nothing. Absent `implementation:` list means no implementation yet (pre-integration). An absent REQ key entirely means neither test nor implementation exists for that REQ.
 
-**Parallel fragments**: `traceability_implementer.yml`, `traceability_test-engineer.yml`. Reconciliation is a per-REQ merge of `tests` and `implementation` arrays — no conflicts by construction because the two agents write to disjoint fields within each REQ key. The implementation-planner performs the merge at batch completion.
+**Parallel fragments**: `traceability_implementer.yml`, `traceability_test-engineer.yml`. Reconciliation is a per-REQ merge of every list-valued key (`tests`, `implementation`, `acceptance`) — no conflicts by construction because the writers own disjoint fields within each REQ key. The implementation-planner performs the merge at batch completion.
 
 ### Bidirectional REQ↔Architectural-Element Traceability
 

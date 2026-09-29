@@ -108,6 +108,36 @@ When **no** REQ in the file carries `architectural_elements:`, the matrix render
 
 --> See `SKILL.md`'s Bidirectional Traceability section for the convention's two surfaces (LikeC4 element metadata and SPEC frontmatter).
 
+## Acceptance Edges — the `acceptance:` Key
+
+`traceability.yml` supports an optional `acceptance:` key per REQ, listing the outer-loop test nodes (`tests/acceptance/` or `tests/e2e/`) that prove the requirement from outside. The planner writes it, seeded from `ACCEPTANCE_TESTS.md`; the test-engineer's `tests:` key keeps holding the inner-loop tests. Absence is back-compatible — a file without `acceptance:` reads exactly as before.
+
+```yaml
+requirements:
+  REQ-01:
+    tests:
+      - tests/auth/test_session.py::test_expired_token_returns_401
+    acceptance:                # OPTIONAL — outer-loop test nodes
+      - tests/acceptance/test_sessions.py::test_expired_session_is_refused
+    implementation:
+      - src/auth/session.py::validate()
+```
+
+Coverage counts `tests` and `acceptance` together (union semantics: [`SKILL.md`](../SKILL.md#requirement-id-conventions), "Union coverage"). The matrix header is unchanged in every example above; the `Test(s)` cell lists the nodes of both keys, `(none)` only when both are empty.
+
+## Observable Surface
+
+A requirement is written for an outside observer, so it names nothing the architect decides. When a requirement must cite a name anyway because it is already public or the user fixed it, declare the name under `### Observable Surface`, a subsection of `## Behavioral Specification`, as a list item with the name in backticks:
+
+```markdown
+### Observable Surface
+
+- `/sdd-coverage` — the existing coverage command
+- `--check` — the flag the user asked for
+```
+
+Declare only names that exist independently of this feature's design. A name the architect would invent stays out of the spec: rephrase the requirement in plain words instead. The lint that enforces this, its rules and its golden bad and good tokens live only in the docstring of `scripts/extract_spec.py`; this guide does not restate them.
+
 ## Persistent Spec Template
 
 Archived to `.ai-state/specs/SPEC_<feature-name>_YYYY-MM-DD.md` during the end-of-feature workflow.

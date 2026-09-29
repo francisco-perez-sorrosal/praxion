@@ -191,7 +191,7 @@ A pure function of the path; the first match wins, so every path lands in exactl
 
 1. *outer-loop driver*: under `tests/acceptance/` or `tests/e2e/`, inside a `drivers/` directory
 2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`
-3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file under a `tests/`, `test/`, `spec/` or `__tests__/` directory. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production
+3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file with a `tests/`, `test/`, `spec/` or `__tests__/` directory segment at any depth. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production. In Praxion, `claude/project-baseline/tests/` is shipped product and belongs to class 5, not here
 4. *state/doc*: `.ai-state/**`, `docs/**`
 5. *production*: everything else — in Praxion this includes agent, skill, rule and command Markdown, because they are the product
 
@@ -201,7 +201,7 @@ The **first production commit** is the earliest commit in `<Base commit>..HEAD` 
 
 - **Round 0 (before design).** The orchestrator reads `## Spec Questions` after the acceptance-design return. An intent question goes to the user; a specification question (ambiguous requirement wording) goes to the architect (resume, `Mode: spec`), which answers by amending requirement text only — never design text — and reruns `extract_spec.py`. The test-engineer resumes, re-reads the extract, turns `withheld` scenarios into executable ones and sets the question's `Resolution:`. The orchestrator commits, still before any production commit.
 - **One round.** A question still open afterwards, or a new one the second pass raises, is escalated to the user at the architecture phase-transition checkpoint; the provisional scenario stands unless the user overrides it. There is no second automatic round.
-- **Late path (implementation time).** An implementer whose due outer-loop test cannot pass without contradicting the spec reports `[BLOCKED]` with the Spec Question (test node, requirement, conflict) in its return and under `WIP.md § Blockers`. Routing is as in round 0, but the architect's context is likely heavy, so expect a charged resume. The test-engineer resume records the question as raised by the implementer and fixes the scenario or confirms it; the orchestrator commits and records the commit sha as `Resolved in:`. A mismatch that is really a *design* change (a renamed flag, say) is not a Spec Question: the planner adds a driver-binding step.
+- **Late path (implementation time).** An implementer whose due outer-loop test cannot pass without contradicting the spec reports `[BLOCKED]` with the Spec Question (test node, requirement, conflict) in its return and under `WIP.md § Blockers`. Routing is as in round 0 except that the architect answers from its `Mode: feature` resume, whose context is likely heavy, so expect a charged resume. The test-engineer resume records the question as raised by the implementer and fixes the scenario or confirms it; the orchestrator commits and records the commit sha as `Resolved in:`. A mismatch that is really a *design* change (a renamed flag, say) is not a Spec Question: the planner adds a driver-binding step.
 
 ### Tiers
 
@@ -209,7 +209,7 @@ The **first production commit** is the earliest commit in `<Base commit>..HEAD` 
 |---|---|
 | Direct, Spike | None added. A bug fix still writes its failing regression test first |
 | Lightweight | Temporal-only: the orchestrator commits failing tests before any code — no stage, no `ACCEPTANCE_TESTS.md`. See `tier-templates.md § Lightweight Snippet` |
-| Standard, Full | The full stage, when `SYSTEMS_PLAN.md` carries `### Observable Surface` (the spec-mode marker). A pipeline that started before the stage existed records the skipped form with the reason "predates the acceptance-design stage" and is not failed for it. Skippable only through the **skipped form** of `ACCEPTANCE_TESTS.md` (`**Stage:** skipped — <specific reason>`, all five sections kept), e.g. every deliverable is a Markdown prompt with no drivable boundary. A generic reason is a verifier WARN. The orchestrator may write the skipped form itself without spawning — the schema binds the path, not the author |
+| Standard, Full | The full stage. A pipeline that started before the stage existed records the skipped form with the reason "predates the acceptance-design stage"; without that artifact the verifier fails it. Skippable only through the **skipped form** of `ACCEPTANCE_TESTS.md` (`**Stage:** skipped — <specific reason>`, all five sections kept), e.g. every deliverable is a Markdown prompt with no drivable boundary. A generic reason is a verifier WARN. The orchestrator may write the skipped form itself without spawning — the schema binds the path, not the author |
 
 ### Spawn Accounting, Routing and Commits
 

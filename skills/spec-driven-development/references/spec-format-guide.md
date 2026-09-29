@@ -110,7 +110,7 @@ When **no** REQ in the file carries `architectural_elements:`, the matrix render
 
 ## Acceptance Edges — the `acceptance:` Key
 
-`traceability.yml` supports an optional `acceptance:` key per REQ, listing the outer-loop test nodes (`tests/acceptance/` or `tests/e2e/`) that prove the requirement from outside. The planner writes it, seeded from `ACCEPTANCE_TESTS.md`; the test-engineer's `tests:` key keeps holding the inner-loop tests. Absence is back-compatible — a file without `acceptance:` reads exactly as before.
+`traceability.yml` supports an optional `acceptance:` key per REQ, listing the outer-loop test nodes (`tests/acceptance/` or `tests/e2e/`) that prove the requirement from outside. The planner writes it, seeded from `ACCEPTANCE_TESTS.md`; the `tests:` key, written by the implementer, keeps holding the inner-loop tests. Absence is back-compatible — a file without `acceptance:` reads exactly as before.
 
 ```yaml
 requirements:

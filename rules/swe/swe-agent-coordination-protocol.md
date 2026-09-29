@@ -68,9 +68,9 @@ Full per-agent checklists (systems-architect, implementation-planner, implemente
 
 Spawn agents without waiting for the user to ask:
 
-- Complex feature --> `researcher` then `systems-architect` (skip researcher if codebase context suffices)
+- Complex feature --> `researcher` (skip if codebase context suffices), then `systems-architect` spec phase, then `test-engineer` acceptance design (most capable tier; [stage](../../skills/software-planning/references/coordination-details.md#acceptance-design-stage)), then the architect's design phase
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
-- Plan ready --> `test-engineer` then `implementer` per paired step **at Standard/Full only**; both done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, the implementer's own test sub-step suffices — don't spawn `test-engineer`
+- Plan ready --> `implementer` per step, **owning its unit tests** (acceptance tests are read-only to it); done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, don't spawn `test-engineer`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group
@@ -98,7 +98,7 @@ Agents communicate through shared documents, not direct invocation — see [coor
 | Return contract | A subagent's final message is a **pointer, not a payload**: a terse summary (≤ ~15 lines) + its `.ai-work/<task-slug>/` artifact path — never the artifact body, and the orchestrator never solicits the artifact body inline. The orchestrator delegates for summaries and reads an artifact only when it needs the detail. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#agent-return-contract). |
 | Completion handshake | Trust a subagent return only if it carries a recognized terminal marker (`[COMPLETE]`/`[BLOCKED]`/`[CONFLICT]`/`[PARTIAL]`) **and** the durable artifact agrees (step's `WIP.md` checkbox flipped). A missing or contradicted marker is a **suspected truncation**: do **not** advance and do **not** re-run from scratch — re-derive completion from ground truth (codebase + `git diff` + tests, never the checkboxes), then mark verified-done work complete or re-spawn the unfinished remainder. Operationalized by `scripts/reconcile_pipeline_state.py` + `/resume-pipeline`; every auto-recovery is logged to `RECOVERY_LOG.md` and surfaced to the user. Deep-dive: [agent-pipeline-details.md](../../skills/software-planning/references/agent-pipeline-details.md#completion-handshake-truncation-detection). |
 | Do not skip stages | Research before architecture (unless codebase context suffices); re-invoke upstream when downstream input is incomplete |
-| BDD/TDD execution | Paired test + implementation steps, test-first; tests run until green |
+| BDD/TDD execution | Acceptance tests designed first; implementer writes unit tests test-first; paired test steps for risky logic; tests run until green |
 | Batched improvements | Evaluate independence; execute via the Classify / Pair-spawn / Sequence / Full-suite-gate procedure |
 | Context-engineer shadowing | Context artifacts touched → context-engineer shadows researcher/systems-architect, appending to cumulative `CONTEXT_REVIEW.md` — [deep-dive](../../skills/software-planning/references/coordination-details.md#context-engineer-shadowing). |
 | Context-engineer scope | 1 artifact → direct invocation at any stage; 3+ artifacts or restructuring → full pipeline under planner supervision — same deep-dive as above. |

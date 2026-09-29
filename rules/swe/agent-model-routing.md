@@ -33,7 +33,7 @@ Aliases for `opus`/`sonnet` (they track the newest generation — Opus 5 / Sonne
 | `discipline-consultant` | H | `opus` | Adversarial specialist judgment against a draft; frontmatter floor is `sonnet` so a `routine` consult can route down — the only sanctioned downgrade |
 | `implementation-planner` | M | `sonnet` | Feature-scoped decomposition |
 | `implementer` | M | `sonnet` | Single-step execution; step-H/L override |
-| `test-engineer` | M | `sonnet` | Per-step judgment paired with implementer |
+| `test-engineer` | M | `sonnet` | Outer-loop test judgment; acceptance-design mode spawns at `opus` |
 | `context-engineer` | M | `sonnet` | Placement, conflict detection |
 | `researcher` | M | `sonnet` | Default; modes route up or down |
 | `cicd-engineer` | M | `sonnet` | Pipeline design, security review |

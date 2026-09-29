@@ -4,7 +4,7 @@ Detailed templates for WIP.md and LEARNINGS.md, plus the end-of-feature workflow
 
 ## IMPLEMENTATION_PLAN.md Annotated Example
 
-Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation_planmd-structure) with the annotations the [`implementation-planner`](../../../agents/implementation-planner.md) agent layers on during step decomposition: `[parallel-group: X]`, per-step `Assignee`, a paired implementer/test-engineer group, an integration checkpoint, and a `[Phase: Refactoring]` step.
+Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation_planmd-structure) with the annotations the [`implementation-planner`](../../../agents/implementation-planner.md) agent layers on during step decomposition: `[parallel-group: X]`, per-step `Assignee`, a paired implementer/test-engineer group, a driver-binding step, an implementer step carrying `Read-only:`, an integration checkpoint, and a `[Phase: Refactoring]` step.
 
 ```markdown
 ## Steps
@@ -24,7 +24,22 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 **Files**: [test files]
 **Done when**: Tests written, runnable (expected to fail until implementation lands)
 
-### Step 3: [Integration checkpoint after group A]
+### Step 3: Bind the drivers for [surface] to the real interface [parallel-group: B]
+
+**Assignee**: test-engineer
+**Implementation**: Connect each surface the outer-loop tests need to the real interface, in the outer-loop `drivers/` layer, before any production step
+**Files**: [driver files]
+**Done when**: Drivers import and the outer-loop tests collect (they still fail until the implementer steps land)
+
+### Step 4: [One sentence description] [parallel-group: C]
+
+**Assignee**: implementer
+**Implementation**: What code will we write?
+**Files**: [production files and unit-test files — never outer-loop test files]
+**Read-only**: [outer-loop test nodes this step must turn green]
+**Done when**: The `Read-only:` nodes pass, with no edit to any outer-loop file
+
+### Step 5: [Integration checkpoint after group C]
 
 **Assignee**: implementer
 **Implementation**: Run full test suite, fix failures (new tests + pre-existing broken tests)
@@ -47,6 +62,8 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 
 - `full — <reason>` — force the full suite for this step.
 - `<path> [<path> ...] — <reason>` — force these explicit paths, bypassing derivation.
+
+**`Read-only:` field — canonical schema.** Optional; present on an implementer step whose work turns outer-loop tests green. It lists the outer-loop test nodes (under `tests/acceptance/` or `tests/e2e/`) the step must make pass. The implementer runs them and edits no outer-loop file, listed or not. Each scenario node in `ACCEPTANCE_TESTS.md` appears in exactly one step's `Read-only:` field (planner invariant; the verifier cross-checks it). Keep it off `**Files**:`: `reconcile_pipeline_state.py` parses `Files:` to attribute git changes to steps, and a read-only node is not a change. The stage that produces the nodes: `coordination-details.md § Acceptance-Design Stage`.
 
 There is no `groups=`/`tier=`/`selector=` schema — that topology-era field retired with the hand-maintained topology. This is the single canonical statement of the `Tests:` field; other references (`SKILL.md`, `agent-pipeline-details.md`) point here rather than restate it.
 

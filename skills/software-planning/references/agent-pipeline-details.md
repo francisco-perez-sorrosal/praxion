@@ -28,6 +28,7 @@ When an agent encounters work outside its boundary, it flags the need and recomm
 | Multi-source research, architecture 3+ components, large feature decomposition | Agent |
 | Ecosystem audit or 3+ context artifacts | `context-engineer` or `sentinel` |
 | Complex test design, test suite refactoring, testing infrastructure setup | `test-engineer` |
+| Designing the outer-loop acceptance tests from the spec, before any design exists (Standard/Full) | `test-engineer` in `Mode: acceptance-design` — stage detail: `coordination-details.md § Acceptance-Design Stage` |
 | Post-implementation quality review | `verifier` |
 | Documentation scope assessment, post-implementation doc updates, cross-reference fixes | `doc-engineer` |
 | Feature-level ideation from project state | `promethean` |
@@ -287,7 +288,7 @@ Status: in-progress
 ```markdown
 ## Step N — <one-line description>
 Command: `<runner> pytest <scope> -q --tb=short -rf`
-Result: pass=<n> fail=<n> skip=<n>
+Result: pass=<n> fail=<n> skip=<n> [pending=<n>]
 Duration: <s>s
 Selection: derived files=<n> | widened reason=<r> | override <full|paths> reason="<text>"   # optional
 Audit: missed=<n> flaky=<n>                                                                  # optional, integration checkpoints only
@@ -302,6 +303,7 @@ Green (`fail=0`, no `error=`>0, and `pass=` above zero): nothing after the lines
 - **Blocks.** Only a `## Step <id>` heading opens a step block; `<id>` may carry a letter suffix (`1b`, `12c`). Sub-headings (`### Failures`, `### Lint / format`) stay inside their step's block. A heading-only anchor (no `Result:` line) produces no finding.
 - **`Result:` keys.** `pass=`, `fail=`, `skip=`, optional `error=`. `pass=0` is **never green** — an all-zero line above a `### Failures` block is a collection error, not a pass. A `Result:` line without `key=<n>` counts (`Result: 23 passed`) is malformed and never green.
 - **`preexisting=<n>`** records baseline failures still red: `fail=` counts only non-baseline failures, `preexisting=` never changes the status, and it may exceed `fail=`. Each pre-existing failure still needs its own disposition (fix or a tech-debt row).
+- **`pending=<n>`** counts failing outer-loop tests (`tests/acceptance/`, `tests/e2e/`) whose owning step — the one whose `Read-only:` field lists them — has not run yet. `fail=` excludes them, so an intermediate run reports honestly instead of looking broken; `pending=` never changes the status and the implementer never "fixes" a pending test. It must read `pending=0` at the final integration checkpoint (verifier check). The parser ignores the key as an additive unknown (see `scripts/_step_schema.py`), so no code change carries it. The `Read-only:` schema: [`document-templates.md`](document-templates.md).
 - **`Result: none`** declares a block that ran no tests (a measurement or review step); it is never green, and an oversized one is reported as `no-run-over-ceiling`.
 - **Per-step status.** Each step is judged by its own latest run, never by the file's last line. An own red run is cleared by any green run recorded later in document order (the RED→GREEN pair a test-first step and its partner leave behind); a later malformed or `Result: none` line never clears it. A step with no run of its own falls back to the file's latest run. Declared limits: an unrelated later green also clears an earlier red; a RED test-authoring step recorded after its GREEN partner (step N+1 behind step N) stays red until that test step records its own green run, so the test-engineer re-runs and records its tests once the partner lands; and text before the first step heading is not read.
 

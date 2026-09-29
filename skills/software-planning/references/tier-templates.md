@@ -41,7 +41,7 @@ Example (architect → planner): `<task-slug>` = `payment-api`, `<tier>` = `Stan
 
 ## Full-Tier Parallel Scaffold (implementer ∥ test-engineer)
 
-Use when the planner assigns paired steps with disjoint file sets. Spawn both instances in the same turn; each receives the same slug but distinct step numbers and fragment files.
+Use when the planner assigns an optional paired step (risky logic, property or contract tests) with disjoint file sets. Spawn both instances in the same turn; each receives the same slug but distinct step numbers and fragment files.
 
 ```markdown
 You are the <agent-role> for the `<task-slug>` pipeline (tier: Full).
@@ -77,6 +77,7 @@ Return findings in your response (no file); cite paths.
 
 - **Criteria-first, in one line** — at Direct and Lightweight tiers there is no `WIP.md` / `SYSTEMS_PLAN.md` acceptance-criteria / `traceability.yml` machinery (those only run at Standard/Full). The stand-in: *before touching code*, state in one line what "done" looks like as a testable assertion — *"`parse_config` returns a `Config` for valid YAML and raises `ConfigError` naming the offending key for invalid"*, not "make it work". For multi-step work, list the steps with a `→ verify: <check>` per step. Same verify-before-done discipline, no ceremony.
 - **No `TEST_RESULTS.md`** — Lightweight test runs use whatever test command the project defines; the canonical handoff artifact is created only when work escalates to Standard.
+- **Temporal-only acceptance tests** — the Standard/Full acceptance-design stage (`coordination-details.md § Acceptance-Design Stage`) does not run at Lightweight: no stage, no `ACCEPTANCE_TESTS.md`. What survives is the ordering. Before any code, the orchestrator writes failing tests from the `TASK_BRIEF.md` Key Signals and commits them alone, with a subject that says `temporal-only`. Test-first order holds; independence from the design does not, since the orchestrator has already seen the code's neighbourhood — the subject line records that honestly.
 - **Architecture-doc update on structural change** — Lightweight respects the same `.ai-state/DESIGN.md` / `docs/architecture.md` update expectation as Standard when the change is structural; trivial-bug Lightweight work does not trigger doc edits.
 - **Mid-task escalation, not silent scope-creep** — when scope grows past 3 files or starts requiring architect/planner input, stop and re-scope to Standard rather than expanding silently. Escalation is a controlled transition; the new tier inherits the work-in-progress and the calibration log records both the original tier and the escalation.
 

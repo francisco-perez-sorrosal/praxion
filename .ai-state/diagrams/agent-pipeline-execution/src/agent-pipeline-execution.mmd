@@ -13,7 +13,11 @@ sequenceDiagram
     Main->>Main: EnterWorktree
     Main->>Res: Explore codebase + external docs
     Res-->>Main: RESEARCH_FINDINGS.md
-    Main->>Arch: Design system
+    Main->>Arch: Spec phase (Mode: spec)
+    Arch-->>Main: Spec sections + SPEC_EXTRACT.md
+    Main->>Test: Acceptance design (from the extract alone)
+    Test-->>Main: ACCEPTANCE_TESTS.md + RED outer-loop tests
+    Main->>Arch: Design phase (Mode: feature)
     Arch-->>Main: SYSTEMS_PLAN.md + ADRs
     Main->>Plan: Decompose into steps
     Plan-->>Main: IMPLEMENTATION_PLAN.md + WIP.md

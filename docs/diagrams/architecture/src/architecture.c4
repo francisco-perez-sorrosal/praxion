@@ -119,6 +119,8 @@ model {
       // Pipeline documents — first-class elements so handoff edges are addressable.
       doc_idea        = document "IDEA_PROPOSAL.md"        { description "promethean output" }
       doc_research    = document "RESEARCH_FINDINGS.md"    { description "researcher output; carries CIS section" }
+      doc_spec_extract = document "SPEC_EXTRACT.md"        { description "spec-only extract written by extract_spec.py; sole input of acceptance design" }
+      doc_acceptance  = document "ACCEPTANCE_TESTS.md"     { description "test-engineer acceptance-design output; RED outer-loop tests" }
       doc_systems     = document "SYSTEMS_PLAN.md"         { description "architect output; carries dispositions" }
       doc_interface   = document "INTERFACE_DESIGN.md"     { description "interface-designer output; carries Architecture Challenges" }
       doc_transactions = document "TRANSACTIONS_DESIGN.md" { description "agentic-transactions-architect output; carries Architecture Challenges" }
@@ -181,6 +183,10 @@ model {
     orchestration.pipeline.researcher -> orchestration.doc_research    "writes" { #forward }
     orchestration.doc_research        -> orchestration.pipeline.architect "reads" { #forward }
     orchestration.pipeline.architect  -> orchestration.doc_systems     "writes" { #forward }
+    orchestration.pipeline.architect  -> orchestration.doc_spec_extract "writes spec extract" { #forward }
+    orchestration.doc_spec_extract    -> orchestration.pipeline.test_engineer "reads" { #forward }
+    orchestration.pipeline.test_engineer -> orchestration.doc_acceptance "writes" { #forward }
+    orchestration.doc_acceptance      -> orchestration.pipeline.planner "reads" { #forward }
     orchestration.doc_systems         -> orchestration.pipeline.planner "reads" { #forward }
     orchestration.pipeline.planner    -> orchestration.doc_impl_plan   "writes" { #forward }
     orchestration.pipeline.planner    -> orchestration.doc_wip         "writes" { #forward }

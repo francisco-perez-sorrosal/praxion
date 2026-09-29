@@ -28,7 +28,7 @@ When an agent encounters work outside its boundary, it flags the need and recomm
 | Multi-source research, architecture 3+ components, large feature decomposition | Agent |
 | Ecosystem audit or 3+ context artifacts | `context-engineer` or `sentinel` |
 | Complex test design, test suite refactoring, testing infrastructure setup | `test-engineer` |
-| Designing the outer-loop acceptance tests from the spec, before any design exists (Standard/Full) | `test-engineer` in `Mode: acceptance-design` — stage detail: `coordination-details.md § Acceptance-Design Stage` |
+| Designing the outer-loop acceptance tests from the spec, before any design exists (Standard/Full) | `test-engineer` in `Mode: acceptance-design` — stage detail: [`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage) |
 | Post-implementation quality review | `verifier` |
 | Documentation scope assessment, post-implementation doc updates, cross-reference fixes | `doc-engineer` |
 | Feature-level ideation from project state | `promethean` |

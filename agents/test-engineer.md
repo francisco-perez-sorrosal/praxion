@@ -230,7 +230,7 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 - `.ai-state/decisions/drafts/`;
 - any working-tree file that differs from the Base commit.
 
-Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** the authoritative copy is `skills/software-planning/references/coordination-details.md § Acceptance-Design Stage`; `agents/verifier.md` names the three class names only. Change all three together.
+Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** the authoritative copy is [`skills/software-planning/references/coordination-details.md § Acceptance-Design Stage`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage); `agents/verifier.md` names the three class names only. Change all three together.
 
 ### Output
 

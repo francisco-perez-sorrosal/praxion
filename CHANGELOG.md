@@ -1,3 +1,29 @@
+## v0.41.0 (2026-09-29)
+
+### Feat
+
+- **onboard**: Install the tests capability
+- **tests**: Wire /test and the scheduled test-health loop
+- **onboard**: Add the tests capability templates
+- **tests**: Hand non-Python pockets to their own runners
+- **tests**: Derive the test selection from the code
+
+### Fix
+
+- **onboard**: Pass a new project with no tests yet
+- **tests**: Make the shipped test surfaces work as written
+- **tests**: Close the selector's silent under-selection paths
+- **agents**: Run the resolver's commands and audit checkpoint failures
+- **tests**: Keep a class-based test's module file in the audit
+- **metrics**: Request coverage when addopts does not
+- **tests**: Use a neutral foreign hook name in a fixture
+- **tests**: Isolate dispatch-reworks tests in throwaway repos
+- **tests**: Serialize the metrics fixture build across workers
+
+### Refactor
+
+- **tests**: Replace the topology checks with GL07 and an audit
+
 ## v0.40.2 (2026-09-28)
 
 ### Fix

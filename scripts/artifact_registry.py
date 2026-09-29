@@ -322,6 +322,28 @@ ARTIFACTS: tuple[Artifact, ...] = (
         description="Architect's system plan with acceptance criteria.",
     ),
     Artifact(
+        "SPEC_EXTRACT.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="script:extract_spec.py",
+        cleanup_policy="delete",
+        description="Design-free spec boundary the acceptance designer reads; derived, not authored.",
+    ),
+    Artifact(
+        # Floor: SDD_ACTIVE at Standard, promoted to always at Full (as traceability.yml).
+        # Safe because a skipped stage still writes the artifact, so absence is a defect.
+        "ACCEPTANCE_TESTS.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        snapshot=True,
+        floor=Floor(standard=Signal.SDD_ACTIVE, full="always"),
+        production_gate="producer:test-engineer",
+        cleanup_policy="delete",
+        description="Acceptance designer's scenarios, boundary assumptions and spec questions.",
+    ),
+    Artifact(
         "PRE_REFACTOR_PLAN.md",
         "ai-work",
         "ephemeral",

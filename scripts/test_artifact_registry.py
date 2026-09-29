@@ -288,7 +288,7 @@ def test_canary_bogus_gate_kind_is_rejected() -> None:
 
 
 def test_floor_standard_matches_the_documented_projection() -> None:
-    """The Standard floor: seven always artifacts, two signal-gated, five when-produced."""
+    """The Standard floor: seven always artifacts, three signal-gated, five when-produced."""
     entries = {e.name: e.requirement for e in registry.floor("standard")}
 
     always = {
@@ -305,6 +305,7 @@ def test_floor_standard_matches_the_documented_projection() -> None:
 
     assert entries["TEST_RESULTS.md"] == registry.Signal.TESTS_RAN
     assert entries["traceability.yml"] == registry.Signal.SDD_ACTIVE
+    assert entries["ACCEPTANCE_TESTS.md"] == registry.Signal.SDD_ACTIVE
 
     produced = {
         "RESEARCH_FINDINGS.md",
@@ -317,22 +318,57 @@ def test_floor_standard_matches_the_documented_projection() -> None:
         assert entries[name] == registry.Signal.PRODUCED, f"{name}: expected 'when produced'"
 
 
-def test_floor_full_promotes_traceability_to_always_and_matches_standard_otherwise() -> None:
-    """Full = Standard with exactly one promotion — no other entry may diverge."""
+# The only artifacts whose Full obligation is stronger than their Standard one.
+_FULL_PROMOTIONS = frozenset({"traceability.yml", "ACCEPTANCE_TESTS.md"})
+
+
+def test_floor_full_promotes_exactly_the_documented_artifacts_to_always() -> None:
+    """Full = Standard with exactly two promotions — no other entry may diverge."""
     standard = {e.name: e.requirement for e in registry.floor("standard")}
     full = {e.name: e.requirement for e in registry.floor("full")}
 
     assert set(full) == set(standard), (
         "full floor must cover exactly the same artifact names as standard"
     )
-    assert full["traceability.yml"] == "always"
+    for name in _FULL_PROMOTIONS:
+        assert full[name] == "always", f"{name}: Full must promote to always"
     for name, requirement in standard.items():
-        if name == "traceability.yml":
+        if name in _FULL_PROMOTIONS:
             continue
         assert full[name] == requirement, (
             f"{name}: full requirement {full[name]!r} diverges from standard "
-            f"{requirement!r} outside the documented traceability.yml promotion"
+            f"{requirement!r} outside the documented promotions {sorted(_FULL_PROMOTIONS)}"
         )
+
+
+def test_spec_extract_is_a_derived_script_produced_artifact_outside_the_floor() -> None:
+    """SPEC_EXTRACT.md is written by extract_spec.py and verified with --check, so no floor."""
+    artifact = registry.by_name("SPEC_EXTRACT.md")
+    assert artifact is not None, "SPEC_EXTRACT.md is not registered"
+    assert artifact.production_gate == "script:extract_spec.py"
+    assert artifact.floor is None
+    assert artifact.location == "ai-work"
+    assert artifact.lifecycle == "ephemeral"
+    assert artifact.activation == "conditional"
+    assert artifact.cleanup_policy == "delete"
+    assert artifact.dashboard is False
+    assert artifact.snapshot is False
+    assert artifact.description
+
+
+def test_acceptance_tests_floor_is_sdd_active_at_standard_and_always_at_full() -> None:
+    """A skipped stage still writes the artifact, so absence is a defect once a spec exists."""
+    artifact = registry.by_name("ACCEPTANCE_TESTS.md")
+    assert artifact is not None, "ACCEPTANCE_TESTS.md is not registered"
+    assert artifact.floor == registry.Floor(standard=registry.Signal.SDD_ACTIVE, full="always")
+    assert artifact.production_gate == "producer:test-engineer"
+    assert artifact.location == "ai-work"
+    assert artifact.lifecycle == "ephemeral"
+    assert artifact.activation == "conditional"
+    assert artifact.cleanup_policy == "delete"
+    assert artifact.snapshot is True
+    assert artifact.dashboard is False
+    assert artifact.description
 
 
 def test_floor_construction_rejects_full_weaker_than_standard() -> None:

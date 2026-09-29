@@ -33,7 +33,7 @@ The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.
 Determine what you have to work with:
 
 1. **Check for `SYSTEMS_PLAN.md`** -- if it exists, extract the acceptance criteria. This is your primary reference for what the implementation should achieve. Also check `.ai-work/<task-slug>/TASK_BRIEF.md` -- when present, its `## Key Signals` are the user's verbatim success predicates (binary, outcome-not-output) and its `## Health Guards` are the non-regression checklist; verify against them directly, and flag any Key Signal that `SYSTEMS_PLAN.md` failed to carry forward. In Lightweight runs with no `SYSTEMS_PLAN.md`, `TASK_BRIEF.md` Key Signals are the acceptance-criteria source. **When `SYSTEMS_PLAN.md` is present but `TASK_BRIEF.md` is absent**, emit: `WARN: Standard/Full run produced no TASK_BRIEF — criteria thread has no provenance anchor.` (PROMPT-kind gate. Golden bad-case: `.ai-work/<slug>/SYSTEMS_PLAN.md` present + `.ai-work/<slug>/TASK_BRIEF.md` absent → this WARN fires in Phase 1.)
-2. **Check for `IMPLEMENTATION_PLAN.md` and `WIP.md`** -- extract the planned scope and completion status.
+2. **Check for `IMPLEMENTATION_PLAN.md` and `WIP.md`** -- extract the planned scope and completion status. Also `ACCEPTANCE_TESTS.md` and `SPEC_EXTRACT.md` when present (Phase 4 Acceptance Independence).
 3. **Check for `LEARNINGS.md`** -- note any implementation context or decisions made during development.
 4. **Determine mode** -- if pipeline documents exist, operate in pipeline mode (full report). If not, operate in standalone mode (convention compliance and test coverage only).
 5. **Detect pre-refactor sub-pipeline run.** The verifier operates in **pre-refactor mode** when:
@@ -80,20 +80,32 @@ After Phase 3a, continue with standard Phase 3 evaluation for all non-metric cri
 When `SYSTEMS_PLAN.md` contains a `## Behavioral Specification` section with REQ IDs:
 
 1. Build the traceability matrix from the canonical external source — **never by grepping code or test names**. Code must not contain REQ/AC references per [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the YAML and the archived SPEC matrix are the only authoritative sources.
-   - **Pipeline active**: read `.ai-work/<task-slug>/traceability.yml`. In parallel mode, merge `traceability_implementer.yml` and `traceability_test-engineer.yml` per-REQ (tests/implementation arrays union).
+   - **Pipeline active**: read `.ai-work/<task-slug>/traceability.yml`. In parallel mode, merge `traceability_implementer.yml` and `traceability_test-engineer.yml` per-REQ (tests/implementation/acceptance arrays union).
    - **Feature already archived**: read the archived SPEC at `.ai-state/specs/SPEC_<name>_YYYY-MM-DD.md` and extract its `## Traceability` matrix.
-2. Classify each requirement using the YAML/matrix contents and `TEST_RESULTS.md`: `PASS` (tests listed and passing), `FAIL` (tests listed but failing, or implementation empty), `UNTESTED` (no tests listed for this requirement)
+2. Classify each requirement using the YAML/matrix contents and `TEST_RESULTS.md`: `PASS` (tests or acceptance nodes listed and passing), `FAIL` (listed but failing, or implementation empty), `UNTESTED` (neither `tests` nor `acceptance` lists anything for this requirement). Coverage classifies on the union: an acceptance-only requirement is never UNTESTED
 3. Add a `## Spec Conformance` section to `VERIFICATION_REPORT.md` with the traceability matrix:
 
 | Requirement | Test(s) | Implementation | Status |
 |-------------|---------|----------------|--------|
 | REQ-01 | tests/auth/test_session.py::test_expired_token_returns_401 | src/auth/session.py::validate() | PASS |
 
+`Test(s)` lists `tests` plus `acceptance` nodes. Never add a column for acceptance coverage; it gets its own subsection below.
+
 **Four-column matrix when bidirectional traceability is populated.** Before rendering, scan all REQ entries in `traceability.yml` for the `architectural_elements:` key. When at least one REQ carries it, render the matrix with four columns (Requirement, Test(s), Implementation, Architectural Element(s), Status). When no REQ carries that field (back-compat), render the existing three-column format. REQs missing the field in a four-column render show `—` in the architectural-element cell. See [`skills/spec-driven-development/references/spec-format-guide.md`](../skills/spec-driven-development/references/spec-format-guide.md) for the YAML schema and worked example.
 
 4. If `traceability.yml` is missing while the feature is still in-pipeline (no archived SPEC exists yet), emit a FAIL finding tagged `[Spec Conformance: Missing traceability.yml]` — the implementer and test-engineer were expected to populate it per their step protocols.
 
 When `SPEC_DELTA.md` exists alongside the behavioral specification, add a `## Delta Validation` subsection after the traceability matrix. Compare the new traceability matrix against the prior spec's matrix (referenced in the delta's header). Verify: added requirements have new tests, modified requirements have updated tests, removed requirements have no orphaned tests. Classify each delta claim as CONFIRMED (evidence matches) or UNCONFIRMED (evidence missing or contradicts the claim).
+
+#### Acceptance Independence (Standard/Full, when `ACCEPTANCE_TESTS.md` exists or a Behavioral Specification does)
+
+Audit the outer loop's independence and record the result in `### Acceptance Coverage` inside `## Spec Conformance`. Input classes A1-A3, the forbidden set and the path classes are defined once in [`coordination-details.md#acceptance-design-stage`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage); cite them by class name and never re-copy them here.
+
+1. **Presence** -- FAIL when a Behavioral Specification exists and `ACCEPTANCE_TESTS.md` does not. A skipped form (`**Stage:** skipped -- <reason>`) is accepted only with a specific reason; a generic one ("not needed", "Markdown only") is a WARN. Golden bad-case: a Full run with requirements and no `ACCEPTANCE_TESTS.md`.
+2. **Declared sources** -- FAIL when `## Sources Read` is empty, lacks the extract, or lists anything outside A1-A3. Golden bad-case: `Sources Read` lists `.ai-work/<slug>/SYSTEMS_PLAN.md`.
+3. **Extract freshness** -- run `extract_spec.py <task-slug> --check` (`python3 scripts/extract_spec.py` when self-hosting); FAIL on non-zero, or when the digest in `Sources Read` differs from the final extract and no answered Spec Question accounts for it. Golden bad-case: the spec was edited after acceptance design and no question records it.
+4. **Commit order** -- with the path classes and first production commit as defined at the anchor, FAIL when the acceptance-design commit is not strictly before the first production commit; when a scenario file changes afterwards outside a `Resolved in:` sha; or when a driver file changes in a commit that also touches a production path. Golden bad-case: the first commit touching `scripts/extract_spec.py` precedes the commit adding the scenario file.
+5. **Coverage** -- FAIL when a requirement of the extract is in neither `## Scenarios` nor `## Not Black-Box Testable` (or in both), when a requirement with scenarios has an empty `acceptance:` list in `traceability.yml`, or when `pending` is not zero at the final integration checkpoint. An `acceptance:` list that differs from the scenario nodes is a WARN. Golden bad-case: a requirement listed in neither section.
 
 **Decision log cross-reference (optional):** Find ADRs related to the current feature (matching tags or summary) in `.ai-state/decisions/DECISIONS_INDEX.md`. Prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the feature's file scope is known; otherwise the index grows unbounded, so **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`). For matching entries, read the full ADR files and verify that `affected_reqs` in their frontmatter reference real REQ IDs from the behavioral specification. Flag mismatches as WARN findings — the ADR may reference outdated or incorrect requirement IDs.
 

@@ -427,3 +427,74 @@ def test_req_pattern_prefix_shapes_cover_the_live_corpus() -> None:
     assert matched_prefixes == found_prefixes, (
         f"REQ_PATTERN misses corpus prefix shape(s): {found_prefixes - matched_prefixes!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test: acceptance edges count as dependents (outer-loop tests)
+# ---------------------------------------------------------------------------
+
+_ACCEPTANCE_NODE = "tests/acceptance/test_outer_loop.py::test_observable_behavior"
+
+
+def _seed_acceptance_task(tmp_path: Path) -> None:
+    task_dir = tmp_path / ".ai-work" / "my-task"
+    task_dir.mkdir(parents=True)
+    fixture = FIXTURES / "traceability_acceptance_edge.yml"
+    (task_dir / "traceability.yml").write_text(fixture.read_text())
+
+
+def test_deleted_acceptance_test_yields_orphaned_edge(tmp_path: Path) -> None:
+    """An `acceptance:` node whose file was deleted is an orphaned edge, like a `tests:` node."""
+    from scripts.spec_drift import detect_drift
+
+    _seed_acceptance_task(tmp_path)
+    deleted = "tests/acceptance/test_outer_loop.py"
+
+    findings = detect_drift(
+        scope="in-flight:my-task",
+        repo_root=tmp_path,
+        base_sha=None,
+        _changed_files_override=[deleted],
+        _deleted_files_override=[deleted],
+    )
+
+    orphaned = [f for f in findings if f["kind"] == "orphaned-edge"]
+    assert [f["stale_dependents"] for f in orphaned] == [[_ACCEPTANCE_NODE]]
+    assert orphaned[0]["severity"] == "important"
+    _assert_finding_shape(orphaned[0], scope="in-flight:my-task")
+
+
+def test_untouched_acceptance_test_after_spec_change_is_stale(tmp_path: Path) -> None:
+    """A spec change that leaves the acceptance node untouched flags it as a stale dependent."""
+    from scripts.spec_drift import detect_drift
+
+    _seed_acceptance_task(tmp_path)
+
+    findings = detect_drift(
+        scope="in-flight:my-task",
+        repo_root=tmp_path,
+        base_sha=None,
+        _changed_files_override=["SYSTEMS_PLAN.md"],
+    )
+
+    stale = [f for f in findings if f["kind"] == "stale-dependent"]
+    assert len(stale) == 1
+    assert _ACCEPTANCE_NODE in stale[0]["stale_dependents"]
+    assert stale[0]["severity"] == "important"
+
+
+def test_touched_acceptance_test_after_spec_change_is_not_stale(tmp_path: Path) -> None:
+    """Touching the acceptance file along with the spec change removes it from the stale list."""
+    from scripts.spec_drift import detect_drift
+
+    _seed_acceptance_task(tmp_path)
+
+    findings = detect_drift(
+        scope="in-flight:my-task",
+        repo_root=tmp_path,
+        base_sha=None,
+        _changed_files_override=["SYSTEMS_PLAN.md", "tests/acceptance/test_outer_loop.py"],
+    )
+
+    stale = [f for f in findings if f["kind"] == "stale-dependent"]
+    assert all(_ACCEPTANCE_NODE not in f["stale_dependents"] for f in stale)

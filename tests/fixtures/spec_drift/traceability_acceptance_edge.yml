@@ -1,0 +1,12 @@
+# Fixture: a requirement whose only outer-loop coverage is an `acceptance:` edge.
+# Acceptance edges are dependents like `tests:` and `implementation:` entries:
+# a deleted node is an orphaned edge, an untouched node after a spec change is stale.
+
+requirements:
+  REQ-07:
+    tests:
+      - tests/test_unit_side.py::test_unit_behavior
+    implementation:
+      - src/unit_side.py
+    acceptance:
+      - tests/acceptance/test_outer_loop.py::test_observable_behavior

@@ -180,7 +180,7 @@ def _detect_in_flight(
     for req_id, edges in requirements.items():
         tests: list[str] = edges.get("tests", [])
         impl: list[str] = edges.get("implementation", [])
-        all_dependents = tests + impl
+        all_dependents = tests + impl + edges.get("acceptance", [])
 
         orphaned = _find_orphaned(all_dependents, deleted_files)
         if orphaned:

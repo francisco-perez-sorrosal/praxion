@@ -71,7 +71,7 @@ Two independent axes classify every test. Conflating them is the most common sou
 
 **Inner loop** (unit, internal integration): owned and edited by the implementer, alongside the production code.
 
-**Outer loop** (boundary integration, acceptance, end-to-end): designed by the test-engineer in `tests/acceptance/` and `tests/e2e/`. These directories are **read-only for the implementer** -- the implementer runs outer-loop tests but never edits them, so acceptance criteria stay independent of the implementation that must satisfy them (Principle 6).
+**Outer loop** (boundary integration, acceptance, end-to-end): designed by the test-engineer in `tests/acceptance/` and `tests/e2e/`. These directories are **read-only for the implementer** -- the implementer runs outer-loop tests but never edits them, so acceptance criteria stay independent of the implementation that must satisfy them (Principle 6). At Standard and Full tier they are designed from the spec alone, before the plan; the procedure and input sets are in [coordination-details.md](../software-planning/references/coordination-details.md#acceptance-design-stage).
 
 ## The Five Loops
 

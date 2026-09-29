@@ -152,22 +152,15 @@ Each step MUST:
 
 ## Testing in Plan Steps (BDD/TDD)
 
-**Behavioral tests first.** Tests are designed from the acceptance criteria in the systems plan — they encode what the system should do, not how it does it. On each paired step the test-engineer runs first and reports RED, then the implementer works on the disjoint production file set.
+**Behavioral tests first.** Tests encode what the system should do, not how it does it. Two loops own them: the **outer loop** (acceptance, boundary-integration and end-to-end tests) is designed from the spec alone, before the plan, and is read-only for the implementer; the **inner loop** (unit and internal-integration tests) is written by the implementer, test first, inside each step. Mechanics and the Fix Cycle: [coordination-details.md](references/coordination-details.md#acceptance-design-stage).
 
-**Paired step pattern:**
-1. **Test step** (test-engineer): design behavioral tests from acceptance criteria
-2. **Implementation step** (implementer): write production code
-3. **Integration checkpoint** (implementer): run full test suite, fix all failures including pre-existing broken tests (boy scout rule)
+**Pairing is optional.** Put a test-engineer step (RED first) ahead of an implementer step, closed by a full-suite integration checkpoint, when:
 
-**Create paired test steps when:**
-
-- The step implements behavioral acceptance criteria
-- Complex algorithms or business logic
-- Critical user flows or integration points
-- Edge cases in important features
+- Complex algorithms or business logic carry risk
+- The step needs property or contract tests, or a driver bound to a real interface
 - Fixing bugs (regression tests)
 
-**Skip paired test steps when:**
+**Skip pairing when:**
 
 - Obvious code with no logic (simple wiring, config)
 - Framework-provided functionality

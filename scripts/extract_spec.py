@@ -4,11 +4,15 @@
     extract_spec.py <slug> [--repo-root DIR] [--check] [--json] [--verbose]
 
 Reads `.ai-work/<slug>/SYSTEMS_PLAN.md` (required) and
-`.ai-work/<slug>/TASK_BRIEF.md` (optional; only its `## Key Signals` section)
+`.ai-work/<slug>/TASK_BRIEF.md` (optional; only its Key Signals section)
 and writes `.ai-work/<slug>/SPEC_EXTRACT.md`: the key signals, the acceptance
 criteria and the behavioral specification, verbatim with HTML comments
 stripped, and no other section of the plan. Whoever designs tests from the spec
 alone reads this file instead of the plan, so no design text can reach them.
+
+The brief's Key Signals section is a `##` or `###` heading titled `Key Signals`,
+optionally followed by a qualifier (`## Key Signals (acceptance, observable)`);
+it runs to the next heading of the same or higher level.
 
 The extract is a derived value with one writer: this command. It carries a
 digest of its own body (`sha256`, first 12 hex characters); a hand edit or a
@@ -44,6 +48,9 @@ line, token, message}`.
           bad  parse_plan  RefundPolicy  SPEC_MAX_LINES  auth.session
                RefundPolicy.apply()  --strict
           good e.g.  i.e.  Opus  3.11  v0.41.0  a spaced double dash
+    key-signals-missing  (advisory, not a design word)
+          the brief exists but holds no non-empty Key Signals section, so the
+          extract carries none; reported, never a silent empty section
 
 False positives are settled by declaration, not by a growing allowlist: a brand
 or external name goes under `### Observable Surface`, or the text is rephrased
@@ -63,7 +70,8 @@ unless a current extract exists.
 
 Stdlib-only and Python 3.9-safe (no runtime `X | Y` unions, no `match`): the
 command runs under whichever bare `python3` the project has.
-Tests and canaries: `scripts/test_extract_spec.py`.
+Tests and canaries: `scripts/test_extract_spec.py` (extraction, exit codes) and
+`scripts/test_extract_spec_lint.py` (the DV rules), over `scripts/_extract_spec_testkit.py`.
 """
 
 from __future__ import annotations
@@ -95,6 +103,7 @@ BLOCKING = "blocking"
 ADVISORY = "advisory"
 RULE_STALE = "stale-extract"
 RULE_SPAN, RULE_PATH, RULE_IDENTIFIER = "DV01", "DV02", "DV03"
+RULE_KEY_SIGNALS_MISSING = "key-signals-missing"
 
 PLAN_NAME = "SYSTEMS_PLAN.md"
 BRIEF_NAME = "TASK_BRIEF.md"
@@ -112,6 +121,9 @@ KEY_SIGNALS_MISSING = "_None: TASK_BRIEF.md has no Key Signals section._"
 _SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _H2 = re.compile(r"^## +(.+?)\s*$")
+_HEADING = re.compile(r"^(#{1,6}) +(.+?)\s*$")
+_KEY_SIGNALS_TITLE = re.compile(rf"^{re.escape(KEY_SIGNALS_HEADING)}(?:\W.*)?$")
+KEY_SIGNALS_LEVELS = (2, 3)
 _REQ_HEADING = re.compile(r"^###\s+(REQ-\d+)\b")
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 _H3 = re.compile(r"^###\s+(.+?)\s*$")
@@ -360,7 +372,7 @@ def parse_spec(plan_text: str, brief_text: str | None) -> Spec:
 
     key_signals = None
     if brief_text is not None:
-        candidate = _h2_sections(_clean_lines(brief_text)).get(KEY_SIGNALS_HEADING)
+        candidate = _key_signals_section(_clean_lines(brief_text))
         key_signals = candidate if candidate is not None and candidate.substantive else None
     return Spec(acceptance, behavior, key_signals, brief_present=brief_text is not None)
 
@@ -386,6 +398,28 @@ def _h2_sections(lines: list[tuple[int, str]]) -> dict[str, Section]:
         elif current is not None:
             current.append((number, text))
     return {title: Section(tuple(body)) for title, body in found.items()}
+
+
+def _key_signals_section(lines: list[tuple[int, str]]) -> Section | None:
+    """The first Key Signals section: `##`/`###` heading, optional qualifier, up to a peer heading."""
+    body: list[tuple[int, str]] | None = None
+    level = 0
+    for number, text, kind in _walk(lines):
+        heading = _HEADING.match(text) if kind == TEXT else None
+        if body is None:
+            if heading and _is_key_signals_heading(heading):
+                body, level = [], len(heading.group(1))
+        elif heading and len(heading.group(1)) <= level:
+            break
+        else:
+            body.append((number, text))
+    return Section(tuple(body)) if body is not None else None
+
+
+def _is_key_signals_heading(heading: re.Match[str]) -> bool:
+    return len(heading.group(1)) in KEY_SIGNALS_LEVELS and bool(
+        _KEY_SIGNALS_TITLE.match(heading.group(2))
+    )
 
 
 def _walk(lines: Sequence[tuple[int, str]]) -> Iterator[tuple[int, str, str]]:
@@ -476,7 +510,19 @@ def lint_spec(spec: Spec) -> list[Finding]:
     findings += _lint_section(BEHAVIOR_HEADING, spec.behavior, BLOCKING, declared)
     if spec.key_signals is not None:
         findings += _lint_section(KEY_SIGNALS_HEADING, spec.key_signals, ADVISORY, declared)
+    elif spec.brief_present:
+        findings.append(_key_signals_missing())
     return findings
+
+
+def _key_signals_missing() -> Finding:
+    message = (
+        f"{BRIEF_NAME} has no non-empty '## {KEY_SIGNALS_HEADING}' or '### {KEY_SIGNALS_HEADING}' "
+        "section (a trailing qualifier is allowed): the extract carries no key signals"
+    )
+    return Finding(
+        RULE_KEY_SIGNALS_MISSING, ADVISORY, KEY_SIGNALS_HEADING, None, 0, BRIEF_NAME, message
+    )
 
 
 def _annotate(section: Section) -> Iterator[Row]:

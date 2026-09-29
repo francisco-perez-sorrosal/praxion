@@ -498,3 +498,31 @@ def test_touched_acceptance_test_after_spec_change_is_not_stale(tmp_path: Path) 
 
     stale = [f for f in findings if f["kind"] == "stale-dependent"]
     assert all(_ACCEPTANCE_NODE not in f["stale_dependents"] for f in stale)
+
+
+# ---------------------------------------------------------------------------
+# Test: a bare edge key is an empty edge list, not a crash
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bare_key", ["acceptance", "tests", "implementation"])
+def test_bare_edge_key_is_an_empty_list_not_a_crash(tmp_path: Path, bare_key: str) -> None:
+    """A YAML key with no value loads as None; it must read as no edges."""
+    from scripts.spec_drift import detect_drift
+
+    task_dir = tmp_path / ".ai-work" / "my-task"
+    task_dir.mkdir(parents=True)
+    kept = sorted({"acceptance", "tests", "implementation"} - {bare_key})
+    lines = ["requirements:", "  REQ-01:", f"    {bare_key}:"]  # id-citation-discipline:ignore
+    lines += [f"    {key}: [src/{key}.py]" for key in kept]
+    (task_dir / "traceability.yml").write_text("\n".join(lines) + "\n")
+
+    findings = detect_drift(
+        scope="in-flight:my-task",
+        repo_root=tmp_path,
+        base_sha=None,
+        _changed_files_override=["SYSTEMS_PLAN.md"],
+    )
+
+    stale = [f for f in findings if f["kind"] == "stale-dependent"]
+    assert [sorted(f["stale_dependents"]) for f in stale] == [[f"src/{key}.py" for key in kept]]

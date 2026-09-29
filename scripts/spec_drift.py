@@ -57,6 +57,8 @@ SPEC_SOURCE_FILENAMES = frozenset(
     }
 )
 
+EDGE_KEYS = ("tests", "implementation", "acceptance")
+
 REQ_PATTERN = re.compile(r"\bREQ-(?:[A-Z]+-)?\d+\b")
 
 
@@ -324,9 +326,25 @@ def _load_traceability(path: Path) -> dict[str, Any]:
     try:
         content = path.read_text(encoding="utf-8")
         data = yaml.safe_load(content)
-        return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+    return _with_empty_edge_lists(data) if isinstance(data, dict) else {}
+
+
+def _with_empty_edge_lists(data: dict[str, Any]) -> dict[str, Any]:
+    """Every requirement carries all three edge lists; a bare YAML key (None) means no edges."""
+    requirements = data.get("requirements")
+    if not isinstance(requirements, dict):
+        return data
+    return {
+        **data,
+        "requirements": {req: _edges_as_lists(edges) for req, edges in requirements.items()},
+    }
+
+
+def _edges_as_lists(edges: Any) -> dict[str, Any]:
+    edges = edges if isinstance(edges, dict) else {}
+    return {**edges, **{key: edges.get(key) or [] for key in EDGE_KEYS}}
 
 
 def _git_changed_files(repo_root: Path, base_sha: str | None) -> set[str]:

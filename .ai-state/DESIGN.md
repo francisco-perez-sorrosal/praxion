@@ -581,10 +581,10 @@ Inline `dec-NNN` references in this document's component, interface, and constra
 
 ## 9. Test Selection and Feedback Loops
 
-<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-09-28 by systems-architect (test-refresh-core: the hand-maintained test topology is retired in favour of derived selection; decisions dec-408, dec-406, dec-407, rewritten to dec-NNN at finalize) -->
-<!-- Architect-facing design target. Status values follow §3: Designed = specified by the
-     test-refresh-core pipeline, not yet on disk; Deprecated = on disk, scheduled for removal
-     by the same pipeline. For the developer-facing code-verified view, see docs/architecture.md §9. -->
+<!-- OWNER: systems-architect (skeleton, ownership boundaries) | LAST UPDATED: 2026-09-28 by systems-architect (acceptance-independence: the acceptance-design stage, the spec extract and the acceptance artifact added as Designed rows; decision dec-draft-752d9a05 with companion dec-draft-93cfaad9, rewritten to dec-NNN at finalize). Previously 2026-09-28 by systems-architect (test-refresh-core: the hand-maintained test topology is retired in favour of derived selection; decisions dec-408, dec-406, dec-407) -->
+<!-- Architect-facing design target. Status values follow §3: Designed = specified by a
+     pipeline, not yet on disk; Deprecated = on disk, scheduled for removal by the same
+     pipeline. For the developer-facing code-verified view, see docs/architecture.md §9. -->
 
 ### 9.1 Purpose
 
@@ -593,6 +593,7 @@ The doctrine lives in `skills/testing-strategy/SKILL.md`. It consists of ten ord
 - **Scope** decides who designs a test. The implementer owns unit and internal-integration tests. The test-engineer, in acceptance mode, owns boundary, acceptance and end-to-end tests under `tests/acceptance/` and `tests/e2e/`.
 - **Size** decides when a test runs. `small` tests run in-process. `medium` tests use a subprocess, git or localhost. `large` tests need live services; `large` is the only marker, and those tests are deselected by default.
 - **Ownership.** Beyond the unit level, tests are designed independently of the design, and the implementer never edits outer-loop tests.
+- **Acceptance design (Designed, `dec-draft-752d9a05`).** At Standard/Full the architect's spec phase ends by running `scripts/extract_spec.py`, which lints the spec for design vocabulary and writes `SPEC_EXTRACT.md`. The test-engineer in acceptance-design mode (Opus) then designs the outer-loop tests from that extract, before the architect's design phase exists: the barrier holds by construction for the main pass. It writes `ACCEPTANCE_TESTS.md` plus RED tests, and the orchestrator commits them before any production change. The planner plans from the design plus those tests; the implementer owns unit tests. Enforcement is contract plus provenance (`dec-draft-93cfaad9`): declared sources, commit order and `acceptance:` coverage are checked by the verifier. There is no hook.
 
 Test selection is **derived from the code, never hand-kept**. Anything the derivation cannot account for widens the run to the full suite, and a full-suite run always backs up the selection (dec-084, kept). Decisions: `dec-408` (philosophy), `dec-406` (derived selection; retires the topology) and `dec-407` (the onboarding `tests` capability).
 
@@ -608,6 +609,9 @@ Test selection is **derived from the code, never hand-kept**. Anything the deriv
 | Collection gate | GL07 in `scripts/check_gate_liveness.py` | Built | A test file that no runner collects is a gate that never fires. Replaces TT07 and is portable |
 | Scheduled loop | `.github/workflows/test-scheduled.yml` | Built | `large` tests, audit, flaky and slow reports. Watched by ci-autofix |
 | Onboarding `tests` capability | `skills/onboard-project/references/phases-optional.md` §8e.10–8e.13, `claude/project-baseline/tests/`, `claude/canonical-blocks/testing.md` | Built | Parallel, coverage-off runner config, outer-loop directories, declared list, test and scheduled workflows, `## Testing` block |
+| Spec extractor | `scripts/extract_spec.py` (+ co-located `test_extract_spec.py`) | Designed | The spec boundary: `SYSTEMS_PLAN.md` spec sections + `TASK_BRIEF.md` Key Signals → `SPEC_EXTRACT.md`. Design-vocabulary lint (code spans, paths, identifiers; names declared under `### Observable Surface` exempt), blocking for AC/REQ text and advisory for Key Signals. `--check` detects a stale extract. Exits 0 clean / 1 findings or stale / 2 input error. Stdlib-only, git-rooted (never `__file__`) |
+| Acceptance-design stage | `agents/test-engineer.md` `Mode: acceptance-design`; procedure and allowed/forbidden inputs in `skills/software-planning/references/coordination-details.md § Acceptance-Design Stage` | Designed | Runs between the architect's `Mode: spec` and its resumed `Mode: feature`. Reads only the extract, `INTERFACE_DESIGN.md § Public Contract` and the base-commit repository. One Spec-Question round runs before design |
+| Acceptance artifact | `.ai-work/<slug>/ACCEPTANCE_TESTS.md` (ephemeral); RED tests under `tests/acceptance/`, `tests/e2e/`, with late-bound drivers under `drivers/` | Designed | Sum type on `Stage: designed \| skipped — <reason>`. Sections: Sources Read, Scenarios per REQ (boundary kind, Given/When/Then, oracle, test node), Boundary Assumptions, Spec Questions, Not Black-Box Testable. Durable projection: the `acceptance:` key in `traceability.yml`, seeded by the planner and archived into the SPEC matrix |
 | Test topology (instance, trunk, command, checker, parser, TT01–TT07) | `.ai-state/TEST_TOPOLOGY.md`, `references/test-topology.md`, `commands/refresh-topology.md`, `scripts/check_topology_conformance.py`, `scripts/_topology_yaml.py` | Removed | Replaced by the rows above. Their ADRs are superseded or retired per `dec-406` |
 
 ### 9.3 The Five Loops

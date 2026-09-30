@@ -9,9 +9,15 @@ module therefore connects that module to changed files by basename:
 - a literal made only of `*` and `?` names no file, so a stray asterisk can
   never mark every change as covered.
 
+Data files narrow, code widens: a wildcard match stands in for the full suite
+only when the changed file is data (Markdown, JSON, YAML, TOML, text, shell).
+A source file (an extension of an ecosystem the resolver serves: .py, .js,
+.ts, .vue, .rs, .go, .kt, ...) that only a wildcard reaches widens exactly as
+if the wildcard did not exist; its reader still runs, inside the full run.
+
 Everything the literal does not account for still widens exactly as before.
-Each scenario builds a single-pocket Python repository and names the changed
-files explicitly.
+Each scenario builds a Python repository and names the changed files
+explicitly.
 """
 
 from __future__ import annotations
@@ -100,6 +106,123 @@ def test_tests_reaching_a_source_module_that_holds_a_wildcard_literal_are_select
     payload = resolve(repo, "--changed", "docs/intro.md")
 
     assert "tests/test_doc_index.py" in selected_tests(payload), payload
+
+
+@pytest.mark.parametrize(
+    ("literal", "changed"),
+    [
+        ("*.*", "data/sample.txt"),
+        ("*.*", "config/app.yaml"),
+        ("*.sh", "tools/deploy.sh"),
+        ("*.toml", "config/app.toml"),
+    ],
+)
+def test_a_data_file_read_only_by_a_broad_wildcard_gets_the_narrow_run(
+    repo: ScratchRepo, literal: str, changed: str
+) -> None:
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader(literal))
+    repo.write(changed, "content\n")
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", changed)
+
+    assert changed not in unmapped_paths(payload), payload["widen"]
+    assert payload["decision"] == "selected"
+    reader = selected_tests(payload).get("tests/test_reads_by_pattern.py")
+    assert reader is not None, f"{changed} matches {literal!r} yet its reader was not selected"
+    assert (reader["via"], reader["because"]) == ("path-literal", changed)
+
+
+def test_a_source_file_mapped_elsewhere_also_selects_its_wildcard_reader(
+    repo: ScratchRepo,
+) -> None:
+    repo.write("pkg/__init__.py")
+    repo.write("pkg/foo.py", "value = 1\n")
+    repo.write(
+        "pkg/test_foo.py", "from pkg import foo\n\n\ndef test_value():\n    assert foo.value\n"
+    )
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader("*.py"))
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", "pkg/foo.py")
+
+    selected = selected_tests(payload)
+    assert {"pkg/test_foo.py", "tests/test_reads_by_pattern.py"} <= set(selected), (
+        f"expected the layout test and the *.py reader, got {sorted(selected)}"
+    )
+    reader = selected["tests/test_reads_by_pattern.py"]
+    assert (reader["via"], reader["because"]) == ("path-literal", "pkg/foo.py")
+    assert payload["decision"] == "selected"
+
+
+# -- A source file reached only by a wildcard still widens --------------------
+
+
+@pytest.mark.parametrize(
+    ("literal", "changed"),
+    [
+        ("*.py", "pkg/orphan.py"),
+        ("*.*", "pkg/orphan.py"),
+        ("*.ts", "tools/codegen.ts"),
+        ("*.vue", "ui/App.vue"),
+        ("*.*", "native/lib.rs"),
+        ("*.go", "cmd/main.go"),
+        ("*.kt", "jvm/Main.kt"),
+    ],
+)
+def test_a_source_file_reached_only_by_a_wildcard_still_widens(
+    repo: ScratchRepo, literal: str, changed: str
+) -> None:
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader(literal))
+    repo.write(changed, "// source\n")
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", changed)
+
+    assert changed in unmapped_paths(payload), (
+        f"{changed} is code reached only by {literal!r} yet did not widen: {payload}"
+    )
+    assert payload["decision"] == "widened"
+    assert [p["selection"] for p in payload["pockets"]] == ["full"] * len(payload["pockets"])
+
+
+def test_a_source_file_reached_only_by_a_wildcard_runs_every_pocket_in_full(
+    repo: ScratchRepo,
+) -> None:
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader("*.py"))
+    repo.write("pkg/orphan.py", "value = 1\n")
+    repo.write(
+        "web/package.json",
+        '{"name": "web", "private": true, "scripts": {"test": "vitest run"},'
+        ' "devDependencies": {"vitest": "^2.0.0"}}\n',
+    )
+    repo.write("web/vitest.config.ts", "export default {}\n")
+    repo.write("web/src/keep.ts", "export const value = 1\n")
+    repo.commit_all("seed")
+    repo.provide_tools(["vitest"])
+
+    payload = resolve(repo, "--changed", "pkg/orphan.py")
+
+    selections = {p["root"]: (p["adapter"], p["selection"]) for p in payload["pockets"]}
+    assert selections == {".": ("python-derived", "full"), "web": ("vitest", "full")}
+    assert "pkg/orphan.py" in unmapped_paths(payload)
+
+
+def test_a_wildcard_narrows_the_data_file_but_not_the_code_in_one_change(
+    repo: ScratchRepo,
+) -> None:
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader("*.*"))
+    repo.write("data/sample.txt", "rows\n")
+    repo.write("pkg/orphan.py", "value = 1\n")
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", "data/sample.txt", "pkg/orphan.py")
+
+    unmapped = unmapped_paths(payload)
+    assert ("pkg/orphan.py" in unmapped, "data/sample.txt" in unmapped) == (True, False), (
+        f"expected only the code file to widen: {payload['widen']}"
+    )
+    assert payload["decision"] == "widened"
 
 
 # -- Another source never displaces the wildcard reader ----------------------

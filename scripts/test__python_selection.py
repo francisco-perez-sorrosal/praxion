@@ -15,6 +15,7 @@ state for this step.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import sys
 from pathlib import Path
@@ -202,6 +203,234 @@ def test_path_literal_basename_match_does_not_fire_on_a_substring(tmp_path: Path
     selection = python_selection.select(tmp_path, ["scripts/praxion-sidecar"], NO_DEPS)
 
     assert "scripts/test_unrelated.py" not in {s.path for s in selection}
+
+
+# -- Literal classes and basename-pattern readers ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("literal", "expected"),
+    [
+        ("", "ignored"),
+        (".", "ignored"),
+        ("*", "ignored"),
+        ("**", "ignored"),
+        ("?", "ignored"),
+        ("?*", "ignored"),
+        (".*", "ignored"),
+        ("*.*", "ignored"),
+        ("[a-z]*", "ignored"),
+        ("[abc]", "ignored"),
+        ("settings.yaml", "exact-basename"),
+        ("Makefile", "exact-basename"),
+        ("*.md", "basename-pattern"),
+        ("report_??.csv", "basename-pattern"),
+        ("[abc]_case.json", "basename-pattern"),
+        ("v2*", "basename-pattern"),
+        ("docs/*.md", "path-glob"),
+        ("**/*", "path-glob"),
+        ("docs/guide.md", "path-suffix"),
+    ],
+)
+def test_a_literal_lands_in_exactly_one_class(literal: str, expected: str) -> None:
+    """Letters inside a bracket class do not count as letters outside the wildcards."""
+    assert python_selection._literal_class(literal) == expected
+
+
+def _index_of(**modules: str) -> Any:
+    """A literal index holding one module per keyword: `name="<python source>"`."""
+    index = python_selection._LiteralIndex()
+    for name, source in modules.items():
+        index.add_module(f"{name}.py", ast.parse(source))
+    return index
+
+
+def test_pattern_readers_match_the_basename_at_any_depth() -> None:
+    index = _index_of(reader='GLOB = "*.md"\n')
+
+    assert index.pattern_readers("README.md") == {"reader.py"}
+    assert index.pattern_readers("docs/deep/er/guide.md") == {"reader.py"}
+    assert index.pattern_readers("docs/guide.txt") == set()
+
+
+def test_a_pattern_matches_the_whole_basename_not_a_part_of_it() -> None:
+    index = _index_of(reader='GLOB = "report_??.csv"\n')
+
+    assert index.pattern_readers("data/report_01.csv") == {"reader.py"}
+    assert index.pattern_readers("data/report_001.csv") == set()
+    assert index.pattern_readers("data/old_report_01.csv") == set()
+
+
+def test_a_module_is_never_its_own_pattern_reader() -> None:
+    index = _index_of(reader='GLOB = "*.py"\n')
+
+    assert index.pattern_readers("reader.py") == set()
+    assert index.pattern_readers("other.py") == {"reader.py"}
+
+
+def test_a_pattern_that_does_not_compile_is_ignored() -> None:
+    index = _index_of(reader='ODD = "a[b-a]*"\n')
+
+    assert index.pattern_readers("ab.txt") == set()
+
+
+def test_letterless_wildcards_name_no_file() -> None:
+    index = _index_of(reader='ALL = ["*", "**", "?", ".*", "*.*", "[a-z]*"]\n')
+
+    assert index.pattern_readers("data.md") == set()
+    assert index.pattern_readers("a.b") == set()
+    assert index.modules_matching("data.md") == set()
+
+
+def test_pattern_readers_never_include_a_holder_of_a_named_literal() -> None:
+    index = _index_of(
+        exact='NAME = "guide.md"\n',
+        suffix='PATH = "docs/guide.md"\n',
+        glob='GLOB = "docs/*.md"\n',
+    )
+
+    assert index.pattern_readers("docs/guide.md") == set()
+    assert index.modules_matching("docs/guide.md") == {"exact.py", "suffix.py", "glob.py"}
+
+
+def test_modules_matching_never_returns_a_pattern_holder() -> None:
+    index = _index_of(reader='GLOB = "*.md"\n')
+
+    assert index.modules_matching("README.md") == set()
+
+
+def test_the_graph_lists_pattern_readers_sorted(tmp_path: Path) -> None:
+    _write(tmp_path, "b_reader.py", 'GLOB = "*.md"\n')
+    _write(tmp_path, "a_reader.py", 'GLOB = "READ*"\n')
+    _write(tmp_path, "README.md", "# x\n")
+    files = ("b_reader.py", "a_reader.py", "README.md")
+
+    graph = python_selection._Graph(tmp_path, files, ["README.md"], NO_DEPS, (".",))
+
+    assert graph.pattern_readers("README.md") == ("a_reader.py", "b_reader.py")
+    assert graph.dependents("README.md", "path-literal") == ()
+
+
+# -- Basename patterns select their readers ------------------------------------
+
+_READS_EVERY_MARKDOWN = 'GLOB = "*.md"\n\n\ndef test_reads():\n    assert True\n'
+_READS_EVERY_PYTHON = 'GLOB = "*.py"\n\n\ndef test_reads():\n    assert True\n'
+
+
+def test_a_data_file_selects_its_pattern_reader_and_is_accounted_for(tmp_path: Path) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "tests/test_reads_docs.py", _READS_EVERY_MARKDOWN)
+
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md"], NO_DEPS)
+
+    (test,) = derivation.tests
+    assert (test.path, test.via, test.because) == (
+        "tests/test_reads_docs.py",
+        "path-literal",
+        "docs/guide.md",
+    )
+    assert derivation.mapped == {"docs/guide.md"}
+
+
+def test_a_source_file_reached_only_by_a_pattern_selects_the_reader_but_is_not_accounted_for(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/tool.py", "value = 1\n")
+    _write(tmp_path, "tests/test_scan.py", _READS_EVERY_PYTHON)
+
+    derivation = python_selection.derive(tmp_path, ["pkg/tool.py"], NO_DEPS)
+
+    assert [t.path for t in derivation.tests] == ["tests/test_scan.py"]
+    assert derivation.mapped == frozenset()
+
+
+def test_a_source_file_with_a_named_edge_is_accounted_for_and_keeps_every_reader(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/foo.py", "value = 1\n")
+    _write(tmp_path, "pkg/test_foo.py", "def test_value():\n    assert True\n")
+    _write(tmp_path, "tests/test_scan.py", _READS_EVERY_PYTHON)
+
+    derivation = python_selection.derive(tmp_path, ["pkg/foo.py"], NO_DEPS)
+
+    assert _via(derivation.tests, "pkg/test_foo.py") == "layout"
+    assert _via(derivation.tests, "tests/test_scan.py") == "path-literal"
+    assert derivation.mapped == {"pkg/foo.py"}
+
+
+def test_a_data_file_and_a_source_file_in_one_change_are_judged_separately(tmp_path: Path) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "pkg/tool.py", "value = 1\n")
+    _write(tmp_path, "tests/test_scan.py", 'GLOB = ["*.md", "*.py"]\n\n\ndef test_x():\n    pass\n')
+
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md", "pkg/tool.py"], NO_DEPS)
+
+    assert derivation.mapped == {"docs/guide.md"}
+
+
+def test_a_pattern_is_a_first_hop_only_and_never_connects_through_a_module(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/lib.py", "value = 1\n")
+    _write(tmp_path, "pkg/helper.py", "import lib\n")
+    _write(tmp_path, "pkg/test_helper.py", "def test_helper():\n    assert True\n")
+    _write(tmp_path, "tests/test_pat.py", 'GLOB = "helper*"\n\n\ndef test_x():\n    pass\n')
+
+    selection = python_selection.select(tmp_path, ["pkg/lib.py"], NO_DEPS)
+
+    assert "pkg/test_helper.py" in {s.path for s in selection}
+    assert "tests/test_pat.py" not in {s.path for s in selection}
+
+
+def test_a_test_reaching_a_module_that_holds_a_pattern_is_selected(tmp_path: Path) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "pkg/scan.py", 'GLOB = "*.md"\n')
+    _write(tmp_path, "tests/test_scan.py", "import scan\n\n\ndef test_x():\n    pass\n")
+
+    selection = python_selection.select(tmp_path, ["docs/guide.md"], NO_DEPS)
+
+    assert _via(selection, "tests/test_scan.py") == "path-literal"
+
+
+def test_a_changed_test_holding_a_matching_pattern_stays_self(tmp_path: Path) -> None:
+    _write(tmp_path, "tests/test_scan.py", _READS_EVERY_PYTHON)
+
+    derivation = python_selection.derive(tmp_path, ["tests/test_scan.py"], NO_DEPS)
+
+    (test,) = derivation.tests
+    assert (test.path, test.via, test.because) == (
+        "tests/test_scan.py",
+        "self",
+        "tests/test_scan.py",
+    )
+
+
+def test_letterless_wildcards_select_nothing_and_account_for_nothing(tmp_path: Path) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(
+        tmp_path,
+        "tests/test_scan.py",
+        'ALL = ["*", "**", "?", ".*", "*.*"]\n\n\ndef test_x():\n    pass\n',
+    )
+
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md"], NO_DEPS)
+
+    assert derivation.tests == ()
+    assert derivation.mapped == frozenset()
+
+
+def test_an_unrunnable_pattern_reader_is_neither_selected_nor_accounted_for(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "tests/test_reads_docs.py", _READS_EVERY_MARKDOWN)
+
+    derivation = python_selection.derive(
+        tmp_path, ["docs/guide.md"], NO_DEPS, is_runnable=lambda _path: False
+    )
+
+    assert derivation.tests == ()
+    assert derivation.mapped == frozenset()
 
 
 # -- Declared edges ------------------------------------------------------------

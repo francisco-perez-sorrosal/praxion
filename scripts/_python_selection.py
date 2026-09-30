@@ -10,9 +10,15 @@ sources, listed in attribution order:
    `importlib.import_module("<literal>")`, resolved sibling-first, then from
    the pocket root / pytest `pythonpath` / `src`, then by flat stem across the
    pocket (an ambiguous stem connects to every match);
-3. **path-literal** -- any string constant in any pocket module: with a `/` it
-   matches as a path suffix (of the file or of one of its directories), or as
-   a glob when it has wildcards; without a `/` only as an exact basename;
+3. **path-literal** -- any string constant in any pocket module, in one of
+   five classes. With a `/`: a path suffix (of the file or of one of its
+   directories), or a glob when it has wildcards. Without a `/`: an exact
+   basename, or a basename pattern (`*.md`) matching the basename of a changed
+   path at any depth. A wildcard literal with no letter or digit outside its
+   wildcards (`*`, `.*`, `*.*`) names no file. Suffixes, globs and exact
+   basenames are *named* edges that hold at every hop; a basename pattern
+   holds only as the first hop out of a changed path, so it never connects
+   through an intermediate module;
 4. **declared** -- `tests/declared-deps.toml` entries.
 
 A changed path selects every test that reaches it through reverse
@@ -21,6 +27,12 @@ stopping at the first source to connect drops the tests of modules that
 import the changed one. The order above only decides the `via` attribution:
 the kind of the first hop out of the changed path, along the test's shortest
 path to it.
+
+Data files narrow, code widens: a changed file reached only by a basename
+pattern selects its readers, but stands in for the full suite only when it is
+not source code. A pattern is a guess about which files a module reads, so a
+source file it happens to match is still unaccounted for and widens; its
+readers run within that full run.
 
 Dynamic imports beyond the literal `import_module` form are invisible here;
 the resolver widens unmapped paths and the full suite backstops the rest.
@@ -36,6 +48,7 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -44,6 +57,7 @@ from _test_inventory import (  # noqa: E402
     glob_body,
     has_wildcard,
     is_any_test_file,
+    is_source_code,
     join_rel,
     matches_glob,
     read_pytest_options,
@@ -54,6 +68,7 @@ from _test_inventory import (  # noqa: E402
 SERIAL_BELOW_TESTS = 20
 VIA_ORDER = ("layout", "import", "path-literal", "declared")
 _VIA_RANK = {"self": -1, **{via: rank for rank, via in enumerate(VIA_ORDER)}}
+_PATTERN_RANK = _VIA_RANK["path-literal"]
 _TEST_DEF = re.compile(r"^[ \t]*(?:async[ \t]+)?def[ \t]+test_", re.MULTILINE)
 _MAX_LITERAL = 300
 
@@ -67,7 +82,11 @@ class SelectedTest:
 
 @dataclass(frozen=True)
 class Derivation:
-    """Selected tests, plus the changed paths that reached at least one of them."""
+    """Selected tests, plus the changed paths they account for.
+
+    A path counts when it reached a test, except a source-code path that only
+    its own basename-pattern readers reached: that one still widens.
+    """
 
     tests: tuple[SelectedTest, ...]
     mapped: frozenset[str]
@@ -94,21 +113,34 @@ def derive(
     best: dict[str, tuple[int, SelectedTest]] = {}
     mapped: set[str] = set()
     for path in changed_paths:
-        for test, via in _reach(graph, path, is_runnable).items():
-            mapped.add(path)
+        reached = _reach(graph, path, is_runnable)
+        for test, via in reached.items():
             rank = _VIA_RANK[via]
             if test not in best or rank < best[test][0]:
                 best[test] = (rank, SelectedTest(test, via, path))
+        if reached and _accounted_for(graph, path, is_runnable):
+            mapped.add(path)
     tests = tuple(best[test][1] for test in sorted(best))
     return Derivation(tests, frozenset(mapped))
 
 
-def _reach(graph: _Graph, start: str, is_runnable: Callable[[str], bool]) -> dict[str, str]:
+def _accounted_for(graph: _Graph, path: str, is_runnable: Callable[[str], bool]) -> bool:
+    """A path that reached a test stands in for the full suite, unless only a pattern reached it."""
+    if not is_source_code(path) or not graph.pattern_readers(path):
+        return True
+    return bool(_reach(graph, path, is_runnable, patterns=False))
+
+
+def _reach(
+    graph: _Graph, start: str, is_runnable: Callable[[str], bool], *, patterns: bool = True
+) -> dict[str, str]:
     """Tests reaching `start`, each tagged with the kind of its first hop out of `start`.
 
     Level-order search: a test is attributed along its shortest path, so a
     direct edge is reported as itself; among equally short paths the
-    higher-priority first hop wins.
+    higher-priority first hop wins. With `patterns`, the first hop also
+    includes the modules whose basename pattern matches `start`; after it the
+    search follows named edges only.
     """
     found: dict[str, str] = {}
     if is_any_test_file(start) and is_runnable(start):
@@ -117,6 +149,9 @@ def _reach(graph: _Graph, start: str, is_runnable: Callable[[str], bool]) -> dic
     for rank, via in enumerate(VIA_ORDER):
         for node in graph.dependents(start, via):
             frontier[node] = min(frontier.get(node, rank), rank)
+    if patterns:
+        for node in graph.pattern_readers(start):
+            frontier[node] = min(frontier.get(node, _PATTERN_RANK), _PATTERN_RANK)
     visited = {start, *frontier}
     while frontier:
         following: dict[str, int] = {}
@@ -193,6 +228,10 @@ class _Graph:
         else:
             found = self._declared(node)
         return tuple(sorted(dependent for dependent in found if dependent != node))
+
+    def pattern_readers(self, node: str) -> tuple[str, ...]:
+        """Modules holding a slash-less wildcard literal that matches `node`'s basename."""
+        return tuple(sorted(self._literals.pattern_readers(node)))
 
     def _layout(self, node: str) -> set[str]:
         directory, _, name = node.rpartition("/")
@@ -367,6 +406,27 @@ def _is_import_module_call(node: ast.Call) -> bool:
 # --- Path-literal edges ------------------------------------------------------------
 
 
+_LiteralClass = Literal["ignored", "exact-basename", "basename-pattern", "path-glob", "path-suffix"]
+_BRACKET_CLASS = re.compile(r"\[[^\]]*\]")
+
+
+def _literal_class(literal: str) -> _LiteralClass:
+    """The one class of a normalized literal (leading `./` and `/` already removed).
+
+    A slash-less wildcard literal needs a letter or digit outside its wildcards
+    to name a file, so `*`, `.*` and `*.*` name none; a bracket class counts as
+    wildcard, so `[a-z]*` names none either.
+    """
+    if literal in ("", "."):
+        return "ignored"
+    if "/" in literal:
+        return "path-glob" if has_wildcard(literal) else "path-suffix"
+    if not has_wildcard(literal):
+        return "exact-basename"
+    outside_wildcards = _BRACKET_CLASS.sub("", literal)
+    return "basename-pattern" if any(ch.isalnum() for ch in outside_wildcards) else "ignored"
+
+
 class _LiteralIndex:
     """String constants, indexed so a node looks up only candidate literals."""
 
@@ -374,28 +434,24 @@ class _LiteralIndex:
         self._by_basename: dict[str, set[str]] = {}
         self._by_last_segment: dict[str, list[tuple[str, str]]] = {}
         self._globs: list[tuple[re.Pattern[str], str]] = []
+        self._basename_patterns: list[tuple[re.Pattern[str], str]] = []
 
     def add_module(self, module: str, tree: ast.Module) -> None:
         for literal in _string_constants(tree):
             normalized = literal.removeprefix("./").strip("/")
-            if not normalized or normalized == ".":
-                continue
-            if "/" not in normalized:
+            kind = _literal_class(normalized)
+            if kind == "exact-basename":
                 self._by_basename.setdefault(normalized, set()).add(module)
-            elif has_wildcard(normalized):
-                self._add_glob(normalized, module)
-            else:
+            elif kind == "basename-pattern":
+                _append_compiled(self._basename_patterns, "", normalized, module)
+            elif kind == "path-glob":
+                _append_compiled(self._globs, r"(?:.*/)?", normalized, module)
+            elif kind == "path-suffix":
                 last = normalized.rpartition("/")[2]
                 self._by_last_segment.setdefault(last, []).append((normalized, module))
 
-    def _add_glob(self, literal: str, module: str) -> None:
-        try:
-            pattern = re.compile(r"(?:.*/)?" + glob_body(literal) + r"\Z")
-        except re.error:  # a string no glob engine could read is not a path glob
-            return
-        self._globs.append((pattern, module))
-
     def modules_matching(self, node: str) -> set[str]:
+        """Holders of a *named* literal: exact basename, path suffix or path glob."""
         found = set(self._by_basename.get(node.rpartition("/")[2], ()))
         segments = node.split("/")
         for end in range(len(segments), 0, -1):  # the file itself, then each ancestor directory
@@ -405,6 +461,25 @@ class _LiteralIndex:
                     found.add(module)
         found.update(module for pattern, module in self._globs if pattern.match(node))
         return found
+
+    def pattern_readers(self, node: str) -> set[str]:
+        """Holders of a basename pattern that matches `node`'s basename, other than `node`."""
+        name = node.rpartition("/")[2]
+        return {
+            module
+            for pattern, module in self._basename_patterns
+            if module != node and pattern.match(name)
+        }
+
+
+def _append_compiled(
+    into: list[tuple[re.Pattern[str], str]], prefix: str, literal: str, module: str
+) -> None:
+    try:
+        pattern = re.compile(prefix + glob_body(literal) + r"\Z")
+    except re.error:  # a string no glob engine could read is not a glob
+        return
+    into.append((pattern, module))
 
 
 def _string_constants(tree: ast.Module) -> Iterable[str]:

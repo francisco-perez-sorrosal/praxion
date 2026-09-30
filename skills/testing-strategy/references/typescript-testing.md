@@ -385,5 +385,5 @@ coverage: {
 
 **Parallelize**: both Vitest and Jest parallelize by default (worker threads / workers); no extra flag is required for a derived selection.
 
-**Fall back**: when neither `vitest` nor `jest` is discoverable on the pocket (missing config, missing binary), the pocket widens to its full suite (`no-adapter` / `tool-unavailable`) rather than guessing at import relationships.
+**Fall back**: when neither `vitest` nor `jest` is discoverable on the pocket (missing config, missing binary), the pocket widens to its full suite (`no-adapter` / `tool-unavailable`) rather than guessing at import relationships. A changed file that is not a module (a fixture, a JSON config), or a module that no longer exists, widens the pocket too (`unmapped-path`): both tools walk the graph outward from a module that must be there, and otherwise report no related tests with exit 0.
 - **Async test timeout**: Default timeout is 5 seconds (Vitest) or 5 seconds (Jest). Integration tests may need longer: set `testTimeout` in config or per-test with `it("name", async () => {}, 30_000)`.

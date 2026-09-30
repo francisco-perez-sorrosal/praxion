@@ -10,7 +10,14 @@ The resolver builds one dependency graph per pocket from four sources, then unio
 
 1. **Layout.** `dir/test_foo.py` / `dir/foo_test.py` depend on `dir/foo.py`. Mirrored layout matches by basename with the longest common directory suffix; ties select all matches. A `conftest.py` (or equivalent) is depended on by every test under its directory.
 2. **Import.** Static imports (`ast.Import`/`ast.ImportFrom`, relative imports, `importlib.import_module("<literal>")` for Python). Resolution tries, in order: a sibling file; the dotted path from the pocket root and any configured import root; a flat stem match across the pocket (ambiguous stems connect to all matches).
-3. **Path-literal.** String constants anywhere in a pocket module (not just tests): a string containing `/` matches as a path suffix or glob; a string without `/` matches only as an exact basename of a tracked file.
+3. **Path-literal.** String constants anywhere in a pocket module (not just tests), each in exactly one class:
+   - *path suffix* — contains `/`, no wildcard: matches the end of a path (the file or one of its directories);
+   - *path glob* — contains `/` and a wildcard (`*`, `?`, `[`): matches as a glob;
+   - *exact basename* — no `/`, no wildcard: matches only that exact basename, at any depth;
+   - *basename pattern* — no `/`, a wildcard, and at least one letter or digit outside the wildcards (`*.md`, `report*`): matches the basename of a **changed** path at any depth, as the first hop only, so it never connects through an intermediate module the way a path glob does;
+   - *ignored* — empty, `.`, or a wildcard literal with no letter or digit outside its wildcards (`*`, `**`, `?`, `.*`, `*.*`, `[a-z]*`): a separator, a repetition count or a regular expression, never a claim about which files a module reads.
+
+   **Data files narrow, code widens.** A changed file reached only by a basename pattern always selects the pattern's holders, but it counts as accounted for (no `unmapped-path`) only when it is a data file. A source file of any pocket ecosystem — Python `.py`; JavaScript and TypeScript `.js .jsx .mjs .cjs .ts .tsx .mts .cts .vue .svelte`; Rust `.rs`; Go `.go`; JVM `.java .kt` — reached only by a pattern still widens, and its readers run within that full run: a pattern is a guess about what a module reads, never a substitute for the import and layout tracing that code relies on.
 4. **Declared.** Non-code dependencies the first three sources cannot see — see [The Declared List](#the-declared-list-testsdeclared-depstoml) below.
 
 A changed test file always selects itself (`via: self`). Selection is reverse reachability: which test files reach a changed path through any of the four edges.
@@ -23,7 +30,7 @@ Unmapped is not silently narrow — a changed path that reaches no test, is not 
 
 | Reason | Trigger |
 |---|---|
-| `unmapped-path` | A changed path connects to no test, is not itself a test, and is not non-source |
+| `unmapped-path` | A changed path connects to no test, is not itself a test, and is not non-source; or a source file only a basename pattern reaches; or, in a vitest or jest pocket, a changed file that is not a module or a module that no longer exists |
 | `selector-changed` | A resolver source file changed (the selector cannot vouch for its own edits) |
 | `declared-deps-changed` | `tests/declared-deps.toml` changed |
 | `declared-deps-invalid` | The declared-deps file fails to parse or violates an invariant (see below) |
@@ -32,7 +39,7 @@ Unmapped is not silently narrow — a changed path that reaches no test, is not 
 | `tool-unavailable` | The ecosystem's own tool is not on `PATH` |
 | `full-requested` | `--full` was passed explicitly |
 
-A repo-level widen (`selector-changed`, `declared-deps-*`, and `unmapped-path` for a path a Python pocket owns) forces every pocket to `full`. A pocket-level widen (`pocket-config-changed`, `no-adapter`, `tool-unavailable`, and `unmapped-path` for a path outside a native pocket's module graph, crate or package) forces only that pocket.
+A repo-level widen (`selector-changed`, `declared-deps-*`, and `unmapped-path` for a path a Python pocket owns) forces every pocket to `full`. A pocket-level widen (`pocket-config-changed`, `no-adapter`, `tool-unavailable`, and `unmapped-path` for a path outside a native pocket's module graph, crate or package, including a vitest or jest module that no longer exists: `related` and `--findRelatedTests` walk outward from a file that must be there, and report no tests with exit 0 when it is gone) forces only that pocket. Ownership-based tools (Maven, Gradle, nx, turbo, Pants) place a deleted path by its directory and stay narrow.
 
 Non-source paths (git-ignored, root narrative files, or an explicit `[[inert]]` entry) are exempted from ever triggering `unmapped-path` — each exemption is reported in `ignored_non_source`, auditable rather than an opaque allowlist.
 
@@ -77,7 +84,7 @@ A missing tool or a missing adapter widens only that pocket (`tool-unavailable` 
 
 ## Input Modes and Output Contract
 
-Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD`, plus uncommitted changes to tracked files, plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`). A rename counts as both its old and its new path, and a deleted file is never emitted as a test target (a deleted source still selects its surviving tests).
+Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD`, plus uncommitted changes to tracked files, plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`). A rename counts as both its old and its new path, and a deleted file is never emitted as a test target (a deleted source still selects its surviving tests, except in a vitest or jest pocket, where a deleted module widens that pocket).
 
 ```json
 {

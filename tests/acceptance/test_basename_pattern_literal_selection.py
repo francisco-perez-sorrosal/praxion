@@ -2,7 +2,9 @@
 
 A Python test that globs `*.md` depends on every Markdown file, though no
 import or path names one. A slash-less string literal in a Python pocket
-module therefore connects that module to changed files by basename:
+module therefore connects that module to changed files by basename. A
+wildcard pattern selects only a holder that is itself a test module; nothing
+propagates from a production module holding one to the tests reaching it.
 
 - a literal with a wildcard (`*`, `?` or `[`) matches as a glob pattern;
 - a literal without one matches only that exact basename;
@@ -92,21 +94,45 @@ def test_a_file_read_only_by_a_wildcard_literal_gets_the_narrow_run(repo: Scratc
     assert payload["decision"] == "selected"
 
 
-def test_tests_reaching_a_source_module_that_holds_a_wildcard_literal_are_selected(
-    repo: ScratchRepo,
-) -> None:
+def _add_non_test_holder_and_its_importer(repo: ScratchRepo) -> None:
+    """A production module holding `*.md`, and a test that merely imports it."""
     repo.write("pkg/__init__.py")
     repo.write("pkg/doc_index.py", 'DOC_PATTERN = "*.md"\n')
     repo.write(
         "tests/test_doc_index.py",
         "from pkg import doc_index\n\n\ndef test_pattern():\n    assert doc_index.DOC_PATTERN\n",
     )
+
+
+def test_a_data_file_matched_only_by_a_non_test_module_still_widens(repo: ScratchRepo) -> None:
+    _add_non_test_holder_and_its_importer(repo)
     repo.write("docs/intro.md", "# Intro\n")
     repo.commit_all("seed")
 
     payload = resolve(repo, "--changed", "docs/intro.md")
 
-    assert "tests/test_doc_index.py" in selected_tests(payload), payload
+    assert "docs/intro.md" in unmapped_paths(payload), (
+        f"a pattern held by a non-test module accounted for docs/intro.md: {payload}"
+    )
+    assert payload["decision"] == "widened"
+
+
+def test_a_test_reaching_a_non_test_holder_is_not_selected_through_its_pattern(
+    repo: ScratchRepo,
+) -> None:
+    _add_non_test_holder_and_its_importer(repo)
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader("*.md"))
+    repo.write("docs/intro.md", "# Intro\n")
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", "docs/intro.md")
+
+    selected = selected_tests(payload)
+    assert payload["decision"] == "selected", payload
+    assert "tests/test_reads_by_pattern.py" in selected
+    assert "tests/test_doc_index.py" not in selected, (
+        f"a test was selected merely for importing a module that holds *.md: {sorted(selected)}"
+    )
 
 
 @pytest.mark.parametrize(

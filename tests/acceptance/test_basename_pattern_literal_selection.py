@@ -6,8 +6,9 @@ module therefore connects that module to changed files by basename:
 
 - a literal with a wildcard (`*`, `?` or `[`) matches as a glob pattern;
 - a literal without one matches only that exact basename;
-- a literal made only of `*` and `?` names no file, so a stray asterisk can
-  never mark every change as covered.
+- a wildcard literal with no letter or digit outside its wildcards (`*`,
+  `.*`, `*.*`) names no file, so a stray asterisk or a match-anything regex
+  can never mark every change as covered.
 
 Data files narrow, code widens: a wildcard match stands in for the full suite
 only when the changed file is data (Markdown, JSON, YAML, TOML, text, shell).
@@ -111,13 +112,11 @@ def test_tests_reaching_a_source_module_that_holds_a_wildcard_literal_are_select
 @pytest.mark.parametrize(
     ("literal", "changed"),
     [
-        ("*.*", "data/sample.txt"),
-        ("*.*", "config/app.yaml"),
         ("*.sh", "tools/deploy.sh"),
         ("*.toml", "config/app.toml"),
     ],
 )
-def test_a_data_file_read_only_by_a_broad_wildcard_gets_the_narrow_run(
+def test_a_data_file_read_only_by_an_extension_wildcard_gets_the_narrow_run(
     repo: ScratchRepo, literal: str, changed: str
 ) -> None:
     repo.write("tests/test_reads_by_pattern.py", _literal_reader(literal))
@@ -211,15 +210,15 @@ def test_a_source_file_reached_only_by_a_wildcard_runs_every_pocket_in_full(
 def test_a_wildcard_narrows_the_data_file_but_not_the_code_in_one_change(
     repo: ScratchRepo,
 ) -> None:
-    repo.write("tests/test_reads_by_pattern.py", _literal_reader("*.*"))
-    repo.write("data/sample.txt", "rows\n")
-    repo.write("pkg/orphan.py", "value = 1\n")
+    repo.write("tests/test_reads_by_pattern.py", _literal_reader("report*"))
+    repo.write("data/report.txt", "rows\n")
+    repo.write("pkg/report.py", "value = 1\n")
     repo.commit_all("seed")
 
-    payload = resolve(repo, "--changed", "data/sample.txt", "pkg/orphan.py")
+    payload = resolve(repo, "--changed", "data/report.txt", "pkg/report.py")
 
     unmapped = unmapped_paths(payload)
-    assert ("pkg/orphan.py" in unmapped, "data/sample.txt" in unmapped) == (True, False), (
+    assert ("pkg/report.py" in unmapped, "data/report.txt" in unmapped) == (True, False), (
         f"expected only the code file to widen: {payload['widen']}"
     )
     assert payload["decision"] == "widened"
@@ -322,6 +321,29 @@ def test_a_literal_made_only_of_wildcards_leaves_an_unmapped_change_widened(
 
     assert "data/sample.txt" in unmapped_paths(payload), (
         f"the literal {literal!r} switched off the unmapped-path backstop: {payload}"
+    )
+    assert payload["decision"] == "widened"
+
+
+@pytest.mark.parametrize(
+    ("literal", "changed"),
+    [
+        (".*", "config/.editorconfig"),
+        ("*.*", "data/sample.txt"),
+        ("*.*", "config/app.yaml"),
+    ],
+)
+def test_a_match_anything_literal_leaves_a_matching_data_file_widened(
+    repo: ScratchRepo, literal: str, changed: str
+) -> None:
+    repo.write("tests/test_matches_anything.py", _literal_reader(literal))
+    repo.write(changed, "content\n")
+    repo.commit_all("seed")
+
+    payload = resolve(repo, "--changed", changed)
+
+    assert changed in unmapped_paths(payload), (
+        f"{literal!r} has no letter or digit yet accounted for {changed}: {payload}"
     )
     assert payload["decision"] == "widened"
 

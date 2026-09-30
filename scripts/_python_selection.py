@@ -16,9 +16,11 @@ sources, listed in attribution order:
    basename, or a basename pattern (`*.md`) matching the basename of a changed
    path at any depth. A wildcard literal with no letter or digit outside its
    wildcards (`*`, `.*`, `*.*`) names no file. Suffixes, globs and exact
-   basenames are *named* edges that hold at every hop; a basename pattern
-   holds only as the first hop out of a changed path, so it never connects
-   through an intermediate module;
+   basenames are *named* edges that hold at every hop. A basename pattern
+   selects only holders that are themselves runnable test modules, directly
+   from a changed path: nothing propagates from such a holder, and a
+   production module holding `*.md` reads no file in particular, so it
+   selects nothing;
 4. **declared** -- `tests/declared-deps.toml` entries.
 
 A changed path selects every test that reaches it through reverse
@@ -29,9 +31,9 @@ the kind of the first hop out of the changed path, along the test's shortest
 path to it.
 
 Data files narrow, code widens: a changed file reached only by a basename
-pattern selects its readers, but stands in for the full suite only when it is
-not source code. A pattern is a guess about which files a module reads, so a
-source file it happens to match is still unaccounted for and widens; its
+pattern selects its test readers, but stands in for the full suite only when
+it is not source code. A pattern is a guess about which files a module reads,
+so a source file it happens to match is still unaccounted for and widens; its
 readers run within that full run.
 
 Dynamic imports beyond the literal `import_module` form are invisible here;
@@ -126,9 +128,18 @@ def derive(
 
 def _accounted_for(graph: _Graph, path: str, is_runnable: Callable[[str], bool]) -> bool:
     """A path that reached a test stands in for the full suite, unless only a pattern reached it."""
-    if not is_source_code(path) or not graph.pattern_readers(path):
+    if not is_source_code(path) or not _pattern_tests(graph, path, is_runnable):
         return True
     return bool(_reach(graph, path, is_runnable, patterns=False))
+
+
+def _pattern_tests(graph: _Graph, path: str, is_runnable: Callable[[str], bool]) -> list[str]:
+    """Runnable test modules whose basename pattern matches `path`."""
+    return [
+        holder
+        for holder in graph.pattern_readers(path)
+        if is_any_test_file(holder) and is_runnable(holder)
+    ]
 
 
 def _reach(
@@ -138,9 +149,10 @@ def _reach(
 
     Level-order search: a test is attributed along its shortest path, so a
     direct edge is reported as itself; among equally short paths the
-    higher-priority first hop wins. With `patterns`, the first hop also
-    includes the modules whose basename pattern matches `start`; after it the
-    search follows named edges only.
+    higher-priority first hop wins. With `patterns`, a test whose basename
+    pattern matches `start` is found directly at the `path-literal` rank, unless
+    a named edge of higher priority also reaches it; it is never expanded, so
+    nothing propagates from a pattern holder.
     """
     found: dict[str, str] = {}
     if is_any_test_file(start) and is_runnable(start):
@@ -150,8 +162,9 @@ def _reach(
         for node in graph.dependents(start, via):
             frontier[node] = min(frontier.get(node, rank), rank)
     if patterns:
-        for node in graph.pattern_readers(start):
-            frontier[node] = min(frontier.get(node, _PATTERN_RANK), _PATTERN_RANK)
+        for holder in _pattern_tests(graph, start, is_runnable):
+            if frontier.get(holder, _PATTERN_RANK) >= _PATTERN_RANK:
+                found[holder] = "path-literal"
     visited = {start, *frontier}
     while frontier:
         following: dict[str, int] = {}

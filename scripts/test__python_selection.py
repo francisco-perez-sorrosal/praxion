@@ -382,14 +382,47 @@ def test_a_pattern_is_a_first_hop_only_and_never_connects_through_a_module(
     assert "tests/test_pat.py" not in {s.path for s in selection}
 
 
-def test_a_test_reaching_a_module_that_holds_a_pattern_is_selected(tmp_path: Path) -> None:
+def test_a_test_importing_a_non_test_pattern_holder_is_not_selected(tmp_path: Path) -> None:
+    """Fan-out through production modules that hold `*.md` selected most of the suite."""
     _write(tmp_path, "docs/guide.md", "# guide\n")
     _write(tmp_path, "pkg/scan.py", 'GLOB = "*.md"\n')
     _write(tmp_path, "tests/test_scan.py", "import scan\n\n\ndef test_x():\n    pass\n")
 
-    selection = python_selection.select(tmp_path, ["docs/guide.md"], NO_DEPS)
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md"], NO_DEPS)
 
-    assert _via(selection, "tests/test_scan.py") == "path-literal"
+    assert derivation.tests == ()
+    assert derivation.mapped == frozenset()
+
+
+def test_a_non_test_holder_beside_a_test_holder_adds_nothing(tmp_path: Path) -> None:
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "pkg/scan.py", 'GLOB = "*.md"\n')
+    _write(tmp_path, "tests/test_scan.py", "import scan\n\n\ndef test_x():\n    pass\n")
+    _write(tmp_path, "tests/test_reads_docs.py", _READS_EVERY_MARKDOWN)
+
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md"], NO_DEPS)
+
+    assert [t.path for t in derivation.tests] == ["tests/test_reads_docs.py"]
+    assert derivation.mapped == {"docs/guide.md"}
+
+
+def test_a_source_file_matched_by_a_non_test_holder_only_still_widens(tmp_path: Path) -> None:
+    _write(tmp_path, "pkg/tool.py", "value = 1\n")
+    _write(tmp_path, "pkg/scan.py", 'GLOB = "*.py"\n')
+
+    derivation = python_selection.derive(tmp_path, ["pkg/tool.py"], NO_DEPS)
+
+    assert derivation.tests == ()
+    assert derivation.mapped == frozenset()
+
+
+def test_a_named_edge_outranks_the_pattern_that_also_reaches_the_test(tmp_path: Path) -> None:
+    _write(tmp_path, "pkg/foo.py", "value = 1\n")
+    _write(tmp_path, "pkg/test_foo.py", 'GLOB = "*.py"\n\n\ndef test_value():\n    pass\n')
+
+    selection = python_selection.select(tmp_path, ["pkg/foo.py"], NO_DEPS)
+
+    assert _via(selection, "pkg/test_foo.py") == "layout"
 
 
 def test_a_changed_test_holding_a_matching_pattern_stays_self(tmp_path: Path) -> None:

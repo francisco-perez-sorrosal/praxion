@@ -47,6 +47,14 @@ def _prepend_path(monkeypatch: pytest.MonkeyPatch, bin_dir: Path) -> None:
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
 
+def _touch(root: Path, *relative: str) -> None:
+    """Create each pocket-relative file, so a module reads as present on disk."""
+    for rel in relative:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("", encoding="utf-8")
+
+
 # --- no-adapter / tool-unavailable -------------------------------------------
 
 
@@ -77,6 +85,7 @@ def test_a_local_node_modules_binary_counts_as_available(
     local_bin.mkdir(parents=True)
     (local_bin / "vitest").write_text("#!/bin/sh\n", encoding="utf-8")
     (local_bin / "vitest").chmod(0o755)
+    _touch(tmp_path, "src/foo.ts")
     result = native.select("vitest", tmp_path, ("pnpm", "exec"), ("src/foo.ts",))
     assert result == native.Selected(("pnpm", "exec", "vitest", "related", "src/foo.ts", "--run"))
 
@@ -87,6 +96,7 @@ def test_a_local_node_modules_binary_counts_as_available(
 def test_vitest_related_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub(tmp_path / "bin", "vitest")
     _prepend_path(monkeypatch, tmp_path / "bin")
+    _touch(tmp_path, "src/foo.ts")
     result = native.select("vitest", tmp_path, ("pnpm", "exec"), ("src/foo.ts",))
     assert result == native.Selected(("pnpm", "exec", "vitest", "related", "src/foo.ts", "--run"))
 
@@ -94,6 +104,7 @@ def test_vitest_related_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 def test_jest_find_related_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _stub(tmp_path / "bin", "jest")
     _prepend_path(monkeypatch, tmp_path / "bin")
+    _touch(tmp_path, "src/foo.ts")
     result = native.select("jest", tmp_path, ("npx",), ("src/foo.ts",))
     assert result == native.Selected(("npx", "jest", "--findRelatedTests", "src/foo.ts"))
 
@@ -214,6 +225,141 @@ def test_a_changed_non_module_widens_a_module_graph_pocket(
     assert isinstance(result, native.Widen)
     assert result.reason == native.REASON_UNMAPPED
     assert "test/fixtures/data.json" in result.detail
+
+
+_MODULE_SUFFIXES = (
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".mts",
+    ".cts",
+    ".vue",
+    ".svelte",
+)
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+@pytest.mark.parametrize("suffix", _MODULE_SUFFIXES)
+def test_every_module_suffix_keeps_the_narrow_run_for_an_existing_module(
+    framework: str, suffix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary for the suffix set: a module the graph can trace must not widen."""
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    _touch(tmp_path, f"src/foo{suffix}")
+    result = native.select(framework, tmp_path, (), (f"src/foo{suffix}",))
+    assert isinstance(result, native.Selected)
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_json_path_widens_a_module_graph_pocket(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select(framework, tmp_path, (), ("package.json",))
+    assert isinstance(result, native.Widen)
+    assert result.reason == native.REASON_UNMAPPED
+
+
+# --- a module that no longer exists is invisible to the import graph -----------
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_module_that_no_longer_exists_widens_the_pocket(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary: the related-tests run traces outward from a file that must exist, so
+    a deleted module selects nothing and exits 0 -- a silent all-clear."""
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select(framework, tmp_path, (), ("src/gone.ts",))
+    assert isinstance(result, native.Widen)
+    assert result.reason == native.REASON_UNMAPPED
+    assert "src/gone.ts" in result.detail
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_deleted_module_widens_even_beside_a_surviving_changed_module(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    _touch(tmp_path, "src/kept.ts")
+    result = native.select(framework, tmp_path, (), ("src/kept.ts", "src/gone.ts"))
+    assert isinstance(result, native.Widen)
+    assert "src/gone.ts" in result.detail
+    assert "src/kept.ts" not in result.detail
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_directory_named_like_a_module_is_not_a_module(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    (tmp_path / "src" / "odd.ts").mkdir(parents=True)
+    result = native.select(framework, tmp_path, (), ("src/odd.ts",))
+    assert isinstance(result, native.Widen)
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_the_detail_names_both_the_non_module_and_the_missing_module(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select(framework, tmp_path, (), ("test/fixtures/data.json", "src/gone.ts"))
+    assert isinstance(result, native.Widen)
+    assert "test/fixtures/data.json" in result.detail
+    assert "src/gone.ts" in result.detail
+
+
+@pytest.mark.parametrize("framework", ["vitest", "jest"])
+def test_a_module_is_looked_up_under_the_pocket_directory(
+    framework: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A canary for a nested pocket: paths are pocket-relative, never repo-relative."""
+    _stub(tmp_path / "bin", framework)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    pocket = tmp_path / "web"
+    _touch(pocket, "src/kept.ts")
+    kept = native.select(framework, pocket, (), ("src/kept.ts",))
+    gone = native.select(framework, pocket, (), ("src/gone.ts",))
+    assert isinstance(kept, native.Selected)
+    assert isinstance(gone, native.Widen)
+
+
+# Scope boundary: only the import-graph tools trace outward from a file that must
+# exist. Ownership-based adapters place a missing path by its directory and stay narrow.
+@pytest.mark.parametrize(
+    ("framework", "tool", "expected"),
+    [
+        ("maven", "mvn", ("mvn", "test", "-pl", "module-a", "-amd")),
+        ("gradle", "gradle", ("gradle", ":module-a:buildDependents")),
+        (
+            "nx",
+            "nx",
+            ("nx", "affected", "--target=test", "--files=module-a/src/Gone.java"),
+        ),
+        ("turbo", "turbo", ("turbo", "run", "test", "--affected")),
+        ("pants", "pants", ("pants", "test", "module-a/src/Gone.java")),
+    ],
+)
+def test_a_missing_path_still_selects_narrowly_in_an_ownership_based_pocket(
+    framework: str,
+    tool: str,
+    expected: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub(tmp_path / "bin", tool)
+    _prepend_path(monkeypatch, tmp_path / "bin")
+    result = native.select(framework, tmp_path, (), ("module-a/src/Gone.java",))
+    assert result == native.Selected(expected)
 
 
 def _go_select(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, listing: str, *paths: str):

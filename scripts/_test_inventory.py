@@ -37,6 +37,7 @@ import re
 import shlex
 import subprocess
 import tomllib
+import types
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -123,9 +124,48 @@ def under(path: str, root: str) -> bool:
     return root in ("", ".") or path == root or path.startswith(root + "/")
 
 
+# --- Source code ---------------------------------------------------------------
+
+# What each pocket ecosystem's sources end in -- the one place that says "this is
+# code" rather than data. Additive: a new pocket ecosystem adds a key. `monorepo`
+# has no sources of its own, so it has no row.
+SOURCE_SUFFIXES: types.MappingProxyType[str, tuple[str, ...]] = types.MappingProxyType(
+    {
+        "python": (".py",),
+        "typescript": (
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",
+            ".mjs",
+            ".cjs",
+            ".mts",
+            ".cts",
+            ".vue",
+            ".svelte",
+        ),
+        "rust": (".rs",),
+        "go": (".go",),
+        "jvm": (".java", ".kt"),
+    }
+)
+_ALL_SOURCE_SUFFIXES = tuple(s for suffixes in SOURCE_SUFFIXES.values() for s in suffixes)
+# Single-file components are modules a test imports, never test files themselves.
+_COMPONENT_SUFFIXES = (".vue", ".svelte")
+
+
+def is_source_code(path: str) -> bool:
+    """Does `path` end in a source suffix of any pocket ecosystem? Case-sensitive."""
+    return path.endswith(_ALL_SOURCE_SUFFIXES)
+
+
 # --- Naming conventions --------------------------------------------------------
 
-_JS_EXTENSIONS = r"(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)"
+_JS_EXTENSIONS = (
+    "(?:"
+    + "|".join(s[1:] for s in SOURCE_SUFFIXES["typescript"] if s not in _COMPONENT_SUFFIXES)
+    + ")"
+)
 _TEST_NAME = {
     "python": re.compile(r"(?:test_[^/]*|[^/]*_test)\.py\Z"),
     "typescript": re.compile(rf"[^/]*\.(?:test|spec)\.{_JS_EXTENSIONS}\Z"),

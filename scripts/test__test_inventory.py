@@ -166,3 +166,89 @@ def test_file_matching_no_scope_is_uncollected() -> None:
     pytest_scope = test_inventory.CollectionScope(patterns=("scripts/**",))
 
     assert not test_inventory.is_collected("orphan/test_x.py", [pytest_scope])
+
+
+# -- JavaScript test-file suffixes ---------------------------------------------
+
+_JS_SCRIPT_SUFFIXES = ("ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts")
+
+
+@pytest.mark.parametrize("suffix", _JS_SCRIPT_SUFFIXES)
+def test_a_dot_test_file_in_each_javascript_script_suffix_is_a_typescript_test(
+    suffix: str,
+) -> None:
+    assert test_inventory.is_test_file(f"src/x.test.{suffix}", "typescript") is True
+
+
+@pytest.mark.parametrize("suffix", ["vue", "svelte"])
+def test_a_dot_test_component_file_is_not_a_test_file(suffix: str) -> None:
+    """Components are modules a test imports, never tests themselves."""
+    assert test_inventory.is_test_file(f"src/x.test.{suffix}", "typescript") is False
+
+
+# -- Source-code table ---------------------------------------------------------
+
+_ALL_SOURCE_SUFFIXES = [
+    suffix for suffixes in test_inventory.SOURCE_SUFFIXES.values() for suffix in suffixes
+]
+
+
+def test_the_source_table_names_exactly_the_ecosystems_that_have_sources() -> None:
+    assert set(test_inventory.SOURCE_SUFFIXES) == set(test_inventory.ECOSYSTEMS) - {"monorepo"}
+
+
+@pytest.mark.parametrize("suffix", _ALL_SOURCE_SUFFIXES)
+def test_every_source_suffix_is_a_lowercase_dotted_suffix(suffix: str) -> None:
+    assert suffix.startswith(".")
+    assert suffix == suffix.lower()
+    assert len(suffix) > 1
+
+
+def test_no_source_suffix_appears_twice_in_the_table() -> None:
+    assert len(_ALL_SOURCE_SUFFIXES) == len(set(_ALL_SOURCE_SUFFIXES))
+
+
+def test_the_source_table_cannot_be_mutated() -> None:
+    with pytest.raises(TypeError):
+        test_inventory.SOURCE_SUFFIXES["ruby"] = (".rb",)
+
+
+@pytest.mark.parametrize("suffix", _JS_SCRIPT_SUFFIXES)
+def test_the_javascript_script_suffixes_are_part_of_the_typescript_row(suffix: str) -> None:
+    assert f".{suffix}" in test_inventory.SOURCE_SUFFIXES["typescript"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "src/app.py",
+        "web/src/app.tsx",
+        "web/src/App.vue",
+        "web/src/Widget.svelte",
+        "crate/src/lib.rs",
+        "cmd/main.go",
+        "service/src/Main.java",
+        "service/src/Main.kt",
+        "pkg.v2/module.py",
+    ],
+)
+def test_is_source_code_recognises_every_pocket_ecosystems_sources(path: str) -> None:
+    assert test_inventory.is_source_code(path) is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "docs/guide.md",
+        "settings.yaml",
+        "data/report.csv",
+        "package.json",
+        "Makefile",
+        "src.py/data.json",
+        "notes.py.txt",
+        "SRC/APP.PY",
+    ],
+)
+def test_is_source_code_rejects_data_and_case_variants(path: str) -> None:
+    """A dotted directory does not make a file source, and the suffix test is case-sensitive."""
+    assert test_inventory.is_source_code(path) is False

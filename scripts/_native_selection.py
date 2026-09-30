@@ -28,9 +28,13 @@ by hand. A recognized framework whose tool is missing from `PATH` widens with
 `tool-unavailable` instead of raising -- exactly like an unmapped Python path,
 a native pocket the resolver cannot account for runs in full, never in
 silence. For the same reason a changed path the adapter cannot place widens
-with `unmapped-path`: a non-module file for vitest/jest (their graph follows
-imports, so a fixture read at run time reaches no test), a file outside every
-crate for cargo, a file outside every package for go.
+with `unmapped-path`: for vitest/jest a non-module file (their graph follows
+imports, so a fixture read at run time reaches no test) and a module that no
+longer exists (the graph walks outward from a file that must be there), a file
+outside every crate for cargo, a file outside every package for go. Ownership-
+based adapters (Maven, Gradle, nx, turbo, Pants) place a deleted path by its
+directory and stay narrow. An adapter of an import-graph tool routes through
+`_module_graph_only` to inherit both rules.
 
 Contract: `skills/testing-strategy/references/test-selection.md`.
 Stdlib-only: it runs under a bare `python3` (gate-liveness GL05).
@@ -41,9 +45,14 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _test_inventory import SOURCE_SUFFIXES  # noqa: E402
 
 REASON_TOOL_UNAVAILABLE = "tool-unavailable"
 REASON_NO_ADAPTER = "no-adapter"
@@ -53,18 +62,7 @@ REASON_UNMAPPED = "unmapped-path"
 # What a module-graph tool (vitest `related`, jest `--findRelatedTests`) can
 # trace. Anything else -- a fixture read through `fs`, a JSON config -- is
 # invisible to it, and it reports "no related tests" with exit 0.
-_JS_MODULE_SUFFIXES = (
-    ".js",
-    ".jsx",
-    ".mjs",
-    ".cjs",
-    ".ts",
-    ".tsx",
-    ".mts",
-    ".cts",
-    ".vue",
-    ".svelte",
-)
+_JS_MODULE_SUFFIXES = SOURCE_SUFFIXES["typescript"]
 
 
 @dataclass(frozen=True)
@@ -166,20 +164,43 @@ def _unmapped(paths: Sequence[str], why: str) -> Widen | None:
     return Widen(REASON_UNMAPPED, f"{why}: {', '.join(paths)}")
 
 
-def _module_graph_only(paths: tuple[str, ...]) -> Widen | None:
-    outside = [p for p in paths if not p.endswith(_JS_MODULE_SUFFIXES)]
-    return _unmapped(outside, "not a module the related-tests graph can trace")
+def _module_graph_only(pocket_dir: Path, paths: tuple[str, ...]) -> Widen | None:
+    """The widen for a path an import-graph tool cannot trace, or None when it can trace all.
+
+    Two shapes are invisible to `related`/`--findRelatedTests`, and both come back as
+    "no related tests" with exit 0: a file that is not a module, and a module that no
+    longer exists (the graph walks outward from a file that must be there).
+    """
+    modules = [p for p in paths if p.endswith(_JS_MODULE_SUFFIXES)]
+    outside = [p for p in paths if p not in modules]
+    gone = [p for p in modules if not (pocket_dir / p).is_file()]
+    findings = [
+        (why, group)
+        for why, group in (
+            ("not a module the related-tests graph can trace", outside),
+            ("a module that no longer exists", gone),
+        )
+        if group
+    ]
+    if not findings:
+        return None
+    detail = "; ".join(f"{why}: {', '.join(group)}" for why, group in findings)
+    return Widen(REASON_UNMAPPED, detail)
 
 
 # --- Self-computing adapters: the tool's own flag walks its dependency graph ---
 
 
 def _vitest(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:
-    return _module_graph_only(paths) or Selected((*prefix, "vitest", "related", *paths, "--run"))
+    return _module_graph_only(pocket_dir, paths) or Selected(
+        (*prefix, "vitest", "related", *paths, "--run")
+    )
 
 
 def _jest(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:
-    return _module_graph_only(paths) or Selected((*prefix, "jest", "--findRelatedTests", *paths))
+    return _module_graph_only(pocket_dir, paths) or Selected(
+        (*prefix, "jest", "--findRelatedTests", *paths)
+    )
 
 
 def _maven(pocket_dir: Path, prefix: tuple[str, ...], paths: tuple[str, ...]) -> Native:

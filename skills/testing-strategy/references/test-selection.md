@@ -14,10 +14,10 @@ The resolver builds one dependency graph per pocket from four sources, then unio
    - *path suffix* — contains `/`, no wildcard: matches the end of a path (the file or one of its directories);
    - *path glob* — contains `/` and a wildcard (`*`, `?`, `[`): matches as a glob;
    - *exact basename* — no `/`, no wildcard: matches only that exact basename, at any depth;
-   - *basename pattern* — no `/`, a wildcard, and at least one letter or digit outside the wildcards (`*.md`, `report*`): matches the basename of a **changed** path at any depth, as the first hop only, so it never connects through an intermediate module the way a path glob does;
+   - *basename pattern* — no `/`, a wildcard, and at least one letter or digit outside the wildcards (`*.md`, `report*`): matches the basename of a **changed** path at any depth and selects only holders that are themselves test modules. Nothing propagates from a holder, and a production module holding one selects nothing through it: a script that globs every Markdown file names no file in particular, and fanning out through such scripts would select most of the suite for any documentation change;
    - *ignored* — empty, `.`, or a wildcard literal with no letter or digit outside its wildcards (`*`, `**`, `?`, `.*`, `*.*`, `[a-z]*`): a separator, a repetition count or a regular expression, never a claim about which files a module reads.
 
-   **Data files narrow, code widens.** A changed file reached only by a basename pattern always selects the pattern's holders, but it counts as accounted for (no `unmapped-path`) only when it is a data file. A source file of any pocket ecosystem — Python `.py`; JavaScript and TypeScript `.js .jsx .mjs .cjs .ts .tsx .mts .cts .vue .svelte`; Rust `.rs`; Go `.go`; JVM `.java .kt` — reached only by a pattern still widens, and its readers run within that full run: a pattern is a guess about what a module reads, never a substitute for the import and layout tracing that code relies on.
+   **Data files narrow, code widens.** A changed file reached only by a basename pattern always selects the test modules that hold it, but it counts as accounted for (no `unmapped-path`) only when it is a data file. A source file of any pocket ecosystem — Python `.py`; JavaScript and TypeScript `.js .jsx .mjs .cjs .ts .tsx .mts .cts .vue .svelte`; Rust `.rs`; Go `.go`; JVM `.java .kt` — reached only by a pattern still widens, and its readers run within that full run: a pattern is a guess about what a module reads, never a substitute for the import and layout tracing that code relies on.
 4. **Declared.** Non-code dependencies the first three sources cannot see — see [The Declared List](#the-declared-list-testsdeclared-depstoml) below.
 
 A changed test file always selects itself (`via: self`). Selection is reverse reachability: which test files reach a changed path through any of the four edges.
@@ -126,6 +126,17 @@ Measured 2026-09-29 on Praxion itself: the resolver at `90cbdc2a` run over the c
 | Edge attribution across narrow selections | path-literal 63%, declared 33%, import 4% |
 
 The refresh plan's risk trigger ("restrict production path-literal edges if the median selection exceeds 25% of the corpus") **fires**: the narrow median is 36%. Removing path-literal edges would drop at most 44 files from the median narrow selection, roughly 19% of the corpus. That is an upper bound, because `via` names only the first source that connects a test, so some of those files are also reached through a declared edge. Re-measure with the same method before and after any change to the edge sources.
+
+**Re-measured 2026-09-30, before and after basename patterns and the vitest/jest deleted-module widen.** Same method and the same 50 change sets, with both resolvers run over one tree (a 270-file corpus: the tree had gained outer-loop test files since the first measurement).
+
+| Measure | Before | After |
+|---|---|---|
+| Widened to the full suite | 8 of 50 | 8 of 50 |
+| Median / p90, narrow runs only (42) | 98.5 / 199 files (36% / 74%) | 101 / 201 files (37% / 74%) |
+| Median / p90, widened runs counted as 270 | 122 / 270 (45% / 100%) | 124 / 270 (46% / 100%) |
+| Edge attribution | path-literal 64%, declared 32%, import 4% | path-literal 65%, declared 30%, import 4% |
+
+A first design let a basename pattern select every test reaching its holder. Measured the same way, it moved the narrow median to 82%, because dozens of production scripts hold `*.md`; that is why a pattern selects only holders that are test modules.
 
 ## The Five Loops — Operational Copy
 

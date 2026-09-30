@@ -350,6 +350,58 @@ def test_slug_regex_accepts_backticked_form() -> None:
     assert module.TASK_SLUG_RE.search("Task slug: auth-flow\n").group(1) == "auth-flow"
 
 
+@pytest.mark.parametrize("trailer", [".", ",", ";", ":", ")", "?", "!", "\n"])
+def test_slug_ends_at_the_first_character_outside_the_slug_alphabet(trailer: str) -> None:
+    """Silent failure pinned: `Task slug: auth-flow.` read as `auth-flow.`, so a
+    briefed pipeline was warned about `.ai-work/auth-flow./TASK_BRIEF.md`."""
+    module = _load_module()
+    match = module.TASK_SLUG_RE.search(f"Task slug: auth-flow{trailer} Design it.")
+    assert match.group(1) == "auth-flow"
+
+
+def test_backticked_slug_followed_by_a_period_is_read_whole() -> None:
+    """Silent failure pinned: closing backtick plus sentence period bled into the slug."""
+    module = _load_module()
+    assert module.TASK_SLUG_RE.search("Task slug: `auth-flow`.").group(1) == "auth-flow"
+
+
+def test_slug_alphabet_is_letters_digits_hyphens_and_underscores() -> None:
+    module = _load_module()
+    assert module.TASK_SLUG_RE.search("Task slug: auth_flow-2.").group(1) == "auth_flow-2"
+
+
+def test_a_dot_inside_a_slug_ends_it_there() -> None:
+    """`v1.2-fix` is not a legal task slug; it is read as `v1`, never as a dotted path."""
+    module = _load_module()
+    assert module.TASK_SLUG_RE.search("Task slug: v1.2-fix").group(1) == "v1"
+
+
+def test_slug_must_start_with_a_letter_or_digit() -> None:
+    module = _load_module()
+    assert module.TASK_SLUG_RE.search("Task slug: -auth") is None
+
+
+@pytest.mark.parametrize("punctuation", [".", ",", ")"])
+def test_silent_when_brief_exists_and_punctuation_follows_the_slug(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, punctuation: str
+) -> None:
+    """Silent failure pinned: a briefed pipeline was told its brief was missing."""
+    (repo / ".ai-work" / "auth-flow" / "TASK_BRIEF.md").write_text("brief")
+    payload = _payload(prompt=f"Task slug: auth-flow{punctuation} Design it.", cwd=str(repo))
+    assert _drive_process(_load_module(), payload, monkeypatch) == ""
+
+
+@pytest.mark.parametrize("punctuation", [".", ",", ")"])
+def test_missing_brief_warning_names_the_path_without_the_punctuation(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, punctuation: str
+) -> None:
+    """Silent failure pinned: the advisory pointed at `.ai-work/auth-flow./TASK_BRIEF.md`."""
+    payload = _payload(prompt=f"Task slug: auth-flow{punctuation} Design it.", cwd=str(repo))
+    text = _drive_process(_load_module(), payload, monkeypatch)
+    assert ".ai-work/auth-flow/TASK_BRIEF.md" in text
+    assert f"auth-flow{punctuation}/" not in text
+
+
 def test_namespaced_subagent_type_is_normalized() -> None:
     module = _load_module()
     assert module._normalize_stage("praxion:systems-architect") == "systems-architect"

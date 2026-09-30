@@ -68,9 +68,15 @@ BRIEF_CONSUMING_STAGES = frozenset(
     }
 )
 
-# `Task slug: <slug>` per the task-slug propagation contract. Backticks are
-# optional because orchestrators write the slug both ways.
-TASK_SLUG_RE = re.compile(r"Task slug:\s*`?([A-Za-z0-9][A-Za-z0-9._-]*)`?")
+# `Task slug: <slug>` per the task-slug propagation contract. An opening
+# backtick is optional because orchestrators write the slug both ways.
+#
+# The slug alphabet is letters, digits, `-` and `_` (the one extract_spec.py
+# accepts). `.` is excluded on purpose: orchestrators write the label inside
+# ordinary sentences, and a sentence-final period read into the slug points the
+# reminder at a brief path that can never exist. The slug ends at the first
+# character outside the alphabet, so a closing backtick needs no pattern of its own.
+TASK_SLUG_RE = re.compile(r"Task slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
 
 
 def _emit(message: str) -> None:

@@ -13,6 +13,8 @@ The probe fails, with a reason of the form `expected ...; observed ...`, when:
 - the resolver is missing or does not answer `--help` (checked first, in seconds);
 - the tracer is shadowed, the suite does not run (pytest exit other than 0 or 1),
   or no reads are recorded at all (a dead tracer must not pass as an empty audit);
+- a test file fails to collect (named): its reads cannot be audited, and under
+  xdist pytest reports that as exit 1, the same code as a failing test;
 - a collected test file never ran under the tracer (no heartbeat);
 - the resolver fails, or does not answer for a path (a missing or unparseable
   answer selects nothing: fail closed);
@@ -39,6 +41,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -72,6 +75,8 @@ RESOLVER_TIMEOUT_S = 240.0
 RESOLVER_PROCESSES = min(8, os.cpu_count() or 1)
 SUITE_EXIT_CODES = (0, 1)  # 1 = failing tests, a note; anything else means the suite did not run
 
+_SUMMARY_HEADER = "short test summary info"
+_COLLECTION_ERROR = re.compile(r"ERROR (?P<target>\S+)(?: - .*)?")
 _TAIL_CHARS = 300
 _NAMED_FILES = 5
 
@@ -348,13 +353,16 @@ def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedRead
         _check_tracer_loads(repo_root, traced)
         argv = [
             sys.executable, "-m", "pytest", "--no-cov", "-p", "no:cacheprovider",
-            "-p", "selection_trace_plugin", "--continue-on-collection-errors",
+            "-p", "selection_trace_plugin", "--continue-on-collection-errors", "--color=no",
         ]  # fmt: skip
         done = _capture(argv, repo_root, traced, SUITE_TIMEOUT_S, "the traced default suite")
+        uncollected = uncollected_reason(done.stdout)
+        if uncollected is not None:
+            raise ProbeError(uncollected)
         if done.returncode not in SUITE_EXIT_CODES:
             observed = f"pytest exit code {done.returncode}: {_tail(done.stderr or done.stdout)}"
             raise ProbeError(_failure("the default suite to run under the tracer", observed))
-        return _read_trace(out_dir), _suite_notes(done.returncode, done.stdout)
+        return _read_trace(out_dir), suite_notes(done.returncode)
     finally:
         shutil.rmtree(out_dir, ignore_errors=True)
 
@@ -395,32 +403,40 @@ def _read_trace(out_dir: Path) -> ObservedReads:
         raise ProbeError(_failure("readable trace records", str(exc))) from exc
 
 
-def _suite_notes(exit_code: int, stdout: str) -> tuple[str, ...]:
-    notes: list[str] = []
+def suite_notes(exit_code: int) -> tuple[str, ...]:
     if exit_code == 1:
-        notes.append("the suite exited 1 (failing tests); its health belongs to other jobs")
+        return ("the suite exited 1 (failing tests); its health belongs to other jobs",)
+    return ()
+
+
+def uncollected_reason(stdout: str) -> str | None:
+    """Why a suite with test files that failed to collect cannot support an audit; None when none did."""
     uncollected = collection_errors(stdout)
-    if uncollected:
-        named = ", ".join(uncollected[:_NAMED_FILES])
-        notes.append(
-            f"{len(uncollected)} test file(s) failed to collect, so their reads were not audited: {named}"
-        )
-    return tuple(notes)
+    if not uncollected:
+        return None
+    named = ", ".join(uncollected[:_NAMED_FILES]) + (
+        ", ..." if len(uncollected) > _NAMED_FILES else ""
+    )
+    return _failure(
+        "every test file to collect, so its reads can be audited",
+        f"{len(uncollected)} failed to collect: {named}",
+    )
 
 
 def collection_errors(stdout: str) -> tuple[str, ...]:
     """The test files pytest's short summary reports as `ERROR <file>` collection errors, sorted.
 
-    The suite runs with `--continue-on-collection-errors`: one file that cannot be imported
-    must not hide the reads of every other test, but it must stay visible in the verdict.
+    Read from uncoloured output (the suite runs with `--color=no`, since `FORCE_COLOR` in the
+    environment would otherwise colour the `ERROR` word). `--continue-on-collection-errors`
+    makes the run report every such file, with or without xdist, instead of stopping at the first.
+    Only the summary section counts, so a failing test's captured `ERROR` log line is not
+    misread as a file; the ` - <reason>` suffix is optional (pytest omits it in some modes).
     """
-    files = set()
-    for line in stdout.splitlines():
-        if line.startswith("ERROR ") and " - " in line:
-            target = line[len("ERROR ") :].split(" - ", 1)[0].strip()
-            if "::" not in target:
-                files.add(target)
-    return tuple(sorted(files))
+    _, header, summary = stdout.rpartition(_SUMMARY_HEADER)
+    if not header:
+        return ()
+    matches = (_COLLECTION_ERROR.fullmatch(line) for line in summary.splitlines())
+    return tuple(sorted({m["target"] for m in matches if m and "::" not in m["target"]}))
 
 
 def _tracked_files(repo_root: Path) -> frozenset[str]:

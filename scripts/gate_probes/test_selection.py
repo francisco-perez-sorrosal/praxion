@@ -492,24 +492,54 @@ def test_good_twin_a_live_resolver_passes_the_canary(monkeypatch):
     assert missed == ()
 
 
-def test_collection_errors_names_each_file_that_failed_to_collect():
+def test_collection_errors_names_each_file_the_short_summary_lists():
     stdout = "\n".join(
         [
+            "ERROR    root:test_e.py:3 a captured log line, not a summary line",
+            "ERROR scripts/test_e.py",
+            "=========================== short test summary info ============================",
             "ERROR scripts/test_b.py - ImportError: cannot import name 'x'",
-            "ERROR scripts/test_a.py - SyntaxError: invalid syntax",
+            "ERROR scripts/test_a.py",
             "ERROR scripts/test_a.py - SyntaxError: invalid syntax",
             "FAILED scripts/test_c.py::test_one - AssertionError",
             "ERROR scripts/test_d.py::test_fixture - fixture 'f' not found",
+            "========================== 1 passed, 2 errors in 0.05s ==========================",
         ]
     )
     assert selection.collection_errors(stdout) == ("scripts/test_a.py", "scripts/test_b.py")
 
 
-def test_suite_notes_name_uncollected_files_beside_the_failing_exit():
-    notes = selection._suite_notes(1, "ERROR scripts/test_b.py - ImportError: boom\n")
-    assert len(notes) == 2
-    assert "scripts/test_b.py" in notes[1]
+def test_good_twin_error_lines_outside_the_summary_name_no_file():
+    assert selection.collection_errors("ERROR scripts/test_e.py\n1 passed in 0.01s\n") == ()
 
 
-def test_good_twin_a_clean_run_has_no_notes():
-    assert selection._suite_notes(0, "1 passed in 0.01s\n") == ()
+SUMMARY = "=========================== short test summary info ============================"
+
+
+def test_a_test_file_that_failed_to_collect_fails_the_audit_naming_it():
+    reason = selection.uncollected_reason(
+        f"{SUMMARY}\nERROR scripts/test_b.py - ImportError: boom\n"
+    )
+    assert reason is not None
+    assert reason.startswith("expected ")
+    assert "scripts/test_b.py" in reason
+
+
+def test_good_twin_a_run_that_collected_every_file_has_no_collection_reason():
+    assert selection.uncollected_reason("1 passed in 0.01s\n") is None
+
+
+def test_a_failing_test_exit_is_a_note_and_a_clean_exit_is_none():
+    assert len(selection.suite_notes(1)) == 1
+    assert selection.suite_notes(0) == ()
+
+
+def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_selected(tmp_path):
+    root = _scratch_repo(tmp_path, resolver=_SELECTS_ALL)
+    (root / "tests" / "test_broken.py").write_text("import a_module_that_does_not_exist\n")
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+
+    verdict = selection.run(root, {**_env(), "FORCE_COLOR": "1"})
+
+    assert not verdict.passed, verdict
+    assert "tests/test_broken.py" in verdict.reason

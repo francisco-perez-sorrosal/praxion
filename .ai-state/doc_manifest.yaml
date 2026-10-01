@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-01T07:19:53Z'
+generated_at: '2026-10-01T08:23:25Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-09-30'
+  last_modified: '2026-10-01'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2931,7 +2931,7 @@ surfaces:
   path: .ai-state/decisions/394-per-tier-pipeline-envelope.md
   type: markdown
   title: "Encode the per-tier pipeline envelope mechanically \u2014 registry-owned artifact floor, agent_start spawn count with a per-tier budget, model-visible calibration reminder"
-  last_modified: '2026-09-30'
+  last_modified: '2026-10-01'
   renderer: adr_card
 - id: ai-state-decisions-395-keep-wip-separate-from-implementation-plan
   path: .ai-state/decisions/395-keep-wip-separate-from-implementation-plan.md
@@ -3053,11 +3053,17 @@ surfaces:
   title: Observation-log location and project resolve once, in the owner package, to the nearest project within the checkout
   last_modified: '2026-10-01'
   renderer: adr_card
+- id: ai-state-decisions-415-report-artifacts-born-partial
+  path: .ai-state/decisions/415-report-artifacts-born-partial.md
+  type: markdown
+  title: Report artifacts are written first, marked [PARTIAL], and unmarked last; existence no longer means finished
+  last_modified: '2026-10-01'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-09-30'
+  last_modified: '2026-10-01'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3777,6 +3783,7 @@ groups:
   - ai-state-decisions-412-raise-spawn-budgets
   - ai-state-decisions-413-spawns-attributed-by-prompt-task-slug
   - ai-state-decisions-414-wal-rows-resolve-to-nearest-project
+  - ai-state-decisions-415-report-artifacts-born-partial
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

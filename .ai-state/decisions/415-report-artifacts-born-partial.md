@@ -1,7 +1,8 @@
 ---
-id: dec-draft-b819a971
+id: dec-415
+draft_id: dec-draft-b819a971
 title: Report artifacts are written first, marked [PARTIAL], and unmarked last; existence no longer means finished
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-01
 summary: "The verifier, researcher, systems-architect, implementation-planner and sentinel write their report within their first three tool calls with [PARTIAL] on the title and remove it as their last edit (a light review writes LIGHT_REVIEW_step-<N>.md the same way); artifact_registry owns PARTIAL_MARKER and is_partial, the eval task manifest reports partial and the dashboard no longer treats a [PARTIAL] verification report as done"

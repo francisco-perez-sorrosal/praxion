@@ -44,9 +44,13 @@ duplicated into any prose document -- point a reader here instead.
 6. `pytest_add_cli_args_test_selection` is the `--tests` file **basenames**.
    mutmut's own pytest sub-invocations run with `cwd=mutants/`, so a path
    carrying the target directory's name would read as not-found there.
-7. `pytest_add_cli_args = ["--no-cov"]` on every pytest call mutmut makes,
-   so a mutation run can never clobber the repo-root `coverage.xml`/`.coverage`
-   this tool's own test suite depends on.
+7. `pytest_add_cli_args = ["-o", "addopts="]` on every pytest call mutmut
+   makes: it drops the project's configured `addopts`, so a mutation run can
+   never clobber the repo-root `coverage.xml`/`.coverage` this tool's own test
+   suite depends on, and never runs tests in xdist workers (`-n auto`), whose
+   calls mutmut's in-process trampolines cannot see -- every mutant then reads
+   as uncovered and the run fails. A core pytest option, it also works where
+   neither pytest-cov nor xdist is installed (`--no-cov` and `-n 0` do not).
 8. The generated `pyproject.toml` carries a marker comment
    (`PYPROJECT_MARKER` below) so a run killed mid-flight (SIGKILL, a hard
    turn-budget cutoff) leaves a stray config this script can recognize and
@@ -405,7 +409,7 @@ def _write_pyproject(
         f"source_paths = {json.dumps(source_paths)}\n"
         f"only_mutate = {json.dumps(target_names)}\n"
         f"pytest_add_cli_args_test_selection = {json.dumps(test_names)}\n"
-        'pytest_add_cli_args = ["--no-cov"]\n'
+        'pytest_add_cli_args = ["-o", "addopts="]\n'
         f"debug = {'true' if debug else 'false'}\n"
     )
     path = target_dir / "pyproject.toml"

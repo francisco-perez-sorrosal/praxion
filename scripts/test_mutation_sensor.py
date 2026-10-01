@@ -16,7 +16,7 @@ Boundary discipline: the mutmut/uv subprocess is the only external system in sco
 and it is faked at the `subprocess.run` seam (`_install_fake_uv` below) for every
 test except `TestRealMutmutSmoke`, which performs one genuinely real invocation --
 required because the coverage-isolation claim below is about mutmut's *own* pytest
-sub-invocations (`cwd=mutants/`, `--no-cov`), which no fake can exercise. The real
+sub-invocations (`cwd=mutants/`, `-o addopts=`), which no fake can exercise. The real
 `git` binary is never faked -- `_install_fake_uv` passes any non-`uv` executable
 through to the real `subprocess.run` unchanged, so the foreign-project-root lookup
 (`git -C <dir> rev-parse --show-toplevel`) always runs for real.
@@ -302,6 +302,20 @@ class TestFlatLayoutRefusal:
 # ---------------------------------------------------------------------------
 # An existing pyproject.toml is a refusal, and is never touched
 # ---------------------------------------------------------------------------
+
+
+class TestGeneratedConfigDropsProjectAddopts:
+    def test_mutmut_pytest_runs_override_addopts_rather_than_naming_plugin_flags(
+        self, tmp_path: Path
+    ) -> None:
+        """A project's `-n auto` sends tests to xdist workers whose calls mutmut's
+        trampolines never see, failing every run; `--no-cov`/`-n 0` would break an
+        environment without those plugins. `-o addopts=` is core pytest."""
+        (tmp_path / "flaky.py").write_text("X = 1\n", encoding="utf-8")
+
+        path = ms._write_pyproject(tmp_path, ["flaky.py"], ["test_flaky.py"], debug=False)
+
+        assert 'pytest_add_cli_args = ["-o", "addopts="]' in path.read_text(encoding="utf-8")
 
 
 class TestPyprojectPresentRefusal:

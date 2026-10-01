@@ -913,6 +913,7 @@ class TestObservationEnvelope:
             "classification",
             "agent_type_source",
             "start_correlation",
+            "slug_attribution",
         }
         assert row["project"] == project.name
         assert row["tool_name"] is None
@@ -1666,6 +1667,40 @@ class TestSubagentTranscriptUsage:
 
         assert "tokens_in" not in row
         assert "usage_source" not in row
+
+
+class TestAgentStartAttributionMarker:
+    """New `agent_start` rows say a stated slug is joined at read time; the
+    marker's absence is what tells a reader the row predates that."""
+
+    def test_an_agent_start_carries_the_marker_and_still_names_the_checkout_as_project(
+        self, project: Path
+    ) -> None:
+        module = _load_module()
+        payload = {"agent_id": "a1", "agent_type": "praxion:researcher", "cwd": str(project)}
+
+        row = module.build_observation(payload, "agent_start", project=project.name)
+
+        assert row["slug_attribution"] == "spawn-prompt"
+        assert row["project"] == project.name
+
+    @pytest.mark.parametrize("event_type", ["agent_stop", "session_start", "session_stop"])
+    def test_no_other_lifecycle_row_carries_the_marker(
+        self, project: Path, event_type: str
+    ) -> None:
+        module = _load_module()
+        payload = {"agent_id": "a1", "agent_type": "praxion:researcher", "cwd": str(project)}
+
+        row = module.build_observation(payload, event_type, project=project.name)
+
+        assert "slug_attribution" not in row
+
+    def test_a_helper_stop_does_not_carry_the_marker(self) -> None:
+        module = _load_module()
+
+        row = module.build_helper_stop({"agent_id": "h1", "session_id": "s"}, project="repo")
+
+        assert "slug_attribution" not in row
 
 
 def _sum_subagent_transcript_without_tag_check(module, payload: dict) -> dict:

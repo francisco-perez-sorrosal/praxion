@@ -69,3 +69,19 @@ def test_canary_dropping_a_standard_min_consumers_need_fails_the_contract():
         "dropping a standard-min consumer's declared event class out of "
         "standard must be caught, not silent"
     )
+
+
+def test_only_the_agent_start_class_declares_the_attribution_marker():
+    declaring = [
+        event_class
+        for event_class, spec in registry.EVENTS.items()
+        if "slug_attribution" in spec.fields
+    ]
+
+    assert declaring == [registry.EventClass.AGENT_START]
+
+
+def test_the_spawn_tally_declares_the_attribution_marker_among_its_agent_start_needs():
+    (tally,) = [c for c in registry.CONSUMERS if c.name == "scripts/spawn_count.py"]
+
+    assert "slug_attribution" in tally.needs[registry.EventClass.AGENT_START]

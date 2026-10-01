@@ -227,6 +227,11 @@ CORRELATION_NOT_APPLICABLE = "not-applicable"
 STOP_SOURCE_HOOK = "hook"
 STOP_SOURCE_TRANSCRIPT_NOTIFICATION = "transcript-notification"
 
+# Marker on every agent_start written here: the slug a spawn is charged to is
+# joined at read time from the prompt its Agent result carries, not stamped on
+# this row. Rows lacking it predate that and are charged to their `project`.
+SLUG_ATTRIBUTION_SPAWN_PROMPT = "spawn-prompt"
+
 # Which transcript `_sum_subagent_transcript` actually read to populate the
 # usage fields below. Commit 23b1bbc5 changed what those fields *mean* on an
 # `agent_stop` row -- pre-fix rows carried the parent session's cumulative
@@ -664,6 +669,8 @@ def build_observation(
     if event_type == "agent_stop":
         row["stop_source"] = STOP_SOURCE_HOOK
         row.update(_sum_subagent_transcript(payload))
+    elif event_type == _SPAWN_EVENT_TYPE:
+        row["slug_attribution"] = SLUG_ATTRIBUTION_SPAWN_PROMPT
     return row
 
 

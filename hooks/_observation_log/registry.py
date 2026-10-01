@@ -85,6 +85,9 @@ _LIFECYCLE_FIELDS = (
 # process resolved the mode it did -- every other lifecycle row only carries
 # the mode itself.
 _SESSION_START_FIELDS = _LIFECYCLE_FIELDS + ("log_mode_source",)
+# An agent_start written since stated slugs began joining at read time says so;
+# a row without the marker predates that, and a reader charges it to `project`.
+_AGENT_START_FIELDS = _LIFECYCLE_FIELDS + ("slug_attribution",)
 _AGENT_STOP_USAGE_FIELDS = (
     "stop_source",
     "tokens_in",
@@ -125,7 +128,7 @@ EVENTS = MappingProxyType(
             "session_stop", "capture_session", _FULL_AND_STANDARD, _LIFECYCLE_FIELDS
         ),
         EventClass.AGENT_START: EventSpec(
-            "agent_start", "capture_session", _FULL_AND_STANDARD, _LIFECYCLE_FIELDS
+            "agent_start", "capture_session", _FULL_AND_STANDARD, _AGENT_START_FIELDS
         ),
         EventClass.AGENT_STOP: EventSpec(
             "agent_stop",
@@ -273,6 +276,7 @@ CONSUMERS = (
                 "timestamp",
                 "session_id",
                 "project",
+                "slug_attribution",
             )
         },
         Mode.STANDARD,

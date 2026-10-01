@@ -106,8 +106,10 @@ dev = [
 # always is what keeps tests hermetic -- a test that shares a fixed path or
 # global state fails here, not in CI. Debug a single test with `-n 0`
 # (needed for --pdb). `large` tests (live external services) are deselected;
-# run them with `-m large`.
-addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
+# run them with `-m large`. `liveness` tests (whole-suite gate-liveness
+# scenarios, minutes each) are deselected too, and run only by the scheduled
+# liveness job with `-m liveness` -- never in the default suite or `-m large`.
+addopts = "-ra --strict-markers -n auto --dist load -m 'not large and not liveness'"
 # `hooks` joined `tests`/`scripts` on 2026-08-06. It was previously excluded and
 # invoked as a separate `pytest hooks/ --no-cov` CI step, which made the canonical
 # coverage measurement blind to all 41 hook modules: only the handful that
@@ -122,6 +124,7 @@ addopts = "-ra --strict-markers -n auto --dist load -m 'not large'"
 testpaths = ["tests", "scripts", "hooks", "skills"]
 markers = [
     "large: needs live external services (daemons, network); deselected by default, run with -m large",
+    "liveness: whole-suite gate-liveness scenarios; deselected by default; run only by the scheduled gate-liveness-canaries job with -m liveness",
 ]
 # Repo root on sys.path so tests can import `scripts.project_metrics.*`
 # without requiring PYTHONPATH to be set by the invoker. scripts/ is not

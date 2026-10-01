@@ -31,9 +31,9 @@ Code uses): `heavy` when the last assistant turn at/before the resume timestamp 
 `--heavy-context` (default 250,000), `light` below it, `unsized` when unknown.
 
 Budget verdict: `charged` is every attributed spawn (definite) plus every heavy resume;
-unsized resumes and every unattributed spawn in the log form the pending pool, each of
-which could still turn out to be charged to this slug. `within` needs
-`charged + unsized + unattributed <= budget`; `over` is `charged > budget`;
+unsized resumes, every unattributed spawn in the log and each resume of one form the
+pending pool, each of which could still turn out to be charged to this slug. `within`
+needs `charged + unsized + pending unattributed <= budget`; `over` is `charged > budget`;
 `indeterminate` is the remainder; `no-budget` when `--budget` is omitted. Exit 0 for
 within/indeterminate/no-budget, 1 for over, 2 for withheld (`wal-absent`, `slug-unseen`,
 `plugin-cache-root`).
@@ -195,8 +195,9 @@ def verdict(
 ) -> Verdict:
     """Compute the budget verdict for `tallies` at `threshold` against `budget`.
 
-    `pending_spawns` is every spawn in the log not yet attributed to any slug: each could
-    still turn out to belong to these `tallies`, so it holds the verdict like an unsized resume.
+    `pending_spawns` counts every item not yet attributed to any slug (an unattributed spawn
+    and each resume of one): each could still turn out to belong to these `tallies`, so it
+    holds the verdict like an unsized resume.
     """
     classifications = [
         classify_resume(resume.context_tokens, threshold)
@@ -519,7 +520,9 @@ def _run(args: argparse.Namespace) -> int:
     unattributed = tuple(t for t in all_tallies if t.owner is None)
     if projects_dir is not None:
         tallies = tuple(resolve_resume_context(t, projects_dir) for t in tallies)
-    result = verdict(tallies, args.budget, args.heavy_context, pending_spawns=len(unattributed))
+    # Each unattributed spawn, and each resume of one, could still be charged to this slug.
+    pending = sum(1 + len(t.resumes) for t in unattributed)
+    result = verdict(tallies, args.budget, args.heavy_context, pending_spawns=pending)
     envelope = _build_envelope(
         args.slug,
         sources,

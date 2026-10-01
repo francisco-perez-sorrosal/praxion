@@ -1728,15 +1728,39 @@ def test_every_resume_is_sized_up_to_its_own_time(tmp_path: Path) -> None:
 
 
 def test_text_blocks_of_one_message_are_joined_by_a_line_break(tmp_path: Path) -> None:
-    # Joined with no separator the slug would read "split-slug"; the line break ends it at
-    # "split", since a slug never continues onto the next line.
-    blocks = [{"type": "text", "text": "Task slug: split"}, {"type": "text", "text": "-slug"}]
+    # A slug never continues onto the next line: joined by a line break the marker states
+    # nothing and the agent falls back to its project; joined by a space it would read
+    # "real-slug".
+    blocks = [{"type": "text", "text": "Task slug:"}, {"type": "text", "text": "real-slug"}]
     _write_agent_transcript(tmp_path, "a1", [_user_line(blocks)])
 
-    assert _owner_read_from(tmp_path, _unattributed()) == "split"
+    assert _owner_read_from(tmp_path, _unattributed()) == _CHECKOUT
 
 
 def test_a_turn_logged_out_of_order_does_not_hide_the_earlier_ones(tmp_path: Path) -> None:
     lines = [_turn("a1", _T2, input_tokens=900), _turn("a1", _T0, input_tokens=100)]
 
     assert _context_at(tmp_path, lines, _T1) == 100
+
+
+# A resume of a spawn nobody has attributed yet could belong to this slug and turn out heavy,
+# so it waits in the pending pool beside the spawn itself.
+@pytest.mark.parametrize(
+    ("budget", "code", "label"),
+    [(0, 1, "over"), (1, 0, "indeterminate"), (2, 0, "indeterminate"), (3, 0, "within")],
+)
+def test_a_resume_of_an_unattributed_spawn_holds_the_verdict_too(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], budget: int, code: int, label: str
+) -> None:
+    rows = [
+        _start("definite"),
+        _result("definite", "held"),
+        _start("pending-x", at=_T1),
+        _start("pending-x", at=_T2),
+    ]
+    repo = _repo_with_rows(tmp_path, rows)
+
+    got_code, report, _ = _report(capsys, repo, "held", "--budget", str(budget))
+
+    assert (got_code, report["charged"], report["verdict"]) == (code, 1, label)
+    assert [u["agent_id"] for u in report["unattributed"]] == ["pending-x"]

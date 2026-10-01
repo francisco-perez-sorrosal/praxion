@@ -23,12 +23,15 @@ SPAWN_COUNT = "scripts/spawn_count.py"
 RESOLVER = "scripts/resolve_test_scope.py"
 HOOK_REGISTRATION = "hooks/hooks.json"
 
+# Import-safe: a dead gate is still importable (a real one does nothing, it does not
+# crash its importers), so the copy's suite can still be collected and traced (SQ-03).
 _STUB = '''#!/usr/bin/env python3
 """A dead gate standing in for {name}, written by a liveness acceptance scenario."""
 import sys
 
-sys.stdout.write({stdout!r})
-sys.exit({exit_code})
+if __name__ == "__main__":
+    sys.stdout.write({stdout!r})
+    sys.exit({exit_code})
 '''
 
 

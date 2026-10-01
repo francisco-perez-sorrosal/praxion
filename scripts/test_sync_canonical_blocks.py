@@ -69,6 +69,19 @@ def _load_module():
     return importlib.reload(mod)
 
 
+@pytest.fixture(autouse=True)
+def _restore_module_state():
+    """Tests point CANONICAL_DIR and COMMAND_FILES at tmp fixtures by assignment.
+
+    The module object is shared by every test in the worker, so reload it after
+    each test: a later reader (tests/test_pre_commit_onboarding_regex.py) then sees
+    the import-time paths, never a tmp one.
+    """
+    yield
+    if "sync_canonical_blocks" in sys.modules:
+        _load_module()
+
+
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------

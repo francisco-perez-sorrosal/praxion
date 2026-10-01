@@ -202,14 +202,17 @@ def test_every_collected_test_file_has_a_heartbeat(repo: Path, tmp_path: Path) -
     ],
     ids=["module-import", "class-level", "space-in-name"],
 )
+@pytest.mark.parametrize(
+    "workers", [("-n", "0"), ("-p", "xdist", "-n", "2")], ids=["serial", "xdist-workers"]
+)
 def test_a_test_file_that_fails_to_collect_is_recorded_as_uncollected(
-    repo: Path, tmp_path: Path, name: str, body: str
+    repo: Path, tmp_path: Path, name: str, body: str, workers: tuple[str, ...]
 ) -> None:
     (repo / name).write_text(body, encoding="utf-8")
     out = tmp_path / "out"
     out.mkdir()
 
-    run = _traced_pytest(repo, out, "--continue-on-collection-errors", "-rN")
+    run = _traced_pytest(repo, out, "--continue-on-collection-errors", "-rN", *workers)
 
     assert {"uncollected": name} in _records(out), run.stdout + run.stderr
 

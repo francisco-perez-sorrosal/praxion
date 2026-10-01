@@ -116,6 +116,8 @@ A plan step's `Tests:` field, when present, overrides the derived selection: `Te
 
 ## Selection-Size Baseline
 
+Re-measure with `measure_selection_size.py` (`--ref`, `--commits`, `--pocket`; `--compare-ref REF` also runs the resolver as it was at that ref over the same tree, for a before/after of a resolver change). It implements the method below and reports p90 with Python's default quantile method, as these figures do.
+
 Measured 2026-09-29 on Praxion itself: the resolver at `90cbdc2a` run over the change sets of the 50 preceding non-merge commits, root pocket only. The corpus is 267 test files. The dependency graph is today's, not the graph as it stood at each commit.
 
 | Measure | Value |

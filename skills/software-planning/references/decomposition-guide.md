@@ -47,6 +47,14 @@ For each step, ask:
 
 If any answer is "no", break it down further.
 
+### Shared Contracts Before Parallel Lanes
+
+Disjoint files are not disjoint knowledge. When steps that will run in parallel depend on one shared contract (a regex, a row schema, an enum, a file format, a flag set), each lane otherwise encodes its own reading of it, and the disagreement surfaces only at the integration checkpoint.
+
+Give the contract its own step, ordered before the split: it defines the contract once (a constant, a type or a schema file) and pins it with unit tests that fail on any other reading. Each lane then lists it in its `**Read-only**:` field as `contract: <path>::<symbol>, pinned by <test node>`, and uses it, runs those tests and never edits it.
+
+**Golden bad-case** (the planner must flag it): two steps in one `[parallel-group]` whose `Implementation` fields each describe the same pattern, schema or format, for example both "parse the task slug from the prompt", with no earlier step that owns it.
+
 ## Handling Unknowns
 
 ### Spike Steps

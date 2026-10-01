@@ -32,7 +32,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Update `WIP.md` with completion status"
 - "If structural changes: update `.ai-state/DESIGN.md` and `docs/architecture.md` (Post-implementation updates)"
 - "If the step runs tests: write `TEST_RESULTS.md` at `.ai-work/<task-slug>/` per the canonical schema in [agent-pipeline-details.md](agent-pipeline-details.md)"
-- "Write the step's unit and internal-integration tests; run the outer-loop tests named in its `**Read-only**:` field and edit none — on a mismatch with the spec, stop `[BLOCKED]` with a Spec Question"
+- "Write the step's unit and internal-integration tests; run the outer-loop tests named in its `**Read-only**:` field and edit none — on a mismatch with the spec, stop `[BLOCKED]` with a Spec Question; a `contract:` entry there is used as pinned, never edited"
 
 **test-engineer** — always include in prompt:
 - Paired mode (optional test step or driver-binding step): "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`; design tests from the acceptance criteria in `SYSTEMS_PLAN.md`; report RED; a driver-binding step edits driver files only"

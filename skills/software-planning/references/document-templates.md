@@ -36,7 +36,7 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 **Assignee**: implementer
 **Implementation**: What code will we write?
 **Files**: [production files and unit-test files — never outer-loop test files]
-**Read-only**: [outer-loop test nodes this step must turn green]
+**Read-only**: [outer-loop test nodes this step must turn green; `contract: <path>::<symbol>, pinned by <test node>` for each shared contract it uses but never edits]
 **Done when**: The `Read-only:` nodes pass, with no edit to any outer-loop file
 
 ### Step 5: [Integration checkpoint after group C]

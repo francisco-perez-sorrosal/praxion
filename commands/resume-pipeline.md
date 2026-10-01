@@ -16,7 +16,7 @@ USAGE
   Runs reconcile_pipeline_state.py to classify every WIP.md step against ground
   truth, then acts per verdict: auto-mark verified-complete steps, auto-resume
   partial/in-flight steps (scoped to the unfinished remainder), and surface
-  `unknown` steps to you. Every automatic action is recorded in five places
+  `unknown` and `blocked` steps to you. Every automatic action is recorded in five places
   (see "Audit trail") — recovery is never silent.
 
 EXAMPLES
@@ -33,7 +33,7 @@ OPTIONS
 EXIT CODES
   0   nothing to recover (all steps verified-complete or pending) / dry-run done
   1   recovery actions taken (auto-mark and/or auto-resume)
-  2   one or more `unknown` steps surfaced for your decision
+  2   one or more `unknown` or `blocked` steps surfaced for your decision
   3   reconcile error (no WIP.md for the slug, bad slug, plugin-cache path)
 ```
 
@@ -99,11 +99,13 @@ a convenience document from becoming a correctness hazard.
    | `verified-complete`, `needs_mark: false` | No action — checkbox already correct. |
    | `mismatch` / `partial@<pt>` / `in-flight` | **Auto-resume**: re-spawn the step's agent (the assignee in the step row) scoped to `resume_scope` only, citing the Tier-1 evidence of what is already done. See "Auto-resume contract". |
    | `unknown` | **Surface, do not act.** Report the step + its evidence to the user and stop on that step. |
+   | `blocked` | **Surface, do not act — never auto-mark, never auto-resume.** The step is otherwise done but is tagged `mutation: on` and its results carry no usable `Mutation:` reading. Report the step, the reason in `evidence`, and the two ways out: restore the sensor (environment, network) and re-run it, or amend the plan to drop the tag with a recorded reason. Stop on that step. |
    | `pending` | No action — a not-started step is normal. |
 
 5. **Write the audit trail** for every auto-action (Audit trail, below).
 6. **Summarize** to the user: counts per verdict, every auto-mark and auto-resume
-   with its evidence, and every `unknown` needing a decision. Name every point where
+   with its evidence, every `unknown` needing a decision, and every `blocked` step with its
+   reason and the two ways out. Name every point where
    the handoff read in step 1 disagreed with a verdict, stating that the verdict won.
    Point to `RECOVERY_LOG.md` for the full record.
 
@@ -112,7 +114,12 @@ a convenience document from becoming a correctness hazard.
 The guard against re-spawning over verified work is structural:
 
 - A `verified-complete` step is **never** a resume target — only `mismatch`,
-  `partial`, and `in-flight`.
+  `partial`, and `in-flight`. A `blocked` step is not one either: its files are done, and
+  re-running the agent cannot produce a sensor reading the environment withholds. For the same
+  reason a `blocked` verdict carries an empty `resume_scope` (no file is unfinished; `tier1`
+  lists the changed files and the reason lives in `evidence`), unlike the non-empty
+  scope of the verdicts above. Do not read "blocked" here as the subagent `[BLOCKED]` marker:
+  this is the reconciler's verdict for a step awaiting a mutation reading.
 - The re-spawn is scoped to `resume_scope` (the files Tier-1 shows still
   *unchanged*), and the brief explicitly lists what git shows already done so the
   agent does not redo it.
@@ -168,6 +175,15 @@ To fix: confirm the task slug, or run from the worktree holding the pipeline.
 Cannot resume: no task slug. Pipelines with a WIP.md under this worktree:
   <slug>  (<N> steps, last modified <date>)
 To fix: re-run as /resume-pipeline <task-slug>.
+```
+
+**Exit 2 — blocked step surfaced:**
+```
+<N> step(s) are done but tagged `mutation: on` with no usable mutation reading
+(verdict: blocked) and were NOT marked complete:
+  <Step N>: <evidence>
+To fix: restore the sensor (environment, network) and re-run it so the step's results
+carry a `Mutation:` line, or amend the plan to drop the tag with a recorded reason.
 ```
 
 **Exit 2 — ambiguous steps surfaced:**

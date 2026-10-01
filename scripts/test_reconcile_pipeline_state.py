@@ -1264,6 +1264,236 @@ def test_reconcile_preexisting_failures_never_block_verified_complete(tmp_path):
     assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
 
 
+# --- a step tagged `mutation: on` needs a mutation reading to complete -------
+
+_SENSOR_RAN_LINE = "Mutation: survivors=1 mutants=14 targets=[f.py] (build: 1)"
+_LAYOUT_REFUSAL_LINE = "Mutation: unavailable reason=not-flat-layout (not one flat directory)"
+
+
+def _refusal_line(reason: str) -> str:
+    return f"Mutation: unavailable reason={reason} (the sensor could not produce a reading)"
+
+
+def _step_results(*mutation_lines: str | None, heading: str = "## Step 1") -> str:
+    """One green section per entry; a ``None`` entry carries no Mutation: line."""
+    return "".join(
+        f"{heading}\nResult: pass=5 fail=0 skip=0\n" + (f"{line}\n" if line else "")
+        for line in mutation_lines
+    )
+
+
+def _reconcile_tagged(
+    tmp_path: Path, tag: str | None, test_results: str, *, committed: bool = True
+) -> dict:
+    """Step 1 (one file, checked off) carrying ``tag`` over the given TEST_RESULTS.md."""
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    tag_line = f"{tag}\n" if tag is not None else ""
+    plan = f"### Step 1: Build the thing\n**Files**: f.py\n{tag_line}**Done when**: built\n"
+    _setup(repo_root, "- [x] Step 1: build the thing\n", plan)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(test_results, encoding="utf-8")
+    if committed:
+        _commit(repo_root, "f.py", "# work\n")
+    return _verdict_for(rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[]), "Step 1")
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "run-failed",
+        "toolchain-missing",
+        "run-timeout",
+        "path-missing",
+        "pyproject-present",
+        "mutants-dir-present",
+        "a-reason-no-one-has-seen-yet",
+    ],
+)
+def test_reconcile_a_tagged_step_whose_sensor_refused_is_blocked_naming_the_reason(
+    tmp_path, reason
+):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results(_refusal_line(reason)))
+    assert verdict["verdict"] == "blocked"
+    assert verdict["evidence"].startswith("Step 1:")
+    assert f"reason={reason}" in verdict["evidence"]
+
+
+def test_reconcile_a_blocked_verdict_is_never_marked_or_respawned_and_has_no_resume_scope(tmp_path):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results(None))
+    assert verdict["verdict"] == "blocked"
+    assert verdict["needs_mark"] is False
+    assert verdict["resume_scope"] == [], "no file is unfinished; the reason lives in the evidence"
+    assert verdict["tier1"]["files_unchanged"] == []
+
+
+def test_reconcile_a_tagged_step_with_no_mutation_line_is_blocked_naming_the_missing_line(tmp_path):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results(None))
+    assert verdict["verdict"] == "blocked"
+    assert "no Mutation: line" in verdict["evidence"]
+
+
+def test_reconcile_a_blocked_evidence_names_both_ways_out(tmp_path):
+    evidence = _reconcile_tagged(tmp_path, "mutation: on", _step_results(None))["evidence"]
+    assert "restore the sensor" in evidence
+    assert "drop the tag" in evidence
+
+
+def test_reconcile_a_tagged_step_with_an_unreadable_mutation_line_is_blocked(tmp_path):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results("Mutation: survivors=lots"))
+    assert verdict["verdict"] == "blocked"
+    assert "unreadable" in verdict["evidence"]
+
+
+@pytest.mark.parametrize("line", [_SENSOR_RAN_LINE, _LAYOUT_REFUSAL_LINE], ids=["ran", "layout"])
+def test_reconcile_a_tagged_step_with_a_reading_or_the_declared_layout_refusal_completes(
+    tmp_path, line
+):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results(line))
+    assert verdict["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_later_block_with_a_reading_supersedes_an_earlier_refusal(tmp_path):
+    results = _step_results(_refusal_line("run-failed"), _SENSOR_RAN_LINE)
+    assert _reconcile_tagged(tmp_path, "mutation: on", results)["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_later_refusal_supersedes_an_earlier_reading(tmp_path):
+    results = _step_results(_SENSOR_RAN_LINE, _refusal_line("run-failed"))
+    assert _reconcile_tagged(tmp_path, "mutation: on", results)["verdict"] == "blocked"
+
+
+# Every spelling of the tag that is not an explicit `off` arms the block: a
+# mis-formatted tag must fail closed, never disarm the gate.
+_TAG_SPELLINGS_THAT_ARM_THE_BLOCK = [
+    "**mutation: on**",
+    "**mutation:** on",
+    "**mutation**: on",
+    "- mutation: on",
+    "* mutation: on",
+    "> mutation: on",
+    "   mutation: on   ",
+    "MUTATION: ON",
+    "`mutation: on`",
+    "mutation: on  # risky world-read step",
+    "mutation: yes",
+    "mutation: onn",
+    "mutation:",
+]
+
+
+@pytest.mark.parametrize("tag", _TAG_SPELLINGS_THAT_ARM_THE_BLOCK)
+def test_reconcile_a_tag_spelled_with_emphasis_list_prefix_case_or_comment_still_blocks(
+    tmp_path, tag
+):
+    verdict = _reconcile_tagged(tmp_path, tag, _step_results(None))
+    assert verdict["verdict"] == "blocked", tag
+
+
+@pytest.mark.parametrize(
+    "tag",
+    ["mutation: off", "**mutation: off**", "- MUTATION: Off  # no sensor here"],
+)
+def test_reconcile_an_explicit_off_tag_in_any_spelling_is_untagged(tmp_path, tag):
+    verdict = _reconcile_tagged(tmp_path, tag, _step_results(None))
+    assert verdict["verdict"] == "verified-complete", tag
+
+
+def test_reconcile_a_quoted_mutation_reading_in_the_plan_is_not_a_tag(tmp_path):
+    verdict = _reconcile_tagged(tmp_path, _SENSOR_RAN_LINE, _step_results(None))
+    assert verdict["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_newer_block_with_no_mutation_line_supersedes_an_older_reading(tmp_path):
+    results = _step_results(_SENSOR_RAN_LINE, None)
+    assert _reconcile_tagged(tmp_path, "mutation: on", results)["verdict"] == "blocked"
+
+
+def test_reconcile_tags_are_read_from_the_wip_checklist_when_the_plan_is_absent(tmp_path):
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    wip = "- [x] Step 1: build the thing\n**Files**: f.py\nmutation: on\n"
+    _setup(repo_root, wip)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(
+        _step_results(None), encoding="utf-8"
+    )
+    _commit(repo_root, "f.py", "# work\n")
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] == "blocked"
+
+
+def test_reconcile_a_test_status_override_never_reads_the_results_file(tmp_path):
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = "### Step 1: Build the thing\n**Files**: f.py\nmutation: on\n"
+    _setup(repo_root, "- [x] Step 1: build the thing\n", plan)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(
+        _step_results(_SENSOR_RAN_LINE), encoding="utf-8"
+    )
+    _commit(repo_root, "f.py", "# work\n")
+    out = rps.reconcile(
+        SLUG, repo_root, base_sha, _wal_rows_override=[], _test_status_override="green"
+    )
+    assert _verdict_for(out, "Step 1")["verdict"] == "blocked", (
+        "hermetic: the file is not consulted"
+    )
+
+
+@pytest.mark.parametrize("tag", [None, "mutation: off"], ids=["no-tag", "tag-off"])
+@pytest.mark.parametrize("line", [None, _refusal_line("run-failed")], ids=["no-line", "refusal"])
+def test_reconcile_an_untagged_step_ignores_a_stray_refusal_or_a_missing_line(tmp_path, tag, line):
+    verdict = _reconcile_tagged(tmp_path, tag, _step_results(line))
+    assert verdict["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_tagged_step_with_red_tests_keeps_its_mismatch_verdict(tmp_path):
+    results = "## Step 1\nResult: pass=3 fail=2 skip=0\n"
+    assert _reconcile_tagged(tmp_path, "mutation: on", results)["verdict"] == "mismatch"
+
+
+def test_reconcile_a_tagged_step_with_unchanged_files_keeps_its_mismatch_verdict(tmp_path):
+    verdict = _reconcile_tagged(tmp_path, "mutation: on", _step_results(None), committed=False)
+    assert verdict["verdict"] == "mismatch"
+
+
+def test_reconcile_a_mutation_tag_mentioned_in_prose_does_not_tag_the_step(tmp_path):
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = (
+        "### Step 1: Build the thing\n**Files**: f.py\n"
+        "**Implementation**: set mutation: on for the risky steps later\n"
+    )
+    _setup(repo_root, "- [x] Step 1: build the thing\n", plan)
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(
+        _step_results(None), encoding="utf-8"
+    )
+    _commit(repo_root, "f.py", "# work\n")
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+
+
+def test_reconcile_a_tag_binds_only_the_step_it_sits_under(tmp_path):
+    repo_root = tmp_path / "repo"
+    base_sha = _seed_repo(repo_root)
+    plan = (
+        "### Step 1: Build the thing\n**Files**: f.py\n"
+        "### Step 2: Extend the thing\n**Files**: g.py\nmutation: on\n"
+    )
+    _setup(repo_root, "- [x] Step 1: build\n- [x] Step 2: extend\n", plan)
+    results = _step_results(None) + _step_results(None, heading="## Step 2")
+    (repo_root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(results, encoding="utf-8")
+    _commit(repo_root, "f.py", "# work\n")
+    _commit(repo_root, "g.py", "# work\n")
+    out = rps.reconcile(SLUG, repo_root, base_sha, _wal_rows_override=[])
+    assert _verdict_for(out, "Step 1")["verdict"] == "verified-complete"
+    assert _verdict_for(out, "Step 2")["verdict"] == "blocked"
+
+
+def test_exit_code_two_covers_a_blocked_step():
+    assert rps._exit_code([{"verdict": "blocked"}]) == 2
+    assert rps._exit_code([{"verdict": "mismatch"}, {"verdict": "blocked"}]) == 2
+    assert rps._exit_code([{"verdict": "verified-complete"}, {"verdict": "blocked"}]) == 2
+
+
 # --- attribution: pins keeping earliest-declarer safe against re-opening ----
 # --- td-238(3) (both regression locks -- pass on current code) --------------
 

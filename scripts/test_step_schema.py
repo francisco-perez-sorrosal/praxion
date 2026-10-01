@@ -565,3 +565,124 @@ def test_latest_block_reading_supersedes_an_earlier_one() -> None:
     later = schema.step_mutation_reading("4", reversed_blocks)
     assert schema.mutation_block_reason(later) == "refused, reason=run-failed"
     assert schema.step_mutation_reading("Step 9", blocks) is None  # id-citation-discipline:ignore
+
+
+# ---------------------------------------------------------------------------
+# The `mutation: on|off` plan tag -- fails closed
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "mutation: on",
+        "Mutation: On",
+        "MUTATION: ON",
+        "**mutation: on**",
+        "**mutation:** on",
+        "**mutation**: on",
+        "`mutation: on`",
+        "- mutation: on",
+        "* mutation: on",
+        "+ mutation: on",
+        "1. mutation: on",
+        "> mutation: on",
+        "   mutation: on   ",
+        "mutation: on # risky world-read step",
+        "mutation: yes",
+        "mutation: onn",
+        "mutation: on please",
+        "mutation:",
+    ],
+)
+def test_parse_mutation_tag_reads_every_spelling_that_is_not_an_explicit_off_as_tagged(
+    line: str,
+) -> None:
+    assert schema.parse_mutation_tag(line) is True
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["mutation: off", "Mutation: OFF", "**mutation: off**", "- mutation: off # no sensor here"],
+)
+def test_parse_mutation_tag_reads_an_explicit_off_as_untagged(line: str) -> None:
+    assert schema.parse_mutation_tag(line) is False
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "",
+        "**Implementation**: set mutation: on for the risky steps later",
+        "The mutation: on tag is the planner's",
+        "mutation testing is optional",
+        "Mutation: survivors=1 mutants=14 targets=[a.py] (f: 1)",
+        "Mutation: unavailable reason=run-failed (boom)",
+    ],
+)
+def test_parse_mutation_tag_ignores_prose_and_a_mutation_reading(line: str) -> None:
+    assert schema.parse_mutation_tag(line) is None
+
+
+def test_mutation_tagged_steps_binds_a_tag_to_the_step_it_sits_under() -> None:
+    plan = (
+        "### Step 1: a\n**Files**: a.py\n"  # id-citation-discipline:ignore
+        "### Step 2: b\n**Files**: b.py\n**mutation: on**\n"  # id-citation-discipline:ignore
+        "### Step 3: c\nmutation: off\n"  # id-citation-discipline:ignore
+    )
+    assert schema.mutation_tagged_steps(plan) == frozenset(
+        {"Step 2"}  # id-citation-discipline:ignore
+    )
+
+
+def test_mutation_tagged_steps_the_last_tag_under_a_step_wins() -> None:
+    assert (
+        schema.mutation_tagged_steps(
+            "### Step 1: a\nmutation: on\nmutation: off\n"  # id-citation-discipline:ignore
+        )
+        == frozenset()
+    )
+    assert schema.mutation_tagged_steps(
+        "### Step 1: a\nmutation: off\nmutation: on\n"  # id-citation-discipline:ignore
+    ) == frozenset({"Step 1"})  # id-citation-discipline:ignore
+
+
+def test_mutation_tagged_steps_reads_a_wip_checklist() -> None:
+    wip = "- [ ] Step 7: x\nmutation: on\n- [x] Step 8: y\n"  # id-citation-discipline:ignore
+    assert schema.mutation_tagged_steps(wip) == frozenset(
+        {"Step 7"}  # id-citation-discipline:ignore
+    )
+
+
+def test_mutation_tagged_steps_ignores_a_tag_before_any_step() -> None:
+    assert (
+        schema.mutation_tagged_steps(
+            "mutation: on\n### Step 1: a\n"  # id-citation-discipline:ignore
+        )
+        == frozenset()
+    )
+
+
+def test_mutation_block_reasons_names_only_tagged_steps_without_a_usable_reading() -> None:
+    plan = "### Step 1: a\nmutation: on\n### Step 2: b\nmutation: on\n### Step 3: c\n"  # id-citation-discipline:ignore
+    results = "## Step 1\nMutation: survivors=0 mutants=3 targets=[a.py] ()\n## Step 2\nResult: none\n"  # id-citation-discipline:ignore
+    reasons = schema.mutation_block_reasons(plan, results)
+    assert set(reasons) == {"Step 2"}  # id-citation-discipline:ignore
+    assert reasons["Step 2"] == "no Mutation: line"  # id-citation-discipline:ignore
+
+
+def test_off_followed_by_a_reason_disarms_the_tag() -> None:
+    assert schema.parse_mutation_tag("mutation: off (no world reads)") is False
+    assert schema.parse_mutation_tag("mutation: offline") is True
+
+
+def test_canary_a_line_of_repeated_list_markers_parses_in_linear_time() -> None:
+    # A nested quantifier around the list-marker prefix once backtracked exponentially
+    # (about 3x per added marker); run it in a child so a regression fails on the timeout
+    # instead of hanging the suite.
+    probe = (
+        "import sys; sys.path.insert(0, sys.argv[1]); import _step_schema as s; "
+        "s.parse_mutation_tag('-   ' * 60 + 'x'); s.parse_mutation_tag('*   ' * 60 + 'x')"
+    )
+    scripts_dir = str(Path(__file__).resolve().parent)
+    subprocess.run([sys.executable, "-c", probe, scripts_dir], check=True, timeout=10)

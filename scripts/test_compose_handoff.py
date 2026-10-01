@@ -1991,6 +1991,33 @@ def test_falls_back_to_the_first_unknown_when_nothing_else_is_actionable():
     assert re.search(r"verif", text, re.IGNORECASE)
 
 
+def test_names_a_blocked_step_as_the_next_action_with_its_escape_path():
+    evidence = (
+        "Step 4: mutation: on, no Mutation: line; restore the sensor (environment, network) "  # id-citation-discipline:ignore
+        "and re-run it, or amend the plan to drop the tag with a recorded reason"
+    )
+    verdicts = [
+        _verdict("Step 3", "verified-complete"),  # id-citation-discipline:ignore
+        _verdict(
+            "Step 4",  # id-citation-discipline:ignore
+            "blocked",
+            resume_scope=[],
+            evidence=evidence,
+        ),
+        _verdict("Step 5", "pending"),  # id-citation-discipline:ignore
+    ]
+    text = compose_handoff._render_next_action(verdicts)
+    assert text.startswith("`Step 4`"), text  # id-citation-discipline:ignore
+    assert "blocked" in text
+    assert "restore the sensor" in text
+    assert "drop the tag" in text
+
+
+def test_a_blocked_step_is_not_a_needs_mark_or_mismatch_conflict():
+    blocked = _verdict("Step 4", "blocked", needs_mark=False)  # id-citation-discipline:ignore
+    assert compose_handoff._find_conflicts([blocked]) == []
+
+
 def test_reports_the_phase_next_move_when_every_step_is_verified_complete():
     verdicts = [
         _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore

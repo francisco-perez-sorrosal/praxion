@@ -706,3 +706,73 @@ def mutation_block_reason(reading: MutationReading | None) -> str | None:
     if isinstance(reading, MutationMalformed):
         return "unreadable Mutation: line"
     raise TypeError(f"not a MutationReading: {reading!r}")
+
+
+# ---------------------------------------------------------------------------
+# The `mutation: on|off` plan tag -- the planner's opt-in that makes a step's
+# `Mutation:` reading mandatory. It fails closed, like the reading grammar:
+# anything on a tag line that is not an explicit `off` arms the block, so a
+# mis-formatted tag can never silently disarm the gate.
+# ---------------------------------------------------------------------------
+
+# A line that names the tag: any list/quote prefix and emphasis around the word.
+_MUTATION_TAG_RE = re.compile(
+    r"^\s*(?:(?:[-*+>]|\d+\.)\s+)*[\s*_`]*mutation[\s*_`]*:(?P<value>.*)$", re.IGNORECASE
+)
+_TAG_COMMENT_RE = re.compile(r"#.*")
+# `off` disarms the tag even when a reason follows it (`off (no world reads)`).
+_TAG_OFF_RE = re.compile(r"off\b")
+
+
+def parse_mutation_tag(line: str) -> bool | None:
+    """One line -> True (tagged), False (explicit `off`), None (not a tag line).
+
+    Surrounding emphasis, a list prefix, case and a trailing `# comment` are
+    all tolerated. A line that names the tag with any value but `off` -- `on`
+    or something unreadable -- is tagged. A well-formed `Mutation:` reading is not a tag.
+    """
+    match = _MUTATION_TAG_RE.match(line)
+    if match is None or isinstance(
+        parse_mutation_line(line.strip()), (MutationRan, MutationRefused)
+    ):
+        return None
+    value = _TAG_COMMENT_RE.sub("", match["value"]).strip(" \t*_`").lower()
+    return _TAG_OFF_RE.match(value) is None
+
+
+def mutation_tagged_steps(plan_text: str) -> frozenset[str]:
+    """The `"Step <id>"` labels a plan (or WIP checklist) tags `mutation: on`.
+
+    A tag line belongs to the step heading or checklist line above it; the
+    last tag under a step wins, and a tag before any step belongs to none.
+    """
+    tagged: set[str] = set()
+    current: str | None = None
+    for line in plan_text.splitlines():
+        step_id = step_id_from_heading(line) or checklist_step_id(line)
+        if step_id is not None:
+            current = step_id
+            continue
+        tag = parse_mutation_tag(line)
+        if tag is None or current is None:
+            continue
+        if tag:
+            tagged.add(current)
+        else:
+            tagged.discard(current)
+    return frozenset(tagged)
+
+
+def mutation_block_reasons(plan_text: str, test_results_text: str) -> dict[str, str]:
+    """Map each `mutation: on` step to why its reading blocks it from completing.
+
+    A tagged step whose reading is acceptable is absent, as is any untagged
+    step. The reading is the step's own latest block, so a later run
+    supersedes an earlier one.
+    """
+    blocks = split_step_blocks(test_results_text)
+    reasons = {
+        step: mutation_block_reason(step_mutation_reading(step, blocks))
+        for step in mutation_tagged_steps(plan_text)
+    }
+    return {step: reason for step, reason in reasons.items() if reason is not None}

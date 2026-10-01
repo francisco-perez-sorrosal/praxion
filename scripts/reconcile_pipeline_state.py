@@ -23,13 +23,16 @@ Entry point: ``reconcile(slug, repo_root, base_ref) -> list[verdict]`` is a pure
 side-effect-free function (no writes, no git mutation) — trivially unit-testable
 via the ``_*_override`` hooks, and safe to run read-only at any pipeline seam.
 
-Verdict ∈ {verified-complete, mismatch, partial, in-flight, unknown, pending}.
-Tier-1 is always the arbiter: when correlation is ambiguous or the WAL dropped a
-line, a step degrades to `unknown` (surfaced to the user) — never to a guessed
-`verified-complete`. The WAL can only sharpen localization, never certify work.
+Verdict ∈ {verified-complete, mismatch, partial, in-flight, unknown, pending,
+blocked}. Tier-1 is always the arbiter: when correlation is ambiguous or the WAL
+dropped a line, a step degrades to `unknown` (surfaced to the user) — never to a
+guessed `verified-complete`. The WAL can only sharpen localization, never certify
+work. `blocked` is an otherwise-done step the plan tags `mutation: on` whose
+results carry no usable mutation reading.
 
 Exit codes: 0 nothing to recover; 1 >=1 step needs recovery
-(mismatch/partial/in-flight); 2 >=1 unknown (needs human); 3 reconcile error.
+(mismatch/partial/in-flight); 2 >=1 unknown or blocked (needs human); 3 reconcile
+error.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _step_schema import (
     RecordedRun,
     checklist_step_id,
+    mutation_block_reasons,
     parse_wip_claims,
     recorded_runs,
     step_id_from_heading,
@@ -120,21 +124,25 @@ def reconcile(
     if not claims:
         return []
 
-    declared_files = _parse_plan_files(task_dir / "IMPLEMENTATION_PLAN.md", wip_path)
+    plan_path = task_dir / "IMPLEMENTATION_PLAN.md"
+    declared_files = _parse_plan_files(plan_path, wip_path)
+    # The one read of the results file. `_test_status_override` (the test hook)
+    # isolates the run from it entirely, so a hermetic run sees no results.
+    results_text = (
+        "" if _test_status_override is not None else _read_text(task_dir / "TEST_RESULTS.md")
+    )
+    mutation_blocks = mutation_block_reasons(
+        _read_text(plan_path) or _read_text(wip_path), results_text
+    )
 
     changed_files = (
         set(_changed_files_override)
         if _changed_files_override is not None
         else _git_changed_files(repo_root, base_ref)
     )
-    # A per-step pool: `_test_status_override` (the test hook) still applies
-    # one status to every step, so the pool is left empty on that path --
-    # nothing consults it there.
-    test_runs = (
-        []
-        if _test_status_override is not None
-        else recorded_runs(_read_text(task_dir / "TEST_RESULTS.md"))
-    )
+    # A per-step pool; empty under `_test_status_override`, which applies one
+    # status to every step and so never consults it.
+    test_runs = recorded_runs(results_text)
     wal_rows = (
         _wal_rows_override
         if _wal_rows_override is not None
@@ -150,6 +158,7 @@ def reconcile(
             wal_rows,
             test_runs,
             _test_status_override,
+            mutation_blocks.get(step_id),
         )
         for step_id in sorted(claims, key=step_sort_key)
     ]
@@ -163,6 +172,7 @@ def _reconcile_step(
     wal_rows: list[dict[str, Any]],
     test_runs: list[RecordedRun],
     test_status_override: str | None,
+    mutation_block: str | None,
 ) -> dict[str, Any]:
     # `attributable()` files only -- a file another step also declares isn't enough.
     files = attributable(step_id, declared_files)
@@ -178,6 +188,7 @@ def _reconcile_step(
         ),
         tier2=_correlate_agents(files, wal_rows),
         earlier_declarers=_earlier_declarers(step_id, declared_files) if not files else [],
+        mutation_block=mutation_block,
     )
 
 
@@ -213,6 +224,7 @@ def _classify_step(
     test_status: str,
     tier2: dict[str, Any],
     earlier_declarers: list[str] | None = None,
+    mutation_block: str | None = None,
 ) -> dict[str, Any]:
     """Classify one step. Tier-1 (git + tests) is the arbiter — ground truth
     decides "done," NOT the WIP checkbox (which is Tier-3, validated here).
@@ -236,6 +248,14 @@ def _classify_step(
     # done, regardless of the checkbox. If the checkbox disagrees, it just needs
     # marking — the died-before-checkbox case the whole design targets.
     if changed and not unchanged and not tests_red:
+        if mutation_block is not None:
+            # The escape is always a visible decision, never a silent pass.
+            evidence = (
+                f"{step_id}: mutation: on, {mutation_block}; restore the sensor "
+                "(environment, network) and re-run it, or amend the plan to drop "
+                "the tag with a recorded reason"
+            )
+            return _make_verdict(step_id, claim, "blocked", tier1, tier2, evidence, [])
         needs_mark = claim != "COMPLETE"
         evidence = f"all {len(changed)} declared file(s) changed; tests={test_status}" + (
             "; WIP not marked COMPLETE — auto-mark on resume" if needs_mark else ""
@@ -665,9 +685,9 @@ def _needs_recovery(verdict: str) -> bool:
 
 
 def _exit_code(verdicts: list[dict[str, Any]]) -> int:
-    """0 clean; 1 recovery needed; 2 unknown present."""
+    """0 clean; 1 recovery needed; 2 unknown or blocked present (a human decides)."""
     kinds = {v["verdict"] for v in verdicts}
-    if any(k == "unknown" for k in kinds):
+    if kinds & {"unknown", "blocked"}:
         return 2
     if any(_needs_recovery(k) for k in kinds):
         return 1

@@ -14,6 +14,7 @@ Behavioral specifications bridge architecture and implementation by giving each 
 **Satellite files** (loaded on-demand):
 
 - [references/spec-format-guide.md](references/spec-format-guide.md) -- full spec format with examples, EARS/GWT comparison, traceability matrix template, persistent spec template, spec delta template, edge cases
+- [references/footprint-criteria.md](references/footprint-criteria.md) -- quantitative footprint criteria: workflow per role, worked example, pointers to the normative grammar and check command
 - [references/sentinel-spec-checks.md](references/sentinel-spec-checks.md) -- spec health check catalog for sentinel integration, pass conditions, integration guidance
 - [references/calibration-procedure.md](references/calibration-procedure.md) -- structured tier assessment procedure with signal catalog, scoring matrix, evidence template, and calibration log format
 
@@ -24,7 +25,7 @@ Behavioral specifications bridge architecture and implementation by giving each 
 - **Stale archived specs as baseline.** Before using an archived spec in `.ai-state/specs/` as a baseline for a spec delta, check `SENTINEL_LOG.md` for the most recent SH03 result. A FAIL means the spec's behavioral claims may have drifted from the code -- the delta's "before" side is unreliable.
 - **Using Given/When/Then instead of ecosystem format.** Agents trained on BDD content default to Given/When/Then. This ecosystem uses `When/and/the system/so that` -- a distinct format that captures intent (`so that`) rather than test assertions (`Then`). Catch and correct GWT usage in specs.
 - **Omitting the `so that` clause.** The `so that` clause is required, not optional. Without it, a requirement reads as a test assertion rather than a behavioral specification. The intent clause is what distinguishes SDD from a test plan.
-- **Quantitative acceptance criteria discharged by structural argument.** A criterion written as a measurement (a numeric threshold, rate, or cost bound with a comparator) must be discharged by an actual recorded measurement — not by an argument that the bound is "plausibly held." If no measurement was taken, mark the criterion `WARN` (asserted, not verified) rather than `PASS`, or demote it to a qualitative/structural claim at authoring time. This exact gap has independently surfaced from both an authoring-side and a verification-side review converging on the same defect — a signal worth treating as a recurring authoring risk, not a one-off.
+- **Quantitative acceptance criteria discharged by structural argument.** A criterion must be discharged by an actual recorded measurement, not by an argument that the bound is "plausibly held." Two severities: a row in `### Footprint Criteria` with no valid measurement is FAIL (the check names it, see [footprint-criteria.md](references/footprint-criteria.md)); a measurement-shaped claim in prose (a numeric threshold, rate, or cost bound with a comparator) with no measurement stays `WARN` (asserted, not verified). Move a claim that can be measured into the table, or demote it to a qualitative/structural claim at authoring time. The gap surfaced independently from an authoring-side and a verification-side review, so treat it as a recurring authoring risk.
 
 ## Process Calibration
 

@@ -138,6 +138,8 @@ A requirement is written for an outside observer, so it names nothing the archit
 
 Declare only names that exist independently of this feature's design. A name the architect would invent stays out of the spec: rephrase the requirement in plain words instead. The lint that enforces this, its rules and its golden bad and good tokens live only in the docstring of `scripts/extract_spec.py`; this guide does not restate them.
 
+A cost bound (tokens, prompt lines, suite time) is not a behavioral requirement: it goes in the `### Footprint Criteria` and `### Footprints Not Measured` tables of `## Acceptance Criteria`, where a recorded measurement discharges it. The workflow, a worked example and the pointers to the normative grammar are in [footprint-criteria.md](footprint-criteria.md).
+
 ## Persistent Spec Template
 
 Archived to `.ai-state/specs/SPEC_<feature-name>_YYYY-MM-DD.md` during the end-of-feature workflow.

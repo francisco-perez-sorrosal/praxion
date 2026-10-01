@@ -44,6 +44,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Check `.ai-state/DESIGN.md` design coherence (Phase 8) and `docs/architecture.md` code accuracy (Phase 9)"
 - "Read `TEST_RESULTS.md` at `.ai-work/<task-slug>/` for test outcomes (missing file → WARN, not FAIL)"
 - If `ACCEPTANCE_TESTS.md` exists (Standard/Full): "Run the Acceptance Independence checks — declared sources against the allowed input classes, extract freshness, commit order, `acceptance:` coverage" ([procedure](#acceptance-design-stage))
+- "State `Base commit: <sha>`" — the pipeline's base; Phase 3b reads it when `ACCEPTANCE_TESTS.md` records none (a skipped-acceptance run), and without it the footprint criteria go ungraded
 
 <a id="pipeline-worktree-lifecycle"></a>
 ## Agent Roster

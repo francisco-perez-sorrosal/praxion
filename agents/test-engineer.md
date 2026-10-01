@@ -272,7 +272,7 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 - **REQ-NN** — <internal-only behavior | no drivable boundary | Markdown-prompt behavior> → inner loop | verifier judgment
 ```
 
-A footprint row (`FC-NN` in `### Footprint Criteria`, or a declared footprint) goes to `## Not Black-Box Testable` as `- **FC-NN** — footprint bound → measurement step, then verifier`, never a test pinned to a dated baseline. A REQ with drivable behavior keeps its scenario; the entry names only the footprint bound as the undrivable part. Sites: `coordination-details.md § Acceptance-Design Stage` and `agents/verifier.md` Phase 3b.
+A footprint row (`FC-NN` in `### Footprint Criteria`, or a declared footprint) goes to `## Not Black-Box Testable` as `- **FC-NN** — footprint bound → measurement step, then verifier` (a declared footprint as `- **<footprint>** — declared not measured → verifier`), never a test pinned to a dated baseline. A REQ with drivable behavior keeps its scenario, and a REQ that is only a footprint bound still gets its own `**REQ-NN**` entry; the entry names only the footprint bound as the undrivable part. Sites: `coordination-details.md § Acceptance-Design Stage` and `agents/verifier.md` Phase 3b.
 
 An empty section reads `_None._`. The skipped form keeps all five sections; `## Sources Read` and `## Scenarios` read `_None — stage skipped._`. Every REQ of the extract lands in `Scenarios` or `Not Black-Box Testable` (in both only when the Not Black-Box Testable entry names the part no scenario can drive), and every `Needs: BA-NN` resolves to a Boundary Assumption.
 

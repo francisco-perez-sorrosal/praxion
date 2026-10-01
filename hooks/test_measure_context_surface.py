@@ -229,6 +229,47 @@ class TestMeasurementParity:
         assert sorted(observation["file_paths"]) == sorted(gate_report["files"])
 
 
+class TestStartedBelowTheProjectRoot:
+    def test_measures_the_project_root_and_names_it_when_started_in_a_subdirectory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        (tmp_path / ".git").mkdir()
+        (tmp_path / ".ai-state").mkdir()
+        (tmp_path / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
+        below = tmp_path / "src" / "pkg"
+        below.mkdir(parents=True)
+        payload = {"hook_event_name": "SessionStart", "cwd": str(below), "session_id": "sub"}
+        monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
+
+        m.main()
+
+        obs_path = tmp_path / ".ai-state" / "observations.jsonl"
+        (row,) = [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines()]
+        assert row["project"] == tmp_path.name
+        assert any(p.endswith("CLAUDE.md") for p in row["file_paths"])
+        assert not (below / ".ai-state").exists()
+
+    @pytest.mark.parametrize("cwd", [None, "", 7, "absent"])
+    def test_records_nothing_without_a_usable_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cwd
+    ):
+        m = _load_module()
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        (tmp_path / ".ai-state").mkdir()
+        (tmp_path / "CLAUDE.md").write_text("# Project\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)  # the old process-directory fallback would have recorded
+        payload = {"hook_event_name": "SessionStart", "session_id": "no-cwd"}
+        if cwd != "absent":
+            payload["cwd"] = cwd
+        monkeypatch.setattr(sys, "stdin", _StringIO(json.dumps(payload)))
+
+        m.main()
+
+        assert not (tmp_path / ".ai-state" / "observations.jsonl").exists()
+
+
 class TestWritesThroughTheOwnerWriter:
     """The measurement row goes through the observation log's owner writer,
     not a private appender: it rotates like every other writer and appends

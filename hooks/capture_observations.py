@@ -17,10 +17,10 @@ import json
 import re
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
 from _observation_log import writer
+from _observation_log.location import locate
 
 # Tools that generate too much noise to capture. Read/Glob/Grep are
 # deliberately absent -- they are recorded (path + pattern only, never file
@@ -129,10 +129,13 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     return _truncate(", ".join(parts)) if parts else tool_name
 
 
-def build_observation(payload: dict) -> dict:
+def build_observation(payload: dict, *, project: str) -> dict:
     """Assemble an observation record from a completed PostToolUse payload.
 
-    Pure function -- reads only ``payload`` and performs no I/O, so the
+    ``project`` is the checkout's name as resolved by ``locate``; the payload's
+    ``cwd`` may sit anywhere below it and is not consulted here.
+
+    Pure function -- reads only its arguments and performs no I/O, so the
     classification branches are unit-testable without a stdin/subprocess
     harness (mirrors the ``classify_event``/``build_summary``/
     ``extract_file_paths`` extraction pattern already in this file).
@@ -144,7 +147,6 @@ def build_observation(payload: dict) -> dict:
     stay valid.
     """
     tool_name = payload.get("tool_name", "")
-    cwd = payload.get("cwd", ".")
 
     tool_input = payload.get("tool_input", {})
     if isinstance(tool_input, str):
@@ -182,7 +184,7 @@ def build_observation(payload: dict) -> dict:
         "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
         "agent_id": agent_id,
-        "project": Path(cwd).name,
+        "project": project,
         "event_type": event_type,
         "tool_name": tool_name,
         "summary": summary,
@@ -215,13 +217,14 @@ def main() -> None:
     if tool_name in BLOCKLIST:
         return
 
-    cwd = payload.get("cwd", ".")
-    ai_state_dir = Path(cwd) / ".ai-state"
-    if not ai_state_dir.exists():
-        return  # graceful degradation
+    location = locate(payload.get("cwd"))
+    if location is None:
+        return  # graceful degradation: no project serves this directory
 
-    observation = build_observation(payload)
-    writer.record_tool_call(ai_state_dir, observation, is_subagent=bool(payload.get("agent_id")))
+    observation = build_observation(payload, project=location.project)
+    writer.record_tool_call(
+        location.state_dir, observation, is_subagent=bool(payload.get("agent_id"))
+    )
 
 
 if __name__ == "__main__":

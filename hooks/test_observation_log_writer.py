@@ -391,6 +391,62 @@ def test_record_never_mutates_the_callers_row(tmp_path: Path) -> None:
     assert row == {"event_type": "agent_start"}, "the caller's row dict must not be mutated"
 
 
+# -- gate verdicts resolve their log through the one location answer ------------
+
+
+def _checkout_with_state(tmp_path: Path) -> Path:
+    root = tmp_path / "checkout"
+    (root / ".git").mkdir(parents=True)
+    (root / ".ai-state").mkdir()
+    (root / "src" / "pkg").mkdir(parents=True)
+    return root
+
+
+def test_a_gate_verdict_recorded_below_the_root_reaches_the_roots_log(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PRAXION_OBSERVATION_LOG", Mode.STANDARD.value)
+    root = _checkout_with_state(tmp_path)
+
+    writer.record_gate_fire("check_x", "block", "why", project_dir=root / "src" / "pkg")
+
+    (row,) = _read_rows(root / ".ai-state")
+    assert (row["event_type"], row["hook"], row["outcome"]) == ("gate_fire", "check_x", "block")
+
+
+def test_a_gate_verdict_falls_back_to_the_process_directory_below_the_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PRAXION_OBSERVATION_LOG", Mode.STANDARD.value)
+    root = _checkout_with_state(tmp_path)
+    monkeypatch.chdir(root / "src")
+
+    writer.record_gate_fire("check_x", "pass")
+
+    assert [r["event_type"] for r in _read_rows(root / ".ai-state")] == ["gate_fire"]
+
+
+def test_a_gate_verdict_in_no_project_records_nothing_and_does_not_raise(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PRAXION_OBSERVATION_LOG", Mode.STANDARD.value)
+    bare = tmp_path / "bare"
+    bare.mkdir()
+
+    writer.record_gate_fire("check_x", "pass", project_dir=bare)
+
+    assert not (bare / ".ai-state").exists()
+
+
+def test_a_gate_verdict_records_nothing_when_the_mode_is_off(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("PRAXION_OBSERVATION_LOG", Mode.OFF.value)
+    root = _checkout_with_state(tmp_path)
+
+    writer.record_gate_fire("check_x", "block", project_dir=root / "src")
+
+    assert not (root / ".ai-state" / "observations.jsonl").exists()
+
+
 # -- hot-path import constraint --------------------------------------------------
 
 _BANNED_HOT_PATH_MODULES = ("dataclasses", "typing", "inspect", "tempfile", "subprocess", "urllib")

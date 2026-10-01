@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from _observation_log import registry, writer  # noqa: E402
+from _observation_log.location import locate  # noqa: E402
 from _observation_log.modes import resolve_mode  # noqa: E402
 from _observation_log.registry import EventClass  # noqa: E402
 
@@ -79,12 +80,11 @@ def main() -> None:
     if payload.get("hook_event_name", "") != "SessionStart":
         return
 
-    cwd = payload.get("cwd", ".")
-    ai_state_dir = Path(cwd) / ".ai-state"
-    if not ai_state_dir.exists():
-        return  # graceful degradation: no state dir means no project to measure
+    location = locate(payload.get("cwd"))
+    if location is None:
+        return  # graceful degradation: no project serves this directory
 
-    report = measure(Path(cwd), api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    report = measure(location.project_dir, api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
     if report["bytes"] == 0:
         return  # nothing measurable — skip silently
@@ -96,7 +96,7 @@ def main() -> None:
         "session_id": session_id,
         "agent_type": payload.get("agent_type", "main"),
         "agent_id": payload.get("agent_id", "") or session_id,
-        "project": Path(cwd).name,
+        "project": location.project,
         "event_type": "context_surface_measurement",
         "tool_name": None,
         "summary": _build_summary(
@@ -107,7 +107,7 @@ def main() -> None:
         "classification": None,
     }
 
-    writer.record(ai_state_dir, EventClass.CONTEXT_SURFACE, observation)
+    writer.record(location.state_dir, EventClass.CONTEXT_SURFACE, observation)
 
 
 if __name__ == "__main__":

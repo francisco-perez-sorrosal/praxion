@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import registry
+from .location import locate
 from .modes import resolve_mode
 from .reader import LOG_FILENAME
 from .registry import FILE_CHANGING_TOOLS, EventClass
@@ -268,14 +269,14 @@ def record_gate_fire(
     observation event carries) -- both keys, one value.
 
     ``session_id`` is best-effort: pass it when the caller already parsed a
-    hook payload carrying one. Resolves the target project's `.ai-state/` the
-    way every ambient-invoked hook in this codebase falls back when no parsed
-    payload `cwd` is in scope: the process's own working directory. A caller
-    that already resolved the repo root passes ``project_dir``.
+    hook payload carrying one. Resolves the target project through `locate`,
+    starting from ``project_dir`` or, when no parsed payload `cwd` is in
+    scope, the process's own working directory -- either may sit anywhere
+    below the project root. No project serving it means no row.
     """
     try:
-        ai_state_dir = (project_dir or Path(os.getcwd())) / ".ai-state"
-        if not ai_state_dir.exists():
+        location = locate(str(project_dir or os.getcwd()))
+        if location is None:
             return
         observation = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -293,6 +294,6 @@ def record_gate_fire(
                 else f"unrecognised decision {decision!r}: {reason}"
             ),
         }
-        record(ai_state_dir, EventClass.GATE_FIRE, observation)
+        record(location.state_dir, EventClass.GATE_FIRE, observation)
     except Exception:
         pass

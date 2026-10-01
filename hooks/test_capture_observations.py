@@ -1,6 +1,6 @@
 """Tests for hooks/capture_observations.py — the `skill_activation` observations event.
 
-Targets `build_observation(payload: dict) -> dict`, the pure function
+Targets `build_observation(payload, *, project) -> dict`, the pure function
 extracted from `main()`'s inlined observation-dict assembly. Calling it
 directly (no stdin/subprocess harness) lets these tests exercise the new
 `Skill`-tool branch, envelope preservation, the non-Skill negative case, and
@@ -45,6 +45,11 @@ def _load_reconcile_observations():
     return reconcile_observations
 
 
+def _observe(module, payload: dict) -> dict:
+    """`build_observation` for the fixture payloads, which sit in `some-project`."""
+    return module.build_observation(payload, project="some-project")
+
+
 def _tool_call_payload(tool_name: str, tool_input: dict | None = None, **overrides: object) -> dict:
     """Build a synthetic completed-PostToolUse payload for the given tool.
 
@@ -75,7 +80,7 @@ class TestSkillActivationShape:
         m = _load_module()
         payload = _tool_call_payload("Skill", {"skill": "python-development"})
 
-        observation = m.build_observation(payload)
+        observation = _observe(m, payload)
 
         assert observation["event_type"] == "skill_activation"
         assert observation["skill_name"] == "python-development"
@@ -97,13 +102,13 @@ class TestSkillActivationEnvelope:
             agent_id="session-envelope-check",
         )
 
-        observation = m.build_observation(payload)
+        observation = _observe(m, payload)
 
         assert observation["timestamp"]  # non-empty ISO8601 stamp
         assert observation["session_id"] == "session-envelope-check"
         assert observation["agent_type"] == "test-engineer"
         assert observation["agent_id"] == "session-envelope-check"
-        assert observation["project"] == "some-project"  # Path(cwd).name
+        assert observation["project"] == "some-project"  # the project handed in
         assert observation["tool_name"] == "Skill"
         assert observation["summary"] == "Activate skill: python-development"
         assert observation["outcome"] == "success"
@@ -121,7 +126,7 @@ class TestNonSkillToolsStayToolUse:
         m = _load_module()
         payload = _tool_call_payload("Write", {"file_path": "src/foo.py"})
 
-        observation = m.build_observation(payload)
+        observation = _observe(m, payload)
 
         assert observation["event_type"] == "tool_use"
         assert "skill_name" not in observation
@@ -132,7 +137,7 @@ class TestNonSkillToolsStayToolUse:
             "Agent", {"subagent_type": "researcher", "description": "explore the codebase"}
         )
 
-        observation = m.build_observation(payload)
+        observation = _observe(m, payload)
 
         assert observation["event_type"] == "tool_use"
         assert "skill_name" not in observation
@@ -148,23 +153,25 @@ class TestSkillActivationMergeSurvival:
         m = _load_module()
         reconcile_observations = _load_reconcile_observations()
 
-        ours_row = m.build_observation(
+        ours_row = _observe(
+            m,
             _tool_call_payload(
                 "Skill",
                 {"skill": "python-development"},
                 session_id="session-ours",
                 agent_id="session-ours",
-            )
+            ),
         )
         ours_row["timestamp"] = "2026-07-16T09:00:00+00:00"
 
-        theirs_row = m.build_observation(
+        theirs_row = _observe(
+            m,
             _tool_call_payload(
                 "Skill",
                 {"skill": "refactoring"},
                 session_id="session-theirs",
                 agent_id="session-theirs",
-            )
+            ),
         )
         theirs_row["timestamp"] = "2026-07-16T10:00:00+00:00"
 
@@ -444,7 +451,7 @@ class TestObservationEnvelope:
 
         # A malformed payload must not make the observation unbuildable --
         # `main()` has no recovery path once `build_observation` raises.
-        observation = m.build_observation(_tool_call_payload("Write", tool_input="not-a-dict"))
+        observation = _observe(m, _tool_call_payload("Write", tool_input="not-a-dict"))
 
         assert observation["file_paths"] == []
         assert observation["tool_name"] == "Write"
@@ -452,8 +459,8 @@ class TestObservationEnvelope:
     def test_tool_error_is_recorded_as_a_failed_outcome(self):
         m = _load_module()
 
-        observation = m.build_observation(
-            _tool_call_payload("Bash", {"command": "false"}, tool_response={"error": "exit 1"})
+        observation = _observe(
+            m, _tool_call_payload("Bash", {"command": "false"}, tool_response={"error": "exit 1"})
         )
 
         assert observation["outcome"] == "failure"
@@ -461,8 +468,8 @@ class TestObservationEnvelope:
     def test_missing_agent_id_falls_back_to_the_session_id(self):
         m = _load_module()
 
-        observation = m.build_observation(
-            _tool_call_payload("Write", {"file_path": "a.py"}, session_id="sess-9", agent_id="")
+        observation = _observe(
+            m, _tool_call_payload("Write", {"file_path": "a.py"}, session_id="sess-9", agent_id="")
         )
 
         assert observation["agent_id"] == "sess-9"
@@ -470,7 +477,8 @@ class TestObservationEnvelope:
     def test_trace_context_surfaced_by_a_tool_is_carried_onto_the_row(self):
         m = _load_module()
 
-        observation = m.build_observation(
+        observation = _observe(
+            m,
             _tool_call_payload(
                 "Bash",
                 {"command": "true"},
@@ -481,7 +489,7 @@ class TestObservationEnvelope:
                         "parent_span_id": "0020000000000001",
                     }
                 },
-            )
+            ),
         )
 
         assert observation["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
@@ -491,8 +499,11 @@ class TestObservationEnvelope:
     def test_malformed_trace_context_degrades_to_empty_ids(self):
         m = _load_module()
 
-        observation = m.build_observation(
-            _tool_call_payload("Bash", {"command": "true"}, tool_response={"additionalContext": []})
+        observation = _observe(
+            m,
+            _tool_call_payload(
+                "Bash", {"command": "true"}, tool_response={"additionalContext": []}
+            ),
         )
 
         assert observation["trace_id"] == ""
@@ -692,3 +703,90 @@ class TestHookNeverRaisesIntoTheHarness:
         monkeypatch.setattr(sys, "stdin", io.StringIO(payload_text))
 
         runpy.run_path(str(HOOK_SCRIPT_PATH), run_name="__main__")
+
+
+# ---------------------------------------------------------------------------
+# Which log a tool event reaches -- resolved once, from anywhere in the checkout
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def checkout(isolated_project: Path) -> Path:
+    """`isolated_project` made a checkout root, so the upward walk has a stop."""
+    (isolated_project / ".git").mkdir()
+    return isolated_project
+
+
+class TestEventsFromBelowTheCheckoutRoot:
+    def test_a_subdirectory_event_lands_in_the_checkouts_log_under_the_checkouts_name(
+        self, checkout: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        below = checkout / "src" / "pkg"
+        below.mkdir(parents=True)
+        payload = _tool_call_payload("Write", {"file_path": "a.py"}, cwd=str(below))
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        (row,) = _wal_rows(checkout)
+        assert row["project"] == checkout.name
+        assert not (below / ".ai-state").exists()
+
+    def test_a_subdirectory_row_equals_the_row_from_the_root_but_for_its_timestamp(
+        self, checkout: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        below = checkout / "deep" / "er"
+        below.mkdir(parents=True)
+
+        for cwd in (checkout, below):
+            payload = _tool_call_payload("Write", {"file_path": "a.py"}, cwd=str(cwd))
+            _drive_main(m, json.dumps(payload), monkeypatch)
+
+        from_root, from_below = _wal_rows(checkout)
+        from_root.pop("timestamp")
+        from_below.pop("timestamp")
+        assert from_below == from_root
+
+    def test_a_nested_project_keeps_its_rows_to_itself(
+        self, checkout: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        nested = checkout / "vendor" / "inner"
+        (nested / ".ai-state").mkdir(parents=True)
+        payload = _tool_call_payload("Write", {"file_path": "a.py"}, cwd=str(nested / "src"))
+        (nested / "src").mkdir()
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        assert _wal_rows(checkout) == []
+        (row,) = _wal_rows(nested)
+        assert row["project"] == "inner"
+
+    def test_a_clone_inside_the_checkout_records_nothing(
+        self, checkout: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        m = _load_module()
+        clone = checkout / "third_party" / "clone"
+        (clone / ".git").mkdir(parents=True)
+        payload = _tool_call_payload("Write", {"file_path": "a.py"}, cwd=str(clone))
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        assert _wal_rows(checkout) == []
+
+    @pytest.mark.parametrize("cwd_override", [{"cwd": None}, {"cwd": ""}, {"cwd": 7}, "absent"])
+    def test_a_payload_without_a_usable_cwd_records_nothing_and_does_not_raise(
+        self, checkout: Path, monkeypatch: pytest.MonkeyPatch, cwd_override
+    ):
+        m = _load_module()
+        monkeypatch.chdir(checkout)  # the old process-directory fallback would have recorded
+        payload = _tool_call_payload("Write", {"file_path": "a.py"})
+        if cwd_override == "absent":
+            del payload["cwd"]
+        else:
+            payload.update(cwd_override)
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        assert _wal_rows(checkout) == []

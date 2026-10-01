@@ -29,6 +29,14 @@
 # rerun-survives check — only the *audit*'s attribution is coarser).
 #
 # Actions are SHA-pinned per security convention (dec-024).
+#
+# Two further jobs, `gate-liveness` and `gate-liveness-canaries`, prove the
+# gates still bite on known input (`scripts/check_gates_bite.py`, and the
+# `liveness`-marked scenarios under tests/e2e). They are Praxion-specific:
+# they are not mirrored into `claude/project-baseline/tests/test-scheduled.yml.tmpl`.
+# Both hold a read-only grant and no secret, start no assistant session, and
+# give each pytest invocation one tree (tests/ and fitness/tests/ never share
+# one, td-302).
 
 name: Test (scheduled)
 
@@ -340,3 +348,50 @@ jobs:
           if [ "$FULL" = "failure" ]; then
             echo "::error::The full suite failed - see junit.xml."; exit 1
           fi
+
+  gate-liveness:
+    name: Gate liveness (do the gates still bite?)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # Exit 1 when any gate no longer bites, naming what each probe expected
+      # and observed. The command bounds each probe on its own; this limit
+      # bounds the whole run.
+      - name: Prove each gate still bites
+        timeout-minutes: 20
+        run: .venv/bin/python scripts/check_gates_bite.py
+
+  gate-liveness-canaries:
+    name: Gate liveness canaries (whole-suite scenarios)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # The last -m wins over the runner config's -m 'not large and not liveness'.
+      - name: Run the liveness scenarios
+        run: .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider

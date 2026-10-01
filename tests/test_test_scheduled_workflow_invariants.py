@@ -89,3 +89,63 @@ def test_workflow_is_read_only() -> None:
     permissions = _workflow()["permissions"]
     assert permissions.get("contents") == "read"
     assert not any(value == "write" for value in permissions.values())
+
+
+# -- the gate-liveness jobs: read-only, secretless, bounded, and never one pytest over both trees --
+
+LIVENESS_JOBS = ("gate-liveness", "gate-liveness-canaries")
+LIVENESS_CLI = "scripts/check_gates_bite.py"
+LIVENESS_STEP_LIMIT_MINUTES = 20  # the run's budget; the job limit adds setup around it
+SESSION_OR_SECRET_TOKENS = ("secrets.", "github.token", "claude-code-action", "ANTHROPIC_")
+
+
+def _runs(job: dict) -> list[str]:
+    return [step["run"] for step in job["steps"] if "run" in step]
+
+
+@pytest.mark.parametrize("job_id", LIVENESS_JOBS)
+def test_liveness_job_holds_only_a_read_grant_of_its_own(job_id: str) -> None:
+    job = _workflow()["jobs"][job_id]
+    assert job["permissions"] == {"contents": "read"}
+
+
+@pytest.mark.parametrize("job_id", LIVENESS_JOBS)
+def test_liveness_job_reaches_no_secret_and_starts_no_assistant_session(job_id: str) -> None:
+    job = _workflow()["jobs"][job_id]
+    assert "env" not in job, "a job-level env is where a token would arrive"
+    reached = [token for token in SESSION_OR_SECRET_TOKENS if token in yaml.safe_dump(job)]
+    assert not reached, f"{job_id} reaches {reached}"
+
+
+@pytest.mark.parametrize("job_id", LIVENESS_JOBS)
+def test_liveness_job_has_a_time_limit_of_its_own(job_id: str) -> None:
+    assert int(_workflow()["jobs"][job_id]["timeout-minutes"]) > 0
+
+
+def test_liveness_cli_step_is_bounded_within_the_run_budget() -> None:
+    job = _workflow()["jobs"]["gate-liveness"]
+    steps = [step for step in job["steps"] if LIVENESS_CLI in step.get("run", "")]
+    assert len(steps) == 1
+    assert 0 < int(steps[0]["timeout-minutes"]) <= LIVENESS_STEP_LIMIT_MINUTES
+    assert int(job["timeout-minutes"]) > int(steps[0]["timeout-minutes"])
+
+
+def test_liveness_cli_runs_from_the_synced_environment_and_nowhere_else() -> None:
+    jobs = _workflow()["jobs"]
+    cli_jobs = [job_id for job_id, job in jobs.items() if LIVENESS_CLI in _run_text(job)]
+    assert cli_jobs == ["gate-liveness"]
+    assert ".venv/bin/python scripts/check_gates_bite.py" in _run_text(jobs["gate-liveness"])
+    assert "uv sync --frozen" in _run_text(jobs["gate-liveness"])
+
+
+def test_liveness_canaries_run_the_liveness_marker_over_the_e2e_directory() -> None:
+    text = _run_text(_workflow()["jobs"]["gate-liveness-canaries"])
+    assert "pytest -m liveness tests/e2e" in text
+    assert "uv sync --frozen" in text
+
+
+@pytest.mark.parametrize("job_id", LIVENESS_JOBS)
+def test_no_liveness_pytest_run_mixes_the_root_and_fitness_trees(job_id: str) -> None:
+    # td-302: tests/ and fitness/tests/ in one invocation collide on the `tests` package name.
+    for run in _runs(_workflow()["jobs"][job_id]):
+        assert "fitness" not in run, run

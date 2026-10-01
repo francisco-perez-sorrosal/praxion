@@ -88,6 +88,16 @@ def test_a_slugged_spawn_no_longer_counts_toward_the_checkout(tmp_path: Path, mo
     assert (parent.spawns, parent.agent_ids()) == (1, ["agent-adhoc"]), parent.describe()
 
 
+def test_a_checkout_whose_spawns_all_state_slugs_reports_zero_spawns(tmp_path: Path) -> None:
+    root = _checkout(tmp_path)
+    session = _session(tmp_path, root)
+    session.spawn_foreground("Task slug: split-pipeline\n\nDesign the parser.", "agent-split")
+
+    parent = _tally(tmp_path, root, CHECKOUT)
+
+    assert (parent.exit_code, parent.spawns, parent.agent_ids()) == (0, 0, []), parent.describe()
+
+
 def test_a_slug_stated_only_in_spawn_prompts_is_not_withheld_as_unseen(tmp_path: Path) -> None:
     root = _checkout(tmp_path)
     session = _session(tmp_path, root)
@@ -174,7 +184,7 @@ def test_the_first_marker_names_the_slug_when_a_prompt_states_two(tmp_path: Path
     first = _tally(tmp_path, root, "first-slug")
     second = _tally(tmp_path, root, "second-slug")
     assert (first.spawns, first.agent_ids()) == (1, ["agent-one"]), first.describe()
-    assert second.counts_nothing(), second.describe()
+    assert second.withheld_as_unseen(), second.describe()
 
 
 # -- A resume counts where its spawn counts -----------------------------------
@@ -207,14 +217,14 @@ def test_a_resume_is_reported_under_its_spawns_slug_and_never_as_a_new_spawn(
     )
 
 
-def test_a_resume_never_counts_under_the_slug_its_message_states(tmp_path: Path) -> None:
+def test_a_slug_stated_only_in_a_resume_message_is_withheld_as_unseen(tmp_path: Path) -> None:
     root = _checkout(tmp_path)
     session = _session(tmp_path, root)
 
     _spawn_then_resume_with_another_slug_in_the_message(session)
 
     other = _tally(tmp_path, root, "other-pipeline")
-    assert other.counts_nothing(), other.describe()
+    assert other.withheld_as_unseen(), other.describe()
 
 
 def test_a_resume_of_a_slugged_spawn_adds_nothing_to_the_checkout(tmp_path: Path) -> None:
@@ -347,30 +357,55 @@ def test_spawns_of_unknown_attribution_are_left_out_of_every_slugs_count(
     assert (tally.spawns, tally.agent_ids()) == (1, attributed), tally.describe()
 
 
-def test_a_slug_with_only_unattributed_spawns_counts_none_of_them(tmp_path: Path) -> None:
+def test_a_slug_stated_only_by_unattributed_spawns_is_withheld_as_unseen(tmp_path: Path) -> None:
     root, _, _ = _one_definite_spawn_and_two_unattributable(tmp_path)
 
     other = _tally(tmp_path, root, "other-pipeline")
 
-    assert other.counts_nothing(), other.describe()
+    assert other.withheld_as_unseen(), other.describe()
 
 
-def test_a_budget_met_only_without_the_unknown_spawns_reads_indeterminate(tmp_path: Path) -> None:
-    root, _, _ = _one_definite_spawn_and_two_unattributable(tmp_path)
-
-    held = _tally(tmp_path, root, "held-pipeline", budget=1)
-
-    assert (held.exit_code, held.charged, held.verdict) == (0, 1, "indeterminate"), held.describe()
-
-
-def test_a_budget_that_holds_with_every_unknown_spawn_charged_reads_within(
-    tmp_path: Path,
+# Each slug below has one definite spawn, and the log holds two unattributed
+# spawns: `within` needs 1 + 2 to fit the budget, so 1 and 2 fall short.
+@pytest.mark.parametrize(
+    ("slug", "budget"),
+    [("held-pipeline", 1), ("held-pipeline", 2), (CHECKOUT, 2)],
+)
+def test_a_budget_short_of_the_definite_charge_plus_every_pending_spawn_reads_indeterminate(
+    tmp_path: Path, slug: str, budget: int
 ) -> None:
     root, _, _ = _one_definite_spawn_and_two_unattributable(tmp_path)
 
-    held = _tally(tmp_path, root, "held-pipeline", budget=3)
+    tally = _tally(tmp_path, root, slug, budget=budget)
 
-    assert (held.exit_code, held.spawns, held.verdict) == (0, 1, "within"), held.describe()
+    assert (tally.exit_code, tally.charged, tally.verdict) == (0, 1, "indeterminate"), (
+        tally.describe()
+    )
+
+
+@pytest.mark.parametrize("slug", ["held-pipeline", CHECKOUT])
+def test_a_budget_that_fits_the_definite_charge_plus_every_pending_spawn_reads_within(
+    tmp_path: Path, slug: str
+) -> None:
+    root, _, _ = _one_definite_spawn_and_two_unattributable(tmp_path)
+
+    tally = _tally(tmp_path, root, slug, budget=3)
+
+    assert (tally.exit_code, tally.spawns, tally.verdict) == (0, 1, "within"), tally.describe()
+
+
+# With the definite spawn also resumed (a resume of unknown size), the pending
+# items are that resume and both unattributed spawns: 1 + 3 must fit.
+@pytest.mark.parametrize(("budget", "verdict"), [(3, "indeterminate"), (4, "within")])
+def test_unsized_resumes_and_unattributed_spawns_are_pending_together(
+    tmp_path: Path, budget: int, verdict: str
+) -> None:
+    root, session, _ = _one_definite_spawn_and_two_unattributable(tmp_path)
+    session.resume("agent-definite")
+
+    held = _tally(tmp_path, root, "held-pipeline", budget=budget)
+
+    assert (held.exit_code, held.charged, held.verdict) == (0, 1, verdict), held.describe()
 
 
 def test_a_definite_charge_beyond_the_budget_reads_over_despite_unknown_spawns(

@@ -57,11 +57,9 @@ class Tally:
         agent = next(a for a in self.report["agents"] if a["agent_id"] == agent_id)
         return _how_many(agent["resumes"])
 
-    def counts_nothing(self) -> bool:
-        """True when the slug is withheld or reports no spawn and no resume."""
-        if self.withheld:
-            return True
-        return self.report is not None and self.spawns == 0 and self.resumes == 0
+    def withheld_as_unseen(self) -> bool:
+        """Exit status 2, no report, and `slug-unseen` named on stderr."""
+        return self.withheld and self.report is None and "slug-unseen" in self.stderr
 
     def describe(self) -> str:
         return f"exit={self.exit_code} report={self.report} stderr={self.stderr.strip()!r}"

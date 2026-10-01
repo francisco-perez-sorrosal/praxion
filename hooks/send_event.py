@@ -62,7 +62,9 @@ def _resolve_project_root(cwd):
         return cwd
 
 
-TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*(\S+)")
+# Same slug alphabet as remind_task_brief.TASK_SLUG_RE: letters, digits, `-`
+# and `_`, so sentence-final punctuation and a closing backtick end the slug.
+TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
 
 
 def _git_context(cwd):

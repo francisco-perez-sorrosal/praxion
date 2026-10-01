@@ -769,6 +769,13 @@ class TestTaskSlugExtraction:
     def test_empty_description_yields_an_empty_string(self, hook):
         assert hook._extract_task_slug("") == ""
 
+    @pytest.mark.parametrize("trailer", [".", ",", ";", ":", ")", "?", "!"])
+    def test_trailing_punctuation_is_not_part_of_the_slug(self, hook, trailer):
+        assert hook._extract_task_slug(f"Task slug: auth-flow{trailer} Next") == "auth-flow"
+
+    def test_backticked_slug_is_read_without_backticks(self, hook):
+        assert hook._extract_task_slug("Task slug: `auth-flow`.") == "auth-flow"
+
 
 # ---------------------------------------------------------------------------
 # POST transport -- must never raise into the hook

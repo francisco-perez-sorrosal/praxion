@@ -876,3 +876,317 @@ tests = [
   "tests/test_plugin_namespace_invariants.py",
 ]
 why = "whole-repo content scanners: they walk every tracked file, so any change can affect them"
+
+# Closed 2026-10-01 from the first full gate-liveness selection audit: each test below
+# read these files (in a subprocess it spawns, or by scanning a directory) without any
+# layout, import or path-literal edge selecting it when they change. The weekly audit
+# reports any new miss of this kind.
+
+[[dep]]
+paths = [
+  "hooks/capture_observations.py",
+  "hooks/send_event.py",
+]
+tests = [
+  "scripts/gate_probes/test_observation.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "tests/fixtures/sentinel/spec_archival_gap/.ai-state/decisions/001-auth-session.md",
+  "tests/fixtures/sentinel/spec_archival_gap/.ai-state/decisions/002-auth-token.md",
+  "tests/fixtures/sentinel/spec_archival_gap/.ai-state/decisions/003-auth-middleware.md",
+]
+tests = [
+  "scripts/test_check_spec_archival_gap.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  ".ai-state/DESIGN_CHANGELOG.md",
+  ".ai-state/FOOTPRINTS.md",
+  ".ai-state/LANDSCAPE_WATCHLIST.md",
+  ".ai-state/SYSTEM_DEPLOYMENT.md",
+  ".ai-state/UPSTREAM_ISSUES.md",
+]
+tests = [
+  "scripts/test_check_state_ledgers.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "commands/*.md",
+]
+tests = [
+  "scripts/test_export_codex_command_skills.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "claude/aac-templates/precommit-block-d.sh.frag",
+]
+tests = [
+  "scripts/test_finalize_chain.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "commands/*.md",
+  "rules/eval/eval-data-governance.md",
+  "rules/ml/eval-driven-verification.md",
+  "rules/ml/experiment-commit-conventions.md",
+  "rules/ml/experiment-tracking-conventions.md",
+  "rules/ml/gpu-budget-conventions.md",
+  "rules/swe/adr-conventions.md",
+  "rules/swe/agent-behavioral-contract.md",
+  "rules/swe/coding-style.md",
+  "rules/swe/gate-liveness.md",
+  "rules/swe/id-citation-discipline.md",
+  "rules/swe/plugin-install-conventions.md",
+  "rules/swe/shipped-artifact-isolation.md",
+  "rules/swe/staleness-policy.md",
+  "rules/swe/testing-conventions.md",
+  "rules/swe/vcs/git-conventions.md",
+  "rules/swe/vcs/pr-conventions.md",
+  "rules/writing/aac-dac-conventions.md",
+  "rules/writing/diagram-conventions.md",
+  "rules/writing/html-output-conventions.md",
+  "rules/writing/readme-style.md",
+  "scripts/render_claude_md.py",
+  "skills/adapt-claude-to-agents/scripts/claude_to_agents.py",
+]
+tests = [
+  "scripts/test_install_codex.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/test_fixtures/ledger_triage/base/.ai-state/decisions/*.md",
+]
+tests = [
+  "scripts/test_ledger_health.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/_git_runner.py",
+  "scripts/_sidecar_checks.py",
+  "scripts/_sidecar_cli.py",
+  "scripts/_sidecar_commit.py",
+  "scripts/_sidecar_convergence.py",
+  "scripts/_sidecar_git.py",
+  "scripts/_sidecar_identity.py",
+  "scripts/_sidecar_init.py",
+  "scripts/_sidecar_inputs.py",
+  "scripts/_sidecar_link.py",
+  "scripts/_sidecar_manifest.py",
+  "scripts/_sidecar_mergeback.py",
+  "scripts/_sidecar_mount.py",
+  "scripts/_sidecar_publish.py",
+  "scripts/_sidecar_render.py",
+  "scripts/_state_repo.py",
+  "scripts/install_git_hooks.py",
+]
+tests = [
+  "scripts/test_onboard_project_placement.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/_sidecar_checks.py",
+  "scripts/_sidecar_cli.py",
+  "scripts/_sidecar_commit.py",
+  "scripts/_sidecar_convergence.py",
+  "scripts/_sidecar_identity.py",
+  "scripts/_sidecar_init.py",
+  "scripts/_sidecar_inputs.py",
+  "scripts/_sidecar_link.py",
+  "scripts/_sidecar_manifest.py",
+  "scripts/_sidecar_mergeback.py",
+  "scripts/_sidecar_publish.py",
+  "scripts/_sidecar_render.py",
+  "scripts/install_git_hooks.py",
+]
+tests = [
+  "scripts/test_praxion_sidecar.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/praxion_feedback/issue_triage.py",
+]
+tests = [
+  "scripts/test_report_praxion_issue.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/_sidecar_init.py",
+  "scripts/_sidecar_mergeback.py",
+  "scripts/_sidecar_publish.py",
+]
+tests = [
+  "scripts/test_sidecar_inputs.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "hooks/_observation_log/__init__.py",
+  "hooks/_observation_log/modes.py",
+  "hooks/_observation_log/reader.py",
+  "scripts/check_test_results_shape.py",
+  "scripts/reconcile_pipeline_state.py",
+]
+tests = [
+  "scripts/test_step_schema.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "claude/aac-templates/architecture.yml.tmpl",
+  "scripts/_sidecar_checks.py",
+  "scripts/_sidecar_cli.py",
+  "scripts/_sidecar_commit.py",
+  "scripts/_sidecar_convergence.py",
+  "scripts/_sidecar_identity.py",
+  "scripts/_sidecar_init.py",
+  "scripts/_sidecar_inputs.py",
+  "scripts/_sidecar_link.py",
+  "scripts/_sidecar_manifest.py",
+  "scripts/_sidecar_mergeback.py",
+  "scripts/_sidecar_publish.py",
+  "scripts/_sidecar_render.py",
+  "scripts/install_git_hooks.py",
+  "scripts/praxion-sidecar",
+  "scripts/reconcile_aac_surfaces.py",
+  "scripts/refresh_labels_baseline.py",
+]
+tests = [
+  "scripts/test_upgrade_project_pins.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "hooks/capture_observations.py",
+  "hooks/inject_subagent_context.py",
+  "hooks/remind_task_brief.py",
+  "hooks/send_event.py",
+]
+tests = [
+  "tests/acceptance/test_observation_log_compatibility.py",
+  "tests/acceptance/test_spawn_slug_attribution.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "hooks/_hook_utils.py",
+  "hooks/_observation_log/*.py",
+  "hooks/_sidecar_hook_common.py",
+  "hooks/auto_complete_install.py",
+  "hooks/capture_observations.py",
+  "hooks/capture_session.py",
+  "hooks/heal_hook_chain.py",
+  "hooks/inject_decisions.py",
+  "hooks/inject_rules.py",
+  "hooks/inject_sidecar_banner.py",
+  "hooks/inject_subagent_context.py",
+  "hooks/measure_context_surface.py",
+  "hooks/notify_bg_session_state.py",
+  "hooks/remind_calibration.py",
+  "hooks/remind_task_brief.py",
+  "hooks/send_event.py",
+  "hooks/sidecar_autocommit.py",
+  "hooks/surface_praxion_feedback.py",
+  "rules/_manifest.yaml",
+  "rules/swe/agent-model-routing.md",
+  "rules/swe/vcs/git-conventions.md",
+  "scripts/_git_runner.py",
+  "scripts/_script_cli.py",
+  "scripts/_state_repo.py",
+  "scripts/check_calibration_coverage.py",
+  "scripts/measure_token_budget.py",
+  "scripts/praxion_feedback/__init__.py",
+  "scripts/praxion_feedback/candidate_store.py",
+  "scripts/praxion_feedback/fingerprint.py",
+  "scripts/render_claude_md.py",
+]
+tests = [
+  "tests/acceptance/test_observation_log_location.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "hooks/_hook_utils.py",
+  "hooks/_observation_log/*.py",
+  "hooks/capture_observations.py",
+  "hooks/capture_session.py",
+  "hooks/inject_subagent_context.py",
+  "hooks/remind_task_brief.py",
+  "hooks/send_event.py",
+]
+tests = [
+  "tests/acceptance/test_recording_never_breaks_the_session.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/rework_manifest.py",
+]
+tests = [
+  "tests/test_dispatch_reworks_bg.py",
+  "tests/test_dispatch_reworks_manifest.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = [
+  "scripts/adr_health.py",
+  "scripts/check_aac_golden_rule.py",
+  "scripts/check_adr_reciprocity.py",
+  "scripts/check_agent_lifecycle_pairing.py",
+  "scripts/check_agent_prompt_size.py",
+  "scripts/check_architecture_projection.py",
+  "scripts/check_artifact_conformance.py",
+  "scripts/check_behavioral_contract.py",
+  "scripts/check_calibration_coverage.py",
+  "scripts/check_design_checkpoint.py",
+  "scripts/check_doc_manifest_freshness.py",
+  "scripts/check_gate_liveness.py",
+  "scripts/check_hackathon_graduation.py",
+  "scripts/check_hook_installation.py",
+  "scripts/check_metrics_freshness.py",
+  "scripts/check_p06_task_brief.py",
+  "scripts/check_path_resolution.py",
+  "scripts/check_readiness_feedback.py",
+  "scripts/check_registry_projection.py",
+  "scripts/check_sentinel_self_audit.py",
+  "scripts/check_spec_archival_gap.py",
+  "scripts/check_spec_drift.py",
+  "scripts/check_specialist_dispositions.py",
+  "scripts/check_staleness_markers.py",
+  "scripts/check_state_corpus.py",
+  "scripts/clean_work_safety.py",
+  "scripts/ledger_health.py",
+  "scripts/measure_token_budget.py",
+  "scripts/regenerate_adr_index.py",
+]
+tests = [
+  "tests/test_sentinel_check_triangle.py",
+]
+why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"

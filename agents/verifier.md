@@ -71,11 +71,22 @@ Skip this phase entirely in standalone mode.
 
 #### Phase 3a -- ML Metric Threshold Evaluation (conditional sub-branch)
 
-**Activation:** fires when EITHER (1) `SYSTEMS_PLAN.md` acceptance criteria contain metric-threshold syntax (e.g., `val_bpb < 1.75 ± 0.02`, `val_perplexity ≤ 8.5`), OR (2) the project has ML training signals (`program.md` or `train.py` at repo root, or `pyproject.toml` declares `torch`/`jax`/`tensorflow`). When neither is present, skip Phase 3a and continue with Phase 4.
+**Activation:** fires when EITHER (1) `SYSTEMS_PLAN.md` acceptance criteria contain metric-threshold syntax (e.g., `val_bpb < 1.75 ± 0.02`, `val_perplexity ≤ 8.5`), OR (2) the project has ML training signals (`program.md` or `train.py` at repo root, or `pyproject.toml` declares `torch`/`jax`/`tensorflow`). When neither is present, skip Phase 3a and continue with Phase 3b.
 
 When activated: locate `TRAINING_RESULTS.md` (ephemeral `.ai-work/<task-slug>/TRAINING_RESULTS.md` first, then archival `.ai-state/training_runs/<run-tag>.md` using the run-tag from the acceptance criteria). An absent file with metric-threshold criteria is a WARN (not FAIL — the run may not have executed). When found, load `skills/llm-training-eval/references/training-results-schema.md` § "Verifier Consumption (Phase 3a)" and follow its evaluation steps — parse each threshold, apply tolerance bands, classify PASS/FAIL/WARN per `rules/ml/eval-driven-verification.md`, and emit findings in the Acceptance Criteria section.
 
-After Phase 3a, continue with standard Phase 3 evaluation for all non-metric criteria.
+After Phase 3a (activated or skipped), run Phase 3b, then continue with standard Phase 3 evaluation for all non-metric criteria.
+
+#### Phase 3b -- Footprint Criteria (conditional sub-branch)
+
+**Activation:** only when `SYSTEMS_PLAN.md` exists with an `## Acceptance Criteria` section; Lightweight, pre-refactor and plan-less runs skip it silently. Footprint-free runs cost nothing: a missing command is a WARN only when Glob or Grep finds `.ai-state/FOOTPRINTS.md` or a `### Footprint Criteria` / `### Footprints Not Measured` heading in the plan, otherwise stay silent. Detail: [`footprint-criteria.md`](../skills/spec-driven-development/references/footprint-criteria.md).
+
+1. **Run** `check_footprint_criteria.py <task-slug> --stage verify --base-ref <Base commit> --json` (`python3 scripts/check_footprint_criteria.py` when self-hosting). Read the Base commit from `ACCEPTANCE_TESTS.md`; when none is recorded, WARN naming that and pass no default. A missing command, exit 2, or stdout that is not the JSON envelope (a traceback) is a WARN naming the failure, never "inactive". Exit 1 still carries the envelope: read the per-criterion rows. `active: false` is silent. Golden bad-case: an exit-2 run reported as "no footprint criteria".
+2. **Findings** are rows in the Acceptance Criteria section. FP02 and FP03 fail the criterion; FP05 is a WARN naming the registry row; FP04 is info only; FP01 is a WARN naming the footprint and the moving paths (verdict at best PASS WITH FINDINGS). Golden bad-case: a moved registered footprint with neither table row.
+3. **Judge each valid final row** against the limit and comparator, and against the baseline row's value when `against` is Baseline; FAIL a breach naming metric, limit, against, measured value (or its absence) and command. Judge an `estimate` against the metric's stated basis. When the diff touches none of the paths registered for the footprint in `.ai-state/FOOTPRINTS.md`, say so (the FAIL stands); an unregistered footprint has no registered paths, say that. Golden bad-cases: a criterion with no final row; a recorded value outside its limit; a baseline `measured` and final `estimate` pair.
+4. **Not-measured footprints** are listed in the Acceptance Criteria section. A reasonless declaration is a missing criterion, by your judgment beyond the CLI's placeholder list. Golden bad-case: a `Footprints Not Measured` row whose reason is `TBD for now`.
+
+Routing of footprint rows to this phase: `agents/test-engineer.md` and [`coordination-details.md`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage).
 
 ### Phase 4 -- Spec Conformance (pipeline mode, when behavioral specification exists)
 

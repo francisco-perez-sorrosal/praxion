@@ -272,6 +272,8 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 - **REQ-NN** — <internal-only behavior | no drivable boundary | Markdown-prompt behavior> → inner loop | verifier judgment
 ```
 
+A footprint row (`FC-NN` in `### Footprint Criteria`, or a declared footprint) goes to `## Not Black-Box Testable` as `- **FC-NN** — footprint bound → measurement step, then verifier`, never a test pinned to a dated baseline. A REQ with drivable behavior keeps its scenario; the entry names only the footprint bound as the undrivable part. Sites: `coordination-details.md § Acceptance-Design Stage` and `agents/verifier.md` Phase 3b.
+
 An empty section reads `_None._`. The skipped form keeps all five sections; `## Sources Read` and `## Scenarios` read `_None — stage skipped._`. Every REQ of the extract lands in `Scenarios` or `Not Black-Box Testable` (in both only when the Not Black-Box Testable entry names the part no scenario can drive), and every `Needs: BA-NN` resolves to a Boundary Assumption.
 
 **Procedure.** Use the spec's Observable Surface names only. Run the tests and confirm each is RED for the right reason (behavior missing or driver unbound, never a syntax or collection error). A surprise green outside `guard` is a Register Objection. An unbound driver raises with the assumption's words, never its id. For ambiguous requirement wording, raise a Spec Question with a provisional or `withheld` scenario rather than guessing. **On a Spec-Question resume,** re-read only the regenerated extract, turn `withheld` scenarios into executable ones, set each `Resolution:`, and (for a question raised by the implementer) record it as such.

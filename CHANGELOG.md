@@ -1,3 +1,28 @@
+## v0.43.0 (2026-10-01)
+
+### Feat
+
+- Record each spawn's agent id and task slug
+- Mark new agent_start rows for slug attribution
+- **scripts**: Add measure_selection_size.py
+
+### Fix
+
+- **agents**: Define the acceptance designer's context inputs
+- Declare the reads five tests made unselected
+- Hold the verdict for unattributed agents' resumes
+- Keep spawn slugs on one line and rows on odd input
+- Count spawns by the pipeline that launched them
+- Resolve no log for a missing or relative cwd
+- Route every log writer through locate()
+- Record session rows from any checkout subdirectory
+- Drop project addopts in mutation-sensor runs
+- Stop the event slug at trailing punctuation
+
+### Refactor
+
+- Read the task slug in one shared place
+
 ## v0.42.1 (2026-10-01)
 
 ### Fix

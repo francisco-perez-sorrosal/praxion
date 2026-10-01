@@ -488,6 +488,34 @@ def test_refuses_a_plugin_cache_repo_root(tmp_path: Path) -> None:
     assert "plugin-cache-root" in result.stderr
 
 
+def test_the_read_includes_the_rotation_archive_before_the_live_log(tmp_path: Path) -> None:
+    """In-process, so a mutant that drops the archive is seen (the CLI tests run a subprocess,
+    which never executes a mutated module): a spawn recorded only in `.1` must still count."""
+    import spawn_count
+
+    _write_wal(tmp_path, dot1_lines=[_ROW_FIRST_START], live_lines=[_ROW_RESUME_START])
+
+    sources, rows, _ = spawn_count._read_wal_rows(tmp_path)
+
+    expected = [json.loads(line) for line in (_ROW_FIRST_START, _ROW_RESUME_START)]
+    assert [p.name for p in sources] == ["observations.jsonl.1", "observations.jsonl"]
+    assert [(r["timestamp"], r["event_type"]) for r in rows] == [
+        (e["timestamp"], e["event_type"]) for e in expected
+    ]
+
+
+def test_malformed_lines_are_summed_across_segments(tmp_path: Path) -> None:
+    """Each segment's malformed lines add to one total; none overwrites another."""
+    import spawn_count
+
+    broken = '{"timestamp": "2026-01-01T00:00:00+00:00", "trunc'
+    _write_wal(tmp_path, dot1_lines=[broken, broken], live_lines=[_ROW_RESUME_START, broken])
+
+    _, _, skipped = spawn_count._read_wal_rows(tmp_path)
+
+    assert skipped == 3
+
+
 def test_malformed_wal_line_is_skipped_and_counted_not_zeroed(tmp_path: Path) -> None:
     """A truncated JSONL line must not zero the whole run -- it is skipped and counted."""
     repo = tmp_path / "repo"

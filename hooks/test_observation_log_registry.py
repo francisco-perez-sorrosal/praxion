@@ -11,6 +11,8 @@ a field going undeclared -- must fail this test.
 
 from __future__ import annotations
 
+import pytest
+
 from hooks._observation_log import registry
 from hooks._observation_log.modes import Mode
 
@@ -112,6 +114,23 @@ def test_only_the_spawn_result_class_declares_the_spawn_result_fields():
         ]
 
         assert declaring == [registry.EventClass.TOOL_AGENT_SPAWN], field
+
+
+@pytest.mark.parametrize(
+    "consumer_name",
+    [
+        "hooks/capture_session.py#backfill",
+        "scripts/check_agent_lifecycle_pairing.py",
+        "agents/sentinel.md#P03",
+    ],
+)
+def test_a_reader_of_a_subagents_first_call_also_reads_the_spawn_result(consumer_name):
+    """A subagent whose first call is a spawn writes the spawn row, not a
+    first-call row, so these readers must be declared on both."""
+    (consumer,) = [c for c in registry.CONSUMERS if c.name == consumer_name]
+    first_call = consumer.needs[registry.EventClass.TOOL_FIRST_OF_SUBAGENT]
+
+    assert set(first_call) <= set(consumer.needs[registry.EventClass.TOOL_AGENT_SPAWN])
 
 
 def test_the_spawn_tally_declares_the_spawn_result_fields_among_its_needs():

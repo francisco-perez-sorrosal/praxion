@@ -167,7 +167,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - `.ai-state/observations.jsonl` -- one appended JSON line per recorded call, mode-gated
 - `.ai-state/observations.jsonl.1` -- rotation archive; the active log is renamed onto it at 10 MiB
 - `.ai-state/observations.lock` -- empty `fcntl` lock file
-- `<tmp>/praxion-observation-log-first-call-<16 hex>` -- first-call marker: empty, created `O_CREAT | O_EXCL` with mode `0o600`; `<tmp>` is the first of `TMPDIR`, `TEMP`, `TMP`, else `/tmp` (created if absent); the name is a SHA-256 digest of the `.ai-state/` device, inode and agent id. Created only after a subagent's first tool-use row (or a file-changing one) has been written; never for the main agent, never in `off` mode
+- `<tmp>/praxion-observation-log-first-call-<16 hex>` -- first-call marker: empty, created `O_CREAT | O_EXCL` with mode `0o600`; `<tmp>` is the first of `TMPDIR`, `TEMP`, `TMP`, else `/tmp` (created if absent); the name is a SHA-256 digest of the `.ai-state/` device, inode and agent id. Created only after a subagent's first tool-use row (or a file-changing one, or an `Agent`/`Task` result row) has been written; never for the main agent, never in `off` mode. Besides first calls and file writes, `standard` also records every `Agent`/`Task` result (the spawn row), the main session's included
 
 **External contact**:
 - None

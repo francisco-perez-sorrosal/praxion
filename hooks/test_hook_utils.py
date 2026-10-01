@@ -69,7 +69,8 @@ def test_observability_flag_name():
         ("Task slug: `auth-flow`", "auth-flow"),
         ("Task slug: auth-flow\n", "auth-flow"),
         ("Task slug:auth-flow", "auth-flow"),
-        ("Task  slug:\n  auth-flow", "auth-flow"),
+        ("Task  slug:  auth-flow", "auth-flow"),
+        ("Task\tslug:\tauth-flow", "auth-flow"),
         ("blah\n\nTask slug: auth-flow\nmore", "auth-flow"),
         ("Task slug: auth_flow-2.", "auth_flow-2"),
         ("Task slug: v1.2-fix", "v1"),
@@ -78,7 +79,8 @@ def test_observability_flag_name():
         "backticks",
         "bare",
         "no-space",
-        "wrapped-marker",
+        "wide-gap",
+        "tab-gap",
         "middle-line",
         "alphabet",
         "dot-ends-slug",
@@ -94,6 +96,17 @@ def test_stated_task_slug_ends_at_the_first_character_outside_the_alphabet(trail
     the brief reminder at `.ai-work/auth-flow./TASK_BRIEF.md`."""
     text = f"Task slug: auth-flow{trailer} Design it."
     assert _import_hook_utils().stated_task_slug(text) == "auth-flow"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Task slug:\n\nExplore the code.", "Task slug:\nauth-flow", "Task\nslug: auth-flow"],
+    ids=["blank-line-then-prose", "slug-on-next-line", "wrapped-label"],
+)
+def test_stated_task_slug_never_reads_across_a_line_break(text):
+    """Silent failure pinned: `Task slug:` left empty, then a blank line and a
+    sentence, recorded the first word of the sentence as the slug."""
+    assert _import_hook_utils().stated_task_slug(text) is None
 
 
 def test_stated_task_slug_reads_the_first_marker_when_a_prompt_states_two():

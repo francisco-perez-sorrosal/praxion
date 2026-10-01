@@ -47,8 +47,10 @@ def is_disabled(flag_name: str) -> bool:
 # accepts). `.` is excluded on purpose: orchestrators write the label inside
 # ordinary sentences, and a sentence-final period read into the slug names a
 # path that can never exist. The slug ends at the first character outside the
-# alphabet, so a closing backtick needs no pattern of its own.
-_TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
+# alphabet, so a closing backtick needs no pattern of its own. Gaps are
+# horizontal whitespace only: a label left empty must not borrow the first word
+# of the next line as its slug.
+_TASK_SLUG_RE = re.compile(r"Task[ \t]+slug:[ \t]*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
 
 
 def stated_task_slug(text: object) -> str | None:

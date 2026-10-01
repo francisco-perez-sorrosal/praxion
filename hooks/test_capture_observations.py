@@ -886,6 +886,21 @@ class TestSpawnResultRow:
 
         assert _observe(m, payload)["project"] == "some-project"
 
+    @pytest.mark.parametrize(
+        "tool_input", [None, [], 7, ["prompt"]], ids=["null", "list", "int", "words"]
+    )
+    def test_a_non_object_input_still_records_the_spawn_with_a_null_slug(self, tool_input: object):
+        m = _load_module()
+        payload = _tool_call_payload("Agent")
+        payload["tool_input"] = tool_input
+        payload["tool_response"] = {"agentId": "c", "agentType": "praxion:researcher"}
+
+        observation = _observe(m, payload)
+
+        assert observation["spawned_agent_id"] == "c"
+        assert observation["spawned_agent_type"] == "praxion:researcher"
+        assert observation["task_slug"] is None
+
     def test_a_non_spawn_tool_never_carries_the_spawn_fields(self):
         m = _load_module()
         payload = _tool_call_payload("Bash", {"command": "ls"})

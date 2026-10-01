@@ -175,7 +175,7 @@ def build_observation(payload: dict, *, project: str) -> dict:
     tool_name = payload.get("tool_name", "")
 
     tool_input = payload.get("tool_input", {})
-    if isinstance(tool_input, str):
+    if not isinstance(tool_input, dict):
         tool_input = {}
 
     file_paths = extract_file_paths(tool_input, tool_name)

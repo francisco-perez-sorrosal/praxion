@@ -64,13 +64,23 @@ def _load_sitecustomize():
     """The tracer module, loaded inert (no `PX_TRACE_ROOT`), under the name the interpreter gives it.
 
     A mutation run keys its mutants by module name, so a private alias would hide every hit.
+    Inert is enforced, not assumed: inside a traced suite run the tracer's variables are set,
+    and loading the module live would leave a second audit hook in the worker for good,
+    crediting every later test's reads to this file.
     """
     spec = importlib.util.spec_from_file_location("sitecustomize", TRACER_DIR / "sitecustomize.py")
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    saved = {key: os.environ.pop(key) for key in _TRACER_ENV if key in os.environ}
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        os.environ.update(saved)
     return module
+
+
+_TRACER_ENV = ("PX_TRACE_ROOT", "PX_TRACE_OUT", "PX_TRACE_PID", "PX_TRACE_TEST")
 
 
 @pytest.fixture

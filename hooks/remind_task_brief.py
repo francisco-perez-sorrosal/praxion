@@ -41,12 +41,11 @@ Fast-skip conditions (exit 0, silent):
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-from _hook_utils import is_disabled
+from _hook_utils import is_disabled, stated_task_slug
 
 DISABLE_FLAG = "PRAXION_DISABLE_TASK_BRIEF_REMINDER"
 PREFIX = "[task-brief-reminder]"
@@ -67,16 +66,6 @@ BRIEF_CONSUMING_STAGES = frozenset(
         "implementation-planner",
     }
 )
-
-# `Task slug: <slug>` per the task-slug propagation contract. An opening
-# backtick is optional because orchestrators write the slug both ways.
-#
-# The slug alphabet is letters, digits, `-` and `_` (the one extract_spec.py
-# accepts). `.` is excluded on purpose: orchestrators write the label inside
-# ordinary sentences, and a sentence-final period read into the slug points the
-# reminder at a brief path that can never exist. The slug ends at the first
-# character outside the alphabet, so a closing backtick needs no pattern of its own.
-TASK_SLUG_RE = re.compile(r"Task slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
 
 
 def _emit(message: str) -> None:
@@ -133,10 +122,9 @@ def _process(payload: dict) -> None:
     if stage not in BRIEF_CONSUMING_STAGES:
         return
 
-    match = TASK_SLUG_RE.search(str(tool_input.get("prompt", "")))
-    if match is None:
+    slug = stated_task_slug(tool_input.get("prompt"))
+    if slug is None:
         return
-    slug = match.group(1)
 
     root = _repo_root(str(payload.get("cwd", "")))
     if root is None:

@@ -60,6 +60,61 @@ def test_observability_flag_name():
     assert hu.DISABLE_OBSERVABILITY.startswith("PRAXION_DISABLE_")
 
 
+# -- stated_task_slug: the one reading of a prompt's `Task slug:` marker ------
+
+
+@pytest.mark.parametrize(
+    ("text", "slug"),
+    [
+        ("Task slug: `auth-flow`", "auth-flow"),
+        ("Task slug: auth-flow\n", "auth-flow"),
+        ("Task slug:auth-flow", "auth-flow"),
+        ("Task  slug:\n  auth-flow", "auth-flow"),
+        ("blah\n\nTask slug: auth-flow\nmore", "auth-flow"),
+        ("Task slug: auth_flow-2.", "auth_flow-2"),
+        ("Task slug: v1.2-fix", "v1"),
+    ],
+    ids=[
+        "backticks",
+        "bare",
+        "no-space",
+        "wrapped-marker",
+        "middle-line",
+        "alphabet",
+        "dot-ends-slug",
+    ],
+)
+def test_stated_task_slug_reads_the_slug_the_marker_names(text, slug):
+    assert _import_hook_utils().stated_task_slug(text) == slug
+
+
+@pytest.mark.parametrize("trailer", [".", ",", ";", ":", ")", "?", "!", "\n", "`."])
+def test_stated_task_slug_ends_at_the_first_character_outside_the_alphabet(trailer):
+    """Silent failure pinned: a sentence-final period read into the slug pointed
+    the brief reminder at `.ai-work/auth-flow./TASK_BRIEF.md`."""
+    text = f"Task slug: auth-flow{trailer} Design it."
+    assert _import_hook_utils().stated_task_slug(text) == "auth-flow"
+
+
+def test_stated_task_slug_reads_the_first_marker_when_a_prompt_states_two():
+    text = "Task slug: first-slug\n\nlater, Task slug: second-slug."
+    assert _import_hook_utils().stated_task_slug(text) == "first-slug"
+
+
+@pytest.mark.parametrize("text", ["", "no marker here", "Task slug: -auth", "Task slug: "])
+def test_stated_task_slug_is_none_without_a_slug(text):
+    assert _import_hook_utils().stated_task_slug(text) is None
+
+
+@pytest.mark.parametrize(
+    "not_text",
+    [None, 7, 1.5, ["Task slug: x"], {"prompt": "Task slug: x"}, b"Task slug: x"],
+    ids=["none", "int", "float", "list", "object", "bytes"],
+)
+def test_stated_task_slug_is_none_for_input_that_is_not_text(not_text):
+    assert _import_hook_utils().stated_task_slug(not_text) is None
+
+
 # -- Integration: observability hooks short-circuit when disabled -------------
 
 

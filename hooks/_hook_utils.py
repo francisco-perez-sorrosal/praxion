@@ -5,7 +5,9 @@ kill-switch flag consumed by the capture/telemetry hooks (``capture_observations
 ``capture_session``, ``send_event``, ``measure_context_surface``,
 ``notify_bg_session_state``).
 
-Also provides ``record_gate_fire`` -- a thin forwarding wrapper for
+Also provides ``stated_task_slug`` -- the one reading of the ``Task slug:``
+marker an orchestrator writes into a spawn prompt -- and
+``record_gate_fire`` -- a thin forwarding wrapper for
 commit-gate scripts recording their own pass/warn/block verdict. The row
 shape, mode gating, and the append/rotate/lock machinery now live in
 ``hooks/_observation_log/writer.py``; this module keeps the same public
@@ -15,6 +17,7 @@ name and signature so no gate call site needs to change.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 # -- Per-project opt-out flag --------------------------------------------------
@@ -35,6 +38,29 @@ _TRUTHY = frozenset({"1", "true", "yes"})
 def is_disabled(flag_name: str) -> bool:
     """Return True if the named opt-out env var is set to a truthy value."""
     return os.environ.get(flag_name, "").strip().lower() in _TRUTHY
+
+
+# `Task slug: <slug>` per the task-slug propagation contract. An opening
+# backtick is optional because orchestrators write the slug both ways.
+#
+# The slug alphabet is letters, digits, `-` and `_` (the one extract_spec.py
+# accepts). `.` is excluded on purpose: orchestrators write the label inside
+# ordinary sentences, and a sentence-final period read into the slug names a
+# path that can never exist. The slug ends at the first character outside the
+# alphabet, so a closing backtick needs no pattern of its own.
+_TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
+
+
+def stated_task_slug(text: object) -> str | None:
+    """The slug the first ``Task slug:`` marker in ``text`` names, else None.
+
+    Total over its input: anything that is not text reads as "no marker", so a
+    caller handing it a raw payload field needs no type check of its own.
+    """
+    if not isinstance(text, str):
+        return None
+    match = _TASK_SLUG_RE.search(text)
+    return match.group(1) if match else None
 
 
 def record_gate_fire(

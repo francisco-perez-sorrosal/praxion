@@ -11,7 +11,12 @@ import subprocess
 import sys
 import urllib.request
 
-from _hook_utils import DISABLE_EVENT_POSTING, DISABLE_OBSERVABILITY, is_disabled
+from _hook_utils import (
+    DISABLE_EVENT_POSTING,
+    DISABLE_OBSERVABILITY,
+    is_disabled,
+    stated_task_slug,
+)
 
 # `PROGRESS.md` is written by the orchestrator alone, and only in hackathon
 # mode; pipeline agents report through their terminal marker and `WIP.md`
@@ -60,11 +65,6 @@ def _resolve_project_root(cwd):
         return cwd
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         return cwd
-
-
-# Same slug alphabet as remind_task_brief.TASK_SLUG_RE: letters, digits, `-`
-# and `_`, so sentence-final punctuation and a closing backtick end the slug.
-TASK_SLUG_RE = re.compile(r"Task\s+slug:\s*`?([A-Za-z0-9][A-Za-z0-9_-]*)")
 
 
 def _git_context(cwd):
@@ -132,10 +132,7 @@ def _git_context(cwd):
 
 def _extract_task_slug(description):
     """Extract task slug from agent description (e.g. 'Task slug: auth-flow')."""
-    if not description:
-        return ""
-    match = TASK_SLUG_RE.search(description)
-    return match.group(1) if match else ""
+    return stated_task_slug(description) or ""
 
 
 PROGRESS_LINE_RE = re.compile(

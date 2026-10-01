@@ -344,41 +344,16 @@ class TestHookNeverRaisesIntoTheHarness:
 # ---------------------------------------------------------------------------
 
 
-def test_slug_regex_accepts_backticked_form() -> None:
-    module = _load_module()
-    assert module.TASK_SLUG_RE.search("Task slug: `auth-flow`").group(1) == "auth-flow"
-    assert module.TASK_SLUG_RE.search("Task slug: auth-flow\n").group(1) == "auth-flow"
+def test_a_prompt_that_is_not_text_is_silent(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-text prompt states no slug: nothing to look up, nothing to say."""
+    payload = _payload(cwd=str(repo))
+    payload["tool_input"]["prompt"] = ["Task slug: auth-flow"]
+    assert _drive_process(_load_module(), payload, monkeypatch) == ""
 
 
-@pytest.mark.parametrize("trailer", [".", ",", ";", ":", ")", "?", "!", "\n"])
-def test_slug_ends_at_the_first_character_outside_the_slug_alphabet(trailer: str) -> None:
-    """Silent failure pinned: `Task slug: auth-flow.` read as `auth-flow.`, so a
-    briefed pipeline was warned about `.ai-work/auth-flow./TASK_BRIEF.md`."""
-    module = _load_module()
-    match = module.TASK_SLUG_RE.search(f"Task slug: auth-flow{trailer} Design it.")
-    assert match.group(1) == "auth-flow"
-
-
-def test_backticked_slug_followed_by_a_period_is_read_whole() -> None:
-    """Silent failure pinned: closing backtick plus sentence period bled into the slug."""
-    module = _load_module()
-    assert module.TASK_SLUG_RE.search("Task slug: `auth-flow`.").group(1) == "auth-flow"
-
-
-def test_slug_alphabet_is_letters_digits_hyphens_and_underscores() -> None:
-    module = _load_module()
-    assert module.TASK_SLUG_RE.search("Task slug: auth_flow-2.").group(1) == "auth_flow-2"
-
-
-def test_a_dot_inside_a_slug_ends_it_there() -> None:
-    """`v1.2-fix` is not a legal task slug; it is read as `v1`, never as a dotted path."""
-    module = _load_module()
-    assert module.TASK_SLUG_RE.search("Task slug: v1.2-fix").group(1) == "v1"
-
-
-def test_slug_must_start_with_a_letter_or_digit() -> None:
-    module = _load_module()
-    assert module.TASK_SLUG_RE.search("Task slug: -auth") is None
+def test_the_slug_pattern_lives_in_the_shared_utilities() -> None:
+    """One definition of the marker: this module reads it through `_hook_utils`."""
+    assert not hasattr(_load_module(), "TASK_SLUG_RE")
 
 
 @pytest.mark.parametrize("punctuation", [".", ",", ")"])

@@ -67,6 +67,25 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 
 There is no `groups=`/`tier=`/`selector=` schema — that topology-era field retired with the hand-maintained topology. This is the single canonical statement of the `Tests:` field; other references (`SKILL.md`, `agent-pipeline-details.md`) point here rather than restate it.
 
+**Measurement step — canonical shape.** A step that takes the readings behind a footprint criterion (the spec's `### Footprint Criteria` table; workflow and worked example in [`footprint-criteria.md`](../../spec-driven-development/references/footprint-criteria.md)). It changes no file and runs no test:
+
+```markdown
+### Step B: Baseline measurement for FC-01, FC-02
+
+**Assignee**: orchestrator
+**Files**: none
+**Implementation**: for each listed criterion, run the row's `Command` and append one row to `.ai-work/<slug>/MEASUREMENTS.md`: `Criterion | Phase | Value | Reading | Head | Taken | Command`. The log is append-only; never edit an earlier row. `Reading` is copied from the instrument's own label (`measured`, `estimate`, or `none: <reason>`).
+**Done when**: every listed criterion has a row for this phase.
+```
+
+Placement rules:
+
+1. A `baseline` step runs before the first production step whose `Files` match the footprint's paths, and only for rows whose `Against` is `baseline:`.
+2. A `final` step runs after the last step whose `Files` match them.
+3. Earlier steps are committed first, so `Head` (the 8-character short SHA) names the measured tree.
+4. No agent or other suite runs during the measurement when the footprint is time or tokens.
+5. The step writes `Result: none measurement` in `TEST_RESULTS.md` and never a `Measurement:` line.
+
 ## WIP.md Structure
 
 ### Sequential Mode (default)

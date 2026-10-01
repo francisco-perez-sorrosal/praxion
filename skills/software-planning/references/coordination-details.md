@@ -243,14 +243,27 @@ The [acceptance-design stage](#acceptance-design-stage) is a charged first start
 
 ### Reading the count
 
-Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log — the `agent_start` rows whose `project` is the slug — so it counts only this pipeline. A row's `project` is the name of the directory its session ran in, so **a slug is its worktree's name**; the count sees no other. A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume. Exit codes: `0` counted (within budget), `1` over budget, `2` count withheld (no log in this checkout, slug not seen yet, or a plugin-cache root) — a withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
+Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log. Sessions working from any subdirectory of the checkout are recorded there too.
+
+**Which pipeline a spawn counts toward.** A spawn counts toward the `Task slug:` its prompt states (the first one), whatever the worktree is named. So keep `Task slug: <slug>` in every spawn prompt. A spawn that states no slug counts toward the checkout's directory name. A resume counts wherever its spawn counts, whatever the resume message says. Rows recorded before slug attribution existed keep counting toward their directory name.
+
+**Spawns and resumes.** A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume.
+
+**Unattributed spawns.** A spawn whose prompt cannot be read yet is listed under `unattributed` and counted in no slug's `spawns`. It keeps the verdict at `indeterminate` until the budget would hold with all of them charged.
+
+**Exit codes and the record.**
+- `0`: counted (within budget, or indeterminate).
+- `1`: over budget.
+- `2`: count withheld, because there is no log in this checkout, the slug is not seen yet, or the root is a plugin-cache path. A slug is seen once a spawn states it or a row is recorded under that directory name.
+
+A withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
 
 ### When the next spawn would exceed the budget
 
 Stop at the checkpoint and pick one:
 
 1. **Re-tier** Standard → Full (user-confirmed) when the remaining work is genuinely Full-shaped — cross-cutting, or more behaviours than planned.
-2. **Split** — land and commit the completed work; the remainder becomes a new slug with its own plan and budget, in its own worktree named for that slug. Branch it from the parent's tip (`git worktree add .claude/worktrees/<new-slug> -b worktree-<new-slug> <parent-branch>`), enter it with `EnterWorktree(path=…)`, and read the count there. A split that keeps working in the parent's worktree is still counted under the parent's slug, and its own slug reads `slug-unseen`.
+2. **Split** — land and commit the completed work; the remainder becomes a new slug with its own plan and budget. Put the new `Task slug: <new-slug>` in every spawn prompt from then on. The split's spawns then count toward the new slug, even in the parent's worktree, and the parent's count stops growing. Its own worktree (`git worktree add .claude/worktrees/<new-slug> -b worktree-<new-slug> <parent-branch>`, entered with `EnterWorktree(path=…)`) is still the cleaner isolation, but no longer a counting requirement. Until the split's first spawn is recorded, its slug reads `slug-unseen`.
 
 Cheaper moves that the orchestrator can make without spawning — authoring a mechanical step itself, dropping a shadow whose output is already fixed — are legitimate before either option, provided the step is still reviewed.
 

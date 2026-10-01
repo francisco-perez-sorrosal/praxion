@@ -171,7 +171,8 @@ Closed classes, so the Sources Read audit is a set-membership check.
 |---|---|
 | A1 spec | `.ai-work/<task-slug>/SPEC_EXTRACT.md`, the only spec input. It embeds the Key Signals, so `TASK_BRIEF.md` is not needed |
 | A2 public contract | `### Public Contract` subsections of `.ai-work/<task-slug>/INTERFACE_DESIGN.md`, when present |
-| A3 base commit | Repository files as of the Base commit: public entry points (CLI usage, command docs, routes, public API signatures, file-format docs), existing tests, manifests and runner config, archived specs under `.ai-state/specs/`. Read with `git show <base>:<path>`, or from the working tree when `git diff --quiet <base> -- <path>` holds |
+| A3 base commit | Repository files as of the Base commit: public entry points (CLI usage, command docs, routes, public API signatures, file-format docs, and a module's top docstring or `--help` output, including the module under test's; never the bodies of its functions), existing tests, manifests and runner config, archived specs under `.ai-state/specs/`. Read with `git show <base>:<path>`, or from the working tree when `git diff --quiet <base> -- <path>` holds |
+| A4 procedure and harness context | The stage procedure and the designer's own agent definition; content the harness injects unasked (skill bodies, path-scoped rules that load on a read); the output format of the tool that writes the designer's inputs (`extract_spec.py`'s usage and digest line); and the names of environment and disable variables a test harness must set to isolate the system under test. Never an oracle source |
 
 **Forbidden** — everything else, named explicitly so the audit is mechanical:
 
@@ -179,11 +180,13 @@ Closed classes, so the Sources Read audit is a set-membership check.
 - `.ai-state/decisions/drafts/`;
 - any working-tree file that differs from the Base commit.
 
-Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** this section is authoritative; `agents/test-engineer.md` carries the operational copy (agents must be self-contained); `agents/verifier.md` carries the three class names only. A note at each site names the other two.
+Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** this section is authoritative; `agents/test-engineer.md` carries the operational copy (agents must be self-contained); `agents/verifier.md` carries the class names only. A note at each site names the other two.
 
 ### Sources Read Audit
 
-`ACCEPTANCE_TESTS.md` lists every input under `## Sources Read` (the extract with its digest, plus each A2 or A3 file with the reason it was read). The verifier fails the audit when the list is empty, lacks the extract, or names anything outside A1–A3.
+`ACCEPTANCE_TESTS.md` lists every input under `## Sources Read` (the extract with its digest, plus each A2, A3 or A4 source with the reason it was read; injected A4 content is listed once, by name). The verifier fails the audit when the list is empty, lacks the extract, names anything outside A1–A4, or shows an oracle traced to an A4 source or to a function body of the code under test.
+
+**Coverage.** Every requirement lands in `## Scenarios` or `## Not Black-Box Testable`. It may appear in both only when the Not Black-Box Testable entry names the specific part of the requirement no scenario can drive.
 
 ### Path Classes and the First Production Commit
 

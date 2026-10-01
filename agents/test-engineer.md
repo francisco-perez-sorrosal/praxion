@@ -222,7 +222,8 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 |---|---|
 | A1 spec | `.ai-work/<task-slug>/SPEC_EXTRACT.md`, the only spec input. It embeds the Key Signals, so `TASK_BRIEF.md` is not needed |
 | A2 public contract | `### Public Contract` subsections of `.ai-work/<task-slug>/INTERFACE_DESIGN.md`, when present |
-| A3 base commit | Repository files as of the Base commit: public entry points (CLI usage, command docs, routes, public API signatures, file-format docs), existing tests, manifests and runner config, archived specs under `.ai-state/specs/`. Read with `git show <base>:<path>`, or from the working tree when `git diff --quiet <base> -- <path>` holds |
+| A3 base commit | Repository files as of the Base commit: public entry points (CLI usage, command docs, routes, public API signatures, file-format docs, and a module's top docstring or `--help` output, including the module under test's; never the bodies of its functions), existing tests, manifests and runner config, archived specs under `.ai-state/specs/`. Read with `git show <base>:<path>`, or from the working tree when `git diff --quiet <base> -- <path>` holds |
+| A4 procedure and harness context | The stage procedure and the designer's own agent definition; content the harness injects unasked (skill bodies, path-scoped rules that load on a read); the output format of the tool that writes the designer's inputs (`extract_spec.py`'s usage and digest line); and the names of environment and disable variables a test harness must set to isolate the system under test. Never an oracle source |
 
 **Forbidden** — everything else, named explicitly so the audit is mechanical:
 
@@ -230,7 +231,7 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 - `.ai-state/decisions/drafts/`;
 - any working-tree file that differs from the Base commit.
 
-Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** the authoritative copy is [`skills/software-planning/references/coordination-details.md § Acceptance-Design Stage`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage); `agents/verifier.md` names the three class names only. Change all three together.
+Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** the authoritative copy is [`skills/software-planning/references/coordination-details.md § Acceptance-Design Stage`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage); `agents/verifier.md` names the class names only. Change all three together.
 
 ### Output
 
@@ -246,6 +247,7 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 - `.ai-work/<slug>/SPEC_EXTRACT.md` (sha256:<12 hex>)
 - `.ai-work/<slug>/INTERFACE_DESIGN.md § Public Contract`   # only if read
 - `<path>@<base-sha7>` — <why: public entry point | existing tests | manifest | archived spec>
+- `<source>` — A4: <procedure | injected skill or rule | input-format tooling | harness isolation>   # listed, never an oracle
 ## Scenarios
 ### REQ-NN — <title from the spec>
 #### <scenario, as a behavior sentence>
@@ -270,7 +272,7 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 - **REQ-NN** — <internal-only behavior | no drivable boundary | Markdown-prompt behavior> → inner loop | verifier judgment
 ```
 
-An empty section reads `_None._`. The skipped form keeps all five sections; `## Sources Read` and `## Scenarios` read `_None — stage skipped._`. Every REQ of the extract lands in `Scenarios` or `Not Black-Box Testable`, and every `Needs: BA-NN` resolves to a Boundary Assumption.
+An empty section reads `_None._`. The skipped form keeps all five sections; `## Sources Read` and `## Scenarios` read `_None — stage skipped._`. Every REQ of the extract lands in `Scenarios` or `Not Black-Box Testable` (in both only when the Not Black-Box Testable entry names the part no scenario can drive), and every `Needs: BA-NN` resolves to a Boundary Assumption.
 
 **Procedure.** Use the spec's Observable Surface names only. Run the tests and confirm each is RED for the right reason (behavior missing or driver unbound, never a syntax or collection error). A surprise green outside `guard` is a Register Objection. An unbound driver raises with the assumption's words, never its id. For ambiguous requirement wording, raise a Spec Question with a provisional or `withheld` scenario rather than guessing. **On a Spec-Question resume,** re-read only the regenerated extract, turn `withheld` scenarios into executable ones, set each `Resolution:`, and (for a question raised by the implementer) record it as such.
 

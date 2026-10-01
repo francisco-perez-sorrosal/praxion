@@ -279,12 +279,12 @@ When tests exist or are expected:
 5. Note untested edge cases in complex logic.
 6. Flag if the plan required tests that were not written.
 7. When verifying agent-based systems, consult the `agent-evals` skill for agent-specific evaluation methodology (non-determinism handling, trajectory evaluation, grader design).
-8. **Mutation sensor disposition** (when the step carries `mutation: on` per `IMPLEMENTATION_PLAN.md`) — read the `Mutation:` line in the step's `TEST_RESULTS.md` section; this is a document cross-check only, you never invoke the sensor yourself:
+8. **Mutation sensor disposition** (when the step carries `mutation: on` per `IMPLEMENTATION_PLAN.md`) — read the step's `TEST_RESULTS.md` section and run `reconcile_pipeline_state.py <task-slug> --json` (`python3 scripts/reconcile_pipeline_state.py` when self-hosting); you never invoke the sensor yourself:
+   - A `blocked` verdict (no `Mutation:` line, an unreadable one, or `unavailable` for any reason but `not-flat-layout`) → `FAIL` naming the step and the reason: the step never got its reading. The way out is the evidence's: restore the sensor and re-run it, or amend the plan to drop the tag with a recorded reason.
    - `Mutation: survivors=…` naming a survivor inside a function that performs a world read (subprocess, git, filesystem, network, environment, or clock) → `WARN` naming the function(s), plus a `TECH_DEBT_LEDGER` row (category `coverage-gap`) describing a world-read function with a surviving mutant and no test through the real adapter — never cite a specific ledger row id in this file.
-   - `Mutation: unavailable reason=<code> (<detail>)` where `<code>` is one of the runner's closed reasons (`not-flat-layout`, `path-missing`, `pyproject-present`, `mutants-dir-present`, `toolchain-missing`, `run-timeout`, `run-failed`) → recorded, no finding — a refusal is a missing reading, never a failing test, and must never train the reader to ignore the signal.
-   - A step tagged `mutation: on` whose section carries **no** `Mutation:` line at all → `WARN`, advisory during rollout, mirroring the missing-`TEST_RESULTS.md` disposition in step 1 above.
+   - `Mutation: unavailable reason=not-flat-layout` → recorded with no finding: the declared refusal for a layout the sensor cannot mutate.
 
-   Golden bad-case: a tagged step's `Mutation:` line reads `survivors=1 mutants=40 (subprocess_call: 1)` where `subprocess_call` is a world-read function — this WARN fires in Phase 10, naming `subprocess_call` and filing the `TECH_DEBT_LEDGER` row.
+   Golden bad-cases: a tagged step whose line reads `Mutation: unavailable reason=run-failed (…)` must FAIL as blocked; a line `survivors=1 mutants=40 (subprocess_call: 1)` with a world-read `subprocess_call` fires the WARN, naming it and filing the `TECH_DEBT_LEDGER` row.
 9. **Audit closure check** (integration-checkpoint steps only) — when a step's `TEST_RESULTS.md` section carries an `Audit: missed=<n>` line with `n > 0`, confirm the diff closed each missed case (the missing edge was added) before treating the step as done; an unresolved `missed` count is a `FAIL`.
 
 #### Loading and invoking the `test-coverage` skill (permission, not obligation)

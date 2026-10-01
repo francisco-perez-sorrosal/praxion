@@ -31,9 +31,10 @@ silence. For the same reason a changed path the adapter cannot place widens
 with `unmapped-path`: for vitest/jest a non-module file (their graph follows
 imports, so a fixture read at run time reaches no test) and a module that no
 longer exists (the graph walks outward from a file that must be there), a file
-outside every crate for cargo, a file outside every package for go. Ownership-
-based adapters (Maven, Gradle, nx, turbo, Pants) place a deleted path by its
-directory and stay narrow. An adapter of an import-graph tool routes through
+outside every crate for cargo, a file outside every package for go. Maven and
+Gradle map a path to the module or project owning its directory, so a deleted
+path still selects its owner; nx and Pants receive paths as given and turbo
+reads the git diff, and their handling of a deleted path is unverified. An adapter of an import-graph tool routes through
 `_module_graph_only` to inherit both rules.
 
 Contract: `skills/testing-strategy/references/test-selection.md`.

@@ -1,3 +1,13 @@
+## v0.42.1 (2026-10-01)
+
+### Fix
+
+- Let a basename pattern select only test holders
+- Match slash-less wildcard literals by basename
+- Stop the task-brief slug at trailing punctuation
+- Widen vitest/jest pockets on a deleted module
+- Guard empty placement arrays for bash 3.2
+
 ## v0.42.0 (2026-09-29)
 
 ### Feat

@@ -41,6 +41,9 @@ ALLOWLIST = frozenset(
         "scripts/_sidecar_init.py",  # writes the .gitattributes string
         "eval/src/praxion_evals/live/scenarios.py",  # hook-byproduct file list
         "scripts/check_gate_liveness.py",  # the liveness checker itself
+        # Acceptance driver: observes the log through the filesystem as a black
+        # box, never through the package, so it reads no row via the reader.
+        "tests/acceptance/drivers/observation_harness.py",
     }
 )
 

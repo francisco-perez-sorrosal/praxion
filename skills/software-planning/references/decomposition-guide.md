@@ -133,13 +133,13 @@ mutation: on
 **Done when**: ...
 ```
 
-Precedence mirrors `review: force`/`review: off` exactly: the planner field wins over every auto-signal, and — unlike `review:` — there are no auto-signals in this tag's first version, so an absent field always means off. The tag costs nothing when absent: no invocation, no line, no reader action. When present, the step's canonical `TEST_RESULTS.md` writer runs `scripts/mutation_sensor.py` against the step's targets and tests and copies its stdout `Mutation:` line verbatim into the step's section (see [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](agent-pipeline-details.md#test_resultsmd-reconciliation) for the line's two shapes and placement).
+Precedence mirrors `review: force`/`review: off` exactly: the planner field wins over every auto-signal, and — unlike `review:` — there are no auto-signals in this tag's first version, so an absent field always means off. The tag costs nothing when absent: no invocation, no line, no reader action. When present, the step's canonical `TEST_RESULTS.md` writer runs `scripts/mutation_sensor.py` against the step's targets and tests and copies its stdout `Mutation:` line verbatim into the step's section (see [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](agent-pipeline-details.md#test_resultsmd-reconciliation) for the line's two shapes and placement). A tagged step completes only on a `survivors=` reading or the declared `not-flat-layout` refusal: a missing or unreadable `Mutation:` line, or any other refusal, blocks the step until the sensor is restored and re-run, or the plan drops the tag with a recorded reason.
 
 **Reversal trigger**: if two consecutive Standard/Full pipelines complete with zero steps tagged `mutation: on`, convert the tag to an auto-signal (mirroring `tier: H`'s detection table) rather than leaving it a planner-only opt-in the ecosystem never exercises.
 
 | Value | Effect |
 |-------|--------|
-| `mutation: on` | Canonical writer runs the sensor and copies its line into `TEST_RESULTS.md` |
+| `mutation: on` | Canonical writer runs the sensor and copies its line into `TEST_RESULTS.md`; the step completes only on a `survivors=` reading or the `not-flat-layout` refusal, otherwise it is blocked |
 | `mutation: off` | Equivalent to omitting the field — no invocation |
 | *(omit field)* | No invocation, no line — the default |
 

@@ -790,3 +790,132 @@ class TestEventsFromBelowTheCheckoutRoot:
         _drive_main(m, json.dumps(payload), monkeypatch)
 
         assert _wal_rows(checkout) == []
+
+
+def _spawn_result_payload(tool_response: object, **tool_input: object) -> dict:
+    """A completed `Agent` call whose result is `tool_response`."""
+    payload = _tool_call_payload("Agent", dict(tool_input))
+    payload["tool_response"] = tool_response
+    return payload
+
+
+SPAWN_RESULT_FIELDS = ("spawned_agent_id", "spawned_agent_type", "task_slug")
+
+
+class TestSpawnResultRow:
+    @pytest.mark.parametrize("status", ["completed", "async_launched"])
+    def test_a_result_naming_an_agent_carries_the_three_spawn_fields(self, status: str):
+        m = _load_module()
+        payload = _spawn_result_payload(
+            {"agentId": "child-1", "agentType": "praxion:researcher", "status": status},
+            prompt="Task slug: auth-flow\n\nExplore.",
+            subagent_type="researcher",
+        )
+
+        observation = _observe(m, payload)
+
+        assert observation["spawned_agent_id"] == "child-1"
+        assert observation["spawned_agent_type"] == "praxion:researcher"
+        assert observation["task_slug"] == "auth-flow"
+
+    def test_the_task_alias_is_a_spawn_too(self):
+        m = _load_module()
+        payload = _spawn_result_payload({"agentId": "child-1"}, prompt="Task slug: s1")
+        payload["tool_name"] = "Task"
+
+        assert _observe(m, payload)["spawned_agent_id"] == "child-1"
+
+    def test_the_spawned_type_falls_back_to_the_requested_subagent_type_then_to_empty(self):
+        m = _load_module()
+        requested = _spawn_result_payload({"agentId": "c"}, subagent_type="researcher")
+        unnamed = _spawn_result_payload({"agentId": "c"})
+
+        assert _observe(m, requested)["spawned_agent_type"] == "researcher"
+        assert _observe(m, unnamed)["spawned_agent_type"] == ""
+
+    def test_the_slug_is_read_from_the_result_when_the_input_has_no_prompt(self):
+        m = _load_module()
+        payload = _spawn_result_payload({"agentId": "c", "prompt": "Task slug: from-result"})
+
+        assert _observe(m, payload)["task_slug"] == "from-result"
+
+    def test_the_input_prompt_wins_over_the_result_prompt(self):
+        m = _load_module()
+        payload = _spawn_result_payload(
+            {"agentId": "c", "prompt": "Task slug: from-result"}, prompt="Task slug: from-input"
+        )
+
+        assert _observe(m, payload)["task_slug"] == "from-input"
+
+    def test_the_slug_is_the_first_marker_of_the_prompt(self):
+        m = _load_module()
+        payload = _spawn_result_payload(
+            {"agentId": "c"}, prompt="Task slug: first-one\nthen Task slug: second-one."
+        )
+
+        assert _observe(m, payload)["task_slug"] == "first-one"
+
+    @pytest.mark.parametrize(
+        "prompt", ["no marker here", 7, ["Task slug: x"], None], ids=["text", "int", "list", "null"]
+    )
+    def test_a_prompt_without_a_readable_slug_reads_null(self, prompt: object):
+        m = _load_module()
+        payload = _spawn_result_payload({"agentId": "c"}, prompt=prompt)
+
+        observation = _observe(m, payload)
+
+        assert observation["spawned_agent_id"] == "c"
+        assert observation["task_slug"] is None
+
+    @pytest.mark.parametrize(
+        "tool_response",
+        [{}, {"agentId": ""}, {"agentId": 7}, {"agentId": None}, "error text", None, ["agentId"]],
+        ids=["empty", "blank-id", "numeric-id", "null-id", "string", "null", "list"],
+    )
+    def test_a_result_that_names_no_agent_leaves_the_row_as_it_was(self, tool_response: object):
+        m = _load_module()
+        payload = _spawn_result_payload(tool_response, prompt="Task slug: auth-flow")
+
+        observation = _observe(m, payload)
+
+        assert not set(SPAWN_RESULT_FIELDS) & set(observation)
+
+    def test_project_names_the_checkout_never_the_stated_slug(self):
+        m = _load_module()
+        payload = _spawn_result_payload({"agentId": "c"}, prompt="Task slug: other-pipeline")
+
+        assert _observe(m, payload)["project"] == "some-project"
+
+    def test_a_non_spawn_tool_never_carries_the_spawn_fields(self):
+        m = _load_module()
+        payload = _tool_call_payload("Bash", {"command": "ls"})
+        payload["tool_response"] = {"agentId": "c"}
+
+        assert not set(SPAWN_RESULT_FIELDS) & set(_observe(m, payload))
+
+
+class TestSpawnResultsAreRecorded:
+    def test_a_main_session_spawn_result_lands_in_the_log_in_standard_mode(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("PRAXION_OBSERVATION_LOG", "standard")
+        m = _load_module()
+        payload = _spawn_result_payload(
+            {"agentId": "child-1", "status": "async_launched"}, prompt="Task slug: auth-flow"
+        )
+        payload["cwd"] = str(isolated_project)
+
+        _drive_main(m, json.dumps(payload), monkeypatch)
+
+        (row,) = _wal_rows(isolated_project)
+        assert (row["spawned_agent_id"], row["task_slug"]) == ("child-1", "auth-flow")
+
+    @pytest.mark.parametrize("tool_response", [{"agentId": 7}, "boom", None, ["x"]])
+    def test_a_garbled_result_is_swallowed_with_exit_zero(
+        self, isolated_project: Path, monkeypatch: pytest.MonkeyPatch, tool_response: object
+    ):
+        m = _load_module()
+        payload = _spawn_result_payload(tool_response, prompt=["not", "text"])
+        payload["cwd"] = str(isolated_project)
+
+        _drive_main(m, json.dumps(payload), monkeypatch)  # must not raise

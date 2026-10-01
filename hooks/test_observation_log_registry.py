@@ -85,3 +85,36 @@ def test_the_spawn_tally_declares_the_attribution_marker_among_its_agent_start_n
     (tally,) = [c for c in registry.CONSUMERS if c.name == "scripts/spawn_count.py"]
 
     assert "slug_attribution" in tally.needs[registry.EventClass.AGENT_START]
+
+
+SPAWN_RESULT_FIELDS = ("spawned_agent_id", "spawned_agent_type", "task_slug")
+
+
+def test_the_spawn_result_class_writes_tool_use_rows_in_standard_and_full():
+    spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
+
+    assert spec.event_type == "tool_use"
+    assert spec.writer == "capture_observations"
+    assert spec.modes == frozenset({Mode.FULL, Mode.STANDARD})
+
+
+def test_the_spawn_result_class_declares_the_tool_use_envelope_plus_its_three_fields():
+    spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
+    tool_use_envelope = registry.EVENTS[registry.EventClass.TOOL_FILE_CHANGE].fields
+
+    assert spec.fields == tool_use_envelope + SPAWN_RESULT_FIELDS
+
+
+def test_only_the_spawn_result_class_declares_the_spawn_result_fields():
+    for field in SPAWN_RESULT_FIELDS:
+        declaring = [
+            event_class for event_class, spec in registry.EVENTS.items() if field in spec.fields
+        ]
+
+        assert declaring == [registry.EventClass.TOOL_AGENT_SPAWN], field
+
+
+def test_the_spawn_tally_declares_the_spawn_result_fields_among_its_needs():
+    (tally,) = [c for c in registry.CONSUMERS if c.name == "scripts/spawn_count.py"]
+
+    assert set(SPAWN_RESULT_FIELDS) <= set(tally.needs[registry.EventClass.TOOL_AGENT_SPAWN])

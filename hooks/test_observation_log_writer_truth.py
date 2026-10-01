@@ -95,7 +95,7 @@ DRIVEN_WRITER_MODULES = frozenset(
 )
 
 # Order matters: the first-call marker (steps 5-6) and the WAL lookups
-# (steps 10-11, 14) depend on rows written by earlier steps.
+# (steps 11-12, 15) depend on rows written by earlier steps.
 SCENARIO: tuple[Step, ...] = (
     Step(
         "session_start",
@@ -172,6 +172,17 @@ SCENARIO: tuple[Step, ...] = (
         (Expect("tool_other"),),
     ),
     Step(
+        "tool Agent result",
+        "capture_observations",
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "tool_input": {"prompt": "Task slug: s1\n\nExplore.", "subagent_type": "researcher"},
+            "tool_response": {"agentId": "a3", "status": "async_launched"},
+        },
+        (Expect("tool_agent_spawn"),),
+    ),
+    Step(
         "tool Skill",
         "capture_observations",
         {
@@ -242,7 +253,7 @@ def _build_project(tmp_path: Path) -> tuple[Path, Path, Path]:
     Returns `(proj, parent_transcript, marker_dir)`. `proj/CLAUDE.md` is
     non-empty so `measure_context_surface`'s `measure()` reports non-zero
     bytes; the parent transcript carries one suspended-subagent
-    task-notification for `a2` (step 14 backfills its `agent_stop`); a1's
+    task-notification for `a2` (step 15 backfills its `agent_stop`); a1's
     own subagent transcript exists so its stop sums real usage instead of
     falling back to the parent's.
     """

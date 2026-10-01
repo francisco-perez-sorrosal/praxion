@@ -29,7 +29,7 @@ from . import registry
 from .location import locate
 from .modes import resolve_mode
 from .reader import LOG_FILENAME
-from .registry import FILE_CHANGING_TOOLS, EventClass
+from .registry import FILE_CHANGING_TOOLS, SPAWN_TOOLS, EventClass
 
 # When the active observations.jsonl reaches this size, `append_observation`
 # renames it to observations.jsonl.1 before writing the new row. Best-effort:
@@ -115,7 +115,9 @@ def _classify(row: dict, *, marker_present: bool) -> EventClass:
     """Pure tool-call classification: (row, marker_present) -> EventClass.
 
     A ``Skill`` call is always ``SKILL_ACTIVATION``; a file-changing tool is
-    always ``TOOL_FILE_CHANGE``, regardless of the marker. Otherwise,
+    always ``TOOL_FILE_CHANGE``, regardless of the marker; a spawn tool whose
+    row names the agent it started is always ``TOOL_AGENT_SPAWN`` (the result
+    is the tally's join key, so it is kept in every recording mode). Otherwise,
     ``marker_present`` being False means this is the first recorded call for
     this (log, subagent) pair -- ``TOOL_FIRST_OF_SUBAGENT`` -- and every
     later call from that same subagent, or any main-agent call that is
@@ -127,6 +129,8 @@ def _classify(row: dict, *, marker_present: bool) -> EventClass:
         return EventClass.SKILL_ACTIVATION
     if row.get("tool_name") in FILE_CHANGING_TOOLS:
         return EventClass.TOOL_FILE_CHANGE
+    if row.get("tool_name") in SPAWN_TOOLS and row.get("spawned_agent_id"):
+        return EventClass.TOOL_AGENT_SPAWN
     if not marker_present:
         return EventClass.TOOL_FIRST_OF_SUBAGENT
     return EventClass.TOOL_OTHER
@@ -139,7 +143,7 @@ _MARKER_PREFIX = "praxion-observation-log-first-call-"
 # The classes whose row is a `tool_use` row -- the only rows that may set the
 # first-call marker.
 _MARKER_CONSUMING_CLASSES = frozenset(
-    {EventClass.TOOL_FIRST_OF_SUBAGENT, EventClass.TOOL_FILE_CHANGE}
+    {EventClass.TOOL_FIRST_OF_SUBAGENT, EventClass.TOOL_FILE_CHANGE, EventClass.TOOL_AGENT_SPAWN}
 )
 
 

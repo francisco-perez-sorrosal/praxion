@@ -18,9 +18,10 @@ import re
 import sys
 from datetime import datetime, timezone
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled
+from _hook_utils import DISABLE_OBSERVABILITY, is_disabled, stated_task_slug
 from _observation_log import writer
 from _observation_log.location import locate
+from _observation_log.registry import SPAWN_TOOLS
 
 # Tools that generate too much noise to capture. Read/Glob/Grep are
 # deliberately absent -- they are recorded (path + pattern only, never file
@@ -111,7 +112,8 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     if tool_name == "Agent":
         desc = tool_input.get("description", "")
         agent_type = tool_input.get("subagent_type", "")
-        prompt_preview = _truncate(tool_input.get("prompt", ""), 80)
+        prompt = tool_input.get("prompt", "")
+        prompt_preview = _truncate(prompt if isinstance(prompt, str) else "", 80)
         parts = [f"Spawn {agent_type}" if agent_type else "Spawn agent"]
         if desc:
             parts.append(f"— {desc}")
@@ -129,6 +131,29 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     return _truncate(", ".join(parts)) if parts else tool_name
 
 
+def spawn_result_fields(tool_name: str, tool_input: dict, tool_response: object) -> dict:
+    """The fields that tie a spawn call's result to the agent it started.
+
+    Empty unless this is a spawn tool whose result is an object naming the
+    agent it started (``agentId``, non-empty text) -- a failed or garbled
+    result started nothing, so its row stays an ordinary tool row. The slug is
+    read from the prompt the call was made with, else from the one the result
+    echoes back; ``None`` when neither states one.
+    """
+    if tool_name not in SPAWN_TOOLS or not isinstance(tool_response, dict):
+        return {}
+    agent_id = tool_response.get("agentId")
+    if not isinstance(agent_id, str) or not agent_id:
+        return {}
+    agent_type = tool_response.get("agentType") or tool_input.get("subagent_type") or ""
+    return {
+        "spawned_agent_id": agent_id,
+        "spawned_agent_type": agent_type,
+        "task_slug": stated_task_slug(tool_input.get("prompt"))
+        or stated_task_slug(tool_response.get("prompt")),
+    }
+
+
 def build_observation(payload: dict, *, project: str) -> dict:
     """Assemble an observation record from a completed PostToolUse payload.
 
@@ -142,7 +167,8 @@ def build_observation(payload: dict, *, project: str) -> dict:
 
     A ``tool_name == "Skill"`` call is recorded as a first-class
     ``skill_activation`` event carrying a top-level ``skill_name``; every
-    other tool stays a generic ``tool_use`` event. Both event types populate
+    other tool stays a generic ``tool_use`` event, a spawn result additionally
+    carrying the fields of ``spawn_result_fields``. Both event types populate
     the identical envelope so the merge dedup key and all downstream readers
     stay valid.
     """
@@ -198,6 +224,8 @@ def build_observation(payload: dict, *, project: str) -> dict:
 
     if tool_name == "Skill":
         observation["skill_name"] = tool_input.get("skill", "")
+
+    observation.update(spawn_result_fields(tool_name, tool_input, tool_response))
 
     return observation
 

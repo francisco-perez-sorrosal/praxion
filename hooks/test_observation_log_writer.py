@@ -28,6 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from hooks._observation_log import registry, writer
 from hooks._observation_log.modes import Mode
 
@@ -551,3 +553,72 @@ def test_the_marker_is_never_set_when_the_row_it_marks_was_not_written(
 def _read_rows(ai_state_dir: Path) -> list[dict]:
     obs_path = ai_state_dir / "observations.jsonl"
     return [json.loads(line) for line in obs_path.read_text(encoding="utf-8").splitlines() if line]
+
+
+# -- spawn results: an Agent/Task call that names the agent it started -------------
+
+
+def _spawn_row(**overrides) -> dict:
+    row = {
+        "tool_name": "Agent",
+        "file_paths": [],
+        "agent_id": "main-1",
+        "spawned_agent_id": "child-1",
+        "spawned_agent_type": "praxion:researcher",
+        "task_slug": "some-slug",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_a_main_session_spawn_result_is_written_in_every_recording_mode(tmp_path: Path) -> None:
+    """`standard` used to drop a main-session `Agent` call as an ordinary later
+    call; a spawn result is the join key for the spawn tally and must be kept."""
+    for mode in (Mode.STANDARD, Mode.FULL):
+        rows = _write_and_read(tmp_path, mode, _spawn_row())
+
+        assert [r["spawned_agent_id"] for r in rows] == ["child-1"], mode.value
+
+
+def test_a_spawn_result_is_not_written_when_the_mode_is_off(tmp_path: Path) -> None:
+    assert _write_and_read(tmp_path, Mode.OFF, _spawn_row()) == []
+
+
+def test_the_legacy_task_alias_is_a_spawn_result_too(tmp_path: Path) -> None:
+    rows = _write_and_read(tmp_path, Mode.STANDARD, _spawn_row(tool_name="Task"))
+
+    assert [r["tool_name"] for r in rows] == ["Task"]
+
+
+@pytest.mark.parametrize(
+    "row",
+    [_spawn_row(spawned_agent_id=""), {"tool_name": "Agent", "file_paths": [], "agent_id": "m-1"}],
+    ids=["blank-id", "no-id-field"],
+)
+def test_an_agent_call_that_names_no_spawned_agent_stays_an_ordinary_call(
+    tmp_path: Path, row: dict
+) -> None:
+    """Without a result naming an agent there is no spawn to join on: today's
+    classification holds, so `standard` drops a main-session call and `full` keeps it."""
+    assert _write_and_read(tmp_path / "standard", Mode.STANDARD, row) == []
+    assert len(_write_and_read(tmp_path / "full", Mode.FULL, row)) == 1
+
+
+def test_only_agent_and_task_calls_can_be_spawn_results(tmp_path: Path) -> None:
+    rows = _write_and_read(tmp_path, Mode.STANDARD, _spawn_row(tool_name="Bash"))
+
+    assert rows == []
+
+
+def test_a_subagents_spawn_result_consumes_its_first_call_marker(tmp_path: Path) -> None:
+    """The spawn result is that subagent's first recorded tool call; its next
+    ordinary call must therefore read as a later call and be dropped in `standard`."""
+    ai_state_dir = tmp_path / ".ai-state"
+    ai_state_dir.mkdir()
+    env = {"PRAXION_OBSERVATION_LOG": Mode.STANDARD.value, "TMPDIR": str(_marker_tmp(tmp_path))}
+    read = {"tool_name": "Read", "file_paths": ["a.py"], "agent_id": "sub-s"}
+
+    writer.record_tool_call(ai_state_dir, _spawn_row(agent_id="sub-s"), is_subagent=True, env=env)
+    writer.record_tool_call(ai_state_dir, read, is_subagent=True, env=env)
+
+    assert [r["tool_name"] for r in _read_rows(ai_state_dir)] == ["Agent"]

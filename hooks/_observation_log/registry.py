@@ -1,10 +1,10 @@
 """The recording-class table: what gets written, in which mode, for whom.
 
 ``EventClass`` is the unit modes are defined over -- finer-grained than the
-written ``event_type``, because three classes (``TOOL_FILE_CHANGE``,
-``TOOL_FIRST_OF_SUBAGENT``, ``TOOL_OTHER``) all write ``tool_use``. ``EVENTS``
-maps each class to its envelope; ``CONSUMERS`` states, per named reader, which
-classes and fields it needs and at which minimum mode. ``records()`` is the
+written ``event_type``, because four classes (``TOOL_FILE_CHANGE``,
+``TOOL_FIRST_OF_SUBAGENT``, ``TOOL_OTHER``, ``TOOL_AGENT_SPAWN``) all write
+``tool_use``. ``EVENTS`` maps each class to its envelope; ``CONSUMERS`` states,
+per named reader, which classes and fields it needs and at which minimum mode. ``records()`` is the
 one function every writer consults -- it is the single place "does this mode
 record this class" is decided, so a per-writer switch check (the bug that let
 ``record_gate_fire`` ignore the kill switch) cannot recur.
@@ -29,10 +29,15 @@ from .modes import Mode
 # (a later step's migration).
 FILE_CHANGING_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 
+# Tools that start an agent: the `hooks.json` matcher's `Agent|Task` pair, the
+# second name being the legacy alias. One definition of "a spawn call" for the
+# classifier here and the row builder in `capture_observations`.
+SPAWN_TOOLS = frozenset({"Agent", "Task"})
+
 
 class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ targets 3.9+
-    """The 13 recording classes. Many-to-one onto the written ``event_type``:
-    three classes below write ``tool_use``, so every existing reader's
+    """The 14 recording classes. Many-to-one onto the written ``event_type``:
+    four classes below write ``tool_use``, so every existing reader's
     ``event_type == "tool_use"`` filter stays valid across the split."""
 
     SESSION_START = "session_start"
@@ -43,6 +48,7 @@ class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ target
     TOOL_FILE_CHANGE = "tool_file_change"
     TOOL_FIRST_OF_SUBAGENT = "tool_first_of_subagent"
     TOOL_OTHER = "tool_other"
+    TOOL_AGENT_SPAWN = "tool_agent_spawn"
     SKILL_ACTIVATION = "skill_activation"
     COMPACTION = "compaction"
     CONTEXT_SURFACE = "context_surface_measurement"
@@ -100,7 +106,7 @@ _AGENT_STOP_USAGE_FIELDS = (
 )
 
 # Every tool_use-writing class (capture_observations) shares this envelope;
-# only SKILL_ACTIVATION adds its own field.
+# SKILL_ACTIVATION and TOOL_AGENT_SPAWN add their own fields.
 _TOOL_USE_FIELDS = (
     "timestamp",
     "session_id",
@@ -118,6 +124,10 @@ _TOOL_USE_FIELDS = (
     "parent_span_id",
     "log_mode",
 )
+# An `Agent`/`Task` result names the agent it started. That id joins the result
+# to the agent's `agent_start` at read time, and `task_slug` carries the slug the
+# spawn prompt stated (None when it stated none).
+_AGENT_SPAWN_FIELDS = _TOOL_USE_FIELDS + ("spawned_agent_id", "spawned_agent_type", "task_slug")
 
 EVENTS = MappingProxyType(
     {
@@ -150,6 +160,9 @@ EVENTS = MappingProxyType(
         ),
         EventClass.TOOL_OTHER: EventSpec(
             "tool_use", "capture_observations", frozenset({Mode.FULL}), _TOOL_USE_FIELDS
+        ),
+        EventClass.TOOL_AGENT_SPAWN: EventSpec(
+            "tool_use", "capture_observations", _FULL_AND_STANDARD, _AGENT_SPAWN_FIELDS
         ),
         EventClass.SKILL_ACTIVATION: EventSpec(
             "skill_activation",
@@ -277,7 +290,13 @@ CONSUMERS = (
                 "session_id",
                 "project",
                 "slug_attribution",
-            )
+            ),
+            EventClass.TOOL_AGENT_SPAWN: (
+                "project",
+                "spawned_agent_id",
+                "spawned_agent_type",
+                "task_slug",
+            ),
         },
         Mode.STANDARD,
     ),

@@ -285,6 +285,8 @@ tests = [
   "scripts/test_check_test_results_shape.py",
   "scripts/test_check_token_ratchet.py",
   "scripts/test_claude_to_agents.py",
+  "scripts/test_export_codex_agents.py",
+  "scripts/test_install_codex.py",
   "scripts/test_list_harvest_sources.py",
   "scripts/test_measure_token_budget.py",
   "scripts/test_parse_pre_refactor_yaml.py",
@@ -861,3 +863,16 @@ tests = [
   "tests/test_run_store_backend.py",
 ]
 why = "the schema and vocabulary reference docs the ledger and eval scripts implement; the state-ledger tests read these to check the schemas and enums they parse still match what the docs specify"
+
+[[dep]]
+paths = ["hooks/*.py"]
+tests = ["scripts/test_export_codex_rules_bridge.py"]
+why = "the codex rules-bridge exporter test loads the exporter by path, and the exporter reads the hook sources"
+
+[[dep]]
+paths = ["**"]
+tests = [
+  "scripts/test_check_behavioral_contract.py",
+  "tests/test_plugin_namespace_invariants.py",
+]
+why = "whole-repo content scanners: they walk every tracked file, so any change can affect them"

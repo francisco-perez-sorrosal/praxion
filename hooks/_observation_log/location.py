@@ -30,13 +30,19 @@ def locate(cwd):
     nearest ancestor that does serves it, provided that ancestor sits at or
     below the checkout root (the first directory up with a ``.git`` entry). A
     directory that is in no checkout, or whose checkout holds no state, has no
-    log. Never raises: a non-string or empty ``cwd`` and any ``OSError`` give
-    None.
+    log. A relative ``cwd`` has no meaning to a hook (it would resolve against
+    the hook's own directory), and one that no longer exists -- a removed linked
+    worktree, a deleted subdirectory -- would otherwise be read as its
+    still-recording parents by path text alone: both give None. Never raises: a
+    non-string or empty ``cwd`` and any ``OSError`` give None.
     """
     if not isinstance(cwd, str) or not cwd:
         return None
+    start = Path(cwd)
     try:
-        project_dir = _serving_directory(Path(cwd))
+        if not start.is_absolute() or not start.is_dir():
+            return None
+        project_dir = _serving_directory(start)
     except OSError:
         return None
     if project_dir is None:

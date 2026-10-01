@@ -151,8 +151,35 @@ def test_a_cwd_that_is_not_a_non_empty_string_resolves_to_nothing(cwd: object) -
     assert locate(cwd) is None
 
 
-def test_a_directory_that_does_not_exist_resolves_to_nothing(tmp_path: Path) -> None:
-    assert locate(str(tmp_path / "never" / "created")) is None
+def test_a_directory_that_does_not_exist_below_a_recording_checkout_resolves_to_nothing(
+    tmp_path: Path,
+) -> None:
+    root = _project(tmp_path / "praxion")
+
+    assert locate(str(root / "gone" / "deeper")) is None
+
+
+def test_a_removed_linked_worktree_does_not_leak_into_the_main_checkout(tmp_path: Path) -> None:
+    main = _project(tmp_path / "praxion")
+    linked = main / ".claude" / "worktrees" / "feature"
+    linked.mkdir(parents=True)
+    (linked / GIT).write_text("pointer to the main checkout's metadata\n", encoding="utf-8")
+    assert locate(str(linked)) is None  # alive: its own checkout, holding no state
+    (linked / GIT).unlink()
+    linked.rmdir()
+
+    assert locate(str(linked)) is None
+
+
+@pytest.mark.parametrize("cwd", [".", "sub", "sub/deeper", "~/x", "../up"])
+def test_a_relative_directory_resolves_to_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cwd: str
+) -> None:
+    root = _project(tmp_path / "praxion")
+    (root / "sub" / "deeper").mkdir(parents=True)
+    monkeypatch.chdir(root)
+
+    assert locate(cwd) is None
 
 
 def test_an_os_error_while_looking_resolves_to_nothing(

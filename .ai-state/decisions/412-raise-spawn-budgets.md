@@ -1,7 +1,8 @@
 ---
-id: dec-draft-620b4085
+id: dec-412
+draft_id: dec-draft-620b4085
 title: Raise the per-tier spawn budgets to Standard 16 / Full 32
-status: proposed
+status: accepted
 category: configuration
 date: 2026-10-01
 summary: "The charged-spawn budgets of the per-tier pipeline envelope double, from Standard ≤ 8 / Full ≤ 16 to Standard ≤ 16 / Full ≤ 32. The counting rule (first start plus heavy resume), the read-before-spawn duty and the never-meet-the-budget-by list are unchanged."

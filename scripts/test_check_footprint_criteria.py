@@ -388,6 +388,17 @@ def test_the_inactive_check_is_a_no_op_through_the_cli(repo, capsys):
     assert (code, data["active"], data["registry"], data["findings"]) == (0, False, False, [])
 
 
+@pytest.mark.parametrize("base_args", [(), ("--base-ref", "no-such-ref")])
+def test_an_inactive_check_exits_0_whatever_the_base_ref(repo, capsys, base_args):
+    (repo / ".ai-state/FOOTPRINTS.md").unlink()
+    write_plan(repo)
+    git(repo, "branch", "-m", "main", "trunk")
+
+    code, data, _ = cli(capsys, repo, *base_args)
+
+    assert (code, data["active"], data["base_ref"], data["findings"]) == (0, False, None, [])
+
+
 def test_the_text_report_names_each_finding_and_the_verdict(repo, capsys):
     write_log(repo)
     code = cfc.main([SLUG, "--repo-root", str(repo)])

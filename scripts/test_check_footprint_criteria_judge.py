@@ -274,6 +274,56 @@ def test_good_twin_a_log_command_that_extends_the_criterions_command_is_the_same
     assert ("FP03", "wrong-command") not in reasons(judged(log=(BASELINE, extended)))
 
 
+SUITE = "`.venv/bin/python -m pytest -q`"
+
+
+def _suite_findings(command):
+    suite_criterion = criterion_row(command=SUITE)
+    baseline = log_row(phase="baseline", head=BASE_HEAD, command=SUITE)
+    final = log_row(phase="final", head=FINAL_HEAD, command=command)
+    return judged(criteria=(suite_criterion,), log=(baseline, final))
+
+
+@pytest.mark.parametrize(
+    "narrowed",
+    [
+        "`.venv/bin/python -m pytest -q tests/only_one_file.py`",
+        "`.venv/bin/python -m pytest -q -x tests/only_one_file.py`",
+        "`.venv/bin/python -m pytest -q -k widget tests/only_one_file.py`",
+        "`.venv/bin/python -m pytest -q --junitxml out.xml tests/only_one_file.py`",
+        "`.venv/bin/python -m pytest tests/only_one_file.py -q`",
+        "`.venv/bin/python -m pytest -q 'unbalanced`",
+    ],
+)
+def test_canary_flags_a_narrowed_run_as_a_different_instrument(narrowed):
+    assert ("FP03", "wrong-command") in reasons(_suite_findings(narrowed))
+
+
+@pytest.mark.parametrize(
+    "same",
+    [
+        "`.venv/bin/python -m pytest -q`",
+        "`.venv/bin/python -m pytest -q --no-cov`",
+        "`.venv/bin/python -m pytest -q --junitxml out.xml -x`",
+        "`.venv/bin/python -m pytest -q --junitxml=out.xml`",
+    ],
+)
+def test_good_twin_added_options_and_their_values_are_the_same_instrument(same):
+    assert ("FP03", "wrong-command") not in reasons(_suite_findings(same))
+
+
+def test_good_twin_a_value_after_the_criterions_own_trailing_option_is_the_same_instrument():
+    measure = "`python3 scripts/measure.py --compare-ref`"
+    baseline = log_row(phase="baseline", head=BASE_HEAD, command=measure)
+    final = log_row(
+        phase="final", head=FINAL_HEAD, command="`python3 scripts/measure.py --compare-ref abc1234`"
+    )
+
+    found = judged(criteria=(criterion_row(command=measure),), log=(baseline, final))
+
+    assert ("FP03", "wrong-command") not in reasons(found)
+
+
 def test_canary_flags_baseline_and_final_of_different_reading_kinds():
     estimate = log_row(
         phase="final", reading="estimate", head=FINAL_HEAD, command=PROMPT_COMMAND
@@ -509,3 +559,14 @@ def test_an_unregistered_footprint_says_why_it_is():
 
     assert "not in the registry" in message_of(absent, "unregistered")
     assert "no registry" in message_of(no_registry, "unregistered")
+
+
+def test_a_declaration_without_a_registry_row_says_nothing_about_staleness():
+    declared = ("| spawn-count | counts a finished run only |",)
+
+    found = judged("spec", registry=(), log=(), criteria=(), declared=declared)
+
+    message = message_of(found, "unregistered")
+    assert "spawn-count" in message
+    assert "declared not measured" in message
+    assert "stale" not in message

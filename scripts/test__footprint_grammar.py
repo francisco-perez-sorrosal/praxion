@@ -205,6 +205,19 @@ def test_synonym_outside_the_placeholder_list_reads_as_a_real_reason():
         assert [n.footprint for n in parsed.not_measured] == ["spawn-count"], reason
 
 
+def test_a_comparator_written_in_symbols_is_substantive_but_a_bare_dash_is_not():
+    symbols = ("<", "<=", "≤", ">", ">=", "≥", "==", "=", "!=", "≠")
+    for symbol in symbols:
+        parsed = fg.parse_spec_tables(
+            plan(table(CRITERIA_HEADER, criterion_row(comparator=symbol)))
+        )
+        assert parsed.findings == (), symbol
+        assert [c.comparator for c in parsed.criteria] == [symbol], symbol
+    for hollow in ("-", "—", "?", "<>", "<-"):
+        found = fg.parse_spec_tables(plan(table(CRITERIA_HEADER, criterion_row(comparator=hollow))))
+        assert [f.reason for f in found.findings] == ["missing-cell"], hollow
+
+
 # --- registry -------------------------------------------------------------------------------
 
 

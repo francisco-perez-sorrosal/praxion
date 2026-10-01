@@ -45,7 +45,8 @@ Grammar 1, spec tables. Both sit inside `## Acceptance Criteria` of
     in it is one of `na`, `n/a`, `none`, `none yet`, `not applicable`, `nil`,
     `pending`, `tbd`, `tbc`, `tba` or `todo`, ignoring case, spacing, punctuation
     and backticks: so `-`, `—`, `?`, `n/a.`, `N / A`, `` `tbd` ``, `n/a, tbd` and
-    `none (tbd)` all are. The list is finite, a declared limit: a synonym outside
+    `none (tbd)` all are. A Comparator cell that is a comparison symbol (`<`, `<=`,
+    `≤`, `>`, `>=`, `≥`, `==`, `=`, `!=`, `≠`) is substance, not a placeholder. The list is finite, a declared limit: a synonym outside
     it (`to be determined`, `TBD for now`) reads as a real reason, and the
     verifier's judgment catches it. A declaration reason that is a placeholder is
     `reasonless`: it counts as a missing criterion.
@@ -404,6 +405,10 @@ _PLACEHOLDER_WORDS = {_NON_SUBSTANCE.sub("", word) for word in PLACEHOLDER_REASO
 _PLACEHOLDER_RUN = re.compile(
     "(?:" + "|".join(sorted(_PLACEHOLDER_WORDS, key=len, reverse=True)) + ")*"
 )
+# A comparator may be written in symbols; they hold no letter or digit, yet are the substance.
+_COMPARISON_SYMBOLS = frozenset(
+    {"<", "<=", "\u2264", ">", ">=", "\u2265", "==", "=", "!=", "\u2260"}
+)
 _NONE_PREFIX = "none:"
 
 
@@ -708,7 +713,12 @@ def _span_message(cell: str) -> str:
 
 
 def _is_placeholder(text: str) -> bool:
-    """No letter or digit, or only placeholder words once punctuation, case and spacing are gone."""
+    """No letter or digit, or only placeholder words once punctuation, case and spacing are gone.
+
+    A lone comparison symbol (`<=`) is the exception: it is a comparator, not an absent cell.
+    """
+    if text.strip() in _COMPARISON_SYMBOLS:
+        return False
     return _PLACEHOLDER_RUN.fullmatch(_NON_SUBSTANCE.sub("", text.lower())) is not None
 
 

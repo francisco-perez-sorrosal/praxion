@@ -12,7 +12,7 @@ the command that runs them.
 CLI. `--stage` defaults to `verify`. `--paths` is required for `plan` and
 rejected for the other stages. `--base-ref` is used only by `verify`; its default
 is `git merge-base HEAD main`, and when that cannot be resolved the command exits
-2 and asks for `--base-ref`. The repository root is `--repo-root`, else the git
+2 and asks for `--base-ref`; an inactive check never resolves a base. The repository root is `--repo-root`, else the git
 toplevel of the working directory; it is never derived from this file's
 location, because managed projects run the command through a `~/.local/bin`
 symlink where that location is the plugin. The command reads
@@ -21,7 +21,7 @@ symlink where that location is the plugin. The command reads
 `git ls-files`, `git rev-parse` and `git merge-base`, and never executes a
 command named in a table or the registry.
 
-Exit codes: `0` no `fail` finding (including the inactive case); `1` at least one
+Exit codes: `0` no `fail` finding (the inactive case included, whatever `--base-ref` says);`1` at least one
 `fail` finding; `2` input error (bad arguments, the plan missing or without
 `## Acceptance Criteria`, the base unresolvable); stderr names the input.
 
@@ -45,6 +45,7 @@ import fnmatch
 import json
 import posixpath
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -85,6 +86,8 @@ EXIT_OK, EXIT_FAIL, EXIT_INPUT_ERROR = 0, 1, 2
 DEFAULT_BASE_BRANCH = "main"
 REGISTRY_PATH = ".ai-state/FOOTPRINTS.md"
 PLAN_NAME, LOG_NAME = "SYSTEMS_PLAN.md", "MEASUREMENTS.md"
+_FRESHNESS_FALLBACK = f"any tracked change outside {STATE_DIR_PREFIX} stales it"
+_DECLARED_FALLBACK = "it is declared not measured, and nothing can show a change moved it"
 _SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 
@@ -125,7 +128,8 @@ def run(args: argparse.Namespace) -> Report:
     spec = parse_spec_tables(read_plan(root, args.slug))
     registry = parse_registry(read_optional(root / REGISTRY_PATH))
     tracked = tracked_files(root)
-    verifying = args.stage == "verify"
+    # Decide `active` first: an inactive check reads nothing else, so a stale base cannot fail it.
+    verifying = args.stage == "verify" and is_active(registry.registry, spec)
     base_ref = resolve_base_ref(root, args.base_ref) if verifying else None
     log = _read_log(root, args.slug) if verifying else LogParse((), ())
     moved_paths = _moved_paths(root, args, base_ref)
@@ -304,17 +308,20 @@ def _dead_glob_findings(registry: Registry | NoRegistry, tracked: tuple[str, ...
 
 def _unregistered(registry: Registry | NoRegistry, spec: SpecTables) -> list[Finding]:
     """A spec footprint with no registry row: freshness falls back to any tracked change."""
-    names = [c.footprint for c in spec.criteria] + [n.footprint for n in spec.not_measured]
+    # A bounded footprint is measured, so the fallback is a freshness rule; a declared one is
+    # never measured, so what it loses is the means to see a change move it.
+    bounded = [(c.footprint, _FRESHNESS_FALLBACK) for c in spec.criteria]
+    declared = [(n.footprint, _DECLARED_FALLBACK) for n in spec.not_measured]
     why = (
         "there is no registry" if isinstance(registry, NoRegistry) else "it is not in the registry"
     )
     found, seen = [], set()
-    for name in names:
+    for name, consequence in bounded + declared:
         key = footprint_key(name)
         if key in seen or _registered(registry, name) is not None:
             continue
         seen.add(key)
-        message = f"{name}: {why}, so any tracked change outside {STATE_DIR_PREFIX} stales it"
+        message = f"{name}: {why}, so {consequence}"
         found.append(make_finding("FP04", "unregistered", message, footprint=name))
     return found
 
@@ -401,12 +408,47 @@ def _row_defects(criterion: Criterion, row: Measurement) -> list[Finding]:
                 criterion, "no-reading", f"{row.phase} reading withheld: {row.reading.reason}"
             )
         )
-    if criterion.command not in row.command:
+    if not _same_instrument(criterion.command, row.command):
         message = (
-            f"{row.phase} row ran {row.command!r}, which does not contain {criterion.command!r}"
+            f"{row.phase} row ran {row.command!r}, which is not {criterion.command!r} "
+            "with options added"
         )
         found.append(_unmeasured(criterion, "wrong-command", message))
     return found
+
+
+def _same_instrument(criterion_command: str, logged_command: str) -> bool:
+    """The logged command is the criterion's command plus options and their values, nothing else.
+
+    A bare positional after the criterion's tokens (a test path, say) narrows the run to a
+    different instrument. A single-dash token is a flag and takes no value, so `-q tests/x.py`
+    narrows; a `--name` may take the one value after it, and the criterion's own trailing
+    `--name` counts, so `--compare-ref` followed by a sha is the same instrument.
+    """
+    wanted, ran = _tokens(criterion_command), _tokens(logged_command)
+    if ran[: len(wanted)] != wanted:
+        return False
+    takes_value = bool(wanted) and _is_long_option(wanted[-1])
+    for token in ran[len(wanted) :]:
+        if token.startswith("-"):
+            takes_value = _is_long_option(token)
+        elif takes_value:
+            takes_value = False
+        else:
+            return False
+    return True
+
+
+def _is_long_option(token: str) -> bool:
+    """`--name` may be followed by its value; `--name=value` carries its own."""
+    return token.startswith("--") and "=" not in token
+
+
+def _tokens(command: str) -> list[str]:
+    try:
+        return shlex.split(command)
+    except ValueError:  # an unbalanced quote: whitespace split, which cannot match a clean twin
+        return command.split()
 
 
 def _incomparable(criterion: Criterion, baseline: Measurement, final: Measurement) -> list[Finding]:

@@ -406,6 +406,21 @@ def test_a_non_test_holder_beside_a_test_holder_adds_nothing(tmp_path: Path) -> 
     assert derivation.mapped == {"docs/guide.md"}
 
 
+def test_nothing_propagates_from_a_test_holder_of_a_pattern(tmp_path: Path) -> None:
+    """The holder is found directly and never expanded: its own importers are not selected."""
+    _write(tmp_path, "docs/guide.md", "# guide\n")
+    _write(tmp_path, "tests/test_reads_docs.py", _READS_EVERY_MARKDOWN)
+    _write(
+        tmp_path,
+        "tests/test_imports_reader.py",
+        "import test_reads_docs\n\n\ndef test_y():\n    pass\n",
+    )
+
+    derivation = python_selection.derive(tmp_path, ["docs/guide.md"], NO_DEPS)
+
+    assert [t.path for t in derivation.tests] == ["tests/test_reads_docs.py"]
+
+
 def test_a_source_file_matched_by_a_non_test_holder_only_still_widens(tmp_path: Path) -> None:
     _write(tmp_path, "pkg/tool.py", "value = 1\n")
     _write(tmp_path, "pkg/scan.py", 'GLOB = "*.py"\n')

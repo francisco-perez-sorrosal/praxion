@@ -302,6 +302,15 @@ CONSUMERS = (
         Mode.STANDARD,
     ),
     ConsumerSpec(
+        "scripts/gate_probes/observation.py",
+        "code",
+        {
+            EventClass.AGENT_START: ("event_type", "project", "slug_attribution"),
+            EventClass.TOOL_AGENT_SPAWN: ("event_type", "project", "spawned_agent_id", "task_slug"),
+        },
+        Mode.STANDARD,
+    ),
+    ConsumerSpec(
         "scripts/reconcile_pipeline_state.py",
         "code",
         {

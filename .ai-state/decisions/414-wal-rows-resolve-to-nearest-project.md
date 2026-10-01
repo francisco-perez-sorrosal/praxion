@@ -1,7 +1,8 @@
 ---
-id: dec-draft-6692b078
+id: dec-414
+draft_id: dec-draft-6692b078
 title: Observation-log location and project resolve once, in the owner package, to the nearest project within the checkout
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-01
 summary: "A new hooks/_observation_log/location.py locate(cwd) becomes the only answer to which log a row goes to and which project it carries; capture_session, capture_observations, measure_context_surface and record_gate_fire stop deriving Path(cwd)/.ai-state and Path(cwd).name, so sessions working in a checkout subdirectory are recorded instead of silently dropped"

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-53d813ee
+id: dec-413
+draft_id: dec-draft-53d813ee
 title: Spawns count toward the Task slug their prompt states, joined on agent id from the recorded Agent result; unknown spawns pend
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-01
 summary: "The Agent tool's PostToolUse result (agentId + prompt) is recorded in standard and full modes with spawned_agent_id/spawned_agent_type/task_slug; new agent_start rows carry slug_attribution; spawn_count.py attributes each agent to its prompt's first Task slug (else the checkout), keeps rows written before the change on their project, falls back to the agent's own transcript, and holds the verdict for spawns it cannot attribute"

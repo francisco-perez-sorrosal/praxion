@@ -305,7 +305,7 @@ def test_the_graph_lists_pattern_readers_sorted(tmp_path: Path) -> None:
     _write(tmp_path, "README.md", "# x\n")
     files = ("b_reader.py", "a_reader.py", "README.md")
 
-    graph = python_selection._Graph(tmp_path, files, ["README.md"], NO_DEPS, (".",))
+    graph = python_selection.Graph(tmp_path, files, ["README.md"], NO_DEPS, (".",))
 
     assert graph.pattern_readers("README.md") == ("a_reader.py", "b_reader.py")
     assert graph.dependents("README.md", "path-literal") == ()
@@ -572,3 +572,82 @@ def test_count_tests_counts_sync_and_async_test_functions() -> None:
     )
 
     assert python_selection.count_tests(source) == 2
+
+
+# -- A graph built once serves every derivation ---------------------------------------
+
+
+MIXED_FILES = {
+    "pkg/foo.py": "value = 1\n",
+    "pkg/test_foo.py": "def test_value():\n    assert True\n",
+    "lib/helper.py": "value = 2\n",
+    "tests/test_uses_helper.py": "import helper\n\n\ndef test_it():\n    assert True\n",
+    "data/table.csv": "a,b\n",
+    "tests/test_reads_table.py": 'NAME = "table.csv"\n\n\ndef test_it():\n    pass\n',
+    "docs/guide.md": "# guide\n",
+    "tests/test_reads_docs.py": _READS_EVERY_MARKDOWN,
+    "orphan.py": "value = 3\n",
+}
+
+
+def _mixed_repo(root: Path) -> tuple[str, ...]:
+    """One path per edge source, so a shared graph is exercised on each."""
+    for rel, text in MIXED_FILES.items():
+        _write(root, rel, text)
+    return tuple(MIXED_FILES)
+
+
+def _counting_graph(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Record every graph construction made by `derive`, whatever its caller."""
+    built: list[int] = []
+    original_init = python_selection.Graph.__init__
+
+    def counting_init(self: object, *args: object, **kwargs: object) -> None:
+        built.append(1)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(python_selection.Graph, "__init__", counting_init)
+    return built
+
+
+@pytest.mark.parametrize("path", [*MIXED_FILES, "pkg/missing.py"])
+def test_a_prebuilt_graph_derives_exactly_what_a_fresh_build_derives(
+    tmp_path: Path, path: str
+) -> None:
+    files = _mixed_repo(tmp_path)
+    graph = python_selection.build_graph(tmp_path, files, NO_DEPS)
+
+    fresh = python_selection.derive(tmp_path, [path], NO_DEPS, files=files)
+    shared = python_selection.derive(tmp_path, [path], NO_DEPS, files=files, graph=graph)
+
+    assert shared == fresh
+
+
+def test_a_prebuilt_graph_is_built_once_however_many_paths_it_serves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    files = _mixed_repo(tmp_path)
+    built = _counting_graph(monkeypatch)
+
+    graph = python_selection.build_graph(tmp_path, files, NO_DEPS)
+    derived = [
+        python_selection.derive(tmp_path, [path], NO_DEPS, files=files, graph=graph)
+        for path in files
+    ]
+
+    assert len(derived) == len(files)
+    assert len(built) == 1
+
+
+def test_a_changed_path_the_prebuilt_graph_does_not_know_gets_its_own_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A deleted or new path joins the node set of a single-path derivation; a graph
+    # built without it would answer differently, so the shared one must not be used.
+    files = _mixed_repo(tmp_path)
+    graph = python_selection.build_graph(tmp_path, files, NO_DEPS)
+    built = _counting_graph(monkeypatch)
+
+    python_selection.derive(tmp_path, ["pkg/deleted.py"], NO_DEPS, files=files, graph=graph)
+
+    assert len(built) == 1

@@ -99,6 +99,16 @@ def select(root: Path, changed: Iterable[str], deps: DeclaredDeps) -> tuple[Sele
     return derive(root, changed, deps).tests
 
 
+def build_graph(
+    root: Path, files: Sequence[str], deps: DeclaredDeps, pocket_roots: Sequence[str] = (".",)
+) -> Graph:
+    """The graph over `files` alone, for `derive` to reuse across many changes.
+
+    Building it parses every module, which dominates the cost of a derivation.
+    """
+    return Graph(root, files, (), deps, pocket_roots)
+
+
 def derive(
     root: Path,
     changed: Iterable[str],
@@ -107,11 +117,19 @@ def derive(
     files: Sequence[str] | None = None,
     pocket_roots: Sequence[str] = (".",),
     is_runnable: Callable[[str], bool] = lambda _path: True,
+    graph: Graph | None = None,
 ) -> Derivation:
-    """Every runnable test reachable from a changed path, attributed."""
+    """Every runnable test reachable from a changed path, attributed.
+
+    A `graph` from `build_graph` is reused when it knows every changed path, which
+    gives the result a fresh build would. A changed path outside it (deleted, or
+    not in `files`) joins the node set of its own derivation, so such a change
+    builds its own graph.
+    """
     changed_paths = sorted(set(changed))
-    universe = tuple(walk_files(root)) if files is None else tuple(files)
-    graph = _Graph(root, universe, changed_paths, deps, pocket_roots)
+    if graph is None or not graph.knows(changed_paths):
+        universe = tuple(walk_files(root)) if files is None else tuple(files)
+        graph = Graph(root, universe, changed_paths, deps, pocket_roots)
     best: dict[str, tuple[int, SelectedTest]] = {}
     mapped: set[str] = set()
     for path in changed_paths:
@@ -126,14 +144,14 @@ def derive(
     return Derivation(tests, frozenset(mapped))
 
 
-def _accounted_for(graph: _Graph, path: str, is_runnable: Callable[[str], bool]) -> bool:
+def _accounted_for(graph: Graph, path: str, is_runnable: Callable[[str], bool]) -> bool:
     """A path that reached a test stands in for the full suite, unless only a pattern reached it."""
     if not is_source_code(path) or not _pattern_tests(graph, path, is_runnable):
         return True
     return bool(_reach(graph, path, is_runnable, patterns=False))
 
 
-def _pattern_tests(graph: _Graph, path: str, is_runnable: Callable[[str], bool]) -> list[str]:
+def _pattern_tests(graph: Graph, path: str, is_runnable: Callable[[str], bool]) -> list[str]:
     """Runnable test modules whose basename pattern matches `path`."""
     return [
         holder
@@ -143,7 +161,7 @@ def _pattern_tests(graph: _Graph, path: str, is_runnable: Callable[[str], bool])
 
 
 def _reach(
-    graph: _Graph, start: str, is_runnable: Callable[[str], bool], *, patterns: bool = True
+    graph: Graph, start: str, is_runnable: Callable[[str], bool], *, patterns: bool = True
 ) -> dict[str, str]:
     """Tests reaching `start`, each tagged with the kind of its first hop out of `start`.
 
@@ -203,7 +221,7 @@ def estimate_tests(root: Path, paths: Iterable[str]) -> int:
 # --- The graph -------------------------------------------------------------------
 
 
-class _Graph:
+class Graph:
     """Reverse edges ("who depends on this node?"), computed on demand per kind."""
 
     def __init__(
@@ -216,6 +234,7 @@ class _Graph:
     ) -> None:
         self._deps = deps
         known = set(files) | set(changed)
+        self._known = frozenset(known)
         self._test_files = tuple(sorted(path for path in known if is_any_test_file(path)))
         self._py_tests_by_stem = _tests_by_stem(self._test_files)
         modules = sorted(path for path in known if path.endswith(".py"))
@@ -230,6 +249,10 @@ class _Graph:
                 self._importers.setdefault(target, set()).add(module)
             self._literals.add_module(module, tree)
         self.dependents = functools.lru_cache(maxsize=None)(self._dependents)
+
+    def knows(self, paths: Iterable[str]) -> bool:
+        """Is every path a node of this graph?"""
+        return self._known.issuperset(paths)
 
     def _dependents(self, node: str, via: str) -> tuple[str, ...]:
         if via == "layout":

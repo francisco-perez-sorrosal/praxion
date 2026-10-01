@@ -2,7 +2,7 @@
 """Derived test selection: which tests does this change need?
 
     python3 scripts/resolve_test_scope.py [--changed PATH ... | --changed-from REF | --full]
-                                          [--json] [--repo-root DIR]
+                                          [--json [--per-path]] [--repo-root DIR]
 
 Input is exactly one mode: explicit paths, the branch diff `REF...HEAD` plus
 the working tree, the full suite, or (no mode) the working tree alone -- the
@@ -58,7 +58,11 @@ Output
 ------
 `--json` emits the schema-2 object; otherwise runnable, runner-prefixed
 commands go to stdout and context to stderr, so `resolve_test_scope.py | sh -e`
-runs the selection. Exit codes: 0 resolved (widened included), 2 usage or
+runs the selection. `--changed ... --json --per-path` answers many paths from
+one process: one single-line schema-2 object per distinct path, in sorted
+order, each exactly what `--changed <path> --json` prints for that path alone
+(the same payload, compactly serialized). Any other combination is a usage
+error. Exit codes: 0 resolved (widened included), 2 usage or
 internal error -- callers treat 2 as "run the full suite".
 
 Stdlib-only: agent prose and hooks invoke it through a bare `python3`, so a
@@ -93,7 +97,9 @@ from _native_selection import Widen as _NativeWiden  # noqa: E402
 from _native_selection import select as _select_native  # noqa: E402
 from _python_selection import (  # noqa: E402
     Derivation,
+    Graph,
     SelectedTest,
+    build_graph,
     derive,
     estimate_tests,
     needs_serial,
@@ -238,8 +244,25 @@ class Resolution:
 # --- Resolution ------------------------------------------------------------------
 
 
-def resolve(repo_root: Path, changed: ChangedSet, files: Sequence[str]) -> Resolution:
-    """The whole decision for one changed set over the repo's tracked+untracked files."""
+def resolve_each(repo_root: Path, paths: Sequence[str], files: Sequence[str]) -> list[Resolution]:
+    """`resolve` of each path alone, over one import graph instead of one per path."""
+    declared, _ = _load_declared(repo_root, files)
+    graph = build_graph(
+        repo_root, files, declared, _python_roots(discover_pockets(repo_root, files))
+    )
+    return [
+        resolve(repo_root, ChangedSet((path,), SOURCE_EXPLICIT), files, graph=graph)
+        for path in paths
+    ]
+
+
+def resolve(
+    repo_root: Path, changed: ChangedSet, files: Sequence[str], *, graph: Graph | None = None
+) -> Resolution:
+    """The whole decision for one changed set over the repo's tracked+untracked files.
+
+    A `graph` over `files` (from `build_graph`) spares the derivation its rebuild.
+    """
     pockets = discover_pockets(repo_root, files)
     if changed.source == SOURCE_FULL:
         widen = (Widen(REASON_FULL, (), "full suite requested"),)
@@ -249,7 +272,7 @@ def resolve(repo_root: Path, changed: ChangedSet, files: Sequence[str]) -> Resol
     config_widen = _pocket_config_widens(changed.paths, pockets)
     if repo_widen:  # every pocket runs in full already; deriving would change nothing
         return _all_full(changed, (*repo_widen, *config_widen.values()), (), pockets)
-    derivation = _derive(repo_root, changed.paths, files, pockets, declared)
+    derivation = _derive(repo_root, changed.paths, files, pockets, declared, graph)
     # Config paths still feed the derivation (another pocket's test may read them),
     # but their own pocket is already widened, so they never count as unmapped.
     accounted = derivation.mapped | {p for w in config_widen.values() for p in w.paths}
@@ -274,17 +297,22 @@ def _derive(
     files: Sequence[str],
     pockets: tuple[Pocket, ...],
     declared: DeclaredDeps,
+    graph: Graph | None,
 ) -> Derivation:
-    python_roots = tuple(pocket.root for pocket in pockets if pocket.ecosystem == "python")
     workflows = workflow_collection_scope(repo_root / WORKFLOWS_DIR)
     return derive(
         repo_root,
         paths,
         declared,
         files=files,
-        pocket_roots=python_roots or (".",),
+        pocket_roots=_python_roots(pockets),
         is_runnable=lambda test: _is_runnable(test, pockets, workflows),
+        graph=graph,
     )
+
+
+def _python_roots(pockets: tuple[Pocket, ...]) -> tuple[str, ...]:
+    return tuple(pocket.root for pocket in pockets if pocket.ecosystem == "python") or (".",)
 
 
 def _per_pocket(
@@ -617,6 +645,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     mode.add_argument("--full", action="store_true", help="the full suite for every pocket")
     parser.add_argument("--json", action="store_true", help="emit the schema-2 object")
+    parser.add_argument(
+        "--per-path",
+        action="store_true",
+        help="with --changed --json: one single-line schema-2 object per path",
+    )
     parser.add_argument("--repo-root", help="repo root override")
     return parser
 
@@ -626,20 +659,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = _build_parser().parse_args(argv)
     except SystemExit as exc:  # argparse reports usage errors by exiting; keep the int contract
         return exc.code if isinstance(exc.code, int) else EXIT_ERROR
+    if args.per_path and not (args.changed and args.json):
+        print("error: --per-path needs --changed and --json", file=sys.stderr)
+        return EXIT_ERROR
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     try:
         changed = changed_paths(args, repo_root)
-        payload = to_payload(resolve(repo_root, changed, repo_files(repo_root)))
+        files = repo_files(repo_root)
+        if args.per_path:
+            payloads = [to_payload(each) for each in resolve_each(repo_root, changed.paths, files)]
+        else:
+            payloads = [to_payload(resolve(repo_root, changed, files))]
     except ResolverError as exc:
         print(f"error: {exc} -- run the full suite", file=sys.stderr)
         return EXIT_ERROR
     except Exception as exc:  # an internal defect must still honour "2 means run everything"
         print(f"internal error: {exc!r} -- run the full suite", file=sys.stderr)
         return EXIT_ERROR
-    if args.json:
-        print(json.dumps(payload, indent=2))
+    if args.per_path:
+        for payload in payloads:
+            print(json.dumps(payload))
+    elif args.json:
+        print(json.dumps(payloads[0], indent=2))
     else:
-        print_human(payload)
+        print_human(payloads[0])
     return EXIT_OK
 
 

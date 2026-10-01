@@ -349,3 +349,123 @@ def test_a_deleted_source_selects_its_surviving_tests_only(
     assert payload["decision"] == "selected", payload
     assert _selected_paths(payload) == {"tests/test_reads_foo.py"}
     assert not any("test_foo.py" in arg for arg in _invocation_args(payload))
+
+
+# -- --per-path: one payload per changed path, from one process --------------------
+
+PER_PATH_SAMPLE = (
+    "pkg/foo.py",  # layout edge (and the declared list names its test)
+    "lib/helper.py",  # import edge
+    "data/table.csv",  # path-literal edge
+    ".ai-state/decisions/001-choice.md",  # declared edge
+    "pkg/orphan.py",  # reaches no test: widens
+    "README.md",  # reaches no test and is root narrative: ignored
+    "scripts/_python_selection.py",  # a resolver source: widens
+    "pkg/deleted.py",  # not in the inventory
+)
+
+
+@pytest.fixture
+def per_path_repo(base_repo: Path) -> Path:
+    """`base_repo` plus one path for every edge source, a widening one and an ignored one."""
+    files = {
+        "lib/helper.py": "value = 2\n",
+        "tests/test_uses_helper.py": "import helper\n\n\ndef test_it():\n    assert helper.value\n",
+        "data/table.csv": "a,b\n",
+        "tests/test_reads_table.py": 'NAME = "table.csv"\n\n\ndef test_it():\n    assert NAME\n',
+        ".ai-state/decisions/001-choice.md": "# choice\n",
+        "pkg/orphan.py": "value = 3\n",
+        "README.md": "# repo\n",
+    }
+    for rel, text in files.items():
+        target = base_repo / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    _git(base_repo, "add", "-A")
+    _git(base_repo, "commit", "-qm", "one path per edge source")
+    return base_repo
+
+
+def _per_path_lines(capsys: pytest.CaptureFixture, repo: Path, *paths: str) -> list[str]:
+    exit_code = rts.main(["--repo-root", str(repo), "--json", "--per-path", "--changed", *paths])
+    assert exit_code == 0
+    return capsys.readouterr().out.splitlines()
+
+
+def _single_path_line(capsys: pytest.CaptureFixture, repo: Path, path: str) -> str:
+    """What `--changed <path> --json` prints, on one line: the same payload, the same bytes."""
+    _, payload = _run(capsys, repo, "--changed", path)
+    return json.dumps(payload)
+
+
+@pytest.mark.parametrize("path", PER_PATH_SAMPLE)
+def test_per_path_line_equals_single_path_output_for_each_edge_source(
+    per_path_repo: Path, capsys: pytest.CaptureFixture, path: str
+) -> None:
+    lines = _per_path_lines(capsys, per_path_repo, *PER_PATH_SAMPLE)
+
+    by_path = {json.loads(line)["changed"]["paths"][0]: line for line in lines}
+    assert len(lines) == len(PER_PATH_SAMPLE)
+    assert by_path[path] == _single_path_line(capsys, per_path_repo, path)
+
+
+def test_per_path_sample_covers_selected_widened_and_ignored_outcomes(
+    per_path_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    lines = _per_path_lines(capsys, per_path_repo, *PER_PATH_SAMPLE)
+    payloads = [json.loads(line) for line in lines]
+
+    decisions = {p["changed"]["paths"][0]: p["decision"] for p in payloads}
+    assert decisions["pkg/foo.py"] == "selected"
+    assert decisions["pkg/orphan.py"] == "widened"
+    assert decisions["scripts/_python_selection.py"] == "widened"
+    assert decisions["README.md"] == "nothing-to-run"
+    ignored = {p["changed"]["paths"][0]: p["ignored_non_source"] for p in payloads}
+    assert ignored["README.md"] == [{"path": "README.md", "rule": "root-narrative"}]
+
+
+def test_per_path_lines_follow_the_sorted_unique_changed_paths(
+    per_path_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    lines = _per_path_lines(capsys, per_path_repo, "pkg/orphan.py", "pkg/foo.py", "./pkg/foo.py")
+
+    firsts = [json.loads(line)["changed"]["paths"][0] for line in lines]
+    assert firsts == ["pkg/foo.py", "pkg/orphan.py"]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--per-path", "--json"],
+        ["--per-path", "--changed", "pkg/foo.py"],
+        ["--per-path", "--json", "--changed-from", "HEAD"],
+        ["--per-path", "--json", "--full"],
+    ],
+    ids=["no-changed", "no-json", "changed-from", "full"],
+)
+def test_per_path_without_changed_and_json_is_a_usage_error(
+    per_path_repo: Path, capsys: pytest.CaptureFixture, args: list[str]
+) -> None:
+    exit_code = rts.main(["--repo-root", str(per_path_repo), *args])
+
+    assert exit_code == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_per_path_builds_the_import_graph_once_for_every_inventory_path(
+    per_path_repo: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    built: list[int] = []
+    original_init = rts.Graph.__init__
+
+    def counting_init(self: object, *args: object, **kwargs: object) -> None:
+        built.append(1)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(rts.Graph, "__init__", counting_init)
+    inventory_paths = [p for p in PER_PATH_SAMPLE if p != "pkg/deleted.py"]
+
+    lines = _per_path_lines(capsys, per_path_repo, *inventory_paths)
+
+    assert len(lines) == len(inventory_paths)
+    assert len(built) == 1

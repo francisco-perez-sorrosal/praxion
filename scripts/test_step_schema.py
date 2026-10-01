@@ -440,3 +440,128 @@ def test_the_three_step_document_readers_import_under_a_legacy_bare_interpreter(
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# The `Mutation:` line grammar (Contract A) -- the one parser and the one
+# renderer, plus the single policy deciding whether a reading blocks a step.
+# ---------------------------------------------------------------------------
+
+# Every line the sensor prints today, captured from its renderer before the
+# render moved here: ran (plain, with `inconclusive`, clean, several targets,
+# `+<j> more`) and a refusal per closed reason.
+GOLDEN_RAN_LINES = (
+    "Mutation: survivors=3 mutants=10 targets=[a.py] (f: 2, g: 1)",
+    "Mutation: survivors=2 mutants=10 inconclusive=1 targets=[a.py] (f: 2)",
+    "Mutation: survivors=0 mutants=5 targets=[a.py] ()",
+    "Mutation: survivors=2 mutants=7 targets=[a.py, b.py] (f: 1, g: 1)",
+    "Mutation: survivors=28 mutants=48 targets=[a.py] "
+    "(fn0: 4, fn1: 4, fn2: 4, fn3: 4, fn4: 4, +2 more)",
+)
+GOLDEN_REFUSAL_REASONS = (
+    "not-flat-layout",
+    "path-missing",
+    "pyproject-present",
+    "mutants-dir-present",
+    "toolchain-missing",
+    "run-timeout",
+    "run-failed",
+)
+GOLDEN_REFUSAL_LINES = tuple(
+    f"Mutation: unavailable reason={reason} (line one line two (x))"
+    for reason in GOLDEN_REFUSAL_REASONS
+)
+
+
+def test_every_golden_mutation_line_round_trips() -> None:
+    for line in (*GOLDEN_RAN_LINES, *GOLDEN_REFUSAL_LINES):
+        reading = schema.parse_mutation_line(line)
+        assert reading is not None, line
+        assert not isinstance(reading, schema.MutationMalformed), line
+        assert schema.render_mutation_line(reading) == line
+
+
+def test_a_parsed_ran_line_exposes_its_counts_targets_and_attribution() -> None:
+    reading = schema.parse_mutation_line(GOLDEN_RAN_LINES[-1])
+    assert reading == schema.MutationRan(
+        survivors=28,
+        mutants=48,
+        inconclusive=0,
+        targets=("a.py",),
+        per_function=(("fn0", 4), ("fn1", 4), ("fn2", 4), ("fn3", 4), ("fn4", 4)),
+        more=2,
+    )
+
+
+def test_a_line_that_is_not_a_mutation_line_parses_to_none() -> None:
+    assert schema.parse_mutation_line("Result: pass=1 fail=0") is None
+    assert schema.parse_mutation_line("  Mutation: survivors=0 mutants=5 targets=[a.py] ()") is None
+
+
+def test_unseen_refusal_reason_parses_as_refused_and_blocks() -> None:
+    reading = schema.parse_mutation_line("Mutation: unavailable reason=disk-on-fire (boom)")
+    assert reading == schema.MutationRefused(reason="disk-on-fire", detail="boom")
+    assert schema.mutation_block_reason(reading) == "refused, reason=disk-on-fire"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Mutation: survivors=x mutants=5 targets=[a.py] ()",
+        "Mutation: survivors=1 targets=[a.py] ()",
+        "Mutation: survivors=1 mutants=5 targets=[a.py]",
+        "Mutation: survivors=1 mutants=5 targets=[a.py] (f: two)",
+        "Mutation: survivors=1 mutants=5 targets=[a.py] (+1 more, f: 1)",
+        "Mutation: unavailable reason=Bad_Code (x)",
+        "Mutation: unavailable",
+        "Mutation: survivors=0 mutants=0 targets=[a.py] ()",
+        "Mutation: survivors=6 mutants=5 targets=[a.py] ()",
+        "Mutation: survivors=3 mutants=5 inconclusive=3 targets=[a.py] ()",
+        "Mutation:",
+    ],
+)
+def test_garbled_mutation_line_parses_as_malformed_and_blocks(line: str) -> None:
+    reading = schema.parse_mutation_line(line)
+    assert reading == schema.MutationMalformed(line)
+    assert schema.mutation_block_reason(reading) == "unreadable Mutation: line"
+
+
+def test_absent_mutation_line_blocks_with_the_missing_line_reason() -> None:
+    assert schema.mutation_block_reason(None) == "no Mutation: line"
+    blocks = schema.split_step_blocks(
+        "### Step 4\nResult: pass=3 fail=0\n"  # id-citation-discipline:ignore
+    )
+    assert schema.step_mutation_reading("Step 4", blocks) is None  # id-citation-discipline:ignore
+
+
+def test_declared_layout_refusal_does_not_block() -> None:
+    assert schema.DECLARED_LIMIT_REASONS == frozenset({"not-flat-layout"})
+    layout = schema.parse_mutation_line(GOLDEN_REFUSAL_LINES[0])
+    assert schema.mutation_block_reason(layout) is None
+    ran = schema.parse_mutation_line(GOLDEN_RAN_LINES[0])
+    assert schema.mutation_block_reason(ran) is None
+    other = schema.parse_mutation_line(GOLDEN_REFUSAL_LINES[-1])
+    assert schema.mutation_block_reason(other) == "refused, reason=run-failed"
+
+
+def test_latest_block_reading_supersedes_an_earlier_one() -> None:
+    text = (
+        "### Step 4\nResult: pass=3 fail=0\n"  # id-citation-discipline:ignore
+        f"{GOLDEN_REFUSAL_LINES[-1]}\n"
+        "### Step 5\nResult: pass=1 fail=0\n"  # id-citation-discipline:ignore
+        f"{GOLDEN_RAN_LINES[2]}\n"
+        "### Step 4\nResult: pass=3 fail=0\n"  # id-citation-discipline:ignore
+        f"{GOLDEN_RAN_LINES[0]}\n"
+    )
+    blocks = schema.split_step_blocks(text)
+    latest = schema.step_mutation_reading("Step 4", blocks)  # id-citation-discipline:ignore
+    assert isinstance(latest, schema.MutationRan)
+    assert latest.survivors == 3
+    assert schema.mutation_block_reason(latest) is None
+    # the reverse order: a refusal recorded later clears nothing, it blocks
+    reversed_blocks = schema.split_step_blocks(
+        f"### Step 4\n{GOLDEN_RAN_LINES[0]}\n### Step 4\n{GOLDEN_REFUSAL_LINES[-1]}\n"  # id-citation-discipline:ignore
+    )
+    later = schema.step_mutation_reading("4", reversed_blocks)
+    assert schema.mutation_block_reason(later) == "refused, reason=run-failed"
+    assert schema.step_mutation_reading("Step 9", blocks) is None  # id-citation-discipline:ignore

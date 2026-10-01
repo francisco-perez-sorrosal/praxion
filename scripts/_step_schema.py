@@ -100,7 +100,8 @@ class StepBlock:
     ceiling measures. `results` holds every `Result:` line found in the
     block, in document order, each with its 1-based line number -- a
     sub-heading (e.g. `### Failures`) does not open a new block, so its
-    `Result:` lines (if any) stay attributed to the parent step.
+    `Result:` lines (if any) stay attributed to the parent step. `mutation`
+    is the block's last `Mutation:` line read, or None when it has none.
     """
 
     step: str | None
@@ -108,6 +109,7 @@ class StepBlock:
     text: str
     first_line: int
     results: tuple[tuple[int, ResultLine], ...]
+    mutation: MutationReading | None = None
 
 
 def step_id_from_heading(line: str) -> str | None:
@@ -204,7 +206,16 @@ def split_step_blocks(text: str) -> tuple[StepBlock, ...]:
         if (step_id := step_id_from_heading(line)) is not None
     ]
     if not openings:
-        return (StepBlock(None, "", text.rstrip(), 1, _collect_results(lines, 0, len(lines))),)
+        return (
+            StepBlock(
+                None,
+                "",
+                text.rstrip(),
+                1,
+                _collect_results(lines, 0, len(lines)),
+                _last_mutation(lines),
+            ),
+        )
 
     boundaries = [start for start, _, _ in openings] + [len(lines)]
     return tuple(
@@ -214,6 +225,7 @@ def split_step_blocks(text: str) -> tuple[StepBlock, ...]:
             text="\n".join(lines[start : boundaries[i + 1]]).rstrip(),
             first_line=start + 1,
             results=_collect_results(lines, start, boundaries[i + 1]),
+            mutation=_last_mutation(lines[start : boundaries[i + 1]]),
         )
         for i, (start, step_id, title) in enumerate(openings)
     )
@@ -530,3 +542,167 @@ def step_test_status(step: str, runs: list[RecordedRun]) -> str:
         return "green"
     superseded = any(r.status == "green" and r.order > latest.order for r in runs)
     return "green" if superseded else latest.status
+
+
+# ---------------------------------------------------------------------------
+# The `Mutation:` line -- the mutation sensor's one stdout line, copied into a
+# step's TEST_RESULTS.md section and read back by the gate. One renderer and
+# one parser live here so the producer and the gate cannot drift apart.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MutationRan:
+    """A completed run. `per_function` is the shown survivors in display order;
+    `more` counts those the line's byte cap left out. `mutants >= 1` and
+    `survivors + inconclusive <= mutants` are enforced by `parse_mutation_line`."""
+
+    survivors: int
+    mutants: int
+    inconclusive: int
+    targets: tuple[str, ...]
+    per_function: tuple[tuple[str, int], ...]
+    more: int
+
+
+@dataclass(frozen=True)
+class MutationRefused:
+    """The sensor declined to count. `reason` is open at parse time -- a code
+    this module has not seen is still a refusal (and blocks), never a crash."""
+
+    reason: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class MutationMalformed:
+    """A line that opens with `Mutation:` but breaks the grammar or an invariant."""
+
+    text: str
+
+
+# Absence of a line is `None`, a fourth state distinct from these three.
+MutationReading = Union[MutationRan, MutationRefused, MutationMalformed]  # noqa: UP007 -- runtime value, 3.9 floor
+
+# Refusals that state a limit of the sensor's reach, not a failure of the
+# environment: the target is not in a flat layout, so there is nothing to mutate.
+# Must stay a subset of `mutation_sensor.ReasonCode`'s values (pinned there).
+DECLARED_LIMIT_REASONS = frozenset({"not-flat-layout"})
+
+_MUTATION_RAN_RE = re.compile(
+    r"^Mutation: survivors=(?P<survivors>\d+) mutants=(?P<mutants>\d+)"
+    r"(?: inconclusive=(?P<inconclusive>\d+))?"
+    r" targets=\[(?P<targets>[^\]]*)\] \((?P<functions>.*)\)$"
+)
+_MUTATION_REFUSED_RE = re.compile(
+    r"^Mutation: unavailable reason=(?P<reason>[a-z][a-z-]*) \((?P<detail>.*)\)$"
+)
+_FUNCTION_COUNT_RE = re.compile(r"^(?P<name>.+): (?P<count>\d+)$")
+_MORE_RE = re.compile(r"^\+(?P<more>\d+) more$")
+
+
+def parse_mutation_line(line: str) -> MutationReading | None:
+    """One line -> its reading; None if it is not a `Mutation:` line at all.
+
+    The line must start at column 0 with `Mutation:`. Past that, anything the
+    grammar or its invariants reject is `MutationMalformed`, never None -- a
+    garbled line must not read as an absent one.
+    """
+    text = line.rstrip()
+    if not text.startswith("Mutation:"):
+        return None
+    return _parse_ran(text) or _parse_refused(text) or MutationMalformed(text)
+
+
+def _parse_ran(text: str) -> MutationRan | None:
+    match = _MUTATION_RAN_RE.match(text)
+    if match is None:
+        return None
+    survivors, mutants = int(match["survivors"]), int(match["mutants"])
+    inconclusive = int(match["inconclusive"] or 0)
+    functions = _parse_functions(match["functions"])
+    if functions is None or mutants < 1 or survivors + inconclusive > mutants:
+        return None
+    shown, more = functions
+    targets = tuple(match["targets"].split(", ")) if match["targets"] else ()
+    return MutationRan(survivors, mutants, inconclusive, targets, shown, more)
+
+
+def _parse_functions(body: str) -> tuple[tuple[tuple[str, int], ...], int] | None:
+    """`f: 2, g: 1, +3 more` -> ((("f", 2), ("g", 1)), 3); None if any part is off-grammar."""
+    parts = body.split(", ") if body else []
+    more_match = _MORE_RE.match(parts[-1]) if parts else None
+    more = int(more_match["more"]) if more_match else 0
+    shown = []
+    for part in parts[: -1 if more_match else None]:
+        counted = _FUNCTION_COUNT_RE.match(part)
+        if counted is None:
+            return None
+        shown.append((counted["name"], int(counted["count"])))
+    return tuple(shown), more
+
+
+def _parse_refused(text: str) -> MutationRefused | None:
+    match = _MUTATION_REFUSED_RE.match(text)
+    return None if match is None else MutationRefused(match["reason"], match["detail"])
+
+
+def render_mutation_line(reading: MutationReading) -> str:
+    """The inverse of `parse_mutation_line`; the sensor prints exactly this.
+
+    A refusal's `detail` must already be one line -- the producer flattens its
+    free text before it reaches the grammar."""
+    if isinstance(reading, MutationRan):
+        return _render_ran(reading)
+    if isinstance(reading, MutationRefused):
+        return f"Mutation: unavailable reason={reading.reason} ({reading.detail})"
+    if isinstance(reading, MutationMalformed):
+        return reading.text
+    raise TypeError(f"not a MutationReading: {reading!r}")
+
+
+def _render_ran(reading: MutationRan) -> str:
+    parts = [f"Mutation: survivors={reading.survivors} mutants={reading.mutants}"]
+    if reading.inconclusive:
+        parts.append(f"inconclusive={reading.inconclusive}")
+    parts.append(f"targets=[{', '.join(reading.targets)}]")
+    shown = [f"{name}: {count}" for name, count in reading.per_function]
+    if reading.more:
+        shown.append(f"+{reading.more} more")
+    parts.append(f"({', '.join(shown)})")
+    return " ".join(parts)
+
+
+def _last_mutation(lines: list[str]) -> MutationReading | None:
+    readings = [r for r in map(parse_mutation_line, lines) if r is not None]
+    return readings[-1] if readings else None
+
+
+def step_mutation_reading(step: str, blocks: tuple[StepBlock, ...]) -> MutationReading | None:
+    """The reading in the step's own latest block (`"Step N"` or a bare `"N"`).
+
+    No file-wide fallback: a step is judged by its own newest block, so a later
+    run supersedes an earlier one and another step's line never speaks for it.
+    """
+    label = step if step.startswith("Step") else f"Step {step}"
+    own = [block for block in blocks if block.step == label]
+    return own[-1].mutation if own else None
+
+
+def mutation_block_reason(reading: MutationReading | None) -> str | None:
+    """Why this reading blocks a `mutation: on` step from completing; None if it does not.
+
+    The single policy: a ran line and the declared layout refusal pass; a
+    missing, unreadable, or otherwise-refused line blocks.
+    """
+    if reading is None:
+        return "no Mutation: line"
+    if isinstance(reading, MutationRan):
+        return None
+    if isinstance(reading, MutationRefused):
+        if reading.reason in DECLARED_LIMIT_REASONS:
+            return None
+        return f"refused, reason={reading.reason}"
+    if isinstance(reading, MutationMalformed):
+        return "unreadable Mutation: line"
+    raise TypeError(f"not a MutationReading: {reading!r}")

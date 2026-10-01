@@ -128,6 +128,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from _step_schema import MutationRan, MutationRefused, render_mutation_line
+
 EXIT_OK = 0
 EXIT_ERROR = 2
 
@@ -643,16 +645,16 @@ def _run_mutmut(
 # ---------------------------------------------------------------------------
 
 
-def _render_functions(per_function: Mapping[str, int], cap_n: int) -> str:
-    if not per_function:
-        return "()"
-    items = sorted(per_function.items(), key=lambda kv: (-kv[1], kv[0]))
-    shown = items[:cap_n]
-    remaining = len(items) - len(shown)
-    parts = [f"{fn}: {count}" for fn, count in shown]
-    if remaining > 0:
-        parts.append(f"+{remaining} more")
-    return "(" + ", ".join(parts) + ")"
+def _reading(outcome: Ran, shown: int) -> MutationRan:
+    ranked = sorted(outcome.per_function.items(), key=lambda kv: (-kv[1], kv[0]))
+    return MutationRan(
+        survivors=outcome.survivors,
+        mutants=outcome.mutants,
+        inconclusive=outcome.inconclusive,
+        targets=tuple(Path(t).name for t in outcome.targets),
+        per_function=tuple(ranked[:shown]),
+        more=len(ranked) - len(ranked[:shown]),
+    )
 
 
 def render_line(outcome: Ran) -> str:
@@ -661,18 +663,12 @@ def render_line(outcome: Ran) -> str:
     `TEST_RESULTS.md` step section past `check_test_results_shape.py`'s
     1,024-byte ceiling. Progressively drops shown functions before ever
     truncating mid-character; the loop only ever runs past `cap_n=5` in a
-    pathological case no fixture reaches today.
+    pathological case no fixture reaches today. The grammar itself is
+    `_step_schema.render_mutation_line`'s.
     """
-    prefix_parts = [f"Mutation: survivors={outcome.survivors} mutants={outcome.mutants}"]
-    if outcome.inconclusive:
-        prefix_parts.append(f"inconclusive={outcome.inconclusive}")
-    target_names = ", ".join(Path(t).name for t in outcome.targets)
-    prefix_parts.append(f"targets=[{target_names}]")
-    prefix = " ".join(prefix_parts)
-
-    candidate = prefix
+    candidate = ""
     for cap_n in range(TOP_N_FUNCTIONS, -1, -1):
-        candidate = f"{prefix} {_render_functions(outcome.per_function, cap_n)}"
+        candidate = render_mutation_line(_reading(outcome, cap_n))
         if len(candidate.encode("utf-8")) <= LINE_BYTE_CAP:
             return candidate
     return candidate.encode("utf-8")[:LINE_BYTE_CAP].decode("utf-8", errors="ignore")
@@ -693,7 +689,9 @@ def _emit(outcome: Ran | Refused, *, json_mode: bool) -> int:
             )
         else:
             print(
-                f"Mutation: unavailable reason={outcome.reason.value} ({_one_line(outcome.detail)})"
+                render_mutation_line(
+                    MutationRefused(outcome.reason.value, _one_line(outcome.detail))
+                )
             )
         return EXIT_ERROR
 

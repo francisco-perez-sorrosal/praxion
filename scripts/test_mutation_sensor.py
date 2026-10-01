@@ -1311,3 +1311,60 @@ class TestRealMutmutSmoke:
         assert before_cov == after_cov, "repo-root .coverage must be byte-identical around the run"
         assert not (d / "mutants").exists(), "cleanup must run after a real invocation too"
         assert not (d / "pyproject.toml").exists()
+
+
+# ---------------------------------------------------------------------------
+# The `Mutation:` line grammar lives in `_step_schema`; the sensor only renders
+# through it. These pin that the move changed no printed byte.
+# ---------------------------------------------------------------------------
+
+
+def test_reason_code_contains_the_declared_limit_reasons() -> None:
+    import _step_schema
+
+    produced = {code.value for code in ms.ReasonCode}
+    assert _step_schema.DECLARED_LIMIT_REASONS <= produced
+
+
+def _golden_ran(survived, timeout, killed, per_function, targets=("scripts/a.py",)):
+    histogram = {
+        "survived": survived,
+        "no_tests": 0,
+        "timeout": timeout,
+        "suspicious": 0,
+        "segfault": 0,
+        "killed": killed,
+        "skipped": 0,
+    }
+    return ms.Ran(
+        targets=targets,
+        mutants=sum(histogram.values()),
+        histogram=histogram,
+        per_function=per_function,
+        elapsed_s=1.0,
+    )
+
+
+def test_sensor_lines_are_byte_identical_to_the_goldens_after_the_render_move(capsys) -> None:
+    ran_goldens = {
+        "Mutation: survivors=3 mutants=10 targets=[a.py] (f: 2, g: 1)": _golden_ran(
+            3, 0, 7, {"f": 2, "g": 1}
+        ),
+        "Mutation: survivors=2 mutants=10 inconclusive=1 targets=[a.py] (f: 2)": _golden_ran(
+            2, 1, 7, {"f": 2}
+        ),
+        "Mutation: survivors=0 mutants=5 targets=[a.py] ()": _golden_ran(0, 0, 5, {}),
+        "Mutation: survivors=2 mutants=7 targets=[a.py, b.py] (f: 1, g: 1)": _golden_ran(
+            2, 0, 5, {"f": 1, "g": 1}, targets=("scripts/a.py", "scripts/b.py")
+        ),
+        "Mutation: survivors=28 mutants=48 targets=[a.py] "
+        "(fn0: 4, fn1: 4, fn2: 4, fn3: 4, fn4: 4, +2 more)": _golden_ran(
+            28, 0, 20, {f"fn{i}": 4 for i in range(7)}
+        ),
+    }
+    for golden, outcome in ran_goldens.items():
+        assert ms.render_line(outcome) == golden
+    for code in ms.ReasonCode:
+        ms._emit(ms.Refused(code, "line one\n  line two (x)"), json_mode=False)
+        out = capsys.readouterr().out
+        assert out == f"Mutation: unavailable reason={code.value} (line one line two (x))\n"

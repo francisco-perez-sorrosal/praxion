@@ -12,10 +12,26 @@ modules -- no import statement, no name collision.
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 import pytest
 from _ledger_triage_testkit import build_fixture_repo
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Put the test interpreter's own `bin/` first on `PATH` for the session.
+
+    Many tests here run shell entry points and `#!/usr/bin/env python3` CLIs as
+    subprocesses (onboarding, the sidecar CLI, the finalize chain). Without this,
+    `python3` is whatever the developer's ambient interpreter happens to be, and
+    one that lacks the project's declared dependencies (PyYAML) fails them with a
+    message about the machine rather than the code. With it, they run under the
+    interpreter running the suite, as on CI.
+    """
+    interpreter_bin = str(Path(sys.executable).parent)
+    os.environ["PATH"] = f"{interpreter_bin}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
 @pytest.fixture

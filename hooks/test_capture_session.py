@@ -734,7 +734,9 @@ class TestStartStopCorrelation:
         """No row leaves the emitter without a verdict a reader can act on."""
         module = _load_module()
         for event_type in ("session_start", "session_stop", "agent_start", "agent_stop"):
-            row = module.build_observation({"agent_id": "a-1", "cwd": str(project)}, event_type)
+            row = module.build_observation(
+                {"agent_id": "a-1", "cwd": str(project)}, event_type, project=project.name
+            )
             assert row["start_correlation"] in {
                 module.CORRELATION_PAIRED,
                 module.CORRELATION_UNOBSERVED_START,
@@ -895,6 +897,7 @@ class TestObservationEnvelope:
                 "cwd": str(project),
             },
             "agent_start",
+            project=project.name,
         )
         assert set(row) == {
             "timestamp",
@@ -917,13 +920,13 @@ class TestObservationEnvelope:
 
     def test_row_timestamp_is_utc_iso8601(self, project: Path) -> None:
         module = _load_module()
-        row = module.build_observation({"cwd": str(project)}, "session_start")
+        row = module.build_observation({"cwd": str(project)}, "session_start", project=project.name)
         assert row["timestamp"].endswith("+00:00")
 
     def test_building_a_row_without_a_wal_path_does_no_io(self) -> None:
         """`obs_path=None` is the pure path — resolution degrades, never raises."""
         module = _load_module()
-        row = module.build_observation({"agent_id": "a-1"}, "agent_stop", None)
+        row = module.build_observation({"agent_id": "a-1"}, "agent_stop", None, project="p")
         assert row["agent_type_source"] == module.SOURCE_UNRESOLVED
 
 
@@ -1645,6 +1648,7 @@ class TestSubagentTranscriptUsage:
                 "transcript_path": str(transcript),
             },
             "agent_stop",
+            project=project.name,
         )
 
         assert row["tokens_in"] == 4
@@ -1656,7 +1660,9 @@ class TestSubagentTranscriptUsage:
         """Only `agent_stop` rows are enriched -- a start has no transcript yet."""
         module = _load_module()
 
-        row = module.build_observation({"agent_id": "a1", "cwd": str(project)}, "agent_start")
+        row = module.build_observation(
+            {"agent_id": "a1", "cwd": str(project)}, "agent_start", project=project.name
+        )
 
         assert "tokens_in" not in row
         assert "usage_source" not in row
@@ -2008,70 +2014,202 @@ class TestBuildSessionSummary:
         assert "tool_calls_by_tool" not in summary
 
 
-class TestPipelineSlugSharedHelper:
-    """RED: `build_session_summary` does not yet emit `pipeline_slug`.
+class TestPipelineSlugSharedProject:
+    """The summary's `pipeline_slug` and a WAL row's `project` are one value.
 
-    The shared-helper agreement requires the summary row's new `pipeline_slug`
-    key to be derived by the exact same `Path(cwd).name` helper a WAL row's
-    `project` field already uses, so the two must always agree for one shared
-    payload -- not two independently-computed values that could drift.
+    Both come from the `project` the caller resolved once, so the two cannot
+    independently drift for one shared payload.
 
     `session_id="7edc5d0d-a503-4c19-9daa-39d73367d2b1"` is copied verbatim
     from an `agent_stop` row in this repository's committed
     `.ai-state/observations.jsonl`, and the same session is confirmed present
     in the committed `.ai-state/observations_summary.jsonl` -- both are real
-    corpus rows, not invented. `cwd` is derived from this test file's own
-    location (this worktree's root, the directory the real row was written
-    from) rather than hardcoded as a literal path, per the no-hardcoded-paths
-    convention.
+    corpus rows, not invented.
     """
 
     _SESSION_ID = "7edc5d0d-a503-4c19-9daa-39d73367d2b1"
 
     def test_summary_pipeline_slug_matches_the_wal_rows_project_field(self) -> None:
         module = _load_module()
-        cwd = HOOKS_DIR.parent
-        payload = {"session_id": self._SESSION_ID, "agent_id": "agent-1", "cwd": str(cwd)}
+        payload = {"session_id": self._SESSION_ID, "agent_id": "agent-1"}
 
-        observation = module.build_observation(payload, "agent_stop")
+        observation = module.build_observation(payload, "agent_stop", project="praxion")
+        summary = module.build_session_summary(
+            [], payload, "2026-09-23T00:00:00+00:00", project="praxion"
+        )
+
+        assert observation["project"] == summary["pipeline_slug"] == "praxion"
+
+    def test_the_project_is_taken_as_given_whatever_the_payload_cwd_says(self) -> None:
+        """A row built for a session working in a subdirectory names the
+        checkout it was resolved to, never the subdirectory."""
+        module = _load_module()
+        payload = {"session_id": self._SESSION_ID, "agent_id": "a-1", "cwd": "/repo/src/deep"}
+
+        observation = module.build_observation(payload, "agent_start", project="repo")
+        helper = module.build_helper_stop(payload, project="repo")
+        suspension = module.build_suspension_stop(
+            payload, "a-1", module.OUTCOME_STOPPED, "praxion:implementer", "payload", "repo"
+        )
+        summary = module.build_session_summary(
+            [], payload, "2026-09-23T00:00:00+00:00", project="repo"
+        )
+
+        assert observation["project"] == "repo"
+        assert helper["project"] == "repo"
+        assert suspension["project"] == "repo"
+        assert summary["pipeline_slug"] == "repo"
+
+    def test_summary_built_without_a_project_has_no_pipeline_slug_key(self) -> None:
+        """A legacy payload (session id only, like the real committed row for
+        the session above) must not have a slug fabricated for it."""
+        module = _load_module()
+        payload = {"session_id": self._SESSION_ID, "cwd": "/repo/src"}
+
         summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
 
-        assert observation["project"] == summary["pipeline_slug"]
+        assert "pipeline_slug" not in summary
 
-    def test_legacy_payload_without_cwd_still_has_no_pipeline_slug_key(self) -> None:
-        """Pins today's shape for a payload matching a pre-existing committed
-        row that carries no slug concept at all.
-
-        The real committed summary row for session
-        `7edc5d0d-a503-4c19-9daa-39d73367d2b1` (read directly from
-        `.ai-state/observations_summary.jsonl` in this repository) has no
-        `cwd` or `pipeline_slug` field -- only `session_id` and the
-        aggregate rollups. A payload built from that same minimal shape
-        (`session_id` only, matching how every pre-existing
-        `TestBuildSessionSummary` case above already calls this function)
-        must not have `build_session_summary` fabricate a slug out of an
-        absent `cwd`. This assertion already holds today (the key does not
-        exist yet at all) and is not itself the RED case -- it is the
-        baseline this RED step establishes that the implementer's additive
-        change must not break for a cwd-less legacy payload.
-        """
+    def test_summary_built_with_an_empty_project_has_no_pipeline_slug_key(self) -> None:
+        """No reader ever meets `pipeline_slug: ""`."""
         module = _load_module()
         payload = {"session_id": self._SESSION_ID}
 
-        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
+        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00", project="")
 
         assert "pipeline_slug" not in summary
 
-    def test_cwd_that_derives_to_an_empty_slug_omits_the_key(self) -> None:
-        """A cwd the harness would never send ("." names no directory) must
-        not produce an empty slug: the key is either a real directory name
-        or absent, so no reader ever meets `pipeline_slug: ""`."""
+    def test_the_module_keeps_no_working_directory_to_name_mapping_of_its_own(self) -> None:
         module = _load_module()
-        payload = {"session_id": self._SESSION_ID, "cwd": "."}
 
-        summary = module.build_session_summary([], payload, "2026-09-23T00:00:00+00:00")
+        assert not hasattr(module, "_pipeline_slug")
+        assert not hasattr(module, "_resolve_ai_state_dir")
 
-        assert "pipeline_slug" not in summary
+
+class TestEventsFromBelowTheCheckoutRoot:
+    """A session working in a subdirectory records into its checkout's log."""
+
+    @pytest.fixture
+    def checkout(self, project: Path) -> Path:
+        (project / ".git").mkdir()
+        return project
+
+    @pytest.fixture
+    def below(self, checkout: Path) -> Path:
+        deep = checkout / "src" / "pkg"
+        deep.mkdir(parents=True)
+        return deep
+
+    @pytest.mark.parametrize(
+        ("hook_event", "event_type"),
+        [
+            ("SessionStart", "session_start"),
+            ("SubagentStart", "agent_start"),
+            ("SubagentStop", "agent_stop"),
+        ],
+    )
+    def test_lifecycle_rows_land_in_the_roots_log_under_the_checkouts_name(
+        self,
+        checkout: Path,
+        below: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        hook_event: str,
+        event_type: str,
+    ) -> None:
+        module = _load_module()
+
+        _run_main(
+            module,
+            {"hook_event_name": hook_event, "agent_id": "a-1", "cwd": str(below)},
+            monkeypatch,
+        )
+
+        rows = _read_wal(checkout / ".ai-state" / "observations.jsonl")
+        assert [(r["event_type"], r["project"]) for r in rows] == [(event_type, checkout.name)]
+        assert not (below / ".ai-state").exists()
+
+    def test_a_compaction_from_below_the_root_lands_in_the_roots_log(
+        self, checkout: Path, below: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+
+        _run_main(module, _post_compact_payload(below), monkeypatch)
+
+        rows = _read_wal(checkout / ".ai-state" / "observations.jsonl")
+        assert [r["event_type"] for r in rows] == ["compaction"]
+
+    def test_a_stop_from_below_the_root_updates_the_roots_summary_under_its_name(
+        self, checkout: Path, below: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        _run_main(module, _start_payload(below, session_id="sess-1"), monkeypatch)
+
+        _run_main(
+            module,
+            {"hook_event_name": "Stop", "session_id": "sess-1", "cwd": str(below)},
+            monkeypatch,
+        )
+
+        summary_rows = _read_summary(checkout / ".ai-state" / module.SUMMARY_FILENAME)
+        assert [(r["session_id"], r["pipeline_slug"]) for r in summary_rows] == [
+            ("sess-1", checkout.name)
+        ]
+        assert summary_rows[0]["spawns_by_agent_type"] == {"praxion:implementer": 1}
+
+    def test_a_nested_project_keeps_its_rows_and_its_name(
+        self, checkout: Path, below: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        nested = below / "inner-project"
+        (nested / ".ai-state").mkdir(parents=True)
+
+        _run_main(module, _stop_payload(nested), monkeypatch)
+
+        nested_rows = _read_wal(nested / ".ai-state" / "observations.jsonl")
+        assert [r["project"] for r in nested_rows] == ["inner-project"]
+        assert not (checkout / ".ai-state" / "observations.jsonl").exists()
+
+    def test_a_clone_inside_the_project_without_state_records_nothing(
+        self, checkout: Path, below: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        clone = below / "vendored-clone"
+        (clone / ".git").mkdir(parents=True)
+
+        _run_main(module, _stop_payload(clone), monkeypatch)
+
+        assert not (checkout / ".ai-state" / "observations.jsonl").exists()
+        assert not (clone / ".ai-state").exists()
+
+    @pytest.mark.parametrize("payload_cwd", [None, "", 7])
+    def test_a_payload_without_a_usable_cwd_records_nothing(
+        self, project: Path, monkeypatch: pytest.MonkeyPatch, payload_cwd: object
+    ) -> None:
+        module = _load_module()
+        payload = _stop_payload(project)
+        payload["cwd"] = payload_cwd
+        monkeypatch.chdir(project)
+
+        _run_main(module, payload, monkeypatch)
+
+        assert not (project / ".ai-state" / "observations.jsonl").exists()
+
+    def test_a_linked_state_directory_is_written_through_and_names_the_checkout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        module = _load_module()
+        target = tmp_path / "shared-state"
+        target.mkdir()
+        root = tmp_path / "praxion"
+        (root / ".git").mkdir(parents=True)
+        (root / ".ai-state").symlink_to(target, target_is_directory=True)
+        below = root / "src"
+        below.mkdir()
+
+        _run_main(module, _stop_payload(below), monkeypatch)
+
+        rows = _read_wal(target / "observations.jsonl")
+        assert [r["project"] for r in rows] == ["praxion"]
 
 
 class TestSessionSummaryUpsert:

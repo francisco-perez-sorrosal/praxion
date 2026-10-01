@@ -171,6 +171,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _observation_log import reader, writer
+from _observation_log.location import locate
 from _observation_log.modes import Mode, resolve_mode
 from _observation_log.registry import EventClass
 
@@ -614,18 +615,13 @@ def _needs_wal_lookup(payload: dict, event_type: str) -> bool:
     return event_type in AGENT_LIFECYCLE_EVENTS and not str(payload.get("agent_type") or "").strip()
 
 
-def _pipeline_slug(cwd: str) -> str:
-    """Derive the pipeline slug a working directory belongs to.
-
-    The one place every WAL/summary row's cwd-to-slug mapping goes through,
-    so a WAL row's ``project`` field and the committed summary row's
-    ``pipeline_slug`` can never independently drift from each other.
-    """
-    return Path(cwd).name
-
-
-def build_observation(payload: dict, event_type: str, obs_path: Path | None = None) -> dict:
+def build_observation(
+    payload: dict, event_type: str, obs_path: Path | None = None, *, project: str
+) -> dict:
     """Assemble one WAL row from a lifecycle payload.
+
+    ``project`` is the checkout's name, resolved once by ``locate`` -- never
+    derived here from the payload's ``cwd``, which may be any subdirectory.
 
     ``obs_path`` is read once per row and only when ``_needs_wal_lookup`` says
     an earlier row could answer something; every other path is pure. A failed
@@ -643,20 +639,19 @@ def build_observation(payload: dict, event_type: str, obs_path: Path | None = No
         else ("", False, False)
     )
     agent_type, agent_type_source = resolve_agent_type(payload, event_type, backfilled)
-    cwd = payload.get("cwd", ".")
     start_correlation = resolve_start_correlation(event_type, start_row_seen, any_row_seen)
     if (
         event_type == "agent_stop"
         and start_correlation == CORRELATION_UNOBSERVED_AGENT
         and _has_no_own_transcript(payload)
     ):
-        return build_helper_stop(payload)
+        return build_helper_stop(payload, project=project)
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
         "agent_type": agent_type,
         "agent_id": resolve_agent_id(payload),
-        "project": _pipeline_slug(cwd),
+        "project": project,
         "event_type": event_type,
         "tool_name": None,
         "summary": build_summary(event_type, payload, agent_type),
@@ -686,7 +681,7 @@ def _has_no_own_transcript(payload: dict) -> bool:
     return not Path(own_path).is_file() and not _workflow_agent_transcript_path(payload)
 
 
-def build_helper_stop(payload: dict) -> dict:
+def build_helper_stop(payload: dict, *, project: str) -> dict:
     """The slim row for a harness helper call's stop.
 
     A helper has no start row, no prior row of any kind and no transcript,
@@ -698,7 +693,7 @@ def build_helper_stop(payload: dict) -> dict:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
         "agent_id": resolve_agent_id(payload),
-        "project": _pipeline_slug(payload.get("cwd", ".")),
+        "project": project,
         "event_type": "helper_stop",
     }
 
@@ -791,7 +786,12 @@ def _tokens_by_agent_type(rows: list[dict]) -> dict[str, dict[str, int]]:
 
 
 def build_session_summary(
-    session_rows: list[dict], payload: dict, ended_at: str, *, mode: Mode = Mode.FULL
+    session_rows: list[dict],
+    payload: dict,
+    ended_at: str,
+    *,
+    mode: Mode = Mode.FULL,
+    project: str | None = None,
 ) -> dict:
     """Assemble one committed summary row from this session's local WAL rows.
 
@@ -804,9 +804,9 @@ def build_session_summary(
     gates emit `gate_fire` rows -- it is counted here defensively (the
     aggregation is generic over event_type/key) so no further change to this
     function is needed once that field exists. ``pipeline_slug`` is additive
-    and present only when ``payload`` carries a ``cwd`` -- a legacy payload
-    without one yields a row with no ``pipeline_slug`` key at all, matching
-    how a WAL row's own ``project`` field is derived. ``mode`` names the
+    and is the ``project`` the caller resolved -- the same value every WAL row
+    of the session carries -- present only when one was given: a summary built
+    without a project has no ``pipeline_slug`` key at all. ``mode`` names the
     recording mode this session ran under and is carried on the row as
     ``log_mode``; ``tool_calls_by_tool`` is a per-tool breakdown of every
     tool call, which only ``full`` records, so it is present only then --
@@ -841,13 +841,11 @@ def build_session_summary(
     }
     if mode is Mode.FULL:
         summary["tool_calls_by_tool"] = _count_by(session_rows, _TOOL_EVENT_TYPE, "tool_name")
-    # Additive-only: a legacy payload with no cwd omits the key entirely
-    # rather than fabricating a slug from a meaningless default -- a reader
-    # of an older committed row treats a missing key as "not derivable",
-    # never as an empty or "." pipeline.
-    slug = _pipeline_slug(payload.get("cwd") or "")
-    if slug:
-        summary["pipeline_slug"] = slug
+    # Additive-only: with no project the key is omitted rather than
+    # fabricated -- a reader of an older committed row treats a missing key as
+    # "not derivable", never as an empty pipeline.
+    if project:
+        summary["pipeline_slug"] = project
     return summary
 
 
@@ -958,23 +956,22 @@ _SUSPENSION_SUMMARY = {
 
 
 def build_suspension_stop(
-    payload: dict, task_id: str, kind: str, agent_type: str, agent_type_source: str
+    payload: dict, task_id: str, kind: str, agent_type: str, agent_type_source: str, project: str
 ) -> dict:
     """Build the synthetic ``agent_stop`` row for a transcript-observed suspension.
 
-    Reuses the harness Stop payload's own ``session_id``/``cwd`` -- the
-    suspension was reported to the main agent in that same session, so the
-    row belongs to it. ``start_correlation`` is always ``paired``: the caller
-    only reaches here after confirming an `agent_start` row exists for
-    ``task_id`` (see ``_record_suspended_subagent_stops``).
+    Reuses the harness Stop payload's own ``session_id`` and the session's
+    ``project`` -- the suspension was reported to the main agent in that same
+    session, so the row belongs to it. ``start_correlation`` is always
+    ``paired``: the caller only reaches here after confirming an `agent_start`
+    row exists for ``task_id`` (see ``_record_suspended_subagent_stops``).
     """
-    cwd = payload.get("cwd", ".")
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": payload.get("session_id", ""),
         "agent_type": agent_type,
         "agent_id": task_id,
-        "project": _pipeline_slug(cwd),
+        "project": project,
         "event_type": "agent_stop",
         "tool_name": None,
         "summary": _SUSPENSION_SUMMARY[kind].format(agent_type=agent_type),
@@ -1000,7 +997,7 @@ def _stop_row_exists(obs_path: Path, agent_id: str) -> bool:
     return False
 
 
-def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
+def _record_suspended_subagent_stops(obs_path: Path, payload: dict, project: str) -> None:
     """Backfill ``agent_stop`` rows for subagents the harness suspended silently.
 
     The harness reports a suspended background subagent to the MAIN agent as
@@ -1025,19 +1022,8 @@ def _record_suspended_subagent_stops(obs_path: Path, payload: dict) -> None:
         writer.record(
             obs_path.parent,
             EventClass.AGENT_STOP,
-            build_suspension_stop(payload, task_id, kind, resolved_type, source),
+            build_suspension_stop(payload, task_id, kind, resolved_type, source, project),
         )
-
-
-def _resolve_ai_state_dir(payload: dict) -> Path | None:
-    """The payload project's ``.ai-state/`` directory, or None when it has none.
-
-    Resolved once, ahead of dispatch, so the compaction branch and the
-    lifecycle path below share one graceful-degradation check rather than
-    repeating it.
-    """
-    ai_state_dir = Path(payload.get("cwd", ".")) / ".ai-state"
-    return ai_state_dir if ai_state_dir.exists() else None
 
 
 def main() -> None:
@@ -1061,9 +1047,10 @@ def main() -> None:
     if event_type is None and hook_event != POST_COMPACT_HOOK_EVENT:
         return
 
-    ai_state_dir = _resolve_ai_state_dir(payload)
-    if ai_state_dir is None:
-        return  # graceful degradation
+    location = locate(payload.get("cwd"))
+    if location is None:
+        return  # graceful degradation: no log serves this directory
+    ai_state_dir = location.state_dir
     obs_path = reader.log_path(ai_state_dir)
 
     # Dispatched ahead of the lifecycle path because a compaction has no
@@ -1073,10 +1060,10 @@ def main() -> None:
         writer.record(ai_state_dir, EventClass.COMPACTION, build_compaction_observation(payload))
         return
 
-    observation = build_observation(payload, event_type, obs_path)
+    observation = build_observation(payload, event_type, obs_path, project=location.project)
     writer.record(ai_state_dir, _EVENT_CLASS_BY_TYPE[observation["event_type"]], observation)
     if event_type == "session_stop":
-        _record_suspended_subagent_stops(obs_path, payload)
+        _record_suspended_subagent_stops(obs_path, payload, location.project)
         try:
             session_id = payload.get("session_id", "")
             session_rows = [
@@ -1085,7 +1072,7 @@ def main() -> None:
                 if r.get("session_id") == session_id
             ]
             summary_row = build_session_summary(
-                session_rows, payload, observation["timestamp"], mode=mode
+                session_rows, payload, observation["timestamp"], mode=mode, project=location.project
             )
             _upsert_session_summary(ai_state_dir / SUMMARY_FILENAME, summary_row)
         except Exception:

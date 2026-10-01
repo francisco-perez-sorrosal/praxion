@@ -14,6 +14,8 @@ Modules, in dependency order:
 - ``modes``    -- ``Mode``/``ModeSource`` and the pure ``resolve_mode(env)``.
 - ``registry`` -- ``EventClass``, the class-by-mode recording table, and the
   consumer contract every ``standard``-min reader is checked against.
+- ``location`` -- ``locate(cwd)``: which ``.ai-state/`` and which ``project`` a
+  working directory belongs to; the one answer every writer records under.
 - ``writer``   -- append-only, fail-open, mode-gated. Rotation and locking
   live here.
 - ``reader``   -- stdlib-only (no ``fcntl``): segment discovery, streamed

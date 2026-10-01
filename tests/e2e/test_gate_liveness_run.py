@@ -30,7 +30,7 @@ from tests.e2e.drivers.selection_audit import (
     run_liveness,
 )
 
-pytestmark = pytest.mark.large
+pytestmark = pytest.mark.liveness
 
 
 def test_every_liveness_check_passes_on_this_change_and_leaves_no_trace(tmp_path):

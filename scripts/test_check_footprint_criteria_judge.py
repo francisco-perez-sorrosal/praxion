@@ -324,6 +324,50 @@ def test_good_twin_a_value_after_the_criterions_own_trailing_option_is_the_same_
     assert ("FP03", "wrong-command") not in reasons(found)
 
 
+def _template_findings(criterion_command, logged_command):
+    baseline = log_row(phase="baseline", head=BASE_HEAD, command=logged_command)
+    final = log_row(phase="final", head=FINAL_HEAD, command=logged_command)
+    return judged(criteria=(criterion_row(command=criterion_command),), log=(baseline, final))
+
+
+@pytest.mark.parametrize(
+    ("criterion_command", "logged_command"),
+    [
+        ("`/usr/bin/time -p <command...>`", "`/usr/bin/time -p python3 scripts/liveness.py --all`"),
+        (
+            "`.venv/bin/python -m pytest -q -m <marker>`",
+            "`.venv/bin/python -m pytest -q -m liveness`",
+        ),
+        (
+            "`python3 scripts/measure.py --compare-ref <ref>`",
+            "`python3 scripts/measure.py --compare-ref abc1234`",
+        ),
+    ],
+)
+def test_good_twin_a_placeholder_matches_what_the_author_declared_variable(
+    criterion_command, logged_command
+):
+    assert ("FP03", "wrong-command") not in reasons(
+        _template_findings(criterion_command, logged_command)
+    )
+
+
+@pytest.mark.parametrize(
+    ("criterion_command", "logged_command"),
+    [
+        ("`pytest -m <marker>`", "`pytest -m liveness tests/x.py`"),
+        ("`/usr/bin/time -p <command...>`", "`/usr/bin/time -p`"),
+        ("`/usr/bin/time -p <command...>`", "`/usr/bin/env -p python3 x.py`"),
+        ("`pytest -m <marker>`", "`pytest -m <marker>`"),
+        ("`/usr/bin/time -p <command...>`", "`/usr/bin/time -p <command...>`"),
+    ],
+)
+def test_canary_a_placeholder_never_widens_past_its_declaration(criterion_command, logged_command):
+    assert ("FP03", "wrong-command") in reasons(
+        _template_findings(criterion_command, logged_command)
+    )
+
+
 def test_canary_flags_baseline_and_final_of_different_reading_kinds():
     estimate = log_row(
         phase="final", reading="estimate", head=FINAL_HEAD, command=PROMPT_COMMAND

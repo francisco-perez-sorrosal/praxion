@@ -424,12 +424,19 @@ def _same_instrument(criterion_command: str, logged_command: str) -> bool:
     different instrument. A single-dash token is a flag and takes no value, so `-q tests/x.py`
     narrows; a `--name` may take the one value after it, and the criterion's own trailing
     `--name` counts, so `--compare-ref` followed by a sha is the same instrument.
+    Placeholders in the criterion (`<name>`, trailing `<name...>`) match what the author
+    declared variable, and a logged placeholder means the command was never filled in.
     """
     wanted, ran = _tokens(criterion_command), _tokens(logged_command)
-    if ran[: len(wanted)] != wanted:
+    if any(_PLACEHOLDER.fullmatch(token) for token in ran):
+        return False  # a logged placeholder was never filled in, so nothing was run
+    consumed = _match_template(wanted, ran)
+    if consumed is None:
         return False
+    if consumed == len(ran) and wanted and _REST_PLACEHOLDER.fullmatch(wanted[-1]):
+        return True
     takes_value = bool(wanted) and _is_long_option(wanted[-1])
-    for token in ran[len(wanted) :]:
+    for token in ran[consumed:]:
         if token.startswith("-"):
             takes_value = _is_long_option(token)
         elif takes_value:
@@ -437,6 +444,27 @@ def _same_instrument(criterion_command: str, logged_command: str) -> bool:
         else:
             return False
     return True
+
+
+# A criterion command may declare where a run varies: `<name>` stands for exactly one
+# token and a trailing `<name...>` for one or more, so a wrapper (`/usr/bin/time -p
+# <command...>`) or an option value (`-m <marker>`) can be bounded without letting an
+# undeclared token through.
+_PLACEHOLDER = re.compile(r"<[a-z][a-z0-9-]*(\.\.\.)?>")
+_REST_PLACEHOLDER = re.compile(r"<[a-z][a-z0-9-]*\.\.\.>")
+
+
+def _match_template(wanted: list[str], ran: list[str]) -> int | None:
+    """How many logged tokens the criterion's tokens consume, or None on a mismatch."""
+    for index, token in enumerate(wanted):
+        if _REST_PLACEHOLDER.fullmatch(token):
+            is_last = index == len(wanted) - 1
+            return len(ran) if is_last and len(ran) > index else None
+        if index >= len(ran):
+            return None
+        if not _PLACEHOLDER.fullmatch(token) and ran[index] != token:
+            return None
+    return len(wanted)
 
 
 def _is_long_option(token: str) -> bool:

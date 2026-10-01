@@ -136,8 +136,9 @@ severity is `fail`, `warn` or `info`, and comes from this table:
   - FP03: no valid measurement. `stale-final`: a change touched the footprint's
     paths after the final row's head. `late-baseline`: a change touched them
     between the base and the baseline row's head. `incomparable`: baseline and
-    final differ in reading kind. `wrong-command`: the log command does not
-    contain the criterion's command.
+    final differ in reading kind. `wrong-command`: the log command is not the
+    criterion's command plus options; in the criterion, `<name>` stands for one
+    token and a trailing `<name...>` for the rest, so a run varies only there.
   - FP04: a spec footprint is not in the registry, or there is no registry.
     Freshness then falls back to "any tracked change outside `.ai-state/`" and
     late-baseline is not checked.

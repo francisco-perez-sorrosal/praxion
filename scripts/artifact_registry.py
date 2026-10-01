@@ -351,6 +351,15 @@ ARTIFACTS: tuple[Artifact, ...] = (
         description="Design-free spec boundary the acceptance designer reads; derived, not authored.",
     ),
     Artifact(
+        "MEASUREMENTS.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="producer:implementer",
+        cleanup_policy="delete",
+        description="Append-only baseline and final readings of the plan's footprint criteria.",
+    ),
+    Artifact(
         # Floor: SDD_ACTIVE at Standard, promoted to always at Full (as traceability.yml).
         # Safe because a skipped stage still writes the artifact, so absence is a defect.
         "ACCEPTANCE_TESTS.md",

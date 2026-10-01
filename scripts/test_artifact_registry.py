@@ -27,6 +27,7 @@ must satisfy.
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import re
 import sys
@@ -354,6 +355,33 @@ def test_spec_extract_is_a_derived_script_produced_artifact_outside_the_floor() 
     assert artifact.dashboard is False
     assert artifact.snapshot is False
     assert artifact.description
+
+
+def test_measurements_log_is_a_producer_gated_artifact_outside_floor_dashboard_and_snapshot() -> (
+    None
+):
+    """MEASUREMENTS.md is appended by measurement steps; no consumer lists it by filename."""
+    artifact = registry.by_name("MEASUREMENTS.md")
+    assert artifact is not None, "MEASUREMENTS.md is not registered"
+    assert artifact.production_gate == "producer:implementer"
+    assert artifact.floor is None
+    assert artifact.location == "ai-work"
+    assert artifact.lifecycle == "ephemeral"
+    assert artifact.activation == "conditional"
+    assert artifact.cleanup_policy == "delete"
+    assert artifact.description
+    assert "MEASUREMENTS.md" not in registry.dashboard_artifacts()
+    assert "MEASUREMENTS.md" not in registry.snapshot_artifacts()
+
+
+def test_canary_a_dashboard_flagged_measurements_log_would_fail_the_drift_assertion() -> None:
+    """A misregistered copy joins the dashboard set; the consumer list (unchanged) then differs."""
+    original = registry.by_name("MEASUREMENTS.md")
+    assert original is not None
+    misregistered = dataclasses.replace(original, dashboard=True)
+    drifted = {a.name for a in registry.ARTIFACTS if a.dashboard} | {misregistered.name}
+    assert drifted != _dashboard_workshop()
+    assert "MEASUREMENTS.md" not in _dashboard_workshop()
 
 
 def test_acceptance_tests_floor_is_sdd_active_at_standard_and_always_at_full() -> None:

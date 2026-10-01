@@ -346,6 +346,8 @@ def test_run_leaves_the_checkout_unchanged(
     assert [p.name for p in root.rglob("*")] == ["tracked.txt"]
 
 
-def test_script_is_executable_with_a_python_shebang() -> None:
-    assert os.access(SCRIPT, os.X_OK)
+def test_script_is_not_executable_so_the_installer_keeps_it_off_users_path() -> None:
+    # Its probes audit this repository's own gates; on a user's PATH it would report
+    # every gate dead in a project that has none of them.
+    assert not os.access(SCRIPT, os.X_OK)
     assert SCRIPT.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n")

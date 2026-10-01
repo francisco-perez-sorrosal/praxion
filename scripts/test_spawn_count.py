@@ -1728,10 +1728,12 @@ def test_every_resume_is_sized_up_to_its_own_time(tmp_path: Path) -> None:
 
 
 def test_text_blocks_of_one_message_are_joined_by_a_line_break(tmp_path: Path) -> None:
-    blocks = [{"type": "text", "text": "Task slug:"}, {"type": "text", "text": "joined-slug"}]
+    # Joined with no separator the slug would read "split-slug"; the line break ends it at
+    # "split", since a slug never continues onto the next line.
+    blocks = [{"type": "text", "text": "Task slug: split"}, {"type": "text", "text": "-slug"}]
     _write_agent_transcript(tmp_path, "a1", [_user_line(blocks)])
 
-    assert _owner_read_from(tmp_path, _unattributed()) == "joined-slug"
+    assert _owner_read_from(tmp_path, _unattributed()) == "split"
 
 
 def test_a_turn_logged_out_of_order_does_not_hide_the_earlier_ones(tmp_path: Path) -> None:

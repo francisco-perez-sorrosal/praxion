@@ -234,8 +234,8 @@ The Standard/Full envelope has two halves: the [artifact floor](artifact-invento
 
 | Tier | Budget | Counts as a spawn |
 |------|--------|-------------------|
-| Standard | ≤ 8 | every first start of an agent in this slug, plus every resume into an agent already holding ≥ 250k tokens of context |
-| Full | ≤ 16 | same |
+| Standard | ≤ 16 | every first start of an agent in this slug, plus every resume into an agent already holding ≥ 250k tokens of context |
+| Full | ≤ 32 | same |
 
 A resume into a small context is free under the count, but it is not free: it is reported separately with its context size, because resumes are where a capped count hides its real cost.
 

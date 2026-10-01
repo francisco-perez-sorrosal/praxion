@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-09-29T06:39:58Z'
+generated_at: '2026-10-01T04:35:36Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -34,7 +34,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 18293
+  chars: 18294
 - id: swe/agent-model-routing
   path: rules/swe/agent-model-routing.md
   load: always_on

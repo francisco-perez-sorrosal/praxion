@@ -245,16 +245,16 @@ The [acceptance-design stage](#acceptance-design-stage) is a charged first start
 
 Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log. Sessions working from any subdirectory of the checkout are recorded there too.
 
-**Which pipeline a spawn counts toward.** A spawn counts toward the `Task slug:` its prompt states (the first one), whatever the worktree is named. So keep `Task slug: <slug>` in every spawn prompt. A spawn that states no slug counts toward the checkout's directory name. A resume counts wherever its spawn counts, whatever the resume message says. Rows recorded before slug attribution existed keep counting toward their directory name.
+**Which pipeline a spawn counts toward.** A spawn counts toward the `Task slug:` its prompt states (the first one), whatever the worktree is named. So keep `Task slug: <slug>` in every spawn prompt. A spawn that states no slug counts toward the checkout's directory name. The slug comes from the recorded `Agent` result, else from the agent's own transcript prompt (not read under `--no-context`). A resume counts wherever its spawn counts, whatever the resume message says. Rows recorded before slug attribution existed keep counting toward their directory name.
 
 **Spawns and resumes.** A first start of an `agent_id` is a spawn; any later start of the same `agent_id` is a resume.
 
-**Unattributed spawns.** A spawn whose prompt cannot be read yet is listed under `unattributed` and counted in no slug's `spawns`. It keeps the verdict at `indeterminate` until the budget would hold with all of them charged.
+**Unattributed spawns.** A spawn whose prompt cannot be read yet is listed under `unattributed` and counted in no slug's `spawns`. The key appears only when some spawn in the log is unattributed. Every such spawn could still belong to this slug, so it keeps the verdict at `indeterminate` until the budget would hold with all of them charged.
 
 **Exit codes and the record.**
 - `0`: counted (within budget, or indeterminate).
 - `1`: over budget.
-- `2`: count withheld, because there is no log in this checkout, the slug is not seen yet, or the root is a plugin-cache path. A slug is seen once a spawn states it or a row is recorded under that directory name.
+- `2`: count withheld, because there is no readable log in this checkout, the slug is not seen yet, or the root is a plugin-cache path. A slug is seen once a spawn states it or a row is recorded under that directory name.
 
 A withheld count is not a zero; keep a manual tally until the log appears. Record the final tally in the pipeline's calibration row.
 

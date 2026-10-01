@@ -7,19 +7,17 @@ driver is the one place the scenarios learn that answer: it returns the full
 requirement and each given criterion and declaration written at its designed
 place, every given value copied verbatim.
 
-Unbound until a binding step writes `spec_carrying` against the design.
+Criteria are written to the `### Footprint Criteria` table and declarations to
+the `### Footprints Not Measured` table, both under `## Acceptance Criteria`;
+each criterion's command is also listed on `### Observable Surface`.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-UNBOUND = (
-    "unbound: the place a spec carries a quantitative criterion (metric, "
-    "comparator, limit, baseline or reference, and the command that measures "
-    "it) and a not-measured declaration (footprint and reason) is decided in "
-    "design; bind this driver to that place"
-)
+_CRITERIA_HEADER = ("Id", "Footprint", "Metric", "Comparator", "Limit", "Against", "Command")
+_DECLARATION_HEADER = ("Footprint", "Reason")
 
 
 @dataclass(frozen=True)
@@ -48,4 +46,50 @@ def spec_carrying(
     plain requirement) and is free of design vocabulary outside the given
     values, so the spec lint judges only how the criteria are carried.
     """
-    raise NotImplementedError(UNBOUND)
+    acceptance = ["## Acceptance Criteria", "", "- [ ] The change behaves as described", ""]
+    if criteria:
+        rows = [
+            (
+                f"FC-{number:02d}",
+                f"footprint-{number}",
+                criterion.metric,
+                criterion.comparator,
+                criterion.limit,
+                f"baseline: {criterion.baseline}",
+                f"`{criterion.command}`",
+            )
+            for number, criterion in enumerate(criteria, start=1)
+        ]
+        acceptance += ["### Footprint Criteria", "", *_table(_CRITERIA_HEADER, rows), ""]
+    if declarations:
+        rows = [(declaration.footprint, declaration.reason) for declaration in declarations]
+        acceptance += ["### Footprints Not Measured", "", *_table(_DECLARATION_HEADER, rows), ""]
+
+    surface = [f"- `{criterion.command}`" for criterion in criteria] or ["- the change's behavior"]
+    lines = [
+        "# Footprint-moving change",
+        "",
+        "## Goal",
+        "",
+        "Ship a change that moves a measurable footprint.",
+        "",
+        *acceptance,
+        "## Behavioral Specification",
+        "",
+        "### REQ-01",  # id-citation-discipline:ignore -- spec format requires a requirement heading
+        "",
+        "The change behaves as described.",
+        "",
+        "### Observable Surface",
+        "",
+        *surface,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
+    def row(cells: tuple[str, ...]) -> str:
+        return "| " + " | ".join(cell.replace("|", "\\|") for cell in cells) + " |"
+
+    return [row(header), "|" + "---|" * len(header), *(row(cells) for cells in rows)]

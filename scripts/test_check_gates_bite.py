@@ -24,6 +24,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import check_gates_bite as cgb  # noqa: E402
+from gate_probes import selection  # noqa: E402
 from gate_probes.verdict import GateId  # noqa: E402
 
 SCRIPT = SCRIPTS_DIR / "check_gates_bite.py"
@@ -292,6 +293,28 @@ def test_human_output_names_each_failing_gate_and_its_reason(
     assert "FAIL spawn-count" in out
     assert "expected a catch; observed a pass" in out
     assert "PASS mutation-sensor" in out
+
+
+def test_human_output_prints_each_verdicts_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    install_probes(
+        tmp_path,
+        monkeypatch,
+        noted__spawn_count=(
+            "return Verdict(gate=GateId.SPAWN_COUNT, passed=True, reason='', elapsed_s=0.0, "
+            "notes=('the suite exited 1',))"
+        ),
+    )
+
+    cgb.main(["--repo-root", str(tmp_path), "--gate", "spawn-count"])
+
+    assert "note: the suite exited 1" in capsys.readouterr().out
+
+
+def test_the_selection_probes_own_limits_fit_inside_the_time_the_cli_gives_it() -> None:
+    # Else the CLI's kill lands first, on a probe whose children run in their own sessions.
+    assert sum(selection.EFFECT_LIMITS_S) < cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
 
 
 def test_repo_root_comes_from_git_when_no_flag_is_given(

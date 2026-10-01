@@ -246,6 +246,7 @@ def _render_text(verdicts: Sequence[Verdict]) -> str:
         if verdict.reason:
             lines.append(f"  {verdict.reason}")
         lines.extend(f"  unselected read: {test} reads {read}" for test, read in verdict.unselected)
+        lines.extend(f"  note: {note}" for note in verdict.notes)
     return "\n".join(lines)
 
 

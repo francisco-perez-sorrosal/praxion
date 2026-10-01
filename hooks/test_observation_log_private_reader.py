@@ -44,6 +44,9 @@ ALLOWLIST = frozenset(
         # Acceptance driver: observes the log through the filesystem as a black
         # box, never through the package, so it reads no row via the reader.
         "tests/acceptance/drivers/observation_harness.py",
+        # Acceptance driver: names the project log only to seed it and compare its
+        # bytes from outside, through the filesystem; it reads no row via the reader.
+        "tests/acceptance/drivers/gate_liveness.py",
     }
 )
 

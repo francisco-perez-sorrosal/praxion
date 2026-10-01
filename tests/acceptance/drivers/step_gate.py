@@ -14,17 +14,22 @@ complete belongs in `build_task`, never in a scenario.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.acceptance.drivers.gate_liveness import UnboundDriverError
+from tests.acceptance.drivers.gate_liveness import REPO_ROOT
 
 SLUG = "liveness-step"
 STEP = "1"
 STEP_TITLE = "Read the widget file"
 STEP_FILES = ("src/widget.py", "tests/test_widget.py")
+
+RECONCILER = REPO_ROOT / "scripts" / "reconcile_pipeline_state.py"
+_RECONCILER_VERDICT_EXITS = (0, 1, 2)  # clean, recovery needed, unknown or blocked; 3 is an error
 
 
 @dataclass(frozen=True)
@@ -150,10 +155,34 @@ def build_task(workspace: Path, *, tag: str | None, runs: tuple[RecordedRun, ...
 
 def judge_step(task: PipelineTask, step: str = STEP) -> StepJudgment:
     """Ask the pipeline whether `step` may complete and the pipeline advance past it."""
-    raise UnboundDriverError(
-        "The pipeline's mechanical step-completion judgment for a step tagged for "
-        "mutation testing is not designed yet: given a task's plan, progress file and "
-        "recorded test results in a checkout, it reports whether the step may complete "
-        "and, when it is blocked, names the step and either the refusal reason or the "
-        "missing mutation line."
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(RECONCILER),
+            task.slug,
+            "--repo-root",
+            str(task.root),
+            "--base-ref",
+            task.base,
+            "--json",
+            "--quiet",
+        ],
+        cwd=task.root,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
+    if result.returncode not in _RECONCILER_VERDICT_EXITS:
+        raise AssertionError(
+            f"the reconciler failed (exit {result.returncode}) instead of judging the step:\n"
+            f"{result.stdout}{result.stderr}"
+        )
+    verdicts = {str(v["step"]): v for v in json.loads(result.stdout)}
+    step_id = f"Step {step}"
+    if step_id not in verdicts:
+        raise AssertionError(f"the reconciler judged no {step_id!r}: {sorted(verdicts)}")
+    verdict = verdicts[step_id]
+    return StepJudgment(
+        completes=verdict["verdict"] == "verified-complete", message=verdict["evidence"]
     )

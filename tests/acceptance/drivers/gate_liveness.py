@@ -22,9 +22,11 @@ adds the session's variables back explicitly.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -49,10 +51,6 @@ _GIT_IDENTITY = (
 )
 
 
-class UnboundDriverError(NotImplementedError):
-    """The surface this driver reaches has not been designed yet."""
-
-
 class Gate(Enum):
     MUTATION_SENSOR = "mutation sensor"
     OBSERVATION_HOOKS = "observation-log hooks"
@@ -62,6 +60,14 @@ class Gate(Enum):
 
 ALL_GATES = tuple(Gate)
 QUICK_GATES = (Gate.MUTATION_SENSOR, Gate.OBSERVATION_HOOKS, Gate.SPAWN_COUNT)
+
+LIVENESS_COMMAND = "scripts/check_gates_bite.py"
+_GATE_IDS = {
+    Gate.MUTATION_SENSOR: "mutation-sensor",
+    Gate.OBSERVATION_HOOKS: "observation-hooks",
+    Gate.SPAWN_COUNT: "spawn-count",
+    Gate.SELECTION_AUDIT: "selection-audit",
+}
 
 
 @dataclass(frozen=True)
@@ -198,6 +204,32 @@ def isolated_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
     return env
 
 
+def _text(stream: str | bytes | None) -> str:
+    if stream is None:
+        return ""
+    return stream if isinstance(stream, str) else stream.decode(errors="replace")
+
+
+def _parse_verdicts(stdout: str) -> dict[Gate, Verdict]:
+    """The `verdicts` of the command's JSON report; empty when it printed none."""
+    try:
+        report = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {}
+    gate_by_id = {gate_id: gate for gate, gate_id in _GATE_IDS.items()}
+    verdicts: dict[Gate, Verdict] = {}
+    for entry in report.get("verdicts", []):
+        gate = gate_by_id.get(entry["gate"])
+        if gate is None:
+            raise AssertionError(f"the run reported a check this driver does not know: {entry!r}")
+        verdicts[gate] = Verdict(
+            passed=entry["passed"],
+            reason=entry.get("reason", ""),
+            unselected=tuple((test, read) for test, read in entry.get("unselected", ())),
+        )
+    return verdicts
+
+
 def run_liveness(
     copy: RepoCopy,
     gates: Collection[Gate] = ALL_GATES,
@@ -206,20 +238,31 @@ def run_liveness(
     timeout: float = 900,
 ) -> LivenessRun:
     """Run the liveness checks for `gates` from the copy's root, as the scheduled job does."""
-    raise UnboundDriverError(
-        "The liveness run's entry point is not designed yet: one command, run from a "
-        "repository root with no secret and no assistant session, that runs all four "
-        "liveness checks or a named subset of them, reaches each gate in that same "
-        "repository, exits non-zero when any selected check fails, and reports for each "
-        "selected check whether it passed and, when it failed, what was expected against "
-        "what was observed (for the selection audit, each unselected test file and the "
-        "file it read)."
+    copy_python = copy.path(".venv") / "bin" / "python"
+    python = str(copy_python) if copy_python.exists() else sys.executable
+    selected = [gate for gate in ALL_GATES if gate in gates]
+    command = [python, LIVENESS_COMMAND, "--json"]
+    for gate in selected:
+        command += ["--gate", _GATE_IDS[gate]]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=copy.root,
+            env=isolated_env(extra_env),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as expired:
+        output = _text(expired.stdout) + _text(expired.stderr)
+        return LivenessRun(exit_code=None, output=output, verdicts={})
+    return LivenessRun(
+        exit_code=result.returncode,
+        output=result.stdout + result.stderr,
+        verdicts=_parse_verdicts(result.stdout),
     )
 
 
 def liveness_step_marker() -> str:
     """Text that appears in the `run:` of a workflow step that starts the liveness run."""
-    raise UnboundDriverError(
-        "The liveness run's entry point is not designed yet, so no workflow step can be "
-        "recognized as the one that starts it."
-    )
+    return LIVENESS_COMMAND

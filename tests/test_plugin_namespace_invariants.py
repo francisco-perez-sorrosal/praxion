@@ -106,6 +106,9 @@ HISTORICAL_PATHS: tuple[str, ...] = (
     ".ai-state/calibration_log.md",
     "CHANGELOG.md",
     "docs/independent-analysis/",
+    # Frozen archive of prior spec texts, kept byte-identical as the oracle for
+    # the spec-lint regression guard; one archived text predates the rename.
+    "tests/acceptance/fixtures/spec_lint_before.jsonl",
 )
 
 

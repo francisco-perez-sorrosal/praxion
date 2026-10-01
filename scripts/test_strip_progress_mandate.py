@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "strip_progress_mandate.py"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import strip_progress_mandate  # noqa: E402
 from strip_progress_mandate import (  # noqa: E402
     WIDER_SCAN_ALLOWLIST,
     WIDER_SCAN_GLOBS,
@@ -44,21 +45,22 @@ def test_allowlisted_paths_still_mention_progress(rel: str) -> None:
     assert "PROGRESS" in (REPO_ROOT / rel).read_text(encoding="utf-8")
 
 
-def test_reintroduced_claim_is_flagged(tmp_path: Path) -> None:
+def test_reintroduced_claim_is_flagged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The canary: a producer-side claim in a scanned, non-allowlisted file
-    must fail the check."""
-    target = REPO_ROOT / "skills" / "roadmap-synthesis" / "SKILL.md"
-    original = target.read_text(encoding="utf-8")
-    backup = tmp_path / "SKILL.md"
-    backup.write_text(original, encoding="utf-8")
-    try:
-        target.write_text(
-            original + "\n- `PROGRESS.md` — phase-transition signals\n", encoding="utf-8"
-        )
-        assert any("roadmap-synthesis" in v for v in check_wider_surfaces())
-    finally:
-        target.write_text(backup.read_text(encoding="utf-8"), encoding="utf-8")
+    must fail the check.
+
+    It runs against a scratch tree, never the repository's own file: under
+    xdist another worker reading the real file mid-edit saw the injected claim.
+    """
+    target = tmp_path / "skills" / "roadmap-synthesis" / "SKILL.md"
+    target.parent.mkdir(parents=True)
+    clean = (REPO_ROOT / "skills" / "roadmap-synthesis" / "SKILL.md").read_text(encoding="utf-8")
+    monkeypatch.setattr(strip_progress_mandate, "REPO_ROOT", tmp_path)
+
+    target.write_text(clean, encoding="utf-8")
     assert check_wider_surfaces() == []
+    target.write_text(clean + "\n- `PROGRESS.md` — phase-transition signals\n", encoding="utf-8")
+    assert any("roadmap-synthesis" in v for v in check_wider_surfaces())
 
 
 def test_check_exits_zero() -> None:

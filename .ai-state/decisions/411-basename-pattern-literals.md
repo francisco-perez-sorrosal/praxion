@@ -1,7 +1,8 @@
 ---
-id: dec-draft-394f2685
+id: dec-411
+draft_id: dec-draft-394f2685
 title: Slash-less wildcard literals select only their test holders and account only for data files
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-09-29
 summary: "In Python test selection, a slash-less string literal with a wildcard and at least one letter or digit outside its wildcards becomes a basename pattern. It selects only holders that are themselves runnable test modules, directly from a changed file, and nothing propagates from a holder; it is attributed path-literal and suppresses the unmapped-path widen only when the changed file is a data file. A source file (extension in the per-ecosystem SOURCE_SUFFIXES table) reached only through such a pattern widens as if the literal did not exist. A wildcard literal with no letter or digit outside its wildcards (*, .*, *.*, [a-z]*) is ignored."

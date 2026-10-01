@@ -5,9 +5,11 @@
 
 The audit hook in `sitecustomize.py` records every repository file opened for
 reading; this plugin supplies the attribution (the test file whose collection,
-setup, call or teardown is running), a heartbeat per test file that ran, and the
-set of test files each process collected. Heartbeats let the probe tell a test
-file that read nothing from one that never ran under the tracer.
+setup, call or teardown is running), a heartbeat per test file that ran, the
+set of test files each process collected, and every test file whose collection
+failed. Heartbeats let the probe tell a test file that read nothing from one
+that never ran under the tracer; a failed collection is reported by pytest's
+own hook, never read back from its human-formatted summary.
 
 Stdlib-only, and written against pytest's hook names alone so that importing it
 needs nothing but the host. It also runs in xdist workers, where each worker
@@ -46,7 +48,10 @@ def pytest_collectstart(collector: object) -> None:
 
 
 def pytest_collectreport(report: object) -> None:
-    _tracer().begin(NO_TEST)
+    tracer = _tracer()
+    tracer.begin(NO_TEST)
+    if report.failed:  # type: ignore[attr-defined]
+        tracer.emit({"uncollected": report.nodeid.partition("::")[0] or "."})  # type: ignore[attr-defined]
 
 
 def pytest_collection_finish(session: object) -> None:

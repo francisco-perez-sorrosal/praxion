@@ -189,6 +189,40 @@ def test_every_collected_test_file_has_a_heartbeat(repo: Path, tmp_path: Path) -
     assert heartbeats == collected
 
 
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        ("tests/test_broken.py", "import a_module_that_does_not_exist\n"),
+        (
+            "tests/test_class.py",
+            "import pytest\n\n\n@pytest.mark.parametrize('a', [1])\n"
+            "class TestC:\n    def test_x(self):\n        pass\n",
+        ),
+        ("tests/test_a space.py", "def test_x(:\n"),
+    ],
+    ids=["module-import", "class-level", "space-in-name"],
+)
+def test_a_test_file_that_fails_to_collect_is_recorded_as_uncollected(
+    repo: Path, tmp_path: Path, name: str, body: str
+) -> None:
+    (repo / name).write_text(body, encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+
+    run = _traced_pytest(repo, out, "--continue-on-collection-errors", "-rN")
+
+    assert {"uncollected": name} in _records(out), run.stdout + run.stderr
+
+
+def test_good_twin_a_suite_that_collects_records_nothing_uncollected(
+    repo: Path, tmp_path: Path
+) -> None:
+    out = tmp_path / "out"
+    _traced_run(repo, out)
+
+    assert not [r for r in _records(out) if "uncollected" in r]
+
+
 def test_repeat_runs_give_identical_records_after_channel_filtering(
     repo: Path, tmp_path: Path
 ) -> None:
@@ -540,9 +574,17 @@ def test_any_other_collector_is_collected_under_no_test(plugin: SimpleNamespace)
 
 
 def test_a_finished_collection_report_clears_the_current_test(plugin: SimpleNamespace) -> None:
-    plugin.module.pytest_collectreport(object())
+    plugin.module.pytest_collectreport(SimpleNamespace(failed=False, nodeid="a.py"))
 
     assert plugin.calls == [("begin", "")]
+
+
+def test_a_failed_collection_report_emits_its_test_file_as_uncollected(
+    plugin: SimpleNamespace,
+) -> None:
+    plugin.module.pytest_collectreport(SimpleNamespace(failed=True, nodeid="a.py::TestC"))
+
+    assert plugin.calls == [("begin", ""), ("emit", {"uncollected": "a.py"})]
 
 
 def test_the_collected_test_files_are_emitted_sorted_and_unique(plugin: SimpleNamespace) -> None:

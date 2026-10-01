@@ -16,6 +16,7 @@ Records (JSON Lines), each written the moment it is first seen:
     {"t": <test file>, "p": <repo path>, "c": "direct" | "child" | "import"}
     {"heartbeat": <test file>}
     {"collected": [<test file>, ...]}
+    {"uncollected": <test file whose collection failed>}
 
 Channels: `child` is every read in a process other than the one running the
 tests; `import` is an in-process read made while the import machinery

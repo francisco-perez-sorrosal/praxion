@@ -11,26 +11,30 @@ check that would have caught the 29 reads the resolver missed in September 2026.
 The probe fails, with a reason of the form `expected ...; observed ...`, when:
 
 - the resolver is missing or does not answer `--help` (checked first, in seconds);
+- the resolver canary misses: a change to the first co-located `scripts/<name>.py`
+  does not select its `scripts/test_<name>.py`, the most basic layout edge, so a
+  dead resolver fails before any tracing, with the canary pair listed unselected;
 - the tracer is shadowed, the suite does not run (pytest exit other than 0 or 1),
   or no reads are recorded at all (a dead tracer must not pass as an empty audit);
-- a test file fails to collect (named): its reads cannot be audited, and under
-  xdist pytest reports that as exit 1, the same code as a failing test;
+- a test file fails to collect (the tracer's plugin records each failed collection
+  report, so this holds whatever the summary or exit code says);
 - a collected test file never ran under the tracer (no heartbeat);
-- the resolver fails, or does not answer for a path (a missing or unparseable
-  answer selects nothing: fail closed);
+- the resolver fails, or gives no usable answer for a read file (named);
 - any audited pair is unselected.
 
-A pair is selected when the file's answer widened, or the root pocket selects
-the full suite, or the root pocket lists the test. Exit 1 from the suite (failing
-tests) is only a note: the suite's health belongs to other jobs. A failing test's
-traceback rendering reads source files, so the audit is meant for a green suite.
+A pair is selected when the root pocket's answer is the full suite or lists the
+test. A widen scoped to another pocket (a native tool missing on this machine)
+leaves the root pocket's own list in charge; every widen that reaches the root
+pocket already sets its selection to the full suite. Exit 1 from the suite
+(failing tests) is only a note: the suite's health belongs to other jobs. A
+failing test's traceback rendering reads source files, so the audit is meant for
+a green suite.
 
-Declared limit: first-import credit varies run to run, so reads made by the
-import machinery are not audited per test. They belong to the module that was
-imported and are covered through the resolver's import graph; the verdict's
-notes carry the count of imported repository files left unaudited, so the limit
-is visible on every run. Only tracked files are audited, because only a tracked
-file can appear in a diff.
+Declared limit: first-import credit varies run to run, so reads made while the
+import machinery runs are not audited per test. For code that is harmless, since
+the resolver's import graph covers it; a data file opened at import time has no
+such edge and goes unaudited. The verdict's notes count both kinds on every run.
+Only tracked files are audited, because only a tracked file can appear in a diff.
 
 `judge`-style functions here are pure; `run` and the helpers under "the edge"
 are the only effects. Imports are flat siblings, the layout the mutation sensor
@@ -41,7 +45,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -68,15 +71,24 @@ ROOT_POCKET_ROOTS = (".", "")
 NO_ROOT_POCKET = "absent"
 SELECTS_FULL = "full"
 
-# The CLI gives this probe 900 s; the three effects below leave headroom for the rest.
-PREFLIGHT_TIMEOUT_S = 30.0
-SUITE_TIMEOUT_S = 600.0
-RESOLVER_TIMEOUT_S = 240.0
+# Per-effect limits. Their sum stays under the 900 s the CLI gives this probe, so the
+# probe's own process-group kill always fires before the CLI's (pinned by a test there).
+PREFLIGHT_TIMEOUT_S = 30.0  # each of: resolver --help, git ls-files, tracer load check
+CANARY_TIMEOUT_S = 60.0
+SUITE_TIMEOUT_S = 540.0
+RESOLVER_TIMEOUT_S = 180.0
+EFFECT_LIMITS_S = (
+    PREFLIGHT_TIMEOUT_S * 3,
+    CANARY_TIMEOUT_S,
+    SUITE_TIMEOUT_S,
+    RESOLVER_TIMEOUT_S,
+)
 RESOLVER_PROCESSES = min(8, os.cpu_count() or 1)
 SUITE_EXIT_CODES = (0, 1)  # 1 = failing tests, a note; anything else means the suite did not run
 
-_SUMMARY_HEADER = "short test summary info"
-_COLLECTION_ERROR = re.compile(r"ERROR (?P<target>\S+)(?: - .*)?")
+CANARY_DIR = "scripts/"
+
+_REAP_TIMEOUT_S = 5.0
 _TAIL_CHARS = 300
 _NAMED_FILES = 5
 
@@ -84,7 +96,15 @@ Pair = tuple[str, str]  # (test file, repository file it read)
 
 
 class ProbeError(Exception):
-    """The audit cannot be trusted; the message is the verdict's `expected ...; observed ...`."""
+    """The audit fails; the message is the verdict's `expected ...; observed ...`.
+
+    `unselected` carries the pairs already known to be unselected when the failure
+    is a finding rather than a broken run (the resolver canary's pair).
+    """
+
+    def __init__(self, reason: str, unselected: tuple[Pair, ...] = ()) -> None:
+        super().__init__(reason)
+        self.unselected = unselected
 
 
 @dataclass(frozen=True)
@@ -94,6 +114,7 @@ class ObservedReads:
     pairs_by_channel: Mapping[str, frozenset[Pair]]
     heartbeats: frozenset[str]  # test files that ran under the tracer
     collected: frozenset[str]  # test files the suite collected
+    uncollected: frozenset[str] = frozenset()  # test files whose collection failed
 
     def verdict_pairs(self) -> frozenset[Pair]:
         """The pairs worth auditing: direct reads and reads by a child process."""
@@ -104,12 +125,11 @@ class ObservedReads:
 class Answer:
     """What the resolver said a change to one file selects, reduced to the root pocket."""
 
-    widened: bool
     root_selection: str
     tests: frozenset[str]
 
     def selects(self, test: str) -> bool:
-        return self.widened or self.root_selection == SELECTS_FULL or test in self.tests
+        return self.root_selection == SELECTS_FULL or test in self.tests
 
 
 def run(repo_root: Path, env: Mapping[str, str]) -> Verdict:
@@ -122,18 +142,17 @@ def run(repo_root: Path, env: Mapping[str, str]) -> Verdict:
             passed=False,
             reason=str(failure),
             elapsed_s=time.monotonic() - started,
+            unselected=failure.unselected,
         )
     return verdict_from(unselected, notes, time.monotonic() - started)
 
 
 def _audit(repo_root: Path, env: Mapping[str, str]) -> tuple[tuple[Pair, ...], tuple[str, ...]]:
     _check_resolver(repo_root, env)
-    tracked = _tracked_files(repo_root)
+    tracked = _tracked_files(repo_root, env)
     canary = canary_pair(tracked)
     if canary is not None:
-        missed, note = _resolver_canary(repo_root, env, canary)
-        if missed:
-            return missed, (note,)
+        _resolver_canary(repo_root, env, canary)
     observed, suite_notes = _traced_suite(repo_root, env)
     reason = dead_tracer_reason(observed)
     if reason is not None:
@@ -141,8 +160,10 @@ def _audit(repo_root: Path, env: Mapping[str, str]) -> tuple[tuple[Pair, ...], t
     pairs = checked_pairs(observed, tracked)
     if not pairs:
         raise ProbeError(_failure("tests to read tracked repository files", "none did"))
-    answers = _ask_resolver(repo_root, env, sorted({read for _, read in pairs}))
-    return find_unselected(pairs, answers), (*suite_notes, import_note(observed, tracked))
+    answers = _ask_resolver(repo_root, env, sorted({read for _, read in pairs}), RESOLVER_TIMEOUT_S)
+    skipped = () if canary is not None else (CANARY_SKIPPED,)
+    notes = (*skipped, *suite_notes, import_note(observed, tracked))
+    return find_unselected(pairs, answers), notes
 
 
 # -- the pure judge ----------------------------------------------------------------
@@ -170,17 +191,21 @@ def verdict_from(unselected: tuple[Pair, ...], notes: tuple[str, ...], elapsed_s
 
 def dead_tracer_reason(observed: ObservedReads) -> str | None:
     """Why the trace cannot support an audit; None when it can."""
+    if observed.uncollected:
+        return _failure(
+            "every test file to collect, so its reads can be audited",
+            f"{len(observed.uncollected)} failed to collect: {_named(observed.uncollected)}",
+        )
     if not observed.verdict_pairs():
         return _failure(
             "the traced run to record direct or child reads of repository files",
             "no such reads (empty trace)",
         )
-    missing = sorted(observed.collected - observed.heartbeats)
+    missing = observed.collected - observed.heartbeats
     if missing:
-        named = ", ".join(missing[:_NAMED_FILES]) + (", ..." if len(missing) > _NAMED_FILES else "")
         return _failure(
             "every collected test file to run under the tracer",
-            f"{len(missing)} without a heartbeat: {named}",
+            f"{len(missing)} without a heartbeat: {_named(missing)}",
         )
     return None
 
@@ -190,7 +215,7 @@ def checked_pairs(observed: ObservedReads, tracked: frozenset[str]) -> tuple[Pai
     return tuple(sorted(pair for pair in observed.verdict_pairs() if pair[1] in tracked))
 
 
-CANARY_DIR = "scripts/"
+CANARY_SKIPPED = "no co-located scripts/ test and source pair, so the resolver canary was skipped"
 
 
 def canary_pair(tracked: frozenset[str]) -> Pair | None:
@@ -223,12 +248,14 @@ def _selected(pair: Pair, answers: Mapping[str, Answer]) -> bool:
 
 
 def import_note(observed: ObservedReads, tracked: frozenset[str]) -> str:
-    """The declared limit, with its size: imported files that no direct or child read audits."""
+    """The declared limit, with its size: files read only at import time, by kind."""
     audited = {read for _, read in observed.verdict_pairs()}
     imported = {read for _, read in observed.pairs_by_channel[IMPORT] if read in tracked}
+    unaudited = imported - audited
+    code = sum(1 for read in unaudited if read.endswith(".py"))
     return (
-        f"{len(imported - audited)} imported repository files are not audited per test "
-        "(first-import credit varies run to run; covered through the resolver's import graph)"
+        f"read only at import time, not audited per test: {len(unaudited) - code} data files "
+        f"(no import edge covers them) and {code} code files (the resolver's import graph covers them)"
     )
 
 
@@ -240,6 +267,7 @@ def parse_records(lines: Iterable[str]) -> ObservedReads:
     pairs: dict[str, set[Pair]] = {channel: set() for channel in CHANNELS}
     heartbeats: set[str] = set()
     collected: set[str] = set()
+    uncollected: set[str] = set()
     for line in lines:
         if not line.strip():
             continue
@@ -252,12 +280,15 @@ def parse_records(lines: Iterable[str]) -> ObservedReads:
                 heartbeats.add(test)
             case {"collected": [*files]} if all(isinstance(name, str) for name in files):
                 collected.update(files)
+            case {"uncollected": str() as test}:
+                uncollected.add(test)
             case _:
                 raise ValueError(f"unrecognised trace record: {line.strip()[:_TAIL_CHARS]!r}")
     return ObservedReads(
         pairs_by_channel={channel: frozenset(found) for channel, found in pairs.items()},
         heartbeats=frozenset(heartbeats),
         collected=frozenset(collected),
+        uncollected=frozenset(uncollected),
     )
 
 
@@ -275,14 +306,14 @@ def _parse_answer(line: str) -> tuple[str, Answer] | None:
     payload = _json_value(line)
     if not isinstance(payload, dict) or payload.get("schema") != RESOLVER_SCHEMA:
         return None
-    changed, widen, pockets = payload.get("changed"), payload.get("widen"), payload.get("pockets")
+    changed, pockets = payload.get("changed"), payload.get("pockets")
     paths = changed.get("paths") if isinstance(changed, dict) else None
     if not (isinstance(paths, list) and len(paths) == 1 and isinstance(paths[0], str)):
         return None
-    if not (isinstance(widen, list) and isinstance(pockets, list)):
+    if not isinstance(pockets, list):
         return None
     root_selection, tests = _root_pocket(pockets)
-    return paths[0], Answer(widened=bool(widen), root_selection=root_selection, tests=tests)
+    return paths[0], Answer(root_selection=root_selection, tests=tests)
 
 
 def _root_pocket(pockets: list[object]) -> tuple[str, frozenset[str]]:
@@ -307,22 +338,20 @@ def _json_value(line: str) -> object:
 # -- the edge: processes and files ----------------------------------------------------
 
 
-def _resolver_canary(
-    repo_root: Path, env: Mapping[str, str], canary: Pair
-) -> tuple[tuple[Pair, ...], str]:
-    """The canary pair as unselected when the resolver does not select it, with the reason.
+def _resolver_canary(repo_root: Path, env: Mapping[str, str], canary: Pair) -> None:
+    """Fail, listing the canary pair unselected, when the resolver does not select it.
 
     A resolver that crashes, answers nothing or answers garbage selects nothing, which is
-    exactly the dead gate this audit exists to catch.
+    exactly the dead gate this audit exists to catch; the reason says which it was.
     """
     test, read = canary
+    expected = f"a change to {read} to select {test} (the resolver canary, before any tracing)"
     try:
-        answers = _ask_resolver(repo_root, env, [read])
+        answers = _ask_resolver(repo_root, env, [read], CANARY_TIMEOUT_S)
     except ProbeError as failure:
-        return (canary,), f"resolver canary: changing {read} must select {test}; {failure}"
-    missed = find_unselected([canary], answers)
-    note = f"resolver canary: changing {read} must select {test}; it did not, so the suite was not traced"
-    return missed, note
+        raise ProbeError(_failure(expected, f"no usable answer ({failure})"), (canary,)) from None
+    if find_unselected([canary], answers):
+        raise ProbeError(_failure(expected, "an answer that does not select it"), (canary,))
 
 
 def _check_resolver(repo_root: Path, env: Mapping[str, str]) -> None:
@@ -351,14 +380,12 @@ def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedRead
     try:
         traced = _traced_env(env, repo_root, out_dir)
         _check_tracer_loads(repo_root, traced)
+        # Every failed collection is recorded, not only the first; a failure's tail stays plain text.
         argv = [
             sys.executable, "-m", "pytest", "--no-cov", "-p", "no:cacheprovider",
             "-p", "selection_trace_plugin", "--continue-on-collection-errors", "--color=no",
         ]  # fmt: skip
         done = _capture(argv, repo_root, traced, SUITE_TIMEOUT_S, "the traced default suite")
-        uncollected = uncollected_reason(done.stdout)
-        if uncollected is not None:
-            raise ProbeError(uncollected)
         if done.returncode not in SUITE_EXIT_CODES:
             observed = f"pytest exit code {done.returncode}: {_tail(done.stderr or done.stdout)}"
             raise ProbeError(_failure("the default suite to run under the tracer", observed))
@@ -409,41 +436,11 @@ def suite_notes(exit_code: int) -> tuple[str, ...]:
     return ()
 
 
-def uncollected_reason(stdout: str) -> str | None:
-    """Why a suite with test files that failed to collect cannot support an audit; None when none did."""
-    uncollected = collection_errors(stdout)
-    if not uncollected:
-        return None
-    named = ", ".join(uncollected[:_NAMED_FILES]) + (
-        ", ..." if len(uncollected) > _NAMED_FILES else ""
-    )
-    return _failure(
-        "every test file to collect, so its reads can be audited",
-        f"{len(uncollected)} failed to collect: {named}",
-    )
-
-
-def collection_errors(stdout: str) -> tuple[str, ...]:
-    """The test files pytest's short summary reports as `ERROR <file>` collection errors, sorted.
-
-    Read from uncoloured output (the suite runs with `--color=no`, since `FORCE_COLOR` in the
-    environment would otherwise colour the `ERROR` word). `--continue-on-collection-errors`
-    makes the run report every such file, with or without xdist, instead of stopping at the first.
-    Only the summary section counts, so a failing test's captured `ERROR` log line is not
-    misread as a file; the ` - <reason>` suffix is optional (pytest omits it in some modes).
-    """
-    _, header, summary = stdout.rpartition(_SUMMARY_HEADER)
-    if not header:
-        return ()
-    matches = (_COLLECTION_ERROR.fullmatch(line) for line in summary.splitlines())
-    return tuple(sorted({m["target"] for m in matches if m and "::" not in m["target"]}))
-
-
-def _tracked_files(repo_root: Path) -> frozenset[str]:
+def _tracked_files(repo_root: Path, env: Mapping[str, str]) -> frozenset[str]:
     done = _capture(
         ["git", "-C", str(repo_root), "ls-files", "-z"],
         repo_root,
-        os.environ,
+        env,
         PREFLIGHT_TIMEOUT_S,
         "`git ls-files`",
     )
@@ -457,25 +454,41 @@ def spread(reads: list[str], ways: int) -> list[list[str]]:
     return [chunk for chunk in (reads[start::ways] for start in range(ways)) if chunk]
 
 
-def _ask_resolver(repo_root: Path, env: Mapping[str, str], reads: list[str]) -> dict[str, Answer]:
-    """One resolver process per chunk of reads, concurrently.
+def _ask_resolver(
+    repo_root: Path, env: Mapping[str, str], reads: list[str], timeout: float
+) -> dict[str, Answer]:
+    """One resolver process per chunk of reads, concurrently; every read must get an answer.
 
     A path's answer depends on that path alone (the resolver's `--per-path` lines are
     pinned equal to single-path calls), so chunking cannot change an answer; it only
     divides the per-path derivation, the cost that grows with the suite, across cores.
+    A read with no usable answer fails here, by name, rather than reading as a finding.
     """
     chunks = spread(reads, RESOLVER_PROCESSES)
     with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
-        stdouts = list(pool.map(lambda chunk: _resolve_chunk(repo_root, env, chunk), chunks))
-    return parse_answers("\n".join(stdouts))
+        stdouts = list(
+            pool.map(lambda chunk: _resolve_chunk(repo_root, env, chunk, timeout), chunks)
+        )
+    answers = parse_answers("\n".join(stdouts))
+    unanswered = set(reads) - set(answers)
+    if unanswered:
+        raise ProbeError(
+            _failure(
+                f"the resolver to answer for each of {len(reads)} read files",
+                f"no usable answer for {len(unanswered)}: {_named(unanswered)}",
+            )
+        )
+    return answers
 
 
-def _resolve_chunk(repo_root: Path, env: Mapping[str, str], reads: list[str]) -> str:
+def _resolve_chunk(
+    repo_root: Path, env: Mapping[str, str], reads: list[str], timeout: float
+) -> str:
     argv = [
         sys.executable, str(repo_root / RESOLVER), "--repo-root", str(repo_root),
         "--json", "--per-path", "--changed", *reads,
     ]  # fmt: skip
-    done = _capture(argv, repo_root, env, RESOLVER_TIMEOUT_S, f"`{RESOLVER}`")
+    done = _capture(argv, repo_root, env, timeout, f"`{RESOLVER}`")
     if done.returncode != 0:
         raise ProbeError(
             _failure(
@@ -501,7 +514,10 @@ def _capture(
         stdout, stderr = child.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         os.killpg(child.pid, signal.SIGKILL)
-        child.communicate()
+        try:  # a grandchild that left the group may still hold the pipes open
+            child.communicate(timeout=_REAP_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            pass
         raise ProbeError(
             _failure(f"{what} to finish within {timeout:g} s", "it was still running")
         ) from None
@@ -510,6 +526,11 @@ def _capture(
 
 def _failure(expected: str, observed: str) -> str:
     return f"expected {expected}; observed {observed}"
+
+
+def _named(files: Iterable[str]) -> str:
+    ordered = sorted(files)
+    return ", ".join(ordered[:_NAMED_FILES]) + (", ..." if len(ordered) > _NAMED_FILES else "")
 
 
 def _tail(text: str) -> str:

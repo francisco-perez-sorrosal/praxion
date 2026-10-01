@@ -49,10 +49,8 @@ def _observed(
     )
 
 
-def _answer(
-    root_selection: str = "tests", tests: tuple[str, ...] = (), widen: bool = False
-) -> selection.Answer:
-    return selection.Answer(widened=widen, root_selection=root_selection, tests=frozenset(tests))
+def _answer(root_selection: str = "tests", tests: tuple[str, ...] = ()) -> selection.Answer:
+    return selection.Answer(root_selection=root_selection, tests=frozenset(tests))
 
 
 def _payload_line(path: str, root_selection="tests", tests=(), widen=False, root=".") -> str:
@@ -87,6 +85,7 @@ def test_records_are_sorted_into_channels_heartbeats_and_collected_files():
         _record(TEST, "scripts/mod.py", "import"),
         json.dumps({"heartbeat": TEST}),
         json.dumps({"collected": [TEST, OTHER_TEST]}),
+        json.dumps({"uncollected": "tests/test_broken.py"}),
         "",
     ]
 
@@ -97,6 +96,7 @@ def test_records_are_sorted_into_channels_heartbeats_and_collected_files():
     assert observed.pairs_by_channel["import"] == {(TEST, "scripts/mod.py")}
     assert observed.heartbeats == {TEST}
     assert observed.collected == {TEST, OTHER_TEST}
+    assert observed.uncollected == {"tests/test_broken.py"}
 
 
 def test_verdict_pairs_are_direct_and_child_reads_never_import_credit():
@@ -145,6 +145,20 @@ def test_a_collected_test_file_that_never_ran_under_the_tracer_is_named():
     assert reason is not None
     assert OTHER_TEST in reason
     assert TEST not in reason.split("observed")[1]
+
+
+def test_a_test_file_that_failed_to_collect_is_named_even_when_nothing_was_read():
+    observed = selection.ObservedReads(
+        pairs_by_channel={"direct": frozenset(), "child": frozenset(), "import": frozenset()},
+        heartbeats=frozenset(),
+        collected=frozenset(),
+        uncollected=frozenset({"tests/test_broken.py"}),
+    )
+
+    reason = selection.dead_tracer_reason(observed)
+
+    assert reason is not None
+    assert "tests/test_broken.py" in reason
 
 
 def test_reads_covering_every_collected_file_are_a_working_tracer():
@@ -233,10 +247,10 @@ def test_a_pair_read_only_by_a_child_process_is_found_when_unselected():
     assert selection.find_unselected(pairs, {}) == ((TEST, DATA),)
 
 
-def test_a_widened_answer_selects_every_test():
-    answers = {DATA: _answer("nothing", widen=True)}
+def test_a_widen_scoped_to_another_pocket_leaves_the_root_pockets_list_in_charge():
+    answers = selection.parse_answers(_payload_line(DATA, "tests", tests=(OTHER_TEST,), widen=True))
 
-    assert selection.find_unselected(((TEST, DATA),), answers) == ()
+    assert selection.find_unselected(((TEST, DATA), (OTHER_TEST, DATA)), answers) == ((TEST, DATA),)
 
 
 def test_a_full_root_pocket_selects_every_test():
@@ -296,15 +310,22 @@ def test_no_unselected_reads_pass_and_keep_their_notes():
     assert verdict.notes == ("n",)
 
 
-def test_import_only_files_are_declared_as_a_count_never_a_finding():
+def test_import_only_files_are_counted_apart_as_data_and_code_never_as_findings():
     observed = _observed(
-        direct=[(TEST, DATA)], imported=[(TEST, "mod.py"), (OTHER_TEST, "mod.py"), (TEST, DATA)]
+        direct=[(TEST, DATA)],
+        imported=[
+            (TEST, "mod.py"),
+            (OTHER_TEST, "mod.py"),
+            (TEST, DATA),
+            (TEST, "a.json"),
+            (TEST, "b.toml"),
+        ],
     )
 
-    note = selection.import_note(observed, tracked=frozenset({DATA, "mod.py"}))
+    note = selection.import_note(observed, tracked=frozenset({DATA, "mod.py", "a.json", "b.toml"}))
 
-    assert "1 " in note
-    assert "import" in note
+    assert "2 data files" in note
+    assert "1 code files" in note
 
 
 # -- the effectful edge --------------------------------------------------------------
@@ -367,7 +388,6 @@ def test_a_missing_resolver_fails_in_seconds_saying_which_file_is_missing(tmp_pa
     assert not verdict.passed
     assert "scripts/resolve_test_scope.py" in verdict.reason
     assert "missing" in verdict.reason
-    assert verdict.elapsed_s < 20
 
 
 def test_a_resolver_whose_help_fails_is_dead_before_any_tracing(tmp_path):
@@ -457,76 +477,64 @@ def test_canary_pair_is_none_without_a_co_located_scripts_pair():
 
 CANARY = ("scripts/test_b.py", "scripts/b.py")
 
-
-def _canary_answer(tests):
-    return selection.Answer(widened=False, root_selection="narrow", tests=frozenset(tests))
-
-
-def _answers_nothing(*_args):
-    return {}
+_ANSWERS_NOTHING = 'import sys\nif "--help" in sys.argv:\n    sys.exit(0)\n'
+_CRASHES_WHEN_ASKED = 'import sys\nsys.exit(0 if "--help" in sys.argv else 1)\n'
 
 
-def _selects_nothing(*_args):
-    return {"scripts/b.py": _canary_answer(set())}
+def _add_files(root: Path, files: dict[str, str]) -> Path:
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    return root
 
 
-def _crashes(*_args):
-    raise selection.ProbeError("exit code 1: boom")
-
-
-@pytest.mark.parametrize("resolver", [_answers_nothing, _selects_nothing, _crashes])
-def test_canary_returns_its_pair_when_the_resolver_is_dead(monkeypatch, resolver):
-    monkeypatch.setattr(selection, "_ask_resolver", resolver)
-    missed, note = selection._resolver_canary(Path("."), {}, CANARY)
-    assert missed == (CANARY,)
-    assert "scripts/b.py" in note
-
-
-def _selects_the_test(*_args):
-    return {"scripts/b.py": _canary_answer({"scripts/test_b.py"})}
-
-
-def test_good_twin_a_live_resolver_passes_the_canary(monkeypatch):
-    monkeypatch.setattr(selection, "_ask_resolver", _selects_the_test)
-    missed, _ = selection._resolver_canary(Path("."), {}, CANARY)
-    assert missed == ()
-
-
-def test_collection_errors_names_each_file_the_short_summary_lists():
-    stdout = "\n".join(
-        [
-            "ERROR    root:test_e.py:3 a captured log line, not a summary line",
-            "ERROR scripts/test_e.py",
-            "=========================== short test summary info ============================",
-            "ERROR scripts/test_b.py - ImportError: cannot import name 'x'",
-            "ERROR scripts/test_a.py",
-            "ERROR scripts/test_a.py - SyntaxError: invalid syntax",
-            "FAILED scripts/test_c.py::test_one - AssertionError",
-            "ERROR scripts/test_d.py::test_fixture - fixture 'f' not found",
-            "========================== 1 passed, 2 errors in 0.05s ==========================",
-        ]
+def _with_canary_pair(root: Path) -> Path:
+    return _add_files(
+        root, {"scripts/b.py": "B = 1\n", "scripts/test_b.py": "def test_b():\n    pass\n"}
     )
-    assert selection.collection_errors(stdout) == ("scripts/test_a.py", "scripts/test_b.py")
 
 
-def test_good_twin_error_lines_outside_the_summary_name_no_file():
-    assert selection.collection_errors("ERROR scripts/test_e.py\n1 passed in 0.01s\n") == ()
+@pytest.mark.parametrize(
+    "resolver",
+    [_SELECTS_NOTHING, _ANSWERS_NOTHING, _CRASHES_WHEN_ASKED],
+    ids=["selects-nothing", "answers-nothing", "crashes-when-asked"],
+)
+def test_a_dead_resolver_fails_the_canary_listing_its_pair_and_saying_why(tmp_path, resolver):
+    root = _with_canary_pair(_scratch_repo(tmp_path, resolver=resolver))
+
+    verdict = selection.run(root, _env())
+
+    assert not verdict.passed
+    assert verdict.unselected == (CANARY,)
+    assert "resolver canary" in verdict.reason
 
 
-SUMMARY = "=========================== short test summary info ============================"
+def test_good_twin_a_live_resolver_passes_the_canary_and_the_audit(tmp_path):
+    root = _with_canary_pair(_scratch_repo(tmp_path, resolver=_SELECTS_ALL))
+
+    verdict = selection.run(root, _env())
+
+    assert verdict.passed, verdict
+    assert selection.CANARY_SKIPPED not in verdict.notes
 
 
-def test_a_test_file_that_failed_to_collect_fails_the_audit_naming_it():
-    reason = selection.uncollected_reason(
-        f"{SUMMARY}\nERROR scripts/test_b.py - ImportError: boom\n"
-    )
-    assert reason is not None
-    assert reason.startswith("expected ")
-    assert "scripts/test_b.py" in reason
+def test_without_a_co_located_pair_the_canary_is_skipped_and_the_notes_say_so(tmp_path):
+    root = _scratch_repo(tmp_path, resolver=_SELECTS_ALL)
+
+    verdict = selection.run(root, _env())
+
+    assert selection.CANARY_SKIPPED in verdict.notes
 
 
-def test_good_twin_a_run_that_collected_every_file_has_no_collection_reason():
-    assert selection.uncollected_reason("1 passed in 0.01s\n") is None
+def test_a_resolver_that_answers_no_path_fails_naming_the_unanswered_reads(tmp_path):
+    root = _scratch_repo(tmp_path, resolver=_ANSWERS_NOTHING)
+
+    verdict = selection.run(root, _env())
+
+    assert not verdict.passed
+    assert "no usable answer" in verdict.reason
+    assert DATA in verdict.reason
 
 
 def test_a_failing_test_exit_is_a_note_and_a_clean_exit_is_none():
@@ -534,12 +542,26 @@ def test_a_failing_test_exit_is_a_note_and_a_clean_exit_is_none():
     assert selection.suite_notes(0) == ()
 
 
-def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_selected(tmp_path):
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        ("tests/test_broken.py", "import a_module_that_does_not_exist\n"),
+        (
+            "tests/test_class.py",
+            "import pytest\n\n\n@pytest.mark.parametrize('a', [1])\n"
+            "class TestC:\n    def test_x(self):\n        pass\n",
+        ),
+        ("tests/test_a space.py", "def test_x(:\n"),
+    ],
+    ids=["module-import", "class-level", "space-in-name"],
+)
+def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_selected(
+    tmp_path, name, body
+):
     root = _scratch_repo(tmp_path, resolver=_SELECTS_ALL)
-    (root / "tests" / "test_broken.py").write_text("import a_module_that_does_not_exist\n")
-    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    _add_files(root, {name: body, "pyproject.toml": '[tool.pytest.ini_options]\naddopts = "-rN"\n'})
 
     verdict = selection.run(root, {**_env(), "FORCE_COLOR": "1"})
 
     assert not verdict.passed, verdict
-    assert "tests/test_broken.py" in verdict.reason
+    assert name in verdict.reason

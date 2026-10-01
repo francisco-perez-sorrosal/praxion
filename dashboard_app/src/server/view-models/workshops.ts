@@ -19,6 +19,19 @@ function renderModeFor(name: string): WorkshopArtifact["renderMode"] {
 }
 
 /**
+ * Report-producing agents write their report first with this marker on its
+ * title and remove it as their last edit (`PARTIAL_MARKER` in
+ * scripts/artifact_registry.py), so a report that still carries it belongs to
+ * an agent that has not finished.
+ */
+const PARTIAL_MARKER = "[PARTIAL]";
+
+function isPartialReport(body: string | null): boolean {
+  const title = body?.split("\n").find((line) => line.startsWith("# "));
+  return title?.includes(PARTIAL_MARKER) ?? false;
+}
+
+/**
  * A PROGRESS.md phase entry like "6/6" is terminal when the current phase
  * equals the total. Returns false for malformed or absent phase strings.
  */
@@ -71,12 +84,14 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
         )
       ).filter((artifact): artifact is WorkshopArtifact => artifact !== null);
 
-      const hasVerificationReport = artifacts.some(
-        (artifact) => artifact.name === "VERIFICATION_REPORT.md"
+      const hasFinishedVerificationReport = artifacts.some(
+        (artifact) =>
+          artifact.name === "VERIFICATION_REPORT.md" && !isPartialReport(artifact.body)
       );
       const lastEvent = events.at(-1);
       const isDone =
-        hasVerificationReport || (lastEvent !== undefined && isTerminalPhase(lastEvent.phase));
+        hasFinishedVerificationReport ||
+        (lastEvent !== undefined && isTerminalPhase(lastEvent.phase));
 
       const artifactBody = (name: string): string | null =>
         artifacts.find((artifact) => artifact.name === name)?.body ?? null;

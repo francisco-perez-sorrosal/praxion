@@ -264,8 +264,8 @@ class Family1PipelineOutcomeFidelity(Family):
         Activates only when ``corpus.task_slug`` is populated (i.e. the
         operator passed ``--task-slug`` to the harness CLI). Emits one
         CheckResult per expected artifact in manifest order: PASS when
-        present, FAIL when required-and-missing, WARN when optional-and-
-        missing or stale.
+        present, FAIL when required and missing or partial, WARN when
+        optional and missing or partial, or stale.
         """
         if corpus.task_slug is None or not corpus.task_artifacts:
             return []
@@ -293,6 +293,21 @@ class Family1PipelineOutcomeFidelity(Family):
                         verdict=outcome,
                         artifact_path=verdict.path,
                         findings=(f"Expected {tag} artifact missing: {verdict.description}",),
+                        score=-1,
+                    )
+                )
+            elif verdict.verdict == "partial":
+                outcome = "FAIL" if verdict.required else "WARN"
+                tag = "required" if verdict.required else "optional"
+                results.append(
+                    CheckResult(
+                        check_name="task_artifact_manifest",
+                        check_kind="mechanical",
+                        verdict=outcome,
+                        artifact_path=verdict.path,
+                        findings=(
+                            f"Expected {tag} artifact unfinished ({verdict.detail}): {verdict.description}",
+                        ),
                         score=-1,
                     )
                 )

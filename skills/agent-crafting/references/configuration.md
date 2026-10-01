@@ -165,6 +165,8 @@ Security Review Checklist:
 - Security misconfiguration
 ```
 
+**Write the deliverable first** when an agent produces one report: within its first three tool calls it writes the report's skeleton with ` [PARTIAL]` on the title and every section `[pending]`, fills sections as phases end, and removes the marker as its last edit. Put this instruction before the first phase, not inside the last: a turn cap ends an agent mid-call with no cleanup pass, so whatever is not yet on disk is lost.
+
 **Define output format:**
 
 ```markdown

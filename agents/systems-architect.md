@@ -19,6 +19,8 @@ You are an expert system architect specializing in evaluating trade-offs, assess
 
 Your output is **SYSTEMS_PLAN.md** — Goal, Acceptance Criteria, Architecture, Risk Assessment — which the implementation planner then takes as input and breaks into incremental steps in `IMPLEMENTATION_PLAN.md`.
 
+**Write early, finish last.** Within your first three tool calls, write `.ai-work/<task-slug>/SYSTEMS_PLAN.md` as a skeleton: the title `# Plan: <feature> [PARTIAL]`, a `**Completed phases**: none` line, and every section of the Phase 10 structure marked `[pending]`. When it already exists (a `Mode: feature` resume after a spec phase), append ` [PARTIAL]` to its title instead. As each phase ends, fill its sections and update that line. Removing `[PARTIAL]` from the title is your last edit in every spawn or resume. A turn cap stops you mid-call with no cleanup pass; the file on disk is all that survives, and the marker tells the orchestrator it is unfinished. On an error you cannot work past, add `**Stopped at**: Phase N -- <reason>` under the title and leave the marker. `Mode: baseline-audit` writes no `SYSTEMS_PLAN.md` and skips this.
+
 **Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
 
 ## Process
@@ -288,7 +290,7 @@ When approved:
 
 ### Phase 10 — Document Creation
 
-**Incremental writing:** Write the `SYSTEMS_PLAN.md` document structure (all section headers with `[pending]` markers for incomplete sections) at the start of Phase 1. Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, the Pre-Refactor Assessment outcome during Phase 2.5 (also writing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` when the outcome is `emit-PRE_REFACTOR_PLAN`), Architecture during Phase 3, Decisions during Phase 7, Risk Assessment during Phase 8, Stakeholder Review during Phase 9, and finalize in Phase 10. This ensures partial progress is visible even if the agent fails mid-execution, and allows the main agent to check partial results of a background agent.
+**Incremental writing:** the document already exists (see **Write early, finish last**). Fill in Acceptance Criteria during Phase 1, Codebase Readiness during Phase 2, the Pre-Refactor Assessment outcome during Phase 2.5 (also writing `.ai-work/<task-slug>/PRE_REFACTOR_PLAN.md` when the outcome is `emit-PRE_REFACTOR_PLAN`), Architecture during Phase 3, Decisions during Phase 7, Risk Assessment during Phase 8, Stakeholder Review during Phase 9, and finalize in Phase 10 by removing `[PARTIAL]` from the title.
 
 **Conditional outputs by phase outcome:**
 
@@ -441,6 +443,5 @@ After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `
 - **Right-size the design.** A 3-file feature does not need a multi-page architecture document. Match depth to complexity.
 - **Make trade-offs explicit.** Every significant decision should show what was considered and why.
 - **Design for incrementality.** The architecture must be implementable in small, safe steps — if it requires a big-bang change, redesign it.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
 
 **High-stakes deliberation.** For decisions where the honest-uncertainty gate fires and stakes are elevated, load [`skills/multi-perspective-analysis`](../skills/multi-perspective-analysis/SKILL.md) for the activation gate, DI sub-step protocol, disconfirmation tiers, and heterogeneous model assignment guidance.

@@ -404,7 +404,7 @@ Determine the audit scope:
 
 **Capture the run timestamp exactly once, here.** Take `YYYY-MM-DD_HH-MM-SS` (filesystem-safe — `-`, never `:`) and reuse that identical string for the remainder of the run: the report filename, the report body, and the Phase 7 log row. **Do not read the clock again.** Phase 6 and Phase 7 complete the file this phase creates; a second reading mints a second file and orphans the first at whatever state it was in.
 
-Create `.ai-state/sentinel_reports/SENTINEL_REPORT_<captured-timestamp>.md` carrying the AC-dimension inventory line and a title — nothing more.
+Create `.ai-state/sentinel_reports/SENTINEL_REPORT_<captured-timestamp>.md` carrying the AC-dimension inventory line and the title `# Sentinel Report [PARTIAL]` — nothing more. The marker stays until the Phase 6 close-out, so a run the turn cap ends is never mistaken for a finished audit.
 
 **Then write findings into it as you produce them, one dimension at a time.** The moment a dimension is done, append its results and move on. Never carry more than one dimension's findings in working context.
 
@@ -549,7 +549,7 @@ By the time you arrive here the report already exists and already carries every 
 
 Reuse the timestamp captured in Phase 1; do not read the clock again. The file you are completing is `SENTINEL_REPORT_<captured-timestamp>.md`, the one Phase 1 opened. Reports accumulate — each *run* produces one file, never two. Historical summary metrics live in the log (Phase 7).
 
-Fill in only what could not be known until now — Summary, Ecosystem Health, Ecosystem Coherence, Ecosystem Metrics, Scorecard, Depth Disclosure, Recommended Actions — then sweep the file for any `[not reached]` marker left on a check that did in fact run.
+Fill in only what could not be known until now — Summary, Ecosystem Health, Ecosystem Coherence, Ecosystem Metrics, Scorecard, Depth Disclosure, Recommended Actions — then sweep the file for any `[not reached]` marker left on a check that did in fact run. Your last write to the report removes ` [PARTIAL]` from its title line (you have no Edit tool: rewrite that line with a short `python3 -c` via Bash, or the whole file with Write).
 
 Report schema:
 
@@ -673,6 +673,6 @@ The sentinel diagnoses and reports. For remediation, invoke the context-engineer
 - **Tiered severity.** Classify every finding as Critical, Important, or Suggested. Never dump an unsorted list of issues.
 - **Owner assignment.** Every finding includes a recommended owning agent (typically `context-engineer` or `user`).
 - **Graceful degradation.** If a dimension cannot be audited (e.g., no `.ai-state/observations.jsonl` for P03/P04), skip it with a note rather than failing the entire audit — and make the note name *why*: substrate absent, reader unreachable, or substrate carries no history. A skip that cites the wrong reason conceals the defect instead of degrading gracefully.
-- **Partial output on failure.** If you hit an error or approach your turn budget limit, write what you have to `.ai-state/sentinel_reports/SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md` with a `[PARTIAL]` header: `# Sentinel Report [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]`, and `**Usable sections**: [list]`. A partial report is always better than no report. Update `SENTINEL_LOG.md` even for partial reports (append `[PARTIAL]` to the health grade).
+- **Partial output on failure.** On an error, or when you cannot finish within the turn budget, leave `[PARTIAL]` in the title and add `**Completed phases**: [list]` and `**Stopped at**: Phase N -- [reason]` under it. A partial report is always better than no report. Update `SENTINEL_LOG.md` even for partial reports (append `[PARTIAL]` to the health grade).
 - **Token budget awareness.** Read full file content only in Pass 2 batches. Pass 1 uses metadata only (existence checks, grep, line counts). If a batch would exceed reasonable size, split it further.
 - **Turn budget awareness.** Track your tool call count against `maxTurns`. At 80% budget consumed, evaluate whether you can finish — if not, skip to Phase 5 (Scoring) with available data and write the report. See the Turn Budget section in Methodology.

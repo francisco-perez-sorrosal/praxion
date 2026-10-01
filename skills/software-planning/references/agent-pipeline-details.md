@@ -206,7 +206,7 @@ The contract above tells the orchestrator *how* to read a return; this clause te
 **The gate.** Before advancing the pipeline past any subagent, the orchestrator confirms a *completion handshake*. It applies to step-executing pipeline agents (those whose `## Output` block defines terminal markers and that write a durable step artifact — `implementer`, `test-engineer`, `implementation-planner`, etc.); research/exploration agents without markers are governed by check 2 alone.
 
 1. **Terminal marker present** — the return carries one of the agent's recognized terminal markers (`[COMPLETE]` / `[BLOCKED]` / `[CONFLICT]` / `[PARTIAL]`). A return that ends mid-sentence with no marker is the signature of a hard cut.
-2. **Durable artifact agrees** — for a claimed `[COMPLETE]`, the step's `WIP.md` checkbox is flipped (`- [x]` / `[COMPLETE]`). A marker that contradicts the artifact is as suspect as a missing one.
+2. **Durable artifact agrees** — for a claimed `[COMPLETE]`, the step's `WIP.md` checkbox is flipped (`- [x]` / `[COMPLETE]`). For a report-producing agent (verifier, researcher, systems-architect, implementation-planner, sentinel) the durable artifact is its report, written within its first few calls with `[PARTIAL]` on the title and unmarked last: a title still carrying the marker contradicts a finished return, an absent report means the agent never started, and the report's `[pending]` sections name the remainder to resume. A marker that contradicts the artifact is as suspect as a missing one.
 
 If **either** check fails, treat the return as a **suspected truncation** — do **not** advance, and do **not** blindly re-spawn the step from scratch (that redoes completed work and can clobber it).
 

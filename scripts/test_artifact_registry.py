@@ -533,3 +533,60 @@ def test_inventory_floor_table_matches_registry_projection() -> None:
         assert full_label == expected_full[name], (
             f"{name}: table Full={full_label!r} != registry {expected_full[name]!r}"
         )
+
+
+# -- Born-partial reports -------------------------------------------------------
+# Report-producing agents write their report first, titled with PARTIAL_MARKER,
+# and unmark it last. The instruction must come before the agent's first phase:
+# placed inside the final phase (where it sat before), an agent read it only once
+# the turns it was meant to protect had already been spent.
+
+_WRITE_EARLY_AGENTS = (
+    "agents/verifier.md",
+    "agents/researcher.md",
+    "agents/systems-architect.md",
+    "agents/implementation-planner.md",
+)
+
+
+def _write_early_precedes_first_phase(text: str) -> bool:
+    block = text.find("**Write early, finish last.**")
+    first_phase = text.find("### Phase 1 ")
+    return (
+        block != -1
+        and first_phase != -1
+        and block < first_phase
+        and registry.PARTIAL_MARKER in text[block : text.find("\n", block)]
+    )
+
+
+@pytest.mark.parametrize("agent", _WRITE_EARLY_AGENTS)
+def test_report_agents_write_their_partial_skeleton_before_phase_one(agent: str) -> None:
+    assert _write_early_precedes_first_phase(_read(agent))
+
+
+def test_canary_a_write_early_block_inside_the_last_phase_is_rejected() -> None:
+    late = (
+        "## Process\n\n### Phase 1 -- Input\n\nRead.\n\n### Phase 9 -- Report\n\n"
+        f"**Write early, finish last.** Title it `# Report {registry.PARTIAL_MARKER}`.\n"
+    )
+    assert not _write_early_precedes_first_phase(late)
+
+
+def test_sentinel_opens_its_report_with_a_partial_title() -> None:
+    assert f"# Sentinel Report {registry.PARTIAL_MARKER}" in _read("agents/sentinel.md")
+
+
+def test_is_partial_reads_only_the_title() -> None:
+    assert registry.is_partial(f"# Verification Report: x {registry.PARTIAL_MARKER}\n\nbody\n")
+    assert not registry.is_partial(
+        f"# Verification Report: x\n\nquoted {registry.PARTIAL_MARKER}\n"
+    )
+    assert not registry.is_partial(f"no title {registry.PARTIAL_MARKER}\n")
+
+
+def test_placeholder_names_resolve_their_instances_but_exact_names_win() -> None:
+    assert registry.by_name("CONSULT_security.md").name == "CONSULT_<discipline>.md"
+    assert registry.by_name("LIGHT_REVIEW_step-3.md").name == "LIGHT_REVIEW_<step>.md"
+    assert registry.by_name("CONSULT_LEDGER.md") is None  # a ledger, not a consult fragment
+    assert registry.cleanup_policy_for("LIGHT_REVIEW_step-3.md") == "delete"

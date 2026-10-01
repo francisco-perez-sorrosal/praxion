@@ -293,6 +293,22 @@ Ship the server reader
     expect(workshops[0]?.isDone).toBe(true);
   });
 
+  it("does not mark a workshop done while its VERIFICATION_REPORT.md title still carries [PARTIAL]", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-partial-report-");
+    const workshop = path.join(root, ".ai-work", "verifying-task");
+
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeFile(
+      path.join(workshop, "VERIFICATION_REPORT.md"),
+      "# Verification Report: verifying-task [PARTIAL]\n**Completed phases**: 1, 2\n\n## Verdict\n[pending]\n"
+    );
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.isDone).toBe(false);
+  });
+
   it("marks a workshop done when PROGRESS.md ends with a terminal phase", async () => {
     const root = await createTempProjectRoot("dashboard-workshops-done-progress-");
     const workshop = path.join(root, ".ai-work", "completed-task");

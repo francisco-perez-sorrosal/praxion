@@ -109,10 +109,30 @@ Requirement = Literal["always"] | Signal
 # than an unnoticed gap. Paired site: agents/implementation-planner.md.
 NO_TEST_TARGET_MARKER = "no test target"
 
+# Report-producing agents write their report first, with this marker on its
+# title, and remove the marker as their last edit, so a turn-capped agent leaves
+# an artifact that says it is unfinished. Existence therefore no longer means
+# done: a consumer that treats a report as finished reads `is_partial` too.
+# Paired sites: the "Write early, finish last" block in agents/verifier.md,
+# researcher.md, systems-architect.md, implementation-planner.md and the
+# sentinel's Phase 1 title.
+PARTIAL_MARKER = "[PARTIAL]"
+
 # A numbered requirement *heading* (the SDD behavioral-spec shape), not a bare
 # mention of one in prose -- a config/infra plan that merely says a REQ block
 # is unwarranted must not read as SDD-active.
 _REQ_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*REQ-\d")
+
+
+def is_partial(text: str) -> bool:
+    """Whether a report's title (its first `# ` heading) still carries `PARTIAL_MARKER`.
+
+    Only the title counts: a finished report may quote the marker in its body.
+    """
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return PARTIAL_MARKER in line
+    return False
 
 
 def _requirement_strength(requirement: Requirement) -> int:
@@ -451,6 +471,19 @@ ARTIFACTS: tuple[Artifact, ...] = (
         cleanup_policy="consume-marker",  # WARNs until its patterns are folded into LEARNINGS.md
         description="Verifier's quality-gate report.",
     ),
+    # One per light-reviewed step (`<step>` is `step-<N>`). Written first as
+    # `verdict: [PARTIAL]`, so a capped reviewer leaves its findings so far.
+    # Exact-filename consumers (dashboard, snapshot) cannot list it, as with
+    # CONSULT_<discipline>.md.
+    Artifact(
+        "LIGHT_REVIEW_<step>.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="producer:verifier",
+        cleanup_policy="delete",
+        description="Intra-step light-review verdict block, mirrored in the reviewer's return.",
+    ),
     Artifact(
         "REWORK_MANIFEST.md",
         "ai-work",
@@ -565,10 +598,21 @@ def all_names() -> set[str]:
 
 
 def by_name(name: str) -> Artifact | None:
+    """The artifact registered as `name`; a placeholder name (`CONSULT_<discipline>.md`)
+    matches its instances, whose variable part is a lowercase kebab slug. Exact
+    names win, so `CONSULT_LEDGER.md` never reads as a consult fragment."""
     for a in ARTIFACTS:
         if a.name == name:
             return a
+    for a in ARTIFACTS:
+        if "<" in a.name and _instance_pattern(a.name).fullmatch(name):
+            return a
     return None
+
+
+def _instance_pattern(placeholder_name: str) -> re.Pattern[str]:
+    literal_parts = re.split(r"<[^>]+>", placeholder_name)
+    return re.compile(r"[a-z][a-z0-9-]*".join(re.escape(part) for part in literal_parts))
 
 
 def cleanup_policy_for(name: str) -> str | None:

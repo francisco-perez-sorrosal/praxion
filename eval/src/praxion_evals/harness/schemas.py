@@ -121,7 +121,7 @@ def sum_usage(check_results: Iterable[CheckResult]) -> JudgeUsage:
 # ---------------------------------------------------------------------------
 
 
-ArtifactVerdict = Literal["present", "missing", "stale"]
+ArtifactVerdict = Literal["present", "missing", "stale", "partial"]
 
 
 @dataclass(frozen=True)
@@ -135,8 +135,10 @@ class TaskArtifactVerdict:
         path: Path (relative to corpus root) of the expected artifact.
         verdict: ``present`` if the file exists, ``missing`` if not,
             ``stale`` if recency was checked and the mtime predates the
-            pipeline-start timestamp.
-        required: When True, ``missing`` flips the overall check to FAIL.
+            pipeline-start timestamp, ``partial`` if the file exists but its
+            title still carries the ``[PARTIAL]`` marker its producer writes
+            first and removes last (the producer stopped before finishing).
+        required: When True, ``missing`` or ``partial`` flips the overall check to FAIL.
         description: Human-readable explanation of the artifact's purpose.
         detail: Optional extra context (e.g., the mtime that caused stale).
     """

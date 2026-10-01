@@ -344,3 +344,50 @@ def test_family1_mechanical_only_skips_judge_calls():
     # Should still emit some mechanical SKIP rows for the empty corpus
     assert len(results) > 0
     assert all(r.check_kind == "mechanical" for r in results)
+
+
+def test_a_report_whose_title_still_carries_the_partial_marker_reads_partial(tmp_path: Path):
+    """A turn-capped verifier leaves a born-partial report; existence alone must not read as done."""
+    slug = "demo"
+    task_dir = tmp_path / ".ai-work" / slug
+    task_dir.mkdir(parents=True)
+    (task_dir / "VERIFICATION_REPORT.md").write_text(
+        "# Verification Report: demo [PARTIAL]\n**Completed phases**: 1, 2\n\n## Verdict\n[pending]\n",
+        encoding="utf-8",
+    )
+    (task_dir / "SYSTEMS_PLAN.md").write_text(
+        "# Plan: demo\n\n## Risk Assessment\nA capped agent leaves `[PARTIAL]` in its title.\n",
+        encoding="utf-8",
+    )
+    by_name = {
+        Path(v.path).name: v for v in scan_task_manifest(tmp_path, slug, PipelineTier.STANDARD)
+    }
+    assert by_name["VERIFICATION_REPORT.md"].verdict == "partial"
+    assert by_name["VERIFICATION_REPORT.md"].required is True
+    assert by_name["SYSTEMS_PLAN.md"].verdict == "present"  # the marker in a body is not a title
+
+
+def test_family1_emits_fail_for_required_partial_and_warn_for_optional_partial():
+    corpus = _make_corpus_with_verdicts(
+        (
+            TaskArtifactVerdict(
+                path=".ai-work/demo/VERIFICATION_REPORT.md",
+                verdict="partial",
+                required=True,
+                description="Verifier's quality-gate report.",
+                detail="title still carries [PARTIAL]",
+            ),
+            TaskArtifactVerdict(
+                path=".ai-work/demo/RESEARCH_FINDINGS.md",
+                verdict="partial",
+                required=False,
+                description="Researcher's findings.",
+                detail="title still carries [PARTIAL]",
+            ),
+        )
+    )
+    results = Family1PipelineOutcomeFidelity().run(corpus, NullJudgeClient(), mechanical_only=True)
+    rows = {r.artifact_path: r for r in results if r.check_name == "task_artifact_manifest"}
+    assert rows[".ai-work/demo/VERIFICATION_REPORT.md"].verdict == "FAIL"
+    assert rows[".ai-work/demo/RESEARCH_FINDINGS.md"].verdict == "WARN"
+    assert "unfinished" in rows[".ai-work/demo/VERIFICATION_REPORT.md"].findings[0]

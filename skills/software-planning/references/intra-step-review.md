@@ -76,7 +76,7 @@ findings:
 
 Each finding must reference either the step's acceptance criteria or a documented convention (coding-style rule or behavioral contract). Findings without a traceable anchor are not valid.
 
-**The reviewer does NOT produce a `VERIFICATION_REPORT.md`** in light-review mode. The output is a bounded inline response — no file artifact.
+**The reviewer does NOT produce a `VERIFICATION_REPORT.md`** in light-review mode. It writes the bounded verdict block to `.ai-work/<task-slug>/LIGHT_REVIEW_step-<N>.md` early, as `verdict: [PARTIAL]`, appends findings as it confirms them, sets the verdict last, and returns the same block inline. A capped reviewer therefore leaves its findings so far, and a file still reading `verdict: [PARTIAL]` is an unfinished review, never an `accept`.
 
 ---
 

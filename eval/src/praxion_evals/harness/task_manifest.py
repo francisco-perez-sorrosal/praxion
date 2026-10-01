@@ -47,6 +47,14 @@ def _load_artifact_registry() -> Any:
     return importlib.import_module("artifact_registry")
 
 
+def _is_partial(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return bool(_load_artifact_registry().is_partial(text))
+
+
 class PipelineTier(StrEnum):
     """Coordination-protocol tiers that produce different artifact sets."""
 
@@ -193,6 +201,14 @@ def _verdict_for(
             verdict="missing",
             required=effective_required,
             description=spec.description,
+        )
+    if _is_partial(path):
+        return TaskArtifactVerdict(
+            path=relative,
+            verdict="partial",
+            required=effective_required,
+            description=spec.description,
+            detail="title still carries [PARTIAL]: its producer stopped before finishing",
         )
     if spec.check_recency and pipeline_start is not None:
         mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=pipeline_start.tzinfo)

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d23f86c2
+id: dec-417
+draft_id: dec-draft-d23f86c2
 title: Footprint criteria are authored in the spec and routed by acceptance design to measurement steps and the verifier
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-01
 summary: "A change that moves a measurable footprint states its quantitative criteria as a ### Footprint Criteria table (and reasoned ### Footprints Not Measured rows) inside the spec's Acceptance Criteria; acceptance design files each row under Not Black-Box Testable routed to measurement steps and the verifier instead of encoding it as an outer-loop test; table criteria are FAIL when unmeasured while prose numeric claims keep the spec-driven-development WARN rule; an unbounded moved footprint is a WARN"
@@ -37,7 +38,7 @@ The evidence that shaped the decision:
 
 ## Decision
 
-1. **Spec template.** A quantitative criterion is a row of a `### Footprint Criteria` table (Id, Footprint, Metric, Comparator, Limit, Against, Command) inside `## Acceptance Criteria`. A footprint with no usable instrument is a row of `### Footprints Not Measured` (Footprint, Reason). Both tables are optional, and a spec with neither has today's shape. The grammar's normative text lives in the docstring of the check script (see `dec-draft-5c302933`).
+1. **Spec template.** A quantitative criterion is a row of a `### Footprint Criteria` table (Id, Footprint, Metric, Comparator, Limit, Against, Command) inside `## Acceptance Criteria`. A footprint with no usable instrument is a row of `### Footprints Not Measured` (Footprint, Reason). Both tables are optional, and a spec with neither has today's shape. The grammar's normative text lives in the docstring of the check script (see `dec-416`).
 2. **Acceptance design classifies; it does not encode.** The test-engineer files each row under `## Not Black-Box Testable`, routed "measurement step, then verifier". A footprint criterion is never written as an outer-loop test pinned to a dated baseline.
 3. **Enforcement.** The plan adds baseline and final measurement steps. The verifier's Phase 3b runs the mechanical check and grades each value against its limit.
 4. **Severity.** A table criterion with a missing, no-reading, stale, late or incomparable measurement is FAIL. A numeric claim written as prose acceptance criteria keeps the spec-driven-development skill's WARN-when-unmeasured rule; that skill's gotcha is rewritten to state both cases. A registered footprint moved without any row is a WARN, so the verdict is at best PASS WITH FINDINGS. The plan stage raises the same omission earlier, as a Spec Question.

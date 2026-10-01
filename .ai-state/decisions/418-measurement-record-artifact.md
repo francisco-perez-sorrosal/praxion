@@ -1,7 +1,8 @@
 ---
-id: dec-draft-47fb43f2
+id: dec-418
+draft_id: dec-draft-47fb43f2
 title: Measured footprint values are recorded in an append-only MEASUREMENTS.md table, not as TEST_RESULTS.md lines
-status: proposed
+status: accepted
 category: implementation
 date: 2026-10-01
 summary: "Measurement steps append rows (Criterion, Phase baseline|final, Value, Reading measured|estimate|none, Head, Taken, Command) to .ai-work/<slug>/MEASUREMENTS.md; the latest row per criterion and phase is authoritative; a measurement step records Result: none measurement in TEST_RESULTS.md and never adds Measurement: lines there, keeping the shared step parser and the 1024-byte no-run ceiling untouched"

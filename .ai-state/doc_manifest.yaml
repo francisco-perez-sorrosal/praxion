@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-01T08:23:25Z'
+generated_at: '2026-10-01T10:51:05Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-09-30'
+  last_modified: '2026-10-01'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -3059,6 +3059,24 @@ surfaces:
   title: Report artifacts are written first, marked [PARTIAL], and unmarked last; existence no longer means finished
   last_modified: '2026-10-01'
   renderer: adr_card
+- id: ai-state-decisions-416-footprint-check-and-registry
+  path: .ai-state/decisions/416-footprint-check-and-registry.md
+  type: markdown
+  title: A stdlib footprint check script and an optional per-project footprint registry own the criteria grammars and the trigger
+  last_modified: '2026-10-01'
+  renderer: adr_card
+- id: ai-state-decisions-417-footprint-criteria-placement
+  path: .ai-state/decisions/417-footprint-criteria-placement.md
+  type: markdown
+  title: Footprint criteria are authored in the spec and routed by acceptance design to measurement steps and the verifier
+  last_modified: '2026-10-01'
+  renderer: adr_card
+- id: ai-state-decisions-418-measurement-record-artifact
+  path: .ai-state/decisions/418-measurement-record-artifact.md
+  type: markdown
+  title: Measured footprint values are recorded in an append-only MEASUREMENTS.md table, not as TEST_RESULTS.md lines
+  last_modified: '2026-10-01'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3784,6 +3802,9 @@ groups:
   - ai-state-decisions-413-spawns-attributed-by-prompt-task-slug
   - ai-state-decisions-414-wal-rows-resolve-to-nearest-project
   - ai-state-decisions-415-report-artifacts-born-partial
+  - ai-state-decisions-416-footprint-check-and-registry
+  - ai-state-decisions-417-footprint-criteria-placement
+  - ai-state-decisions-418-measurement-record-artifact
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

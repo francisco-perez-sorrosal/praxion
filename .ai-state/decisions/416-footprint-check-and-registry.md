@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5c302933
+id: dec-416
+draft_id: dec-draft-5c302933
 title: A stdlib footprint check script and an optional per-project footprint registry own the criteria grammars and the trigger
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-01
 summary: "New CODE gate scripts/check_footprint_criteria.py (stdlib, 3.9-safe, stages spec|plan|verify, findings FP01-FP05) is the single owner of the spec-table, registry and measurement-log grammars; new optional .ai-state/FOOTPRINTS.md maps footprint classes to path globs and instruments so the trigger is a mechanical path-class match at plan and verify time; instruments stay measure-only, the check owns validity and freshness, the verifier owns the value-vs-limit grade; no registry and no tables means inactive, exit 0"

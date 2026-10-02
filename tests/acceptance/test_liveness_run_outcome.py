@@ -38,6 +38,7 @@ _PROJECT_ROW = json.dumps(
 )
 
 
+@pytest.mark.liveness
 def test_every_check_reports_and_the_run_fails_when_two_gates_are_dead(tmp_path):
     copy = make_copy(tmp_path)
     dead_gates.mutation_sensor_parallel_inheritance_failure(copy)
@@ -54,6 +55,7 @@ def test_every_check_reports_and_the_run_fails_when_two_gates_are_dead(tmp_path)
     )
 
 
+@pytest.mark.liveness
 def test_each_failing_check_says_what_it_expected_and_what_it_observed(tmp_path):
     copy = make_copy(tmp_path)
     dead_gates.mutation_sensor_reports_success_without_running(copy)

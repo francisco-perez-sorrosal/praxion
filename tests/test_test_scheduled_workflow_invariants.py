@@ -140,7 +140,7 @@ def test_liveness_cli_runs_from_the_synced_environment_and_nowhere_else() -> Non
 
 def test_liveness_canaries_run_the_liveness_marker_over_the_e2e_directory() -> None:
     text = _run_text(_workflow()["jobs"]["gate-liveness-canaries"])
-    assert "pytest -m liveness tests/e2e" in text
+    assert "pytest -m liveness tests/e2e tests/acceptance" in text
     assert "uv sync --frozen" in text
 
 

@@ -16,6 +16,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from tests.acceptance.drivers import dead_gates
 from tests.acceptance.drivers.gate_liveness import (
     Gate,
@@ -46,6 +48,7 @@ def test_counter_tallying_hook_written_spawns_exactly_passes_the_check(tmp_path)
     assert run.exit_code == 0, run.describe()
 
 
+@pytest.mark.liveness
 def test_counter_attributing_spawns_by_checkout_name_fails_the_check_showing_both_tallies(
     tmp_path,
 ):
@@ -60,6 +63,7 @@ def test_counter_attributing_spawns_by_checkout_name_fails_the_check_showing_bot
     )
 
 
+@pytest.mark.liveness
 def test_counter_that_reports_nothing_fails_the_check(tmp_path):
     copy = _copy_with_dead_counter(tmp_path, dead_gates.spawn_counter_says_nothing)
 
@@ -69,6 +73,7 @@ def test_counter_that_reports_nothing_fails_the_check(tmp_path):
     assert verdict.reason.strip(), f"a failure with no reason\n{run.describe()}"
 
 
+@pytest.mark.liveness
 def test_counter_answering_an_unseen_slug_with_zero_fails_the_check(tmp_path):
     copy = _copy_with_dead_counter(tmp_path, dead_gates.spawn_counter_counts_unseen_slug_as_zero)
 
@@ -78,6 +83,7 @@ def test_counter_answering_an_unseen_slug_with_zero_fails_the_check(tmp_path):
     assert verdict.reason.strip(), f"a failure with no reason\n{run.describe()}"
 
 
+@pytest.mark.liveness
 def test_missing_counter_fails_the_check_and_says_why(tmp_path):
     copy = _copy_with_dead_counter(tmp_path, lambda c: c.remove(dead_gates.SPAWN_COUNT))
 

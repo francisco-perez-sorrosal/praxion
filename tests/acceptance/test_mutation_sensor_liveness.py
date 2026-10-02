@@ -16,6 +16,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from tests.acceptance.drivers import dead_gates
 from tests.acceptance.drivers.gate_liveness import (
     Gate,
@@ -46,6 +48,7 @@ def test_live_sensor_on_the_in_repository_fixture_passes_the_check(tmp_path):
     assert run.exit_code == 0, run.describe()
 
 
+@pytest.mark.liveness
 def test_sensor_refusing_because_its_test_runs_inherit_parallel_options_fails_the_check(
     tmp_path,
 ):
@@ -60,6 +63,7 @@ def test_sensor_refusing_because_its_test_runs_inherit_parallel_options_fails_th
     )
 
 
+@pytest.mark.liveness
 def test_sensor_refusing_with_the_layout_reason_still_fails_the_check(tmp_path):
     copy = _copy_with_dead_sensor(
         tmp_path,
@@ -76,6 +80,7 @@ def test_sensor_refusing_with_the_layout_reason_still_fails_the_check(tmp_path):
     )
 
 
+@pytest.mark.liveness
 def test_sensor_reporting_success_without_running_fails_the_check(tmp_path):
     copy = _copy_with_dead_sensor(
         tmp_path, dead_gates.mutation_sensor_reports_success_without_running
@@ -87,6 +92,7 @@ def test_sensor_reporting_success_without_running_fails_the_check(tmp_path):
     assert verdict.reason.strip(), f"a failure with no reason\n{run.describe()}"
 
 
+@pytest.mark.liveness
 def test_sensor_reporting_a_survivor_outside_the_loosely_tested_code_fails_the_check(
     tmp_path,
 ):
@@ -100,6 +106,7 @@ def test_sensor_reporting_a_survivor_outside_the_loosely_tested_code_fails_the_c
     assert verdict.reason.strip(), f"a failure with no reason\n{run.describe()}"
 
 
+@pytest.mark.liveness
 def test_sensor_that_prints_nothing_fails_the_check_and_says_why(tmp_path):
     copy = _copy_with_dead_sensor(tmp_path, dead_gates.mutation_sensor_says_nothing)
 
@@ -109,6 +116,7 @@ def test_sensor_that_prints_nothing_fails_the_check_and_says_why(tmp_path):
     assert verdict.reason.strip(), f"a failure with no reason\n{run.describe()}"
 
 
+@pytest.mark.liveness
 def test_missing_sensor_fails_the_check_and_says_why(tmp_path):
     copy = _copy_with_dead_sensor(tmp_path, lambda c: c.remove(dead_gates.MUTATION_SENSOR))
 

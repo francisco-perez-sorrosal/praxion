@@ -394,4 +394,4 @@ jobs:
 
       # The last -m wins over the runner config's -m 'not large and not liveness'.
       - name: Run the liveness scenarios
-        run: .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider
+        run: .venv/bin/python -m pytest -m liveness tests/e2e tests/acceptance -n 0 --no-cov -p no:cacheprovider

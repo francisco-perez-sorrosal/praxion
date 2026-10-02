@@ -13,7 +13,10 @@ Nothing passes by default. A probe module that does not exist, raises, returns
 something other than its own gate's verdict, or outlives its time limit becomes
 a failed verdict whose reason reads `expected ...; observed ...`, and the
 remaining probes still run. Each probe runs in its own process group, so a
-timeout kills the probe together with whatever it started.
+timeout kills the probe and the children that stay in its group. A probe that
+starts children in their own sessions (the selection audit does, to kill its
+own traced runs) is outside that reach and must finish within its own limits,
+which sit below the CLI's.
 
 Probes see a scrubbed environment: no session, credential or git-plumbing
 variables (`CLAUDE*`, `PRAXION_*`, `GIT_*`, `ANTHROPIC_*`, `GH_TOKEN`,

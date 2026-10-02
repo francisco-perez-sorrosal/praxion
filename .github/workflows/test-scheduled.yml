@@ -32,7 +32,7 @@
 #
 # Two further jobs, `gate-liveness` and `gate-liveness-canaries`, prove the
 # gates still bite on known input (`scripts/check_gates_bite.py`, and the
-# `liveness`-marked scenarios under tests/e2e). They are Praxion-specific:
+# `liveness`-marked scenarios under tests/e2e and tests/acceptance). They are Praxion-specific:
 # they are not mirrored into `claude/project-baseline/tests/test-scheduled.yml.tmpl`.
 # Both hold a read-only grant and no secret, start no assistant session, and
 # give each pytest invocation one tree (tests/ and fitness/tests/ never share
@@ -375,7 +375,7 @@ jobs:
         run: .venv/bin/python scripts/check_gates_bite.py
 
   gate-liveness-canaries:
-    name: Gate liveness canaries (whole-suite scenarios)
+    name: Gate liveness canaries (liveness-marked scenarios)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

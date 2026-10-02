@@ -124,6 +124,20 @@ def test_gate_fire_row_lands_in_the_payloads_project_not_the_processs(
     assert _read_gate_fire_rows(process_project) == []
 
 
+def test_a_payload_without_cwd_records_in_the_process_project(tmp_path: Path, monkeypatch) -> None:
+    """With no payload `cwd` the hook judges its own working directory, so the record
+    goes there too, never nowhere."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    monkeypatch.chdir(tmp_path)
+    payload = {"tool_name": "Bash", "tool_input": {"command": "rm -rf .ai-work/some-slug"}}
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+
+    module.main()
+
+    assert [row["outcome"] for row in _read_gate_fire_rows(tmp_path)] == ["pass"]
+
+
 def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.chdir(tmp_path)

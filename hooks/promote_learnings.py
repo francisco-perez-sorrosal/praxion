@@ -7,6 +7,7 @@ Exit 0 unconditionally.
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -102,7 +103,9 @@ def main() -> None:
     if not _is_cleanup_command(command):
         return
 
-    project_dir = payload.get("cwd", ".")
+    # No payload cwd: the hook judges its own working directory, so that is where the
+    # record goes (an absolute path, which the log locator requires).
+    project_dir = payload.get("cwd") or os.getcwd()
     decision = _check_and_warn(project_dir)
     try:
         # The record belongs to the project the decision judged, not to whatever directory

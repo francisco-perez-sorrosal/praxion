@@ -878,16 +878,12 @@ why = "reads these files in a child process or by a directory scan; found unsele
 
 [[dep]]
 paths = [
-  ".ai-state/DESIGN_CHANGELOG.md",
-  ".ai-state/FOOTPRINTS.md",
-  ".ai-state/LANDSCAPE_WATCHLIST.md",
-  ".ai-state/SYSTEM_DEPLOYMENT.md",
-  ".ai-state/UPSTREAM_ISSUES.md",
+  ".ai-state/*.md",
 ]
 tests = [
   "scripts/test_check_state_ledgers.py",
 ]
-why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+why = "the live-tree check runs the ledger gate in a child process over every top-level state file: it parses the registered ledgers and scans the rest for a Schema line"
 
 [[dep]]
 paths = [

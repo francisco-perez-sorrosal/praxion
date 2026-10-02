@@ -22,6 +22,8 @@ The resolver builds one dependency graph per pocket from four sources, then unio
 
 A changed test file always selects itself (`via: self`). Selection is reverse reachability: which test files reach a changed path through any of the four edges.
 
+**State data stops after one hop.** A changed file under `.ai-state/` that is not source code selects only the tests one hop away: those holding its path or a matching pattern, and those declared for it. Nothing propagates from a production module that names it. Such a module reads the project's live state at run time, while the tests that import it build their own state under a temp directory, so the live file cannot change their outcome. Before this rule, one ledger schema imported by a `conftest.py` selected about 175 tests for every state commit. A state file no test reaches directly widens as `unmapped-path`. A test that does read live state must hold its path or be declared, and the weekly selection audit reports one that does neither.
+
 **Serial threshold.** When the estimated test count (occurrences of `def test_`/`async def test_`) in a Python pocket's selection is at or below the serial threshold (`SERIAL_BELOW_TESTS`, initially 20), the emitted invocation adds `-n 0` — skipping parallel-worker start-up for a run too small to benefit from it. This only applies when the pocket's own config already enables xdist.
 
 ## Widening
@@ -139,6 +141,16 @@ The refresh plan's risk trigger ("restrict production path-literal edges if the 
 | Edge attribution | path-literal 64%, declared 32%, import 4% | path-literal 65%, declared 30%, import 4% |
 
 A first design let a basename pattern select every test reaching its holder. Measured the same way, it moved the narrow median to 82%, because dozens of production scripts hold `*.md`; that is why a pattern selects only holders that are test modules.
+
+**Re-measured 2026-10-02, before and after the one-hop rule for state data and the evidence-pruned `rules/**`+`skills/**` declared entry (53 to 13 test files).** Both are measured over the same tree, a 303-file corpus, on two 50-commit windows. The first window ends at `a79d4e04`, the window of the spike that proposed both changes; it is rich in state and Markdown commits. The second ends at `39ebc23d` and is mostly narrow script work.
+
+| Measure | Spike window, before | after | Recent window, before | after |
+|---|---|---|---|---|
+| Widened to the full suite | 6 of 50 | 6 of 50 | 4 of 50 | 4 of 50 |
+| Median / p90, narrow runs only | 103.5 / 230 (34% / 76%) | 38.5 / 169 (13% / 56%) | 74 / 231 (24% / 76%) | 27 / 100 (9% / 33%) |
+| Median, widened runs counted as 303 | 41% | 22% | 25% | 10% |
+
+The trigger no longer fires on either window. The two windows read 24% and 34% on one tree before the change, so a single window is a weak basis for the trigger; measure more than one.
 
 ## The Five Loops — Operational Copy
 

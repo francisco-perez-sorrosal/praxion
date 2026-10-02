@@ -36,6 +36,13 @@ it is not source code. A pattern is a guess about which files a module reads,
 so a source file it happens to match is still unaccounted for and widens; its
 readers run within that full run.
 
+State data does not fan out: a changed non-code file under `.ai-state/`
+selects only the tests one hop away -- those holding its path or a matching
+pattern, and those declared for it. A production module naming a state file
+reads the project's live state at run time, while the tests that import it
+build their own under a temp directory, so the live file cannot change their
+outcome. A state file no test reaches directly is unaccounted for and widens.
+
 Dynamic imports beyond the literal `import_module` form are invisible here;
 the resolver widens unmapped paths and the full suite backstops the rest.
 Stdlib-only: it runs under a bare `python3` (gate-liveness GL05).
@@ -73,6 +80,7 @@ _VIA_RANK = {"self": -1, **{via: rank for rank, via in enumerate(VIA_ORDER)}}
 _PATTERN_RANK = _VIA_RANK["path-literal"]
 _TEST_DEF = re.compile(r"^[ \t]*(?:async[ \t]+)?def[ \t]+test_", re.MULTILINE)
 _MAX_LITERAL = 300
+STATE_DIR = ".ai-state/"
 
 
 @dataclass(frozen=True)
@@ -170,8 +178,9 @@ def _reach(
     higher-priority first hop wins. With `patterns`, a test whose basename
     pattern matches `start` is found directly at the `path-literal` rank, unless
     a named edge of higher priority also reaches it; it is never expanded, so
-    nothing propagates from a pattern holder.
+    nothing propagates from a pattern holder. State data stops after the first hop.
     """
+    fans_out = is_source_code(start) or not start.startswith(STATE_DIR)
     found: dict[str, str] = {}
     if is_any_test_file(start) and is_runnable(start):
         found[start] = "self"
@@ -194,7 +203,7 @@ def _reach(
                     if dependent not in visited:
                         following[dependent] = min(following.get(dependent, rank), rank)
         visited.update(following)
-        frontier = following
+        frontier = following if fans_out else {}
     return found
 
 

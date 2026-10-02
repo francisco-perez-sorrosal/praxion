@@ -484,6 +484,56 @@ def test_an_unrunnable_pattern_reader_is_neither_selected_nor_accounted_for(
 # -- Declared edges ------------------------------------------------------------
 
 
+_NAMES_THE_LEDGER = 'LEDGER = "{path}"\n'
+_IMPORTS_SCHEMA = "import schema\n\n\ndef test_x():\n    pass\n"
+
+
+def test_a_state_data_file_selects_its_direct_holder_but_not_importers_of_a_module_naming_it(
+    tmp_path: Path,
+) -> None:
+    """A module naming live project state is tested on fixture state, never the live file."""
+    _write(tmp_path, ".ai-state/LEDGER.md", "| row |\n")
+    _write(tmp_path, "pkg/schema.py", _NAMES_THE_LEDGER.format(path=".ai-state/LEDGER.md"))
+    _write(tmp_path, "pkg/test_uses_schema.py", _IMPORTS_SCHEMA)
+    _write(
+        tmp_path,
+        "tests/test_live_ledger.py",
+        'def test_reads():\n    open(".ai-state/LEDGER.md")\n',
+    )
+
+    derivation = python_selection.derive(tmp_path, [".ai-state/LEDGER.md"], NO_DEPS)
+
+    assert [(t.path, t.via) for t in derivation.tests] == [
+        ("tests/test_live_ledger.py", "path-literal")
+    ]
+    assert derivation.mapped == {".ai-state/LEDGER.md"}
+
+
+def test_a_state_data_file_only_a_production_module_names_is_not_accounted_for(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, ".ai-state/LEDGER.md", "| row |\n")
+    _write(tmp_path, "pkg/schema.py", _NAMES_THE_LEDGER.format(path=".ai-state/LEDGER.md"))
+    _write(tmp_path, "pkg/test_uses_schema.py", _IMPORTS_SCHEMA)
+
+    derivation = python_selection.derive(tmp_path, [".ai-state/LEDGER.md"], NO_DEPS)
+
+    assert derivation.tests == ()
+    assert derivation.mapped == frozenset()
+
+
+def test_a_data_file_outside_the_state_directory_still_reaches_importers_of_its_holder(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "docs/LEDGER.md", "| row |\n")
+    _write(tmp_path, "pkg/schema.py", _NAMES_THE_LEDGER.format(path="docs/LEDGER.md"))
+    _write(tmp_path, "pkg/test_uses_schema.py", _IMPORTS_SCHEMA)
+
+    selection = python_selection.select(tmp_path, ["docs/LEDGER.md"], NO_DEPS)
+
+    assert _via(selection, "pkg/test_uses_schema.py") == "path-literal"
+
+
 def test_declared_dep_reaches_its_listed_test(tmp_path: Path) -> None:
     _write(tmp_path, ".ai-state/decisions/001-x.md", "# x\n")
     _write(

@@ -626,61 +626,34 @@ tests = [
 ]
 why = "the root Python project config (tool pins, markers, addopts, pytest-cov settings); the repo-gate and CI-workflow-invariant tests read it to check tool version pins and config values match what CI enforces"
 
+# Evidence-pruned (2026-10-02) from the 53 test files of the seeded group list to
+# the 13 that read this corpus: each listed file was traced reading at least one
+# matching file (scripts/gate_probes/tracer/, direct or child-process reads,
+# identical in one parallel run and one process per file), and none of the 40
+# dropped files failed with every matching file deleted, emptied or garbled.
+# The weekly selection audit (check_gates_bite.py) fails when a test reads a
+# matching file this list no longer reaches; re-derive with the same tracer.
 [[dep]]
 paths = [
   "rules/**/*.md",
   "skills/**/*.md",
 ]
 tests = [
-  "fitness/**",
-  "scripts/test_apply_skill_description_diet.py",
+  "fitness/tests/test_discipline_registry_invariants.py",
   "scripts/test_artifact_registry.py",
-  "scripts/test_build_doc_manifest.py",
-  "scripts/test_canonical_block_identity.py",
-  "scripts/test_check_aac_golden_rule.py",
-  "scripts/test_check_agent_lifecycle_pairing.py",
   "scripts/test_check_agent_prompt_size.py",
-  "scripts/test_check_agent_shared_blocks.py",
-  "scripts/test_check_architecture_projection.py",
-  "scripts/test_check_artifact_conformance.py",
   "scripts/test_check_behavioral_contract.py",
-  "scripts/test_check_commit_msg_authorship.py",
-  "scripts/test_check_doc_manifest_freshness.py",
   "scripts/test_check_frontmatter_parses.py",
-  "scripts/test_check_gate_liveness.py",
-  "scripts/test_check_html_authorship.py",
-  "scripts/test_check_p06_task_brief.py",
-  "scripts/test_check_path_resolution.py",
-  "scripts/test_check_paths_syntax.py",
-  "scripts/test_check_registry_projection.py",
-  "scripts/test_check_ruff_pin_drift.py",
-  "scripts/test_check_sentinel_self_audit.py",
-  "scripts/test_check_shipped_artifact_isolation.py",
-  "scripts/test_check_squash_safety.py",
-  "scripts/test_check_staleness_markers.py",
-  "scripts/test_check_template_mirrors.py",
-  "scripts/test_check_test_results_shape.py",
   "scripts/test_check_token_ratchet.py",
-  "scripts/test_claude_to_agents.py",
   "scripts/test_measure_token_budget.py",
-  "scripts/test_refresh_claude_blocks.py",
   "scripts/test_regenerate_rules_manifest.py",
-  "scripts/test_render_claude_md.py",
   "scripts/test_return_contract_clause_completeness.py",
-  "scripts/test_run_check_families.py",
   "scripts/test_strip_progress_mandate.py",
   "scripts/test_sync_canonical_blocks.py",
-  "tests/test_aac_fence_validator.py",
-  "tests/test_agent_frontmatter_plugin_compat.py",
-  "tests/test_check_id_citation_discipline.py",
-  "tests/test_check_id_citation_discipline_hook_mode.py",
   "tests/test_declared_arguments_reach_the_body.py",
   "tests/test_plugin_namespace_invariants.py",
-  "tests/test_pre_commit_onboarding_regex.py",
-  "tests/test_sentinel_check_triangle.py",
-  "tests/test_sentinel_row_contract.py",
 ]
-why = "every rule and skill file; the fitness, knowledge-projection and repo-gate tests (staleness markers, token budget, template mirrors, id-citation discipline) read this corpus directly to validate its content and structure"
+why = "the rule and skill corpus; these tests read it directly to validate its frontmatter, structure, token cost and the blocks synced into it"
 
 [[dep]]
 paths = [

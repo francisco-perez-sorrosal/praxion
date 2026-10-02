@@ -78,6 +78,16 @@ def _payload_line(path: str, root_selection="tests", tests=(), widen=False, root
 # -- parsing the trace -------------------------------------------------------------
 
 
+def test_a_blank_line_between_records_skips_only_itself():
+    """Records after a blank line still count: dropping them would judge fewer reads than ran."""
+    lines = [_record(TEST, DATA, "direct"), "", _record(TEST, "tools/x.py", "child")]
+
+    observed = selection.parse_records(lines)
+
+    assert observed.pairs_by_channel["direct"] == {(TEST, DATA)}
+    assert observed.pairs_by_channel["child"] == {(TEST, "tools/x.py")}
+
+
 def test_records_are_sorted_into_channels_heartbeats_and_collected_files():
     lines = [
         _record(TEST, DATA, "direct"),
@@ -295,7 +305,7 @@ def test_fewer_reads_than_ways_yield_no_empty_chunk():
 def test_unselected_reads_fail_with_an_expected_observed_reason_naming_one_of_them():
     verdict = selection.verdict_from(unselected=((TEST, DATA),), notes=("n",), elapsed_s=1.5)
 
-    assert not verdict.passed
+    assert verdict.passed is False
     assert verdict.gate is GateId.SELECTION_AUDIT
     assert verdict.unselected == ((TEST, DATA),)
     assert verdict.reason.startswith("expected ")
@@ -306,7 +316,9 @@ def test_unselected_reads_fail_with_an_expected_observed_reason_naming_one_of_th
 def test_no_unselected_reads_pass_and_keep_their_notes():
     verdict = selection.verdict_from(unselected=(), notes=("n",), elapsed_s=2.0)
 
-    assert verdict.passed
+    assert verdict.passed is True
+    assert verdict.gate is GateId.SELECTION_AUDIT
+    assert verdict.reason == ""
     assert verdict.notes == ("n",)
 
 
@@ -468,6 +480,11 @@ def test_canary_pair_is_the_first_co_located_scripts_test_and_its_source():
     tracked = frozenset(
         {"hooks/test_a.py", "hooks/a.py", "scripts/test_b.py", "scripts/b.py", "scripts/test_c.py"}
     )
+    assert selection.canary_pair(tracked) == ("scripts/test_b.py", "scripts/b.py")
+
+
+def test_canary_pair_skips_a_co_located_pair_that_is_not_python():
+    tracked = frozenset({"scripts/test_a.sh", "scripts/a.sh", "scripts/test_b.py", "scripts/b.py"})
     assert selection.canary_pair(tracked) == ("scripts/test_b.py", "scripts/b.py")
 
 

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-ccf73d37
+id: dec-420
+draft_id: dec-draft-ccf73d37
 title: The selection audit's oracle is traced direct and child-process reads, with first-importer credit reported but not judged, evaluated through a per-path resolver mode
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-01
 summary: "A committed stdlib read tracer (scripts/gate_probes/tracer/: a sitecustomize audit hook plus a pytest plugin) records, per test file, the tracked files opened for reading on three channels: direct (in-process, non-import, including explicit path loads), child (any read in a process the test started) and import (an in-process load under importlib _find_and_load, credited to whichever test imported first). Bytecode-cache reads map back to source. The verdict judges direct and child pairs only; import pairs are a note. resolve_test_scope.py gains --per-path (with --changed and --json): JSON Lines, each line identical to the single-path payload, with the graph built once. A missing per-path answer counts as selecting nothing"

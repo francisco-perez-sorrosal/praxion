@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-01T10:51:05Z'
+generated_at: '2026-10-02T16:21:38Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-02'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-02'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-02'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2895,7 +2895,7 @@ surfaces:
   path: .ai-state/decisions/388-mutation-sensor.md
   type: markdown
   title: "A per-step mutation sensor: one stdlib runner owning the recipe, one bounded TEST_RESULTS line, one planner tag \u2014 sensor, never a gate"
-  last_modified: '2026-09-20'
+  last_modified: '2026-10-01'
   renderer: adr_card
 - id: ai-state-decisions-389-workflow-encoded-lens-fan-out-skill
   path: .ai-state/decisions/389-workflow-encoded-lens-fan-out-skill.md
@@ -3076,6 +3076,24 @@ surfaces:
   type: markdown
   title: Measured footprint values are recorded in an append-only MEASUREMENTS.md table, not as TEST_RESULTS.md lines
   last_modified: '2026-10-01'
+  renderer: adr_card
+- id: ai-state-decisions-419-production-shaped-gate-liveness-probes
+  path: .ai-state/decisions/419-production-shaped-gate-liveness-probes.md
+  type: markdown
+  title: Production-shaped gate-liveness probes run behind one CLI in a read-only job of the scheduled test workflow
+  last_modified: '2026-10-02'
+  renderer: adr_card
+- id: ai-state-decisions-420-selection-audit-oracle-from-traced-reads
+  path: .ai-state/decisions/420-selection-audit-oracle-from-traced-reads.md
+  type: markdown
+  title: The selection audit's oracle is traced direct and child-process reads, with first-importer credit reported but not judged, evaluated through a per-path resolver mode
+  last_modified: '2026-10-02'
+  renderer: adr_card
+- id: ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
+  path: .ai-state/decisions/421-tagged-step-blocks-without-a-mutation-reading.md
+  type: markdown
+  title: A step tagged mutation on completes only on a mutation reading; the step-completion reconciler owns the block and the step-document schema owns the Mutation line
+  last_modified: '2026-10-02'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3805,6 +3823,9 @@ groups:
   - ai-state-decisions-416-footprint-check-and-registry
   - ai-state-decisions-417-footprint-criteria-placement
   - ai-state-decisions-418-measurement-record-artifact
+  - ai-state-decisions-419-production-shaped-gate-liveness-probes
+  - ai-state-decisions-420-selection-audit-oracle-from-traced-reads
+  - ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

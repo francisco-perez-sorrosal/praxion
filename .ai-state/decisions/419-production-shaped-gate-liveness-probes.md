@@ -1,7 +1,8 @@
 ---
-id: dec-draft-54f10c9f
+id: dec-419
+draft_id: dec-draft-54f10c9f
 title: Production-shaped gate-liveness probes run behind one CLI in a read-only job of the scheduled test workflow
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-01
 summary: "New CLI scripts/check_gates_bite.py over a new scripts/gate_probes/ package runs four probes (mutation sensor, observation-log hooks, spawn counter, selection audit), each reaching its gate through the production entry point and input shape; it reports one verdict per gate (JSON schema 1 owned by gate_probes/verdict.py) and exits 1 if any fails. New test-scheduled.yml jobs gate-liveness (20-minute step limit, contents: read, no secret) and gate-liveness-canaries (the liveness-marked e2e scenarios); a new liveness pytest marker is deselected by default and absent from the -m large job"

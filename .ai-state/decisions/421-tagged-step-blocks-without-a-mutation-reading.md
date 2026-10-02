@@ -1,7 +1,8 @@
 ---
-id: dec-draft-65e11d84
+id: dec-421
+draft_id: dec-draft-65e11d84
 title: A step tagged mutation on completes only on a mutation reading; the step-completion reconciler owns the block and the step-document schema owns the Mutation line
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-01
 summary: "The Mutation: line grammar moves into scripts/_step_schema.py (MutationReading sum type, parse/render, DECLARED_LIMIT_REASONS = {not-flat-layout}, mutation_block_reason); the sensor renders through it. reconcile_pipeline_state.py scans the plan's mutation: on|off tag and reports a new blocked verdict (exit 2) for an otherwise-done tagged step whose latest run has no line, an unreadable line, or a refusal other than not-flat-layout. The writer returns [BLOCKED], /resume-pipeline surfaces it and never auto-marks, and the verifier grades it FAIL. This narrows dec-388's 'a refusal is recorded, never a failure' disposition"

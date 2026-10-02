@@ -39,6 +39,7 @@ STEP_ID_RE = re.compile(r"^\d+[a-z]?$")
 
 _HEADING_STEP_RE = re.compile(r"^#{2,4}\s*Step\s+(\d+[a-z]?)\b")
 _ATX_HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
+_CODE_FENCE_RE = re.compile(r"^[ \t]{0,3}(```|~~~)")
 _SORT_KEY_RE = re.compile(r"(\d+)([a-z]?)\s*$")
 
 _RESULT_PREFIX_RE = re.compile(r"^Result:\s*(.*)$")
@@ -752,24 +753,34 @@ def mutation_tagged_steps(plan_text: str) -> frozenset[str]:
 
     A tag line belongs to the step heading or checklist line above it; the
     last tag under a step wins, and a tag before any step belongs to none.
-    A step's block ends at a heading of its own level or higher (a checklist
-    step's at any heading), so a tag-shaped line in a later section such as
-    `## Notes` can never untag the last step; a deeper subsection stays inside it.
+    A step's block ends at an ATX heading (`#` .. `######` then a space) of its
+    own level or higher -- a checklist step's at any such heading -- so a
+    tag-shaped line in a later section such as `## Notes` can never untag the
+    last step, while a deeper subsection stays inside it. A line inside a ```
+    or ~~~ code fence is never a heading. Other section breaks (a bold label,
+    a `---` rule, a setext heading) do not end a step.
     """
     tagged: set[str] = set()
     current: str | None = None
     current_level = 0  # heading level that opened `current`; 0 for a checklist step
+    fence: str | None = None  # the open code fence's marker, while inside one
     for line in plan_text.splitlines():
-        heading_step = step_id_from_heading(line)
-        step_id = heading_step or checklist_step_id(line)
-        if step_id is not None:
-            current = step_id
-            current_level = _heading_level(line) if heading_step else 0
+        fence_marker = _CODE_FENCE_RE.match(line)
+        if fence_marker:
+            marker = fence_marker.group(1)
+            fence = None if fence == marker else (fence or marker)
             continue
-        level = _heading_level(line)
-        if level and (current_level == 0 or level <= current_level):
-            current = None
-            continue
+        if fence is None:  # headings and step lines exist only outside a code fence
+            heading_step = step_id_from_heading(line)
+            step_id = heading_step or checklist_step_id(line)
+            if step_id is not None:
+                current = step_id
+                current_level = len(line) - len(line.lstrip("#")) if heading_step else 0
+                continue
+            level = _heading_level(line)
+            if level and (current_level == 0 or level <= current_level):
+                current = None
+                continue
         tag = parse_mutation_tag(line)
         if tag is None or current is None:
             continue

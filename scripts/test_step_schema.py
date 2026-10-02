@@ -678,6 +678,23 @@ def test_mutation_tagged_steps_a_subsection_inside_a_step_keeps_its_tag() -> Non
     )
 
 
+def test_mutation_tagged_steps_a_comment_inside_a_code_fence_is_not_a_heading() -> None:
+    plan = (
+        "### Step 3: c\n```bash\n# run the sensor\n```\nmutation: on\n"  # id-citation-discipline:ignore
+        "### Step 4: d\n~~~\n## not a section\n~~~\nmutation: on\n"  # id-citation-discipline:ignore
+    )
+    assert schema.mutation_tagged_steps(plan) == frozenset(
+        {"Step 3", "Step 4"}  # id-citation-discipline:ignore
+    )
+
+
+def test_mutation_tagged_steps_a_spaceless_step_heading_keeps_its_subsection() -> None:
+    plan = "###Step 3: c\n#### Detail\nmutation: on\n"  # id-citation-discipline:ignore
+    assert schema.mutation_tagged_steps(plan) == frozenset(
+        {"Step 3"}  # id-citation-discipline:ignore
+    )
+
+
 def test_mutation_tagged_steps_a_heading_ends_a_checklist_step() -> None:
     wip = (
         "- [ ] Step 7: x\nmutation: on\n## Notes\nmutation: off\n"  # id-citation-discipline:ignore

@@ -102,9 +102,17 @@ def main() -> None:
     if not _is_cleanup_command(command):
         return
 
-    decision = _check_and_warn(payload.get("cwd", "."))
+    project_dir = payload.get("cwd", ".")
+    decision = _check_and_warn(project_dir)
     try:
-        record_gate_fire("promote_learnings", decision, session_id=payload.get("session_id", ""))
+        # The record belongs to the project the decision judged, not to whatever directory
+        # the hook process happens to run in.
+        record_gate_fire(
+            "promote_learnings",
+            decision,
+            session_id=payload.get("session_id", ""),
+            project_dir=project_dir,
+        )
     except Exception:
         pass
 

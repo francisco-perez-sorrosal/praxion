@@ -101,6 +101,29 @@ def test_gate_fire_row_on_warn(tmp_path: Path, monkeypatch) -> None:
     assert rows[0]["outcome"] == "warn"
 
 
+def test_gate_fire_row_lands_in_the_payloads_project_not_the_processs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The decision is about the payload's project, so its record goes there too: a hook
+    started from another checkout (a test run from the repository root) must not write
+    into that checkout's log."""
+    module = _load_module()
+    process_project = tmp_path / "process"
+    payload_project = tmp_path / "payload"
+    for project in (process_project, payload_project):
+        (project / ".ai-state").mkdir(parents=True)
+    _write_learnings(payload_project)
+    monkeypatch.chdir(process_project)
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps(_cleanup_payload(str(payload_project))))
+    )
+
+    module.main()
+
+    assert [row["outcome"] for row in _read_gate_fire_rows(payload_project)] == ["warn"]
+    assert _read_gate_fire_rows(process_project) == []
+
+
 def test_helper_exception_does_not_change_exit_code_on_pass(tmp_path: Path, monkeypatch) -> None:
     module = _load_module()
     monkeypatch.chdir(tmp_path)

@@ -38,6 +38,7 @@ RED = "red"
 STEP_ID_RE = re.compile(r"^\d+[a-z]?$")
 
 _HEADING_STEP_RE = re.compile(r"^#{2,4}\s*Step\s+(\d+[a-z]?)\b")
+_ATX_HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
 _SORT_KEY_RE = re.compile(r"(\d+)([a-z]?)\s*$")
 
 _RESULT_PREFIX_RE = re.compile(r"^Result:\s*(.*)$")
@@ -233,6 +234,12 @@ def split_step_blocks(text: str) -> tuple[StepBlock, ...]:
 
 def _heading_title(line: str) -> str:
     return line.lstrip("#").strip()
+
+
+def _heading_level(line: str) -> int:
+    """A Markdown ATX heading's level (`## x` -> 2); 0 for any other line."""
+    match = _ATX_HEADING_RE.match(line)
+    return len(match.group(1)) if match else 0
 
 
 def _collect_results(lines: list[str], start: int, end: int) -> tuple[tuple[int, ResultLine], ...]:
@@ -745,13 +752,23 @@ def mutation_tagged_steps(plan_text: str) -> frozenset[str]:
 
     A tag line belongs to the step heading or checklist line above it; the
     last tag under a step wins, and a tag before any step belongs to none.
+    A step's block ends at a heading of its own level or higher (a checklist
+    step's at any heading), so a tag-shaped line in a later section such as
+    `## Notes` can never untag the last step; a deeper subsection stays inside it.
     """
     tagged: set[str] = set()
     current: str | None = None
+    current_level = 0  # heading level that opened `current`; 0 for a checklist step
     for line in plan_text.splitlines():
-        step_id = step_id_from_heading(line) or checklist_step_id(line)
+        heading_step = step_id_from_heading(line)
+        step_id = heading_step or checklist_step_id(line)
         if step_id is not None:
             current = step_id
+            current_level = _heading_level(line) if heading_step else 0
+            continue
+        level = _heading_level(line)
+        if level and (current_level == 0 or level <= current_level):
+            current = None
             continue
         tag = parse_mutation_tag(line)
         if tag is None or current is None:

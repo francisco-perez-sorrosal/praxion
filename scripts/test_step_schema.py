@@ -654,6 +654,39 @@ def test_mutation_tagged_steps_reads_a_wip_checklist() -> None:
     )
 
 
+def test_mutation_tagged_steps_a_later_section_cannot_disarm_the_last_step() -> None:
+    """A tag-shaped bullet under a closing section belongs to no step: read as the last
+    step's, it would silently untag it and let it complete without a reading."""
+    plan = (
+        "### Step 3: c\nmutation: on\n"  # id-citation-discipline:ignore
+        "## Notes\n- `mutation: off` (or omitting the field) means no sensor run.\n"
+    )
+    assert schema.mutation_tagged_steps(plan) == frozenset(
+        {"Step 3"}  # id-citation-discipline:ignore
+    )
+
+
+def test_mutation_tagged_steps_a_same_level_heading_ends_the_step_block() -> None:
+    plan = "### Step 1: a\n### Risks\nmutation: on\n"  # id-citation-discipline:ignore
+    assert schema.mutation_tagged_steps(plan) == frozenset()
+
+
+def test_mutation_tagged_steps_a_subsection_inside_a_step_keeps_its_tag() -> None:
+    plan = "### Step 1: a\n#### Detail\nmutation: on\n"  # id-citation-discipline:ignore
+    assert schema.mutation_tagged_steps(plan) == frozenset(
+        {"Step 1"}  # id-citation-discipline:ignore
+    )
+
+
+def test_mutation_tagged_steps_a_heading_ends_a_checklist_step() -> None:
+    wip = (
+        "- [ ] Step 7: x\nmutation: on\n## Notes\nmutation: off\n"  # id-citation-discipline:ignore
+    )
+    assert schema.mutation_tagged_steps(wip) == frozenset(
+        {"Step 7"}  # id-citation-discipline:ignore
+    )
+
+
 def test_mutation_tagged_steps_ignores_a_tag_before_any_step() -> None:
     assert (
         schema.mutation_tagged_steps(

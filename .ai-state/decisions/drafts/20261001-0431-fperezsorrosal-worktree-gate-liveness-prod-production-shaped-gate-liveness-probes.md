@@ -41,7 +41,7 @@ The acceptance tests (BA-01) fix the boundary: one command, run from a repositor
   - The counter probe counts rows the hooks wrote, never hand-written rows.
 - **Host: `test-scheduled.yml`**, as two jobs:
   - `gate-liveness`: the CLI, with a step `timeout-minutes: 20`, `permissions: contents: read`, and no secret or token.
-  - `gate-liveness-canaries`: `pytest -m liveness tests/e2e`, with job `timeout-minutes: 45`.
+  - `gate-liveness-canaries`: `pytest -m liveness tests/e2e tests/acceptance`, with job `timeout-minutes: 45` (the acceptance path carries the dead-gate scenarios moved off the per-push run to hold the suite-runtime footprint).
 - **A `liveness` marker**, registered in `pyproject.toml` and deselected by addopts (`-m 'not large and not liveness'`), so the whole-suite audit scenarios run only in the canary job, never in the default run or the `-m large` job (SQ-01).
 
 ## Considered Options

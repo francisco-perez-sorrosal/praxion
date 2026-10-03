@@ -148,6 +148,7 @@ class HookHarness:
 
     scratch: Path
     mode: str | None = None
+    extra_env: dict = field(default_factory=dict)  # added last, after isolation
     _env: dict = field(init=False)
 
     def __post_init__(self) -> None:
@@ -169,6 +170,7 @@ class HookHarness:
         env["CLAUDE_PLUGIN_ROOT"] = str(REPO_ROOT)
         if self.mode is not None:
             env["PRAXION_OBSERVATION_LOG"] = self.mode
+        env.update(self.extra_env)
         self._env = env
 
     def deliver(

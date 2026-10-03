@@ -246,11 +246,13 @@
 }
 
 .educational-popover__title {
+  display: block;
   font-size: var(--text-sm);
   margin: 0;
 }
 
 .educational-popover__body {
+  display: block;
   color: var(--color-overlay-dark-muted);
   font-size: var(--text-sm);
   line-height: 1.5;

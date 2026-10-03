@@ -7,8 +7,8 @@
  * artifact mtimes pass `null`, which omits the stamp.
  *
  * Intentionally not "use client" — static markup only. No timer, no polling.
- * The "· live ⟳" suffix is a visual cue; the actual refresh animation lives
- * in LiveRefresh inside the sidebar footer.
+ * The "· live ⟳" suffix is a visual cue; only the Workshops and Overview pages
+ * mount a LiveRefresh of their own.
  *
  * Breadcrumb renders only when breadcrumb.length > 1, which on the 7 top-
  * level surfaces degenerates to an empty list (no crumb rendered).

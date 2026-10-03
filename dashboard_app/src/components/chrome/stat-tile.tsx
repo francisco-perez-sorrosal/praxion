@@ -23,7 +23,8 @@ export type StatTileProps = {
  * One glance tile: label, dominant value, optional trend and caption.
  *
  * The tone is rendered as a left accent plus a glyph next to the label so the
- * meaning survives without colour. A tile with `href` is a link; the whole
+ * meaning survives without colour, and exposed as `data-tone` on the value so
+ * tests and assistive tooling can read it. A tile with `href` is a link; the whole
  * surface is the target (Fitts).
  */
 export function StatTile({ badge, caption, href, label, tone = "neutral", trend, value }: StatTileProps) {
@@ -37,7 +38,7 @@ export function StatTile({ badge, caption, href, label, tone = "neutral", trend,
         </span>
         {badge != null ? <span className="stat-tile__badge">{badge}</span> : null}
       </span>
-      <span className="stat-tile__value">{value}</span>
+      <span className="stat-tile__value" data-tone={tone}>{value}</span>
       {trend != null ? <span className="stat-tile__trend">{trend}</span> : null}
       {caption != null ? <span className="stat-tile__caption">{caption}</span> : null}
     </>

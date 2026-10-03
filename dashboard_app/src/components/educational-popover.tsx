@@ -26,6 +26,8 @@ export function EducationalPopover({
 
   const ariaLabel = title ? `More information about ${title}` : "More information";
 
+  // Phrasing content only: the trigger sits inside a <p> lede on most surfaces, so
+  // a <div> or <p> here is invalid HTML and made React raise hydration error #418.
   return (
     <span
       className="educational-popover"
@@ -45,16 +47,16 @@ export function EducationalPopover({
       >
         ?
       </button>
-      <div
+      <span
         className="educational-popover__panel"
         hidden={!open}
         id={panelId}
         role="tooltip"
       >
         {title ? (
-          <p className="educational-popover__title">{title}</p>
+          <span className="educational-popover__title">{title}</span>
         ) : null}
-        <p className="educational-popover__body">{body}</p>
+        <span className="educational-popover__body">{body}</span>
         {href ? (
           <a
             className="educational-popover__link"
@@ -65,7 +67,7 @@ export function EducationalPopover({
             Open ↗
           </a>
         ) : null}
-      </div>
+      </span>
     </span>
   );
 }

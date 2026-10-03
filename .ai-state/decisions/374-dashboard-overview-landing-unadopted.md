@@ -2,7 +2,7 @@
 id: dec-374
 title: The dashboard /overview landing is not adopted; / continues to redirect to /architecture
 status: superseded
-superseded_by: dec-draft-8ec17bb1
+superseded_by: dec-423
 category: architectural
 date: 2026-09-06
 summary: dec-160's three components never existed in git history and no code references them. Rather than leave an accepted decision asserting a design target that was never built, this record decides the question the other way and supersedes it.

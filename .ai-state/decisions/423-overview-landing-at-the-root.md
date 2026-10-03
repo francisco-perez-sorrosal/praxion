@@ -1,7 +1,8 @@
 ---
-id: dec-draft-8ec17bb1
+id: dec-423
+draft_id: dec-draft-8ec17bb1
 title: The dashboard front door is an Overview composed at the root; dec-374's falsifier fired
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-03
 summary: "The operator asked for a dashboard that presents the core status in one viewport and reaches the rest through progressive disclosure, which is the falsifier dec-374 named; / now renders an Overview composed from the existing view-models (no new store), the quality-eval reports gain a reader and a surface, and the sidebar carries the composed signals."
@@ -34,7 +35,7 @@ On 2026-10-02 the operator asked for exactly that: a dashboard that "presents th
 
 Alongside it, the sidebar groups the surfaces by intent (Overview; Health: Sentinel, Metrics, Evals; Work: Workshops, Roadmap; Knowledge: Architecture, ADRs, Documentation) and carries the composed live signals; the Evals surface leads with the quality-eval history and digest and gates the experiment leaderboard on the ledger's shape; the Sentinel surface leads with a grade-first digest; workshops carry a last-activity time and group active / stale / done; only the Workshops and Overview pages poll; every surface shows "data as of".
 
-`dec-374` flips to `status: superseded` with `superseded_by: dec-draft-8ec17bb1` (finalize rewrites the id). `dec-160` stays `superseded` by `dec-374`; its composition design is re-used, not re-decided, so no relation edge is added to it beyond the prose here.
+`dec-374` flips to `status: superseded` with `superseded_by: dec-423` (finalize rewrites the id). `dec-160` stays `superseded` by `dec-374`; its composition design is re-used, not re-decided, so no relation edge is added to it beyond the prose here.
 
 ## Considered Options
 

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-02T16:49:11Z'
+generated_at: '2026-10-03T03:50:22Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-03'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-02'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2810,7 +2810,7 @@ surfaces:
   path: .ai-state/decisions/374-dashboard-overview-landing-unadopted.md
   type: markdown
   title: The dashboard /overview landing is not adopted; / continues to redirect to /architecture
-  last_modified: '2026-09-06'
+  last_modified: '2026-10-02'
   renderer: adr_card
 - id: ai-state-decisions-375-seal-witness-none-tombstone-exemption
   path: .ai-state/decisions/375-seal-witness-none-tombstone-exemption.md
@@ -3101,6 +3101,12 @@ surfaces:
   title: A changed non-code file under .ai-state/ selects only the tests one hop away
   last_modified: '2026-10-02'
   renderer: adr_card
+- id: ai-state-decisions-423-overview-landing-at-the-root
+  path: .ai-state/decisions/423-overview-landing-at-the-root.md
+  type: markdown
+  title: The dashboard front door is an Overview composed at the root; dec-374's falsifier fired
+  last_modified: '2026-10-02'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3113,12 +3119,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-06_22-09-15.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-07'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-07_14-00-50.md
   type: markdown
@@ -3172,6 +3172,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-09-14'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-10-02_18-17-29.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-10-02'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-08-25-04-25-13
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-25_04-25-13.json
@@ -3833,6 +3839,7 @@ groups:
   - ai-state-decisions-420-selection-audit-oracle-from-traced-reads
   - ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
   - ai-state-decisions-422-state-data-does-not-fan-out
+  - ai-state-decisions-423-overview-landing-at-the-root
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3857,7 +3864,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-23-16-09-26
   - ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
   - ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
-  - ai-state-sentinel-reports-sentinel-report-2026-08-06-22-09-15
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
@@ -3867,6 +3873,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-12-02-10-28
   - ai-state-sentinel-reports-sentinel-report-2026-09-12-12-49-16
   - ai-state-sentinel-reports-sentinel-report-2026-09-14-07-59-49
+  - ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

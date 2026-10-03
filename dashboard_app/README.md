@@ -69,12 +69,14 @@ All commands accept an optional `[project-path]` argument (default: cwd).
 
 | Surface | Source artifacts | Notes |
 |---------|-----------------|-------|
+| Overview (`/`) | Sentinel, metrics, quality-eval and readiness reports + `.ai-work/<slug>/` workshops + `.ai-state/decisions/` + the tech-debt ledger | Front-door digest: four health tiles, in-flight workshops, decisions, attention items, recent activity and a link into every surface; refreshes every 4x the poll interval (never under 60 s) |
 | Architecture | `.ai-state/DESIGN.md` + `docs/architecture.md` + rendered SVGs from `docs/diagrams/**/rendered/` and `.ai-state/diagrams/**/rendered/` | Interactive pan/zoom diagram viewer; AaC fence regions get badges; diagram refs served via `/api/diagram` route |
-| Workshops | `.ai-work/<slug>/WIP.md` + `PROGRESS.md` | Step DAG; 15 s live refresh (this surface only) |
+| Workshops | `.ai-work/<slug>/WIP.md` + `PROGRESS.md` | Grouped by recency (active in the last 7 days / stale / done) with age and step progress; step DAG; 15 s live refresh |
 | ADRs | `.ai-state/decisions/` (finalized + drafts) + `DECISIONS_INDEX.md` | Interactive relationship graph from `supersedes`/`re_affirms` frontmatter; status/category/tag filters; full metadata chips |
 | Sentinel | `.ai-state/sentinel_reports/` + `SENTINEL_LOG.md` | Health-grade sparkline from log; latest report split into Critical/Important/Suggested collapsibles |
 | Roadmap | `ROADMAP.md` | — |
 | Metrics | `.ai-state/metrics_reports/` | Recharts trend charts from `METRICS_LOG.md`/per-run JSON; hotspot table; collectors summary |
+| Evals | `.ai-state/praxion_eval_reports/` (quality-eval reports + `PRAXION_EVAL_LOG.md`) + `.ai-state/eval_ledger/EVAL_LOG.md` | Run history and the latest report digest with failures grouped by check; the experiment leaderboard renders only for a leaderboard-shaped ledger |
 | Documentation | `.ai-state/doc_manifest.yaml` | Dispatched through the Diátaxis-typed renderer registry |
 
 Every surface degrades gracefully to an informative empty/error state when
@@ -86,8 +88,10 @@ its source artifact is absent — a freshly-onboarded project with only
 - **Single install, per-project usage**: `PRAXION_PROJECT_ROOT` selects the
   target project. The dashboard never uses `cwd` as the project root.
 - **Read-only**: filesystem access is purely read; no writes to the target project.
-- **Auto-refresh on Workshops only**: default 15 s interval; override via
-  `PRAXION_DASHBOARD_POLL_SECONDS`. All other pages require a manual browser refresh.
+- **Auto-refresh on Workshops and Overview only**: Workshops polls at the default
+  15 s interval (override via `PRAXION_DASHBOARD_POLL_SECONDS`); the Overview polls
+  at four times that interval, never under 60 s. All other pages require a manual
+  browser refresh.
 - **Server-only filesystem access**: Node `fs` stays in `src/server/` modules
   and route handlers. Client components never import server readers.
 - **Diagram security**: the `/api/diagram` route streams only allowlisted `.svg`

@@ -7,47 +7,49 @@
    text, 3:1 for non-text UI). Backward-compat aliases at the bottom keep every
    existing component class working without edits. */
 :root {
+  color-scheme: light dark;   /* follow the OS until the operator picks a theme (see data-theme below) */
+
   /* ── Neutral surface scale — warm-tinted near-white, cool-slate text ──────── */
-  --color-bg:            #f8f7f5;   /* page background — flat, faintly warm near-white */
-  --color-surface-1:     #ffffff;   /* card — pure white, lifts off the warm bg */
-  --color-surface-2:     #f1f0ec;   /* inset / active-nav / table-stripe */
-  --color-surface-3:     #e5e2dc;   /* deeper inset / disabled */
-  --color-border:        #e5e2dc;   /* hairline — ~1.4:1 vs surface-1; decorative only (cards also carry --shadow-card, so the border is never the *sole* boundary signal) */
-  --color-border-strong: #8c8780;   /* input borders, focus-target outlines — 3.5:1 vs surface-1 ✓ */
+  --color-bg:            light-dark(#f8f7f5, #14130f);   /* page background — flat; faintly warm near-white | flat warm near-black */
+  --color-surface-1:     light-dark(#ffffff, #1c1a16);   /* card — pure white lifts off the warm bg */
+  --color-surface-2:     light-dark(#f1f0ec, #262420);   /* inset / active-nav / table-stripe */
+  --color-surface-3:     light-dark(#e5e2dc, #34312b);   /* deeper inset / disabled */
+  --color-border:        light-dark(#e5e2dc, #262420);   /* hairline, decorative only — light ~1.4:1 vs surface-1; cards also carry --shadow-card, so the border is never the *sole* boundary signal */
+  --color-border-strong: light-dark(#8c8780, #6b665e);   /* input borders, focus-target outlines — light 3.5:1 ✓ · dark 3.6:1 ✓ vs surface-1 */
 
   /* ── Text — slate; temperature is invisible at these luminances ──────────── */
-  --color-text:          #0f172a;   /* 16.1:1 on surface-1 ✓ · 15.2:1 on surface-2 ✓ */
-  --color-text-muted:    #475569;   /* 7.5:1 on surface-1 ✓ · 7.0:1 on surface-2 ✓ */
-  --color-text-faint:    #64748b;   /* 5.0:1 on surface-1 ✓ — 11px metadata only */
+  --color-text:          light-dark(#0f172a, #f5f4f1);   /* on surface-1 — light 16.1:1 ✓ (15.2:1 on surface-2 ✓) · dark 16.8:1 ✓ */
+  --color-text-muted:    light-dark(#475569, #cbc8c1);   /* on surface-1 — light 7.5:1 ✓ (7.0:1 on surface-2 ✓) · dark 9.7:1 ✓ */
+  --color-text-faint:    light-dark(#64748b, #94918a);   /* on surface-1 — light 5.0:1 ✓ · dark 4.7:1 ✓ — 11px metadata only */
 
   /* ── Accent — cool indigo; the identity anchor. Interactive affordances + active nav only. ── */
-  --color-accent:        #4338ca;   /* 8.5:1 on surface-1 ✓ — link text, active-nav text */
-  --color-accent-hover:  #3730a3;   /* 10.4:1 on surface-1 ✓ */
-  --color-accent-subtle: #eef2ff;   /* accent-tinted surface — active-nav bg, chip bg */
-  --color-accent-border: #c7d2fe;   /* accent-tinted hairline */
-  --color-on-accent:     #ffffff;   /* text on a --color-accent fill — 8.5:1 ✓ (flips dark in dark mode) */
+  --color-accent:        light-dark(#4338ca, #a5b4fc);   /* link text, active-nav text — light 8.5:1 ✓ · dark 6.8:1 ✓ on surface-1 */
+  --color-accent-hover:  light-dark(#3730a3, #c7d2fe);   /* light 10.4:1 ✓ · dark 9.1:1 ✓ on surface-1 */
+  --color-accent-subtle: light-dark(#eef2ff, #1e1b3a);   /* accent-tinted surface — active-nav bg, chip bg (deep indigo in dark) */
+  --color-accent-border: light-dark(#c7d2fe, #3730a3);   /* accent-tinted hairline */
+  --color-on-accent:     light-dark(#ffffff, #14130f);   /* text on a --color-accent fill — light 8.5:1 ✓ · dark 6.5:1 ✓ (the accent is light in dark mode, so the text flips dark) */
 
   /* ── Semantic status — status meaning only, never decoration ──────────────
      Each: -text (AA on surface-1), -subtle (tinted surface), -border (tinted hairline). */
-  --color-success-text:   #15803d;  /* 4.8:1 on surface-1 ✓ */
-  --color-success-subtle: #f0fdf4;
-  --color-success-border: #bbf7d0;
-  --color-warn-text:      #b45309;  /* 4.7:1 on surface-1 ✓ — amber-700, not yellow (yellow fails on white) */
-  --color-warn-subtle:    #fffbeb;
-  --color-warn-border:    #fde68a;
-  --color-danger-text:    #b91c1c;  /* 6.0:1 on surface-1 ✓ */
-  --color-danger-subtle:  #fef2f2;
-  --color-danger-border:  #fecaca;
-  --color-info-text:      #0e7490;  /* 4.6:1 on surface-1 ✓ */
-  --color-info-subtle:    #ecfeff;
-  --color-info-border:    #a5f3fc;
+  --color-success-text:   light-dark(#15803d, #4ade80);   /* light 4.8:1 ✓ · dark 7.9:1 ✓ on surface-1 */
+  --color-success-subtle: light-dark(#f0fdf4, #052e16);
+  --color-success-border: light-dark(#bbf7d0, #166534);
+  --color-warn-text:      light-dark(#b45309, #fbbf24);   /* light 4.7:1 ✓ — amber-700, not yellow (yellow fails on white) · dark 10.0:1 ✓ on surface-1 */
+  --color-warn-subtle:    light-dark(#fffbeb, #422006);
+  --color-warn-border:    light-dark(#fde68a, #92400e);
+  --color-danger-text:    light-dark(#b91c1c, #f87171);   /* light 6.0:1 ✓ · dark 6.2:1 ✓ on surface-1 */
+  --color-danger-subtle:  light-dark(#fef2f2, #450a0a);
+  --color-danger-border:  light-dark(#fecaca, #991b1b);
+  --color-info-text:      light-dark(#0e7490, #22d3ee);   /* light 4.6:1 ✓ · dark 8.9:1 ✓ on surface-1 */
+  --color-info-subtle:    light-dark(#ecfeff, #083344);
+  --color-info-border:    light-dark(#a5f3fc, #155e75);
 
   /* Sentinel grade chips reuse the semantic set: A→success, B→info, C→warn, D→danger. */
 
-  /* ── Inverse / dark-overlay surface — code blocks and dark tooltips (same in both modes) ── */
-  --color-overlay-dark:        #1c1a16;   /* warm charcoal */
-  --color-overlay-dark-text:   #f5f4f1;   /* 15.6:1 on overlay-dark ✓ */
-  --color-overlay-dark-muted:  #c8c4bc;   /* 8.7:1 on overlay-dark ✓ — secondary text in dark tooltips */
+  /* ── Inverse / dark-overlay surface — code blocks and dark tooltips (a touch darker than surface-1 in dark mode so they read as distinct) ── */
+  --color-overlay-dark:        light-dark(#1c1a16, #0c0b09);   /* warm charcoal */
+  --color-overlay-dark-text:   #f5f4f1;   /* on overlay-dark — light mode 15.6:1 ✓ · dark mode 18.6:1 ✓ */
+  --color-overlay-dark-muted:  #c8c4bc;   /* secondary text in dark tooltips — on overlay-dark, light mode 8.7:1 ✓ · dark mode 10.4:1 ✓ */
 
   /* ── Typography — system sans, tight modular scale ───────────────────────── */
   --font-sans:
@@ -98,9 +100,9 @@
   --radius-full: 9999px;  /* pills only — count badges, status pills */
 
   /* ── Shadow = elevation. Cards barely lift; overlays clearly lift. No warm drama. ── */
-  --shadow-card:    0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.10);
-  --shadow-popover: 0 4px 6px rgba(15, 23, 42, 0.07), 0 10px 15px rgba(15, 23, 42, 0.12);
-  --shadow-modal:   0 10px 25px rgba(15, 23, 42, 0.15), 0 20px 48px rgba(15, 23, 42, 0.20);
+  --shadow-card:    0 1px 2px light-dark(rgba(15, 23, 42, 0.06), rgba(0, 0, 0, 0.40)), 0 1px 3px light-dark(rgba(15, 23, 42, 0.10), rgba(0, 0, 0, 0.50));
+  --shadow-popover: 0 4px 6px light-dark(rgba(15, 23, 42, 0.07), rgba(0, 0, 0, 0.40)), 0 10px 15px light-dark(rgba(15, 23, 42, 0.12), rgba(0, 0, 0, 0.55));
+  --shadow-modal:   0 10px 25px light-dark(rgba(15, 23, 42, 0.15), rgba(0, 0, 0, 0.55)), 0 20px 48px light-dark(rgba(15, 23, 42, 0.20), rgba(0, 0, 0, 0.65));
 
   /* ── Motion (consumed inside @media (prefers-reduced-motion: no-preference)) ── */
   --duration-micro: 120ms;
@@ -161,50 +163,7 @@
   --shadow-md: var(--shadow-popover);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Surface scale — warm charcoal, cool-slate-tinted near-white text */
-    --color-bg:            #14130f;   /* flat warm near-black */
-    --color-surface-1:     #1c1a16;   /* card */
-    --color-surface-2:     #262420;   /* inset / active-nav / table-stripe */
-    --color-surface-3:     #34312b;   /* deeper inset / disabled */
-    --color-border:        #262420;   /* hairline — decorative; cards carry shadow */
-    --color-border-strong: #6b665e;   /* input borders / focus targets — 3.6:1 vs surface-1 ✓ */
-
-    --color-text:          #f5f4f1;   /* 16.8:1 on surface-1 ✓ */
-    --color-text-muted:    #cbc8c1;   /* 9.7:1 on surface-1 ✓ */
-    --color-text-faint:    #94918a;   /* 4.7:1 on surface-1 ✓ — 11px metadata only */
-
-    /* Accent — cool indigo, lightened for dark surfaces */
-    --color-accent:        #a5b4fc;   /* 6.8:1 on surface-1 ✓ */
-    --color-accent-hover:  #c7d2fe;   /* 9.1:1 on surface-1 ✓ */
-    --color-accent-subtle: #1e1b3a;   /* deep-indigo tinted surface — active-nav bg, chip bg */
-    --color-accent-border: #3730a3;   /* indigo hairline */
-    --color-on-accent:     #14130f;   /* text on a --color-accent fill — 6.5:1 ✓ (accent is light here) */
-
-    /* Semantic status — lightened for dark surfaces */
-    --color-success-text:   #4ade80;  /* 7.9:1 on surface-1 ✓ */
-    --color-success-subtle: #052e16;
-    --color-success-border: #166534;
-    --color-warn-text:      #fbbf24;  /* 10.0:1 on surface-1 ✓ */
-    --color-warn-subtle:    #422006;
-    --color-warn-border:    #92400e;
-    --color-danger-text:    #f87171;  /* 6.2:1 on surface-1 ✓ */
-    --color-danger-subtle:  #450a0a;
-    --color-danger-border:  #991b1b;
-    --color-info-text:      #22d3ee;  /* 8.9:1 on surface-1 ✓ */
-    --color-info-subtle:    #083344;
-    --color-info-border:    #155e75;
-
-    /* Inverse / dark-overlay surface — code blocks & dark tooltips; a touch darker than surface-1 so they read as distinct */
-    --color-overlay-dark:        #0c0b09;
-    --color-overlay-dark-text:   #f5f4f1;   /* 18.6:1 on overlay-dark ✓ */
-    --color-overlay-dark-muted:  #c8c4bc;   /* 10.4:1 on overlay-dark ✓ */
-
-    /* Shadows — deeper, since elevation reads weaker on dark */
-    --shadow-card:    0 1px 2px rgba(0, 0, 0, 0.40), 0 1px 3px rgba(0, 0, 0, 0.50);
-    --shadow-popover: 0 4px 6px rgba(0, 0, 0, 0.40), 0 10px 15px rgba(0, 0, 0, 0.55);
-    --shadow-modal:   0 10px 25px rgba(0, 0, 0, 0.55), 0 20px 48px rgba(0, 0, 0, 0.65);
-  }
-}
-
+/* Theme toggle: the root's data-theme pins color-scheme, so every light-dark()
+   token above resolves to one side. Absent attribute = follow the OS. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }

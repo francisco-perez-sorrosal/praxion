@@ -5,9 +5,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Chip } from "@/components/chrome/chip";
+import { gradeChipVariant, gradeTone } from "@/lib/tone";
 import type { SidebarSignals } from "@/server/view-models/sidebar-signals";
 
 type NavKey =
+  | "overview"
   | "architecture"
   | "workshops"
   | "adrs"
@@ -23,20 +26,50 @@ type NavItem = {
   label: string;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/architecture", key: "architecture", label: "Architecture" },
-  { href: "/workshops", key: "workshops", label: "Workshops" },
-  { href: "/adrs", key: "adrs", label: "ADRs" },
-  { href: "/sentinel", key: "sentinel", label: "Sentinel" },
-  { href: "/roadmap", key: "roadmap", label: "Roadmap" },
-  { href: "/metrics", key: "metrics", label: "Metrics" },
-  { href: "/evals", key: "evals", label: "Evals" },
-  { href: "/documentation", key: "documentation", label: "Documentation" }
+type NavGroup = {
+  /** `null` for the leading Overview entry, which stands alone without a label. */
+  label: string | null;
+  items: NavItem[];
+};
+
+// Grouped by intent: where the project stands (Health), what is moving (Work),
+// what explains it (Knowledge).
+const NAV_GROUPS: NavGroup[] = [
+  { label: null, items: [{ href: "/", key: "overview", label: "Overview" }] },
+  {
+    label: "Health",
+    items: [
+      { href: "/sentinel", key: "sentinel", label: "Sentinel" },
+      { href: "/metrics", key: "metrics", label: "Metrics" },
+      { href: "/evals", key: "evals", label: "Evals" }
+    ]
+  },
+  {
+    label: "Work",
+    items: [
+      { href: "/workshops", key: "workshops", label: "Workshops" },
+      { href: "/roadmap", key: "roadmap", label: "Roadmap" }
+    ]
+  },
+  {
+    label: "Knowledge",
+    items: [
+      { href: "/architecture", key: "architecture", label: "Architecture" },
+      { href: "/adrs", key: "adrs", label: "ADRs" },
+      { href: "/documentation", key: "documentation", label: "Documentation" }
+    ]
+  }
 ];
 
 // 16px inline-SVG icons, stroke-width:1.5, currentColor.
 // aria-hidden is set at the usage site.
 const ICONS: Record<NavKey, ReactNode> = {
+  overview: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 7.5 8 2.5l6 5" />
+      <path d="M3.5 6.5V13.5h9V6.5" />
+    </svg>
+  ),
   architecture: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="1" y="1" width="6" height="6" rx="1" />
@@ -97,46 +130,73 @@ const ICONS: Record<NavKey, ReactNode> = {
   )
 };
 
-function gradeChipClass(grade: string): string {
-  const letter = grade.toUpperCase();
-  if (letter === "A") return "chip chip--grade-a";
-  if (letter === "B") return "chip chip--grade-b";
-  if (letter === "C") return "chip chip--grade-c";
-  return "chip chip--grade-d";
-}
-
 type SidebarNavProps = {
   signals: SidebarSignals;
 };
+
+/**
+ * The live signal shown at the right edge of a row, or `null` when its
+ * artifact family is absent. Each new signal is one more case here.
+ */
+function signalFor(key: NavKey, signals: SidebarSignals): ReactNode {
+  switch (key) {
+    case "workshops":
+      return signals.activeWorkshops > 0 ? (
+        <span className="nav-badge" aria-label={`${signals.activeWorkshops} active`}>
+          {signals.activeWorkshops}
+        </span>
+      ) : null;
+    case "sentinel":
+      return signals.sentinelGrade !== null ? (
+        <span data-tone={gradeTone(signals.sentinelGrade)}>
+          <Chip variant={gradeChipVariant(signals.sentinelGrade)} title="Latest sentinel grade">
+            {signals.sentinelGrade}
+          </Chip>
+        </span>
+      ) : null;
+    default:
+      return null;
+  }
+}
 
 export function SidebarNav({ signals }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
     <nav className="sidebar-nav" aria-label="Dashboard pages">
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href;
+      {NAV_GROUPS.map((group) => {
+        const labelId = group.label === null ? undefined : `nav-group-${group.label.toLowerCase()}`;
         return (
-          <Link
-            key={item.href}
-            className={`nav-card${active ? " is-active" : ""}`}
-            href={item.href}
+          <div
+            key={group.label ?? "overview"}
+            className="nav-group"
+            role={labelId === undefined ? undefined : "group"}
+            aria-labelledby={labelId}
           >
-            <span className="nav-card__icon" aria-hidden="true">
-              {ICONS[item.key]}
-            </span>
-            <span className="nav-label">{item.label}</span>
-            {item.key === "workshops" && signals.activeWorkshops > 0 && (
-              <span className="nav-badge" aria-label={`${signals.activeWorkshops} active`}>
-                {signals.activeWorkshops}
-              </span>
+            {group.label !== null && (
+              <p id={labelId} className="nav-group__label">
+                {group.label}
+              </p>
             )}
-            {item.key === "sentinel" && signals.sentinelGrade !== null && (
-              <span className={gradeChipClass(signals.sentinelGrade)}>
-                {signals.sentinelGrade}
-              </span>
-            )}
-          </Link>
+            {group.items.map((item) => {
+              const active = pathname === item.href;
+              const signal = signalFor(item.key, signals);
+              return (
+                <Link
+                  key={item.href}
+                  className={`nav-card${active ? " is-active" : ""}`}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <span className="nav-card__icon" aria-hidden="true">
+                    {ICONS[item.key]}
+                  </span>
+                  <span className="nav-label">{item.label}</span>
+                  {signal !== null && <span className="nav-card__signal">{signal}</span>}
+                </Link>
+              );
+            })}
+          </div>
         );
       })}
     </nav>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { LiveRefresh } from "@/components/live-refresh";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getShellConfig } from "@/lib/config";
 import { getSidebarSignals } from "@/server/view-models/sidebar-signals";
 
@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: "Praxion Dashboard Web"
 };
 
+// Runs in <head>, before first paint, so a remembered theme never flashes the
+// other one. Inline by design: no external script, no fetch. Keep the key in
+// step with THEME_STORAGE_KEY in components/theme-toggle.tsx (pinned by a test).
+const THEME_BOOTSTRAP = `try{var t=localStorage.getItem("praxion-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}`;
+
 export default async function RootLayout({
   children
 }: Readonly<{
@@ -24,7 +29,11 @@ export default async function RootLayout({
   const signals = await getSidebarSignals(cfg.projectRoot);
 
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the head script sets data-theme before React hydrates.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
       <body>
         <div className="app-shell">
           <aside className="sidebar">
@@ -44,12 +53,9 @@ export default async function RootLayout({
 
             <SidebarNav signals={signals} />
 
-            {/* Sidebar footer: live refresh indicator + version */}
+            {/* Sidebar footer: theme choice + version */}
             <footer className="sidebar-footer">
-              <LiveRefresh seconds={cfg.pollIntervalSeconds} />
-              <span className="sidebar-footer__refresh">
-                live · {cfg.pollIntervalSeconds}s
-              </span>
+              <ThemeToggle />
               <span className="sidebar-footer__version">v{cfg.dashboardVersion}</span>
             </footer>
           </aside>

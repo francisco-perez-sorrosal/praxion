@@ -1,7 +1,7 @@
 .app-shell {
   display: grid;
   gap: 0;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 232px 1fr;
   min-height: 100vh;
 }
 
@@ -19,7 +19,7 @@
   box-shadow: var(--shadow-card);
 }
 
-/* The sidebar itself: 240px fixed column, flat surface, hairline right border. */
+/* The sidebar itself: 232px fixed column, flat surface, hairline right border. */
 .sidebar {
   background: var(--color-surface-1);
   border: none;
@@ -75,13 +75,31 @@
   white-space: nowrap;
 }
 
-/* Nav: 36px rows, icon + label flex, 2px left accent bar on active. */
+/* Nav: four groups (the Overview alone, then Health / Work / Knowledge);
+   36px rows, icon + label + right-aligned signal, 2px left accent bar on active. */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--space-1);
+  gap: var(--space-3);
   padding: 0 var(--space-2);
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Group label: a plain caption, never a link — uppercase 11px faint. */
+.nav-group__label {
+  color: var(--color-text-faint);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  margin: 0;
+  padding: 0 var(--space-3);
+  text-transform: uppercase;
 }
 
 .nav-card {
@@ -110,6 +128,11 @@
   color: var(--color-text);
 }
 
+/* Inset ring: the sidebar edge would clip an outset one on the left. */
+.nav-card:focus-visible {
+  outline-offset: -2px;
+}
+
 .nav-card.is-active {
   background: var(--color-accent-subtle);
   border-left-color: var(--color-accent);
@@ -128,6 +151,14 @@
   font-weight: var(--weight-medium);
 }
 
+/* Right-aligned live signal (grade chip, count badge); absent when its family is. */
+.nav-card__signal {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
 /* Live count badge — Workshops row only, when activeWorkshops > 0. */
 .nav-badge {
   background: var(--color-accent);
@@ -142,21 +173,16 @@
   text-align: center;
 }
 
-/* Sidebar footer: refresh indicator + version. */
+/* Sidebar footer: theme choice + version. */
 .sidebar-footer {
   align-items: center;
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  justify-content: space-between;
   margin-top: auto;
   padding: var(--space-3) var(--space-4);
-}
-
-.sidebar-footer__refresh {
-  color: var(--color-text-faint);
-  flex: 1;
-  font-size: var(--text-2xs);
 }
 
 .sidebar-footer__version {
@@ -164,6 +190,55 @@
   flex-shrink: 0;
   font-family: var(--font-mono), monospace;
   font-size: var(--text-2xs);
+}
+
+/* Theme toggle: segmented system / light / dark. The pressed segment is filled
+   and carries a ring, so the state reads without relying on colour alone. */
+.theme-toggle {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  padding: 2px;
+}
+
+.theme-toggle__option {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  justify-content: center;
+  line-height: 1;
+  min-height: 26px;
+  min-width: 32px;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .theme-toggle__option {
+    transition:
+      background var(--duration-micro) var(--ease-out),
+      color var(--duration-micro) var(--ease-out);
+  }
+}
+
+.theme-toggle__option:hover {
+  color: var(--color-text);
+}
+
+.theme-toggle__option[aria-pressed="true"] {
+  background: var(--color-surface-1);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+.theme-toggle__option:focus-visible {
+  outline-offset: -2px;
 }
 
 /* Compat shims for removed blocks (brand-body/eyebrow used in workshops page). */
@@ -347,3 +422,28 @@
   text-transform: uppercase;
 }
 
+/* Wide layout: pin the sidebar to the viewport so the footer (theme toggle,
+   version) stays in reach on long pages instead of sitting at the page bottom.
+   Scoped to wide screens because top-bar mode (pages-and-viz.css) wants auto height. */
+@media (min-width: 1081px) {
+  .sidebar {
+    align-self: start;
+    height: 100vh;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* Top-bar mode (the sidebar collapses at <=1080px, see pages-and-viz.css):
+   each group becomes an inline run of links with its label as a lead-in. */
+@media (max-width: 1080px) {
+  .nav-group {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .nav-group__label {
+    padding: 0 var(--space-1) 0 var(--space-2);
+  }
+}

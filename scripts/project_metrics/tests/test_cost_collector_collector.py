@@ -233,6 +233,38 @@ class TestCostCollectorProductionWiring:
         )
 
 
+class TestCostCollectorArchives:
+    """Every retained archive is read, and a missing position degrades the report visibly."""
+
+    def test_counts_agents_from_every_archive_and_names_a_missing_position(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        attributed_row: dict[str, Any],
+        calibration_log_excerpt_path: Path,
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+        from scripts.project_metrics.collectors.base import CollectionContext
+
+        repo = tmp_path / "praxion"
+        _populate_repo(repo, attributed_row, calibration_log_excerpt_path)
+        state = repo / ".ai-state"
+        for position in (1, 3):
+            row = {**attributed_row, "agent_id": f"archived-{position}"}
+            (state / f"observations.jsonl.{position}").write_text(json.dumps(row) + "\n")
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+        )
+
+        result = cost_collector.CostCollector(repo_root=str(repo)).collect(
+            CollectionContext(repo_root=str(repo), window_days=90, git_sha="deadbeef")
+        )
+
+        assert result.data["coverage"]["attributed_rows"] == 3
+        assert result.status == "partial"
+        assert any(str(state / "observations.jsonl.2") in issue for issue in result.issues)
+
+
 class TestCostCollectorResolve:
     def test_registers_as_the_cost_collector_at_tier_zero(self) -> None:
         """The collector must register under the exact name the report's

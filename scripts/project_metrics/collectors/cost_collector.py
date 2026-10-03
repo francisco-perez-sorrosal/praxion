@@ -1,7 +1,7 @@
 """Cost collector -- read pass plus aggregate pass.
 
 This module reads the observability write-ahead log (the observation log
-under `.ai-state/` and its `.1` rotation archive) plus the committed per-session summary rollup
+under `.ai-state/` and every retained archive) plus the committed per-session summary rollup
 across the main checkout and every sibling worktree, classifies each
 `agent_stop` row by how honestly its token usage was attributed, and
 de-duplicates the honest population by `agent_id` (the read pass). It then
@@ -140,7 +140,6 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 _WAL_FILENAME = reader.LOG_FILENAME
-_WAL_ARCHIVE_FILENAME = f"{reader.LOG_FILENAME}.1"
 _SUMMARY_FILENAME = "observations_summary.jsonl"
 _CALIBRATION_LOG_FILENAME = "calibration_log.md"
 
@@ -241,6 +240,10 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     checkout, so the discovered order is stable regardless of which checkout
     the collector runs from -- the property that lets every checkout see the
     same source set, so a report from a worktree and one from main agree.
+    A checkout's segments come from the log reader's discovery: the active
+    log first, then each archive from the newest, so across files the newer
+    segment keeps an `agent_id` the dedup sees twice. An archive position
+    missing between present ones is an `issues` entry naming its path.
     A file is only included when it exists; de-duplication is by resolved
     path, so a checkout that happens to equal `repo_root` (or one already
     seen under another name) contributes its files exactly once.
@@ -269,8 +272,7 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     seen_paths: set[str] = set()
     sources: list[SourceRef] = []
 
-    def _add(dir_path: Path, kind: str, filename: str) -> None:
-        candidate = dir_path / ".ai-state" / filename
+    def _add(dir_path: Path, kind: str, candidate: Path) -> None:
         if not candidate.is_file():
             return
         resolved = str(candidate.resolve())
@@ -290,10 +292,16 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
         )
 
     for dir_path in checkout_dirs:
-        _add(dir_path, _SOURCE_KIND_WAL, _WAL_FILENAME)
-        _add(dir_path, _SOURCE_KIND_WAL_ARCHIVE, _WAL_ARCHIVE_FILENAME)
+        listing = reader.segment_listing(dir_path / ".ai-state", archives=True)
+        for gap in listing.missing:
+            issue = f"missing log archive between present archives: {gap}"
+            if issue not in issues:  # a checkout reached twice names its gaps once
+                issues.append(issue)
+        for segment in reversed(listing.segments):
+            kind = _SOURCE_KIND_WAL if segment.name == _WAL_FILENAME else _SOURCE_KIND_WAL_ARCHIVE
+            _add(dir_path, kind, segment)
     for dir_path in checkout_dirs:
-        _add(dir_path, _SOURCE_KIND_SUMMARY, _SUMMARY_FILENAME)
+        _add(dir_path, _SOURCE_KIND_SUMMARY, dir_path / ".ai-state" / _SUMMARY_FILENAME)
 
     return sources, issues
 

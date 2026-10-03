@@ -64,7 +64,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # hooks/_observation_log is a sibling package to this file's own scripts/
 # directory -- both live one level under the repo root.
 sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
-from _observation_log import reader  # noqa: E402 (after sys.path injection)
+from _observation_log import reader, retention  # noqa: E402 (after sys.path injection)
 
 # Only step-executing agent types can be correlated to a WIP step verdict;
 # research / doc / context agents touch files for other reasons.
@@ -502,60 +502,93 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-def _parse_ts(ts: str) -> datetime:
-    """Parse an ISO 8601 timestamp; return the epoch on parse error.
-
-    Epoch acts as "infinitely old" so malformed timestamps in the .1 segment
-    are pruned by the window filter.  Active-file rows never reach this helper.
-    """
-    try:
-        dt = datetime.fromisoformat(ts)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        return datetime.fromtimestamp(0, timezone.utc)
-
-
 def _read_wal(
     obs_path: Path,
     *,
     max_age_days: int = 7,
     now: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    """Read the active observation log + optional rotated archive segment
-    within a window.
+    """Read the observation log's segments within an age window, oldest row first.
 
-    Active-file rows are retained unconditionally — the active file is
-    size-bounded by rotation, so a current-session row with a malformed/missing
-    timestamp must still reach correlation (pre-mortem scenario 6).
+    The window is each row's own recorded time, whichever segment holds it --
+    rows merged in from a worktree sit in the active log with old times and
+    must not widen what recovery considers. Archives are walked newest first
+    only while each archive's mtime is inside the window: an older archive
+    cannot hold a row newer than the one that ended the walk.
 
-    The archive segment is included only when its mtime falls within
-    max_age_days, and its rows are additionally timestamp-filtered to the
-    same window. Malformed timestamps in the segment parse as epoch →
-    outside any window → pruned. Malformed/non-object lines in either
-    segment are skipped by ``reader.read_segment``, never fatal to the rest
-    of the read.
+    A row with no readable time is the one exception: in the active log it is
+    kept, because it may belong to the session in progress (a bad correlation
+    degrades to unknown, never to a false verdict); in an archive it is
+    dropped. Rows are ordered by recorded time, never by arrival, so a merge
+    cannot change a verdict. A segment that cannot be read is named on
+    stderr and the rest are still read.
     """
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(days=max_age_days)
+    listing = reader.segment_listing(obs_path.parent, archives=True)
 
-    active_rows = list(_read_segment_or_warn(obs_path).rows)
+    archives = _archives_inside_window(
+        [path for path in listing.segments if path != obs_path], cutoff
+    )
+    _warn_of_gaps(listing.missing, archives)
 
-    seg_path = Path(str(obs_path) + ".1")
-    seg_rows: list[dict[str, Any]] = []
+    rows = [
+        row
+        for path in (*archives, obs_path)
+        for row in _read_segment_or_warn(path).rows
+        if _inside_window(row, cutoff, untimed_is_inside=path == obs_path)
+    ]
+    return sorted(rows, key=reader.row_time)
+
+
+def _archives_inside_window(archives: list[Path], cutoff: datetime) -> tuple[Path, ...]:
+    """The archives (oldest first) from position 1 up to the first one older than ``cutoff``."""
+    inside: list[Path] = []
+    for path in reversed(archives):  # position 1, the newest, first
+        if _modified_at(path) < cutoff:
+            break
+        inside.append(path)
+    return tuple(reversed(inside))
+
+
+def _modified_at(path: Path) -> datetime:
+    """When ``path`` was last written; a file that cannot be examined counts as current,
+    so reading it names the problem instead of the walk hiding it."""
     try:
-        seg_mtime = datetime.fromtimestamp(seg_path.stat().st_mtime, timezone.utc)
-        if seg_mtime >= cutoff:
-            seg_rows = [
-                r
-                for r in _read_segment_or_warn(seg_path).rows
-                if _parse_ts(r.get("timestamp", "")) >= cutoff
-            ]
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
     except OSError:
-        pass  # segment absent or unreadable → skip silently
+        return datetime.max.replace(tzinfo=timezone.utc)
 
-    return active_rows + seg_rows
+
+def _warn_of_gaps(missing: tuple[Path, ...], archives: tuple[Path, ...]) -> None:
+    """Name each archive position absent inside the range ``archives`` covers.
+
+    A position missing beyond the oldest archive read is outside the window
+    anyway; one inside it is history lost, not the end of it.
+    """
+    if not archives:
+        return
+    oldest_read = _position(archives[0])
+    for path in missing:
+        if _position(path) < oldest_read:
+            print(
+                f"reconcile_pipeline_state: wal-gap: {path}; "
+                "Tier-2 localization hints may be incomplete",
+                file=sys.stderr,
+            )
+
+
+def _position(archive: Path) -> int:
+    position = retention.archive_position(archive, reader.LOG_FILENAME)
+    assert position is not None, f"not an archive of the log: {archive}"
+    return position
+
+
+def _inside_window(row: dict[str, Any], cutoff: datetime, *, untimed_is_inside: bool) -> bool:
+    recorded = reader.row_time(row)
+    if recorded == reader.UNTIMED:
+        return untimed_is_inside
+    return recorded >= cutoff
 
 
 def _read_segment_or_warn(path: Path) -> reader.SegmentRead:
@@ -712,7 +745,7 @@ def main(argv: list[str] | None = None) -> int:
         "--max-age-days",
         type=int,
         default=7,
-        help="max age in days for the rotated WAL segment (default: 7)",
+        help="max age in days of a log row; bounds every segment, active log included (default: 7)",
     )
     args = parser.parse_args(argv)
 

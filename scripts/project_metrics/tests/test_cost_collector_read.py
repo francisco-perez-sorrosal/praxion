@@ -352,6 +352,70 @@ class TestDiscoverSources:
             ("summary", "checkout"),
         ], f"Unexpected discovery order/set: {kinds_and_checkouts!r}"
 
+    def test_finds_every_numbered_archive_active_log_first_then_newest_archive_first(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Across files the first source to hold an `agent_id` keeps it, so the
+        newer segment must come first for a repeated id to resolve as before."""
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        checkout = tmp_path / "checkout"
+        state = checkout / ".ai-state"
+        for name in ("observations.jsonl", "observations.jsonl.1", "observations.jsonl.2"):
+            _touch(state / name, "{}\n")
+        _touch(state / "observations.jsonl.bak", "{}\n")
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+        )
+
+        sources, issues = cost_collector.discover_sources(str(checkout))
+
+        assert issues == []
+        assert [(s.kind, Path(s.path).name) for s in sources] == [
+            ("wal", "observations.jsonl"),
+            ("wal-archive", "observations.jsonl.1"),
+            ("wal-archive", "observations.jsonl.2"),
+        ]
+
+    def test_names_a_missing_archive_position_as_an_issue_and_still_finds_the_rest(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        checkout = tmp_path / "checkout"
+        state = checkout / ".ai-state"
+        for name in ("observations.jsonl", "observations.jsonl.1", "observations.jsonl.3"):
+            _touch(state / name, "{}\n")
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+        )
+
+        sources, issues = cost_collector.discover_sources(str(checkout))
+
+        assert [Path(s.path).name for s in sources] == [
+            "observations.jsonl",
+            "observations.jsonl.1",
+            "observations.jsonl.3",
+        ]
+        assert [i for i in issues if str(state / "observations.jsonl.2") in i], issues
+
+    def test_names_a_missing_archive_once_when_repo_root_is_the_main_checkout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        checkout = tmp_path / "checkout"
+        state = checkout / ".ai-state"
+        for name in ("observations.jsonl", "observations.jsonl.2"):
+            _touch(state / name, "{}\n")
+        monkeypatch.setattr(
+            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+        )
+
+        _, issues = cost_collector.discover_sources(str(checkout))
+
+        assert len([i for i in issues if "observations.jsonl.1" in i]) == 1, issues
+
     def test_includes_both_repo_root_and_main_when_they_differ(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

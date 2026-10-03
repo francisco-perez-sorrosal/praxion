@@ -1614,3 +1614,132 @@ def test_read_wal_is_silent_when_the_log_is_simply_absent(tmp_path: Path, capsys
 
     assert rows == []
     assert "wal-unreadable" not in capsys.readouterr().err
+
+
+# -- The recovery window spans every retained archive ---------------------------------
+# Several rotations inside one window must not hide a recent stop; the window is each
+# row's own recorded time, so neither a long retention nor rows merged in from a
+# worktree widen what recovery considers.
+
+
+def _write_segment(path: Path, rows: list[dict], *, age_days: float = 0) -> Path:
+    """Write ``rows`` to ``path`` and date the file ``age_days`` before ``_NOW``."""
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    mtime = (_NOW - timedelta(days=age_days)).timestamp()
+    os.utime(path, (mtime, mtime))
+    return path
+
+
+def _stop(agent_id: str, timestamp: str | None) -> dict:
+    row: dict = {"event_type": "agent_stop", "agent_id": agent_id}
+    if timestamp is not None:
+        row["timestamp"] = timestamp
+    return row
+
+
+def _agent_ids(rows: list[dict]) -> list[str]:
+    return [row["agent_id"] for row in rows]
+
+
+def test_read_wal_reads_every_archive_inside_the_window_oldest_first(tmp_path):
+    older = "2026-06-23T12:00:00+00:00"
+    newer = "2026-06-24T12:00:00+00:00"
+    _write_segment(tmp_path / "observations.jsonl.3", [_stop("oldest", older)])
+    _write_segment(tmp_path / "observations.jsonl.2", [_stop("middle", newer)])
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("newest-archive", newer)])
+    _write_segment(tmp_path / "observations.jsonl", [_stop("active", _WITHIN_WINDOW_TS)])
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["oldest", "middle", "newest-archive", "active"]
+
+
+def test_read_wal_stops_walking_archives_at_the_first_one_older_than_the_window(tmp_path):
+    _write_segment(
+        tmp_path / "observations.jsonl.2", [_stop("stale", _WITHIN_WINDOW_TS)], age_days=10
+    )
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("fresh", _WITHIN_WINDOW_TS)])
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["fresh"]
+
+
+def test_read_wal_applies_the_window_to_a_row_in_the_active_log(tmp_path):
+    _write_segment(
+        tmp_path / "observations.jsonl",
+        [_stop("old", _OUTSIDE_WINDOW_TS), _stop("recent", _WITHIN_WINDOW_TS)],
+    )
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["recent"]
+
+
+def test_read_wal_keeps_an_untimed_active_row_and_drops_an_untimed_archived_one(tmp_path):
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("archived", None)])
+    _write_segment(tmp_path / "observations.jsonl", [_stop("active", None)])
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["active"]
+
+
+def test_read_wal_orders_rows_by_recorded_time_whatever_segment_holds_them(tmp_path):
+    """Rows merged in from a worktree arrive after later ones, in any segment."""
+    _write_segment(
+        tmp_path / "observations.jsonl.1", [_stop("second", "2026-06-25T10:00:00+00:00")]
+    )
+    _write_segment(
+        tmp_path / "observations.jsonl",
+        [_stop("third", "2026-06-25T11:00:00+00:00"), _stop("first", "2026-06-24T10:00:00+00:00")],
+    )
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["first", "second", "third"]
+
+
+def test_read_wal_names_a_missing_archive_inside_the_read_range(tmp_path, capsys):
+    _write_segment(tmp_path / "observations.jsonl.3", [_stop("oldest", _WITHIN_WINDOW_TS)])
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("newest", _WITHIN_WINDOW_TS)])
+
+    rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert _agent_ids(rows) == ["oldest", "newest"]
+    assert f"wal-gap: {tmp_path / 'observations.jsonl.2'}" in capsys.readouterr().err
+
+
+def test_read_wal_does_not_name_a_gap_beyond_the_read_range(tmp_path, capsys):
+    _write_segment(
+        tmp_path / "observations.jsonl.3", [_stop("stale", _WITHIN_WINDOW_TS)], age_days=10
+    )
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("fresh", _WITHIN_WINDOW_TS)])
+
+    rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+
+    assert "wal-gap" not in capsys.readouterr().err
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a chmod-000 file")
+def test_read_wal_names_an_unreadable_archive_and_reads_the_rest(tmp_path, capsys):
+    unreadable = _write_segment(
+        tmp_path / "observations.jsonl.2", [_stop("lost", _WITHIN_WINDOW_TS)]
+    )
+    _write_segment(tmp_path / "observations.jsonl.1", [_stop("kept", _WITHIN_WINDOW_TS)])
+    unreadable.chmod(0o000)
+    try:
+        rows = rps._read_wal(tmp_path / "observations.jsonl", max_age_days=7, now=_NOW)
+    finally:
+        unreadable.chmod(0o644)
+
+    assert _agent_ids(rows) == ["kept"]
+    assert f"wal-unreadable: {unreadable}" in capsys.readouterr().err
+
+
+def test_the_max_age_help_says_the_window_bounds_every_segment(capsys):
+    with pytest.raises(SystemExit):
+        rps.main(["--help"])
+
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "every segment" in help_text

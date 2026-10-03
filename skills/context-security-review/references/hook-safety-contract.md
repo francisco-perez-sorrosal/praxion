@@ -13,7 +13,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
-| `capture_observations.py` | PostToolUse (all tools; a fixed noise blocklist is skipped) | stdin (JSON payload), `.ai-state/` (existence + `stat`), `$TMPDIR` first-call markers (existence) | Observation log (`.ai-state/observations.jsonl`, its `.1` rotation archive, `.ai-state/observations.lock`); empty `0o600` digest-named first-call markers under `$TMPDIR` | None | Fail-open (exit 0), async |
+| `capture_observations.py` | PostToolUse (all tools; a fixed noise blocklist is skipped) | stdin (JSON payload), `.ai-state/` (existence + `stat`), `$TMPDIR` first-call markers (existence) | Observation log (`.ai-state/observations.jsonl`, its numbered rotation archives (`.1` to `.5`), `.ai-state/observations.lock`); empty `0o600` digest-named first-call markers under `$TMPDIR` | None | Fail-open (exit 0), async |
 | `capture_session.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostCompact | stdin (JSON payload), observation-log tail, session and subagent transcripts (usage fields only), `.ai-state/observations_summary.jsonl` | Observation log (as above); committed `.ai-state/observations_summary.jsonl` (+ `.ai-state/observations_summary.lock`, transient `.tmp` sibling) | None | Fail-open (exit 0), async |
 | `measure_context_surface.py` | SessionStart | stdin (JSON payload), always-loaded surface (project and `~/.claude` `CLAUDE.md` + unscoped rules, `settings.json` excludes, rules manifest), `ANTHROPIC_API_KEY` | Observation log (as above) -- one measurement row | `api.anthropic.com` token-count endpoint, only when `ANTHROPIC_API_KEY` is set | Fail-open (exit 0), async |
 
@@ -165,7 +165,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 
 **Writes**:
 - `.ai-state/observations.jsonl` -- one appended JSON line per recorded call, mode-gated
-- `.ai-state/observations.jsonl.1` -- rotation archive; the active log is renamed onto it at 10 MiB
+- `.ai-state/observations.jsonl.1` to `.5` -- numbered rotation archives; at 10 MiB the archives shift up one position by rename and the active log becomes `.1`, all inside the append lock, the oldest dropped only when no position is free. No row is read or rewritten. Merge-in (`scripts/merge_worktree_log.py`, run at `/merge-worktree` and by the post-merge step) and the sentinel's log-health script reach the log only through the `hooks/_observation_log/` owner package; merge-in appends to the primary checkout's active log under the same lock and never touches an archive
 - `.ai-state/observations.lock` -- empty `fcntl` lock file
 - `<tmp>/praxion-observation-log-first-call-<16 hex>` -- first-call marker: empty, created `O_CREAT | O_EXCL` with mode `0o600`; `<tmp>` is the first of `TMPDIR`, `TEMP`, `TMP`, else `/tmp` (created if absent); the name is a SHA-256 digest of the `.ai-state/` device, inode and agent id. Created only after a subagent's first tool-use row (or a file-changing one, or an `Agent`/`Task` result row) has been written; never for the main agent, never in `off` mode. Besides first calls and file writes, `standard` also records every `Agent`/`Task` result (the spawn row), the main session's included
 
@@ -192,7 +192,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Environment: `PRAXION_DISABLE_OBSERVABILITY`, `PRAXION_OBSERVATION_LOG`
 
 **Writes**:
-- `.ai-state/observations.jsonl`, its `.1` rotation archive, and `.ai-state/observations.lock` -- as for `capture_observations.py`: lifecycle rows, helper-stop rows, compaction rows, and backfilled stop rows for suspended subagents
+- `.ai-state/observations.jsonl`, its numbered rotation archives (`observations.jsonl.1` to `.5`), and `.ai-state/observations.lock` -- as for `capture_observations.py`: lifecycle rows, helper-stop rows, compaction rows, and backfilled stop rows for suspended subagents
 - `.ai-state/observations_summary.jsonl` -- **committed**; one aggregate row per session, rewritten atomically via a `.tmp` sibling under `.ai-state/observations_summary.lock`; skipped in `off` mode
 
 **External contact**:
@@ -214,7 +214,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Environment: `PRAXION_DISABLE_OBSERVABILITY`, `PRAXION_OBSERVATION_LOG`, `ANTHROPIC_API_KEY`, `CLAUDE_PLUGIN_ROOT`
 
 **Writes**:
-- `.ai-state/observations.jsonl`, its `.1` rotation archive, and `.ai-state/observations.lock` -- one measurement row (token and byte counts, basis, measured file paths)
+- `.ai-state/observations.jsonl`, its numbered rotation archives (`observations.jsonl.1` to `.5`), and `.ai-state/observations.lock` -- one measurement row (token and byte counts, basis, measured file paths)
 
 **External contact**:
 - Only when `ANTHROPIC_API_KEY` is set: HTTPS POST to `https://api.anthropic.com/v1/messages/count_tokens`, carrying the concatenated always-loaded text and the key. Without a key, or on any network error, it falls back to a local byte-ratio estimate

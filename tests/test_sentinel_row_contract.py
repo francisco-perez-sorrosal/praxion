@@ -992,6 +992,12 @@ EXTRACTED_CHECKS: list[tuple[str, str]] = [
     ("P08", "clean_work_safety"),
     ("T02", "measure_token_budget"),
     ("TD07", "ledger_health"),
+    ("P09", "check_observation_log_health"),
+    ("P10", "check_observation_log_health"),
+    ("P11", "check_observation_log_health"),
+    ("P12", "check_observation_log_health"),
+    ("P13", "check_observation_log_health"),
+    ("P14", "check_observation_log_health"),
 ]
 
 

@@ -137,3 +137,20 @@ def test_the_spawn_tally_declares_the_spawn_result_fields_among_its_needs():
     (tally,) = [c for c in registry.CONSUMERS if c.name == "scripts/spawn_count.py"]
 
     assert set(SPAWN_RESULT_FIELDS) <= set(tally.needs[registry.EventClass.TOOL_AGENT_SPAWN])
+
+
+def test_the_log_health_check_declares_the_recorded_mode_source_it_reads():
+    (health,) = [
+        c for c in registry.CONSUMERS if c.name == "scripts/check_observation_log_health.py"
+    ]
+
+    assert "log_mode_source" in health.needs[registry.EventClass.SESSION_START]
+
+
+def test_the_log_health_check_reads_both_kinds_of_stop_at_standard():
+    (health,) = [
+        c for c in registry.CONSUMERS if c.name == "scripts/check_observation_log_health.py"
+    ]
+
+    assert health.min_mode == Mode.STANDARD
+    assert {registry.EventClass.AGENT_STOP, registry.EventClass.HELPER_STOP} <= set(health.needs)

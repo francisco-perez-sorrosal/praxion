@@ -377,6 +377,26 @@ CONSUMERS = (
         Mode.STANDARD,
     ),
     ConsumerSpec(
+        "scripts/check_observation_log_health.py",
+        "code",
+        {
+            EventClass.SESSION_START: (
+                "event_type",
+                "session_id",
+                "timestamp",
+                "log_mode_source",
+            ),
+            EventClass.AGENT_STOP: (
+                "event_type",
+                "agent_id",
+                "timestamp",
+                "start_correlation",
+            ),
+            EventClass.HELPER_STOP: ("event_type", "agent_id", "timestamp"),
+        },
+        Mode.STANDARD,
+    ),
+    ConsumerSpec(
         "scripts/project_metrics/collectors/cost_collector.py",
         "code",
         {

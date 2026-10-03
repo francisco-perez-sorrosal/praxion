@@ -138,7 +138,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 
 ### Pipeline Discipline (P)
 
-**Substrate, stated precisely, because naming the wrong one produced a false all-clear here.** P03 and P04 read `.ai-state/observations.jsonl` — the append-only observation WAL the hooks emit, and the only durable agent-event history this agent can reach. P05–P08 read `.ai-work/` documents and need no event substrate at all; nothing in this preamble gates them.
+**Substrate, stated precisely, because naming the wrong one produced a false all-clear here.** P03, P04 and P09–P13 read `.ai-state/observations.jsonl` — the append-only observation WAL the hooks emit, and the only durable agent-event history this agent can reach. P14 reads each linked worktree's own log beside it. P05–P08 read `.ai-work/` documents and need no event substrate at all; nothing in this preamble gates them.
 
 **Not Task Chronograph.** Its `get_pipeline_status` returns only the *current* session and `get_agent_events` returns empty for past agent types, and no agent in the fleet holds a Chronograph MCP grant (this agent's is `Read, Glob, Grep, Bash, Write`). A check written against it can therefore only ever observe the session in flight — trivially clean — and report that as a PASS. This is a **specification** defect, not a data gap: no amount of accumulated history repairs a check pointed at a reader it cannot call.
 
@@ -159,6 +159,12 @@ A correct gate nobody can run and a deleted one catch the same number of defects
 | P06 | A | TASK_BRIEF mandatory at Standard/Full | Family: `python3 scripts/check_p06_task_brief.py --json`; WARN per `check: "P06"` finding — a slug with `SYSTEMS_PLAN.md` present and `TASK_BRIEF.md` absent (Standard/Full tier implied). |
 | P07 | A | Undisposed Architecture Challenges in specialist design docs | Family: `python3 scripts/check_specialist_dispositions.py --json`; Important per `findings` entry — an `INTERFACE_DESIGN.md`/`TRANSACTIONS_DESIGN.md` `## Architecture Challenges` section, or a `CONSULT_<discipline>.md` `### CH-NN` entry, left without a recorded disposition. |
 | P08 | A | Stale `.ai-work/` slugs accumulating without cleanup | Family: `python3 scripts/clean_work_safety.py --json`; advisory (not WARN, not FAIL) when `examined.stale_safe >= 3` — "N stale safe dirs in `.ai-work/` — consider `/clean-work`." Golden bad-case: `clean_work_safety_stale.json` (`stale_safe = 3`); control: `clean_work_safety_clean.json` (`stale_safe = 0`). |
+| P09 | A | Archive coverage is judged against the retention policy | Family: `python3 scripts/check_observation_log_health.py --json`; WARN per archive position missing between two present ones (a pending rotation, not a lost archive), per archive past the policy count, and once when a full sequence spans less than the history target; INFO span and count. |
+| P10 | A | Rotation has not stopped firing | Family: `python3 scripts/check_observation_log_health.py --json`; WARN when the active log is past the size cap by more than one append; INFO its size against the cap. |
+| P11 | A | Every log segment is readable, one JSON object per line | Family: `python3 scripts/check_observation_log_health.py --json`; WARN per segment with malformed lines (count and line numbers) and per unreadable segment; well-formed rows are still judged; INFO totals. |
+| P12 | A | Helper share of all stops is reported, never judged | Family: `python3 scripts/check_observation_log_health.py --json`; INFO only: helper stops, agent stops, and helpers over all stops (null with no stops) - the figure a stop-based attribution claim is checked against. |
+| P13 | A | Sessions recorded under an unusual mode setting are surfaced | Family: `python3 scripts/check_observation_log_health.py --json`; WARN per invalid-setting session and per legacy-disable session; INFO sessions per recorded mode source and the count recorded before modes. |
+| P14 | A | Worktree logs are merged into the main log before the worktree goes | Family: `python3 scripts/check_observation_log_health.py --json`; WARN per worktree past the age limit holding rows the main log lacks (run scripts/merge_worktree_log.py --worktree <path>); INFO per in-flight worktree. |
 
 **Golden bad-case (P06):** Any `.ai-work/<slug>/` with `SYSTEMS_PLAN.md` present and `TASK_BRIEF.md` absent must produce a `WARN` for P06. `SYSTEMS_PLAN.md` presence implies Standard/Full tier (the architect only runs there), so a Lightweight slug without a plan file never trips this check. CODE-kind gate — `scripts/check_p06_task_brief.py` runs deterministically; the canary `scripts/test_check_p06_task_brief.py` builds the bad-case in `tmp_path` (no committed fixture, since `.ai-work/` is gitignored — see `tests/fixtures/sentinel/p06_missing_task_brief/README.md`).
 
@@ -450,6 +456,7 @@ Run every `A` row: the family scripts first (table below), then the remaining sc
 | `.ai-state/calibration_log.md` | `python3 scripts/check_calibration_coverage.py --json` | CA02 CA03 |
 | `.ai-state/doc_manifest.yaml` | `python3 scripts/check_doc_manifest_freshness.py --json` | F11 |
 | `.ai-state/observations.jsonl` | `python3 scripts/check_agent_lifecycle_pairing.py --json` | P03 |
+| `.ai-state/observations.jsonl` (P09–P13) · linked worktrees (P14) | `python3 scripts/check_observation_log_health.py --json` | P09 P10 P11 P12 P13 P14 |
 | `.ai-state/specs/` | `python3 scripts/check_spec_drift.py --json` | SH07 |
 | `.ai-state/decisions/` (either lifecycle stage) | `python3 scripts/check_adr_reciprocity.py --json` | DL06 |
 | `PRAXION_HACKATHON_MODE=1` | `python3 scripts/check_hackathon_graduation.py --json` | HK01 |
@@ -610,7 +617,7 @@ Check codes reference dimensions above; Pipeline Discipline (P), Code Health (CH
 | # | Check | Dimension | Location | Finding | Recommended Action | Owner |
 
 ### Pipeline Discipline
-[P03/P04: findings plus the count of WAL records examined — a zero over three records is not a clean fleet. Break P03's unpaired starts down per `session_id`, state the largest session's share beside any total, and hold the spawns that ran no tool apart from the WARNs. P05-P08 from `.ai-work/`. When skipped, name which of the three substrate states applies; never a bare "unavailable"]
+[P03/P04: findings plus the count of WAL records examined — a zero over three records is not a clean fleet. Break P03's unpaired starts down per `session_id`, state the largest session's share beside any total, and hold the spawns that ran no tool apart from the WARNs. P09-P14: the digest's figures beside each verdict (P12's share is information, never a finding). P05-P08 from `.ai-work/`. When skipped, name which of the three substrate states applies; never a bare "unavailable"]
 
 ### Tech-Debt Findings
 [Count of new TD rows filed this run by class; count of TD05 discipline issues; per-row "why filed" rationale (LLM-judgment trace).

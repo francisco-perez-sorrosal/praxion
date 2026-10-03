@@ -53,14 +53,14 @@ HTML rendering is **not hand-authored per artifact**. The as-built Next.js App R
 | Layer | Location | Role |
 |---|---|---|
 | **Server view-models** | `dashboard_app/src/server/view-models/<surface>.ts` | Data shaping — reads MD/JSON/YAML from disk, returns typed props |
-| **Presentation primitives** | `dashboard_app/src/components/` | Stateless React components: `EmptyState`, `MarkdownSurface`, `LiveRefresh`, `MetricsDashboard`, `SidebarNav`, `MetricsSummaryCards`, `MetricsTrends`, `ArtifactCard`, `MetadataChips`, `EducationalPopover`, `AppHeader`, `PageShell`, `MarkdownToc` |
+| **Presentation primitives** | `dashboard_app/src/components/` | Stateless React components: `EmptyState`, `MarkdownSurface`, `LiveRefresh`, `MetricsDashboard`, `SidebarNav`, `ThemeToggle`, `MetricsSummaryCards`, `MetricsTrends`, `ArtifactCard`, `MetadataChips`, `EducationalPopover`, `AppHeader`, `PageShell`, `MarkdownToc`, the Overview cards under `components/overview/` and the quality-eval digest under `components/praxion-evals/` |
 | **Diátaxis shells** | `dashboard_app/src/components/shells/` | Layout chrome wrapping `MarkdownSurface`: `ReferenceShell`, `ExplanationShell`, `DefaultShell`, `TutorialShell` (ordered step-rail), `HowToShell` (goal-banner), `ConceptsShell` (narrative + takeaway aside) |
 | **Per-artifact renderers** | `dashboard_app/src/components/renderers/` | Five specialized components for artifact types: `MetricsViewRenderer`, `PlanViewRenderer`, `VerificationReportRenderer`, `IdeaGridRenderer`, `ArchitectureExplorerRenderer`; all accept `{body, surface?}` and gracefully degrade to `DefaultShell` on malformed input |
 | **Renderer registry** | `dashboard_app/src/components/registry.ts` | `RENDERER_REGISTRY: Map<string, ComponentType<{body: string; surface?: ManifestSurface}>>` + `resolveRenderer(renderer?, diataxis?, contentType?)` — `renderer:` field is highest-priority key; preserves pre-existing diataxis/contentType fallback chain |
 | **Viz components** | `dashboard_app/src/components/viz/` | Interactive: `DiagramFrame`, `DiagramModal`, `DecisionGraph`, `TrendChart`, `Sparkline`, `usePanZoom` |
-| **Library utilities** | `dashboard_app/src/lib/`, `dashboard_app/src/server/` | Pure utilities: `markdown-headings.ts` (slugify, extractToc), `health-tone.ts` (metrics aggregation), `sidebar-signals.ts` (view-model for sidebar state), `normalize-svg.ts` (SVG attribute normalization) |
-| **Chrome components** | `dashboard_app/src/components/chrome/` | `Chip`, `Tabs`, `ErrorState` |
-| **Page routes** | `dashboard_app/src/app/<surface>/page.tsx` | 7 surface pages: `adrs`, `architecture`, `documentation`, `metrics`, `roadmap`, `sentinel`, `workshops` |
+| **Library utilities** | `dashboard_app/src/lib/`, `dashboard_app/src/server/` | Pure utilities: `markdown-headings.ts` (slugify, extractToc), `health-tone.ts` (metrics aggregation), `tone.ts` (the one grade/health/verdict → tone map, relative ages), `praxion-evals.ts` (quality-eval log and report parsers), `workshops.ts` (recency grouping), `sidebar-signals.ts` and `overview.ts` (compositions over the per-surface view-models), `normalize-svg.ts` (SVG attribute normalization) |
+| **Chrome components** | `dashboard_app/src/components/chrome/` | `Chip`, `Tabs`, `ErrorState`, and the digest primitives `StatTile`, `SectionCard`, `TonePill` (every status tone is colour plus glyph or word, exposed as `data-tone`) |
+| **Page routes** | `dashboard_app/src/app/page.tsx` (the Overview at `/`) and `dashboard_app/src/app/<surface>/page.tsx` | The Overview plus 8 surface pages: `adrs`, `architecture`, `documentation`, `evals`, `metrics`, `roadmap`, `sentinel`, `workshops`; only the Overview and Workshops pages mount `LiveRefresh` |
 
 **Initial surface coverage:**
 

@@ -22,10 +22,10 @@ function formatReportLabel(report: SentinelReport): string {
   if (report.reportTimestamp === null) {
     return report.fileName;
   }
+  // Local time, like the header stamp the same report feeds.
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC"
+    timeStyle: "short"
   }).format(new Date(report.reportTimestamp));
 }
 

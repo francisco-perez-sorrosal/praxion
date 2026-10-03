@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LiveRefresh } from "@/components/live-refresh";
 import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
+import { newestOf } from "@/lib/tone";
 import { getWorkshopsData } from "@/server/view-models/workshops";
 
 import { WorkshopsClient } from "./workshops-client";
@@ -10,6 +11,7 @@ import { WorkshopsClient } from "./workshops-client";
 export default async function WorkshopsPage() {
   const cfg = getConfig();
   const workshops = await getWorkshopsData(cfg.projectRoot);
+  const now = new Date();
 
   const sources = (
     <>
@@ -24,12 +26,17 @@ export default async function WorkshopsPage() {
   );
 
   return (
-    <PageShell title="Workshops" sourcesContent={sources}>
+    <PageShell
+      title="Workshops"
+      dataAsOf={newestOf(workshops.map((workshop) => workshop.updatedAt))}
+      sourcesContent={sources}
+    >
       <LiveRefresh seconds={cfg.pollIntervalSeconds} />
 
       <p className="page-intro__lede muted">
         In-flight pipeline state from <code>.ai-work/&lt;task-slug&gt;/</code>, refreshed on a
         fixed cadence.{" "}
+        <span className="workshops-live">live · {cfg.pollIntervalSeconds}s</span>{" "}
         <EducationalPopover
           title="Pipeline workshops"
           body="In-flight agent pipelines surface here: the current WIP step, the step plan, the PROGRESS.md transition log, and which intermediate artifacts exist. Workshop directories disappear after the pipeline completes and is cleaned."
@@ -44,7 +51,7 @@ export default async function WorkshopsPage() {
           producerPath=".ai-work/<task-slug>/"
         />
       ) : (
-        <WorkshopsClient workshops={workshops} />
+        <WorkshopsClient workshops={workshops} nowIso={now.toISOString()} />
       )}
     </PageShell>
   );

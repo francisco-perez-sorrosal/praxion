@@ -35,6 +35,8 @@ export type WorkshopState = {
   path: string;
   progress: WorkshopProgressItem[];
   status: string | null;
+  /** Newest modification time among the workshop's read artifacts (ISO); null when it holds none. */
+  updatedAt: string | null;
 };
 
 export type ManifestGroup = {

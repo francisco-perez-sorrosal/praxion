@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   CANONICAL_WORKSHOP_ARTIFACTS,
   listDirectoryByMtimeDesc,
+  newestMtime,
   readText
 } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
@@ -42,6 +43,9 @@ function isTerminalPhase(phase: string): boolean {
   const total = parseInt(match[2], 10);
   return total > 0 && current === total;
 }
+
+/** A WIP `## Status` of "[COMPLETE]" (or "COMPLETE - ...") is the author's own finish marker. */
+const COMPLETE_STATUS = /^\[?complete\b/i;
 
 export async function getWorkshopsData(projectRoot: string): Promise<WorkshopState[]> {
   const validatedRoot = await validateProjectRoot(projectRoot);
@@ -88,10 +92,16 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
         (artifact) =>
           artifact.name === "VERIFICATION_REPORT.md" && !isPartialReport(artifact.body)
       );
+      // Directory mtime is deliberately excluded: it moves when files are
+      // created or removed, not when the pipeline does work.
+      const updatedAt = await newestMtime(
+        artifacts.map((artifact) => path.join(workshopRoot, artifact.name))
+      );
       const lastEvent = events.at(-1);
       const isDone =
         hasFinishedVerificationReport ||
-        (lastEvent !== undefined && isTerminalPhase(lastEvent.phase));
+        (lastEvent !== undefined && isTerminalPhase(lastEvent.phase)) ||
+        COMPLETE_STATUS.test(wipState.status ?? "");
 
       const artifactBody = (name: string): string | null =>
         artifacts.find((artifact) => artifact.name === name)?.body ?? null;
@@ -110,7 +120,8 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
         isDone,
         path: workshopRoot,
         progress: wipState.progress,
-        status: wipState.status
+        status: wipState.status,
+        updatedAt
       };
     })
   );

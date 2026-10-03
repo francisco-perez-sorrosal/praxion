@@ -329,6 +329,26 @@ Ship the server reader
     expect(workshops[0]?.isDone).toBe(true);
   });
 
+  it.each([
+    ["[COMPLETE]", true],
+    ["COMPLETE - shipped", true],
+    ["[IN-PROGRESS] - not COMPLETE yet", false]
+  ])("reads a WIP status of %s as done=%s", async (status, expected) => {
+    const root = await createTempProjectRoot("dashboard-workshops-wip-status-");
+    const workshop = path.join(root, ".ai-work", "status-task");
+
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeFile(
+      path.join(workshop, "WIP.md"),
+      `# WIP\n\n## Status\n\n${status}\n\n## Progress\n\n- [x] 1. only step\n`
+    );
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.isDone).toBe(expected);
+  });
+
   it("does not mark a workshop done when neither VERIFICATION_REPORT nor terminal phase exists", async () => {
     const root = await createTempProjectRoot("dashboard-workshops-active-");
     const workshop = path.join(root, ".ai-work", "active-task");
@@ -343,5 +363,51 @@ Ship the server reader
     const workshops = await getWorkshopsData(root);
 
     expect(workshops[0]?.isDone).toBe(false);
+  });
+});
+
+describe("getWorkshopsData — updatedAt", () => {
+  const WIP_STAMP = new Date("2026-09-01T10:00:00.000Z");
+  const LEARNINGS_STAMP = new Date("2026-09-20T08:30:00.000Z");
+
+  async function writeAt(file: string, stamp: Date): Promise<void> {
+    await writeFile(file, "# artifact\n");
+    await utimes(file, stamp, stamp);
+  }
+
+  it("is the newest modification time among the workshop's artifacts", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-updated-");
+    const workshop = path.join(root, ".ai-work", "busy-task");
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeAt(path.join(workshop, "WIP.md"), WIP_STAMP);
+    await writeAt(path.join(workshop, "LEARNINGS.md"), LEARNINGS_STAMP);
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.updatedAt).toBe(LEARNINGS_STAMP.toISOString());
+  });
+
+  it("ignores files that are not canonical artifacts", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-updated-extra-");
+    const workshop = path.join(root, ".ai-work", "noisy-task");
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(workshop, { recursive: true });
+    await writeAt(path.join(workshop, "WIP.md"), WIP_STAMP);
+    await writeAt(path.join(workshop, "scratch.txt"), LEARNINGS_STAMP);
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.updatedAt).toBe(WIP_STAMP.toISOString());
+  });
+
+  it("is null when the workshop holds no canonical artifact", async () => {
+    const root = await createTempProjectRoot("dashboard-workshops-updated-empty-");
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(path.join(root, ".ai-work", "bare-task"), { recursive: true });
+
+    const workshops = await getWorkshopsData(root);
+
+    expect(workshops[0]?.updatedAt).toBeNull();
   });
 });

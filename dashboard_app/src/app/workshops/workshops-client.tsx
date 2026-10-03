@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 
+import { Chip } from "@/components/chrome/chip";
+import { SectionCard } from "@/components/chrome/section-card";
 import { CopyAsPromptButton } from "@/components/copy-as-prompt-button";
 import { MarkdownSurface } from "@/components/markdown-surface";
 import { DecisionGraph } from "@/components/viz/decision-graph";
+import { relativeAge, type Tone } from "@/lib/tone";
+import { groupWorkshops, progressSummary } from "@/lib/workshops";
 import type { AdrGraphNode } from "@/server/view-models/adr-graph";
 import type { WorkshopArtifact, WorkshopProgressItem, WorkshopState } from "@/server/types";
 
@@ -53,9 +57,37 @@ function ArtifactDisclosure({ artifact }: { readonly artifact: WorkshopArtifact 
   );
 }
 
+// ─── Step graph — mounted only once opened ───────────────────────────────────
+
+/**
+ * The graph is the heaviest widget on the page and the checklist beneath it
+ * already carries the same facts, so it stays unmounted until the operator
+ * asks for it.
+ */
+function StepGraphDisclosure({ items }: { readonly items: WorkshopProgressItem[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <details
+      className="workshop-artifact"
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+    >
+      <summary className="workshop-artifact__summary">
+        <span className="workshop-artifact__chevron" aria-hidden="true" />
+        Step graph
+      </summary>
+      <div className="workshop-artifact__body">
+        {isOpen ? <DecisionGraph nodes={stepsToNodes(items)} /> : null}
+      </div>
+    </details>
+  );
+}
+
 // ─── Selected-workshop panel ──────────────────────────────────────────────────
 
-function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
+function WorkshopPanel({ workshop, now }: { readonly workshop: WorkshopState; readonly now: Date }) {
+  const lastActivity = relativeAge(workshop.updatedAt, now);
+
   return (
     <article className="workshop-panel">
       <header className="workshop-panel__header">
@@ -64,19 +96,21 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
           <CopyAsPromptButton prompt={workshop.handoffPrompt} />
         </div>
         <div className="artifact-meta">
-          {workshop.currentStep ? <span className="chip">{workshop.currentStep}</span> : null}
-          {workshop.status ? <span className="chip">{workshop.status}</span> : null}
+          {workshop.currentStep ? <Chip>{workshop.currentStep}</Chip> : null}
+          {workshop.status ? <Chip>{workshop.status}</Chip> : null}
         </div>
+        <p className="workshop-panel__activity muted" title={workshop.updatedAt ?? undefined}>
+          Last activity: {lastActivity ?? "unknown"}
+        </p>
       </header>
 
-      <section className="section-card">
-        <h3>Progress</h3>
+      <SectionCard title="Progress">
         {workshop.progress.length === 0 ? (
           <p className="muted">No parsed WIP checklist yet.</p>
         ) : (
           <>
             {workshop.progress.length >= MIN_STEPS_FOR_DAG && (
-              <DecisionGraph nodes={stepsToNodes(workshop.progress)} />
+              <StepGraphDisclosure key={workshop.path} items={workshop.progress} />
             )}
             <ul className="status-list">
               {workshop.progress.map((item) => (
@@ -91,10 +125,9 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
             </ul>
           </>
         )}
-      </section>
+      </SectionCard>
 
-      <section className="section-card">
-        <h3>Recent events</h3>
+      <SectionCard title="Recent events">
         {workshop.events.length === 0 ? (
           <p className="muted">No `PROGRESS.md` events yet.</p>
         ) : (
@@ -110,10 +143,9 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
             ))}
           </ul>
         )}
-      </section>
+      </SectionCard>
 
-      <section className="section-card">
-        <h3>Artifacts</h3>
+      <SectionCard title="Artifacts">
         {workshop.artifacts.length === 0 ? (
           <p className="muted">No canonical artifacts found in this workshop.</p>
         ) : (
@@ -123,46 +155,111 @@ function WorkshopPanel({ workshop }: { readonly workshop: WorkshopState }) {
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
     </article>
   );
 }
 
-// ─── Workshop selector button ─────────────────────────────────────────────────
+// ─── Workshop selector ────────────────────────────────────────────────────────
+
+function progressTone(done: number, total: number): Tone {
+  return done === total ? "good" : "neutral";
+}
 
 function WorkshopButton({
   workshop,
-  isActive,
+  now,
+  isSelected,
   onSelect
 }: {
   readonly workshop: WorkshopState;
-  readonly isActive: boolean;
+  readonly now: Date;
+  readonly isSelected: boolean;
   readonly onSelect: (path: string) => void;
 }) {
+  const progress = progressSummary(workshop.progress);
+  const age = relativeAge(workshop.updatedAt, now);
+
   return (
     <button
       type="button"
-      className={`workshop-selector__item${isActive ? " workshop-selector__item--active" : ""}${workshop.isDone ? " workshop-selector__item--done" : ""}`}
+      className={`workshop-selector__item${isSelected ? " workshop-selector__item--active" : ""}${workshop.isDone ? " workshop-selector__item--done" : ""}`}
       onClick={() => onSelect(workshop.path)}
-      aria-pressed={isActive}
+      aria-current={isSelected ? "true" : undefined}
     >
       <span className="workshop-selector__name">{basename(workshop.path)}</span>
-      {workshop.isDone ? (
-        <span className="chip chip--status-accepted workshop-selector__badge">Done</span>
-      ) : workshop.currentStep ? (
+      <span className="workshop-selector__meta">
+        {progress !== null ? (
+          <span
+            className={`tone-pill tone-pill--mono tone-pill--${progressTone(progress.done, progress.total)}`}
+            data-tone={progressTone(progress.done, progress.total)}
+            title="Steps done of total"
+          >
+            {progress.done}/{progress.total}
+          </span>
+        ) : null}
+        {age !== null ? <span className="workshop-selector__age muted">{age}</span> : null}
+        {workshop.isDone ? <Chip variant="status-accepted">Done</Chip> : null}
+      </span>
+      {!workshop.isDone && workshop.currentStep ? (
         <span className="workshop-selector__step muted">{workshop.currentStep}</span>
       ) : null}
     </button>
   );
 }
 
+function WorkshopGroup({
+  title,
+  workshops,
+  now,
+  selectedPath,
+  onSelect,
+  defaultOpen,
+  emptyNote
+}: {
+  readonly title: string;
+  readonly workshops: WorkshopState[];
+  readonly now: Date;
+  readonly selectedPath: string;
+  readonly onSelect: (path: string) => void;
+  readonly defaultOpen: boolean;
+  readonly emptyNote?: string;
+}) {
+  return (
+    <SectionCard title={`${title} (${workshops.length})`} collapsible defaultOpen={defaultOpen}>
+      {workshops.length === 0 ? (
+        <p className="muted">{emptyNote}</p>
+      ) : (
+        <div className="workshop-selector">
+          {workshops.map((workshop) => (
+            <WorkshopButton
+              key={workshop.path}
+              workshop={workshop}
+              now={now}
+              isSelected={workshop.path === selectedPath}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 // ─── Main client component ────────────────────────────────────────────────────
 
-export function WorkshopsClient({ workshops }: { readonly workshops: WorkshopState[] }) {
-  const activeWorkshops = workshops.filter((workshop) => !workshop.isDone);
-  const doneWorkshops = workshops.filter((workshop) => workshop.isDone);
+/** `nowIso` comes from the server render so ages agree between server and client. */
+export function WorkshopsClient({
+  workshops,
+  nowIso
+}: {
+  readonly workshops: WorkshopState[];
+  readonly nowIso: string;
+}) {
+  const now = new Date(nowIso);
+  const { active, stale, done } = groupWorkshops(workshops, now);
 
-  const firstWorkshop = activeWorkshops[0] ?? doneWorkshops[0] ?? null;
+  const firstWorkshop = active[0] ?? stale[0] ?? done[0] ?? null;
   const [selectedPath, setSelectedPath] = useState(firstWorkshop?.path ?? "");
 
   const selected =
@@ -172,47 +269,27 @@ export function WorkshopsClient({ workshops }: { readonly workshops: WorkshopSta
     return null;
   }
 
-  const hasBothGroups = activeWorkshops.length > 0 && doneWorkshops.length > 0;
+  const groupProps = { now, selectedPath: selected.path, onSelect: setSelectedPath };
 
   return (
     <div className="workshops-client">
-      <nav className="workshop-selector" aria-label="Select a workshop">
-        {activeWorkshops.length > 0 && (
-          <div className="workshop-selector__group">
-            {hasBothGroups && (
-              <p className="workshop-selector__group-label" aria-hidden="true">
-                Active
-              </p>
-            )}
-            {activeWorkshops.map((workshop) => (
-              <WorkshopButton
-                key={workshop.path}
-                workshop={workshop}
-                isActive={workshop.path === selected.path}
-                onSelect={setSelectedPath}
-              />
-            ))}
-          </div>
+      <nav className="workshop-groups" aria-label="Select a workshop">
+        <WorkshopGroup
+          title="Active"
+          workshops={active}
+          defaultOpen
+          emptyNote="Nothing touched in the last seven days."
+          {...groupProps}
+        />
+        {stale.length > 0 && (
+          <WorkshopGroup title="Stale" workshops={stale} defaultOpen={false} {...groupProps} />
         )}
-
-        {doneWorkshops.length > 0 && (
-          <div className="workshop-selector__group">
-            <p className="workshop-selector__group-label" aria-hidden="true">
-              Done
-            </p>
-            {doneWorkshops.map((workshop) => (
-              <WorkshopButton
-                key={workshop.path}
-                workshop={workshop}
-                isActive={workshop.path === selected.path}
-                onSelect={setSelectedPath}
-              />
-            ))}
-          </div>
+        {done.length > 0 && (
+          <WorkshopGroup title="Done" workshops={done} defaultOpen={false} {...groupProps} />
         )}
       </nav>
 
-      <WorkshopPanel workshop={selected} />
+      <WorkshopPanel workshop={selected} now={now} />
     </div>
   );
 }

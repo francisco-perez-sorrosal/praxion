@@ -1,43 +1,52 @@
 "use client";
 
 import { Sparkline } from "@/components/viz/sparkline";
+import { gradeTone, normalizeGrade } from "@/lib/tone";
+import type { Grade, Tone } from "@/lib/tone";
 
-// ─── Grade → color mapping ────────────────────────────────────────────────────
+// ─── Grade ↔ plotted height ───────────────────────────────────────────────────
 
-const GRADE_COLOR_TOKENS: Record<number, string> = {
-  4: "var(--grade-a)",
-  3: "var(--grade-b)",
-  2: "var(--grade-c)",
-  1: "var(--grade-d)"
+/** Worst to best, so a grade's index is its height on the sparkline. */
+const GRADES_WORST_FIRST: readonly Grade[] = ["F", "D", "C", "B", "A"];
+
+const TONE_COLORS: Record<Tone, string> = {
+  good: "var(--color-success-text)",
+  info: "var(--color-info-text)",
+  warn: "var(--color-warn-text)",
+  bad: "var(--color-danger-text)",
+  neutral: "var(--color-text-muted)"
 };
 
-function gradeColorForNumber(y: number): string {
-  return GRADE_COLOR_TOKENS[Math.round(y)] ?? "var(--color-text-muted)";
+function gradeHeight(raw: string | null): number | null {
+  const grade = normalizeGrade(raw);
+  return grade === null ? null : GRADES_WORST_FIRST.indexOf(grade);
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-type SentinelSparklineClientProps = {
-  readonly points: Array<{ x: string; y: number | null }>;
-};
+function colorForHeight(height: number): string {
+  return TONE_COLORS[gradeTone(GRADES_WORST_FIRST[Math.round(height)])];
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+export type SentinelTrendRun = {
+  readonly grade: string | null;
+  readonly timestamp: string | null;
+};
+
 /**
- * Client wrapper that owns the grade→color closure so the server component
- * never passes a function across the server→client boundary.
+ * Client wrapper that owns the grade→height and tone→colour closures so the
+ * server component never passes a function across the server→client boundary.
  */
-export function SentinelSparklineClient({ points }: SentinelSparklineClientProps) {
+export function SentinelSparklineClient({ runs }: { readonly runs: readonly SentinelTrendRun[] }) {
+  const points = runs.map((run, index) => ({
+    x: run.timestamp ?? String(index + 1),
+    y: gradeHeight(run.grade)
+  }));
+
   return (
     <Sparkline
-      series={[
-        {
-          label: "Health",
-          color: "var(--color-accent)",
-          points
-        }
-      ]}
-      colorForValue={gradeColorForNumber}
+      series={[{ label: "Health", color: "var(--color-accent)", points }]}
+      colorForValue={colorForHeight}
     />
   );
 }

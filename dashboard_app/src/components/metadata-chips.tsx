@@ -1,5 +1,6 @@
 import { Chip } from "@/components/chrome/chip";
 import type { ChipVariant } from "@/components/chrome/chip";
+import { gradeChipVariant } from "@/lib/tone";
 
 const STATUS_VARIANTS: Record<string, ChipVariant> = {
   accepted: "status-accepted",
@@ -8,19 +9,8 @@ const STATUS_VARIANTS: Record<string, ChipVariant> = {
   superseded: "status-superseded"
 };
 
-const GRADE_VARIANTS: Record<string, ChipVariant> = {
-  a: "grade-a",
-  b: "grade-b",
-  c: "grade-c",
-  d: "grade-d"
-};
-
 function statusVariant(value: string): ChipVariant {
   return STATUS_VARIANTS[value.toLowerCase()] ?? "neutral";
-}
-
-function gradeVariant(value: string): ChipVariant {
-  return GRADE_VARIANTS[value.toLowerCase()] ?? "neutral";
 }
 
 function renderKnownKey(key: string, value: unknown): React.ReactNode[] {
@@ -34,7 +24,7 @@ function renderKnownKey(key: string, value: unknown): React.ReactNode[] {
 
   if (key === "grade" && typeof value === "string") {
     return [
-      <Chip key={`grade-${value}`} variant={gradeVariant(value)}>
+      <Chip key={`grade-${value}`} variant={gradeChipVariant(value)}>
         Grade {value.toUpperCase()}
       </Chip>
     ];

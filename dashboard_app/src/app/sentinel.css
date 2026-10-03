@@ -1,2 +1,68 @@
 /* ─── Sentinel digest ───
    Per-surface layer; builds on digest.css primitives. Keep under 800 lines. */
+
+/* Grade F chip: the one rule `chip.tsx` (ChipVariant "grade-f") needs and
+   widgets.css lacks. Same tone as D ("D and F to bad"); the inset ring keeps
+   the two apart without relying on colour. */
+.chip--grade-f {
+  background: var(--color-danger-subtle);
+  box-shadow: inset 0 0 0 1px var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+/* Report selector, in the trend card's header. */
+.sentinel-selector {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.sentinel-selector__label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.sentinel-selector select {
+  appearance: none;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+}
+
+.sentinel-selector select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Grade trend: sparkline over the dated runs. */
+.sentinel-trend {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.sentinel-trend .sparkline-wrapper {
+  display: block;
+}
+
+.sentinel-trend__runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sentinel-trend__runs li {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  font-size: var(--text-xs);
+  gap: var(--space-1);
+}

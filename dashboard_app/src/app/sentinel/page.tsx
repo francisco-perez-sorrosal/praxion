@@ -3,37 +3,8 @@ import { EmptyState } from "@/components/empty-state";
 import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
 import { getSentinelData } from "@/server/view-models/sentinel";
-import type { SentinelLogPoint } from "@/server/view-models/sentinel";
 
 import { SentinelClient } from "./sentinel-client";
-import { SentinelSparklineClient } from "./sentinel-sparkline-client";
-
-// ─── Grade helpers ────────────────────────────────────────────────────────────
-
-const GRADE_NUMBERS: Record<string, number> = {
-  a: 4,
-  b: 3,
-  c: 2,
-  d: 1
-};
-
-function gradeToNumber(grade: string | null): number | null {
-  if (grade === null) {
-    return null;
-  }
-  return GRADE_NUMBERS[grade.toLowerCase()] ?? null;
-}
-
-function logSeriesToSparklinePoints(
-  logSeries: SentinelLogPoint[]
-): Array<{ x: string; y: number | null }> {
-  return logSeries.map((point, idx) => ({
-    x: point.timestamp ?? String(idx + 1),
-    y: gradeToNumber(point.grade)
-  }));
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function SentinelPage() {
   const cfg = getConfig();
@@ -52,10 +23,13 @@ export default async function SentinelPage() {
   );
 
   return (
-    <PageShell title="Sentinel" sourcesContent={sources}>
+    <PageShell
+      title="Sentinel"
+      dataAsOf={sentinel.reports[0]?.reportTimestamp ?? null}
+      sourcesContent={sources}
+    >
       <p className="page-intro__lede muted">
-        Health history and per-report audits rendered from{" "}
-        <code>.ai-state/sentinel_reports/</code>.{" "}
+        The latest audit at a glance, with the full report one click away.{" "}
         <EducationalPopover
           title="Sentinel audits"
           body="The sentinel agent audits the project's context artifacts across ten dimensions and grades overall health. Findings are tiered Critical / Important / Suggested."
@@ -71,16 +45,7 @@ export default async function SentinelPage() {
         />
       ) : (
         <div className="sentinel-body">
-          {sentinel.logSeries.length > 0 ? (
-            <div className="sentinel-sparkline-row">
-              <span className="sentinel-sparkline-label muted">Health grade trend</span>
-              <SentinelSparklineClient
-                points={logSeriesToSparklinePoints(sentinel.logSeries)}
-              />
-            </div>
-          ) : null}
-
-          <SentinelClient reports={sentinel.reports} />
+          <SentinelClient reports={sentinel.reports} logSeries={sentinel.logSeries} />
         </div>
       )}
     </PageShell>

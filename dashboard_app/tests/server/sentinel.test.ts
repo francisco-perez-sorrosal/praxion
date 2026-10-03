@@ -1,6 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { parseMetricsLog } from "@/server/view-models/metrics";
+import {
+  countNotReached,
+  getSentinelData,
+  isPartialReport,
+  reportTimestampFromFileName
+} from "@/server/view-models/sentinel";
 import { extractSections, parseSentinelLog } from "@/server/sentinel/extract-sections";
 
 // ---------------------------------------------------------------------------
@@ -254,5 +264,136 @@ describe("parseMetricsLog", () => {
   it("returns an empty array for an empty or headerless body", () => {
     expect(parseMetricsLog("")).toHaveLength(0);
     expect(parseMetricsLog("# Title\n\nNo table.")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Digest facts: timestamp, partial mark, not-reached count
+// ---------------------------------------------------------------------------
+
+describe("reportTimestampFromFileName", () => {
+  it("recovers the UTC instant from the report filename", () => {
+    expect(reportTimestampFromFileName("SENTINEL_REPORT_2026-10-01_09-30-00.md")).toBe(
+      "2026-10-01T09:30:00.000Z"
+    );
+  });
+
+  it("returns null for a name without a valid stamp", () => {
+    expect(reportTimestampFromFileName("SENTINEL_REPORT_latest.md")).toBeNull();
+    expect(reportTimestampFromFileName("SENTINEL_REPORT_2026-13-45_99-99-99.md")).toBeNull();
+  });
+});
+
+describe("isPartialReport", () => {
+  it("is true when the title line carries [PARTIAL]", () => {
+    expect(isPartialReport("# Sentinel Report [PARTIAL]\n\nbody")).toBe(true);
+  });
+
+  it("is false when only the body mentions the mark", () => {
+    expect(isPartialReport("# Sentinel Report\n\nThis was not a [PARTIAL] run.")).toBe(false);
+  });
+});
+
+describe("countNotReached", () => {
+  it("counts one check per marker line", () => {
+    const body = [
+      "- **CA02** — not performed (time budget) — **[not reached]**.",
+      "- **P04** — not performed — **[not reached]**."
+    ].join("\n");
+
+    expect(countNotReached(body)).toBe(2);
+  });
+
+  it("counts every check id written before a shared marker", () => {
+    expect(countNotReached("- **TT01/TT02/TT04/TT05** — validation skipped — **[not reached]**.")).toBe(4);
+  });
+
+  it("ignores ids cited only in the commentary after a table-row marker", () => {
+    const body = [
+      "| AC02 | [not reached] | extraction failed; parity covered by AC13 |",
+      "| N06, T05, T06 | [not reached] | not run; BC05 covers the duplication |"
+    ].join("\n");
+
+    expect(countNotReached(body)).toBe(4);
+  });
+
+  it("treats a marker quoted in backticks as prose", () => {
+    expect(countNotReached("Checks marked `[not reached]`: none (AC01 ran).")).toBe(0);
+    expect(countNotReached("**`[not reached]`**: **AC02**, **N06**.")).toBe(0);
+  });
+
+  it("counts a check once however often its marker repeats", () => {
+    const body = ["- **AC02** — **[not reached]**", "| AC02 | [not reached] | again |"].join("\n");
+
+    expect(countNotReached(body)).toBe(1);
+  });
+
+  it("counts a marker naming no check as one unnamed check", () => {
+    expect(countNotReached("The dimension was skipped — **[not reached]**.")).toBe(1);
+  });
+
+  it("is zero when no marker appears", () => {
+    expect(countNotReached("Every catalog check reached a verdict.")).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSentinelData over a fixture project root
+// ---------------------------------------------------------------------------
+
+describe("getSentinelData digest fields", () => {
+  const roots: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
+  });
+
+  async function buildRoot(): Promise<string> {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dashboard-sentinel-digest-"));
+    roots.push(root);
+    const dir = path.join(root, ".ai-state", "sentinel_reports");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      path.join(dir, "SENTINEL_REPORT_2026-10-01_09-30-00.md"),
+      [
+        "# Sentinel Report [PARTIAL]",
+        "",
+        "## Ecosystem Health: C",
+        "",
+        "- **CA02** — skipped — **[not reached]**.",
+        "- **P04** — skipped — **[not reached]**.",
+        ""
+      ].join("\n")
+    );
+    await writeFile(
+      path.join(dir, "SENTINEL_LOG.md"),
+      [
+        "# Sentinel Log",
+        "",
+        "| Timestamp | Health Grade | Artifacts | Findings (C/I/S) | Ecosystem Coherence | Report File |",
+        "|---|---|---|---|---|---|",
+        "| 2026-10-01 09:30:00 | C [PARTIAL] | 40 | 1/2/3 | A | SENTINEL_REPORT_2026-10-01_09-30-00.md |",
+        ""
+      ].join("\n")
+    );
+    return root;
+  }
+
+  it("derives timestamp, partial mark and not-reached count for each report", async () => {
+    const { reports } = await getSentinelData(await buildRoot());
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({
+      isPartial: true,
+      notReachedCount: 2,
+      reportTimestamp: "2026-10-01T09:30:00.000Z"
+    });
+  });
+
+  it("reduces a partial run's grade cell to its letter in the log series and the highlight", async () => {
+    const { logSeries, reports } = await getSentinelData(await buildRoot());
+
+    expect(logSeries[0]?.grade).toBe("C");
+    expect(reports[0]?.highlight).toMatchObject({ coherence: "A", critical: 1, grade: "C" });
   });
 });

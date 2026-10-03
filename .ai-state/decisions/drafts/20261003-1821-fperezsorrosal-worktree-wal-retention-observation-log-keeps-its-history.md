@@ -99,6 +99,8 @@ Activation: fired — structural (about 17 files across the hooks package, consu
 
 ## Consequences
 
+**Version skew (recorded, not fixable in code).** A hook process from an earlier plugin release (0.43.0/0.44.0) renames the active log onto `.1` under the same lock; while such a process writes beside a current one, it overwrites the newest archive, and the rotation-state check cannot see it. The window closes when every writer is on this release. Lowering the archive count later needs a migration of the positions above the new count.
+
 **Positive**
 
 - History grows from about 7 weeks to 35–70 weeks with a fixed disk bound, and no rotation reads or rewrites a row.

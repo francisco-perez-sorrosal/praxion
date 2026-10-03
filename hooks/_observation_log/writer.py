@@ -1,7 +1,8 @@
 """Append-only, fail-open, mode-gated writer for the observation log.
 
-Every function here is fail-open and never raises; each returns whether a row
-was actually written. ``record``/``record_tool_call`` resolve the recording
+Every function here is fail-open and never raises. ``record``,
+``record_tool_call`` and ``append_observation`` return whether the row was
+written; ``append_lines`` returns how many rows landed and the first error. ``record``/``record_tool_call`` resolve the recording
 mode from ``env`` and consult ``registry.records()`` live -- through the
 ``registry`` module object, not a locally bound copy of the function -- so a
 test (or a future caller) that reconfigures the registry is always honored,

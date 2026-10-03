@@ -25,58 +25,177 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import registry
+from . import registry, retention
 from .location import locate
 from .modes import resolve_mode
 from .reader import LOG_FILENAME
 from .registry import FILE_CHANGING_TOOLS, SPAWN_TOOLS, EventClass
 
-# When the active observations.jsonl reaches this size, `append_observation`
-# renames it to observations.jsonl.1 before writing the new row. Best-effort:
-# OSError during rename is swallowed so the append always completes. Moved
-# verbatim from `hooks/_hook_utils.py` -- tests monkeypatch it here now.
-OBSERVATIONS_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
+# The size at which the active log rotates. A writer-local name for the policy's
+# cap so tests can patch the cap without touching the policy.
+OBSERVATIONS_MAX_BYTES = retention.SIZE_CAP_BYTES
+
+# The most row bytes `append_lines` writes per lock hold, so a large copy never
+# keeps the per-tool-call hooks waiting for long.
+APPEND_BATCH_BYTES = 1024 * 1024  # 1 MiB
 
 # Decision values a commit-gate script may report. Kept as a plain tuple (not
 # an enum) because the six call sites are independent scripts translating
 # their own pass/fail/return-code convention into this shared vocabulary.
 GATE_FIRE_DECISIONS = ("pass", "warn", "block")
 
+_LOCK_FILENAME = "observations.lock"
+
+# The characters the reader's line iteration splits a segment on (universal
+# newlines); a row holding one would be read back as two.
+_LINE_BREAKS = ("\n", "\r")
+
+
+def append_observation(obs_path: Path, observation: dict) -> None:
+    """Append one observation to the log as a JSONL line, under the writer's lock.
+
+    Rotates first when the log has reached its cap. Raises on a failure to
+    lock or write -- `record()` turns that into "not written".
+    """
+    line = json.dumps(observation, separators=(",", ":"))
+    with _LogLock(obs_path):
+        _append_line(obs_path, line)
+
+
+def append_lines(obs_path: Path, lines: list[str]) -> tuple[int, str | None]:
+    """Append pre-serialized rows (one JSON text each, no line break) in order.
+
+    Rows go in batches of at most ``APPEND_BATCH_BYTES`` per lock hold (a row
+    longer than that gets a hold of its own), and rotation is checked before
+    every row, exactly as for a single append. Returns ``(written, error)``:
+    on an error, ``written`` counts the rows that landed and no row after the
+    one that failed was attempted, so a caller that skips rows the log already
+    holds can simply run again. A row holding a line break would land as two
+    rows, so it is refused before anything is written.
+    """
+    written = 0
+    try:
+        if any(brk in line for line in lines for brk in _LINE_BREAKS):
+            return 0, "refused: a row holds a line break and would be split"
+        for batch in _batches(lines, APPEND_BATCH_BYTES):
+            with _LogLock(obs_path):
+                for line in batch:
+                    _append_line(obs_path, line)
+                    written += 1
+    except Exception as exc:
+        return written, f"append failed after {written} rows: {exc!r}"
+    return written, None
+
+
+def _append_line(obs_path: Path, line: str) -> None:
+    """Rotate if the log is at its cap, then append ``line``. Caller holds the lock."""
+    _rotate_if_needed(obs_path)
+    with open(obs_path, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+        f.flush()
+
+
+class _LogLock:
+    """The writer's exclusive ``flock`` on the log's directory, for one critical section.
+
+    Every append and every rotation happens inside it: two hooks at the cap
+    then rotate once between them, and no shift is ever seen half-done by
+    another writer. Readers take no lock.
+    """
+
+    def __init__(self, obs_path: Path) -> None:
+        self._lock_path = obs_path.parent / _LOCK_FILENAME
+        self._lock_fd = None
+
+    def __enter__(self) -> _LogLock:
+        self._lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = open(self._lock_path, "w")
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        except BaseException:
+            lock_fd.close()
+            raise
+        self._lock_fd = lock_fd
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        try:
+            fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+        finally:
+            self._lock_fd.close()
+
 
 def _rotate_if_needed(obs_path: Path) -> None:
-    """Rename obs_path to obs_path.1 when it exceeds OBSERVATIONS_MAX_BYTES.
+    """At the cap, make the active log the newest archive (position 1).
 
-    Must be called inside the fcntl-locked section of append_observation so
-    concurrent hook invocations cannot double-rotate. Best-effort: any
-    OSError is silently swallowed -- the subsequent append still runs.
+    Renames only: no row is read or rewritten, no directory is listed, and
+    below the cap nothing beyond one ``stat`` happens. Best-effort -- any
+    ``OSError`` stops the rotation where it stands and the caller's append
+    still runs into the active log, which never moves unless position 1 is
+    free. A shift stopped part-way leaves exactly one free position, and the
+    next rotation's shift stops there instead of dropping an archive.
     """
     try:
-        if obs_path.exists() and obs_path.stat().st_size >= OBSERVATIONS_MAX_BYTES:
-            os.replace(obs_path, Path(str(obs_path) + ".1"))
+        if obs_path.stat().st_size < OBSERVATIONS_MAX_BYTES:
+            return
+        _shift_archives(obs_path)
+        os.replace(obs_path, retention.archive_path(obs_path, 1))
     except OSError:
         pass
 
 
-def append_observation(obs_path: Path, observation: dict) -> None:
-    """Append a single observation to the JSONL file with exclusive locking.
+def _shift_archives(obs_path: Path) -> None:
+    """Free position 1 by moving each archive one position older, oldest first.
 
-    Acquires the fcntl lock at obs_path.parent / "observations.lock", calls
-    _rotate_if_needed inside the lock, then appends the serialized JSONL line
-    and flushes. Never raises -- callers already wrap main() in except Exception.
+    The shift runs down from the lowest free position, so a gap absorbs it.
+    With every position taken it runs down from the last one, and the rename
+    onto that position is the only place history is deleted. Positions above
+    the policy count are never touched. Raises ``OSError`` at the first
+    rename or ``lstat`` that fails, leaving every earlier rename in place.
     """
-    obs_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = obs_path.parent / "observations.lock"
-    lock_path.touch(exist_ok=True)
+    count = retention.ARCHIVE_COUNT
+    stop = _lowest_free_position(obs_path, count) or count
+    for position in range(stop - 1, 0, -1):
+        os.replace(
+            retention.archive_path(obs_path, position),
+            retention.archive_path(obs_path, position + 1),
+        )
 
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
+def _lowest_free_position(obs_path: Path, count: int) -> int | None:
+    """The lowest position in ``1..count`` with no entry at its name, or ``None``.
+
+    Only "no such file" counts as free: a position whose name cannot be
+    examined raises, so a rename never lands on an archive merely because its
+    ``lstat`` failed.
+    """
+    for position in range(1, count + 1):
         try:
-            _rotate_if_needed(obs_path)
-            with open(obs_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(observation, separators=(",", ":")) + "\n")
-                f.flush()
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.lstat(retention.archive_path(obs_path, position))
+        except FileNotFoundError:
+            return position
+    return None
+
+
+def _batches(lines: list[str], limit: int) -> list[list[str]]:
+    """``lines`` in order, grouped so each group's bytes stay within ``limit``.
+
+    A line counts its encoded bytes plus its newline; a line longer than
+    ``limit`` forms a group of its own.
+    """
+    batches: list[list[str]] = []
+    current: list[str] = []
+    size = 0
+    for line in lines:
+        line_bytes = len(line.encode("utf-8")) + 1
+        if current and size + line_bytes > limit:
+            batches.append(current)
+            current, size = [], 0
+        current.append(line)
+        size += line_bytes
+    if current:
+        batches.append(current)
+    return batches
 
 
 def record(

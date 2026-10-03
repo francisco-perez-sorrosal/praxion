@@ -22,6 +22,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import _sidecar_mount
+import pytest
+
+from hooks._observation_log import reader
 
 CHAIN_PATH = Path(__file__).parent / "finalize_chain.sh"
 
@@ -1129,3 +1132,131 @@ def test_strict_mode_does_not_turn_an_aborted_convergence_into_a_failing_chain(
     result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
+
+
+# --- Post-merge: merge-in of worktree observation logs ------------------------
+
+_MERGE_STEP = "post-merge: merge_worktree_log"
+
+
+def _post_merge_steps(*, repo_root: Path, placement: str = "in-repo") -> list[str]:
+    """The steps `finalize_chain_post_merge` runs, with every predicate and
+    runner stubbed to echo its label, so the gate decision is all that shows."""
+    snippet = f"""
+        source {shlex.quote(str(CHAIN_PATH))}
+        _finalize_chain_run_script() {{ echo "RAN:$1"; }}
+        _finalize_chain_run_on_main() {{ echo "RAN:on-main"; }}
+        _finalize_chain_repo_root() {{ echo {shlex.quote(str(repo_root))}; }}
+        _finalize_chain_repair_broken_block_d() {{ :; }}
+        _finalize_chain_load_placement() {{ _FC_PLACEMENT={shlex.quote(placement)}; }}
+        _finalize_chain_state_was_touched() {{ return 0; }}
+        _finalize_chain_on_main() {{ return 0; }}
+        finalize_chain_post_merge
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True, check=True)
+    return [line.split(":", 1)[1] for line in result.stdout.splitlines() if line.startswith("RAN:")]
+
+
+def test_post_merge_merges_worktree_logs_after_reconcile_and_before_finalize(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _post_merge_steps(repo_root=tmp_path)
+
+    assert steps == [
+        "post-merge: reconcile_ai_state",
+        _MERGE_STEP,
+        "on-main",
+        "post-merge: check_squash_safety",
+    ]
+
+
+def test_post_merge_in_a_linked_worktree_does_not_merge_logs(tmp_path: Path) -> None:
+    (tmp_path / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n")
+
+    assert _MERGE_STEP not in _post_merge_steps(repo_root=tmp_path)
+
+
+@pytest.mark.parametrize("placement", ["sidecar", "dangling", "foreign", "not-yet-linked"])
+def test_post_merge_does_not_merge_logs_unless_the_state_lives_in_the_repository(
+    tmp_path: Path, placement: str
+) -> None:
+    (tmp_path / ".git").mkdir()
+
+    assert _MERGE_STEP not in _post_merge_steps(repo_root=tmp_path, placement=placement)
+
+
+def _repo_on_feature_branch(root: Path) -> Path:
+    """A repository the on-main composition skips, so only the log merge is in play."""
+    root.mkdir()
+    _git_ok(root, "init", "-q", "-b", "feature")
+    _configure_identity_sc(root)
+    _git_ok(root, "commit", "-q", "--allow-empty", "-m", "initial")
+    return root
+
+
+@pytest.mark.parametrize("strict", [False, True])
+def test_a_failing_log_merge_never_fails_the_chain_or_stops_the_steps_after_it(
+    tmp_path: Path, strict: bool
+) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "merge_worktree_log.py").write_text("import sys\nsys.exit(1)\n")
+    marker = tmp_path / "squash-safety-ran"
+    (scripts_dir / "check_squash_safety.py").write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+    )
+    strict_line = "export FINALIZE_CHAIN_STRICT=1" if strict else ""
+    snippet = f"""
+        cd {shlex.quote(str(repo))}
+        {strict_line}
+        source {shlex.quote(str(CHAIN_PATH))}
+        FINALIZE_CHAIN_DIR={shlex.quote(str(scripts_dir))}
+        set -e
+        finalize_chain_post_merge
+    """
+
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert marker.exists()
+
+
+def test_a_missing_log_merge_script_is_skipped_without_a_word(tmp_path: Path) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+    empty_dir = tmp_path / "scripts"
+    empty_dir.mkdir()
+
+    result = _run_chain(cwd=repo, finalize_dir=empty_dir, entry="finalize_chain_post_merge")
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_post_merge_copies_a_contained_worktrees_log_once_and_is_silent_after(
+    tmp_path: Path,
+) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+    worktree = tmp_path / "pipeline-wt"
+    _git_ok(repo, "worktree", "add", "-q", "-b", "pipeline-wt", str(worktree))
+    (worktree / ".ai-state").mkdir()
+    reader.log_path(worktree / ".ai-state").write_text(
+        '{"event_type": "agent_start", "timestamp": "2026-10-01T00:00:00Z", "n": 1}\n'
+    )
+    scripts_dir = _make_fake_plugin(tmp_path / "plugin")
+
+    def post_merge() -> subprocess.CompletedProcess[str]:
+        return _run_chain(
+            cwd=repo,
+            finalize_dir=scripts_dir,
+            entry="finalize_chain_post_merge",
+            git_hook_env=True,
+        )
+
+    first, second = post_merge(), post_merge()
+
+    assert first.returncode == 0, first.stderr
+    assert "merge-in pipeline-wt: copied 1" in first.stdout
+    assert reader.log_path(repo / ".ai-state").read_text().count("\n") == 1
+    assert (second.returncode, "merge-in" in second.stdout) == (0, False)

@@ -421,3 +421,84 @@ def test_the_report_names_a_reason_exactly_when_it_is_degraded(
 
     assert [r.outcome for r in reports] == [MERGED, RECORDING_OFF, NOTHING_TO_MERGE, DEGRADED]
     assert [r.reason is not None for r in reports] == [False, False, False, True]
+
+
+# -- several worktrees in one run ----------------------------------------------------------
+
+
+def _merge_all(main_state: Path, worktree_states: list[Path], env=STANDARD):
+    return merge_in.merge_worktree_logs(main_state, worktree_states, env=env)
+
+
+def test_each_worktree_in_a_run_is_checked_against_the_rows_the_one_before_copied(
+    main_state: Path, tmp_path: Path
+) -> None:
+    _seed(main_state, [_row(1)])
+    first, second = tmp_path / "first" / ".ai-state", tmp_path / "second" / ".ai-state"
+    _seed(first, [_row(2), _row(3)])
+    _seed(second, [_row(3), _row(4)])
+
+    reports = _merge_all(main_state, [first, second])
+
+    assert [(r.outcome, r.copied, r.skipped) for r in reports] == [(MERGED, 2, 0), (MERGED, 1, 1)]
+    assert sorted(row["n"] for row in _history(main_state)) == [1, 2, 3, 4]
+
+
+def test_the_main_log_is_read_once_for_a_run_and_not_at_all_when_no_worktree_has_a_log(
+    main_state: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(main_state, [_row(1)])
+    withlog = [tmp_path / name / ".ai-state" for name in ("a", "b", "c")]
+    for n, state in enumerate(withlog, start=2):
+        _seed(state, [_row(n)])
+    reads = []
+    real = merge_in._identities_held
+    monkeypatch.setattr(
+        merge_in, "_identities_held", lambda state: reads.append(state) or real(state)
+    )
+
+    _merge_all(main_state, [tmp_path / "none" / ".ai-state"])
+    assert reads == []
+
+    _merge_all(main_state, withlog)
+    assert reads == [main_state]
+
+
+def test_a_worktree_with_no_log_is_not_degraded_by_an_unreadable_main_log(
+    main_state: Path, tmp_path: Path
+) -> None:
+    _seed(main_state, [_row(1)])
+    archive_path(reader.log_path(main_state), 1).mkdir()
+    withlog = tmp_path / "withlog" / ".ai-state"
+    _seed(withlog, [_row(2)])
+
+    empty, degraded = _merge_all(main_state, [tmp_path / "none" / ".ai-state", withlog])
+
+    assert (empty.outcome, degraded.outcome) == (NOTHING_TO_MERGE, DEGRADED)
+
+
+def test_a_row_a_failed_append_never_landed_is_still_copied_from_the_next_worktree(
+    main_state: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(main_state, [])
+    first, second = tmp_path / "first" / ".ai-state", tmp_path / "second" / ".ai-state"
+    _seed(first, [_row(1), _row(2)])
+    _seed(second, [_row(2)])
+    real = merge_in.writer.append_lines
+    calls = []
+
+    def fails_after_one_row(log, lines):
+        calls.append(list(lines))
+        return (
+            (real(log, lines[:1])[0], "append failed after 1 row")
+            if len(calls) == 1
+            else real(log, lines)
+        )
+
+    monkeypatch.setattr(merge_in.writer, "append_lines", fails_after_one_row)
+
+    first_report, second_report = _merge_all(main_state, [first, second])
+
+    assert (first_report.outcome, first_report.copied) == (DEGRADED, 1)
+    assert (second_report.outcome, second_report.copied, second_report.skipped) == (MERGED, 1, 0)
+    assert sorted(row["n"] for row in _history(main_state)) == [1, 2]

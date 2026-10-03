@@ -16,7 +16,7 @@ and the retention policy to each one like any other append.
 from __future__ import annotations
 
 from collections import namedtuple
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from . import reader, writer
@@ -38,7 +38,9 @@ MergeReport = namedtuple(
 )
 
 # What one pass over the worktree's segments found.
-_Walk = namedtuple("_Walk", ("queued", "skipped", "malformed", "unreadable", "reasons"))
+_Walk = namedtuple(
+    "_Walk", ("queued", "identities", "skipped", "malformed", "unreadable", "reasons")
+)
 
 
 def merge_worktree_log(
@@ -52,17 +54,56 @@ def merge_worktree_log(
     cannot be read or written makes the outcome ``degraded`` while every row that
     can be copied still is. Never raises for a problem in either log.
     """
+    return merge_worktree_logs(main_state_dir, [worktree_state_dir], env=env)[0]
+
+
+def merge_worktree_logs(
+    main_state_dir: Path, worktree_state_dirs: Sequence[Path], *, env: Mapping[str, str]
+) -> tuple[MergeReport, ...]:
+    """One report per worktree, in order, each as ``merge_worktree_log`` reports it.
+
+    The main log's row identities are read once, on the first worktree that has
+    rows to offer, and shared by the rest: a worktree with no log never costs a
+    read of the main log, and a run over many worktrees reads it once, not once
+    per worktree. Each worktree sees the rows the one before it copied.
+    """
     mode, _ = resolve_mode(env)
+    main = _MainIdentities(main_state_dir)
+    return tuple(_merge_one(main, state_dir, mode) for state_dir in worktree_state_dirs)
+
+
+class _MainIdentities:
+    """The identity of every row the main log holds, read on first use.
+
+    Shared by the worktrees of one run, so the set is what the next worktree is
+    checked against. It holds only rows that are in the main log: after a failed
+    append the caller takes back the rows that never landed, or a later worktree
+    holding the same row would skip it and the row would be in no log.
+    """
+
+    def __init__(self, state_dir: Path) -> None:
+        self.state_dir = state_dir
+        self._read: tuple[set[str], str | None] | None = None
+
+    def held(self) -> tuple[set[str], str | None]:
+        """`(identities, None)`, or `(empty, why the main log cannot be trusted)`."""
+        if self._read is None:
+            self._read = _identities_held(self.state_dir)
+        return self._read
+
+
+def _merge_one(main: _MainIdentities, worktree_state_dir: Path, mode: Mode) -> MergeReport:
     if mode is Mode.OFF:
         return _settled(worktree_state_dir, mode, RECORDING_OFF)
-    held, main_problem = _identities_held(main_state_dir)
-    if main_problem is not None:
-        return _degraded(worktree_state_dir, mode, (main_problem,))
     listing = reader.segment_listing(worktree_state_dir, archives=True)
     if not listing.segments:
         return _settled(worktree_state_dir, mode, NOTHING_TO_MERGE)
+    held, main_problem = main.held()
+    if main_problem is not None:
+        return _degraded(worktree_state_dir, mode, (main_problem,))
     walk = _walk_worktree(listing, held)
-    written, append_error = writer.append_lines(reader.log_path(main_state_dir), walk.queued)
+    written, append_error = writer.append_lines(reader.log_path(main.state_dir), walk.queued)
+    held.difference_update(walk.identities[written:])
     reasons = walk.reasons + ((append_error,) if append_error else ())
     counts = {"copied": written, "skipped": walk.skipped, "malformed": walk.malformed}
     if reasons:
@@ -90,9 +131,11 @@ def _walk_worktree(listing: reader.SegmentListing, held: set[str]) -> _Walk:
     """Queue the stored text of each row the main log lacks, oldest segment first.
 
     ``held`` grows as rows are queued, so a row repeated inside the worktree's
-    own log is queued once.
+    own log is queued once; ``identities`` is the queued rows' identities in
+    queue order, so the caller can take back the ones that never landed.
     """
     queued: list[str] = []
+    identities: list[str] = []
     skipped = malformed = 0
     unreadable = [str(path) for path in listing.missing]
     reasons = [f"worktree archive is missing ({path})" for path in unreadable]
@@ -110,7 +153,8 @@ def _walk_worktree(listing: reader.SegmentListing, held: set[str]) -> _Walk:
                 continue
             held.add(identity)
             queued.append(text)
-    return _Walk(queued, skipped, malformed, tuple(unreadable), tuple(reasons))
+            identities.append(identity)
+    return _Walk(queued, identities, skipped, malformed, tuple(unreadable), tuple(reasons))
 
 
 def _settled(

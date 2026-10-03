@@ -160,6 +160,7 @@
 
 .section-card__summary {
   cursor: pointer;
+  justify-content: flex-start;
   list-style: none;
 }
 

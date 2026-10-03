@@ -265,7 +265,7 @@ export function digestSentinel(data: SentinelData): SentinelDigest | null {
     notReachedCount: newest?.notReachedCount ?? 0,
     series: data.logSeries.slice(-SENTINEL_TREND_RUNS),
     suggested: latest?.suggested ?? null,
-    timestamp: newest?.reportTimestamp ?? latest?.timestamp ?? null
+    timestamp: newest?.fileTimestamp ?? latest?.timestamp ?? null
   };
 }
 

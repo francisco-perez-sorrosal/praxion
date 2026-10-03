@@ -66,6 +66,11 @@ describe("AppHeader — the data-as-of label names the local calendar day", () =
     vi.useRealTimers();
   });
 
+  it("runs in a zone that is not UTC, or the pins below could not fail", () => {
+    // vitest.config.ts pins TZ; in UTC the local day and the UTC day coincide at noon only.
+    expect(new Date(2026, 9, 1, 23, 30).getTimezoneOffset()).not.toBe(0);
+  });
+
   it("labels an earlier day with its local date, not the UTC date", async () => {
     const { AppHeader } = await import("@/components/app-header");
     vi.useFakeTimers({ toFake: ["Date"] });

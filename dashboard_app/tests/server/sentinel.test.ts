@@ -8,8 +8,10 @@ import { parseMetricsLog } from "@/server/view-models/metrics";
 import {
   countNotReached,
   getSentinelData,
+  getSentinelSignal,
   isPartialReport,
-  reportTimestampFromFileName
+  reportTimestampFromFileName,
+  runStampFromFileName
 } from "@/server/view-models/sentinel";
 import { extractSections, parseSentinelLog } from "@/server/sentinel/extract-sections";
 
@@ -284,6 +286,39 @@ describe("reportTimestampFromFileName", () => {
   });
 });
 
+describe("runStampFromFileName", () => {
+  it("is the filename's wall-clock text to the minute", () => {
+    expect(runStampFromFileName("SENTINEL_REPORT_2026-09-11_17-10-27.md")).toBe("2026-09-11 17:10");
+  });
+
+  it("returns null for a name without a valid stamp", () => {
+    expect(runStampFromFileName("SENTINEL_REPORT_latest.md")).toBeNull();
+    expect(runStampFromFileName("SENTINEL_REPORT_2026-13-45_99-99-99.md")).toBeNull();
+  });
+
+  it("keeps a wall-clock time that does not exist locally on a spring-forward day", () => {
+    // 02:30 on 2026-03-08 never happens in America/Los_Angeles; the producer still wrote it.
+    expect(runStampFromFileName("SENTINEL_REPORT_2026-03-08_02-30-00.md")).toBe("2026-03-08 02:30");
+  });
+
+  it("gives the same text in every zone", () => {
+    const original = process.env.TZ;
+    try {
+      const stamps = ["UTC", "Asia/Tokyo", "America/Los_Angeles"].map((zone) => {
+        process.env.TZ = zone;
+        return runStampFromFileName("SENTINEL_REPORT_2026-10-01_23-30-00.md");
+      });
+      expect(new Set(stamps)).toEqual(new Set(["2026-10-01 23:30"]));
+    } finally {
+      if (original === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = original;
+      }
+    }
+  });
+});
+
 describe("isPartialReport", () => {
   it("is true when the title line carries [PARTIAL]", () => {
     expect(isPartialReport("# Sentinel Report [PARTIAL]\n\nbody")).toBe(true);
@@ -397,10 +432,25 @@ describe("getSentinelData digest fields", () => {
 
     const { reports } = await getSentinelData(root);
 
-    expect(reports[0]?.reportTimestamp).toBe(written.toISOString());
-    expect(reports[0]?.reportTimestamp).not.toBe(
+    expect(reports[0]?.fileTimestamp).toBe(written.toISOString());
+    expect(reports[0]?.fileTimestamp).not.toBe(
       reportTimestampFromFileName("SENTINEL_REPORT_2026-10-01_09-30-00.md")
     );
+  });
+
+  it("names each report's run from its filename, however git set the file times", async () => {
+    const root = await buildRoot();
+    const reportsDir = path.join(root, ".ai-state", "sentinel_reports");
+    await writeFile(path.join(reportsDir, "SENTINEL_REPORT_2026-09-11_17-10-27.md"), "# Sentinel Report\n");
+    const checkout = new Date("2026-10-02T18:26:00.000Z");
+    for (const name of ["SENTINEL_REPORT_2026-09-11_17-10-27.md", "SENTINEL_REPORT_2026-10-01_09-30-00.md"]) {
+      await utimes(path.join(reportsDir, name), checkout, checkout);
+    }
+
+    const { reports } = await getSentinelData(root);
+
+    expect(reports.map((report) => report.fileTimestamp)).toEqual([checkout.toISOString(), checkout.toISOString()]);
+    expect(reports.map((report) => report.runStamp)).toEqual(["2026-10-01 09:30", "2026-09-11 17:10"]);
   });
 
   it("exposes the log's path so a consumer can stamp its modification time", async () => {
@@ -409,6 +459,35 @@ describe("getSentinelData digest fields", () => {
     const { log } = await getSentinelData(root);
 
     expect(log?.path).toBe(path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_LOG.md"));
+  });
+
+  it("reads the signal's grade letter from the log row naming the newest report", async () => {
+    expect(await getSentinelSignal(await buildRoot())).toEqual({ grade: "C" });
+  });
+
+  it("grades a newest report that no log row names as not graded, never as the previous run", async () => {
+    const root = await buildRoot();
+    await writeFile(
+      path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_REPORT_2026-10-02_09-30-00.md"),
+      "# Sentinel Report [PARTIAL]\n"
+    );
+
+    expect(await getSentinelSignal(root)).toEqual({ grade: null });
+  });
+
+  it("falls back to the log's last row when no report file exists", async () => {
+    const root = await buildRoot();
+    await rm(path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_REPORT_2026-10-01_09-30-00.md"));
+
+    expect(await getSentinelSignal(root)).toEqual({ grade: "C" });
+  });
+
+  it("has no grade when the project has no sentinel directory", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dashboard-sentinel-signal-"));
+    roots.push(root);
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+
+    expect(await getSentinelSignal(root)).toEqual({ grade: null });
   });
 
   it("reduces a partial run's grade cell to its letter in the log series and the highlight", async () => {

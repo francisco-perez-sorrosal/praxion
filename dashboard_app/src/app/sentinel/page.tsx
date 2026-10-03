@@ -25,7 +25,7 @@ export default async function SentinelPage() {
   return (
     <PageShell
       title="Sentinel"
-      dataAsOf={sentinel.reports[0]?.reportTimestamp ?? null}
+      dataAsOf={sentinel.reports[0]?.fileTimestamp ?? null}
       sourcesContent={sources}
     >
       <p className="page-intro__lede muted">

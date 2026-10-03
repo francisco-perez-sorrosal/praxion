@@ -18,15 +18,9 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
+/** The run's wall-clock stamp: unique per report, and plain text so hydration cannot disagree. */
 function formatReportLabel(report: SentinelReport): string {
-  if (report.reportTimestamp === null) {
-    return report.fileName;
-  }
-  // Local time, like the header stamp the same report feeds.
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(report.reportTimestamp));
+  return report.runStamp ?? report.fileName;
 }
 
 /** The calendar day of a log timestamp, or the raw text when it is not date-shaped. */

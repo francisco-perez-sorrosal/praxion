@@ -28,8 +28,9 @@ function report(overrides: Partial<SentinelReport> & Pick<SentinelReport, "fileN
     highlight: null,
     isPartial: false,
     notReachedCount: 0,
+    fileTimestamp: null,
     path: `/fixture/${overrides.fileName}`,
-    reportTimestamp: null,
+    runStamp: null,
     sections: { critical: "", important: "", suggested: "", rest: BODY_SENTENCE },
     ...overrides
   };
@@ -43,7 +44,8 @@ const NEWEST = report({
   highlight: NEWEST_POINT,
   isPartial: true,
   notReachedCount: 2,
-  reportTimestamp: "2026-10-01T09:30:00.000Z",
+  fileTimestamp: "2026-10-01T09:30:00.000Z",
+  runStamp: "2026-10-01 09:30",
   sections: {
     critical: "#### Critical\n\nCritical table",
     important: "#### Important\n\nImportant table",
@@ -54,7 +56,8 @@ const NEWEST = report({
 const OLDER = report({
   fileName: OLDER_FILE,
   highlight: OLDER_POINT,
-  reportTimestamp: "2026-09-20T09:30:00.000Z"
+  fileTimestamp: "2026-09-20T09:30:00.000Z",
+  runStamp: "2026-09-20 09:30"
 });
 
 function renderDigest(reports: SentinelReport[], logSeries: SentinelLogPoint[]) {
@@ -176,5 +179,27 @@ describe("the report selector", () => {
 
     expect(container.querySelector(".stat-tile__value--grade")?.textContent).toBe("B");
     expect(container.textContent).not.toContain("PARTIAL");
+  });
+
+  it("labels each report with its run stamp, even when git gave every file the same time", () => {
+    const checkout = "2026-10-02T18:26:00.000Z";
+    const { container } = renderDigest(
+      [{ ...NEWEST, fileTimestamp: checkout }, { ...OLDER, fileTimestamp: checkout }],
+      [OLDER_POINT, NEWEST_POINT]
+    );
+    const select = container.querySelector("select") as HTMLSelectElement;
+
+    expect(Array.from(select.options).map((option) => option.text)).toEqual([
+      "2026-10-01 09:30",
+      "2026-09-20 09:30"
+    ]);
+  });
+
+  it("falls back to the file name for a report whose name carries no stamp", () => {
+    const unstamped = report({ fileName: "SENTINEL_REPORT_latest.md" });
+    const { container } = renderDigest([unstamped], []);
+    const select = container.querySelector("select") as HTMLSelectElement;
+
+    expect(select.options[0]?.text).toBe("SENTINEL_REPORT_latest.md");
   });
 });

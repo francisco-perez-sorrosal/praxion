@@ -268,7 +268,8 @@ function reportWith(overrides: Partial<SentinelReport>): SentinelReport {
     isPartial: false,
     notReachedCount: 0,
     path: "/r/SENTINEL_REPORT_2026-10-01_09-30-00.md",
-    reportTimestamp: "2026-10-01T09:30:00.000Z",
+    fileTimestamp: "2026-10-01T09:30:00.000Z",
+    runStamp: "2026-10-01 09:30",
     sections: { critical: "", important: "", rest: "", suggested: "" },
     ...overrides
   };
@@ -307,6 +308,16 @@ describe("digestSentinel", () => {
       suggested: null,
       timestamp: "2026-10-01T09:30:00.000Z"
     });
+  });
+
+  it("ages the digest by the file's time, not by the run stamp the filename names", () => {
+    const data: SentinelData = {
+      log: null,
+      logSeries: [],
+      reports: [reportWith({ fileTimestamp: "2026-10-02T18:26:00.000Z", runStamp: "2026-09-11 17:10" })]
+    };
+
+    expect(digestSentinel(data)?.timestamp).toBe("2026-10-02T18:26:00.000Z");
   });
 
   it("uses the log's last row only when there is no report at all", () => {

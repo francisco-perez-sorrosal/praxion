@@ -228,6 +228,25 @@ describe("getSidebarSignals", () => {
     expect(signals.sentinelGrade).toBeNull();
   });
 
+  it("takes the grade from the log without opening any report body", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+    const root = await createTempProjectRoot("sidebar-signals-sentinel-light-");
+    await seedBareProjectRoot(root);
+    const filename = "SENTINEL_REPORT_2026-05-10_09-00-00.md";
+    await seedSentinelReports(root, [{ filename, grade: "B" }]);
+    // The newest report is a symlink out of the project: reading its body would be refused.
+    const outside = await createTempProjectRoot("sidebar-signals-outside-");
+    const escaped = path.join(outside, "report.md");
+    await writeFile(escaped, "## Ecosystem Health: B\n");
+    const reportPath = path.join(root, ".ai-state", "sentinel_reports", filename);
+    await rm(reportPath);
+    await symlink(escaped, reportPath);
+
+    const signals = await getSidebarSignals(root);
+
+    expect(signals.sentinelGrade).toBe("B");
+  });
+
   it("returns sentinelGrade null when no sentinel reports exist", async () => {
     const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
 

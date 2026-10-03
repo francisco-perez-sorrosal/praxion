@@ -28,11 +28,18 @@ export type SentinelReport = {
   notReachedCount: number;
   path: string;
   /**
-   * ISO instant the report was written: the file's modification time, which is
-   * absolute. Only when the file cannot be stat'ed is it recovered from the
-   * filename, whose stamp is local wall-clock time.
+   * ISO instant the file was last written: its modification time, which is
+   * absolute. It dates the page's data-as-of stamp and the report's age. Git
+   * rewrites it on checkout, so it never says when the run happened. Only when
+   * the file cannot be stat'ed is it recovered from the filename.
    */
-  reportTimestamp: string | null;
+  fileTimestamp: string | null;
+  /**
+   * When the producer ran, as the plain wall-clock text `YYYY-MM-DD HH:MM` taken
+   * from the filename; `null` when the name carries no valid stamp. A string, not
+   * an instant: the stamp has no zone, so the text is the same on server and client.
+   */
+  runStamp: string | null;
   sections: SentinelSections;
 };
 
@@ -48,6 +55,34 @@ const PARTIAL_MARKER = "[PARTIAL]";
 const NOT_REACHED_MARKER = /\[not reached\]/i;
 const INLINE_CODE_SPAN = /`[^`]*`/g;
 const CHECK_ID = /\b[A-Z]{1,3}\d{2}\b/g;
+
+/**
+ * The run's wall-clock `YYYY-MM-DD HH:MM` from a report filename; `null` when
+ * the name carries no valid stamp. No `Date` in the output and none in the
+ * validity check (UTC arithmetic), so no zone can change the text.
+ */
+export function runStampFromFileName(fileName: string): string | null {
+  const match = FILE_TIMESTAMP_PATTERN.exec(fileName);
+  if (!match) {
+    return null;
+  }
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number) as [
+    number, number, number, number, number, number
+  ];
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const roundTrips =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute &&
+    date.getUTCSeconds() === second;
+  if (!roundTrips) {
+    return null;
+  }
+  const two = (value: number) => String(value).padStart(2, "0");
+  return `${String(year).padStart(4, "0")}-${two(month)}-${two(day)} ${two(hour)}:${two(minute)}`;
+}
 
 /**
  * ISO instant from a report filename; `null` when the name carries no valid
@@ -122,18 +157,31 @@ function withGradeLetters(point: SentinelLogPoint): SentinelLogPoint {
   return { ...point, coherence: letter(point.coherence), grade: letter(point.grade) };
 }
 
-async function readSentinelData(projectRoot: string): Promise<SentinelData> {
-  const validatedRoot = await validateProjectRoot(projectRoot);
-  const reportsRoot = path.join(validatedRoot, ".ai-state", "sentinel_reports");
+const SENTINEL_LOG_FILE = "SENTINEL_LOG.md";
 
-  // Newest-first: filenames sort lexically because the timestamp is fixed-width.
-  const reportFileNames = (await listDirectory(reportsRoot))
+function reportsRootOf(validatedRoot: string): string {
+  return path.join(validatedRoot, ".ai-state", "sentinel_reports");
+}
+
+/** Newest-first: filenames sort lexically because the timestamp is fixed-width. */
+async function listReportFileNames(reportsRoot: string): Promise<string[]> {
+  return (await listDirectory(reportsRoot))
     .filter((entry) => isSentinelReport(entry))
     .sort((left, right) => right.localeCompare(left));
+}
 
-  const log = await readMarkdown(
-    await assertAllowedArtifactPath(validatedRoot, path.join(reportsRoot, "SENTINEL_LOG.md"))
+async function readLog(validatedRoot: string, reportsRoot: string) {
+  return readMarkdown(
+    await assertAllowedArtifactPath(validatedRoot, path.join(reportsRoot, SENTINEL_LOG_FILE))
   );
+}
+
+async function readSentinelData(projectRoot: string): Promise<SentinelData> {
+  const validatedRoot = await validateProjectRoot(projectRoot);
+  const reportsRoot = reportsRootOf(validatedRoot);
+
+  const reportFileNames = await listReportFileNames(reportsRoot);
+  const log = await readLog(validatedRoot, reportsRoot);
   const logSeries = parseSentinelLog(log?.body ?? "").map(withGradeLetters);
   const highlightByFile = new Map<string, SentinelLogPoint>();
   for (const point of logSeries) {
@@ -155,11 +203,12 @@ async function readSentinelData(projectRoot: string): Promise<SentinelData> {
           body: file.body,
           data: file.data,
           fileName,
+          fileTimestamp: (await fileMtime(file.path)) ?? reportTimestampFromFileName(fileName),
           highlight: highlightByFile.get(fileName) ?? null,
           isPartial: isPartialReport(file.body),
           notReachedCount: countNotReached(file.body),
           path: file.path,
-          reportTimestamp: (await fileMtime(file.path)) ?? reportTimestampFromFileName(fileName),
+          runStamp: runStampFromFileName(fileName),
           sections: extractSections(file.body)
         } satisfies SentinelReport;
       })
@@ -174,3 +223,27 @@ async function readSentinelData(projectRoot: string): Promise<SentinelData> {
 }
 
 export const getSentinelData = cache(readSentinelData);
+
+/** What the sidebar chip needs from the audits: the latest grade letter, or `null` when it has none. */
+export type SentinelSignal = { grade: string | null };
+
+/**
+ * The latest grade without opening any report: the log row that names the
+ * newest report file. A newest report no row names (a run cut short before the
+ * log append) is not graded, never the previous run's grade; the log's last row
+ * stands in only when no report exists. Same rule as the Overview's digest, at
+ * the cost of one directory listing and one log read however many reports exist.
+ */
+async function readSentinelSignal(projectRoot: string): Promise<SentinelSignal> {
+  const validatedRoot = await validateProjectRoot(projectRoot);
+  const reportsRoot = reportsRootOf(validatedRoot);
+
+  const newest = (await listReportFileNames(reportsRoot))[0] ?? null;
+  const log = await readLog(validatedRoot, reportsRoot);
+  const series = parseSentinelLog(log?.body ?? "").map(withGradeLetters);
+  const row =
+    newest === null ? series.at(-1) : series.filter((point) => point.reportFile === newest).at(-1);
+  return { grade: normalizeGrade(row?.grade) ?? null };
+}
+
+export const getSentinelSignal = cache(readSentinelSignal);

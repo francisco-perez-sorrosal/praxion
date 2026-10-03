@@ -115,14 +115,46 @@ _RESUME_AGENT_ID = "a65ec99bc016c1ca0"
 # -- WAL / repo-root fixture helpers ----------------------------------------------
 
 
+def _git(cwd: Path, *args: str) -> None:
+    """Run git in `cwd` with no inherited `GIT_*` scoping and a fixed identity."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    identity = ("-c", "user.name=spawn-count", "-c", "user.email=spawn-count@example.invalid")
+    subprocess.run(
+        ["git", *identity, "-c", "commit.gpgsign=false", *args],
+        cwd=cwd,
+        env=env,
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+
+def _init_git(root: Path) -> Path:
+    """Make `root` a git checkout: the tally lists a repository's checkouts through git."""
+    root.mkdir(parents=True, exist_ok=True)
+    _git(root, "init", "-q")
+    return root
+
+
+def _add_worktree(main: Path, location: Path) -> Path:
+    """A linked worktree of `main` at `location` (git needs one commit to branch from)."""
+    _git(main, "commit", "-q", "--no-verify", "--allow-empty", "-m", "initial")
+    location.parent.mkdir(parents=True, exist_ok=True)
+    _git(main, "worktree", "add", "-q", "-b", f"wt-{location.name}", str(location))
+    return location
+
+
 def _write_wal(repo_root: Path, dot1_lines: list[str], live_lines: list[str]) -> None:
     """Write the rotation archive (.1) and the live WAL, mirroring the real read order.
 
     spawn_count.py must read .ai-state/observations.jsonl.1 THEN
     .ai-state/observations.jsonl -- splitting the verbatim rows across both files (as
     the tests below do) is itself a check that the reader crosses the rotation
-    boundary rather than reading only the live file.
+    boundary rather than reading only the live file. A root that is not yet a git
+    checkout becomes one, since the tally asks git which checkouts exist.
     """
+    if not (repo_root / ".git").exists():
+        _init_git(repo_root)
     state_dir = repo_root / ".ai-state"
     state_dir.mkdir(parents=True, exist_ok=True)
     if dot1_lines:
@@ -437,8 +469,7 @@ def test_json_output_shape_and_cross_project_filtering(tmp_path: Path) -> None:
 
 def test_withholds_on_absent_wal(tmp_path: Path) -> None:
     """No .ai-state/observations.jsonl* at all must withhold (exit 2), never report 0 spawns."""
-    repo = tmp_path / "repo"
-    repo.mkdir()
+    repo = _init_git(tmp_path / "repo")
 
     result = _run_cli(["--slug", "praxion", "--repo-root", str(repo), "--json"], cwd=_REPO_ROOT)
 
@@ -1267,8 +1298,7 @@ def test_a_log_with_no_project_at_all_withholds_with_none_seen(
 def test_an_absent_log_is_withheld_by_name(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
+    repo = _init_git(tmp_path / "repo")
 
     code, _, err = _report(capsys, repo, "any-slug")
 
@@ -1792,3 +1822,267 @@ def test_a_resume_of_an_unattributed_spawn_holds_the_verdict_too(
 
     assert (got_code, report["charged"], report["verdict"]) == (code, 1, label)
     assert [u["agent_id"] for u in report["unattributed"]] == ["pending-x"]
+
+
+# -- The tally spans the repository's checkouts ------------------------------------
+# A pipeline's spawns may sit in the main checkout's log and in the log (archives
+# included) of any worktree that still exists; the read names every log it cannot use.
+
+
+def _jsonl(*rows: dict) -> list[str]:
+    return [json.dumps(row) for row in rows]
+
+
+def _main_with_worktree(tmp_path: Path, *, under_main: bool = True) -> tuple[Path, Path]:
+    main = _init_git(tmp_path / "main")
+    parent = main / ".claude" / "worktrees" if under_main else tmp_path / "elsewhere"
+    return main, _add_worktree(main, parent / "wt")
+
+
+def _agent_ids(rows: list[dict]) -> list[str]:
+    return [row["agent_id"] for row in rows]
+
+
+def test_the_read_spans_the_main_checkout_and_every_worktree_by_recorded_time(
+    tmp_path: Path,
+) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    _write_wal(main, [], _jsonl(_start("a-main", at=_T1, project="main")))
+    _write_wal(
+        worktree,
+        _jsonl(_start("a-archived", at=_T0, project="wt")),
+        _jsonl(_start("a-active", at=_T2, project="wt")),
+    )
+
+    sources, rows, _ = spawn_count._read_wal_rows(main)
+
+    assert _agent_ids(rows) == ["a-archived", "a-main", "a-active"]
+    assert len(sources) == 3
+
+
+def test_a_worktrees_read_includes_the_main_checkouts_log(tmp_path: Path) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path, under_main=False)
+    _write_wal(main, [], _jsonl(_start("a-main", at=_T0, project="main")))
+    _write_wal(worktree, [], _jsonl(_start("a-wt", at=_T1, project="wt")))
+
+    _, rows, _ = spawn_count._read_wal_rows(worktree)
+
+    assert _agent_ids(rows) == ["a-main", "a-wt"]
+
+
+def test_a_worktree_alone_holding_a_log_is_enough(tmp_path: Path) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    _write_wal(worktree, [], _jsonl(_start("a-wt", at=_T0, project="wt")))
+
+    sources, rows, _ = spawn_count._read_wal_rows(main)
+
+    assert _agent_ids(rows) == ["a-wt"]
+    assert len(sources) == 1
+
+
+def test_a_row_copied_into_a_second_log_is_read_once(tmp_path: Path) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    copied = _start("a-wt", at=_T0, project="wt")
+    _write_wal(main, [], _jsonl(copied))
+    _write_wal(worktree, [], _jsonl(copied, _start("a-wt", at=_T1, project="wt")))
+
+    _, rows, _ = spawn_count._read_wal_rows(main)
+    (tallied,) = spawn_count.tally(rows)
+
+    assert len(rows) == 2
+    assert len(tallied.resumes) == 1
+
+
+def test_a_spawn_in_one_checkout_and_its_resume_in_another_is_one_spawn_and_a_resume(
+    tmp_path: Path,
+) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    _write_wal(main, [], _jsonl(_start("a1", at=_T0, project="main")))
+    _write_wal(worktree, [], _jsonl(_start("a1", at=_T1, project="wt")))
+
+    _, rows, _ = spawn_count._read_wal_rows(main)
+    (tallied,) = spawn_count.tally(rows)
+
+    assert (tallied.spawned_at, len(tallied.resumes)) == (_T0, 1)
+
+
+def test_the_first_start_by_time_is_the_spawn_whatever_order_the_rows_arrived_in(
+    tmp_path: Path,
+) -> None:
+    import spawn_count
+
+    merged = _start("a1", at=_T0)
+    recorded_here = _start("a1", at=_T2)
+
+    def spawned_at(arrival: list[dict], root: str) -> str:
+        repo = tmp_path / root
+        _write_wal(repo, [], _jsonl(*arrival))
+        _, rows, _ = spawn_count._read_wal_rows(repo)
+        return spawn_count.tally(rows)[0].spawned_at
+
+    assert spawned_at([merged, recorded_here], "one") == _T0
+    assert spawned_at([recorded_here, merged], "two") == _T0
+
+
+def test_rows_with_no_readable_time_keep_their_read_order_after_the_dated_ones(
+    tmp_path: Path,
+) -> None:
+    import spawn_count
+
+    untimed = {k: v for k, v in _start("a-untimed").items() if k != "timestamp"}
+    garbled = {**_start("a-garbled"), "timestamp": "not a time"}
+    repo = tmp_path / "repo"
+    _write_wal(
+        repo,
+        [],
+        _jsonl(untimed, _start("a-late", at=_T2), garbled, _start("a-early", at=_T0)),
+    )
+
+    _, rows, _ = spawn_count._read_wal_rows(repo)
+
+    assert _agent_ids(rows) == ["a-early", "a-late", "a-untimed", "a-garbled"]
+
+
+def test_a_missing_archive_between_present_ones_withholds_as_a_gap_naming_it(
+    tmp_path: Path,
+) -> None:
+    import spawn_count
+
+    repo = tmp_path / "repo"
+    _write_wal(repo, _jsonl(_start("a1")), _jsonl(_start("a2")))
+    (repo / ".ai-state" / "observations.jsonl.3").write_text(
+        "\n".join(_jsonl(_start("a3"))) + "\n", encoding="utf-8"
+    )
+
+    with pytest.raises(spawn_count._WalWithheldError) as withheld:
+        spawn_count._read_wal_rows(repo)
+
+    ((reason, message),) = withheld.value.faults
+    assert reason == "wal-gap"
+    assert str(repo.resolve() / ".ai-state" / "observations.jsonl.2") in message
+
+
+def test_an_unreadable_segment_in_a_worktree_withholds_naming_its_path(tmp_path: Path) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    _write_wal(main, [], _jsonl(_start("a-main")))
+    unreadable = worktree.resolve() / ".ai-state" / "observations.jsonl"
+    unreadable.parent.mkdir(parents=True)
+    unreadable.mkdir()  # a directory where the log belongs: unreadable even for root
+
+    with pytest.raises(spawn_count._WalWithheldError) as withheld:
+        spawn_count._read_wal_rows(main)
+
+    ((reason, message),) = withheld.value.faults
+    assert reason == "wal-unreadable"
+    assert message.startswith(f"{unreadable}: ")
+
+
+def test_every_unreadable_segment_is_named_not_only_the_first(tmp_path: Path) -> None:
+    import spawn_count
+
+    main, worktree = _main_with_worktree(tmp_path)
+    unreadable = []
+    for root in (main, worktree):
+        log = root.resolve() / ".ai-state" / "observations.jsonl"
+        log.mkdir(parents=True)
+        unreadable.append(log)
+
+    with pytest.raises(spawn_count._WalWithheldError) as withheld:
+        spawn_count._read_wal_rows(main)
+
+    reason, message = withheld.value.faults[0]
+    assert reason == "wal-unreadable"
+    assert all(str(log) in message for log in unreadable)
+
+
+def test_an_unreadable_segment_and_a_gap_are_both_reported(tmp_path: Path) -> None:
+    import spawn_count
+
+    repo = tmp_path / "repo"
+    _write_wal(repo, _jsonl(_start("a1")), [])
+    state = repo / ".ai-state"
+    (state / "observations.jsonl.3").write_text("\n".join(_jsonl(_start("a3"))) + "\n")
+    (state / "observations.jsonl").mkdir()
+
+    with pytest.raises(spawn_count._WalWithheldError) as withheld:
+        spawn_count._read_wal_rows(repo)
+
+    assert [reason for reason, _ in withheld.value.faults] == ["wal-unreadable", "wal-gap"]
+
+
+def test_a_directory_git_cannot_list_withholds_as_checkouts_unlisted(tmp_path: Path) -> None:
+    import spawn_count
+
+    not_a_repository = tmp_path / "plain"
+    state = not_a_repository / ".ai-state"
+    state.mkdir(parents=True)
+    (state / "observations.jsonl").write_text("\n".join(_jsonl(_start("a1"))) + "\n")
+
+    with pytest.raises(spawn_count._WalWithheldError) as withheld:
+        spawn_count._read_wal_rows(not_a_repository)
+
+    ((reason, message),) = withheld.value.faults
+    assert reason == "checkouts-unlisted"
+    assert message
+
+
+def test_a_gap_is_printed_as_reason_colon_message_with_exit_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = tmp_path / "repo"
+    _write_wal(repo, _jsonl(_start("a1")), [])
+    state = repo.resolve() / ".ai-state"
+    (state / "observations.jsonl.3").write_text("\n".join(_jsonl(_start("a3"))) + "\n")
+
+    code, report, err = _report(capsys, repo, _CHECKOUT)
+
+    assert (code, report) == (2, None)
+    assert err.startswith("wal-gap: ")
+    assert str(state / "observations.jsonl.2") in err
+
+
+def test_a_failed_listing_is_printed_as_checkouts_unlisted_with_exit_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    plain = tmp_path / "plain"
+    (plain / ".ai-state").mkdir(parents=True)
+    (plain / ".ai-state" / "observations.jsonl").write_text(json.dumps(_start("a1")) + "\n")
+
+    code, report, err = _report(capsys, plain, _CHECKOUT)
+
+    assert (code, report) == (2, None)
+    assert err.startswith("checkouts-unlisted: ")
+
+
+def test_sources_are_relative_under_the_repository_root_and_absolute_elsewhere(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main = _init_git(tmp_path / "main")
+    inside = _add_worktree(main, main / ".claude" / "worktrees" / "inside")
+    outside = _add_worktree(main, tmp_path / "elsewhere" / "outside")
+    for root, agent in ((main, "a-main"), (inside, "a-in"), (outside, "a-out")):
+        _write_wal(root, [], _jsonl(_start(agent, legacy=True)))
+
+    code, report, _ = _report(capsys, main, _CHECKOUT)
+
+    assert code == 0
+    assert report is not None
+    assert sorted(report["sources"]) == sorted(
+        [
+            ".ai-state/observations.jsonl",
+            ".claude/worktrees/inside/.ai-state/observations.jsonl",
+            str(outside.resolve() / ".ai-state" / "observations.jsonl"),
+        ]
+    )

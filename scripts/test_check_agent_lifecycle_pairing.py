@@ -27,6 +27,7 @@ import pytest
 
 _POST_BASELINE = "2026-09-06T00:00:00+00:00"
 _PRE_BASELINE = "2026-09-01T00:00:00+00:00"
+_NEWEST = "2026-09-07T00:00:00+00:00"
 
 
 def _row(
@@ -196,10 +197,10 @@ def test_golden_bad_case_burst_vs_scattered_total_count(tmp_path: Path) -> None:
         # Cleanly-paired control: must never appear in any bucket.
         _row("agent_start", "clean1", session_id="s-clean", timestamp=_POST_BASELINE),
         _row("agent_stop", "clean1", session_id="s-clean"),
-        # In-flight: the newest session in the file, excluded from pairing
-        # entirely even though it looks like an unpaired, tool-using start.
-        _row("agent_start", "inflight1", session_id="s-newest", timestamp=_POST_BASELINE),
-        _row("tool_use", "inflight1", session_id="s-newest"),
+        # In-flight: the session with the newest recorded time, excluded from
+        # pairing entirely even though it looks like an unpaired, tool-using start.
+        _row("agent_start", "inflight1", session_id="s-newest", timestamp=_NEWEST),
+        _row("tool_use", "inflight1", session_id="s-newest", timestamp=_NEWEST),
     ]
     _write_wal(tmp_path, rows)
 
@@ -458,3 +459,70 @@ def test_slim_helper_stops_report_identically_to_legacy_helper_stops(tmp_path: P
 
     assert slim_report == legacy_report
     assert slim_report["info"]["unmatched_stops"]["unobserved-agent"] == ["h1", "h2"]
+
+
+# -- Row order: the in-flight session is the newest by recorded time ----------------
+
+
+_EARLY = "2026-09-20T10:00:00+00:00"
+_MIDDLE = "2026-09-20T11:00:00+00:00"
+_LATE = "2026-09-21T10:00:00+00:00"
+
+
+def _merged_and_recorded_here() -> tuple[list[dict], list[dict]]:
+    """A worktree's older rows (an unpaired, tool-using start) and the session recorded here."""
+    merged = [
+        _row("agent_start", "a-wt", session_id="s-wt", timestamp=_EARLY),
+        _row("tool_use", "a-wt", session_id="s-wt", timestamp=_MIDDLE),
+    ]
+    recorded_here = [
+        _row("agent_start", "a-here", session_id="s-here", timestamp=_LATE),
+        _row("agent_stop", "a-here", session_id="s-here", timestamp=_LATE),
+    ]
+    return merged, recorded_here
+
+
+def test_the_verdict_is_the_same_for_rows_merged_in_after_later_ones(tmp_path: Path) -> None:
+    merged, recorded_here = _merged_and_recorded_here()
+    _write_wal(tmp_path / "time-order", merged + recorded_here)
+    _write_wal(tmp_path / "arrival-order", recorded_here + merged)
+
+    in_time_order = clp.classify(tmp_path / "time-order")
+    in_arrival_order = clp.classify(tmp_path / "arrival-order")
+
+    assert in_arrival_order == in_time_order
+
+
+def test_merged_rows_appended_last_do_not_become_the_in_flight_session(tmp_path: Path) -> None:
+    """Canary: by file position the merged worktree session would be in flight and its
+    lost stop would go unreported; by recorded time the session recorded here is."""
+    merged, recorded_here = _merged_and_recorded_here()
+    _write_wal(tmp_path, recorded_here + merged)
+
+    report = clp.classify(tmp_path)
+
+    assert report["examined"]["excluded_in_flight_session"] == "s-here"
+    assert [finding["entity"] for finding in report["findings"]] == ["a-wt"]
+
+
+def test_rows_with_no_readable_time_sort_after_the_dated_ones(tmp_path: Path) -> None:
+    """An unreadable time orders last, so the session of such a row is the one in flight."""
+    dated = [_row("agent_start", "a1", session_id="s-dated", timestamp=_LATE)]
+    untimed = {**_row("agent_start", "a2", session_id="s-untimed"), "timestamp": "not a time"}
+    _write_wal(tmp_path, [untimed, *dated])
+
+    report = clp.classify(tmp_path)
+
+    assert report["examined"]["excluded_in_flight_session"] == "s-untimed"
+
+
+def test_rows_of_one_instant_keep_their_file_order(tmp_path: Path) -> None:
+    rows = [
+        _row("agent_start", "a1", session_id="s-first"),
+        _row("agent_start", "a2", session_id="s-last"),
+    ]
+    _write_wal(tmp_path, rows)
+
+    report = clp.classify(tmp_path)
+
+    assert report["examined"]["excluded_in_flight_session"] == "s-last"

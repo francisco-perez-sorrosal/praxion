@@ -5,8 +5,9 @@ The orchestrator consults this before each agent spawn -- a miscount is a silent
 breach, so this never reports a false "0 spawns, within budget": an absent WAL, an
 unrecognised slug, or a plugin-cache repo root all withhold (exit 2) rather than guess.
 
-Functional core (`tally`, `classify_resume`, `verdict`) is pure over already-parsed
-data; the WAL, transcript directory, and argv live in the I/O-shell/CLI section below.
+Functional core (`distinct_in_time_order`, `tally`, `classify_resume`, `verdict`) is pure
+over already-parsed data; the WAL, transcript directory, and argv live in the I/O-shell/CLI
+section below.
 
 Counting model: a spawn is an `agent_id` first recorded by an `agent_start` row or by a
 spawn-result `tool_use` row (`spawned_agent_id`, the `Agent` call's result); every later
@@ -30,13 +31,25 @@ Code uses): `heavy` when the last assistant turn at/before the resume timestamp 
 `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` at or above
 `--heavy-context` (default 250,000), `light` below it, `unsized` when unknown.
 
+Reach: the rows are every checkout's, not one log's -- the main working tree and every
+linked worktree that still exists (`git worktree list`), each with all of its archives. A
+row copied into a second log by merge-in is one event (equal field for field) and is read
+once. Rows are ordered by recorded time before counting, so the first start is the spawn
+whatever order the logs delivered it in; a row with no readable time keeps its read order
+after the dated ones. A merged and removed worktree is reached through the main log it
+was merged into.
+
 Budget verdict: `charged` is every attributed spawn (definite) plus every heavy resume;
 unsized resumes, every unattributed spawn in the log and each resume of one form the
 pending pool, each of which could still turn out to be charged to this slug. `within`
 needs `charged + unsized + pending unattributed <= budget`; `over` is `charged > budget`;
 `indeterminate` is the remainder; `no-budget` when `--budget` is omitted. Exit 0 for
 within/indeterminate/no-budget, 1 for over, 2 for withheld (`wal-absent`, `slug-unseen`,
-`plugin-cache-root`).
+`plugin-cache-root`, `wal-unreadable`, `wal-gap`, `checkouts-unlisted`). A log that cannot
+be used withholds the whole tally -- an unrelated worktree's included -- and names every
+path at fault: `wal-unreadable` (a segment that cannot be read), `wal-gap` (an archive
+missing between present ones, history lost) and `checkouts-unlisted` (git could not list
+the checkouts). Clear it by fixing the named path or removing the stale worktree.
 """
 
 from __future__ import annotations
@@ -44,6 +57,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import namedtuple
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -56,7 +70,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # directory -- both live one level under the repo root.
 sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
 from _hook_utils import stated_task_slug  # noqa: E402 (after sys.path injection)
-from _observation_log import reader  # noqa: E402 (after sys.path injection)
+from _observation_log import checkouts, reader  # noqa: E402 (after sys.path injection)
 
 # Default resume-classification boundary (input + cache-read + cache-creation tokens).
 HEAVY_CONTEXT_DEFAULT = 250_000
@@ -111,6 +125,23 @@ class Verdict:
     resumes_heavy: int
     resumes_unsized: int
     budget: int | None
+
+
+def distinct_in_time_order(rows: list[dict]) -> list[dict]:
+    """`rows` with each event once (first read wins), oldest recorded time first.
+
+    Two rows are one event exactly when `row_identity` agrees, so a row merge-in copied
+    into a second log counts once. The sort is stable and a row with no readable time
+    answers `UNTIMED`, so such rows follow the dated ones in the order they were read.
+    """
+    seen: set[str] = set()
+    distinct = []
+    for row in rows:
+        identity = reader.row_identity(row)
+        if identity not in seen:
+            seen.add(identity)
+            distinct.append(row)
+    return sorted(distinct, key=reader.row_time)
 
 
 def tally(rows: list[dict]) -> tuple[AgentTally, ...]:
@@ -233,31 +264,70 @@ def verdict(
 # -- I/O shell ---------------------------------------------------------------------------
 
 
-class _WalUnreadableError(Exception):
-    """A log segment exists but could not be read (permissions, I/O)."""
+class _WalWithheldError(Exception):
+    """The log cannot be counted completely; `faults` are `(reason, message)` pairs.
+
+    Counting spawns over a partial log would under-report the budget, so every log
+    that cannot be used is named, one pair per reason, and the caller withholds.
+    """
+
+    def __init__(self, faults: tuple[tuple[str, str], ...]) -> None:
+        super().__init__("; ".join(f"{reason}: {message}" for reason, message in faults))
+        self.faults = faults
+
+
+# `(segments, rows, malformed, unreadable, gaps)` for one checkout's state directory:
+# `rows` as stored (never upcast, which is what `row_identity` needs), `unreadable` the
+# `<path>: <error>` of each segment that could not be read, `gaps` the archive paths
+# missing between present ones.
+_CheckoutRead = namedtuple("_CheckoutRead", ("segments", "rows", "malformed", "unreadable", "gaps"))
+
+
+def _read_checkout(state_dir: Path) -> _CheckoutRead:
+    """Every segment of the log in `state_dir`, archives first, with what could not be read."""
+    listing = reader.segment_listing(state_dir, archives=True)
+    segments, rows, unreadable, malformed = [], [], [], 0
+    for path in listing.segments:
+        raw = reader.read_raw_segment(path)
+        if raw.error is not None:
+            unreadable.append(f"{path}: {raw.error}")
+            continue
+        segments.append(path)
+        rows.extend(row for _, row in raw.entries)
+        malformed += len(raw.malformed_lines)
+    return _CheckoutRead(segments, rows, malformed, unreadable, [str(p) for p in listing.missing])
 
 
 def _read_wal_rows(repo_root: Path) -> tuple[list[Path], list[dict], int]:
-    """Read the rotated archive segment then the active observation log.
+    """Read every log of the repository: each checkout's archives, then its active log.
 
-    Returns (files_that_existed, parsed_rows, rows_skipped). A missing file is
-    silently skipped -- withholding on a totally absent WAL is the caller's job. A
-    malformed/non-dict line is skipped and counted, never treated as a reason to
-    zero the whole run. A segment that exists but cannot be read raises
-    `_WalUnreadableError`: counting spawns over a partial log would under-report
-    the budget, so the caller withholds instead.
+    Returns (segments_that_were_read, rows, rows_skipped), the rows distinct and in
+    recorded-time order. A checkout with no log contributes nothing -- withholding on a
+    wholly absent WAL is the caller's job. A malformed or non-dict line is skipped and
+    counted, never a reason to zero the run. Anything that would make the count partial
+    raises `_WalWithheldError` naming every path at fault: a segment that exists but
+    cannot be read, an archive missing between present ones, or a failed listing of the
+    checkouts (a failed listing is never an empty repository).
     """
-    state_dir = repo_root / ".ai-state"
-    existing = list(reader.segments(state_dir, archives=True))
-    rows: list[dict] = []
-    skipped = 0
-    for path in existing:
-        segment = reader.read_segment(path)
-        if segment.error is not None:
-            raise _WalUnreadableError(f"{path}: {segment.error}")
-        rows.extend(segment.rows)
-        skipped += len(segment.malformed_lines)
-    return existing, rows, skipped
+    listing = checkouts.repository_checkouts(repo_root)
+    if listing.error is not None:
+        raise _WalWithheldError((("checkouts-unlisted", listing.error),))
+    reads = [_read_checkout(checkout.state_dir) for checkout in listing.checkouts]
+    unreadable = [fault for read in reads for fault in read.unreadable]
+    gaps = [path for read in reads for path in read.gaps]
+    faults = []
+    if unreadable:
+        faults.append(("wal-unreadable", "; ".join(unreadable)))
+    if gaps:
+        faults.append(("wal-gap", "missing archive between present ones: " + ", ".join(gaps)))
+    if faults:
+        raise _WalWithheldError(tuple(faults))
+    rows = distinct_in_time_order([row for read in reads for row in read.rows])
+    return (
+        [path for read in reads for path in read.segments],
+        rows,
+        sum(read.malformed for read in reads),
+    )
 
 
 def _find_agent_transcript(projects_dir: Path, session_id: str, agent_id: str) -> Path | None:
@@ -379,6 +449,14 @@ def resolve_owner(agent_tally: AgentTally, projects_dir: Path) -> AgentTally:
     return replace(agent_tally, owner=owner)
 
 
+def _source_label(path: Path, repo_root: Path) -> str:
+    """`path` relative to `repo_root` when it lies under it, absolute otherwise."""
+    try:
+        return str(path.relative_to(repo_root))
+    except ValueError:
+        return str(path)
+
+
 def _build_envelope(
     slug: str,
     sources: list[Path],
@@ -409,10 +487,9 @@ def _build_envelope(
             }
         )
 
-    # sources are always built as repo_root / ".ai-state" / <name> -- relative_to never fails.
     envelope = {
         "slug": slug,
-        "sources": [str(p.relative_to(repo_root)) for p in sources],
+        "sources": [_source_label(p, repo_root) for p in sources],
         "rows_skipped": rows_skipped,
         "spawns": result.spawns,
         "resumes": {
@@ -501,8 +578,9 @@ def _run(args: argparse.Namespace) -> int:
         return 2
     try:
         sources, all_rows, rows_skipped = _read_wal_rows(repo_root)
-    except _WalUnreadableError as exc:
-        _fail("wal-unreadable", str(exc))
+    except _WalWithheldError as exc:
+        for reason, message in exc.faults:
+            _fail(reason, message)
         return 2
     if not sources:
         _fail("wal-absent", f"no observation log found under {repo_root} (checked .ai-state/).")

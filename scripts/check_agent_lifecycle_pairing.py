@@ -13,7 +13,10 @@ Two boundaries are not findings:
 1. **In-flight exclusion.** An agent still running legitimately has a start
    and no stop. Every record whose `session_id` equals the newest record's
    in the file is excluded from pairing entirely -- it is not evidence of
-   anything, in either direction.
+   anything, in either direction. Newest means latest recorded time, never
+   file position: merge-in appends a worktree's older rows after newer ones.
+   Rows are stable-sorted by `reader.row_time`, so rows of one instant keep
+   their file order and a row with no readable time sorts after the dated ones.
 2. **WAL truncation at the front.** Rotation and `.ai-state/` merges can
    strip the file's earlier lines, so an `agent_stop` whose start predates
    the truncation point is a boundary artifact, not a defect. Unmatched
@@ -223,9 +226,10 @@ def _read_rows(segment: reader.SegmentRead) -> tuple[list[_Row], list[str]]:
     A line that fails to parse is counted into `withheld` (naming its line
     number) and excluded from every other count -- never silently dropped.
     Assumes the caller has already handled `segment.error`: this function
-    only ever sees a segment that read cleanly.
+    only ever sees a segment that read cleanly. Rows come back in recorded-time
+    order, not file order (see the module docstring's in-flight exclusion).
     """
-    rows = [_row_from(raw) for raw in segment.rows]
+    rows = [_row_from(raw) for raw in sorted(segment.rows, key=reader.row_time)]
     withheld = [
         f"line {line_no}: unparseable JSONL record, excluded" for line_no in segment.malformed_lines
     ]

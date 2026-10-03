@@ -1,3 +1,46 @@
+## v0.44.0 (2026-10-03)
+
+### Feat
+
+- Select only direct readers of state data
+- Add the traced selection audit probe
+- Add the spawn-count liveness probe
+- Add the observation-hook liveness probe
+- Add the mutation-sensor liveness probe
+- Commit the read tracer for the selection audit
+- Resolve test scope per path in one run
+- Block a tagged step that has no mutation reading
+- Add the gate-liveness verdict contract and CLI
+- Let footprint commands declare where runs vary
+- **agents**: Point architect and planner at footprints
+- **agents**: Grade footprint criteria in the verifier
+- Register the measurement log and footprint registry
+- **state**: Add Praxion's footprint registry
+- Judge footprint criteria from the diff and log
+- Add the footprint-criteria grammar contract
+- **planning**: Pin shared contracts before parallel lanes
+- **agents**: Write report skeletons first, marked [PARTIAL]
+
+### Fix
+
+- Keep code fences and spaceless step headings out of the boundary
+- Keep promote_learnings fires when a payload has no cwd
+- End a step's mutation-tag scan at its own section
+- Record promote_learnings fires in the judged project
+- Print each liveness verdict's notes
+- Close the selection audit's fail-open edges
+- Keep the liveness command off users' PATH
+- Fail the selection audit on a collection error
+- Tighten footprint command identity and inactivity
+- **agents**: Gate the whole footprint phase on evidence
+- Close the contract's silent-drop gaps
+- **agents**: Link the planner to the spawn-budget source
+
+### Refactor
+
+- Own the Mutation line grammar in _step_schema
+- Split the footprint contract by cohesion
+
 ## v0.43.0 (2026-10-01)
 
 ### Feat

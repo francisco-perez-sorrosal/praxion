@@ -5,6 +5,7 @@ Regenerate: `python scripts/regenerate_specs_index.py`
 
 | Spec | Slug | Archived | Status | Tier | ADRs | Summary |
 |------|------|----------|--------|------|------|---------|
+| [SPEC_wal-modes-core_2026-09-27.md](SPEC_wal-modes-core_2026-09-27.md) | wal-modes-core | 2026-10-03 (post-merge; merged to main 2026-09-27 as `5fc87503`) | completed -- verifier round 1 FAIL | Standard | dec-401, dec-400, dec-370 | The observation log had become a load-bearing input to Praxion's process (spawn budget, completion handshake, sentinel P... |
 | [SPEC_process-economy-p3-1_2026-09-18.md](SPEC_process-economy-p3-1_2026-09-18.md) | process-economy-p3-1 | 2026-09-18 | completed | Standard | dec-387 |  |
 | [SPEC_sentinel-phase-b_2026-09-13.md](SPEC_sentinel-phase-b_2026-09-13.md) | sentinel-phase-b | 2026-09-13 | completed | Standard | dec-385 |  |
 | [SPEC_sidecar-placement_2026-09-03.md](SPEC_sidecar-placement_2026-09-03.md) | sidecar-placement | 2026-09-03 | Integration pass Batch 21 executed 49 scenarios | Full | dec-364, dec-365, dec-361, dec-362, dec-359, dec-363, dec-357, dec-358, dec-368, dec-367, dec-366, dec-360, dec-366 | Praxion assumes it owns the git tree it manages. That assumption breaks for an operator running Praxion on someone else'... |

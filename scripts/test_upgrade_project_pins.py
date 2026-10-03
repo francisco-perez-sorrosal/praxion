@@ -892,6 +892,57 @@ _OLD_AI_ASSISTANTS_BLOCK = (
 )
 
 
+_BLOCK_WITH_LINE_BUT_NO_GLOB = _OLD_AI_ASSISTANTS_BLOCK + ".ai-state/observations.jsonl\n"
+_BLOCK_WITH_GLOB = _BLOCK_WITH_LINE_BUT_NO_GLOB + ".ai-state/observations.jsonl.*\n"
+
+
+def test_wal_archive_glob_check_reports_drift_without_mutating(project):
+    """A project onboarded with the single `.1` archive line lacks the glob
+    that covers numbered archives -- --check must flag it and change nothing."""
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text(_BLOCK_WITH_LINE_BUT_NO_GLOB)
+    before = gitignore.read_text()
+
+    r = _run(repo, live, "--check")
+
+    assert r.returncode == 1, r.stdout
+    assert "glob" in r.stdout.lower()
+    assert gitignore.read_text() == before
+
+
+def test_wal_archive_glob_apply_appends_once_and_keeps_the_old_line(project):
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text(_BLOCK_WITH_LINE_BUT_NO_GLOB)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    text = gitignore.read_text()
+    assert text.count(".ai-state/observations.jsonl.*\n") == 1
+    assert ".ai-state/observations.jsonl.1\n" in text, "the old single-archive line stays in place"
+    assert text.startswith(_BLOCK_WITH_LINE_BUT_NO_GLOB), (
+        ".gitignore is appended to, never rewritten"
+    )
+
+    second = _run(repo, live)
+    assert second.returncode == 0, second.stderr
+    assert gitignore.read_text() == text
+    assert _run(repo, live, "--check").returncode == 0
+
+
+def test_wal_archive_glob_present_changes_nothing(project):
+    repo, live = project["repo"], project["live"]
+    gitignore = repo / ".gitignore"
+    gitignore.write_text(_BLOCK_WITH_GLOB)
+
+    r = _run(repo, live)
+
+    assert r.returncode == 0, r.stderr
+    assert gitignore.read_text() == _BLOCK_WITH_GLOB
+
+
 def test_wal_gitignore_check_reports_drift_without_mutating(project):
     """A project onboarded before the WAL-untrack change carries the old block
     with no `.ai-state/observations.jsonl` line -- --check must flag it and

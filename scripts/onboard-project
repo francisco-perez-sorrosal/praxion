@@ -660,7 +660,7 @@ EOF
 .ai-state/**/*.lock
 .ai-state/*.backup.json
 .ai-state/observations.jsonl
-.ai-state/observations.jsonl.1
+.ai-state/observations.jsonl.*
 .claude/settings.local.json
 .claude/worktrees/
 .env

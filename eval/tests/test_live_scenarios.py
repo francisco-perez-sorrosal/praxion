@@ -407,6 +407,7 @@ def test_lightweight_fix_is_not_elicited_when_only_byproducts_changed(tmp_path):
             ".claude/praxion-rules.yaml.example": "# example\n",
             ".ai-state/observations.jsonl": "{}\n",
             ".ai-state/observations.jsonl.1": "{}\n",
+            ".ai-state/observations.jsonl.3": "{}\n",
             ".ai-state/observations.lock": "",
             ".ai-state/observations_summary.jsonl": "{}\n",
             ".pytest_cache/v/cache/lastfailed": "{}\n",
@@ -418,6 +419,25 @@ def test_lightweight_fix_is_not_elicited_when_only_byproducts_changed(tmp_path):
     result = SCENARIOS["lightweight-fix"].capture(_envelope("lightweight_fix"), delta, {})
 
     assert isinstance(result, NotElicited)
+
+
+def test_lightweight_fix_drops_numbered_log_archives_and_keeps_a_real_change(tmp_path):
+    from praxion_evals.live.results import Captured
+    from praxion_evals.live.scenarios import SCENARIOS, FsDelta
+
+    delta = FsDelta(
+        created={
+            ".ai-state/observations.jsonl.2": "{}\n",
+            ".ai-state/observations.jsonl.5": "{}\n",
+            "scripts/paginate.py": "fixed\n",
+        },
+        modified={},
+    )
+
+    result = SCENARIOS["lightweight-fix"].capture(_envelope("lightweight_fix"), delta, {})
+
+    assert isinstance(result, Captured)
+    assert result.value == ["scripts/paginate.py"]
 
 
 def test_lightweight_fix_is_not_elicited_when_nothing_changed(tmp_path):

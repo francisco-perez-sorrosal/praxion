@@ -20,6 +20,7 @@ Bash tool_use commands the session actually ran.
 from __future__ import annotations
 
 import hashlib
+import re
 import shlex
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
@@ -507,8 +508,15 @@ _HOOK_CREATED_FILES = frozenset(
 )
 
 
+# Numbered rotation archives of the observations log (.1 ... .N): hook
+# byproducts like the active log, matched by shape since the count is policy.
+_LOG_ARCHIVE = re.compile(r"\A\.ai-state/observations\.jsonl\.\d+\Z")
+
+
 def _is_authored(path: str) -> bool:
-    return path not in _HOOK_CREATED_FILES and _BYPRODUCT_DIRS.isdisjoint(path.split("/"))
+    if path in _HOOK_CREATED_FILES or _LOG_ARCHIVE.match(path):
+        return False
+    return _BYPRODUCT_DIRS.isdisjoint(path.split("/"))
 
 
 def capture_lightweight_fix(

@@ -65,8 +65,9 @@ tmp/
 .ai-state/*.backup.json
 # Raw observations WAL: local-only per dec-draft-66cd5bb6 (observations-wal-leaves-git).
 # The committed rollup is .ai-state/observations_summary.jsonl (one row per session).
+# The glob covers every numbered rotation archive (.1 ... .N).
 .ai-state/observations.jsonl
-.ai-state/observations.jsonl.1
+.ai-state/observations.jsonl.*
 .ai-state/*.pre-forget.json
 # Judge-verdict cache: content-addressed, regenerated on demand by a judged
 # eval run. Local-only (td-189): 1.1 MB trips check-added-large-files and its

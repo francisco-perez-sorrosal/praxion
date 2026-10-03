@@ -689,6 +689,9 @@ echo
 
 echo "[wal] Observations WAL gitignore + untrack"
 WAL_REL='.ai-state/observations.jsonl'
+# Numbered rotation archives (.1 ... .N) are ignored by one glob; a project
+# onboarded with the single '.1' line keeps that line and gains the glob.
+WAL_GLOB='.ai-state/observations.jsonl.*'
 if [ "$PLACEMENT" = "sidecar" ]; then
     # .ai-state is already excluded wholesale under sidecar placement (it is a
     # shadow symlink onto the state mount, per phases-core.md's sidecar
@@ -708,6 +711,10 @@ else
         info ".gitignore: line already present"
     else
         wal_needs_ignore=1
+    fi
+    wal_needs_glob=0
+    if [ "$wal_onboarded" -eq 1 ] && ! grep -qxF "$WAL_GLOB" "$GITIGNORE"; then
+        wal_needs_glob=1
     fi
 
     # Untracking is gated on the same onboarding predicate as the ignore line:
@@ -729,14 +736,19 @@ else
         attr_migrate=1
     fi
 
-    if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_tracked" -eq 1 ] || [ "$attr_migrate" -eq 1 ]; then
+    if [ "$wal_needs_ignore" -eq 1 ] || [ "$wal_needs_glob" -eq 1 ] || [ "$wal_tracked" -eq 1 ] || [ "$attr_migrate" -eq 1 ]; then
         note_change
         [ "$wal_needs_ignore" -eq 1 ] && info ".gitignore: line missing → appending"
+        [ "$wal_needs_glob" -eq 1 ] && info ".gitignore: archive glob missing → appending"
         [ "$wal_tracked" -eq 1 ] && info "observations.jsonl: still tracked → untracking (file stays on disk)"
         [ "$attr_migrate" -eq 1 ] && info ".gitattributes: merge attribute on the raw WAL → moving it to observations_summary.jsonl"
         if mutating; then
             if [ "$wal_needs_ignore" -eq 1 ]; then
                 printf '%s\n' "$WAL_REL" >> "$GITIGNORE"
+                STAGED_FILES+=("$GITIGNORE")
+            fi
+            if [ "$wal_needs_glob" -eq 1 ]; then
+                printf '%s\n' "$WAL_GLOB" >> "$GITIGNORE"
                 STAGED_FILES+=("$GITIGNORE")
             fi
             [ "$wal_tracked" -eq 1 ] && git -C "$REPO_ROOT" rm --cached --quiet -- "$WAL_REL"

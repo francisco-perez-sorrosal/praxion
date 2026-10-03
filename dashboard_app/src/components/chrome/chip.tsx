@@ -10,6 +10,7 @@ export type ChipVariant =
   | "grade-b"
   | "grade-c"
   | "grade-d"
+  | "grade-f"
   | "neutral";
 
 export function Chip({

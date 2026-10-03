@@ -7,10 +7,17 @@
    source order, exactly as in the pre-split monolith).
 
    Edit the layer files directly; this file is only an import manifest.
-   layout.tsx imports this file, which transitively pulls in all six. */
+   layout.tsx imports this file, which transitively pulls in every layer; the digest layer and the
+   per-surface layers (overview, sentinel, evals, workshops) load last so their
+   rules win over the generic widget styles by source order. */
 @import "./tokens.css";
 @import "./base.css";
 @import "./app-chrome.css";
 @import "./surfaces.css";
 @import "./widgets.css";
 @import "./pages-and-viz.css";
+@import "./digest.css";
+@import "./overview.css";
+@import "./sentinel.css";
+@import "./evals.css";
+@import "./workshops.css";

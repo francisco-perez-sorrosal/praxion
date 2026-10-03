@@ -77,6 +77,31 @@ export async function listDirectoryByMtimeDesc(target: string): Promise<string[]
     .map((entry) => entry.entry);
 }
 
+/** ISO modification time of a file or directory; `null` when it is absent. */
+export async function fileMtime(target: string): Promise<string | null> {
+  try {
+    const stats = await fs.stat(target);
+    return stats.mtime.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The newest modification time among `targets` (absent paths ignored), for the
+ * "data as of" stamp a surface shows for the artifacts it read.
+ */
+export async function newestMtime(targets: readonly string[]): Promise<string | null> {
+  const stamps = await Promise.all(targets.map((target) => fileMtime(target)));
+  let newest: string | null = null;
+  for (const stamp of stamps) {
+    if (stamp !== null && (newest === null || stamp > newest)) {
+      newest = stamp;
+    }
+  }
+  return newest;
+}
+
 export async function readText(target: string): Promise<string | null> {
   try {
     return await fs.readFile(target, "utf8");

@@ -11,11 +11,14 @@
  * the implementation file exists (concurrent BDD/TDD RED handshake).
  */
 
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FIXED_NOW, removeProjectRoots } from "../acceptance/drivers/fixture-project";
+import { cleanProject, emptyProject, fullProject } from "../acceptance/drivers/project-presets";
 
 // ─── Temp-root bookkeeping ────────────────────────────────────────────────────
 
@@ -36,6 +39,8 @@ async function seedBareProjectRoot(root: string): Promise<void> {
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  await removeProjectRoots();
   await Promise.all(
     tempRoots.splice(0).map((root) => rm(root, { force: true, recursive: true }))
   );
@@ -294,5 +299,75 @@ describe("getSidebarSignals", () => {
     } else {
       expect(signals.sentinelGrade).toBeNull();
     }
+  });
+});
+
+// ─── The signals the Overview shares ──────────────────────────────────────────
+
+describe("getSidebarSignals — workshop recency", () => {
+  const NOW = new Date("2026-10-02T15:00:00Z");
+
+  async function seedWorkshop(root: string, slug: string, touched: Date): Promise<void> {
+    const dir = path.join(root, ".ai-work", slug);
+    await mkdir(dir, { recursive: true });
+    await writeInProgressWip(dir);
+    await utimes(path.join(dir, "WIP.md"), touched, touched);
+  }
+
+  it("counts only the workshops touched within the Active window", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+    const root = await createTempProjectRoot("sidebar-signals-recency-");
+    await seedBareProjectRoot(root);
+    await seedWorkshop(root, "recent", new Date("2026-10-01T15:00:00Z"));
+    await seedWorkshop(root, "edge", new Date("2026-09-25T15:00:00Z"));
+    await seedWorkshop(root, "abandoned", new Date("2026-09-10T15:00:00Z"));
+
+    const signals = await getSidebarSignals(root, NOW);
+
+    expect(signals.activeWorkshops).toBe(2);
+  });
+});
+
+describe("getSidebarSignals — metrics health and quality-eval failures", () => {
+  it("reads the quality-eval failure count and the metrics health word from the fixtures", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+
+    const signals = await getSidebarSignals(await fullProject(), FIXED_NOW);
+
+    expect(signals).toEqual({ activeWorkshops: 2, evalFails: 3, metricsHealth: "WORSENING", sentinelGrade: "C" });
+  });
+
+  it("words a project with a single metrics snapshot as the baseline", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+
+    const signals = await getSidebarSignals(await cleanProject(), FIXED_NOW);
+
+    expect(signals.metricsHealth).toBe("BASELINE CAPTURED");
+  });
+
+  it("omits every signal whose family is absent", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+
+    const signals = await getSidebarSignals(await emptyProject(), FIXED_NOW);
+
+    expect(signals).toEqual({ activeWorkshops: 0, evalFails: null, metricsHealth: null, sentinelGrade: null });
+  });
+
+  it("keeps the other signals when one reader throws", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const root = await fullProject();
+    const outside = await createTempProjectRoot("sidebar-signals-outside-");
+    const escaped = path.join(outside, "report.md");
+    await writeFile(escaped, "# Quality eval\n");
+    const reportsDir = path.join(root, ".ai-state", "praxion_eval_reports");
+    const log = path.join(reportsDir, "PRAXION_EVAL_LOG.md");
+    await rm(log);
+    await symlink(escaped, log);
+
+    const signals = await getSidebarSignals(root, FIXED_NOW);
+
+    expect(signals).toEqual({ activeWorkshops: 2, evalFails: null, metricsHealth: "WORSENING", sentinelGrade: "C" });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("sidebar quality evals unreadable"), expect.any(String));
   });
 });

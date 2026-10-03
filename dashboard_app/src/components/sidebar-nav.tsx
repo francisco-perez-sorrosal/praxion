@@ -6,7 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Chip } from "@/components/chrome/chip";
-import { gradeChipVariant, gradeTone } from "@/lib/tone";
+import { healthWord } from "@/components/overview/health-word";
+import type { Tone } from "@/lib/tone";
+import { gradeChipVariant, gradeTone, healthLabelTone, verdictTone } from "@/lib/tone";
 import type { SidebarSignals } from "@/server/view-models/sidebar-signals";
 
 type NavKey =
@@ -154,9 +156,26 @@ function signalFor(key: NavKey, signals: SidebarSignals): ReactNode {
           </Chip>
         </span>
       ) : null;
+    case "metrics":
+      return signals.metricsHealth !== null ? (
+        <TonePill tone={healthLabelTone(signals.metricsHealth)}>{healthWord(signals.metricsHealth)}</TonePill>
+      ) : null;
+    case "evals":
+      return signals.evalFails !== null ? (
+        <TonePill tone={verdictTone(signals.evalFails > 0 ? "FAIL" : "PASS")}>{signals.evalFails} FAIL</TonePill>
+      ) : null;
     default:
       return null;
   }
+}
+
+/** A signal word with its tone: the word carries the meaning, the colour only reinforces it. */
+function TonePill({ children, tone }: { children: ReactNode; tone: Tone }) {
+  return (
+    <span className={`tone-pill tone-pill--${tone}`} data-tone={tone}>
+      {children}
+    </span>
+  );
 }
 
 export function SidebarNav({ signals }: SidebarNavProps) {

@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname }));
 
 const LAYOUT_SOURCE = readFileSync(path.join(process.cwd(), "src/app/layout.tsx"), "utf8");
 
-const NO_SIGNALS: SidebarSignals = { activeWorkshops: 0, sentinelGrade: null };
+const NO_SIGNALS: SidebarSignals = { activeWorkshops: 0, evalFails: null, metricsHealth: null, sentinelGrade: null };
 
 function renderNav(signals: SidebarSignals = NO_SIGNALS, pathname = "/") {
   navigation.pathname = pathname;
@@ -76,7 +76,7 @@ describe("SidebarNav structure", () => {
 
 describe("SidebarNav signals", () => {
   it("renders the sentinel grade as a toned chip for its grade variant", () => {
-    renderNav({ activeWorkshops: 0, sentinelGrade: "C" });
+    renderNav({ ...NO_SIGNALS, sentinelGrade: "C" });
 
     const chip = within(screen.getByRole("link", { name: /sentinel/i })).getByText("C");
     expect(chip.className).toContain("chip--grade-c");
@@ -88,7 +88,7 @@ describe("SidebarNav signals", () => {
     ["D", "chip--grade-d", "bad"],
     ["F", "chip--grade-f", "bad"]
   ])("maps grade %s to %s with tone %s", (grade, chipClass, tone) => {
-    renderNav({ activeWorkshops: 0, sentinelGrade: grade });
+    renderNav({ ...NO_SIGNALS, sentinelGrade: grade });
 
     const chip = within(screen.getByRole("link", { name: /sentinel/i })).getByText(grade);
     expect(chip.className).toContain(chipClass);
@@ -96,9 +96,31 @@ describe("SidebarNav signals", () => {
   });
 
   it("shows the active workshop count on the Workshops row", () => {
-    renderNav({ activeWorkshops: 2, sentinelGrade: null });
+    renderNav({ ...NO_SIGNALS, activeWorkshops: 2 });
 
     expect(within(screen.getByRole("link", { name: /workshops/i })).getByText("2")).toBeDefined();
+  });
+
+  it.each([
+    ["WORSENING", "Worsening ↘", "bad"],
+    ["IMPROVING", "Improving ↗", "good"],
+    ["STABLE", "Stable →", "neutral"],
+    ["BASELINE CAPTURED", "Baseline captured", "info"]
+  ] as const)("words the metrics health %s as %s with tone %s", (health, word, tone) => {
+    renderNav({ ...NO_SIGNALS, metricsHealth: health });
+
+    const pill = within(screen.getByRole("link", { name: /metrics/i })).getByText(word);
+    expect(pill.getAttribute("data-tone")).toBe(tone);
+  });
+
+  it.each([
+    [3, "3 FAIL", "bad"],
+    [0, "0 FAIL", "good"]
+  ])("shows %i quality-eval failures on the Evals row as %s with tone %s", (fails, text, tone) => {
+    renderNav({ ...NO_SIGNALS, evalFails: fails });
+
+    const pill = within(screen.getByRole("link", { name: /evals/i })).getByText(text);
+    expect(pill.getAttribute("data-tone")).toBe(tone);
   });
 
   it("omits a signal whose family is absent", () => {

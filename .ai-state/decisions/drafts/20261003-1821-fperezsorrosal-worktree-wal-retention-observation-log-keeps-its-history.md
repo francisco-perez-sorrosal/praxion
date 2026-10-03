@@ -1,0 +1,145 @@
+---
+id: dec-draft-10dba96c
+title: The observation log keeps its history — numbered archives behind the reader, worktree logs merged in at merge time, and a log-health family
+status: proposed
+category: architectural
+date: 2026-10-03
+summary: "Rotation keeps five numbered archives shifted by rename inside the writer's lock (count-bounded, 26-week target); a copy-path merge-in in the owner package appends a worktree's rows the main log lacks (whole-row identity) at /merge-worktree and from the post-merge finalize chain for every contained worktree; the spawn counter reads every checkout; sentinel family P09-P14 audits archives, rotation, segment integrity, helper share, recorded mode source and unmerged worktree logs"
+tags: [observability, observations-jsonl, wal, retention, rotation, worktrees, merge-in, sentinel, log-health, spawn-budget, td-308]
+made_by: agent
+agent_type: systems-architect
+branch: worktree-wal-retention
+pipeline_tier: standard
+affected_files:
+  - hooks/_observation_log/
+  - scripts/spawn_count.py
+  - scripts/reconcile_pipeline_state.py
+  - scripts/project_metrics/collectors/cost_collector.py
+  - scripts/project_metrics/collectors/cost_collector_read.py
+  - scripts/check_agent_lifecycle_pairing.py
+  - scripts/finalize_chain.sh
+  - commands/merge-worktree.md
+  - agents/sentinel.md
+  - tests/test_sentinel_row_contract.py
+  - .gitignore
+  - scripts/onboard-project
+  - scripts/upgrade_project_pins.sh
+  - skills/onboard-project/references/phases-core.md
+  - eval/src/praxion_evals/live/scenarios.py
+affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20, REQ-21, REQ-22, REQ-23, REQ-24, REQ-25, REQ-26, REQ-27, REQ-28, REQ-29, REQ-30]
+supersedes_in_part: [dec-250]
+dissent: "A post-merge step that copies rows into every managed project's log on every pull is fleet-wide machinery for a problem only pipeline worktrees have; reading worktree logs where they live, plus an explicit copy at /merge-worktree, would serve Praxion without touching the fleet's git hooks."
+---
+
+## Context
+
+`dec-401` gave the observation log one owner package and explicitly left three items to this pipeline: "retention and archives (the reader's `segments()` is the extension point for the following pipeline), worktree-log merge-in, and the log-health sentinel check." Measured on 2026-10-03:
+
+- **Rotation destroys history.** `dec-250` keeps one archive: "the next rotation overwrites it." The `.1` holds 2026-08-07 → 2026-09-25, and everything earlier is gone. `dec-377`'s reversal trigger names this exact gap ("…or widen the local retention window").
+- **Worktree rows vanish.** Ten worktrees held about 4,650 rows main's log never saw. `/merge-worktree` step 7 claims to reconcile `observations.jsonl`, but `reconcile_ai_state.py` acts only on git-conflicted paths and the log is gitignored, so the step is inert. Step 10 then deletes the worktree's log. The spawn counter reads only its own checkout, so a pipeline split across checkouts is under-charged (td-308).
+- **Nothing checks the log's health.** The September defects (rows dropped from a subdirectory cwd, `dec-414`; hooks silently off) were found by accident. `dec-401` added `log_mode_source` to `session_start` rows for this check, with the instruction to remove the field if this pipeline does not consume it.
+- **Hand-built archive paths remain** in the recovery reconciler and the cost collector, so `dec-401`'s single-owner invariant held only for the active file.
+
+## Decision
+
+1. **Retention is a policy module in the owner package**, `hooks/_observation_log/retention.py`: `SIZE_CAP_BYTES` (10 MiB, unchanged), `ARCHIVE_COUNT = 5`, `HISTORY_TARGET = 182 days`, and the only builder and parser of archive names (`<log>.<position>`, 1 = newest).
+   - **Rotation (writer, inside the existing lock):** at the cap, find the lowest missing position in `1..N`. If there is one, shift the positions below it up by one; otherwise shift `N−1 → N`, dropping the oldest. Then rename active → 1. It only renames: no row is read or rewritten, and nothing is listed below the cap.
+   - **A failed rename** leaves a gap that the next rotation fills.
+   - **Retention is bounded by count only.** An age limit could only delete history earlier.
+   - **Why five:** at measured growth, five archives hold about 35 weeks under `full` (7 weeks per segment) and about 70 under `standard`; both clear the 26-week target. The disk bound is 60 MiB plus one append per checkout.
+2. **Discovery stays in `segments()`.** `reader.segment_listing()` scans for numbered archives, returns them oldest first and reports missing positions; `segments()` derives from it with its signature unchanged. The reconciler and the cost collector delete their hand-built `.1` paths and take segments from the reader. The reconciler's age window now bounds every segment by row time; it keeps a row of unreadable time only in the active log.
+3. **Merge-in is a copy path in the owner package**, `hooks/_observation_log/merge_in.py`, with the CLI `scripts/merge_worktree_log.py` (`--worktree PATH | --merged`, exit 0 complete / 1 degraded / 2 input error).
+   - **Copy.** It reads the worktree's segments raw and skips every row whose **identity** — a digest of the row's canonical JSON as stored, i.e. whole-row equality — is held by any main-log segment. It appends the rest through the writer's lock with per-row rotation. Copied rows are unchanged, so `project` and `log_mode` survive.
+   - **Mode.** Only `off` suppresses the copy, because recording modes govern recording, not the copying of rows already recorded.
+   - **Never touched.** The worktree's log is never written.
+   - **Degraded runs.** If any main segment is unreadable, the run copies nothing and reports `degraded`, since duplicates cannot be ruled out.
+4. **Two triggers, one entry point.**
+   - `/merge-worktree` runs `--worktree` before teardown and keeps the worktree when the result is degraded, unless the user discards it.
+   - The post-merge finalize chain (`finalize_chain_post_merge`) runs `--merged` in the primary working tree under in-repo placement. That covers every linked worktree whose `HEAD` the primary checkout now contains. The step is state-driven and non-blocking, like the rest of the chain. User decision SQ-1, 2026-10-03: ship it.
+5. **Cross-checkout reading** comes from one package function, `checkouts.repository_checkouts()`, over `git worktree list`.
+   - The spawn counter reads every checkout's segments, deduplicates by identity and orders rows by recorded time. It withholds, naming the path, on an unreadable segment (`wal-unreadable`), a missing position (`wal-gap`) or a failed listing (`checkouts-unlisted`). This closes td-308.
+   - P03 and the reconciler also order by recorded time, because merge-in appends rows out of time order.
+6. **A log-health family**, `scripts/check_observation_log_health.py`, adds rows P09–P14 to the sentinel's Pipeline Discipline dimension: archive coverage against the policy, rotation state, segment integrity (malformed lines, unreadable segments), helper share (information only), recorded mode source (consuming `log_mode_source`), and worktree logs unmerged past 14 days. It skips with the three named substrate states. It is registered in the catalogue, the dispatch table and `EXTRACTED_CHECKS`, with a canary per id.
+7. **Every archive is gitignored by glob** (`.ai-state/observations.jsonl.*`) in Praxion, the onboarding block and the upgrade path. The live eval treats every archive as a hook byproduct.
+
+New components (the `architectural` falsifier):
+
+- `hooks/_observation_log/retention.py`, `checkouts.py` and `merge_in.py`;
+- `scripts/merge_worktree_log.py` and `scripts/check_observation_log_health.py`.
+
+Responsibility moved: archive naming moves out of the writer and two consumers into `retention.py`. Published contracts changed: the shipped post-merge hook behaviour and the onboarding `.gitignore` block. The two new scripts join `affected_files` once they exist.
+
+Activation: fired — structural (about 17 files across the hooks package, consumer scripts, the git hook chain, the sentinel prompt and onboarding), with real alternatives for archive naming, the merge-in key and the trigger. Lens set: Security, Performance, Simplicity, Testability. Convergence: stable. REQ-01..REQ-30 were unchanged by the design except for the two Spec-Question clarifications, REQ-07's active-log window and REQ-24's denominator, which are text amendments, not added or removed REQs.
+
+## Considered Options
+
+### Archive scheme
+
+- **Numbered positions shifted by rename, count-bounded (chosen).** Keeps the existing `.1` as position 1, so the legacy archive becomes position 2 at the first rotation. Uses only renames, and at most N stats, only at the cap. A missing archive is detectable as a missing position. *Con:* up to N renames per rotation; a mid-shift fault leaves a gap that the next rotation fills.
+- **Timestamped archive names.** One rename per rotation; pruning by directory listing. *Con:* there is no sequence, so a lost archive is indistinguishable from a quiet period, and pruning lists a directory under the lock.
+- **One larger archive** (active appended to `.1`, head trimmed). *Con:* O(size) reading and rewriting under the lock, the shape `dec-250` already rejected.
+- **Compressed archives.** *Con:* compressing 10 MiB under the lock; a possible later increment off the hot path.
+
+### Merge-in key
+
+- **Whole-row identity (chosen).** Exact, because rows are copied unchanged, and it cannot fold distinct events.
+- **`reconcile_observations`' `timestamp|session_id|event_type|tool_name`.** *Con:* folds two `agent_start` rows of one session at the same instant (no `tool_name`) and two gate fires of one commit.
+
+### Merge-in vs reading in place
+
+- **Copy into the main log (chosen),** with the spawn counter also reading live worktrees in place.
+- **Read every checkout in place, never copy.** *Con:* rows die with `git worktree remove`, which is the defect being fixed.
+
+### Trigger
+
+- **`/merge-worktree` plus a state-driven post-merge step over contained worktrees (chosen).**
+- **Post-merge detecting *the* merged branch from `ORIG_HEAD` or the reflog.** *Con:* the event detection the finalize chain abandoned, because it silently skipped non-merge paths.
+- **A SessionStart sweep.** *Con:* a whole-log scan on every session start.
+- **The command only.** *Con:* misses `git merge` and pull-request merges, which the pipeline exit procedure permits.
+
+## Consequences
+
+**Positive**
+
+- History grows from about 7 weeks to 35–70 weeks with a fixed disk bound, and no rotation reads or rewrites a row.
+- A pipeline's spawns, stops, costs and gate fires outlive its worktree. The spawn counter sees a split pipeline whole (td-308).
+- Every history reader inherits the policy through `segments()`; no consumer builds an archive path.
+- The log's health is audited every sentinel run. `log_mode_source` has its consumer, so `dec-401`'s field stays.
+
+**Negative**
+
+- **Fleet reach.** Every onboarded project's `post-merge` hook (a symlink into the plugin) runs the merge-in step from the next plugin release. In a repository with no contained linked worktree holding a log it is one `git worktree list` call; otherwise about 1 s per run at a full five-archive main log. The release notes name it.
+- **Squash merges** leave the worktree's `HEAD` uncontained and are not merged in by the hook. `/merge-worktree` or P14's warning covers them. Worktrees discarded with `ExitWorktree` remove still lose their rows.
+- **Merged rows are distinguishable only by `project`.** `gate_fire` and `compaction` rows carry no `project`, so their origin is recoverable by session only.
+- **`dec-400`'s residual window widens.** Legacy helper `agent_stop` rows and `pre-attribution` cost rows now leave after five rotations, not one. The reader's upcast and the cost collector's provenance classes already handle them; the residual counts simply persist longer.
+- **New withhold reasons.** The spawn counter can now withhold because of another checkout's unreadable log; that is deliberate, since a silent partial count is the failure it exists to refuse.
+- **Two checkout enumerations coexist.** The cost collector keeps its own crawl behind its documented patch seam; unifying the two is a follow-up.
+
+## Disconfirmation
+
+- **Falsifier:** any of the following:
+  - P09's "archive count at the policy count, span below target" warning fires on Praxion's own log at `standard`: the count is wrong for real volume.
+  - The post-merge step measurably slows a pull in a managed project, beyond about 2 s.
+  - A spawn-count or P03 verdict over a real log differs between time-ordered and arrival-ordered rows after this change.
+  - A merged row is ever counted twice by a consumer.
+- **Steelmanned runner-up:** timestamped archives with no merge-in hook. Rotation becomes one rename, with no shift, no gap states and no partial-failure reasoning. Readers order by name. Merge-in happens only at `/merge-worktree`, which keeps the fleet's git hooks untouched. Praxion's own pipelines all exit through that command when the user remembers. Its weaknesses are real but bounded: a lost archive is undetectable, and a pipeline merged by `git merge` or a PR silently keeps its rows in a worktree that is later removed. If Praxion's exit procedure were narrowed to `/merge-worktree` only, the runner-up's fleet argument would win.
+- **Reversal trigger:** revisit if any of the following happens:
+  - Claude Code or git gains a worktree-removal hook, which would make the post-merge step redundant.
+  - P09's span warning fires in two consecutive sentinel runs; raise `ARCHIVE_COUNT` or lower the target.
+  - The managed-project feedback loop reports post-merge noise or latency from this step; narrow it to `/merge-worktree` and P14.
+  - The pipeline exit procedure is narrowed to `/merge-worktree` only, at which point the hook step should be retired.
+
+## Prior Decision
+
+This ADR **narrows `dec-250`** (partial supersession). Two clauses change:
+
+- Decision clause 1's "A single archived segment is kept; the next rotation overwrites it." It becomes "five numbered archives are kept; a rotation shifts them by rename and drops only the oldest."
+- Decision clause 3's two-file read ("the active file **and** `observations.jsonl.1` when the segment's mtime is within the window"). It becomes every archive newest first while its mtime is inside the window, with the window applied to every segment by row time.
+
+These survive unchanged: rotate-and-archive as a best-effort, `OSError`-swallowing rename **inside the append lock**; archives **gitignored** and outside every merge driver; and the reconciler's **windowed** read with its 7-day default. `dec-250` stays `accepted` and gains this record in `superseded_in_part_by`.
+
+Related, without a frontmatter relation:
+
+- **`dec-401`:** this record discharges its "Not in this decision" hand-off. It uses `segments()` as the extension point that record named, and it consumes `log_mode_source`. No clause of `dec-401` is narrowed: its single-owner and three-gate contracts are extended to the new modules.
+- **`dec-377`:** the WAL stays out of git. This record is the "widen the local retention window" alternative its reversal trigger names, not a reversal.
+- **`dec-413` and `dec-414`:** `project` still means the checkout that recorded the row, and merged rows keep it.

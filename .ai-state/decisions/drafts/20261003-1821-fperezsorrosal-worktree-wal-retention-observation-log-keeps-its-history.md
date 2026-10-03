@@ -4,7 +4,7 @@ title: The observation log keeps its history — numbered archives behind the re
 status: proposed
 category: architectural
 date: 2026-10-03
-summary: "Rotation keeps five numbered archives shifted by rename inside the writer's lock (count-bounded, 26-week target); a copy-path merge-in in the owner package appends a worktree's rows the main log lacks (whole-row identity) at /merge-worktree and from the post-merge finalize chain for every contained worktree; the spawn counter reads every checkout; sentinel family P09-P14 audits archives, rotation, segment integrity, helper share, recorded mode source and unmerged worktree logs"
+summary: "Rotation keeps five numbered archives shifted by rename inside the writer's lock (count-bounded, 26-week target); a copy-path merge-in in the owner package appends a worktree's rows the main log lacks (whole-row identity) at /merge-worktree and from the post-merge finalize chain for every worktree that merge newly brings in; the spawn counter reads every checkout; sentinel family P09-P14 audits archives, rotation, segment integrity, helper share, recorded mode source and unmerged worktree logs"
 tags: [observability, observations-jsonl, wal, retention, rotation, worktrees, merge-in, sentinel, log-health, spawn-budget, td-308]
 made_by: agent
 agent_type: systems-architect
@@ -26,6 +26,8 @@ affected_files:
   - scripts/upgrade_project_pins.sh
   - skills/onboard-project/references/phases-core.md
   - eval/src/praxion_evals/live/scenarios.py
+  - scripts/merge_worktree_log.py
+  - scripts/check_observation_log_health.py
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20, REQ-21, REQ-22, REQ-23, REQ-24, REQ-25, REQ-26, REQ-27, REQ-28, REQ-29, REQ-30]
 supersedes_in_part: [dec-250]
 dissent: "A post-merge step that copies rows into every managed project's log on every pull is fleet-wide machinery for a problem only pipeline worktrees have; reading worktree logs where they live, plus an explicit copy at /merge-worktree, would serve Praxion without touching the fleet's git hooks."
@@ -55,7 +57,8 @@ dissent: "A post-merge step that copies rows into every managed project's log on
    - **Degraded runs.** If any main segment is unreadable, the run copies nothing and reports `degraded`, since duplicates cannot be ruled out.
 4. **Two triggers, one entry point.**
    - `/merge-worktree` runs `--worktree` before teardown and keeps the worktree when the result is degraded, unless the user discards it.
-   - The post-merge finalize chain (`finalize_chain_post_merge`) runs `--merged` in the primary working tree under in-repo placement. That covers every linked worktree whose `HEAD` the primary checkout now contains. The step is state-driven and non-blocking, like the rest of the chain. User decision SQ-1, 2026-10-03: ship it.
+   - The post-merge finalize chain (`finalize_chain_post_merge`) runs `--merged` in the primary working tree under in-repo placement. That covers every linked worktree **this merge brings in**: one that holds a log, whose `HEAD` is contained in the primary checkout's `HEAD`, and whose `HEAD` is not contained in `ORIG_HEAD`, the pre-merge tip `git merge` and `git pull` record. The step is non-blocking, like the rest of the chain. User decision SQ-1, 2026-10-03: ship it. *Narrowed at Step 8a* (light review F1): the first cut used `HEAD` alone. That also copied a worktree with no commits of its own, contained from the moment it was created, while its sessions ran, and P03 on main then reported their agents as never stopped. For an abandoned or squash-merged worktree that report is permanent.
+   - Both entry points resolve the recording mode the way the project sets it: the process environment when it defines a mode key, else the main checkout's `.claude/settings.local.json` over `.claude/settings.json` `env`. A git hook does not see Claude Code's settings `env`, and onboarding writes `PRAXION_DISABLE_OBSERVABILITY` there (Step 8a, F5).
 5. **Cross-checkout reading** comes from one package function, `checkouts.repository_checkouts()`, over `git worktree list`.
    - The spawn counter reads every checkout's segments, deduplicates by identity and orders rows by recorded time. It withholds, naming the path, on an unreadable segment (`wal-unreadable`), a missing position (`wal-gap`) or a failed listing (`checkouts-unlisted`). This closes td-308.
    - P03 and the reconciler also order by recorded time, because merge-in appends rows out of time order.
@@ -92,8 +95,10 @@ Activation: fired — structural (about 17 files across the hooks package, consu
 
 ### Trigger
 
-- **`/merge-worktree` plus a state-driven post-merge step over contained worktrees (chosen).**
-- **Post-merge detecting *the* merged branch from `ORIG_HEAD` or the reflog.** *Con:* the event detection the finalize chain abandoned, because it silently skipped non-merge paths.
+- **`/merge-worktree` plus a post-merge step over the worktrees that merge brings in (chosen at Step 8a).** Every linked worktree's `HEAD` is tested against the merge's after-tip (`HEAD`) and before-tip (`ORIG_HEAD`), and no branch name is parsed. That covers fast-forward merges, merge commits, pulls and pulled pull-request merge commits alike.
+- **`/merge-worktree` plus a post-merge step over every contained worktree (first cut, refuted by the Step 8 light review, F1).** *Con:* a worktree with no commits of its own is contained while its sessions run. Its partial sessions reach main's log and P03 WARNs about live agents, permanently once that worktree is squash-merged or abandoned. It also re-read every kept worktree's log on every merge or pull.
+  - *Rejected repairs:* copying only sessions with a `session_stop` row (written at every turn end, not session end, and it turns the REQ-11 acceptance nodes red); skipping logs younger than an age (a heuristic, also red on REQ-11); teaching P03 that rows of a live checkout are in flight (cross-checkout knowledge in a sentinel check, and no help after removal).
+- **Post-merge detecting *the* merged branch by name from the reflog.** *Con:* the event detection the finalize chain abandoned, because it silently skipped non-merge paths.
 - **A SessionStart sweep.** *Con:* a whole-log scan on every session start.
 - **The command only.** *Con:* misses `git merge` and pull-request merges, which the pipeline exit procedure permits.
 
@@ -110,7 +115,15 @@ Activation: fired — structural (about 17 files across the hooks package, consu
 
 **Negative**
 
-- **Fleet reach.** Every onboarded project's `post-merge` hook (a symlink into the plugin) runs the merge-in step from the next plugin release. In a repository with no contained linked worktree holding a log it is one `git worktree list` call; otherwise about 1 s per run at a full five-archive main log. The release notes name it.
+- **Fleet reach and cost.** Every onboarded project's `post-merge` hook (a symlink into the plugin) runs the merge-in step from the next plugin release; the release notes name it.
+  - *Measured on the first cut* (Step 8 light review F4; median of 5 runs on Python 3.13, scratch repository with copies of this repository's logs):
+    - 0.04 s with no worktrees;
+    - 0.12 s with ten worktrees and no logs (one `git merge-base` per worktree, run before any log check);
+    - 0.37 s steady state at today's sizes, because every kept worktree with a log forced a full main-log identity read on every merge or pull;
+    - 1.08 s with the main log at full retention (six segments, 55 MB).
+  - *Under the Step 8a rule:* a merge or pull costs one `git worktree list`, one stat and scan per linked worktree, and two `merge-base` calls per worktree holding a log. The main-log identity read happens only at the merge that brings a worktree in, about 1 s at full retention, once per pipeline.
+- **Recording mode in a git hook (F5).** Only the project's settings layers are read (`.claude/settings.local.json` over `.claude/settings.json`). User-scope and managed-policy `env` are not, so a mode set only there is invisible to the hook. Rows keep the mode they were recorded under in every case.
+- **Partial copy of a running session (Step 8a residual).** A merge taken while the merged worktree's own agents still run copies their starts without their stops. P03 on main WARNs until the next merge bringing in that worktree's later commit, or `/merge-worktree`, copies the rest. Praxion merges after verification, when the pipeline's agents have stopped.
 - **Squash merges** leave the worktree's `HEAD` uncontained and are not merged in by the hook. `/merge-worktree` or P14's warning covers them. Worktrees discarded with `ExitWorktree` remove still lose their rows.
 - **Merged rows are distinguishable only by `project`.** `gate_fire` and `compaction` rows carry no `project`, so their origin is recoverable by session only.
 - **`dec-400`'s residual window widens.** Legacy helper `agent_stop` rows and `pre-attribution` cost rows now leave after five rotations, not one. The reader's upcast and the cost collector's provenance classes already handle them; the residual counts simply persist longer.
@@ -124,6 +137,7 @@ Activation: fired — structural (about 17 files across the hooks package, consu
   - The post-merge step measurably slows a pull in a managed project, beyond about 2 s.
   - A spawn-count or P03 verdict over a real log differs between time-ordered and arrival-ordered rows after this change.
   - A merged row is ever counted twice by a consumer.
+  - A P03 WARN on main traces to a partial copy the post-merge step took of a worktree's running session, outside the narrow residual named in the Consequences.
 - **Steelmanned runner-up:** timestamped archives with no merge-in hook. Rotation becomes one rename, with no shift, no gap states and no partial-failure reasoning. Readers order by name. Merge-in happens only at `/merge-worktree`, which keeps the fleet's git hooks untouched. Praxion's own pipelines all exit through that command when the user remembers. Its weaknesses are real but bounded: a lost archive is undetectable, and a pipeline merged by `git merge` or a PR silently keeps its rows in a worktree that is later removed. If Praxion's exit procedure were narrowed to `/merge-worktree` only, the runner-up's fleet argument would win.
 - **Reversal trigger:** revisit if any of the following happens:
   - Claude Code or git gains a worktree-removal hook, which would make the post-merge step redundant.

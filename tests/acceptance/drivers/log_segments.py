@@ -15,10 +15,11 @@ Padding rows are plain JSON objects with `event_type: "padding"`, a generation
 number and a sequence number, so a scenario can tell which rotation moved which
 rows where without knowing how the writer does it.
 
-Assumed boundary, unbound until a binding step names it: the retention policy
-(how many archives it keeps, the span of history it targets, and where the
-owner keeps the archive at a given position). Each unbound function raises
-with the assumption in words.
+The retention policy (how many archives it keeps, the span of history it
+targets, and where the owner keeps the archive at a given position) is read
+from the one module that states it. It carries no behavior of its own and
+imports neither the log's reader nor its writer, so the owner's gates keep
+holding. The import is lazy: a scenario reaches it only when it runs.
 """
 
 from __future__ import annotations
@@ -40,31 +41,28 @@ SIZE_CAP_BYTES = 10 * 1024 * 1024
 _PAD = "x" * 900
 
 
-# -- The retention policy: an assumed boundary ------------------------------
+# -- The retention policy ----------------------------------------------------
 
 
 def retention_archive_count() -> int:
     """How many archives the retention policy keeps (more than one, per the spec)."""
-    raise NotImplementedError(
-        "unbound: the retention policy's archive count, read from the one named place "
-        "where the policy is stated, has not been bound to this driver yet"
-    )
+    from hooks._observation_log import retention
+
+    return retention.ARCHIVE_COUNT
 
 
 def retention_history_target() -> timedelta:
     """The span of history the retention policy is meant to cover."""
-    raise NotImplementedError(
-        "unbound: the retention policy's history target, read from the one named place "
-        "where the policy is stated, has not been bound to this driver yet"
-    )
+    from hooks._observation_log import retention
+
+    return retention.HISTORY_TARGET
 
 
 def archive_position_path(state_dir: Path, position: int) -> Path:
     """Where the owner keeps the archive at `position` (1 is the newest)."""
-    raise NotImplementedError(
-        "unbound: where the log's owner keeps the archive at a given position of the "
-        "archive sequence has not been bound to this driver yet"
-    )
+    from hooks._observation_log import retention
+
+    return retention.archive_path(active_log(state_dir), position)
 
 
 # -- The size cap: existing surface --------------------------------------------

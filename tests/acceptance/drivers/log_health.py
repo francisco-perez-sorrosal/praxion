@@ -1,15 +1,13 @@
 """Driver for the log-health check family, run over one checkout.
 
-Assumed boundary, unbound until a binding step names it: the family is one
-command that takes `--repo-root <checkout>` and `--json` and prints the
-envelope every multi-check sentinel family prints today (`checks`, `skipped`,
-`examined`, `findings`, `bound`, keyed by check id; each finding carrying
-`check`, `severity`, `entity` and `message`), with information reported as
-findings of severity `info` and warnings as severity `warn`. Unbound too:
-which check id is which of the six checks, and how each check's information
-(the figures the specification says it reports) is read from its envelope.
-
-The envelope parsing that only relies on today's family shape is bound here.
+The family is one command that takes `--repo-root <checkout>` and `--json` and
+prints the envelope every multi-check sentinel family prints (`checks`,
+`skipped`, `examined`, `findings`, `bound`, keyed by check id; each finding
+carrying `check`, `severity`, `entity` and `message`), with information
+reported as findings of severity `info` and warnings as severity `warn`, and
+with a `judged_against` object naming the policy it judged. This driver maps
+that envelope onto its value types: which check id is which of the six checks,
+and how each check's figures are read from `examined`.
 """
 
 from __future__ import annotations
@@ -38,23 +36,24 @@ class Check(Enum):
 LOG_READING_CHECKS = tuple(c for c in Check if c is not Check.UNMERGED_WORKTREES)
 
 
-# -- The assumed boundary ----------------------------------------------------------
+# -- The family's command and check ids -------------------------------------------
 
 
 def family_command() -> list[str]:
     """The family's command, relative to this repository, without `--repo-root`/`--json`."""
-    raise NotImplementedError(
-        "unbound: the log-health family's command (taking --repo-root and --json and "
-        "printing the multi-check family envelope) has not been bound to this driver yet"
-    )
+    return ["scripts/check_observation_log_health.py"]
 
 
 def check_ids() -> dict[Check, str]:
     """The check id the family reports each of the six log-health checks under."""
-    raise NotImplementedError(
-        "unbound: which check id the log-health family reports each of its six checks "
-        "under has not been bound to this driver yet"
-    )
+    return {
+        Check.ARCHIVE_COVERAGE: "P09",
+        Check.ROTATION_STATE: "P10",
+        Check.MALFORMED_LINES: "P11",
+        Check.HELPER_SHARE: "P12",
+        Check.MODE_SOURCE: "P13",
+        Check.UNMERGED_WORKTREES: "P14",
+    }
 
 
 @dataclass(frozen=True)
@@ -89,13 +88,6 @@ class Unmerged:
     worktree: str
     rows: int
     newest: datetime
-
-
-def _unbound(what: str) -> NotImplementedError:
-    return NotImplementedError(
-        f"unbound: reading {what} from the log-health family's envelope has not been "
-        "bound to this driver yet"
-    )
 
 
 # -- Running the family and reading its envelope -----------------------------------
@@ -177,39 +169,75 @@ def run_log_health(checkout: Path) -> LogHealthReport:
     return LogHealthReport(envelope, ids, result.stderr)
 
 
-# -- Information readings (assumed boundary) ------------------------------------------
+# -- Information readings ------------------------------------------------------------
+
+
+def _figures(report: LogHealthReport, check: Check) -> dict:
+    """What a check examined; a check that did not run fails the reading, naming why."""
+    figures = report.examined(check)
+    assert isinstance(figures, dict), (
+        f"{report.ids[check]} ({check.value}) reported no figures "
+        f"(skipped: {report.skip_reason(check)!r}):\n{report.describe()}"
+    )
+    return figures
+
+
+def _stamp(figures: dict, key: str, check_id: str) -> datetime:
+    stored = figures.get(key)
+    assert stored is not None, f"{check_id} reported no {key!r} time: {figures}"
+    return datetime.fromisoformat(stored)
 
 
 def archive_coverage(report: LogHealthReport) -> ArchiveCoverage:
-    raise _unbound("the retained span and archive count")
+    figures = _figures(report, Check.ARCHIVE_COVERAGE)
+    return ArchiveCoverage(
+        figures["archive_count"],
+        _stamp(figures, "oldest", "P09"),
+        _stamp(figures, "newest", "P09"),
+    )
 
 
 def rotation_state(report: LogHealthReport) -> RotationState:
-    raise _unbound("the active log's size against its cap")
+    figures = _figures(report, Check.ROTATION_STATE)
+    return RotationState(figures["active_bytes"], figures["cap_bytes"])
 
 
 def helper_share(report: LogHealthReport) -> HelperShare:
-    raise _unbound("the helper-stop and agent-stop counts and the helpers' share")
+    figures = _figures(report, Check.HELPER_SHARE)
+    assert figures["share"] is not None, f"P12 reported no share: {figures}"
+    return HelperShare(figures["helper_stops"], figures["agent_stops"], figures["share"])
 
 
 def mode_sources(report: LogHealthReport) -> dict[str | None, int]:
     """Sessions per recorded mode source; None counts sessions recorded before modes."""
-    raise _unbound("the count of sessions per recorded mode source")
+    figures = _figures(report, Check.MODE_SOURCE)
+    sources: dict[str | None, int] = dict(figures["by_source"])
+    if figures["before_modes"]:
+        sources[None] = figures["before_modes"]
+    return sources
 
 
 def in_flight_worktrees(report: LogHealthReport) -> list[str]:
     """Names of worktrees reported as in flight."""
-    raise _unbound("the worktrees reported as in flight")
+    return sorted(_figures(report, Check.UNMERGED_WORKTREES)["in_flight"])
 
 
 def judged_against(report: LogHealthReport) -> JudgedAgainst:
-    raise _unbound("the retention policy and worktree age limit the family judged against")
+    judged = report.envelope.get("judged_against")
+    assert isinstance(judged, dict), f"the family stated no judged_against:\n{report.describe()}"
+    return JudgedAgainst(
+        judged["archive_count"],
+        timedelta(days=judged["history_target_days"]),
+        timedelta(days=judged["worktree_age_limit_days"]),
+    )
 
 
 def malformed_detail(finding: Finding) -> tuple[int, tuple[int, ...]]:
     """(count, line numbers) a malformed-lines warning reports."""
-    raise _unbound("the malformed-line count and line numbers of a warning")
+    detail = finding.raw["detail"]
+    return detail["count"], tuple(detail["lines"])
 
 
 def unmerged_detail(finding: Finding) -> Unmerged:
-    raise _unbound("the worktree, unmerged-row count and newest-row time of a warning")
+    detail = finding.raw["detail"]
+    return Unmerged(detail["worktree"], detail["rows"], datetime.fromisoformat(detail["newest"]))

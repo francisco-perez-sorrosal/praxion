@@ -4,18 +4,6 @@
    colour tokens come from tokens.css, never literals. Loaded after widgets.css
    and before the per-surface layers (overview, sentinel, evals, workshops). */
 
-/* Tone → token mapping, consumed by the tile, pill and section-card accents. */
-.stat-tile--good,  .tone-pill--good  { --tone-text: var(--color-success-text); --tone-subtle: var(--color-success-subtle); --tone-border: var(--color-success-border); }
-.stat-tile--info,  .tone-pill--info  { --tone-text: var(--color-info-text);    --tone-subtle: var(--color-info-subtle);    --tone-border: var(--color-info-border); }
-.stat-tile--warn,  .tone-pill--warn  { --tone-text: var(--color-warn-text);    --tone-subtle: var(--color-warn-subtle);    --tone-border: var(--color-warn-border); }
-.stat-tile--bad,   .tone-pill--bad   { --tone-text: var(--color-danger-text);  --tone-subtle: var(--color-danger-subtle);  --tone-border: var(--color-danger-border); }
-.stat-tile--neutral, .tone-pill--neutral { --tone-text: var(--color-text-muted); --tone-subtle: var(--color-surface-2); --tone-border: var(--color-border); }
-
-.section-card--good { --tone-text: var(--color-success-text); --tone-border: var(--color-success-border); }
-.section-card--info { --tone-text: var(--color-info-text);    --tone-border: var(--color-info-border); }
-.section-card--warn { --tone-text: var(--color-warn-text);    --tone-border: var(--color-warn-border); }
-.section-card--bad  { --tone-text: var(--color-danger-text);  --tone-border: var(--color-danger-border); }
-
 /* ─── Digest row: auto-fitting grid of tiles ──────────────────────────────── */
 .digest-row {
   display: grid;
@@ -80,6 +68,7 @@
   font-weight: var(--weight-medium);
   gap: var(--space-2);
   letter-spacing: 0.04em;
+  margin: 0;
   text-transform: uppercase;
 }
 
@@ -217,6 +206,22 @@
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-snug);
+  margin: 0;
+}
+
+.section-card__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.section-card__title a:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.section-card__title a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .section-card__subtitle {
@@ -240,6 +245,20 @@
 .section-card__body--flush {
   padding: 0;
 }
+
+/* Tone → token mapping, consumed by the tile, pill and section-card accents.
+   Declared after the base rules: the base sets the neutral defaults and a
+   modifier of equal specificity only wins by coming later in the source. */
+.stat-tile--good,  .tone-pill--good  { --tone-text: var(--color-success-text); --tone-subtle: var(--color-success-subtle); --tone-border: var(--color-success-border); }
+.stat-tile--info,  .tone-pill--info  { --tone-text: var(--color-info-text);    --tone-subtle: var(--color-info-subtle);    --tone-border: var(--color-info-border); }
+.stat-tile--warn,  .tone-pill--warn  { --tone-text: var(--color-warn-text);    --tone-subtle: var(--color-warn-subtle);    --tone-border: var(--color-warn-border); }
+.stat-tile--bad,   .tone-pill--bad   { --tone-text: var(--color-danger-text);  --tone-subtle: var(--color-danger-subtle);  --tone-border: var(--color-danger-border); }
+.stat-tile--neutral, .tone-pill--neutral { --tone-text: var(--color-text-muted); --tone-subtle: var(--color-surface-2); --tone-border: var(--color-border); }
+
+.section-card--good { --tone-text: var(--color-success-text); --tone-border: var(--color-success-border); }
+.section-card--info { --tone-text: var(--color-info-text);    --tone-border: var(--color-info-border); }
+.section-card--warn { --tone-text: var(--color-warn-text);    --tone-border: var(--color-warn-border); }
+.section-card--bad  { --tone-text: var(--color-danger-text);  --tone-border: var(--color-danger-border); }
 
 /* ─── Tone pill: inline count or word with tone ────────────────────────────── */
 .tone-pill {

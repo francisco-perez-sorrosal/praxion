@@ -116,7 +116,7 @@ describe("getOverviewData for a project with every family", () => {
       ["warn", "Sentinel report is partial — 3 checks not reached"],
       ["bad", "Metrics health is worsening"],
       ["bad", "3 quality-eval failures across 2 checks"],
-      ["warn", "1 important tech-debt row open or in flight"]
+      ["warn", "1 critical or important tech-debt row open or in flight"]
     ]);
     expect(attention.find((line) => /tech-debt/.test(line.text))?.href).toBeNull();
     expect(attention.find((line) => /sentinel finding/.test(line.text))?.href).toBe("/sentinel");

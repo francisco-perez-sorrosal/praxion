@@ -8,7 +8,7 @@ import type { AttentionLine } from "@/server/view-models/overview";
 export function AttentionCard({ attention }: { attention: AttentionLine[] }) {
   const calm = attention.length === 0;
   return (
-    <SectionCard title={<h2 className="overview-card__title">Attention</h2>} tone={calm ? "good" : "warn"}>
+    <SectionCard title="Attention" tone={calm ? "good" : "warn"}>
       {calm ? (
         <p className="digest-placeholder">Nothing needs attention.</p>
       ) : (

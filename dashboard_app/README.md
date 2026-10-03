@@ -73,7 +73,7 @@ All commands accept an optional `[project-path]` argument (default: cwd).
 | Architecture | `.ai-state/DESIGN.md` + `docs/architecture.md` + rendered SVGs from `docs/diagrams/**/rendered/` and `.ai-state/diagrams/**/rendered/` | Interactive pan/zoom diagram viewer; AaC fence regions get badges; diagram refs served via `/api/diagram` route |
 | Workshops | `.ai-work/<slug>/WIP.md` + `PROGRESS.md` | Grouped by recency (active in the last 7 days / stale / done) with age and step progress; step DAG; 15 s live refresh |
 | ADRs | `.ai-state/decisions/` (finalized + drafts) + `DECISIONS_INDEX.md` | Interactive relationship graph from `supersedes`/`re_affirms` frontmatter; status/category/tag filters; full metadata chips |
-| Sentinel | `.ai-state/sentinel_reports/` + `SENTINEL_LOG.md` | Health-grade sparkline from log; latest report split into Critical/Important/Suggested collapsibles |
+| Sentinel | `.ai-state/sentinel_reports/` + `SENTINEL_LOG.md` | Grade-first digest (health and coherence grades, critical/important/suggested tiles, partial and not-reached markers, dated health trend from the log, report selector); findings sections and the full report as collapsibles |
 | Roadmap | `ROADMAP.md` | — |
 | Metrics | `.ai-state/metrics_reports/` | Recharts trend charts from `METRICS_LOG.md`/per-run JSON; hotspot table; collectors summary |
 | Evals | `.ai-state/praxion_eval_reports/` (quality-eval reports + `PRAXION_EVAL_LOG.md`) + `.ai-state/eval_ledger/EVAL_LOG.md` | Run history and the latest report digest with failures grouped by check; the experiment leaderboard renders only for a leaderboard-shaped ledger |

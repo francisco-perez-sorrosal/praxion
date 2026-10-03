@@ -20,17 +20,6 @@
 }
 
 /* The tile's own label is the visible name; the heading is for the outline. */
-.overview-sr-only {
-  border: 0;
-  clip-path: inset(50%);
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  padding: 0;
-  position: absolute;
-  white-space: nowrap;
-  width: 1px;
-}
 
 .pulse-tile .stat-tile__trend .sparkline-wrapper,
 .overview-trend {
@@ -96,22 +85,6 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.overview-card__title {
-  font: inherit;
-  margin: 0;
-}
-
-.overview-card__title a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.overview-card__title a:hover {
-  color: var(--color-accent);
-  text-decoration: underline;
-}
-
-.overview-card__title a:focus-visible,
 .overview-row__link:focus-visible,
 .overview-explore__link:focus-visible,
 .overview-attention a:focus-visible {

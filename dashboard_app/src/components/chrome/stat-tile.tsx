@@ -10,6 +10,8 @@ export type StatTileProps = {
   badge?: ReactNode;
   /** One short line under the value: a delta, a date, "not run yet". */
   caption?: ReactNode;
+  /** Render the label as a heading of this level, so the tile names itself in the outline. */
+  headingLevel?: 2 | 3 | 4;
   /** Links the whole tile to the surface holding the detail. */
   href?: Route;
   label: ReactNode;
@@ -27,15 +29,16 @@ export type StatTileProps = {
  * tests and assistive tooling can read it. A tile with `href` is a link; the whole
  * surface is the target (Fitts).
  */
-export function StatTile({ badge, caption, href, label, tone = "neutral", trend, value }: StatTileProps) {
+export function StatTile({ badge, caption, headingLevel, href, label, tone = "neutral", trend, value }: StatTileProps) {
   const className = `stat-tile stat-tile--${tone}`;
+  const Label = headingLevel === undefined ? "span" : (`h${headingLevel}` as const);
   const body = (
     <>
       <span className="stat-tile__head">
-        <span className="stat-tile__label">
+        <Label className="stat-tile__label">
           <span className="stat-tile__glyph" aria-hidden="true">{TONE_GLYPHS[tone]}</span>
           {label}
-        </span>
+        </Label>
         {badge != null ? <span className="stat-tile__badge">{badge}</span> : null}
       </span>
       <span className="stat-tile__value" data-tone={tone}>{value}</span>

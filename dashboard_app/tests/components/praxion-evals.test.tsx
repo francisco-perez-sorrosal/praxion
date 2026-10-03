@@ -72,7 +72,8 @@ describe("ReportDigest", () => {
     expect(closed.map(([title]) => title)).toEqual([
       expect.stringContaining("Warnings by check"),
       expect.stringContaining("Calibration notes"),
-      expect.stringContaining("Full report")
+      expect.stringContaining("Full report"),
+      expect.stringContaining("PASS results")
     ]);
     expect(closed.every(([, open]) => open === false)).toBe(true);
     const warnings = container.querySelector("details") as HTMLElement;
@@ -83,7 +84,9 @@ describe("ReportDigest", () => {
     const { container } = render(<ReportDigest report={report} />);
 
     expect(placeholderRows(container)).toEqual([]);
-    expect(container.querySelectorAll(".eval-report-table tbody tr")).toHaveLength(report.checks.length);
+    const passCount = report.checks.filter((entry) => entry.verdict === "PASS").length;
+    expect(container.querySelectorAll(".eval-report-table tbody tr")).toHaveLength(report.checks.length - passCount);
+    expect(container.querySelector(".eval-pass-list summary")?.textContent).toContain(`${passCount} PASS results`);
   });
 
   it("leaves out a fact the report does not state instead of showing a dash", () => {

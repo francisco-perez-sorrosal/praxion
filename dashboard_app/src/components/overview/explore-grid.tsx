@@ -19,7 +19,7 @@ const SURFACES: Surface[] = [
 
 export function ExploreGrid() {
   return (
-    <SectionCard title={<h2 className="overview-card__title">Explore</h2>}>
+    <SectionCard title="Explore">
       <ul className="overview-explore">
         {SURFACES.map((surface) => (
           <li key={surface.href}>

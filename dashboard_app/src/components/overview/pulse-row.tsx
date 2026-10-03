@@ -41,8 +41,9 @@ function SentinelTile({ sentinel }: { sentinel: SentinelDigest | null }) {
     { count: sentinel.suggested, label: "suggested" }
   ];
   return (
-    <PulseTile title="Sentinel">
+    <PulseTile>
       <StatTile
+        headingLevel={2}
         badge={sentinel.isPartial ? "PARTIAL" : undefined}
         caption={
           <span className="overview-caption">
@@ -81,8 +82,9 @@ function MetricsTile({ metrics }: { metrics: MetricsDigest | null }) {
   const { bad, good, steady } = metrics.tones;
   const isBaseline = metrics.healthLabel === "BASELINE CAPTURED";
   return (
-    <PulseTile title="Metrics">
+    <PulseTile>
       <StatTile
+        headingLevel={2}
         badge={metrics.degraded ? "degraded" : undefined}
         caption={
           isBaseline ? (
@@ -111,8 +113,9 @@ function EvalsTile({ evals }: { evals: EvalsDigest | null }) {
   const { fail, pass, warn, costUsd } = evals.latest;
   const headline = fail !== null && fail > 0 ? "FAIL" : warn !== null && warn > 0 ? "WARN" : "PASS";
   return (
-    <PulseTile title="Quality evals">
+    <PulseTile>
       <StatTile
+        headingLevel={2}
         caption={
           <span className="overview-caption">
             <span className="overview-counts">
@@ -137,8 +140,9 @@ function ReadinessTile({ readiness }: { readiness: MetricsDigest["readiness"] })
     return <MissingTile href="/metrics" producer={<code>/project-metrics</code>} title="Agent readiness" />;
   }
   return (
-    <PulseTile title="Agent readiness">
+    <PulseTile>
       <StatTile
+        headingLevel={2}
         caption={`${formatPercent(readiness.passPct)} of criteria pass`}
         href="/metrics"
         label="Agent readiness"
@@ -150,21 +154,17 @@ function ReadinessTile({ readiness }: { readiness: MetricsDigest["readiness"] })
 
 // ─── Pieces ───────────────────────────────────────────────────────────────────
 
-/** A tile is an article headed by its name; the heading is for the outline and assistive tools, the tile's own label is the visible one. */
-function PulseTile({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <article className="pulse-tile">
-      <h2 className="overview-sr-only">{title}</h2>
-      {children}
-    </article>
-  );
+/** A tile is an article headed by its own label (the tile renders that label as the heading). */
+function PulseTile({ children }: { children: ReactNode }) {
+  return <article className="pulse-tile">{children}</article>;
 }
 
 function MissingTile({ href, producer, title }: { href: Route; producer: ReactNode; title: string }) {
   const tone: Tone = "neutral";
   return (
-    <PulseTile title={title}>
+    <PulseTile>
       <StatTile
+        headingLevel={2}
         caption={<>Produced by {producer}</>}
         href={href}
         label={title}

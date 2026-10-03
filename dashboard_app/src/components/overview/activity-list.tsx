@@ -7,7 +7,7 @@ import type { ActivityEntry } from "@/server/view-models/overview";
 /** The newest artifact of each family with its age, newest first. */
 export function ActivityList({ activity, now }: { activity: ActivityEntry[]; now: Date }) {
   return (
-    <SectionCard title={<h2 className="overview-card__title">Recent activity</h2>}>
+    <SectionCard title="Recent activity">
       {activity.length === 0 ? (
         <p className="digest-placeholder">No artifacts yet. Activity appears as the project's agents write state.</p>
       ) : (

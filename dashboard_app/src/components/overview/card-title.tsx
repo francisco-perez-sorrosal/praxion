@@ -2,13 +2,9 @@ import type { Route } from "next";
 import Link from "next/link";
 
 /**
- * The heading of an Overview card: a real heading (so the page has an outline
- * and a card can be named) whose text links to the surface holding the detail.
+ * The text of an Overview card title, linking to the surface holding the
+ * detail. `SectionCard` supplies the heading element itself.
  */
 export function CardTitle({ href, children }: { children: string; href: Route }) {
-  return (
-    <h2 className="overview-card__title">
-      <Link href={href}>{children}</Link>
-    </h2>
-  );
+  return <Link href={href}>{children}</Link>;
 }

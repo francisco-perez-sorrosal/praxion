@@ -374,7 +374,7 @@ function dayOf(value: unknown): string | null {
 
 type AttentionSources = Pick<OverviewData, "debt" | "evals" | "metrics" | "sentinel">;
 
-const IMPORTANT_DEBT_SEVERITY = "important";
+const ATTENTION_DEBT_SEVERITIES = ["critical", "important"] as const;
 
 /** One line per condition an operator should look at, most urgent first. */
 function deriveAttention({ debt, evals, metrics, sentinel }: AttentionSources): AttentionLine[] {
@@ -400,9 +400,9 @@ function deriveAttention({ debt, evals, metrics, sentinel }: AttentionSources): 
     const across = checks > 0 ? ` across ${checks} ${plural(checks, "check")}` : "";
     lines.push({ href: "/evals", text: `${failures} quality-eval ${plural(failures, "failure")}${across}`, tone: "bad" });
   }
-  const importantDebt = debt?.bySeverity[IMPORTANT_DEBT_SEVERITY] ?? 0;
-  if (importantDebt > 0) {
-    lines.push({ href: null, text: `${importantDebt} important tech-debt ${plural(importantDebt, "row")} open or in flight`, tone: "warn" });
+  const urgentDebt = ATTENTION_DEBT_SEVERITIES.reduce((sum, severity) => sum + (debt?.bySeverity[severity] ?? 0), 0);
+  if (urgentDebt > 0) {
+    lines.push({ href: null, text: `${urgentDebt} critical or important tech-debt ${plural(urgentDebt, "row")} open or in flight`, tone: "warn" });
   }
   return lines;
 }

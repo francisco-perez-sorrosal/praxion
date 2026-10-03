@@ -123,8 +123,48 @@ function FailureCard({ groups }: { groups: PraxionEvalReport["failGroups"] }) {
   );
 }
 
+// PASS rows are the bulk of a report (two thirds of a real one) and carry no
+// finding worth reading inline; the table keeps every WARN, FAIL and SKIP row
+// and the PASS rows follow as a compact per-check artifact list, so the whole
+// report stays inside the disclosure at a fraction of the table's weight.
+const isPassRow = (entry: PraxionEvalCheck): boolean => entry.verdict.trim().toUpperCase() === "PASS";
+
+function passArtifactsByCheck(checks: readonly PraxionEvalCheck[]): Array<[string, string[]]> {
+  const byCheck = new Map<string, string[]>();
+  for (const entry of checks) {
+    if (!isPassRow(entry)) {
+      continue;
+    }
+    const artifacts = byCheck.get(entry.check) ?? [];
+    artifacts.push(entry.artifact);
+    byCheck.set(entry.check, artifacts);
+  }
+  return Array.from(byCheck.entries()).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+}
+
+function PassList({ checks }: { checks: readonly PraxionEvalCheck[] }) {
+  const groups = passArtifactsByCheck(checks);
+  if (groups.length === 0) {
+    return null;
+  }
+  const total = groups.reduce((sum, [, artifacts]) => sum + artifacts.length, 0);
+  return (
+    <details className="eval-pass-list">
+      <summary>{formatCount(total)} PASS results, listed by check</summary>
+      <ul>
+        {groups.map(([check, artifacts]) => (
+          <li key={check}>
+            <strong>{check}</strong> ({formatCount(artifacts.length)}): {artifacts.join(", ")}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function CheckTable({ checks, fileName }: { checks: readonly PraxionEvalCheck[]; fileName: string }) {
-  const isClipped = checks.some((entry) => entry.findings.length > FINDINGS_PREVIEW_CHARS);
+  const shown = checks.filter((entry) => !isPassRow(entry));
+  const isClipped = shown.some((entry) => entry.findings.length > FINDINGS_PREVIEW_CHARS);
   return (
     <div className="eval-table-wrap">
       {isClipped ? (
@@ -145,7 +185,7 @@ function CheckTable({ checks, fileName }: { checks: readonly PraxionEvalCheck[];
           </tr>
         </thead>
         <tbody>
-          {checks.map((entry, index) => (
+          {shown.map((entry, index) => (
             <tr key={index}>
               <td>{entry.check}</td>
               <td>{entry.kind}</td>
@@ -159,6 +199,7 @@ function CheckTable({ checks, fileName }: { checks: readonly PraxionEvalCheck[];
           ))}
         </tbody>
       </table>
+      <PassList checks={checks} />
     </div>
   );
 }

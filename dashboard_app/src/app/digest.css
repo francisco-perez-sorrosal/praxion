@@ -163,6 +163,12 @@
   list-style: none;
 }
 
+/* The summary has no heading wrapper (a span there would be invalid markup), so
+   title, subtitle and actions are its direct flex children. */
+.section-card__summary .section-card__actions {
+  margin-left: auto;
+}
+
 .section-card__summary::-webkit-details-marker {
   display: none;
 }

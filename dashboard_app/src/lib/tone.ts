@@ -105,16 +105,6 @@ function toDate(value: string | Date | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** Whole days from `earlier` to `later` (negative when the order is reversed). */
-export function daysBetween(earlier: string | Date, later: string | Date): number | null {
-  const a = toDate(earlier);
-  const b = toDate(later);
-  if (a === null || b === null) {
-    return null;
-  }
-  return Math.floor((b.getTime() - a.getTime()) / DAY_MS);
-}
-
 /**
  * Human relative age ("just now", "5 min ago", "3 h ago", "12 d ago", "4 mo ago").
  * `now` is injected so renders and tests are deterministic. Future stamps read

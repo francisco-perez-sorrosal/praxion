@@ -1,7 +1,7 @@
 import type { Route } from "next";
 import type { ReactNode } from "react";
 
-import { SentinelSparklineClient } from "@/app/sentinel/sentinel-sparkline-client";
+import { GradeSparkline } from "@/components/viz/grade-sparkline";
 import { StatTile } from "@/components/chrome/stat-tile";
 import { Sparkline } from "@/components/viz/sparkline";
 import { formatEvalCost } from "@/lib/evals";
@@ -9,7 +9,7 @@ import { gradeTone, healthLabelTone, verdictTone } from "@/lib/tone";
 import type { Tone } from "@/lib/tone";
 import type { EvalsDigest, MetricsDigest, OverviewData, SentinelDigest } from "@/server/view-models/overview";
 
-import { healthWord } from "./health-word";
+import { healthWord } from "@/lib/health-word";
 import { LabelledCount } from "./labelled-count";
 
 const PERCENT = 100;
@@ -60,7 +60,7 @@ function SentinelTile({ sentinel }: { sentinel: SentinelDigest | null }) {
         tone={gradeTone(sentinel.grade)}
         trend={
           sentinel.series.length > 1 ? (
-            <SentinelSparklineClient runs={sentinel.series.map(({ grade, timestamp }) => ({ grade, timestamp }))} />
+            <GradeSparkline runs={sentinel.series.map(({ grade, timestamp }) => ({ grade, timestamp }))} />
           ) : undefined
         }
         value={
@@ -106,12 +106,23 @@ function MetricsTile({ metrics }: { metrics: MetricsDigest | null }) {
   );
 }
 
+/** The verdict word for a run, or null when its counts are unknown: unknown is never PASS. */
+function evalsHeadline(fail: number | null, warn: number | null): "FAIL" | "WARN" | "PASS" | null {
+  if (fail !== null && fail > 0) {
+    return "FAIL";
+  }
+  if (warn !== null && warn > 0) {
+    return "WARN";
+  }
+  return fail === null ? null : "PASS";
+}
+
 function EvalsTile({ evals }: { evals: EvalsDigest | null }) {
   if (evals === null) {
     return <MissingTile href="/evals" producer={<code>/eval-praxion</code>} title="Quality evals" />;
   }
   const { fail, pass, warn, costUsd } = evals.latest;
-  const headline = fail !== null && fail > 0 ? "FAIL" : warn !== null && warn > 0 ? "WARN" : "PASS";
+  const headline = evalsHeadline(fail, warn);
   return (
     <PulseTile>
       <StatTile
@@ -127,7 +138,7 @@ function EvalsTile({ evals }: { evals: EvalsDigest | null }) {
         }
         href="/evals"
         label="Quality evals"
-        tone={verdictTone(headline)}
+        tone={headline === null ? "neutral" : verdictTone(headline)}
         trend={evals.runs.length > 1 ? <FailTrend runs={evals.runs} /> : undefined}
         value={fail === null ? <span className="stat-tile__value--word">No counts</span> : `${fail} FAIL`}
       />

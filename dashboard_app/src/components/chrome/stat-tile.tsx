@@ -34,13 +34,13 @@ export function StatTile({ badge, caption, headingLevel, href, label, tone = "ne
   const Label = headingLevel === undefined ? "span" : (`h${headingLevel}` as const);
   const body = (
     <>
-      <span className="stat-tile__head">
+      <div className="stat-tile__head">
         <Label className="stat-tile__label">
           <span className="stat-tile__glyph" aria-hidden="true">{TONE_GLYPHS[tone]}</span>
           {label}
         </Label>
         {badge != null ? <span className="stat-tile__badge">{badge}</span> : null}
-      </span>
+      </div>
       <span className="stat-tile__value" data-tone={tone}>{value}</span>
       {trend != null ? <span className="stat-tile__trend">{trend}</span> : null}
       {caption != null ? <span className="stat-tile__caption">{caption}</span> : null}

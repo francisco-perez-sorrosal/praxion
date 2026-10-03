@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  daysBetween,
   gradeChipVariant,
   gradeTone,
   healthLabelTone,
@@ -82,12 +81,6 @@ describe("relative age", () => {
 });
 
 describe("date helpers", () => {
-  it("counts whole days between two stamps", () => {
-    expect(daysBetween("2026-09-26T00:00:00Z", NOW)).toBe(7);
-    expect(daysBetween("2026-10-03T00:00:00Z", NOW)).toBe(0);
-    expect(daysBetween("garbage", NOW)).toBeNull();
-  });
-
   it("picks the newest parseable stamp and ignores the rest", () => {
     expect(newestOf(["2026-01-01T00:00:00Z", null, "bad", "2026-10-01T00:00:00Z"])).toBe(
       "2026-10-01T00:00:00.000Z"

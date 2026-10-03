@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { Chip } from "@/components/chrome/chip";
 import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
 import { newestOf } from "@/lib/tone";
@@ -64,12 +65,12 @@ export default async function DocumentationPage({
           <h3>{selectedSurface?.title ?? "Surface preview"}</h3>
           {selectedSurface ? (
             <div className="artifact-meta">
-              <span className="chip">
+              <Chip>
                 {selectedSurfaceData && path.isAbsolute(selectedSurfaceData.path)
                   ? path.relative(cfg.projectRoot, selectedSurfaceData.path)
                   : selectedSurface.path}
-              </span>
-              {selectedSurface.diataxis ? <span className="chip">{selectedSurface.diataxis}</span> : null}
+              </Chip>
+              {selectedSurface.diataxis ? <Chip>{selectedSurface.diataxis}</Chip> : null}
             </div>
           ) : null}
           <SurfaceBody surface={selectedSurface} surfaceData={selectedSurfaceData} />

@@ -7,7 +7,7 @@ import type { OverviewData } from "@/server/view-models/overview";
 
 // Recharts needs layout the DOM does not have; the trends are not under test here.
 vi.mock("@/components/viz/sparkline", () => ({ Sparkline: () => null }));
-vi.mock("@/app/sentinel/sentinel-sparkline-client", () => ({ SentinelSparklineClient: () => null }));
+vi.mock("@/components/viz/grade-sparkline", () => ({ GradeSparkline: () => null }));
 
 const NOW = new Date("2026-10-02T15:00:00Z");
 
@@ -126,6 +126,15 @@ describe("OverviewGrid pulse row", () => {
       ["64 WARN", "warn"]
     ]);
     expect(tile.textContent).toContain("$0.43");
+  });
+
+  it("never presents an eval run whose counts are unreadable as passing", () => {
+    const unreadable = { ...EVAL_RUN, fail: null, pass: null, warn: null };
+    renderGrid({ ...FULL, evals: { failGroups: [], latest: unreadable, runs: [unreadable], timestamp: unreadable.timestamp } });
+    const tile = cardNamed(/^quality evals$/i);
+
+    expect(tonesIn(tile)).toEqual([["No counts", "neutral"]]);
+    expect(tile.textContent).not.toContain("PASS");
   });
 
   it("words the metrics health with the indicator counts, tone included", () => {

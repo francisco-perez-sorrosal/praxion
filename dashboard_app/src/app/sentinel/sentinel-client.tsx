@@ -5,12 +5,12 @@ import { useMemo, useState } from "react";
 import { ArtifactCard } from "@/components/artifact-card";
 import { SectionCard } from "@/components/chrome/section-card";
 import { StatTile } from "@/components/chrome/stat-tile";
+import { TonePill } from "@/components/chrome/tone-pill";
 import { MarkdownSurface } from "@/components/markdown-surface";
+import { GradeSparkline } from "@/components/viz/grade-sparkline";
 import { gradeTone } from "@/lib/tone";
 import type { Tone } from "@/lib/tone";
 import type { SentinelLogPoint, SentinelReport } from "@/server/view-models/sentinel";
-
-import { SentinelSparklineClient } from "./sentinel-sparkline-client";
 
 /** Runs shown in the trend: enough to see a direction, few enough to read the dates. */
 const TREND_RUN_LIMIT = 12;
@@ -103,9 +103,7 @@ function GradeTile({ report }: { readonly report: SentinelReport }) {
       }
       trend={
         coherence === null ? undefined : (
-          <ToneText className={`tone-pill tone-pill--${coherenceTone}`} tone={coherenceTone}>
-            Coherence {coherence}
-          </ToneText>
+          <TonePill tone={coherenceTone}>Coherence {coherence}</TonePill>
         )
       }
       caption={notReachedCaption(report.notReachedCount)}
@@ -166,7 +164,7 @@ function GradeTrend({ logSeries }: { readonly logSeries: readonly SentinelLogPoi
 
   return (
     <figure className="sentinel-trend" aria-label="Health grade trend by run">
-      <SentinelSparklineClient runs={recent} />
+      <GradeSparkline runs={recent} />
       <figcaption>
         <ol className="sentinel-trend__runs">
           {recent.map((run, index) => {
@@ -174,9 +172,7 @@ function GradeTrend({ logSeries }: { readonly logSeries: readonly SentinelLogPoi
             return (
               <li key={`${run.timestamp ?? "run"}-${index}`}>
                 <time>{runDay(run.timestamp, index)}</time>
-                <ToneText className={`tone-pill tone-pill--${tone}`} tone={tone}>
-                  {run.grade ?? "?"}
-                </ToneText>
+                <TonePill tone={tone}>{run.grade ?? "?"}</TonePill>
               </li>
             );
           })}

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Chip } from "@/components/chrome/chip";
 import { SectionCard } from "@/components/chrome/section-card";
+import { TonePill } from "@/components/chrome/tone-pill";
 import { CopyAsPromptButton } from "@/components/copy-as-prompt-button";
 import { MarkdownSurface } from "@/components/markdown-surface";
 import { DecisionGraph } from "@/components/viz/decision-graph";
@@ -190,13 +191,9 @@ function WorkshopButton({
       <span className="workshop-selector__name">{basename(workshop.path)}</span>
       <span className="workshop-selector__meta">
         {progress !== null ? (
-          <span
-            className={`tone-pill tone-pill--mono tone-pill--${progressTone(progress.done, progress.total)}`}
-            data-tone={progressTone(progress.done, progress.total)}
-            title="Steps done of total"
-          >
+          <TonePill mono title="Steps done of total" tone={progressTone(progress.done, progress.total)}>
             {progress.done}/{progress.total}
-          </span>
+          </TonePill>
         ) : null}
         {age !== null ? <span className="workshop-selector__age muted">{age}</span> : null}
         {workshop.isDone ? <Chip variant="status-accepted">Done</Chip> : null}

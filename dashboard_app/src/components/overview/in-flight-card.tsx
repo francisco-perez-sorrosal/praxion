@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SectionCard } from "@/components/chrome/section-card";
+import { TonePill } from "@/components/chrome/tone-pill";
 import { ACTIVE_WINDOW_DAYS } from "@/lib/workshops";
 import { relativeAge } from "@/lib/tone";
 import type { OverviewData, WorkshopDigest } from "@/server/view-models/overview";
@@ -48,9 +49,9 @@ function WorkshopRow({ now, workshop }: { now: Date; workshop: WorkshopDigest })
         <span className="overview-row__primary">{workshop.slug}</span>
         {workshop.currentStep === null ? null : <span className="overview-row__detail">{workshop.currentStep}</span>}
         {workshop.progress === null ? null : (
-          <span className="tone-pill tone-pill--neutral tone-pill--mono">
+          <TonePill mono tone="neutral">
             {workshop.progress.done}/{workshop.progress.total}
-          </span>
+          </TonePill>
         )}
         {age === null ? null : <span className="digest-list__secondary">{age}</span>}
       </Link>

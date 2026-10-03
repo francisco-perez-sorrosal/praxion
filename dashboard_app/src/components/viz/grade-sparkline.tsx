@@ -37,7 +37,7 @@ export type SentinelTrendRun = {
  * Client wrapper that owns the grade→height and tone→colour closures so the
  * server component never passes a function across the server→client boundary.
  */
-export function SentinelSparklineClient({ runs }: { readonly runs: readonly SentinelTrendRun[] }) {
+export function GradeSparkline({ runs }: { readonly runs: readonly SentinelTrendRun[] }) {
   const points = runs.map((run, index) => ({
     x: run.timestamp ?? String(index + 1),
     y: gradeHeight(run.grade)

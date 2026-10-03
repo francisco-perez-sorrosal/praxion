@@ -1,3 +1,4 @@
+import { TonePill } from "@/components/chrome/tone-pill";
 import type { PraxionEvalCheckGroup } from "@/lib/praxion-evals";
 import type { Tone } from "@/lib/tone";
 
@@ -19,9 +20,9 @@ export function CheckGroups({ groups, showArtifacts, tone }: CheckGroupsProps) {
         <li className="eval-group" key={group.check}>
           <div className="eval-group__head">
             <code className="eval-group__check">{group.check}</code>
-            <span className={`tone-pill tone-pill--${tone} tone-pill--mono`} data-tone={tone}>
+            <TonePill mono tone={tone}>
               ×{group.count}
-            </span>
+            </TonePill>
           </div>
           {showArtifacts && group.artifacts.length > 0 ? (
             <ul className="eval-group__artifacts">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SectionCard } from "@/components/chrome/section-card";
+import { TonePill } from "@/components/chrome/tone-pill";
 import type { DecisionsDigest } from "@/server/view-models/overview";
 
 import { CardTitle } from "./card-title";
@@ -36,8 +37,10 @@ export function DecisionsCard({ decisions }: { decisions: DecisionsDigest | null
             {Object.entries(decisions.byCategory)
               .sort(([leftName, left], [rightName, right]) => right - left || leftName.localeCompare(rightName))
               .map(([category, count]) => (
-                <li className="tone-pill tone-pill--neutral" key={category}>
-                  {category} · {count}
+                <li key={category}>
+                  <TonePill tone="neutral">
+                    {category} · {count}
+                  </TonePill>
                 </li>
               ))}
           </ul>

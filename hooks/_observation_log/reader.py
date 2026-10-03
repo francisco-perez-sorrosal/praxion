@@ -7,16 +7,23 @@ does not apply and does not need to.
 Every code reader of the log goes through these functions; a module that
 names the log file directly instead is caught by
 `hooks/test_observation_log_private_reader.py`. Segment discovery lives in
-`segments()` alone, so a future retention policy extends one function.
+`segment_listing()` alone, so the retention policy extends one function.
+
+Hot-path constraint: the writer imports this module, so everything here stays
+on modules the writer already loads (no ``dataclasses``, runtime ``typing``,
+``subprocess``, ...); values are namedtuples.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections import namedtuple
+from datetime import datetime, timezone
 from pathlib import Path
 
+from . import retention
 from .modes import Mode
 
 LOG_FILENAME = "observations.jsonl"
@@ -28,28 +35,69 @@ LOG_FILENAME = "observations.jsonl"
 # from this one field.
 SegmentRead = namedtuple("SegmentRead", ("path", "rows", "malformed_lines", "error"))
 
+# `(path, entries, malformed_lines, error)`: `SegmentRead`'s shape for a copier.
+# `entries` is a tuple of `(text, row)`: the stored line without its newline and
+# the object it parses to, never upcast, so a copy is byte-faithful.
+RawSegmentRead = namedtuple("RawSegmentRead", ("path", "entries", "malformed_lines", "error"))
+
+# `(segments, missing)`. `segments` holds the paths that exist: archives by
+# descending position (oldest first), then the active log. `missing` holds the
+# archive paths absent between position 1 and the highest position present --
+# a gap is history lost, never the end of it. The two never overlap.
+SegmentListing = namedtuple("SegmentListing", ("segments", "missing"))
+
+# `row_time` of a row with no readable time: later than any real instant, so a
+# time-ordered sort puts it after the rest. Compare it, never subtract from it.
+UNTIMED = datetime.max.replace(tzinfo=timezone.utc)
+
+_IDENTITY_DIGEST_BYTES = 16  # blake2b-128: collisions are not a concern at log scale
+
 
 def log_path(ai_state_dir: Path) -> Path:
     """The active log path for ``ai_state_dir``."""
     return ai_state_dir / LOG_FILENAME
 
 
-def segments(ai_state_dir: Path, *, archives: bool) -> tuple[Path, ...]:
-    """Existing log segments for ``ai_state_dir``, oldest first.
+def segment_listing(ai_state_dir: Path, *, archives: bool) -> SegmentListing:
+    """The log's segments for ``ai_state_dir``, oldest first, and any gaps.
 
-    The ``.1`` archive (when ``archives`` is True and the file exists) comes
-    before the active file. This is the one place a future rotation policy
-    extends to N archives.
+    With ``archives`` False this is the active log alone and no directory is
+    listed, so the hot path and the active-only readers cost what they always
+    did. With it True every numbered archive is found by name -- one directory
+    scan -- including a position above the retention policy's count.
     """
     active = log_path(ai_state_dir)
-    paths: list[Path] = []
-    if archives:
-        archive = Path(f"{active}.1")
-        if archive.exists():
-            paths.append(archive)
-    if active.exists():
-        paths.append(active)
-    return tuple(paths)
+    newest = (active,) if active.exists() else ()
+    if not archives:
+        return SegmentListing(segments=newest, missing=())
+    present = _archives_by_position(ai_state_dir)
+    if not present:
+        return SegmentListing(segments=newest, missing=())
+    positions = range(max(present), 0, -1)
+    return SegmentListing(
+        segments=tuple(present[p] for p in positions if p in present) + newest,
+        missing=tuple(retention.archive_path(active, p) for p in positions if p not in present),
+    )
+
+
+def _archives_by_position(ai_state_dir: Path) -> dict[int, Path]:
+    """Every numbered archive of the log in ``ai_state_dir``; empty when it cannot be listed."""
+    found: dict[int, Path] = {}
+    try:
+        with os.scandir(ai_state_dir) as entries:
+            for entry in entries:
+                path = ai_state_dir / entry.name
+                position = retention.archive_position(path, LOG_FILENAME)
+                if position is not None:
+                    found[position] = path
+    except OSError:
+        return {}
+    return found
+
+
+def segments(ai_state_dir: Path, *, archives: bool) -> tuple[Path, ...]:
+    """Existing log segments for ``ai_state_dir``, oldest first."""
+    return segment_listing(ai_state_dir, archives=archives).segments
 
 
 def read_segment(path: Path) -> SegmentRead:
@@ -59,12 +107,31 @@ def read_segment(path: Path) -> SegmentRead:
     reason. A line that fails to parse as a JSON object is counted into
     ``malformed_lines`` by its 1-based line number and excluded from
     ``rows`` -- never silently dropped, never fatal to the rest of the read.
+    """
+    entries, malformed, error = _scan_segment(path)
+    rows = tuple(upcast(row) for _, row in entries)
+    return SegmentRead(path=path, rows=rows, malformed_lines=malformed, error=error)
+
+
+def read_raw_segment(path: Path) -> RawSegmentRead:
+    """Stream one segment file as stored text plus parsed row, never upcast.
+
+    For copying and identity: ``read_segment`` shows the vocabulary readers
+    share, this shows what the file holds. Same tagged errors, same line
+    numbering, never raises.
+    """
+    entries, malformed, error = _scan_segment(path)
+    return RawSegmentRead(path=path, entries=entries, malformed_lines=malformed, error=error)
+
+
+def _scan_segment(path: Path) -> tuple[tuple, tuple[int, ...], str | None]:
+    """`(entries, malformed_lines, error)` for one segment, never raising.
 
     A line is what text-mode file iteration yields, never `str.splitlines()`,
     which also breaks at U+0085, U+2028, U+2029 and other separators a
     JSON-valid row may carry raw. Memory is bounded by the longest line.
     """
-    rows: list[dict] = []
+    entries: list[tuple[str, dict]] = []
     malformed: list[int] = []
     try:
         # errors="replace": a torn multi-byte sequence must cost one malformed
@@ -77,12 +144,12 @@ def read_segment(path: Path) -> SegmentRead:
                 if row is None:
                     malformed.append(line_no)
                 else:
-                    rows.append(upcast(row))
+                    entries.append((line.removesuffix("\n"), row))
     except FileNotFoundError:
-        return SegmentRead(path=path, rows=(), malformed_lines=(), error="missing")
+        return (), (), "missing"
     except OSError as exc:
-        return SegmentRead(path=path, rows=(), malformed_lines=(), error=f"unreadable: {exc}")
-    return SegmentRead(path=path, rows=tuple(rows), malformed_lines=tuple(malformed), error=None)
+        return (), (), f"unreadable: {exc}"
+    return tuple(entries), tuple(malformed), None
 
 
 def _parse_row(line: str) -> dict | None:
@@ -92,6 +159,37 @@ def _parse_row(line: str) -> dict | None:
     except (json.JSONDecodeError, TypeError):
         return None
     return row if isinstance(row, dict) else None
+
+
+def row_identity(row: dict) -> str:
+    """The identity of ``row`` as stored: two rows are one event exactly when equal.
+
+    A hash of the row's canonical JSON -- key order never matters, any field
+    does. Compute it over the row from `read_raw_segment`, never an upcast
+    one, so a copied row and its original agree.
+    """
+    canonical = json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.blake2b(canonical.encode("utf-8"), digest_size=_IDENTITY_DIGEST_BYTES)
+    return digest.hexdigest()
+
+
+def row_time(row: dict) -> datetime:
+    """When ``row`` was recorded, as an aware ``datetime``; the one timestamp parser.
+
+    A naive stamp is read as UTC. A row with no readable time answers
+    ``UNTIMED``, so ``sorted(rows, key=row_time)`` orders the dated rows and
+    leaves the rest after them in their original order (the sort is stable).
+    """
+    stamp = row.get("timestamp")
+    if not isinstance(stamp, str):
+        return UNTIMED
+    if stamp.endswith("Z"):
+        stamp = stamp[:-1] + "+00:00"  # `fromisoformat` takes "Z" only from Python 3.11
+    try:
+        moment = datetime.fromisoformat(stamp)
+    except ValueError:
+        return UNTIMED
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
 
 
 def read_rows(ai_state_dir: Path, *, archives: bool = False) -> list[dict]:

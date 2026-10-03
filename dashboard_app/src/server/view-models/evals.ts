@@ -2,26 +2,13 @@ import "server-only";
 
 import path from "node:path";
 
-import type { EvalLeaderboardData, EvalLogRow } from "@/lib/evals";
-import { sortEvalRows } from "@/lib/evals";
+import type { EvalLedger, EvalLogRow, LedgerTable } from "@/lib/evals";
+import { detectLedgerShape, sortEvalRows, toNumberCell, toStringCell } from "@/lib/evals";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { readMarkdown } from "@/server/parsers/content";
 import { parseMarkdownTable } from "@/server/parsers/markdown-table";
 
-function toStringCell(cell: string | undefined): string | null {
-  if (cell === undefined || cell.trim() === "") {
-    return null;
-  }
-  return cell.trim();
-}
-
-function toNumberCell(cell: string | undefined): number | null {
-  if (cell === undefined || cell.trim() === "") {
-    return null;
-  }
-  const parsed = Number(cell.trim());
-  return Number.isFinite(parsed) ? parsed : null;
-}
+const LEDGER_RELATIVE_PATH = ".ai-state/eval_ledger/EVAL_LOG.md";
 
 /**
  * Parses the EVAL_LOG.md append-only table into a typed array of eval rows.
@@ -45,25 +32,58 @@ export function parseEvalsLog(body: string): EvalLogRow[] {
   }));
 }
 
+/** The cells of the first table line in the body (its header row); empty when there is no table. */
+function firstTableHeader(body: string): string[] {
+  const headerLine = body
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("|"));
+  return headerLine === undefined
+    ? []
+    : headerLine.split("|").slice(1, -1).map((cell) => cell.trim());
+}
+
+function hasAnyValue(row: EvalLogRow): boolean {
+  return Object.values(row).some((value) => value !== null);
+}
+
+function toLedgerTable(body: string, headers: string[]): LedgerTable {
+  const rows = parseMarkdownTable(body)
+    .map((record) => headers.map((header) => record[header] ?? ""))
+    .filter((cells) => cells.some((cell) => cell !== ""));
+  return { headers, rows };
+}
+
 /**
- * Reads `.ai-state/eval_ledger/EVAL_LOG.md`, parses the 11-column Markdown
- * table, and returns typed `EvalLeaderboardData` sorted descending by
- * `primary_metric`. When the file is absent or empty, returns an empty rows
- * array — the component renders the empty-state gracefully.
+ * Classifies the ledger body by its header and keeps only that shape's payload.
+ * A leaderboard drops rows with no value at all, so no row of placeholder dashes
+ * can reach the page.
  */
-export async function getEvalsData(projectRoot: string): Promise<EvalLeaderboardData> {
+export function parseEvalLedger(body: string, ledgerPath: string): EvalLedger {
+  const headers = firstTableHeader(body);
+  const shape = detectLedgerShape(headers);
+  if (shape === "leaderboard") {
+    const rows = sortEvalRows(parseEvalsLog(body).filter(hasAnyValue), "primary_metric");
+    return { shape, path: ledgerPath, rows };
+  }
+  if (shape === "table") {
+    return { shape, path: ledgerPath, table: toLedgerTable(body, headers) };
+  }
+  return { shape };
+}
+
+/**
+ * Reads `.ai-state/eval_ledger/EVAL_LOG.md` and returns it in its own shape
+ * (`path` is project-relative, for display):
+ * leaderboard rows ranked by `primary_metric`, any other table as written, or
+ * `absent` when the file is missing, unreadable or holds no table.
+ */
+export async function getEvalsData(projectRoot: string): Promise<EvalLedger> {
   const validatedRoot = await validateProjectRoot(projectRoot);
-  const logPath = path.join(validatedRoot, ".ai-state", "eval_ledger", "EVAL_LOG.md");
+  const logPath = path.join(validatedRoot, LEDGER_RELATIVE_PATH);
 
   const allowedPath = await assertAllowedArtifactPath(validatedRoot, logPath);
   const logFile = await readMarkdown(allowedPath);
 
-  if (!logFile) {
-    return { rows: [] };
-  }
-
-  const parsed = parseEvalsLog(logFile.body);
-  const sorted = sortEvalRows(parsed, "primary_metric");
-
-  return { rows: sorted };
+  return logFile ? parseEvalLedger(logFile.body, LEDGER_RELATIVE_PATH) : { shape: "absent" };
 }

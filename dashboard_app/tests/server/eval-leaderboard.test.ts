@@ -1,13 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { EvalLeaderboardData, EvalLogRow, EvalSortKey } from "@/lib/evals";
 import {
+  detectLedgerShape,
   filterEvalRowsByTask,
   formatEvalCost,
   formatEvalMetric,
   sortEvalRows
 } from "@/lib/evals";
-import { parseEvalsLog } from "@/server/view-models/evals";
+import { getEvalsData, parseEvalLedger, parseEvalsLog } from "@/server/view-models/evals";
 
 // ---------------------------------------------------------------------------
 // Fixtures derived from the Minimal Valid Example in
@@ -394,5 +399,99 @@ describe("EvalLeaderboardData and EvalLogRow structural contract", () => {
         sortEvalRows([], key);
       }
     }).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ledger shape: leaderboard only when the header carries run_id
+// ---------------------------------------------------------------------------
+
+const LEDGER_PATH = ".ai-state/eval_ledger/EVAL_LOG.md";
+
+const BASELINE_LEDGER = `
+# EVAL_LOG — context-layer quality baselines
+
+| date | commit | purpose | notes |
+| --- | --- | --- | --- |
+| 2026-09-07 | d483b2ec | Phase zero baseline | first measurement |
+| 2026-09-20 | 3242a76b | Post-slice remeasure | after the prune |
+`.trim();
+
+describe("detectLedgerShape", () => {
+  it("selects the leaderboard when the header has a run_id column, in any case or position", () => {
+    expect(detectLedgerShape(["task", "RUN_ID", "generation"])).toBe("leaderboard");
+  });
+
+  it("selects a plain table for any other header", () => {
+    expect(detectLedgerShape(["date", "commit", "purpose"])).toBe("table");
+  });
+
+  it("reports absent when there is no header at all", () => {
+    expect(detectLedgerShape([])).toBe("absent");
+    expect(detectLedgerShape(["", " "])).toBe("absent");
+  });
+});
+
+describe("parseEvalLedger", () => {
+  it("ranks a leaderboard-shaped ledger by primary metric", () => {
+    const ledger = parseEvalLedger(TWO_ROW_TABLE, LEDGER_PATH);
+
+    expect(ledger.shape).toBe("leaderboard");
+    if (ledger.shape !== "leaderboard") return;
+    expect(ledger.rows.map((row) => row.run_id)).toEqual(["eval-swebench-g3-a4b2c1", "eval-swebench-g1-bb0011"]);
+    expect(ledger.path).toBe(LEDGER_PATH);
+  });
+
+  it("drops a leaderboard row that holds no value at all", () => {
+    const header = TWO_ROW_TABLE.split("\n").slice(0, 2).join("\n");
+    const blankRow = `|${" |".repeat(11)}`;
+
+    const ledger = parseEvalLedger(`${header}\n${blankRow}`, LEDGER_PATH);
+
+    expect(ledger).toMatchObject({ shape: "leaderboard", rows: [] });
+  });
+
+  it("keeps a table of any other shape as its headers and rows, skipping empty rows", () => {
+    const ledger = parseEvalLedger(`${BASELINE_LEDGER}\n|  |  |  |  |`, LEDGER_PATH);
+
+    expect(ledger.shape).toBe("table");
+    if (ledger.shape !== "table") return;
+    expect(ledger.table.headers).toEqual(["date", "commit", "purpose", "notes"]);
+    expect(ledger.table.rows).toEqual([
+      ["2026-09-07", "d483b2ec", "Phase zero baseline", "first measurement"],
+      ["2026-09-20", "3242a76b", "Post-slice remeasure", "after the prune"]
+    ]);
+  });
+
+  it("reports a body without a table as absent", () => {
+    expect(parseEvalLedger("# EVAL_LOG\n\nNo runs yet.\n", LEDGER_PATH)).toEqual({ shape: "absent" });
+  });
+});
+
+describe("getEvalsData", () => {
+  const roots: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  });
+
+  async function rootWithLedger(content: string | null): Promise<string> {
+    const root = await mkdtemp(path.join(os.tmpdir(), "eval-ledger-"));
+    roots.push(root);
+    await mkdir(path.join(root, ".ai-state", "eval_ledger"), { recursive: true });
+    if (content !== null) {
+      await writeFile(path.join(root, LEDGER_PATH), content);
+    }
+    return root;
+  }
+
+  it("reads the ledger in its own shape with a project-relative path", async () => {
+    const ledger = await getEvalsData(await rootWithLedger(BASELINE_LEDGER));
+
+    expect(ledger).toMatchObject({ shape: "table", path: LEDGER_PATH });
+  });
+
+  it("is absent when the ledger file does not exist", async () => {
+    expect(await getEvalsData(await rootWithLedger(null))).toEqual({ shape: "absent" });
   });
 });

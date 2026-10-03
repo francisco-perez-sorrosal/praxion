@@ -1,6 +1,9 @@
-import type { EvalLeaderboardData, EvalLogRow } from "@/lib/evals";
-import { formatEvalCost, formatEvalMetric } from "@/lib/evals";
+import { SectionCard } from "@/components/chrome/section-card";
 import { EmptyState } from "@/components/empty-state";
+import type { EvalLeaderboardData, EvalLedger, EvalLogRow, LedgerTable } from "@/lib/evals";
+import { formatEvalCost, formatEvalMetric } from "@/lib/evals";
+
+const LEDGER_PRODUCER_PATH = ".ai-state/eval_ledger/EVAL_LOG.md";
 
 type EvalLeaderboardProps = {
   data: EvalLeaderboardData;
@@ -92,6 +95,64 @@ export function EvalLeaderboard({ data }: EvalLeaderboardProps) {
         Sorted by primary metric descending. Delta: held-out minus public score;
         negative values indicate no contamination.
       </p>
+    </div>
+  );
+}
+
+/**
+ * The eval ledger section below the quality evals: the ranked leaderboard only
+ * for a ledger whose header carries a `run_id` column, a plain captioned table
+ * for any other shape, and the empty state naming the ledger's file when absent.
+ */
+export function EvalLedgerSection({ ledger }: { ledger: EvalLedger }) {
+  switch (ledger.shape) {
+    case "leaderboard":
+      return (
+        <SectionCard title="Experiment leaderboard" subtitle={ledger.path}>
+          <EvalLeaderboard data={{ rows: ledger.rows }} />
+        </SectionCard>
+      );
+    case "table":
+      return (
+        <SectionCard title="Eval ledger">
+          <LedgerTableView path={ledger.path} table={ledger.table} />
+        </SectionCard>
+      );
+    case "absent":
+      return (
+        <EmptyState
+          title="No eval ledger recorded"
+          body="Record an eval baseline or experiment run to start the ledger."
+          producerPath={LEDGER_PRODUCER_PATH}
+        />
+      );
+  }
+}
+
+function LedgerTableView({ path, table }: { path: string; table: LedgerTable }) {
+  return (
+    <div className="eval-table-wrap">
+      <table className="eval-ledger-table">
+        <caption>{path}</caption>
+        <thead>
+          <tr>
+            {table.headers.map((header, index) => (
+              <th key={index} scope="col">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((cells, rowIndex) => (
+            <tr key={rowIndex}>
+              {cells.map((cell, cellIndex) => (
+                <td key={cellIndex}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

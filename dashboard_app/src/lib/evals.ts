@@ -25,6 +25,60 @@ export type EvalLeaderboardData = {
   rows: EvalLogRow[];
 };
 
+/** A ledger table of any other shape, kept as the cells it was written with. */
+export type LedgerTable = {
+  headers: string[];
+  rows: string[][];
+};
+
+/**
+ * What `.ai-state/eval_ledger/EVAL_LOG.md` holds (`path` is project-relative): the experiment leaderboard
+ * (header carries a `run_id` column), a plain table of any other shape, or
+ * nothing. A sum type so a shape never carries another shape's payload.
+ */
+export type EvalLedger =
+  | { shape: "absent" }
+  | { shape: "leaderboard"; path: string; rows: EvalLogRow[] }
+  | { shape: "table"; path: string; table: LedgerTable };
+
+export type LedgerShape = EvalLedger["shape"];
+
+const LEADERBOARD_KEY_COLUMN = "run_id";
+
+/** Selects the ledger shape from its header cells: `run_id` means leaderboard. */
+export function detectLedgerShape(headerCells: readonly string[]): LedgerShape {
+  const cells = headerCells.map((cell) => cell.trim().toLowerCase()).filter((cell) => cell !== "");
+  if (cells.length === 0) {
+    return "absent";
+  }
+  return cells.includes(LEADERBOARD_KEY_COLUMN) ? "leaderboard" : "table";
+}
+
+/** Trimmed text of a table cell; blank or missing cells are `null`. */
+export function toStringCell(cell: string | undefined): string | null {
+  if (cell === undefined || cell.trim() === "") {
+    return null;
+  }
+  return cell.trim();
+}
+
+/** Numeric table cell; blank, missing and non-numeric cells are `null`. */
+export function toNumberCell(cell: string | undefined): number | null {
+  if (cell === undefined || cell.trim() === "") {
+    return null;
+  }
+  const parsed = Number(cell.trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+const EVAL_STAMP = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-\d{2}Z$/;
+
+/** `2026-10-03T01-22-07Z` (the stamp in quality-eval filenames) as `2026-10-03 01:22 UTC`. */
+export function formatEvalTimestamp(stamp: string): string {
+  const match = EVAL_STAMP.exec(stamp);
+  return match ? `${match[1]} ${match[2]}:${match[3]} UTC` : stamp;
+}
+
 export type EvalSortKey = "primary_metric" | "generation" | "cost_usd";
 
 /**

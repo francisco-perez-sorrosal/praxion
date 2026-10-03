@@ -20,6 +20,8 @@ type PageShellProps = {
   breadcrumb?: BreadcrumbItem[];
   children: ReactNode;
   dataAsOf?: Date | string | null;
+  /** The page refreshes itself; the header shows the live cue only then. */
+  live?: boolean;
   sourcesContent?: ReactNode;
   title: string;
 };
@@ -27,13 +29,14 @@ type PageShellProps = {
 export function PageShell({
   title,
   dataAsOf,
+  live,
   breadcrumb,
   sourcesContent,
   children
 }: PageShellProps) {
   return (
     <>
-      <AppHeader title={title} dataAsOf={dataAsOf} breadcrumb={breadcrumb} />
+      <AppHeader title={title} dataAsOf={dataAsOf} live={live} breadcrumb={breadcrumb} />
       <section className="page">{children}</section>
       {sourcesContent != null && (
         <details className="page-sources">

@@ -7,8 +7,9 @@
  * artifact mtimes pass `null`, which omits the stamp.
  *
  * Intentionally not "use client" — static markup only. No timer, no polling.
- * The "· live ⟳" suffix is a visual cue; only the Workshops and Overview pages
- * mount a LiveRefresh of their own.
+ * The "· live ⟳" suffix is a visual cue shown only when the page passes `live`;
+ * those are the pages that mount a LiveRefresh of their own (Workshops and
+ * Overview), so reference pages never claim to refresh.
  *
  * Breadcrumb renders only when breadcrumb.length > 1, which on the 7 top-
  * level surfaces degenerates to an empty list (no crumb rendered).
@@ -22,10 +23,17 @@ type BreadcrumbItem = {
 type AppHeaderProps = {
   breadcrumb?: BreadcrumbItem[];
   dataAsOf?: Date | string | null;
+  /** The page mounts a LiveRefresh; only then does the header say it is live. */
+  live?: boolean;
   title: string;
 };
 
-const TODAY_DATE_LABEL_CHARS = 10; // YYYY-MM-DD
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+/** `YYYY-MM-DD` in the viewer's calendar — the same zone that decides "today". */
+function localDateLabel(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
 
 function formatDataAsOf(raw: Date | string): string {
   const date = typeof raw === "string" ? new Date(raw) : raw;
@@ -46,7 +54,7 @@ function formatDataAsOf(raw: Date | string): string {
       minute: "2-digit"
     });
   }
-  return date.toISOString().slice(0, TODAY_DATE_LABEL_CHARS);
+  return localDateLabel(date);
 }
 
 function toIsoString(raw: Date | string): string {
@@ -54,7 +62,7 @@ function toIsoString(raw: Date | string): string {
   return isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
-export function AppHeader({ title, dataAsOf, breadcrumb = [] }: AppHeaderProps) {
+export function AppHeader({ title, dataAsOf, live = false, breadcrumb = [] }: AppHeaderProps) {
   const showCrumbs = breadcrumb.length > 1;
 
   return (
@@ -89,10 +97,14 @@ export function AppHeader({ title, dataAsOf, breadcrumb = [] }: AppHeaderProps) 
           <span className="app-header__stamp">
             data as of{" "}
             <time dateTime={toIsoString(dataAsOf)}>{formatDataAsOf(dataAsOf)}</time>
-            {" · "}
-            <span className="app-header__live" aria-hidden="true">
-              live ⟳
-            </span>
+            {live && (
+              <>
+                {" · "}
+                <span className="app-header__live" aria-hidden="true">
+                  live ⟳
+                </span>
+              </>
+            )}
           </span>
         )}
       </div>

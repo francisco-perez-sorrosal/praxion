@@ -2,6 +2,8 @@ import "server-only";
 
 import path from "node:path";
 
+import { cache } from "react";
+
 import type {
   DashboardMetricsData,
   MetricDelta,
@@ -341,7 +343,7 @@ function sortMetricSnapshots(snapshots: MetricsSnapshot[]): MetricsSnapshot[] {
   });
 }
 
-export async function getMetricsData(projectRoot: string): Promise<DashboardMetricsData> {
+async function readMetricsData(projectRoot: string): Promise<DashboardMetricsData> {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const reportsRoot = path.join(validatedRoot, ".ai-state", "metrics_reports");
   const entries = await listDirectory(reportsRoot);
@@ -380,3 +382,5 @@ export async function getMetricsData(projectRoot: string): Promise<DashboardMetr
     snapshots: sortedMetrics
   };
 }
+
+export const getMetricsData = cache(readMetricsData);

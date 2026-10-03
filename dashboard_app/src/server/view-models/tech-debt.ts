@@ -2,6 +2,8 @@ import "server-only";
 
 import path from "node:path";
 
+import { cache } from "react";
+
 import { fileMtime, readText } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { parseMarkdownTable } from "@/server/parsers/markdown-table";
@@ -50,7 +52,7 @@ export function countActiveDebt(body: string): DebtCounts {
 }
 
 /** The active tech-debt rows by severity; `null` when the ledger is absent or unreadable. */
-export async function getTechDebtSummary(projectRoot: string): Promise<TechDebtSummary | null> {
+async function readTechDebtSummary(projectRoot: string): Promise<TechDebtSummary | null> {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const ledgerPath = await assertAllowedArtifactPath(validatedRoot, path.join(validatedRoot, ...LEDGER_RELATIVE_PATH));
   const body = await readText(ledgerPath);
@@ -59,3 +61,5 @@ export async function getTechDebtSummary(projectRoot: string): Promise<TechDebtS
   }
   return { ...countActiveDebt(body), mtime: await fileMtime(ledgerPath), path: ledgerPath };
 }
+
+export const getTechDebtSummary = cache(readTechDebtSummary);

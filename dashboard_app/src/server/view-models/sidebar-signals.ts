@@ -10,13 +10,12 @@ import "server-only";
 import type { HealthLabel } from "@/lib/health-tone";
 import { groupWorkshops } from "@/lib/workshops";
 import {
-  digestEvals,
   digestMetrics,
   digestSentinel,
   readOrNull
 } from "@/server/view-models/overview";
 import { getMetricsData } from "@/server/view-models/metrics";
-import { getPraxionEvalsData } from "@/server/view-models/praxion-evals";
+import { getPraxionEvalRuns } from "@/server/view-models/praxion-evals";
 import { getSentinelData } from "@/server/view-models/sentinel";
 import { getWorkshopsData } from "@/server/view-models/workshops";
 
@@ -30,16 +29,16 @@ export type SidebarSignals = {
 };
 
 export async function getSidebarSignals(projectRoot: string, now: Date = new Date()): Promise<SidebarSignals> {
-  const [workshops, sentinel, metrics, evals] = await Promise.all([
+  const [workshops, sentinel, metrics, evalRuns] = await Promise.all([
     readOrNull("sidebar workshops", () => getWorkshopsData(projectRoot)),
     readOrNull("sidebar sentinel", () => getSentinelData(projectRoot)),
     readOrNull("sidebar metrics", () => getMetricsData(projectRoot)),
-    readOrNull("sidebar quality evals", () => getPraxionEvalsData(projectRoot))
+    readOrNull("sidebar quality evals", () => getPraxionEvalRuns(projectRoot))
   ]);
 
   return {
     activeWorkshops: workshops === null ? 0 : groupWorkshops(workshops, now).active.length,
-    evalFails: (evals === null ? null : digestEvals(evals)?.latest.fail) ?? null,
+    evalFails: evalRuns?.at(-1)?.fail ?? null,
     metricsHealth: (metrics === null ? null : digestMetrics(metrics)?.healthLabel) ?? null,
     sentinelGrade: (sentinel === null ? null : digestSentinel(sentinel)?.grade) ?? null
   };

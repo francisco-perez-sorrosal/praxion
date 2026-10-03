@@ -2,8 +2,10 @@ import "server-only";
 
 import path from "node:path";
 
+import { cache } from "react";
+
 import { normalizeGrade } from "@/lib/tone";
-import { isSentinelReport, listDirectory } from "@/server/artifacts/files";
+import { fileMtime, isSentinelReport, listDirectory } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { readMarkdown } from "@/server/parsers/content";
 import { extractSections, parseSentinelLog } from "@/server/sentinel/extract-sections";
@@ -25,13 +27,17 @@ export type SentinelReport = {
   /** Distinct checks the report marks `[not reached]`. */
   notReachedCount: number;
   path: string;
-  /** ISO instant recovered from the `SENTINEL_REPORT_<date>_<time>.md` filename (UTC). */
+  /**
+   * ISO instant the report was written: the file's modification time, which is
+   * absolute. Only when the file cannot be stat'ed is it recovered from the
+   * filename, whose stamp is local wall-clock time.
+   */
   reportTimestamp: string | null;
   sections: SentinelSections;
 };
 
 export type SentinelData = {
-  log: { body: string } | null;
+  log: { body: string; path: string } | null;
   logSeries: SentinelLogPoint[];
   reports: SentinelReport[];
 };
@@ -43,15 +49,30 @@ const NOT_REACHED_MARKER = /\[not reached\]/i;
 const INLINE_CODE_SPAN = /`[^`]*`/g;
 const CHECK_ID = /\b[A-Z]{1,3}\d{2}\b/g;
 
-/** ISO instant from a report filename; `null` when the name carries no valid stamp. */
+/**
+ * ISO instant from a report filename; `null` when the name carries no valid
+ * stamp. The sentinel writes local wall-clock stamps (no zone), so the stamp is
+ * read as local time, never UTC.
+ */
 export function reportTimestampFromFileName(fileName: string): string | null {
   const match = FILE_TIMESTAMP_PATTERN.exec(fileName);
   if (!match) {
     return null;
   }
-  const [, year, month, day, hour, minute, second] = match;
-  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  // The pattern captures exactly six digit groups.
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number) as [
+    number, number, number, number, number, number
+  ];
+  const date = new Date(year, month - 1, day, hour, minute, second);
+  // `Date` rolls an impossible stamp over (month 13 -> next year); a real one round-trips.
+  const roundTrips =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date.getHours() === hour &&
+    date.getMinutes() === minute &&
+    date.getSeconds() === second;
+  return roundTrips ? date.toISOString() : null;
 }
 
 /** Whether the report's title line (first `# ` heading) carries the partial mark. */
@@ -101,7 +122,7 @@ function withGradeLetters(point: SentinelLogPoint): SentinelLogPoint {
   return { ...point, coherence: letter(point.coherence), grade: letter(point.grade) };
 }
 
-export async function getSentinelData(projectRoot: string): Promise<SentinelData> {
+async function readSentinelData(projectRoot: string): Promise<SentinelData> {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const reportsRoot = path.join(validatedRoot, ".ai-state", "sentinel_reports");
 
@@ -138,7 +159,7 @@ export async function getSentinelData(projectRoot: string): Promise<SentinelData
           isPartial: isPartialReport(file.body),
           notReachedCount: countNotReached(file.body),
           path: file.path,
-          reportTimestamp: reportTimestampFromFileName(fileName),
+          reportTimestamp: (await fileMtime(file.path)) ?? reportTimestampFromFileName(fileName),
           sections: extractSections(file.body)
         } satisfies SentinelReport;
       })
@@ -146,8 +167,10 @@ export async function getSentinelData(projectRoot: string): Promise<SentinelData
   ).filter((report): report is SentinelReport => report !== null);
 
   return {
-    log: log ? { body: log.body } : null,
+    log: log ? { body: log.body, path: log.path } : null,
     logSeries,
     reports
   };
 }
+
+export const getSentinelData = cache(readSentinelData);

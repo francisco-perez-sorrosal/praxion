@@ -15,7 +15,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // ─── AppHeader ────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,70 @@ describe("AppHeader — renders title as the page-level heading", () => {
     );
 
     expect(html).not.toContain("<time");
+  });
+});
+
+describe("AppHeader — the data-as-of label names the local calendar day", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("labels an earlier day with its local date, not the UTC date", async () => {
+    const { AppHeader } = await import("@/components/app-header");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 2, 12, 0, 0));
+
+    // 23:30 local on 1 Oct: the UTC date is 2 Oct in every zone west of Greenwich.
+    const html = renderToStaticMarkup(
+      createElement(AppHeader, { title: "Sentinel", dataAsOf: new Date(2026, 9, 1, 23, 30, 0) })
+    );
+
+    expect(html).toContain(">2026-10-01</time>");
+  });
+
+  it("labels today with the local clock time", async () => {
+    const { AppHeader } = await import("@/components/app-header");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 2, 12, 0, 0));
+
+    const html = renderToStaticMarkup(
+      createElement(AppHeader, { title: "Sentinel", dataAsOf: new Date(2026, 9, 2, 9, 5, 0) })
+    );
+
+    expect(html).toContain(">09:05</time>");
+  });
+});
+
+describe("AppHeader — the live cue appears only on pages that refresh", () => {
+  it("omits the live cue by default", async () => {
+    const { AppHeader } = await import("@/components/app-header");
+
+    const html = renderToStaticMarkup(
+      createElement(AppHeader, { title: "Metrics", dataAsOf: new Date("2026-05-10T14:32:00Z") })
+    );
+
+    expect(html).not.toContain("live");
+  });
+
+  it("renders the live cue when the page refreshes", async () => {
+    const { AppHeader } = await import("@/components/app-header");
+
+    const html = renderToStaticMarkup(
+      createElement(AppHeader, { title: "Workshops", dataAsOf: new Date("2026-05-10T14:32:00Z"), live: true })
+    );
+
+    expect(html).toContain("live ⟳");
+  });
+
+  it("PageShell passes the cue through to its header", async () => {
+    const { PageShell } = await import("@/components/page-shell");
+    const dataAsOf = new Date("2026-05-10T14:32:00Z");
+
+    const still = renderToStaticMarkup(createElement(PageShell, { children: "body", dataAsOf, title: "ADRs" }));
+    const refreshing = renderToStaticMarkup(createElement(PageShell, { children: "body", dataAsOf, live: true, title: "Overview" }));
+
+    expect(still).not.toContain("live");
+    expect(refreshing).toContain("live ⟳");
   });
 });
 

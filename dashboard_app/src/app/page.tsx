@@ -24,7 +24,7 @@ export default async function OverviewPage() {
   );
 
   return (
-    <PageShell title="Overview" dataAsOf={overview.dataAsOf} sourcesContent={sources}>
+    <PageShell title="Overview" dataAsOf={overview.dataAsOf} live sourcesContent={sources}>
       <LiveRefresh seconds={overviewRefreshSeconds(cfg.pollIntervalSeconds)} />
 
       <p className="page-intro__lede muted">

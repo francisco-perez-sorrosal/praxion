@@ -20,7 +20,7 @@ import type { DashboardMetricsData } from "@/lib/metrics";
 import { deriveMetricsView, selectActiveSnapshot } from "@/lib/metrics-dashboard-data";
 import type { PraxionEvalCheckGroup, PraxionEvalRun } from "@/lib/praxion-evals";
 import type { Tone } from "@/lib/tone";
-import { normalizeGrade } from "@/lib/tone";
+import { newestOf, normalizeGrade } from "@/lib/tone";
 import type { ProgressSummary } from "@/lib/workshops";
 import { groupWorkshops, progressSummary } from "@/lib/workshops";
 import { fileMtime, newestMtime } from "@/server/artifacts/files";
@@ -136,11 +136,15 @@ export type DecisionRecord = { data: Record<string, unknown>; isDraft: boolean; 
 
 export type KnowledgeStamps = { architecture: string | null; documentation: string | null; roadmap: string | null };
 
+/** When the sentinel and metrics run logs last changed; they feed the page stamp, not the activity list. */
+export type LogStamps = { metrics: string | null; sentinel: string | null };
+
 export type OverviewInputs = {
   debt: TechDebtSummary | null;
   decisions: Read<DecisionRecord[]> | null;
   evals: Read<PraxionEvalsData> | null;
   knowledge: KnowledgeStamps;
+  logStamps: LogStamps;
   metrics: Read<DashboardMetricsData> | null;
   sentinel: Read<SentinelData> | null;
   workshops: WorkshopState[] | null;
@@ -182,7 +186,11 @@ async function readInputs(root: string): Promise<OverviewInputs> {
     readOrNull("tech debt", () => getTechDebtSummary(root)),
     readKnowledgeStamps(root)
   ]);
-  return { debt, decisions, evals, knowledge, metrics, sentinel, workshops };
+  const logStamps: LogStamps = {
+    metrics: await mtimeOf(metrics?.value.log?.path),
+    sentinel: await mtimeOf(sentinel?.value.log?.path)
+  };
+  return { debt, decisions, evals, knowledge, logStamps, metrics, sentinel, workshops };
 }
 
 const mtimeOf = async (target: string | undefined): Promise<string | null> =>
@@ -223,7 +231,7 @@ export function composeOverview(inputs: OverviewInputs, now: Date): OverviewData
   return {
     activity,
     attention: deriveAttention({ debt, evals, metrics, sentinel }),
-    dataAsOf: activity[0]?.mtime ?? null,
+    dataAsOf: newestOf([activity[0]?.mtime, inputs.debt?.mtime, inputs.logStamps.metrics, inputs.logStamps.sentinel]),
     debt,
     decisions,
     evals,
@@ -237,10 +245,14 @@ export function composeOverview(inputs: OverviewInputs, now: Date): OverviewData
 
 const SENTINEL_TREND_RUNS = 8;
 
-/** The newest report's log row when it has one, else the log's last row. */
+/**
+ * The newest report's own log row. A report no row names (a run cut short
+ * before the log append) is reported as not graded, never as the previous
+ * run's grade; the log's last row stands in only when no report exists.
+ */
 export function digestSentinel(data: SentinelData): SentinelDigest | null {
   const newest = data.reports[0] ?? null;
-  const latest = newest?.highlight ?? data.logSeries.at(-1) ?? null;
+  const latest = newest === null ? (data.logSeries.at(-1) ?? null) : newest.highlight;
   if (newest === null && latest === null) {
     return null;
   }

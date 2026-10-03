@@ -11,7 +11,7 @@
  * the implementation file exists (concurrent BDD/TDD RED handshake).
  */
 
-import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -74,8 +74,12 @@ async function writeCompleteWip(workshopDir: string): Promise<void> {
 /**
  * Builds a SENTINEL_LOG.md body with one row per entry in the provided array.
  * Timestamps are used as-is (lexicographic sort = chronological for ISO strings).
+ * Row i names `reportFiles[i]`: the digest binds a log row to its report by file name.
  */
-function buildSentinelLogBody(entries: Array<{ timestamp: string; grade: string }>): string {
+function buildSentinelLogBody(
+  entries: Array<{ timestamp: string; grade: string }>,
+  reportFiles: readonly string[]
+): string {
   const header = [
     "# Sentinel Log",
     "",
@@ -85,8 +89,8 @@ function buildSentinelLogBody(entries: Array<{ timestamp: string; grade: string 
 
   const rows = entries
     .map(
-      ({ timestamp, grade }) =>
-        `| ${timestamp} | ${grade} | 30 | 0/2/3 | ${grade} | SENTINEL_REPORT_fake.md |`
+      ({ timestamp, grade }, index) =>
+        `| ${timestamp} | ${grade} | 30 | 0/2/3 | ${grade} | ${reportFiles[index] ?? "SENTINEL_REPORT_fake.md"} |`
     )
     .join("\n");
 
@@ -120,7 +124,13 @@ async function seedSentinelReports(
       grade: r.grade
     }));
 
-  await writeFile(path.join(reportsDir, "SENTINEL_LOG.md"), buildSentinelLogBody(entries));
+  await writeFile(
+    path.join(reportsDir, "SENTINEL_LOG.md"),
+    buildSentinelLogBody(
+      entries,
+      reports.map((report) => report.filename)
+    )
+  );
 }
 
 // ─── getSidebarSignals ────────────────────────────────────────────────────────
@@ -195,6 +205,27 @@ describe("getSidebarSignals", () => {
     // The newest entry (A) must win — not an earlier one (B)
     expect(signals.sentinelGrade).toBe("A");
     expect(signals.sentinelGrade).not.toBe("B");
+  });
+
+  it("reads the newest report as not graded when the log has no row for it", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+
+    const root = await createTempProjectRoot("sidebar-signals-sentinel-unlogged-");
+    await seedBareProjectRoot(root);
+    await seedSentinelReports(
+      root,
+      [{ filename: "SENTINEL_REPORT_2026-05-10_09-00-00.md", grade: "B" }],
+      [{ timestamp: "2026-05-10T09:00:00Z", grade: "B" }]
+    );
+    // A newer run cut short before the log append: a report, but no row naming it.
+    await writeFile(
+      path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_REPORT_2026-05-11_09-00-00.md"),
+      "# Sentinel Report [PARTIAL]\n\nTruncated.\n"
+    );
+
+    const signals = await getSidebarSignals(root);
+
+    expect(signals.sentinelGrade).toBeNull();
   });
 
   it("returns sentinelGrade null when no sentinel reports exist", async () => {
@@ -369,5 +400,24 @@ describe("getSidebarSignals — metrics health and quality-eval failures", () =>
 
     expect(signals).toEqual({ activeWorkshops: 2, evalFails: null, metricsHealth: "WORSENING", sentinelGrade: "C" });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("sidebar quality evals unreadable"), expect.any(String));
+  });
+
+  it("takes the failure count from the log row even when the newest report cannot be read", async () => {
+    const { getSidebarSignals } = await import("@/server/view-models/sidebar-signals");
+    const root = await fullProject();
+    const outside = await createTempProjectRoot("sidebar-signals-outside-");
+    const escaped = path.join(outside, "report.md");
+    await writeFile(escaped, "# Quality eval\n");
+    const reportsDir = path.join(root, ".ai-state", "praxion_eval_reports");
+    const newest = (await readdir(reportsDir)).filter((name) => name.startsWith("PRAXION_EVAL_REPORT_")).sort().at(-1);
+    if (newest === undefined) {
+      throw new Error("the full project fixture has no quality-eval report");
+    }
+    await rm(path.join(reportsDir, newest));
+    await symlink(escaped, path.join(reportsDir, newest));
+
+    const signals = await getSidebarSignals(root, FIXED_NOW);
+
+    expect(signals.evalFails).toBe(3);
   });
 });

@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -12,7 +12,7 @@ import {
   parsePraxionEvalLog,
   parsePraxionEvalReport
 } from "@/lib/praxion-evals";
-import { getPraxionEvalsData } from "@/server/view-models/praxion-evals";
+import { getPraxionEvalRuns, getPraxionEvalsData } from "@/server/view-models/praxion-evals";
 
 const FIXTURES = path.join(__dirname, "..", "fixtures", "praxion-evals");
 const NEWEST_REPORT = "PRAXION_EVAL_REPORT_2026-10-03T01-22-07Z.md";
@@ -241,5 +241,28 @@ describe("getPraxionEvalsData", () => {
 
     expect(data.runs).toEqual([]);
     expect(data.selected?.timestamp).toBe("2026-10-03T01-22-07Z");
+  });
+
+  it("reads the log's runs alone, never opening a report", async () => {
+    const root = await projectWithReports();
+    const outside = await mkdtemp(path.join(os.tmpdir(), "praxion-evals-outside-"));
+    roots.push(outside);
+    const escaped = path.join(outside, "report.md");
+    await writeFile(escaped, "# Quality eval\n");
+    const newest = path.join(root, ".ai-state", "praxion_eval_reports", NEWEST_REPORT);
+    await rm(newest);
+    await symlink(escaped, newest);
+
+    // The full reader must open the newest report and is refused; the runs reader never does.
+    await expect(getPraxionEvalsData(root)).rejects.toThrow();
+    expect(await getPraxionEvalRuns(root)).toHaveLength(5);
+  });
+
+  it("returns no runs for a project with no log", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "praxion-evals-empty-"));
+    roots.push(root);
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+
+    expect(await getPraxionEvalRuns(root)).toEqual([]);
   });
 });

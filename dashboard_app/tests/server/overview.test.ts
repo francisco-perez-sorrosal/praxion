@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardMetricsData } from "@/lib/metrics";
 import type { PraxionEvalRun } from "@/lib/praxion-evals";
-import type { DecisionRecord } from "@/server/view-models/overview";
+import type { DecisionRecord, OverviewInputs } from "@/server/view-models/overview";
 import {
   composeOverview,
   digestDecisions,
@@ -289,10 +289,30 @@ describe("digestSentinel", () => {
     expect(digestSentinel({ log: null, logSeries: [], reports: [] })).toBeNull();
   });
 
-  it("falls back to the log's last row when the newest report has no row of its own", () => {
-    const data: SentinelData = { log: null, logSeries: [LOG_POINT], reports: [reportWith({})] };
+  it("reads the newest report as not graded when no log row names it, never the previous run's row", () => {
+    const earlier = { ...LOG_POINT, reportFile: "SENTINEL_REPORT_2026-09-30_09-00-00.md" };
+    const data: SentinelData = {
+      log: null,
+      logSeries: [earlier],
+      reports: [reportWith({ isPartial: true, notReachedCount: 2 })]
+    };
 
-    expect(digestSentinel(data)).toMatchObject({ grade: "D", important: 3, timestamp: "2026-10-01T09:30:00.000Z" });
+    expect(digestSentinel(data)).toMatchObject({
+      coherence: null,
+      critical: null,
+      grade: null,
+      important: null,
+      isPartial: true,
+      notReachedCount: 2,
+      suggested: null,
+      timestamp: "2026-10-01T09:30:00.000Z"
+    });
+  });
+
+  it("uses the log's last row only when there is no report at all", () => {
+    const data: SentinelData = { log: null, logSeries: [LOG_POINT], reports: [] };
+
+    expect(digestSentinel(data)).toMatchObject({ grade: "D", important: 3, timestamp: "2026-09-30 09:00:00" });
   });
 
   it("reads a grade the log wrote as free text as not graded", () => {
@@ -344,17 +364,41 @@ describe("digestEvals", () => {
   });
 });
 
+const NO_INPUTS: OverviewInputs = {
+  debt: null,
+  decisions: null,
+  evals: null,
+  knowledge: { architecture: null, documentation: null, roadmap: null },
+  logStamps: { metrics: null, sentinel: null },
+  metrics: null,
+  sentinel: null,
+  workshops: null
+};
+
 describe("composeOverview", () => {
+  it("stamps the page with the newest artifact it read, not only the newest activity", () => {
+    const debt = { bySeverity: {}, inFlight: 0, mtime: "2026-10-03T08:00:00.000Z", open: 1, path: "/l" };
+    const stamped = (inputs: Partial<OverviewInputs>) =>
+      composeOverview(
+        { ...NO_INPUTS, knowledge: { architecture: "2026-10-02T12:00:00.000Z", documentation: null, roadmap: null }, ...inputs },
+        FIXED_NOW
+      ).dataAsOf;
+
+    expect(stamped({})).toBe("2026-10-02T12:00:00.000Z");
+    expect(stamped({ debt })).toBe("2026-10-03T08:00:00.000Z");
+    expect(stamped({ logStamps: { metrics: "2026-10-04T08:00:00.000Z", sentinel: null } })).toBe("2026-10-04T08:00:00.000Z");
+    expect(stamped({ logStamps: { metrics: null, sentinel: "2026-10-05T08:00:00.000Z" } })).toBe("2026-10-05T08:00:00.000Z");
+  });
+
+  it("has no stamp when nothing was read", () => {
+    expect(composeOverview(NO_INPUTS, FIXED_NOW).dataAsOf).toBeNull();
+  });
+
   it("raises no quality-eval line for a run without failures", () => {
     const calm = composeOverview(
       {
-        debt: null,
-        decisions: null,
-        evals: { touched: null, value: { dataAsOf: null, reports: [], runs: [{ ...EVAL_RUN, fail: 0 }], selected: null } },
-        knowledge: { architecture: null, documentation: null, roadmap: null },
-        metrics: null,
-        sentinel: null,
-        workshops: null
+        ...NO_INPUTS,
+        evals: { touched: null, value: { dataAsOf: null, reports: [], runs: [{ ...EVAL_RUN, fail: 0 }], selected: null } }
       },
       FIXED_NOW
     );
@@ -371,15 +415,7 @@ describe("composeOverview", () => {
     };
 
     const overview = composeOverview(
-      {
-        debt: null,
-        decisions: null,
-        evals: null,
-        knowledge: { architecture: null, documentation: null, roadmap: null },
-        metrics: null,
-        sentinel: { touched: null, value: data },
-        workshops: null
-      },
+      { ...NO_INPUTS, sentinel: { touched: null, value: data } },
       FIXED_NOW
     );
 

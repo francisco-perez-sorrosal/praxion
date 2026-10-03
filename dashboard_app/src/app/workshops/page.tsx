@@ -29,6 +29,7 @@ export default async function WorkshopsPage() {
     <PageShell
       title="Workshops"
       dataAsOf={newestOf(workshops.map((workshop) => workshop.updatedAt))}
+      live
       sourcesContent={sources}
     >
       <LiveRefresh seconds={cfg.pollIntervalSeconds} />

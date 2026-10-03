@@ -2,6 +2,8 @@ import "server-only";
 
 import path from "node:path";
 
+import { cache } from "react";
+
 import {
   CANONICAL_WORKSHOP_ARTIFACTS,
   listDirectoryByMtimeDesc,
@@ -47,7 +49,7 @@ function isTerminalPhase(phase: string): boolean {
 /** A WIP `## Status` of "[COMPLETE]" (or "COMPLETE - ...") is the author's own finish marker. */
 const COMPLETE_STATUS = /^\[?complete\b/i;
 
-export async function getWorkshopsData(projectRoot: string): Promise<WorkshopState[]> {
+async function readWorkshopsData(projectRoot: string): Promise<WorkshopState[]> {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const workshopsRoot = path.join(validatedRoot, ".ai-work");
   const workshopDirs = await listDirectoryByMtimeDesc(workshopsRoot);
@@ -126,3 +128,5 @@ export async function getWorkshopsData(projectRoot: string): Promise<WorkshopSta
     })
   );
 }
+
+export const getWorkshopsData = cache(readWorkshopsData);

@@ -2,12 +2,14 @@ import "server-only";
 
 import path from "node:path";
 
+import { cache } from "react";
+
 import { isFinalizedAdr, listDirectory, newestMtime } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { readMarkdown } from "@/server/parsers/content";
 import { buildAdrGraph } from "@/server/view-models/adr-graph";
 
-export async function getAdrData(projectRoot: string) {
+async function readAdrData(projectRoot: string) {
   const validatedRoot = await validateProjectRoot(projectRoot);
   const decisionsRoot = path.join(validatedRoot, ".ai-state", "decisions");
   const draftsRoot = path.join(decisionsRoot, "drafts");
@@ -37,3 +39,5 @@ export async function getAdrData(projectRoot: string) {
 
   return { dataAsOf, graph, records };
 }
+
+export const getAdrData = cache(readAdrData);

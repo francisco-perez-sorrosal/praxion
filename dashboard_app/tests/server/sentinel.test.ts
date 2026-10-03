@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -272,9 +272,9 @@ describe("parseMetricsLog", () => {
 // ---------------------------------------------------------------------------
 
 describe("reportTimestampFromFileName", () => {
-  it("recovers the UTC instant from the report filename", () => {
+  it("reads the filename stamp as local wall-clock time, never UTC", () => {
     expect(reportTimestampFromFileName("SENTINEL_REPORT_2026-10-01_09-30-00.md")).toBe(
-      "2026-10-01T09:30:00.000Z"
+      new Date(2026, 9, 1, 9, 30, 0).toISOString()
     );
   });
 
@@ -379,15 +379,36 @@ describe("getSentinelData digest fields", () => {
     return root;
   }
 
-  it("derives timestamp, partial mark and not-reached count for each report", async () => {
+  it("derives the partial mark and not-reached count for each report", async () => {
     const { reports } = await getSentinelData(await buildRoot());
 
     expect(reports).toHaveLength(1);
-    expect(reports[0]).toMatchObject({
-      isPartial: true,
-      notReachedCount: 2,
-      reportTimestamp: "2026-10-01T09:30:00.000Z"
-    });
+    expect(reports[0]).toMatchObject({ isPartial: true, notReachedCount: 2 });
+  });
+
+  it("stamps a report with its file's modification time, not the zone-less filename stamp", async () => {
+    const root = await buildRoot();
+    const written = new Date("2026-10-01T19:30:00.000Z");
+    await utimes(
+      path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_REPORT_2026-10-01_09-30-00.md"),
+      written,
+      written
+    );
+
+    const { reports } = await getSentinelData(root);
+
+    expect(reports[0]?.reportTimestamp).toBe(written.toISOString());
+    expect(reports[0]?.reportTimestamp).not.toBe(
+      reportTimestampFromFileName("SENTINEL_REPORT_2026-10-01_09-30-00.md")
+    );
+  });
+
+  it("exposes the log's path so a consumer can stamp its modification time", async () => {
+    const root = await buildRoot();
+
+    const { log } = await getSentinelData(root);
+
+    expect(log?.path).toBe(path.join(root, ".ai-state", "sentinel_reports", "SENTINEL_LOG.md"));
   });
 
   it("reduces a partial run's grade cell to its letter in the log series and the highlight", async () => {

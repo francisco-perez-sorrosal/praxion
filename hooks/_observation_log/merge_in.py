@@ -69,7 +69,21 @@ def merge_worktree_logs(
     """
     mode, _ = resolve_mode(env)
     main = _MainIdentities(main_state_dir)
-    return tuple(_merge_one(main, state_dir, mode) for state_dir in worktree_state_dirs)
+    return tuple(_merge_guarded(main, state_dir, mode) for state_dir in worktree_state_dirs)
+
+
+def holds_log(worktree_state_dir: Path) -> bool:
+    """Whether a merge of this worktree has anything to look at.
+
+    False only when the directory listed cleanly and holds no segment. One that
+    cannot be listed counts as holding a log, so it becomes a ``degraded`` merge
+    with a reason, never a silent skip.
+    """
+    return _has_log(reader.segment_listing(worktree_state_dir, archives=True))
+
+
+def _has_log(listing: reader.SegmentListing) -> bool:
+    return bool(listing.segments) or listing.error is not None
 
 
 class _MainIdentities:
@@ -86,17 +100,36 @@ class _MainIdentities:
         self._read: tuple[set[str], str | None] | None = None
 
     def held(self) -> tuple[set[str], str | None]:
-        """`(identities, None)`, or `(empty, why the main log cannot be trusted)`."""
+        """`(identities, None)`, or `(empty, why the main log cannot be trusted)`.
+
+        A failure to build the index is remembered, so every later worktree is
+        degraded with the same reason instead of repeating a read that failed.
+        """
         if self._read is None:
-            self._read = _identities_held(self.state_dir)
+            try:
+                self._read = _identities_held(self.state_dir)
+            except Exception as exc:  # noqa: BLE001 -- a merge reports a fault, never raises
+                self._read = (set(), _internal_error(exc))
         return self._read
+
+
+def _internal_error(exc: Exception) -> str:
+    return f"internal error: {type(exc).__name__}: {exc}"
+
+
+def _merge_guarded(main: _MainIdentities, worktree_state_dir: Path, mode: Mode) -> MergeReport:
+    """``_merge_one``, with any exception turned into this worktree's own ``degraded`` report."""
+    try:
+        return _merge_one(main, worktree_state_dir, mode)
+    except Exception as exc:  # noqa: BLE001 -- one worktree's fault must not stop the run
+        return _degraded(worktree_state_dir, mode, (_internal_error(exc),))
 
 
 def _merge_one(main: _MainIdentities, worktree_state_dir: Path, mode: Mode) -> MergeReport:
     if mode is Mode.OFF:
         return _settled(worktree_state_dir, mode, RECORDING_OFF)
     listing = reader.segment_listing(worktree_state_dir, archives=True)
-    if not listing.segments:
+    if not _has_log(listing):
         return _settled(worktree_state_dir, mode, NOTHING_TO_MERGE)
     held, main_problem = main.held()
     if main_problem is not None:
@@ -114,11 +147,14 @@ def _merge_one(main: _MainIdentities, worktree_state_dir: Path, mode: Mode) -> M
 def _identities_held(main_state_dir: Path) -> tuple[set[str], str | None]:
     """`(identities of every row the main log holds, None)`, or `(empty, why not)`.
 
-    An unreadable main segment may hold the very rows a copy would duplicate, so
-    one makes the whole merge degraded rather than risk a duplicate.
+    An unreadable main segment, or a main directory that cannot be listed for
+    archives, may hold the very rows a copy would duplicate, so either makes the
+    whole merge degraded rather than risk a duplicate.
     """
     held: set[str] = set()
     listing = reader.segment_listing(main_state_dir, archives=True)
+    if listing.error is not None:
+        return set(), f"the main log cannot be read ({listing.error})"
     for path in listing.segments:
         segment = reader.read_raw_segment(path)
         if segment.error is not None:
@@ -139,6 +175,8 @@ def _walk_worktree(listing: reader.SegmentListing, held: set[str]) -> _Walk:
     skipped = malformed = 0
     unreadable = [str(path) for path in listing.missing]
     reasons = [f"worktree archive is missing ({path})" for path in unreadable]
+    if listing.error is not None:
+        reasons.append(f"worktree log cannot be listed ({listing.error})")
     for path in listing.segments:
         segment = reader.read_raw_segment(path)
         if segment.error is not None:

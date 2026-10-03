@@ -1234,29 +1234,54 @@ def test_a_missing_log_merge_script_is_skipped_without_a_word(tmp_path: Path) ->
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
 
 
-def test_post_merge_copies_a_contained_worktrees_log_once_and_is_silent_after(
+def _record_in_worktree(worktree: Path, *numbers: int) -> None:
+    (worktree / ".ai-state").mkdir(exist_ok=True)
+    rows = "".join(
+        f'{{"event_type": "agent_start", "timestamp": "2026-10-01T00:00:00Z", "n": {n}}}\n'
+        for n in numbers
+    )
+    reader.log_path(worktree / ".ai-state").write_text(rows)
+
+
+def _post_merge(repo: Path, scripts_dir: Path) -> subprocess.CompletedProcess[str]:
+    return _run_chain(
+        cwd=repo, finalize_dir=scripts_dir, entry="finalize_chain_post_merge", git_hook_env=True
+    )
+
+
+def test_post_merge_copies_the_log_of_a_worktree_the_merge_brought_in_once_and_is_silent_after(
     tmp_path: Path,
 ) -> None:
     repo = _repo_on_feature_branch(tmp_path / "repo")
     worktree = tmp_path / "pipeline-wt"
     _git_ok(repo, "worktree", "add", "-q", "-b", "pipeline-wt", str(worktree))
-    (worktree / ".ai-state").mkdir()
-    reader.log_path(worktree / ".ai-state").write_text(
-        '{"event_type": "agent_start", "timestamp": "2026-10-01T00:00:00Z", "n": 1}\n'
-    )
+    _record_in_worktree(worktree, 1)
+    _git_ok(worktree, "commit", "-q", "--allow-empty", "-m", "work in the worktree")
+    _git_ok(repo, "merge", "-q", "--no-ff", "--no-edit", "pipeline-wt")
     scripts_dir = _make_fake_plugin(tmp_path / "plugin")
 
-    def post_merge() -> subprocess.CompletedProcess[str]:
-        return _run_chain(
-            cwd=repo,
-            finalize_dir=scripts_dir,
-            entry="finalize_chain_post_merge",
-            git_hook_env=True,
-        )
-
-    first, second = post_merge(), post_merge()
+    first, second = _post_merge(repo, scripts_dir), _post_merge(repo, scripts_dir)
 
     assert first.returncode == 0, first.stderr
     assert "merge-in pipeline-wt: copied 1" in first.stdout
     assert reader.log_path(repo / ".ai-state").read_text().count("\n") == 1
     assert (second.returncode, "merge-in" in second.stdout) == (0, False)
+
+
+def test_post_merge_leaves_a_running_worktree_with_no_commit_of_its_own_alone(
+    tmp_path: Path,
+) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+    running = tmp_path / "running-wt"
+    _git_ok(repo, "worktree", "add", "-q", "-b", "running-wt", str(running))
+    _record_in_worktree(running, 1)
+    other = tmp_path / "other-wt"
+    _git_ok(repo, "worktree", "add", "-q", "-b", "other-wt", str(other))
+    _git_ok(other, "commit", "-q", "--allow-empty", "-m", "other work")
+    _git_ok(repo, "merge", "-q", "--no-ff", "--no-edit", "other-wt")
+    scripts_dir = _make_fake_plugin(tmp_path / "plugin")
+
+    result = _post_merge(repo, scripts_dir)
+
+    assert (result.returncode, "merge-in" in result.stdout) == (0, False)
+    assert not reader.log_path(repo / ".ai-state").exists()

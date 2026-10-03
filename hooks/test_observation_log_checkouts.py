@@ -193,6 +193,48 @@ def test_a_failure_to_ask_reads_as_not_contained(tmp_path: Path) -> None:
     assert not checkouts.contains(tmp_path, "0" * 40)
 
 
+def test_a_commit_is_contained_within_the_revision_asked_about(main: Path) -> None:
+    before = _git(main, "rev-parse", "HEAD")
+    linked = _add_worktree(main, "pipeline-a")
+    work = _commit(linked, "work")
+    _git(main, "merge", "--no-ff", "-m", "merge", "pipeline-a")
+
+    assert checkouts.contains(main, work, within="HEAD")
+    assert not checkouts.contains(main, work, within=before)
+    assert checkouts.contains(main, before, within=before)
+
+
+def test_a_worktree_with_no_commit_of_its_own_is_contained_in_the_revision_before_the_merge(
+    main: Path,
+) -> None:
+    before = _git(main, "rev-parse", "HEAD")
+    idle = _add_worktree(main, "idle")
+    idle_head = _git(idle, "rev-parse", "HEAD")
+    _commit(main, "later work on main")
+
+    assert checkouts.contains(main, idle_head)
+    assert checkouts.contains(main, idle_head, within=before)
+
+
+def test_a_revision_that_does_not_exist_reads_as_not_containing(main: Path) -> None:
+    assert not checkouts.contains(main, _git(main, "rev-parse", "HEAD"), within="no-such-rev")
+
+
+def test_a_revision_resolves_to_its_commit_in_the_main_checkout(main: Path) -> None:
+    head = _git(main, "rev-parse", "HEAD")
+    _commit(main, "second")
+    _git(main, "reset", "--hard", head)
+
+    assert checkouts.resolve_commit(main, "HEAD") == head
+    assert checkouts.resolve_commit(main, "ORIG_HEAD") != head  # points at "second"
+
+
+def test_a_revision_git_cannot_resolve_gives_none(main: Path, tmp_path: Path) -> None:
+    assert checkouts.resolve_commit(main, "ORIG_HEAD") is None
+    assert checkouts.resolve_commit(main, "no-such-rev") is None
+    assert checkouts.resolve_commit(tmp_path, "HEAD") is None
+
+
 def test_the_hook_hot_path_never_loads_the_modules_that_run_git() -> None:
     script = (
         "import sys\n"

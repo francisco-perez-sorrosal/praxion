@@ -1,7 +1,7 @@
 ---
 description: Merge a worktree branch back into current branch
 argument-hint: "[branch-name]"
-allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Bash(praxion-sidecar:*), Read, Grep]
+allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Bash(command:*), Bash(praxion-sidecar:*), Read, Grep]
 disable-model-invocation: true
 ---
 
@@ -29,9 +29,17 @@ Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is 
 8. Promote any draft ADRs introduced by the merged branch: `python3 scripts/finalize_adrs.py --merged` (command-layer invocation complementing the post-merge git hook — idempotent; no-op when the hook already ran).
 9. Resolve any remaining conflicts based on your knowledge of the changes and continue the merging process.
    Then commit everything the merge left dirty under `.ai-state/` — reconciliation and finalize outputs, the observations-summary tail, the calibration row — as **one** `chore(state)` commit, staged by name. A finalize or ledger migration that surfaces after that commit rides the next state commit rather than getting one of its own.
-9.5. Merge the worktree's observation log into this checkout's log. A worktree's log is deleted with the worktree and git does not carry it, so this is the only point where the spawns, stops and costs it recorded are kept. From the root directory run `python3 scripts/merge_worktree_log.py --worktree "$WORKTREE_PATH"` and report what it prints: rows copied, rows already held (skipped), and malformed lines left behind. Safe to repeat. The exit code decides Step 10:
+9.5. Merge the worktree's observation log into this checkout's log. A worktree's log is deleted with the worktree and git does not carry it, so this is the only point where the spawns, stops and costs it recorded are kept. The script ships with the plugin, so a managed project has no `scripts/merge_worktree_log.py` of its own. Resolve it, trying these in order and taking the first that exists:
+    - `$CLAUDE_PLUGIN_ROOT/scripts/merge_worktree_log.py` (check with `test -f`; skip when `CLAUDE_PLUGIN_ROOT` is unset),
+    - the `PATH` symlink `install_claude.sh` creates: `command -v merge_worktree_log.py`,
+    - `scripts/merge_worktree_log.py` (only exists in Praxion's own checkout).
+
+    When one exists, run it from the root directory: `python3 <resolved path> --worktree "$WORKTREE_PATH"`, and report what it prints: rows copied, rows already held (skipped), and malformed lines left behind. Safe to repeat. The exit code decides Step 10:
     - `0` — merged, nothing to merge (the worktree never recorded), or recording is off. Proceed to Step 10.
-    - `1` — the log could not be merged whole (a segment unreadable or missing, or this checkout's own log unreadable or unwritable). Every row that could be copied was. Show the printed `reason:`, do **not** remove the worktree in Step 10, and tell the user the rows still in the worktree will be lost with it. Offer to re-run once the cause is fixed. Remove the worktree anyway only if the user explicitly chooses to discard those rows.
+    - `1` — the log could not be merged whole (a segment or the worktree's log directory unreadable or missing, this checkout's own log unreadable or unwritable, or an internal error). Every row that could be copied was. Show the printed `reason:`, do **not** remove the worktree in Step 10, and tell the user the rows still in the worktree will be lost with it. Offer to re-run once the cause is fixed. Remove the worktree anyway only if the user explicitly chooses to discard those rows.
     - `2` — input error (not a worktree of this repository, or not inside a repository). Show the message and treat it as exit `1`.
-    A merge made without this command (a plain `git merge`, a pull) does the same for every worktree this checkout contains, from the post-merge hook.
+
+    When **none** of the three exists, the merge-in tool is not installed. That is not an input error and the log has not been merged: tell the user so (reinstall Praxion via `install_claude.sh`), do **not** remove the worktree in Step 10, and say that removing it loses the rows it recorded. Remove it anyway only if the user explicitly chooses to discard them.
+
+    A plain merge or a pull does the same for every worktree that merge brings in, from the post-merge hook; it does not cover a worktree that was already merged, a squash merge, or one with no commits of its own, which is why this step runs on every teardown.
 10. Teardown, once the merge is clean and Step 9.5 allows it (optional — leave the worktree in place if the user wants to keep working in it). Claude Code locks a worktree it opened for the session, and that lock outlives the session, so `git worktree remove "$WORKTREE_PATH"` alone refuses on a still-locked worktree. Check first with `git worktree list --porcelain | grep -A2 "$WORKTREE_PATH"` (a locked entry carries a `locked` line); if locked, run `git worktree unlock "$WORKTREE_PATH"` — `unlock` itself errors on an already-unlocked worktree, so only run it when the check confirms a lock. Then `git worktree remove "$WORKTREE_PATH"`. Under sidecar placement (the same `--print` check from Step 4.5), also run `praxion-sidecar link --prune` afterward — it drops the now-orphaned mount entry the removed worktree left behind in the sidecar; skip it under `placement=in-repo`, where there is no mount to prune.

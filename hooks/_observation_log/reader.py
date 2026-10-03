@@ -40,11 +40,14 @@ SegmentRead = namedtuple("SegmentRead", ("path", "rows", "malformed_lines", "err
 # the object it parses to, never upcast, so a copy is byte-faithful.
 RawSegmentRead = namedtuple("RawSegmentRead", ("path", "entries", "malformed_lines", "error"))
 
-# `(segments, missing)`. `segments` holds the paths that exist: archives by
+# `(segments, missing, error)`. `segments` holds the paths that exist: archives by
 # descending position (oldest first), then the active log. `missing` holds the
 # archive paths absent between position 1 and the highest position present --
-# a gap is history lost, never the end of it. The two never overlap.
-SegmentListing = namedtuple("SegmentListing", ("segments", "missing"))
+# a gap is history lost, never the end of it. The two never overlap. `error` is
+# None, or "unreadable: <state dir>: <why>" when the directory could not be
+# scanned for archives: the listing is then incomplete, which is different from
+# a directory that holds none, and a caller that copies or counts must say so.
+SegmentListing = namedtuple("SegmentListing", ("segments", "missing", "error"), defaults=(None,))
 
 # `row_time` of a row with no readable time: later than any real instant, so a
 # time-ordered sort puts it after the rest. Compare it, never subtract from it.
@@ -65,23 +68,49 @@ def segment_listing(ai_state_dir: Path, *, archives: bool) -> SegmentListing:
     listed, so the hot path and the active-only readers cost what they always
     did. With it True every numbered archive is found by name -- one directory
     scan -- including a position above the retention policy's count.
+
+    A directory that cannot be entered or scanned is never reported as holding
+    no log: the active path stays listed (its read then names the reason) and a
+    failed scan sets ``error``. Only a path that is not there, or is no
+    directory, holds nothing.
     """
     active = log_path(ai_state_dir)
-    newest = (active,) if active.exists() else ()
+    newest = (active,) if _may_exist(active) else ()
     if not archives:
         return SegmentListing(segments=newest, missing=())
-    present = _archives_by_position(ai_state_dir)
+    present, error = _archives_by_position(ai_state_dir)
     if not present:
-        return SegmentListing(segments=newest, missing=())
+        return SegmentListing(segments=newest, missing=(), error=error)
     positions = range(max(present), 0, -1)
     return SegmentListing(
         segments=tuple(present[p] for p in positions if p in present) + newest,
         missing=tuple(retention.archive_path(active, p) for p in positions if p not in present),
+        error=error,
     )
 
 
-def _archives_by_position(ai_state_dir: Path) -> dict[int, Path]:
-    """Every numbered archive of the log in ``ai_state_dir``; empty when it cannot be listed."""
+def _may_exist(path: Path) -> bool:
+    """False only when ``path`` is certainly not there.
+
+    Stats the path itself: ``Path.exists()`` reads a permission error as "not
+    there" from Python 3.14 on, which would turn an unreadable state directory
+    into one with no log.
+    """
+    try:
+        os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _archives_by_position(ai_state_dir: Path) -> tuple[dict[int, Path], str | None]:
+    """`(every numbered archive in ai_state_dir by position, None)`.
+
+    A directory that is not there, or is no directory, has none; any other
+    failure to scan returns what was found (nothing) with the reason.
+    """
     found: dict[int, Path] = {}
     try:
         with os.scandir(ai_state_dir) as entries:
@@ -90,9 +119,11 @@ def _archives_by_position(ai_state_dir: Path) -> dict[int, Path]:
                 position = retention.archive_position(path, LOG_FILENAME)
                 if position is not None:
                     found[position] = path
-    except OSError:
-        return {}
-    return found
+    except (FileNotFoundError, NotADirectoryError):
+        return {}, None
+    except OSError as exc:
+        return {}, f"unreadable: {ai_state_dir}: {exc}"
+    return found, None
 
 
 def segments(ai_state_dir: Path, *, archives: bool) -> tuple[Path, ...]:
@@ -169,7 +200,11 @@ def row_identity(row: dict) -> str:
     one, so a copied row and its original agree.
     """
     canonical = json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    digest = hashlib.blake2b(canonical.encode("utf-8"), digest_size=_IDENTITY_DIGEST_BYTES)
+    # surrogatepass: a row may hold an escaped lone surrogate ("\ud83d" is valid
+    # JSON, and the form json.dumps writes); strict encoding would raise on it.
+    digest = hashlib.blake2b(
+        canonical.encode("utf-8", "surrogatepass"), digest_size=_IDENTITY_DIGEST_BYTES
+    )
     return digest.hexdigest()
 
 

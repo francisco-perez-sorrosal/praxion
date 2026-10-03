@@ -68,14 +68,25 @@ def repository_checkouts(repo_root: Path) -> CheckoutListing:
     return CheckoutListing(checkouts, None)
 
 
-def contains(main_root: Path, commit: str) -> bool:
-    """Whether ``commit`` is part of the history of the HEAD of ``main_root``.
+def contains(main_root: Path, commit: str, *, within: str = "HEAD") -> bool:
+    """Whether ``commit`` is part of the history of ``within`` in ``main_root``.
 
-    A commit git does not know, or a failure to ask, reads as not contained: the
-    caller then leaves that worktree for the explicit merge command.
+    ``within`` is any revision git resolves in that checkout (default: its
+    ``HEAD``). A commit or revision git does not know, or a failure to ask, reads
+    as not contained: the caller then leaves that worktree for the explicit
+    merge command. A caller that asks "not contained in <revision>" must resolve
+    the revision first (``resolve_commit``), or that same answer reads as true.
     """
-    completed, _ = _git(main_root, "merge-base", "--is-ancestor", commit, "HEAD")
+    completed, _ = _git(main_root, "merge-base", "--is-ancestor", commit, within)
     return completed is not None and completed.returncode == 0
+
+
+def resolve_commit(main_root: Path, revision: str) -> str | None:
+    """The commit ``revision`` names in ``main_root``, or None when git cannot say."""
+    completed, _ = _git(main_root, "rev-parse", "--verify", "--quiet", f"{revision}^{{commit}}")
+    if completed is None or completed.returncode != 0:
+        return None
+    return completed.stdout.strip() or None
 
 
 _PorcelainEntry = namedtuple("_PorcelainEntry", ("root", "head", "bare"))

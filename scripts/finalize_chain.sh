@@ -473,15 +473,24 @@ _finalize_chain_state_driven() {
 # /merge-worktree does by hand). A pipeline merged by a plain `git merge` or a
 # pull request leaves its rows in a worktree log that dies with the worktree, so
 # every post-merge in the primary working tree copies the log of each worktree
-# the checkout's HEAD now contains. Idempotent: rows the main log already holds
-# are skipped, so re-running on every merge is safe. Squash merges are not
-# covered -- the squashed commit is not the worktree's HEAD, so it is never
-# "contained".
+# THIS merge brought in: its HEAD is contained in the checkout's HEAD and not in
+# ORIG_HEAD (the state before the merge; the script's default). A worktree with
+# no commit of its own, or one an earlier merge already took in, is never copied
+# here, so a pipeline still running never has half a session copied; teardown
+# through /merge-worktree copies whatever is left. Idempotent: rows the main log
+# already holds are skipped. Squash merges are not covered -- the squashed commit
+# is not the worktree's HEAD.
+#
+# The recording mode is the project's: a git hook does not see the variables the
+# settings files define for a session, so the script reads the two mode keys from
+# this checkout's .claude/settings.local.json over .claude/settings.json when the
+# process defines none. User-scope and managed-policy settings are not read.
 #
 # Gated to keep it a no-op where it has nothing to do: only the primary working
 # tree (a linked worktree's `.git` is a file) owns the main log, and only
 # in-repo placement keeps the log in this checkout. Where no linked worktree
-# holds a log it costs one `git worktree list`, and prints nothing.
+# holds a log it costs one `git worktree list` and a scan per worktree, and
+# prints nothing.
 #
 # Non-blocking whatever FINALIZE_CHAIN_STRICT says: a log that cannot be merged
 # is reported by the script and must never fail the merge that has already
@@ -500,7 +509,7 @@ _finalize_chain_merge_worktree_logs() {
 # Sequence (load-bearing):
 #   0. broken-Block-D hook repair               — branch-independent backstop
 #   1. reconcile_ai_state.py --post-merge      — only if .ai-state/ was touched
-#   1.5. merge worktree observation logs        — primary working tree, in-repo only
+#   1.5. merge logs of the worktrees this merge brought in — primary working tree, in-repo only
 #   2. finalize on main (ADR if drafts; ledger always) — only on main
 #   3. check_squash_safety.py                   — diagnostic, always runs
 #

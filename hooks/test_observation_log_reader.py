@@ -190,6 +190,61 @@ def test_a_state_directory_that_cannot_be_listed_has_no_archives(tmp_path: Path)
     assert listing == SegmentListing(segments=(), missing=())
 
 
+def test_a_listing_that_met_no_error_carries_none(tmp_path: Path) -> None:
+    _touch(tmp_path, LOG_FILENAME, f"{LOG_FILENAME}.1")
+
+    assert segment_listing(tmp_path, archives=True).error is None
+    assert segment_listing(tmp_path, archives=False).error is None
+    assert segment_listing(tmp_path / "absent", archives=True).error is None
+
+
+def test_a_state_path_that_is_a_file_holds_no_log_and_is_not_an_error(tmp_path: Path) -> None:
+    not_a_directory = tmp_path / "state"
+    not_a_directory.write_text("x")
+
+    assert segment_listing(not_a_directory, archives=True) == SegmentListing((), ())
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any directory")
+def test_a_state_directory_nobody_may_enter_is_an_error_never_no_log(tmp_path: Path) -> None:
+    state = tmp_path / ".ai-state"
+    state.mkdir()
+    (state / LOG_FILENAME).write_text("{}\n")
+    state.chmod(0o000)
+    try:
+        listing = segment_listing(state, archives=True)
+        read = read_raw_segment(state / LOG_FILENAME)
+    finally:
+        state.chmod(0o755)
+
+    assert listing.segments == (state / LOG_FILENAME,)
+    assert listing.error is not None
+    assert str(state) in listing.error
+    assert listing.error.startswith("unreadable: ")
+    assert read.error is not None
+    assert read.error.startswith("unreadable: ")
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any directory")
+def test_a_state_directory_that_can_be_entered_but_not_listed_names_the_error(
+    tmp_path: Path,
+) -> None:
+    state = tmp_path / ".ai-state"
+    state.mkdir()
+    (state / LOG_FILENAME).write_text("{}\n")
+    state.chmod(0o111)
+    try:
+        listing = segment_listing(state, archives=True)
+        without_archives = segment_listing(state, archives=False)
+    finally:
+        state.chmod(0o755)
+
+    assert listing.segments == (state / LOG_FILENAME,)
+    assert listing.error is not None
+    assert str(state) in listing.error
+    assert without_archives == SegmentListing((state / LOG_FILENAME,), ())
+
+
 def test_segments_is_the_listing_without_the_gaps(tmp_path: Path) -> None:
     _touch(tmp_path, LOG_FILENAME, f"{LOG_FILENAME}.1", f"{LOG_FILENAME}.3")
 
@@ -281,6 +336,23 @@ def test_identity_is_a_128_bit_hex_digest() -> None:
 
 def test_identity_is_stable_for_non_ascii_text() -> None:
     row = {"summary": "café ☃"}
+
+    assert row_identity(row) == row_identity(json.loads(json.dumps(row)))
+
+
+def test_a_row_holding_an_escaped_lone_surrogate_has_an_identity() -> None:
+    row = json.loads('{"summary": "half \\ud83d pair"}')
+
+    assert len(row_identity(row)) == 32
+    assert row_identity(row) != row_identity({"summary": "half  pair"})
+
+
+def test_an_escaped_lone_surrogate_row_read_from_a_segment_has_a_stable_identity(
+    tmp_path: Path,
+) -> None:
+    path = _segment(tmp_path, b'{"summary": "half \\ud83d pair"}\n')
+
+    ((_, row),) = read_raw_segment(path).entries
 
     assert row_identity(row) == row_identity(json.loads(json.dumps(row)))
 

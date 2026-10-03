@@ -502,3 +502,179 @@ def test_a_row_a_failed_append_never_landed_is_still_copied_from_the_next_worktr
     assert (first_report.outcome, first_report.copied) == (DEGRADED, 1)
     assert (second_report.outcome, second_report.copied, second_report.skipped) == (MERGED, 1, 0)
     assert sorted(row["n"] for row in _history(main_state)) == [1, 2]
+
+
+# -- a worktree that cannot be read, or holds a row that cannot be handled ---------------------
+
+
+def _unlistable(state: Path):
+    """A state directory that can be entered but not listed (never for root)."""
+    state.chmod(0o111)
+    return lambda: state.chmod(0o755)
+
+
+needs_permissions = pytest.mark.skipif(
+    os.geteuid() == 0, reason="root reads any directory, so nothing here is unreadable"
+)
+
+
+def test_a_worktree_holds_a_log_exactly_when_it_has_a_segment(
+    worktree_state: Path, tmp_path: Path
+) -> None:
+    assert not merge_in.holds_log(tmp_path / "absent" / ".ai-state")
+    worktree_state.mkdir(parents=True)
+    assert not merge_in.holds_log(worktree_state)
+    (worktree_state / "notes.txt").write_text("x")
+    assert not merge_in.holds_log(worktree_state)
+
+    _seed(worktree_state, [])
+
+    assert merge_in.holds_log(worktree_state)
+
+
+def test_a_worktree_holding_only_an_archive_holds_a_log(worktree_state: Path) -> None:
+    worktree_state.mkdir(parents=True)
+    archive_path(reader.log_path(worktree_state), 1).write_bytes(_lines([_row(1)]))
+
+    assert merge_in.holds_log(worktree_state)
+
+
+@needs_permissions
+def test_a_worktree_that_cannot_be_listed_is_taken_to_hold_a_log(worktree_state: Path) -> None:
+    _seed(worktree_state, [_row(1)])
+    worktree_state.chmod(0o000)
+    try:
+        assert merge_in.holds_log(worktree_state)
+    finally:
+        worktree_state.chmod(0o755)
+
+
+@needs_permissions
+def test_a_worktree_directory_nobody_may_enter_is_degraded_with_a_reason_never_no_log(
+    main_state: Path, worktree_state: Path
+) -> None:
+    _seed(main_state, [_row(1)])
+    _seed(worktree_state, [_row(2)])
+    worktree_state.chmod(0o000)
+    try:
+        report = _merge(main_state, worktree_state)
+    finally:
+        worktree_state.chmod(0o755)
+
+    assert report.outcome == DEGRADED
+    assert str(worktree_state) in report.reason
+    assert _history(main_state) == [_row(1)]
+    assert _history(worktree_state) == [_row(2)]
+
+
+@needs_permissions
+def test_a_worktree_directory_that_cannot_be_listed_still_copies_its_readable_log(
+    main_state: Path, worktree_state: Path
+) -> None:
+    _seed(main_state, [])
+    _seed(worktree_state, [_row(2)])
+    restore = _unlistable(worktree_state)
+    try:
+        report = _merge(main_state, worktree_state)
+    finally:
+        restore()
+
+    assert (report.outcome, report.copied) == (DEGRADED, 1)
+    assert str(worktree_state) in report.reason
+    assert _history(main_state) == [_row(2)]
+
+
+@needs_permissions
+def test_a_main_directory_that_cannot_be_listed_copies_nothing_and_names_it(
+    main_state: Path, worktree_state: Path
+) -> None:
+    _seed(main_state, [_row(1)])
+    _seed(worktree_state, [_row(2)])
+    restore = _unlistable(main_state)
+    try:
+        report = _merge(main_state, worktree_state)
+    finally:
+        restore()
+
+    assert (report.outcome, report.copied) == (DEGRADED, 0)
+    assert str(main_state) in report.reason
+    assert _history(main_state) == [_row(1)]
+
+
+@needs_permissions
+def test_one_unreadable_worktree_never_stops_the_others(main_state: Path, tmp_path: Path) -> None:
+    _seed(main_state, [_row(1)])
+    bad, good = tmp_path / "bad" / ".ai-state", tmp_path / "good" / ".ai-state"
+    _seed(bad, [_row(2)])
+    _seed(good, [_row(3)])
+    bad.chmod(0o000)
+    try:
+        bad_report, good_report = _merge_all(main_state, [bad, good])
+    finally:
+        bad.chmod(0o755)
+
+    assert (bad_report.outcome, good_report.outcome) == (DEGRADED, MERGED)
+    assert sorted(row["n"] for row in _history(main_state)) == [1, 3]
+
+
+def test_a_row_with_an_escaped_lone_surrogate_is_copied_once(
+    main_state: Path, worktree_state: Path
+) -> None:
+    surrogate_row = '{"event_type": "agent_start", "n": 7, "text": "half \\ud83d pair"}\n'
+    _seed(main_state, [_row(1)])
+    worktree_state.mkdir(parents=True)
+    reader.log_path(worktree_state).write_text(surrogate_row, encoding="utf-8")
+
+    first, again = _merge(main_state, worktree_state), _merge(main_state, worktree_state)
+
+    assert [(r.outcome, r.copied, r.skipped) for r in (first, again)] == [
+        (MERGED, 1, 0),
+        (MERGED, 0, 1),
+    ]
+    assert reader.log_path(main_state).read_text(encoding="utf-8").count("ud83d") == 1
+
+
+def test_an_exception_in_one_worktree_degrades_it_and_the_run_goes_on(
+    main_state: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(main_state, [_row(1)])
+    first, second = tmp_path / "first" / ".ai-state", tmp_path / "second" / ".ai-state"
+    _seed(first, [_row(2)])
+    _seed(second, [_row(3)])
+    real = merge_in._walk_worktree
+
+    def explodes_for_the_first(listing, held):
+        if first in {path.parent for path in listing.segments}:
+            raise RuntimeError("boom")
+        return real(listing, held)
+
+    monkeypatch.setattr(merge_in, "_walk_worktree", explodes_for_the_first)
+
+    first_report, second_report = _merge_all(main_state, [first, second])
+
+    assert first_report.outcome == DEGRADED
+    assert first_report.reason == "internal error: RuntimeError: boom"
+    assert (second_report.outcome, second_report.copied) == (MERGED, 1)
+
+
+def test_an_exception_building_the_main_index_degrades_every_worktree_that_holds_a_log(
+    main_state: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(main_state, [_row(1)])
+    first, second = tmp_path / "first" / ".ai-state", tmp_path / "second" / ".ai-state"
+    _seed(first, [_row(2)])
+    _seed(second, [_row(3)])
+    reads = []
+
+    def explodes(state):
+        reads.append(state)
+        raise ValueError("bad index")
+
+    monkeypatch.setattr(merge_in, "_identities_held", explodes)
+
+    reports = _merge_all(main_state, [tmp_path / "none" / ".ai-state", first, second])
+
+    assert [r.outcome for r in reports] == [NOTHING_TO_MERGE, DEGRADED, DEGRADED]
+    assert all("internal error: ValueError: bad index" in r.reason for r in reports[1:])
+    assert reads == [main_state]  # the failure is remembered, not retried per worktree
+    assert _history(main_state) == [_row(1)]

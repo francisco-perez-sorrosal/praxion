@@ -1,3 +1,4 @@
+import { SectionCard } from "@/components/chrome/section-card";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownSurface } from "@/components/markdown-surface";
 import { PageShell } from "@/components/page-shell";
@@ -18,7 +19,7 @@ export default async function RoadmapPage() {
   return (
     <PageShell
       title="Roadmap"
-      // TODO: thread artifact mtime through the view-model for the "data as of" stamp
+      dataAsOf={roadmap?.dataAsOf}
       sourcesContent={sources}
     >
       <p className="page-intro__lede muted">
@@ -32,9 +33,9 @@ export default async function RoadmapPage() {
           body="Generate `ROADMAP.md` for the target project to surface long-horizon direction here."
         />
       ) : (
-        <article className="artifact-card">
+        <SectionCard title="ROADMAP.md">
           <MarkdownSurface body={roadmap.body} />
-        </article>
+        </SectionCard>
       )}
     </PageShell>
   );

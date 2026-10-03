@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { PageShell } from "@/components/page-shell";
 import { getConfig } from "@/lib/config";
+import { newestOf } from "@/lib/tone";
 import {
   getDocumentationData,
   getDocumentationSurfaceData
@@ -40,7 +41,11 @@ export default async function DocumentationPage({
   );
 
   return (
-    <PageShell title="Documentation" sourcesContent={sources}>
+    <PageShell
+      title="Documentation"
+      dataAsOf={newestOf([data.dataAsOf, selectedSurfaceData?.dataAsOf])}
+      sourcesContent={sources}
+    >
       <p className="page-intro__lede muted">
         Live rendering of documentation surfaces discovered through the generated doc manifest.
       </p>

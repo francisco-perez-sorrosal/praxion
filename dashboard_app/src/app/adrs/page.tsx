@@ -9,7 +9,7 @@ import { AdrGraphClient } from "./adr-graph-client";
 
 export default async function AdrsPage() {
   const cfg = getConfig();
-  const { records: adrs, graph } = await getAdrData(cfg.projectRoot);
+  const { dataAsOf, records: adrs, graph } = await getAdrData(cfg.projectRoot);
 
   const sources = (
     <>
@@ -23,6 +23,7 @@ export default async function AdrsPage() {
   return (
     <PageShell
       title="ADRs"
+      dataAsOf={dataAsOf}
       sourcesContent={sources}
     >
       <p className="page-intro__lede muted">

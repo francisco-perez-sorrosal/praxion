@@ -7,12 +7,14 @@ import {
   assertContainedProjectPath,
   validateProjectRoot
 } from "@/server/artifacts/project-root";
-import { readText } from "@/server/artifacts/files";
+import { fileMtime, readText } from "@/server/artifacts/files";
 import { readJson, readMarkdown, readYaml } from "@/server/parsers/content";
 import type { ManifestGroup, ManifestSurface } from "@/server/types";
 
 export type DocumentationSurfaceData = {
   body: string | null;
+  /** ISO modification time of the surface file; null when it could not be resolved. */
+  dataAsOf: string | null;
   errorMessage: string | null;
   path: string;
   renderMode: "api" | "code" | "error" | "markdown" | "unsupported";
@@ -94,6 +96,7 @@ export async function getDocumentationData(projectRoot: string) {
   }
 
   return {
+    dataAsOf: await fileMtime(manifestPath),
     groups: manifest.groups ?? [],
     manifestPath,
     surfaces: manifest.surfaces ?? []
@@ -112,6 +115,7 @@ export async function getDocumentationSurfaceData(
       path.join(validatedRoot, surface.path)
     );
     assertAllowedDocSurface(validatedRoot, absolutePath);
+    const dataAsOf = await fileMtime(absolutePath);
 
     // API-reference surfaces route through the registry regardless of `type`
     // (yaml/json/graphql): the raw spec text is read server-side and handed to
@@ -121,6 +125,7 @@ export async function getDocumentationSurfaceData(
       const text = await readText(absolutePath);
       return {
         body: text,
+        dataAsOf,
         errorMessage: text === null ? "Unreadable file." : null,
         path: absolutePath,
         renderMode: "api",
@@ -132,6 +137,7 @@ export async function getDocumentationSurfaceData(
       const file = await readMarkdown(absolutePath);
       return {
         body: file?.body ?? null,
+        dataAsOf,
         errorMessage: file ? null : "Unreadable file.",
         path: absolutePath,
         renderMode: "markdown",
@@ -143,6 +149,7 @@ export async function getDocumentationSurfaceData(
       const value = await readJson<Record<string, unknown>>(absolutePath);
       return {
         body: value === null ? null : JSON.stringify(value, null, 2),
+        dataAsOf,
         errorMessage: value === null ? "Unreadable file." : null,
         path: absolutePath,
         renderMode: "code",
@@ -154,6 +161,7 @@ export async function getDocumentationSurfaceData(
       const value = await readYaml<Record<string, unknown>>(absolutePath);
       return {
         body: value === null ? null : JSON.stringify(value, null, 2),
+        dataAsOf,
         errorMessage: value === null ? "Unreadable file." : null,
         path: absolutePath,
         renderMode: "code",
@@ -163,6 +171,7 @@ export async function getDocumentationSurfaceData(
 
     return {
       body: null,
+      dataAsOf,
       errorMessage: `Unsupported surface type for this slice: ${surface.type}`,
       path: absolutePath,
       renderMode: "unsupported",
@@ -171,6 +180,7 @@ export async function getDocumentationSurfaceData(
   } catch (error) {
     return {
       body: null,
+      dataAsOf: null,
       errorMessage:
         error instanceof Error ? error.message : "Surface path could not be resolved.",
       path: surface.path,

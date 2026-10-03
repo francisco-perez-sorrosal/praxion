@@ -2,7 +2,7 @@ import "server-only";
 
 import path from "node:path";
 
-import { isFinalizedAdr, listDirectory } from "@/server/artifacts/files";
+import { isFinalizedAdr, listDirectory, newestMtime } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { readMarkdown } from "@/server/parsers/content";
 import { buildAdrGraph } from "@/server/view-models/adr-graph";
@@ -33,6 +33,7 @@ export async function getAdrData(projectRoot: string) {
   ).filter((record) => record !== null);
 
   const graph = buildAdrGraph(records);
+  const dataAsOf = await newestMtime(records.map((record) => record.path));
 
-  return { records, graph };
+  return { dataAsOf, graph, records };
 }

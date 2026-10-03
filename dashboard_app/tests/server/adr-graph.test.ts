@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
+import { afterEach, describe, expect, it } from "vitest";
+
+import { getAdrData } from "@/server/view-models/adrs";
 import { buildAdrGraph } from "@/server/view-models/adr-graph";
 import {
   assignCoordinates,
@@ -365,5 +370,42 @@ describe("assignCoordinates", () => {
 
     expect(layout.width).toBeGreaterThan(0);
     expect(layout.height).toBeGreaterThan(0);
+  });
+});
+
+// ─── getAdrData dataAsOf ──────────────────────────────────────────────────────
+
+describe("getAdrData dataAsOf", () => {
+  const roots: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
+  });
+
+  async function seedRoot(): Promise<string> {
+    const root = await mkdtemp(path.join(os.tmpdir(), "dashboard-adrs-asof-"));
+    roots.push(root);
+    await mkdir(path.join(root, ".ai-state", "decisions", "drafts"), { recursive: true });
+    await mkdir(path.join(root, ".ai-work"), { recursive: true });
+    return root;
+  }
+
+  async function writeAt(target: string, at: string) {
+    await writeFile(target, "---\nid: dec-001\n---\n# ADR\n");
+    await utimes(target, new Date(at), new Date(at));
+  }
+
+  it("is the newest record file, drafts included", async () => {
+    const root = await seedRoot();
+    const decisions = path.join(root, ".ai-state", "decisions");
+    await writeAt(path.join(decisions, "001-first.md"), "2026-09-01T00:00:00Z");
+    await writeAt(path.join(decisions, "002-second.md"), "2026-09-05T00:00:00Z");
+    await writeAt(path.join(decisions, "drafts", "20260906-draft.md"), "2026-09-06T00:00:00Z");
+
+    expect((await getAdrData(root)).dataAsOf).toBe("2026-09-06T00:00:00.000Z");
+  });
+
+  it("is null when there are no records", async () => {
+    expect((await getAdrData(await seedRoot())).dataAsOf).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import path from "node:path";
 import { ArtifactCard } from "@/components/artifact-card";
 import { Chip } from "@/components/chrome/chip";
 import { ErrorState } from "@/components/chrome/error-state";
+import { SectionCard } from "@/components/chrome/section-card";
 import { EducationalPopover } from "@/components/educational-popover";
 import { EmptyState } from "@/components/empty-state";
 import { MarkdownSurface } from "@/components/markdown-surface";
@@ -120,14 +121,10 @@ export default async function ArchitecturePage() {
   const hasDiagrams = diagramCount > 0;
   const hasAacRegions = data.regions.length > 0;
 
-  // The view-model does not currently expose mtime; pass null and let the
-  // AppHeader omit the stamp. A follow-up can wire mtime into MarkdownFile.
-  const dataAsOf = null;
-
   return (
     <PageShell
       title="Architecture"
-      dataAsOf={dataAsOf}
+      dataAsOf={data.dataAsOf}
       sourcesContent={<SourceContract hasDiagrams={hasDiagrams} />}
     >
       <p className="page-intro__lede">
@@ -142,13 +139,10 @@ export default async function ArchitecturePage() {
 
       {/* ── Row 1: Diagrams (full width) ────────────────────────────────── */}
       {hasDiagrams && (
-        <section className="section-card">
-          <h3>
-            Diagrams
-            <span className="section-card__meta">
-              {" "}· {diagramCount} {diagramCount === 1 ? "diagram" : "diagrams"}
-            </span>
-          </h3>
+        <SectionCard
+          title="Diagrams"
+          subtitle={`${diagramCount} ${diagramCount === 1 ? "diagram" : "diagrams"}`}
+        >
           <div className="architecture-diagrams">
             {sortedDiagrams.map((diagram, index) => {
               if (diagram.markup === null) {
@@ -166,7 +160,7 @@ export default async function ArchitecturePage() {
               );
             })}
           </div>
-        </section>
+        </SectionCard>
       )}
 
       {/* ── Row 2: Two-column (Component index + docs) ──────────────────── */}

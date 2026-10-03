@@ -84,6 +84,7 @@ const GUIDE_SURFACE = surface({ id: "guide", title: "Guide" });
 function surfaceData(overrides: Partial<DocumentationSurfaceData> & { surface: ManifestSurface }): DocumentationSurfaceData {
   return {
     body: "fallback body",
+    dataAsOf: null,
     errorMessage: null,
     path: `/fake-project/${overrides.surface.path}`,
     renderMode: "markdown",
@@ -431,5 +432,50 @@ describe("DocumentationPage — renderMode 'unsupported' and 'error'", () => {
     const html = await renderPage();
 
     expect(html).toContain("Surface path could not be resolved.");
+  });
+});
+
+// ─── DocumentationPage — the data-as-of stamp ────────────────────────────────
+
+describe("DocumentationPage — data as of", () => {
+  const MANIFEST_AT = "2026-09-01T10:00:00.000Z";
+  const SURFACE_AT = "2026-09-08T10:00:00.000Z";
+
+  async function seedManifest(dataAsOf: string | null) {
+    const getDocumentationData = await getMockedGetDocumentationData();
+    getDocumentationData.mockResolvedValue({
+      dataAsOf,
+      groups: [],
+      manifestPath: "/fake-project/.ai-state/doc_manifest.yaml",
+      surfaces: [README_SURFACE]
+    });
+  }
+
+  async function seedSurface(dataAsOf: string | null) {
+    const getDocumentationSurfaceData = await getMockedGetDocumentationSurfaceData();
+    getDocumentationSurfaceData.mockResolvedValue(
+      surfaceData({ dataAsOf, surface: README_SURFACE })
+    );
+  }
+
+  it("stamps the newer of the manifest and the selected surface", async () => {
+    await seedManifest(MANIFEST_AT);
+    await seedSurface(SURFACE_AT);
+
+    expect(await renderPage()).toContain(`<time dateTime="${SURFACE_AT}">`);
+  });
+
+  it("stamps the manifest when the selected surface has no modification time", async () => {
+    await seedManifest(MANIFEST_AT);
+    await seedSurface(null);
+
+    expect(await renderPage()).toContain(`<time dateTime="${MANIFEST_AT}">`);
+  });
+
+  it("omits the stamp when nothing was read", async () => {
+    await seedManifest(null);
+    await seedSurface(null);
+
+    expect(await renderPage()).not.toContain("data as of");
   });
 });

@@ -2,7 +2,7 @@ import "server-only";
 
 import path from "node:path";
 
-import { readText, walkRenderedSvgs } from "@/server/artifacts/files";
+import { newestMtime, readText, walkRenderedSvgs } from "@/server/artifacts/files";
 import { assertAllowedArtifactPath, validateProjectRoot } from "@/server/artifacts/project-root";
 import { sanitizeSvg } from "@/server/diagrams/sanitize";
 import { normalizeSvg } from "@/server/diagrams/normalize-svg";
@@ -46,6 +46,7 @@ export async function getArchitectureData(projectRoot: string) {
   ).filter((diagram) => diagram.markup);
 
   const regions = rewrittenDesign ? splitAacRegions(rewrittenDesign.body) : [];
+  const dataAsOf = await newestMtime([designPath, guidePath, ...diagramPaths]);
 
-  return { design: rewrittenDesign, diagrams, guide: rewrittenGuide, regions };
+  return { dataAsOf, design: rewrittenDesign, diagrams, guide: rewrittenGuide, regions };
 }

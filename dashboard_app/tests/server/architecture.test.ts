@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -87,5 +87,41 @@ describe("getArchitectureData", () => {
     expect(diagram?.markup).not.toMatch(/\bheight="\d+"/);
     // The inline max-width declaration must be gone.
     expect(diagram?.markup).not.toMatch(/max-width/i);
+  });
+});
+
+describe("getArchitectureData dataAsOf", () => {
+  const stamp = (iso: string) => new Date(iso);
+
+  async function seed(prefix: string) {
+    const root = await createTempProjectRoot(prefix);
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(path.join(root, ".ai-work"), { recursive: true });
+    await mkdir(path.join(root, "docs", "diagrams", "rendered"), { recursive: true });
+    return root;
+  }
+
+  async function writeAt(target: string, body: string, at: Date) {
+    await writeFile(target, body);
+    await utimes(target, at, at);
+  }
+
+  it("is the newest of the design, the guide and the rendered diagrams", async () => {
+    const root = await seed("dashboard-architecture-asof-");
+    await writeAt(path.join(root, ".ai-state", "DESIGN.md"), "# Design\n", stamp("2026-09-01T00:00:00Z"));
+    await writeAt(path.join(root, "docs", "architecture.md"), "# Guide\n", stamp("2026-09-02T00:00:00Z"));
+    await writeAt(
+      path.join(root, "docs", "diagrams", "rendered", "system.svg"),
+      "<svg><title>System</title></svg>",
+      stamp("2026-09-03T00:00:00Z")
+    );
+
+    expect((await getArchitectureData(root)).dataAsOf).toBe("2026-09-03T00:00:00.000Z");
+  });
+
+  it("is null when no architecture artifact exists", async () => {
+    const root = await seed("dashboard-architecture-asof-empty-");
+
+    expect((await getArchitectureData(root)).dataAsOf).toBeNull();
   });
 });

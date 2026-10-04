@@ -234,7 +234,7 @@ def publish(built: Path, rendered: Path) -> None:
 
 def staged_roots(roots: Sequence[Path]) -> list[Path]:
     """The roots with a staged `.c4` source change, found through git."""
-    top = Path(_git(["rev-parse", "--show-toplevel"], Path.cwd()).strip())
+    top = _toplevel()
     names = _git(list(STAGED_CHANGES), top).split("\0")
     staged = [(top / name).resolve() for name in names if name.endswith(".c4")]
     return [root for root in roots if _holds_any(root.resolve() / SOURCE_DIR, staged)]
@@ -245,19 +245,44 @@ def _holds_any(directory: Path, paths: Sequence[Path]) -> bool:
 
 
 def stage(rendered: Path) -> None:
-    """`git add` the render directory, so refreshed and pruned renders join the commit."""
-    top = Path(_git(["rev-parse", "--show-toplevel"], rendered.parent).strip())
+    """`git add` the render directory from the work tree's top, so refreshed and pruned renders join the commit.
+
+    Git exports `GIT_DIR` to hook processes, and a git call made from a subdirectory with
+    `GIT_DIR` set and no `GIT_WORK_TREE` treats that subdirectory as the work tree. The
+    pathspec is therefore given relative to the top and the call is made from the top.
+    """
+    top = _toplevel()
+    target = rendered.resolve().relative_to(top)
     done = subprocess.run(
-        ["git", "add", "--", str(rendered.resolve())], cwd=top, capture_output=True, text=True
+        ["git", "add", "--", str(target)],
+        cwd=top,
+        env=_git_env(top),
+        capture_output=True,
+        text=True,
     )
     if done.returncode != 0:
         raise _toolchain_error(
-            str(rendered), ["git", "add", str(rendered)], "failed", done.stderr.strip()
+            str(rendered), ["git", "add", str(target)], "failed", done.stderr.strip()
         )
 
 
+def _toplevel() -> Path:
+    """The work tree's top, read from the process directory (a hook runs from the top)."""
+    return Path(_git(["rev-parse", "--show-toplevel"], Path.cwd()).strip()).resolve()
+
+
+def _git_env(work_tree: Path) -> dict[str, str]:
+    """The process environment with the work tree made explicit when a hook exported `GIT_DIR`."""
+    env = dict(os.environ)
+    if "GIT_DIR" in env and "GIT_WORK_TREE" not in env:
+        env["GIT_WORK_TREE"] = str(work_tree)
+    return env
+
+
 def _git(args: Sequence[str], cwd: Path) -> str:
-    done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    done = subprocess.run(
+        ["git", *args], cwd=cwd, env=_git_env(cwd), capture_output=True, text=True
+    )
     if done.returncode != 0:
         raise UsageError(f"git {' '.join(args)} failed in {cwd}: {done.stderr.strip()}")
     return done.stdout

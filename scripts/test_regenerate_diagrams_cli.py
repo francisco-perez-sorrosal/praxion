@@ -541,6 +541,25 @@ def test_staged_regenerates_only_the_roots_with_a_staged_source_and_stages_them(
     assert not (repo / SECOND / "rendered").exists()
 
 
+def test_staged_inside_a_git_hook_environment_stages_paths_from_the_work_tree_top(
+    go, tools, repo, monkeypatch
+):
+    """Git exports GIT_DIR to hooks; a git call from a subdirectory would then treat it as the tree."""
+    stage_model_change(repo)
+    monkeypatch.setenv("GIT_DIR", str(repo / ".git"))
+    monkeypatch.delenv("GIT_WORK_TREE", raising=False)
+
+    code, _, _ = go("--staged")
+
+    assert code == 0
+    added = set(staged(repo, "--diff-filter=A"))
+    assert added == {
+        f"{ARCH}/rendered/{name}"
+        for name in ("index.d2", "index.svg", "structure.d2", "structure.svg")
+    }
+    assert not any(name.startswith("rendered/") for name in added)
+
+
 def test_staged_with_nothing_staged_runs_no_tool(go, tools, repo):
     assert go("--staged")[0] == 0
     assert tools.calls == []

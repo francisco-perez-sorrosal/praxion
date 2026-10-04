@@ -45,6 +45,7 @@ What git does, probed on git 2.44.0 in scratch repositories on 2026-10-03:
 - `git commit --amend` runs `post-commit` (an amended merge commit is again a merge commit) and then `post-rewrite amend`.
 - `git merge` itself runs only `post-merge`.
 - `git rebase --abort` runs no `post-rewrite`.
+- A rebase that rewrites no commit runs no `post-rewrite` either, and no `post-merge` or `post-commit`: a fast-forward by `git rebase` (either backend, `--force-rebase` included), a `git rebase` or `git pull --rebase` whose every local commit is already upstream and dropped, and an interactive rebase that drops every commit run only `pre-rebase` and a detached `post-checkout` before the branch moves. `git pull --rebase` with no local commits fast-forwards through `post-merge`.
 
 The finalize hook names lived in five independent copies: the reconciler's constant, the pin upgrade's array, the pin upgrade's manifest list, Praxion's own install lines, and the dispatcher's case arms.
 
@@ -70,7 +71,7 @@ The finalize hook names lived in five independent copies: the reconciler's const
    - The dispatcher arms, the pin upgrade's array and manifest list, Praxion's own install lines and the onboarding manifest example mirror it.
    - A parity unit test, `scripts/test_finalize_hook_names.py`, fails naming any stale mirror.
    - The reconciler, its SessionStart heal and the chaining wrapper already iterate the constant. The wrapper passes stdin to a chained foreign hook unchanged.
-5. **Every text that declared the gap** now states the coverage and the one remaining limit, the squash merge: `.ai-state/DESIGN.md`, `/merge-worktree` step 9.5, the chain's step description, the CLI's docstring and the architecture guide. Every enumeration of the finalize hooks lists four.
+5. **Every text that declared the gap** now states the coverage and the two remaining limits, both left to step 9.5 and P14: a squash merge (or another landing of copies) and a rebase that rewrites no commit. The texts are `.ai-state/DESIGN.md`, `/merge-worktree` step 9.5, the chain's step description, the CLI's docstring and the architecture guide. Every enumeration of the finalize hooks lists four.
 
 What changed, for the `architectural` test:
 
@@ -118,7 +119,7 @@ Activation: fired.
 
 **Positive**
 
-- A merge finished by `git commit` or `git merge --continue` after a conflict or `--no-commit` merges in its worktrees at that commit. So does a rebase that brings worktrees in, `git pull --rebase` included. The rows no longer depend on `/merge-worktree` running before `git worktree remove`.
+- A merge finished by `git commit` or `git merge --continue` after a conflict or `--no-commit` merges in its worktrees at that commit. So does a rebase that rewrites at least one commit and brings worktrees in, `git pull --rebase` over local commits included; a `git pull --rebase` with no local commits fast-forwards through `post-merge`, which already merged in. For these, the rows no longer depend on `/merge-worktree` running before `git worktree remove`.
 - Each row is still copied once: whole-row identity makes a second step seeing one merge a no-op, and `git merge` still runs merge-in once.
 - An unresolvable before-revision is told apart from a fault.
 - A future finalize hook is a one-line change in the owner plus a red parity test naming every stale mirror.
@@ -131,7 +132,8 @@ Activation: fired.
   - Until then, a rebasing pull in that project stays covered as before: by step 9.5 and P14.
   - The release notes name both.
 - **Cost.** Every commit in every onboarded project pays one more git query (the parent count). A merge commit finished by a commit pays two, plus the merge-in a plain merge already pays. A finished rebase pays one placement resolution plus merge-in.
-- **The squash merge stays the named limit.** The squashed commit is not the worktree's `HEAD`, so no hook can recognise that the worktree was merged. `/merge-worktree` step 9.5 and P14 remain its coverage, and worktrees discarded with `ExitWorktree` remove still lose their rows.
+- **The squash merge stays a named limit.** The squashed commit is not the worktree's `HEAD`, so no hook can recognise that the worktree was merged; the same holds for any landing of copies (a cherry-pick, a server-side rebase merge). `/merge-worktree` step 9.5 and P14 remain its coverage, and worktrees discarded with `ExitWorktree` remove still lose their rows.
+- **A rebase that rewrites no commit is a second named limit.** git runs `post-rewrite` only for a non-empty rewrite list, so a fast-forward by `git rebase` (`git fetch` then `git rebase origin/main` with no local commits), a `git rebase` or `git pull --rebase` whose every local commit is already upstream and dropped, and an interactive rebase that drops every commit move the branch with only `pre-rebase` and a detached `post-checkout` run, both before it moves (probe, git 2.44.0). Such a rebase can bring a worktree in with no merge-in; step 9.5 and P14 cover it as they cover the squash merge. No hook closes it at acceptable cost. `post-checkout` runs at the start of every rebase, before its outcome is known, so copying there would copy for a rebase later abandoned, and under the apply backend it cannot be told from a plain detached checkout. `pre-rebase` would be a fifth slot whose record still waits for a later trigger, which may come after `git worktree remove`. `reference-transaction`, the only hook that sees the branch move, runs five times for a plain commit (probe) and would also be a fifth slot.
 - **A repository whose reflog was disabled from `git init`** (`core.logAllRefUpdates=false` before the first commit) cannot tell a finished merge from an amend, because `HEAD@{1}` does not resolve there. Merges finished by a commit fall back to step 9.5 and P14; the reflog-subject alternative is equally blind there. Disabling the reflog later keeps HEAD's existing reflog appending, and the probe confirmed the predicate still works.
 - **A primary checkout whose `.git` is a file** (`--separate-git-dir`) is treated as a linked worktree. That limit is inherited unchanged from `dec-424`'s merge-time gate.
 - **A rebase of a feature branch onto main in the primary checkout** brings in worktrees created from main with no commits of their own, exactly as `git merge main` into that branch does today. This is `dec-424`'s accepted partial-copy leftover; P03 warns until a later merge copies the rest.
@@ -141,13 +143,14 @@ Activation: fired.
 ## Disconfirmation
 
 - **Falsifier:** any of the following:
-  - A lost worktree log, or a P14 warning, traces to a merge finished by a commit or to a rebasing pull, in a project that has all four finalize hooks installed and its reflog enabled.
+  - A lost worktree log, or a P14 warning, traces to a merge finished by a commit or to a rebase that rewrote at least one commit, in a project that has all four finalize hooks installed and its reflog enabled. One that traces to a rebase that rewrote no commit is the declared limit, not a falsifier.
   - A P03 WARN on main traces to a merge-in started at an amend or while a rebase replayed commits.
   - Managed-project feedback shows the parent-count query measurably slowing commits.
   - A git release changes the parent order of a merge commit made by `git commit`, or stops recording HEAD's reflog by default.
 - **Steelmanned runner-up:** `post-commit` alone, with no new hook slot.
   - It closes the conflicted and `--no-commit` merge with no install change anywhere: no reconciler, pin-upgrade, onboarding-contract or documentation change for a slot.
   - A rebasing pull brings a worktree in only when the user has unpushed commits on main *and* the incoming commits carry a worktree's branch merged elsewhere. With no local commits the pull fast-forwards, and `post-merge` already handles it. That combination is uncommon, and step 9.5 and P14 already cover it.
+  - The probe narrows the slot's reach further: a rebase that rewrites no commit runs no `post-rewrite`, so the slot covers only a rebase that replays at least one local commit.
   - It loses here for three reasons:
     - The installers treat the slot set as data, so the slot costs one element in each mirror, enforced by a parity test.
     - The user asked for no gap.
@@ -157,12 +160,13 @@ Activation: fired.
   - Managed-project feedback reports commit latency or noise from the post-commit predicate. Narrow the post-commit step, or drop it in favour of `/merge-worktree` and P14.
   - The pipeline exit procedure is narrowed to `/merge-worktree` only.
   - P14 warnings trace to rebasing pulls in projects that never ran `/upgrade-project`. Accelerate the fleet upgrade rather than reverse this decision.
+  - P14 warnings or lost logs trace to rebases that rewrote no commit (a fetch-then-rebase on a main with no local commits, or a pull whose local commits were all already upstream). Evaluate a `reference-transaction` trigger for the branch checked out in the primary working tree, measuring its cost per ref update first; it would be a fifth finalize hook and a requirement change.
 
 ## Prior Decision
 
 This record **narrows `dec-424`** (partial supersession). Two clauses change:
 
-- **Consequences, "Merges git completes outside `git merge`".** It recorded the gap for a merge stopped on a conflict or run with `--no-commit` and then committed, and for a pull that rebases local commits, as named and not built, covered only as a squash merge is. It becomes: those merges are merged in by the `post-commit` step (judged against the merge commit's first parent) and by the `post-rewrite` step (judged against `ORIG_HEAD`). The squash merge alone stays left to step 9.5 and P14.
+- **Consequences, "Merges git completes outside `git merge`".** It recorded the gap for a merge stopped on a conflict or run with `--no-commit` and then committed, and for a pull that rebases local commits, as named and not built, covered only as a squash merge is. It becomes: those merges are merged in by the `post-commit` step (judged against the merge commit's first parent) and, for a rebase that rewrites at least one commit, by the `post-rewrite` step (judged against `ORIG_HEAD`). A squash merge, and a rebase that rewrites no commit (git runs no `post-rewrite` for it), stay left to step 9.5 and P14.
 - **Decision clause 4's hook trigger.** The post-merge finalize chain as the only hook that runs `--merged` becomes three finalize hooks running it, each with its operation's before-revision. One entry point stays one entry point.
 
 The last bullet of `dec-424`'s reversal trigger fires with this record, as that bullet prescribed.

@@ -1,0 +1,677 @@
+{
+ "_stage": "computed",
+ "elements": {
+  "claude_code": {
+   "id": "claude_code",
+   "kind": "external",
+   "style": {},
+   "title": "Claude Code"
+  },
+  "developer": {
+   "description": {
+    "txt": "Writes the code and reviews the diagrams"
+   },
+   "id": "developer",
+   "kind": "person",
+   "style": {},
+   "title": "Developer"
+  },
+  "praxion": {
+   "description": {
+    "txt": "A long description that the summary replaces on every render of this system"
+   },
+   "id": "praxion",
+   "kind": "system",
+   "style": {},
+   "summary": {
+    "txt": "Agent harness for software work"
+   },
+   "title": "Praxion"
+  },
+  "praxion.doc_idea": {
+   "description": {
+    "txt": "promethean output"
+   },
+   "id": "praxion.doc_idea",
+   "kind": "document",
+   "style": {},
+   "title": "IDEA_PROPOSAL.md"
+  },
+  "praxion.knowledge": {
+   "id": "praxion.knowledge",
+   "kind": "component",
+   "metadata": {
+    "category": "Layer"
+   },
+   "style": {},
+   "title": "Knowledge Layer"
+  },
+  "praxion.knowledge.commands": {
+   "description": {
+    "txt": "User-invoked workflows"
+   },
+   "id": "praxion.knowledge.commands",
+   "kind": "component",
+   "metadata": {
+    "category": "Knowledge asset"
+   },
+   "style": {},
+   "title": "Commands"
+  },
+  "praxion.knowledge.skills": {
+   "description": {
+    "txt": "Domain expertise modules"
+   },
+   "id": "praxion.knowledge.skills",
+   "kind": "component",
+   "metadata": {
+    "category": "Knowledge asset"
+   },
+   "style": {},
+   "title": "Skills"
+  },
+  "praxion.odd": {
+   "id": "praxion.odd",
+   "kind": "component",
+   "metadata": {
+    "category": "Gizmo"
+   },
+   "style": {},
+   "title": "Odd"
+  },
+  "praxion.orchestrator": {
+   "description": {
+    "txt": "Tier selector, task-slug propagator, rework-worktree spawner, subagent dispatcher"
+   },
+   "id": "praxion.orchestrator",
+   "kind": "agent",
+   "style": {},
+   "technology": "Claude Code",
+   "title": "Main Agent (Orchestrator)"
+  },
+  "praxion.stray": {
+   "description": {
+    "txt": "Declares no category"
+   },
+   "id": "praxion.stray",
+   "kind": "component",
+   "style": {},
+   "title": "Stray"
+  },
+  "praxion.twice": {
+   "id": "praxion.twice",
+   "kind": "component",
+   "metadata": {
+    "category": [
+     "Tooling",
+     "Persistent store"
+    ]
+   },
+   "style": {},
+   "title": "Twice"
+  }
+ },
+ "projectId": "fixture",
+ "relations": {
+  "r1": {
+   "id": "r1",
+   "source": {
+    "model": "praxion.knowledge.skills"
+   },
+   "target": {
+    "model": "praxion.orchestrator"
+   },
+   "title": "injects"
+  },
+  "r10": {
+   "id": "r10",
+   "source": {
+    "model": "praxion.orchestrator"
+   },
+   "target": {
+    "model": "praxion.knowledge.commands"
+   },
+   "title": "dispatches"
+  },
+  "r2": {
+   "id": "r2",
+   "source": {
+    "model": "praxion.knowledge.skills"
+   },
+   "target": {
+    "model": "praxion.orchestrator"
+   },
+   "title": "constrains"
+  },
+  "r3": {
+   "id": "r3",
+   "source": {
+    "model": "praxion.knowledge.commands"
+   },
+   "target": {
+    "model": "praxion.orchestrator"
+   },
+   "title": "triggers"
+  },
+  "r4": {
+   "id": "r4",
+   "kind": "reads",
+   "line": "dashed",
+   "source": {
+    "model": "praxion.doc_idea"
+   },
+   "target": {
+    "model": "praxion.orchestrator"
+   },
+   "title": "informs"
+  },
+  "r5": {
+   "id": "r5",
+   "source": {
+    "model": "praxion.orchestrator"
+   },
+   "target": {
+    "model": "praxion.doc_idea"
+   },
+   "title": "writes"
+  },
+  "r6": {
+   "id": "r6",
+   "source": {
+    "model": "developer"
+   },
+   "target": {
+    "model": "praxion"
+   },
+   "title": "develops"
+  },
+  "r7": {
+   "id": "r7",
+   "source": {
+    "model": "claude_code"
+   },
+   "target": {
+    "model": "praxion"
+   },
+   "title": "executes agents"
+  },
+  "r8": {
+   "id": "r8",
+   "source": {
+    "model": "praxion.orchestrator"
+   },
+   "target": {
+    "model": "praxion.knowledge.commands"
+   },
+   "title": "spawns"
+  },
+  "r9": {
+   "id": "r9",
+   "source": {
+    "model": "praxion.orchestrator"
+   },
+   "target": {
+    "model": "praxion.knowledge.commands"
+   },
+   "title": "dispatches (gated)"
+  }
+ },
+ "specification": {
+  "elements": {
+   "agent": {
+    "notation": "Runtime agent",
+    "style": {}
+   },
+   "component": {
+    "style": {}
+   },
+   "document": {
+    "notation": "Pipeline document",
+    "style": {}
+   },
+   "external": {
+    "notation": "External system",
+    "style": {}
+   },
+   "person": {
+    "notation": "Person",
+    "style": {}
+   },
+   "system": {
+    "notation": "System in scope",
+    "style": {}
+   }
+  },
+  "tags": {
+   "c4_component": {
+    "color": "grass"
+   },
+   "c4_container": {
+    "color": "blue"
+   },
+   "c4_system_context": {
+    "color": "orange"
+   }
+  }
+ },
+ "views": {
+  "double_tagged": {
+   "_type": "element",
+   "description": null,
+   "edges": [],
+   "id": "double_tagged",
+   "nodes": [
+    {
+     "children": [],
+     "description": {
+      "txt": "Domain expertise modules"
+     },
+     "id": "praxion.knowledge.skills",
+     "kind": "component",
+     "level": 1,
+     "modelRef": "praxion.knowledge.skills",
+     "parent": "praxion.knowledge",
+     "tags": [],
+     "title": "Skills"
+    }
+   ],
+   "tags": [
+    "c4_container",
+    "c4_component"
+   ],
+   "title": "Skills twice"
+  },
+  "flow": {
+   "_type": "dynamic",
+   "description": null,
+   "edges": [
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "step-01",
+     "label": "drafts the proposal",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r5"
+     ],
+     "source": "praxion.orchestrator",
+     "tags": [],
+     "target": "praxion.doc_idea"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "step-02",
+     "kind": "reads",
+     "label": "informs the plan",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r4"
+     ],
+     "source": "praxion.doc_idea",
+     "tags": [],
+     "target": "praxion.orchestrator"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "step-10",
+     "label": "files the proposal",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r5"
+     ],
+     "source": "praxion.orchestrator",
+     "tags": [],
+     "target": "praxion.doc_idea"
+    }
+   ],
+   "flow": [
+    "step-01",
+    "step-02",
+    "step-10"
+   ],
+   "id": "flow",
+   "nodes": [
+    {
+     "children": [],
+     "description": {
+      "txt": "Tier selector, task-slug propagator, rework-worktree spawner, subagent dispatcher"
+     },
+     "id": "praxion.orchestrator",
+     "kind": "agent",
+     "level": 0,
+     "modelRef": "praxion.orchestrator",
+     "notation": "Runtime agent",
+     "parent": null,
+     "tags": [],
+     "technology": "Claude Code",
+     "title": "Main Agent (Orchestrator)"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "promethean output"
+     },
+     "id": "praxion.doc_idea",
+     "kind": "document",
+     "level": 0,
+     "modelRef": "praxion.doc_idea",
+     "notation": "Pipeline document",
+     "parent": null,
+     "tags": [],
+     "title": "IDEA_PROPOSAL.md"
+    }
+   ],
+   "tags": null,
+   "title": "Proposal flow",
+   "variant": "diagram"
+  },
+  "index": {
+   "_type": "element",
+   "description": null,
+   "edges": [
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e1",
+     "label": "develops",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r6"
+     ],
+     "source": "developer",
+     "tags": [],
+     "target": "praxion"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e2",
+     "label": "executes agents",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r7"
+     ],
+     "source": "claude_code",
+     "tags": [],
+     "target": "praxion"
+    }
+   ],
+   "id": "index",
+   "nodes": [
+    {
+     "children": [],
+     "description": {
+      "txt": "Writes the code and reviews the diagrams"
+     },
+     "id": "developer",
+     "kind": "person",
+     "level": 0,
+     "modelRef": "developer",
+     "notation": "Person",
+     "parent": null,
+     "tags": [],
+     "title": "Developer"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "A long description that the summary replaces on every render of this system"
+     },
+     "id": "praxion",
+     "kind": "system",
+     "level": 0,
+     "modelRef": "praxion",
+     "notation": "System in scope",
+     "parent": null,
+     "tags": [],
+     "title": "Praxion"
+    },
+    {
+     "children": [],
+     "id": "claude_code",
+     "kind": "external",
+     "level": 0,
+     "modelRef": "claude_code",
+     "notation": "External system",
+     "parent": null,
+     "tags": [],
+     "title": "Claude Code"
+    }
+   ],
+   "tags": [
+    "c4_system_context"
+   ],
+   "title": "Praxion — System Context"
+  },
+  "structure": {
+   "_type": "element",
+   "description": null,
+   "edges": [
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e3",
+     "label": "[...]",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r1",
+      "r2"
+     ],
+     "source": "praxion.knowledge.skills",
+     "tags": [],
+     "target": "praxion.orchestrator"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e4",
+     "label": "triggers",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r3"
+     ],
+     "source": "praxion.knowledge.commands",
+     "tags": [],
+     "target": "praxion.orchestrator"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e5",
+     "kind": "reads",
+     "label": "informs",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r4"
+     ],
+     "source": "praxion.doc_idea",
+     "tags": [],
+     "target": "praxion.orchestrator"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e6",
+     "label": "writes",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r5"
+     ],
+     "source": "praxion.orchestrator",
+     "tags": [],
+     "target": "praxion.doc_idea"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e7",
+     "label": "[...]",
+     "line": "dashed",
+     "parent": null,
+     "relations": [
+      "r8",
+      "r9",
+      "r10"
+     ],
+     "source": "praxion.orchestrator",
+     "tags": [],
+     "target": "praxion.knowledge.commands"
+    }
+   ],
+   "id": "structure",
+   "nodes": [
+    {
+     "children": [
+      "praxion.knowledge.skills",
+      "praxion.knowledge.commands"
+     ],
+     "id": "praxion.knowledge",
+     "kind": "component",
+     "level": 0,
+     "modelRef": "praxion.knowledge",
+     "parent": null,
+     "tags": [],
+     "title": "Knowledge Layer"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "Domain expertise modules"
+     },
+     "id": "praxion.knowledge.skills",
+     "kind": "component",
+     "level": 1,
+     "modelRef": "praxion.knowledge.skills",
+     "parent": "praxion.knowledge",
+     "tags": [],
+     "title": "Skills"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "User-invoked workflows"
+     },
+     "id": "praxion.knowledge.commands",
+     "kind": "component",
+     "level": 1,
+     "modelRef": "praxion.knowledge.commands",
+     "parent": "praxion.knowledge",
+     "tags": [],
+     "title": "Commands"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "Tier selector, task-slug propagator, rework-worktree spawner, subagent dispatcher"
+     },
+     "id": "praxion.orchestrator",
+     "kind": "agent",
+     "level": 0,
+     "modelRef": "praxion.orchestrator",
+     "notation": "Runtime agent",
+     "parent": null,
+     "tags": [],
+     "technology": "Claude Code",
+     "title": "Main Agent (Orchestrator)"
+    },
+    {
+     "children": [],
+     "description": {
+      "txt": "promethean output"
+     },
+     "id": "praxion.doc_idea",
+     "kind": "document",
+     "level": 0,
+     "modelRef": "praxion.doc_idea",
+     "notation": "Pipeline document",
+     "parent": null,
+     "tags": [],
+     "title": "IDEA_PROPOSAL.md"
+    }
+   ],
+   "tags": [
+    "c4_component"
+   ],
+   "title": "Praxion — Knowledge and Orchestration"
+  },
+  "unresolved": {
+   "_type": "element",
+   "description": null,
+   "edges": [],
+   "id": "unresolved",
+   "nodes": [
+    {
+     "children": [],
+     "description": {
+      "txt": "Declares no category"
+     },
+     "id": "praxion.stray",
+     "kind": "component",
+     "level": 0,
+     "modelRef": "praxion.stray",
+     "parent": null,
+     "tags": [],
+     "title": "Stray"
+    },
+    {
+     "children": [],
+     "id": "praxion.odd",
+     "kind": "component",
+     "level": 0,
+     "modelRef": "praxion.odd",
+     "parent": null,
+     "tags": [],
+     "title": "Odd"
+    },
+    {
+     "children": [],
+     "id": "praxion.twice",
+     "kind": "component",
+     "level": 0,
+     "modelRef": "praxion.twice",
+     "parent": null,
+     "tags": [],
+     "title": "Twice"
+    }
+   ],
+   "tags": [
+    "c4_component"
+   ],
+   "title": "Elements without a category"
+  },
+  "untagged": {
+   "_type": "element",
+   "description": null,
+   "edges": [],
+   "id": "untagged",
+   "nodes": [
+    {
+     "children": [],
+     "description": {
+      "txt": "Domain expertise modules"
+     },
+     "id": "praxion.knowledge.skills",
+     "kind": "component",
+     "level": 1,
+     "modelRef": "praxion.knowledge.skills",
+     "parent": "praxion.knowledge",
+     "tags": [],
+     "title": "Skills"
+    }
+   ],
+   "tags": [],
+   "title": "Skills alone"
+  }
+ }
+}

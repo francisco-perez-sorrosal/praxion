@@ -42,7 +42,7 @@ Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST 
 1. **Mode.** `Baseline-audit mode — no specific feature scope. Read the existing codebase and produce architecture docs that describe the as-built state, not a future design target.`
 2. **Inputs.** Point the agent at the project root. Tell it which language/framework signals were detected in §Pre-flight (Python, JavaScript, Rust, Go, etc.) so it scopes the codebase scan correctly.
 3. **Outputs (required).**
-   - `.ai-state/DESIGN.md` — architect-facing design-target document. Use the `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` template. Sections: System Overview, System Context (L0 — LikeC4+D2 `c4` block + committed SVG reference), Components (L1 — LikeC4+D2 `c4` block + committed SVG reference + table), Data Flow, Quality Attributes (testing, observability, deployment current state), Open Questions / Known Gaps. Mark unverified-by-code claims with section ownership tags so future updates can supersede cleanly.
+   - `.ai-state/DESIGN.md` — architect-facing design-target document. Use the `skills/software-planning/assets/ARCHITECTURE_TEMPLATE.md` template. Sections: System Overview, System Context (L0 — a committed render embedded with markdown image syntax and an alt text naming the view and its C4 type; the LikeC4 source lives under `<doc-dir>/diagrams/architecture/src/`), Components (L1 — committed render embed + table), Data Flow, Quality Attributes (testing, observability, deployment current state), Open Questions / Known Gaps. Mark unverified-by-code claims with section ownership tags so future updates can supersede cleanly.
    - `docs/architecture.md` — developer-facing navigation guide. Use the `skills/doc-management/assets/ARCHITECTURE_GUIDE_TEMPLATE.md` template. Filter `.ai-state/DESIGN.md` to the **Built** components only — every component name and file path must resolve on disk (verify with `Glob` or `ls`). Skip components that exist only in the design-target document.
 4. **Outputs (optional, agent's call).**
    - One ADR draft under `.ai-state/decisions/drafts/` if the baseline reading surfaces a load-bearing architectural invariant worth preserving (e.g., a one-way module dependency, a layer boundary, a data-flow constraint). The ADR is *only* warranted when the invariant is non-obvious from the code; do not write a ceremonial "architecture is now baselined" ADR.
@@ -50,7 +50,7 @@ Delegate to `systems-architect` via the `Task` tool. The delegation prompt MUST 
    - Do NOT produce `SYSTEMS_PLAN.md` — there is no feature in scope for a baseline audit, and a SYSTEMS_PLAN without a feature is anti-pattern.
    - Do NOT produce `PRE_REFACTOR_PLAN.md` — Phase 2.5 is skipped in baseline-audit mode (no feature scope means no pre-refactor scope).
    - Do NOT invent components that don't exist on disk. Every component table row and SVG reference must be code-verified.
-   - Do NOT exceed L1 detail in C4 diagrams (≤10 nodes per `rules/writing/diagram-conventions.md`). Use LikeC4 DSL for C4-architectural views; Mermaid for sequence/state/ER/flowchart. L2 internals are deferred to feature-pipeline updates.
+   - Do NOT exceed L1 detail in C4 diagrams; per-view size follows the advisory heuristic in `rules/writing/diagram-conventions.md`, and the review checks it links decide legibility. Author the real model against the installed style kit (`<doc-dir>/diagrams/architecture/src/_spec.c4`; Phase 8b.5 installs it — when Phase 8 runs first on a fresh project, run `python3 <plugin-root>/scripts/install_diagram_kit.py --project-root . --plugin-root <plugin-root> --diagrams-dir <doc-dir>/diagrams` before authoring; the installer is idempotent, so 8b.5 then reports every item skipped), regenerate with `python3 scripts/regenerate_diagrams.py`, and apply its `--check` review checks until every view passes. Use LikeC4 DSL for C4-architectural views; Mermaid for sequence/state/ER/flowchart. L2 internals are deferred to feature-pipeline updates.
    - Do NOT modify any source code, tests, or non-architecture documentation.
 
 The architect operates in a fresh context window (`Task` tool spawn) and reports completion when both docs are written. The main agent reads the produced docs at completion to confirm shape, then proceeds to Phase 9.
@@ -61,7 +61,7 @@ The architect operates in a fresh context window (`Task` tool spawn) and reports
 
 ## §Phase 8b — AaC Tier Install (opt-in, default-skip)
 
-**Why this phase exists.** Phase 8 produces architecture docs. Phase 8b installs the AaC enforcement layer: fence-region examples in those docs, fitness tests for architectural invariants, a golden-rule pre-commit block, CI workflow, and a diagram directory stub. All five surfaces are idempotent and independent — each sub-step is guarded by its own predicate so re-runs produce zero `git diff`. Sentinel-only surfaces (traceability convention, sentinel AC dimension) need no per-project install — the AaC convention and sentinel agent are global.
+**Why this phase exists.** Phase 8 produces architecture docs. Phase 8b installs the AaC enforcement layer: fence-region examples in those docs, fitness tests for architectural invariants, a golden-rule pre-commit block, CI workflow, and the diagram kit (style vocabulary, example model, the regeneration command and its hook wiring). All five surfaces are idempotent and independent — each sub-step is guarded by its own predicate so re-runs produce zero `git diff`. Sentinel-only surfaces (traceability convention, sentinel AC dimension) need no per-project install — the AaC convention and sentinel agent are global.
 
 Note: AaC enforcement via Block D requires the `praxion` plugin to be installed. If the plugin is absent, the golden-rule hook block silently exits 0 — same behavior as Phase 4's id-citation check.
 
@@ -129,30 +129,32 @@ Print: `8b.3: Block D appended to .git/hooks/pre-commit`.
 
 - If exists: skip with notice `8b.4: skipped (.github/workflows/architecture.yml already present)`.
 
-**Action.** Create `.github/workflows/` directory if missing. Read `claude/aac-templates/architecture.yml.tmpl`. Perform placeholder substitution:
+**Action.** Run the diagram-kit installer, which renders `claude/aac-templates/architecture.yml.tmpl` with the placeholders below, validates the YAML, and skips the file when it is already present (the same run installs sub-step 8b.5's surfaces, so one invocation serves both and their order is immaterial):
+
+```bash
+python3 <plugin-root>/scripts/install_diagram_kit.py --project-root . --plugin-root <plugin-root> --diagrams-dir <doc-dir>/diagrams
+```
+
+The installer prints one `installed` or `skipped` line per file; exit 2 means a precondition failed (not a git repository, templates missing, a diagrams directory outside the project) and the sub-step reports `8b.4: skipped — <installer message>`. Placeholder substitution:
 
 | Placeholder | Derivation | Default |
 |---|---|---|
-| `{{PROJECT_PATHS_DIAGRAMS}}` | Detected `<doc-dir>/diagrams/` from sub-step 8b.5 or `docs/diagrams/` | `docs/diagrams/` |
+| `{{PROJECT_PATHS_DIAGRAMS}}` | The `--diagrams-dir` passed to the installer: the detected `<doc-dir>/diagrams/` | `docs/diagrams/` |
 | `{{PROJECT_PATHS_ARCHITECTURE_DOCS}}` | Fixed | `**/DESIGN.md` |
 | `{{PROJECT_PYTHON_VERSION}}` | `requires-python` lower bound from `pyproject.toml`, or fallback | `3.13` |
 | `{{PROJECT_PLUGIN_DIR}}` | Plugin install scope; `.` works for user-installed plugins | `.` |
 
-After substitution, validate the result parses as valid YAML. If YAML parsing fails, abort this sub-step with: `8b.4: skipped — architecture.yml template substitution produced invalid YAML; check pyproject.toml requires-python value`. Continue with 8b.5.
+Print: `8b.4: .github/workflows/architecture.yml written` (or the installer's `skipped` line).
 
-Write the validated YAML to `.github/workflows/architecture.yml` using `Write`.
+### Sub-step 8b.5 — Diagram kit
 
-Print: `8b.4: .github/workflows/architecture.yml written`.
+**Predicate.** No `*.c4` file exists under `<doc-dir>/diagrams/` (default `docs/diagrams/`). A bare or `.gitkeep`-only directory from an earlier onboarding does not satisfy the predicate, so projects onboarded before the kit existed receive it on a re-run. Per the forward-binding constraint on `<doc-dir>/diagrams/`, a top-level `architecture/` directory is NEVER created.
 
-### Sub-step 8b.5 — Diagrams scaffold
+- If any `*.c4` exists under it: skip with notice `8b.5: skipped (model sources already present)`.
 
-**Predicate.** `docs/diagrams/` does NOT exist (or `<doc-dir>/diagrams/` if pre-flight detected a non-default doc dir). Per the forward-binding constraint on `<doc-dir>/diagrams/`, a top-level `architecture/` directory is NEVER created.
+**Action.** The installer run of sub-step 8b.4 installs this sub-step's surfaces as one set: the style kit `<doc-dir>/diagrams/architecture/src/_spec.c4` (the floor vocabulary — Person, System in scope, External system, Container, Component, Data store — each with its drawing and legend entry), an example model beside it, the `rendered/` directory, and the regeneration command with its sibling modules under `scripts/`. When the pinned toolchain is present (pre-flight probe 4c), render once with `python3 scripts/regenerate_diagrams.py` so the committed renders exist from the first commit; otherwise print the probe's install pointer. No `.gitkeep` is written.
 
-- If `docs/diagrams/` exists: skip with notice `8b.5: skipped (docs/diagrams/ already present)`.
-
-**Action.** Create `docs/` if missing. Create `docs/diagrams/`. If the directory is otherwise empty (no `.c4`, `.d2`, `.svg`, or other files), write `docs/diagrams/.gitkeep` (0-byte placeholder so git commits the directory). If the directory already contains files (user has `.c4` sources), do not write `.gitkeep`.
-
-Print: `8b.5: docs/diagrams/ created` (with `.gitkeep` appended if the placeholder was written).
+Print: `8b.5: diagram kit installed` (or the installer's `skipped` lines).
 
 **Verification handoff.** After all five sub-steps complete, print the final-state checklist:
 
@@ -162,7 +164,7 @@ AaC tier install summary:
   8b.2 fitness/:          <installed | skipped (reason)>
   8b.3 Block D:           <installed | skipped (reason)>
   8b.4 architecture.yml:  <installed | skipped (reason)>
-  8b.5 docs/diagrams/:    <installed | skipped (reason)>
+  8b.5 diagram kit:       <installed | skipped (reason)>
 ```
 
 Phase 9 verification handoff lists every staged file across all phases — Phase 8b's surfaces are included in that enumeration.

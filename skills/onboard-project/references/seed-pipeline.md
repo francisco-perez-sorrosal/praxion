@@ -296,7 +296,7 @@ Generate `<project-root>/onboarding_for_mushi_busy_ppl.md` with these nine secti
 1. **Canonical Praxion paragraph** — copied verbatim (byte-for-byte) from between the `PRAXION-PARAGRAPH-START` and `PRAXION-PARAGRAPH-END` sentinel markers in §What is Praxion. Do not paraphrase.
 2. **How Claude drives Praxion** — copied verbatim from between the `PRAXION-ORCHESTRATOR-START` and `PRAXION-ORCHESTRATOR-END` sentinel markers in §How Claude drives Praxion. Placed immediately after the canonical paragraph — the first thing the user reads after "what is Praxion" is "how I talk to it."
 3. **TL;DR card** — exactly three lines: "what you have", "what you can do right now", "what to do next".
-4. **Mermaid happy-path diagram** — ≤10 nodes per `rules/writing/diagram-conventions.md`. One concept only.
+4. **Mermaid happy-path diagram** — a flowchart within the Mermaid node budget of `rules/writing/diagram-conventions.md`. One concept only.
 5. **What got created table** — columns `Artifact | Purpose | Edit when…`. One row per generated file. **Just-in-time verification:** `ls -la <path>` every row; do not ship a row whose path does not resolve.
 6. **Five-to-seven lesson ladder** — `<details>` collapsibles, one per lesson, in the "Put this in Claude" four-bullet format defined in §Five-to-Seven Lessons. L6 is mandatory.
 7. **Glossary collapsible** — short definitions for: Praxion, skill, agent, rule, command, **orchestrator**, **subagent**, pipeline, Understand/Plan/Verify, Claude Agent SDK, uv, `.ai-state/`, `.ai-work/`, `/co`, `/cop`, **ADR** (`dec-NNN`), **sentinel report**.
@@ -370,7 +370,7 @@ Ship all seven by default; L1 / L2 / L7 may be omitted only if anchor generation
 
 - **What you'll learn:** orient yourself once the seed shape has grown past a handful of files.
 - **Put this in Claude:**
-  > The codebase has grown past the seed shape. Produce a current architecture view: map modules, entry points, external dependencies, and any surprising coupling. Output a one-page summary with a Mermaid component diagram (≤10 nodes). Skip anything CLAUDE.md already says.
+  > The codebase has grown past the seed shape. Produce a current architecture view: map modules, entry points, external dependencies, and any surprising coupling. Output a one-page summary with a Mermaid component diagram within the Mermaid node budget of `rules/writing/diagram-conventions.md`. Skip anything CLAUDE.md already says.
 - **What will happen:** Claude runs the `project-exploration` skill, generates a compact summary with a diagram.
 - **Expected touches:** none (read-only). Useful once the project has ≥10 files.
 
@@ -409,7 +409,7 @@ Each sub-step is idempotent — a predicate gates every write. Partial-run resum
 ```
 # Append to .ai-state/DESIGN.md (and docs/architecture.md when present):
 
-<!-- aac:generated — do not edit this block by hand; regenerate via scripts/diagram-regen-hook.sh -->
+<!-- aac:generated — do not edit this block by hand; regenerate via python3 scripts/regenerate_diagrams.py -->
 <!-- Fence example — see rules/writing/aac-dac-conventions.md for the full convention -->
 <!-- Replace this block with your first LikeC4 .c4 source region when ready -->
 <!-- aac:generated:end -->
@@ -462,11 +462,11 @@ After rendering, YAML-load the output to validate syntax before writing. If YAML
 
 ### Sub-step 5f.5 — docs/diagrams/ scaffold
 
-**What it does.** Creates `docs/diagrams/` and writes `.gitkeep` so the scaffolded path is visible to git immediately. Per the forward-binding diagram convention, this is `<doc-dir>/diagrams/` — never a top-level `architecture/` directory.
+**What it does.** Installs the diagram kit under `docs/diagrams/architecture/` (style vocabulary `src/_spec.c4`, an example model, the `rendered/` directory) and the regeneration command with its sibling modules under `scripts/`, so the seeded project renders professional C4 views from its first commit. Per the forward-binding diagram convention, this is `<doc-dir>/diagrams/` — never a top-level `architecture/` directory.
 
-**Predicate (skip `.gitkeep` write if true):** `test -e docs/diagrams/.gitkeep` OR `[ -n "$(ls -A docs/diagrams/ 2>/dev/null)" ]` — skip when `.gitkeep` already exists OR directory already has content.
+**Predicate (skip if true):** `[ -n "$(find docs/diagrams -name '*.c4' -print -quit 2>/dev/null)" ]` — skip when model sources already exist.
 
-**Action:** `mkdir -p docs/diagrams && touch docs/diagrams/.gitkeep` when predicate fails.
+**Action:** `python3 <plugin-root>/scripts/install_diagram_kit.py --project-root . --plugin-root <plugin-root> --diagrams-dir docs/diagrams` when the predicate fails; the installer is idempotent and prints one `installed` or `skipped` line per file.
 
 ---
 

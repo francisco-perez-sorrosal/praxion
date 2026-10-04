@@ -1,3 +1,42 @@
+## v0.45.0 (2026-10-04)
+
+### Feat
+
+- **hooks**: Install post-rewrite wherever the finalize hooks install
+- **hooks**: Run merge-in after commit-finished merges and rebases
+- **scripts**: Add a named skip for an unresolvable merge-in revision
+- **sentinel**: add the log-health check family P09 to P14
+- **observation-log**: count spawns across every checkout and order verdicts by recorded time
+- **observation-log**: merge worktree logs from /merge-worktree and the post-merge chain
+- **observation-log**: Read every archive in the recovery reader and the cost collector
+- **observation-log**: add checkout listing and worktree-log merge-in copy path
+- **observation-log**: Shift numbered archives at rotation and add a batched append
+- **observation-log**: Define the retention policy and the reader's archive discovery
+- **dashboard**: Compose the Overview at the root and carry live signals in the sidebar
+- **dashboard**: Stamp data-as-of on the reference surfaces and drop orphaned CSS
+- **dashboard**: chrome with light-dark tokens, theme toggle and grouped sidebar
+- **dashboard**: Present quality-eval history and digest on the Evals surface
+- **dashboard**: Lead the Sentinel surface with a grade-first digest
+- **dashboard**: Group workshops by recency with age and progress
+- **dashboard**: Lay the digest foundation for the Overview
+
+### Fix
+
+- **tests**: Cover the rewrite entry point and name the reflog limit
+- **observation-log**: Name unreadable worktree logs, bound archive discovery, resolve the mode key by key
+- **observation-log**: Apply the merge-in re-review
+- **observation-log**: copy only the worktrees a merge brings in and degrade unreadable ones
+- **dashboard**: Resolve td-323, the sidebar's sentinel read is light
+- **dashboard**: Stamp sentinel runs from the filename, pin the test zone
+- **dashboard**: Label sentinel reports in local time; refresh the dashboard rule and guide
+- **dashboard**: stamp reports by file time, local day labels, consistent sentinel digest, cheap sidebar reads
+- **dashboard**: Make the popover phrasing content and expose tile tones
+
+### Refactor
+
+- **dashboard**: Share one tone pill, fix heading wrappers and layering
+- **dashboard**: Give digest cards real headings and fix the tone cascade
+
 ## v0.44.0 (2026-10-03)
 
 ### Feat

@@ -150,7 +150,7 @@ def test_the_example_draws_a_view_of_each_declared_type_and_all_its_elements(rd,
         encoding="utf-8"
     )
 
-    assert renders == ["containers.svg", "index.svg"]
+    assert renders == ["components.svg", "containers.svg", "index.svg"]
     assert all(
         name in text for name in ("Storefront", "Order service", "Order database", "Mail provider")
     )

@@ -17,6 +17,11 @@ model {
     orders = container 'Order service' {
       summary 'Owns order state and payment status'
       technology 'Python'
+
+      payments = component 'Payment handler' {
+        summary 'Charges the customer and records the result'
+        technology 'Python'
+      }
     }
     database = datastore 'Order database' {
       summary 'Holds orders and customers'
@@ -31,6 +36,7 @@ model {
   customer -> shop.storefront 'places an order through'
   shop.storefront -> shop.orders 'asks to create the order'
   shop.orders -> shop.database 'stores the order in'
+  shop.orders.payments -> shop.database 'records the payment in'
   shop.storefront -> mail 'sends the receipt through'
 }
 
@@ -46,5 +52,11 @@ views {
     title 'Inside the web shop'
     include *
     exclude customer
+  }
+
+  view components of shop.orders {
+    #c4_component
+    title 'Inside the order service'
+    include *
   }
 }

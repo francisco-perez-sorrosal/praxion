@@ -29,6 +29,8 @@ on:
       - "docs/architecture.md"
       - ".ai-state/decisions/**"
       - "fitness/**"
+      - "scripts/regenerate_diagrams.py"
+      - "scripts/_diagram_*.py"
   push:
     branches: [main]
     paths:
@@ -38,6 +40,8 @@ on:
       - "docs/architecture.md"
       - ".ai-state/decisions/**"
       - "fitness/**"
+      - "scripts/regenerate_diagrams.py"
+      - "scripts/_diagram_*.py"
 
 permissions: {}  # least-privilege; jobs below add only what they need
 
@@ -49,8 +53,10 @@ jobs:
   # ---------------------------------------------------------------------------
   # Job 1: regenerate-and-diff
   #
-  # Verifies that committed diagram renders match what `likec4 gen d2` + `d2`
-  # would produce from the source .c4 files. Fails if any render disagrees.
+  # Verifies that committed diagram renders match what the project-local command
+  # `python3 scripts/regenerate_diagrams.py` produces from the source .c4 files.
+  # Fails if any render disagrees, or if regeneration leaves anything untracked.
+  # The command is copied into the project at onboarding; no plugin path runs here.
   # ---------------------------------------------------------------------------
   regenerate-and-diff:
     runs-on: ubuntu-latest
@@ -67,33 +73,41 @@ jobs:
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
         with:
           python-version: "{{PROJECT_PYTHON_VERSION}}"
+          # This job installs likec4 (npm) and d2 (curl), never a uv dependency, so
+          # the uv cache stays empty and setup-uv's post-step `cache prune` would
+          # fail the job. Disable caching where there is nothing to cache.
+          enable-cache: false
 
       - name: Install likec4
+        # Pinned: a different likec4 can export a different model reading, which
+        # would legitimately change the renders.
         run: npm install -g likec4@1.59.4
 
       - name: Install d2
+        # Pinned for GEOMETRY stability: a different d2 version can lay diagrams
+        # out differently. --method standalone forces the release tarball so the
+        # binary is identical regardless of a runner's Homebrew state.
         run: |
           curl -fsSL https://d2lang.com/install.sh \
             | sh -s -- --version v0.7.1 --method standalone
 
       - name: Regenerate diagrams from source .c4 files
-        run: |
-          find {{PROJECT_PATHS_DIAGRAMS}} -name '*.c4' | while IFS= read -r c4_file; do
-            workspace="${c4_file%/*}"
-            out_dir="${c4_file%.c4}"
-            echo "[ci] Regenerating d2 from ${c4_file} → ${out_dir}/"
-            likec4 gen d2 "${workspace}" -o "${out_dir}/"
-            find "${out_dir}" -maxdepth 1 -name '*.d2' | while IFS= read -r d2_file; do
-              svg_file="${d2_file%.d2}.svg"
-              echo "[ci] Rendering ${d2_file} → ${svg_file}"
-              d2 "${d2_file}" "${svg_file}"
-            done
-          done
+        run: python3 scripts/regenerate_diagrams.py --diagrams-dir {{PROJECT_PATHS_DIAGRAMS}}
 
-      - name: Diff regenerated diagrams against committed
+      - name: Fail when regeneration changed or added a render
+        # `git status` also catches a render the command wrote that was never
+        # committed, which a plain `git diff` passes over.
         run: |
-          git diff --exit-code -- {{PROJECT_PATHS_DIAGRAMS}}/ \
-            || (echo "::error::Generated diagrams disagree with committed renders. Run scripts/diagram-regen-hook.sh locally (after staging the .c4 file) and commit the result." && exit 1)
+          changed="$(git status --porcelain -- {{PROJECT_PATHS_DIAGRAMS}}/)"
+          if [ -n "${changed}" ]; then
+            echo "${changed}"
+            echo "::error::Generated diagrams disagree with the committed renders. Run python3 scripts/regenerate_diagrams.py locally and commit the result."
+            exit 1
+          fi
+
+      - name: Show the difference
+        if: failure()
+        run: git diff --stat -- {{PROJECT_PATHS_DIAGRAMS}}/
 
   # ---------------------------------------------------------------------------
   # Job 2: fitness-functions

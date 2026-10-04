@@ -1,0 +1,62 @@
+/**
+ * Architecture style kit. Every model and view in this project must pass the review checks
+ * DRC-01..DRC-12: title and legend, element text, arrows, categories, contrast, legibility, proportions.
+ * Read the `likec4-diagramming` skill (`references/review-checks.md`, `references/likec4-authoring-recipes.md`)
+ * before editing; `python3 scripts/regenerate_diagrams.py --check` applies the checks.
+ *
+ * A kind's `notation` is its category name in every legend: add an element, pick its kind. Where one kind spans
+ * several categories (`component`), state each element's own with `metadata { category '<name>' }`.
+ * Colours match the renderer's token table; the committed renders are drawn from that table, not from here.
+ */
+specification {
+  color pxd-person #1D4E89
+  color pxd-system #4338CA
+  color pxd-external #77726A
+  color pxd-container #0B6FA4
+  color pxd-component #00684A
+  color pxd-store #9B3A75
+
+  element person {
+    notation 'Person'
+    style {
+      shape person
+      color pxd-person
+    }
+  }
+  element system {
+    notation 'System in scope'
+    style { color pxd-system }
+  }
+  element external {
+    notation 'External system'
+    style {
+      color pxd-external
+      border dashed
+    }
+  }
+  element container {
+    notation 'Container'
+    style { color pxd-container }
+  }
+  element component {
+    notation 'Component'
+    style { color pxd-component }
+  }
+  element datastore {
+    notation 'Data store'
+    style {
+      shape cylinder
+      color pxd-store
+    }
+  }
+
+  relationship reads {
+    line dashed
+  }
+
+  tag c4_system_context
+  tag c4_system_landscape
+  tag c4_container
+  tag c4_component
+  tag c4_deployment
+}

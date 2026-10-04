@@ -1,0 +1,50 @@
+/**
+ * Example model: a small web shop. Replace its elements with your system's, keeping the shape:
+ * every element described, every arrow a verb phrase from source to target, every view tagged and titled.
+ */
+model {
+  customer = person 'Customer' {
+    summary 'Orders goods and follows their delivery'
+  }
+
+  shop = system 'Web shop' {
+    summary 'Sells goods and ships them'
+
+    storefront = container 'Storefront' {
+      summary 'Shows the catalogue and takes orders'
+      technology 'Python, FastAPI'
+    }
+    orders = container 'Order service' {
+      summary 'Owns order state and payment status'
+      technology 'Python'
+    }
+    database = datastore 'Order database' {
+      summary 'Holds orders and customers'
+      technology 'PostgreSQL'
+    }
+  }
+
+  mail = external 'Mail provider' {
+    summary 'Delivers receipts and shipping notices'
+  }
+
+  customer -> shop.storefront 'places an order through'
+  shop.storefront -> shop.orders 'asks to create the order'
+  shop.orders -> shop.database 'stores the order in'
+  shop.storefront -> mail 'sends the receipt through'
+}
+
+views {
+  view index {
+    #c4_system_context
+    title 'Web shop and the people and systems around it'
+    include customer, shop, mail
+  }
+
+  view containers of shop {
+    #c4_container
+    title 'Inside the web shop'
+    include *
+    exclude customer
+  }
+}

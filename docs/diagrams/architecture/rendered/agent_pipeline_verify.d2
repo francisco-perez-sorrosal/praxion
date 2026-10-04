@@ -32,18 +32,6 @@ classes: {
       font-size: 15
     }
   }
-  category_runtime_agent_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#A85A00"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-      border-radius: 16
-    }
-  }
   line_acts_on: {
     style: {
       fill: "#FFFFFF"
@@ -86,13 +74,9 @@ Title: {
   label: "WIP.md\n[Pipeline document]\nstep state"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.pipeline": {
-  label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-  class: category_runtime_agent_frame
-  "el_praxion.orchestration.pipeline.verifier": {
-    label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
-    class: category_runtime_agent
-  }
+"el_praxion.orchestration.pipeline.verifier": {
+  label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
+  class: category_runtime_agent
 }
 Legend: {
   label: "Legend"
@@ -114,10 +98,6 @@ Legend: {
   category_pipeline_document: {
     label: "Pipeline document"
     class: category_pipeline_document
-  }
-  category_runtime_agent_frame: {
-    label: "Runtime agent (boundary)"
-    class: category_runtime_agent_frame
   }
   line_acts_on_sample: {
     label: ""
@@ -180,6 +160,6 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration.doc_test" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
-"el_praxion.orchestration.doc_wip" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration.doc_verify": "writes" {class: line_acts_on}
+"el_praxion.orchestration.doc_test" -> "el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_wip" -> "el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
+"el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration.doc_verify": "writes" {class: line_acts_on}

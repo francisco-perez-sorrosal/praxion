@@ -32,18 +32,6 @@ classes: {
       font-size: 15
     }
   }
-  category_runtime_agent_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#A85A00"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-      border-radius: 16
-    }
-  }
   line_acts_on: {
     style: {
       fill: "#FFFFFF"
@@ -90,21 +78,17 @@ Title: {
   label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.pipeline": {
-  label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-  class: category_runtime_agent_frame
-  "el_praxion.orchestration.pipeline.architect": {
-    label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline.promethean": {
-    label: "Promethean\n[Runtime agent]\nFeature-level ideation"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline.researcher": {
-    label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
-    class: category_runtime_agent
-  }
+"el_praxion.orchestration.pipeline.architect": {
+  label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.promethean": {
+  label: "Promethean\n[Runtime agent]\nFeature-level ideation"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.researcher": {
+  label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+  class: category_runtime_agent
 }
 Legend: {
   label: "Legend"
@@ -126,10 +110,6 @@ Legend: {
   category_pipeline_document: {
     label: "Pipeline document"
     class: category_pipeline_document
-  }
-  category_runtime_agent_frame: {
-    label: "Runtime agent (boundary)"
-    class: category_runtime_agent_frame
   }
   line_acts_on_sample: {
     label: ""
@@ -192,9 +172,9 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration.doc_idea" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "informs" {class: line_read_only}
-"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs" {class: line_read_only}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_spec_extract": "writes spec extract" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.promethean" -> "el_praxion.orchestration.doc_idea": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "writes" {class: line_acts_on}
+"el_praxion.orchestration.doc_idea" -> "el_praxion.orchestration.pipeline.researcher": "informs" {class: line_read_only}
+"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline.architect": "informs" {class: line_read_only}
+"el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_spec_extract": "writes spec extract" {class: line_acts_on}
+"el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "writes" {class: line_acts_on}
+"el_praxion.orchestration.pipeline.promethean" -> "el_praxion.orchestration.doc_idea": "writes" {class: line_acts_on}
+"el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "writes" {class: line_acts_on}

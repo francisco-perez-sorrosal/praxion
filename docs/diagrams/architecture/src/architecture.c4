@@ -358,6 +358,7 @@ views {
 
     include
       praxion.orchestration.pipeline.promethean, praxion.orchestration.pipeline.researcher, praxion.orchestration.pipeline.architect, praxion.orchestration.doc_idea, praxion.orchestration.doc_research, praxion.orchestration.doc_systems, praxion.orchestration.doc_spec_extract
+    exclude praxion.orchestration.pipeline
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop
@@ -370,6 +371,7 @@ views {
 
     include
       praxion.orchestration.pipeline.architect, praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.planner, praxion.orchestration.doc_spec_extract, praxion.orchestration.doc_acceptance, praxion.orchestration.doc_systems, praxion.orchestration.doc_impl_plan
+    exclude praxion.orchestration.pipeline
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop
@@ -382,6 +384,7 @@ views {
 
     include
       praxion.orchestration.pipeline.planner, praxion.orchestration.pipeline.implementer, praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.doc_engineer, praxion.orchestration.doc_impl_plan, praxion.orchestration.doc_wip, praxion.orchestration.doc_test, praxion.orchestration.doc_learnings
+    exclude praxion.orchestration.pipeline
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop
@@ -394,6 +397,7 @@ views {
 
     include
       praxion.orchestration.pipeline.verifier, praxion.orchestration.doc_wip, praxion.orchestration.doc_test, praxion.orchestration.doc_verify
+    exclude praxion.orchestration.pipeline
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop

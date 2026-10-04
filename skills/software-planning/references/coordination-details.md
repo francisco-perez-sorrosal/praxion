@@ -141,7 +141,7 @@ When tests fail at an integration checkpoint:
 2. For new-test failures: the implementer updates production code until the tests pass. A test-engineer never modifies tests to accommodate buggy production code.
 3. For pre-existing-test failures (boy scout rule): the implementer fixes the pre-existing tests that the change broke, even if the tests predate the step. This excludes the outer loop, which the implementer never edits, and excludes `pending` outer-loop nodes, which are not failures. Leaving broken tests in the suite is never acceptable.
 4. For an outer-loop failure that production code cannot satisfy without contradicting the spec: stop and route it as a Spec Question ([late path](#spec-question-routing)). Never edit, skip, xfail or weaken the test or its driver.
-5. Iterate until all tests pass. Any other test that genuinely cannot be satisfied without changing the test escalates to the planner — do not silently weaken it.
+5. Iterate at most three times. If the suite is still red after the third fix iteration, stop and report `[BLOCKED]` with the failing set and what each iteration changed; the planner decides between a replan and a Spec Question. Past that point repeated fixing is where fixes start shipping defects of their own. Any other test that genuinely cannot be satisfied without changing the test escalates to the planner — do not silently weaken it.
 
 ### When to Pair
 
@@ -616,6 +616,8 @@ The user then either:
 - **rolls back** — the orchestrator re-invokes a specific upstream agent (`systems-architect` for a design fix, `implementation-planner` for a plan fix, `implementer` + `test-engineer` for an implementation fix) per what needs modifying. This runs with the pipeline still in flight — it is **not** a rework worktree and **not** the verifier rework loop.
 
 Two rollback paths bracket the verifier by design: the pre-verification checkpoint (user-driven, before verification) and the verifier rework loop (verifier-driven, after — the automated backstop for whatever the user did not catch). The pre-verification checkpoint catches what the verifier structurally cannot: the verifier checks the build against the plan's acceptance criteria, so a plan that drifted from intent passes verification; only a human intent-level inspect catches plan-level drift.
+
+**In-place rework rounds are bounded.** After a verifier FAIL the orchestrator may fix in place and re-verify at most twice. A third FAIL on the same pipeline routes through `REWORK_MANIFEST.md` to rework worktrees, where the architect looks first: two in-place rounds that did not converge mean the defect is structural rather than local, and a third patch in the same window is where the orchestrator's own unreviewed fixes have shipped defects.
 
 ### The pre-mortem gate (planning → implementation boundary)
 

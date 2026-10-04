@@ -1,7 +1,8 @@
 ---
-id: dec-draft-dc96c2c1
+id: dec-425
+draft_id: dec-draft-dc96c2c1
 title: Observation-log merge-in also runs from post-commit for a merge finished by a commit and from a fourth finalize hook slot, post-rewrite, for a finished rebase
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-03
 summary: "post-commit runs merge-in for a merge commit finished by git commit (primary working tree, outside a rebase, HEAD@{1} equal to its first parent, judged against that parent); a new fourth finalize hook slot, post-rewrite, runs merge-in after a finished rebase (judged against ORIG_HEAD; an amend does nothing); an unresolvable before-revision becomes a named skip through an additive CLI flag; the finalize hook names are declared once in install_git_hooks.py and a parity test keeps their mirrors equal"

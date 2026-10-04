@@ -291,4 +291,6 @@ One ADR landed (`dec-424`, architectural), one user decision at intake, and five
 
 **Declared limits** (`SYSTEMS_PLAN.md § Declared limits (post-implementation)`): a state directory that can be entered but not listed is named by merge-in and the health family but still reads as "no archives" in the spawn counter, the recovery reader and the cost collector (td-326); the post-merge gap for merges finished outside `git merge` (above); the identity-read race (td-330); after the archive count is lowered, a deleted run of in-policy positions below a surviving surplus position is not reported as missing, though P09 still warns on the surplus.
 
+**Follow-up.** The post-merge gap this spec declared (a merge git finishes outside `git merge`, or a rebasing pull) is closed by `SPEC_merge-triggers_2026-10-03.md` (`dec-425`, partially superseding `dec-424`): post-commit and post-rewrite triggers; a squash merge and a rebase that rewrites no commit remain the named limits.
+
 **Second half of `wal-modes`.** With this spec the effort the 2026-09-26 brief described is complete: `wal-modes-core` gave the log one owner and three recording modes; `wal-retention` gave it history, cross-checkout reach and a health check. Follow-ups are ledger rows, not a third pipeline.

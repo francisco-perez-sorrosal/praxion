@@ -16,7 +16,7 @@ to the implementer):
     first_turn   context tokens at the first assistant turn
     turns        number of assistant records carrying usage
     requests     number of distinct API requests (subagent only)
-    max_turns    the agent file's declared `maxTurns`, or None (subagent only)
+    max_turns    the `maxTurns` declared when the spawn ran, or None (subagent only)
     tools        tool_use block count; ignored for kind="main"
     compactions  count of isCompactSummary rows seen
     spawns       list of [context_at_spawn, spawned_agent_type]; kind="main" only
@@ -472,6 +472,18 @@ def test_agent_type_with_no_declared_cap_is_left_out():
     assert set(_cap_outs(rows)) == {"implementer"}
 
 
+def test_cap_outs_reads_each_spawn_against_the_cap_it_ran_under():
+    rows = [
+        _subagent_row(requests=80, max_turns=80),  # old cap, reached: capped
+        _subagent_row(requests=80, max_turns=100),  # new cap, not reached
+        _subagent_row(requests=100, max_turns=100),
+    ]
+
+    entry = _cap_outs(rows)["implementer"]
+
+    assert (entry["n"], entry["capped"], entry["max_turns"]) == (3, 2, 100)
+
+
 def test_cap_outs_rate_is_rounded_to_three_places():
     rows = [_subagent_row(requests=100, max_turns=100)] + [
         _subagent_row(requests=5, max_turns=100) for _ in range(2)
@@ -498,12 +510,17 @@ def test_frontmatter_max_turns_reads_only_the_leading_block(text, expected):
     assert ctx._frontmatter_max_turns(text) == expected
 
 
-def _write_transcript(path: Path, requests: list[tuple[str, int]]) -> None:
-    """A subagent transcript: a first prompt, then per request the given number
-    of assistant records sharing one `requestId` (the harness splits a request
-    into a thinking record and a tool-use record)."""
+def _write_transcript(
+    path: Path, requests: list[tuple[str, int]], started: str | None = None
+) -> None:
+    """A subagent transcript: a first prompt (stamped `started` when given), then
+    per request the given number of assistant records sharing one `requestId`
+    (the harness splits a request into a thinking record and a tool-use record)."""
     usage = {"input_tokens": 1, "cache_creation_input_tokens": 1, "cache_read_input_tokens": 0}
-    lines = [{"type": "user", "message": {"content": "You are the implementer. Task slug: s"}}]
+    prompt = {"type": "user", "message": {"content": "You are the implementer. Task slug: s"}}
+    if started is not None:
+        prompt["timestamp"] = started
+    lines = [prompt]
     for request_id, records in requests:
         for _ in range(records):
             lines.append(
@@ -537,6 +554,62 @@ def test_load_counts_distinct_requests_not_assistant_records(tmp_path, monkeypat
 
     assert (row["turns"], row["requests"], row["max_turns"]) == (5, 3, 3)
     assert _cap_outs([row])["implementer"]["capped"] == 1
+
+
+def _implementer_cap_100(tmp_path) -> Path:
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    (agents_dir / "implementer.md").write_text("---\nmaxTurns: 100\n---\n", encoding="utf-8")
+    return agents_dir
+
+
+def test_load_reads_a_spawn_at_80_requests_before_the_cap_change_as_capped(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    eighty = [(f"req_{i}", 1) for i in range(80)]
+    _write_transcript(subagents / "agent-old.jsonl", eighty, started="2026-09-11T23:59:59.000Z")
+
+    (row,) = ctx.load(project_root, _implementer_cap_100(tmp_path))
+
+    assert row["max_turns"] == 80
+    entry = _cap_outs([row])["implementer"]
+    assert (entry["n"], entry["capped"]) == (1, 1)
+
+
+def test_load_reads_a_spawn_at_80_requests_after_the_cap_change_as_not_capped(
+    tmp_path, monkeypatch
+):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    eighty = [(f"req_{i}", 1) for i in range(80)]
+    _write_transcript(subagents / "agent-new.jsonl", eighty, started="2026-09-12T00:00:00.000Z")
+
+    (row,) = ctx.load(project_root, _implementer_cap_100(tmp_path))
+
+    assert row["max_turns"] == 100
+    entry = _cap_outs([row])["implementer"]
+    assert (entry["n"], entry["capped"]) == (1, 0)
+
+
+@pytest.mark.parametrize(
+    ("current", "agent_type", "started", "expected"),
+    [
+        (100, "implementer", None, 100),  # no readable start: the current cap
+        (100, "implementer", ctx.date(2026, 9, 11), 80),
+        (100, "implementer", ctx.date(2026, 9, 12), 100),
+        (80, "verifier", ctx.date(2026, 1, 1), 80),  # no recorded change for this type
+        (None, "implementer", ctx.date(2026, 1, 1), None),  # no declared cap stays none
+    ],
+)
+def test_max_turns_when_run(current, agent_type, started, expected):
+    assert ctx._max_turns_when_run(current, agent_type, started) == expected
+
+
+def test_load_reads_a_spawn_with_an_unparsable_start_against_the_current_cap(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_transcript(subagents / "agent-x.jsonl", [("req_1", 1)], started="not a timestamp")
+
+    (row,) = ctx.load(project_root, _implementer_cap_100(tmp_path))
+
+    assert (row["started"], row["max_turns"]) == (None, 100)
 
 
 def test_load_leaves_max_turns_unset_when_the_agent_file_is_absent(tmp_path, monkeypatch):

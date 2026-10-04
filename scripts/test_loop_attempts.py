@@ -107,15 +107,35 @@ def test_a_line_that_breaks_the_grammar_is_unreadable_under_its_step(line: str) 
 
 
 @pytest.mark.parametrize(
-    "line",
+    ("line", "unnamed"),
     [
-        "  - Attempts: count=2",
-        "  - Attempts: three attempts so far",
-        "  - Attempts:",
+        ("  - Attempts: count=2", "count=2"),
+        ("  - Attempts: three attempts so far", "three attempts so far"),
+        ("  - Attempts: step 3 count=2", "step 3 count=2"),
+        ("  - Attempts: 3 count=2", "3 count=2"),
+        ("  - Attempts:", ""),
     ],
 )
-def test_a_broken_line_naming_no_step_is_dropped_without_a_count(line: str) -> None:
-    assert fields.parse_attempts(line) == fields.AttemptsReading({}, {})
+def test_a_broken_line_naming_no_step_is_listed_as_unnamed_and_gives_no_count(
+    line: str, unnamed: str
+) -> None:
+    assert fields.parse_attempts(line) == fields.AttemptsReading({}, {}, (unnamed,))
+
+
+def test_an_unnamed_line_does_not_disturb_a_readable_one_or_an_unreadable_one() -> None:
+    text = "\n".join(
+        [
+            f"  - Attempts: {label(1)} count=2",
+            "  - Attempts: step 2 count=1",
+            f"  - Attempts: {label(3)} count=zero",
+        ]
+    )
+
+    reading = fields.parse_attempts(text)
+
+    assert reading.counts == {label(1): fields.Attempt(2)}
+    assert list(reading.unreadable) == [label(3)]
+    assert reading.unnamed == ("step 2 count=1",)
 
 
 @pytest.mark.parametrize(

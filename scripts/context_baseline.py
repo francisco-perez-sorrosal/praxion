@@ -43,8 +43,9 @@ transcript or its `.meta.json` sidecar, so a spawn counts as capped when its
 `maxTurns` declared in its agent file's frontmatter (read from this checkout's
 `agents/` at measure time). It is therefore always an `estimate`: a spawn that
 finishes naturally on its cap-th request reads as capped, a resumed spawn counts
-once at its total, and a spawn made under an older cap is read against the
-current one. Agent types with no declared `maxTurns` are left out. `requests`
+once at its total, and a spawn with no readable start time is read against the
+current cap. A spawn made before a recorded cap change is read against the cap
+it ran under (`_PRIOR_MAX_TURNS`). Agent types with no declared `maxTurns` are left out. `requests`
 is not the `turns` field: one request is split across several assistant records
 (thinking, then tool use), so `turns` runs well past the cap and stays as it was
 because the published `turns_p50` is built on it. The worktree-sibling limit
@@ -72,7 +73,7 @@ import json
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from _repo_root import git_toplevel_from_cwd
@@ -87,6 +88,13 @@ from _observation_log import reader  # noqa: E402 (after sys.path injection)
 _AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
+
+# A spawn is read against the cap that was declared when it ran, not the agent
+# file's current one: agent type -> (first day the current cap applies, the cap
+# before it). The implementer's cap was 80 until 2026-09-12 and 100 after,
+# because spawns kept stopping at 80 inside their own verification pass with the
+# work already on disk. Add a row here whenever an agent's `maxTurns` changes.
+_PRIOR_MAX_TURNS = {"implementer": (date(2026, 9, 12), 80)}
 
 # No harness marker exists for a turn-cap stop, so a cap-out is always inferred
 # from the request count (see module docstring), never observed.
@@ -203,6 +211,16 @@ def _declared_max_turns(agents_dir: Path, agent_type: str) -> int | None:
     return _frontmatter_max_turns(text)
 
 
+def _max_turns_when_run(current: int | None, agent_type: str, started: date | None) -> int | None:
+    """The turn cap in force when a spawn started: the earlier cap for a spawn
+    that began before a recorded change, else `current`. `None` stays `None`
+    (no declared cap), and so does a spawn with no start time."""
+    prior = _PRIOR_MAX_TURNS.get(agent_type)
+    if current is not None and prior and started and started < prior[0]:
+        return prior[1]
+    return current
+
+
 def _classify_from_prompt(first_prompt: str) -> str:
     """`baseline.py`'s simple match, falling back to `retype.py`'s broader one
     -- the exact two-pass cascade the ad hoc scripts ran against a WAL-unjoined
@@ -238,29 +256,46 @@ def _iter_records(path: Path):
             continue
 
 
+def _message_of(record: dict) -> dict | None:
+    message = record.get("message") or {}
+    return message if isinstance(message, dict) else None
+
+
+def _first_user_prompt(records: list[dict]) -> str:
+    for record in records:
+        message = _message_of(record)
+        if record.get("type") == "user" and message is not None:
+            text = _content_text(message.get("content"))
+            if text:
+                return text
+    return ""
+
+
+def _start_day(records: list[dict]) -> date | None:
+    """The calendar day (UTC) of the first timestamped record, or `None`."""
+    for record in records:
+        stamp = record.get("timestamp")
+        if isinstance(stamp, str):
+            try:
+                return date.fromisoformat(stamp[:10])
+            except ValueError:
+                return None
+    return None
+
+
 def _parse_subagent_transcript(path: Path) -> dict | None:
     """One pass over a subagent transcript. Returns `None` when the agent
     never reached an assistant turn with usage (dropped, mirroring
     `baseline.py`'s `if turns == 0: continue`)."""
-    turns = peak = tools = compactions = 0
+    records = list(_iter_records(path))
+    compactions = sum(1 for r in records if r.get("isCompactSummary") or r.get("type") == "summary")
+    turns = peak = tools = 0
     first_turn: int | None = None
-    first_prompt = ""
     request_ids: set = set()
-    for record in _iter_records(path):
-        if record.get("isCompactSummary") or record.get("type") == "summary":
-            compactions += 1
-        message = record.get("message") or {}
-        if not isinstance(message, dict):
-            continue
-        content = message.get("content")
-
-        if record.get("type") == "user" and not first_prompt:
-            first_prompt = _content_text(content)
-
-        if record.get("type") != "assistant":
-            continue
-        usage = message.get("usage") or {}
-        if not usage:
+    for record in records:
+        message = _message_of(record)
+        usage = (message or {}).get("usage")
+        if record.get("type") != "assistant" or not usage:
             continue
         turns += 1
         # One API request spans several assistant records; a record with no id
@@ -270,11 +305,13 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         peak = max(peak, ctx)
         if first_turn is None and usage.get("cache_creation_input_tokens") is not None:
             first_turn = ctx
+        content = message.get("content")
         if isinstance(content, list):
             tools += sum(1 for b in content if isinstance(b, dict) and b.get("type") == "tool_use")
 
     if turns == 0:
         return None
+    first_prompt = _first_user_prompt(records)
     slug_match = _SLUG_RE.search(first_prompt)
     return {
         "kind": "subagent",
@@ -285,6 +322,7 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         "turns": turns,
         "requests": len(request_ids),
         "max_turns": None,
+        "started": _start_day(records),
         "tools": tools,
         "compactions": compactions,
         "spawns": [],
@@ -373,7 +411,9 @@ def load(project_root: Path, agents_dir: Path = _AGENTS_DIR) -> list[dict]:
             row["atype"] = wal_type.replace("praxion:", "")
         if row["atype"] not in max_turns_by_type:
             max_turns_by_type[row["atype"]] = _declared_max_turns(agents_dir, row["atype"])
-        row["max_turns"] = max_turns_by_type[row["atype"]]
+        row["max_turns"] = _max_turns_when_run(
+            max_turns_by_type[row["atype"]], row["atype"], row["started"]
+        )
         rows.append(row)
 
     for path in sorted(transcripts_dir.glob("*.jsonl")):
@@ -438,7 +478,9 @@ def _aggregate_by_agent_type(subagent_rows: list[dict]) -> dict:
 
 
 def _aggregate_cap_outs(subagent_rows: list[dict]) -> dict:
-    """Per agent type with a declared `maxTurns`: how many spawns reached it."""
+    """Per agent type with a declared `maxTurns`: how many spawns reached the
+    cap they ran under. The reported `max_turns` is the highest in the group,
+    which is the current one."""
     by_type: dict[str, list[dict]] = defaultdict(list)
     for row in subagent_rows:
         if row["max_turns"] is not None:
@@ -446,13 +488,12 @@ def _aggregate_cap_outs(subagent_rows: list[dict]) -> dict:
 
     result = {}
     for atype, group in by_type.items():
-        max_turns = group[0]["max_turns"]
-        capped = sum(1 for r in group if r["requests"] >= max_turns)
+        capped = sum(1 for r in group if r["requests"] >= r["max_turns"])
         result[atype] = {
             "n": len(group),
             "capped": capped,
             "rate": round(capped / len(group), 3),
-            "max_turns": max_turns,
+            "max_turns": max(r["max_turns"] for r in group),
             "basis": _CAP_OUT_BASIS,
         }
     return result

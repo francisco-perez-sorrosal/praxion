@@ -259,6 +259,47 @@ def test_an_unclaimed_step_with_an_unmet_check_keeps_the_partial_and_in_flight_l
     assert classify(half_done(), outcome)["verdict"] == "in-flight"
 
 
+RESUME_INSTRUCTION = "run the step's check command and record its Result: line"
+
+
+@pytest.mark.parametrize(
+    ("outcome", "named"),
+    [
+        pytest.param(unmet("pass", ">=", 6, 4), "check unmet: pass", id="unmet"),
+        pytest.param(NoResult(f"no Result: recorded for {STEP}"), "no Result: recorded", id="none"),
+    ],
+)
+def test_a_stopped_agent_with_every_file_changed_is_told_to_run_the_check(outcome, named) -> None:
+    result = classify(evidence(tier2=dict(STOPPED)), outcome)
+
+    assert result["verdict"] == "partial@a.py"
+    assert named in result["evidence"]
+    assert "remainder: none" in result["evidence"]
+    assert f"resume: {RESUME_INSTRUCTION}" in result["evidence"]
+    assert (result["decided_by"], result["outcome_source"]) == ("check", "recorded")
+
+
+def test_a_stopped_agent_with_files_left_is_told_to_finish_them_before_running_the_check() -> None:
+    result = classify(half_done(tier2=dict(STOPPED)), unmet("fail", "=", 0, 2))
+
+    assert "remainder: b.py; check unmet: fail" in result["evidence"]
+    assert "resume: finish the remainder, then run the step's check" in result["evidence"]
+    assert result["resume_scope"] == ["b.py"]
+
+
+def test_an_agent_that_may_still_be_running_is_not_told_to_resume() -> None:
+    result = classify(evidence(), unmet("pass", ">=", 6, 4))
+
+    assert result["verdict"] == "in-flight"
+    assert "resume:" not in result["evidence"]
+
+
+def test_a_stopped_agent_without_a_check_keeps_the_plain_remainder_text() -> None:
+    result = classify(half_done(tier2=dict(STOPPED)))
+
+    assert result["evidence"] == "1 file(s) changed; agent stopped after a.py; remainder: b.py"
+
+
 def test_an_unclaimed_untouched_step_with_an_unmet_check_is_pending_and_decided_by_nothing() -> (
     None
 ):

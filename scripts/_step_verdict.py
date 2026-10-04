@@ -15,7 +15,8 @@ Policy, in order:
 1. A step that declares a check is decided by that check against the result
    recorded for it. A met check completes the step (unless a completion
    blocker applies); an unmet check, or no recorded result, never does, and
-   a claim of completion cannot outrank it. A check that cannot be read is
+   a claim of completion cannot outrank it. A stopped agent's partial verdict
+   names what the check lacks and says to run it and record its result. A check that cannot be read is
    surfaced to a human.
 2. A step that declares no check is decided by the file and test evidence.
 3. A step that has used its fresh attempts (``ATTEMPT_CAP``) without being
@@ -230,7 +231,20 @@ def _decide_by_check(evidence: StepEvidence, outcome: CheckOutcome) -> Decision:
     if evidence.claim == "COMPLETE":
         scope = evidence.unchanged or evidence.files
         return Decision("mismatch", f"WIP=[COMPLETE] but {_why_unmet(outcome)}", scope)
-    return _decide_unclaimed(evidence)
+    return _name_the_check(_decide_unclaimed(evidence), outcome)
+
+
+def _name_the_check(decision: Decision, outcome: Unmet | NoResult) -> Decision:
+    """A stopped agent's partial verdict also says what the check still lacks and
+    that running it is part of the remainder, even when every file already changed."""
+    if not decision.verdict.startswith("partial@"):
+        return decision
+    first = "finish the remainder, then run" if decision.resume_scope else "run"
+    text = (
+        f"{decision.evidence}; {_why_unmet(outcome)}; resume: {first} the step's check "
+        "command and record its Result: line last in the step's TEST_RESULTS section"
+    )
+    return Decision(decision.verdict, text, decision.resume_scope)
 
 
 def _why_unmet(outcome: Unmet | NoResult) -> str:
@@ -334,7 +348,7 @@ def _decide_unclaimed(evidence: StepEvidence) -> Decision:
         last = evidence.tier2.get("last_write") or "?"
         text = (
             f"{len(changed)} file(s) changed; agent stopped after {last}; "
-            f"remainder: {', '.join(unchanged)}"
+            f"remainder: {', '.join(unchanged) or 'none'}"
         )
         return Decision(f"partial@{last}", text, unchanged)
     text = f"{len(changed)} file(s) changed, no terminal marker — possibly still running"

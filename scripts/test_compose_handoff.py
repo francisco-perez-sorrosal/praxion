@@ -32,6 +32,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import _handoff_readiness  # noqa: E402
+import _step_verdict  # noqa: E402
 import compose_handoff  # noqa: E402
 
 SLUG = "demo-task"
@@ -2011,6 +2012,10 @@ def test_names_a_blocked_step_as_the_next_action_with_its_escape_path():
     assert "blocked" in text
     assert "restore the sensor" in text
     assert "drop the tag" in text
+
+
+def test_the_steps_never_picked_as_next_are_the_reconciler_human_verdicts_but_blocked():
+    assert set(compose_handoff.HUMAN_OWED) == set(_step_verdict.HUMAN_VERDICTS) - {"blocked"}
 
 
 def test_a_blocked_step_is_not_a_needs_mark_or_mismatch_conflict():

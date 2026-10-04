@@ -33,7 +33,9 @@ checkbox, one line outside code fences, anywhere in `WIP.md`:
     - Attempts: Step <id> count=<n> [[BLOCKED] replan: <text>]
 
 with `<n>` a decimal integer of at least 1. Two lines for one step keep the
-highest count and its replan text; a line breaking the grammar is unreadable.
+highest count and its replan text. A line that names its step but breaks the
+grammar is unreadable for that step; a line under the label that names no step
+(`step 3 count=2`, `3 count=2`) belongs to none, so it is listed apart as unnamed.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ import re
 from dataclasses import dataclass
 from typing import Union
 
-from _step_schema import STEP_ID_RE, Counts, split_step_blocks
+from _step_schema import STEP_ID_RE, Counts, NoRun, split_step_blocks
 
 # The one-line grammar the prose sites quote; the docstring above is normative.
 CHECK_GRAMMAR_LINE = "Check: `<command>` expects <key><op><count> [<key><op><count> ...]"
@@ -205,17 +207,20 @@ CheckOutcome = Union[Met, Unmet, NoResult]  # noqa: UP007 -- runtime value, 3.9 
 
 
 def evaluate_check(check: Check, step: str, test_results_text: str) -> CheckOutcome:
-    """Judge `check` against the latest `Counts` line in `step`'s own results block.
+    """Judge `check` against the latest `Result:` line in `step`'s own results blocks.
 
-    Only the step's own block counts: a result recorded for another step, a
-    file-wide fallback, `Result: none`, a malformed line or no line at all is
-    never `Met`.
+    Only the step's own blocks count: a result recorded for another step, a
+    file-wide fallback or no line at all is never `Met`, and neither is a latest
+    line that is `Result: none`, which supersedes an earlier count line. A
+    malformed line is not a result and is passed over (see `latest_result`).
     """
     label = step if step.startswith("Step") else f"Step {step}"
-    latest = _latest_counts_line(label, test_results_text)
+    latest = latest_result(label, test_results_text)
     if latest is None:
         return NoResult(f"no Result: recorded for {label}")
     counts, raw_line = latest
+    if isinstance(counts, NoRun):
+        return NoResult(f"the latest Result: recorded for {label} records no run")
     observed = {
         "pass": counts.passed,
         "fail": counts.failed,
@@ -232,15 +237,21 @@ def evaluate_check(check: Check, step: str, test_results_text: str) -> CheckOutc
     return Unmet(tuple(unmet)) if unmet else Met()
 
 
-def _latest_counts_line(label: str, test_results_text: str) -> tuple[Counts, str] | None:
-    """The step's own latest `Counts` line with its raw text, across all its blocks."""
-    latest: tuple[int, Counts, str] | None = None
-    for block in split_step_blocks(test_results_text):
+def latest_result(label: str, results_text: str) -> tuple[Counts | NoRun, str] | None:
+    """The step's own latest well-formed `Result:` line, with its text as written.
+
+    The one reader behind the check judgment and the iteration ledger, so both
+    mean the same line. It looks across all the step's blocks and takes the last
+    count line or declared no-run; a malformed line is passed over, since neither
+    reader can act on one.
+    """
+    latest: tuple[int, Counts | NoRun, str] | None = None
+    for block in split_step_blocks(results_text):
         if block.step != label:
             continue
         lines = block.text.splitlines()
         for number, parsed in block.results:
-            if isinstance(parsed, Counts) and (latest is None or number > latest[0]):
+            if isinstance(parsed, (Counts, NoRun)) and (latest is None or number > latest[0]):
                 latest = (number, parsed, lines[number - block.first_line])
     return None if latest is None else (latest[1], latest[2])
 
@@ -283,16 +294,20 @@ class Attempt:
 
 @dataclass(frozen=True)
 class AttemptsReading:
-    """A count per readable step and a reason per broken line; a step in neither has no count."""
+    """A count per readable step and a reason per broken line that names its step; a
+    step in neither has no count. A broken line that names no step is kept in
+    `unnamed` as the line's text, since it cannot be tied to any step."""
 
     counts: dict[str, Attempt]
     unreadable: dict[str, str]
+    unnamed: tuple[str, ...] = ()
 
 
 def parse_attempts(wip_text: str) -> AttemptsReading:
     """Read every `- Attempts:` line outside code fences, merging per step."""
     counts: dict[str, Attempt] = {}
     unreadable: dict[str, str] = {}
+    unnamed: list[str] = []
     labelled = (_ATTEMPTS_LABEL_RE.match(line) for line in _unfenced_lines(wip_text))
     for value in (match["value"].strip() for match in labelled if match):
         try:
@@ -300,9 +315,11 @@ def parse_attempts(wip_text: str) -> AttemptsReading:
             counts[step] = _higher(counts.get(step), attempt)
         except _UnreadableError as broken:
             named = _ATTEMPTS_STEP_RE.match(value)
-            if named is not None:
+            if named is None:
+                unnamed.append(value)
+            else:
                 unreadable.setdefault(f"Step {named['id']}", str(broken))
-    return AttemptsReading(counts, unreadable)
+    return AttemptsReading(counts, unreadable, tuple(unnamed))
 
 
 def _read_attempt(value: str) -> tuple[str, Attempt]:

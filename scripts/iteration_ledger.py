@@ -48,8 +48,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from _loop_fields import latest_result
 from _repo_root import git_toplevel_from_cwd, is_plugin_cache_path
-from _step_schema import STEP_ID_RE, Counts, NoRun, parse_result_line, split_step_blocks
+from _step_schema import STEP_ID_RE, Counts, NoRun, parse_result_line
 from _step_verdict import VERDICT_WORDS
 
 LEDGER_FILE = "ITERATION_LEDGER.jsonl"
@@ -334,14 +335,8 @@ def record_from_ground_truth(
 
 def latest_result_line(step_label: str, results_text: str) -> str:
     """The step's own latest ``Result:`` line across its blocks, as written."""
-    recorded = [
-        (number, block.text.splitlines()[number - block.first_line])
-        for block in split_step_blocks(results_text)
-        if block.step == step_label
-        for number, parsed in block.results
-        if isinstance(parsed, (Counts, NoRun))
-    ]
-    return max(recorded)[1] if recorded else NO_RESULT_RECORDED
+    latest = latest_result(step_label, results_text)
+    return NO_RESULT_RECORDED if latest is None else latest[1]
 
 
 def _run_read(args: argparse.Namespace, task_dir: Path) -> int:

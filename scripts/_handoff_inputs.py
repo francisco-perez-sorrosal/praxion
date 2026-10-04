@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from _git_runner import git_output
+from _step_verdict import HUMAN_VERDICTS
 
 VERIFIED_COMPLETE = "verified-complete"
 # The reconciler's own "unknown" verdict value -- claimed complete, no
@@ -32,7 +33,11 @@ VERDICT_UNKNOWN = "unknown"
 # A step that used its fresh attempts without verified completion: a person
 # decides what happens next, so it is never the next step to run.
 VERDICT_EXHAUSTED = "attempts-exhausted"
-HUMAN_OWED = (VERDICT_UNKNOWN, VERDICT_EXHAUSTED)
+# Verdicts whose step is never the next to run: a person verifies or decides it.
+# The reconciler's human set minus `blocked`, which names a move that comes before
+# any later step (restore the sensor reading and re-run, or amend the plan), so
+# the picker returns it as the next action.
+HUMAN_OWED = tuple(verdict for verdict in HUMAN_VERDICTS if verdict != "blocked")
 
 # Tried in order only when `refs/remotes/origin/HEAD` is unset (no remote, or a
 # clone that never populated it) -- both conventional default-branch names,

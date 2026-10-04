@@ -370,7 +370,6 @@ CHECK = parsed_check("pass>=1", "fail=0")
         "# Test Results\n\nnothing recorded\n",
         results_text((label(4), ("Result: pass=9 fail=0",))),
         results_text((label(30), ("Result: pass=9 fail=0",))),
-        results_text((label(3), ("Result: none -- measurement",))),
         results_text((label(3), ("Result: pass=9",))),
         results_text((label(3), ("Outcome: all green",))),
         "Result: pass=9 fail=0\n",
@@ -389,10 +388,58 @@ def test_the_latest_counts_line_decides_so_a_later_green_rerun_supersedes_a_red_
     assert isinstance(judge(CHECK, *reversed(lines)), fields.Unmet)
 
 
-def test_a_later_line_that_is_not_a_count_does_not_hide_the_latest_count() -> None:
-    outcome = judge(CHECK, "Result: pass=5 fail=0", "Result: none -- note", "Result: pass=oops")
+def test_a_later_malformed_line_does_not_hide_the_latest_count() -> None:
+    assert judge(CHECK, "Result: pass=5 fail=0", "Result: pass=oops") == fields.Met()
 
-    assert outcome == fields.Met()
+
+@pytest.mark.parametrize("earlier", ["Result: pass=5 fail=0", "Result: pass=1 fail=3"])
+def test_a_later_no_run_line_supersedes_an_earlier_count_line(earlier: str) -> None:
+    outcome = judge(CHECK, earlier, "Result: none -- note")
+
+    assert outcome == fields.NoResult(f"the latest Result: recorded for {label(3)} records no run")
+
+
+def test_a_no_run_line_alone_is_never_met() -> None:
+    outcome = judge(CHECK, "Result: none -- measurement")
+
+    assert outcome == fields.NoResult(f"the latest Result: recorded for {label(3)} records no run")
+
+
+def test_a_later_count_line_supersedes_an_earlier_no_run_line() -> None:
+    assert judge(CHECK, "Result: none -- note", "Result: pass=5 fail=0") == fields.Met()
+
+
+def test_a_no_run_line_in_another_block_of_the_same_step_is_the_latest_when_it_comes_last() -> None:
+    text = results_text(
+        (label(3), ("Result: pass=5 fail=0",)),
+        (label(4), ("Result: pass=5 fail=0",)),
+        (label(3), ("Result: none -- rerun skipped",)),
+    )
+
+    assert isinstance(fields.evaluate_check(CHECK, label(3), text), fields.NoResult)
+    assert fields.evaluate_check(CHECK, label(4), text) == fields.Met()
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected"),
+    [
+        (("Result: pass=5 fail=0",), "Result: pass=5 fail=0"),
+        (("Result: pass=5 fail=0", "Result: none -- note"), "Result: none -- note"),
+        (("Result: none -- note", "Result: pass=5 fail=0"), "Result: pass=5 fail=0"),
+        (("Result: pass=5 fail=0", "Result: pass=oops"), "Result: pass=5 fail=0"),
+    ],
+)
+def test_the_latest_result_is_the_last_well_formed_line_as_written(lines, expected) -> None:
+    latest = fields.latest_result(label(3), results_text((label(3), lines)))
+
+    assert latest is not None
+    assert latest[1] == expected
+
+
+def test_no_result_for_the_step_reads_as_none() -> None:
+    assert (
+        fields.latest_result(label(3), results_text((label(4), ("Result: pass=1 fail=0",)))) is None
+    )
 
 
 def test_a_step_label_without_the_word_step_names_the_same_block() -> None:

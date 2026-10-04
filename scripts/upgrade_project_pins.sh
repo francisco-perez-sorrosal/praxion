@@ -16,7 +16,7 @@
 #
 # It reconciles every onboarding-installed surface that a plugin upgrade (or
 # rename) can invalidate:
-#   1. The three finalize-hook symlinks (post-merge, post-commit, post-checkout)
+#   1. The four finalize-hook symlinks (post-merge, post-commit, post-checkout, post-rewrite)
 #   2. The merge.observations-jsonl.driver git config
 #   3. Retired merge drivers + their .gitattributes lines (cross-version cleanup)
 #   4. The .ai-state/.praxion-onboard.json manifest version stamp
@@ -68,10 +68,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
 PLUGIN_KEY="praxion@bit-agora"
 EXPECTED_DRIVERS=("observations-jsonl")
-FINALIZE_HOOKS=("post-merge" "post-commit" "post-checkout")
+# Mirrors scripts/install_git_hooks.py FINALIZE_HOOK_NAMES (scripts/test_finalize_hook_names.py).
+FINALIZE_HOOKS=("post-merge" "post-commit" "post-checkout" "post-rewrite")
 LEGACY_HOOK_BASENAME="git-post-merge-hook.sh"
 PRAXION_HUB="francisco-perez-sorrosal/praxion"
 
@@ -366,7 +366,7 @@ echo
 # husky/lefthook-style core.hooksPath the loop above has no notion of at
 # all, or an orphaned wrapper directory) via scripts/install_git_hooks.py.
 # Both run every invocation -- they answer different questions about the
-# same four hook slots and neither subsumes the other.
+# same hook slots and neither subsumes the other.
 
 echo "[1/4] Finalize hooks"
 for h in "${FINALIZE_HOOKS[@]}"; do
@@ -582,7 +582,7 @@ if [ -f "$MANIFEST" ] && command -v jq >/dev/null 2>&1; then
     # core keys win (so a retired driver is still pruned from merge_drivers /
     # gitattributes), while a conditional caller-set key an onboard recorded
     # (e.g. ci_autofix) is preserved across the upgrade.
-    expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations_summary.jsonl merge=observations-jsonl"]}'
+    expected_artifacts='{"hooks":["pre-commit","post-merge","post-commit","post-checkout","post-rewrite"],"merge_drivers":["observations-jsonl"],"gitattributes":[".ai-state/observations_summary.jsonl merge=observations-jsonl"]}'
     cur_artifacts="$(jq -cS '.artifacts // {}' "$MANIFEST")"
     merged_artifacts="$(jq -cS '(.artifacts // {}) + $a' --argjson a "$expected_artifacts" "$MANIFEST")"
 

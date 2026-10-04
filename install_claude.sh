@@ -381,18 +381,24 @@ install_git_merge_infra() {
 
     info "Merge driver: observations-jsonl"
 
-    # Install three git hooks (post-merge, post-commit, post-checkout) as
-    # symlinks pointing at the multiplexed dispatcher scripts/git-finalize-hook.sh.
+    # Install the four finalize git hooks (post-merge, post-commit,
+    # post-checkout, post-rewrite) as symlinks pointing at the multiplexed
+    # dispatcher scripts/git-finalize-hook.sh. The names mirror
+    # scripts/install_git_hooks.py FINALIZE_HOOK_NAMES
+    # (scripts/test_finalize_hook_names.py keeps them equal).
     # State-driven finalization: any path landing drafts on main (ff merge,
     # direct commit, rebase, fresh clone, branch reset) eventually triggers
-    # one of these and finalizes. The dispatcher reads basename($0) to
-    # determine which trigger fired; gate logic lives in finalize_chain.sh.
+    # one of these and finalizes; post-merge, post-commit and post-rewrite
+    # also merge in the worktree logs a merge, a merge finished by a commit,
+    # or a rebase brought in. The dispatcher reads basename($0) to determine
+    # which trigger fired; gate logic lives in finalize_chain.sh.
     local finalize_hook_target="${SCRIPT_DIR}/scripts/git-finalize-hook.sh"
 
     if [ -f "$finalize_hook_target" ]; then
         install_finalize_hook "$repo_root" "$finalize_hook_target" post-merge
         install_finalize_hook "$repo_root" "$finalize_hook_target" post-commit
         install_finalize_hook "$repo_root" "$finalize_hook_target" post-checkout
+        install_finalize_hook "$repo_root" "$finalize_hook_target" post-rewrite
     fi
 
     # Activate Praxion's commit gate via the pre-commit framework. The five

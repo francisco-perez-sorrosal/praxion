@@ -4,11 +4,11 @@
 `scripts/git-<name>-hook.sh` files are the source of truth for Praxion's git
 hooks; `install_claude.sh` symlinks (or copies) them into `.git/hooks/<hook>`.
 A source script can be **multiplexed** -- one script installed under several
-hook names at once (`git-finalize-hook.sh` under `post-merge`, `post-commit`
-*and* `post-checkout`) -- so **filename derivation is unsound**: a naive
-`git-<name>-hook.sh` -> `.git/hooks/<name>` mapping has no single target for
-a multiplexed source and reports false MISSINGs for every correctly-installed
-copy.
+hook names at once (`git-finalize-hook.sh` under `post-merge`, `post-commit`,
+`post-checkout` *and* `post-rewrite`) -- so **filename derivation is
+unsound**: a naive `git-<name>-hook.sh` -> `.git/hooks/<name>` mapping has no
+single target for a multiplexed source and reports false MISSINGs for every
+correctly-installed copy.
 
 This check resolves installed counterparts **by content instead**: every
 `.git/hooks/*` entry (symlink-aware -- read through the link, so a dangling

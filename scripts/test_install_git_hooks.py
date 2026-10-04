@@ -313,6 +313,12 @@ class TestWrapperExitPolicy:
 
 
 class TestInstallOrHeal:
+    def test_the_rewrite_hook_is_the_last_finalize_slot(self):
+        # Appended last, so the slots that existed before keep their
+        # iteration and report order.
+        assert hooks.FINALIZE_HOOK_NAMES[-1] == "post-rewrite"
+        assert hooks.ALL_HOOK_NAMES == ("pre-commit", *hooks.FINALIZE_HOOK_NAMES)
+
     def test_unset_absent_installs_plain_slots_byte_identical_to_template(self, repo, plugin_root):
         result = hooks.install_or_heal(repo, "install", plugin_root)
         assert result.changed

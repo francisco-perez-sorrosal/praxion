@@ -67,7 +67,11 @@ WRAPPER_MARKER = "# praxion-hook-wrapper v1"
 MARKER_SCAN_LINES = 5
 WRAPPER_DIRNAME = "praxion-hooks"
 DELEGATE_RECORD_FILENAME = ".praxion-delegate"
-FINALIZE_HOOK_NAMES = ("post-merge", "post-commit", "post-checkout")
+# The finalize hook names, declared once. The dispatcher's case arms
+# (git-finalize-hook.sh), upgrade_project_pins.sh (FINALIZE_HOOKS and the
+# manifest hooks list), install_claude.sh and the onboarding manifest example
+# mirror this tuple; scripts/test_finalize_hook_names.py keeps them equal.
+FINALIZE_HOOK_NAMES = ("post-merge", "post-commit", "post-checkout", "post-rewrite")
 ALL_HOOK_NAMES = ("pre-commit", *FINALIZE_HOOK_NAMES)
 PRECOMMIT_MARKER = "Praxion commit gate (installed by /onboard-project)"
 FINALIZE_DISPATCHER = "git-finalize-hook.sh"

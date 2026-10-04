@@ -40,6 +40,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from install_git_hooks import ALL_HOOK_NAMES, FINALIZE_HOOK_NAMES
 
 _SCRIPT = Path(__file__).resolve().parent / "upgrade_project_pins.sh"
 
@@ -78,7 +79,7 @@ def project(tmp_path: Path) -> dict:
     (live / "scripts" / "git-finalize-hook.sh").write_text("#!/usr/bin/env bash\n")
 
     # stale finalize-hook symlinks, then GC the old cache -> dangling
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         (repo / ".git" / "hooks" / h).symlink_to(stale / "scripts" / "git-finalize-hook.sh")
     shutil.rmtree(stale)
 
@@ -106,7 +107,7 @@ def project(tmp_path: Path) -> dict:
                 "onboarded_at": "2026-01-01T00:00:00Z",
                 "scope": "user",
                 "artifacts": {
-                    "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
+                    "hooks": list(ALL_HOOK_NAMES),
                     "merge_drivers": ["observations-jsonl", "memory-json"],
                     "gitattributes": [
                         ".ai-state/observations.jsonl merge=observations-jsonl",
@@ -243,7 +244,7 @@ def test_apply_repoints_all_surfaces(project):
     r = _run(repo, live)
     assert r.returncode == 0, r.stderr
     live_hook = str(live / "scripts" / "git-finalize-hook.sh")
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         assert os.readlink(repo / ".git" / "hooks" / h) == live_hook
     assert (
         _git(repo, "config", "--get", "merge.observations-jsonl.driver")
@@ -681,7 +682,7 @@ def test_hub_sha_absent_skips_caller_surfaces_but_reconciles_existing_four(proje
     assert caller.read_text() == before_caller
     assert not cross_model.exists()
     live_hook = str(live / "scripts" / "git-finalize-hook.sh")
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         assert os.readlink(repo / ".git" / "hooks" / h) == live_hook
     assert _manifest(repo)["onboarded_with_version"] == "0.9.0"
 
@@ -819,7 +820,7 @@ def test_self_host_symlink_in_a_praxion_named_dir_left_untouched(project, tmp_pa
     selfhost.mkdir(parents=True)
     target = selfhost / "git-finalize-hook.sh"
     target.write_text("#!/usr/bin/env bash\n")
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         hook = repo / ".git" / "hooks" / h
         hook.unlink()
         hook.symlink_to(target)
@@ -828,7 +829,7 @@ def test_self_host_symlink_in_a_praxion_named_dir_left_untouched(project, tmp_pa
 
     assert r.returncode == 0, r.stderr
     assert "skip (dev/self-host symlink" in r.stdout
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         assert (repo / ".git" / "hooks" / h).readlink() == target
 
 
@@ -841,7 +842,7 @@ def test_live_but_old_plugin_cache_symlink_still_repointed(project, tmp_path):
     old_cache.mkdir(parents=True)
     target = old_cache / "git-finalize-hook.sh"
     target.write_text("#!/usr/bin/env bash\n")
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         hook = repo / ".git" / "hooks" / h
         hook.unlink()
         hook.symlink_to(target)
@@ -849,7 +850,7 @@ def test_live_but_old_plugin_cache_symlink_still_repointed(project, tmp_path):
     r = _run(repo, live)
 
     assert r.returncode == 0, r.stderr
-    for h in ("post-merge", "post-commit", "post-checkout"):
+    for h in FINALIZE_HOOK_NAMES:
         resolved = (repo / ".git" / "hooks" / h).readlink()
         assert resolved == live / "scripts" / "git-finalize-hook.sh"
 

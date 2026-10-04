@@ -295,13 +295,13 @@ Do NOT create `.ai-state/observations.jsonl` — that is written on first use by
 
 **Why these hooks.** The pre-commit hook enforces id-citation discipline — committed code must not reference ephemeral pipeline ids (`REQ-NN`, `AC-NN`, `Step N`, draft ADR hashes). Rationale, exempt paths, and escape hatch live in `rules/swe/id-citation-discipline.md`.
 
-Three finalize hooks (post-merge, post-commit, post-checkout) all symlink to a single multiplexed dispatcher (`scripts/git-finalize-hook.sh`) that reads `basename($0)` and dispatches to the matching entry point in `scripts/finalize_chain.sh`. The trio is state-driven: each entry point gates on "are we on main with drafts present?" so draft ADRs landing on main via any path eventually promote — fast-forward merges (post-merge), direct commits / non-ff merges / rebases / cherry-picks (post-commit), branch switch / fresh clone / reset (post-checkout). Single-trigger coverage misses real cases (a branch reset to main, a fresh clone with drafts on main, a fast-forward pull) where drafts otherwise sit in `decisions/drafts/` indefinitely.
+Four finalize hooks (post-merge, post-commit, post-checkout, post-rewrite) all symlink to a single multiplexed dispatcher (`scripts/git-finalize-hook.sh`) that reads `basename($0)` and dispatches to the matching entry point in `scripts/finalize_chain.sh`. The finalize is state-driven: each entry point gates on "are we on main with drafts present?" so draft ADRs landing on main via any path eventually promote — fast-forward merges (post-merge), direct commits / merges finished by a commit / cherry-picks (post-commit), branch switch / fresh clone / reset (post-checkout). Single-trigger coverage misses real cases (a branch reset to main, a fresh clone with drafts on main, a fast-forward pull) where drafts otherwise sit in `decisions/drafts/` indefinitely.
 
-Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-state/` was touched), `finalize_adrs.py --all` and `finalize_tech_debt_ledger.py --all` (when on main with drafts), then `check_squash_safety.py` (always, as a non-blocking diagnostic). `post-commit` and `post-checkout` run only the on-main finalize subset. All steps are non-blocking — a hook cannot abort a completed git operation.
+Composition per trigger: `post-merge` runs `reconcile_ai_state.py` (when `.ai-state/` was touched), the worktree-log merge-in (`merge_worktree_log.py --merged`, primary working tree, in-repo placement), `finalize_adrs.py --all` and `finalize_tech_debt_ledger.py --all` (when on main), then `check_squash_safety.py` (always, as a non-blocking diagnostic). `post-commit` merges in the worktree logs a merge commit brought in when that merge was finished by `git commit` or `git merge --continue` (after a conflict or `--no-commit`; an amend, or a commit a rebase replays, copies nothing), then runs the on-main finalize subset. `post-checkout` runs only the on-main finalize subset. `post-rewrite` runs only the merge-in, once a rebase has finished (`git pull --rebase` included; an amend does nothing). A squash merge is the one merge no hook merges in; `/merge-worktree` and P14 cover it. All steps are non-blocking — a hook cannot abort a completed git operation.
 
 **Skip condition.** If §Pre-flight set the `skip-phase-4` flag (plugin not installed), skip this phase entirely and emit: `Skipping Phase 4 — install the plugin and re-run /onboard-project to install hooks.`
 
-**Delegated implementation.** All four hook slots (`pre-commit`, `post-merge`, `post-commit`, `post-checkout`) are installed by one deterministic reconciler, `scripts/install_git_hooks.py`, rather than by prose+bash carried in this skill:
+**Delegated implementation.** All five hook slots (`pre-commit`, `post-merge`, `post-commit`, `post-checkout`, `post-rewrite`) are installed by one deterministic reconciler, `scripts/install_git_hooks.py`, rather than by prose+bash carried in this skill:
 
 ```bash
 python3 "${PLUGIN_INSTALL_PATH}/scripts/install_git_hooks.py" \
@@ -535,7 +535,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      Phase 1: .gitignore (appended 10 lines, AI-assistants block)
      Phase 2: .ai-state/ skeleton (list the entries actually created this run)
      Phase 3: .gitattributes (appended 1 line), git config (1 merge driver registered)
-     Phase 4: .git/hooks/pre-commit (new), .git/hooks/{post-merge,post-commit,post-checkout} (symlinks)
+     Phase 4: .git/hooks/pre-commit (new), .git/hooks/{post-merge,post-commit,post-checkout,post-rewrite} (symlinks)
      Phase 5: .claude/settings.json (PRAXION_DISABLE_OBSERVABILITY env var; permissions.allow baseline) — or 'skipped' per sub-step
      Phase 6: CLAUDE.md (appended Agent Pipeline + Compaction + Behavioral Contract + Praxion Process + Working-in-this-project blocks)
      Phase 7: companion CLIs — scc missing (install: ...)
@@ -570,7 +570,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
      "scope": "user | project",
      "mode": "<'full' or 'hackathon' — see below>",
      "artifacts": {
-       "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout"],
+       "hooks": ["pre-commit", "post-merge", "post-commit", "post-checkout", "post-rewrite"],
        "merge_drivers": ["observations-jsonl"],
        "gitattributes": [".ai-state/observations_summary.jsonl merge=observations-jsonl"],
        "ci_autofix": {

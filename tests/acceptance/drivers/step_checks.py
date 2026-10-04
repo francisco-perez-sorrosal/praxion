@@ -10,12 +10,12 @@ file and the step's `TEST_RESULTS.md` section, in the shapes the planning
 templates document -- and asks the reconciler (`scripts/reconcile_pipeline_state.py`)
 for its per-step verdicts, the same way `/resume-pipeline` does.
 
-The bound part is everything that exists at the base commit: legacy plan, progress
-and result shapes, and the reconciler's command line and its `step`, `verdict`
-and `evidence` fields. The unbound part raises until a binding step connects it
-to the designed surface: how a `Check:` is written in a plan step, how an attempt
-count and a replan marking are written in `WIP.md`, and how a verdict names its
-deciding criterion, its outcome source and the attempt count.
+The hooks are bound to the designed surface: how a `Check:` is written in a plan
+step (every declared count is an exact `=` count), how an attempt count and a
+replan marking are written in `WIP.md` (a self-naming sub-bullet under the step's
+checklist line), the name of the cap verdict, and the verdict fields that name its
+deciding criterion, its outcome source and the attempt count. Until the reconciler
+implements that surface, the scenarios fail on its missing behavior.
 """
 
 from __future__ import annotations
@@ -139,74 +139,81 @@ class Reconciliation:
         return self.steps[key]
 
 
-# -- Unbound hooks: the designed surface ------------------------------------------
+# -- Hooks bound to the designed surface -------------------------------------------
 
 
 def check_field(check: Check) -> str:
-    """The plan-step line(s) declaring `check`, in the designed `Check:` grammar."""
-    raise UnboundDriverError(
-        "unbound: a plan step declares its completion check in a `Check:` field naming the "
-        "command, the pass/fail/skip counts its `Result:` line must show and, where acceptance "
-        "tests fall due, the expected `pending=` count -- bind this to the designed grammar"
-    )
+    """The plan-step line declaring `check`: every declared count is an exact (`=`) count."""
+    counts = f"pass={check.passed} fail={check.failed} skip={check.skipped}"
+    if check.pending is not None:
+        counts += f" pending={check.pending}"
+    return f"**Check**: `{check.command}` expects {counts}"
 
 
-def unreadable_check_field() -> str:
-    """A `Check:` field the plan reader cannot read: the designed label with a garbled value."""
-    raise UnboundDriverError(
-        "unbound: a plan step carries a `Check:` field whose value the plan reader cannot "
-        "read -- bind this to the designed label with a value outside its grammar"
-    )
+def unreadable_check_field(*, unknown_key: bool = False) -> str:
+    """A `Check:` line the plan reader cannot read.
+
+    By default it omits the `fail` count, which every readable check declares; with
+    `unknown_key` it instead carries a count key outside the grammar.
+    """
+    if unknown_key:
+        return f"**Check**: `{DEFAULT_COMMAND}` expects pass=4 fail=0 flaky=0"
+    return f"**Check**: `{DEFAULT_COMMAND}` expects pass=4 skip=0"
 
 
 def progress_entry(
     number: str, title: str, done: bool, attempt: int | None, blocked_for_replan: str | None
 ) -> str:
-    """The step's `WIP.md` checklist entry, with its attempt count and replan marking if any."""
-    if attempt is None and blocked_for_replan is None:
-        return f"- [{'x' if done else ' '}] Step {number}: {title}"
-    raise UnboundDriverError(
-        "unbound: `WIP.md` records a step's attempt number (and, after the attempt cap, a "
-        "`[BLOCKED]` marking with a replan request) -- bind this to the designed entry shape"
-    )
+    """The step's `WIP.md` checklist entry, with its attempt count and replan marking if any.
+
+    The attempt count is a self-naming sub-bullet (no checkbox) under the checklist line;
+    the replan marking continues that same single line.
+    """
+    entry = f"- [{'x' if done else ' '}] Step {number}: {title}"
+    if attempt is None:
+        if blocked_for_replan is not None:
+            raise ValueError("a replan marking needs the attempt count it is recorded beside")
+        return entry
+    line = f"  - Attempts: Step {number} count={attempt}"
+    if blocked_for_replan is not None:
+        request = blocked_for_replan.removeprefix("replan:").strip()
+        line += f" [BLOCKED] replan: {request}"
+    return f"{entry}\n{line}"
 
 
 def cap_exhausted_verdict() -> str:
     """The verdict name for a step that used its two fresh attempts without completing."""
-    raise UnboundDriverError(
-        "unbound: a step that has used its two fresh attempts without verified completion gets "
-        "its own verdict, distinct from both mismatch and blocked -- bind this to the designed "
-        "verdict name"
-    )
+    return "attempts-exhausted"
 
 
-def _criterion_of(raw: dict[str, Any]) -> Criterion:
-    raise UnboundDriverError(
-        "unbound: each reconciler verdict names the criterion that decided it -- the declared "
-        "check, the fallback evidence, or none -- bind this to the designed verdict field"
-    )
+_CRITERIA_BY_DECIDED_BY = {
+    "check": Criterion.CHECK,
+    "fallback": Criterion.FALLBACK,
+    "none": Criterion.NONE,
+}
 
 
 def _criterion_label_of(raw: dict[str, Any]) -> str:
-    raise UnboundDriverError(
-        "unbound: the text by which a verdict names its deciding criterion -- bind this to "
-        "the designed verdict field"
-    )
+    """The text by which a verdict names its deciding criterion (`decided_by`)."""
+    if "decided_by" not in raw:
+        raise AssertionError(f"the reconciler's verdict names no deciding criterion: {raw}")
+    return str(raw["decided_by"])
+
+
+def _criterion_of(raw: dict[str, Any]) -> Criterion:
+    return _CRITERIA_BY_DECIDED_BY[_criterion_label_of(raw)]
 
 
 def _outcome_source_of(raw: dict[str, Any]) -> OutcomeSource | None:
-    raise UnboundDriverError(
-        "unbound: a check-decided verdict says whether its outcome came from running the "
-        "declared command or from a result recorded for the step -- bind this to the designed "
-        "verdict field"
-    )
+    """`recorded` when the check outcome was read from a result; absent when none was read."""
+    source = raw.get("outcome_source")
+    if source is None:
+        return None
+    return OutcomeSource.RECORDED if source == "recorded" else OutcomeSource.RUN
 
 
 def _attempt_of(raw: dict[str, Any]) -> int | None:
-    raise UnboundDriverError(
-        "unbound: the reconciler shows each step's attempt count beside its verdict, and none "
-        "when WIP.md records none -- bind this to the designed verdict field"
-    )
+    return raw.get("attempt")
 
 
 # -- Bound: building the task ------------------------------------------------------

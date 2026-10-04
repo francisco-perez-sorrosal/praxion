@@ -1,7 +1,8 @@
 ---
-id: dec-draft-10dba96c
+id: dec-424
+draft_id: dec-draft-10dba96c
 title: The observation log keeps its history — numbered archives behind the reader, worktree logs merged in at merge time, and a log-health family
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-03
 summary: "Rotation keeps five numbered archives shifted by rename inside the writer's lock (count-bounded, 26-week target); a copy-path merge-in in the owner package appends a worktree's rows the main log lacks (whole-row identity) at /merge-worktree and from the post-merge finalize chain for every worktree that merge newly brings in; the spawn counter reads every checkout; sentinel family P09-P14 audits archives, rotation, segment integrity, helper share, recorded mode source and unmerged worktree logs"

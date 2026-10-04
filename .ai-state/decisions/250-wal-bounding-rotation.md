@@ -11,7 +11,7 @@ agent_type: systems-architect
 branch: wave2-criticals
 pipeline_tier: standard
 re_affirms: dec-248
-superseded_in_part_by: [dec-draft-10dba96c]
+superseded_in_part_by: [dec-424]
 affected_files:
   - hooks/_hook_utils.py
   - hooks/capture_observations.py

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-03T03:50:22Z'
+generated_at: '2026-10-04T01:27:08Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-02'
+  last_modified: '2026-10-03'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -503,7 +503,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-02'
+  last_modified: '2026-10-03'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-02'
+  last_modified: '2026-10-03'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-02'
+  last_modified: '2026-10-03'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2066,7 +2066,7 @@ surfaces:
   path: .ai-state/decisions/250-wal-bounding-rotation.md
   type: markdown
   title: "Bound the recovery WAL \u2014 best-effort rotate-and-archive to a gitignored segment + windowed cross-boundary read"
-  last_modified: '2026-09-07'
+  last_modified: '2026-10-03'
   renderer: adr_card
 - id: ai-state-decisions-251-artifact-registry-declarative-spine
   path: .ai-state/decisions/251-artifact-registry-declarative-spine.md
@@ -3107,6 +3107,12 @@ surfaces:
   title: The dashboard front door is an Overview composed at the root; dec-374's falsifier fired
   last_modified: '2026-10-02'
   renderer: adr_card
+- id: ai-state-decisions-424-observation-log-keeps-its-history
+  path: .ai-state/decisions/424-observation-log-keeps-its-history.md
+  type: markdown
+  title: "The observation log keeps its history \u2014 numbered archives behind the reader, worktree logs merged in at merge time, and a log-health family"
+  last_modified: '2026-10-03'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3369,6 +3375,12 @@ surfaces:
   type: markdown
   title: 'Spec: Sidecar Placement (P0 hook chaining + P1 sidecar placement axis)'
   last_modified: '2026-09-04'
+  renderer: default_markdown
+- id: ai-state-specs-spec-wal-modes-core-2026-09-27
+  path: .ai-state/specs/SPEC_wal-modes-core_2026-09-27.md
+  type: markdown
+  title: 'Spec: wal-modes-core (observation log: one owner package + recording modes)'
+  last_modified: '2026-10-03'
   renderer: default_markdown
 groups:
 - id: tutorial
@@ -3840,6 +3852,7 @@ groups:
   - ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
   - ai-state-decisions-422-state-data-does-not-fan-out
   - ai-state-decisions-423-overview-landing-at-the-root
+  - ai-state-decisions-424-observation-log-keeps-its-history
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3885,6 +3898,7 @@ groups:
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
+  - ai-state-specs-spec-wal-modes-core-2026-09-27
   - ai-state-system-deployment
   - ai-state-tech-debt-ledger
   - ai-state-tech-debt-resolved

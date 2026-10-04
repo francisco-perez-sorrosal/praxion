@@ -21,6 +21,7 @@ affected_files:
   - claude/aac-templates/fitness-README.md.tmpl
   - claude/aac-templates/precommit-block-d.sh.frag
 re_affirms: dec-099
+superseded_in_part_by: [dec-draft-ffb3c58b]
 ---
 
 ## Context

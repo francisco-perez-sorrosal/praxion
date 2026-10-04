@@ -19,6 +19,7 @@ affected_files:
   - skills/onboard-project/SKILL.md
   - agents/systems-architect.md
   - agents/implementer.md
+superseded_in_part_by: [dec-draft-6aad9591]
 ---
 
 ## Context

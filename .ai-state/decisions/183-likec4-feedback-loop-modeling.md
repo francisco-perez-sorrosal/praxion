@@ -18,6 +18,7 @@ affected_files:
   - docs/diagrams/architecture/rendered/rework_loop_detail.svg
   - .ai-state/DESIGN.md
 re_affirms: dec-164
+superseded_in_part_by: [dec-draft-c609547f]
 ---
 
 ## Context
@@ -57,7 +58,7 @@ The LikeC4 model adopts three complementary modeling choices:
    - `feedback_loops` — L2 pipeline + all three feedback edges in one view (the bidirectional-shape view)
    - `cis_loop_detail` — L2 CIS loop in isolation (researcher → architect → ADRs + tech-debt ledger)
    - `rework_loop_detail` — L2 rework loop in isolation (verifier → orchestrator → worktrees → /resume-rework → architect)
-   
+
    No flat node cap (per `rules/writing/diagram-conventions.md`: LikeC4 + D2 architecture models are explicitly exempt). Each view is self-contained — a reader grasps it standalone — and shows one concept.
 
 3. **Edges route through document elements.** Agent-to-agent communication is modeled as agent → document → agent rather than agent → agent. Pipeline documents (`IDEA_PROPOSAL.md`, `RESEARCH_FINDINGS.md`, `SYSTEMS_PLAN.md`, `INTERFACE_DESIGN.md`, `IMPLEMENTATION_PLAN.md`, `WIP.md`, `LEARNINGS.md`, `TEST_RESULTS.md`, `VERIFICATION_REPORT.md`, `REWORK_MANIFEST.md`, `VERIFIER_FINDINGS.md`, `CONTEXT_REVIEW.md`) are first-class `document` elements in the model. This matches the coordination contract: *"agents communicate through shared documents, not direct invocation"* (`rules/swe/swe-agent-coordination-protocol.md` Coordination Pipeline section). Edges carry verbs that match the document semantics (`writes`, `reads`, `updates`, `surfaces`, `disposes`, `dispatches`, `emits`, `flips`, `spawns`).

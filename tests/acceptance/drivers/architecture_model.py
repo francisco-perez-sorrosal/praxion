@@ -38,6 +38,7 @@ RENDER_DIR = DIAGRAM_ROOT / "rendered"
 BASE_COMMIT = "2d6ec71e"
 
 _DEAD_PROXY = "http://127.0.0.1:9"
+KIND_NOTATION_KEY = "kind_notation"  # where `_parse` leaves an element's kind notation in `raw`
 
 
 @dataclass(frozen=True)
@@ -154,8 +155,25 @@ def _endpoint(value: object) -> str:
     return str(value)
 
 
+def _kind_notations(data: dict) -> dict[str, str]:
+    """Each element kind's `notation` from the specification: the name legends show for it."""
+    kinds = (data.get("specification") or {}).get("elements") or {}
+    return {
+        kind: notation
+        for kind, spec in kinds.items()
+        if isinstance(notation := (spec or {}).get("notation"), str) and notation.strip()
+    }
+
+
 def _parse(data: dict) -> Model:
-    elements = {key: _element(raw, key) for key, raw in (data.get("elements") or {}).items()}
+    notations = _kind_notations(data)
+
+    def with_notation(raw: dict) -> dict:
+        return {**raw, KIND_NOTATION_KEY: notations.get(str(raw.get("kind")))}
+
+    elements = {
+        key: _element(with_notation(raw), key) for key, raw in (data.get("elements") or {}).items()
+    }
     relationships = tuple(
         Relationship(
             _endpoint(raw.get("source")), _endpoint(raw.get("target")), _text(raw.get("title"))
@@ -172,7 +190,7 @@ def _parse(data: dict) -> Model:
             merged = dict(base.raw) if base else {}
             merged.update({k: v for k, v in node.items() if v not in (None, "", {})})
             merged["modelRef"] = ref
-            nodes.append(_element(merged))
+            nodes.append(_element(with_notation(merged)))
         edges = tuple(
             ViewEdge(str(edge.get("source")), str(edge.get("target")), _text(edge.get("label")))
             for edge in raw.get("edges") or []
@@ -222,14 +240,17 @@ def base_model() -> Model:
 
 
 def category_of(element: Element) -> str:
-    """The name of the category of Praxion's category vocabulary the element belongs to.
+    """The name of the category of the category vocabulary the element belongs to.
 
-    Unbound: the model must say which category each element belongs to, under the
-    name the legends use for it. How the model records that is a design decision
-    this driver cannot assume; a binding step reads it from the designed place.
+    The element's own `metadata.category` when it is a string, else its kind's
+    `notation`. An element with neither, or whose `category` the toolchain merged
+    into a list, has no category: the empty string, so a scenario reports a
+    violation instead of the driver raising.
     """
-    raise NotImplementedError(
-        "Unbound driver: the model does not yet say, in a readable place, which one "
-        "category of Praxion's category vocabulary each element belongs to and under "
-        "what name the legends show it."
-    )
+    metadata = element.raw.get("metadata")
+    declared = metadata.get("category") if isinstance(metadata, dict) else None
+    if isinstance(declared, str):
+        return declared.strip()
+    if declared is not None:
+        return ""
+    return str(element.raw.get(KIND_NOTATION_KEY) or "").strip()

@@ -47,6 +47,9 @@ ALLOWLIST = frozenset(
         # Acceptance driver: names the project log only to seed it and compare its
         # bytes from outside, through the filesystem; it reads no row via the reader.
         "tests/acceptance/drivers/gate_liveness.py",
+        # Acceptance driver: writes an onboarded project's `.gitattributes` line
+        # and merge-driver config as fixture text; it reads no row via the reader.
+        "tests/acceptance/drivers/hook_installation.py",
     }
 )
 

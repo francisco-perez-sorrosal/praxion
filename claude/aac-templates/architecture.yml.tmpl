@@ -69,11 +69,12 @@ jobs:
           python-version: "{{PROJECT_PYTHON_VERSION}}"
 
       - name: Install likec4
-        run: npm install -g @likec4/cli
+        run: npm install -g likec4@1.59.4
 
       - name: Install d2
         run: |
-          curl -fsSL https://d2lang.com/install.sh | sh -s --
+          curl -fsSL https://d2lang.com/install.sh \
+            | sh -s -- --version v0.7.1 --method standalone
 
       - name: Regenerate diagrams from source .c4 files
         run: |

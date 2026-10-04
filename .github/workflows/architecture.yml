@@ -113,7 +113,7 @@ jobs:
         # 2023) whose CLI lacks the current `gen` command surface — installing
         # it made this job fail on every run. Pin keeps CI byte-aligned with
         # the local likec4 used by scripts/diagram-regen-hook.sh.
-        run: npm install -g likec4@1.56.0
+        run: npm install -g likec4@1.59.4
 
       - name: Install d2
         # Pinned for GEOMETRY stability: a different d2 version can lay diagrams

@@ -173,6 +173,7 @@ repos:
         language: system
         files: '\.c4$'
         pass_filenames: false
+        verbose: true
 
       # Block D — AaC golden-rule gate. Self-discovers staged architectural
       # surfaces via --mode=gate.

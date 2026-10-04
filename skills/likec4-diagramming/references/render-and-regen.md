@@ -60,8 +60,8 @@ go to stdout as `<CHECK-ID> <VIEW> <PASS|FAIL> <evidence>`; progress and the sum
 
 ## Where it runs
 
-- **Pre-commit hook `diagram-regen`.** A staged `.c4` runs the command with `--staged`. Toolchain absent: a
-  warning and the commit proceeds. A regeneration failure aborts the commit and the three lines say why.
+- **Pre-commit hook `diagram-regen`.** A staged `.c4` runs the command with `--staged`. Toolchain absent or off its pin: a
+  warning naming the pinned versions, nothing regenerated, and the commit proceeds. A regeneration failure aborts the commit and the three lines say why.
 - **CI job `regenerate-and-diff`.** Installs the two pins, runs the command (non-zero fails the job), then
   fails when `git status --porcelain -- docs/diagrams/` is non-empty (this catches modified, deleted and
   untracked renders) and prints `git diff --exit-code -- docs/diagrams/`. The review checks run through

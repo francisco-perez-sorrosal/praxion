@@ -658,6 +658,28 @@ def test_canary_a_write_early_block_inside_the_last_phase_is_rejected() -> None:
     assert not _write_early_precedes_first_phase(late)
 
 
+def _write_early_line(text: str) -> str:
+    start = text.find("**Write early, finish last.**")
+    return text[start : text.find("\n", start)] if start != -1 else ""
+
+
+def _carries_fill_sentence(text: str) -> bool:
+    return registry.FILL_AS_YOU_CHECK in _write_early_line(text)
+
+
+@pytest.mark.parametrize("agent", registry.FILL_AS_YOU_CHECK_AGENTS)
+def test_fill_sentence_is_identical_in_every_write_early_line(agent: str) -> None:
+    assert _carries_fill_sentence(_read(f"agents/{agent}.md"))
+
+
+def test_canary_a_write_early_line_without_the_fill_sentence_is_rejected() -> None:
+    bare = "**Write early, finish last.** Write a skeleton, then fill it as each phase ends.\n"
+    assert not _carries_fill_sentence(bare)
+    assert not _carries_fill_sentence(
+        f"{registry.FILL_AS_YOU_CHECK}\n**Write early, finish last.** x\n"
+    )
+
+
 def test_sentinel_opens_its_report_with_a_partial_title() -> None:
     assert f"# Sentinel Report {registry.PARTIAL_MARKER}" in _read("agents/sentinel.md")
 

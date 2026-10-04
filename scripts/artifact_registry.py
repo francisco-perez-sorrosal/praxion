@@ -115,8 +115,23 @@ NO_TEST_TARGET_MARKER = "no test target"
 # done: a consumer that treats a report as finished reads `is_partial` too.
 # Paired sites: the "Write early, finish last" block in agents/verifier.md,
 # researcher.md, systems-architect.md, implementation-planner.md and the
-# sentinel's Phase 1 title.
+# sentinel's Phase 1 title; the fill sentence below pairs with the block in the
+# three agents of FILL_AS_YOU_CHECK_AGENTS.
 PARTIAL_MARKER = "[PARTIAL]"
+
+# A capped agent keeps only what it already wrote, so a section filled "at the
+# end from notes" is lost with the cap. This sentence, byte for byte, sits in the
+# "Write early, finish last" line of each agent in FILL_AS_YOU_CHECK_AGENTS. The
+# researcher and the sentinel are deliberately left out: that is the scope of
+# this change, not a size limit. The researcher's write-early paragraph has the
+# same shape, so adding it is a one-line follow-up to the tuple; the sentinel's
+# pin differs (its title is pinned in Phase 1, not in a write-early block).
+FILL_AS_YOU_CHECK = (
+    "Fill a section right after its check, from the evidence in hand, never at "
+    "the end from notes: deferred fills are how two capped final verifiers left "
+    "only headings."
+)
+FILL_AS_YOU_CHECK_AGENTS = ("verifier", "systems-architect", "implementation-planner")
 
 # A numbered requirement *heading* (the SDD behavioral-spec shape), not a bare
 # mention of one in prose -- a config/infra plan that merely says a REQ block

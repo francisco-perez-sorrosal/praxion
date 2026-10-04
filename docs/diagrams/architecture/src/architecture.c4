@@ -15,6 +15,12 @@
  *   Persistence Layer    — Chronograph MCP, .ai-state/
  *   Tooling              — Installers, Scripts, Versioning
  *
+ * Specification: kinds, the `reads` relationship kind and tags live in _spec.c4.
+ * Categories: an element's category is its kind's `notation`, or its own
+ * `metadata { category }` where one kind spans several categories (every
+ * `component` below). Read-only flows are `-[reads]->` relationships whose
+ * titles read from source to target.
+ *
  * Rendering: the six views above regenerate to ../rendered/*.{d2,svg} via
  * scripts/diagram-regen-hook.sh; the Architecture CI workflow re-runs that
  * regeneration and fails if the committed renders drift from this source.
@@ -40,28 +46,13 @@
  * contract from rules/swe/swe-agent-coordination-protocol.md.
  *
  * Regen:
- *   likec4 export d2 docs/diagrams/architecture/src/architecture.c4 -o docs/diagrams/architecture/rendered/
+ *   likec4 gen d2 docs/diagrams/architecture/src -o docs/diagrams/architecture/rendered/
  *   for v in context components agent_pipeline feedback_loops cis_loop_detail rework_loop_detail; do
  *     d2 docs/diagrams/architecture/rendered/$v.d2 docs/diagrams/architecture/rendered/$v.svg
  *   done
  *
  * DSL reference: https://likec4.dev/llms-full.txt
  */
-specification {
-  element person
-  element system
-  element external
-  element component
-  element agent
-  element document
-
-  tag forward
-  tag cis_loop
-  tag rework_loop
-  tag challenge_loop
-  tag artifact
-}
-
 model {
   // ── External Actors ──────────────────────────────────────────────────────
   developer      = person   "Developer"
@@ -77,15 +68,19 @@ model {
 
     // Knowledge Layer: static assets loaded into agent context
     knowledge = component "Knowledge Layer" {
-      skills   = component "Skills"         { description "Domain expertise modules" }
-      rules    = component "Rules"          { description "Declarative conventions" }
-      commands = component "Commands"       { description "User-invoked workflows" }
-      agents   = component "Agents"         { description "Authored subprocess specifications" }
+      metadata { category 'Layer' }
+
+      skills   = component "Skills"         { description "Domain expertise modules" metadata { category 'Knowledge asset' } }
+      rules    = component "Rules"          { description "Declarative conventions" metadata { category 'Knowledge asset' } }
+      commands = component "Commands"       { description "User-invoked workflows" metadata { category 'Knowledge asset' } }
+      agents   = component "Agents"         { description "Authored subprocess specifications" metadata { category 'Knowledge asset' } }
     }
 
     // Orchestration Layer: runtime execution and ephemeral state.
     // Individual agents are first-class elements so pipeline views can address them.
     orchestration = component "Orchestration Layer" {
+      metadata { category 'Layer' }
+
 
       orchestrator = agent "Main Agent (Orchestrator)" {
         description "Tier selector, task-slug propagator, rework-worktree spawner, subagent dispatcher"
@@ -93,6 +88,7 @@ model {
 
       pipeline = component "Agent Pipeline" {
         description "Spawned subprocesses (runtime instances)"
+        metadata { category 'Runtime agent' }
 
         promethean       = agent "Promethean"       { description "Feature-level ideation" }
         researcher       = agent "Researcher"       { description "Hat 1 codebase + Hat 2 external research; surfaces CIS" }
@@ -113,9 +109,8 @@ model {
         roadmap_cartographer = agent "Roadmap Cartographer" { description "Project-level audit-to-roadmap through a project-derived lens set (on-demand)" }
       }
 
-      hooks    = component "Hooks"          { description "Lifecycle enforcement (send_event)" }
-      aiwork   = component ".ai-work/"      { description "Ephemeral pipeline docs (task-slug scoped)" }
-
+      hooks    = component "Hooks"          { description "Lifecycle enforcement (send_event)" metadata { category 'Tooling' } }
+      aiwork   = component ".ai-work/"      { description "Ephemeral pipeline docs (task-slug scoped)" metadata { category 'Pipeline document' } }
       // Pipeline documents — first-class elements so handoff edges are addressable.
       doc_idea        = document "IDEA_PROPOSAL.md"        { description "promethean output" }
       doc_research    = document "RESEARCH_FINDINGS.md"    { description "researcher output; carries CIS section" }
@@ -136,19 +131,23 @@ model {
 
     // Persistence Layer: durable intelligence and observability
     persistence = component "Persistence Layer" {
-      chronograph = component "Chronograph MCP" { description "OTel relay" }
-      aistate     = component ".ai-state/"      { description "ADRs, specs, sentinel reports, tech-debt ledger" }
-      adrs        = component "ADR Fragments"   { description ".ai-state/decisions/drafts/ — finalized at merge-to-main" }
-      tdl         = component "Tech-Debt Ledger" { description ".ai-state/TECH_DEBT_LEDGER.md (+ RESOLVED)" }
+      metadata { category 'Layer' }
+
+      chronograph = component "Chronograph MCP" { description "OTel relay" metadata { category 'Tooling' } }
+      aistate     = component ".ai-state/"      { description "ADRs, specs, sentinel reports, tech-debt ledger" metadata { category 'Persistent store' } }
+      adrs        = component "ADR Fragments"   { description ".ai-state/decisions/drafts/ — finalized at merge-to-main" metadata { category 'Persistent store' } }
+      tdl         = component "Tech-Debt Ledger" { description ".ai-state/TECH_DEBT_LEDGER.md (+ RESOLVED)" metadata { category 'Persistent store' } }
     }
 
     // Tooling: deployment and release automation
     tooling = component "Tooling" {
-      installers = component "Installers"   { description "3 targets" }
-      scripts    = component "Scripts"      { description "Worktrees, merge, Phoenix, finalize" }
-      versioning = component "Versioning"   { description "Commitizen" }
-      dashboard  = component "Pipeline Dashboard" { description "Next.js runtime, own process + sha256-derived port; read-only over project state" }
-      evals      = component "Eval Framework"     { description "Out-of-band quality measurement over completed artifacts" }
+      metadata { category 'Layer' }
+
+      installers = component "Installers"   { description "3 targets" metadata { category 'Tooling' } }
+      scripts    = component "Scripts"      { description "Worktrees, merge, Phoenix, finalize" metadata { category 'Tooling' } }
+      versioning = component "Versioning"   { description "Commitizen" metadata { category 'Tooling' } }
+      dashboard  = component "Pipeline Dashboard" { description "Next.js runtime, own process + sha256-derived port; read-only over project state" metadata { category 'Tooling' } }
+      evals      = component "Eval Framework"     { description "Out-of-band quality measurement over completed artifacts" metadata { category 'Tooling' } }
     }
 
     // ── Intra-system Relationships ──────────────────────────────────────────
@@ -179,37 +178,37 @@ model {
 
     // Forward pipeline — agent reads/writes against pipeline documents
     orchestration.pipeline.promethean -> orchestration.doc_idea        "writes" { #forward }
-    orchestration.doc_idea            -> orchestration.pipeline.researcher "reads" { #forward }
+    orchestration.doc_idea            -[reads]-> orchestration.pipeline.researcher "informs" { #forward }
     orchestration.pipeline.researcher -> orchestration.doc_research    "writes" { #forward }
-    orchestration.doc_research        -> orchestration.pipeline.architect "reads" { #forward }
+    orchestration.doc_research        -[reads]-> orchestration.pipeline.architect "informs" { #forward }
     orchestration.pipeline.architect  -> orchestration.doc_systems     "writes" { #forward }
     orchestration.pipeline.architect  -> orchestration.doc_spec_extract "writes spec extract" { #forward }
-    orchestration.doc_spec_extract    -> orchestration.pipeline.test_engineer "reads" { #forward }
+    orchestration.doc_spec_extract    -[reads]-> orchestration.pipeline.test_engineer "is read by" { #forward }
     orchestration.pipeline.test_engineer -> orchestration.doc_acceptance "writes" { #forward }
-    orchestration.doc_acceptance      -> orchestration.pipeline.architect "reads" { #forward }
-    orchestration.doc_acceptance      -> orchestration.pipeline.planner "reads" { #forward }
-    orchestration.doc_systems         -> orchestration.pipeline.planner "reads" { #forward }
+    orchestration.doc_acceptance      -[reads]-> orchestration.pipeline.architect "is read by" { #forward }
+    orchestration.doc_acceptance      -[reads]-> orchestration.pipeline.planner "is read by" { #forward }
+    orchestration.doc_systems         -[reads]-> orchestration.pipeline.planner "informs" { #forward }
     orchestration.pipeline.planner    -> orchestration.doc_impl_plan   "writes" { #forward }
     orchestration.pipeline.planner    -> orchestration.doc_wip         "writes" { #forward }
-    orchestration.doc_impl_plan       -> orchestration.pipeline.implementer "reads" { #forward }
-    orchestration.doc_impl_plan       -> orchestration.pipeline.test_engineer "reads" { #forward }
-    orchestration.doc_impl_plan       -> orchestration.pipeline.doc_engineer  "reads" { #forward }
+    orchestration.doc_impl_plan       -[reads]-> orchestration.pipeline.implementer "is read by" { #forward }
+    orchestration.doc_impl_plan       -[reads]-> orchestration.pipeline.test_engineer "is read by" { #forward }
+    orchestration.doc_impl_plan       -[reads]-> orchestration.pipeline.doc_engineer  "is read by" { #forward }
     orchestration.pipeline.implementer   -> orchestration.doc_wip       "updates" { #forward }
     orchestration.pipeline.implementer   -> orchestration.doc_test      "writes" { #forward }
     orchestration.pipeline.test_engineer -> orchestration.doc_test      "writes" { #forward }
     orchestration.pipeline.doc_engineer  -> orchestration.doc_wip       "updates" { #forward }
-    orchestration.doc_wip              -> orchestration.pipeline.verifier "reads" { #forward }
-    orchestration.doc_test             -> orchestration.pipeline.verifier "reads" { #forward }
+    orchestration.doc_wip              -[reads]-> orchestration.pipeline.verifier "is read by" { #forward }
+    orchestration.doc_test             -[reads]-> orchestration.pipeline.verifier "is read by" { #forward }
     orchestration.pipeline.verifier    -> orchestration.doc_verify     "writes" { #forward }
 
     // Interface-designer shadow + challenge loop (one round, orchestrator-mediated)
     orchestration.pipeline.interface_des -> orchestration.doc_interface  "writes" { #challenge_loop }
-    orchestration.doc_interface          -> orchestration.pipeline.architect "reads challenges" { #challenge_loop }
+    orchestration.doc_interface          -[reads]-> orchestration.pipeline.architect "raises challenges for" { #challenge_loop }
     orchestration.pipeline.architect     -> orchestration.doc_interface  "revises per architect re-eval" { #challenge_loop }
 
     // Agentic-transactions-architect shadow + challenge loop (one round, orchestrator-mediated)
     orchestration.pipeline.transactions_arch -> orchestration.doc_transactions "writes" { #challenge_loop }
-    orchestration.doc_transactions           -> orchestration.pipeline.architect "reads challenges" { #challenge_loop }
+    orchestration.doc_transactions           -[reads]-> orchestration.pipeline.architect "raises challenges for" { #challenge_loop }
     orchestration.pipeline.architect         -> orchestration.doc_transactions "revises per architect re-eval" { #challenge_loop }
 
     // Context-engineer shadow (cumulative single-writer)
@@ -221,7 +220,7 @@ model {
 
     // ── CIS Loop (forward-feeding: researcher Hat 2 -> architect disposition) ───
     orchestration.pipeline.researcher -> orchestration.doc_research "surfaces CIS section" { #cis_loop }
-    orchestration.doc_research        -> orchestration.pipeline.architect "reads CIS in Phase 7" { #cis_loop }
+    orchestration.doc_research        -[reads]-> orchestration.pipeline.architect "surfaces CIS signals to" { #cis_loop }
     orchestration.pipeline.architect  -> orchestration.doc_systems  "records disposition per signal" { #cis_loop }
     orchestration.pipeline.architect  -> persistence.adrs           "writes ADR fragment when load-bearing" { #cis_loop }
     // defer-with-rationale becomes a tech-debt-ledger row written by verifier/sentinel/orchestrator
@@ -231,7 +230,7 @@ model {
 
     // ── Rework Loop (backward-feeding: verifier Phase 12.5 -> architect re-pipeline) ───
     orchestration.pipeline.verifier   -> orchestration.doc_rework "emits Phase 12.5" { #rework_loop }
-    orchestration.doc_rework          -> orchestration.orchestrator "reads manifest" { #rework_loop }
+    orchestration.doc_rework          -[reads]-> orchestration.orchestrator "hands the manifest to" { #rework_loop }
     orchestration.orchestrator        -> tooling.scripts "spawns rework worktree per row (EnterWorktree)" { #rework_loop }
     orchestration.orchestrator        -> orchestration.doc_findings "writes one VERIFIER_FINDINGS.md per worktree" { #rework_loop }
     orchestration.orchestrator        -> persistence.tdl "flips linked td-NNN rows to in-flight" { #rework_loop }
@@ -241,7 +240,7 @@ model {
 
     // Validator + skill-genesis side-channels (post-pipeline)
     orchestration.pipeline.arch_validator -> persistence.tdl "files drift rows"
-    orchestration.pipeline.skill_genesis  -> orchestration.doc_learnings "reads at pipeline-end"
+    orchestration.pipeline.skill_genesis  -[reads]-> orchestration.doc_learnings "reads at pipeline-end"
 
     // Orchestration internal — hooks + handoff substrate
     orchestration.hooks    -> orchestration.pipeline      "enforces"
@@ -262,9 +261,9 @@ model {
 
     // Both read completed state and never mutate it -- the read-only property is
     // the architectural claim, so the edges are one-directional by design.
-    tooling.dashboard   -> persistence.aistate   "reads (read-only)"
-    tooling.dashboard   -> orchestration.aiwork  "reads in-flight pipeline docs (read-only)"
-    tooling.evals       -> persistence.aistate   "reads completed artifacts (read-only)"
+    tooling.dashboard   -[reads]-> persistence.aistate   "reads (read-only)"
+    tooling.dashboard   -[reads]-> orchestration.aiwork  "reads in-flight pipeline docs (read-only)"
+    tooling.evals       -[reads]-> persistence.aistate   "reads completed artifacts (read-only)"
   }
 
   // The eval framework's only outbound boundary, and the one the fitness suite

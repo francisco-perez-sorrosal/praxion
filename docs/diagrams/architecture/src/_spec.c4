@@ -1,0 +1,52 @@
+/**
+ * Praxion Architecture — LikeC4 specification
+ *
+ * Every kind, relationship kind and tag the model and its views use is declared
+ * here and nowhere else.
+ *
+ * Categories: a kind that carries a `notation` has a category, and the notation
+ * is its exact name in every legend. `component` carries none because it spans
+ * several categories, so each `component` element states its own with
+ * `metadata { category '<name>' }` (see architecture.c4).
+ *
+ * Read-only flows use the `reads` relationship kind. Its titles read from source
+ * to target: "informs", "is read by".
+ *
+ * Each non-dynamic view carries exactly one `c4_*` tag naming its C4 diagram type.
+ */
+specification {
+  element person {
+    notation 'Person'
+  }
+  element system {
+    notation 'System in scope'
+  }
+  element external {
+    notation 'External system'
+  }
+  element agent {
+    notation 'Runtime agent'
+  }
+  element document {
+    notation 'Pipeline document'
+  }
+  element component {
+    notation 'Component'
+  }
+
+  relationship reads {
+    line dashed
+  }
+
+  tag forward
+  tag cis_loop
+  tag rework_loop
+  tag challenge_loop
+  tag artifact
+
+  tag c4_system_context
+  tag c4_system_landscape
+  tag c4_container
+  tag c4_component
+  tag c4_deployment
+}

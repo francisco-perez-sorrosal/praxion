@@ -2,7 +2,7 @@
 # scripts/finalize_chain.sh — shared library for the .ai-state/ finalize chain.
 #
 # Sourced by git-finalize-hook.sh (the multiplexed dispatcher symlinked to
-# .git/hooks/{post-merge,post-commit,post-checkout}). Single source of truth for:
+# .git/hooks/{post-merge,post-commit,post-checkout,post-rewrite}). Single source of truth for:
 #
 #   - Path resolution (works for both cp-installed and symlink-installed hooks)
 #   - Repo-state predicates (on_main, drafts_present, state_was_touched)
@@ -13,11 +13,16 @@
 #
 #   finalize_chain_post_merge       — reconcile + worktree-log merge-in + state-driven finalize
 #                                     + squash-safety
-#   finalize_chain_post_commit      — state-driven finalize on main (ADR promotion sub-gated on drafts)
+#   finalize_chain_post_commit      — worktree-log merge-in for a merge commit finished by a
+#                                     commit, then state-driven finalize on main (ADR promotion
+#                                     sub-gated on drafts)
 #   finalize_chain_post_checkout    — state-driven finalize on branch switch to main, plus an
 #                                     unconditional (branch-independent) sidecar `link` under
 #                                     sidecar placement -- the primary channel that materializes
 #                                     a new project worktree's state mount
+#   finalize_chain_post_rewrite     — worktree-log merge-in after a finished rebase; merge-in
+#                                     only, since the next commit or checkout on main runs the
+#                                     finalize
 #   finalize_chain_run_on_main      — on-main composition (adr -> ledger -> manifest) for
 #                                     non-hook callers (e.g. CI); resolves repo_root from the
 #                                     argument or the current working tree. Honors
@@ -58,7 +63,8 @@
 #
 #   - Idempotent. The python scripts hold an advisory file lock and no-op when
 #     there is nothing to do, so multiple triggers firing on the same state
-#     (e.g., post-commit + post-merge on a non-ff merge) are safe.
+#     (e.g., post-commit for every commit a rebase replays and post-rewrite at
+#     its end, or a hook run twice) are safe.
 
 # -- Path resolution ----------------------------------------------------------
 #
@@ -115,6 +121,31 @@ _finalize_chain_state_was_touched() {
     local merged_files
     merged_files="$(git -C "$repo_root" diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || true)"
     echo "$merged_files" | grep -q "^\.ai-state/"
+}
+
+# Prints the first parent of HEAD when HEAD is a merge commit finished by a
+# commit in the primary working tree -- not one a rebase is replaying
+# (rebase-merge/rebase-apply present) and not an amend (HEAD@{1}, the tip
+# before this commit, differs from the first parent; git rewrites the reflog
+# subject when GIT_REFLOG_ACTION is set, so the subject is not used). Prints
+# nothing otherwise, and always returns 0 because the dispatcher runs under
+# set -e. A single-parent commit costs exactly one git query here; a linked
+# worktree or a replayed commit costs none. A repository whose reflog was
+# disabled from init cannot tell a finished merge from an amend, so nothing
+# prints there.
+_finalize_chain_finished_merge_parent() {
+    local repo_root="$1" commit_and_parents tip_before
+    local -a fields=()
+    [ -d "${repo_root}/.git" ] || return 0
+    if [ -e "${repo_root}/.git/rebase-merge" ] || [ -e "${repo_root}/.git/rebase-apply" ]; then
+        return 0
+    fi
+    commit_and_parents="$(git rev-list --parents -n 1 HEAD 2>/dev/null)" || return 0
+    read -r -a fields <<<"$commit_and_parents"
+    [ "${#fields[@]}" -ge 3 ] || return 0
+    tip_before="$(git rev-parse -q --verify 'HEAD@{1}' 2>/dev/null)" || return 0
+    [ "$tip_before" = "${fields[1]}" ] || return 0
+    printf '%s\n' "${fields[1]}"
 }
 
 # -- Hook environment scrubbing ------------------------------------------------
@@ -282,6 +313,12 @@ _finalize_chain_load_placement() {
             reason) _FC_REASON="$value" ;;
         esac
     done < <(_finalize_chain_resolve_placement "$repo_root")
+}
+
+# Load placement unless this entry point already did, so an entry that runs
+# two placement-gated steps still resolves it once.
+_finalize_chain_ensure_placement() {
+    [ -n "$_FC_PLACEMENT" ] || _finalize_chain_load_placement "$1"
 }
 
 # Cheap existence check for at least one sidecar-side wt/* state branch,
@@ -454,10 +491,10 @@ finalize_chain_run_on_main() {
 
 # State-driven finalize on main. Shared body for post-commit (and, when
 # already on main, post-checkout's tail). Inlined into both for clarity (the
-# entry name is part of the hook's contract).
+# entry name is part of the hook's contract). repo_root defaults to the
+# current working tree's root when omitted.
 _finalize_chain_state_driven() {
-    local repo_root
-    repo_root="$(_finalize_chain_repo_root)"
+    local repo_root="${1:-$(_finalize_chain_repo_root)}"
     [ -n "$repo_root" ] || return 0
     # Hook repair is branch-independent — run before the on-main gate.
     _finalize_chain_repair_broken_block_d "$repo_root"
@@ -465,26 +502,33 @@ _finalize_chain_state_driven() {
     # Placement is resolved only once we know the composition will actually
     # run — the common case (an ordinary commit on a feature branch) never
     # pays for it.
-    _finalize_chain_load_placement "$repo_root"
+    _finalize_chain_ensure_placement "$repo_root"
     _finalize_chain_run_on_main "$repo_root"
 }
 
 # Merge-in of worktree observation logs (the state-driven half of what
-# /merge-worktree does by hand). A pipeline merged by a plain `git merge` or a
-# pull request leaves its rows in a worktree log that dies with the worktree, so
-# every post-merge in the primary working tree copies the log of each worktree
-# THIS merge brought in: its HEAD is contained in the checkout's HEAD and not in
-# ORIG_HEAD (the state before the merge; the script's default). A worktree with
-# no commit of its own, or one an earlier merge already took in, is not copied
-# here, so a running pipeline's half session stays out -- except a worktree
-# branched from origin/main while local main was behind, which the next pull
-# brings in (accepted leftover: P03 warns until a later merge copies the rest);
-# teardown through /merge-worktree copies whatever is left. Idempotent: rows the main log
-# already holds are skipped. Not covered, left to /merge-worktree and P14: a
-# squash merge (the squashed commit is not the worktree's HEAD), and a merge git
-# finishes outside `git merge` -- stopped on a conflict or run with --no-commit,
-# then committed -- or a pull that rebases local commits: git runs no post-merge
-# hook for those, and later merges find the worktree already in ORIG_HEAD.
+# /merge-worktree does by hand). A pipeline merged without /merge-worktree
+# leaves its rows in a worktree log that dies with the worktree, so the primary
+# working tree copies the log of each worktree a git operation brought in: its
+# HEAD is contained in the checkout's HEAD and not in that operation's
+# before-revision. Three hook steps run it, one per way a merge lands:
+#   post-merge   -- `git merge` and `git pull` (merge or fast-forward), against
+#                   ORIG_HEAD (the script's default);
+#   post-commit  -- a merge finished by `git commit` or `git merge --continue`
+#                   after a conflict or --no-commit, against the new commit's
+#                   first parent (exact even when ORIG_HEAD was overwritten);
+#   post-rewrite -- a finished rebase, `git pull --rebase` included, against
+#                   ORIG_HEAD (the tip the branch held when the rebase began).
+# A worktree with no commit of its own, or one an earlier merge already took
+# in, is not copied here, so a running pipeline's half session stays out --
+# except a worktree branched from origin/main while local main was behind,
+# which the next pull brings in (accepted leftover: P03 warns until a later
+# merge copies the rest); teardown through /merge-worktree copies whatever is
+# left. Idempotent: rows the main log already holds are skipped, so two steps
+# seeing one merge copy each row once. The one merge no hook recognises is a
+# squash merge (the squashed commit is not the worktree's HEAD); it is left to
+# /merge-worktree step 9.5 and P14. An unresolvable before-revision is a
+# one-line named skip (--skip-unresolvable-before), never a failure.
 #
 # The recording mode is the project's: a git hook does not see the variables the
 # settings files define for a session, so the script takes each of the two mode
@@ -501,12 +545,16 @@ _finalize_chain_state_driven() {
 # Non-blocking whatever FINALIZE_CHAIN_STRICT says: a log that cannot be merged
 # is reported by the script and must never fail the merge that has already
 # happened, nor the finalizers that follow.
+#
+# Args: <repo_root> <hook-name> [extra merge-in args, e.g. --before REV...]
 _finalize_chain_merge_worktree_logs() {
-    local repo_root="$1"
+    local repo_root="$1" hook_name="$2"
+    shift 2
     [ -d "${repo_root}/.git" ] || return 0
     [ "$_FC_PLACEMENT" = "in-repo" ] || return 0
-    _finalize_chain_run_script "post-merge: merge_worktree_log" \
-        "${FINALIZE_CHAIN_DIR}/merge_worktree_log.py" --merged --repo-root "$repo_root" \
+    _finalize_chain_run_script "${hook_name}: merge_worktree_log" \
+        "${FINALIZE_CHAIN_DIR}/merge_worktree_log.py" --merged --skip-unresolvable-before \
+        --repo-root "$repo_root" "$@" \
         || true
 }
 
@@ -537,7 +585,7 @@ finalize_chain_post_merge() {
             --repo-root "$repo_root"
     fi
 
-    _finalize_chain_merge_worktree_logs "$repo_root"
+    _finalize_chain_merge_worktree_logs "$repo_root" post-merge
 
     if _finalize_chain_on_main; then
         _finalize_chain_run_on_main "$repo_root"
@@ -547,11 +595,21 @@ finalize_chain_post_merge() {
         "${FINALIZE_CHAIN_DIR}/check_squash_safety.py" --repo-root "$repo_root"
 }
 
-# Post-commit entry point. Catches paths that create commits on main without
-# a merge event: direct commits, non-ff merges (creates merge commit), rebases
-# (each replayed commit), cherry-picks.
+# Post-commit entry point. Two steps, in order: merge-in for a merge finished
+# by a commit (only when _finalize_chain_finished_merge_parent prints a
+# parent), then the state-driven finalize on main (direct commits, merge
+# commits, cherry-picks). A single-parent commit pays one git query for the
+# first step and starts no merge-in.
 finalize_chain_post_commit() {
-    _finalize_chain_state_driven
+    local repo_root first_parent
+    repo_root="$(_finalize_chain_repo_root)"
+    [ -n "$repo_root" ] || return 0
+    first_parent="$(_finalize_chain_finished_merge_parent "$repo_root")"
+    if [ -n "$first_parent" ]; then
+        _finalize_chain_ensure_placement "$repo_root"
+        _finalize_chain_merge_worktree_logs "$repo_root" post-commit --before "$first_parent"
+    fi
+    _finalize_chain_state_driven "$repo_root"
 }
 
 # Post-checkout entry point. Catches paths that arrive on main without a
@@ -588,4 +646,24 @@ finalize_chain_post_checkout() {
 
     _finalize_chain_on_main || return 0
     _finalize_chain_run_on_main "$repo_root"
+}
+
+# Post-rewrite entry point. git runs it once after `git commit --amend`
+# (argument `amend`) and once after a rebase finishes (argument `rebase`, with
+# the rewritten pairs on stdin, which this entry does not read). Only a
+# finished rebase in the primary working tree runs merge-in, against ORIG_HEAD;
+# an amend brings in nothing its original commit had not, and an abandoned
+# rebase never reaches this hook. Merge-in only: the on-main finalize is
+# state-driven, so the next commit or checkout on main runs it, while merge-in
+# is relative to this operation's before-revision, which only this hook still
+# knows.
+finalize_chain_post_rewrite() {
+    [ "${1:-}" = "rebase" ] || return 0
+    local repo_root
+    repo_root="$(_finalize_chain_repo_root)"
+    [ -n "$repo_root" ] || return 0
+    # Gate before placement resolution: a linked worktree starts no Python.
+    [ -d "${repo_root}/.git" ] || return 0
+    _finalize_chain_ensure_placement "$repo_root"
+    _finalize_chain_merge_worktree_logs "$repo_root" post-rewrite --before ORIG_HEAD
 }

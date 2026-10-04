@@ -17,6 +17,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import shlex
+import shutil
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -1285,3 +1286,331 @@ def test_post_merge_leaves_a_running_worktree_with_no_commit_of_its_own_alone(
 
     assert (result.returncode, "merge-in" in result.stdout) == (0, False)
     assert not reader.log_path(repo / ".ai-state").exists()
+
+
+# --- Merge-in from post-commit and post-rewrite -------------------------------
+
+
+def _chain_steps(
+    entry: str, *, repo_root: Path, placement: str = "in-repo", stubs: str = ""
+) -> list[str]:
+    """The steps a chain entry point runs, each as its label followed by the
+    arguments it passes, under the dispatcher's `set -eo pipefail` and with
+    every runner and predicate stubbed. `stubs` redefines more of them."""
+    snippet = f"""
+        set -eo pipefail
+        source {shlex.quote(str(CHAIN_PATH))}
+        _finalize_chain_run_script() {{ local label="$1"; shift 2; echo "RAN:$label $*"; }}
+        _finalize_chain_run_on_main() {{ echo "RAN:on-main"; }}
+        _finalize_chain_repo_root() {{ echo {shlex.quote(str(repo_root))}; }}
+        _finalize_chain_repair_broken_block_d() {{ :; }}
+        _finalize_chain_load_placement() {{ _FC_PLACEMENT={shlex.quote(placement)}; }}
+        _finalize_chain_on_main() {{ return 0; }}
+        {stubs}
+        {entry}
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True, check=True)
+    return [
+        line.split(":", 1)[1].rstrip()
+        for line in result.stdout.splitlines()
+        if line.startswith("RAN:")
+    ]
+
+
+def _merge_in(hook: str, repo_root: Path, *before: str) -> str:
+    return " ".join(
+        [
+            f"{hook}: merge_worktree_log",
+            "--merged",
+            "--skip-unresolvable-before",
+            "--repo-root",
+            str(repo_root),
+            *before,
+        ]
+    )
+
+
+def _first_parent_is(sha: str) -> str:
+    return f"_finalize_chain_finished_merge_parent() {{ printf '%s\\n' {shlex.quote(sha)}; }}"
+
+
+_A_FIRST_PARENT = "0123456789abcdef0123456789abcdef01234567"
+
+
+def test_post_merge_merges_in_against_orig_head_with_the_named_skip(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps("finalize_chain_post_merge", repo_root=tmp_path)
+
+    assert _merge_in("post-merge", tmp_path) in steps
+
+
+def test_post_commit_starts_no_merge_in_for_a_commit_that_is_not_a_finished_merge(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps(
+        "finalize_chain_post_commit", repo_root=tmp_path, stubs=_first_parent_is("")
+    )
+
+    assert steps == ["on-main"]
+
+
+def test_post_commit_merges_in_against_the_first_parent_then_finalizes(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps(
+        "finalize_chain_post_commit", repo_root=tmp_path, stubs=_first_parent_is(_A_FIRST_PARENT)
+    )
+
+    assert steps == [
+        _merge_in("post-commit", tmp_path, "--before", _A_FIRST_PARENT),
+        "on-main",
+    ]
+
+
+def test_post_commit_resolves_placement_once_for_merge_in_and_the_finalize(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".git").mkdir()
+    counting_placement = (
+        '_finalize_chain_load_placement() { echo "RAN:placement"; _FC_PLACEMENT=in-repo; }'
+    )
+
+    steps = _chain_steps(
+        "finalize_chain_post_commit",
+        repo_root=tmp_path,
+        stubs=_first_parent_is(_A_FIRST_PARENT) + "\n" + counting_placement,
+    )
+
+    assert steps.count("placement") == 1
+
+
+@pytest.mark.parametrize("placement", ["sidecar", "dangling", "foreign", "not-yet-linked"])
+def test_post_commit_merges_in_nothing_unless_the_state_lives_in_the_repository(
+    tmp_path: Path, placement: str
+) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps(
+        "finalize_chain_post_commit",
+        repo_root=tmp_path,
+        placement=placement,
+        stubs=_first_parent_is(_A_FIRST_PARENT),
+    )
+
+    assert steps == ["on-main"]
+
+
+def test_state_driven_finalize_uses_the_repo_root_it_is_given(tmp_path: Path) -> None:
+    given = tmp_path / "given"
+    stubs = (
+        '_finalize_chain_run_on_main() { echo "RAN:on-main $1"; }\n'
+        "_finalize_chain_repo_root() { echo /not/this/one; }"
+    )
+
+    steps = _chain_steps(
+        f"_finalize_chain_state_driven {shlex.quote(str(given))}", repo_root=tmp_path, stubs=stubs
+    )
+
+    assert steps == [f"on-main {given}"]
+
+
+def test_post_rewrite_merges_in_against_orig_head_after_a_rebase(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps("finalize_chain_post_rewrite rebase", repo_root=tmp_path)
+
+    assert steps == [_merge_in("post-rewrite", tmp_path, "--before", "ORIG_HEAD")]
+
+
+def test_post_rewrite_after_a_rebase_in_a_linked_worktree_starts_nothing(tmp_path: Path) -> None:
+    (tmp_path / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n")
+    counting_placement = '_finalize_chain_load_placement() { echo "RAN:placement"; }'
+
+    steps = _chain_steps(
+        "finalize_chain_post_rewrite rebase", repo_root=tmp_path, stubs=counting_placement
+    )
+
+    assert steps == []
+
+
+@pytest.mark.parametrize("placement", ["sidecar", "dangling", "foreign", "not-yet-linked"])
+def test_post_rewrite_merges_in_nothing_unless_the_state_lives_in_the_repository(
+    tmp_path: Path, placement: str
+) -> None:
+    (tmp_path / ".git").mkdir()
+
+    steps = _chain_steps(
+        "finalize_chain_post_rewrite rebase", repo_root=tmp_path, placement=placement
+    )
+
+    assert steps == []
+
+
+def _git_recorder(tmp_path: Path) -> tuple[Path, Path]:
+    """A `git` on PATH that logs each invocation's arguments, then runs the real one."""
+    bin_dir = tmp_path / "recording-bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "git-calls.log"
+    real_git = shutil.which("git")
+    assert real_git is not None
+    (bin_dir / "git").write_text(
+        f'#!/bin/sh\necho "$*" >> {shlex.quote(str(calls))}\nexec {shlex.quote(real_git)} "$@"\n'
+    )
+    (bin_dir / "git").chmod(0o755)
+    return bin_dir, calls
+
+
+def _run_recording_git(
+    snippet_body: str, *, cwd: Path, tmp_path: Path
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    bin_dir, calls = _git_recorder(tmp_path)
+    snippet = f"""
+        set -eo pipefail
+        cd {shlex.quote(str(cwd))}
+        source {shlex.quote(str(CHAIN_PATH))}
+        PATH={shlex.quote(str(bin_dir))}:"$PATH"
+        {snippet_body}
+    """
+    result = subprocess.run(["bash", "-c", snippet], capture_output=True, text=True)
+    return result, (calls.read_text().splitlines() if calls.exists() else [])
+
+
+@pytest.mark.parametrize("argument", ["amend", "", "something-git-adds-later"])
+def test_post_rewrite_starts_nothing_and_asks_git_nothing_unless_a_rebase_finished(
+    tmp_path: Path, argument: str
+) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+    stubs = '_finalize_chain_run_script() { echo "RAN:$1"; }'
+
+    result, calls = _run_recording_git(
+        f"{stubs}\nfinalize_chain_post_rewrite {shlex.quote(argument)}",
+        cwd=repo,
+        tmp_path=tmp_path,
+    )
+
+    assert (result.returncode, result.stdout, calls) == (0, "", [])
+
+
+def _diverged_repo(root: Path) -> Path:
+    """A repository on `feature` with a `side` branch holding one commit of its own."""
+    repo = _repo_on_feature_branch(root)
+    _git_ok(repo, "checkout", "-q", "-b", "side")
+    _git_ok(repo, "commit", "-q", "--allow-empty", "-m", "side work")
+    _git_ok(repo, "checkout", "-q", "feature")
+    return repo
+
+
+_COMMIT_FINISH = ("commit", "-q", "--no-edit")
+_CONTINUE_FINISH = ("-c", "core.editor=true", "merge", "--continue")
+
+
+def _finish_a_merge_of_side_by_a_commit(
+    checkout: Path, finish: Sequence[str] = _COMMIT_FINISH
+) -> None:
+    _git_ok(checkout, "commit", "-q", "--allow-empty", "-m", "own work")
+    _git_ok(checkout, "merge", "-q", "--no-ff", "--no-commit", "side")
+    _git_ok(checkout, *finish)
+
+
+def _finished_merge_parent(checkout: Path, tmp_path: Path) -> tuple[str, list[str]]:
+    """What the real predicate prints in `checkout`, and the git queries it made."""
+    result, calls = _run_recording_git(
+        f"_finalize_chain_finished_merge_parent {shlex.quote(str(checkout))}",
+        cwd=checkout,
+        tmp_path=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip(), calls
+
+
+def test_a_single_parent_commit_is_no_finished_merge_and_costs_one_git_query(
+    tmp_path: Path,
+) -> None:
+    repo = _repo_on_feature_branch(tmp_path / "repo")
+
+    printed, calls = _finished_merge_parent(repo, tmp_path)
+
+    assert (printed, calls) == ("", ["rev-list --parents -n 1 HEAD"])
+
+
+@pytest.mark.parametrize("finish", [_COMMIT_FINISH, _CONTINUE_FINISH], ids=["commit", "continue"])
+def test_a_merge_finished_by_a_commit_prints_its_first_parent(
+    tmp_path: Path, finish: Sequence[str]
+) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    _finish_a_merge_of_side_by_a_commit(repo, finish)
+
+    printed, calls = _finished_merge_parent(repo, tmp_path)
+
+    assert printed == _git_ok(repo, "rev-parse", "HEAD^1").stdout.strip()
+    assert len(calls) == 2
+
+
+def test_an_amended_merge_commit_is_no_finished_merge(tmp_path: Path) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    _finish_a_merge_of_side_by_a_commit(repo)
+    _git_ok(repo, "commit", "-q", "--amend", "--no-edit")
+
+    printed, _ = _finished_merge_parent(repo, tmp_path)
+
+    assert printed == ""
+
+
+@pytest.mark.parametrize("state_dir", ["rebase-merge", "rebase-apply"])
+def test_a_merge_commit_a_rebase_is_replaying_is_no_finished_merge_and_asks_git_nothing(
+    tmp_path: Path, state_dir: str
+) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    _finish_a_merge_of_side_by_a_commit(repo)
+    (repo / ".git" / state_dir).mkdir()
+
+    assert _finished_merge_parent(repo, tmp_path) == ("", [])
+
+
+def test_a_merge_finished_by_a_commit_in_a_linked_worktree_asks_git_nothing(
+    tmp_path: Path,
+) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    worktree = tmp_path / "wt"
+    _git_ok(repo, "worktree", "add", "-q", "-b", "wt", str(worktree), "feature")
+    _finish_a_merge_of_side_by_a_commit(worktree)
+
+    assert _finished_merge_parent(worktree, tmp_path) == ("", [])
+
+
+def _without_reflog(repo: Path) -> Path:
+    """HEAD@{1} cannot resolve, as in a repository whose reflog was disabled from init."""
+    shutil.rmtree(repo / ".git" / "logs")
+    return repo
+
+
+def test_a_merge_commit_without_a_reflog_is_no_finished_merge(tmp_path: Path) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    _finish_a_merge_of_side_by_a_commit(repo)
+
+    printed, _ = _finished_merge_parent(_without_reflog(repo), tmp_path)
+
+    assert printed == ""
+
+
+def test_an_unresolvable_reflog_never_ends_post_commit_before_the_finalize(
+    tmp_path: Path,
+) -> None:
+    repo = _diverged_repo(tmp_path / "repo")
+    _finish_a_merge_of_side_by_a_commit(repo)
+    stubs = (
+        '_finalize_chain_run_script() { echo "RAN:$1"; }\n'
+        '_finalize_chain_run_on_main() { echo "RAN:on-main"; }\n'
+        "_finalize_chain_repair_broken_block_d() { :; }\n"
+        "_finalize_chain_load_placement() { _FC_PLACEMENT=in-repo; }\n"
+        "_finalize_chain_on_main() { return 0; }"
+    )
+
+    result, _ = _run_recording_git(
+        f"{stubs}\nfinalize_chain_post_commit", cwd=_without_reflog(repo), tmp_path=tmp_path
+    )
+
+    assert (result.returncode, result.stdout) == (0, "RAN:on-main\n"), result.stderr

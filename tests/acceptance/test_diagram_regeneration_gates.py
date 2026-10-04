@@ -30,6 +30,7 @@ from tests.acceptance.drivers.diagram_regen import (
     staged_paths,
     unstaged_render_changes,
 )
+from tests.acceptance.drivers.svg_render import read_render
 
 NEW_NAME = "Developer Renamed For Regeneration"
 MINIMAL_PATH = "/usr/bin:/bin"
@@ -105,8 +106,9 @@ def test_staging_a_model_change_regenerates_and_stages_the_renders(staged_model_
     assert result.returncode == 0, f"regeneration hook failed:\n{result.stdout}{result.stderr}"
     assert staged_renders, "no refreshed render was staged with the model change"
     assert any(
-        NEW_NAME in (staged_model_change / p).read_text(encoding="utf-8") for p in staged_renders
-    )
+        read_render(staged_model_change / p).element_block(NEW_NAME) is not None
+        for p in staged_renders
+    ), "no staged render draws an element named after the changed model"
     assert unstaged_render_changes(staged_model_change) == []
 
 

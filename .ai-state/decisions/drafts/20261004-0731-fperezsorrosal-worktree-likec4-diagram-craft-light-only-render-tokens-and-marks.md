@@ -27,7 +27,7 @@ Today every element in every render is the same blue rectangle. There is no lege
 
 ## Decision
 
-- **Token set.** Each category gets a tint fill, a strong category stroke and slate text `#0F172A`. The only solid fill is the System in scope box (indigo `#4338CA`, white text). Canvas is opaque `#FFFFFF`; edges `#475569`; edge labels `#334155`; dynamic steps `#4338CA` 2.5 px. Every text is ≥ 7.9:1 against its surface and every outline ≥ 3.56:1 against the canvas. Hue families are Okabe-Ito, and every category pair below CIEDE2000 ΔE 7 under Machado-2009 simulation differs in shape.
+- **Token set.** Each category gets a tint fill, a strong category stroke and slate text `#0F172A`. The only solid fill is the System in scope box (indigo `#4338CA`, white text). Canvas is opaque `#FFFFFF`; edges `#475569`; edge labels `#334155`; dynamic steps `#4338CA` 3 px. Every text is ≥ 7.9:1 against its surface and every outline ≥ 3.56:1 against the canvas. Stroke widths are whole pixels, because d2 0.7.1 draws no fractions: boxes 2 (System in scope 3; Uncategorised and the legend frame 1), frames 2, numbered-step lines 3 (amended after the renderer's first implementation; the earlier draft said 1.5 for frames and 2.5 for steps). Hue families are Okabe-Ito, and every category pair below CIEDE2000 ΔE 7 under Machado-2009 simulation differs in shape.
 - **Marks.** Each (category, form) has a unique non-colour mark, uniform across views:
   - boxes: person = square + glyph; system = square, stroke 3; external = dashed; knowledge = package; agent = rounded r16; document = document; store = cylinder; tooling = 3d; layer = double-border;
   - frames: system = solid; layer = dashed square; runtime agent = dashed rounded;

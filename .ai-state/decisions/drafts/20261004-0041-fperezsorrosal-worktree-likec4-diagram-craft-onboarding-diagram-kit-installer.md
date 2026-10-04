@@ -76,7 +76,7 @@ No pre-commit regeneration block is added to managed projects. The drift gate na
 - The installer is reusable by `/upgrade-project` later.
 
 **Negative:**
-- Each managed project carries a renderer copy (≈ 600 lines).
+- Each managed project carries a renderer copy (seven files, roughly 2,000 lines, copied as one set).
 - Existing projects keep their broken workflow until reconciled. This is a ledger row and is out of scope.
 
 ## Disconfirmation

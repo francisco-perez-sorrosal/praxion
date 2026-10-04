@@ -35,7 +35,7 @@ The committed-artifact contract (source + generated + rendered SVG committed; pr
 
 ## Decision
 
-Add **`scripts/regenerate_diagrams.py`**: stdlib-only, Python 3.9-safe, single file. It is the one regeneration path for C4 views.
+Add **`scripts/regenerate_diagrams.py`**: stdlib-only, Python 3.9-safe, a CLI over six flat sibling modules (`scripts/_diagram_*.py`). It is the one regeneration path for C4 views.
 
 1. Read each workspace with `likec4 export json --skip-layout`.
 2. Resolve every element's category (kind `notation`, overridden by `metadata.category`; see dec-draft-2fbfa6d3).
@@ -69,7 +69,7 @@ The pre-commit shim, Praxion's CI drift gate, the managed-project CI template an
 - Probed end to end through the acceptance SVG driver: element marks, legend region, arrows, text height and overlap all read correctly.
 
 **Cons:**
-- Praxion owns about 400–600 tested lines.
+- Praxion owns roughly 2,000 tested lines across seven flat files.
 - d2's ELK layout differs from LikeC4's own.
 - Markdown labels are unusable: d2 puts their `foreignObject` outside the shape's group.
 

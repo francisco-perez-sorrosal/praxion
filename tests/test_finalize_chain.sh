@@ -117,7 +117,7 @@ start_test "library sources cleanly with correct FINALIZE_CHAIN_DIR"
         fail "FINALIZE_CHAIN_DIR=$FINALIZE_CHAIN_DIR (expected ${REPO_ROOT}/scripts)"
     fi
 
-    for fn in finalize_chain_post_merge finalize_chain_post_commit finalize_chain_post_checkout; do
+    for fn in finalize_chain_post_merge finalize_chain_post_commit finalize_chain_post_checkout finalize_chain_post_rewrite; do
         if declare -F "$fn" >/dev/null; then
             pass "exposes $fn"
         else

@@ -36,6 +36,10 @@ landings reach no hook, and ``--worktree`` at teardown and P14 cover both: a
 squash merge, whose squashed commit is not the worktree's HEAD; and a rebase
 that rewrites no commit (a fast-forward by ``git rebase``, or one that drops
 every local commit as already upstream), after which git runs no post-rewrite.
+A third is declared: a repository whose reflog was disabled before its first
+commit (``core.logAllRefUpdates=false`` from ``git init``) cannot tell a merge
+finished by a commit from an amend, so its post-commit step copies nothing and
+the same two covers apply.
 
 ``--repo-root`` is any checkout of the repository (default: the git toplevel of
 the working directory). It is never derived from this file's location: managed

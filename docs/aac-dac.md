@@ -78,7 +78,7 @@ The LikeC4 DSL is the single source of structural truth: component definitions, 
 topology, and element metadata. Views are projections over this model — a LikeC4 source file may yield a
 System Context (L0), Container/Component (L1), and Internals (L2) view without duplicating any fact.
 
-The `likec4-querying` skill (`skills/likec4-querying/SKILL.md`, path-scoped) gives agents an eight-task
+The `likec4-diagramming` skill (`skills/likec4-diagramming/SKILL.md`, path-scoped) gives agents an eight-task
 decision rubric for when to call the LikeC4 MCP server versus read `.c4` files directly. The rubric
 matters: calling `read-project-summary` repeatedly when a single `Read` of a 100-line file would suffice is
 latency waste; reading every `.c4` file when one `search-element` call would suffice is token waste. The MCP's

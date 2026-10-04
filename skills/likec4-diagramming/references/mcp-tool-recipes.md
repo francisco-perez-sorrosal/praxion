@@ -1,9 +1,41 @@
 # LikeC4 MCP Tool Recipes
 
 Worked-examples companion to [`../SKILL.md`](../SKILL.md)'s decision rubric. For each of
-the 13 `likec4` MCP tools: use case, input shape, and a representative invocation with
+the 20 `likec4` MCP tools: use case, input shape, and a representative invocation with
 response excerpt. Inputs and outputs are illustrative — the live tool surface is the
 source of truth.
+
+## MCP Tool Quick Reference
+<!-- last-verified: 2026-10-04 -->
+
+**20 tools.** Every tool below carries `readOnlyHint` and `idempotentHint` **except
+`apply-semantic-layout`**, which writes a snapshot — see [Layout](#layout-not-read-only).
+
+| Tool | Purpose |
+|------|---------|
+| `list-projects` | List all LikeC4 projects in the workspace |
+| `read-project-summary` | Full project spec: all elements, deployment nodes, and views in one call |
+| `search-element` | Search elements and deployment nodes by id, title, kind, shape, tags, or metadata |
+| `read-element` | Full details for one element: relationships, views it appears in, deployment instances |
+| `read-deployment` | Details for a deployment node or deployed instance |
+| `read-view` | Full view details including nodes, edges, and source location |
+| `render-view` | Render an existing view as an interactive diagram (pan/zoom/fit) inline, for hosts that support MCP Apps |
+| `preview-view` | Render a view defined by DSL text against the project's real elements, without saving; the view id must be new |
+| `find-relationships` | Direct and indirect relationships between two named elements |
+| `query-graph` | Element hierarchy queries (ancestors, descendants, siblings) and relationship queries |
+| `query-incomers-graph` | Complete upstream dependency graph (recursive incomers) |
+| `query-outgoers-graph` | Complete downstream dependent graph (recursive outgoers) |
+| `query-by-metadata` | Search elements by metadata key-value with exact/contains/exists matching |
+| `query-by-tags` | Advanced tag filtering with boolean logic (allOf, anyOf, noneOf) |
+| `find-relationship-paths` | All paths (chains of relationships) between two elements via BFS |
+| `query-by-tag-pattern` | Tag **pattern** matching — prefix / contains / suffix; for structured taxonomies (`schedule_*`, `*_asil_*`) |
+| `batch-read-elements` | Read details for multiple elements in one call (**max 50 ids**) |
+| `element-diff` | Compare two elements side by side: properties, tags, metadata, relationships |
+| `subgraph-summary` | Compact summary of all descendants of a parent: depth, tags, metadata, relationship counts (`maxDepth` default 10, max 20; capped at 200 descendants) |
+| `apply-semantic-layout` | Apply semantic layout to a **view** (LLM-driven via MCP sampling). **Not read-only** — saves a snapshot |
+
+Re-verify when the LikeC4 MCP tool surface changes: inspect the server's tool list in the session, or the
+`instructions` string it sends at start.
 
 **Sample domain**: Acme Banking — `auth.service` → `accounts.service`;
 `payments.service` → `accounts.service`, `payments.service` → `notifications.service`.
@@ -410,6 +442,47 @@ Response excerpt:
 Descendants come back breadth-first (`depth: 1` = direct child). Watch both truncation flags:
 `truncated` means the 200-descendant cap was hit, `truncatedByDepth` means deeper elements
 exist beyond `maxDepth`. Use `metadataKeys` to keep the response small.
+
+## Render and preview
+
+### `render-view`
+
+**Use case**: Show an existing view as an interactive diagram inline in the chat (pan, zoom, fit) when
+the user wants to *see* it. Use `read-view` instead when only the structure (nodes and edges) matters.
+It draws with LikeC4's own layout, not the committed D2 render.
+
+**Input shape**:
+```json
+{ "viewId": "string", "project": "optional", "fullModel": false,
+  "render": { "size": "compact | standard | large", "fitView": true, "initialZoom": 1 } }
+```
+
+**Worked example** — Invocation: `{ "viewId": "landscape", "project": "acme-banking" }`
+
+The result is the laid-out view (nodes, edges, bounds) and its model data, consumed by an interactive UI in
+hosts that support MCP Apps; other hosts get the data only.
+
+---
+
+### `preview-view`
+
+**Use case**: Iterate on a **new** element view before writing it to a `.c4` file. The DSL text is
+rendered in the context of the project's real elements and nothing is saved.
+
+**Input shape**:
+```json
+{ "dsl": "view <id> ... { ... }", "project": "optional", "fullModel": false }
+```
+
+**Worked example** — Invocation:
+`{ "dsl": "view auth-flow { include auth.service, accounts.service }", "project": "acme-banking" }`
+
+Constraints: the DSL is one `view <id> ...` definition referencing elements that already exist; the id must
+not match an existing view (use `render-view` for that); `dynamic view` and `deployment view` text is
+rejected; the preview does not apply the project's custom theme, so judge structure here and styling from
+the regenerated render.
+
+---
 
 ## Layout (not read-only)
 

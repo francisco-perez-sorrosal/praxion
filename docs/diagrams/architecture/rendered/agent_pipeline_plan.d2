@@ -65,7 +65,7 @@ classes: {
   }
 }
 Title: {
-  label: "Agent pipeline, ideation to design — Component diagram"
+  label: "Agent pipeline, acceptance tests and plan — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -74,12 +74,12 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.orchestration.doc_idea": {
-  label: "IDEA_PROPOSAL.md\n[Pipeline document]\npromethean output"
+"el_praxion.orchestration.doc_acceptance": {
+  label: "ACCEPTANCE_TESTS.md\n[Pipeline document]\ntest-engineer\nacceptance-design output;\nRED outer-loop tests"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.doc_research": {
-  label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
+"el_praxion.orchestration.doc_impl_plan": {
+  label: "IMPLEMENTATION_PLAN.md\n[Pipeline document]\nplanner output"
   class: category_pipeline_document
 }
 "el_praxion.orchestration.doc_spec_extract": {
@@ -97,12 +97,12 @@ Title: {
     label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline.promethean": {
-    label: "Promethean\n[Runtime agent]\nFeature-level ideation"
+  "el_praxion.orchestration.pipeline.planner": {
+    label: "Implementation Planner\n[Runtime agent]\nStep decomposition;\nsupervises step execution"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline.researcher": {
-    label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+  "el_praxion.orchestration.pipeline.test_engineer": {
+    label: "Test Engineer\n[Runtime agent]\nTest design and execution"
     class: category_runtime_agent
   }
 }
@@ -192,9 +192,12 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration.doc_idea" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "informs" {class: line_read_only}
-"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs" {class: line_read_only}
+"el_praxion.orchestration.doc_acceptance" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_acceptance" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_impl_plan" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.test_engineer": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_spec_extract" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.test_engineer": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_systems" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner": "informs" {class: line_read_only}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_spec_extract": "writes spec extract" {class: line_acts_on}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.promethean" -> "el_praxion.orchestration.doc_idea": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "writes" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner" -> "el_praxion.orchestration.doc_impl_plan": "writes" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.test_engineer" -> "el_praxion.orchestration.doc_acceptance": "writes" {class: line_acts_on}

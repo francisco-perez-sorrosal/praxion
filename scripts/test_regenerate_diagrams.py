@@ -818,3 +818,63 @@ def test_an_element_named_like_the_title_or_the_legend_stays_apart_from_both(rd,
     assert len(set(top_level_keys)) == len(top_level_keys)
     assert "Praxion — System Context — System Context diagram" in text
     assert "Developer" in text
+
+
+# --- layout intent: direction, groups and lone frames -------------------------------------------
+
+
+def _structure_view(rd, edit):
+    """The `structure` view of the small export, its raw form changed by `edit(raw_view)`."""
+    model = json.loads((FIXTURES / "export_small.json").read_text(encoding="utf-8"))
+    edit(model["views"]["structure"])
+    return {v.id: v for v in rd.project(model).views}["structure"]
+
+
+@pytest.mark.parametrize(
+    ("declared", "d2"),
+    [("TB", "down"), ("BT", "up"), ("LR", "right"), ("RL", "left"), (None, "down")],
+)
+def test_a_views_auto_layout_direction_becomes_the_d2_direction(rd, declared, d2):
+    view = _structure_view(rd, lambda raw: raw.update(autoLayout={"direction": declared}))
+
+    assert view.direction == d2
+    assert f"direction: {d2}\n" in rd.emit_d2(view).split("vars:")[0]
+
+
+def test_a_view_group_is_drawn_as_a_titled_layer_frame_around_its_members(rd):
+    def group(raw):
+        for node in raw["nodes"]:
+            if node["id"] in ("praxion.orchestrator", "praxion.doc_idea"):
+                node["parent"] = "@gr1"
+        raw["nodes"].append(
+            {"id": "@gr1", "kind": "@group", "title": "Runtime", "parent": None, "children": [
+                "praxion.orchestrator", "praxion.doc_idea"]}
+        )  # fmt: skip
+
+    view = _structure_view(rd, group)
+
+    drawn = {node.id: node for node in view.nodes}
+    assert (drawn["@gr1"].name, drawn["@gr1"].category, drawn["@gr1"].is_frame) == (
+        "Runtime",
+        "Layer",
+        True,
+    )
+    assert drawn["praxion.doc_idea"].parent == "@gr1"
+    assert "[Layer]" in rd.emit_d2(view)
+
+
+def test_a_frame_stays_drawn_when_no_arrow_touches_it(rd):
+    def untouched(raw):
+        raw["edges"] = [
+            e for e in raw["edges"] if "praxion.knowledge" not in (e["source"], e["target"])
+        ]
+
+    view = _structure_view(rd, untouched)
+
+    assert "praxion.knowledge" in {node.id for node in view.nodes}
+
+
+def test_every_legend_has_the_same_width(rd, views):
+    widths = {re.search(r"^\s*width: (\d+)$", rd.emit_d2(v), re.M)[1] for v in views.values()}
+
+    assert len(widths) == 1

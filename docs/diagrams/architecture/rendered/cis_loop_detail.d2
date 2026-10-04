@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -41,51 +42,18 @@ classes: {
       font-size: 15
     }
   }
-  category_runtime_agent_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#A85A00"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-      border-radius: 16
-    }
-  }
-  category_layer_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#8C8780"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-    }
-  }
-  line_acts_on: {
+  line_step: {
     style: {
       fill: "#FFFFFF"
-      stroke: "#475569"
-      stroke-width: 2
+      stroke: "#4338CA"
+      stroke-width: 3
       font-color: "#334155"
       font-size: 14
-    }
-  }
-  line_read_only: {
-    style: {
-      fill: "#FFFFFF"
-      stroke: "#475569"
-      stroke-width: 2
-      font-color: "#334155"
-      font-size: 14
-      stroke-dash: 5
     }
   }
 }
 Title: {
-  label: "CIS Loop Detail — Forward-Feeding (L2)"
+  label: "Continuous improvement signals loop — Dynamic diagram"
   shape: text
   near: top-center
   style: {
@@ -94,59 +62,48 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.orchestration": {
-  label: "Orchestration Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.orchestration.doc_research": {
-    label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.doc_systems": {
-    label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.orchestrator": {
-    label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline": {
-    label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-    class: category_runtime_agent_frame
-    "el_praxion.orchestration.pipeline.architect": {
-      label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.researcher": {
-      label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.sentinel": {
-      label: "Sentinel\n[Runtime agent]\nRead-only ecosystem auditor\n(independent)"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.verifier": {
-      label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
-      class: category_runtime_agent
-    }
-  }
+"el_praxion.orchestration.doc_research": {
+  label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
+  class: category_pipeline_document
 }
-"el_praxion.persistence": {
-  label: "Persistence Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.persistence.adrs": {
-    label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
-    class: category_persistent_store
-  }
-  "el_praxion.persistence.tdl": {
-    label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-    class: category_persistent_store
-  }
+"el_praxion.orchestration.doc_systems": {
+  label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
+  class: category_pipeline_document
+}
+"el_praxion.orchestration.orchestrator": {
+  label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.architect": {
+  label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.researcher": {
+  label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.sentinel": {
+  label: "Sentinel\n[Runtime agent]\nRead-only ecosystem auditor\n(independent)"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.verifier": {
+  label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
+  class: category_runtime_agent
+}
+"el_praxion.persistence.adrs": {
+  label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
+  class: category_persistent_store
+}
+"el_praxion.persistence.tdl": {
+  label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
+  class: category_persistent_store
 }
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -166,15 +123,7 @@ Legend: {
     label: "Persistent store"
     class: category_persistent_store
   }
-  category_runtime_agent_frame: {
-    label: "Runtime agent (boundary)"
-    class: category_runtime_agent_frame
-  }
-  category_layer_frame: {
-    label: "Layer (boundary)"
-    class: category_layer_frame
-  }
-  line_acts_on_sample: {
+  line_step_sample: {
     label: ""
     direction: right
     style: {
@@ -187,12 +136,12 @@ Legend: {
       width: 8
       height: 8
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: "#4338CA"
+        stroke: "#4338CA"
       }
     }
     caption: {
-      label: "acts on (invokes, writes)"
+      label: "numbered step, in order (dynamic views)"
       style: {
         fill: transparent
         stroke-width: 0
@@ -201,48 +150,14 @@ Legend: {
       }
     }
     tail -> caption: {
-      class: line_acts_on
-    }
-  }
-  line_read_only_sample: {
-    label: ""
-    direction: right
-    style: {
-      fill: transparent
-      stroke-width: 0
-    }
-    tail: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
-      style: {
-        fill: "#475569"
-        stroke: "#475569"
-      }
-    }
-    caption: {
-      label: "read-only flow (consumed, not modified)"
-      style: {
-        fill: transparent
-        stroke-width: 0
-        font-size: 14
-        font-color: "#334155"
-      }
-    }
-    tail -> caption: {
-      class: line_read_only
+      class: line_step
     }
   }
 }
-"el_praxion.orchestration"."el_praxion.orchestration.doc_research" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs +1 more" {class: line_read_only}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel": "dispatches (independent)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_systems": "re-enters pipeline at SYSTEMS_PLAN +2 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_research": "surfaces CIS section +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
+"el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "1 · surfaces the CIS section" {class: line_step}
+"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline.architect": "2 · signals CIS to" {class: line_step}
+"el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "3 · records a disposition per signal" {class: line_step}
+"el_praxion.orchestration.pipeline.architect" -> "el_praxion.persistence.adrs": "4 · writes an ADR fragment when load-bearing" {class: line_step}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.persistence.tdl": "5 · files a row from a deferred signal" {class: line_step}
+"el_praxion.orchestration.pipeline.sentinel" -> "el_praxion.persistence.tdl": "5 · files a row from a deferred signal" {class: line_step}
+"el_praxion.orchestration.pipeline.verifier" -> "el_praxion.persistence.tdl": "5 · files a row from a deferred signal" {class: line_step}

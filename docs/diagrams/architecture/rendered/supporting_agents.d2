@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -31,16 +32,6 @@ classes: {
       font-size: 15
     }
   }
-  category_persistent_store: {
-    shape: cylinder
-    style: {
-      fill: "#F6E6F0"
-      stroke: "#9B3A75"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-    }
-  }
   category_runtime_agent_frame: {
     shape: rectangle
     style: {
@@ -53,17 +44,6 @@ classes: {
       border-radius: 16
     }
   }
-  category_layer_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#8C8780"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-    }
-  }
   line_acts_on: {
     style: {
       fill: "#FFFFFF"
@@ -73,19 +53,9 @@ classes: {
       font-size: 14
     }
   }
-  line_read_only: {
-    style: {
-      fill: "#FFFFFF"
-      stroke: "#475569"
-      stroke-width: 2
-      font-color: "#334155"
-      font-size: 14
-      stroke-dash: 5
-    }
-  }
 }
 Title: {
-  label: "Shadow, gated and independent agents — Component diagram"
+  label: "Shadow and gated agents — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -94,67 +64,40 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.orchestration": {
-  label: "Orchestration Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.orchestration.doc_context": {
-    label: "CONTEXT_REVIEW.md\n[Pipeline document]\ncontext-engineer cumulative\nreview"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.doc_learnings": {
-    label: "LEARNINGS.md\n[Pipeline document]\nin-flight knowledge"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.orchestrator": {
-    label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+"el_praxion.orchestration.doc_context": {
+  label: "CONTEXT_REVIEW.md\n[Pipeline document]\ncontext-engineer cumulative\nreview"
+  class: category_pipeline_document
+}
+"el_praxion.orchestration.orchestrator": {
+  label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline": {
+  label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
+  class: category_runtime_agent_frame
+  "el_praxion.orchestration.pipeline.cicd_engineer": {
+    label: "CI/CD Engineer\n[Runtime agent]\nPipeline design, GitHub\nActions, deployment\nautomation"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline": {
-    label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-    class: category_runtime_agent_frame
-    "el_praxion.orchestration.pipeline.arch_validator": {
-      label: "Architect Validator\n[Runtime agent]\nPer-PR DSL <-> code <-> ADR\ntriangle check"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.cicd_engineer": {
-      label: "CI/CD Engineer\n[Runtime agent]\nPipeline design, GitHub\nActions, deployment\nautomation"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.context_eng": {
-      label: "Context Engineer\n[Runtime agent]\nContext artifact domain\nexpert (shadow)"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.discipline_consultant": {
-      label: "Discipline Consultant\n[Runtime agent]\nGated adversarial peer\nsub-architect, parameterized\nper spawn; challenges only,\ndecides nothing"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.roadmap_cartographer": {
-      label: "Roadmap Cartographer\n[Runtime agent]\nProject-level\naudit-to-roadmap through a\nproject-derived lens set\n(on-demand)"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.sentinel": {
-      label: "Sentinel\n[Runtime agent]\nRead-only ecosystem auditor\n(independent)"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.skill_genesis": {
-      label: "Skill Genesis\n[Runtime agent]\nLearning triage; artifact\nproposal"
-      class: category_runtime_agent
-    }
+  "el_praxion.orchestration.pipeline.context_eng": {
+    label: "Context Engineer\n[Runtime agent]\nContext artifact domain\nexpert (shadow)"
+    class: category_runtime_agent
   }
-}
-"el_praxion.persistence": {
-  label: "Persistence Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.persistence.tdl": {
-    label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-    class: category_persistent_store
+  "el_praxion.orchestration.pipeline.discipline_consultant": {
+    label: "Discipline Consultant\n[Runtime agent]\nGated adversarial peer\nsub-architect, parameterized\nper spawn; challenges only,\ndecides nothing"
+    class: category_runtime_agent
+  }
+  "el_praxion.orchestration.pipeline.roadmap_cartographer": {
+    label: "Roadmap Cartographer\n[Runtime agent]\nProject-level\naudit-to-roadmap through a\nproject-derived lens set\n(on-demand)"
+    class: category_runtime_agent
   }
 }
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -170,17 +113,9 @@ Legend: {
     label: "Pipeline document"
     class: category_pipeline_document
   }
-  category_persistent_store: {
-    label: "Persistent store"
-    class: category_persistent_store
-  }
   category_runtime_agent_frame: {
     label: "Runtime agent (boundary)"
     class: category_runtime_agent_frame
-  }
-  category_layer_frame: {
-    label: "Layer (boundary)"
-    class: category_layer_frame
   }
   line_acts_on_sample: {
     label: ""
@@ -212,46 +147,9 @@ Legend: {
       class: line_acts_on
     }
   }
-  line_read_only_sample: {
-    label: ""
-    direction: right
-    style: {
-      fill: transparent
-      stroke-width: 0
-    }
-    tail: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
-      style: {
-        fill: "#475569"
-        stroke: "#475569"
-      }
-    }
-    caption: {
-      label: "read-only flow (consumed, not modified)"
-      style: {
-        fill: transparent
-        stroke-width: 0
-        font-size: 14
-        font-color: "#334155"
-      }
-    }
-    tail -> caption: {
-      class: line_read_only
-    }
-  }
 }
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.arch_validator": "dispatches (per-PR)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.cicd_engineer": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng": "dispatches (shadow)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.discipline_consultant": "dispatches (gated, one discipline per spawn)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.roadmap_cartographer": "dispatches (on-demand)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel": "dispatches (independent)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.skill_genesis": "dispatches (post-pipeline)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.arch_validator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_context": "writes (cumulative)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.skill_genesis" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_learnings": "reads at pipeline-end" {class: line_read_only}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.cicd_engineer": "dispatches" {class: line_acts_on}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng": "dispatches (shadow)" {class: line_acts_on}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.discipline_consultant": "dispatches (gated)" {class: line_acts_on}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.roadmap_cartographer": "dispatches (on-demand)" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng" -> "el_praxion.orchestration.doc_context": "writes (cumulative)" {class: line_acts_on}

@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -26,16 +27,6 @@ classes: {
     style: {
       fill: "#E3F1FB"
       stroke: "#0B6FA4"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-    }
-  }
-  category_persistent_store: {
-    shape: cylinder
-    style: {
-      fill: "#F6E6F0"
-      stroke: "#9B3A75"
       stroke-width: 2
       font-color: "#0F172A"
       font-size: 15
@@ -105,7 +96,7 @@ classes: {
   }
 }
 Title: {
-  label: "Persistence and tooling layers — Component diagram"
+  label: "Tooling layer — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -118,43 +109,19 @@ Title: {
   label: "Anthropic API\n[External system]"
   class: category_external_system
 }
-"el_arize_phoenix": {
-  label: "Arize Phoenix\n[External system]"
-  class: category_external_system
-}
 "el_praxion": {
   label: "Praxion\n[System in scope · Markdown, Python and shell]\nSkills, rules, commands and\nagents that equip an AI\ncoding assistant"
   class: category_system_in_scope_frame
   "el_praxion.knowledge": {
-    label: "Knowledge Layer\n[Layer]"
+    label: "Knowledge\n[Layer]"
     class: category_layer
   }
   "el_praxion.orchestration": {
-    label: "Orchestration Layer\n[Layer]"
+    label: "Orchestration\n[Layer]"
     class: category_layer_frame
     "el_praxion.orchestration.aiwork": {
       label: ".ai-work/\n[Pipeline document]\nEphemeral pipeline docs\n(task-slug scoped)"
       class: category_pipeline_document
-    }
-  }
-  "el_praxion.persistence": {
-    label: "Persistence Layer\n[Layer]"
-    class: category_layer_frame
-    "el_praxion.persistence.adrs": {
-      label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
-      class: category_persistent_store
-    }
-    "el_praxion.persistence.aistate": {
-      label: ".ai-state/\n[Persistent store]\nADRs, specs, sentinel\nreports, tech-debt ledger"
-      class: category_persistent_store
-    }
-    "el_praxion.persistence.chronograph": {
-      label: "Chronograph MCP\n[Tooling]\nOTel relay"
-      class: category_tooling
-    }
-    "el_praxion.persistence.tdl": {
-      label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-      class: category_persistent_store
     }
   }
   "el_praxion.tooling": {
@@ -172,10 +139,6 @@ Title: {
       label: "Installers\n[Tooling]\n3 targets"
       class: category_tooling
     }
-    "el_praxion.tooling.scripts": {
-      label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
-      class: category_tooling
-    }
     "el_praxion.tooling.versioning": {
       label: "Versioning\n[Tooling]\nCommitizen"
       class: category_tooling
@@ -185,8 +148,9 @@ Title: {
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -201,10 +165,6 @@ Legend: {
   category_pipeline_document: {
     label: "Pipeline document"
     class: category_pipeline_document
-  }
-  category_persistent_store: {
-    label: "Persistent store"
-    class: category_persistent_store
   }
   category_tooling: {
     label: "Tooling"
@@ -283,12 +243,6 @@ Legend: {
     }
   }
 }
-"el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "finalized at merge-to-main" {class: line_acts_on}
-"el_praxion"."el_praxion.persistence"."el_praxion.persistence.chronograph" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads in-flight pipeline docs (read-only)" {class: line_read_only}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads (read-only)" {class: line_read_only}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads in-flight documents" {class: line_read_only}
 "el_praxion"."el_praxion.tooling"."el_praxion.tooling.evals" -> "el_anthropic_api": "judges via the JudgeClient adapter" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.evals" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads completed artifacts (read-only)" {class: line_read_only}
 "el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge": "deploys +3 more" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs": "finalize_adrs.py promotes drafts to dec-NNN" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}

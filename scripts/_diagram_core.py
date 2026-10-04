@@ -1,7 +1,7 @@
 """The pure core of the diagram renderer: an `export json` reading in, D2 text out.
 
 Holds the result records, the category rule, the view projection, label synthesis, the
-legend and D2 emission. Pure: no clock, file, network or subprocess.
+layout intent and D2 emission. Pure: no clock, file, network or subprocess.
 """
 
 from __future__ import annotations
@@ -12,42 +12,46 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from _diagram_legend import (
+    LEGEND_KEY,
+    TITLE_KEY,
+    LegendEntry,
+    legend_entries_of,
+    legend_fields,
+    legend_selection,
+    title_fields,
+)
 from _diagram_tokens import (
     ACTS_ON,
     CANVAS,
-    CATEGORY_RANK,
     DEFAULT_TOKENS,
+    EDGE_FONT_SIZE,
     EDGE_LABEL_INK,
     ICON_URIS,
     INK,
-    LEGEND_STROKE,
     LINE_DRAWINGS,
-    LINE_ORDER,
     READ_ONLY,
     STEP,
     UNCATEGORISED,
     UNCATEGORISED_NAME,
     LineDrawing,
     Token,
+    quote,
     snake_case,
 )
 
 LABEL_WIDTH = 28
 
 ELEMENT_FONT_SIZE = 15
-EDGE_FONT_SIZE = 14
-TITLE_FONT_SIZE = 24
 CANVAS_PAD = 40
-LEGEND_DOT = 8
-LEGEND_COLUMNS = 4
-# D2 pads a grid container by its gaps, so the vertical one is also the bottom margin.
-LEGEND_HORIZONTAL_GAP = 40
-LEGEND_VERTICAL_GAP = 12
 
-LEGEND_KEY = "Legend"
-TITLE_KEY = "Title"
 ELEMENT_KEY_PREFIX = "el_"
-FRAME_SUFFIX = " (boundary)"
+
+# A view's `autoLayout.direction` as D2's `direction`; D2 reads no spacing from the file.
+DIRECTIONS = {"TB": "down", "BT": "up", "LR": "right", "RL": "left"}
+DEFAULT_DIRECTION = "down"
+GROUP_KIND = "@group"
+GROUP_CATEGORY = "Layer"  # a group is drawn with the frame of this category
 
 READS_KIND = "reads"
 PLACEHOLDER_LABEL = "[...]"
@@ -135,18 +139,13 @@ class View:
     c4_type: str | None
     nodes: tuple[Node, ...]
     edges: tuple[Edge, ...]
+    direction: str = DEFAULT_DIRECTION
 
 
 @dataclass(frozen=True)
 class Projection:
     views: tuple[View, ...]
     findings: tuple[Finding, ...]
-
-
-@dataclass(frozen=True)
-class LegendEntry:
-    label: str
-    drawing_class: str | None
 
 
 # --- the category rule and the view projection -----------------------------------------------
@@ -197,8 +196,9 @@ def _project_view(
         _project_edge(e, relations, position if dynamic else None)
         for position, e in enumerate(raw.get("edges") or [], 1)
     ]
-    view = View(view_id, raw.get("title") or view_id, c4_type, tuple(nodes), tuple(edges))
-    return view, findings
+    direction = DIRECTIONS.get((raw.get("autoLayout") or {}).get("direction"), DEFAULT_DIRECTION)
+    title = raw.get("title") or view_id
+    return View(view_id, title, c4_type, tuple(nodes), tuple(edges), direction), findings
 
 
 def _c4_type(raw: Mapping[str, Any]) -> tuple[str | None, str | None]:
@@ -218,6 +218,8 @@ def _project_node(
     raw: Mapping[str, Any], model: Mapping[str, Any], drawings: Mapping, in_view: set
 ) -> tuple[Node, str | None]:
     """The node as drawn, and why it draws as Uncategorised when it does."""
+    if raw.get("kind") == GROUP_KIND:
+        return _group_node(raw, drawings, in_view)
     element = (model.get("elements") or {}).get(raw.get("modelRef") or raw["id"]) or raw
     is_frame = any(child in in_view for child in raw.get("children") or [])
     category = resolve_category(element, model.get("specification") or {})
@@ -238,6 +240,22 @@ def _project_node(
         parent=parent if parent in in_view else None,
     )
     return node, problem
+
+
+def _group_node(raw: Mapping[str, Any], drawings: Mapping, in_view: set) -> tuple[Node, None]:
+    """A view `group`: a titled frame with no element behind it."""
+    drawing = drawings.get((GROUP_CATEGORY, True)) or UNCATEGORISED
+    parent = raw.get("parent")
+    node = Node(
+        raw["id"],
+        raw.get("title") or raw["id"],
+        drawing,
+        None,
+        None,
+        True,
+        parent if parent in in_view else None,
+    )
+    return node, None
 
 
 def _project_edge(
@@ -301,47 +319,31 @@ def node_label_lines(node: Node) -> list[str]:
     return lines
 
 
-# --- the legend ------------------------------------------------------------------------------
+# --- D2 emission -----------------------------------------------------------------------------
 
 
 def legend_entries(view: View) -> list[LegendEntry]:
     """Boxes in vocabulary order, then frames, then the line meanings the view uses."""
-    drawings, lines = _legend(view)
-    entries = [LegendEntry(_legend_label(token), token.drawing_class) for token in drawings]
-    return entries + [LegendEntry(line.meaning, None) for line in lines]
+    return legend_entries_of(*_legend(view))
 
 
 def _legend(view: View) -> tuple[list[Token], list[LineDrawing]]:
-    unknown_rank = len(CATEGORY_RANK)
-
-    def order(token: Token) -> tuple:
-        last = token.category == UNCATEGORISED_NAME
-        return (token.frame, last, CATEGORY_RANK.get(token.category, unknown_rank), token.category)
-
-    drawings = sorted({node.drawing for node in view.nodes}, key=order)
-    used = {edge.line for edge in view.edges}
-    return drawings, [LINE_DRAWINGS[line] for line in LINE_ORDER if line in used]
-
-
-def _legend_label(token: Token) -> str:
-    return token.category + (FRAME_SUFFIX if token.frame else "")
-
-
-# --- D2 emission -----------------------------------------------------------------------------
+    return legend_selection((n.drawing for n in view.nodes), (e.line for e in view.edges))
 
 
 def emit_d2(view: View) -> str:
     """The view as D2 text; pure, and independent of the order nodes and edges are listed in."""
     drawings, lines = _legend(view)
     document = {
+        "direction": view.direction,
         "vars": {
             "d2-config": {
                 "layout-engine": "elk",
                 "pad": CANVAS_PAD,
                 "theme-overrides": {
-                    "N1": _quote(INK),
-                    "N2": _quote(EDGE_LABEL_INK),
-                    "N7": _quote(CANVAS),
+                    "N1": quote(INK),
+                    "N2": quote(EDGE_LABEL_INK),
+                    "N7": quote(CANVAS),
                 },
             }
         },
@@ -349,19 +351,23 @@ def emit_d2(view: View) -> str:
             **{token.drawing_class: _token_fields(token) for token in drawings},
             **{line.drawing_class: _line_fields(line) for line in lines},
         },
-        TITLE_KEY: _title_fields(view),
+        TITLE_KEY: title_fields(_title(view)),
         **_node_entries(view),
-        LEGEND_KEY: _legend_fields(drawings, lines),
+        LEGEND_KEY: legend_fields(drawings, lines),
     }
     return "\n".join([*_render(document), *_edge_lines(view)]) + "\n"
 
 
+def _title(view: View) -> str:
+    return view.title if view.c4_type is None else f"{view.title} — {view.c4_type} diagram"
+
+
 def _token_fields(token: Token) -> dict:
     style = {
-        "fill": _quote(token.fill) if token.fill else "transparent",
-        "stroke": _quote(token.stroke),
+        "fill": quote(token.fill) if token.fill else "transparent",
+        "stroke": quote(token.stroke),
         "stroke-width": token.stroke_width,
-        "font-color": _quote(token.text_colour),
+        "font-color": quote(token.text_colour),
         "font-size": ELEMENT_FONT_SIZE,
     }
     if token.dash:
@@ -372,31 +378,21 @@ def _token_fields(token: Token) -> dict:
         style[token.extra] = "true"
     fields: dict = {"shape": token.shape}
     if token.icon != "none":
-        fields["icon"] = _quote(ICON_URIS[token.icon])
+        fields["icon"] = quote(ICON_URIS[token.icon])
     return {**fields, "style": style}
 
 
 def _line_fields(line: LineDrawing) -> dict:
     style = {
-        "fill": _quote(CANVAS),
-        "stroke": _quote(line.stroke),
+        "fill": quote(CANVAS),
+        "stroke": quote(line.stroke),
         "stroke-width": line.width,
-        "font-color": _quote(EDGE_LABEL_INK),
+        "font-color": quote(EDGE_LABEL_INK),
         "font-size": EDGE_FONT_SIZE,
     }
     if line.dash:
         style["stroke-dash"] = line.dash
     return {"style": style}
-
-
-def _title_fields(view: View) -> dict:
-    title = view.title if view.c4_type is None else f"{view.title} — {view.c4_type} diagram"
-    return {
-        "label": _quote(title),
-        "shape": "text",
-        "near": "top-center",
-        "style": {"font-size": TITLE_FONT_SIZE, "bold": "true", "font-color": _quote(INK)},
-    }
 
 
 def _node_entries(view: View) -> dict:
@@ -408,7 +404,7 @@ def _node_entries(view: View) -> dict:
     def entries(parent: str | None) -> dict:
         return {
             _node_key(node.id): {
-                "label": _quote("\n".join(node_label_lines(node))),
+                "label": quote("\n".join(node_label_lines(node))),
                 "class": node.drawing.drawing_class,
                 **entries(node.id),
             }
@@ -422,7 +418,7 @@ def _edge_lines(view: View) -> list[str]:
     paths = _node_paths(view)
     ordered = sorted(view.edges, key=lambda e: (e.step_no or 0, e.source, e.target, e.label))
     return [
-        f"{paths[e.source]} -> {paths[e.target]}: {_quote(e.label)} "
+        f"{paths[e.source]} -> {paths[e.target]}: {quote(e.label)} "
         f"{{class: {LINE_DRAWINGS[e.line].drawing_class}}}"
         for e in ordered
     ]
@@ -440,56 +436,6 @@ def _node_paths(view: View) -> dict[str, str]:
     return {node_id: path(node_id) for node_id in parents}
 
 
-def _legend_fields(drawings: Sequence[Token], lines: Sequence[LineDrawing]) -> dict:
-    """A grid of one sample per drawing, then one per line meaning."""
-    fields: dict = {
-        "label": _quote(LEGEND_KEY),
-        "near": "bottom-center",
-        "grid-columns": LEGEND_COLUMNS,
-        "horizontal-gap": LEGEND_HORIZONTAL_GAP,
-        "vertical-gap": LEGEND_VERTICAL_GAP,
-        "style": {
-            "fill": _quote(CANVAS),
-            "stroke": _quote(LEGEND_STROKE),
-            "stroke-width": 1,
-            "font-color": _quote(INK),
-        },
-    }
-    for token in drawings:
-        drawing_class = token.drawing_class
-        fields[drawing_class] = {"label": _quote(_legend_label(token)), "class": drawing_class}
-    for line in lines:
-        fields[f"{line.drawing_class}_sample"] = _line_sample(line)
-    return fields
-
-
-def _line_sample(line: LineDrawing) -> dict:
-    """A dot and an unlabelled arrow ending at the meaning, left to right in its own cell.
-
-    The meaning is the arrow's target and not its label, so the caption stays off the line.
-    """
-    dot = {
-        "label": '""',
-        "shape": "circle",
-        "width": LEGEND_DOT,
-        "height": LEGEND_DOT,
-        "style": {"fill": _quote(line.stroke), "stroke": _quote(line.stroke)},
-    }
-    invisible = {"fill": "transparent", "stroke-width": 0}
-    caption = {
-        "label": _quote(line.meaning),
-        "style": {**invisible, "font-size": EDGE_FONT_SIZE, "font-color": _quote(EDGE_LABEL_INK)},
-    }
-    return {
-        "label": '""',
-        "direction": "right",
-        "style": invisible,
-        "tail": dot,
-        "caption": caption,
-        "tail -> caption": {"class": line.drawing_class},
-    }
-
-
 def _render(fields: Mapping[str, Any], indent: str = "") -> list[str]:
     """D2 text of a nested mapping; keys and values are already D2 tokens."""
     rendered = []
@@ -503,10 +449,4 @@ def _render(fields: Mapping[str, Any], indent: str = "") -> list[str]:
 
 def _node_key(element_id: str) -> str:
     """D2 keys ignore case and quoting, so a bare id `title` would merge into the title block."""
-    return _quote(ELEMENT_KEY_PREFIX + element_id)
-
-
-def _quote(text: str) -> str:
-    """A D2 double-quoted string; `$` is escaped because D2 substitutes `${...}` inside one."""
-    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-    return '"' + escaped.replace("$", "\\$") + '"'
+    return quote(ELEMENT_KEY_PREFIX + element_id)

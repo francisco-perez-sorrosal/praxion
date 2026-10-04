@@ -63,7 +63,7 @@ model {
     technology "Markdown, Python and shell"
 
     // Knowledge Layer: static assets loaded into agent context
-    knowledge = component "Knowledge Layer" {
+    knowledge = component "Knowledge" {
       metadata { category 'Layer' }
 
       skills   = component "Skills"         { description "Domain expertise modules" metadata { category 'Knowledge asset' } }
@@ -74,7 +74,7 @@ model {
 
     // Orchestration Layer: runtime execution and ephemeral state.
     // Individual agents are first-class elements so pipeline views can address them.
-    orchestration = component "Orchestration Layer" {
+    orchestration = component "Orchestration" {
       metadata { category 'Layer' }
 
 
@@ -126,7 +126,7 @@ model {
     }
 
     // Persistence Layer: durable intelligence and observability
-    persistence = component "Persistence Layer" {
+    persistence = component "Persistence" {
       metadata { category 'Layer' }
 
       chronograph = component "Chronograph MCP" { description "OTel relay" metadata { category 'Tooling' } }
@@ -159,7 +159,7 @@ model {
     orchestration.orchestrator -> orchestration.pipeline.architect     "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.interface_des "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.transactions_arch "dispatches (shadow)"
-    orchestration.orchestrator -> orchestration.pipeline.discipline_consultant "dispatches (gated, one discipline per spawn)"
+    orchestration.orchestrator -> orchestration.pipeline.discipline_consultant "dispatches (gated)"
     orchestration.orchestrator -> orchestration.pipeline.context_eng   "dispatches (shadow)"
     orchestration.orchestrator -> orchestration.pipeline.planner       "dispatches"
     orchestration.orchestrator -> orchestration.pipeline.implementer   "dispatches"
@@ -216,9 +216,9 @@ model {
 
     // ── CIS Loop (forward-feeding: researcher Hat 2 -> architect disposition) ───
     orchestration.pipeline.researcher -> orchestration.doc_research "surfaces CIS section" { #cis_loop }
-    orchestration.doc_research        -[reads]-> orchestration.pipeline.architect "surfaces CIS signals to" { #cis_loop }
+    orchestration.doc_research        -[reads]-> orchestration.pipeline.architect "signals CIS to" { #cis_loop }
     orchestration.pipeline.architect  -> orchestration.doc_systems  "records disposition per signal" { #cis_loop }
-    orchestration.pipeline.architect  -> persistence.adrs           "writes ADR fragment when load-bearing" { #cis_loop }
+    orchestration.pipeline.architect  -> persistence.adrs           "writes an ADR when load-bearing" { #cis_loop }
     // defer-with-rationale becomes a tech-debt-ledger row written by verifier/sentinel/orchestrator
     orchestration.pipeline.verifier   -> persistence.tdl            "files row from deferred CIS" { #cis_loop }
     orchestration.pipeline.sentinel   -> persistence.tdl            "files row from deferred CIS" { #cis_loop }
@@ -227,11 +227,11 @@ model {
     // ── Rework Loop (backward-feeding: verifier Phase 12.5 -> architect re-pipeline) ───
     orchestration.pipeline.verifier   -> orchestration.doc_rework "emits Phase 12.5" { #rework_loop }
     orchestration.doc_rework          -[reads]-> orchestration.orchestrator "hands the manifest to" { #rework_loop }
-    orchestration.orchestrator        -> tooling.scripts "spawns rework worktree per row (EnterWorktree)" { #rework_loop }
-    orchestration.orchestrator        -> orchestration.doc_findings "writes one VERIFIER_FINDINGS.md per worktree" { #rework_loop }
+    orchestration.orchestrator        -> tooling.scripts "spawns a worktree per row" { #rework_loop }
+    orchestration.orchestrator        -> orchestration.doc_findings "writes a findings file per worktree" { #rework_loop }
     orchestration.orchestrator        -> persistence.tdl "flips linked td-NNN rows to in-flight" { #rework_loop }
     orchestration.doc_findings        -> knowledge.commands "auto-discovered by /resume-rework" { #rework_loop }
-    knowledge.commands                -> orchestration.pipeline.architect "dispatches systems-architect (always-first)" { #rework_loop }
+    knowledge.commands                -> orchestration.pipeline.architect "starts" { #rework_loop }
     orchestration.pipeline.architect  -> orchestration.doc_systems "re-enters pipeline at SYSTEMS_PLAN" { #rework_loop }
 
     // Validator + skill-genesis side-channels (post-pipeline)
@@ -252,14 +252,14 @@ model {
     tooling.installers  -> knowledge.rules    "deploys"
     tooling.installers  -> knowledge.commands "deploys"
     tooling.installers  -> knowledge.agents   "deploys"
-    tooling.scripts     -> persistence.adrs   "finalize_adrs.py promotes drafts to dec-NNN"
-    tooling.scripts     -> persistence.tdl    "finalize_tech_debt_ledger.py reconciles"
+    tooling.scripts     -> persistence.adrs   "promotes drafts"
+    tooling.scripts     -> persistence.tdl    "reconciles"
 
     // Both read completed state and never mutate it -- the read-only property is
     // the architectural claim, so the edges are one-directional by design.
     tooling.dashboard   -[reads]-> persistence.aistate   "reads (read-only)"
-    tooling.dashboard   -[reads]-> orchestration.aiwork  "reads in-flight pipeline docs (read-only)"
-    tooling.evals       -[reads]-> persistence.aistate   "reads completed artifacts (read-only)"
+    tooling.dashboard   -[reads]-> orchestration.aiwork  "reads in-flight documents"
+    tooling.evals       -[reads]-> persistence.aistate   "reads completed artifacts"
   }
 
   // The eval framework's only outbound boundary, and the one the fitness suite
@@ -281,7 +281,7 @@ views {
 
   view index {
     #c4_system_context
-    title "Praxion"
+    title "Praxion in its context"
     description "Praxion in scope, the developer who uses it, and the six external systems it meets"
 
     include developer, claude_code, claude_desktop, cursor, github, arize_phoenix, anthropic_api, praxion
@@ -289,7 +289,7 @@ views {
 
   view components {
     #c4_container
-    title "Praxion layers"
+    title "Praxion's building blocks"
     description "The four layers inside Praxion and the people and systems each one meets"
 
     include
@@ -315,62 +315,85 @@ views {
   view orchestration_components {
     #c4_component
     title "Orchestration layer"
-    description "The main agent, the agent pipeline and the hooks, with the stores and scripts they work through"
+    description "The main agent, the agent pipeline and the hooks, with the relay and the store they write to"
 
     include
       praxion.orchestration.orchestrator, praxion.orchestration.pipeline,
       praxion.orchestration.hooks, praxion.orchestration.aiwork,
-      praxion.persistence.chronograph, praxion.persistence.aistate,
-      praxion.persistence.adrs, praxion.persistence.tdl,
-      praxion.tooling.scripts
+      praxion.persistence.chronograph, praxion.persistence.aistate
   }
 
-  view persistence_tooling_components {
+  view persistence_components {
     #c4_component
-    title "Persistence and tooling layers"
-    description "The durable stores, the tools that read or finalize them and the external systems those tools reach"
+    title "Persistence layer"
+    description "The durable stores, the relay that streams events out and the tools that finalize or read the stores"
 
     include
       praxion.persistence.chronograph, praxion.persistence.aistate,
       praxion.persistence.adrs, praxion.persistence.tdl,
-      praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning,
+      arize_phoenix,
+      praxion.tooling.scripts, praxion.tooling.dashboard
+    exclude praxion.tooling.dashboard -> praxion.orchestration.aiwork
+  }
+
+  view tooling_components {
+    #c4_component
+    title "Tooling layer"
+    description "The installers, versioning, dashboard and eval framework, and the knowledge, pipeline documents and external system each reaches"
+
+    include
+      praxion.tooling.installers, praxion.tooling.versioning,
       praxion.tooling.dashboard, praxion.tooling.evals,
-      arize_phoenix, anthropic_api,
-      praxion.knowledge, praxion.orchestration.aiwork
+      praxion.knowledge, praxion.orchestration.aiwork, anthropic_api
+    exclude praxion.tooling.dashboard -> praxion.persistence.aistate
+    exclude praxion.tooling.evals -> praxion.persistence.aistate
   }
 
   // ── Agent pipeline, forward flow ─────────────────────────────────────────
 
   view agent_pipeline {
     #c4_component
-    title "Agent pipeline, ideation to plan"
-    description "The first half of the forward flow: each agent writes a document and the next agent reads it"
+    title "Agent pipeline, ideation to design"
+    description "The first third of the forward flow: each agent writes a document and the next agent reads it"
 
     include
-      praxion.orchestration.pipeline.promethean, praxion.orchestration.pipeline.researcher,
-      praxion.orchestration.pipeline.architect, praxion.orchestration.pipeline.test_engineer,
-      praxion.orchestration.pipeline.planner,
-      praxion.orchestration.doc_idea, praxion.orchestration.doc_research,
-      praxion.orchestration.doc_spec_extract, praxion.orchestration.doc_acceptance,
-      praxion.orchestration.doc_systems, praxion.orchestration.doc_impl_plan
+      praxion.orchestration.pipeline.promethean, praxion.orchestration.pipeline.researcher, praxion.orchestration.pipeline.architect, praxion.orchestration.doc_idea, praxion.orchestration.doc_research, praxion.orchestration.doc_systems, praxion.orchestration.doc_spec_extract
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop
-    exclude praxion.orchestration.doc_impl_plan -> praxion.orchestration.pipeline.test_engineer
+  }
+
+  view agent_pipeline_plan {
+    #c4_component
+    title "Agent pipeline, acceptance tests and plan"
+    description "The middle of the forward flow: the architect's documents drive the acceptance tests and the plan"
+
+    include
+      praxion.orchestration.pipeline.architect, praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.planner, praxion.orchestration.doc_spec_extract, praxion.orchestration.doc_acceptance, praxion.orchestration.doc_systems, praxion.orchestration.doc_impl_plan
+    exclude * -> * where tag is #cis_loop
+    exclude * -> * where tag is #rework_loop
+    exclude * -> * where tag is #challenge_loop
   }
 
   view agent_pipeline_build {
     #c4_component
-    title "Agent pipeline, plan to verification"
-    description "The second half of the forward flow: the plan is built, tested and documented, then verified"
+    title "Agent pipeline, plan to build"
+    description "The plan is built, tested and documented, and each agent records its progress"
 
     include
-      praxion.orchestration.pipeline.planner, praxion.orchestration.pipeline.implementer,
-      praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.doc_engineer,
-      praxion.orchestration.pipeline.verifier,
-      praxion.orchestration.doc_impl_plan, praxion.orchestration.doc_wip,
-      praxion.orchestration.doc_test, praxion.orchestration.doc_verify,
-      praxion.orchestration.doc_learnings
+      praxion.orchestration.pipeline.planner, praxion.orchestration.pipeline.implementer, praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.doc_engineer, praxion.orchestration.doc_impl_plan, praxion.orchestration.doc_wip, praxion.orchestration.doc_test, praxion.orchestration.doc_learnings
+    exclude * -> * where tag is #cis_loop
+    exclude * -> * where tag is #rework_loop
+    exclude * -> * where tag is #challenge_loop
+  }
+
+  view agent_pipeline_verify {
+    #c4_component
+    title "Agent pipeline, verification"
+    description "The verifier reads the progress and test documents and writes the verification report"
+
+    include
+      praxion.orchestration.pipeline.verifier, praxion.orchestration.doc_wip, praxion.orchestration.doc_test, praxion.orchestration.doc_verify
     exclude * -> * where tag is #cis_loop
     exclude * -> * where tag is #rework_loop
     exclude * -> * where tag is #challenge_loop
@@ -378,17 +401,26 @@ views {
 
   view supporting_agents {
     #c4_component
-    title "Shadow, gated and independent agents"
-    description "The agents outside the forward flow, how the main agent dispatches each, and the documents and ledger they touch"
+    title "Shadow and gated agents"
+    description "The agents the main agent dispatches beside the forward flow, by shadowing, on demand or when a gate opens"
 
     include
       praxion.orchestration.orchestrator,
       praxion.orchestration.pipeline.context_eng, praxion.orchestration.pipeline.discipline_consultant,
-      praxion.orchestration.pipeline.cicd_engineer, praxion.orchestration.pipeline.sentinel,
-      praxion.orchestration.pipeline.arch_validator, praxion.orchestration.pipeline.skill_genesis,
-      praxion.orchestration.pipeline.roadmap_cartographer,
-      praxion.orchestration.doc_context, praxion.orchestration.doc_learnings,
-      praxion.persistence.tdl
+      praxion.orchestration.pipeline.cicd_engineer, praxion.orchestration.pipeline.roadmap_cartographer,
+      praxion.orchestration.doc_context
+  }
+
+  view independent_agents {
+    #c4_component
+    title "Independent and post-pipeline agents"
+    description "The auditors and learning triage the main agent dispatches outside the pipeline, and the ledger and learnings they feed"
+
+    include
+      praxion.orchestration.orchestrator,
+      praxion.orchestration.pipeline.sentinel, praxion.orchestration.pipeline.arch_validator,
+      praxion.orchestration.pipeline.skill_genesis,
+      praxion.orchestration.doc_learnings, praxion.persistence.tdl
   }
 
   view feedback_loops {
@@ -406,47 +438,48 @@ views {
     exclude praxion.orchestration.orchestrator -> praxion.orchestration.pipeline.*
   }
 
-  // L2 — Continuous Improvement Signals (CIS) loop detail.
-  // Forward-feeding: researcher Hat 2 surfaces strict-improvement candidates;
-  // architect dispositions are recorded in SYSTEMS_PLAN.md (and ADR fragments when load-bearing);
-  // deferred dispositions feed the tech-debt ledger.
-  view cis_loop_detail {
-    title "CIS Loop Detail — Forward-Feeding (L2)"
-    description "Continuous Improvement Signals: researcher Hat 2 surfaces strict-improvement candidates; architect dispositions are switch-now / defer-with-rationale / dismiss-with-rationale; deferred signals seed tech-debt-ledger rows"
+  // ── Loop details ─────────────────────────────────────────────────────────
+
+  view challenge_loop_detail {
+    #c4_component
+    title "Challenge loop"
+    description "The interface designer and the transactions architect write designs whose challenges the architect answers in one round"
 
     include
-      praxion.orchestration.pipeline.researcher,
+      praxion.orchestration.pipeline.interface_des, praxion.orchestration.pipeline.transactions_arch,
       praxion.orchestration.pipeline.architect,
-      praxion.orchestration.pipeline.verifier,
-      praxion.orchestration.pipeline.sentinel,
-      praxion.orchestration.orchestrator,
-      praxion.orchestration.doc_research,
-      praxion.orchestration.doc_systems,
-      praxion.persistence.adrs,
-      praxion.persistence.tdl
+      praxion.orchestration.doc_interface, praxion.orchestration.doc_transactions
   }
 
-  // L2 — Verifier rework loop detail.
-  // Backward-feeding: verifier Phase 12.5 emits REWORK_MANIFEST; orchestrator spawns
-  // a rework worktree per row, writes VERIFIER_FINDINGS.md, flips td-NNN rows to in-flight;
-  // a fresh Claude Code session in the worktree; the user runs /resume-rework, which dispatches
-  // systems-architect always-first; the architect re-enters the pipeline at SYSTEMS_PLAN.md.
-  view rework_loop_detail {
-    title "Rework Loop Detail — Backward-Feeding (L2)"
-    description "Verifier Phase 12.5 -> REWORK_MANIFEST.md -> orchestrator -> rework worktrees -> /resume-rework -> systems-architect (always-first) -> re-pipeline; subagent isolation enforced by native worktree isolation"
+  // Each step restates one recorded relationship, in order; a step never invents a fact.
+  dynamic view cis_loop_detail {
+    title "Continuous improvement signals loop"
+    description "A signal the researcher surfaces is dispositioned by the architect, and a deferred one becomes a tech-debt ledger row"
+    autoLayout TopBottom
 
-    include
-      praxion.orchestration.pipeline.verifier,
-      praxion.orchestration.orchestrator,
-      praxion.orchestration.pipeline.architect,
-      praxion.orchestration.pipeline.planner,
-      praxion.orchestration.hooks,
-      praxion.orchestration.doc_verify,
-      praxion.orchestration.doc_rework,
-      praxion.orchestration.doc_findings,
-      praxion.orchestration.doc_systems,
-      praxion.knowledge.commands,
-      praxion.persistence.tdl,
-      praxion.tooling.scripts
+    praxion.orchestration.pipeline.researcher -> praxion.orchestration.doc_research 'surfaces the CIS section'
+    praxion.orchestration.doc_research -[reads]-> praxion.orchestration.pipeline.architect 'signals CIS to'
+    praxion.orchestration.pipeline.architect -> praxion.orchestration.doc_systems 'records a disposition per signal'
+    praxion.orchestration.pipeline.architect -> praxion.persistence.adrs 'writes an ADR fragment when load-bearing'
+    parallel {
+      praxion.orchestration.pipeline.verifier -> praxion.persistence.tdl 'files a row from a deferred signal'
+      praxion.orchestration.pipeline.sentinel -> praxion.persistence.tdl 'files a row from a deferred signal'
+      praxion.orchestration.orchestrator -> praxion.persistence.tdl 'files a row from a deferred signal'
+    }
+  }
+
+  dynamic view rework_loop_detail {
+    title "Rework loop"
+    description "The verifier's rework manifest sends the main agent to one worktree per row, and the architect re-enters the pipeline at the plan"
+    autoLayout TopBottom
+
+    praxion.orchestration.pipeline.verifier -> praxion.orchestration.doc_rework 'emits Phase 12.5'
+    praxion.orchestration.doc_rework -[reads]-> praxion.orchestration.orchestrator 'hands the manifest to'
+    praxion.orchestration.orchestrator -> praxion.tooling.scripts 'spawns a worktree per row'
+    praxion.orchestration.orchestrator -> praxion.orchestration.doc_findings 'writes a findings file per worktree'
+    praxion.orchestration.orchestrator -> praxion.persistence.tdl 'flips linked td-NNN rows to in-flight'
+    praxion.orchestration.doc_findings -> praxion.knowledge.commands 'is auto-discovered by /resume-rework'
+    praxion.knowledge.commands -> praxion.orchestration.pipeline.architect 'dispatches the architect first'
+    praxion.orchestration.pipeline.architect -> praxion.orchestration.doc_systems 're-enters the pipeline at the plan'
   }
 }

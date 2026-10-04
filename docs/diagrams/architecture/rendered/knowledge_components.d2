@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -74,7 +75,7 @@ Title: {
   }
 }
 "el_praxion.knowledge": {
-  label: "Knowledge Layer\n[Layer]"
+  label: "Knowledge\n[Layer]"
   class: category_layer_frame
   "el_praxion.knowledge.agents": {
     label: "Agents\n[Knowledge asset]\nAuthored subprocess\nspecifications"
@@ -94,7 +95,7 @@ Title: {
   }
 }
 "el_praxion.orchestration": {
-  label: "Orchestration Layer\n[Layer]"
+  label: "Orchestration\n[Layer]"
   class: category_layer_frame
   "el_praxion.orchestration.pipeline": {
     label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
@@ -112,8 +113,9 @@ Title: {
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"

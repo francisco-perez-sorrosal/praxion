@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -84,7 +85,7 @@ Title: {
   }
 }
 "el_praxion.orchestration": {
-  label: "Orchestration Layer\n[Layer]"
+  label: "Orchestration\n[Layer]"
   class: category_layer_frame
   "el_praxion.orchestration.aiwork": {
     label: ".ai-work/\n[Pipeline document]\nEphemeral pipeline docs\n(task-slug scoped)"
@@ -104,12 +105,8 @@ Title: {
   }
 }
 "el_praxion.persistence": {
-  label: "Persistence Layer\n[Layer]"
+  label: "Persistence\n[Layer]"
   class: category_layer_frame
-  "el_praxion.persistence.adrs": {
-    label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
-    class: category_persistent_store
-  }
   "el_praxion.persistence.aistate": {
     label: ".ai-state/\n[Persistent store]\nADRs, specs, sentinel\nreports, tech-debt ledger"
     class: category_persistent_store
@@ -118,24 +115,13 @@ Title: {
     label: "Chronograph MCP\n[Tooling]\nOTel relay"
     class: category_tooling
   }
-  "el_praxion.persistence.tdl": {
-    label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-    class: category_persistent_store
-  }
-}
-"el_praxion.tooling": {
-  label: "Tooling\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.tooling.scripts": {
-    label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
-    class: category_tooling
-  }
 }
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -197,12 +183,5 @@ Legend: {
 "el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "enforces" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion.persistence"."el_praxion.persistence.chronograph": "emits events (HTTP)" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches +16 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.tooling"."el_praxion.tooling.scripts": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads/writes documents" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing +1 more" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.aistate": "persists artifacts" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows +2 more" {class: line_acts_on}
-"el_praxion.persistence"."el_praxion.persistence.adrs" -> "el_praxion.persistence"."el_praxion.persistence.aistate": "finalized at merge-to-main" {class: line_acts_on}
-"el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "finalize_adrs.py promotes drafts to dec-NNN" {class: line_acts_on}
-"el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}

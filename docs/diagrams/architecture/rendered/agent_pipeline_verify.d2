@@ -65,7 +65,7 @@ classes: {
   }
 }
 Title: {
-  label: "Agent pipeline, ideation to design — Component diagram"
+  label: "Agent pipeline, verification — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -74,35 +74,23 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.orchestration.doc_idea": {
-  label: "IDEA_PROPOSAL.md\n[Pipeline document]\npromethean output"
+"el_praxion.orchestration.doc_test": {
+  label: "TEST_RESULTS.md\n[Pipeline document]\ntest-run handoff"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.doc_research": {
-  label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
+"el_praxion.orchestration.doc_verify": {
+  label: "VERIFICATION_REPORT.md\n[Pipeline document]\nverifier output"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.doc_spec_extract": {
-  label: "SPEC_EXTRACT.md\n[Pipeline document]\nspec-only extract written by\nextract_spec.py; sole input\nof acceptance design"
-  class: category_pipeline_document
-}
-"el_praxion.orchestration.doc_systems": {
-  label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
+"el_praxion.orchestration.doc_wip": {
+  label: "WIP.md\n[Pipeline document]\nstep state"
   class: category_pipeline_document
 }
 "el_praxion.orchestration.pipeline": {
   label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
   class: category_runtime_agent_frame
-  "el_praxion.orchestration.pipeline.architect": {
-    label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline.promethean": {
-    label: "Promethean\n[Runtime agent]\nFeature-level ideation"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline.researcher": {
-    label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+  "el_praxion.orchestration.pipeline.verifier": {
+    label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
     class: category_runtime_agent
   }
 }
@@ -192,9 +180,6 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration.doc_idea" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "informs" {class: line_read_only}
-"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs" {class: line_read_only}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_spec_extract": "writes spec extract" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.promethean" -> "el_praxion.orchestration.doc_idea": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "writes" {class: line_acts_on}
+"el_praxion.orchestration.doc_test" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
+"el_praxion.orchestration.doc_wip" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration.doc_verify": "writes" {class: line_acts_on}

@@ -145,22 +145,26 @@ def test_a_real_render_reads_at_ten_pixels_or_more_with_no_overlapping_lines():
     found = legibility_outcome(render("index"))
 
     assert found.problems == ()
-    assert (found.measured, found.threshold) == (pytest.approx(12.55, abs=0.01), 10.0)
+    assert (found.measured, found.threshold) == (pytest.approx(10.09, abs=0.01), 10.0)
 
 
 def test_text_of_font_size_8_fails_naming_the_smallest_reading():
     found = legibility_outcome(render("index", ("font-size:15px", "font-size:8px"), count=99))
 
     assert found.problems[0].startswith(
-        "min rendered text 7.2px at 960px (font-size 8, width 1071) < 10px ("
+        "min rendered text 5.8px at 960px (font-size 8, width 1332) < 10px ("
     )
 
 
 def test_a_real_render_too_wide_for_its_text_to_reach_ten_pixels_fails():
-    found = legibility_outcome(read_svg((RENDERS / "structure.svg").read_text(encoding="utf-8")))
+    markup = (RENDERS / "structure.svg").read_text(encoding="utf-8")
+    widened = markup.replace('viewBox="0 0 1332 1391"', 'viewBox="0 0 2000 1391"', 1)
 
-    assert found.problems == (
-        "min rendered text 9.2px at 960px (font-size 14, width 1456) < 10px (27 line(s) below)",
+    found = legibility_outcome(read_svg(widened))
+
+    assert len(found.problems) == 1
+    assert found.problems[0].startswith(
+        "min rendered text 6.7px at 960px (font-size 14, width 2000) < 10px ("
     )
 
 
@@ -214,7 +218,7 @@ def test_a_real_render_is_within_the_proportions_and_the_fan_in(views):
 
     assert found.problems == ()
     assert found.held == (
-        "width/height 1.19 (1071x898) within 0.5-2.5; most arrows meeting one element: 2 (at most 9)"
+        "width/height 1.48 (1332x898) within 0.5-2.5; most arrows meeting one element: 2 (at most 9)"
     )
 
 
@@ -365,10 +369,10 @@ def test_each_view_has_one_drift_finding_and_a_root_wide_one_only_when_a_render_
 def test_the_numeric_findings_carry_their_reading_and_limit_in_check_order(gather):
     found = gather()
 
-    wide = found[("DRC-07", "structure")]
-    assert (wide.status, wide.measured, wide.threshold) == (
-        "FAIL",
-        pytest.approx(9.2, abs=0.05),
+    legible = found[("DRC-07", "structure")]
+    assert (legible.status, legible.measured, legible.threshold) == (
+        "PASS",
+        pytest.approx(10.09, abs=0.05),
         10.0,
     )
     assert found[("DRC-06", "index")].measured == pytest.approx(7.9, abs=0.05)

@@ -65,7 +65,7 @@ classes: {
   }
 }
 Title: {
-  label: "Agent pipeline, ideation to design — Component diagram"
+  label: "Challenge loop — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -74,20 +74,12 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.orchestration.doc_idea": {
-  label: "IDEA_PROPOSAL.md\n[Pipeline document]\npromethean output"
+"el_praxion.orchestration.doc_interface": {
+  label: "INTERFACE_DESIGN.md\n[Pipeline document]\ninterface-designer output;\ncarries Architecture\nChallenges"
   class: category_pipeline_document
 }
-"el_praxion.orchestration.doc_research": {
-  label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
-  class: category_pipeline_document
-}
-"el_praxion.orchestration.doc_spec_extract": {
-  label: "SPEC_EXTRACT.md\n[Pipeline document]\nspec-only extract written by\nextract_spec.py; sole input\nof acceptance design"
-  class: category_pipeline_document
-}
-"el_praxion.orchestration.doc_systems": {
-  label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
+"el_praxion.orchestration.doc_transactions": {
+  label: "TRANSACTIONS_DESIGN.md\n[Pipeline document]\nagentic-transactions-architect\noutput; carries Architecture\nChallenges"
   class: category_pipeline_document
 }
 "el_praxion.orchestration.pipeline": {
@@ -97,12 +89,12 @@ Title: {
     label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline.promethean": {
-    label: "Promethean\n[Runtime agent]\nFeature-level ideation"
+  "el_praxion.orchestration.pipeline.interface_des": {
+    label: "Interface Designer\n[Runtime agent]\nInterface-layer peer\nsub-architect"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline.researcher": {
-    label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+  "el_praxion.orchestration.pipeline.transactions_arch": {
+    label: "Agentic Transactions\nArchitect\n[Runtime agent]\nTransaction-domain shadow\nsub-architect\n(payments/trading);\nchallenge loop"
     class: category_runtime_agent
   }
 }
@@ -192,9 +184,9 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration.doc_idea" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "informs" {class: line_read_only}
-"el_praxion.orchestration.doc_research" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs" {class: line_read_only}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_spec_extract": "writes spec extract" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.promethean" -> "el_praxion.orchestration.doc_idea": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration.doc_research": "writes" {class: line_acts_on}
+"el_praxion.orchestration.doc_interface" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "raises challenges for" {class: line_read_only}
+"el_praxion.orchestration.doc_transactions" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "raises challenges for" {class: line_read_only}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_interface": "revises per architect re-eval" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_transactions": "revises per architect re-eval" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.interface_des" -> "el_praxion.orchestration.doc_interface": "writes" {class: line_acts_on}
+"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.transactions_arch" -> "el_praxion.orchestration.doc_transactions": "writes" {class: line_acts_on}

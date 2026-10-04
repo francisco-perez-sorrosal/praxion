@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -64,7 +65,7 @@ classes: {
   }
 }
 Title: {
-  label: "Agent pipeline, plan to verification — Component diagram"
+  label: "Agent pipeline, plan to build — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -83,10 +84,6 @@ Title: {
 }
 "el_praxion.orchestration.doc_test": {
   label: "TEST_RESULTS.md\n[Pipeline document]\ntest-run handoff"
-  class: category_pipeline_document
-}
-"el_praxion.orchestration.doc_verify": {
-  label: "VERIFICATION_REPORT.md\n[Pipeline document]\nverifier output"
   class: category_pipeline_document
 }
 "el_praxion.orchestration.doc_wip": {
@@ -112,16 +109,13 @@ Title: {
     label: "Test Engineer\n[Runtime agent]\nTest design and execution"
     class: category_runtime_agent
   }
-  "el_praxion.orchestration.pipeline.verifier": {
-    label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
-    class: category_runtime_agent
-  }
 }
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -205,8 +199,6 @@ Legend: {
 "el_praxion.orchestration.doc_impl_plan" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.doc_engineer": "is read by" {class: line_read_only}
 "el_praxion.orchestration.doc_impl_plan" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.implementer": "is read by" {class: line_read_only}
 "el_praxion.orchestration.doc_impl_plan" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.test_engineer": "is read by" {class: line_read_only}
-"el_praxion.orchestration.doc_test" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
-"el_praxion.orchestration.doc_wip" -> "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "is read by" {class: line_read_only}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.doc_engineer" -> "el_praxion.orchestration.doc_wip": "updates" {class: line_acts_on}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.implementer" -> "el_praxion.orchestration.doc_learnings": "writes" {class: line_acts_on}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.implementer" -> "el_praxion.orchestration.doc_test": "writes" {class: line_acts_on}
@@ -215,4 +207,3 @@ Legend: {
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner" -> "el_praxion.orchestration.doc_learnings": "writes (pipeline-end)" {class: line_acts_on}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner" -> "el_praxion.orchestration.doc_wip": "writes" {class: line_acts_on}
 "el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.test_engineer" -> "el_praxion.orchestration.doc_test": "writes" {class: line_acts_on}
-"el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration.doc_verify": "writes" {class: line_acts_on}

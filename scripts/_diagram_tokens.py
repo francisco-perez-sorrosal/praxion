@@ -252,3 +252,12 @@ def _style_problem(token: Token, drawn: Sequence[Token]) -> str | None:
     if twin is not None:
         return f"its mark repeats {twin.drawing_class}; change shape, radius, extra, dash or width"
     return None
+
+
+EDGE_FONT_SIZE = 14
+
+
+def quote(text: str) -> str:
+    """A D2 double-quoted string; `$` is escaped because D2 substitutes `${...}` inside one."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return '"' + escaped.replace("$", "\\$") + '"'

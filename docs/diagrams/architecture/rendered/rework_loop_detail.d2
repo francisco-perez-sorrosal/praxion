@@ -1,3 +1,4 @@
+direction: down
 vars: {
   d2-config: {
     layout-engine: elk
@@ -62,51 +63,18 @@ classes: {
       3d: true
     }
   }
-  category_runtime_agent_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#A85A00"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-      border-radius: 16
-    }
-  }
-  category_layer_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#8C8780"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
-    }
-  }
-  line_acts_on: {
+  line_step: {
     style: {
       fill: "#FFFFFF"
-      stroke: "#475569"
-      stroke-width: 2
+      stroke: "#4338CA"
+      stroke-width: 3
       font-color: "#334155"
       font-size: 14
-    }
-  }
-  line_read_only: {
-    style: {
-      fill: "#FFFFFF"
-      stroke: "#475569"
-      stroke-width: 2
-      font-color: "#334155"
-      font-size: 14
-      stroke-dash: 5
     }
   }
 }
 Title: {
-  label: "Rework Loop Detail — Backward-Feeding (L2)"
+  label: "Rework loop — Dynamic diagram"
   shape: text
   near: top-center
   style: {
@@ -115,79 +83,48 @@ Title: {
     font-color: "#0F172A"
   }
 }
-"el_praxion.knowledge": {
-  label: "Knowledge Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.knowledge.commands": {
-    label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
-    class: category_knowledge_asset
-  }
+"el_praxion.knowledge.commands": {
+  label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
+  class: category_knowledge_asset
 }
-"el_praxion.orchestration": {
-  label: "Orchestration Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.orchestration.doc_findings": {
-    label: "VERIFIER_FINDINGS.md\n[Pipeline document]\norchestrator writes one per\nrework worktree"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.doc_rework": {
-    label: "REWORK_MANIFEST.md\n[Pipeline document]\nverifier Phase 12.5 output;\nper-row fenced JSON\nauthoritative"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.doc_systems": {
-    label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.doc_verify": {
-    label: "VERIFICATION_REPORT.md\n[Pipeline document]\nverifier output"
-    class: category_pipeline_document
-  }
-  "el_praxion.orchestration.hooks": {
-    label: "Hooks\n[Tooling]\nLifecycle enforcement\n(send_event)"
-    class: category_tooling
-  }
-  "el_praxion.orchestration.orchestrator": {
-    label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
-    class: category_runtime_agent
-  }
-  "el_praxion.orchestration.pipeline": {
-    label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-    class: category_runtime_agent_frame
-    "el_praxion.orchestration.pipeline.architect": {
-      label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.planner": {
-      label: "Implementation Planner\n[Runtime agent]\nStep decomposition;\nsupervises step execution"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline.verifier": {
-      label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
-      class: category_runtime_agent
-    }
-  }
+"el_praxion.orchestration.doc_findings": {
+  label: "VERIFIER_FINDINGS.md\n[Pipeline document]\norchestrator writes one per\nrework worktree"
+  class: category_pipeline_document
 }
-"el_praxion.persistence": {
-  label: "Persistence Layer\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.persistence.tdl": {
-    label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-    class: category_persistent_store
-  }
+"el_praxion.orchestration.doc_rework": {
+  label: "REWORK_MANIFEST.md\n[Pipeline document]\nverifier Phase 12.5 output;\nper-row fenced JSON\nauthoritative"
+  class: category_pipeline_document
 }
-"el_praxion.tooling": {
-  label: "Tooling\n[Layer]"
-  class: category_layer_frame
-  "el_praxion.tooling.scripts": {
-    label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
-    class: category_tooling
-  }
+"el_praxion.orchestration.doc_systems": {
+  label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
+  class: category_pipeline_document
+}
+"el_praxion.orchestration.orchestrator": {
+  label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.architect": {
+  label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
+  class: category_runtime_agent
+}
+"el_praxion.orchestration.pipeline.verifier": {
+  label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
+  class: category_runtime_agent
+}
+"el_praxion.persistence.tdl": {
+  label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
+  class: category_persistent_store
+}
+"el_praxion.tooling.scripts": {
+  label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
+  class: category_tooling
 }
 Legend: {
   label: "Legend"
   near: bottom-center
-  grid-columns: 4
-  horizontal-gap: 40
+  grid-columns: 3
+  width: 1250
+  horizontal-gap: 56
   vertical-gap: 12
   style: {
     fill: "#FFFFFF"
@@ -215,15 +152,7 @@ Legend: {
     label: "Tooling"
     class: category_tooling
   }
-  category_runtime_agent_frame: {
-    label: "Runtime agent (boundary)"
-    class: category_runtime_agent_frame
-  }
-  category_layer_frame: {
-    label: "Layer (boundary)"
-    class: category_layer_frame
-  }
-  line_acts_on_sample: {
+  line_step_sample: {
     label: ""
     direction: right
     style: {
@@ -236,12 +165,12 @@ Legend: {
       width: 8
       height: 8
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: "#4338CA"
+        stroke: "#4338CA"
       }
     }
     caption: {
-      label: "acts on (invokes, writes)"
+      label: "numbered step, in order (dynamic views)"
       style: {
         fill: transparent
         stroke-width: 0
@@ -250,53 +179,15 @@ Legend: {
       }
     }
     tail -> caption: {
-      class: line_acts_on
-    }
-  }
-  line_read_only_sample: {
-    label: ""
-    direction: right
-    style: {
-      fill: transparent
-      stroke-width: 0
-    }
-    tail: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
-      style: {
-        fill: "#475569"
-        stroke: "#475569"
-      }
-    }
-    caption: {
-      label: "read-only flow (consumed, not modified)"
-      style: {
-        fill: transparent
-        stroke-width: 0
-        font-size: 14
-        font-color: "#334155"
-      }
-    }
-    tail -> caption: {
-      class: line_read_only
+      class: line_step
     }
   }
 }
-"el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "dispatches systems-architect (always-first)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.doc_findings" -> "el_praxion.knowledge"."el_praxion.knowledge.commands": "auto-discovered by /resume-rework" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.doc_rework" -> "el_praxion.orchestration"."el_praxion.orchestration.orchestrator": "hands the manifest to" {class: line_read_only}
-"el_praxion.orchestration"."el_praxion.orchestration.doc_systems" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner": "informs" {class: line_read_only}
-"el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "enforces" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_findings": "writes one VERIFIER_FINDINGS.md per worktree" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.planner": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.tooling"."el_praxion.tooling.scripts": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_systems": "re-enters pipeline at SYSTEMS_PLAN +2 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_rework": "emits Phase 12.5" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_verify": "writes" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
-"el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}
+"el_praxion.orchestration.pipeline.verifier" -> "el_praxion.orchestration.doc_rework": "1 · emits Phase 12.5" {class: line_step}
+"el_praxion.orchestration.doc_rework" -> "el_praxion.orchestration.orchestrator": "2 · hands the manifest to" {class: line_step}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.tooling.scripts": "3 · spawns a worktree per row" {class: line_step}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration.doc_findings": "4 · writes a findings file per worktree" {class: line_step}
+"el_praxion.orchestration.orchestrator" -> "el_praxion.persistence.tdl": "5 · flips linked td-NNN rows to in-flight" {class: line_step}
+"el_praxion.orchestration.doc_findings" -> "el_praxion.knowledge.commands": "6 · is auto-discovered by /resume-rework" {class: line_step}
+"el_praxion.knowledge.commands" -> "el_praxion.orchestration.pipeline.architect": "7 · dispatches the architect first" {class: line_step}
+"el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration.doc_systems": "8 · re-enters the pipeline at the plan" {class: line_step}

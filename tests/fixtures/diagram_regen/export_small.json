@@ -527,6 +527,18 @@
      "source": "praxion.orchestrator",
      "tags": [],
      "target": "praxion.knowledge.commands"
+    },
+    {
+     "color": "gray",
+     "head": "normal",
+     "id": "e99",
+     "label": "frames the knowledge for",
+     "line": "solid",
+     "parent": null,
+     "relations": [],
+     "source": "praxion.knowledge",
+     "tags": [],
+     "target": "praxion.doc_idea"
     }
    ],
    "id": "structure",

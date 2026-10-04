@@ -302,7 +302,7 @@ def test_fewer_arrows_drawn_than_the_view_has_edges_fails(rd, run, views):
 
 
 def test_two_categories_drawn_with_one_mark_fail(run, built):
-    pipeline_document = "M 144 249 L 144 152 L 326 152 L 326 249 C 296 228 265 228 235 249 C 205 270 174 270 144 249 Z"
+    pipeline_document = "M 523 535 L 523 438 L 705 438 L 705 535 C 675 514 644 514 614 535 C 584 556 553 556 523 535 Z"
     change(built, "structure", pipeline_document, "M 1 1 L 2 2 L 3 3 L 4 4 L 5 5 L 6 6 Z")
 
     evidence = failing(run(), "DRC-05", "structure")
@@ -516,7 +516,7 @@ def test_the_legend_region_is_the_legends_own_frame_and_samples_stand_inside_it(
     reading = svg.read_svg((RENDERS / "index.svg").read_text(encoding="utf-8"))
 
     assert reading.legend.lines[0].text == "Legend"
-    assert reading.legend_region == (-242.0, 556.0, 747.0, 777.0)
+    assert reading.legend_region == (-372.0, 556.0, 878.0, 777.0)
     assert {line.text for g in reading.samples for line in g.lines} >= {"Person", "System in scope"}
     assert reading.legend not in reading.drawn
     assert all(not reading.in_legend(g) for g in reading.drawn)

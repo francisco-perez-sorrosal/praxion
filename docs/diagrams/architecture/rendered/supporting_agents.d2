@@ -85,7 +85,7 @@ classes: {
   }
 }
 Title: {
-  label: "CIS Loop Detail — Forward-Feeding (L2)"
+  label: "Shadow, gated and independent agents — Component diagram"
   shape: text
   near: top-center
   style: {
@@ -97,12 +97,12 @@ Title: {
 "el_praxion.orchestration": {
   label: "Orchestration Layer\n[Layer]"
   class: category_layer_frame
-  "el_praxion.orchestration.doc_research": {
-    label: "RESEARCH_FINDINGS.md\n[Pipeline document]\nresearcher output; carries\nCIS section"
+  "el_praxion.orchestration.doc_context": {
+    label: "CONTEXT_REVIEW.md\n[Pipeline document]\ncontext-engineer cumulative\nreview"
     class: category_pipeline_document
   }
-  "el_praxion.orchestration.doc_systems": {
-    label: "SYSTEMS_PLAN.md\n[Pipeline document]\narchitect output; carries\ndispositions"
+  "el_praxion.orchestration.doc_learnings": {
+    label: "LEARNINGS.md\n[Pipeline document]\nin-flight knowledge"
     class: category_pipeline_document
   }
   "el_praxion.orchestration.orchestrator": {
@@ -112,20 +112,32 @@ Title: {
   "el_praxion.orchestration.pipeline": {
     label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
     class: category_runtime_agent_frame
-    "el_praxion.orchestration.pipeline.architect": {
-      label: "Systems Architect\n[Runtime agent]\nTrade-off analysis; CIS\ndisposition; rework\nfirst-stop"
+    "el_praxion.orchestration.pipeline.arch_validator": {
+      label: "Architect Validator\n[Runtime agent]\nPer-PR DSL <-> code <-> ADR\ntriangle check"
       class: category_runtime_agent
     }
-    "el_praxion.orchestration.pipeline.researcher": {
-      label: "Researcher\n[Runtime agent]\nHat 1 codebase + Hat 2\nexternal research; surfaces\nCIS"
+    "el_praxion.orchestration.pipeline.cicd_engineer": {
+      label: "CI/CD Engineer\n[Runtime agent]\nPipeline design, GitHub\nActions, deployment\nautomation"
+      class: category_runtime_agent
+    }
+    "el_praxion.orchestration.pipeline.context_eng": {
+      label: "Context Engineer\n[Runtime agent]\nContext artifact domain\nexpert (shadow)"
+      class: category_runtime_agent
+    }
+    "el_praxion.orchestration.pipeline.discipline_consultant": {
+      label: "Discipline Consultant\n[Runtime agent]\nGated adversarial peer\nsub-architect, parameterized\nper spawn; challenges only,\ndecides nothing"
+      class: category_runtime_agent
+    }
+    "el_praxion.orchestration.pipeline.roadmap_cartographer": {
+      label: "Roadmap Cartographer\n[Runtime agent]\nProject-level\naudit-to-roadmap through a\nproject-derived lens set\n(on-demand)"
       class: category_runtime_agent
     }
     "el_praxion.orchestration.pipeline.sentinel": {
       label: "Sentinel\n[Runtime agent]\nRead-only ecosystem auditor\n(independent)"
       class: category_runtime_agent
     }
-    "el_praxion.orchestration.pipeline.verifier": {
-      label: "Verifier\n[Runtime agent]\nAcceptance + rework manifest\nemitter (Phase 12.5)"
+    "el_praxion.orchestration.pipeline.skill_genesis": {
+      label: "Skill Genesis\n[Runtime agent]\nLearning triage; artifact\nproposal"
       class: category_runtime_agent
     }
   }
@@ -133,10 +145,6 @@ Title: {
 "el_praxion.persistence": {
   label: "Persistence Layer\n[Layer]"
   class: category_layer_frame
-  "el_praxion.persistence.adrs": {
-    label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
-    class: category_persistent_store
-  }
   "el_praxion.persistence.tdl": {
     label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
     class: category_persistent_store
@@ -235,14 +243,15 @@ Legend: {
     }
   }
 }
-"el_praxion.orchestration"."el_praxion.orchestration.doc_research" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "informs +1 more" {class: line_read_only}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "dispatches" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher": "dispatches" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.arch_validator": "dispatches (per-PR)" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.cicd_engineer": "dispatches" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng": "dispatches (shadow)" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.discipline_consultant": "dispatches (gated, one discipline per spawn)" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.roadmap_cartographer": "dispatches (on-demand)" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel": "dispatches (independent)" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier": "dispatches" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.skill_genesis": "dispatches (post-pipeline)" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_systems": "re-enters pipeline at SYSTEMS_PLAN +2 more" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.researcher" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_research": "surfaces CIS section +1 more" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.arch_validator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.context_eng" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_context": "writes (cumulative)" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.sentinel" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.verifier" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.skill_genesis" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_learnings": "reads at pipeline-end" {class: line_read_only}

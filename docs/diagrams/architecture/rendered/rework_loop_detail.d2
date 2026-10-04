@@ -187,6 +187,8 @@ Legend: {
   label: "Legend"
   near: bottom-center
   grid-columns: 4
+  horizontal-gap: 40
+  vertical-gap: 12
   style: {
     fill: "#FFFFFF"
     stroke: "#8C8780"
@@ -238,18 +240,16 @@ Legend: {
         stroke: "#475569"
       }
     }
-    head: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
+    caption: {
+      label: "acts on (invokes, writes)"
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
       }
     }
-    tail -> head: {
-      label: "acts on (invokes, writes)"
+    tail -> caption: {
       class: line_acts_on
     }
   }
@@ -270,18 +270,16 @@ Legend: {
         stroke: "#475569"
       }
     }
-    head: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
+    caption: {
+      label: "read-only flow (consumed, not modified)"
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
       }
     }
-    tail -> head: {
-      label: "read-only flow (consumed, not modified)"
+    tail -> caption: {
       class: line_read_only
     }
   }

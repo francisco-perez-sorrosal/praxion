@@ -53,7 +53,7 @@ classes: {
   }
 }
 Title: {
-  label: "Landscape view"
+  label: "Praxion — System Context diagram"
   shape: text
   near: top-center
   style: {
@@ -91,13 +91,15 @@ Title: {
   class: category_external_system
 }
 "el_praxion": {
-  label: "Praxion\n[System in scope]"
+  label: "Praxion\n[System in scope · Markdown, Python and shell]\nSkills, rules, commands and\nagents that equip an AI\ncoding assistant"
   class: category_system_in_scope
 }
 Legend: {
   label: "Legend"
   near: bottom-center
   grid-columns: 4
+  horizontal-gap: 40
+  vertical-gap: 12
   style: {
     fill: "#FFFFFF"
     stroke: "#8C8780"
@@ -133,18 +135,16 @@ Legend: {
         stroke: "#475569"
       }
     }
-    head: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
+    caption: {
+      label: "acts on (invokes, writes)"
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
       }
     }
-    tail -> head: {
-      label: "acts on (invokes, writes)"
+    tail -> caption: {
       class: line_acts_on
     }
   }

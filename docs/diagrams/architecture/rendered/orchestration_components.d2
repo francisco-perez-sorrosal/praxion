@@ -1,0 +1,208 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 40
+    theme-overrides: {
+      N1: "#0F172A"
+      N2: "#334155"
+      N7: "#FFFFFF"
+    }
+  }
+}
+classes: {
+  category_runtime_agent: {
+    shape: rectangle
+    style: {
+      fill: "#FDEFD9"
+      stroke: "#A85A00"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      border-radius: 16
+    }
+  }
+  category_pipeline_document: {
+    shape: document
+    style: {
+      fill: "#E3F1FB"
+      stroke: "#0B6FA4"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_persistent_store: {
+    shape: cylinder
+    style: {
+      fill: "#F6E6F0"
+      stroke: "#9B3A75"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_tooling: {
+    shape: rectangle
+    style: {
+      fill: "#F2F4F7"
+      stroke: "#3F4B5C"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      3d: true
+    }
+  }
+  category_layer_frame: {
+    shape: rectangle
+    style: {
+      fill: transparent
+      stroke: "#8C8780"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      stroke-dash: 5
+    }
+  }
+  line_acts_on: {
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#475569"
+      stroke-width: 2
+      font-color: "#334155"
+      font-size: 14
+    }
+  }
+}
+Title: {
+  label: "Orchestration layer — Component diagram"
+  shape: text
+  near: top-center
+  style: {
+    font-size: 24
+    bold: true
+    font-color: "#0F172A"
+  }
+}
+"el_praxion.orchestration": {
+  label: "Orchestration Layer\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.orchestration.aiwork": {
+    label: ".ai-work/\n[Pipeline document]\nEphemeral pipeline docs\n(task-slug scoped)"
+    class: category_pipeline_document
+  }
+  "el_praxion.orchestration.hooks": {
+    label: "Hooks\n[Tooling]\nLifecycle enforcement\n(send_event)"
+    class: category_tooling
+  }
+  "el_praxion.orchestration.orchestrator": {
+    label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+    class: category_runtime_agent
+  }
+  "el_praxion.orchestration.pipeline": {
+    label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
+    class: category_runtime_agent
+  }
+}
+"el_praxion.persistence": {
+  label: "Persistence Layer\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.persistence.adrs": {
+    label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
+    class: category_persistent_store
+  }
+  "el_praxion.persistence.aistate": {
+    label: ".ai-state/\n[Persistent store]\nADRs, specs, sentinel\nreports, tech-debt ledger"
+    class: category_persistent_store
+  }
+  "el_praxion.persistence.chronograph": {
+    label: "Chronograph MCP\n[Tooling]\nOTel relay"
+    class: category_tooling
+  }
+  "el_praxion.persistence.tdl": {
+    label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
+    class: category_persistent_store
+  }
+}
+"el_praxion.tooling": {
+  label: "Tooling\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.tooling.scripts": {
+    label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
+    class: category_tooling
+  }
+}
+Legend: {
+  label: "Legend"
+  near: bottom-center
+  grid-columns: 4
+  horizontal-gap: 40
+  vertical-gap: 12
+  style: {
+    fill: "#FFFFFF"
+    stroke: "#8C8780"
+    stroke-width: 1
+    font-color: "#0F172A"
+  }
+  category_runtime_agent: {
+    label: "Runtime agent"
+    class: category_runtime_agent
+  }
+  category_pipeline_document: {
+    label: "Pipeline document"
+    class: category_pipeline_document
+  }
+  category_persistent_store: {
+    label: "Persistent store"
+    class: category_persistent_store
+  }
+  category_tooling: {
+    label: "Tooling"
+    class: category_tooling
+  }
+  category_layer_frame: {
+    label: "Layer (boundary)"
+    class: category_layer_frame
+  }
+  line_acts_on_sample: {
+    label: ""
+    direction: right
+    style: {
+      fill: transparent
+      stroke-width: 0
+    }
+    tail: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
+    }
+    caption: {
+      label: "acts on (invokes, writes)"
+      style: {
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
+      }
+    }
+    tail -> caption: {
+      class: line_acts_on
+    }
+  }
+}
+"el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "enforces" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion.persistence"."el_praxion.persistence.chronograph": "emits events (HTTP)" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches +16 more" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.tooling"."el_praxion.tooling.scripts": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads/writes documents" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing +1 more" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.aistate": "persists artifacts" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows +2 more" {class: line_acts_on}
+"el_praxion.persistence"."el_praxion.persistence.adrs" -> "el_praxion.persistence"."el_praxion.persistence.aistate": "finalized at merge-to-main" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion.persistence"."el_praxion.persistence.adrs": "finalize_adrs.py promotes drafts to dec-NNN" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}

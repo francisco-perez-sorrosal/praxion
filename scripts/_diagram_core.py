@@ -40,6 +40,9 @@ TITLE_FONT_SIZE = 24
 CANVAS_PAD = 40
 LEGEND_DOT = 8
 LEGEND_COLUMNS = 4
+# D2 pads a grid container by its gaps, so the vertical one is also the bottom margin.
+LEGEND_HORIZONTAL_GAP = 40
+LEGEND_VERTICAL_GAP = 12
 
 LEGEND_KEY = "Legend"
 TITLE_KEY = "Title"
@@ -443,6 +446,8 @@ def _legend_fields(drawings: Sequence[Token], lines: Sequence[LineDrawing]) -> d
         "label": _quote(LEGEND_KEY),
         "near": "bottom-center",
         "grid-columns": LEGEND_COLUMNS,
+        "horizontal-gap": LEGEND_HORIZONTAL_GAP,
+        "vertical-gap": LEGEND_VERTICAL_GAP,
         "style": {
             "fill": _quote(CANVAS),
             "stroke": _quote(LEGEND_STROKE),
@@ -459,7 +464,10 @@ def _legend_fields(drawings: Sequence[Token], lines: Sequence[LineDrawing]) -> d
 
 
 def _line_sample(line: LineDrawing) -> dict:
-    """An arrow between two dots, laid out left to right in its own unframed cell."""
+    """A dot and an unlabelled arrow ending at the meaning, left to right in its own cell.
+
+    The meaning is the arrow's target and not its label, so the caption stays off the line.
+    """
     dot = {
         "label": '""',
         "shape": "circle",
@@ -467,13 +475,18 @@ def _line_sample(line: LineDrawing) -> dict:
         "height": LEGEND_DOT,
         "style": {"fill": _quote(line.stroke), "stroke": _quote(line.stroke)},
     }
+    invisible = {"fill": "transparent", "stroke-width": 0}
+    caption = {
+        "label": _quote(line.meaning),
+        "style": {**invisible, "font-size": EDGE_FONT_SIZE, "font-color": _quote(EDGE_LABEL_INK)},
+    }
     return {
         "label": '""',
         "direction": "right",
-        "style": {"fill": "transparent", "stroke-width": 0},
+        "style": invisible,
         "tail": dot,
-        "head": dot,
-        "tail -> head": {"label": _quote(line.meaning), "class": line.drawing_class},
+        "caption": caption,
+        "tail -> caption": {"class": line.drawing_class},
     }
 
 

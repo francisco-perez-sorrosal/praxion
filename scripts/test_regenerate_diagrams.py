@@ -738,6 +738,13 @@ def test_the_legend_is_a_container_near_the_bottom_holding_every_entry(rd, views
         assert entry.label in text
 
 
+def test_a_legend_line_sample_is_an_unlabelled_arrow_ending_at_its_caption(rd, views):
+    text = rd.emit_d2(views["structure"])
+
+    assert re.search(r"tail -> caption: \{\s+class: line_acts_on\s+\}", text)
+    assert re.search(rf'caption: \{{\s+label: "{re.escape(MEANING_ACTS_ON)}"', text)
+
+
 def test_the_text_pins_the_layout_engine(rd, views):
     assert "layout-engine: elk" in rd.emit_d2(views["structure"])
 

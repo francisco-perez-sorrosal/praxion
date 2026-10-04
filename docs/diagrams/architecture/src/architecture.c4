@@ -1,13 +1,14 @@
 /**
  * Praxion Architecture — LikeC4 source model
  *
- * Six projected views:
- *   context              — L0 System Context: Praxion + external actors (boundary view)
- *   components           — L1 Components: internals grouped by architectural layer
- *   agent_pipeline       — L2 Forward agent pipeline (linear shape)
- *   feedback_loops       — L2 Pipeline + two feedback loops (bidirectional shape)
- *   cis_loop_detail      — L2 Continuous Improvement Signals loop (forward-feeding)
- *   rework_loop_detail   — L2 Verifier rework loop (backward-feeding)
+ * Projected views (each carries one c4_* type tag; the render adds the type to its title):
+ *   index                          — System Context: Praxion + the people and systems around it
+ *   components                     — Container: the four layers and what each meets
+ *   knowledge_components, orchestration_components, persistence_tooling_components
+ *                                  — Component: one layer family each
+ *   agent_pipeline, agent_pipeline_build, supporting_agents, feedback_loops
+ *                                  — Component: the forward flow in two halves, the other agents, the loops
+ *   cis_loop_detail, rework_loop_detail — loop details (restyled by a later step)
  *
  * Layer structure (R1):
  *   Knowledge Layer      — Skills, Rules, Commands, Agents (authored definitions)
@@ -21,9 +22,8 @@
  * `component` below). Read-only flows are `-[reads]->` relationships whose
  * titles read from source to target.
  *
- * Rendering: the six views above regenerate to ../rendered/*.{d2,svg} via
- * scripts/diagram-regen-hook.sh; the Architecture CI workflow re-runs that
- * regeneration and fails if the committed renders drift from this source.
+ * Rendering: `python3 scripts/regenerate_diagrams.py` regenerates ../rendered/*.{d2,svg}
+ * (the pre-commit hook and the Architecture CI workflow run the same command).
  *
  * Dual representation of Agents (R2): the authored Markdown family
  * (knowledge.agents) lives alongside skills/rules/commands as a deployable
@@ -45,12 +45,6 @@
  * the "agents communicate through shared documents, not direct invocation"
  * contract from rules/swe/swe-agent-coordination-protocol.md.
  *
- * Regen:
- *   likec4 gen d2 docs/diagrams/architecture/src -o docs/diagrams/architecture/rendered/
- *   for v in context components agent_pipeline feedback_loops cis_loop_detail rework_loop_detail; do
- *     d2 docs/diagrams/architecture/rendered/$v.d2 docs/diagrams/architecture/rendered/$v.svg
- *   done
- *
  * DSL reference: https://likec4.dev/llms-full.txt
  */
 model {
@@ -65,6 +59,8 @@ model {
 
   // ── Praxion System ───────────────────────────────────────────────────────
   praxion = system "Praxion" {
+    description "Skills, rules, commands and agents that equip an AI coding assistant"
+    technology "Markdown, Python and shell"
 
     // Knowledge Layer: static assets loaded into agent context
     knowledge = component "Knowledge Layer" {
@@ -281,99 +277,133 @@ model {
 }
 
 views {
-  // L0 — System Context: Praxion as a single box plus external actors.
-  // Intentionally omits internal components to show the boundary.
-  view context {
-    title "Praxion System Context (L0)"
-    description "Praxion system boundary and external actors"
+  // ── System context and containers ────────────────────────────────────────
 
-    include developer, claude_code, claude_desktop, cursor, arize_phoenix, github, praxion
+  view index {
+    #c4_system_context
+    title "Praxion"
+    description "Praxion in scope, the developer who uses it, and the six external systems it meets"
+
+    include developer, claude_code, claude_desktop, cursor, github, arize_phoenix, anthropic_api, praxion
   }
 
-  // L1 — Components: internals exposed with layer grouping (R1).
-  // Each layer cluster contains its constituent components.
   view components {
-    title "Praxion Components (L1)"
-    description "Major building blocks grouped by architectural layer"
+    #c4_container
+    title "Praxion layers"
+    description "The four layers inside Praxion and the people and systems each one meets"
 
     include
-      developer, claude_code, claude_desktop, cursor, arize_phoenix, github,
+      developer, claude_code, claude_desktop, cursor, github, arize_phoenix, anthropic_api,
       praxion,
-      praxion.knowledge, praxion.orchestration, praxion.persistence, praxion.tooling,
+      praxion.knowledge, praxion.orchestration, praxion.persistence, praxion.tooling
+  }
+
+  // ── Layer components ─────────────────────────────────────────────────────
+
+  view knowledge_components {
+    #c4_component
+    title "Knowledge layer"
+    description "The authored assets of the knowledge layer, the installers that deploy them and the runtime they shape"
+
+    include
       praxion.knowledge.skills, praxion.knowledge.rules, praxion.knowledge.commands, praxion.knowledge.agents,
-      praxion.orchestration.pipeline, praxion.orchestration.hooks, praxion.orchestration.aiwork, praxion.orchestration.orchestrator,
+      praxion.tooling.installers,
+      praxion.orchestration.pipeline
+    exclude praxion.knowledge.commands -> praxion.orchestration.pipeline.architect
+  }
+
+  view orchestration_components {
+    #c4_component
+    title "Orchestration layer"
+    description "The main agent, the agent pipeline and the hooks, with the stores and scripts they work through"
+
+    include
+      praxion.orchestration.orchestrator, praxion.orchestration.pipeline,
+      praxion.orchestration.hooks, praxion.orchestration.aiwork,
+      praxion.persistence.chronograph, praxion.persistence.aistate,
+      praxion.persistence.adrs, praxion.persistence.tdl,
+      praxion.tooling.scripts
+  }
+
+  view persistence_tooling_components {
+    #c4_component
+    title "Persistence and tooling layers"
+    description "The durable stores, the tools that read or finalize them and the external systems those tools reach"
+
+    include
       praxion.persistence.chronograph, praxion.persistence.aistate,
       praxion.persistence.adrs, praxion.persistence.tdl,
       praxion.tooling.installers, praxion.tooling.scripts, praxion.tooling.versioning,
-      praxion.tooling.dashboard, praxion.tooling.evals
+      praxion.tooling.dashboard, praxion.tooling.evals,
+      arize_phoenix, anthropic_api,
+      praxion.knowledge, praxion.orchestration.aiwork
   }
 
-  // L2 — Agent Pipeline (forward shape only).
-  // The linear flow promethean -> researcher -> architect -> planner -> (implementer ∥ test ∥ doc) -> verifier,
-  // expressed as agent <-> .ai-work/ document handoffs. Feedback edges are excluded for clarity.
+  // ── Agent pipeline, forward flow ─────────────────────────────────────────
+
   view agent_pipeline {
-    title "Agent Pipeline — Forward Flow (L2)"
-    description "Forward-flow agent pipeline with document handoffs through .ai-work/<task-slug>/. Feedback loops are projected separately."
+    #c4_component
+    title "Agent pipeline, ideation to plan"
+    description "The first half of the forward flow: each agent writes a document and the next agent reads it"
 
     include
-      praxion.orchestration.orchestrator,
-      praxion.orchestration.pipeline,
-      praxion.orchestration.pipeline.promethean,
-      praxion.orchestration.pipeline.researcher,
-      praxion.orchestration.pipeline.architect,
+      praxion.orchestration.pipeline.promethean, praxion.orchestration.pipeline.researcher,
+      praxion.orchestration.pipeline.architect, praxion.orchestration.pipeline.test_engineer,
       praxion.orchestration.pipeline.planner,
-      praxion.orchestration.pipeline.implementer,
-      praxion.orchestration.pipeline.test_engineer,
-      praxion.orchestration.pipeline.doc_engineer,
-      praxion.orchestration.pipeline.verifier,
-      praxion.orchestration.doc_idea,
-      praxion.orchestration.doc_research,
-      praxion.orchestration.doc_spec_extract,
-      praxion.orchestration.doc_acceptance,
-      praxion.orchestration.doc_systems,
-      praxion.orchestration.doc_impl_plan,
-      praxion.orchestration.doc_wip,
-      praxion.orchestration.doc_test,
-      praxion.orchestration.doc_verify,
-      praxion.orchestration.doc_learnings
-
-    exclude
-      element.tag = #cis_loop,
-      element.tag = #rework_loop,
-      element.tag = #challenge_loop
+      praxion.orchestration.doc_idea, praxion.orchestration.doc_research,
+      praxion.orchestration.doc_spec_extract, praxion.orchestration.doc_acceptance,
+      praxion.orchestration.doc_systems, praxion.orchestration.doc_impl_plan
+    exclude * -> * where tag is #cis_loop
+    exclude * -> * where tag is #rework_loop
+    exclude * -> * where tag is #challenge_loop
+    exclude praxion.orchestration.doc_impl_plan -> praxion.orchestration.pipeline.test_engineer
   }
 
-  // L2 — Feedback Loops overlay.
-  // Pipeline + the two named feedback loops (CIS forward, Rework backward) + the
-  // local interface-designer challenge loop. Bidirectional shape must be visually obvious.
-  view feedback_loops {
-    title "Pipeline Feedback Loops (L2)"
-    description "Forward pipeline plus the CIS (researcher to architect, forward-feeding), Rework (verifier to architect, backward-feeding), and interface-designer challenge loops"
+  view agent_pipeline_build {
+    #c4_component
+    title "Agent pipeline, plan to verification"
+    description "The second half of the forward flow: the plan is built, tested and documented, then verified"
+
+    include
+      praxion.orchestration.pipeline.planner, praxion.orchestration.pipeline.implementer,
+      praxion.orchestration.pipeline.test_engineer, praxion.orchestration.pipeline.doc_engineer,
+      praxion.orchestration.pipeline.verifier,
+      praxion.orchestration.doc_impl_plan, praxion.orchestration.doc_wip,
+      praxion.orchestration.doc_test, praxion.orchestration.doc_verify,
+      praxion.orchestration.doc_learnings
+    exclude * -> * where tag is #cis_loop
+    exclude * -> * where tag is #rework_loop
+    exclude * -> * where tag is #challenge_loop
+  }
+
+  view supporting_agents {
+    #c4_component
+    title "Shadow, gated and independent agents"
+    description "The agents outside the forward flow, how the main agent dispatches each, and the documents and ledger they touch"
 
     include
       praxion.orchestration.orchestrator,
-      praxion.orchestration.pipeline,
-      praxion.orchestration.pipeline.promethean,
-      praxion.orchestration.pipeline.researcher,
-      praxion.orchestration.pipeline.architect,
-      praxion.orchestration.pipeline.interface_des,
-      praxion.orchestration.pipeline.transactions_arch,
-      praxion.orchestration.pipeline.planner,
-      praxion.orchestration.pipeline.implementer,
-      praxion.orchestration.pipeline.test_engineer,
-      praxion.orchestration.pipeline.doc_engineer,
-      praxion.orchestration.pipeline.verifier,
-      praxion.orchestration.doc_research,
-      praxion.orchestration.doc_systems,
-      praxion.orchestration.doc_interface,
-      praxion.orchestration.doc_transactions,
-      praxion.orchestration.doc_impl_plan,
-      praxion.orchestration.doc_verify,
-      praxion.orchestration.doc_rework,
-      praxion.orchestration.doc_findings,
-      praxion.knowledge.commands,
-      praxion.persistence.adrs,
+      praxion.orchestration.pipeline.context_eng, praxion.orchestration.pipeline.discipline_consultant,
+      praxion.orchestration.pipeline.cicd_engineer, praxion.orchestration.pipeline.sentinel,
+      praxion.orchestration.pipeline.arch_validator, praxion.orchestration.pipeline.skill_genesis,
+      praxion.orchestration.pipeline.roadmap_cartographer,
+      praxion.orchestration.doc_context, praxion.orchestration.doc_learnings,
       praxion.persistence.tdl
+  }
+
+  view feedback_loops {
+    #c4_component
+    title "Feedback loops"
+    description "The improvement-signal loop and the rework loop that return findings to the architect through documents"
+
+    include
+      praxion.orchestration.pipeline.researcher, praxion.orchestration.pipeline.architect,
+      praxion.orchestration.pipeline.verifier, praxion.orchestration.orchestrator,
+      praxion.knowledge.commands,
+      praxion.orchestration.doc_research, praxion.orchestration.doc_systems,
+      praxion.orchestration.doc_rework, praxion.orchestration.doc_findings
+    exclude * -> * where tag is #forward
+    exclude praxion.orchestration.orchestrator -> praxion.orchestration.pipeline.*
   }
 
   // L2 — Continuous Improvement Signals (CIS) loop detail.

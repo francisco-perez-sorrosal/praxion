@@ -218,8 +218,9 @@ def test_a_legend_without_a_sample_of_a_dash_style_the_view_uses_fails(run, buil
     change_matching(
         built,
         "structure",
-        r'stroke-dasharray:[^;"]*;(?=" marker-end[^>]*/><rect[^>]*/><text[^>]*>read-only flow)',
-        "",
+        # the legend's sample arrow is the first dashed path after its caption
+        r'(>read-only flow \(consumed.*?<path[^>]*?style="stroke-width:2;)stroke-dasharray:[^;"]*;',
+        r"\1",
     )
 
     assert "no dashed arrow sample" in failing(run(), "DRC-02", "structure")
@@ -515,10 +516,30 @@ def test_the_legend_region_is_the_legends_own_frame_and_samples_stand_inside_it(
     reading = svg.read_svg((RENDERS / "index.svg").read_text(encoding="utf-8"))
 
     assert reading.legend.lines[0].text == "Legend"
-    assert reading.legend_region == (-272.0, 556.0, 777.0, 796.0)
+    assert reading.legend_region == (-242.0, 556.0, 747.0, 777.0)
     assert {line.text for g in reading.samples for line in g.lines} >= {"Person", "System in scope"}
     assert reading.legend not in reading.drawn
     assert all(not reading.in_legend(g) for g in reading.drawn)
+
+
+@pytest.mark.parametrize("name", RENDERED_VIEWS)
+def test_a_legend_arrow_sample_has_no_text_drawn_over_its_line(svg, name):
+    measures = importlib.import_module("_diagram_measures")
+    reading = svg.read_svg((RENDERS / f"{name}.svg").read_text(encoding="utf-8"))
+    texts = [measures.text_box(line) for group in reading.samples for line in group.lines]
+
+    for arrow in (arrow for group in reading.samples for arrow in group.arrows):
+        a = arrow.box
+        crossing = [t for t in texts if a[0] < t[2] and t[0] < a[2] and a[1] < t[3] and t[1] < a[3]]
+        assert crossing == []
+
+
+@pytest.mark.parametrize("name", RENDERED_VIEWS)
+def test_the_legend_keeps_only_a_small_margin_below_its_samples(svg, name):
+    reading = svg.read_svg((RENDERS / f"{name}.svg").read_text(encoding="utf-8"))
+    lowest = max(group.box[3] for group in reading.samples if group.box)
+
+    assert 0 <= reading.legend_region[3] - lowest <= 24
 
 
 @pytest.mark.parametrize(

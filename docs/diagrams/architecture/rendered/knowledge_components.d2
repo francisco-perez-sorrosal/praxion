@@ -1,0 +1,178 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 40
+    theme-overrides: {
+      N1: "#0F172A"
+      N2: "#334155"
+      N7: "#FFFFFF"
+    }
+  }
+}
+classes: {
+  category_knowledge_asset: {
+    shape: package
+    style: {
+      fill: "#E1F3EC"
+      stroke: "#00684A"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_runtime_agent: {
+    shape: rectangle
+    style: {
+      fill: "#FDEFD9"
+      stroke: "#A85A00"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      border-radius: 16
+    }
+  }
+  category_tooling: {
+    shape: rectangle
+    style: {
+      fill: "#F2F4F7"
+      stroke: "#3F4B5C"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      3d: true
+    }
+  }
+  category_layer_frame: {
+    shape: rectangle
+    style: {
+      fill: transparent
+      stroke: "#8C8780"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      stroke-dash: 5
+    }
+  }
+  line_acts_on: {
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#475569"
+      stroke-width: 2
+      font-color: "#334155"
+      font-size: 14
+    }
+  }
+}
+Title: {
+  label: "Knowledge layer — Component diagram"
+  shape: text
+  near: top-center
+  style: {
+    font-size: 24
+    bold: true
+    font-color: "#0F172A"
+  }
+}
+"el_praxion.knowledge": {
+  label: "Knowledge Layer\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.knowledge.agents": {
+    label: "Agents\n[Knowledge asset]\nAuthored subprocess\nspecifications"
+    class: category_knowledge_asset
+  }
+  "el_praxion.knowledge.commands": {
+    label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
+    class: category_knowledge_asset
+  }
+  "el_praxion.knowledge.rules": {
+    label: "Rules\n[Knowledge asset]\nDeclarative conventions"
+    class: category_knowledge_asset
+  }
+  "el_praxion.knowledge.skills": {
+    label: "Skills\n[Knowledge asset]\nDomain expertise modules"
+    class: category_knowledge_asset
+  }
+}
+"el_praxion.orchestration": {
+  label: "Orchestration Layer\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.orchestration.pipeline": {
+    label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
+    class: category_runtime_agent
+  }
+}
+"el_praxion.tooling": {
+  label: "Tooling\n[Layer]"
+  class: category_layer_frame
+  "el_praxion.tooling.installers": {
+    label: "Installers\n[Tooling]\n3 targets"
+    class: category_tooling
+  }
+}
+Legend: {
+  label: "Legend"
+  near: bottom-center
+  grid-columns: 4
+  horizontal-gap: 40
+  vertical-gap: 12
+  style: {
+    fill: "#FFFFFF"
+    stroke: "#8C8780"
+    stroke-width: 1
+    font-color: "#0F172A"
+  }
+  category_knowledge_asset: {
+    label: "Knowledge asset"
+    class: category_knowledge_asset
+  }
+  category_runtime_agent: {
+    label: "Runtime agent"
+    class: category_runtime_agent
+  }
+  category_tooling: {
+    label: "Tooling"
+    class: category_tooling
+  }
+  category_layer_frame: {
+    label: "Layer (boundary)"
+    class: category_layer_frame
+  }
+  line_acts_on_sample: {
+    label: ""
+    direction: right
+    style: {
+      fill: transparent
+      stroke-width: 0
+    }
+    tail: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
+    }
+    caption: {
+      label: "acts on (invokes, writes)"
+      style: {
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
+      }
+    }
+    tail -> caption: {
+      class: line_acts_on
+    }
+  }
+}
+"el_praxion.knowledge"."el_praxion.knowledge.agents" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "spawns" {class: line_acts_on}
+"el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "triggers" {class: line_acts_on}
+"el_praxion.knowledge"."el_praxion.knowledge.rules" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "constrains" {class: line_acts_on}
+"el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "injects" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.agents": "deploys" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.commands": "deploys" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.rules": "deploys" {class: line_acts_on}
+"el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.skills": "deploys" {class: line_acts_on}

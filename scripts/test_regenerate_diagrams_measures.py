@@ -145,14 +145,14 @@ def test_a_real_render_reads_at_ten_pixels_or_more_with_no_overlapping_lines():
     found = legibility_outcome(render("index"))
 
     assert found.problems == ()
-    assert (found.measured, found.threshold) == (pytest.approx(11.88, abs=0.01), 10.0)
+    assert (found.measured, found.threshold) == (pytest.approx(12.55, abs=0.01), 10.0)
 
 
 def test_text_of_font_size_8_fails_naming_the_smallest_reading():
     found = legibility_outcome(render("index", ("font-size:15px", "font-size:8px"), count=99))
 
     assert found.problems[0].startswith(
-        "min rendered text 6.8px at 960px (font-size 8, width 1131) < 10px ("
+        "min rendered text 7.2px at 960px (font-size 8, width 1071) < 10px ("
     )
 
 
@@ -160,7 +160,7 @@ def test_a_real_render_too_wide_for_its_text_to_reach_ten_pixels_fails():
     found = legibility_outcome(read_svg((RENDERS / "structure.svg").read_text(encoding="utf-8")))
 
     assert found.problems == (
-        "min rendered text 8.8px at 960px (font-size 14, width 1528) < 10px (27 line(s) below)",
+        "min rendered text 9.2px at 960px (font-size 14, width 1456) < 10px (27 line(s) below)",
     )
 
 
@@ -214,7 +214,7 @@ def test_a_real_render_is_within_the_proportions_and_the_fan_in(views):
 
     assert found.problems == ()
     assert found.held == (
-        "width/height 1.23 (1131x917) within 0.5-2.5; most arrows meeting one element: 2 (at most 9)"
+        "width/height 1.19 (1071x898) within 0.5-2.5; most arrows meeting one element: 2 (at most 9)"
     )
 
 
@@ -368,7 +368,7 @@ def test_the_numeric_findings_carry_their_reading_and_limit_in_check_order(gathe
     wide = found[("DRC-07", "structure")]
     assert (wide.status, wide.measured, wide.threshold) == (
         "FAIL",
-        pytest.approx(8.8, abs=0.05),
+        pytest.approx(9.2, abs=0.05),
         10.0,
     )
     assert found[("DRC-06", "index")].measured == pytest.approx(7.9, abs=0.05)

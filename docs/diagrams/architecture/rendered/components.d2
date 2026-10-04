@@ -32,56 +32,15 @@ classes: {
       stroke-dash: 5
     }
   }
-  category_knowledge_asset: {
-    shape: package
-    style: {
-      fill: "#E1F3EC"
-      stroke: "#00684A"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-    }
-  }
-  category_runtime_agent: {
+  category_layer: {
     shape: rectangle
     style: {
-      fill: "#FDEFD9"
-      stroke: "#A85A00"
+      fill: "#FFFFFF"
+      stroke: "#8C8780"
       stroke-width: 2
       font-color: "#0F172A"
       font-size: 15
-      border-radius: 16
-    }
-  }
-  category_pipeline_document: {
-    shape: document
-    style: {
-      fill: "#E3F1FB"
-      stroke: "#0B6FA4"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-    }
-  }
-  category_persistent_store: {
-    shape: cylinder
-    style: {
-      fill: "#F6E6F0"
-      stroke: "#9B3A75"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-    }
-  }
-  category_tooling: {
-    shape: rectangle
-    style: {
-      fill: "#F2F4F7"
-      stroke: "#3F4B5C"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      3d: true
+      double-border: true
     }
   }
   category_system_in_scope_frame: {
@@ -92,17 +51,6 @@ classes: {
       stroke-width: 2
       font-color: "#0F172A"
       font-size: 15
-    }
-  }
-  category_layer_frame: {
-    shape: rectangle
-    style: {
-      fill: transparent
-      stroke: "#8C8780"
-      stroke-width: 2
-      font-color: "#0F172A"
-      font-size: 15
-      stroke-dash: 5
     }
   }
   line_acts_on: {
@@ -126,7 +74,7 @@ classes: {
   }
 }
 Title: {
-  label: "Praxion Components (L1)"
+  label: "Praxion layers — Container diagram"
   shape: text
   near: top-center
   style: {
@@ -134,6 +82,10 @@ Title: {
     bold: true
     font-color: "#0F172A"
   }
+}
+"el_anthropic_api": {
+  label: "Anthropic API\n[External system]"
+  class: category_external_system
 }
 "el_arize_phoenix": {
   label: "Arize Phoenix\n[External system]"
@@ -160,97 +112,31 @@ Title: {
   class: category_external_system
 }
 "el_praxion": {
-  label: "Praxion\n[System in scope]"
+  label: "Praxion\n[System in scope · Markdown, Python and shell]\nSkills, rules, commands and\nagents that equip an AI\ncoding assistant"
   class: category_system_in_scope_frame
   "el_praxion.knowledge": {
     label: "Knowledge Layer\n[Layer]"
-    class: category_layer_frame
-    "el_praxion.knowledge.agents": {
-      label: "Agents\n[Knowledge asset]\nAuthored subprocess\nspecifications"
-      class: category_knowledge_asset
-    }
-    "el_praxion.knowledge.commands": {
-      label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
-      class: category_knowledge_asset
-    }
-    "el_praxion.knowledge.rules": {
-      label: "Rules\n[Knowledge asset]\nDeclarative conventions"
-      class: category_knowledge_asset
-    }
-    "el_praxion.knowledge.skills": {
-      label: "Skills\n[Knowledge asset]\nDomain expertise modules"
-      class: category_knowledge_asset
-    }
+    class: category_layer
   }
   "el_praxion.orchestration": {
     label: "Orchestration Layer\n[Layer]"
-    class: category_layer_frame
-    "el_praxion.orchestration.aiwork": {
-      label: ".ai-work/\n[Pipeline document]\nEphemeral pipeline docs\n(task-slug scoped)"
-      class: category_pipeline_document
-    }
-    "el_praxion.orchestration.hooks": {
-      label: "Hooks\n[Tooling]\nLifecycle enforcement\n(send_event)"
-      class: category_tooling
-    }
-    "el_praxion.orchestration.orchestrator": {
-      label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
-      class: category_runtime_agent
-    }
-    "el_praxion.orchestration.pipeline": {
-      label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
-      class: category_runtime_agent
-    }
+    class: category_layer
   }
   "el_praxion.persistence": {
     label: "Persistence Layer\n[Layer]"
-    class: category_layer_frame
-    "el_praxion.persistence.adrs": {
-      label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
-      class: category_persistent_store
-    }
-    "el_praxion.persistence.aistate": {
-      label: ".ai-state/\n[Persistent store]\nADRs, specs, sentinel\nreports, tech-debt ledger"
-      class: category_persistent_store
-    }
-    "el_praxion.persistence.chronograph": {
-      label: "Chronograph MCP\n[Tooling]\nOTel relay"
-      class: category_tooling
-    }
-    "el_praxion.persistence.tdl": {
-      label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
-      class: category_persistent_store
-    }
+    class: category_layer
   }
   "el_praxion.tooling": {
     label: "Tooling\n[Layer]"
-    class: category_layer_frame
-    "el_praxion.tooling.dashboard": {
-      label: "Pipeline Dashboard\n[Tooling]\nNext.js runtime, own process\n+ sha256-derived port;\nread-only over project state"
-      class: category_tooling
-    }
-    "el_praxion.tooling.evals": {
-      label: "Eval Framework\n[Tooling]\nOut-of-band quality\nmeasurement over completed\nartifacts"
-      class: category_tooling
-    }
-    "el_praxion.tooling.installers": {
-      label: "Installers\n[Tooling]\n3 targets"
-      class: category_tooling
-    }
-    "el_praxion.tooling.scripts": {
-      label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
-      class: category_tooling
-    }
-    "el_praxion.tooling.versioning": {
-      label: "Versioning\n[Tooling]\nCommitizen"
-      class: category_tooling
-    }
+    class: category_layer
   }
 }
 Legend: {
   label: "Legend"
   near: bottom-center
   grid-columns: 4
+  horizontal-gap: 40
+  vertical-gap: 12
   style: {
     fill: "#FFFFFF"
     stroke: "#8C8780"
@@ -265,33 +151,13 @@ Legend: {
     label: "External system"
     class: category_external_system
   }
-  category_knowledge_asset: {
-    label: "Knowledge asset"
-    class: category_knowledge_asset
-  }
-  category_runtime_agent: {
-    label: "Runtime agent"
-    class: category_runtime_agent
-  }
-  category_pipeline_document: {
-    label: "Pipeline document"
-    class: category_pipeline_document
-  }
-  category_persistent_store: {
-    label: "Persistent store"
-    class: category_persistent_store
-  }
-  category_tooling: {
-    label: "Tooling"
-    class: category_tooling
+  category_layer: {
+    label: "Layer"
+    class: category_layer
   }
   category_system_in_scope_frame: {
     label: "System in scope (boundary)"
     class: category_system_in_scope_frame
-  }
-  category_layer_frame: {
-    label: "Layer (boundary)"
-    class: category_layer_frame
   }
   line_acts_on_sample: {
     label: ""
@@ -310,18 +176,16 @@ Legend: {
         stroke: "#475569"
       }
     }
-    head: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
+    caption: {
+      label: "acts on (invokes, writes)"
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
       }
     }
-    tail -> head: {
-      label: "acts on (invokes, writes)"
+    tail -> caption: {
       class: line_acts_on
     }
   }
@@ -342,18 +206,16 @@ Legend: {
         stroke: "#475569"
       }
     }
-    head: {
-      label: ""
-      shape: circle
-      width: 8
-      height: 8
+    caption: {
+      label: "read-only flow (consumed, not modified)"
       style: {
-        fill: "#475569"
-        stroke: "#475569"
+        fill: transparent
+        stroke-width: 0
+        font-size: 14
+        font-color: "#334155"
       }
     }
-    tail -> head: {
-      label: "read-only flow (consumed, not modified)"
+    tail -> caption: {
       class: line_read_only
     }
   }
@@ -363,27 +225,12 @@ Legend: {
 "el_cursor" -> "el_praxion": "loads rules" {class: line_acts_on}
 "el_developer" -> "el_praxion": "develops" {class: line_acts_on}
 "el_github" -> "el_praxion": "hosts" {class: line_acts_on}
-"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.agents" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "spawns" {class: line_acts_on}
-"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches systems-architect (always-first) +1 more" {class: line_acts_on}
-"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.rules" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "constrains" {class: line_acts_on}
-"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "injects" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "enforces" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.chronograph": "emits events (HTTP)" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches +16 more" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads/writes documents" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing +1 more" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "persists artifacts" {class: line_acts_on}
-"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows +2 more" {class: line_acts_on}
-"el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "finalized at merge-to-main" {class: line_acts_on}
-"el_praxion"."el_praxion.persistence"."el_praxion.persistence.chronograph" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads in-flight pipeline docs (read-only)" {class: line_read_only}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads (read-only)" {class: line_read_only}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.evals" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads completed artifacts (read-only)" {class: line_read_only}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.agents": "deploys" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.commands": "deploys" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.rules": "deploys" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.skills": "deploys" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs": "finalize_adrs.py promotes drafts to dec-NNN" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge" -> "el_praxion"."el_praxion.orchestration": "constrains +4 more" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.knowledge": "auto-discovered by /resume-rework" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.persistence": "emits events (HTTP) +8 more" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.tooling": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
+"el_praxion"."el_praxion.persistence" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling" -> "el_anthropic_api": "judges via the JudgeClient adapter" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.knowledge": "deploys +3 more" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.orchestration": "reads in-flight pipeline docs (read-only)" {class: line_read_only}
+"el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.persistence": "finalize_adrs.py promotes drafts to dec-NNN +3 more" {class: line_acts_on}

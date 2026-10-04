@@ -77,7 +77,7 @@ Run these after step 7 (Self-review) and before step 8 (Update WIP.md):
    - Data model changes → update Section 5 (Data Flow: update flow descriptions)
    - New dependency added/removed → update Section 6 (Dependencies: update dependencies table)
    - ADR created → update Section 8 (Decisions: add cross-reference row)
-   - **Diagram regen:** if the structural change touches a C4 view (System Context or Components), update the relevant `.c4` source in `docs/diagrams/` and run `scripts/diagram-regen-hook.sh` (or stage the `.c4` file so the pre-commit hook auto-regenerates) so the committed `.d2` and `.svg` stay in sync with the model.
+   - **Diagram regen:** if the structural change touches a C4 view (System Context or Components), read the project's `_spec.c4` style kit, update the relevant `.c4` source in `docs/diagrams/`, apply the review checks (`review-checks.md` of the `likec4-diagramming` skill) to each view you touched, and regenerate with the project's command so the committed `.d2` and `.svg` stay in sync with the model.
    If `.ai-state/DESIGN.md` does not exist, skip this step — the systems-architect creates it.
 3. **Update developer architecture guide** — if `.ai-state/DESIGN.md` was updated in the previous step AND `docs/architecture.md` exists, propagate the change to `docs/architecture.md` with developer framing:
    - Only include components that exist on disk (verify with Glob/ls)

@@ -219,7 +219,7 @@ When both agents are invoked, the doc-engineer runs AFTER the context-engineer t
 The `web-ui-design` skill is available **on-demand as a consult**, loaded only when the documentation work touches significant visual decisions:
 
 - **HTML share-out artifacts** (`share_out: true` frontmatter) -- non-GitHub readers; load `web-ui-design` for contrast, focus indicators, motion timing, dark-mode safety
-- **`docs/architecture.md`** when it embeds diagrams or visual hierarchies -- diagram colors, node weights, and figure composition are visual-design decisions
+- **`docs/architecture.md`** when it embeds diagrams or visual hierarchies -- diagram colors, node weights, and figure composition are visual-design decisions; for a LikeC4 view read the project's `_spec.c4`, apply the review checks (`review-checks.md` of the `likec4-diagramming` skill) to each view you touch, and regenerate with the project's command
 - **`README.md`** with significant badge strips, complex visual TOCs, or screenshots -- composition discipline is a design-canon question
 - **Hand-authored HTML outside `dashboard_app/`** -- consult `web-ui-design` for visual hierarchy, accessibility, and motion before committing
 

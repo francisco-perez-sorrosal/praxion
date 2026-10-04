@@ -21,105 +21,28 @@
 
 ## 2. System Context
 
-<!-- L0 diagram: system boundary + external actors/dependencies. Max 6-8 elements.
+<!-- L0 diagram: system boundary + external actors/dependencies. No flat node cap: nest, and
+     project focused views that pass the review checks of the `likec4-diagramming` skill.
      Shows WHAT interacts with the system, not internals.
-     Node shapes: rectangles for components, [(Database)] for storage, ([Queue]) for messaging.
-     Only include integrations that exist in the current codebase. -->
+     Only include integrations that exist in the current codebase.
+     Sources live at docs/diagrams/architecture/src/*.c4; alt text is the view title plus its C4 type. -->
 
-<!-- After editing diagrams/architecture/src/architecture.c4, run scripts/diagram-regen-hook.sh (or commit to trigger pre-commit) to regenerate this SVG. -->
-![System Context (L0)](diagrams/architecture/rendered/context.svg)
-
-<details>
-<summary>LikeC4 source (edit diagrams/architecture/src/architecture.c4 to update this diagram)</summary>
-
-```c4
-// System Context view — L0
-// Edit the shared .c4 model, then run the regeneration hook (pre-commit) or:
-//   likec4 gen d2 diagrams/architecture/src/architecture.c4 -o diagrams/architecture/
-//   d2 diagrams/architecture/rendered/context.d2 diagrams/architecture/rendered/context.svg
-specification {
-  element person
-  element system
-}
-
-model {
-  user = person "User" {
-    description "Primary actor"
-  }
-  mySystem = system "[System Name]" {
-    description "The system being documented"
-  }
-  user -> mySystem "uses"
-}
-
-views {
-  view context of mySystem {
-    title "System Context"
-    include *
-  }
-}
-```
-
-</details>
+![System Context, C4 system context view](diagrams/architecture/rendered/context.svg)
 
 > **Component detail:** [Components](#3-components)
 
 ## 3. Components
 
-<!-- L1 diagram: major building blocks and their relationships. Max 10-12 nodes.
-     Use subgraphs for logical boundaries (layers, bounded contexts).
-     Solid arrows for direct dependencies, dotted for async/event-based.
+<!-- L1 diagram: major building blocks and their relationships. No flat node cap for a
+     LikeC4 view (rules/writing/diagram-conventions.md).
      Every component listed here MUST exist on disk -- verify with ls/Glob before including. -->
 
-<!-- After editing diagrams/architecture/src/architecture.c4, run scripts/diagram-regen-hook.sh (or commit to trigger pre-commit) to regenerate this SVG. -->
-![Components (L1)](diagrams/architecture/rendered/components.svg)
-
-<details>
-<summary>LikeC4 source (edit diagrams/architecture/src/architecture.c4 to update this diagram)</summary>
-
-```c4
-// Components view — L1
-// Edit the shared .c4 model, then run the regeneration hook (pre-commit) or:
-//   likec4 gen d2 diagrams/architecture/src/architecture.c4 -o diagrams/architecture/
-//   d2 diagrams/architecture/rendered/components.d2 diagrams/architecture/rendered/components.svg
-specification {
-  element person
-  element system
-  element component
-}
-
-model {
-  user = person "User" {
-    description "Primary actor"
-  }
-  mySystem = system "[System Name]" {
-    description "The system being documented"
-
-    coreLayer = component "Core Layer" {
-      description "Primary business logic"
-    }
-    infraLayer = component "Infrastructure Layer" {
-      description "Storage and external adapters"
-    }
-  }
-  user -> mySystem.coreLayer "calls"
-  mySystem.coreLayer -> mySystem.infraLayer "reads/writes"
-}
-
-views {
-  view components of mySystem {
-    title "Components"
-    include *
-  }
-}
-```
-
-</details>
+![Components, C4 component view](diagrams/architecture/rendered/components.svg)
 
 <!-- aac:generated source=docs/diagrams/architecture/src/architecture.c4 view=components last-regen=YYYY-MM-DD -->
 
 <!-- TWO-TIER SECTION. 3a holds structural building blocks -- one row per `component`
-     element in the LikeC4 model above, capped at the 10-12 nodes noted for the L1 diagram.
+     element in the LikeC4 model above.
      3b holds capabilities: cross-cutting features and loops COMPOSED FROM those blocks,
      owning no single directory and no model element.
      Keep them apart from the first row. A single merged table grows without bound as

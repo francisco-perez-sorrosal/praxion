@@ -15,7 +15,7 @@ The developer guide is derived from the architect doc — it is a code-verified 
 
 Both documents use the same 8 sections (Overview, System Context, Components, Interfaces, Data Flow, Dependencies, Constraints, Decisions). The differences are in framing and content policy:
 
-**Section 3 is two-tier in both documents.** `### 3a. Structural components` holds one row per `component` element in the LikeC4 model, capped at the 10-12 nodes the L1 diagram allows; `### 3b. Capabilities` holds cross-cutting features and loops composed from those blocks, which own no single directory and no model element. The tiers exist because a merged table grows with every shipped feature until it silently contradicts the diagram above it and can no longer be reconciled against the model. Checks that read *components* — AC06 — resolve against 3a only.
+**Section 3 is two-tier in both documents.** `### 3a. Structural components` holds one row per `component` element in the LikeC4 model; `### 3b. Capabilities` holds cross-cutting features and loops composed from those blocks, which own no single directory and no model element. The tiers exist because a merged table grows with every shipped feature until it silently contradicts the diagram above it and can no longer be reconciled against the model. Checks that read *components* — AC06 — resolve against 3a only.
 
 | Dimension | `.ai-state/DESIGN.md` | `docs/architecture.md` |
 |-----------|----------------------------|------------------------|
@@ -198,9 +198,11 @@ The systems-architect adds the CLAUDE.md mention when creating the initial archi
 
 ## Diagram Conventions
 
-Follow the project's Mermaid diagram conventions (see `rules/writing/diagram-conventions.md`):
+C4 views in these documents are LikeC4 models with committed renders: follow the `likec4-diagramming` skill and `rules/writing/diagram-conventions.md`, and apply its review checks to every view you touch.
 
-- **10-12 nodes maximum** per diagram
+Mermaid diagrams (sequence, state, ER, flowcharts) follow the same rule file:
+
+- **10-12 nodes maximum** per Mermaid diagram
 - **L0/L1/L2 decomposition**: L0 for system context, L1 for components, L2 for internals (only when needed)
 - **Standard shapes**: rectangles for components, `[(Database)]` for storage, `([Queue])` for messaging
 - **Solid arrows** (`-->`) for direct dependencies, **dotted** (`-.->`) for async/event-based

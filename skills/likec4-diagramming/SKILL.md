@@ -18,6 +18,8 @@ querying the model (MCP tools or raw `.c4` reads) while you work.
 **Satellite files** (loaded on-demand):
 
 - [`references/review-checks.md`](references/review-checks.md) — the review-check list; the only home of thresholds
+- [`references/style-canon.md`](references/style-canon.md) — why the checks exist: the rules, their evidence grades, palette and shape semantics, anti-patterns
+- [`references/likec4-authoring-recipes.md`](references/likec4-authoring-recipes.md) — DSL recipes: specification, elements, colour and shape, views, view tags, dynamic views
 - [`references/render-and-regen.md`](references/render-and-regen.md) — the pinned toolchain, the one regeneration command, the hook and the CI gate
 - [`references/mcp-tool-recipes.md`](references/mcp-tool-recipes.md) — the 20 MCP tools: quick-reference table, input shapes, worked examples
 
@@ -31,8 +33,9 @@ querying the model (MCP tools or raw `.c4` reads) while you work.
 3. **Regenerate.** `python3 scripts/regenerate_diagrams.py` rewrites `rendered/`; see
    [`render-and-regen.md`](references/render-and-regen.md).
 4. **Check.** `python3 scripts/regenerate_diagrams.py --check` byte-compares the renders and prints one
-   finding per review check and view. Then apply every check in [`review-checks.md`](references/review-checks.md)
-   to each view you touched, and record any you could not run.
+   finding per review check and view; that output is the evidence. Only when the command is unavailable,
+   apply every check in [`review-checks.md`](references/review-checks.md) by hand to each view you touched,
+   and record any you could not run.
 5. **Commit source and renders together.** The `diagram-regen` pre-commit hook stages `rendered/` for you.
 
 ## Categories
@@ -94,9 +97,9 @@ The tool table is in [`references/mcp-tool-recipes.md`](references/mcp-tool-reci
   MCP in the session, fall back to direct `.c4` reads for every query.
 - **A stale render is a defect, not style drift.** Regenerate after every model edit; the CI drift gate
   fails on any difference between `rendered/` and a fresh regeneration.
-- **The version pins are exact** and stated once, in
-  [`render-and-regen.md`](references/render-and-regen.md); a different local version regenerates different
-  bytes.
+- **The version pins are exact.** [`render-and-regen.md`](references/render-and-regen.md) states them for the
+  guidance and names the three places that install the tools and must carry the same pins; a different local
+  version regenerates different bytes.
 
 ## Related Skills
 

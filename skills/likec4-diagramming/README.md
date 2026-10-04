@@ -23,6 +23,8 @@ automatically when Claude reads files matching these patterns.
 
 - `SKILL.md` — authoring loop, category rule and vocabularies, view recipe, query decision rubric, gotchas
 - `references/review-checks.md` — the review-check list and every threshold
+- `references/style-canon.md` — the style rules, their evidence grades, palette and shape semantics, anti-patterns
+- `references/likec4-authoring-recipes.md` — DSL recipes for the specification, elements, views, view tags and dynamic views
 - `references/render-and-regen.md` — pinned toolchain, the regeneration command, hook and CI gate
 - `references/mcp-tool-recipes.md` — quick-reference table and worked examples for all 20 MCP tools
 

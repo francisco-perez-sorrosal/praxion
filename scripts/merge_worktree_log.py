@@ -21,16 +21,23 @@ and its running agents show as unstopped in P03 until a later merge copies the
 rest (an accepted leftover, named in the decision record). REV is resolved once
 a worktree holds a log, and an unresolvable one is an input error.
 
+A merge git finishes outside ``git merge`` (a conflict or ``--no-commit``
+completed by ``git commit``) and a pull that rebases local commits run no
+post-merge hook, so ``--merged`` never sees them; ``--worktree`` at teardown and
+P14 cover them, as they cover a squash merge.
+
 ``--repo-root`` is any checkout of the repository (default: the git toplevel of
 the working directory). It is never derived from this file's location: managed
 projects run this from the plugin cache, and the plugin's own checkout is not
 theirs.
 
-The recording mode is the process environment's when it defines
-``PRAXION_OBSERVATION_LOG`` or ``PRAXION_DISABLE_OBSERVABILITY``; a git hook has
-neither, so the main checkout's ``.claude/settings.local.json`` over
-``.claude/settings.json`` ``env`` supplies them, as they would reach a session.
-User-scope and managed-policy settings are not read.
+The recording mode is resolved key by key, the way Claude Code writes a
+settings ``env`` over the shell's: each of ``PRAXION_OBSERVATION_LOG`` and
+``PRAXION_DISABLE_OBSERVABILITY`` comes from the main checkout's
+``.claude/settings.local.json`` ``env``, else its ``.claude/settings.json``
+``env``, else the process environment. A git hook sees only the shell's
+variables, so the files supply what a session would see. User-scope and
+managed-policy settings are not read.
 
 ``--merged`` is quiet when nothing happened (no worktree holds a log, every row is
 already held, recording is off) and speaks only for a worktree that gained rows or
@@ -47,8 +54,9 @@ main log unreadable or unwritable, an internal error); 2 for an input error.
     {"schema": 1, "main", "worktree", "mode", "outcome", "copied", "skipped",
      "malformed", "unreadable": [path, ...], "reason"}
 
-``mode_source`` is "process", the settings file that supplied a mode key, or
-"default"; ``notes`` names a settings file that could not be used.
+``mode_source`` is the highest-precedence source that supplied a mode key -- a
+settings file, else "process" -- or "default"; ``notes`` names a settings file
+that could not be used.
 
 Standard library only, and 3.9-safe: the post-merge hook runs it under whatever
 interpreter the project has.
@@ -178,22 +186,21 @@ def _worth_saying(report) -> bool:
 
 
 def _recording(main_root: Path | None) -> Recording:
-    """The mode keys in effect: the process's when it sets either, else the project's."""
-    process = {key: os.environ[key] for key in MODE_KEYS if key in os.environ}
-    if process:
-        return Recording(process, PROCESS_SOURCE, ())
-    if main_root is None:
-        return Recording({}, DEFAULT_SOURCE, ())
+    """The mode keys in effect, key by key: each settings file over the process, local last."""
+    layers = [(PROCESS_SOURCE, {key: os.environ[key] for key in MODE_KEYS if key in os.environ})]
+    notes: list[str] = []
+    if main_root is not None:
+        for filename in SETTINGS_FILES:
+            supplied, note = _settings_mode_keys(main_root / filename, filename)
+            if note is not None:
+                notes.append(note)
+            layers.append((filename, supplied))
     env: dict[str, str] = {}
     source = DEFAULT_SOURCE
-    notes: list[str] = []
-    for filename in SETTINGS_FILES:
-        supplied, note = _settings_mode_keys(main_root / filename, filename)
-        if note is not None:
-            notes.append(note)
+    for label, supplied in layers:  # lowest precedence first
         if supplied:
             env.update(supplied)
-            source = filename
+            source = label
     return Recording(env, source, tuple(notes))
 
 

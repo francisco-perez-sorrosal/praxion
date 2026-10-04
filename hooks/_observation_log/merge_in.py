@@ -11,6 +11,11 @@ main log's archives, so a merge is safe to repeat -- after the main log rotated,
 or after the worktree kept recording. The rows that remain go in through
 ``writer.append_lines``, which takes the writer's lock and applies the size cap
 and the retention policy to each one like any other append.
+
+Declared limit: the main log's identity index is read outside the writer's
+lock, so a rotation during that read, or a second merge-in of the same
+worktree running at once, can append a row the main log already held -- one
+extra copy, never a lost row (tech-debt ledger, merge-in identity race).
 """
 
 from __future__ import annotations

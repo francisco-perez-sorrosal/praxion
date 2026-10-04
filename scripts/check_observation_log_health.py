@@ -22,7 +22,8 @@ apart: an `info` finding states a figure, a `warn` finding names a defect.
   a megabyte past the cap.
 * **P11 segment integrity.** Warns per segment with lines that are not a
   single JSON object (count and line numbers) and per segment that cannot be
-  read; well-formed rows are still judged by every other check.
+  read, and once when the state directory cannot be listed for archives;
+  well-formed rows are still judged by every other check.
   Golden bad-case: a JSON array on line 5 of the active log.
 * **P12 helper share.** Information only: harness helper stops (older stop
   rows that self-report as helper calls included), real agent stops, and the
@@ -38,7 +39,10 @@ apart: an `info` finding states a figure, a `warn` finding names a defect.
   is older than `WORKTREE_AGE_LIMIT` and which holds rows with no equal row in
   the main checkout's log; a worktree inside the limit is reported as in
   flight, as information. Golden bad-case: a worktree log last written three
-  weeks ago whose rows the main log lacks.
+  weeks ago whose rows the main log lacks. Also warns per linked worktree whose
+  log cannot be read whole (a listing or segment error), under the same age
+  gate; a log none of whose rows can be read has no known age and is warned
+  on. Golden bad-case: a worktree whose `.ai-state` cannot be entered.
 
 P09 to P13 skip together, with exactly one of three named states, never as a
 clean pass: `substrate-absent` (no segment exists), `reader-unreachable` (every
@@ -55,9 +59,15 @@ claim over stops must be checked against; P14's warning is the cue to run
 removed; P09's span warning is the cue to revisit the retention policy.
 
 Declared limits: P14 compares rows by their identity as stored, so a worktree
-removed before this ran took its log with it and cannot be reported; a segment
-of the main log this could not read is named in P14's `unreadable` figure, and
-rows only that segment held read as unmerged.
+removed before this ran took its log with it and cannot be reported. Where
+part of the main log cannot be read -- a segment, or the directory listing
+that finds its archives -- P14 names the path in its `unreadable` figure, and
+rows only that part held read as unmerged: the error runs toward a warning,
+never toward silence. A worktree whose log cannot be read whole is named with
+its reason (`unjudged`); the rows that did read are still judged, so its
+unmerged count is a lower bound. A missing archive position in a worktree's
+log is not P14's to report: those rows are already gone, and merge-in names
+the gap when the worktree is merged.
 
 Invocation:
 
@@ -206,6 +216,19 @@ class LogView:
 
 
 @dataclass(frozen=True)
+class WorktreeLog:
+    """One worktree's log as P14 judges it; `rows` and `newest` cover only the part that read.
+
+    `problems`: the listing's error, then `"<path>: <error>"` per segment that did not read.
+    """
+
+    rows: int
+    newest: Stamped | None
+    unreadable: tuple[str, ...]
+    problems: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Outcome:
     """One check's result: what it examined and found, or why it did not run."""
 
@@ -322,8 +345,10 @@ def check_archive_coverage(view: LogView, policy: Policy) -> Outcome:
             "P09",
             "warn",
             path,
-            f"{path.name} is position {_position(path)}, past the policy's "
-            f"{policy.archive_count} archives: retention is not being enforced",
+            f"{path.name} is at position {_position(path)}, past the policy's "
+            f"{policy.archive_count} archives, where rotation never writes: an archive left "
+            "by a larger policy, or a copy named like one; it is read as history until it "
+            "is moved out of the state directory",
         )
         for path in surplus
     ]
@@ -403,7 +428,20 @@ def check_rotation_state(view: LogView, policy: Policy) -> Outcome:
 
 
 def check_segment_integrity(view: LogView) -> Outcome:
+    state_dir, listing_error = view.active.parent, view.listing.error
     findings: list[dict] = []
+    if listing_error is not None:
+        findings.append(
+            _finding(
+                "P11",
+                "warn",
+                state_dir,
+                f"the state directory could not be listed for archives ({listing_error}); "
+                "archive coverage is not judged",
+                segment=str(state_dir),
+                error=listing_error,
+            )
+        )
     for facts in view.facts:
         if facts.error is not None:
             findings.append(
@@ -419,7 +457,8 @@ def check_segment_integrity(view: LogView) -> Outcome:
         if facts.malformed_lines:
             findings.append(_malformed_finding(facts))
     malformed = sum(len(f.malformed_lines) for f in view.facts)
-    unreadable = [str(f.path) for f in view.facts if f.error is not None]
+    unreadable = [str(state_dir)] if listing_error is not None else []
+    unreadable += [str(f.path) for f in view.facts if f.error is not None]
     findings.append(
         _finding(
             "P11",
@@ -518,43 +557,55 @@ def check_unmerged_worktrees(repo_root: Path, policy: Policy, now: datetime) -> 
         skipped = {"reason": SKIP_UNREACHABLE, "path": str(repo_root), "detail": listing.error}
         return Outcome(skipped=skipped)
     worktrees = [c for c in listing.checkouts if not c.is_main]
+    # A listing error counts as holding a log: an unlistable directory is never "no log".
     logged = [
-        (c, segments)
+        (c, found)
         for c in worktrees
-        if (segments := reader.segment_listing(c.state_dir, archives=True).segments)
+        if (found := reader.segment_listing(c.state_dir, archives=True)).segments
+        or found.error is not None
     ]
     main = next(c for c in listing.checkouts if c.is_main)
     held, unreadable = main_identities(main.state_dir) if logged else (frozenset(), [])
     findings: list[dict] = []
     unmerged: list[dict] = []
     in_flight: list[str] = []
-    for checkout, segments in logged:
-        rows, newest, bad = worktree_rows_missing_from(segments, held)
-        unreadable += bad
-        if not rows:
+    unjudged: list[dict] = []
+    for checkout, found in logged:
+        log = worktree_rows_missing_from(found, checkout.state_dir, held)
+        unreadable += log.unreadable
+        newest_stamp = log.newest.stamp if log.newest else None
+        recent = log.newest is not None and now - log.newest.time <= policy.worktree_age_limit
+        if log.problems:
+            unjudged.append({"worktree": checkout.name, "reason": log.problems[0]})
+            findings.append(_unjudged_finding(checkout, log, "info" if recent else "warn"))
+        if not log.rows:
             continue
-        newest_stamp = newest.stamp if newest else None
-        if newest is not None and now - newest.time <= policy.worktree_age_limit:
+        if recent:
             in_flight.append(checkout.name)
-            findings.append(_in_flight_finding(checkout, rows, newest_stamp))
+            findings.append(_in_flight_finding(checkout, log.rows, newest_stamp))
             continue
-        unmerged.append({"worktree": checkout.name, "rows": rows, "newest": newest_stamp})
-        findings.append(_unmerged_finding(checkout, rows, newest_stamp))
-    findings.append(_worktree_summary(repo_root, len(worktrees), unmerged, in_flight))
+        unmerged.append({"worktree": checkout.name, "rows": log.rows, "newest": newest_stamp})
+        findings.append(_unmerged_finding(checkout, log.rows, newest_stamp))
+    findings.append(_worktree_summary(repo_root, len(worktrees), unmerged, in_flight, unjudged))
     examined = {
         "worktrees": len(worktrees),
         "in_flight": in_flight,
         "unmerged": unmerged,
+        "unjudged": unjudged,
         "unreadable": unreadable,
     }
     return Outcome(examined, tuple(findings))
 
 
 def main_identities(state_dir: Path) -> tuple[frozenset[str], list[str]]:
-    """Identities of every row in the main checkout's log, and the segments it could not read."""
+    """Identities of every row in the main checkout's log, and what of it could not be read.
+
+    A failed listing names the directory: rows only its unread archives hold read as unmerged.
+    """
+    listing = reader.segment_listing(state_dir, archives=True)
     held: set[str] = set()
-    unreadable: list[str] = []
-    for path in reader.segment_listing(state_dir, archives=True).segments:
+    unreadable: list[str] = [] if listing.error is None else [str(state_dir)]
+    for path in listing.segments:
         read = reader.read_raw_segment(path)
         if read.error is not None:
             unreadable.append(str(path))
@@ -563,16 +614,18 @@ def main_identities(state_dir: Path) -> tuple[frozenset[str], list[str]]:
 
 
 def worktree_rows_missing_from(
-    segments: tuple[Path, ...], held: frozenset[str]
-) -> tuple[int, Stamped | None, list[str]]:
-    """`(distinct rows not in held, newest row of the log, unreadable segments)` for one worktree."""
+    listing: reader.SegmentListing, state_dir: Path, held: frozenset[str]
+) -> WorktreeLog:
+    """The rows of one worktree's log that are not in `held`, and what of it could not be read."""
     missing: set[str] = set()
     newest: Stamped | None = None
-    unreadable: list[str] = []
-    for path in segments:
+    unreadable: list[str] = [] if listing.error is None else [str(state_dir)]
+    problems: list[str] = [] if listing.error is None else [listing.error]
+    for path in listing.segments:
         read = reader.read_raw_segment(path)
         if read.error is not None:
             unreadable.append(str(path))
+            problems.append(f"{path}: {read.error}")
         for _text, row in read.entries:
             identity = reader.row_identity(row)
             if identity not in held:
@@ -580,7 +633,24 @@ def worktree_rows_missing_from(
             moment = reader.row_time(row)
             if moment != reader.UNTIMED and (newest is None or moment > newest.time):
                 newest = Stamped(moment, row["timestamp"])
-    return len(missing), newest, unreadable
+    return WorktreeLog(len(missing), newest, tuple(unreadable), tuple(problems))
+
+
+def _unjudged_finding(checkout: checkouts.Checkout, log: WorktreeLog, severity: str) -> dict:
+    reason, more = log.problems[0], len(log.problems) - 1
+    shown = f"{reason} (+{more} more)" if more else reason
+    return _finding(
+        "P14",
+        severity,
+        checkout.root,
+        f"worktree {checkout.name}: its log could not be read whole ({shown}); rows in the "
+        "unread part are not judged, and merging it in reports degraded until the cause is fixed",
+        worktree=checkout.name,
+        reason=reason,
+        problems=list(log.problems),
+        rows=log.rows,
+        newest=log.newest.stamp if log.newest else None,
+    )
 
 
 def _unmerged_finding(checkout: checkouts.Checkout, rows: int, newest: str | None) -> dict:
@@ -610,13 +680,13 @@ def _in_flight_finding(checkout: checkouts.Checkout, rows: int, newest: str | No
     )
 
 
-def _worktree_summary(root: Path, worktrees: int, unmerged: list, in_flight: list) -> dict:
+def _worktree_summary(root: Path, total: int, unmerged: list, flight: list, unjudged: list) -> dict:
     return _finding(
         "P14",
         "info",
         root,
-        f"{worktrees} linked worktree(s): {len(unmerged)} with unmerged rows past the age "
-        f"limit, {len(in_flight)} in flight",
+        f"{total} linked worktree(s): {len(unmerged)} with unmerged rows past the age "
+        f"limit, {len(flight)} in flight, {len(unjudged)} whose log could not be read whole",
     )
 
 

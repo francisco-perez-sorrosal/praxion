@@ -42,8 +42,11 @@ RawSegmentRead = namedtuple("RawSegmentRead", ("path", "entries", "malformed_lin
 
 # `(segments, missing, error)`. `segments` holds the paths that exist: archives by
 # descending position (oldest first), then the active log. `missing` holds the
-# archive paths absent between position 1 and the highest position present --
-# a gap is history lost, never the end of it. The two never overlap. `error` is
+# archive paths absent at positions h..1, by descending position, where h is the
+# highest present position not above the policy's archive count (0 when none):
+# a gap is history lost, never the end of it. A position above the count is
+# surplus -- listed, read as history, never opening a gap below it -- so
+# `missing` stays within the count. The two never overlap. `error` is
 # None, or "unreadable: <state dir>: <why>" when the directory could not be
 # scanned for archives: the listing is then incomplete, which is different from
 # a directory that holds none, and a caller that copies or counts must say so.
@@ -67,7 +70,8 @@ def segment_listing(ai_state_dir: Path, *, archives: bool) -> SegmentListing:
     With ``archives`` False this is the active log alone and no directory is
     listed, so the hot path and the active-only readers cost what they always
     did. With it True every numbered archive is found by name -- one directory
-    scan -- including a position above the retention policy's count.
+    scan -- including a position above the retention policy's count, and the
+    work is bounded by the files found and the count, never by a position.
 
     A directory that cannot be entered or scanned is never reported as holding
     no log: the active path stays listed (its read then names the reason) and a
@@ -79,12 +83,13 @@ def segment_listing(ai_state_dir: Path, *, archives: bool) -> SegmentListing:
     if not archives:
         return SegmentListing(segments=newest, missing=())
     present, error = _archives_by_position(ai_state_dir)
-    if not present:
-        return SegmentListing(segments=newest, missing=(), error=error)
-    positions = range(max(present), 0, -1)
+    # Read at call time, so a policy change (or a test's patch) reaches every listing.
+    highest = max((p for p in present if p <= retention.ARCHIVE_COUNT), default=0)
     return SegmentListing(
-        segments=tuple(present[p] for p in positions if p in present) + newest,
-        missing=tuple(retention.archive_path(active, p) for p in positions if p not in present),
+        segments=tuple(present[p] for p in sorted(present, reverse=True)) + newest,
+        missing=tuple(
+            retention.archive_path(active, p) for p in range(highest, 0, -1) if p not in present
+        ),
         error=error,
     )
 

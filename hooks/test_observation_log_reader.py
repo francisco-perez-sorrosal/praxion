@@ -168,6 +168,56 @@ def test_a_position_above_the_policy_count_is_still_read(tmp_path: Path) -> None
     assert names[0] == f"{LOG_FILENAME}.{surplus}"
 
 
+def test_a_copy_named_like_a_far_archive_is_listed_at_once_and_opens_no_gap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    far = f"{LOG_FILENAME}.20261003"
+    _touch(tmp_path, LOG_FILENAME, f"{LOG_FILENAME}.1", far)
+    named: list[int] = []
+    real_archive_path = retention.archive_path
+
+    def counted(log_path: Path, position: int) -> Path:
+        named.append(position)
+        return real_archive_path(log_path, position)
+
+    monkeypatch.setattr(retention, "archive_path", counted)
+
+    listing = segment_listing(tmp_path, archives=True)
+
+    assert listing.missing == ()
+    assert [p.name for p in listing.segments] == [far, f"{LOG_FILENAME}.1", LOG_FILENAME]
+    assert len(named) <= retention.ARCHIVE_COUNT
+
+
+def test_a_far_position_alone_opens_no_gap(tmp_path: Path) -> None:
+    _touch(tmp_path, LOG_FILENAME, f"{LOG_FILENAME}.20261003")
+
+    assert segment_listing(tmp_path, archives=True).missing == ()
+
+
+def test_a_surplus_position_leaves_the_gap_below_the_highest_in_policy_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(retention, "ARCHIVE_COUNT", 5)
+    _touch(tmp_path, LOG_FILENAME, f"{LOG_FILENAME}.2", f"{LOG_FILENAME}.7")
+
+    listing = segment_listing(tmp_path, archives=True)
+
+    assert [p.name for p in listing.missing] == [f"{LOG_FILENAME}.1"]
+
+
+def test_the_archive_count_bounding_the_gaps_is_read_at_call_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(retention, "ARCHIVE_COUNT", 3)
+    _touch(tmp_path, LOG_FILENAME, *(f"{LOG_FILENAME}.{p}" for p in (1, 2, 4, 5)))
+
+    listing = segment_listing(tmp_path, archives=True)
+
+    assert listing.missing == ()
+    assert [p.name for p in listing.segments][:2] == [f"{LOG_FILENAME}.5", f"{LOG_FILENAME}.4"]
+
+
 def test_files_that_only_resemble_archives_are_not_listed(tmp_path: Path) -> None:
     _touch(
         tmp_path,

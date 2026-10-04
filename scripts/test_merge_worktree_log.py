@@ -434,8 +434,9 @@ def test_a_row_with_an_escaped_lone_surrogate_never_aborts_the_run(main: Path) -
 # -- the recording mode as the project sets it -------------------------------------------------
 
 
-def test_the_process_environment_decides_the_mode_when_it_defines_one(main: Path) -> None:
-    _write_settings(main, "settings.json", {"env": {"PRAXION_DISABLE_OBSERVABILITY": "1"}})
+def test_the_process_environment_decides_the_mode_when_no_settings_file_sets_one(
+    main: Path,
+) -> None:
     worktree = _add_worktree(main, "pipeline-wt")
     _record(worktree, 1)
 
@@ -444,6 +445,42 @@ def test_the_process_environment_decides_the_mode_when_it_defines_one(main: Path
     report = json.loads(result.stdout)
     assert (report["mode"], report["mode_source"], report["notes"]) == ("standard", "process", [])
     assert report["copied"] == 1
+
+
+def test_a_settings_key_applies_over_the_process_key_by_key(main: Path) -> None:
+    _write_settings(main, "settings.json", {"env": {"PRAXION_DISABLE_OBSERVABILITY": "1"}})
+    worktree = _add_worktree(main, "pipeline-wt")
+    _record(worktree, 1)
+
+    result = _run(
+        "--worktree", str(worktree), "--json", "--repo-root", str(main), cwd=main, mode="full"
+    )
+
+    report = json.loads(result.stdout)
+    assert (report["outcome"], report["mode"], report["mode_source"]) == (
+        "recording-off",
+        "off",
+        ".claude/settings.json",
+    )
+    assert not reader.log_path(main / ".ai-state").exists()
+
+
+def test_the_local_settings_override_a_process_that_turned_recording_off(main: Path) -> None:
+    _write_settings(main, "settings.local.json", {"env": {"PRAXION_OBSERVATION_LOG": "standard"}})
+    worktree = _add_worktree(main, "pipeline-wt")
+    _record(worktree, 1)
+
+    result = _run(
+        "--worktree", str(worktree), "--json", "--repo-root", str(main), cwd=main, mode="off"
+    )
+
+    report = json.loads(result.stdout)
+    assert (report["mode"], report["mode_source"], report["copied"]) == (
+        "standard",
+        ".claude/settings.local.json",
+        1,
+    )
+    assert _held(main) == [1]
 
 
 def test_a_project_that_set_the_mode_off_in_its_settings_copies_nothing(main: Path) -> None:

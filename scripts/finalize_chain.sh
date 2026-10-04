@@ -480,13 +480,17 @@ _finalize_chain_state_driven() {
 # branched from origin/main while local main was behind, which the next pull
 # brings in (accepted leftover: P03 warns until a later merge copies the rest);
 # teardown through /merge-worktree copies whatever is left. Idempotent: rows the main log
-# already holds are skipped. Squash merges are not covered -- the squashed commit
-# is not the worktree's HEAD.
+# already holds are skipped. Not covered, left to /merge-worktree and P14: a
+# squash merge (the squashed commit is not the worktree's HEAD), and a merge git
+# finishes outside `git merge` -- stopped on a conflict or run with --no-commit,
+# then committed -- or a pull that rebases local commits: git runs no post-merge
+# hook for those, and later merges find the worktree already in ORIG_HEAD.
 #
 # The recording mode is the project's: a git hook does not see the variables the
-# settings files define for a session, so the script reads the two mode keys from
-# this checkout's .claude/settings.local.json over .claude/settings.json when the
-# process defines none. User-scope and managed-policy settings are not read.
+# settings files define for a session, so the script takes each of the two mode
+# keys from this checkout's .claude/settings.local.json, else .claude/settings.json,
+# else the process environment -- key by key, as Claude Code writes a settings env
+# over the shell's. User-scope and managed-policy settings are not read.
 #
 # Gated to keep it a no-op where it has nothing to do: only the primary working
 # tree (a linked worktree's `.git` is a file) owns the main log, and only

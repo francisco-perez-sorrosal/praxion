@@ -13,8 +13,11 @@ substitute the checkout listing, which the owner package pins on its own.
 from __future__ import annotations
 
 import json
+import os
+import stat
 import subprocess
 import sys
+from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -79,6 +82,29 @@ def _a_main_with_worktrees(monkeypatch: pytest.MonkeyPatch, root: Path, *names: 
         lambda _root: clh.checkouts.CheckoutListing(entries, None),
     )
     return worktrees
+
+
+@pytest.fixture
+def chmod() -> Iterator[Callable[[Path, int], None]]:
+    """Change a path's mode for one test; every changed mode is restored at teardown."""
+    if os.geteuid() == 0:
+        pytest.skip("root reads any directory, so nothing here is unreadable")
+    changed: list[tuple[Path, int]] = []
+
+    def change(path: Path, mode: int) -> None:
+        changed.append((path, stat.S_IMODE(path.stat().st_mode)))
+        path.chmod(mode)
+
+    yield change
+    for path, mode in reversed(changed):
+        path.chmod(mode)
+
+
+def _check_exit(root: Path) -> int:
+    """The `--check` exit code, run in this process so a substituted listing still applies."""
+    with pytest.raises(SystemExit) as stopped:
+        clh.main(["--check", "--repo-root", str(root)])
+    return stopped.value.code
 
 
 # -- A canary per check: each check, called directly, flags its golden bad-case -------------------
@@ -252,6 +278,23 @@ def test_p09_an_archive_past_the_policy_count_warns_naming_it(tmp_path: Path) ->
     assert report["examined"]["P09"]["surplus"] == [warnings[0]["entity"]]
 
 
+def test_p09_a_copy_named_like_a_far_archive_is_one_surplus_warning_and_opens_no_gap(
+    tmp_path: Path,
+) -> None:
+    state = _state(tmp_path)
+    _write(state, [_row()])
+    _archive(state, 1, [_row()])
+    backup = _archive(state, 20261003, [_row()])
+
+    report = _run(tmp_path)
+
+    (warning,) = _warnings(report, "P09")
+    assert warning["entity"] == str(backup)
+    assert "rotation never writes" in warning["message"]
+    assert "moved out of the state directory" in warning["message"]
+    assert report["examined"]["P09"]["missing"] == []
+
+
 def test_p09_a_full_sequence_spanning_less_than_the_history_target_warns_once(
     tmp_path: Path,
 ) -> None:
@@ -386,6 +429,23 @@ def test_p11_an_unreadable_segment_warns_and_the_other_segments_are_still_judged
     assert report["examined"]["P11"]["unreadable"] == [str(broken)]
     assert report["skipped"]["P13"] is None
     assert [w["entity"] for w in _warnings(report, "P13")] == ["typo"]
+
+
+def test_p11_a_state_directory_that_cannot_be_listed_warns_once_naming_it(
+    tmp_path: Path, chmod: Callable[[Path, int], None]
+) -> None:
+    state = _state(tmp_path)
+    _write(state, [_row()])
+    chmod(state, 0o100)
+
+    report = _run(tmp_path)
+
+    (warning,) = _warnings(report, "P11")
+    assert warning["entity"] == str(state)
+    assert warning["detail"]["segment"] == str(state)
+    assert str(state) in warning["detail"]["error"]
+    assert "archive coverage is not judged" in warning["message"]
+    assert str(state) in report["examined"]["P11"]["unreadable"]
 
 
 def test_p11_a_clean_log_has_no_warning(tmp_path: Path) -> None:
@@ -607,6 +667,67 @@ def test_p14_a_directory_that_is_not_a_repository_skips_rather_than_passes(
     tmp_path: Path,
 ) -> None:
     assert _run(tmp_path)["skipped"]["P14"]["reason"] == clh.SKIP_UNREACHABLE
+
+
+def test_canary_p14_warns_on_a_stale_worktree_whose_state_directory_cannot_be_entered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chmod: Callable[[Path, int], None]
+) -> None:
+    (worktree,) = _a_main_with_worktrees(monkeypatch, tmp_path, "sealed-wt")
+    _write(_state(tmp_path), [_row()])
+    _worktree_log(worktree, newest=STALE)
+    chmod(_state(worktree), 0o000)
+
+    report = _run(tmp_path)
+
+    (warning,) = _warnings(report, "P14")
+    assert warning["entity"] == str(worktree)
+    assert warning["detail"]["worktree"] == "sealed-wt"
+    assert str(_state(worktree)) in warning["detail"]["reason"]
+    assert report["examined"]["P14"]["unjudged"] == [
+        {"worktree": "sealed-wt", "reason": warning["detail"]["reason"]}
+    ]
+    assert report["examined"]["P14"]["unmerged"] == []
+    assert _check_exit(tmp_path) == 1
+
+
+def test_p14_a_stale_worktree_whose_state_directory_cannot_be_listed_warns_naming_why(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chmod: Callable[[Path, int], None]
+) -> None:
+    (worktree,) = _a_main_with_worktrees(monkeypatch, tmp_path, "unlisted-wt")
+    _write(_state(tmp_path), _worktree_log(worktree, newest=STALE))
+    chmod(_state(worktree), 0o100)
+
+    report = _run(tmp_path)
+
+    (warning,) = _warnings(report, "P14")
+    assert warning["detail"] == {
+        "worktree": "unlisted-wt",
+        "reason": warning["detail"]["reason"],
+        "problems": [warning["detail"]["reason"]],
+        "rows": 0,
+        "newest": STALE,
+    }
+    assert warning["detail"]["reason"].startswith(f"unreadable: {_state(worktree)}: ")
+    assert "could not be read whole" in warning["message"]
+    assert str(_state(worktree)) in report["examined"]["P14"]["unreadable"]
+
+
+def test_p14_an_unreadable_archive_of_a_worktree_in_flight_is_information_not_a_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chmod: Callable[[Path, int], None]
+) -> None:
+    (worktree,) = _a_main_with_worktrees(monkeypatch, tmp_path, "busy-wt")
+    _write(_state(tmp_path), _worktree_log(worktree, newest=RECENT))
+    sealed = _archive(_state(worktree), 1, [_row(at=STALE, session_id="older")])
+    chmod(sealed, 0o000)
+
+    report = _run(tmp_path)
+
+    assert _warnings(report, "P14") == []
+    (named,) = [
+        f for f in _information(report, "P14") if f.get("detail", {}).get("worktree") == "busy-wt"
+    ]
+    assert named["detail"]["reason"].startswith(f"{sealed}: ")
+    assert [u["worktree"] for u in report["examined"]["P14"]["unjudged"]] == ["busy-wt"]
 
 
 # -- The command -------------------------------------------------------------------------------

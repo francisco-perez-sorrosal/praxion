@@ -18,6 +18,9 @@ affected_files:
   - scripts/upgrade_project_pins.sh
   - install_claude.sh
   - scripts/check_hook_installation.py
+  - scripts/test_finalize_hook_names.py
+  - tests/test_finalize_chain.sh
+  - skills/context-security-review/references/hook-safety-contract.md
   - skills/onboard-project/references/phases-core.md
   - skills/onboard-project/SKILL.md
   - commands/merge-worktree.md

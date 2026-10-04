@@ -27,6 +27,7 @@ from _loop_fields import CHECK_GRAMMAR_LINE, Check, parse_attempts, parse_check_
 TEMPLATES = REPO_ROOT / "skills" / "software-planning" / "references" / "document-templates.md"
 SKILL = REPO_ROOT / "skills" / "software-planning" / "SKILL.md"
 PLANNER = REPO_ROOT / "agents" / "implementation-planner.md"
+IMPLEMENTER = REPO_ROOT / "agents" / "implementer.md"
 
 GRAMMAR_SITES = {
     "_loop_fields docstring": lambda: _loop_fields.__doc__ or "",
@@ -108,3 +109,25 @@ def test_canary_a_reordered_or_expects_less_site_is_rejected() -> None:
     assert states_the_grammar_exactly(CHECK_GRAMMAR_LINE)
     assert not parses_as_a_check("Check: `pytest -q` pass>=1 fail=0")
     assert not parses_as_a_check("Check: `pytest -q` expects pass>=1")
+
+
+def implementer_check_behavior_clause(text: str) -> bool:
+    return (
+        "record its `Result:` line last" in text
+        and "never edit a `Check:` or an `Attempts:` line" in text
+        and "return `[BLOCKED]` when the check cannot pass without contradicting the spec" in text
+    )
+
+
+def test_implementer_runs_the_check_and_never_edits_check_or_attempts_lines() -> None:
+    text = IMPLEMENTER.read_text(encoding="utf-8")
+    assert implementer_check_behavior_clause(text)
+    assert "Files, `Check`, and `Read-only` when present" in text
+
+
+def test_canary_an_implementer_clause_that_allows_editing_the_check_is_rejected() -> None:
+    editable = (
+        "record its `Result:` line last; edit the `Check:` line when it is wrong, "
+        "and return `[BLOCKED]` when the check cannot pass without contradicting the spec"
+    )
+    assert not implementer_check_behavior_clause(editable)

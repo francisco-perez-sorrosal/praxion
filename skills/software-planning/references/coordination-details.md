@@ -249,7 +249,7 @@ The [acceptance-design stage](#acceptance-design-stage) is a charged first start
 
 ### Reading the count
 
-Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log. Sessions working from any subdirectory of the checkout are recorded there too.
+Before each spawn, run `spawn_count.py --slug <slug> --budget <n>` from the pipeline's checkout (add `--json` for a machine-readable tally). It reads that checkout's observations log. Sessions working from any subdirectory of the checkout are recorded there too. The per-step cap on fresh attempts is a separate limit, stated once in [`agent-pipeline-details.md § Completion handshake`](agent-pipeline-details.md#completion-handshake-truncation-detection).
 
 **Which pipeline a spawn counts toward.** A spawn counts toward the `Task slug:` its prompt states (the first one), whatever the worktree is named. So keep `Task slug: <slug>` in every spawn prompt. A spawn that states no slug counts toward the checkout's directory name. The slug comes from the recorded `Agent` result, else from the agent's own transcript prompt (not read under `--no-context`). A resume counts wherever its spawn counts, whatever the resume message says. Rows recorded before slug attribution existed keep counting toward their directory name.
 

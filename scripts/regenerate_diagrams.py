@@ -50,6 +50,7 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
+from _diagram_checks import regeneration_finding, run_checks
 from _diagram_core import (
     Edge,
     Finding,
@@ -200,10 +201,14 @@ def regenerate(root: Path, args: argparse.Namespace, toolchain: Toolchain) -> bo
     tokens = read_style(root)
     with tempfile.TemporaryDirectory(prefix="diagram-regen-") as work:
         built = Path(work)
-        projection = build_root(toolchain, root, tokens, built)
+        try:
+            projection = build_root(toolchain, root, tokens, built)
+        except RegenerationError as stopped:
+            report([regeneration_finding(stopped.failure)], args)
+            raise
+        findings = run_checks(projection, built, root)
         if not args.check:
             publish(built, root / RENDER_DIR)
-    findings = projection.findings
     if args.staged:
         stage(root / RENDER_DIR)
     report(findings, args)

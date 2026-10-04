@@ -32,6 +32,13 @@ def rd():
     return importlib.import_module("regenerate_diagrams")
 
 
+@pytest.fixture(autouse=True)
+def no_review(rd, monkeypatch):
+    """Keep the review checks out of these tests: the stub `d2` writes no real render, and the
+    checks have their own tests (`test_regenerate_diagrams_checks.py`)."""
+    monkeypatch.setattr(rd, "run_checks", lambda projection, built, root: projection.findings)
+
+
 @pytest.fixture
 def tools(tmp_path) -> Toolchain:
     return Toolchain(tmp_path / "bin")

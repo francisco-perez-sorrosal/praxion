@@ -405,7 +405,7 @@ Flow:
 
 Correlation-safety invariant: the WAL carries no task slug; correlation is from files+time backward, and ambiguous correlation (zero file overlap) degrades to `unknown` → user, never a guessed `verified-complete`. Tier 2 can only add a localization hint, never subtract a Tier-1 verdict.
 
-Check-first and the attempt cap (Designed, §3b.18): when a plan step declares a `Check:`, Tier 1 for that step is the check evaluated against the step's own recorded `Result:` line rather than the `Files:` proxy, and every verdict names which criterion decided it (`decided_by`). A step whose `WIP.md` `Attempts:` count has reached the attempt cap (stated once, in the attempt-cap paragraph of `agent-pipeline-details.md § Completion handshake`) and is not `verified-complete` becomes `attempts-exhausted`, which `/resume-pipeline` surfaces to the user and never auto-resumes — the recovery loop can no longer spend a third automatic attempt on a step that did not converge.
+Check-first and the attempt cap (Built, §3b.18): when a plan step declares a `Check:`, Tier 1 for that step is the check evaluated against the step's own recorded `Result:` line rather than the `Files:` proxy, and every verdict names which criterion decided it (`decided_by`). A step whose `WIP.md` `Attempts:` count has reached the attempt cap (stated once, in the attempt-cap paragraph of `agent-pipeline-details.md § Completion handshake`) and is not `verified-complete` becomes `attempts-exhausted`, which `/resume-pipeline` surfaces to the user and never auto-resumes — the recovery loop can no longer spend a third automatic attempt on a step that did not converge.
 
 ### Continuous Improvement Signals (CIS) Loop (Built)
 

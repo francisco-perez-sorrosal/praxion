@@ -208,6 +208,7 @@ Only proceed with commit after explicit approval.
 
 **Implementation**: What code will we write?
 **Tests**: full — <reason> | <path> [<path> ...] — <reason>
+**Check**: `<command>` expects pass>=<n> fail=0 [pending=<n>]
 **Testing**: What needs testing? (if critical/complex)
 **Done when**: How do we know it's complete?
 
@@ -220,6 +221,8 @@ Only proceed with commit after explicit approval.
 ```
 
 **`Tests:` field** (optional, override-only): canonical schema in [`document-templates.md`](references/document-templates.md). Absence means the implementer derives the selection from the step's changed files.
+
+**`Check:` field** (implementer steps only): canonical paragraph in [`document-templates.md`](references/document-templates.md).
 
 **Acceptance criteria source**: In the agent pipeline, copy criteria verbatim from `SYSTEMS_PLAN.md` — the architect's criteria are authoritative and drive test design downstream. In manual planning (no `SYSTEMS_PLAN.md`), define criteria directly in the plan as concrete, testable conditions for "done."
 

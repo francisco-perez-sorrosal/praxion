@@ -15,6 +15,7 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 **Implementation**: What code will we write?
 **Files**: [production files]
 **Tests:** full — <reason> | <path> [<path> ...] — <reason>   # optional, override-only — see below
+**Check**: `<command>` expects pass>=<n> fail=0 [pending=<n>]   # implementer steps only — see below
 **Done when**: How do we know it's complete?
 
 ### Step 2: Design behavioral tests for [acceptance criteria] [parallel-group: A]
@@ -67,6 +68,20 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 
 There is no `groups=`/`tier=`/`selector=` schema — that topology-era field retired with the hand-maintained topology. This is the single canonical statement of the `Tests:` field; other references (`SKILL.md`, `agent-pipeline-details.md`) point here rather than restate it.
 
+**`Check:` field — canonical schema.** Present on every implementer-assigned step and on no other: test-engineer and orchestrator steps carry none. It names the command that proves the step and the counts the step's own recorded `Result:` line must show, and the recovery reconciler judges that line against it. One logical line in the step block, in this grammar:
+
+```
+Check: `<command>` expects <key><op><count> [<key><op><count> ...]
+```
+
+`<key>` is one of `pass fail skip pending`, `<op>` is `=` (exactly) or `>=` (at least), `<count>` is a decimal integer. The command is the step's own test command, never a narrower re-run, so a green subset cannot hide a red scoped run. A step always declares `fail=0` and `pass>=1` (a run of zero tests proves nothing); it declares `pending=<n>` where its `Read-only:` nodes leave acceptance tests still red because a later step owns them. A wrong expectation is a plan amendment, never an edit by the step's implementer. Example:
+
+```
+**Check**: `uv run pytest tests/test_widget.py -q` expects pass>=4 fail=0 pending=2
+```
+
+Each step's `WIP.md` checklist line also carries one `Attempts:` sub-bullet: no checkbox, a single line, written by the orchestrator before each fresh start (`- Attempts: Step <id> count=<n>`). The grammar is normative in the `scripts/_loop_fields.py` docstring; the planner prompt and `SKILL.md` point here rather than restate it.
+
 **Measurement step — canonical shape.** A step that takes the readings behind a footprint criterion (the spec's `### Footprint Criteria` table; workflow and worked example in [`footprint-criteria.md`](../../spec-driven-development/references/footprint-criteria.md)). It changes no file and runs no test:
 
 ```markdown
@@ -110,6 +125,7 @@ Step N of M: [Description]
 - [x] Step 1: [Description]
 - [x] Step 2: [Description]
 - [ ] Step 3: [Description] <- current
+  - Attempts: Step 3 count=1
 - [ ] Step 4: [Description]
 
 ## Blockers
@@ -157,6 +173,7 @@ Status: in-progress
 - [x] Step 1: [Description]
 - [x] Step 2: [Description]
 - [~] Step 3: [Description] <- parallel batch
+  - Attempts: Step 3 count=1
 - [~] Step 4: [Description] <- parallel batch
 - [ ] Step 5: [Description]
 

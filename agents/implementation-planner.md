@@ -123,7 +123,7 @@ When a parallel group adds, removes, or renames files, introduces new APIs, or c
 
 **`Tests:` field:**
 
-A step's `Tests:` field is optional and override-only — canonical schema in `skills/software-planning/references/document-templates.md`. Its absence means the implementer derives the selection from the step's changed files; add the field only to force `full` or name explicit paths, each with a reason.
+A step's `Tests:` field is optional and override-only — canonical schema in `skills/software-planning/references/document-templates.md`. Its absence means the implementer derives the selection from the step's changed files; add the field only to force `full` or name explicit paths, each with a reason. An implementer-assigned step also carries `` Check: `<command>` expects <key><op><count> [<key><op><count> ...] `` (canonical paragraph in that same file; implementer steps only, never test-engineer or orchestrator steps), always declaring `fail=0` and `pass>=1`, plus `pending=<n>` where its `Read-only` nodes leave acceptance tests due.
 
 **Deployment step annotations:**
 

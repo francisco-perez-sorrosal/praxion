@@ -137,6 +137,7 @@ Each step MUST:
 **Too big if:**
 
 - Takes more than one session
+- Needs more than about 60% of one agent window's turn budget (author, register, one scoped test run, report — about 30–45 tool calls fits a 100-turn cap)
 - Requires multiple commits to complete
 - Has multiple "and"s in description
 - Involves more than 3-5 files

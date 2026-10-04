@@ -148,7 +148,7 @@ Before marking steps as parallel, verify **file disjointness**: no two steps in 
 
 ### Step Size Heuristics
 
-Apply the step size heuristics from the software-planning skill. Quick test: if a step has multiple "and"s, involves more than 3-5 files, or requires multiple commits, break it down further.
+Apply the step size heuristics from the software-planning skill. Size to the agent, not to the file count: a step must fit one implementer window with room to spare — author, register, one scoped test run, report — which is about 30–45 tool calls against a `maxTurns` of 100. The measured cause of implementer cap-outs is steps sized at twice what one capped agent finishes, after which the orchestrator absorbs the remainder unreviewed. Quick test: if a step has multiple "and"s, involves more than 3-5 files, would need more than about 60% of one implementer's turn budget, or requires multiple commits, break it down further.
 
 ### Phase 4 — Test Ownership and Outer-Loop Wiring (BDD/TDD)
 

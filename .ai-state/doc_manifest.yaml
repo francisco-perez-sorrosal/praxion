@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-04T05:57:20Z'
+generated_at: '2026-10-04T05:59:31Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3332,6 +3332,12 @@ surfaces:
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
   last_modified: '2026-08-13'
   renderer: default_markdown
+- id: ai-state-specs-spec-merge-triggers-2026-10-03
+  path: .ai-state/specs/SPEC_merge-triggers_2026-10-03.md
+  type: markdown
+  title: 'Spec: merge-triggers (observation-log merge-in for merges that fire no post-merge hook)'
+  last_modified: '2026-10-03'
+  renderer: default_markdown
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
   type: markdown
@@ -3903,6 +3909,7 @@ groups:
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
+  - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24

@@ -11,6 +11,7 @@
 #   T6: a declared view that draws nothing → commit aborted naming that view           [toolchain]
 #   T7: a toolchain binary that fails → commit aborted carrying that binary's stderr
 #   T8: toolchain absent → the commit proceeds even when python3 itself is broken
+#   T9: a tool off its pinned version → warning naming the pins, exit 0, nothing staged
 #
 # Fixtures are staged in the repository's real diagram layout:
 # docs/diagrams/<name>/src/<name>.c4 in, docs/diagrams/<name>/rendered/ out.
@@ -266,6 +267,24 @@ t8_absent_toolchain_never_reaches_python() {
     fi
 }
 
+# An off-pin tool is refused, never used: the commit proceeds and CI judges the renders.
+t9_off_pin_tool_skips_without_staging() {
+    local stub_dir="${WORK_ROOT}/stubs_t9"
+    make_stub_binary "${stub_dir}" "likec4" 0 "0.0.1"
+    make_stub_binary "${stub_dir}" "d2" 0 "$(pinned_version D2_VERSION)"
+    make_sandbox "${FIXTURES_DIR}/minimal.c4"
+    run_hook "${stub_dir}"
+    local staged
+    staged="$(git -C "${SANDBOX_WORKTREE}" diff --cached --name-only)"
+    if [ "${LAST_EXIT}" -eq 0 ] \
+        && grep -q "likec4 0.0.1 found but $(pinned_version LIKEC4_VERSION) is pinned" "${LAST_ERR}" \
+        && ! echo "${staged}" | grep -q 'rendered/' && [ ! -d "${SANDBOX_RENDER_DIR}" ]; then
+        pass "T9: likec4 off its pin → warning naming the pin, exit 0, nothing written or staged"
+    else
+        fail "T9: expected exit=0, the pin named, nothing staged; got exit=${LAST_EXIT}, staged=$(echo "${staged}" | tr '\n' ' '), stderr=$(cat "${LAST_ERR}")"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -288,11 +307,12 @@ main() {
     t6_empty_view_aborts_naming_it
     t7_failing_toolchain_aborts_with_its_message
     t8_absent_toolchain_never_reaches_python
+    t9_off_pin_tool_skips_without_staging
 
     printf '\n--- summary: %d passed, %d failed, %d skipped ---\n' \
         "${PASS_COUNT}" "${FAIL_COUNT}" "${SKIP_COUNT}"
     if [ "${FAIL_COUNT}" -eq 0 ]; then
-        printf '=== T1–T8: %d passed, %d skipped ===\n' "${PASS_COUNT}" "${SKIP_COUNT}"
+        printf '=== T1–T9: %d passed, %d skipped ===\n' "${PASS_COUNT}" "${SKIP_COUNT}"
         exit 0
     fi
     printf '=== %d of %d tests failed ===\n' "${FAIL_COUNT}" "$((PASS_COUNT + FAIL_COUNT))" >&2

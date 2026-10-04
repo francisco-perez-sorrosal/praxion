@@ -587,15 +587,18 @@ def test_staged_skips_with_a_warning_when_a_tool_is_missing(go, tools, repo):
     assert rendered(repo) == {"old.svg": b"old"}
 
 
-def test_staged_warns_and_proceeds_when_a_tool_is_off_its_pin(go, tools, repo):
+def test_staged_skips_with_a_warning_naming_the_pins_when_a_tool_is_off_its_pin(go, tools, repo):
     stage_model_change(repo)
     tools.set(likec4_version=OFF_PIN)
 
     code, _, err = go("--staged")
 
     assert code == 0
-    assert f"WARN likec4 {OFF_PIN} found but {LIKEC4_PIN} is pinned; regenerating anyway" in err
-    assert (repo / ARCH / "rendered" / "index.svg").is_file()
+    assert f"WARN likec4 {OFF_PIN} found but {LIKEC4_PIN} is pinned; skipping" in err
+    assert f"pinned likec4 {LIKEC4_PIN} and d2 {D2_PIN}" in err
+    assert f"found likec4 {OFF_PIN} and d2 {D2_PIN}" in err
+    assert rendered(repo) == {"old.svg": b"old"}
+    assert staged(repo) == [f"{ARCH.as_posix()}/src/model.c4"]
 
 
 def test_staged_aborts_on_a_regeneration_failure_with_the_message(go, tools, repo):

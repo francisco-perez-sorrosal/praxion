@@ -4,7 +4,8 @@
     ROOT      a diagram root holding `src/*.c4` and `rendered/`; default: every
               `<dir>/<name>/` under `docs/diagrams/` that has a `src/*.c4`
     --staged  pre-commit: only roots with a staged `src/*.c4`, then `git add <root>/rendered/`;
-              failed checks print as non-blocking WARN lines
+              failed checks print as non-blocking WARN lines; a tool absent or off its pin
+              writes and stages nothing, warns naming the pins and exits 0
     --check   render into a temporary directory, byte-compare with the committed `rendered/`
               (DRC-10), run every review check; writes nothing in the checkout, and ends with
               `<n> renders · <f> failed checks · <d> drifted` on stderr
@@ -14,8 +15,9 @@
 
 Exit codes: 0 success (`--check`: no failed check); 1 a regeneration failure, or under
 `--check` a failed check; 2 a usage error (a refused `style.json` included); 3 (default,
-`--check`) `likec4` or `d2` absent from PATH or off its pinned version. `--staged` skips with
-a warning when a tool is absent and warns and proceeds when one is off its pin.
+`--check`) `likec4` or `d2` absent from PATH or off its pinned version. `--staged` exits 0 in
+that case after a warning, regenerating and staging nothing: the commit proceeds and the CI
+drift gate still judges the renders.
 
 The model is read once, through `likec4 export json --skip-layout`, into a view projection;
 each view is drawn as D2 text and rendered by `d2`. Every render guarantees:
@@ -123,6 +125,7 @@ EXIT_TOOLCHAIN = 3
 
 LOG = "[diagram-regen]"
 SEPARATOR = "·"
+SKIPPING = "skipping diagram regeneration"
 DRIFT_CHECK = "DRC-10"
 INSTALL = {
     "likec4": f"npm install --global likec4@{LIKEC4_VERSION}",
@@ -203,7 +206,8 @@ def toolchain_gate(toolchain: Toolchain, staged: bool) -> int | None:
         return None
     if not staged:
         return EXIT_TOOLCHAIN
-    return EXIT_OK if any(problem.found is None for problem in problems) else None
+    print(skip_summary(toolchain, problems), file=sys.stderr)
+    return EXIT_OK
 
 
 def regenerate(
@@ -270,10 +274,22 @@ def describe(problem: ToolProblem, staged: bool) -> list[str]:
     lead = f"{LOG} WARN" if staged else LOG
     fix = f"{LOG}   fix: {INSTALL[tool]}"
     if problem.found is None:
-        action = "skipping diagram regeneration" if staged else f"{pin} is required"
+        action = SKIPPING if staged else f"{pin} is required"
         return [f"{lead} {tool} is not installed (not on PATH); {action}", fix]
-    action = "regenerating anyway" if staged else "refusing to regenerate with another version"
+    action = SKIPPING if staged else "refusing to regenerate with another version"
     return [f"{lead} {tool} {problem.found} found but {pin} is pinned; {action}", fix]
+
+
+def skip_summary(toolchain: Toolchain, problems: Sequence[ToolProblem]) -> str:
+    """The `--staged` skip line: every pin beside what was found, and that nothing was written."""
+    found = {problem.tool: problem.found or "not on PATH" for problem in problems}
+    pins = toolchain.required.items()
+    pinned = " and ".join(f"{tool} {pin}" for tool, pin in pins)
+    seen = " and ".join(f"{tool} {found.get(tool, pin)}" for tool, pin in pins)
+    return (
+        f"{LOG} WARN pinned {pinned}; found {seen}; nothing regenerated or staged,"
+        " the CI drift gate still checks the renders"
+    )
 
 
 def log(message: str) -> None:

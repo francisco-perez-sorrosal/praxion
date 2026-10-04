@@ -38,13 +38,14 @@ python3 scripts/regenerate_diagrams.py [ROOT ...] [--staged] [--check] [--json]
 
 | Exit | Meaning |
 |---|---|
-| 0 | Success. Default and `--staged`: renders written. `--check`: no drift and no failed check. `--staged` also exits 0 when `likec4` or `d2` is not on PATH, after a warning |
+| 0 | Success. Default and `--staged`: renders written. `--check`: no drift and no failed check. `--staged` also exits 0 when `likec4` or `d2` is not on PATH or off its pin, after a warning, writing and staging nothing |
 | 1 | Regeneration failure in any mode; under `--check` also drift or at least one failed check |
 | 2 | Usage error: unknown flag, a ROOT without `src/*.c4`, or `--staged` together with `--check` |
 | 3 | Default and `--check` only: `likec4` or `d2` not on PATH, or a local version that differs from the pin |
 
 A binary that is found but exits non-zero, even on `--version`, is a toolchain error (exit 1). `--staged`
-with a version mismatch warns and proceeds.
+with a version mismatch refuses the same way as an absent tool: a warning naming the pins, nothing
+regenerated or staged, exit 0, so the commit proceeds and the CI drift gate judges the renders.
 
 **Regeneration failures** are the only four things that stop a run; each prints three lines on stderr:
 

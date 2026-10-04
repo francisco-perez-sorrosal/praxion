@@ -2048,5 +2048,70 @@ def test_default_boundary_falls_back_to_the_first_unknown_when_it_is_all_that_is
     assert boundary == f"{compose_handoff.MID_PHASE_PREFIX}Step 2"  # id-citation-discipline:ignore
 
 
+# --- a step that used its fresh attempts is owed to a person, never run -----
+
+
+_EXHAUSTED_EVIDENCE = (
+    "2 fresh attempt(s) used (cap 2) without verified completion; "
+    "replan requested: split the reader from the writer; underlying verdict mismatch: stale"
+)
+
+
+def _exhausted(step: str) -> dict:
+    return _verdict(step, "attempts-exhausted", evidence=_EXHAUSTED_EVIDENCE)
+
+
+def test_an_attempts_exhausted_step_is_surfaced_with_its_replan_request_not_run_next():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _exhausted("Step 2"),  # id-citation-discipline:ignore
+        _verdict("Step 3", "pending"),  # id-citation-discipline:ignore
+    ]
+
+    text = compose_handoff._render_next_action(verdicts)
+
+    assert text.startswith("`Step 3`"), text  # id-citation-discipline:ignore
+    assert "Human decision owed: `Step 2`" in text  # id-citation-discipline:ignore
+    assert "replan requested: split the reader from the writer" in text
+    assert "Do not resume it automatically" in text
+
+
+def test_when_only_an_attempts_exhausted_step_is_left_it_is_named_as_owed_not_as_work():
+    verdicts = [
+        _verdict("Step 1", "verified-complete"),  # id-citation-discipline:ignore
+        _exhausted("Step 2"),  # id-citation-discipline:ignore
+    ]
+
+    text = compose_handoff._render_next_action(verdicts)
+
+    assert text.startswith("No step is actionable beyond human verification.")
+    assert "Human decision owed: `Step 2`" in text  # id-citation-discipline:ignore
+    assert "File scope" not in text
+
+
+def test_the_unknown_and_attempts_exhausted_steps_are_both_surfaced_each_in_its_own_words():
+    verdicts = [
+        _verdict("Step 1", "unknown"),  # id-citation-discipline:ignore
+        _exhausted("Step 2"),  # id-citation-discipline:ignore
+        _verdict("Step 3", "mismatch"),  # id-citation-discipline:ignore
+    ]
+
+    text = compose_handoff._render_next_action(verdicts)
+
+    assert "Human verification owed: `Step 1`" in text  # id-citation-discipline:ignore
+    assert "Human decision owed: `Step 2`" in text  # id-citation-discipline:ignore
+
+
+def test_default_boundary_skips_an_attempts_exhausted_step():
+    verdicts = [
+        _exhausted("Step 1"),  # id-citation-discipline:ignore
+        _verdict("Step 2", "mismatch"),  # id-citation-discipline:ignore
+    ]
+
+    boundary = compose_handoff._default_boundary(verdicts)
+
+    assert boundary == f"{compose_handoff.MID_PHASE_PREFIX}Step 2"  # id-citation-discipline:ignore
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

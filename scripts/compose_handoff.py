@@ -72,14 +72,14 @@ from _git_runner import git_output
 # The world-reading layer; the composer renders what these return and never
 # reaches past them. One-way: nothing there imports from here.
 from _handoff_inputs import (
+    HUMAN_OWED,
     SCOPE_CURRENT_STEP,
     SCOPE_DIRTY_SOURCE,
     SCOPE_UNFINISHED_STEPS,
-    VERDICT_UNKNOWN,
     artifact_names,
     pick_next_step,
     recent_log,
-    render_owed_verification,
+    render_owed,
     resolve_base_ref,
     step_file_scope,
 )
@@ -496,21 +496,16 @@ def _render_step_action(verdict: dict[str, Any]) -> str:
 def _render_next_action(verdicts: Sequence[dict[str, Any]]) -> str:
     if not verdicts:
         return "No tracked steps yet — read `WIP.md` § Next Action and start there."
-    unknown = [v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN]
+    owed = render_owed(verdicts)
     nxt = pick_next_step(verdicts)
     if nxt is None:
         return (
             "Every tracked step is verified-complete against ground truth. The next action is "
             "the phase's own next move — see the plan's remaining steps."
         )
-    if nxt.get("verdict") == VERDICT_UNKNOWN:
-        return (
-            f"No step is actionable beyond human verification. {render_owed_verification(unknown)}"
-        )
-    lines = [_render_step_action(nxt)]
-    if unknown:
-        lines.append(render_owed_verification(unknown))
-    return "\n".join(lines)
+    if nxt.get("verdict") in HUMAN_OWED:
+        return f"No step is actionable beyond human verification. {owed}"
+    return "\n".join(filter(None, [_render_step_action(nxt), owed]))
 
 
 def _render_start_here(slug: str) -> str:

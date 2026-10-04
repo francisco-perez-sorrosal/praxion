@@ -1,7 +1,7 @@
 """Tests for the pure verdict policy (``scripts/_step_verdict.py``).
 
-Four groups: a parity table pinning every branch of the file-and-test logic
-the reconciler used to hold, the check-first table (including the golden bad
+Four groups: a table pinning the verdict of every branch of the file-and-test
+logic, the check-first table (including the golden bad
 case: a claimed step whose check is unmet is never verified complete), the
 attempt cap over every verdict, and the invariants of the one constructor.
 Everything here is pure: no file, no process, no clock.
@@ -63,12 +63,12 @@ def unmet(key: str, op: str, expected: int, observed: int) -> Unmet:
     return Unmet((UnmetExpectation(key, op, expected, observed),))
 
 
-def classify(ev: verdicts.StepEvidence, check=None, attempt: Attempt | None = None) -> dict:
+def classify(ev: verdicts.StepEvidence, check=None, attempt: verdicts.AttemptRecord = None) -> dict:
     return verdicts.classify_step(ev, check, attempt)
 
 
 # ---------------------------------------------------------------------------
-# Parity: every branch of the file-and-test logic, with explicit expectations
+# Pinned: every branch of the file-and-test logic, with explicit expectations
 # ---------------------------------------------------------------------------
 
 _NO_FILES = {"files": [], "changed": [], "unchanged": []}
@@ -169,7 +169,7 @@ PARITY_CASES = [
 
 
 @pytest.mark.parametrize(("ev", "expected"), PARITY_CASES)
-def test_the_file_and_test_logic_keeps_every_branch_verdict(ev, expected) -> None:
+def test_the_file_and_test_logic_yields_the_pinned_verdict_for_each_branch(ev, expected) -> None:
     verdict, text, scope, needs_mark = expected
 
     result = classify(ev)
@@ -181,30 +181,6 @@ def test_the_file_and_test_logic_keeps_every_branch_verdict(ev, expected) -> Non
         assert result["evidence"] == text
     else:
         assert "mutation: on, no Mutation: line recorded" in result["evidence"]
-
-
-@pytest.mark.parametrize(("ev", "expected"), PARITY_CASES)
-def test_a_legacy_call_yields_the_moved_dict_plus_exactly_decided_by(ev, expected) -> None:
-    legacy_keywords = {
-        "step_id": ev.step_id,
-        "claim": ev.claim,
-        "files": ev.files,
-        "changed": ev.changed,
-        "unchanged": ev.unchanged,
-        "test_status": ev.test_status,
-        "tier2": ev.tier2,
-        "earlier_declarers": ev.earlier_declarers,
-        "mutation_block": ev.mutation_block,
-    }
-
-    moved = verdicts._classify_step(**legacy_keywords)
-    stamped = classify(ev)
-
-    assert set(stamped) - set(moved) == {"decided_by"}
-    assert {key: stamped[key] for key in moved} == moved
-    assert set(moved) == {
-        "step", "wip_claim", "verdict", "needs_mark", "tier1", "tier2", "evidence", "resume_scope",
-    }  # fmt: skip
 
 
 def test_tier_one_names_the_files_changed_and_unchanged_and_the_test_status() -> None:
@@ -461,7 +437,6 @@ def test_every_verdict_the_policy_produces_is_a_listed_word() -> None:
 def test_the_verdicts_a_human_must_decide_are_unknown_blocked_and_attempts_exhausted() -> None:
     assert verdicts.HUMAN_VERDICTS == ("unknown", "blocked", "attempts-exhausted")
     assert set(verdicts.HUMAN_VERDICTS) <= set(verdicts.VERDICT_WORDS)
-    assert verdicts.DECIDED_BY_WORDS == ("check", "fallback", "none")
 
 
 def test_classifying_leaves_the_evidence_it_was_given_unchanged() -> None:
@@ -547,7 +522,14 @@ def test_an_agent_that_stopped_without_a_last_write_is_partial_at_an_unknown_poi
 
 
 def test_the_remainder_of_a_stopped_agent_lists_every_unchanged_file() -> None:
-    result = classify(evidence(changed=["a.py"], unchanged=["b.py", "c.py"], tier2=dict(STOPPED)))
+    result = classify(
+        evidence(
+            files=["a.py", "b.py", "c.py"],
+            changed=["a.py"],
+            unchanged=["b.py", "c.py"],
+            tier2=dict(STOPPED),
+        )
+    )
 
     assert result["evidence"].endswith("remainder: b.py, c.py")
     assert result["resume_scope"] == ["b.py", "c.py"]
@@ -578,3 +560,81 @@ def test_the_cap_evidence_without_a_replan_request_says_so_between_the_two_halve
         "no replan request recorded; "
         "underlying verdict pending: step not started (no file changes)"
     )
+
+
+# ---------------------------------------------------------------------------
+# The evidence's own invariant, and an attempt record that cannot be read
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"changed": ["a.py"], "unchanged": []},
+        {"changed": ["a.py", "b.py"], "unchanged": ["a.py"]},
+        {"changed": ["a.py", "z.py"], "unchanged": ["b.py"]},
+    ],
+    ids=["a-file-in-neither", "a-file-in-both", "a-file-not-declared"],
+)
+def test_changed_and_unchanged_must_partition_the_files(overrides) -> None:
+    with pytest.raises(
+        ValueError, match=r"^changed and unchanged must partition the step's files$"
+    ):
+        evidence(**overrides)
+
+
+UNREADABLE = verdicts.UnreadableAttempts("expected `Step <id> count=<n>` and an optional replan")
+
+
+@pytest.mark.parametrize(
+    ("ev", "check", "underlying"),
+    [
+        (half_done(), None, "in-flight"),
+        (half_done(claim="COMPLETE"), None, "mismatch"),
+        (untouched(), None, "pending"),
+        (evidence(claim="COMPLETE"), unmet("pass", ">=", 6, 4), "mismatch"),
+    ],
+    ids=["in-flight", "mismatch", "pending", "unmet-check"],
+)
+def test_an_unreadable_attempt_record_surfaces_the_step_as_unknown(ev, check, underlying) -> None:
+    verdict = classify(ev, check, UNREADABLE)
+
+    assert verdict["verdict"] == "unknown"
+    assert verdict["verdict"] in verdicts.HUMAN_VERDICTS
+    assert f"{STEP}: the Attempts: line cannot be read ({UNREADABLE.reason})" in verdict["evidence"]
+    assert f"underlying verdict {underlying}:" in verdict["evidence"]
+    assert "attempt" not in verdict
+
+
+def test_an_unreadable_attempt_record_never_demotes_a_verified_complete_step() -> None:
+    assert classify(evidence(), None, UNREADABLE)["verdict"] == "verified-complete"
+
+
+def test_an_unreadable_attempt_record_keeps_a_more_specific_human_verdict() -> None:
+    blocked = classify(evidence(mutation_block="no Mutation: line recorded"), None, UNREADABLE)
+
+    assert blocked == classify(evidence(mutation_block="no Mutation: line recorded"))
+
+
+def test_an_unreadable_attempt_record_keeps_the_resume_scope_of_the_verdict_it_replaced() -> None:
+    assert classify(half_done(), None, UNREADABLE)["resume_scope"] == ["b.py"]
+
+
+def test_a_verdict_carries_exactly_the_evidence_it_was_built_from_under_its_documented_keys() -> (
+    None
+):
+    ev = half_done(claim="IN-PROGRESS", tier2=dict(STOPPED))
+
+    verdict = classify(ev)
+
+    assert verdict == {
+        "step": STEP,
+        "wip_claim": "IN-PROGRESS",
+        "verdict": "partial@a.py",
+        "needs_mark": False,
+        "tier1": {"files_changed": ["a.py"], "files_unchanged": ["b.py"], "tests": "green"},
+        "tier2": STOPPED,
+        "evidence": "1 file(s) changed; agent stopped after a.py; remainder: b.py",
+        "resume_scope": ["b.py"],
+        "decided_by": "fallback",
+    }

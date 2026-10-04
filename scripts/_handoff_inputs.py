@@ -29,6 +29,10 @@ VERIFIED_COMPLETE = "verified-complete"
 # elsewhere in the handoff so "step unknown" and "field unreadable" never
 # read as the same concern at a call site.
 VERDICT_UNKNOWN = "unknown"
+# A step that used its fresh attempts without verified completion: a person
+# decides what happens next, so it is never the next step to run.
+VERDICT_EXHAUSTED = "attempts-exhausted"
+HUMAN_OWED = (VERDICT_UNKNOWN, VERDICT_EXHAUSTED)
 
 # Tried in order only when `refs/remotes/origin/HEAD` is unset (no remote, or a
 # clone that never populated it) -- both conventional default-branch names,
@@ -174,19 +178,21 @@ def pick_next_step(verdicts: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
     """The shared next-action picker for the handoff composer's §2 body and
     its mid-phase boundary default.
 
-    The first verdict that is neither `verified-complete` nor `unknown`.
-    `unknown` means "claimed complete, no attributable ground truth" -- the
-    claimed work is not actionable, only verifiable, so it is skipped here and
-    the caller surfaces it separately. Falls back to the first `unknown`
-    verdict only when every step is verified-complete or unknown -- nothing
-    else is actionable, so naming that step beats naming nothing. Both callers
+    The first verdict that is neither `verified-complete` nor one a person
+    owes a look (`unknown`, `attempts-exhausted`). `unknown` means "claimed
+    complete, no attributable ground truth" -- the claimed work is not
+    actionable, only verifiable -- and `attempts-exhausted` is never resumed
+    automatically, so both are skipped here and the caller surfaces them
+    separately. Falls back to the first of them only when every step is
+    verified-complete or owed to a person -- nothing else is actionable, so
+    naming that step beats naming nothing. Both callers
     share this function so a mid-phase boundary and the composer's own next
     action can never name two different steps for the same moment.
     """
     for verdict in verdicts:
-        if verdict.get("verdict") not in (VERIFIED_COMPLETE, VERDICT_UNKNOWN):
+        if verdict.get("verdict") not in (VERIFIED_COMPLETE, *HUMAN_OWED):
             return verdict
-    return next((v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN), None)
+    return next((v for v in verdicts if v.get("verdict") in HUMAN_OWED), None)
 
 
 def render_owed_verification(unknown_verdicts: Sequence[dict[str, Any]]) -> str:
@@ -196,6 +202,21 @@ def render_owed_verification(unknown_verdicts: Sequence[dict[str, Any]]) -> str:
         f"Human verification owed: {steps} — claimed complete, no attributable ground truth. "
         "Verify by hand before treating the claim as fact."
     )
+
+
+def render_owed(verdicts: Sequence[dict[str, Any]]) -> str:
+    """The lines for every step a person owes a look: the `unknown` ones in one line,
+    then each `attempts-exhausted` step with its evidence (which carries the replan
+    request); empty when there are none."""
+    unknown = [v for v in verdicts if v.get("verdict") == VERDICT_UNKNOWN]
+    lines = [render_owed_verification(unknown)] if unknown else []
+    lines += [
+        f"Human decision owed: `{v.get('step', '?')}` — {v.get('evidence', '')}. "
+        "Do not resume it automatically."
+        for v in verdicts
+        if v.get("verdict") == VERDICT_EXHAUSTED
+    ]
+    return "\n".join(lines)
 
 
 def declared_files(verdict: dict[str, Any] | None) -> list[str]:

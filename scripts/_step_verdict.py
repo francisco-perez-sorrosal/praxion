@@ -2,6 +2,10 @@
 
 Tier-1 evidence (repository changes plus recorded tests) is the arbiter of
 "done"; the WIP checkbox is a Tier-3 claim validated here, never trusted.
+Tier-2 is a localization hint that never decides alone: ``agent_stop_seen`` says
+whether an agent that wrote the step's files has since stopped (so a step with
+changes but no stop may still be running), and ``last_write`` is the last file
+that agent wrote (so a stopped step resumes from there; ``None`` when unknown).
 Nothing in this module reads a file, runs a command or consults the clock:
 the reconciler gathers the evidence and hands it in, so every verdict is a
 function of its arguments alone.
@@ -16,7 +20,9 @@ Policy, in order:
 2. A step that declares no check is decided by the file and test evidence.
 3. A step that has used its fresh attempts (``ATTEMPT_CAP``) without being
    verified complete is routed to a human whatever it was classified as; the
-   verdict it would have had stays in the evidence.
+   verdict it would have had stays in the evidence. A step whose attempt record
+   cannot be read is routed to a human the same way (as `unknown`), because a
+   count that cannot be read cannot be trusted to be below the cap.
 
 ``make_verdict`` is the only place a verdict dict is built, so the stamps
 (``decided_by``, ``outcome_source``, ``attempt``) follow from its inputs.
@@ -52,9 +58,6 @@ VERDICT_WORDS = (
 # Verdicts no auto-resume may act on: a person decides what happens next.
 HUMAN_VERDICTS = ("unknown", "blocked", "attempts-exhausted")
 
-# What a verdict says decided it; `none` means nothing happened to decide on.
-DECIDED_BY_WORDS = ("check", "fallback", "none")
-
 # A step's declared check as the policy sees it: None when the step declares
 # none, `UnreadableCheck` when it declares one that cannot be read, otherwise
 # the outcome of judging the check against the recorded result.
@@ -69,7 +72,9 @@ _NEEDS_MARK_SUFFIX = "; WIP not marked COMPLETE — auto-mark on resume"
 class StepEvidence:
     """What was gathered about one step; ``files`` is already the attributable set.
 
-    ``earlier_declarers`` names every step that absorbed a shared file, when any.
+    ``changed`` and ``unchanged`` partition ``files``: every file is in exactly
+    one of them. ``earlier_declarers`` names every step that absorbed a shared
+    file, when any.
     """
 
     step_id: str
@@ -81,6 +86,22 @@ class StepEvidence:
     tier2: dict[str, Any]
     earlier_declarers: list[str] = field(default_factory=list)
     mutation_block: str | None = None
+
+    def __post_init__(self) -> None:
+        if sorted(self.changed + self.unchanged) != sorted(self.files):
+            raise ValueError("changed and unchanged must partition the step's files")
+
+
+@dataclass(frozen=True)
+class UnreadableAttempts:
+    """A step's ``Attempts:`` line that breaks the grammar; ``reason`` says how."""
+
+    reason: str
+
+
+# What the policy knows of a step's attempts: nothing recorded, a count, or a
+# line that could not be read.
+AttemptRecord = Union[Attempt, UnreadableAttempts, None]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 @dataclass(frozen=True)
@@ -103,16 +124,10 @@ class Decision:
 
 
 def classify_step(
-    evidence: StepEvidence, check_outcome: DeclaredCheck, attempt: Attempt | None
+    evidence: StepEvidence, check_outcome: DeclaredCheck, attempt: AttemptRecord
 ) -> dict[str, Any]:
-    """The verdict dict for one step: check first, else files and tests, then the cap."""
-    decision = _decide(evidence, check_outcome)
-    if (
-        attempt is not None
-        and attempt.count >= ATTEMPT_CAP
-        and decision.verdict != "verified-complete"
-    ):
-        decision = _exhausted(decision, attempt)
+    """The verdict dict for one step: check first, else files and tests, then the attempts."""
+    decision = _route_to_a_human(evidence, _decide(evidence, check_outcome), attempt)
     return make_verdict(evidence, decision, check_outcome, attempt)
 
 
@@ -120,14 +135,14 @@ def make_verdict(
     evidence: StepEvidence,
     decision: Decision,
     check_outcome: DeclaredCheck,
-    attempt: Attempt | None,
+    attempt: AttemptRecord,
 ) -> dict[str, Any]:
     """Build the verdict dict, the only constructor of it, and stamp it.
 
     ``decided_by`` is always present: ``none`` exactly when the verdict before
     any cap override is ``pending``, else ``check`` when the step declares a
     check (readable or not), else ``fallback``. ``outcome_source`` appears only
-    when a check outcome decided. ``attempt`` appears only when one is
+    when a check outcome decided. ``attempt`` appears only when a count is
     recorded. Optional keys are omitted, never null.
     """
     decided_by = _decided_by(decision, check_outcome)
@@ -148,7 +163,7 @@ def make_verdict(
     }
     if decided_by == "check" and isinstance(check_outcome, _OUTCOME_TYPES):
         verdict["outcome_source"] = _RECORDED
-    if attempt is not None:
+    if isinstance(attempt, Attempt):
         verdict["attempt"] = attempt.count
     return verdict
 
@@ -157,6 +172,29 @@ def _decided_by(decision: Decision, check_outcome: DeclaredCheck) -> str:
     if (decision.underlying or decision.verdict) == "pending":
         return "none"
     return "fallback" if check_outcome is None else "check"
+
+
+def _route_to_a_human(
+    evidence: StepEvidence, decision: Decision, attempt: AttemptRecord
+) -> Decision:
+    """A step not verified complete goes to a human at the cap or on an unreadable record."""
+    if decision.verdict == "verified-complete" or attempt is None:
+        return decision
+    if isinstance(attempt, UnreadableAttempts):
+        return _unreadable_attempts(evidence, decision, attempt)
+    return _exhausted(decision, attempt) if attempt.count >= ATTEMPT_CAP else decision
+
+
+def _unreadable_attempts(
+    evidence: StepEvidence, decision: Decision, attempt: UnreadableAttempts
+) -> Decision:
+    if decision.verdict in HUMAN_VERDICTS:
+        return decision  # already surfaced to a person, with a more specific reason
+    text = (
+        f"{evidence.step_id}: the Attempts: line cannot be read ({attempt.reason}); fix it so "
+        f"the count can be trusted; underlying verdict {decision.verdict}: {decision.evidence}"
+    )
+    return Decision("unknown", text, decision.resume_scope)
 
 
 def _exhausted(decision: Decision, attempt: Attempt) -> Decision:
@@ -301,41 +339,3 @@ def _decide_unclaimed(evidence: StepEvidence) -> Decision:
         return Decision(f"partial@{last}", text, unchanged)
     text = f"{len(changed)} file(s) changed, no terminal marker — possibly still running"
     return Decision("in-flight", text, unchanged)
-
-
-# ---------------------------------------------------------------------------
-# Transitional entry point for the reconciler's present call shape
-# ---------------------------------------------------------------------------
-
-
-def _classify_step(
-    *,
-    step_id: str,
-    claim: str,
-    files: list[str],
-    changed: list[str],
-    unchanged: list[str],
-    test_status: str,
-    tier2: dict[str, Any],
-    earlier_declarers: list[str] | None = None,
-    mutation_block: str | None = None,
-) -> dict[str, Any]:
-    """The legacy verdict: no check, no attempt, and no ``decided_by`` key yet.
-
-    The reconciler calls this until it reads checks and attempts itself; the
-    verdict it returns is the one it has always returned.
-    """
-    evidence = StepEvidence(
-        step_id=step_id,
-        claim=claim,
-        files=files,
-        changed=changed,
-        unchanged=unchanged,
-        test_status=test_status,
-        tier2=tier2,
-        earlier_declarers=earlier_declarers or [],
-        mutation_block=mutation_block,
-    )
-    verdict = classify_step(evidence, None, None)
-    del verdict["decided_by"]
-    return verdict

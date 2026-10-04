@@ -38,6 +38,11 @@ its files and tests. Each verdict also carries `decided_by` (`check`, `fallback`
 or `none`), `outcome_source` (`recorded`; only when a check decided) and
 `attempt` (only when `WIP.md` records a count).
 
+An `Attempts:` line that names a step but breaks the grammar (a zero or
+non-numeric count) makes that step `unknown`, with exit status 2. A line under
+another label (`Attempt:`) is not an attempts line by the grammar and is
+ignored, by design.
+
 Exit codes: 0 nothing to recover; 1 >=1 step needs recovery
 (mismatch/partial/in-flight); 2 >=1 unknown, blocked or attempts-exhausted
 (needs human); 3 reconcile error.
@@ -57,7 +62,6 @@ from pathlib import Path
 from typing import Any
 
 from _loop_fields import (
-    Attempt,
     Check,
     CheckLine,
     evaluate_check,
@@ -75,7 +79,15 @@ from _step_schema import (
     step_sort_key,
     step_test_status,
 )
-from _step_verdict import HUMAN_VERDICTS, VERDICT_WORDS, DeclaredCheck, StepEvidence, classify_step
+from _step_verdict import (
+    HUMAN_VERDICTS,
+    VERDICT_WORDS,
+    AttemptRecord,
+    DeclaredCheck,
+    StepEvidence,
+    UnreadableAttempts,
+    classify_step,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -156,7 +168,10 @@ def _gather(
     wal_rows: list[dict[str, Any]],
     test_status_override: str | None,
 ) -> _Gathered:
-    """Read the plan, ``WIP.md`` and ``TEST_RESULTS.md`` once each."""
+    """Read the plan, ``WIP.md`` and ``TEST_RESULTS.md`` and parse what they declare.
+
+    The declared-files scan re-reads the plan (``WIP.md`` as fallback) itself.
+    """
     plan_path, wip_path = task_dir / "IMPLEMENTATION_PLAN.md", task_dir / "WIP.md"
     plan_text, wip_text = _read_text(plan_path), _read_text(wip_path)
     # `test_status_override` (the test hook) isolates the run from the results
@@ -174,7 +189,7 @@ def _gather(
         mutation_blocks=mutation_block_reasons(plan_text or wip_text, results_text),
         checks=parse_step_checks(plan_text),
         results_text=results_text,
-        attempts=parse_attempts(wip_text).counts,
+        attempts=_attempt_records(wip_text),
     )
 
 
@@ -190,7 +205,14 @@ class _Gathered:
     mutation_blocks: dict[str, str]
     checks: dict[str, CheckLine]
     results_text: str
-    attempts: dict[str, Attempt]
+    attempts: dict[str, AttemptRecord]
+
+
+def _attempt_records(wip_text: str) -> dict[str, AttemptRecord]:
+    """A count per readable ``Attempts:`` line; an unreadable one outranks any count."""
+    reading = parse_attempts(wip_text)
+    broken = {step: UnreadableAttempts(why) for step, why in reading.unreadable.items()}
+    return {**reading.counts, **broken}
 
 
 def _reconcile_step(step_id: str, claim: str, gathered: _Gathered) -> dict[str, Any]:

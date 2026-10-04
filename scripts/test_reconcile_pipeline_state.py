@@ -1962,3 +1962,48 @@ def test_the_help_lists_every_verdict_and_the_keys_a_verdict_now_carries(capsys)
     help_text = " ".join(capsys.readouterr().out.split())
     for word in (*VERDICT_WORDS, "decided_by", "outcome_source", "attempt"):
         assert word in help_text
+
+
+# --- an attempts line that cannot be read reaches a human --------------------
+
+
+@pytest.mark.parametrize("count", ["two", "0", "-1"], ids=["not-a-number", "zero", "negative"])
+def test_reconcile_a_step_whose_attempts_line_cannot_be_read_is_unknown_and_goes_to_a_human(
+    tmp_path, count
+):
+    wip = _TICKED + f"  - Attempts: Step 1 count={count}\n"
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _THREE_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+    assert verdict["verdict"] == "unknown"
+    assert "Step 1: the Attempts: line cannot be read" in verdict["evidence"]
+    assert "attempt" not in verdict
+    assert rps._exit_code(verdicts) == 2
+
+
+def test_reconcile_an_unreadable_attempts_line_leaves_a_verified_complete_step_alone(tmp_path):
+    wip = _TICKED + "  - Attempts: Step 1 count=0\n"
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _FOUR_GREEN)
+
+    assert _verdict_for(verdicts, "Step 1")["verdict"] == "verified-complete"
+
+
+def test_reconcile_an_unreadable_attempts_line_outranks_a_readable_one_for_the_same_step(tmp_path):
+    wip = _TICKED + "  - Attempts: Step 1 count=1\n  - Attempts: Step 1 count=x\n"
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _THREE_GREEN)
+
+    assert _verdict_for(verdicts, "Step 1")["verdict"] == "unknown"
+
+
+def test_reconcile_a_line_under_another_label_is_not_an_attempts_line_and_stays_silent(tmp_path):
+    wip = _TICKED + "  - Attempt: Step 1 count=2\n"
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _THREE_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+    assert verdict["verdict"] == "mismatch"
+    assert "attempt" not in verdict
+    assert rps._exit_code(verdicts) == 1

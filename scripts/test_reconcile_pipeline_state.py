@@ -23,6 +23,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import mutation_sensor as ms  # noqa: E402
 import reconcile_pipeline_state as rps  # noqa: E402
+from _step_verdict import HUMAN_VERDICTS, VERDICT_WORDS  # noqa: E402
 
 SLUG = "demo-task"
 
@@ -93,7 +94,7 @@ def test_canary_complete_but_files_unchanged_is_flagged(tmp_path):
     A step claims [COMPLETE] but its Files show zero git change — the exact
     truncation signature. The reconciler MUST NOT return verified-complete.
 
-    Proof it bites (mutation-verified): replace _classify_step's
+    Proof it bites (mutation-verified): replace _decide_by_files's
     verified-complete guard condition `changed and not unchanged and not
     tests_red` with an unconditional `if True:` (i.e. trust the checkbox), and
     this test goes red — the false [COMPLETE] claim then returns
@@ -1743,3 +1744,221 @@ def test_the_max_age_help_says_the_window_bounds_every_segment(capsys):
 
     help_text = " ".join(capsys.readouterr().out.split())
     assert "every segment" in help_text
+
+
+# --- a declared check, read from the recorded result, decides first ----------
+
+_CHECKED_PLAN = (
+    "### Step 1: Build the thing\n"
+    "**Files**: src/foo.py\n"
+    "**Check**: `uv run pytest tests -q` expects pass=4 fail=0 skip=0\n"
+)
+_FOUR_GREEN = "## Step 1\nResult: pass=4 fail=0 skip=0\n"
+_THREE_GREEN = "## Step 1\nResult: pass=3 fail=0 skip=0\n"
+_TICKED = "- [x] Step 1: build the thing\n"
+
+
+def _reconcile_checked(
+    tmp_path: Path, wip: str, results: str | None, plan: str = _CHECKED_PLAN
+) -> tuple[list[dict], Path]:
+    """Step 1's files changed; its recorded results are the only evidence in play."""
+    root = _setup(tmp_path, wip, plan)
+    if results is not None:
+        (root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(results, encoding="utf-8")
+    verdicts = rps.reconcile(SLUG, root, None, _changed_files_override=["src/foo.py"])
+    return verdicts, root
+
+
+def test_reconcile_a_met_check_decides_the_step_from_the_recorded_result(tmp_path):
+    verdicts, _ = _reconcile_checked(tmp_path, _TICKED, _FOUR_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+
+    assert verdict["verdict"] == "verified-complete"
+    assert (verdict["decided_by"], verdict["outcome_source"]) == ("check", "recorded")
+
+
+def test_reconcile_a_ticked_step_whose_recorded_result_misses_its_check_is_a_mismatch(tmp_path):
+    verdicts, _ = _reconcile_checked(tmp_path, _TICKED, _THREE_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+
+    assert verdict["verdict"] == "mismatch"
+    assert "pass=: expected =4, observed 3" in verdict["evidence"]
+
+
+@pytest.mark.parametrize(
+    "results",
+    [None, "## Step 2\nResult: pass=4 fail=0 skip=0\n"],
+    ids=["nothing-recorded", "only-another-steps-result"],
+)
+def test_reconcile_a_check_with_no_result_recorded_for_its_step_is_never_verified_complete(
+    tmp_path, results
+):
+    verdicts, _ = _reconcile_checked(tmp_path, _TICKED, results)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+
+    assert verdict["verdict"] == "mismatch"
+    assert "no Result: recorded for Step 1" in verdict["evidence"]
+
+
+def test_reconcile_a_step_beside_a_checked_one_keeps_the_file_and_test_evidence(tmp_path):
+    plan = _CHECKED_PLAN + "### Step 2: Extend it\n**Files**: src/bar.py\n"
+    root = _setup(tmp_path, _TICKED + "- [x] Step 2: extend it\n", plan)
+    (root / ".ai-work" / SLUG / "TEST_RESULTS.md").write_text(_FOUR_GREEN, encoding="utf-8")
+
+    verdicts = rps.reconcile(SLUG, root, None, _changed_files_override=["src/foo.py", "src/bar.py"])
+
+    assert _verdict_for(verdicts, "Step 1")["decided_by"] == "check"
+    assert _verdict_for(verdicts, "Step 2")["decided_by"] == "fallback"
+    assert "outcome_source" not in _verdict_for(verdicts, "Step 2")
+
+
+def test_reconcile_a_check_that_cannot_be_read_surfaces_the_step_to_a_human(tmp_path):
+    plan = (
+        "### Step 1: Build it\n**Files**: src/foo.py\n**Check**: `uv run pytest` expects pass=4\n"
+    )
+
+    verdicts, _ = _reconcile_checked(tmp_path, _TICKED, _FOUR_GREEN, plan)
+
+    assert _verdict_for(verdicts, "Step 1")["verdict"] == "unknown"
+    assert rps._exit_code(verdicts) == 2
+
+
+def test_reconcile_never_runs_a_command_a_check_declares(tmp_path):
+    marker = tmp_path / "ran-the-declared-command"
+    plan = (
+        "### Step 1: Build the thing\n**Files**: src/foo.py\n"
+        f"**Check**: `touch {marker}` expects pass=4 fail=0\n"
+    )
+
+    _reconcile_checked(tmp_path, _TICKED, _FOUR_GREEN, plan)
+
+    assert not marker.exists()
+
+
+# --- the attempt count, shown beside the verdict, and the cap ---------------
+
+
+def test_reconcile_shows_the_attempt_count_wip_records_and_none_when_it_records_none(tmp_path):
+    counted, _ = _reconcile_checked(
+        tmp_path / "counted", _TICKED + "  - Attempts: Step 1 count=1\n", _FOUR_GREEN
+    )
+    uncounted, _ = _reconcile_checked(tmp_path / "uncounted", _TICKED, _FOUR_GREEN)
+
+    assert _verdict_for(counted, "Step 1")["attempt"] == 1
+    assert "attempt" not in _verdict_for(uncounted, "Step 1")
+
+
+@pytest.mark.parametrize("ticked", [True, False], ids=["ticked", "unticked"])
+@pytest.mark.parametrize("marked", [None, "the reader is half written"], ids=["plain", "marked"])
+def test_reconcile_a_step_past_its_fresh_attempts_goes_to_a_human_whatever_wip_claims(
+    tmp_path, ticked, marked
+):
+    replan = f" [BLOCKED] replan: {marked}" if marked else ""
+    wip = (
+        f"- [{'x' if ticked else ' '}] Step 1: build the thing\n"
+        f"  - Attempts: Step 1 count=2{replan}\n"
+    )
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _THREE_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+    assert verdict["verdict"] == "attempts-exhausted"
+    assert verdict["attempt"] == 2
+    assert (marked or "no replan request recorded") in verdict["evidence"]
+    assert rps._exit_code(verdicts) == 2
+
+
+def test_reconcile_a_step_on_its_first_attempt_failing_its_check_stays_resumable(tmp_path):
+    verdicts, _ = _reconcile_checked(
+        tmp_path, _TICKED + "  - Attempts: Step 1 count=1\n", _THREE_GREEN
+    )
+
+    assert rps._exit_code(verdicts) == 1
+
+
+@pytest.mark.parametrize("verdict", HUMAN_VERDICTS)
+def test_exit_code_routes_every_human_verdict_to_status_two(verdict):
+    assert rps._exit_code([{"verdict": "mismatch"}, {"verdict": verdict}]) == 2
+
+
+# --- legacy pipelines, stability, and what the reader prints -----------------
+
+
+def test_reconcile_a_pipeline_without_checks_or_attempts_gains_exactly_decided_by(tmp_path):
+    root = _setup(tmp_path, "- [x] Step 1: build\n", PLAN_ONE_STEP)
+
+    verdicts = rps.reconcile(
+        SLUG,
+        root,
+        None,
+        _changed_files_override=["src/foo.py"],
+        _wal_rows_override=[],
+        _test_status_override="green",
+    )
+
+    assert set(_verdict_for(verdicts, "Step 1")) == {
+        "step",
+        "wip_claim",
+        "verdict",
+        "needs_mark",
+        "tier1",
+        "tier2",
+        "evidence",
+        "resume_scope",
+        "decided_by",
+    }
+
+
+def test_reconcile_reads_an_auto_recovered_checklist_line_with_its_attempts_sub_bullet(tmp_path):
+    wip = (
+        "- [x] Step 1: build the thing **[AUTO-RECOVERED 2026-10-04T10:00Z]**\n"
+        "  - Attempts: Step 1 count=1\n"
+    )
+
+    verdicts, _ = _reconcile_checked(tmp_path, wip, _FOUR_GREEN)
+
+    verdict = _verdict_for(verdicts, "Step 1")
+    assert (verdict["wip_claim"], verdict["verdict"], verdict["attempt"]) == (
+        "COMPLETE",
+        "verified-complete",
+        1,
+    )
+
+
+def test_reconciling_twice_gives_equal_output_and_changes_no_file(tmp_path):
+    first, root = _reconcile_checked(
+        tmp_path, _TICKED + "  - Attempts: Step 1 count=2\n", _THREE_GREEN
+    )
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+    second = rps.reconcile(SLUG, root, None, _changed_files_override=["src/foo.py"])
+
+    assert second == first
+    assert before == {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+
+def test_readable_line_names_the_deciding_criterion_and_the_attempt_when_recorded():
+    base = {"step": "Step 1", "verdict": "mismatch", "decided_by": "check", "evidence": "why"}
+
+    assert rps._readable_line(base).split() == ["Step", "1", "mismatch", "check", "why"]
+    assert rps._readable_line({**base, "attempt": 2}).split() == [
+        "Step",
+        "1",
+        "mismatch",
+        "check",
+        "attempt",
+        "2",
+        "why",
+    ]
+
+
+def test_the_help_lists_every_verdict_and_the_keys_a_verdict_now_carries(capsys):
+    with pytest.raises(SystemExit):
+        rps.main(["--help"])
+
+    help_text = " ".join(capsys.readouterr().out.split())
+    for word in (*VERDICT_WORDS, "decided_by", "outcome_source", "attempt"):
+        assert word in help_text

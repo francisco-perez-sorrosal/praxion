@@ -24,15 +24,23 @@ side-effect-free function (no writes, no git mutation) — trivially unit-testab
 via the ``_*_override`` hooks, and safe to run read-only at any pipeline seam.
 
 Verdict ∈ {verified-complete, mismatch, partial, in-flight, unknown, pending,
-blocked}. Tier-1 is always the arbiter: when correlation is ambiguous or the WAL
-dropped a line, a step degrades to `unknown` (surfaced to the user) — never to a
-guessed `verified-complete`. The WAL can only sharpen localization, never certify
-work. `blocked` is an otherwise-done step the plan tags `mutation: on` whose
-results carry no usable mutation reading.
+blocked, attempts-exhausted}. Tier-1 is always the arbiter: when correlation is
+ambiguous or the WAL dropped a line, a step degrades to `unknown` (surfaced to
+the user) — never to a guessed `verified-complete`. The WAL can only sharpen
+localization, never certify work. `blocked` is an otherwise-done step the plan
+tags `mutation: on` whose results carry no usable mutation reading;
+`attempts-exhausted` is a step that used its fresh attempts (its `WIP.md`
+`Attempts:` count) without being verified complete.
+
+A step's plan `Check:` line is judged against the `Result:` recorded for that
+step in `TEST_RESULTS.md` — only read, never run; a step with none is decided by
+its files and tests. Each verdict also carries `decided_by` (`check`, `fallback`
+or `none`), `outcome_source` (`recorded`; only when a check decided) and
+`attempt` (only when `WIP.md` records a count).
 
 Exit codes: 0 nothing to recover; 1 >=1 step needs recovery
-(mismatch/partial/in-flight); 2 >=1 unknown or blocked (needs human); 3 reconcile
-error.
+(mismatch/partial/in-flight); 2 >=1 unknown, blocked or attempts-exhausted
+(needs human); 3 reconcile error.
 """
 
 from __future__ import annotations
@@ -43,10 +51,19 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from _loop_fields import (
+    Attempt,
+    Check,
+    CheckLine,
+    evaluate_check,
+    parse_attempts,
+    parse_step_checks,
+)
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _step_schema import (
     RecordedRun,
@@ -58,7 +75,7 @@ from _step_schema import (
     step_sort_key,
     step_test_status,
 )
-from _step_verdict import _classify_step
+from _step_verdict import HUMAN_VERDICTS, VERDICT_WORDS, DeclaredCheck, StepEvidence, classify_step
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -101,98 +118,109 @@ def reconcile(
 ) -> list[dict[str, Any]]:
     """Reconcile every step in ``.ai-work/<slug>/WIP.md`` against ground truth.
 
-    Parameters mirror ``spec_drift.detect_drift``: ``repo_root`` is passed
-    explicitly so the function works in any cwd (worktrees, tmp_path fixtures),
-    and the ``_*_override`` hooks let tests inject the three external reads
-    (git diff, the WAL, the test status) for hermetic, side-effect-free runs.
+    ``repo_root`` is passed explicitly so the function works in any cwd; the
+    ``_*_override`` hooks inject the three external reads (git diff, the WAL, the
+    test status) for hermetic runs. ``state_root`` locates ``.ai-state/`` and
+    ``.ai-work/`` when they live outside the git repo (Standard-tier worktrees).
 
-    ``state_root`` locates ``.ai-state/`` and ``.ai-work/`` when they live under
-    a different root than the git repo (Standard-tier worktrees); it defaults to
-    ``repo_root``.
-
-    Returns one verdict dict per WIP step (see module docstring for the shape).
-    Returns ``[]`` when there is no ``WIP.md`` for the slug (graceful degrade).
+    Returns one verdict dict per WIP step (see module docstring for the shape),
+    or ``[]`` when there is no ``WIP.md`` for the slug (graceful degrade).
     """
     repo_root = Path(repo_root)
     state_root = Path(state_root) if state_root is not None else repo_root
-
     task_dir = state_root / ".ai-work" / slug
-    wip_path = task_dir / "WIP.md"
-    if not wip_path.exists():
-        return []
-
-    claims = _parse_wip_steps(wip_path)
+    claims = _parse_wip_steps(task_dir / "WIP.md")  # {} when WIP.md is absent or has no steps
     if not claims:
         return []
-
-    plan_path = task_dir / "IMPLEMENTATION_PLAN.md"
-    declared_files = _parse_plan_files(plan_path, wip_path)
-    # The one read of the results file. `_test_status_override` (the test hook)
-    # isolates the run from it entirely, so a hermetic run sees no results.
-    results_text = (
-        "" if _test_status_override is not None else _read_text(task_dir / "TEST_RESULTS.md")
-    )
-    mutation_blocks = mutation_block_reasons(
-        _read_text(plan_path) or _read_text(wip_path), results_text
-    )
 
     changed_files = (
         set(_changed_files_override)
         if _changed_files_override is not None
         else _git_changed_files(repo_root, base_ref)
     )
-    # A per-step pool; empty under `_test_status_override`, which applies one
-    # status to every step and so never consults it.
-    test_runs = recorded_runs(results_text)
     wal_rows = (
         _wal_rows_override
         if _wal_rows_override is not None
         else _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
     )
-
+    gathered = _gather(task_dir, changed_files, wal_rows, _test_status_override)
     return [
-        _reconcile_step(
-            step_id,
-            claims[step_id],
-            declared_files,
-            changed_files,
-            wal_rows,
-            test_runs,
-            _test_status_override,
-            mutation_blocks.get(step_id),
-        )
+        _reconcile_step(step_id, claims[step_id], gathered)
         for step_id in sorted(claims, key=step_sort_key)
     ]
 
 
-def _reconcile_step(
-    step_id: str,
-    claim: str,
-    declared_files: dict[str, list[str]],
+def _gather(
+    task_dir: Path,
     changed_files: set[str],
     wal_rows: list[dict[str, Any]],
-    test_runs: list[RecordedRun],
     test_status_override: str | None,
-    mutation_block: str | None,
-) -> dict[str, Any]:
+) -> _Gathered:
+    """Read the plan, ``WIP.md`` and ``TEST_RESULTS.md`` once each."""
+    plan_path, wip_path = task_dir / "IMPLEMENTATION_PLAN.md", task_dir / "WIP.md"
+    plan_text, wip_text = _read_text(plan_path), _read_text(wip_path)
+    # `test_status_override` (the test hook) isolates the run from the results
+    # file entirely, so a hermetic run sees no results.
+    results_text = (
+        "" if test_status_override is not None else _read_text(task_dir / "TEST_RESULTS.md")
+    )
+    return _Gathered(
+        declared_files=_parse_plan_files(plan_path, wip_path),
+        changed_files=changed_files,
+        wal_rows=wal_rows,
+        # A per-step pool; empty under the override, which never consults it.
+        test_runs=recorded_runs(results_text),
+        test_status_override=test_status_override,
+        mutation_blocks=mutation_block_reasons(plan_text or wip_text, results_text),
+        checks=parse_step_checks(plan_text),
+        results_text=results_text,
+        attempts=parse_attempts(wip_text).counts,
+    )
+
+
+@dataclass(frozen=True)
+class _Gathered:
+    """Everything read from the outside world, ready for the pure per-step verdict."""
+
+    declared_files: dict[str, list[str]]
+    changed_files: set[str]
+    wal_rows: list[dict[str, Any]]
+    test_runs: list[RecordedRun]
+    test_status_override: str | None
+    mutation_blocks: dict[str, str]
+    checks: dict[str, CheckLine]
+    results_text: str
+    attempts: dict[str, Attempt]
+
+
+def _reconcile_step(step_id: str, claim: str, gathered: _Gathered) -> dict[str, Any]:
     # `attributable()` files only -- a file another step also declares isn't enough.
-    files = attributable(step_id, declared_files)
-    changed = [f for f in files if _path_in_changeset(f, changed_files)]
-    return _classify_step(
+    declared, runs = gathered.declared_files, gathered.test_runs
+    override = gathered.test_status_override
+    files = attributable(step_id, declared)
+    changed = [f for f in files if _path_in_changeset(f, gathered.changed_files)]
+    evidence = StepEvidence(
         step_id=step_id,
         claim=claim,
         files=files,
         changed=changed,
         unchanged=[f for f in files if f not in changed],
-        test_status=(
-            test_status_override
-            if test_status_override is not None
-            else step_test_status(step_id, test_runs)
-        ),
-        tier2=_correlate_agents(files, wal_rows),
-        earlier_declarers=_earlier_declarers(step_id, declared_files) if not files else [],
-        mutation_block=mutation_block,
+        test_status=override if override is not None else step_test_status(step_id, runs),
+        tier2=_correlate_agents(files, gathered.wal_rows),
+        earlier_declarers=_earlier_declarers(step_id, declared) if not files else [],
+        mutation_block=gathered.mutation_blocks.get(step_id),
     )
+    return classify_step(
+        evidence, _declared_check(step_id, gathered), gathered.attempts.get(step_id)
+    )
+
+
+def _declared_check(step_id: str, gathered: _Gathered) -> DeclaredCheck:
+    """None when the step declares no check; the broken line when it cannot be read."""
+    declared = gathered.checks.get(step_id)
+    if isinstance(declared, Check):
+        return evaluate_check(declared, step_id, gathered.results_text)
+    return declared
 
 
 # ---------------------------------------------------------------------------
@@ -580,18 +608,29 @@ def _needs_recovery(verdict: str) -> bool:
 
 
 def _exit_code(verdicts: list[dict[str, Any]]) -> int:
-    """0 clean; 1 recovery needed; 2 unknown or blocked present (a human decides)."""
+    """0 clean; 1 recovery needed; 2 a verdict only a human may act on present."""
     kinds = {v["verdict"] for v in verdicts}
-    if kinds & {"unknown", "blocked"}:
+    if kinds & set(HUMAN_VERDICTS):
         return 2
     if any(_needs_recovery(k) for k in kinds):
         return 1
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def _readable_line(v: dict[str, Any]) -> str:
+    """`<step>  <verdict>  <decided_by>  [attempt <n>]  <evidence>`."""
+    attempt = f"attempt {v['attempt']}  " if "attempt" in v else ""
+    return f"{v['step']:>9}  {v['verdict']:<22}  {v['decided_by']:<8}  {attempt}{v['evidence']}"
+
+
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Reconcile pipeline step-completion against ground truth (read-only)."
+        description=(
+            "Reconcile pipeline step-completion against ground truth (read-only). "
+            f"Verdicts: {', '.join(VERDICT_WORDS)}; attempts-exhausted exits 2 (a human decides). "
+            "A declared Check: is judged against the recorded Result:, never run. Each verdict "
+            "carries decided_by, outcome_source (when a check decided) and attempt (when recorded)."
+        )
     )
     parser.add_argument("slug", help="task slug under .ai-work/<slug>/")
     parser.add_argument("--repo-root", default=None, help="git repo root (default: git rev-parse)")
@@ -609,7 +648,11 @@ def main(argv: list[str] | None = None) -> int:
         default=7,
         help="max age in days of a log row; bounds every segment, active log included (default: 7)",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
 
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     if is_plugin_cache_path(repo_root):
@@ -645,9 +688,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps(verdicts, indent=2))
-    if not args.quiet and not args.json:
-        for v in verdicts:
-            print(f"{v['step']:>9}  {v['verdict']:<22}  {v['evidence']}")
+    elif not args.quiet:
+        print("\n".join(map(_readable_line, verdicts)))
 
     return _exit_code(verdicts)
 

@@ -4,8 +4,9 @@
 markdown, hands both to pure verdict functions (each returns the problems it found, empty when
 the check holds) and returns the findings in check order per view, then the root-wide DRC-12.
 The thresholds and pass conditions are the table in
-`skills/likec4-diagramming/references/review-checks.md`; this module only applies them, and its
-SVG reading is `_diagram_svg.py`, independent of any other reader of a render.
+`skills/likec4-diagramming/references/review-checks.md`; this module only applies them: the
+structural checks are decided here, the numeric ones (DRC-06, 07, 08, 10) in `_diagram_measures.py`.
+Its SVG reading is `_diagram_svg.py`, independent of any other reader of a render.
 """
 
 from __future__ import annotations
@@ -20,6 +21,14 @@ from pathlib import Path
 
 from _diagram_core import C4_TYPES, DYNAMIC, Finding, Projection, RegenerationFailure, View
 from _diagram_edge import RENDER_DIR
+from _diagram_measures import (
+    Outcome,
+    contrast_outcome,
+    drift_outcome,
+    legibility_outcome,
+    proportions_outcome,
+    stale_outcome,
+)
 from _diagram_svg import Group, Svg, normalise, read_svg, spelled_at
 from _diagram_tokens import LINE_DRAWINGS
 
@@ -57,37 +66,55 @@ def run_checks(projection: Projection, built: Path, root: Path) -> tuple[Finding
     readings = [_reading(view, built) for view in projection.views]
     documents = read_documents(root)
     foreign = inconsistent_drawings(readings)
+    rendered = root / RENDER_DIR
     findings = []
     for reading in readings:
         view = reading.view
-        problems = {check: verdict(reading) for check, verdict in READING_CHECKS}
-        problems["DRC-05"] += foreign.get(view.id, [])
-        problems["DRC-09"] = abstraction_problems(view)
-        problems["DRC-11"] = embed_problems(view, documents)
-        held_11 = HELD["DRC-11"] if documents.in_scope else NO_DOCUMENTS
-        for check in sorted(problems):
+        outcomes = {check: _held(check, verdict(reading)) for check, verdict in READING_CHECKS}
+        outcomes["DRC-05"] = outcomes["DRC-05"].with_problems(foreign.get(view.id, []))
+        outcomes["DRC-06"] = contrast_outcome(reading.svg)
+        outcomes["DRC-07"] = legibility_outcome(reading.svg)
+        outcomes["DRC-08"] = proportions_outcome(reading.svg, view)
+        outcomes["DRC-09"] = _held("DRC-09", abstraction_problems(view))
+        outcomes["DRC-10"] = drift_outcome(view.id, built, rendered)
+        outcomes["DRC-11"] = _documented(view, documents)
+        for check in sorted(outcomes):
             modelled = [
                 f.evidence
                 for f in projection.findings
                 if (f.check, f.view, f.status) == (check, view.id, "FAIL")
             ]
-            held = held_11 if check == "DRC-11" else HELD[check]
-            findings.append(_finding(check, view.id, modelled + problems[check], held))
+            findings.append(_finding(check, view.id, outcomes[check].with_problems(modelled)))
+    stale = stale_outcome([view.id for view in projection.views], rendered)
+    if stale.problems:
+        findings.append(_finding("DRC-10", ROOT_WIDE, stale))
     held = f"regenerated {len(readings)} view(s) without a failure"
-    return (*findings, _finding("DRC-12", ROOT_WIDE, [], held))
+    return (*findings, _finding("DRC-12", ROOT_WIDE, Outcome.plain([], held)))
 
 
 def regeneration_finding(failure: RegenerationFailure) -> Finding:
     """DRC-12 failing: the regeneration stopped, so no other check could run."""
-    return _finding("DRC-12", ROOT_WIDE, [f"{failure.kind} {failure.target}: {failure.what}"], "")
+    what = f"{failure.kind} {failure.target}: {failure.what}"
+    return _finding("DRC-12", ROOT_WIDE, Outcome.plain([what], ""))
 
 
-def _finding(check: str, view: str, problems: list[str], held: str) -> Finding:
-    if not problems:
-        return Finding(check, view, "PASS", held)
-    shown = "; ".join(problems[:MAX_LISTED])
-    more = len(problems) - MAX_LISTED
-    return Finding(check, view, "FAIL", f"{shown} (+{more} more)" if more > 0 else shown)
+def _held(check: str, problems: list[str]) -> Outcome:
+    return Outcome.plain(problems, HELD[check])
+
+
+def _documented(view: View, documents: Documents) -> Outcome:
+    held = HELD["DRC-11"] if documents.in_scope else NO_DOCUMENTS
+    return Outcome.plain(embed_problems(view, documents), held)
+
+
+def _finding(check: str, view: str, outcome: Outcome) -> Finding:
+    measured, threshold = outcome.measured, outcome.threshold
+    if not outcome.problems:
+        return Finding(check, view, "PASS", outcome.held, measured, threshold)
+    shown = "; ".join(outcome.problems[:MAX_LISTED])
+    more = len(outcome.problems) - MAX_LISTED
+    evidence = f"{shown} (+{more} more)" if more > 0 else shown
+    return Finding(check, view, "FAIL", evidence, measured, threshold)
 
 
 # --- one render read against its view --------------------------------------------------------

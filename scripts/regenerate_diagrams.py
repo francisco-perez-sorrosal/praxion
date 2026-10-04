@@ -5,8 +5,9 @@
               `<dir>/<name>/` under `docs/diagrams/` that has a `src/*.c4`
     --staged  pre-commit: only roots with a staged `src/*.c4`, then `git add <root>/rendered/`;
               failed checks print as non-blocking WARN lines
-    --check   render into a temporary directory, byte-compare with the committed `rendered/`,
-              run every review check; writes nothing in the checkout
+    --check   render into a temporary directory, byte-compare with the committed `rendered/`
+              (DRC-10), run every review check; writes nothing in the checkout, and ends with
+              `<n> renders · <f> failed checks · <d> drifted` on stderr
     --json    findings as JSON Lines on stdout
     --diagrams-dir DIR
               where roots are discovered when none is named; default `docs/diagrams`
@@ -121,6 +122,8 @@ EXIT_USAGE = 2
 EXIT_TOOLCHAIN = 3
 
 LOG = "[diagram-regen]"
+SEPARATOR = "·"
+DRIFT_CHECK = "DRC-10"
 INSTALL = {
     "likec4": f"npm install --global likec4@{LIKEC4_VERSION}",
     "d2": "curl -fsSL https://d2lang.com/install.sh"
@@ -169,8 +172,15 @@ def run(args: argparse.Namespace, toolchain: Toolchain) -> int:
     refusal = toolchain_gate(toolchain, staged=args.staged)
     if refusal is not None:
         return refusal
-    failed_checks = [regenerate(root, args, toolchain) for root in roots]
-    return EXIT_FAILURE if args.check and any(failed_checks) else EXIT_OK
+    results = [regenerate(root, args, toolchain) for root in roots]
+    if not args.check:
+        return EXIT_OK
+    findings = [finding for _, found in results for finding in found]
+    renders = sum(count for count, _ in results)
+    failed = [finding for finding in findings if finding.status == "FAIL"]
+    drifted = sum(1 for finding in failed if finding.check == DRIFT_CHECK)
+    log(f"{renders} renders {SEPARATOR} {len(failed)} failed checks {SEPARATOR} {drifted} drifted")
+    return EXIT_FAILURE if failed else EXIT_OK
 
 
 def select_roots(args: argparse.Namespace) -> list[Path]:
@@ -196,8 +206,11 @@ def toolchain_gate(toolchain: Toolchain, staged: bool) -> int | None:
     return EXIT_OK if any(problem.found is None for problem in problems) else None
 
 
-def regenerate(root: Path, args: argparse.Namespace, toolchain: Toolchain) -> bool:
-    """Render one root; True when it has a failed finding."""
+def regenerate(
+    root: Path, args: argparse.Namespace, toolchain: Toolchain
+) -> tuple[int, Sequence[Finding]]:
+    """Render one root: how many renders, and its findings. Publishing comes before the checks,
+    so under `--check` alone DRC-10 compares the committed renders with the fresh ones."""
     tokens = read_style(root)
     with tempfile.TemporaryDirectory(prefix="diagram-regen-") as work:
         built = Path(work)
@@ -206,14 +219,14 @@ def regenerate(root: Path, args: argparse.Namespace, toolchain: Toolchain) -> bo
         except RegenerationError as stopped:
             report([regeneration_finding(stopped.failure)], args)
             raise
-        findings = run_checks(projection, built, root)
         if not args.check:
             publish(built, root / RENDER_DIR)
+        findings = run_checks(projection, built, root)
     if args.staged:
         stage(root / RENDER_DIR)
     report(findings, args)
     log(f"{root}: {len(projection.views)} renders {'checked' if args.check else 'written'}")
-    return any(finding.status == "FAIL" for finding in findings)
+    return len(projection.views), findings
 
 
 # --- what the command says -------------------------------------------------------------------

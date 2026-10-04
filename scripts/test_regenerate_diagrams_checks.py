@@ -27,6 +27,8 @@ from _diagram_testkit import D2_PIN, Toolchain
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "diagram_regen"
 RENDERS = FIXTURES / "renders"
 RENDERED_VIEWS = ("flow", "index", "structure")
+STRUCTURAL_CHECKS = ("DRC-01", "DRC-02", "DRC-03", "DRC-04", "DRC-05", "DRC-09", "DRC-11")
+CHECKS_PER_VIEW = 11  # the structural seven and the numeric DRC-06, DRC-07, DRC-08, DRC-10
 INDEX_TYPE = "System Context"
 INDEX_TITLE = "Praxion — System Context"
 
@@ -132,17 +134,19 @@ def failing(found: dict, check: str, view: str) -> str:
 def test_a_real_render_passes_each_structural_check(run, view):
     found = run()
 
-    statuses = {check: f.status for (check, name), f in found.items() if name == view}
+    statuses = {
+        check: f.status
+        for (check, name), f in found.items()
+        if name == view and check in STRUCTURAL_CHECKS
+    }
 
-    assert statuses == dict.fromkeys(
-        ("DRC-01", "DRC-02", "DRC-03", "DRC-04", "DRC-05", "DRC-09", "DRC-11"), "PASS"
-    )
+    assert statuses == dict.fromkeys(STRUCTURAL_CHECKS, "PASS")
 
 
 def test_there_is_one_finding_per_check_per_view_and_one_root_wide_regeneration_finding(run):
     found = run()
 
-    assert len(found) == 7 * len(RENDERED_VIEWS) + 1
+    assert len(found) == CHECKS_PER_VIEW * len(RENDERED_VIEWS) + 1
     regenerated = found[("DRC-12", "-")]
     assert (regenerated.status, regenerated.evidence) == (
         "PASS",
@@ -580,9 +584,10 @@ def test_a_real_render_of_a_small_model_passes_every_check_the_command_runs(
     tools = Toolchain(tmp_path / "bin")
     (tools.directory / "d2").unlink()
     (tools.directory / "d2").symlink_to(d2_path)
+    assert command(rd, tools, capsys)[0] == 0  # the committed renders a check compares with
 
     code, out, _ = command(rd, tools, capsys, "--check")
 
     statuses = [line.split(" ")[2] for line in out.splitlines()]
     assert (code, set(statuses)) == (0, {"PASS"})
-    assert len(statuses) == 7 * 2 + 1
+    assert len(statuses) == CHECKS_PER_VIEW * 2 + 1

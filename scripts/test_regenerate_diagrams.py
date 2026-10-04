@@ -115,14 +115,14 @@ EXPECTED_TOKENS = {
     "category_external_system": _Drawing("External system", False, "rectangle", "#ECEAE6", "#77726A", 2, True, 0, "none", "none", INK),
     "category_knowledge_asset": _Drawing("Knowledge asset", False, "package", "#E1F3EC", "#00684A", 2, False, 0, "none", "none", INK),
     "category_runtime_agent": _Drawing("Runtime agent", False, "rectangle", "#FDEFD9", "#A85A00", 2, False, 16, "none", "none", INK),
-    "category_runtime_agent_frame": _Drawing("Runtime agent", True, "rectangle", None, "#A85A00", 1.5, True, 16, "none", "none", INK),
+    "category_runtime_agent_frame": _Drawing("Runtime agent", True, "rectangle", None, "#A85A00", 2, True, 16, "none", "none", INK),
     "category_pipeline_document": _Drawing("Pipeline document", False, "document", "#E3F1FB", "#0B6FA4", 2, False, 0, "none", "none", INK),
     "category_persistent_store": _Drawing("Persistent store", False, "cylinder", "#F6E6F0", "#9B3A75", 2, False, 0, "none", "none", INK),
     "category_tooling": _Drawing("Tooling", False, "rectangle", "#F2F4F7", "#3F4B5C", 2, False, 0, "3d", "none", INK),
-    "category_layer_frame": _Drawing("Layer", True, "rectangle", None, "#8C8780", 1.5, True, 0, "none", "none", INK),
+    "category_layer_frame": _Drawing("Layer", True, "rectangle", None, "#8C8780", 2, True, 0, "none", "none", INK),
     "category_layer": _Drawing("Layer", False, "rectangle", CANVAS, "#8C8780", 2, False, 0, "double-border", "none", INK),
     "category_container": _Drawing("Container", False, "rectangle", "#E3F1FB", "#0B6FA4", 2, False, 8, "none", "none", INK),
-    "category_container_frame": _Drawing("Container", True, "rectangle", None, "#0B6FA4", 1.5, True, 8, "none", "none", INK),
+    "category_container_frame": _Drawing("Container", True, "rectangle", None, "#0B6FA4", 2, True, 8, "none", "none", INK),
     "category_component": _Drawing("Component", False, "rectangle", "#E1F3EC", "#00684A", 2, False, 0, "double-border", "none", INK),
     "category_data_store": _Drawing("Data store", False, "cylinder", "#F6E6F0", "#9B3A75", 2, False, 0, "none", "none", INK),
 }  # fmt: skip
@@ -304,7 +304,7 @@ def test_style_file_adds_a_frame_when_it_gives_one(rd):
         "shape": "rectangle",
         "fill": None,
         "stroke": "#8A5A00",
-        "stroke_width": 1.5,
+        "stroke_width": 2,
         "dash": 5,
         "radius": 4,
         "text_colour": INK,
@@ -329,6 +329,12 @@ def test_style_file_adds_a_frame_when_it_gives_one(rd):
             id="same-mark-as-persistent-store",
         ),
         pytest.param({"shape": "queue", "fill": "#FFF4D6", "text_colour": INK}, id="no-outline"),
+        pytest.param({**QUEUE_BOX, "stroke_width": 1.5}, id="fractional-width"),
+        pytest.param({**QUEUE_BOX, "shape": "cylinder", "extra": "3d"}, id="3d-on-a-cylinder"),
+        pytest.param(
+            {**QUEUE_BOX, "shape": "package", "extra": "double-border"},
+            id="double-border-on-a-package",
+        ),
     ],
 )
 def test_style_file_entry_that_breaks_a_rule_is_refused_by_name(rd, box):
@@ -774,3 +780,34 @@ def test_emission_does_not_depend_on_the_order_the_toolchain_listed_things(rd, v
     )
 
     assert rd.emit_d2(reversed_view) == rd.emit_d2(view)
+
+
+def test_a_step_over_a_read_only_relationship_draws_like_every_other_step(rd, views):
+    flow = views["flow"]  # step-02 stands for a relationship of kind reads
+
+    assert "stroke-dash" not in rd.emit_d2(flow)
+    assert [e.label for e in rd.legend_entries(flow) if e.drawing_class is None] == [MEANING_STEP]
+
+
+def test_a_dollar_sign_in_model_text_reaches_d2_escaped(rd, views):
+    agent = _node(views["structure"], "praxion.orchestrator")
+    quoting = dataclasses.replace(agent, responsibility="Reads ${PLUGIN_ROOT} at start")
+    view = dataclasses.replace(views["structure"], nodes=(quoting,), edges=())
+
+    text = rd.emit_d2(view)
+
+    assert "\\${PLUGIN_ROOT}" in text
+    assert not re.search(r"(?<!\\)\$\{", text)
+
+
+@pytest.mark.parametrize("element_id", ["title", "LEGEND"])
+def test_an_element_named_like_the_title_or_the_legend_stays_apart_from_both(rd, views, element_id):
+    developer = dataclasses.replace(_node(views["index"], "developer"), id=element_id)
+    view = dataclasses.replace(views["index"], nodes=(developer,), edges=())
+
+    text = rd.emit_d2(view)
+
+    top_level_keys = [key.strip('"').lower() for key in re.findall(r"^(\S+?):", text, re.M)]
+    assert len(set(top_level_keys)) == len(top_level_keys)
+    assert "Praxion — System Context — System Context diagram" in text
+    assert "Developer" in text

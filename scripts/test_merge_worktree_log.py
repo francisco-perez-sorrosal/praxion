@@ -555,8 +555,13 @@ def test_step_nine_five_looks_for_the_script_in_the_plugin_then_on_path_then_the
 def test_step_nine_five_treats_a_missing_script_as_neither_success_nor_an_input_error() -> None:
     step = _step_9_5()
 
-    assert "not installed" in step
-    assert "do **not** remove the worktree" in step
+    none_exists = step.index("When **none** of the three exists")
+    not_installed = step.index("not installed", none_exists)
+    keep = step.index("do **not** remove the worktree", not_installed)
+    assert none_exists < not_installed < keep, (
+        "the missing-tool clause must follow the three lookups, in order"
+    )
+    assert "loses the rows" in step[keep:] or "losing the rows" in step[keep:]
 
 
 def test_step_nine_five_never_runs_a_project_relative_script_unlooked_for() -> None:

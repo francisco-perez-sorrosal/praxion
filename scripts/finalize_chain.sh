@@ -475,9 +475,11 @@ _finalize_chain_state_driven() {
 # every post-merge in the primary working tree copies the log of each worktree
 # THIS merge brought in: its HEAD is contained in the checkout's HEAD and not in
 # ORIG_HEAD (the state before the merge; the script's default). A worktree with
-# no commit of its own, or one an earlier merge already took in, is never copied
-# here, so a pipeline still running never has half a session copied; teardown
-# through /merge-worktree copies whatever is left. Idempotent: rows the main log
+# no commit of its own, or one an earlier merge already took in, is not copied
+# here, so a running pipeline's half session stays out -- except a worktree
+# branched from origin/main while local main was behind, which the next pull
+# brings in (accepted leftover: P03 warns until a later merge copies the rest);
+# teardown through /merge-worktree copies whatever is left. Idempotent: rows the main log
 # already holds are skipped. Squash merges are not covered -- the squashed commit
 # is not the worktree's HEAD.
 #

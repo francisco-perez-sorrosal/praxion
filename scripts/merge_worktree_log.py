@@ -14,9 +14,12 @@ so a run can be repeated. Two ways in, one code path:
 checkout's HEAD contains and REV (default ``ORIG_HEAD``, the state before the
 merge) does not. So only the worktrees a merge or pull brought in are copied: a
 worktree that has not committed anything, or whose branch an earlier merge already
-took in, is left to ``--worktree`` at teardown, never copied while its sessions
-may still be running. REV is resolved once a worktree holds a log, and an
-unresolvable one is an input error.
+took in, is left to ``--worktree`` at teardown, so a running pipeline's half
+session is not copied. One case escapes: a worktree branched from ``origin/main``
+while the local main was behind is brought in by the next pull, commits or not,
+and its running agents show as unstopped in P03 until a later merge copies the
+rest (an accepted leftover, named in the decision record). REV is resolved once
+a worktree holds a log, and an unresolvable one is an input error.
 
 ``--repo-root`` is any checkout of the repository (default: the git toplevel of
 the working directory). It is never derived from this file's location: managed
@@ -211,9 +214,13 @@ def _settings_mode_keys(path: Path, label: str) -> tuple[dict[str, str], str | N
         settings = json.loads(text)
     except ValueError as exc:
         return {}, f"{label}: is not valid JSON ({exc})"
-    env = settings.get("env") if isinstance(settings, dict) else None
+    if not isinstance(settings, dict):
+        return {}, f"{label}: is not an object"
+    env = settings.get("env")
+    if env is None:
+        return {}, None  # a settings file without an env block is the common case, not a defect
     if not isinstance(env, dict):
-        return {}, f"{label}: has no env object"
+        return {}, f"{label}: env is not an object"
     return {key: str(env[key]) for key in MODE_KEYS if key in env}, None
 
 

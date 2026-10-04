@@ -10,6 +10,7 @@ paths:
 - '**/RESEARCH_FINDINGS.md'
 - '**/SYSTEMS_PLAN.md'
 - '**/IMPLEMENTATION_PLAN.md'
+- '**/*.c4'
 core: false
 ---
 
@@ -59,7 +60,7 @@ Use a descriptive alt-text — it serves both accessibility and the agent's text
 
 | Need | Toolchain | Source extension | Render command |
 |------|-----------|------------------|----------------|
-| Multi-view C4 architecture (System Context L0, Container/Component L1+) | LikeC4 → D2 → SVG | `.c4` | `likec4 export d2 ... && d2 ...` (or repo hook) |
+| Multi-view C4 architecture (System Context L0, Container/Component L1+) | LikeC4 → D2 → SVG | `.c4` | `python3 scripts/regenerate_diagrams.py` |
 | Single architectural view, sequence, state, ER, flowchart, process | Mermaid | `.mmd` | `mmdc -i src/<name>.mmd -o rendered/<name>.svg` |
 | Layout-only diagrams not in C4 vocabulary | D2 (direct) | `.d2` | `d2 src/<name>.d2 rendered/<name>.svg` |
 
@@ -73,19 +74,13 @@ Existing inline ` ```mermaid `, ` ```c4 `, and ` ```d2 ` blocks must be migrated
 
 ### Clarity First
 
-- **Node budget — Mermaid only**: a Mermaid flowchart or sequence should target **~10-12 nodes per view** — its auto-layout degrades past that; group related items into a parent subgraph when you would exceed it. **LikeC4 and D2 architecture models are exempt from any flat node cap** — they support arbitrary nesting (groups, boundaries) and project multiple focused views from one model, so they manage complexity through hierarchy and view scoping rather than a hard count. Author the full model; project views that each stay legible.
+- **Node budget — advisory per-view heuristic**: a Mermaid flowchart or sequence should target **~10-12 nodes per view** — its auto-layout degrades past that; group related items into a parent subgraph when you would exceed it. **LikeC4 and D2 architecture models are exempt from a flat node cap** — they nest (groups, boundaries) and project several focused views from one model. Author the full model; project views that each stay legible. The binding checks for LikeC4 views are in the linked list below.
 - **One concept per diagram** — if a diagram explains both data flow and component hierarchy, split it into two
 - **Every arrow must be verifiable** against actual code — diagrams are claims about the system, not decorations
 
-### Decomposition Strategy
+### LikeC4 views
 
-When a Mermaid diagram would exceed the node budget — or whenever a system has natural structural levels (LikeC4 models are layered by default: a context view, then container/component views) — use layered decomposition:
-
-- **L0 — Context**: System boundary + external actors. Shows what interacts with the system, not internals
-- **L1 — Components**: Major building blocks and their relationships. The default level for architecture documentation
-- **L2 — Internals**: Detail view of one L1 component. Only create when that component's internal structure matters to the reader
-
-Each level must be self-contained — a reader should understand L1 without needing L2. Label diagrams with their level when multiple levels coexist in the same document.
+A LikeC4 view is held to the review checks, each decidable from the model, the render's markup or a command's output: title with subject and C4 type; legend; element content (name, category or technology, responsibility); arrow intent and direction; categories told apart without colour; contrast; legibility at the reference embed width; proportions and arrow fan-in; one abstraction level; render agreement with a fresh regeneration. Read the project's `_spec.c4` style kit before editing a `.c4`, apply every check to each view you touch, and record any check you could not run. Thresholds and pass conditions live only in the [review checks of the `likec4-diagramming` skill](../../skills/likec4-diagramming/references/review-checks.md); the skill carries the authoring loop.
 
 ### Diagram Type Selection
 

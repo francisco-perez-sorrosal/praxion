@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-08T15:20:02Z'
+generated_at: '2026-10-10T07:27:10Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -261,7 +261,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 7144
+  chars: 7141
   paths:
   - docs/**
   - README.md
@@ -273,6 +273,7 @@ rules:
   - '**/RESEARCH_FINDINGS.md'
   - '**/SYSTEMS_PLAN.md'
   - '**/IMPLEMENTATION_PLAN.md'
+  - '**/*.c4'
 - id: writing/html-output-conventions
   path: rules/writing/html-output-conventions.md
   load: path_scoped

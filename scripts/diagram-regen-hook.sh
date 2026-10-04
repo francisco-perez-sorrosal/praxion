@@ -1,147 +1,31 @@
 #!/usr/bin/env bash
-# diagram-regen-hook.sh — Pre-commit regeneration of LikeC4 → D2 → SVG artifacts.
+# diagram-regen-hook.sh — pre-commit entry for the `diagram-regen` hook.
 #
-# Invoked by the `diagram-regen` hook in .pre-commit-config.yaml when a staged
-# path matches `\.c4$`. Self-discovers staged *.c4 sources; skips gracefully when
-# likec4/d2 binaries are absent.
+# A thin wrapper: every regeneration rule (pinned versions, the four regeneration
+# failures, which renders to write and stage) lives in the regeneration command,
+# scripts/regenerate_diagrams.py, run here in `--staged` mode. pre-commit fires the
+# hook only when a staged path matches `\.c4$` (.pre-commit-config.yaml).
 #
-# Layout contract:
-#   Sources live at  <root>/diagrams/<name>/src/<name>.c4
-#   Renders land at  <root>/diagrams/<name>/rendered/<view>.{d2,svg}
-#   `likec4 gen` takes the workspace *directory*, so the source's parent is the
-#   workspace and rendered/ is that workspace's sibling. Both are committed.
+# The toolchain check runs before any `python3` call, so a commit made without
+# likec4 or d2 proceeds with a warning even when the system Python shim is broken.
+# Past that check the command decides; this script never calls likec4 or d2 itself.
 #
-# Behavior:
-#   1. Detects staged *.c4 files under any diagrams/ subdirectory.
-#   2. If none are staged, exits 0 immediately (no-op).
-#   3. Gracefully skips (exit 0, stderr warning) when likec4 or d2 are missing.
-#   4. For each staged <name>/src/<name>.c4 model:
-#        a. Runs `likec4 gen <fmt> <name>/src -o <name>/rendered/` per format.
-#        b. For d2: runs `d2 <name>/rendered/<view>.d2 <name>/rendered/<view>.svg`.
-#        c. Stages all generated artifacts with `git add`.
-#   5. On render failure: prints failing command + stderr and exits 1.
-#   6. Exits 0 on success.
-#
-# Render-format flexibility:
-#   LIKEC4_FORMATS env var is a space-separated list of output formats.
-#   Default: "d2". Future additions (mermaid, png) are a config change, not a
-#   code rewrite. Only d2 drives a downstream SVG render step.
+# Exit status: the command's (0 renders written and staged, 1 a regeneration
+# failure that aborts the commit, 2 a usage error), or 0 after the skip warning.
 #
 # See: docs/architecture-diagrams.md
 
 set -eo pipefail
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-# Space-separated list of likec4 output formats to generate.
-# Override via LIKEC4_FORMATS env var; default is d2 only.
-LIKEC4_FORMATS="${LIKEC4_FORMATS:-d2}"
-
-# Sibling normalizer that scrubs the volatile d2 version stamp. Resolved relative
-# to this script so it works regardless of the caller's cwd. Mirrors the
-# normalize step in .github/workflows/architecture.yml — both must stay in sync,
-# which is why the rule lives in one shared script rather than inlined twice.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NORMALIZE_D2_SVG="${SCRIPT_DIR}/normalize_d2_svg.sh"
+REGENERATE="${SCRIPT_DIR}/regenerate_diagrams.py"
 
-# ---------------------------------------------------------------------------
-# Detect staged .c4 files
-# ---------------------------------------------------------------------------
-
-STAGED_C4="$(git diff --cached --name-only --diff-filter=ACMR \
-    | grep -E '.*/diagrams/.*\.c4$' \
-    || true)"
-
-if [ -z "$STAGED_C4" ]; then
-    exit 0
-fi
-
-# ---------------------------------------------------------------------------
-# Binary availability checks (graceful skip)
-# ---------------------------------------------------------------------------
-
-if ! command -v likec4 >/dev/null 2>&1; then
-    echo "[diagram-regen] likec4 not installed; skipping diagram regeneration." \
-        "See docs/architecture-diagrams.md for install instructions." >&2
-    exit 0
-fi
-
-if ! command -v d2 >/dev/null 2>&1; then
-    echo "[diagram-regen] d2 not installed; skipping diagram regeneration." \
-        "See docs/architecture-diagrams.md for install instructions." >&2
-    exit 0
-fi
-
-# ---------------------------------------------------------------------------
-# Regenerate artifacts for each staged .c4 file
-# ---------------------------------------------------------------------------
-
-generate_format() {
-    local src="$1"   # path to <name>.c4
-    local fmt="$2"   # format: d2 | mermaid | png | ...
-    local workspace="${src%/*}"    # parent directory → LikeC4 workspace (likec4 gen takes a dir, not a file)
-    # Renders go to the sibling rendered/ directory — the committed render
-    # location. Source lives at <diagram>/src/<name>.c4, so rendered/ is the
-    # parent of the source workspace. Writing anywhere else leaves committed
-    # renders stale and the CI drift check (architecture.yml) red.
-    local out_dir
-    out_dir="$(dirname "${workspace}")/rendered"
-
-    echo "[diagram-regen] Generating ${fmt} from ${src} → ${out_dir}/" >&2
-
-    local gen_stderr
-    if ! gen_stderr="$(likec4 gen "${fmt}" "${workspace}" -o "${out_dir}/" 2>&1)"; then
-        echo "[diagram-regen] ERROR: likec4 gen ${fmt} failed for ${src}" >&2
-        echo "${gen_stderr}" >&2
-        return 1
+for tool in likec4 d2; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "[diagram-regen] WARN ${tool} not installed; skipping diagram regeneration." \
+            "See docs/architecture-diagrams.md for install instructions." >&2
+        exit 0
     fi
+done
 
-    # For d2 format, render each generated .d2 file to .svg
-    if [ "${fmt}" = "d2" ]; then
-        render_d2_views "${out_dir}"
-    fi
-
-    git add "${out_dir}/"
-}
-
-render_d2_views() {
-    local dir="$1"
-
-    # Find all .d2 files produced in the output directory
-    local d2_files
-    d2_files="$(find "${dir}" -maxdepth 1 -name "*.d2" 2>/dev/null || true)"
-
-    if [ -z "${d2_files}" ]; then
-        echo "[diagram-regen] WARNING: no .d2 files found in ${dir}/" >&2
-        return 0
-    fi
-
-    while IFS= read -r d2_file; do
-        local svg_file="${d2_file%.d2}.svg"
-        echo "[diagram-regen]   Rendering ${d2_file} → ${svg_file}" >&2
-
-        local render_stderr
-        if ! render_stderr="$(d2 "${d2_file}" "${svg_file}" 2>&1)"; then
-            echo "[diagram-regen] ERROR: d2 render failed for ${d2_file}" >&2
-            echo "${render_stderr}" >&2
-            return 1
-        fi
-
-        # Scrub the build-dependent d2 version stamp so a local (Homebrew) render
-        # matches CI's pinned (standalone) render byte-for-byte.
-        bash "${NORMALIZE_D2_SVG}" "${svg_file}"
-    done <<< "${d2_files}"
-}
-
-while IFS= read -r c4_file; do
-    [ -z "${c4_file}" ] && continue
-
-    for fmt in ${LIKEC4_FORMATS}; do
-        generate_format "${c4_file}" "${fmt}"
-    done
-done <<< "${STAGED_C4}"
-
-echo "[diagram-regen] Diagram regeneration complete." >&2
-exit 0
+exec python3 "${REGENERATE}" --staged

@@ -46,6 +46,10 @@ on:
       - 'fitness/**'
       - 'scripts/aac_fence_validator.py'
       - 'scripts/check_aac_golden_rule.py'
+      # The regeneration command is an input to the render byte-diff: a change
+      # to it can change every render, so it must trigger the drift gate.
+      - 'scripts/regenerate_diagrams.py'
+      - 'scripts/_diagram_*.py'
   push:
     branches: [main]
     paths:
@@ -68,6 +72,10 @@ on:
       - 'fitness/**'
       - 'scripts/aac_fence_validator.py'
       - 'scripts/check_aac_golden_rule.py'
+      # The regeneration command is an input to the render byte-diff: a change
+      # to it can change every render, so it must trigger the drift gate.
+      - 'scripts/regenerate_diagrams.py'
+      - 'scripts/_diagram_*.py'
 
 permissions: {}  # least-privilege; jobs below add only what they need
 
@@ -79,12 +87,16 @@ jobs:
   # ---------------------------------------------------------------------------
   # Job 1: regenerate-and-diff
   #
-  # Verifies that committed diagram renders match what `likec4 gen d2` + `d2`
-  # would produce from the source .c4 files. Fails if any render disagrees.
+  # Verifies that the committed diagram renders are what the regeneration
+  # command produces from the source .c4 files with the pinned toolchain.
   #
-  # Note: scripts/diagram-regen-hook.sh is a pre-commit hook that only runs
-  # when .c4 files are staged (git diff --cached). In CI there are no staged
-  # files, so we invoke the underlying commands directly here.
+  # Shape (the managed-project template mirrors it): install the two pinned
+  # tools, regenerate in place with `python3 scripts/regenerate_diagrams.py`,
+  # fail on any change under docs/diagrams/, then show the diff. The comparison
+  # lives in its own steps so the regeneration step is the command alone.
+  # The pre-commit hook (scripts/diagram-regen-hook.sh) runs the same command
+  # with `--staged`; here nothing is staged, so the default mode regenerates
+  # every diagram root. Review-check findings are printed, never enforced here.
   # ---------------------------------------------------------------------------
   regenerate-and-diff:
     runs-on: ubuntu-latest
@@ -110,61 +122,42 @@ jobs:
       - name: Install likec4
         # Pinned to the maintained `likec4` package. The org-scoped
         # `@likec4/cli` is a frozen pre-1.0 distribution (last release v0.40.0,
-        # 2023) whose CLI lacks the current `gen` command surface — installing
-        # it made this job fail on every run. Pin keeps CI byte-aligned with
-        # the local likec4 used by scripts/diagram-regen-hook.sh.
+        # 2023) whose CLI lacks the current command surface — installing it
+        # made this job fail on every run. The version must equal the pin
+        # stated in scripts/regenerate_diagrams.py, which refuses any other.
         run: npm install -g likec4@1.59.4
 
       - name: Install d2
         # Pinned for GEOMETRY stability: a different d2 version can lay diagrams
         # out differently, which would legitimately change the rendered SVG.
         # --method standalone forces the release tarball so the binary is
-        # identical regardless of a runner's Homebrew state.
-        #
-        # The version STAMP (data-d2-version=...) is handled separately: the
-        # render steps below pipe every SVG through scripts/normalize_d2_svg.sh,
-        # which scrubs the stamp to a constant. The stamp varies by build
-        # provenance (Homebrew d2 0.7.1 emits "0.7.1"; this standalone tarball
-        # emits "v0.7.1"), so pinning alone never fully stabilized it — a local
-        # Homebrew regen still drifted the stamp. Normalization closes that gap.
+        # identical regardless of a runner's Homebrew state. The version stamp
+        # d2 writes into each SVG varies by build provenance ("0.7.1" from
+        # Homebrew, "v0.7.1" from this tarball); the regeneration command
+        # scrubs it, so a local render and this one compare equal.
         run: |
           curl -fsSL https://d2lang.com/install.sh \
             | sh -s -- --version v0.7.1 --method standalone
 
-      - name: Regenerate diagrams from source .c4 files
-        run: |
-          # Find all .c4 files under docs/diagrams/ and regenerate each.
-          # Operates over the full tree rather than the git index.
-          #
-          # Output goes to the sibling `rendered/` directory — the committed
-          # render location (e.g. docs/diagrams/architecture/rendered/). The
-          # `.c4` source lives under `<diagram>/src/`, so the rendered dir is
-          # the parent of the source workspace plus `/rendered`. Writing here
-          # is what makes the diff step below meaningful: regenerating into an
-          # untracked path would make `git diff --exit-code` pass vacuously.
-          find docs/diagrams -name '*.c4' | while IFS= read -r c4_file; do
-            workspace="${c4_file%/*}"
-            out_dir="$(dirname "${workspace}")/rendered"
-            echo "[ci] Regenerating d2 from ${c4_file} → ${out_dir}/"
-            likec4 gen d2 "${workspace}" -o "${out_dir}/"
-            # Render each generated .d2 to .svg
-            find "${out_dir}" -maxdepth 1 -name '*.d2' | while IFS= read -r d2_file; do
-              svg_file="${d2_file%.d2}.svg"
-              echo "[ci] Rendering ${d2_file} → ${svg_file}"
-              d2 "${d2_file}" "${svg_file}"
-              # Scrub the build-dependent d2 version stamp. Mirrors the local
-              # regen path (scripts/diagram-regen-hook.sh) so a committed render
-              # produced by a contributor's Homebrew d2 matches this standalone
-              # render. Without this, the stamp alone (0.7.1 vs v0.7.1) reddened
-              # the diff below even when the diagram was byte-identical.
-              bash scripts/normalize_d2_svg.sh "${svg_file}"
-            done
-          done
+      - name: Regenerate diagrams
+        # Default mode: every diagram root under docs/diagrams/, rendered in
+        # place into its rendered/ directory. A regeneration failure exits 1
+        # with the failing step's message; findings print without failing.
+        run: python3 scripts/regenerate_diagrams.py
 
-      - name: Diff regenerated diagrams against committed
+      - name: Fail on renders that differ from the committed ones
         run: |
-          git diff --exit-code -- docs/diagrams/ \
-            || (echo "::error::Generated diagrams disagree with committed renders. Run scripts/diagram-regen-hook.sh locally (after staging the .c4 file) and commit the result." && exit 1)
+          changes="$(git status --porcelain -- docs/diagrams/)"
+          if [ -n "${changes}" ]; then
+            echo "${changes}"
+            echo "::error::Committed diagram renders differ from a fresh regeneration. Run python3 scripts/regenerate_diagrams.py with the pinned toolchain and commit docs/diagrams/."
+            exit 1
+          fi
+
+      - name: Show the render diff
+        # Display only: runs after the step above failed, so the log shows what drifted.
+        if: failure()
+        run: git diff --exit-code -- docs/diagrams/
 
   # ---------------------------------------------------------------------------
   # Job 2: fitness-functions

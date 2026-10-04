@@ -1,30 +1,153 @@
-direction: down
-
-Developer: {
-  label: "Developer"
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 40
+    theme-overrides: {
+      N1: "#0F172A"
+      N2: "#334155"
+      N7: "#FFFFFF"
+    }
+  }
 }
-Claude_code: {
-  label: "Claude Code"
+classes: {
+  category_person: {
+    shape: rectangle
+    icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0LjUiIGZpbGw9IiMxRDRFODkiLz48cGF0aCBkPSJNMyAyMmMwLTUgNC04LjUgOS04LjVzOSAzLjUgOSA4LjV6IiBmaWxsPSIjMUQ0RTg5Ii8+PC9zdmc+"
+    style: {
+      fill: "#E6F0FA"
+      stroke: "#1D4E89"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_system_in_scope: {
+    shape: rectangle
+    style: {
+      fill: "#4338CA"
+      stroke: "#312E81"
+      stroke-width: 3
+      font-color: "#FFFFFF"
+      font-size: 15
+    }
+  }
+  category_external_system: {
+    shape: rectangle
+    style: {
+      fill: "#ECEAE6"
+      stroke: "#77726A"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      stroke-dash: 5
+    }
+  }
+  line_acts_on: {
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#475569"
+      stroke-width: 2
+      font-color: "#334155"
+      font-size: 14
+    }
+  }
 }
-Claude_desktop: {
-  label: "Claude Desktop"
+Title: {
+  label: "Praxion System Context (L0)"
+  shape: text
+  near: top-center
+  style: {
+    font-size: 24
+    bold: true
+    font-color: "#0F172A"
+  }
 }
-Cursor: {
-  label: "Cursor"
+"el_arize_phoenix": {
+  label: "Arize Phoenix\n[External system]"
+  class: category_external_system
 }
-Github: {
-  label: "GitHub"
+"el_claude_code": {
+  label: "Claude Code\n[External system]"
+  class: category_external_system
 }
-Praxion: {
-  label: "Praxion"
+"el_claude_desktop": {
+  label: "Claude Desktop\n[External system]"
+  class: category_external_system
 }
-Arize_phoenix: {
-  label: "Arize Phoenix"
+"el_cursor": {
+  label: "Cursor\n[External system]"
+  class: category_external_system
 }
-
-Developer -> Praxion: "develops"
-Claude_code -> Praxion: "executes agents"
-Claude_desktop -> Praxion: "loads skills"
-Cursor -> Praxion: "loads rules"
-Github -> Praxion: "hosts"
-Praxion -> Arize_phoenix: "streams via OTLP"
+"el_developer": {
+  label: "Developer\n[Person]"
+  class: category_person
+}
+"el_github": {
+  label: "GitHub\n[External system]"
+  class: category_external_system
+}
+"el_praxion": {
+  label: "Praxion\n[System in scope]"
+  class: category_system_in_scope
+}
+Legend: {
+  label: "Legend"
+  near: bottom-center
+  grid-columns: 4
+  style: {
+    fill: "#FFFFFF"
+    stroke: "#8C8780"
+    stroke-width: 1
+    font-color: "#0F172A"
+  }
+  category_person: {
+    label: "Person"
+    class: category_person
+  }
+  category_system_in_scope: {
+    label: "System in scope"
+    class: category_system_in_scope
+  }
+  category_external_system: {
+    label: "External system"
+    class: category_external_system
+  }
+  line_acts_on_sample: {
+    label: ""
+    direction: right
+    style: {
+      fill: transparent
+      stroke-width: 0
+    }
+    tail: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
+    }
+    head: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
+    }
+    tail -> head: {
+      label: "acts on (invokes, writes)"
+      class: line_acts_on
+    }
+  }
+}
+"el_claude_code" -> "el_praxion": "executes agents" {class: line_acts_on}
+"el_claude_desktop" -> "el_praxion": "loads skills" {class: line_acts_on}
+"el_cursor" -> "el_praxion": "loads rules" {class: line_acts_on}
+"el_developer" -> "el_praxion": "develops" {class: line_acts_on}
+"el_github" -> "el_praxion": "hosts" {class: line_acts_on}
+"el_praxion" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}

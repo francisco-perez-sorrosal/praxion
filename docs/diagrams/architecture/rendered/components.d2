@@ -1,121 +1,389 @@
-direction: down
-
-Praxion: {
-  label: "Praxion"
-
-  Tooling: {
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 40
+    theme-overrides: {
+      N1: "#0F172A"
+      N2: "#334155"
+      N7: "#FFFFFF"
+    }
+  }
+}
+classes: {
+  category_person: {
+    shape: rectangle
+    icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0LjUiIGZpbGw9IiMxRDRFODkiLz48cGF0aCBkPSJNMyAyMmMwLTUgNC04LjUgOS04LjVzOSAzLjUgOSA4LjV6IiBmaWxsPSIjMUQ0RTg5Ii8+PC9zdmc+"
+    style: {
+      fill: "#E6F0FA"
+      stroke: "#1D4E89"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_external_system: {
+    shape: rectangle
+    style: {
+      fill: "#ECEAE6"
+      stroke: "#77726A"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      stroke-dash: 5
+    }
+  }
+  category_knowledge_asset: {
+    shape: package
+    style: {
+      fill: "#E1F3EC"
+      stroke: "#00684A"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_runtime_agent: {
+    shape: rectangle
+    style: {
+      fill: "#FDEFD9"
+      stroke: "#A85A00"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      border-radius: 16
+    }
+  }
+  category_pipeline_document: {
+    shape: document
+    style: {
+      fill: "#E3F1FB"
+      stroke: "#0B6FA4"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_persistent_store: {
+    shape: cylinder
+    style: {
+      fill: "#F6E6F0"
+      stroke: "#9B3A75"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_tooling: {
+    shape: rectangle
+    style: {
+      fill: "#F2F4F7"
+      stroke: "#3F4B5C"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      3d: true
+    }
+  }
+  category_system_in_scope_frame: {
+    shape: rectangle
+    style: {
+      fill: "#EEF2FF"
+      stroke: "#4338CA"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+    }
+  }
+  category_layer_frame: {
+    shape: rectangle
+    style: {
+      fill: transparent
+      stroke: "#8C8780"
+      stroke-width: 2
+      font-color: "#0F172A"
+      font-size: 15
+      stroke-dash: 5
+    }
+  }
+  line_acts_on: {
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#475569"
+      stroke-width: 2
+      font-color: "#334155"
+      font-size: 14
+    }
+  }
+  line_read_only: {
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#475569"
+      stroke-width: 2
+      font-color: "#334155"
+      font-size: 14
+      stroke-dash: 5
+    }
+  }
+}
+Title: {
+  label: "Praxion Components (L1)"
+  shape: text
+  near: top-center
+  style: {
+    font-size: 24
+    bold: true
+    font-color: "#0F172A"
+  }
+}
+"el_arize_phoenix": {
+  label: "Arize Phoenix\n[External system]"
+  class: category_external_system
+}
+"el_claude_code": {
+  label: "Claude Code\n[External system]"
+  class: category_external_system
+}
+"el_claude_desktop": {
+  label: "Claude Desktop\n[External system]"
+  class: category_external_system
+}
+"el_cursor": {
+  label: "Cursor\n[External system]"
+  class: category_external_system
+}
+"el_developer": {
+  label: "Developer\n[Person]"
+  class: category_person
+}
+"el_github": {
+  label: "GitHub\n[External system]"
+  class: category_external_system
+}
+"el_praxion": {
+  label: "Praxion\n[System in scope]"
+  class: category_system_in_scope_frame
+  "el_praxion.knowledge": {
+    label: "Knowledge Layer\n[Layer]"
+    class: category_layer_frame
+    "el_praxion.knowledge.agents": {
+      label: "Agents\n[Knowledge asset]\nAuthored subprocess\nspecifications"
+      class: category_knowledge_asset
+    }
+    "el_praxion.knowledge.commands": {
+      label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
+      class: category_knowledge_asset
+    }
+    "el_praxion.knowledge.rules": {
+      label: "Rules\n[Knowledge asset]\nDeclarative conventions"
+      class: category_knowledge_asset
+    }
+    "el_praxion.knowledge.skills": {
+      label: "Skills\n[Knowledge asset]\nDomain expertise modules"
+      class: category_knowledge_asset
+    }
+  }
+  "el_praxion.orchestration": {
+    label: "Orchestration Layer\n[Layer]"
+    class: category_layer_frame
+    "el_praxion.orchestration.aiwork": {
+      label: ".ai-work/\n[Pipeline document]\nEphemeral pipeline docs\n(task-slug scoped)"
+      class: category_pipeline_document
+    }
+    "el_praxion.orchestration.hooks": {
+      label: "Hooks\n[Tooling]\nLifecycle enforcement\n(send_event)"
+      class: category_tooling
+    }
+    "el_praxion.orchestration.orchestrator": {
+      label: "Main Agent (Orchestrator)\n[Runtime agent]\nTier selector, task-slug\npropagator, rework-worktree\nspawner, subagent dispatcher"
+      class: category_runtime_agent
+    }
+    "el_praxion.orchestration.pipeline": {
+      label: "Agent Pipeline\n[Runtime agent]\nSpawned subprocesses\n(runtime instances)"
+      class: category_runtime_agent
+    }
+  }
+  "el_praxion.persistence": {
+    label: "Persistence Layer\n[Layer]"
+    class: category_layer_frame
+    "el_praxion.persistence.adrs": {
+      label: "ADR Fragments\n[Persistent store]\n.ai-state/decisions/drafts/\n— finalized at merge-to-main"
+      class: category_persistent_store
+    }
+    "el_praxion.persistence.aistate": {
+      label: ".ai-state/\n[Persistent store]\nADRs, specs, sentinel\nreports, tech-debt ledger"
+      class: category_persistent_store
+    }
+    "el_praxion.persistence.chronograph": {
+      label: "Chronograph MCP\n[Tooling]\nOTel relay"
+      class: category_tooling
+    }
+    "el_praxion.persistence.tdl": {
+      label: "Tech-Debt Ledger\n[Persistent store]\n.ai-state/TECH_DEBT_LEDGER.md\n(+ RESOLVED)"
+      class: category_persistent_store
+    }
+  }
+  "el_praxion.tooling": {
+    label: "Tooling\n[Layer]"
+    class: category_layer_frame
+    "el_praxion.tooling.dashboard": {
+      label: "Pipeline Dashboard\n[Tooling]\nNext.js runtime, own process\n+ sha256-derived port;\nread-only over project state"
+      class: category_tooling
+    }
+    "el_praxion.tooling.evals": {
+      label: "Eval Framework\n[Tooling]\nOut-of-band quality\nmeasurement over completed\nartifacts"
+      class: category_tooling
+    }
+    "el_praxion.tooling.installers": {
+      label: "Installers\n[Tooling]\n3 targets"
+      class: category_tooling
+    }
+    "el_praxion.tooling.scripts": {
+      label: "Scripts\n[Tooling]\nWorktrees, merge, Phoenix,\nfinalize"
+      class: category_tooling
+    }
+    "el_praxion.tooling.versioning": {
+      label: "Versioning\n[Tooling]\nCommitizen"
+      class: category_tooling
+    }
+  }
+}
+Legend: {
+  label: "Legend"
+  near: bottom-center
+  grid-columns: 4
+  style: {
+    fill: "#FFFFFF"
+    stroke: "#8C8780"
+    stroke-width: 1
+    font-color: "#0F172A"
+  }
+  category_person: {
+    label: "Person"
+    class: category_person
+  }
+  category_external_system: {
+    label: "External system"
+    class: category_external_system
+  }
+  category_knowledge_asset: {
+    label: "Knowledge asset"
+    class: category_knowledge_asset
+  }
+  category_runtime_agent: {
+    label: "Runtime agent"
+    class: category_runtime_agent
+  }
+  category_pipeline_document: {
+    label: "Pipeline document"
+    class: category_pipeline_document
+  }
+  category_persistent_store: {
+    label: "Persistent store"
+    class: category_persistent_store
+  }
+  category_tooling: {
     label: "Tooling"
-
-    Installers: {
-      label: "Installers"
+    class: category_tooling
+  }
+  category_system_in_scope_frame: {
+    label: "System in scope (boundary)"
+    class: category_system_in_scope_frame
+  }
+  category_layer_frame: {
+    label: "Layer (boundary)"
+    class: category_layer_frame
+  }
+  line_acts_on_sample: {
+    label: ""
+    direction: right
+    style: {
+      fill: transparent
+      stroke-width: 0
     }
-    Versioning: {
-      label: "Versioning"
+    tail: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
     }
-    Dashboard: {
-      label: "Pipeline Dashboard"
+    head: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
     }
-    Evals: {
-      label: "Eval Framework"
-    }
-    Scripts: {
-      label: "Scripts"
+    tail -> head: {
+      label: "acts on (invokes, writes)"
+      class: line_acts_on
     }
   }
-  Knowledge: {
-    label: "Knowledge Layer"
-
-    Skills: {
-      label: "Skills"
+  line_read_only_sample: {
+    label: ""
+    direction: right
+    style: {
+      fill: transparent
+      stroke-width: 0
     }
-    Rules: {
-      label: "Rules"
+    tail: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
     }
-    Commands: {
-      label: "Commands"
+    head: {
+      label: ""
+      shape: circle
+      width: 8
+      height: 8
+      style: {
+        fill: "#475569"
+        stroke: "#475569"
+      }
     }
-    Agents: {
-      label: "Agents"
-    }
-  }
-  Orchestration: {
-    label: "Orchestration Layer"
-
-    Hooks: {
-      label: "Hooks"
-    }
-    Orchestrator: {
-      label: "Main Agent (Orchestrator)"
-    }
-    Pipeline: {
-      label: "Agent Pipeline"
-    }
-    Aiwork: {
-      label: ".ai-work/"
-    }
-  }
-  Persistence: {
-    label: "Persistence Layer"
-
-    Chronograph: {
-      label: "Chronograph MCP"
-    }
-    Adrs: {
-      label: "ADR Fragments"
-    }
-    Tdl: {
-      label: "Tech-Debt Ledger"
-    }
-    Aistate: {
-      label: ".ai-state/"
+    tail -> head: {
+      label: "read-only flow (consumed, not modified)"
+      class: line_read_only
     }
   }
 }
-Developer: {
-  label: "Developer"
-}
-Claude_code: {
-  label: "Claude Code"
-}
-Claude_desktop: {
-  label: "Claude Desktop"
-}
-Cursor: {
-  label: "Cursor"
-}
-Github: {
-  label: "GitHub"
-}
-Arize_phoenix: {
-  label: "Arize Phoenix"
-}
-
-Praxion.Knowledge.Skills -> Praxion.Orchestration.Pipeline: "injects"
-Praxion.Knowledge.Rules -> Praxion.Orchestration.Pipeline: "constrains"
-Praxion.Knowledge.Commands -> Praxion.Orchestration.Pipeline: "triggers"
-Praxion.Knowledge.Agents -> Praxion.Orchestration.Pipeline: "spawns"
-Praxion.Orchestration.Hooks -> Praxion.Orchestration.Pipeline: "enforces"
-Praxion.Orchestration.Pipeline -> Praxion.Orchestration.Aiwork: "reads/writes documents"
-Praxion.Orchestration.Orchestrator -> Praxion.Orchestration.Pipeline: "[...]"
-Praxion.Orchestration.Hooks -> Praxion.Persistence.Chronograph: "emits events (HTTP)"
-Praxion.Persistence.Chronograph -> Arize_phoenix: "streams via OTLP"
-Praxion.Orchestration.Pipeline -> Praxion.Persistence.Aistate: "persists artifacts"
-Praxion.Orchestration.Pipeline -> Praxion.Persistence.Adrs: "writes ADR fragments"
-Praxion.Persistence.Adrs -> Praxion.Persistence.Aistate: "finalized at merge-to-main"
-Praxion.Orchestration.Pipeline -> Praxion.Persistence.Tdl: "[...]"
-Praxion.Orchestration.Orchestrator -> Praxion.Persistence.Tdl: "[...]"
-Praxion.Tooling.Installers -> Praxion.Knowledge.Skills: "deploys"
-Praxion.Tooling.Installers -> Praxion.Knowledge.Rules: "deploys"
-Praxion.Tooling.Installers -> Praxion.Knowledge.Commands: "deploys"
-Praxion.Tooling.Installers -> Praxion.Knowledge.Agents: "deploys"
-Praxion.Orchestration.Orchestrator -> Praxion.Tooling.Scripts: "spawns rework worktree per row \n(EnterWorktree)"
-Praxion.Tooling.Scripts -> Praxion.Persistence.Adrs: "finalize_adrs.py promotes drafts to \ndec-NNN"
-Praxion.Tooling.Scripts -> Praxion.Persistence.Tdl: "finalize_tech_debt_ledger.py reconciles"
-Praxion.Tooling.Dashboard -> Praxion.Orchestration.Aiwork: "reads in-flight pipeline docs \n(read-only)"
-Praxion.Tooling.Dashboard -> Praxion.Persistence.Aistate: "reads (read-only)"
-Praxion.Tooling.Evals -> Praxion.Persistence.Aistate: "reads completed artifacts (read-only)"
-Developer -> Praxion: "develops"
-Claude_code -> Praxion: "executes agents"
-Claude_desktop -> Praxion: "loads skills"
-Cursor -> Praxion: "loads rules"
-Github -> Praxion: "hosts"
+"el_claude_code" -> "el_praxion": "executes agents" {class: line_acts_on}
+"el_claude_desktop" -> "el_praxion": "loads skills" {class: line_acts_on}
+"el_cursor" -> "el_praxion": "loads rules" {class: line_acts_on}
+"el_developer" -> "el_praxion": "develops" {class: line_acts_on}
+"el_github" -> "el_praxion": "hosts" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.agents" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "spawns" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches systems-architect (always-first) +1 more" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.rules" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "constrains" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "injects" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "enforces" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.hooks" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.chronograph": "emits events (HTTP)" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline": "dispatches +16 more" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "files row from deferred CIS +1 more" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts": "spawns rework worktree per row (EnterWorktree)" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads/writes documents" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs": "writes ADR fragment when load-bearing +1 more" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "persists artifacts" {class: line_acts_on}
+"el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.pipeline" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "files drift rows +2 more" {class: line_acts_on}
+"el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "finalized at merge-to-main" {class: line_acts_on}
+"el_praxion"."el_praxion.persistence"."el_praxion.persistence.chronograph" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.orchestration"."el_praxion.orchestration.aiwork": "reads in-flight pipeline docs (read-only)" {class: line_read_only}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.dashboard" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads (read-only)" {class: line_read_only}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.evals" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.aistate": "reads completed artifacts (read-only)" {class: line_read_only}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.agents": "deploys" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.commands": "deploys" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.rules": "deploys" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion"."el_praxion.knowledge"."el_praxion.knowledge.skills": "deploys" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.adrs": "finalize_adrs.py promotes drafts to dec-NNN" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling"."el_praxion.tooling.scripts" -> "el_praxion"."el_praxion.persistence"."el_praxion.persistence.tdl": "finalize_tech_debt_ledger.py reconciles" {class: line_acts_on}

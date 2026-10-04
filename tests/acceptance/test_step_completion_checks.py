@@ -16,6 +16,7 @@ commit, `WIP.md` ticks it done, and its recorded run reads green.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -80,29 +81,69 @@ def test_met_check_does_not_lift_an_existing_completion_blocker(tmp_path):
 # -- An unmet check never yields to the agent's own claim --------------------------
 
 
+_RESULT_KEY = re.compile(r"\b(?:pass|fail|skip|pending)=")
+_WINDOW = 60
+
+
+def _counts_named_after(evidence: str, key: str) -> set[str]:
+    """Every count written after an occurrence of `key`, up to the next `Result:` key."""
+    counts: set[str] = set()
+    for match in re.finditer(re.escape(key), evidence):
+        window = evidence[match.end() : match.end() + _WINDOW]
+        next_key = _RESULT_KEY.search(window)
+        counts |= set(re.findall(r"\d+", window[: next_key.start()] if next_key else window))
+    return counts
+
+
+def _unnamed(evidence: str, unmet: tuple[tuple[str, int, int], ...]) -> list[str]:
+    """The unmet expectations the evidence does not name by key, expected and observed count."""
+    return [
+        f"{key} expected {expected} observed {observed}"
+        for key, expected, observed in unmet
+        if not {str(expected), str(observed)} <= _counts_named_after(evidence, key)
+    ]
+
+
 @pytest.mark.parametrize(
-    ("check", "recorded", "unmet_expectation"),
+    ("check", "recorded", "unmet"),
     [
         (
             CHECK_FOUR_GREEN_NOTHING_PENDING,
-            "Result: pass=4 fail=0 skip=0 pending=2",
-            "pending=",
+            "Result: pass=4 fail=0 skip=0 pending=3",
+            (("pending=", 0, 3),),
         ),
-        (Check(command=COMMAND, passed=6), "Result: pass=4 fail=0 skip=0", "pass="),
-        (CHECK_FOUR_GREEN, "Result: pass=3 fail=1 skip=0", "fail="),
+        (
+            Check(command=COMMAND, passed=6),
+            "Result: pass=4 fail=0 skip=0",
+            (("pass=", 6, 4),),
+        ),
+        (CHECK_FOUR_GREEN, "Result: pass=4 fail=2 skip=0", (("fail=", 0, 2),)),
+        (CHECK_FOUR_GREEN, "Result: pass=4 fail=0 skip=1", (("skip=", 0, 1),)),
+        (
+            Check(command=COMMAND, passed=6, pending=0),
+            "Result: pass=4 fail=0 skip=0 pending=3",
+            (("pass=", 6, 4), ("pending=", 0, 3)),
+        ),
     ],
-    ids=["acceptance-tests-still-pending", "fewer-passing-tests", "a-failing-test"],
+    ids=[
+        "acceptance-tests-still-pending",
+        "fewer-passing-tests",
+        "failing-tests",
+        "a-skipped-test",
+        "two-expectations-unmet",
+    ],
 )
-def test_claimed_step_whose_check_is_not_met_is_a_mismatch_naming_the_unmet_expectation(
-    tmp_path, check, recorded, unmet_expectation
+def test_claimed_step_whose_check_is_not_met_is_a_mismatch_naming_each_unmet_count(
+    tmp_path, check, recorded, unmet
 ):
     task = build_task(tmp_path, _step(check=check, result=recorded, claimed_done=True))
 
     judged = reconcile(task).step("1")
 
     assert judged.verdict == "mismatch", judged.evidence
-    assert unmet_expectation in judged.evidence, (
-        f"the mismatch should name the unmet {unmet_expectation!r} expectation: {judged.evidence!r}"
+    assert _unnamed(judged.evidence, unmet) == [], (
+        "the mismatch should name each unmet expectation by its Result: key with the expected "
+        f"and observed counts: {judged.evidence!r}"
     )
 
 

@@ -171,6 +171,15 @@ def progress_entry(
     )
 
 
+def cap_exhausted_verdict() -> str:
+    """The verdict name for a step that used its two fresh attempts without completing."""
+    raise UnboundDriverError(
+        "unbound: a step that has used its two fresh attempts without verified completion gets "
+        "its own verdict, distinct from both mismatch and blocked -- bind this to the designed "
+        "verdict name"
+    )
+
+
 def _criterion_of(raw: dict[str, Any]) -> Criterion:
     raise UnboundDriverError(
         "unbound: each reconciler verdict names the criterion that decided it -- the declared "

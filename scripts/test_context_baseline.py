@@ -14,7 +14,9 @@ to the implementer):
     slug         pipeline slug; ignored for kind="main"
     peak         peak context tokens across assistant turns
     first_turn   context tokens at the first assistant turn
-    turns        number of assistant turns
+    turns        number of assistant records carrying usage
+    requests     number of distinct API requests (subagent only)
+    max_turns    the agent file's declared `maxTurns`, or None (subagent only)
     tools        tool_use block count; ignored for kind="main"
     compactions  count of isCompactSummary rows seen
     spawns       list of [context_at_spawn, spawned_agent_type]; kind="main" only
@@ -85,6 +87,8 @@ def _subagent_row(
     turns: int = 5,
     tools: int = 5,
     compactions: int = 0,
+    requests: int = 3,
+    max_turns: int | None = None,
 ) -> dict:
     """A subagent row -- one spawned agent's transcript."""
     return {
@@ -94,6 +98,8 @@ def _subagent_row(
         "peak": peak,
         "first_turn": first_turn,
         "turns": turns,
+        "requests": requests,
+        "max_turns": max_turns,
         "tools": tools,
         "compactions": compactions,
         "spawns": [],
@@ -121,6 +127,7 @@ def test_report_shape_matches_ds3_exactly():
         "main",
         "by_agent_type",
         "by_pipeline",
+        "cap_outs",
     }
     assert report["sessions"] == 2
     assert report["subagents"] == 3
@@ -412,3 +419,151 @@ def test_main_exits_2_with_wal_unreadable_reason_for_an_unreadable_wal(
     assert exit_code == 2
     assert "wal-unreadable" in captured.err
     assert captured.out == ""
+
+
+# --------------------------------------------------------------------------- #
+# (g) cap-outs: spawns whose request count reached their agent's declared maxTurns
+# --------------------------------------------------------------------------- #
+def _cap_outs(rows: list[dict]) -> dict:
+    report = ctx.compute(rows, generated_at=GENERATED_AT, source_root=SOURCE_ROOT)
+    return report["cap_outs"]
+
+
+def test_spawn_at_its_declared_cap_counts_as_capped():
+    rows = [
+        _subagent_row(requests=100, max_turns=100),
+        _subagent_row(requests=106, max_turns=100),  # resumed past the cap: still one spawn
+        _subagent_row(requests=36, max_turns=100),
+        _subagent_row(requests=99, max_turns=100),
+    ]
+
+    assert _cap_outs(rows) == {
+        "implementer": {"n": 4, "capped": 2, "rate": 0.5, "max_turns": 100, "basis": "estimate"}
+    }
+
+
+def test_spawns_below_their_declared_cap_are_not_capped():
+    rows = [_subagent_row(requests=20, max_turns=80), _subagent_row(requests=79, max_turns=80)]
+
+    entry = _cap_outs(rows)["implementer"]
+
+    assert (entry["n"], entry["capped"], entry["rate"]) == (2, 0, 0.0)
+
+
+def test_each_agent_type_is_judged_against_its_own_cap():
+    rows = [
+        _subagent_row(atype="implementer", requests=90, max_turns=100),
+        _subagent_row(atype="verifier", requests=90, max_turns=80),
+    ]
+
+    cap_outs = _cap_outs(rows)
+
+    assert cap_outs["implementer"]["capped"] == 0
+    assert cap_outs["verifier"]["capped"] == 1
+    assert cap_outs["verifier"]["max_turns"] == 80
+
+
+def test_agent_type_with_no_declared_cap_is_left_out():
+    rows = [
+        _subagent_row(atype="unknown", requests=500, max_turns=None),
+        _subagent_row(atype="implementer", requests=10, max_turns=100),
+    ]
+
+    assert set(_cap_outs(rows)) == {"implementer"}
+
+
+def test_cap_outs_rate_is_rounded_to_three_places():
+    rows = [_subagent_row(requests=100, max_turns=100)] + [
+        _subagent_row(requests=5, max_turns=100) for _ in range(2)
+    ]
+
+    assert _cap_outs(rows)["implementer"]["rate"] == 0.333
+
+
+def test_cap_outs_is_empty_without_subagent_rows():
+    assert _cap_outs([_main_row()]) == {}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("---\nname: x\nmaxTurns: 100\n---\nbody\n", 100),
+        ("---\nname: x\n---\nmaxTurns: 100\n", None),  # the body is not frontmatter
+        ("---\nname: x\nmaxTurnsX: 100\n---\n", None),
+        ("name: x\nmaxTurns: 100\n", None),  # no frontmatter block at all
+        ("", None),
+    ],
+)
+def test_frontmatter_max_turns_reads_only_the_leading_block(text, expected):
+    assert ctx._frontmatter_max_turns(text) == expected
+
+
+def _write_transcript(path: Path, requests: list[tuple[str, int]]) -> None:
+    """A subagent transcript: a first prompt, then per request the given number
+    of assistant records sharing one `requestId` (the harness splits a request
+    into a thinking record and a tool-use record)."""
+    usage = {"input_tokens": 1, "cache_creation_input_tokens": 1, "cache_read_input_tokens": 0}
+    lines = [{"type": "user", "message": {"content": "You are the implementer. Task slug: s"}}]
+    for request_id, records in requests:
+        for _ in range(records):
+            lines.append(
+                {
+                    "type": "assistant",
+                    "requestId": request_id,
+                    "message": {"id": "msg_" + request_id, "usage": usage, "content": []},
+                }
+            )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(line) for line in lines) + "\n", encoding="utf-8")
+
+
+def _project_with_transcripts(tmp_path, monkeypatch) -> tuple[Path, Path]:
+    """(project_root, subagents_dir) with `Path.home()` pointed at `tmp_path`."""
+    monkeypatch.setattr(ctx.Path, "home", lambda: tmp_path / "home")
+    project_root = tmp_path / "project"
+    (project_root / ".ai-state").mkdir(parents=True)
+    subagents = ctx._transcripts_dir(project_root) / "sess-1" / "subagents"
+    return project_root, subagents
+
+
+def test_load_counts_distinct_requests_not_assistant_records(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_transcript(subagents / "agent-a1.jsonl", [("req_1", 2), ("req_2", 2), ("req_3", 1)])
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    (agents_dir / "implementer.md").write_text("---\nmaxTurns: 3\n---\n", encoding="utf-8")
+
+    (row,) = ctx.load(project_root, agents_dir)
+
+    assert (row["turns"], row["requests"], row["max_turns"]) == (5, 3, 3)
+    assert _cap_outs([row])["implementer"]["capped"] == 1
+
+
+def test_load_leaves_max_turns_unset_when_the_agent_file_is_absent(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_transcript(subagents / "agent-a1.jsonl", [("req_1", 1)])
+
+    (row,) = ctx.load(project_root, tmp_path / "no-agents-here")
+
+    assert row["max_turns"] is None
+    assert _cap_outs([row]) == {}
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root ignores file permission bits; chmod 0o000 would not actually block the read",
+)
+def test_load_skips_an_unreadable_transcript_and_names_it_on_stderr(tmp_path, monkeypatch, capsys):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    readable = subagents / "agent-a1.jsonl"
+    unreadable = subagents / "agent-a2.jsonl"
+    _write_transcript(readable, [("req_1", 1)])
+    _write_transcript(unreadable, [("req_9", 1)])
+    unreadable.chmod(0o000)
+    try:
+        rows = ctx.load(project_root, tmp_path / "agents")
+    finally:
+        unreadable.chmod(0o644)
+
+    assert len(rows) == 1
+    assert "unreadable transcript" in capsys.readouterr().err

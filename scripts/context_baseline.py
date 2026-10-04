@@ -36,6 +36,21 @@ across worktree-mangled siblings; a complete accounting needs either several
 `--include-worktrees` flag that globs the sibling directories -- neither is
 implemented here.
 
+Cap-outs: the report's `cap_outs` object counts, per agent type, the spawns
+that stopped at their turn cap. The harness leaves no stop marker in a
+transcript or its `.meta.json` sidecar, so a spawn counts as capped when its
+`requests` -- distinct API requests, the harness's own turn unit -- reach the
+`maxTurns` declared in its agent file's frontmatter (read from this checkout's
+`agents/` at measure time). It is therefore always an `estimate`: a spawn that
+finishes naturally on its cap-th request reads as capped, a resumed spawn counts
+once at its total, and a spawn made under an older cap is read against the
+current one. Agent types with no declared `maxTurns` are left out. `requests`
+is not the `turns` field: one request is split across several assistant records
+(thinking, then tool use), so `turns` runs well past the cap and stays as it was
+because the published `turns_p50` is built on it. The worktree-sibling limit
+above applies to `cap_outs` too, and a subagent transcript that cannot be read
+is skipped with a named warning on stderr, so it is in no aggregate.
+
 Tests are fixture-only (`scripts/test_context_baseline.py`) -- real
 transcripts are never committed or read in CI; reproducing the published
 baseline against a real machine's transcripts is a manual, out-of-band check.
@@ -66,6 +81,16 @@ from _repo_root import git_toplevel_from_cwd
 # directory -- both live one level under the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 from _observation_log import reader  # noqa: E402 (after sys.path injection)
+
+# Declared turn caps live in the frontmatter of the agent files this script ships
+# beside (not the measured project's: a managed project has no `agents/`).
+_AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
+_MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
+
+# No harness marker exists for a turn-cap stop, so a cap-out is always inferred
+# from the request count (see module docstring), never observed.
+_CAP_OUT_BASIS = "estimate"
 
 # The model's context window -- a fixed constant, never a CLI-supplied value
 # (D1: Praxion ships no threshold, so there is nothing to make configurable).
@@ -160,6 +185,24 @@ def _agent_types_from_wal(wal_path: Path) -> dict[str, str]:
     }
 
 
+def _frontmatter_max_turns(text: str) -> int | None:
+    """The `maxTurns` declared in an agent file's leading frontmatter block,
+    or `None` when there is no block or no such key."""
+    block = _FRONTMATTER_RE.match(text)
+    match = _MAX_TURNS_RE.search(block.group(1)) if block else None
+    return int(match.group(1)) if match else None
+
+
+def _declared_max_turns(agents_dir: Path, agent_type: str) -> int | None:
+    """`agents/<type>.md`'s declared turn cap; `None` for a type with no agent
+    file (`unknown`, `multi`, host-native agents) or no declared cap."""
+    try:
+        text = (agents_dir / f"{agent_type}.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    return _frontmatter_max_turns(text)
+
+
 def _classify_from_prompt(first_prompt: str) -> str:
     """`baseline.py`'s simple match, falling back to `retype.py`'s broader one
     -- the exact two-pass cascade the ad hoc scripts ran against a WAL-unjoined
@@ -202,6 +245,7 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
     turns = peak = tools = compactions = 0
     first_turn: int | None = None
     first_prompt = ""
+    request_ids: set = set()
     for record in _iter_records(path):
         if record.get("isCompactSummary") or record.get("type") == "summary":
             compactions += 1
@@ -219,6 +263,9 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         if not usage:
             continue
         turns += 1
+        # One API request spans several assistant records; a record with no id
+        # at all is its own request.
+        request_ids.add(record.get("requestId") or message.get("id") or turns)
         ctx = _context_tokens(usage)
         peak = max(peak, ctx)
         if first_turn is None and usage.get("cache_creation_input_tokens") is not None:
@@ -236,6 +283,8 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         "peak": peak,
         "first_turn": first_turn or 0,
         "turns": turns,
+        "requests": len(request_ids),
+        "max_turns": None,
         "tools": tools,
         "compactions": compactions,
         "spawns": [],
@@ -295,7 +344,7 @@ def _content_text(content) -> str:
     return ""
 
 
-def load(project_root: Path) -> list[dict]:
+def load(project_root: Path, agents_dir: Path = _AGENTS_DIR) -> list[dict]:
     """Walk this project's transcripts + WAL into `compute()`'s row shape.
 
     Impure: the only function in this module that touches the filesystem.
@@ -308,14 +357,23 @@ def load(project_root: Path) -> list[dict]:
     id2type = _agent_types_from_wal(reader.log_path(project_root / ".ai-state"))
 
     rows: list[dict] = []
+    max_turns_by_type: dict[str, int | None] = {}
     for path in _subagent_transcript_paths(transcripts_dir):
-        row = _parse_subagent_transcript(path)
+        try:
+            row = _parse_subagent_transcript(path)
+        except (OSError, UnicodeDecodeError) as exc:
+            # Named, never silent: the spawn is absent from every aggregate.
+            print(f"warning: skipping unreadable transcript {path}: {exc}", file=sys.stderr)
+            continue
         if row is None:
             continue
         agent_id = path.name[len("agent-") : -len(".jsonl")]
         wal_type = id2type.get(agent_id)
         if wal_type:
             row["atype"] = wal_type.replace("praxion:", "")
+        if row["atype"] not in max_turns_by_type:
+            max_turns_by_type[row["atype"]] = _declared_max_turns(agents_dir, row["atype"])
+        row["max_turns"] = max_turns_by_type[row["atype"]]
         rows.append(row)
 
     for path in sorted(transcripts_dir.glob("*.jsonl")):
@@ -375,6 +433,27 @@ def _aggregate_by_agent_type(subagent_rows: list[dict]) -> dict:
             "turns_p50": _percentile([r["turns"] for r in group], 0.5),
             "tools_p50": _percentile([r["tools"] for r in group], 0.5),
             "compacted": sum(1 for r in group if r["compactions"] > 0),
+        }
+    return result
+
+
+def _aggregate_cap_outs(subagent_rows: list[dict]) -> dict:
+    """Per agent type with a declared `maxTurns`: how many spawns reached it."""
+    by_type: dict[str, list[dict]] = defaultdict(list)
+    for row in subagent_rows:
+        if row["max_turns"] is not None:
+            by_type[row["atype"]].append(row)
+
+    result = {}
+    for atype, group in by_type.items():
+        max_turns = group[0]["max_turns"]
+        capped = sum(1 for r in group if r["requests"] >= max_turns)
+        result[atype] = {
+            "n": len(group),
+            "capped": capped,
+            "rate": round(capped / len(group), 3),
+            "max_turns": max_turns,
+            "basis": _CAP_OUT_BASIS,
         }
     return result
 
@@ -442,6 +521,7 @@ def compute(
         "main": _aggregate_main(main_rows),
         "by_agent_type": by_agent_type,
         "by_pipeline": _aggregate_by_pipeline(subagent_rows),
+        "cap_outs": _aggregate_cap_outs(subagent_rows),
     }
     if band is not None:
         report["band"] = _band_counterfactual(band, main_rows, subagent_rows, by_agent_type)

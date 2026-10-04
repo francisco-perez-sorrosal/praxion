@@ -23,7 +23,7 @@ live plugin install); this command is a thin wrapper that resolves the two
 inputs the script must not fetch itself (the live plugin path and the current
 hub SHA), runs it, and surfaces the result. The script reconciles:
 
-1. The three finalize-hook symlinks (`post-merge`, `post-commit`, `post-checkout`)
+1. The four finalize-hook symlinks (`post-merge`, `post-commit`, `post-checkout`, `post-rewrite`)
 2. The `merge.observations-jsonl.driver` git config
 3. Any retired merge driver + its `.gitattributes` line (cross-version cleanup)
 4. The `.ai-state/.praxion-onboard.json` version stamp

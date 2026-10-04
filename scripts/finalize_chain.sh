@@ -512,12 +512,14 @@ _finalize_chain_state_driven() {
 # working tree copies the log of each worktree a git operation brought in: its
 # HEAD is contained in the checkout's HEAD and not in that operation's
 # before-revision. Three hook steps run it, one per way a merge lands:
-#   post-merge   -- `git merge` and `git pull` (merge or fast-forward), against
-#                   ORIG_HEAD (the script's default);
+#   post-merge   -- `git merge` and a `git pull` that merges or fast-forwards
+#                   (`git pull --rebase` with no local commits fast-forwards),
+#                   against ORIG_HEAD (the script's default);
 #   post-commit  -- a merge finished by `git commit` or `git merge --continue`
 #                   after a conflict or --no-commit, against the new commit's
 #                   first parent (exact even when ORIG_HEAD was overwritten);
-#   post-rewrite -- a finished rebase, `git pull --rebase` included, against
+#   post-rewrite -- a finished rebase that rewrote at least one commit,
+#                   `git pull --rebase` over local commits included, against
 #                   ORIG_HEAD (the tip the branch held when the rebase began).
 # A worktree with no commit of its own, or one an earlier merge already took
 # in, is not copied here, so a running pipeline's half session stays out --
@@ -525,10 +527,15 @@ _finalize_chain_state_driven() {
 # which the next pull brings in (accepted leftover: P03 warns until a later
 # merge copies the rest); teardown through /merge-worktree copies whatever is
 # left. Idempotent: rows the main log already holds are skipped, so two steps
-# seeing one merge copy each row once. The one merge no hook recognises is a
-# squash merge (the squashed commit is not the worktree's HEAD); it is left to
-# /merge-worktree step 9.5 and P14. An unresolvable before-revision is a
-# one-line named skip (--skip-unresolvable-before), never a failure.
+# seeing one merge copy each row once. Every other way a worktree's work
+# reaches the branch is left to /merge-worktree step 9.5 and P14, notably a
+# squash merge or another landing of copies (a cherry-pick, a server-side
+# rebase merge: the landed commits are not the worktree's HEAD) and a rebase
+# that rewrites no commit -- a fast-forward by `git rebase`, or a rebase that
+# drops every local commit as already upstream, `git pull --rebase` included --
+# for which git runs no post-rewrite, only a detached post-checkout before the
+# branch moves. An unresolvable before-revision is a one-line named skip
+# (--skip-unresolvable-before), never a failure.
 #
 # The recording mode is the project's: a git hook does not see the variables the
 # settings files define for a session, so the script takes each of the two mode
@@ -649,14 +656,17 @@ finalize_chain_post_checkout() {
 }
 
 # Post-rewrite entry point. git runs it once after `git commit --amend`
-# (argument `amend`) and once after a rebase finishes (argument `rebase`, with
-# the rewritten pairs on stdin, which this entry does not read). Only a
-# finished rebase in the primary working tree runs merge-in, against ORIG_HEAD;
-# an amend brings in nothing its original commit had not, and an abandoned
-# rebase never reaches this hook. Merge-in only: the on-main finalize is
-# state-driven, so the next commit or checkout on main runs it, while merge-in
-# is relative to this operation's before-revision, which only this hook still
-# knows.
+# (argument `amend`) and once after a rebase that rewrote at least one commit
+# finishes (argument `rebase`, with the rewritten pairs on stdin, which this
+# entry does not read). Only a finished rebase in the primary working tree runs
+# merge-in, against ORIG_HEAD; an amend brings in nothing its original commit
+# had not. An abandoned rebase never reaches this hook, and neither does a
+# rebase that rewrites no commit (a fast-forward, or one that drops every local
+# commit): git runs no post-rewrite for an empty rewrite list, so that rebase is
+# left to /merge-worktree step 9.5 and P14. Merge-in only: the on-main
+# finalize is state-driven, so the next commit or checkout on main runs it,
+# while merge-in is relative to this operation's before-revision, which only
+# this hook still knows.
 finalize_chain_post_rewrite() {
     [ "${1:-}" = "rebase" ] || return 0
     local repo_root

@@ -8,9 +8,11 @@
 #
 # Trigger coverage:
 #
-#   post-merge     — every git merge and pull (ff and non-ff, squash). Runs the
-#                    full chain: reconcile + worktree-log merge-in +
-#                    finalize-on-main + squash-safety.
+#   post-merge     — every git merge, and every git pull that merges or
+#                    fast-forwards (ff and non-ff, squash; `git pull --rebase`
+#                    with no local commits fast-forwards). Runs the full chain:
+#                    reconcile + worktree-log merge-in + finalize-on-main +
+#                    squash-safety.
 #   post-commit    — every commit. Merges in the worktree logs a merge commit
 #                    brought in when the merge was finished by `git commit` or
 #                    `git merge --continue` (after a conflict or --no-commit);
@@ -18,14 +20,19 @@
 #   post-checkout  — every branch switch (or fresh clone). Runs finalize when
 #                    arriving on main; links a worktree's state mount under
 #                    sidecar placement.
-#   post-rewrite   — after `git commit --amend` and after a rebase. Merges in
-#                    the worktree logs a finished rebase brought in
-#                    (`git pull --rebase` included); an amend does nothing.
+#   post-rewrite   — after `git commit --amend` and after a rebase that
+#                    rewrote at least one commit. Merges in the worktree logs a
+#                    finished rebase brought in (`git pull --rebase` over local
+#                    commits included); an amend does nothing.
 #
 # The finalize is state-driven: together these cover every path that lands
 # drafts on main. Merge-in is event-relative: each merge-in step judges
-# "brought in" against its own operation's before-revision. A squash merge is
-# the one merge no hook recognises. All logic lives in finalize_chain.sh.
+# "brought in" against its own operation's before-revision. Two landings reach
+# no merge-in step: a squash merge (the landed commit is not the worktree's
+# HEAD), and a rebase that rewrites no commit (a fast-forward by `git rebase`,
+# or one that drops every local commit), for which git runs no post-rewrite.
+# /merge-worktree step 9.5 and P14 cover both. All logic lives in
+# finalize_chain.sh.
 #
 # Installed by install_claude.sh (Praxion self-install), install_git_hooks.py
 # (/onboard-project Phase 4) and upgrade_project_pins.sh (/upgrade-project).

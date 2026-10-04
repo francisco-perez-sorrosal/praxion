@@ -24,14 +24,18 @@ a worktree holds a log; an unresolvable one is an input error, or, with
 ``--skip-unresolvable-before`` (what the finalize hooks pass), a one-line named
 skip that exits 0.
 
-Three finalize hooks run ``--merged``: post-merge after ``git merge`` and
-``git pull`` (REV ``ORIG_HEAD``); post-commit after a merge finished by
-``git commit`` or ``git merge --continue`` following a conflict or
-``--no-commit`` (REV the new commit's first parent, exact even when ``ORIG_HEAD``
-was overwritten); post-rewrite after a rebase finishes, ``git pull --rebase``
-included (REV ``ORIG_HEAD``, the tip the branch held when the rebase began). A
-squash merge is the one merge no hook recognises, because the squashed commit is
-not the worktree's HEAD; ``--worktree`` at teardown and P14 cover it.
+Three finalize hooks run ``--merged``: post-merge after ``git merge`` and a
+``git pull`` that merges or fast-forwards (REV ``ORIG_HEAD``; ``git pull
+--rebase`` with no local commits fast-forwards); post-commit after a merge
+finished by ``git commit`` or ``git merge --continue`` following a conflict or
+``--no-commit`` (REV the new commit's first parent, exact even when
+``ORIG_HEAD`` was overwritten); post-rewrite after a rebase that rewrote at
+least one commit finishes, ``git pull --rebase`` over local commits included
+(REV ``ORIG_HEAD``, the tip the branch held when the rebase began). Two
+landings reach no hook, and ``--worktree`` at teardown and P14 cover both: a
+squash merge, whose squashed commit is not the worktree's HEAD; and a rebase
+that rewrites no commit (a fast-forward by ``git rebase``, or one that drops
+every local commit as already upstream), after which git runs no post-rewrite.
 
 ``--repo-root`` is any checkout of the repository (default: the git toplevel of
 the working directory). It is never derived from this file's location: managed

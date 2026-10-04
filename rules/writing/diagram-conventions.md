@@ -39,7 +39,7 @@ For LikeC4 sources that compile to multiple views, all views render into the sam
 **Embedding in markdown:**
 
 ```markdown
-![Architecture L0 — context](diagrams/architecture/rendered/context.svg)
+![<System> — System Context diagram](diagrams/architecture/rendered/index.svg)
 ```
 
 **Use markdown image syntax `![alt](path)` — never a raw `<img>` tag — in committed `.md` files.** Raw `<img>` is reserved for committed `.html` share-out renders. (`react-markdown`, the dashboard's renderer, escapes raw HTML; a `<img>` in a `.md` body shows as literal text.)

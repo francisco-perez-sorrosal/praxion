@@ -31,7 +31,7 @@
      This file lives in .ai-state/, so embeds climb to ../docs/diagrams/...;
      alt text is the view title plus its C4 type. -->
 
-![System Context, C4 system context view](../docs/diagrams/architecture/rendered/context.svg)
+![<System> — System Context diagram](../docs/diagrams/architecture/rendered/index.svg)
 
 > **Component detail:** [Components](#3-components)
 

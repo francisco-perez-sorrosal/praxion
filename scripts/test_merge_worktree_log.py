@@ -378,6 +378,129 @@ def test_before_belongs_to_merged(main: Path) -> None:
     assert result.returncode == 2
 
 
+# -- an unresolvable before-revision, skipped by name -------------------------------------------
+
+SKIPPED_ENVELOPE_KEYS = {
+    "schema",
+    "main",
+    "mode",
+    "mode_source",
+    "notes",
+    "worktrees",
+    "error",
+    "skipped",
+}
+
+
+def test_skipping_an_unresolvable_before_prints_one_named_line_and_exits_zero(main: Path) -> None:
+    _bring_in(main, "pipeline-wt", record=(1,))
+
+    result = _run(
+        "--merged",
+        "--before",
+        "no-such-rev",
+        "--skip-unresolvable-before",
+        "--repo-root",
+        str(main),
+        cwd=main,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == (
+        "merge-in skipped: cannot resolve no-such-rev; "
+        "worktree logs are left to /merge-worktree and P14\n"
+    )
+    assert result.stderr == ""
+    assert not reader.log_path(main / ".ai-state").exists()
+
+
+def test_the_skip_is_silent_when_no_worktree_holds_a_log(main: Path) -> None:
+    _bring_in(main, "bare-wt")
+
+    result = _run(
+        "--merged",
+        "--before",
+        "no-such-rev",
+        "--skip-unresolvable-before",
+        "--repo-root",
+        str(main),
+        cwd=main,
+    )
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_the_skip_envelope_adds_one_key_and_reports_no_error(main: Path) -> None:
+    _bring_in(main, "pipeline-wt", record=(1,))
+
+    result = _run(
+        "--merged",
+        "--before",
+        "no-such-rev",
+        "--skip-unresolvable-before",
+        "--json",
+        "--repo-root",
+        str(main),
+        cwd=main,
+    )
+
+    envelope = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert set(envelope) == SKIPPED_ENVELOPE_KEYS
+    assert (envelope["schema"], envelope["worktrees"], envelope["error"]) == (1, [], None)
+    assert envelope["skipped"] == "cannot resolve no-such-rev"
+
+
+def test_a_resolvable_before_with_the_skip_flag_merges_as_usual(main: Path) -> None:
+    before = _git(main, "rev-parse", "HEAD")
+    _bring_in(main, "pipeline-wt", record=(1,))
+
+    result = _run(
+        "--merged",
+        "--before",
+        before,
+        "--skip-unresolvable-before",
+        "--json",
+        "--repo-root",
+        str(main),
+        cwd=main,
+    )
+
+    envelope = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert "skipped" not in envelope
+    assert len(envelope["worktrees"]) == 1
+    assert _held(main) == [1]
+
+
+def test_the_skip_applies_to_the_default_boundary_too(main: Path) -> None:
+    worktree = _add_worktree(main, "pipeline-wt", commit=True)
+    _record(worktree, 1)
+    _git(main, "merge", "-q", "--ff-only", "pipeline-wt")
+    (main / ".git" / "ORIG_HEAD").unlink(missing_ok=True)
+
+    result = _run("--merged", "--skip-unresolvable-before", "--repo-root", str(main), cwd=main)
+
+    assert result.returncode == 0
+    assert result.stdout.startswith("merge-in skipped: cannot resolve ORIG_HEAD; ")
+
+
+def test_the_skip_flag_belongs_to_merged(main: Path) -> None:
+    worktree = _add_worktree(main, "pipeline-wt")
+
+    result = _run(
+        "--worktree",
+        str(worktree),
+        "--skip-unresolvable-before",
+        "--repo-root",
+        str(main),
+        cwd=main,
+    )
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+
+
 # -- a worktree that cannot be read ------------------------------------------------------------
 
 

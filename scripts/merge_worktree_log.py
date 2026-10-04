@@ -7,24 +7,31 @@ so a run can be repeated. Two ways in, one code path:
 
     merge_worktree_log.py --worktree PATH   # one named worktree (/merge-worktree)
     merge_worktree_log.py --merged          # every worktree the merge that just
-                                            # ran brought in (post-merge hook)
+                                            # ran brought in (the finalize hooks)
     merge_worktree_log.py --merged --before REV
+    merge_worktree_log.py --merged --before REV --skip-unresolvable-before
 
 ``--merged`` takes a linked worktree that holds a log, whose HEAD the main
 checkout's HEAD contains and REV (default ``ORIG_HEAD``, the state before the
-merge) does not. So only the worktrees a merge or pull brought in are copied: a
+merge) does not. So only the worktrees a merge, pull or rebase brought in are copied: a
 worktree that has not committed anything, or whose branch an earlier merge already
 took in, is left to ``--worktree`` at teardown, so a running pipeline's half
 session is not copied. One case escapes: a worktree branched from ``origin/main``
 while the local main was behind is brought in by the next pull, commits or not,
 and its running agents show as unstopped in P03 until a later merge copies the
 rest (an accepted leftover, named in the decision record). REV is resolved once
-a worktree holds a log, and an unresolvable one is an input error.
+a worktree holds a log; an unresolvable one is an input error, or, with
+``--skip-unresolvable-before`` (what the finalize hooks pass), a one-line named
+skip that exits 0.
 
-A merge git finishes outside ``git merge`` (a conflict or ``--no-commit``
-completed by ``git commit``) and a pull that rebases local commits run no
-post-merge hook, so ``--merged`` never sees them; ``--worktree`` at teardown and
-P14 cover them, as they cover a squash merge.
+Three finalize hooks run ``--merged``: post-merge after ``git merge`` and
+``git pull`` (REV ``ORIG_HEAD``); post-commit after a merge finished by
+``git commit`` or ``git merge --continue`` following a conflict or
+``--no-commit`` (REV the new commit's first parent, exact even when ``ORIG_HEAD``
+was overwritten); post-rewrite after a rebase finishes, ``git pull --rebase``
+included (REV ``ORIG_HEAD``, the tip the branch held when the rebase began). A
+squash merge is the one merge no hook recognises, because the squashed commit is
+not the worktree's HEAD; ``--worktree`` at teardown and P14 cover it.
 
 ``--repo-root`` is any checkout of the repository (default: the git toplevel of
 the working directory). It is never derived from this file's location: managed
@@ -44,12 +51,14 @@ already held, recording is off) and speaks only for a worktree that gained rows 
 could not be merged, so a merge or pull in a project with no pipelines prints
 nothing.
 
-Exit code: 0 merged, nothing to merge, or recording off; 1 when any worktree
+Exit code: 0 merged, nothing to merge, recording off, or skipped
+(``--skip-unresolvable-before``); 1 when any worktree
 could not be merged whole (a segment or its directory unreadable or missing, the
 main log unreadable or unwritable, an internal error); 2 for an input error.
 ``--json`` prints one object per run: for ``--worktree`` the report below plus
 ``mode_source`` and ``notes``, for ``--merged`` an envelope ``{"schema", "main",
-"mode", "mode_source", "notes", "worktrees": [report, ...], "error"}``.
+"mode", "mode_source", "notes", "worktrees": [report, ...], "error"}``, plus
+``"skipped": "cannot resolve REV"`` on a skipped run.
 
     {"schema": 1, "main", "worktree", "mode", "outcome", "copied", "skipped",
      "malformed", "unreadable": [path, ...], "reason"}
@@ -58,7 +67,7 @@ main log unreadable or unwritable, an internal error); 2 for an input error.
 settings file, else "process" -- or "default"; ``notes`` names a settings file
 that could not be used.
 
-Standard library only, and 3.9-safe: the post-merge hook runs it under whatever
+Standard library only, and 3.9-safe: the finalize hooks run it under whatever
 interpreter the project has.
 """
 
@@ -69,6 +78,7 @@ import json
 import os
 import sys
 from collections import namedtuple
+from dataclasses import dataclass
 from pathlib import Path
 
 from _repo_root import git_toplevel_from_cwd, is_plugin_cache_path
@@ -95,6 +105,24 @@ PROCESS_SOURCE, DEFAULT_SOURCE = "process", "default"
 Recording = namedtuple("Recording", ("env", "source", "notes"))
 
 
+@dataclass(frozen=True)
+class BroughtIn:
+    """The linked worktrees the merge just run brought in (possibly none)."""
+
+    targets: tuple
+
+
+@dataclass(frozen=True)
+class UnresolvableBefore:
+    """Some worktree holds a log, but the before-revision names no commit."""
+
+    rev: str
+
+    @property
+    def reason(self) -> str:
+        return f"cannot resolve {self.rev}"
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="merge_worktree_log",
@@ -113,11 +141,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=f"With --merged: the revision before the merge (default: {DEFAULT_BEFORE}).",
     )
+    parser.add_argument(
+        "--skip-unresolvable-before",
+        action="store_true",
+        help="With --merged: an unresolvable REV is a named skip that exits 0, not an input error.",
+    )
     parser.add_argument("--repo-root", default=None, help="Any checkout. Default: found via git.")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.before is not None and not args.merged:
         parser.error("--before applies to --merged")
+    if args.skip_unresolvable_before and not args.merged:
+        parser.error("--skip-unresolvable-before applies to --merged")
     return args
 
 
@@ -133,11 +168,16 @@ def _run(args: argparse.Namespace) -> int:
     main, linked = listing.checkouts[0], listing.checkouts[1:]
     recording = _recording(main.root)
     if args.merged:
-        targets, error = _brought_in(main, linked, args.before or DEFAULT_BEFORE)
+        outcome = _brought_in(main, linked, args.before or DEFAULT_BEFORE)
+        if isinstance(outcome, UnresolvableBefore):
+            if args.skip_unresolvable_before:
+                return _print_skip(args, main, outcome, recording)
+            return _input_error(args, outcome.reason, recording)
+        targets = outcome.targets
     else:
         targets, error = _named(linked, args.worktree)
-    if error is not None:
-        return _input_error(args, error, recording)
+        if error is not None:
+            return _input_error(args, error, recording)
 
     reports = merge_in.merge_worktree_logs(
         main.state_dir, [target.state_dir for target in targets], env=recording.env
@@ -149,25 +189,26 @@ def _run(args: argparse.Namespace) -> int:
     return EXIT_DEGRADED if any(r.outcome == merge_in.DEGRADED for _, r in entries) else EXIT_OK
 
 
-def _brought_in(main, linked, before: str):
-    """`(the linked worktrees the merge just run brought in, None)`, or `([], why not)`.
+def _brought_in(main, linked, before: str) -> BroughtIn | UnresolvableBefore:
+    """The linked worktrees the merge just run brought in, or the revision that named no commit.
 
     Cheapest test first, so the common case (no worktree holds a log) costs one
     scan per worktree and no git question at all.
     """
     holding = [target for target in linked if merge_in.holds_log(target.state_dir)]
     if not holding:
-        return [], None
+        return BroughtIn(())
     boundary = checkouts.resolve_commit(main.root, before)
     if boundary is None:
-        return [], f"cannot resolve {before}"
-    brought_in = [
-        target
-        for target in holding
-        if checkouts.contains(main.root, target.head)
-        and not checkouts.contains(main.root, target.head, within=boundary)
-    ]
-    return brought_in, None
+        return UnresolvableBefore(before)
+    return BroughtIn(
+        tuple(
+            target
+            for target in holding
+            if checkouts.contains(main.root, target.head)
+            and not checkouts.contains(main.root, target.head, within=boundary)
+        )
+    )
 
 
 def _named(linked, path: str):
@@ -246,11 +287,23 @@ def _print_run(args, main, entries, recording: Recording) -> None:
             print(f"merge_worktree_log: note: {note}", file=sys.stderr)
 
 
-def _as_json(args, main, entries, error: str | None, recording: Recording) -> dict:
+def _print_skip(args, main, skipped: UnresolvableBefore, recording: Recording) -> int:
+    if args.json:
+        print(json.dumps(_as_json(args, main, [], None, recording, skipped.reason), indent=2))
+    else:
+        print(
+            f"merge-in skipped: {skipped.reason}; worktree logs are left to /merge-worktree and P14"
+        )
+    return EXIT_OK
+
+
+def _as_json(
+    args, main, entries, error: str | None, recording: Recording, skipped: str | None = None
+) -> dict:
     reports = [_report_json(main, target, report) for target, report in entries]
     provenance = {"mode_source": recording.source, "notes": list(recording.notes)}
     if args.merged:
-        return {
+        envelope = {
             "schema": SCHEMA_VERSION,
             "main": str(main.root) if main else None,
             "mode": modes.resolve_mode(recording.env)[0].value,
@@ -258,6 +311,7 @@ def _as_json(args, main, entries, error: str | None, recording: Recording) -> di
             "worktrees": reports,
             "error": error,
         }
+        return envelope if skipped is None else {**envelope, "skipped": skipped}
     if reports:
         return {**reports[0], **provenance}
     return {"schema": SCHEMA_VERSION, "error": error}

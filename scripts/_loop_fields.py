@@ -1,9 +1,9 @@
 """The loop fields a plan step declares, and the check one of them carries.
 
-A plan step may declare a completion check: the command that proves it, and
-the counts the step's own recorded `Result:` line must show. This module owns
-the grammar of that line and the judging of a check against a recorded result.
-It reads text only and never runs a declared command.
+A plan step may declare a completion check: the command that proves it, and the
+counts the step's own recorded `Result:` line must show. This module owns the
+grammar of that line and the judging of a check against a recorded result; it
+reads text only and never runs a declared command.
 
 Normative grammar of the `Check:` line -- one logical line in the step block,
 at column 0 or as a list item, the label optionally bold (`**Check**:` or
@@ -26,6 +26,14 @@ holding two `Check:` lines is unreadable ("declared twice").
 Only the keys a check declares are judged. `pending` is read from the raw text
 of the `Result:` line, because the shared result parser does not know that key;
 absent means 0.
+
+Normative grammar of the `Attempts:` line -- a self-naming sub-bullet, never a
+checkbox, one line outside code fences, anywhere in `WIP.md`:
+
+    - Attempts: Step <id> count=<n> [[BLOCKED] replan: <text>]
+
+with `<n>` a decimal integer of at least 1. Two lines for one step keep the
+highest count and its replan text; a line breaking the grammar is unreadable.
 """
 
 from __future__ import annotations
@@ -34,7 +42,7 @@ import re
 from dataclasses import dataclass
 from typing import Union
 
-from _step_schema import Counts, split_step_blocks
+from _step_schema import STEP_ID_RE, Counts, split_step_blocks
 
 # The one-line grammar the prose sites quote; the docstring above is normative.
 CHECK_GRAMMAR_LINE = "Check: `<command>` expects <key><op><count> [<key><op><count> ...]"
@@ -47,6 +55,7 @@ _EXPECTS_RE = re.compile(r"^\s+expects(?:\s+(?P<rest>.*))?$")
 _EXPECTATION_RE = re.compile(r"^(?P<key>[a-z]+)(?P<op>>=|=)(?P<count>[0-9]+)$")
 _PENDING_TOKEN_RE = re.compile(r"(?:^|\s)pending=(?P<value>\S*)")
 _CODE_FENCE_RE = re.compile(r"^[ \t]{0,3}(```|~~~)")
+_STEP_ID_CORE = STEP_ID_RE.pattern.strip("^$")
 
 
 @dataclass(frozen=True)
@@ -244,3 +253,68 @@ def _observed_pending(raw_line: str) -> int | None:
     if len(values) > 1 or not (values[0].isascii() and values[0].isdigit()):
         return None
     return int(values[0])
+
+
+# Fresh attempts before a step goes to a human; the authoritative prose is the
+# attempt-cap paragraph in agent-pipeline-details, section "Completion handshake".
+ATTEMPT_CAP = 2
+
+_ATTEMPTS_LABEL_RE = re.compile(
+    r"^\s*[-*+]\s+\*{0,2}Attempts\*{0,2}\s*:\s*\*{0,2}\s*(?P<value>.*)$"
+)
+_ATTEMPTS_VALUE_RE = re.compile(
+    rf"^Step\s+(?P<id>{_STEP_ID_CORE})\s+count=(?P<count>0*[1-9][0-9]*)"
+    r"(?:\s+\[BLOCKED\]\s+replan:\s*(?P<replan>\S.*?))?\s*$"
+)
+_ATTEMPTS_STEP_RE = re.compile(rf"^Step\s+(?P<id>{_STEP_ID_CORE})\b")
+
+
+@dataclass(frozen=True)
+class Attempt:
+    """A step's fresh-attempt count (at least 1) and the replan request, when recorded."""
+
+    count: int
+    replan: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.count < 1:
+            raise ValueError(f"an attempt count is at least 1, got {self.count}")
+
+
+@dataclass(frozen=True)
+class AttemptsReading:
+    """A count per readable step and a reason per broken line; a step in neither has no count."""
+
+    counts: dict[str, Attempt]
+    unreadable: dict[str, str]
+
+
+def parse_attempts(wip_text: str) -> AttemptsReading:
+    """Read every `- Attempts:` line outside code fences, merging per step."""
+    counts: dict[str, Attempt] = {}
+    unreadable: dict[str, str] = {}
+    labelled = (_ATTEMPTS_LABEL_RE.match(line) for line in _unfenced_lines(wip_text))
+    for value in (match["value"].strip() for match in labelled if match):
+        try:
+            step, attempt = _read_attempt(value)
+            counts[step] = _higher(counts.get(step), attempt)
+        except _UnreadableError as broken:
+            named = _ATTEMPTS_STEP_RE.match(value)
+            if named is not None:
+                unreadable.setdefault(f"Step {named['id']}", str(broken))
+    return AttemptsReading(counts, unreadable)
+
+
+def _read_attempt(value: str) -> tuple[str, Attempt]:
+    match = _ATTEMPTS_VALUE_RE.match(value)
+    if match is None:
+        raise _UnreadableError("expected `Step <id> count=<n>` and an optional replan")
+    return f"Step {match['id']}", Attempt(int(match["count"]), match["replan"])
+
+
+def _higher(kept: Attempt | None, candidate: Attempt) -> Attempt:
+    """The highest count wins (attempts only grow, so a stale line understates), then a replan."""
+    return max(
+        (kept or candidate, candidate),
+        key=lambda a: (a.count, a.replan is not None, a.replan or ""),
+    )

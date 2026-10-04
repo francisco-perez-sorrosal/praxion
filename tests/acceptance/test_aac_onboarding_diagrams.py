@@ -1,8 +1,8 @@
 """A freshly onboarded project starts at the same diagram bar and the same drift gate.
 
 Onboarding with the architecture-as-code capability installs a category vocabulary
-(at least people, the system in scope, external systems, containers, components and
-data stores, each with its drawing and legend entry), an example view, and one
+(at least Person, System in scope, External system, Container, Component and Data
+store, under those exact names, each with its drawing and legend entry), an example view, and one
 documented command that regenerates the renders locally. The example's renders pass
 every review check; a second onboarding run changes no file; the project's CI drift
 gate pins the toolchain version Praxion pins, fails a drifted render and passes

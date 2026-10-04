@@ -179,13 +179,13 @@ def drift_gate_steps(repo: Path) -> list[dict]:
     ]
 
 
-def run_steps(repo: Path, steps: list[dict]) -> StepRun:
+def run_steps(repo: Path, steps: list[dict], path_prefix: Path | None = None) -> StepRun:
     output = []
     for step in steps:
         result = subprocess.run(
             ["bash", "-eo", "pipefail", "-c", step["run"]],
             cwd=repo,
-            env=offline_env(),
+            env=offline_env(str(path_prefix) if path_prefix else None),
             capture_output=True,
             text=True,
             timeout=600,
@@ -198,8 +198,8 @@ def run_steps(repo: Path, steps: list[dict]) -> StepRun:
     return StepRun(0, "\n".join(output), None)
 
 
-def run_drift_gate(repo: Path) -> StepRun:
-    return run_steps(repo, drift_gate_steps(repo))
+def run_drift_gate(repo: Path, path_prefix: Path | None = None) -> StepRun:
+    return run_steps(repo, drift_gate_steps(repo), path_prefix)
 
 
 def run_drift_gate_regeneration(repo: Path) -> StepRun:
@@ -265,3 +265,20 @@ def rename_developer(repo: Path, new_name: str) -> None:
         "the model no longer declares the developer element as `developer = <kind> '<name>'`"
     )
     source.write_text(changed, encoding="utf-8")
+
+
+def add_empty_view(repo: Path, view_id: str) -> None:
+    """Declare one more view in the model source that includes no element."""
+    source = repo / MODEL_SOURCE
+    text = source.read_text(encoding="utf-8")
+    source.write_text(
+        f'{text}\nviews {{\n  view {view_id} {{\n    title "Empty Probe View"\n  }}\n}}\n',
+        encoding="utf-8",
+    )
+
+
+def empty_the_model(repo: Path) -> None:
+    """Replace the model source with one the toolchain accepts but that records nothing."""
+    (repo / MODEL_SOURCE).write_text(
+        "specification {\n  element person\n}\nmodel {\n}\n", encoding="utf-8"
+    )

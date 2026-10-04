@@ -17,7 +17,9 @@ import pytest
 from tests.acceptance.drivers.diagram_regen import (
     MODEL_SOURCE,
     RENDER_DIR,
+    add_empty_view,
     changed_renders,
+    empty_the_model,
     git,
     rename_developer,
     require_pinned_toolchain,
@@ -32,6 +34,7 @@ from tests.acceptance.drivers.diagram_regen import (
 NEW_NAME = "Developer Renamed For Regeneration"
 MINIMAL_PATH = "/usr/bin:/bin"
 FAILURE_MESSAGE = "simulated regeneration failure"
+EMPTY_VIEW = "probe_empty_view"
 
 
 @pytest.fixture
@@ -42,6 +45,20 @@ def checkout(tmp_path):
 @pytest.fixture
 def staged_model_change(checkout):
     rename_developer(checkout, NEW_NAME)
+    git(checkout, "add", MODEL_SOURCE.as_posix())
+    return checkout
+
+
+@pytest.fixture
+def staged_empty_view(checkout):
+    add_empty_view(checkout, EMPTY_VIEW)
+    git(checkout, "add", MODEL_SOURCE.as_posix())
+    return checkout
+
+
+@pytest.fixture
+def staged_empty_model(checkout):
+    empty_the_model(checkout)
     git(checkout, "add", MODEL_SOURCE.as_posix())
     return checkout
 
@@ -136,3 +153,61 @@ def test_the_drift_gate_passes_a_change_whose_renders_match(checkout) -> None:
     assert result.returncode == 0, (
         f"the drift gate failed matching renders at {result.failed_step}:\n{result.output[-2000:]}"
     )
+
+
+def test_a_declared_view_that_draws_nothing_aborts_the_commit_naming_that_view(
+    staged_empty_view,
+) -> None:
+    require_pinned_toolchain()
+
+    result = run_precommit_regeneration(staged_empty_view)
+
+    assert result.returncode != 0, (
+        "the commit was allowed although a declared view rendered no element"
+    )
+    assert EMPTY_VIEW in result.stdout + result.stderr, (
+        "the abort message does not name the failing view"
+    )
+
+
+def test_a_model_source_that_records_nothing_aborts_the_commit(staged_empty_model) -> None:
+    require_pinned_toolchain()
+
+    result = run_precommit_regeneration(staged_empty_model)
+
+    assert result.returncode != 0, (
+        "the commit was allowed although the model yields no view showing an element"
+    )
+    assert (result.stdout + result.stderr).strip(), (
+        "the commit was aborted without a message naming the failure"
+    )
+
+
+def test_the_drift_gate_fails_a_change_that_adds_a_view_drawing_nothing(checkout) -> None:
+    require_pinned_toolchain()
+    add_empty_view(checkout, EMPTY_VIEW)
+    git(checkout, "commit", "-q", "--no-verify", "-am", "declare an empty view")
+
+    result = run_drift_gate(checkout)
+
+    assert result.returncode != 0, "the drift gate passed a declared view that renders no element"
+
+
+def test_the_drift_gate_fails_a_change_whose_model_records_nothing(checkout) -> None:
+    require_pinned_toolchain()
+    empty_the_model(checkout)
+    git(checkout, "commit", "-q", "--no-verify", "-am", "empty the model")
+
+    result = run_drift_gate(checkout)
+
+    assert result.returncode != 0, (
+        "the drift gate passed a model source that yields no view showing an element"
+    )
+
+
+def test_the_drift_gate_fails_when_a_toolchain_step_reports_an_error(
+    checkout, failing_toolchain
+) -> None:
+    result = run_drift_gate(checkout, path_prefix=failing_toolchain)
+
+    assert result.returncode != 0, "the drift gate passed although the toolchain reported an error"

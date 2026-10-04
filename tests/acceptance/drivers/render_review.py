@@ -96,13 +96,13 @@ def legend_line_style_violations(render: Render) -> list[str]:
 def legend_category_violations(render: Render, view: View, category_of: CategoryOf) -> list[str]:
     if render.legend_region is None:
         return [f"{render.path.name}: no legend (a region headed 'Legend') in the render"]
-    legend_text = " | ".join(normalise(line.text).casefold() for line in render.legend_lines)
+    entries = [normalise(line.text).casefold() for line in render.legend_lines]
     samples = _legend_sample_drawings(render)
     violations = []
     for category, blocks in _blocks_by_category(render, view, category_of).items():
-        if category.casefold() not in legend_text:
+        if not any(entry.startswith(category.casefold()) for entry in entries):
             violations.append(
-                f"{render.path.name}: the legend does not name the category {category!r}"
+                f"{render.path.name}: no legend entry begins with the category name {category!r}"
             )
         if not any(block.drawing in samples for block in blocks):
             violations.append(
@@ -280,49 +280,37 @@ def category_consistency_violations(
     ]
 
 
-def vocabulary_violations(
-    categories: Iterable[str], vocabulary: dict[str, Callable[[str], bool]]
-) -> list[str]:
-    names = sorted(set(categories))
-    violations = [
-        f"no category of the model is the vocabulary's {term!r}"
-        for term, matches in vocabulary.items()
-        if not any(matches(n) for n in names)
+def vocabulary_violations(categories: Iterable[str], vocabulary: tuple[str, ...]) -> list[str]:
+    """Every vocabulary category is a category of the model under its exact name (case aside)."""
+    names = {normalise(name).casefold() for name in categories}
+    violations = ["an element has no category name" for name in names if not name]
+    violations += [
+        f"no category of the model is named {term!r}"
+        for term in vocabulary
+        if term.casefold() not in names
     ]
-    for name in names:
-        terms = [term for term, matches in vocabulary.items() if matches(name)]
-        if len(terms) > 1:
-            violations.append(f"category {name!r} merges vocabulary categories {terms}")
     return violations
 
 
-def _keyword(*words: str, unless: str | None = None) -> Callable[[str], bool]:
-    def matches(name: str) -> bool:
-        lowered = name.casefold()
-        return any(w in lowered for w in words) and not (unless and unless in lowered)
+PRAXION_VOCABULARY = (
+    "Person",
+    "System in scope",
+    "External system",
+    "Knowledge asset",
+    "Runtime agent",
+    "Pipeline document",
+    "Persistent store",
+    "Tooling",
+)
 
-    return matches
-
-
-PRAXION_VOCABULARY = {
-    "people": _keyword("person", "people"),
-    "the system in scope": _keyword("system", unless="external"),
-    "external systems": _keyword("external"),
-    "knowledge assets": _keyword("knowledge"),
-    "runtime agents": _keyword("agent"),
-    "pipeline documents": _keyword("document"),
-    "persistent stores": _keyword("store"),
-    "tooling": _keyword("tool"),
-}
-
-ONBOARDED_VOCABULARY = {
-    "people": _keyword("person", "people"),
-    "the system in scope": _keyword("system", unless="external"),
-    "external systems": _keyword("external"),
-    "containers": _keyword("container"),
-    "components": _keyword("component"),
-    "data stores": _keyword("store", "database"),
-}
+ONBOARDED_VOCABULARY = (
+    "Person",
+    "System in scope",
+    "External system",
+    "Container",
+    "Component",
+    "Data store",
+)
 
 
 def all_render_check_violations(

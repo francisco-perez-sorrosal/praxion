@@ -19,7 +19,7 @@ follow `translate` transforms and nested `<svg>` viewBox offsets.
 Grouping (bound to the render shape at the base commit): an element drawn in a
 view is the innermost `<g>` whose own text lines spell the element's name; its
 text block and shapes are what that group holds. A legend is the region of the
-group headed by a line reading "Legend" (or "Key"/"Notation").
+group headed by a line reading exactly "Legend".
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REFERENCE_EMBED_WIDTH = 960.0
-LEGEND_HEADINGS = ("legend", "key", "notation")
+LEGEND_HEADING = "Legend"
 WHITE = (255, 255, 255)
 NEAR_BLACK = (18, 18, 18)
 
@@ -222,7 +222,7 @@ class Render:
     @functools.cached_property
     def legend_region(self) -> Box | None:
         for line in self.lines:
-            if normalise(line.text).casefold().rstrip(":") in LEGEND_HEADINGS:
+            if normalise(line.text) == LEGEND_HEADING:
                 boxes = [s.box for s in self.shapes if _within(s.group, line.group) and s.visible]
                 boxes += [other.box for other in self.lines if _within(other.group, line.group)]
                 return _union(boxes)

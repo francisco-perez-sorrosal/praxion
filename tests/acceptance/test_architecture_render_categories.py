@@ -1,11 +1,14 @@
 """A reader tells element categories apart at a glance, and each view explains its notation.
 
-Every element of Praxion's architecture model belongs to one category of the
-vocabulary (people, the system in scope, external systems, knowledge assets,
-runtime agents, pipeline documents, persistent stores, tooling). In every committed
+Every element of Praxion's architecture model belongs to one category, and the
+vocabulary's eight categories are present under their exact names (Person, System
+in scope, External system, Knowledge asset, Runtime agent, Pipeline document,
+Persistent store, Tooling). In every committed
 render, categories in one view differ by a mark other than colour, a category is
-drawn the same way in every view, and the view's own legend names each category
-and line style it uses with a sample of how it is drawn.
+drawn the same way in every view, frames being compared only with frames and boxes
+only with boxes. The view's own legend, headed by a line reading exactly "Legend",
+has an entry beginning with the exact name of each category it draws, with a sample
+of how it is drawn, and a sample of each line style it uses.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ def _view(render_path):
     return view
 
 
-def test_every_model_element_belongs_to_one_vocabulary_category_and_none_are_merged() -> None:
+def test_every_vocabulary_category_is_a_model_category_under_its_exact_name() -> None:
     categories = [category_of(element) for element in current_model().elements.values()]
 
     assert vocabulary_violations(categories, PRAXION_VOCABULARY) == []

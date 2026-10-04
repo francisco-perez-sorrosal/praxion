@@ -384,6 +384,63 @@ def test_canary_a_dashboard_flagged_measurements_log_would_fail_the_drift_assert
     assert "MEASUREMENTS.md" not in _dashboard_workshop()
 
 
+def test_iteration_ledger_is_a_script_gated_artifact_outside_floor_dashboard_and_snapshot() -> None:
+    """ITERATION_LEDGER.jsonl is written only through its script; no consumer lists it by filename."""
+    artifact = registry.by_name("ITERATION_LEDGER.jsonl")
+    assert artifact is not None, "ITERATION_LEDGER.jsonl is not registered"
+    assert artifact.production_gate == "script:iteration_ledger.py"
+    assert artifact.floor is None
+    assert artifact.location == "ai-work"
+    assert artifact.lifecycle == "ephemeral"
+    assert artifact.activation == "conditional"
+    assert artifact.cleanup_policy == "delete"
+    assert artifact.dashboard is False
+    assert artifact.snapshot is False
+    assert artifact.description
+    assert "ITERATION_LEDGER.jsonl" not in registry.dashboard_artifacts()
+    assert "ITERATION_LEDGER.jsonl" not in registry.snapshot_artifacts()
+
+
+def test_canary_a_dashboard_flagged_iteration_ledger_would_fail_the_drift_assertion() -> None:
+    """A misregistered copy joins the dashboard set; the consumer list (unchanged) then differs."""
+    original = registry.by_name("ITERATION_LEDGER.jsonl")
+    assert original is not None
+    misregistered = dataclasses.replace(original, dashboard=True)
+    drifted = {a.name for a in registry.ARTIFACTS if a.dashboard} | {misregistered.name}
+    assert drifted != _dashboard_workshop()
+
+
+def _inventory_ai_work_tree(text: str) -> set[str]:
+    """Entry names inside the first fenced block under the `.ai-work/<task-slug>/` tree heading."""
+    section = text.split("### `.ai-work/<task-slug>/`", 1)[1]
+    block = section.split("```", 2)[1]
+    return {line.strip() for line in block.splitlines()}
+
+
+def _ai_work_names_missing_from(tree: set[str]) -> list[str]:
+    return sorted(
+        a.name for a in registry.ARTIFACTS if a.location == "ai-work" and a.name not in tree
+    )
+
+
+def test_every_ai_work_registry_name_appears_in_the_inventory_tree() -> None:
+    """The inventory tree is the canonical list of what exists; the registry may not outgrow it."""
+    tree = _inventory_ai_work_tree(
+        _read("skills/software-planning/references/artifact-inventory.md")
+    )
+    assert _ai_work_names_missing_from(tree) == []
+
+
+def test_canary_an_inventory_tree_missing_a_registry_name_fails_the_tree_assertion() -> None:
+    fixture = (
+        "### `.ai-work/<task-slug>/`\n\n```\n<project-root>/\n  .ai-work/\n    <task-slug>/\n"
+        "      WIP.md\n```\n"
+    )
+    missing = _ai_work_names_missing_from(_inventory_ai_work_tree(fixture))
+    assert "ITERATION_LEDGER.jsonl" in missing
+    assert "WIP.md" not in missing
+
+
 def test_acceptance_tests_floor_is_sdd_active_at_standard_and_always_at_full() -> None:
     """A skipped stage still writes the artifact, so absence is a defect once a spec exists."""
     artifact = registry.by_name("ACCEPTANCE_TESTS.md")

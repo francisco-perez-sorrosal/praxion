@@ -22,6 +22,7 @@ The canonical list of what exists and where. The inventory tables below add the 
       SYSTEMS_PLAN.md
       SPEC_EXTRACT.md
       MEASUREMENTS.md
+      ITERATION_LEDGER.jsonl
       ACCEPTANCE_TESTS.md
       PRE_REFACTOR_PLAN.md
       SPEC_DELTA.md
@@ -34,6 +35,12 @@ The canonical list of what exists and where. The inventory tables below add the 
       traceability.yml
       VERIFICATION_REPORT.md
       REWORK_MANIFEST.md
+      VERIFIER_FINDINGS.md
+      LIGHT_REVIEW_<step>.md
+      RECOVERY_LOG.md
+      ROADMAP_DRAFT.md
+      CONTRADICTION_MAP.md
+      TRAINING_RESULTS.md
       PROGRESS.md
 ```
 
@@ -129,6 +136,7 @@ Optional/adoption-gated persistent artifacts not in the tree above (created only
 | Ephemeral | `.ai-work/<task-slug>/` | `PRE_REFACTOR_PLAN.md` — writer: systems-architect (Phase 2.5 outcome `emit-PRE_REFACTOR_PLAN`); readers: orchestrator (parses `## Verifier Bypass Criteria` + `## Loop-Back Conditions`), implementation-planner (steps tagged `[Phase: Refactoring]`), test-engineer (sources characterization-tests from `## Behavior Preservation Contract`), verifier (sources acceptance criteria from `## Acceptance Criteria` in pre-refactor mode) | Single pipeline run — receives a `[CONSUMED]` marker at architect's `post-refactor-adaptation` re-entry; deleted with `.ai-work/` at cleanup |
 | Ephemeral | `.ai-work/<task-slug>/` | `SPEC_EXTRACT.md` — writer: `scripts/extract_spec.py` (never hand-edited; produced only when the spec text is free of design vocabulary, and removed when it is not); readers: test-engineer in acceptance-design mode (its principal input), verifier (freshness via `extract_spec.py <slug> --check`). Shape: a `Spec digest:` line, a `Sources:` line, then the Key Signals, Acceptance Criteria and Behavioral Specification sections verbatim, and never any `## Architecture` text. See the `extract_spec.py` module docstring; stage procedure in [`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage) | Single pipeline run — derived from `SYSTEMS_PLAN.md` and `TASK_BRIEF.md`; delete with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `MEASUREMENTS.md` — writer: the agent executing a measurement step of the plan (append-only; one row per baseline or final reading, earlier rows never edited); readers: `scripts/check_footprint_criteria.py` (freshness and comparability), verifier (grades each reading against its criterion's limit). Shape: a `Criterion | Phase | Value | Reading | Head | Taken | Command` table; the grammar is normative in the `scripts/_footprint_grammar.py` docstring. Written only when the spec carries a `### Footprint Criteria` table | Single pipeline run — delete with `.ai-work/` |
+| Ephemeral | `.ai-work/<task-slug>/` | `ITERATION_LEDGER.jsonl` — writer: the orchestrator via `scripts/iteration_ledger.py` (append-only; one record per implementer return, earlier lines never edited; later the step-loop driver); readers: the step-loop driver, `MEASUREMENTS.md` readings and a human. Shape: one JSON object per line, documented in the `scripts/iteration_ledger.py` docstring | Single pipeline run — delete with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `ACCEPTANCE_TESTS.md` — writer: test-engineer in acceptance-design mode (also written in a skipped form, so absence is always a defect once a spec exists); readers: interface-designer (`## Boundary Assumptions`), systems-architect (Boundary Assumptions and Spec Questions), implementation-planner (`## Scenarios` seed the `acceptance:` key of `traceability.yml`; steps that bind drivers), implementer (which outer-loop tests to run, read-only), verifier (Acceptance Independence checks). Shape: a `**Stage:**` line (`designed`, or `skipped` with a specific reason), then `## Sources Read`, `## Scenarios`, `## Boundary Assumptions`, `## Spec Questions` and `## Not Black-Box Testable`; stage procedure in [`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage) | Single pipeline run — delete with `.ai-work/`; snapshotted by the precompact hook |
 | Ephemeral | `.ai-work/<task-slug>/` | `TEST_BASELINE.md` — implementation-planner's pre-pipeline failing-test snapshot (failing node IDs + base commit SHA), captured before any code change; verifier Phase 10 reads it to separate regressions from pre-existing failures | Single pipeline run — delete with `.ai-work/` |
 | Ephemeral | `.ai-work/<task-slug>/` | `HANDOFF.md` — writer: `compose_handoff.py` (via `/handoff`, orchestrator-invoked at a Conversation Checkpoint); reader: `/resume-pipeline` (Tier-3 orientation only). Phase-boundary handoff document (Tier-3 orientation, never certification). Shape: the 8-section `HandoffDoc` from `SYSTEMS_PLAN.md` DS-1 (§0 Preflight · §1 State · §2 Next action · §3 Decisions & assumptions · §4 Operating constraints from the user · §5 Corrections in force · §6 Do not re-inherit · §7 Start here) | Single pipeline run — deleted with `.ai-work/` |

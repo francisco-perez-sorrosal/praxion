@@ -360,6 +360,15 @@ ARTIFACTS: tuple[Artifact, ...] = (
         description="Append-only baseline and final readings of the plan's footprint criteria.",
     ),
     Artifact(
+        "ITERATION_LEDGER.jsonl",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="script:iteration_ledger.py",
+        cleanup_policy="delete",
+        description="Append-only record of each implementer return: verdict, test result and commit.",
+    ),
+    Artifact(
         # Floor: SDD_ACTIVE at Standard, promoted to always at Full (as traceability.yml).
         # Safe because a skipped stage still writes the artifact, so absence is a defect.
         "ACCEPTANCE_TESTS.md",

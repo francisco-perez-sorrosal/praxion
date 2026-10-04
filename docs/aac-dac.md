@@ -55,7 +55,7 @@ The fence convention makes the boundary mechanically detectable using HTML comme
 supported by every markdown renderer:
 
 ```markdown
-<!-- aac:generated source=docs/diagrams/system.c4 view=L1Components last-regen=2026-04-30T12:00Z -->
+<!-- aac:generated source=docs/diagrams/architecture/src/architecture.c4 view=components last-regen=2026-04-30T12:00Z -->
 | Component | Responsibility |
 |-----------|----------------|
 | API Gateway | Route and authenticate requests |
@@ -234,7 +234,7 @@ The loop:
 <!-- aac:end -->
 
 The Mermaid diagram below represents this loop. It is authored prose today and could become an
-`aac:generated` region once a corresponding LikeC4 view (`docs/diagrams/aac-dac-loop.c4`) is created.
+`aac:generated` region once a corresponding LikeC4 view (a `.c4` source under `docs/diagrams/aac-dac-loop/src/`) is created.
 
 ![AaC+DaC feedback loop: author writes ADR + LikeC4 DSL + DESIGN.md with aac fences; pre-commit golden-rule gate, CI jobs, and architect-validator feed FAILs into the tech-debt ledger; sentinel performs periodic AC-dimension audits; feedback routes back to author for resolution](diagrams/aac-dac-feedback-loop/rendered/aac-dac-feedback-loop.svg)
 

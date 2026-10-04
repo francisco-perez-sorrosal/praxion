@@ -5,37 +5,33 @@ audience: developer
 
 # Architecture Diagrams
 
-Praxion uses a **LikeC4 → D2 → SVG** toolchain for C4-style architectural diagrams. A
-single `.c4` source file defines the architectural model; `likec4 gen d2` projects each
-declared view into a `.d2` file; `d2` renders each `.d2` into a committed `.svg` that
-documents embed directly. Source, generated D2, and rendered SVG are all committed together.
+Praxion draws its C4 architecture diagrams from a LikeC4 model. One command,
+`scripts/regenerate_diagrams.py`, reads the model and writes one committed `.svg` (and its
+intermediate `.d2`) per view, in a fixed visual vocabulary: a title naming the view and its C4
+type, a legend, one drawing per element category. Source and renders are committed together, and
+documents embed the `.svg`.
 
 ## Overview
 
-- **Source**: `docs/diagrams/<name>.c4` — the single source of truth for a diagram set.
-- **Generated**: `docs/diagrams/<name>/<view>.d2` — produced by `likec4 gen d2`.
-- **Rendered**: `docs/diagrams/<name>/<view>.svg` — produced by `d2`; embedded in docs via `<img>`.
+- **Source**: `docs/diagrams/architecture/src/*.c4` — the model (`architecture.c4`) and the style kit (`_spec.c4`).
+- **Rendered**: `docs/diagrams/architecture/rendered/<view-id>.svg` plus `<view-id>.d2`, one pair per view.
+- **Catalog**: [`diagrams/README.md`](diagrams/README.md) lists every view with its title, C4 type and the documents that embed it.
 
-Architecture documents (`docs/architecture.md`, `.ai-state/DESIGN.md`) reference the
-rendered SVG and quote the source DSL in a fenced `c4` block so reviewers see both in one
-place. Non-C4 diagrams (sequence, state, ER, flowchart) stay in Mermaid — see
-`rules/writing/diagram-conventions.md` for the coexistence policy.
+Embed the render with a Markdown image, `![<view title> — <C4 type>: <gloss>](path/to/<view-id>.svg)`;
+the alt text names the view's title and its C4 type. Never quote the DSL or paste diagram code
+into a document. Non-C4 diagrams (sequence, state, ER, flowchart) stay in Mermaid — see
+[`rules/writing/diagram-conventions.md`](../rules/writing/diagram-conventions.md) for the
+coexistence policy. The pipeline in full (command flags, exit codes, determinism) is stated once in
+[`skills/likec4-diagramming/references/render-and-regen.md`](../skills/likec4-diagramming/references/render-and-regen.md).
 
 ## Install
 
-Both binaries must be available for the pre-commit hook to regenerate diagrams. If either is
-missing, the hook skips regeneration with a warning (commits still proceed). Install both
+Both binaries must be installed, at the pinned versions, for the command to run. Install both
 before editing `.c4` source files.
 
 ### LikeC4
 
-```bash
-npm install -g likec4   # installs the likec4 CLI globally
-```
-
-Version constraint: exactly `1.59.4` (verified against the npm registry 2026-10-04).
-
-To pin to the exact resolved version:
+Install the exact pin:
 
 ```bash
 npm install -g likec4@1.59.4
@@ -49,16 +45,11 @@ likec4 --version
 
 ### D2
 
-macOS (Homebrew):
+Use the standalone build; the command scrubs the version stamp the standalone build writes, and
+a package-manager build stamps it differently.
 
 ```bash
-brew install d2
-```
-
-Linux / macOS (curl installer, pinned version):
-
-```bash
-curl -fsSL https://d2lang.com/install.sh | sh -s -- v0.7.1
+curl -fsSL https://d2lang.com/install.sh | sh -s -- --version v0.7.1 --method standalone
 ```
 
 Verify:
@@ -67,45 +58,52 @@ Verify:
 d2 --version
 ```
 
-Version pin: `0.7.1` (last stable release as of 2026-04-30; treat as stable, version-pinned
-per risk mitigation R2 in `SYSTEMS_PLAN.md`).
+## Regenerate
 
-## Hook Behavior
+From the repository root:
 
-A pre-commit hook (`scripts/diagram-regen-hook.sh`, run by the `diagram-regen`
-hook in `.pre-commit-config.yaml`) regenerates derived artifacts whenever `**/diagrams/*.c4`
-files are staged for commit.
+```bash
+python3 scripts/regenerate_diagrams.py
+```
 
-**Happy path** (both binaries installed, valid DSL):
+This renders every view in place and deletes any `.svg` or `.d2` in `rendered/` that no view
+produces. Then confirm the committed renders match the model:
 
-1. Detects staged `.c4` files.
-2. Runs `likec4 gen d2 <name>.c4 -o <name>/` to generate one `.d2` per declared view.
-3. Runs `d2 <name>/<view>.d2 <name>/<view>.svg` for each generated `.d2`.
-4. Stages all produced files with `git add`.
-5. Commit proceeds with fresh artifacts.
+```bash
+git status --porcelain -- docs/diagrams/
+```
 
-**Error path** (DSL syntax error or render failure):
+An empty listing means nothing drifted. For the full verdict, including the review checks
+(legibility, proportion, contrast, and that every embed and the catalog describe the view), run:
 
-The hook prints the failing command and its stderr, then exits non-zero, aborting the commit.
-Fix the DSL error and try again. To bypass for a known-broken state, use
-`git commit --no-verify` (the CI gate will catch drift on the PR).
+```bash
+python3 scripts/regenerate_diagrams.py --check
+```
 
-## Graceful-Degradation Path
+`--check` writes nothing in the checkout. It exits 0 only when no render drifted and no check
+failed; exit 3 means `likec4` or `d2` is missing or off its pinned version.
 
-When `likec4` or `d2` is not installed:
+## Add or change a view
 
-- The hook emits a warning to stderr and exits 0.
-- The commit proceeds without regenerated artifacts.
-- The committed `.c4` source is the SSOT; the stale `.svg` is still readable.
-- The CI gate (TBD — see risk R7 in `SYSTEMS_PLAN.md`) regenerates and rejects PRs whose
-  committed SVGs disagree with their source.
+1. Edit `docs/diagrams/architecture/src/architecture.c4`. Give each view one `#c4_*` type tag and a `title`.
+2. Run `python3 scripts/regenerate_diagrams.py`.
+3. Embed the new `.svg` with an alt text carrying the title and the C4 type, and add a row to the catalog in [`diagrams/README.md`](diagrams/README.md).
+4. Run `python3 scripts/regenerate_diagrams.py --check` and fix every `FAIL` it prints.
 
-Workflow for contributors without local binaries:
+## Where it runs
 
-1. Edit the `.c4` source and commit.
-2. The hook warns that regeneration was skipped.
-3. Open a PR; CI regenerates and fails if the committed SVG is stale.
-4. Install binaries, regenerate locally, and push a fixup commit.
+- **Pre-commit hook `diagram-regen`** (`scripts/diagram-regen-hook.sh`). When a `.c4` file is
+  staged it runs the command with `--staged`, then stages `rendered/`. A regeneration failure
+  aborts the commit and prints what happened, why and the exact fix. With `likec4` or `d2` absent or
+  off its pin, the hook warns, writes nothing and lets the commit proceed.
+- **CI job `regenerate-and-diff`** (`.github/workflows/architecture.yml`). Installs the two pins,
+  runs the command and fails when `git status --porcelain -- docs/diagrams/` is non-empty. This
+  catches renders committed from a skipped hook.
+- **Managed projects** get a project-local copy of the command from onboarding
+  (`scripts/install_diagram_kit.py`: a style kit, an example model and the workflow).
+
+Contributors without the tools can commit the `.c4` edit; the hook warns, and CI rejects the pull
+request until the renders are regenerated. Install the pins, regenerate and push a fixup commit.
 
 ## AI Tooling
 

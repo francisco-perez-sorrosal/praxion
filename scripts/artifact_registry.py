@@ -381,7 +381,31 @@ ARTIFACTS: tuple[Artifact, ...] = (
         "conditional",
         production_gate="script:iteration_ledger.py",
         cleanup_policy="delete",
-        description="Append-only record of each implementer return: verdict, test result and commit.",
+        description=(
+            "Append-only record of each implementer return: verdict, test result and commit. "
+            "Written by the step-loop driver (the orchestrator outside the loop) through the script."
+        ),
+    ),
+    # One per spawn request (`<request>` is the driver's kebab request id). The two files hold
+    # what the agent and the orchestrator-after-a-disturbance read; exact-filename consumers
+    # (dashboard, snapshot) cannot list them, as with LIGHT_REVIEW_<step>.md.
+    Artifact(
+        "PROMPT_<request>.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="script:step_loop.py",
+        cleanup_policy="delete",
+        description="The rendered prompt a driver-spawned agent reads first.",
+    ),
+    Artifact(
+        "TREE_SNAPSHOT_<request>.patch",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        production_gate="script:step_loop.py",
+        cleanup_policy="delete",
+        description="What lay outside a driver commit when it found the tree disturbed.",
     ),
     Artifact(
         # Floor: SDD_ACTIVE at Standard, promoted to always at Full (as traceability.yml).

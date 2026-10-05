@@ -9,7 +9,9 @@ a stub script except in the one test that pins the shape of its real answer.
 from __future__ import annotations
 
 import json
+import os
 import shlex
+import signal
 import stat
 import subprocess
 import sys
@@ -506,6 +508,41 @@ def test_a_deleted_and_a_new_path_commit_as_a_deletion_and_an_addition(repo: Pat
     )
 
 
+def test_a_deletion_staged_with_git_rm_commits_beside_an_edit(repo: Path) -> None:
+    write(repo, "a.py", "a = 2\n")
+    write(repo, "decoy.txt", "decoy, edited\n")
+    git(repo, "rm", "-q", "b.py")
+
+    outcome = commit_paths(repo, ["a.py", "b.py"], MESSAGE)
+
+    assert (
+        outcome.files,
+        git(repo, "show", "--name-status", "--format=").splitlines(),
+        git(repo, "status", "--porcelain").strip(),
+    ) == (("a.py", "b.py"), ["M\ta.py", "D\tb.py"], "M decoy.txt")
+
+
+def test_a_move_staged_with_git_mv_commits_with_both_ends_declared(repo: Path) -> None:
+    write(repo, "decoy.txt", "decoy, edited\n")
+    git(repo, "mv", "notes.txt", "moved.txt")
+
+    outcome = commit_paths(repo, ["notes.txt", "moved.txt"], MESSAGE)
+
+    assert (
+        outcome.files,
+        git(repo, "show", "--name-status", "--format=").splitlines(),
+        git(repo, "status", "--porcelain").strip(),
+    ) == (("moved.txt", "notes.txt"), ["R100\tnotes.txt\tmoved.txt"], "M decoy.txt")
+
+
+def test_a_deletion_made_in_the_work_tree_still_stages_and_commits(repo: Path) -> None:
+    (repo / "b.py").unlink()
+
+    outcome = commit_paths(repo, ["b.py"], MESSAGE)
+
+    assert (outcome.files, git(repo, "status", "--porcelain").strip()) == (("b.py",), "")
+
+
 def test_a_path_with_glob_characters_names_only_itself(repo: Path) -> None:
     write(repo, "weird[1].txt", "literal, edited\n")
     write(repo, "weird1.txt", "plain, edited\n")
@@ -705,6 +742,38 @@ def test_a_timeout_kills_the_commands_whole_process_group(tmp_path: Path) -> Non
         "ready\n",
         True,
     )
+
+
+INTERRUPTED_DRIVER = """\
+import sys
+from pathlib import Path
+sys.path.insert(0, {scripts!r})
+from _step_loop_io import run_command
+
+runner = "import os, time; open({pid_file!r}, 'w').write(str(os.getpid())); time.sleep(60)"
+run_command((sys.executable, "-c", runner), Path({cwd!r}), 120)
+"""
+
+
+def test_an_interrupt_inside_a_run_takes_the_runner_down_with_it(tmp_path: Path) -> None:
+    pid_file = tmp_path / "runner.pid"
+    driver = subprocess.Popen(
+        py(
+            INTERRUPTED_DRIVER.format(
+                scripts=str(SCRIPT_DIR), pid_file=str(pid_file), cwd=str(tmp_path)
+            )
+        ),
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 10
+    while not (pid_file.exists() and pid_file.read_text()) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    runner_pid = int(pid_file.read_text())
+
+    os.kill(driver.pid, signal.SIGINT)
+    exit_code = driver.wait(timeout=10)
+
+    assert (exit_code != 0, process_is_gone(runner_pid)) == (True, True)
 
 
 def test_a_command_that_cannot_start_reports_why(tmp_path: Path) -> None:

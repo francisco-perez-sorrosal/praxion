@@ -279,7 +279,12 @@ def _specs(paths: Iterable[str]) -> tuple[str, ...]:
 
 
 def _stage(repo: Path, paths: tuple[str, ...]) -> None:
-    _git(repo, "add", "--all", "--", *_specs(paths))
+    """Stage what exists in the work tree or the index; a deletion or move already staged
+    (`git rm`, `git mv`) names a path in neither, which `git add` refuses and needs nothing."""
+    indexed = frozenset(_lines(_git(repo, "ls-files", "--cached", "-z", "--", *_specs(paths))))
+    present = [p for p in paths if p in indexed or os.path.lexists(repo / p)]
+    if present:
+        _git(repo, "add", "--all", "--", *_specs(present))
 
 
 def _commit_with_retry(repo: Path, job: _Job) -> str | None:
@@ -420,7 +425,7 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
 
     The command leads its own process group and a timeout kills the whole group: a
     `uv run pytest` or a shell wrapper must not leave workers editing the tree after the
-    driver has reported the run as over.
+    driver has reported the run as over or been interrupted.
     """
     try:
         proc = subprocess.Popen(
@@ -435,6 +440,9 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
     except subprocess.TimeoutExpired:
         out, err = _kill_group(proc)
         return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
+    except BaseException:  # an interrupt must not leave the runner editing the tree
+        _kill_group(proc)
+        raise
     return CommandRun(argv, str(cwd), out + err, proc.returncode)
 
 

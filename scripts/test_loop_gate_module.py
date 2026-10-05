@@ -35,6 +35,7 @@ from _step_schema import Counts, NoRun, parse_result_line  # noqa: E402
 
 STEP = "Step "
 COMMAND = "uv run pytest scripts/test_x.py -q"
+NO_SUMMARY = "the output holds no pytest summary line"
 SHORT_SUMMARY_RULE = "=========================== short test summary info ==="
 
 DEFAULT_OUTPUT = f"""\
@@ -131,9 +132,7 @@ def test_count_line_variants(line, expected):
 )
 def test_output_with_no_count_line_is_no_run_never_a_guessed_pass(output):
     assert parse_pytest_summary(output) is None
-    assert classify_run(COMMAND, output, ownership()).counts == NoRun(
-        "the output holds no pytest summary line"
-    )
+    assert classify_run(COMMAND, output, ownership()).counts == NoRun(NO_SUMMARY)
 
 
 def test_the_last_count_line_is_the_run_even_when_a_test_printed_one():
@@ -146,6 +145,13 @@ def test_a_line_after_the_count_line_does_not_hide_the_run():
     output = "FAILED a.py::t - x\n1 failed, 2 passed in 0.20s\nsentry: report sent\n"
 
     assert parse_pytest_summary(output).counts == Counts(passed=2, failed=1)
+
+
+def test_a_node_line_whose_reason_looks_like_a_count_line_is_not_the_count_line():
+    output = "FAILED a.py::t - the log said 3 passed in 2s\nERROR a.py::u - 1 error in 1s\n"
+
+    assert parse_pytest_summary(output) is None
+    assert classify_run(COMMAND, output, ownership()).counts == NoRun(NO_SUMMARY)
 
 
 def test_a_node_listed_twice_is_named_once():
@@ -264,6 +270,30 @@ def test_an_error_no_later_step_owns_is_a_named_failure_beside_the_failed_nodes(
     assert (run.counts, run.failed_ids) == (Counts(4, 1, errors=1), ("t/a.py::f", "t/b.py::g"))
 
 
+def test_a_pending_node_the_count_line_does_not_cover_cannot_hide_an_own_failure():
+    output = (
+        "FAILED scripts/test_x.py::own - x\nFAILED t/a.py::f - captured stdout\n"
+        "1 failed, 4 passed in 0.5s\n"
+    )
+
+    run = classify_run(COMMAND, output, ownership(later=["t/a.py"]))
+
+    assert (run.counts, run.failed_ids, run.pending, run.red) == (
+        Counts(passed=4, failed=1),
+        ("scripts/test_x.py::own",),
+        1,
+        True,
+    )
+
+
+def test_an_error_line_the_count_line_does_not_cover_cannot_hide_an_own_error():
+    output = "ERROR scripts/test_x.py::own - x\nERROR t/a.py::f - y\n1 error, 4 passed in 0.5s\n"
+
+    run = classify_run(COMMAND, output, ownership(later=["t/a.py"]))
+
+    assert (run.counts, run.red) == (Counts(passed=4, failed=0, errors=1), True)
+
+
 def test_a_run_whose_every_failure_is_pending_is_green_with_the_pending_count():
     output = "FAILED t/a.py::f - x\nFAILED t/a.py::g - x\n2 failed, 4 passed in 0.5s\n"
 
@@ -330,26 +360,34 @@ def test_a_rendered_line_reads_back_as_the_counts_it_was_made_from(run):
     )
 
 
+SCOPE_GREEN = GateRun("scope", Counts(passed=9, failed=0))
+SCOPE_RED = GateRun("scope", Counts(passed=8, failed=2), failed_ids=("a.py::s",))
+SCOPE_NONE = GateRun("scope", NoRun("the scope run broke"))
+CHECK_GREEN = GateRun("check", Counts(passed=4, failed=0))
+CHECK_RED = GateRun("check", Counts(passed=3, failed=1), failed_ids=("a.py::c",))
+CHECK_NONE = GateRun("check", NoRun("the check run broke"))
+
+
 @pytest.mark.parametrize(
-    ("scope", "check", "last_is_check"),
+    ("scope", "check", "deciding"),
     [
-        (green(), green(), True),
-        (red(), green(), False),
-        (green(), red(), True),
-        (red(), red(), True),
-        (no_run(), green(), False),
-        (green(), no_run(), True),
-        (no_run(), no_run(), True),
+        (SCOPE_GREEN, CHECK_GREEN, CHECK_GREEN),
+        (SCOPE_RED, CHECK_GREEN, SCOPE_RED),
+        (SCOPE_GREEN, CHECK_RED, CHECK_RED),
+        (SCOPE_RED, CHECK_RED, CHECK_RED),
+        (SCOPE_NONE, CHECK_GREEN, SCOPE_NONE),
+        (SCOPE_GREEN, CHECK_NONE, CHECK_NONE),
+        (SCOPE_NONE, CHECK_NONE, CHECK_NONE),
+        (SCOPE_RED, CHECK_NONE, CHECK_NONE),
+        (SCOPE_NONE, CHECK_RED, CHECK_RED),
     ],
 )
-def test_the_deciding_result_line_is_last(scope, check, last_is_check):
-    scope = GateRun("scope", scope.counts, scope.failed_ids, scope.pending_ids)
-    check = GateRun("check", check.counts, check.failed_ids, check.pending_ids)
+def test_the_deciding_result_line_is_last(scope, check, deciding):
+    other = scope if deciding is check else check
 
     lines = gate_result_lines(scope, check)
 
-    deciding = render_result_line(check if last_is_check else scope)
-    assert (len(lines), lines[-1]) == (2, deciding)
+    assert lines == (render_result_line(other), render_result_line(deciding))
 
 
 def test_both_runs_are_written_and_a_missing_scope_leaves_the_checks_line_alone():
@@ -374,6 +412,20 @@ def test_the_reconciler_reads_the_driver_line_as_the_drivers_and_judges_pending(
     text = results_text("10", (render_result_line(run),))
 
     assert evaluate_check(check, "10", text) == Met(by_step_loop=True)
+
+
+def test_a_run_red_only_by_errors_still_meets_a_check_that_names_no_error_key():
+    """The check grammar has no `error` key: the caller must AND `GateRun.red` with it."""
+    run = GateRun(COMMAND, Counts(passed=4, failed=0, errors=1))
+
+    outcome = evaluate_check(CHECK, "10", results_text("10", (render_result_line(run),)))
+
+    assert (run.red, outcome) == (True, Met(by_step_loop=True))
+
+
+def test_an_ownership_whose_step_is_not_a_key_of_the_map_is_refused():
+    with pytest.raises(ValueError, match="^step '10' is not a key of the Read-only map$"):
+        Ownership("10", {f"{STEP}10": ("t/a.py",)}, frozenset())
 
 
 def test_a_no_run_line_is_never_a_met_check():

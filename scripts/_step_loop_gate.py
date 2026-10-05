@@ -1,8 +1,8 @@
 """The pure gate of the step-loop driver: what a test run showed, who owns its failures
 and how an agent's attempt ended.
 
-Nothing here opens a file, runs a command or reads a clock: pytest output text, plan fields
-and transcript facts go in; counts, `Result:` lines and stop reasons come out.
+Pure: pytest output text, plan fields and transcript facts in; counts, `Result:` lines and
+stop reasons out.
 
 Normative reading of pytest output -- the short summary printed by the default `-rfE`:
 
@@ -13,8 +13,14 @@ Normative reading of pytest output -- the short summary printed by the default `
 The last line holding a duration (`in 0.34s`) and a count (or `no tests ran`) is the count
 line; `-q` drops the `=` rules and reads the same. Output with no such line is no run:
 `NoRun`, never a guessed pass. A node line names its id up to the first ` - ` outside square
-brackets. A failure the count line reports but no node line names stays a failure: only a
-named node can be reclassified as pending.
+brackets. Node lines never count as the count line. A failure the count line reports but
+no node line names stays a failure, and a named failure is never discounted: counts fall to
+the named non-pending nodes at the least.
+
+A run's verdict is `GateRun.red`, not a `Check:` alone: the check grammar has no `error`
+key, so a run red only by errors still meets `pass>=2 fail=0`; the caller must AND the two.
+`classify_run` reads one run's whole output: a derived scope of several invocations is
+merged into one run by the caller, never concatenated raw.
 
 Normative ownership of a failed node -- a `Read-only:` entry owns every node it is a
 prefix of, at a path, `::` or `[` boundary (`a.py::f` owns `a.py::f[x]` but not
@@ -26,6 +32,9 @@ Normative reading of an agent's final text -- its last non-blank line carries on
 terminal marker (`[COMPLETE]`, `[BLOCKED]`, `[CONFLICT]` or `[PARTIAL]`) at its start or
 its end, past any `*`, `_` or backtick emphasis. Two different markers there, or a marker
 elsewhere in the text, read as no marker.
+
+`Ownership.step`, `done_steps` and the map keys share one id form; `step` must be a key of
+the map (a step with no entries maps to `()`).
 """
 
 from __future__ import annotations
@@ -43,6 +52,7 @@ NO_SUMMARY_RATIONALE = "the output holds no pytest summary line"
 Marker = Literal["complete", "blocked", "conflict", "partial", "none"]
 StopReason = Literal["completed", "turn-cap", "blocked", "conflict", "partial", "no-marker"]
 EndSource = Literal["marker", "turn-cap", "agent-stop"]
+Nodes = tuple[str, ...]
 RunCounts = Union[Counts, NoRun]  # noqa: UP007 -- runtime value, 3.9 floor
 
 _SUMMARY_DURATION_RE = re.compile(r"\bin \d+(?:\.\d+)?s\b")
@@ -92,7 +102,7 @@ def parse_pytest_summary(output: str) -> PytestSummary | None:
 
 def _read_count_line(lines: list[str]) -> Counts | None:
     for line in reversed(lines):
-        if not _SUMMARY_DURATION_RE.search(line):
+        if _NODE_LINE_RE.match(line) or not _SUMMARY_DURATION_RE.search(line):
             continue
         tallies: dict[str, int] = {}
         for number, word in _COUNT_RE.findall(line):
@@ -131,11 +141,8 @@ def _cut_reason(rest: str) -> str:
 
 
 def entry_owns(entry: str, node_id: str) -> bool:
-    """Whether `entry` is a prefix of `node_id` at a path, `::` or `[` boundary.
-
-    The `/` boundary applies only to a bare path entry: inside a node id a slash can
-    only follow `[`, which is its own boundary.
-    """
+    """Whether `entry` is a prefix of `node_id` at a path, `::` or `[` boundary (`/` only
+    for a bare path entry: inside a node id a slash can only follow `[`)."""
     if not node_id.startswith(entry):
         return False
     rest = node_id[len(entry) :]
@@ -152,6 +159,10 @@ class Ownership:
     step: str
     read_only_by_step: Mapping[str, tuple[str, ...]]
     done_steps: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if self.step not in self.read_only_by_step:
+            raise ValueError(f"step {self.step!r} is not a key of the Read-only map")
 
     def is_pending(self, node_id: str) -> bool:
         """True when only other steps that are not done own `node_id` (longest entry wins)."""
@@ -175,10 +186,8 @@ class Ownership:
 class GateRun:
     """A test run the driver executed itself: the command and what it showed.
 
-    `counts.failed` and `counts.errors` hold only the failures that belong to the
-    step; the failures owned by a later step are `pending_ids`. `failed_ids` names
-    the failing nodes the summary listed. A run that showed no summary has no ids.
-    """
+    `counts` hold only the failures that belong to the step; those a later step owns are
+    `pending_ids`, the rest `failed_ids`. A run that showed no summary has no ids."""
 
     command: str
     counts: RunCounts
@@ -208,16 +217,14 @@ def classify_run(command: str, output: str, ownership: Ownership) -> GateRun:
     errored, pending_errored = _split_pending(summary.error_ids, ownership)
     counts = replace(
         summary.counts,
-        failed=max(summary.counts.failed - len(pending_failed), 0),
-        errors=max(summary.counts.errors - len(pending_errored), 0),
+        failed=max(summary.counts.failed - len(pending_failed), len(failed)),
+        errors=max(summary.counts.errors - len(pending_errored), len(errored)),
     )
     pending = tuple(dict.fromkeys(pending_failed + pending_errored))
     return GateRun(command, counts, failed + errored, pending)
 
 
-def _split_pending(
-    ids: tuple[str, ...], ownership: Ownership
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _split_pending(ids: Nodes, ownership: Ownership) -> tuple[Nodes, Nodes]:
     pending = tuple(node for node in ids if ownership.is_pending(node))
     return tuple(node for node in ids if node not in pending), pending
 
@@ -269,13 +276,9 @@ def reached_turn_cap(requests: int | None, max_turns: int | None) -> bool:
 
 @dataclass(frozen=True)
 class EndEvidence:
-    """What the driver can see of an agent's end.
-
-    `final_text` is the text of the last well-formed assistant request when that
-    request is text only (None while it still calls a tool, or when unreadable);
-    `requests` the distinct API requests in its own transcript (None when unreadable);
-    `agent_stopped` whether the observation log holds an `agent_stop` row for it.
-    """
+    """What the driver can see of an agent's end: the text of its last well-formed request
+    when that is text only (None while it calls a tool, or unreadable), its distinct API
+    requests (None when unreadable) and whether the log holds an `agent_stop` row for it."""
 
     final_text: str | None
     requests: int | None

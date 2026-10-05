@@ -283,6 +283,27 @@ def test_a_request_id_that_is_not_path_safe_is_refused(tmp_path: Path, request_i
         files.write_prompt(tmp_path, request_id, "x")
 
 
+def test_the_snapshots_beside_the_task_are_listed_by_the_request_they_belong_to(
+    tmp_path: Path,
+) -> None:
+    files.write_tree_snapshot(tmp_path, "s2-a1-implement", "# b\n")
+    files.write_tree_snapshot(tmp_path, REQUEST, "# a\n")
+    files.write_prompt(tmp_path, REQUEST, "prompt\n")
+    (tmp_path / "TREE_SNAPSHOT_Not A Request.patch").write_text("x", encoding="utf-8")
+    (tmp_path / "TREE_SNAPSHOT_notes.txt").write_text("x", encoding="utf-8")
+
+    assert files.snapshot_requests(tmp_path) == (REQUEST, "s2-a1-implement")
+
+
+def test_a_deleted_snapshot_is_no_longer_listed_and_a_task_without_any_lists_none(
+    tmp_path: Path,
+) -> None:
+    path = files.write_tree_snapshot(tmp_path, REQUEST, "# a\n")
+    path.unlink()
+
+    assert files.snapshot_requests(tmp_path) == ()
+
+
 # --- The ledger --------------------------------------------------------------------------
 
 

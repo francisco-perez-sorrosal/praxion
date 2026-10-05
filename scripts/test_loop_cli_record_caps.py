@@ -254,3 +254,39 @@ def test_a_replay_of_the_capped_attempt_settles_the_replan_and_the_stop_carries_
         "attempts-exhausted",
     )
     assert line.endswith(f"[BLOCKED] replan: {stop['replan_request']}")
+
+
+# --- A disturbed tree keeps the loop stopped through the command -------------------------------
+
+
+def disturbed_task(tmp_path):
+    first = record(1, commit=COMMIT)
+    root = build(tmp_path, ledger=[first])
+    task = task_of(root)
+    task.dir.joinpath(f"TREE_SNAPSHOT_{first.request}.patch").write_text("# held\n", "utf-8")
+    return root, first
+
+
+@pytest.mark.parametrize("verb", ["next", "status"])
+def test_a_disturbed_tree_repeats_the_same_stop_byte_for_byte_until_the_snapshot_is_deleted(
+    tmp_path, verb
+):
+    root, first = disturbed_task(tmp_path)
+
+    again = [call(root, verb) for _ in range(2)]
+
+    assert again[0] == again[1]
+    assert ("commit-disturbed-tree" in again[0].stdout, first.request in again[0].lines[0]) == (
+        True,
+        True,
+    )
+
+
+@pytest.mark.parametrize("verb", ["next", "status"])
+def test_deleting_the_snapshot_clears_the_disturbed_stop(tmp_path, verb):
+    root, first = disturbed_task(tmp_path)
+    (root / ".ai-work" / SLUG / f"TREE_SNAPSHOT_{first.request}.patch").unlink()
+
+    cleared = call(root, verb)
+
+    assert (cleared.exit, "commit-disturbed-tree" in cleared.stdout) == (0, False)

@@ -5,6 +5,11 @@ Both runs land in one `TEST_RESULTS.md` block that ends on the deciding line, an
 written for the request is read back instead of run again, so a call cut off part-way completes
 when run again. A red run fails the attempt whatever the check's expectations say: the check
 grammar has no error key, so a run red only by errors would otherwise meet it.
+
+The reconciler reads a step's latest block for its `Mutation:` line, so the block carries the
+step's latest earlier one, set before the `Result:` lines to keep the deciding line last. A derived
+scope the resolver answers `nothing-to-run` (documents, say) contributes no run: the `Check:`
+decides, and a step with no check reads as unverifiable, which is red.
 """
 
 from __future__ import annotations
@@ -33,12 +38,22 @@ from _step_loop_io import (
     run_derived_scope,
 )
 from _step_loop_state import VERIFIED, LoopInputs, bare_id, is_done, series_states
-from _step_schema import GREEN, Counts, NoRun, parse_result_line
+from _step_schema import (
+    GREEN,
+    Counts,
+    NoRun,
+    parse_result_line,
+    render_mutation_line,
+    split_step_blocks,
+    step_mutation_reading,
+)
 from reconcile_pipeline_state import reconcile
 
 RESULTS_FILE = "TEST_RESULTS.md"
 RED_RUN_VERDICT = "mismatch"  # the reconciler's word for evidence that contradicts the claim
 NOTHING_RAN = "the step declares no check and none of its declared files changed"
+NOTHING_SELECTED = "the step declares no check and the test scope selects no test"
+NOTHING_TO_RUN = "nothing-to-run"  # the resolver's decision when no test is needed
 SCOPE_COMMAND = "resolve_test_scope.py"
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
 
@@ -86,25 +101,40 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     check = check_run(task.repo, step, ownership)
     runs = tuple(run for run in (scope, check) if run is not None)
     if not runs:
-        runs = (GateRun("", NoRun(NOTHING_RAN)),)
+        runs = (GateRun("", NoRun(NOTHING_SELECTED if changed else NOTHING_RAN)),)
     if check is None:
         lines = tuple(render_result_line(run) for run in runs)
     else:
         lines = gate_result_lines(scope, check)
-    body = (*(f"Command: `{run.command}`" for run in runs if run.command), *lines)
+    commands = tuple(f"Command: `{run.command}`" for run in runs if run.command)
+    body = (*commands, *carried_mutation(results, step.id), *lines)
     write_gate_block(results, step.id, request, body)
     return Gate(body, any(run.red for run in runs))
 
 
-def scope_run(repo: Path, changed: Sequence[str], ownership: Ownership) -> GateRun:
-    """The derived scope of `changed`, every invocation it lists merged into one run."""
+def scope_run(repo: Path, changed: Sequence[str], ownership: Ownership) -> GateRun | None:
+    """The derived scope of `changed`, every invocation it lists merged into one run; None when
+    the resolver decides no test is needed (a run that failed is red, a run never asked is not)."""
     resolved = run_derived_scope(repo, changed)
     if isinstance(resolved, ScopeUnresolved):
         why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
         return GateRun(SCOPE_COMMAND, NoRun(f"the test scope did not resolve ({why})"))
     if not resolved.runs:
+        if resolved.decision == NOTHING_TO_RUN:
+            return None
         return GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))
     return merge_runs(tuple(classified(run, ownership) for run in resolved.runs))
+
+
+def carried_mutation(results: Path, step_id: str) -> tuple[str, ...]:
+    """The step's latest `Mutation:` line, to repeat in the gate block (empty when it has none).
+
+    A later block of the step supersedes an earlier one in the reconciler's reading, so the
+    driver's block repeats the implementer's line rather than hide it.
+    """
+    text = results.read_text(encoding="utf-8") if results.is_file() else ""
+    reading = step_mutation_reading(step_id, split_step_blocks(text))
+    return () if reading is None else (render_mutation_line(reading),)
 
 
 def check_run(repo: Path, step: PlanStep, ownership: Ownership) -> GateRun | None:

@@ -35,13 +35,13 @@ from _handoff_readiness import WAL_AGENT_STOP, session_wal_rows  # noqa: E402
 from _loop_fields import REQUEST_ID_RE, AnyAttempt, render_attempts_line  # noqa: E402
 from _step_loop_gate import EndEvidence  # noqa: E402
 from _step_loop_render import AgentCall  # noqa: E402
+from _step_loop_state import SNAPSHOT_STEM, SNAPSHOT_SUFFIX  # noqa: E402
 from _step_schema import checklist_step_id  # noqa: E402
 from compose_handoff import MID_PHASE_PREFIX, SECTION_HEADINGS, write_handoff  # noqa: E402
 from iteration_ledger import IterationRecord, append_record, read_ledger  # noqa: E402
 
 STEP_LABEL = "Step "
 PROMPT_STEM, PROMPT_SUFFIX = "PROMPT", ".md"
-SNAPSHOT_STEM, SNAPSHOT_SUFFIX = "TREE_SNAPSHOT", ".patch"
 META_UNREADABLE = "meta-unreadable"
 REQUEST_FIDELITY = "request-fidelity"
 DEFAULT_FILE_MODE, MODE_MASK = 0o644, 0o777
@@ -178,6 +178,18 @@ def write_prompt(task_dir: Path, request: str, text: str) -> Path:
 def write_tree_snapshot(task_dir: Path, request: str, patch_text: str) -> Path:
     """`TREE_SNAPSHOT_<request>.patch`: what lay outside the commit when a tree was disturbed."""
     return _write_request_file(task_dir, SNAPSHOT_STEM, request, SNAPSHOT_SUFFIX, patch_text)
+
+
+def snapshot_requests(task_dir: Path) -> tuple[str, ...]:
+    """The request ids that have a `TREE_SNAPSHOT_<request>.patch` beside the task documents.
+
+    The files keep the loop stopped until a person deletes them, so the next call reads them
+    from the task directory, not from anything the previous call kept.
+    """
+    stem, suffix = f"{SNAPSHOT_STEM}_", SNAPSHOT_SUFFIX
+    names = (path.name for path in task_dir.glob(f"{stem}*{suffix}") if path.is_file())
+    found = (name[len(stem) : -len(suffix)] for name in names)
+    return tuple(sorted(request for request in found if REQUEST_ID_RE.fullmatch(request)))
 
 
 def _write_request_file(task_dir: Path, stem: str, request: str, suffix: str, text: str) -> Path:

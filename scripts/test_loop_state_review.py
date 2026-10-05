@@ -9,6 +9,7 @@ review-file text in and reads values out: no file is written, no process runs, n
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,7 @@ from _step_loop_review import (  # noqa: E402
 )
 from _step_loop_state import (  # noqa: E402
     LoopInputs,
+    Marked,
     Next,
     Verified,
     is_done,
@@ -723,3 +725,85 @@ def test_a_stop_cannot_be_built_against_its_invariants(build, message):
 def test_the_causes_are_the_closed_set_the_stop_texts_cover():
     assert set(HUMAN_CAUSES) | {BUDGET_CAUSE} == set(_ACTIONS)
     assert len(HUMAN_CAUSES) == len(set(HUMAN_CAUSES)) == 12
+
+
+# --- A marked series is done only when its review is satisfied -------------------------------
+
+BLOCKED_REVISION = [
+    verified(FORCED_STEP),
+    reviewed(FORCED_STEP),
+    rec(FORCED_STEP, 1, "revise", stop="blocked"),
+]
+
+
+def test_a_revision_that_returned_blocked_after_a_verified_implement_is_not_done():
+    state = step_series(FORCED_STEP, read(PLAN, records=BLOCKED_REVISION))
+
+    assert (type(state), type(state.review), is_done(state)) == (Marked, RevisionFailed, False)
+
+
+def test_the_marker_stops_the_loop_apart_from_the_done_reading():
+    stop = act(PLAN, records=BLOCKED_REVISION)
+
+    assert (stop.cause, stop.step) == ("blocked-marker", "1")
+
+
+@pytest.mark.parametrize(
+    ("steps", "reviews", "done"),
+    [
+        pytest.param([FORCED_STEP], {"1": ACCEPT}, True, id="review-accepted"),
+        pytest.param([PLAIN_STEP], {}, True, id="no-review-required"),
+        pytest.param([FORCED_STEP], {"1": REVISE}, False, id="review-asked-for-revision"),
+    ],
+)
+def test_a_marked_series_with_verified_work_is_done_exactly_when_its_review_is_satisfied(
+    steps, reviews, done
+):
+    step = steps[0]
+    returned = rec(step, 1, "implement", stop="blocked", verdict="verified-complete")
+    asked = [reviewed(step)] if step is FORCED_STEP else []
+
+    state = step_series(step, read(steps, records=[returned, *asked], reviews=reviews))
+
+    assert (isinstance(state, Marked), is_done(state)) == (True, done)
+
+
+# --- A disturbed tree keeps the loop stopped while its snapshot file stays -------------------
+
+
+def disturbed(*records, snapshots):
+    return replace(read(PLAN, records=records), snapshots=tuple(snapshots))
+
+
+def test_the_snapshot_of_the_latest_request_of_a_step_stops_the_loop_with_its_evidence():
+    first = rec(FORCED_STEP)
+
+    stop = next_action(disturbed(first, snapshots=[first.request]))
+
+    assert (stop.cause, stop.step, stop.attempts) == ("commit-disturbed-tree", "1", (first,))
+    assert first.request in stop.evidence
+    assert f"TREE_SNAPSHOT_{first.request}.patch" in stop.evidence
+
+
+@pytest.mark.parametrize(
+    "held",
+    [
+        pytest.param(lambda first, second: [], id="no-snapshot"),
+        pytest.param(lambda first, second: [first.request], id="an-earlier-request"),
+        pytest.param(lambda first, second: ["s9-a1-implement"], id="an-unknown-request"),
+    ],
+)
+def test_a_snapshot_of_an_earlier_request_or_none_stops_nothing(held):
+    first, second = rec(FORCED_STEP, 1), verified(FORCED_STEP, 2)
+
+    action = next_action(disturbed(first, second, snapshots=held(first, second)))
+
+    assert isinstance(action, Spawn)
+
+
+def test_the_snapshot_stop_comes_before_a_marker():
+    marked = rec(FORCED_STEP, 1, stop="blocked")
+
+    stop = next_action(disturbed(marked, snapshots=[marked.request]))
+
+    assert stop.cause == "commit-disturbed-tree"

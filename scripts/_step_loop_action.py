@@ -10,13 +10,14 @@ Normative precedence, a total function of the inputs, first match wins:
 
 1. `Complete` when every step is done.
 2. A human stop, in this order: `loop-state-defect` (more than one outstanding request),
-   `unnamed-attempts`, `dependency-defect`, then the stop of the selected step, which is the
-   earliest step in plan order that is not done.
+   `unnamed-attempts`, `dependency-defect`, `commit-disturbed-tree`, a marker, then the stop of
+   the selected step, which is the earliest step in plan order that is not done.
 3. `iteration-budget` when the iterations used have reached the budget.
 4. A `Spawn` for the selected step.
 
 The budget is derived from the plan alone, so a plan revision opens a new series without
-growing it. `commit-disturbed-tree` is a cause only the commit adapter raises.
+growing it. `commit-disturbed-tree` holds while the tree snapshot of the step's latest
+recorded request exists beside the task documents, and clears when a person deletes the file.
 """
 
 from __future__ import annotations
@@ -39,6 +40,8 @@ from _step_loop_review import (
 )
 from _step_loop_state import (
     EXHAUSTED,
+    SNAPSHOT_STEM,
+    SNAPSHOT_SUFFIX,
     STEP_LABEL,
     AllDone,
     Defects,
@@ -152,7 +155,23 @@ def _human_stop(inputs: LoopInputs, selection: Next | Defects) -> Stop | None:
             for d in found
         )
         return Stop("dependency-defect", found[0].step, why)
-    return _marked_stop(inputs) or _step_stop(inputs, selection)
+    return _snapshot_stop(inputs) or _marked_stop(inputs) or _step_stop(inputs, selection)
+
+
+def _snapshot_stop(inputs: LoopInputs) -> Stop | None:
+    """A disturbed commit stays a stop while its snapshot file is there: the person who reads
+    the tree deletes the file to say they have, and the next call carries on."""
+    for step in inputs.steps:
+        records = inputs.driver_records(step.id)
+        if records and records[-1].request in inputs.snapshots:
+            last = records[-1]
+            series = tuple(r for r in records if r.step_digest == step.digest)
+            name = f"{SNAPSHOT_STEM}_{last.request}{SNAPSHOT_SUFFIX}"
+            evidence = (
+                f"{last.request} ended with `{last.test_result}`; the tree is saved in {name}"
+            )
+            return Stop("commit-disturbed-tree", step.id, evidence, series)
+    return None
 
 
 def _marked_stop(inputs: LoopInputs) -> Stop | None:

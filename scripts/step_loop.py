@@ -56,7 +56,7 @@ from _loop_fields import ATTEMPT_CAP, OutstandingAttempt, parse_attempts
 from _plan_steps import parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
 from _step_loop_action import Complete, Spawn, Stop, next_action
-from _step_loop_files import set_attempts_line, write_prompt, write_stop_handoff
+from _step_loop_files import set_attempts_line, snapshot_requests, write_prompt, write_stop_handoff
 from _step_loop_io import paths_differing_from_head
 from _step_loop_render import (
     PromptInputs,
@@ -186,8 +186,9 @@ def read_task(args: argparse.Namespace) -> Task:
     }
     base_ref = args.base_ref or resolve_base_ref(repo)
     verdicts = reconcile(args.slug, repo, base_ref, state_root=work, include_untracked=True)
+    snapshots = snapshot_requests(directory)
     inputs = LoopInputs.read(
-        steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed
+        steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed, snapshots
     )
     brief = directory / BRIEF_FILE
     brief_text = brief.read_text("utf-8") if brief.is_file() else ""
@@ -210,11 +211,9 @@ def _required(path: Path) -> str:
 def run_next(
     task: Task, args: argparse.Namespace, invoke: str, took: rec.Taken | None = None
 ) -> Reply:
-    """The next action, carrying what a `record` took back (a disturbed commit stops)."""
+    """The next action, carrying what a `record` took back."""
     action, counts = next_action(task.inputs), cli.iterations_of(task.inputs)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
-    if took is not None and took.disturbed is not None:
-        action = rec.disturbed_stop(task.inputs, took.step, took.disturbed)
     lines = cli.warning_lines(frame.warnings)
     if isinstance(action, Spawn):
         return _issue(task, action, frame, invoke)

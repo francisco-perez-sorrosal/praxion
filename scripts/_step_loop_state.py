@@ -46,6 +46,7 @@ VERIFIED = "verified-complete"
 HUMAN_WORDS = ("unknown", "blocked")
 EXHAUSTED = "attempts-exhausted"
 WORK_KINDS = ("implement", "revise")  # the returns that carry a step's own work
+SNAPSHOT_STEM, SNAPSHOT_SUFFIX = "TREE_SNAPSHOT", ".patch"  # the file a disturbed tree leaves
 
 _KIND_RE = re.compile(r"-(implement|revise|review)(?:-r\d+)?$")
 
@@ -75,6 +76,7 @@ class LoopInputs:
     verdicts: Mapping[str, Mapping[str, Any]]
     reviews: Mapping[str, str] = field(default_factory=dict)  # review file text by step id
     unnamed: tuple[str, ...] = ()  # `Attempts:` lines that name no step
+    snapshots: tuple[str, ...] = ()  # request ids with a tree snapshot file beside the task
 
     @classmethod
     def read(
@@ -85,6 +87,7 @@ class LoopInputs:
         verdicts: Iterable[Mapping[str, Any]],
         reviews: Mapping[str, str] | None = None,
         unnamed: Iterable[str] = (),
+        snapshots: Iterable[str] = (),
     ) -> LoopInputs:
         """Parse the `Step <id>` keys of WIP, ledger and reconciler once, at the boundary."""
         return cls(
@@ -94,6 +97,7 @@ class LoopInputs:
             {bare_id(verdict["step"]): verdict for verdict in verdicts},
             dict(reviews or {}),
             tuple(unnamed),
+            tuple(snapshots),
         )
 
     def driver_records(self, step_id: str) -> tuple[IterationRecord, ...]:
@@ -159,6 +163,7 @@ class Marked:
 
     marker: Marker
     attempts: tuple[IterationRecord, ...]
+    review: ReviewState = NotRequired()
 
 
 @dataclass(frozen=True)
@@ -199,11 +204,13 @@ Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
 def is_done(state: Series) -> bool:
     """Done outside the loop, or verified by the driver with its light review satisfied.
 
-    A marked series whose work verified is done too: the marker still stops the loop while
-    other steps remain (completion outranks that stop only once every step is done).
+    A marked series whose work verified is done too, once its review is satisfied: the marker
+    still stops the loop while other steps remain (completion outranks that stop only once
+    every step is done).
     """
     if isinstance(state, Marked):
-        return any(record.verdict == VERIFIED for record in state.attempts)
+        verified = any(record.verdict == VERIFIED for record in state.attempts)
+        return verified and satisfied(state.review)
     return isinstance(state, DoneOutside) or (
         isinstance(state, Verified) and satisfied(state.review)
     )
@@ -257,11 +264,11 @@ def _series_of_records(
     work = [r for r in current if request_kind(r) in WORK_KINDS]
     if not implement:
         return Fresh(index)
+    review = _review_of(step, current, review_text)
     if work[-1].stop_reason in MARKED_STOPS:
-        return Marked(MARKED_STOPS[work[-1].stop_reason], implement)
+        return Marked(MARKED_STOPS[work[-1].stop_reason], implement, review)
     verified = [r for r in implement if r.verdict == VERIFIED]
     if verified:
-        review = _review_of(step, current, review_text)
         return Verified(verified[-1].attempt, index, verified[-1].commit, review)
     if spent(implement) >= ATTEMPT_CAP:
         return Exhausted(implement)

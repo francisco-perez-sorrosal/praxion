@@ -22,17 +22,23 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import _step_loop_record as rec  # noqa: E402
 import _step_loop_record_gate as gating  # noqa: E402
 from _agent_transcript import Final, Missing, Read, Unreadable  # noqa: E402
+from _loop_fields import ATTEMPT_CAP  # noqa: E402
+from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_files import write_gate_block  # noqa: E402
 from _step_loop_gate import GateRun  # noqa: E402
 from _step_loop_io import (  # noqa: E402
+    CommandRun,
     CommitInterrupted,
     CommitRefused,
     Committed,
     NothingToCommit,
+    ScopeRuns,
     TreeDisturbed,
     TreeSnapshot,
 )
-from _step_schema import Counts, NoRun  # noqa: E402
+from _step_loop_render import RequestKey, spawn_request  # noqa: E402
+from _step_loop_state import LoopInputs  # noqa: E402
+from _step_schema import Counts, NoRun, mutation_block_reasons  # noqa: E402
 
 STEP = "Step "
 REQUEST = "s1-a1-implement"
@@ -261,7 +267,7 @@ def test_each_commit_outcome_says_what_holds_the_work_and_whether_to_stop(
 
     taken = rec.judge_commit(task, REQUEST, outcome)
 
-    assert (taken.sha, taken.failure is not None, taken.disturbed is not None) == (
+    assert (taken.sha, taken.failure is not None, snapshot_of(tmp_path).exists()) == (
         sha,
         failed,
         stops,
@@ -274,8 +280,38 @@ def test_a_disturbed_tree_saves_the_earlier_state_beside_the_task(tmp_path):
 
     taken = rec.judge_commit(task, REQUEST, TreeDisturbed(before, before, ("notes.txt",), None))
 
-    saved = tmp_path / f"TREE_SNAPSHOT_{REQUEST}.patch"
-    assert (str(saved) in taken.disturbed, "notes.txt" in saved.read_text()) == (True, True)
+    saved = snapshot_of(tmp_path)
+    assert (taken.failure in saved.read_text(), "notes.txt" in saved.read_text()) == (True, True)
+
+
+def snapshot_of(task_dir):
+    return task_dir / f"TREE_SNAPSHOT_{REQUEST}.patch"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        rec.GitCommandError("fatal: bad object"),
+        rec.GitUnavailableError("git is not on PATH"),
+        rec.OutsideRepoError("../x leaves the repository"),
+    ],
+    ids=["git-refused", "git-unavailable", "path-outside-the-repository"],
+)
+def test_a_commit_that_could_not_run_leaves_a_snapshot_naming_why_and_no_sha(
+    repo, monkeypatch, error
+):
+    def raising(*_):
+        raise error
+
+    monkeypatch.setattr(rec, "commit_paths", raising)
+    task = SimpleNamespace(dir=repo, repo=repo, slug=SLUG, inputs=SimpleNamespace(steps=()))
+    step = parse_plan_steps(gate_plan())[0]
+    asked = spawn_request(SLUG, step, RequestKey("1", 2, "implement", 1), ATTEMPT_CAP, str(repo))
+
+    taken = rec.commit_attempt(task, step, asked, GREEN_LINE)
+
+    saved = (repo / "TREE_SNAPSHOT_s1-a2-implement.patch").read_text()
+    assert (taken.sha, taken.failure in saved, str(error) in saved) == (None, True, True)
 
 
 def git(repo, *args):
@@ -322,3 +358,119 @@ def test_the_step_line_is_ticked_once_and_no_other(tmp_path, wip, after, wrote):
     ticked = rec.tick_step(path, "1")
 
     assert (ticked, path.read_text(encoding="utf-8")) == (wrote, after + f"- [ ] {STEP}2: Next\n")
+
+
+# --- The mutation line a tagged step carries into the driver's block ---------------------------
+
+SLUG = "demo"
+STEP_HEAD = f"## Steps\n\n### {STEP}1: Do it\n\n**Assignee**: implementer\n"
+CHECK_LINE = "**Check**: `python3 -m pytest -q` expects pass>=1 fail=0\n"
+MUTATION_TAG = "**mutation**: on\n"
+RAN = "Mutation: survivors=0 mutants=5 targets=[a] (a: 0)"
+LAYOUT = "Mutation: unavailable reason=not-flat-layout (the tests are nested)"
+SENSOR_DOWN = "Mutation: unavailable reason=toolchain-missing (uv is absent)"
+PASSED = CommandRun(("python3", "-m", "pytest", "-q"), ".", "3 passed in 0.1s", 0)
+
+
+def gate_plan(*lines):
+    return STEP_HEAD + "".join(lines)
+
+
+def gate_task(tmp_path, plan):
+    inputs = LoopInputs(tuple(parse_plan_steps(plan)), {}, (), {})
+    return SimpleNamespace(
+        slug=SLUG, repo=tmp_path, work=tmp_path, dir=tmp_path, base_ref="HEAD", inputs=inputs
+    )
+
+
+def run_the_gate(monkeypatch, tmp_path, plan, *, changed=(), decision=None):
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
+    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeRuns(decision, ()))
+    task = gate_task(tmp_path, plan)
+    return gating.run_gate(task, task.inputs.steps[0], REQUEST)
+
+
+@pytest.mark.parametrize(
+    ("earlier", "blocked"),
+    [
+        pytest.param([RAN], {}, id="a-ran-line-verifies"),
+        pytest.param([LAYOUT], {}, id="the-declared-layout-limit-verifies"),
+        pytest.param([], {f"{STEP}1": "no Mutation: line"}, id="no-line-stays-blocked"),
+        pytest.param(
+            [SENSOR_DOWN],
+            {f"{STEP}1": "refused, reason=toolchain-missing"},
+            id="another-refusal-stays-blocked",
+        ),
+        pytest.param(
+            ["Mutation: survivors=x"],
+            {f"{STEP}1": "unreadable Mutation: line"},
+            id="an-unreadable-line-stays-blocked",
+        ),
+    ],
+)
+def test_the_driver_block_repeats_the_implementers_mutation_line_for_the_reconciler(
+    monkeypatch, tmp_path, earlier, blocked
+):
+    plan = gate_plan(MUTATION_TAG, CHECK_LINE)
+    results = tmp_path / gating.RESULTS_FILE
+    results.write_text(
+        "\n".join([f"## {STEP}1 — implementer", "", *earlier, GREEN_LINE, ""]), "utf-8"
+    )
+
+    gate = run_the_gate(monkeypatch, tmp_path, plan)
+
+    assert (
+        gate.deciding.startswith("Result: pass="),
+        mutation_block_reasons(plan, results.read_text("utf-8")),
+    ) == (
+        True,
+        blocked,
+    )
+
+
+def test_the_mutation_line_sits_before_the_result_lines_so_the_block_ends_on_the_deciding_line(
+    monkeypatch, tmp_path
+):
+    results = tmp_path / gating.RESULTS_FILE
+    results.write_text(f"## {STEP}1 — implementer\n\n{RAN}\n{GREEN_LINE}\n", "utf-8")
+
+    gate = run_the_gate(monkeypatch, tmp_path, gate_plan(CHECK_LINE))
+
+    assert (gate.body[-2], gate.body[-1].startswith("Result:")) == (RAN, True)
+
+
+# --- A derived scope the resolver says needs no test is not a red run --------------------------
+
+README_STEP = ("**Files**: `README.md`\n",)
+
+
+@pytest.mark.parametrize(
+    ("lines", "red", "deciding"),
+    [
+        pytest.param((*README_STEP, CHECK_LINE), False, "Result: pass=3", id="the-check-decides"),
+        pytest.param(
+            README_STEP, True, f"Result: none — {gating.NOTHING_SELECTED}", id="no-check-no-test"
+        ),
+    ],
+)
+def test_a_scope_that_needs_no_test_leaves_the_decision_to_the_check_or_to_nothing(
+    monkeypatch, tmp_path, lines, red, deciding
+):
+    gate = run_the_gate(
+        monkeypatch, tmp_path, gate_plan(*lines), changed=("README.md",), decision="nothing-to-run"
+    )
+
+    assert (gate.red, gate.deciding.startswith(deciding)) == (red, True)
+
+
+def test_a_scope_that_selects_but_lists_no_invocation_is_still_a_red_run(monkeypatch, tmp_path):
+    gate = run_the_gate(
+        monkeypatch,
+        tmp_path,
+        gate_plan(*README_STEP, CHECK_LINE),
+        changed=("README.md",),
+        decision="selected",
+    )
+
+    assert (gate.red, "the test scope selects no test" in gate.deciding) == (True, True)

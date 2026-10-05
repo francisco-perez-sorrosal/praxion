@@ -17,7 +17,9 @@ derived here, in phases:
    check grammar has no error key, so a run red only by errors would otherwise meet it.
 4. **Commit** a verified attempt by explicit path. A commit git refuses, or one that cannot
    finish or would disturb the tree, adds a `Result: none` line saying why, so every reader
-   sees the attempt unverified; the last two also stop the loop for a person.
+   sees the attempt unverified; the last two (and a repository whose commands cannot run) also
+   leave a `TREE_SNAPSHOT_<request>.patch`, which keeps the loop stopped for a person until
+   they delete it.
 5. **Ledger**: exactly one record per return.
 
 Every phase is keyed by the request, so a call cut off part-way completes when run again: a
@@ -95,7 +97,6 @@ POLL_SECONDS = 0.5
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 WIP_FILE = "WIP.md"
 TRAILER = "Step-Loop-Request: "
-DISTURBED_CAUSE = "commit-disturbed-tree"
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
 _MARKER_OF_STOP = {"completed": "complete", **{m: m for m in ("blocked", "conflict", "partial")}}
 
@@ -110,13 +111,11 @@ class RecordRefusedError(Exception):
 
 @dataclass(frozen=True)
 class Taken:
-    """What one `record` took back: the `recorded` object, its warnings, and, when the commit
-    disturbed the tree, the evidence that stops the loop for a person."""
+    """What one `record` took back: the `recorded` object, the step and its warnings."""
 
     recorded: Mapping[str, Any]
     step: str
     warnings: Warnings = ()
-    disturbed: str | None = None
 
 
 # --- The call --------------------------------------------------------------------------------
@@ -147,7 +146,7 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)
     gate = run_gate(task, step, request)
     verdict = read_verdict(task, step.id, request, gate)
-    committing = Committing(None, None, None)
+    committing = Committing(None, None)
     if verdict["verdict"] == VERIFIED:
         committing = commit_attempt(task, step, asked, gate.deciding)
         if committing.failure is not None:
@@ -176,7 +175,7 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     summary += f" ({record.decided_by})"
     warnings += edit_warnings(task, step, request)
     taken = recorded_object(record, marker, summary)
-    return Taken(taken, step.id, warnings, committing.disturbed)
+    return Taken(taken, step.id, warnings)
 
 
 def withdraw_request(task: TaskView, request: str) -> Taken:
@@ -264,13 +263,6 @@ def recorded_object(
         "ledger": ledger,
         "replayed": replayed,
     }
-
-
-def disturbed_stop(inputs: LoopInputs, step_id: str, evidence: str) -> Stop:
-    """The stop a disturbed commit leaves, naming the attempts of the step's current series."""
-    step = next(s for s in inputs.steps if s.id == step_id)
-    series = tuple(r for r in inputs.driver_records(step.id) if r.step_digest == step.digest)
-    return Stop(DISTURBED_CAUSE, step.id, evidence, series)
 
 
 # --- 1. End: the agent's transcript, until it shows the end ---------------------------------
@@ -403,12 +395,10 @@ def read_return(
 
 
 class Committing(NamedTuple):
-    """The commit's sha (None: none holds the work), why no commit holds it, and the evidence
-    of a tree the commit disturbed or may have disturbed (a stop for a person)."""
+    """The commit's sha (None: none holds the work) and why no commit holds it."""
 
     sha: str | None
     failure: str | None
-    disturbed: str | None
 
 
 def commit_attempt(
@@ -417,33 +407,42 @@ def commit_attempt(
     """Commit the step's declared files, unless HEAD already is the request's commit."""
     sha = head_commit_for(task.repo, asked.key.id)
     if sha is not None:
-        return Committing(sha, None, None)
+        return Committing(sha, None)
     message = commit_message(step, task.slug, asked, deciding)
     read_only = tuple(entry for s in task.inputs.steps for entry in s.read_only)
     try:
         outcome = commit_paths(task.repo, step.files, message, read_only)
     except (GitCommandError, GitUnavailableError, OutsideRepoError) as exc:
         why = f"the step-loop driver could not commit: {_first_line(str(exc))}"
-        return Committing(None, why, why + _lock_note(task.repo))
+        _save_snapshot(task, asked.key.id, "", why)  # the repository could not be read
+        return Committing(None, why)
     return judge_commit(task, asked.key.id, outcome)
 
 
 def judge_commit(task: TaskView, request: str, outcome: CommitOutcome) -> Committing:
     """What each commit outcome means for the attempt (see `Committing`)."""
     if isinstance(outcome, Committed):
-        return Committing(outcome.sha, None, None)
+        return Committing(outcome.sha, None)
     if isinstance(outcome, NothingToCommit):
-        return Committing(None, None, None)
+        return Committing(None, None)
     if isinstance(outcome, CommitRefused):
         refused = "the step-loop driver's commit was refused by the repository's hooks"
-        return Committing(None, f"{refused}: {_first_line(outcome.detail)}", None)
+        return Committing(None, f"{refused}: {_first_line(outcome.detail)}")
     if isinstance(outcome, CommitInterrupted):
-        saved = write_tree_snapshot(task.dir, request, outcome.after.patch_text())
         why = f"the step-loop driver's commit did not finish: {_first_line(outcome.detail)}"
-        return Committing(None, why, f"{why}; the tree is saved in {saved}{_lock_note(task.repo)}")
-    saved = write_tree_snapshot(task.dir, request, outcome.before.patch_text())
+        _save_snapshot(task, request, outcome.after.patch_text(), why)
+        return Committing(None, why)
     why = f"the step-loop driver's commit met files outside its paths: {', '.join(outcome.paths)}"
-    return Committing(outcome.sha, why, f"{why}; the earlier state is saved in {saved}")
+    _save_snapshot(task, request, outcome.before.patch_text(), why)
+    return Committing(outcome.sha, why)
+
+
+def _save_snapshot(task: TaskView, request: str, patch_text: str, why: str) -> None:
+    """Write `TREE_SNAPSHOT_<request>.patch`, headed by why and the lock when one stands.
+
+    The file is the stop: `next` and `status` stop while it exists, until a person deletes it.
+    """
+    write_tree_snapshot(task.dir, request, f"# {why}{_lock_note(task.repo)}\n{patch_text}")
 
 
 def head_commit_for(repo: Path, request: str) -> str | None:

@@ -36,7 +36,7 @@ from _loop_fields import REQUEST_ID_RE, AnyAttempt, render_attempts_line  # noqa
 from _step_loop_gate import EndEvidence  # noqa: E402
 from _step_loop_render import AgentCall  # noqa: E402
 from _step_schema import checklist_step_id  # noqa: E402
-from compose_handoff import SECTION_HEADINGS, write_handoff  # noqa: E402
+from compose_handoff import MID_PHASE_PREFIX, SECTION_HEADINGS, write_handoff  # noqa: E402
 from iteration_ledger import IterationRecord, append_record, read_ledger  # noqa: E402
 
 STEP_LABEL = "Step "
@@ -198,15 +198,18 @@ def append_ledger_record(task_dir: Path, record: IterationRecord) -> bool:
     return True
 
 
-def write_stop_handoff(slug: str, repo_root: Path, next_action: str) -> bool:
+def write_stop_handoff(
+    slug: str, repo_root: Path, next_action: str, cause: str | None = None
+) -> bool:
     """Compose `HANDOFF.md` with `next_action` as section 2 and write it only if section 2 moved.
 
-    The readiness gate is overridden on purpose: a stop leaves the step's files uncommitted
-    by design, and the header says so. Every other section is the composer's, so a stop that
-    repeats leaves the file, and its timestamps, alone.
+    A stop's boundary is `mid-phase:<cause>`: the composer must name one once every step reads
+    verified, and the cause (unlike a request id) repeats. Without one the composer picks its
+    own. The readiness gate is overridden on purpose: a stop leaves the step's files uncommitted.
     """
+    boundary = None if cause is None else f"{MID_PHASE_PREFIX}{cause}"
     composed = write_handoff(
-        slug, repo_root, boundary=None, force=True, next_action=next_action, dry_run=True
+        slug, repo_root, boundary=boundary, force=True, next_action=next_action, dry_run=True
     )
     path: Path = composed["path"]
     existing = read_existing(path)

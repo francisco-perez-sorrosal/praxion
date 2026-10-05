@@ -4,10 +4,10 @@ repository or runs a command.
 * **Git**: `commit_paths`, the commit by explicit path. A declared path (a file or a directory,
   spelled any way git accepts) is normalised once and expanded to the changed files under it;
   filtering, staging, the commit and the snapshots all work on those file names. A row already
-  staged outside them is refused up front, since a path-limited commit leaves it staged for the
-  next plain commit to sweep in. After the commit its file set must equal the staged files and
-  the tree outside them must be unchanged; otherwise the disturbance is reported with both
-  snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
+  staged outside them is tolerated and stays staged, since a path-limited commit never takes it;
+  the snapshot records it. After the commit its file set must equal the staged files and the tree
+  outside them (staged rows included) must be unchanged; otherwise the disturbance is reported
+  with both snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
   `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:`) are withheld
   whatever the plan declares.
 * **Runner**: the `Check:` command and the derived test scope. Each invocation the resolver
@@ -145,8 +145,8 @@ class CommitInterrupted:
 
 @dataclass(frozen=True)
 class TreeDisturbed:
-    """The commit touched, or would touch, more than its files: `paths` names what moved
-    (or was already staged), `sha` the commit if one was made, `before`/`after` the snapshots.
+    """The commit touched more than its files: `paths` names what moved, `sha` the commit
+    if one was made, `before`/`after` the snapshots.
     """
 
     before: TreeSnapshot
@@ -181,8 +181,6 @@ def commit_paths(
     if not kept:
         return NothingToCommit(withheld)
     before = snapshot_outside(repo, frozenset(kept))
-    if before.staged:
-        return TreeDisturbed(before, before, tuple(path for path, _ in before.staged), None)
     return _commit_and_judge(repo, _Job(kept, withheld, message, before, commit_timeout))
 
 

@@ -55,6 +55,7 @@ from _step_loop_state import (
     Verified,
     is_driven,
     select_step,
+    series_states,
     spent,
 )
 
@@ -151,7 +152,18 @@ def _human_stop(inputs: LoopInputs, selection: Next | Defects) -> Stop | None:
             for d in found
         )
         return Stop("dependency-defect", found[0].step, why)
-    return _step_stop(inputs, selection)
+    return _marked_stop(inputs) or _step_stop(inputs, selection)
+
+
+def _marked_stop(inputs: LoopInputs) -> Stop | None:
+    """A blocked or conflict marker stops the loop while steps remain, even on a done step."""
+    states = series_states(inputs)
+    for step in inputs.steps:
+        state = states.get(step.id)
+        if isinstance(state, Marked):
+            evidence = f"the latest return at {STEP_LABEL}{step.id} carried [{state.marker}]"
+            return Stop(f"{state.marker.lower()}-marker", step.id, evidence, state.attempts)
+    return None
 
 
 def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
@@ -161,11 +173,6 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
         evidence = f"{ATTEMPT_CAP} of {ATTEMPT_CAP} fresh attempts at {where} ended unverified"
         replan = getattr(inputs.attempts.get(step.id), "replan", None) or evidence
         return Stop("attempts-exhausted", step.id, evidence, state.attempts, replan)
-    if isinstance(state, Marked):
-        cause = f"{state.marker.lower()}-marker"
-        return Stop(
-            cause, step.id, f"the latest return at {where} carried [{state.marker}]", state.attempts
-        )
     if isinstance(state, HumanVerdict):
         evidence = state.evidence or f"the reconciler reads {where} {state.verdict}"
         if state.verdict == EXHAUSTED:

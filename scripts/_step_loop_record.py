@@ -30,13 +30,12 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import sys
 import time
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, NamedTuple, Protocol, cast
+from typing import Any, NamedTuple, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 from _agent_transcript import (  # noqa: E402 (after sys.path injection)
@@ -46,7 +45,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     parse_transcript,
 )
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
-from _loop_fields import ATTEMPT_CAP, Check, OutstandingAttempt  # noqa: E402
+from _loop_fields import ATTEMPT_CAP, OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
 from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
 from _step_loop_files import (  # noqa: E402
@@ -54,28 +53,20 @@ from _step_loop_files import (  # noqa: E402
     agent_stopped,
     append_ledger_record,
     end_evidence,
-    gate_heading,
+    find_request_transcript,
     meta_warnings,
     names_request,
     read_agent,
-    write_atomic,
-    write_gate_block,
     write_tree_snapshot,
 )
 from _step_loop_gate import (  # noqa: E402
-    GateRun,
     Marker,
-    Ownership,
-    classify_run,
     derive_stop_reason,
     end_source,
-    gate_result_lines,
     parse_marker,
-    render_result_line,
     resolve_marker,
 )
 from _step_loop_io import (  # noqa: E402
-    CommandRun,
     CommitInterrupted,
     CommitOutcome,
     CommitRefused,
@@ -83,34 +74,30 @@ from _step_loop_io import (  # noqa: E402
     GitCommandError,
     NothingToCommit,
     OutsideRepoError,
-    ScopeUnresolved,
     commit_paths,
-    paths_differing_from_head,
-    run_check,
-    run_derived_scope,
-    split_outer_loop,
 )
+from _step_loop_record_gate import TaskView, add_refusal, read_verdict, run_gate  # noqa: E402
 from _step_loop_render import SpawnRequest, commit_message, spawn_request  # noqa: E402
-from _step_loop_state import VERIFIED, LoopInputs, bare_id, is_done, series_states  # noqa: E402
-from _step_schema import GREEN, Counts, NoRun, checklist_step_id, parse_result_line  # noqa: E402
+from _step_loop_settle import (  # noqa: E402
+    PROMPT_FILE,
+    Warnings,
+    edit_warnings,
+    settle_replan,
+    tick_step,
+    withdraw_line,
+)
+from _step_loop_state import VERIFIED, LoopInputs, bare_id  # noqa: E402
 from iteration_ledger import IterationRecord  # noqa: E402
-from reconcile_pipeline_state import reconcile  # noqa: E402
 
 END_WAIT_VARIABLE = "PRAXION_STEP_LOOP_END_WAIT_SECONDS"
 DEFAULT_END_WAIT_SECONDS = 20.0
 POLL_SECONDS = 0.5
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
-RESULTS_FILE, WIP_FILE, PROMPT_FILE = "TEST_RESULTS.md", "WIP.md", "PROMPT_{}.md"
+WIP_FILE = "WIP.md"
 TRAILER = "Step-Loop-Request: "
 DISTURBED_CAUSE = "commit-disturbed-tree"
-RED_RUN_VERDICT = "mismatch"  # the reconciler's word for evidence that contradicts the claim
-NOTHING_RAN = "the step declares no check and none of its declared files changed"
-SCOPE_COMMAND = "resolve_test_scope.py"
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
 _MARKER_OF_STOP = {"completed": "complete", **{m: m for m in ("blocked", "conflict", "partial")}}
-_HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
-
-Warnings = tuple[tuple[str, str], ...]  # (code, message)
 
 
 class RecordRefusedError(Exception):
@@ -119,23 +106,6 @@ class RecordRefusedError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code, self.message = code, message
-
-
-class TaskView(Protocol):
-    """What `record` reads of the task: where it lives and the loop's inputs, by value."""
-
-    @property
-    def slug(self) -> str: ...
-    @property
-    def repo(self) -> Path: ...
-    @property
-    def work(self) -> Path: ...
-    @property
-    def dir(self) -> Path: ...
-    @property
-    def base_ref(self) -> str: ...
-    @property
-    def inputs(self) -> LoopInputs: ...
 
 
 @dataclass(frozen=True)
@@ -152,12 +122,21 @@ class Taken:
 # --- The call --------------------------------------------------------------------------------
 
 
+def take_back(task: TaskView, request: str, agent_id: str | None, relayed: str | None) -> Taken:
+    """The `record` verb: an agent's return, or, with no agent id, a request that never started."""
+    if agent_id is None or relayed is None:
+        return withdraw_request(task, request)
+    return record_return(task, request, agent_id, relayed)
+
+
 def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> Taken:
     """Take back the agent's return for `request`, or replay the record it already has."""
     done = next((r for r in task.inputs.records if r.request == request), None)
     if done is not None:
         marker = _MARKER_OF_STOP.get(done.stop_reason, "none")
-        return Taken(recorded_object(done, marker, None, replayed=True), bare_id(done.step))
+        step_id = bare_id(done.step)
+        settle_replan(task.dir / WIP_FILE, task.inputs, _plan_step(task.inputs, step_id), request)
+        return Taken(recorded_object(done, marker, None, replayed=True), step_id)
     spawn = _pending(task.inputs, request)
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
@@ -191,11 +170,50 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
         max_turns=max_turns,
     )
     append_ledger_record(task.dir, record)
+    ended = replace(task.inputs, records=(*task.inputs.records, record))
+    settle_replan(task.dir / WIP_FILE, ended, step, request)
     summary = f"appended {record.step} attempt {record.attempt}: {record.verdict}"
     summary += f" ({record.decided_by})"
     warnings += edit_warnings(task, step, request)
     taken = recorded_object(record, marker, summary)
     return Taken(taken, step.id, warnings, committing.disturbed)
+
+
+def withdraw_request(task: TaskView, request: str) -> Taken:
+    """Take back a request whose Agent call never started: the `Attempts:` line returns to
+    what it was before the write-ahead and the prompt file goes, so the next `next` writes
+    both again byte for byte. Refused when a transcript naming the request exists."""
+    spawn = _pending(task.inputs, request)
+    prompt = task.dir / PROMPT_FILE.format(request)
+    since = prompt.stat().st_mtime if prompt.exists() else float("-inf")
+    if find_request_transcript(request, since) is not None:
+        raise RecordRefusedError(
+            "not-started-but-ran",
+            f"record failed because an agent was started on {request}. To fix: report its"
+            " agentId and marker once it ends, instead of --not-started.",
+        )
+    outstanding = cast(OutstandingAttempt, task.inputs.attempts[spawn.step.id])
+    withdraw_line(task.dir / WIP_FILE, spawn.step.id, outstanding, spawn.key.kind)
+    prompt.unlink(missing_ok=True)
+    return Taken(withdrawn_object(request), spawn.step.id)
+
+
+def withdrawn_object(request: str) -> dict[str, Any]:
+    """The envelope's `recorded` object for a request that never started."""
+    nothing = dict.fromkeys(("agent_id", "turns", "max_turns", "gate", "review_verdict"))
+    return {
+        **nothing,
+        "request": request,
+        "marker": "none",
+        "stop_reason": "not-started",
+        "commit": None,
+        "ledger": None,
+        "replayed": False,
+    }
+
+
+def _plan_step(inputs: LoopInputs, step_id: str) -> PlanStep:
+    return next(step for step in inputs.steps if step.id == step_id)
 
 
 def require_known(inputs: LoopInputs, request: str) -> None:
@@ -310,13 +328,12 @@ def await_end(
 
 
 def sight(repo: Path, agent_id: str, max_turns: int | None) -> Sighting:
-    """The transcript now. A last request of text only ends an agent with or without a marker
-    (an agent that calls no tool has stopped), beside the gate's three signs of an end."""
+    """The transcript now, and whether the gate's evidence shows the agent has ended."""
     path, raw = read_agent(agent_id)
     reading = salvaged(path, raw)
     evidence = end_evidence(reading, max_turns, agent_stopped(repo, agent_id))
     unreadable = isinstance(raw, Unreadable) or (isinstance(raw, Read) and raw.malformed)
-    ended = evidence.final_text is not None or end_source(evidence) is not None
+    ended = end_source(evidence) is not None
     return Sighting(path, reading, unreadable, evidence.final_text, ended)
 
 
@@ -380,132 +397,6 @@ def read_return(
     fidelity = (w.split(": ", 1) for w in meta_warnings(seen.path, asked.agent_call) if ": " in w)
     warnings += [(code, message) for code, message in fidelity]
     return marker.marker, reason, tuple(warnings)
-
-
-# --- 3. Gate: run the scope and the check, write the block, read the verdict ----------------
-
-
-@dataclass(frozen=True)
-class Gate:
-    """The gate block's body, deciding `Result:` line last, and whether any run was red."""
-
-    body: tuple[str, ...]
-    red: bool
-
-    @property
-    def deciding(self) -> str:
-        return self.body[-1]
-
-
-def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
-    """The request's gate: read back from its block when written, else run and written now."""
-    results = task.dir / RESULTS_FILE
-    written = recorded_gate(results, gate_heading(step.id, request))
-    if written is not None:
-        return written
-    states = series_states(task.inputs)
-    done = frozenset(step_id for step_id, state in states.items() if is_done(state))
-    ownership = Ownership(step.id, {s.id: s.read_only for s in task.inputs.steps}, done)
-    changed = paths_differing_from_head(task.repo, step.files) if step.files else ()
-    scope = scope_run(task.repo, changed, ownership) if changed else None
-    check = check_run(task.repo, step, ownership)
-    runs = tuple(run for run in (scope, check) if run is not None)
-    if not runs:
-        runs = (GateRun("", NoRun(NOTHING_RAN)),)
-    if check is None:
-        lines = tuple(render_result_line(run) for run in runs)
-    else:
-        lines = gate_result_lines(scope, check)
-    body = (*(f"Command: `{run.command}`" for run in runs if run.command), *lines)
-    write_gate_block(results, step.id, request, body)
-    return Gate(body, any(run.red for run in runs))
-
-
-def scope_run(repo: Path, changed: Sequence[str], ownership: Ownership) -> GateRun:
-    """The derived scope of `changed`, every invocation it lists merged into one run."""
-    resolved = run_derived_scope(repo, changed)
-    if isinstance(resolved, ScopeUnresolved):
-        why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
-        return GateRun(SCOPE_COMMAND, NoRun(f"the test scope did not resolve ({why})"))
-    if not resolved.runs:
-        return GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))
-    return merge_runs(tuple(classified(run, ownership) for run in resolved.runs))
-
-
-def check_run(repo: Path, step: PlanStep, ownership: Ownership) -> GateRun | None:
-    if step.check is None:
-        return None
-    if not isinstance(step.check, Check):
-        return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
-    return classified(run_check(repo, step.check.command), ownership, step.check.command)
-
-
-def classified(run: CommandRun, ownership: Ownership, command: str = "") -> GateRun:
-    """One finished command's run as the gate reads it; one that never exited is no run."""
-    shown = command or shlex.join(run.argv)
-    if run.problem is not None:
-        return GateRun(shown, NoRun(f"the run {run.problem}"))
-    return classify_run(shown, run.output, ownership)
-
-
-def merge_runs(runs: Sequence[GateRun]) -> GateRun:
-    """One run from several: counts summed and nodes joined, each run having been read on its
-    own (one invocation's count line never applies to another's nodes); any no-run is no run."""
-    command = " ; ".join(run.command for run in runs)
-    absent = [run.counts.rationale for run in runs if isinstance(run.counts, NoRun)]
-    if absent or not runs:
-        return GateRun(command, NoRun("; ".join(absent) or "nothing ran"))
-    counts = [cast(Counts, run.counts) for run in runs]
-    total = Counts(
-        passed=sum(c.passed for c in counts),
-        failed=sum(c.failed for c in counts),
-        skipped=sum(c.skipped for c in counts),
-        errors=sum(c.errors for c in counts),
-    )
-    failed = tuple(node for run in runs for node in run.failed_ids)
-    pending = tuple(dict.fromkeys(node for run in runs for node in run.pending_ids))
-    return GateRun(command, total, failed, pending)
-
-
-def recorded_gate(results: Path, heading: str) -> Gate | None:
-    """The gate block already written for the request, read back, or None."""
-    lines = results.read_text(encoding="utf-8").splitlines() if results.is_file() else []
-    if heading not in lines:
-        return None
-    start = lines.index(heading) + 1
-    end = next(
-        (i for i in range(start, len(lines)) if lines[i].startswith(_HEADING_PREFIX)), len(lines)
-    )
-    body = tuple(line for line in lines[start:end] if line.strip())
-    read = [parse_result_line(line) for line in body if line.startswith(_RESULT_PREFIX)]
-    red = any(not (isinstance(one, Counts) and one.status == GREEN) for one in read)
-    return Gate(body, red) if read and body[-1].startswith(_RESULT_PREFIX) else None
-
-
-def read_verdict(task: TaskView, step_id: str, request: str, gate: Gate) -> dict[str, Any]:
-    """The reconciler's verdict once the request is recorded; never verified on a red run."""
-    verdicts = reconcile(
-        task.slug,
-        task.repo,
-        task.base_ref,
-        state_root=task.work,
-        assume_recorded=frozenset({request}),
-    )
-    own = next((v for v in verdicts if bare_id(str(v["step"])) == step_id), None)
-    verdict = {"verdict": "unknown", "decided_by": "none", **(own or {})}
-    if gate.red and verdict["verdict"] == VERIFIED:
-        verdict["verdict"] = RED_RUN_VERDICT
-    return verdict
-
-
-def add_refusal(task: TaskView, step_id: str, request: str, gate: Gate, failure: str) -> Gate:
-    """The gate block with a last line saying no commit holds the work, and why."""
-    line = render_result_line(GateRun("", NoRun(failure)))
-    if gate.deciding == line:
-        return gate
-    body = (*gate.body, line)
-    write_gate_block(task.dir / RESULTS_FILE, step_id, request, body)
-    return Gate(body, True)
 
 
 # --- 4. Commit: by explicit path, once per request -------------------------------------------
@@ -572,52 +463,3 @@ def _lock_note(repo: Path) -> str:
 
 def _first_line(text: str) -> str:
     return " ".join((text.strip().splitlines() or ["no detail"])[0].split())
-
-
-def tick_step(wip_path: Path, step_id: str) -> bool:
-    """Tick the step's checklist line in `WIP.md` when it is unticked; True when it wrote."""
-    lines = wip_path.read_text(encoding="utf-8").split("\n")
-    label = STEP_LABEL + step_id
-    at = next(
-        (i for i, line in enumerate(lines) if checklist_step_id(line) == label and "[ ]" in line),
-        None,
-    )
-    if at is None:
-        return False
-    lines[at] = lines[at].replace("[ ]", "[x]", 1)
-    return write_atomic(wip_path, "\n".join(lines))
-
-
-# --- Warnings about the tree -----------------------------------------------------------------
-
-
-def edit_warnings(task: TaskView, step: PlanStep, request: str) -> Warnings:
-    """Files changed since the request's prompt was written that its commit leaves behind:
-    outside the step's `Files:`, or outer-loop files, which are never committed. A change
-    older than the prompt is the user's own and is not reported."""
-    prompt = task.dir / PROMPT_FILE.format(request)
-    since = prompt.stat().st_mtime if prompt.exists() else float("-inf")
-    changed = [
-        path
-        for path in paths_differing_from_head(task.repo, ["."])
-        if _changed_since(task.repo / path, since)
-    ]
-    read_only = tuple(entry for s in task.inputs.steps for entry in s.read_only)
-    kept, outer = split_outer_loop(changed, read_only, task.repo)
-    declared = set(paths_differing_from_head(task.repo, step.files)) if step.files else set()
-    stray = [path for path in kept if path not in declared]
-    left = "left uncommitted"
-    return (
-        *(
-            ("undeclared-edit", f"{path} changed outside the step's Files:; {left}")
-            for path in stray
-        ),
-        *(("outer-loop-edit", f"{path} is an outer-loop file; {left}") for path in outer),
-    )
-
-
-def _changed_since(path: Path, since: float) -> bool:
-    try:
-        return path.lstat().st_mtime >= since
-    except OSError:  # deleted during the attempt, or unreadable: report it rather than hide it
-        return True

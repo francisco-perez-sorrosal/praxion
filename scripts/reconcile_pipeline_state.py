@@ -139,6 +139,7 @@ def reconcile(
     _wal_rows_override: list[dict[str, Any]] | None = None,
     _test_status_override: str | None = None,
     assume_recorded: frozenset[str] = frozenset(),
+    include_untracked: bool = False,
 ) -> list[dict[str, Any]]:
     """Reconcile every step in ``.ai-work/<slug>/WIP.md`` against ground truth.
 
@@ -148,7 +149,10 @@ def reconcile(
     ``.ai-work/`` when they live outside the git repo (Standard-tier worktrees).
     ``assume_recorded`` names requests to read as recorded in the iteration
     ledger though they are not yet, so a caller about to record one sees the
-    verdict the reconciler will give once it has.
+    verdict the reconciler will give once it has. ``include_untracked`` counts new, not yet
+    committed files as changed: a driver that gates a step before committing it needs that,
+    while a reader asking what is still uncommitted (the handoff composer) must not read an
+    untracked file as proof its step finished.
 
     Returns one verdict dict per WIP step (see module docstring for the shape),
     or ``[]`` when there is no ``WIP.md`` for the slug (graceful degrade).
@@ -163,7 +167,7 @@ def reconcile(
     changed_files = (
         set(_changed_files_override)
         if _changed_files_override is not None
-        else _git_changed_files(repo_root, base_ref)
+        else _git_changed_files(repo_root, base_ref, include_untracked)
     )
     wal_rows = (
         _wal_rows_override
@@ -480,14 +484,19 @@ def _read_segment_or_warn(path: Path) -> reader.SegmentRead:
     return segment
 
 
-def _git_changed_files(repo_root: Path, base_ref: str | None) -> set[str]:
-    """Repo-relative paths changed vs base_ref, plus the dirty working tree."""
+def _git_changed_files(
+    repo_root: Path, base_ref: str | None, include_untracked: bool = False
+) -> set[str]:
+    """Repo-relative paths changed vs base_ref, plus the dirty working tree (and, on request,
+    untracked files)."""
     changed: set[str] = set()
     diff_targets = []
     if base_ref:
         diff_targets.append(["git", "diff", "--name-only", base_ref])
     diff_targets.append(["git", "diff", "--name-only", "HEAD"])  # unstaged + staged-vs-HEAD
     diff_targets.append(["git", "diff", "--name-only", "--cached"])  # staged
+    if include_untracked:
+        diff_targets.append(["git", "ls-files", "--others", "--exclude-standard"])
     for cmd in diff_targets:
         try:
             out = subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True, check=True)

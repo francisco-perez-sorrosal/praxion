@@ -20,6 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import _step_loop_record as rec  # noqa: E402
+import _step_loop_record_gate as gating  # noqa: E402
 from _agent_transcript import Final, Missing, Read, Unreadable  # noqa: E402
 from _step_loop_files import write_gate_block  # noqa: E402
 from _step_loop_gate import GateRun  # noqa: E402
@@ -153,7 +154,7 @@ def test_the_implementer_definition_declares_the_turn_cap_and_an_unknown_agent_n
     ],
 )
 def test_a_derived_scope_of_several_runs_merges_into_one(runs, counts, failed, pending):
-    merged = rec.merge_runs(runs)
+    merged = gating.merge_runs(runs)
 
     assert (merged.counts, merged.failed_ids, merged.pending_ids, merged.command) == (
         counts,
@@ -164,7 +165,7 @@ def test_a_derived_scope_of_several_runs_merges_into_one(runs, counts, failed, p
 
 
 def test_one_run_that_showed_no_summary_makes_the_merged_scope_no_run():
-    merged = rec.merge_runs((run(9), GateRun("pytest b", NoRun("timed out"))))
+    merged = gating.merge_runs((run(9), GateRun("pytest b", NoRun("timed out"))))
 
     assert (merged.counts, merged.red) == (NoRun("timed out"), True)
 
@@ -176,16 +177,16 @@ def verdicts_of(word):
 @pytest.mark.parametrize(
     ("red", "word", "read"),
     [
-        (True, "verified-complete", rec.RED_RUN_VERDICT),
+        (True, "verified-complete", gating.RED_RUN_VERDICT),
         (False, "verified-complete", "verified-complete"),
         (True, "pending", "pending"),
     ],
 )
 def test_a_red_run_fails_the_attempt_whatever_the_check_judged(monkeypatch, red, word, read):
-    monkeypatch.setattr(rec, "reconcile", verdicts_of(word))
+    monkeypatch.setattr(gating, "reconcile", verdicts_of(word))
     task = SimpleNamespace(slug="s", repo=Path("."), work=Path("."), base_ref="HEAD")
 
-    verdict = rec.read_verdict(task, "1", REQUEST, rec.Gate((GREEN_LINE,), red))
+    verdict = gating.read_verdict(task, "1", REQUEST, gating.Gate((GREEN_LINE,), red))
 
     assert verdict["verdict"] == read
 
@@ -199,33 +200,35 @@ def test_a_red_run_fails_the_attempt_whatever_the_check_judged(monkeypatch, red,
     ],
 )
 def test_a_written_gate_block_is_read_back_whole_for_a_replay(tmp_path, body, red):
-    results = tmp_path / rec.RESULTS_FILE
+    results = tmp_path / gating.RESULTS_FILE
     write_gate_block(results, "1", REQUEST, body)
     write_gate_block(results, "1", "s1-a2-implement", (RED_LINE,))
 
-    gate = rec.recorded_gate(results, rec.gate_heading("1", REQUEST))
+    gate = gating.recorded_gate(results, gating.gate_heading("1", REQUEST))
 
-    assert gate == rec.Gate(body, red)
+    assert gate == gating.Gate(body, red)
 
 
 def test_no_gate_block_for_the_request_means_the_gate_runs(tmp_path):
-    results = tmp_path / rec.RESULTS_FILE
+    results = tmp_path / gating.RESULTS_FILE
     write_gate_block(results, "1", "s1-a2-implement", (GREEN_LINE,))
 
-    assert rec.recorded_gate(results, rec.gate_heading("1", REQUEST)) is None
+    assert gating.recorded_gate(results, gating.gate_heading("1", REQUEST)) is None
 
 
 def test_a_refused_commit_ends_the_block_on_a_no_result_line(tmp_path):
-    results = tmp_path / rec.RESULTS_FILE
+    results = tmp_path / gating.RESULTS_FILE
     write_gate_block(results, "1", REQUEST, (GREEN_LINE,))
     task = SimpleNamespace(dir=tmp_path)
 
-    gate = rec.add_refusal(task, "1", REQUEST, rec.Gate((GREEN_LINE,), False), "hooks said no")
+    gate = gating.add_refusal(
+        task, "1", REQUEST, gating.Gate((GREEN_LINE,), False), "hooks said no"
+    )
 
     assert (
         gate.red,
         gate.deciding,
-        rec.recorded_gate(results, rec.gate_heading("1", REQUEST)),
+        gating.recorded_gate(results, gating.gate_heading("1", REQUEST)),
     ) == (
         True,
         "Result: none — hooks said no",

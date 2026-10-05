@@ -337,36 +337,38 @@ def test_an_unstaged_edit_and_an_untracked_file_survive_byte_identical(surrounde
     ) == (b"notes, edited\n", b"untracked\n", [" M notes.txt", "?? scratch.txt"])
 
 
-def test_a_decoy_staged_before_the_call_is_refused_and_stays_staged(surrounded: Path) -> None:
+def test_a_decoy_staged_before_the_call_is_tolerated_and_stays_staged(surrounded: Path) -> None:
     write(surrounded, "decoy.txt", "decoy, staged\n")
     git(surrounded, "add", "decoy.txt")
-    before = head(surrounded)
+    row = git(surrounded, "ls-files", "--stage", "decoy.txt")
 
     outcome = commit_paths(surrounded, ["a.py"], MESSAGE)
 
     assert (
-        isinstance(outcome, TreeDisturbed),
-        outcome.paths,
-        outcome.sha,
+        outcome,
+        committed_files(surrounded),
         staged_names(surrounded),
-        head(surrounded),
-    ) == (True, ("decoy.txt",), None, "decoy.txt\n", before)
+        git(surrounded, "ls-files", "--stage", "decoy.txt"),
+    ) == (Committed(head(surrounded), ("a.py",), ()), {"a.py"}, "decoy.txt\n", row)
 
 
-def test_a_refused_tree_is_not_repaired_the_declared_path_stays_unstaged(
-    surrounded: Path,
-) -> None:
+def test_a_staged_decoy_and_the_other_files_survive_byte_identical(surrounded: Path) -> None:
     write(surrounded, "decoy.txt", "decoy, staged\n")
     git(surrounded, "add", "decoy.txt")
 
     commit_paths(surrounded, ["a.py"], MESSAGE)
 
-    assert git(surrounded, "status", "--porcelain").splitlines() == [
-        " M a.py",
-        "M  decoy.txt",
-        " M notes.txt",
-        "?? scratch.txt",
-    ]
+    assert (
+        (surrounded / "decoy.txt").read_bytes(),
+        (surrounded / "notes.txt").read_bytes(),
+        (surrounded / "scratch.txt").read_bytes(),
+        git(surrounded, "status", "--porcelain").splitlines(),
+    ) == (
+        b"decoy, staged\n",
+        b"notes, edited\n",
+        b"untracked\n",
+        ["M  decoy.txt", " M notes.txt", "?? scratch.txt"],
+    )
 
 
 def test_an_outer_loop_file_the_plan_declares_is_never_committed(surrounded: Path) -> None:

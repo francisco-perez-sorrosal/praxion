@@ -197,7 +197,13 @@ Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 def is_done(state: Series) -> bool:
-    """Done outside the loop, or verified by the driver with its light review satisfied."""
+    """Done outside the loop, or verified by the driver with its light review satisfied.
+
+    A marked series whose work verified is done too: the marker still stops the loop while
+    other steps remain (completion outranks that stop only once every step is done).
+    """
+    if isinstance(state, Marked):
+        return any(record.verdict == VERIFIED for record in state.attempts)
     return isinstance(state, DoneOutside) or (
         isinstance(state, Verified) and satisfied(state.review)
     )

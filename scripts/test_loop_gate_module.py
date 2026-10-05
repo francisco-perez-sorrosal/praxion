@@ -472,7 +472,7 @@ def test_marker_parse_of_a_final_text(text, marker):
     [
         (EndEvidence("work\n[COMPLETE]", 5, 100), "marker"),
         (EndEvidence("work\n[COMPLETE]", 100, 100), "marker"),
-        (EndEvidence("no marker here", 99, 100), None),
+        (EndEvidence("no marker here", 99, 100), "final-text"),
         (EndEvidence("no marker here", 100, 100), "turn-cap"),
         (EndEvidence(None, 101, 100), "turn-cap"),
         (EndEvidence(None, 5, 100, agent_stopped=True), "agent-stop"),
@@ -482,10 +482,10 @@ def test_marker_parse_of_a_final_text(text, marker):
         (EndEvidence(None, None, None, agent_stopped=True), "agent-stop"),
         (EndEvidence(None, 5, 0), None),
         (EndEvidence(None, 1, 1), "turn-cap"),
-        (EndEvidence("almost [COMPLETE", 5, 100), None),
+        (EndEvidence("almost [COMPLETE", 5, 100), "final-text"),
     ],
 )
-def test_end_evidence_says_the_agent_ended_only_on_one_of_the_three_signs(evidence, source):
+def test_end_evidence_says_the_agent_ended_only_on_one_of_the_four_signs(evidence, source):
     assert end_source(evidence) == source
 
 

@@ -403,14 +403,14 @@ class ScriptedSpawner:
         return self.returned
 
 
-def test_drive_hands_each_request_to_the_spawner_and_stops_on_a_non_spawn_outcome(tmp_path):
+def test_drive_hands_each_request_to_the_spawner_and_stops_once_one_never_started(tmp_path):
     root = build(tmp_path)
     spawner = ScriptedSpawner(step_loop.NotStarted("the call failed"))
 
     final = step_loop.drive(spawner, SLUG, where(root))
 
     assert [request["id"] for request in spawner.requests] == ["s1-a1-implement"]
-    assert final["outcome"] != "spawn"
+    assert final["recorded"]["stop_reason"] == "not-started"
 
 
 def test_drive_returns_a_stop_without_calling_the_spawner(tmp_path):

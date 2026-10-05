@@ -185,7 +185,7 @@ def read_task(args: argparse.Namespace) -> Task:
         if (path := directory / REVIEW_FILE.format(step.id)).is_file()
     }
     base_ref = args.base_ref or resolve_base_ref(repo)
-    verdicts = reconcile(args.slug, repo, base_ref, state_root=work)
+    verdicts = reconcile(args.slug, repo, base_ref, state_root=work, include_untracked=True)
     inputs = LoopInputs.read(
         steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed
     )
@@ -222,7 +222,7 @@ def run_next(
         line = cli.complete_line(task.inputs.steps, counts)
         return Reply(cli.complete_envelope(frame), (line, *lines))
     view = cli.stop_view(action, task.slug, invoke)
-    write_stop_handoff(task.slug, task.work, stop_next_action(view))
+    write_stop_handoff(task.slug, task.work, stop_next_action(view), action.cause)
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
     return Reply(doc, (stop_stderr(view), *lines))
 
@@ -298,9 +298,7 @@ def _next_line(task: Task, action: Union[Spawn, Complete, Stop], invoke: str) ->
 def run_record(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
     try:
         rec.require_known(task.inputs, args.request)
-        if args.not_started is not None:
-            raise NotImplementedError("record --not-started lands in a later increment")
-        took = rec.record_return(task, args.request, args.agent_id, args.marker)
+        took = rec.take_back(task, args.request, args.agent_id, args.marker)
     except rec.RecordRefusedError as refused:
         raise CallerError(refused.code, refused.message, cli.iterations_of(task.inputs)) from None
     return run_next(read_task(args), args, invoke, took)
@@ -365,9 +363,10 @@ class Spawner(Protocol):
 
 
 def drive(spawner: Spawner, slug: str, location: Sequence[str] = ()) -> Mapping[str, Any]:
-    """Relay `next` and `record` through `spawner` until the outcome is not a spawn."""
+    """Relay `next` and `record` through `spawner` until the outcome is not a spawn, or until a
+    request never started (the withdrawal's envelope returns: whether to retry is the caller's)."""
     doc = execute(["next", slug, *location]).doc
-    while doc["outcome"] == "spawn":
+    while doc["outcome"] == "spawn" and doc.get("recorded", {}).get("stop_reason") != "not-started":
         request = doc["request"]
         returned = spawner.spawn(request)
         if isinstance(returned, AgentRan):

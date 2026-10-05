@@ -51,7 +51,7 @@ NO_SUMMARY_RATIONALE = "the output holds no pytest summary line"
 
 Marker = Literal["complete", "blocked", "conflict", "partial", "none"]
 StopReason = Literal["completed", "turn-cap", "blocked", "conflict", "partial", "no-marker"]
-EndSource = Literal["marker", "turn-cap", "agent-stop"]
+EndSource = Literal["marker", "turn-cap", "final-text", "agent-stop"]
 Nodes = tuple[str, ...]
 RunCounts = Union[Counts, NoRun]  # noqa: UP007 -- runtime value, 3.9 floor
 
@@ -287,11 +287,17 @@ class EndEvidence:
 
 
 def end_source(evidence: EndEvidence) -> EndSource | None:
-    """Which evidence shows the agent has ended, or None while it may still be editing."""
+    """Which evidence shows the agent has ended, or None while it may still be editing.
+
+    A last request of text only ends an agent, with a marker or without one: an agent that
+    calls no tool has stopped.
+    """
     if parse_marker(evidence.final_text) != "none":
         return "marker"
     if reached_turn_cap(evidence.requests, evidence.max_turns):
         return "turn-cap"
+    if evidence.final_text is not None:
+        return "final-text"
     return "agent-stop" if evidence.agent_stopped else None
 
 

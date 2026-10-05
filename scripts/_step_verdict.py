@@ -16,10 +16,15 @@ Policy, in order:
    recorded for it. A met check completes the step (unless a completion
    blocker applies); an unmet check, or no recorded result, never does, and
    a claim of completion cannot outrank it. A stopped agent's partial verdict
-   names what the check lacks and says to run it and record its result. A check that cannot be read is
-   surfaced to a human.
+   names what the check lacks and says to run it and record its result. A
+   check that cannot be read is surfaced to a human.
 2. A step that declares no check is decided by the file and test evidence.
-3. A step that has used its fresh attempts (``ATTEMPT_CAP``) without being
+3. A step not verified complete whose latest attempt is outstanding (started by
+   the step-loop driver, not yet in the iteration ledger) is ``in-flight``
+   whatever it was classified as, and never ``attempts-exhausted``: the cap
+   judges an attempt only once it has ended. The verdict it would have had stays
+   in the evidence.
+4. A step that has used its fresh attempts (``ATTEMPT_CAP``) without being
    verified complete is routed to a human whatever it was classified as; the
    verdict it would have had stays in the evidence. A step whose attempt record
    cannot be read is routed to a human the same way (as `unknown`), because a
@@ -27,6 +32,8 @@ Policy, in order:
 
 ``make_verdict`` is the only place a verdict dict is built, so the stamps
 (``decided_by``, ``outcome_source``, ``attempt``) follow from its inputs.
+``outcome_source`` is ``run`` when the deciding ``Result:`` line is the driver's
+own run of the check and ``recorded`` otherwise; this module itself runs nothing.
 """
 
 from __future__ import annotations
@@ -40,6 +47,7 @@ from _loop_fields import (
     CheckOutcome,
     Met,
     NoResult,
+    OutstandingAttempt,
     Unmet,
     UnreadableCheck,
 )
@@ -62,10 +70,15 @@ HUMAN_VERDICTS = ("unknown", "blocked", "attempts-exhausted")
 # A step's declared check as the policy sees it: None when the step declares
 # none, `UnreadableCheck` when it declares one that cannot be read, otherwise
 # the outcome of judging the check against the recorded result.
-DeclaredCheck = Union[CheckOutcome, UnreadableCheck, None]  # noqa: UP007 -- runtime value, 3.9 floor
+DeclaredCheck = Union[  # noqa: UP007 -- runtime value, 3.9 floor
+    CheckOutcome, UnreadableCheck, None
+]
 
 _OUTCOME_TYPES = (Met, Unmet, NoResult)
-_RECORDED = "recorded"  # the reconciler only reads results; a driver that runs commands says `run`
+_RECORDED = "recorded"  # a result some agent recorded; only read, never run here
+_RUN = "run"  # the step-loop driver's own run of the check wrote the deciding line
+# The verdicts that may replace an underlying one: the cap, and an outstanding attempt.
+_OVERRIDES = ("attempts-exhausted", "in-flight")
 _NEEDS_MARK_SUFFIX = "; WIP not marked COMPLETE — auto-mark on resume"
 
 
@@ -100,17 +113,20 @@ class UnreadableAttempts:
     reason: str
 
 
-# What the policy knows of a step's attempts: nothing recorded, a count, or a
-# line that could not be read.
-AttemptRecord = Union[Attempt, UnreadableAttempts, None]  # noqa: UP007 -- runtime value, 3.9 floor
+# What the policy knows of a step's attempts: nothing recorded, an ended count, a
+# count whose attempt is still outstanding, or a line that could not be read.
+AttemptRecord = Union[  # noqa: UP007 -- runtime value, 3.9 floor
+    Attempt, OutstandingAttempt, UnreadableAttempts, None
+]
 
 
 @dataclass(frozen=True)
 class Decision:
     """A verdict with its evidence, before ``make_verdict`` stamps it.
 
-    ``underlying`` is the verdict a cap override replaced; it is set exactly
-    when the verdict is ``attempts-exhausted``.
+    ``underlying`` is the verdict an override replaced: always set on
+    ``attempts-exhausted``, set on ``in-flight`` when an outstanding attempt
+    produced it, and never set on any other verdict.
     """
 
     verdict: str
@@ -120,15 +136,19 @@ class Decision:
     underlying: str | None = None
 
     def __post_init__(self) -> None:
-        if (self.verdict == "attempts-exhausted") != (self.underlying is not None):
-            raise ValueError("attempts-exhausted carries the verdict it replaced, and only it does")
+        capped_bare = self.verdict == "attempts-exhausted" and self.underlying is None
+        if capped_bare or (self.underlying is not None and self.verdict not in _OVERRIDES):
+            raise ValueError(
+                "attempts-exhausted carries the verdict it replaced, and only it and an "
+                "outstanding attempt's in-flight may"
+            )
 
 
 def classify_step(
     evidence: StepEvidence, check_outcome: DeclaredCheck, attempt: AttemptRecord
 ) -> dict[str, Any]:
     """The verdict dict for one step: check first, else files and tests, then the attempts."""
-    decision = _route_to_a_human(evidence, _decide(evidence, check_outcome), attempt)
+    decision = _read_attempts(evidence, _decide(evidence, check_outcome), attempt)
     return make_verdict(evidence, decision, check_outcome, attempt)
 
 
@@ -141,10 +161,10 @@ def make_verdict(
     """Build the verdict dict, the only constructor of it, and stamp it.
 
     ``decided_by`` is always present: ``none`` exactly when the verdict before
-    any cap override is ``pending``, else ``check`` when the step declares a
+    any override is ``pending``, else ``check`` when the step declares a
     check (readable or not), else ``fallback``. ``outcome_source`` appears only
     when a check outcome decided. ``attempt`` appears only when a count is
-    recorded. Optional keys are omitted, never null.
+    recorded, ended or outstanding. Optional keys are omitted, never null.
     """
     decided_by = _decided_by(decision, check_outcome)
     verdict: dict[str, Any] = {
@@ -163,10 +183,15 @@ def make_verdict(
         "decided_by": decided_by,
     }
     if decided_by == "check" and isinstance(check_outcome, _OUTCOME_TYPES):
-        verdict["outcome_source"] = _RECORDED
-    if isinstance(attempt, Attempt):
+        verdict["outcome_source"] = _outcome_source(check_outcome)
+    if isinstance(attempt, (Attempt, OutstandingAttempt)):
         verdict["attempt"] = attempt.count
     return verdict
+
+
+def _outcome_source(outcome: CheckOutcome) -> str:
+    by_step_loop = isinstance(outcome, (Met, Unmet)) and outcome.by_step_loop
+    return _RUN if by_step_loop else _RECORDED
 
 
 def _decided_by(decision: Decision, check_outcome: DeclaredCheck) -> str:
@@ -175,15 +200,25 @@ def _decided_by(decision: Decision, check_outcome: DeclaredCheck) -> str:
     return "fallback" if check_outcome is None else "check"
 
 
-def _route_to_a_human(
-    evidence: StepEvidence, decision: Decision, attempt: AttemptRecord
-) -> Decision:
-    """A step not verified complete goes to a human at the cap or on an unreadable record."""
+def _read_attempts(evidence: StepEvidence, decision: Decision, attempt: AttemptRecord) -> Decision:
+    """A step not verified complete is in flight while its attempt is outstanding, and
+    goes to a human at the cap or on an unreadable record."""
     if decision.verdict == "verified-complete" or attempt is None:
         return decision
+    if isinstance(attempt, OutstandingAttempt):
+        return _outstanding(decision, attempt)
     if isinstance(attempt, UnreadableAttempts):
         return _unreadable_attempts(evidence, decision, attempt)
     return _exhausted(decision, attempt) if attempt.count >= ATTEMPT_CAP else decision
+
+
+def _outstanding(decision: Decision, attempt: OutstandingAttempt) -> Decision:
+    """The attempt has started and not ended, so no reading of its result is final yet."""
+    evidence = (
+        f"attempt {attempt.count} is outstanding under request {attempt.request} (started, "
+        f"no ledger record yet); underlying verdict {decision.verdict}: {decision.evidence}"
+    )
+    return Decision("in-flight", evidence, decision.resume_scope, underlying=decision.verdict)
 
 
 def _unreadable_attempts(

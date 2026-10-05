@@ -587,10 +587,9 @@ def test_an_unreadable_check_has_nothing_to_resume_and_nothing_to_mark() -> None
     assert (result["resume_scope"], result["needs_mark"]) == ([], False)
 
 
-def test_a_blank_replan_request_reads_as_none_recorded() -> None:
-    result = classify(half_done(), None, Attempt(2, ""))
-
-    assert "no replan request recorded" in result["evidence"]
+def test_a_blank_replan_request_cannot_be_recorded_on_an_attempt() -> None:
+    with pytest.raises(ValueError, match="a replan is one non-blank line"):
+        Attempt(2, "")
 
 
 def test_the_cap_evidence_without_a_replan_request_says_so_between_the_two_halves() -> None:

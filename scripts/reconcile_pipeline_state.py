@@ -35,8 +35,16 @@ tags `mutation: on` whose results carry no usable mutation reading;
 A step's plan `Check:` line is judged against the `Result:` recorded for that
 step in `TEST_RESULTS.md` — only read, never run; a step with none is decided by
 its files and tests. Each verdict also carries `decided_by` (`check`, `fallback`
-or `none`), `outcome_source` (`recorded`; only when a check decided) and
-`attempt` (only when `WIP.md` records a count).
+or `none`), `outcome_source` (only when a check decided: `run` when the deciding
+`Result:` line is the step-loop driver's own run, else `recorded`) and `attempt`
+(only when `WIP.md` records a count).
+
+An `Attempts:` line may name the step-loop driver's request (`request=<id>`). The
+task's iteration ledger records each request that ended; a request it does not
+hold is outstanding, so a step not verified complete reads `in-flight`, never
+`attempts-exhausted`, until its attempt has been recorded. A `WIP.md` without
+the token reads exactly as before. ``reconcile(..., assume_recorded=...)`` gives
+the verdict as it will read once the named requests are recorded.
 
 An `Attempts:` line that names a step but breaks the grammar (a zero or
 non-numeric count) makes that step `unknown`, with exit status 2. A line under
@@ -88,6 +96,7 @@ from _step_verdict import (
     UnreadableAttempts,
     classify_step,
 )
+from iteration_ledger import read_ledger
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -124,6 +133,7 @@ def reconcile(
     _changed_files_override: list[str] | None = None,
     _wal_rows_override: list[dict[str, Any]] | None = None,
     _test_status_override: str | None = None,
+    assume_recorded: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     """Reconcile every step in ``.ai-work/<slug>/WIP.md`` against ground truth.
 
@@ -131,6 +141,9 @@ def reconcile(
     ``_*_override`` hooks inject the three external reads (git diff, the WAL, the
     test status) for hermetic runs. ``state_root`` locates ``.ai-state/`` and
     ``.ai-work/`` when they live outside the git repo (Standard-tier worktrees).
+    ``assume_recorded`` names requests to read as recorded in the iteration
+    ledger though they are not yet, so a caller about to record one sees the
+    verdict the reconciler will give once it has.
 
     Returns one verdict dict per WIP step (see module docstring for the shape),
     or ``[]`` when there is no ``WIP.md`` for the slug (graceful degrade).
@@ -152,7 +165,8 @@ def reconcile(
         if _wal_rows_override is not None
         else _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
     )
-    gathered = _gather(task_dir, changed_files, wal_rows, _test_status_override)
+    recorded = read_ledger(task_dir).requests | assume_recorded
+    gathered = _gather(task_dir, changed_files, wal_rows, _test_status_override, recorded)
     return [
         _reconcile_step(step_id, claims[step_id], gathered)
         for step_id in sorted(claims, key=step_sort_key)
@@ -164,10 +178,12 @@ def _gather(
     changed_files: set[str],
     wal_rows: list[dict[str, Any]],
     test_status_override: str | None,
+    recorded_requests: frozenset[str],
 ) -> _Gathered:
     """Read the plan, ``WIP.md`` and ``TEST_RESULTS.md`` and parse what they declare.
 
     The declared-files scan re-reads the plan (``WIP.md`` as fallback) itself.
+    ``recorded_requests`` are the requests the ledger holds as ended.
     """
     plan_path, wip_path = task_dir / "IMPLEMENTATION_PLAN.md", task_dir / "WIP.md"
     plan_text, wip_text = _read_text(plan_path), _read_text(wip_path)
@@ -186,7 +202,7 @@ def _gather(
         mutation_blocks=mutation_block_reasons(plan_text or wip_text, results_text),
         checks=parse_step_checks(plan_text),
         results_text=results_text,
-        attempts=_attempt_records(wip_text),
+        attempts=_attempt_records(wip_text, recorded_requests),
     )
 
 
@@ -205,9 +221,10 @@ class _Gathered:
     attempts: dict[str, AttemptRecord]
 
 
-def _attempt_records(wip_text: str) -> dict[str, AttemptRecord]:
-    """A count per readable ``Attempts:`` line; an unreadable one outranks any count."""
-    reading = parse_attempts(wip_text)
+def _attempt_records(wip_text: str, recorded: frozenset[str]) -> dict[str, AttemptRecord]:
+    """A count per readable ``Attempts:`` line, outstanding when the ledger has not
+    recorded its request; an unreadable line outranks any count."""
+    reading = parse_attempts(wip_text, recorded)
     broken = {step: UnreadableAttempts(why) for step, why in reading.unreadable.items()}
     return {**reading.counts, **broken}
 
@@ -573,8 +590,10 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Reconcile pipeline step-completion against ground truth (read-only). "
             f"Verdicts: {', '.join(VERDICT_WORDS)}; attempts-exhausted exits 2 (a human decides). "
-            "A declared Check: is judged against the recorded Result:, never run. Each verdict "
-            "carries decided_by, outcome_source (when a check decided) and attempt (when recorded). "
+            "A declared Check: is judged against the recorded Result:, never run. Each "
+            "verdict carries decided_by, outcome_source (when a check decided) and attempt "
+            "(when recorded). An attempt whose request the iteration ledger has not recorded "
+            "reads in-flight. "
             "An Attempts: line naming no step is reported on stderr and exits 2."
         )
     )

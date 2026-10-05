@@ -20,7 +20,15 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import _plan_steps as plan_steps  # noqa: E402
 
 STEP = "Step "
-PURE_IMPORTS = {"__future__", "re", "_step_schema"}
+PURE_IMPORTS = {
+    "__future__",
+    "dataclasses",
+    "hashlib",
+    "re",
+    "typing",
+    "_loop_fields",
+    "_step_schema",
+}
 
 
 def heading(number: str, title: str = "t") -> str:

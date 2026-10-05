@@ -41,11 +41,14 @@ or `none`), `outcome_source` (`recorded`; only when a check decided) and
 An `Attempts:` line that names a step but breaks the grammar (a zero or
 non-numeric count) makes that step `unknown`, with exit status 2. A line under
 another label (`Attempt:`) is not an attempts line by the grammar and is
-ignored, by design.
+ignored, by design. A labelled line that names no step (`step 3 count=2`) binds
+to no step, so it is listed apart: `main` emits it as a top-level
+`unnamed_attempts` list (the JSON report becomes an object with `verdicts` and
+`unnamed_attempts`; with none, it stays the verdict array) and exits 2.
 
 Exit codes: 0 nothing to recover; 1 >=1 step needs recovery
 (mismatch/partial/in-flight); 2 >=1 unknown, blocked or attempts-exhausted
-(needs human); 3 reconcile error.
+(needs human), or an `Attempts:` line naming no step; 3 reconcile error.
 """
 
 from __future__ import annotations
@@ -629,10 +632,17 @@ def _needs_recovery(verdict: str) -> bool:
     return verdict in _RECOVERY_VERDICTS or verdict.startswith("partial")
 
 
-def _exit_code(verdicts: list[dict[str, Any]]) -> int:
-    """0 clean; 1 recovery needed; 2 a verdict only a human may act on present."""
+def unnamed_attempts(slug: str, state_root: Path | str) -> list[str]:
+    """The `Attempts:` lines in ``WIP.md`` that name no step, as written."""
+    wip_text = _read_text(Path(state_root) / ".ai-work" / slug / "WIP.md")
+    return list(parse_attempts(wip_text).unnamed)
+
+
+def _exit_code(verdicts: list[dict[str, Any]], unnamed: tuple[str, ...] | list[str] = ()) -> int:
+    """0 clean; 1 recovery needed; 2 a human must decide: a human verdict, or a
+    count that binds to no step (the cap may be off for one)."""
     kinds = {v["verdict"] for v in verdicts}
-    if kinds & set(HUMAN_VERDICTS):
+    if unnamed or kinds & set(HUMAN_VERDICTS):
         return 2
     if any(_needs_recovery(k) for k in kinds):
         return 1
@@ -651,7 +661,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "Reconcile pipeline step-completion against ground truth (read-only). "
             f"Verdicts: {', '.join(VERDICT_WORDS)}; attempts-exhausted exits 2 (a human decides). "
             "A declared Check: is judged against the recorded Result:, never run. Each verdict "
-            "carries decided_by, outcome_source (when a check decided) and attempt (when recorded)."
+            "carries decided_by, outcome_source (when a check decided) and attempt (when recorded). "
+            "An Attempts: line naming no step is reported as unnamed_attempts and exits 2."
         )
     )
     parser.add_argument("slug", help="task slug under .ai-work/<slug>/")
@@ -708,12 +719,16 @@ def main(argv: list[str] | None = None) -> int:
             sys.stderr.write(f"reconcile_pipeline_state: no WIP.md for slug '{args.slug}'\n")
         return 3
 
+    unnamed = unnamed_attempts(args.slug, state_root)
     if args.json:
-        print(json.dumps(verdicts, indent=2))
+        report = {"verdicts": verdicts, "unnamed_attempts": unnamed} if unnamed else verdicts
+        print(json.dumps(report, indent=2))
     elif not args.quiet:
         print("\n".join(map(_readable_line, verdicts)))
+        for text in unnamed:
+            print(f"WIP.md attempts line names no step: {text}")
 
-    return _exit_code(verdicts)
+    return _exit_code(verdicts, unnamed)
 
 
 if __name__ == "__main__":

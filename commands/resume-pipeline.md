@@ -33,7 +33,7 @@ OPTIONS
 EXIT CODES
   0   nothing to recover (all steps verified-complete or pending) / dry-run done
   1   recovery actions taken (auto-mark and/or auto-resume)
-  2   one or more `unknown`, `blocked` or `attempts-exhausted` steps surfaced for your decision
+  2   one or more `unknown`, `blocked` or `attempts-exhausted` steps, or an `Attempts:` line naming no step, surfaced for your decision
   3   reconcile error (no WIP.md for the slug, bad slug, plugin-cache path)
 ```
 
@@ -92,7 +92,8 @@ a convenience document from becoming a correctness hazard.
    array. Each verdict carries `step`, `wip_claim`, `verdict`, `needs_mark`,
    `tier1`, `tier2`, `evidence`, `resume_scope` and `decided_by` (`check`, `fallback`
    or `none`: what decided it), plus `outcome_source` (when a declared check decided)
-   and `attempt` (when `WIP.md` records a fresh-attempt count for the step).
+   and `attempt` (when `WIP.md` records a fresh-attempt count for the step). When an `Attempts:` line names
+   no step, the output is an object instead: `verdicts` (that array) plus `unnamed_attempts`, the lines to surface.
 4. **Act per verdict** (skip all actions under `--dry-run` — print the plan instead):
 
    | Verdict | Action |

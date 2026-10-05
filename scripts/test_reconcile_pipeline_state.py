@@ -2007,3 +2007,64 @@ def test_reconcile_a_line_under_another_label_is_not_an_attempts_line_and_stays_
     assert verdict["verdict"] == "mismatch"
     assert "attempt" not in verdict
     assert rps._exit_code(verdicts) == 1
+
+
+# --- an attempts line that names no step is reported -------------------------
+
+
+def _run_main(tmp_path, monkeypatch, wip: str, *argv: str) -> int:
+    _setup(tmp_path, wip, PLAN_ONE_STEP)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(rps, "resolve_repo_root", lambda *_a, **_k: tmp_path)
+    monkeypatch.setattr(rps, "is_plugin_cache_path", lambda *_a, **_k: False)
+    monkeypatch.setattr(rps, "_git_changed_files", lambda *_a, **_k: {"src/foo.py"})
+    return rps.main([SLUG, *argv])
+
+
+_UNNAMED_LINES = ["step 3 count=5", "3 count=2"]
+
+
+@pytest.mark.parametrize("text", _UNNAMED_LINES)
+def test_main_json_lists_an_attempts_line_that_names_no_step(tmp_path, capsys, monkeypatch, text):
+    wip = f"- [x] Step 1: build\n  - Attempts: {text}\n"
+
+    exit_code = _run_main(tmp_path, monkeypatch, wip, "--json")
+
+    report = json.loads(capsys.readouterr().out)
+    assert report["unnamed_attempts"] == [text]
+    assert [v["step"] for v in report["verdicts"]] == ["Step 1"]
+    assert exit_code == 2
+
+
+def test_main_prints_one_readable_line_per_attempts_line_that_names_no_step(
+    tmp_path, capsys, monkeypatch
+):
+    wip = "- [x] Step 1: build\n" + "".join(f"  - Attempts: {t}\n" for t in _UNNAMED_LINES)
+
+    exit_code = _run_main(tmp_path, monkeypatch, wip)
+
+    lines = capsys.readouterr().out.splitlines()
+    assert [ln for ln in lines if "names no step" in ln] == [
+        f"WIP.md attempts line names no step: {t}" for t in _UNNAMED_LINES
+    ]
+    assert exit_code == 2
+
+
+def test_main_without_an_attempts_line_that_names_no_step_emits_no_key_and_keeps_its_exit(
+    tmp_path, capsys, monkeypatch
+):
+    wip = "- [x] Step 1: build\n  - Attempts: Step 1 count=2\n"
+
+    exit_code = _run_main(tmp_path, monkeypatch, wip, "--json")
+
+    report = json.loads(capsys.readouterr().out)
+    assert isinstance(report, list)
+    assert exit_code == rps._exit_code(report)
+
+
+def test_exit_code_is_2_for_an_unnamed_attempts_line_even_when_every_step_is_clean():
+    clean = [{"verdict": "verified-complete"}]
+
+    assert rps._exit_code(clean) == 0
+    assert rps._exit_code(clean, ["3 count=2"]) == 2

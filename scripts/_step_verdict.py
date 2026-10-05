@@ -28,7 +28,10 @@ Policy, in order:
    verified complete is routed to a human whatever it was classified as; the
    verdict it would have had stays in the evidence. A step whose attempt record
    cannot be read is routed to a human the same way (as `unknown`), because a
-   count that cannot be read cannot be trusted to be below the cap.
+   count that cannot be read cannot be trusted to be below the cap. That covers
+   an outstanding attempt while the iteration ledger holds a line that breaks its
+   shape: that line may be the attempt's end, so the attempt cannot be read as
+   still running either.
 
 ``make_verdict`` is the only place a verdict dict is built, so the stamps
 (``decided_by``, ``outcome_source``, ``attempt``) follow from its inputs.
@@ -108,9 +111,10 @@ class StepEvidence:
 
 @dataclass(frozen=True)
 class UnreadableAttempts:
-    """A step's ``Attempts:`` line that breaks the grammar; ``reason`` says how."""
+    """An attempt record that cannot be read; ``reason`` says how, ``source`` says where."""
 
     reason: str
+    source: str = "the Attempts: line"
 
 
 # What the policy knows of a step's attempts: nothing recorded, an ended count, a
@@ -227,7 +231,7 @@ def _unreadable_attempts(
     if decision.verdict in HUMAN_VERDICTS:
         return decision  # already surfaced to a person, with a more specific reason
     text = (
-        f"{evidence.step_id}: the Attempts: line cannot be read ({attempt.reason}); fix it so "
+        f"{evidence.step_id}: {attempt.source} cannot be read ({attempt.reason}); fix it so "
         f"the count can be trusted; underlying verdict {decision.verdict}: {decision.evidence}"
     )
     return Decision("unknown", text, decision.resume_scope)

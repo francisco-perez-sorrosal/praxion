@@ -44,7 +44,11 @@ task's iteration ledger records each request that ended; a request it does not
 hold is outstanding, so a step not verified complete reads `in-flight`, never
 `attempts-exhausted`, until its attempt has been recorded. A `WIP.md` without
 the token reads exactly as before. ``reconcile(..., assume_recorded=...)`` gives
-the verdict as it will read once the named requests are recorded.
+the verdict as it will read once the named requests are recorded. A ledger line
+that breaks the record shape (a truncated append, a hand edit, a merge conflict)
+may be the end of any outstanding request, so while the ledger holds one, a step
+whose attempt is outstanding reads `unknown`, naming the line, and not `in-flight`;
+a recorded attempt is unaffected.
 
 An `Attempts:` line that names a step but breaks the grammar (a zero or
 non-numeric count) makes that step `unknown`, with exit status 2. A line under
@@ -73,6 +77,7 @@ from typing import Any
 from _loop_fields import (
     Check,
     CheckLine,
+    OutstandingAttempt,
     evaluate_check,
     parse_attempts,
     parse_step_checks,
@@ -96,7 +101,7 @@ from _step_verdict import (
     UnreadableAttempts,
     classify_step,
 )
-from iteration_ledger import read_ledger
+from iteration_ledger import LedgerReading, read_ledger
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -165,7 +170,8 @@ def reconcile(
         if _wal_rows_override is not None
         else _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
     )
-    recorded = read_ledger(task_dir).requests | assume_recorded
+    ledger = read_ledger(task_dir)
+    recorded = _RecordedRequests(ledger.requests | assume_recorded, _findings_text(ledger))
     gathered = _gather(task_dir, changed_files, wal_rows, _test_status_override, recorded)
     return [
         _reconcile_step(step_id, claims[step_id], gathered)
@@ -178,12 +184,12 @@ def _gather(
     changed_files: set[str],
     wal_rows: list[dict[str, Any]],
     test_status_override: str | None,
-    recorded_requests: frozenset[str],
+    recorded_requests: _RecordedRequests,
 ) -> _Gathered:
     """Read the plan, ``WIP.md`` and ``TEST_RESULTS.md`` and parse what they declare.
 
     The declared-files scan re-reads the plan (``WIP.md`` as fallback) itself.
-    ``recorded_requests`` are the requests the ledger holds as ended.
+    ``recorded_requests`` are the requests the ledger holds as ended, with its findings.
     """
     plan_path, wip_path = task_dir / "IMPLEMENTATION_PLAN.md", task_dir / "WIP.md"
     plan_text, wip_text = _read_text(plan_path), _read_text(wip_path)
@@ -221,12 +227,32 @@ class _Gathered:
     attempts: dict[str, AttemptRecord]
 
 
-def _attempt_records(wip_text: str, recorded: frozenset[str]) -> dict[str, AttemptRecord]:
+@dataclass(frozen=True)
+class _RecordedRequests:
+    """The requests the ledger records as ended, and its unreadable lines ("" when none)."""
+
+    requests: frozenset[str]
+    findings: str
+
+
+def _findings_text(ledger: LedgerReading) -> str:
+    return "; ".join(f"record {item.position}: {item.reason}" for item in ledger.findings)
+
+
+def _attempt_records(wip_text: str, recorded: _RecordedRequests) -> dict[str, AttemptRecord]:
     """A count per readable ``Attempts:`` line, outstanding when the ledger has not
-    recorded its request; an unreadable line outranks any count."""
-    reading = parse_attempts(wip_text, recorded)
+    recorded its request; an unreadable line, or an outstanding attempt the ledger's
+    unreadable lines may have ended, outranks any count."""
+    reading = parse_attempts(wip_text, recorded.requests)
     broken = {step: UnreadableAttempts(why) for step, why in reading.unreadable.items()}
-    return {**reading.counts, **broken}
+    unsettled = {
+        step: UnreadableAttempts(
+            recorded.findings, f"the iteration ledger record ending request {attempt.request}"
+        )
+        for step, attempt in reading.counts.items()
+        if isinstance(attempt, OutstandingAttempt) and recorded.findings
+    }
+    return {**reading.counts, **unsettled, **broken}
 
 
 def _reconcile_step(step_id: str, claim: str, gathered: _Gathered) -> dict[str, Any]:

@@ -31,7 +31,12 @@ from _loop_fields import (  # noqa: E402
     UnmetExpectation,
     UnreadableCheck,
 )
-from iteration_ledger import NO_RESULT_RECORDED, IterationRecord, append_record  # noqa: E402
+from iteration_ledger import (  # noqa: E402
+    LEDGER_FILE,
+    NO_RESULT_RECORDED,
+    IterationRecord,
+    append_record,
+)
 
 STEP_LABEL = "Step "
 STEP_ID = "1"
@@ -193,6 +198,12 @@ def record(task_dir: Path, request: str) -> None:
     )
 
 
+def break_the_ledger(task_dir: Path) -> None:
+    """Append a line that breaks the record shape, as a truncated append leaves one."""
+    with (task_dir / LEDGER_FILE).open("a", encoding="utf-8") as ledger:
+        ledger.write('{"v": 1, "step": \n')
+
+
 def reconcile(tmp_path: Path, **seams: Any) -> list[dict[str, Any]]:
     return rps.reconcile(
         SLUG, tmp_path, None, _changed_files_override=[], _wal_rows_override=[], **seams
@@ -255,3 +266,37 @@ def test_the_driver_s_own_result_line_reads_as_a_run(tmp_path: Path) -> None:
     (verdict,) = reconcile(tmp_path)
 
     assert (verdict["verdict"], verdict["outcome_source"]) == ("verified-complete", "run")
+
+
+def test_an_outstanding_attempt_reads_unknown_while_the_ledger_has_an_unreadable_line(
+    tmp_path: Path,
+) -> None:
+    break_the_ledger(task(tmp_path, attempts_line()))
+
+    (verdict,) = reconcile(tmp_path)
+
+    assert verdict["verdict"] == "unknown"
+    assert verdict["evidence"].startswith(
+        f"{STEP}: the iteration ledger record ending request {REQUEST} cannot be read (record 1: "
+    )
+    assert "underlying verdict pending:" in verdict["evidence"]
+
+
+def test_a_recorded_attempt_is_unaffected_by_an_unreadable_line_elsewhere(tmp_path: Path) -> None:
+    task_dir = task(tmp_path, attempts_line())
+    record(task_dir, REQUEST)
+
+    break_the_ledger(task_dir)
+
+    assert reconcile(tmp_path)[0]["verdict"] == "attempts-exhausted"
+
+
+def test_a_well_formed_ledger_reads_an_outstanding_attempt_as_no_ledger_does(
+    tmp_path: Path,
+) -> None:
+    task_dir = task(tmp_path, attempts_line())
+    without = reconcile(tmp_path)
+
+    record(task_dir, OTHER_REQUEST)
+
+    assert reconcile(tmp_path) == without

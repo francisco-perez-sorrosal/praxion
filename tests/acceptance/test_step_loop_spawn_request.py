@@ -58,6 +58,14 @@ def test_the_agent_call_is_the_implementer_with_a_short_description(tmp_path):
     assert 0 < len(call["description"]) <= 40
 
 
+def test_the_agent_call_carries_only_the_agent_tools_parameters_and_no_background_flag(tmp_path):
+    task = build_loop(tmp_path, Step("7"))
+
+    call = next_action(task).request["agent_call"]
+
+    assert set(call) == {"subagent_type", "model", "prompt", "description"}, sorted(call)
+
+
 @pytest.mark.parametrize(
     ("annotations", "model"),
     [

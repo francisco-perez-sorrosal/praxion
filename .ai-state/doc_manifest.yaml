@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-04T05:59:31Z'
+generated_at: '2026-10-05T05:16:30Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-04'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-04'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -503,7 +503,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-04'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-04'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-04'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3119,6 +3119,18 @@ surfaces:
   title: Observation-log merge-in also runs from post-commit for a merge finished by a commit and from a fourth finalize hook slot, post-rewrite, for a finished rebase
   last_modified: '2026-10-03'
   renderer: adr_card
+- id: ai-state-decisions-426-iteration-ledger-jsonl-artifact
+  path: .ai-state/decisions/426-iteration-ledger-jsonl-artifact.md
+  type: markdown
+  title: Implementer returns are recorded in an append-only ITERATION_LEDGER.jsonl task artifact with one parser-and-writer module, not in a WIP.md section
+  last_modified: '2026-10-04'
+  renderer: adr_card
+- id: ai-state-decisions-427-step-completion-check-and-attempt-cap
+  path: .ai-state/decisions/427-step-completion-check-and-attempt-cap.md
+  type: markdown
+  title: Plan steps declare a machine-checked completion criterion that the reconciler judges first from the step's recorded result, and a step at two fresh attempts gets its own human-routed verdict
+  last_modified: '2026-10-04'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3872,6 +3884,8 @@ groups:
   - ai-state-decisions-423-overview-landing-at-the-root
   - ai-state-decisions-424-observation-log-keeps-its-history
   - ai-state-decisions-425-merge-in-triggers-for-commit-and-rebase
+  - ai-state-decisions-426-iteration-ledger-jsonl-artifact
+  - ai-state-decisions-427-step-completion-check-and-attempt-cap
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

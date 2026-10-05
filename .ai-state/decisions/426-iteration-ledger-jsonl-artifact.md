@@ -1,7 +1,8 @@
 ---
-id: dec-draft-ee960cee
+id: dec-426
+draft_id: dec-draft-ee960cee
 title: Implementer returns are recorded in an append-only ITERATION_LEDGER.jsonl task artifact with one parser-and-writer module, not in a WIP.md section
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
 summary: "New registered pipeline artifact .ai-work/<slug>/ITERATION_LEDGER.jsonl (floor=None, dashboard=False, snapshot=False, cleanup delete) holds one JSON record per implementer return: v, recorded_at, step, attempt, agent_id, verdict, decided_by, test_result (a Result: line that parses as Counts or NoRun), commit (sha or explicit null; key required), stop_reason (completed/turn-cap/blocked/no-marker). New scripts/iteration_ledger.py is its one reader (records in append order plus findings located by 1-based append position; absent and empty read as no history) and one writer (round-trip validation before a single append-mode write), with a CLI whose append derives verdict and decided_by from reconcile() and the test result from the step's recorded Result: line. Written by the orchestrator now, by the step-loop driver later"
@@ -29,7 +30,7 @@ The pass established:
 - **Lifecycle.** Absent, then empty, then n records; absent and empty read the same.
 - **Evolution.** Additive keys are ignored, and a version key covers breaking changes.
 
-**Activation:** fired, as for the companion `dec-draft-5649ee8e`. Two plausible representations, a file of its own and a section of `WIP.md`, plus a third format option.
+**Activation:** fired, as for the companion `dec-427`. Two plausible representations, a file of its own and a section of `WIP.md`, plus a third format option.
 
 ## Decision
 

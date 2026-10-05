@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5649ee8e
+id: dec-427
+draft_id: dec-draft-5649ee8e
 title: Plan steps declare a machine-checked completion criterion that the reconciler judges first from the step's recorded result, and a step at two fresh attempts gets its own human-routed verdict
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
 summary: "A new stdlib module scripts/_loop_fields.py owns the grammar of a plan step's Check: line (backticked command + pass/fail/skip/pending expectations with = or >=) and of WIP.md's orchestrator-written Attempts: sub-bullet, and evaluates a check against the step's own latest Result: line (the sole reader of pending=). The reconciler's verdict state machine moves to a new pure module scripts/_step_verdict.py, which judges a declared check first (fallback: declared Files changed plus green tests), stamps decided_by (check/fallback/none) plus outcome_source and attempt when present, and routes any non-complete step at attempt >= 2 to a new attempts-exhausted verdict (exit 2, never auto-resumed). The reconciler reads recorded results only and never runs a declared command"

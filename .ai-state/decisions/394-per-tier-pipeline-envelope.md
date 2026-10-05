@@ -26,7 +26,7 @@ affected_files:
   - agents/implementation-planner.md
 affected_reqs: []
 supersedes_in_part: dec-261
-superseded_in_part_by: [dec-412, dec-413]
+superseded_in_part_by: [dec-412, dec-413, dec-draft-99b3a8b9]
 dissent: "Resume sizing couples spawn_count.py to the harness transcript layout; the 250k heavy threshold is a memory-derived heuristic, not a measured cliff."
 ---
 

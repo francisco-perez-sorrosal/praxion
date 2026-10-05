@@ -17,6 +17,7 @@ affected_files:
   - skills/software-planning/references/artifact-inventory.md
   - skills/software-planning/references/agent-pipeline-details.md
 affected_reqs: [REQ-09, REQ-10, REQ-11]
+superseded_in_part_by: [dec-draft-53a46554, dec-draft-61d28fbc]
 ---
 
 ## Context

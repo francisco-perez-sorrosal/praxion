@@ -16,6 +16,7 @@ affected_files:
   - .ai-state/decisions/133-drop-dev-prereleases.md
 affected_reqs: [REQ-04, REQ-07]
 re_affirms: dec-114
+re_affirmed_by: [dec-draft-72288a3b]
 ---
 
 ## Context

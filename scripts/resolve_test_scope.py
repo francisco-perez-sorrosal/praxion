@@ -61,8 +61,9 @@ commands go to stdout and context to stderr, so `resolve_test_scope.py | sh -e`
 runs the selection. `--changed ... --json --per-path` answers many paths from
 one process: one single-line schema-2 object per distinct path, in sorted
 order, each exactly what `--changed <path> --json` prints for that path alone
-(the same payload, compactly serialized). Any other combination is a usage
-error. Exit codes: 0 resolved (widened included), 2 usage or
+(the same payload, compactly serialized). Selected tests that cannot share one
+pytest process (`_import_claims`) come out as several invocations; a selection
+without such a clash is one. Any other combination is a usage error. Exit codes: 0 resolved (widened included), 2 usage or
 internal error -- callers treat 2 as "run the full suite".
 
 Stdlib-only: agent prose and hooks invoke it through a bare `python3`, so a
@@ -199,6 +200,7 @@ class Ignored:
 class Tests:
     tests: tuple[SelectedTest, ...]
     serial: bool
+    groups: tuple[tuple[SelectedTest, ...], ...]  # each collects cleanly in one pytest process
 
 
 @dataclass(frozen=True)
@@ -345,7 +347,47 @@ def _python_selection(
     if not tests:
         return Nothing()
     count = estimate_tests(repo_root, (t.path for t in tests))
-    return Tests(tests, needs_serial(count, pocket.xdist))
+    groups = _collision_free_groups(repo_root / pocket.root, pocket.root, tests)
+    return Tests(tests, needs_serial(count, pocket.xdist), groups)
+
+
+def _collision_free_groups(
+    base: Path, root: str, tests: tuple[SelectedTest, ...]
+) -> tuple[tuple[SelectedTest, ...], ...]:
+    """Split `tests` (order kept) greedily into groups that import without clashing."""
+    taken: list[dict[str, str]] = []
+    groups: list[list[SelectedTest]] = []
+    for test in tests:
+        claims = _import_claims(base, _pocket_relative(test.path, root))
+        fits = (i for i, held in enumerate(taken) if all(held.get(n, a) == a for n, a in claims))
+        index = next(fits, len(groups))
+        if index == len(groups):
+            taken.append({})
+            groups.append([])
+        taken[index].update(claims)
+        groups[index].append(test)
+    return tuple(tuple(group) for group in groups)
+
+
+def _import_claims(base: Path, path: str) -> tuple[tuple[str, str], ...]:
+    """The (top-level import name, directory it is found in) pairs a test file occupies.
+
+    pytest imports a file from the first parent without an `__init__.py`: a regular
+    package claims its name from the directory above it, a plain module its stem.
+    `pythonpath` also puts the pocket root on the path, so a directory below it
+    claims its name there. A process holds one module per name, so two files
+    clash when a name is claimed from two directories (`fitness/tests` as a
+    package against the `tests` directory).
+    """
+    *directory, filename = path.split("/")
+    top = len(directory)
+    while top and base.joinpath(*directory[:top], "__init__.py").is_file():
+        top -= 1
+    if top < len(directory):
+        own = (directory[top], "/".join(directory[:top]))
+    else:
+        own = (filename.removesuffix(".py"), "/".join(directory))
+    return (own, (directory[0], "")) if top else (own,)
 
 
 def _native_selection(
@@ -584,8 +626,15 @@ def _invocations(result: PocketResult) -> tuple[tuple[str, ...], ...]:
     pocket, selection = result.pocket, result.selection
     if isinstance(selection, Tests):
         serial = ("-n", "0") if selection.serial else ()
-        paths = tuple(_pocket_relative(t.path, pocket.root) for t in selection.tests)
-        return ((*pocket.runner_prefix, "pytest", *serial, *paths),)
+        return tuple(
+            (
+                *pocket.runner_prefix,
+                "pytest",
+                *serial,
+                *(_pocket_relative(t.path, pocket.root) for t in group),
+            )
+            for group in selection.groups
+        )
     if isinstance(selection, Native):
         return (selection.argv,)
     if isinstance(selection, Full):

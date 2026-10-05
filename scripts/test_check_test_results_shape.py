@@ -444,7 +444,56 @@ def test_a_malformed_result_line_names_its_malformation_distinct_from_a_missing_
 
 
 # ---------------------------------------------------------------------------
-# Live corpus: the harvested pipeline's own TEST_RESULTS.md (td-236(b))
+# A level-2 heading that is no step heading: advisory finding, block closed
+# ---------------------------------------------------------------------------
+
+STEP = "Step"  # step labels are built from this, never written out in test data
+NON_STEP_HEADING = "non-step-heading"
+
+
+def _kinds(findings: list[Any]) -> list[str]:
+    return sorted(f.kind for f in findings)
+
+
+def test_a_level_two_heading_that_is_no_step_heading_is_flagged_with_its_line(
+    tmp_path: Path,
+) -> None:
+    """Canary: the heading is named by title and by line, and the checker exits 1."""
+    body = f"## {STEP} 1\nResult: pass=1 fail=0 skip=0\n\n## Notes\nprose\n"
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert [(f.kind, f.section, "line 4" in f.detail) for f in findings] == [
+        (NON_STEP_HEADING, "Notes", True)
+    ]
+    assert main([str(path)]) == 1
+
+
+def test_a_result_line_under_a_non_step_heading_does_not_make_the_step_green(
+    tmp_path: Path,
+) -> None:
+    body = f"## {STEP} 1\nCommand: x\n\n## Appendix\nResult: pass=9 fail=0 skip=0\n"
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert _kinds(findings) == ["missing-result-line", NON_STEP_HEADING]
+
+
+def test_sub_headings_and_step_headings_are_never_flagged(tmp_path: Path) -> None:
+    body = (
+        f"# Test Results\n\n## {STEP} 1\nResult: pass=1 fail=0 skip=0\n\n### Failures\n\n"
+        f"#### Detail\n\n## {STEP} 2: title\nResult: pass=1 fail=0 skip=0\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    assert find_findings(path, DEFAULT_CEILING_BYTES) == []
+
+
+# ---------------------------------------------------------------------------
+# Live corpus: the harvested pipeline's own, legacy-shaped TEST_RESULTS.md
+# (td-236(b)); it nests ``## Command`` / ``## Failures`` sections under a step
 # ---------------------------------------------------------------------------
 
 _CORPUS_FIXTURE_PATH = (
@@ -454,72 +503,49 @@ _CORPUS_FIXTURE_PATH = (
     / "test_results_step_sections_corpus.md"
 )
 _P3_5_TEST_RESULTS_MD = _CORPUS_FIXTURE_PATH.read_text(encoding="utf-8")
+CORPUS_SUB_SECTIONS = {
+    "Command",
+    "Failures",
+    "Lint / format",
+    "Id-citation discipline",
+    "Scope confirmation",
+    "Validator outputs",
+    "Manual path verification (docs/architecture.md's Done-when criterion)",
+}
 
 
-def test_live_corpus_drops_from_29_findings_to_exactly_6(tmp_path: Path) -> None:
-    """The harvested pipeline's own TEST_RESULTS.md reports 29 findings under
-    the old any-``## ``-heading-is-a-section model, several of which name a
-    sub-heading (Command, Failures, Lint / format, Id-citation discipline,
-    Scope confirmation, Validator outputs, Manual path verification) as the
-    ``section`` -- misreadings of blocks that were never violations. Splitting
-    on step headings alone drops that to the 6 real findings below, and no
-    finding's section is ever a sub-heading title."""
-    path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
-
-    findings = find_findings(path, DEFAULT_CEILING_BYTES)
-
-    kinds_and_sections = sorted((f.kind, f.section) for f in findings)
-    assert kinds_and_sections == sorted(
-        [
-            ("missing-result-line", "Step 6"),  # id-citation-discipline:ignore
-            ("missing-result-line", "Step 12 (doc-engineer)"),  # id-citation-discipline:ignore
-            (
-                "missing-result-line",
-                "Step 13 (health-guards gauntlet, orchestrator)",  # id-citation-discipline:ignore
-            ),
-            (
-                "missing-result-line",
-                "Step 14 (dogfood, orchestrator)",  # id-citation-discipline:ignore
-            ),
-            (
-                "green-over-ceiling",
-                "Step 6 (post-review addendum, F1 fix)",  # id-citation-discipline:ignore
-            ),
-            ("green-over-ceiling", "Step 10"),  # id-citation-discipline:ignore
-        ]
-    )
-
-    sub_heading_titles = {
-        "Command",
-        "Failures",
-        "Lint / format",
-        "Id-citation discipline",
-        "Scope confirmation",
-        "Validator outputs",
-        "Manual path verification",
-    }
-    assert not {f.section for f in findings} & sub_heading_titles
-
-
-def test_live_corpus_green_over_ceiling_byte_counts_match_the_measured_sections(
+def test_live_corpus_level_two_sub_sections_are_advisories_not_step_findings(
     tmp_path: Path,
 ) -> None:
+    """The legacy corpus nests level-2 sections under a step. Each now closes its step, so
+    it is named as an advisory and never as a step's section; the step findings that remain
+    are the four steps whose ``Result:`` line is not under their own heading."""
     path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
 
     findings = find_findings(path, DEFAULT_CEILING_BYTES)
-    by_section = {f.section: f for f in findings if f.kind == "green-over-ceiling"}
 
-    addendum_section = "Step 6 (post-review addendum, F1 fix)"  # id-citation-discipline:ignore
-    final_section = "Step 10"  # id-citation-discipline:ignore
-    assert by_section[addendum_section].byte_count == 3014
-    assert by_section[final_section].byte_count == 1902
+    step_findings = [f for f in findings if f.kind != NON_STEP_HEADING]
+    advisories = {f.section for f in findings if f.kind == NON_STEP_HEADING}
+    assert sorted((f.kind, f.section) for f in step_findings) == sorted(
+        [
+            ("missing-result-line", f"{STEP} 6 (post-review addendum, F1 fix)"),
+            ("missing-result-line", f"{STEP} 12 (doc-engineer)"),
+            ("missing-result-line", f"{STEP} 13 (health-guards gauntlet, orchestrator)"),
+            ("missing-result-line", f"{STEP} 14 (dogfood, orchestrator)"),
+        ]
+    )
+    assert CORPUS_SUB_SECTIONS <= advisories
+    assert not {f.section for f in step_findings} & CORPUS_SUB_SECTIONS
 
 
-def test_live_corpus_cli_reports_six_findings_and_exits_one(tmp_path: Path, capsys: Any) -> None:
+def test_live_corpus_cli_reports_each_advisory_and_exits_one(tmp_path: Path, capsys: Any) -> None:
     path = _write(tmp_path, "TEST_RESULTS.md", _P3_5_TEST_RESULTS_MD)
 
     rc = main([str(path), "--json"])
-    payload = json.loads(capsys.readouterr().out)
+    kinds = [f["kind"] for f in json.loads(capsys.readouterr().out)["findings"]]
 
-    assert rc == 1
-    assert len(payload["findings"]) == 6
+    assert (rc, kinds.count(NON_STEP_HEADING), len(kinds) - kinds.count(NON_STEP_HEADING)) == (
+        1,
+        24,
+        4,
+    )

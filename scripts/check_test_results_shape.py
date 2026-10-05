@@ -12,8 +12,10 @@ gate exists to bound.
 A file is split into step blocks through the shared ``_step_schema`` module
 -- only a ``#{2,4} Step <id>`` heading opens a block, so a sub-heading (e.g.
 ``### Failures``) stays attributed to its parent step, not misread as its own
-section. Each block is classified over **every** ``Result:`` line it
-contains, not just the first: ``empty`` (heading-only, no finding), ``red``
+section. A level-2 heading that is no step heading closes the open block --
+its ``Result:`` lines feed no step -- and is reported as a ``non-step-heading``
+finding naming that line. Each block is classified over **every** ``Result:``
+line it contains, not just the first: ``empty`` (heading-only, no finding), ``red``
 (any counted line reads red -- exempt from the ceiling, since failure detail
 belongs there), ``green`` (subject to the byte ceiling), ``no-run`` (a
 declared ``Result: none`` -- still ceiling-bounded, but never a
@@ -38,7 +40,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from _step_schema import RED as _RED
-from _step_schema import Counts, Malformed, NoRun, StepBlock, split_step_blocks
+from _step_schema import (
+    Counts,
+    Malformed,
+    NoRun,
+    StepBlock,
+    non_step_headings,
+    split_step_blocks,
+)
 
 DEFAULT_CEILING_BYTES = 1024
 
@@ -47,7 +56,8 @@ DEFAULT_CEILING_BYTES = 1024
 class Finding:
     file: str
     section: str
-    kind: str  # "green-over-ceiling" | "no-run-over-ceiling" | "missing-result-line"
+    # "green-over-ceiling" | "no-run-over-ceiling" | "missing-result-line" | "non-step-heading"
+    kind: str
     detail: str
     byte_count: int | None = None
     ceiling: int | None = None
@@ -97,7 +107,12 @@ def _is_heading_only(block: StepBlock) -> bool:
 def find_findings(path: Path, ceiling: int) -> list[Finding]:
     text = path.read_text(encoding="utf-8")
     display = str(path)
-    findings: list[Finding] = []
+    findings = [
+        Finding(
+            display, title, "non-step-heading", f"line {line}: `## {title}` closes the open step"
+        )
+        for line, title in non_step_headings(text)
+    ]
 
     for block in split_step_blocks(text):
         kind, detail = _classify_block(block)

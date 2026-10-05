@@ -4,10 +4,10 @@ repository or runs a command.
 * **Git**: `commit_paths`, the commit by explicit path. A declared path (a file or a directory,
   spelled any way git accepts) is normalised once and expanded to the changed files under it;
   filtering, staging, the commit and the snapshots all work on those file names. A row already
-  staged outside them is tolerated and stays staged, since a path-limited commit never takes it;
-  the snapshot records it. After the commit its file set must equal the staged files and the tree
-  outside them (staged rows included) must be unchanged; otherwise the disturbance is reported
-  with both snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
+  staged outside them is tolerated and stays staged (a path-limited commit never takes it) and
+  the snapshot records it. After the commit its file set must equal the staged files and the
+  tree outside them must be unchanged; otherwise the disturbance is reported with both
+  snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
   `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:`) are withheld
   whatever the plan declares.
 * **Runner**: the `Check:` command and the derived test scope. Each invocation the resolver
@@ -29,7 +29,8 @@ import shlex
 import signal
 import subprocess
 import sys
-from collections.abc import Iterable
+import threading
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
@@ -122,10 +123,7 @@ class NothingToCommit:
 
 @dataclass(frozen=True)
 class CommitRefused:
-    """The hooks, git or a lock refused (after the one re-stage retry when files moved).
-
-    The declared files stay staged; the next attempt reads them as pre-staged until unstaged.
-    """
+    """The hooks, git or a lock refused (after the one re-stage retry); the files stay staged."""
 
     detail: str
 
@@ -145,9 +143,7 @@ class CommitInterrupted:
 
 @dataclass(frozen=True)
 class TreeDisturbed:
-    """The commit touched more than its files: `paths` names what moved, `sha` the commit
-    if one was made, `before`/`after` the snapshots.
-    """
+    """The commit touched more than its files: `paths` moved, `sha` is the commit if any."""
 
     before: TreeSnapshot
     after: TreeSnapshot
@@ -199,10 +195,7 @@ def paths_differing_from_head(repo: Path, paths: Iterable[str]) -> tuple[str, ..
 
 
 def normalise_path(raw: str, root: Path | None = None) -> str:
-    """The repo-relative, `normpath`-clean form of a path (absolute ones relate to `root`).
-
-    A path that leaves the repository raises `OutsideRepoError`.
-    """
+    """The repo-relative, `normpath`-clean form of a path; one leaving the repo is an error."""
     relative = raw
     if root is not None and os.path.isabs(raw):  # the shorter relpath is the one that stays inside
         relative = min((os.path.relpath(raw, base) for base in (root, root.resolve())), key=len)
@@ -425,23 +418,37 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
     `uv run pytest` or a shell wrapper must not leave workers editing the tree after the
     driver has reported the run as over or been interrupted.
     """
+    with _sigterm_as_exit():
+        try:
+            proc = subprocess.Popen(
+                argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                start_new_session=True,
+            )  # fmt: skip
+        except OSError as exc:
+            return CommandRun(argv, str(cwd), "", None, f"could not start: {exc}")
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            out, err = _kill_group(proc)
+            return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
+        except BaseException:  # an interrupt must not leave the runner editing the tree
+            _kill_group(proc)
+            raise
+        return CommandRun(argv, str(cwd), out + err, proc.returncode)
+
+
+@contextlib.contextmanager
+def _sigterm_as_exit() -> Iterator[None]:
+    """Let a SIGTERM reach `run_command`'s kill path as an exit, not as the default action."""
+    if threading.current_thread() is not threading.main_thread():
+        yield  # `signal.signal` works on the main thread only
+        return
+    previous = signal.signal(signal.SIGTERM, lambda signum, _frame: sys.exit(128 + signum))
     try:
-        proc = subprocess.Popen(
-            argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-            start_new_session=True,
-        )  # fmt: skip
-    except OSError as exc:
-        return CommandRun(argv, str(cwd), "", None, f"could not start: {exc}")
-    try:
-        out, err = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        out, err = _kill_group(proc)
-        return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
-    except BaseException:  # an interrupt must not leave the runner editing the tree
-        _kill_group(proc)
-        raise
-    return CommandRun(argv, str(cwd), out + err, proc.returncode)
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous or signal.SIG_DFL)
 
 
 def _kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:

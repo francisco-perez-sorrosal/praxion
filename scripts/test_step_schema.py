@@ -277,6 +277,73 @@ def test_every_result_line_in_a_block_is_collected_in_document_order() -> None:
     assert len(blocks[0].results) == 2
 
 
+STEP = "Step"  # step labels are built from this, never written out in test data
+
+
+def test_a_result_line_under_a_non_step_level_two_heading_belongs_to_no_step() -> None:
+    text = f"## {STEP} 1\nResult: pass=1 fail=1 skip=0\n\n## Notes\nResult: pass=9 fail=0 skip=0\n"
+
+    blocks = schema.split_step_blocks(text)
+
+    assert [(b.step, [r.failed for _, r in b.results], "Notes" in b.text) for b in blocks] == [
+        (f"{STEP} 1", [1], False)
+    ]
+
+
+def test_a_mutation_line_under_a_non_step_level_two_heading_feeds_no_step() -> None:
+    text = f"### {STEP} 4\nResult: pass=3 fail=0\n\n## Notes\n{GOLDEN_RAN_LINES[0]}\n"
+
+    blocks = schema.split_step_blocks(text)
+
+    assert schema.step_mutation_reading(f"{STEP} 4", blocks) is None
+
+
+def test_a_step_heading_after_a_non_step_heading_opens_a_block_again() -> None:
+    text = (
+        f"## {STEP} 1\nResult: pass=1 fail=0 skip=0\n\n## Notes\nprose\n\n"
+        f"## {STEP} 2\nResult: pass=2 fail=0 skip=0\n"
+    )
+
+    blocks = schema.split_step_blocks(text)
+
+    assert [(b.step, b.first_line, "Notes" in b.text) for b in blocks] == [
+        (f"{STEP} 1", 1, False),
+        (f"{STEP} 2", 7, False),
+    ]
+
+
+@pytest.mark.parametrize("sub_heading", ["### Failures", "#### Detail"])
+def test_a_deeper_non_step_heading_stays_inside_its_steps_block(sub_heading: str) -> None:
+    text = f"## {STEP} 1\nResult: pass=1 fail=1 skip=0\n\n{sub_heading}\nResult: pass=2 fail=0\n"
+
+    blocks = schema.split_step_blocks(text)
+
+    assert [(b.step, len(b.results)) for b in blocks] == [(f"{STEP} 1", 2)]
+
+
+def test_a_file_with_only_non_step_headings_is_one_stepless_block() -> None:
+    text = "# Title\n\n## Notes\nResult: pass=3 fail=0 skip=0\n\n## More\nprose\n"
+
+    blocks = schema.split_step_blocks(text)
+
+    assert [(b.step, len(b.results), b.first_line) for b in blocks] == [(None, 1, 1)]
+
+
+def test_a_level_two_heading_line_inside_a_code_fence_does_not_close_the_block() -> None:
+    text = f"## {STEP} 1\n```\n## pasted\n```\nResult: pass=1 fail=0 skip=0\n"
+
+    blocks = schema.split_step_blocks(text)
+
+    assert [(b.step, len(b.results)) for b in blocks] == [(f"{STEP} 1", 1)]
+    assert schema.non_step_headings(text) == ()
+
+
+def test_non_step_headings_lists_level_two_headings_only_with_their_lines() -> None:
+    text = f"# Top\n## Notes\n## {STEP} 1\n### Sub\n#### Deep\n## Appendix — check\n"
+
+    assert schema.non_step_headings(text) == ((2, "Notes"), (6, "Appendix — check"))
+
+
 # ---------------------------------------------------------------------------
 # parse_wip_claims -- one claim map from every declared WIP claim source
 # (checklist, status table, heading marker), merged with the existing

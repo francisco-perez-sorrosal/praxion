@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from itertools import accumulate
 from typing import Union
 
 GREEN = "green"
@@ -197,9 +198,10 @@ def _parse_counts(rest: str) -> Counts | Malformed:
 def split_step_blocks(text: str) -> tuple[StepBlock, ...]:
     """Split `text` into `StepBlock`s at `#{2,4} Step <id>` headings only.
 
-    A file with no step heading becomes a single `step=None` block (the
-    whole text). Several blocks may share one `step` id -- addenda and
-    per-writer blocks are legal, not merged.
+    A level-2 heading that is no step heading closes the open block (its lines
+    belong to no step). A file with no step heading becomes a single
+    `step=None` block (the whole text). Several blocks may share one `step`
+    id -- addenda and per-writer blocks are legal, not merged.
     """
     lines = text.splitlines()
     openings = [
@@ -219,17 +221,30 @@ def split_step_blocks(text: str) -> tuple[StepBlock, ...]:
             ),
         )
 
-    boundaries = [start for start, _, _ in openings] + [len(lines)]
+    stops = sorted([s for s, _, _ in openings] + [n - 1 for n, _ in non_step_headings(text)])
+    ends = {start: min(s for s in (*stops, len(lines)) if s > start) for start, _, _ in openings}
     return tuple(
         StepBlock(
             step=step_id,
             title=title,
-            text="\n".join(lines[start : boundaries[i + 1]]).rstrip(),
+            text="\n".join(lines[start : ends[start]]).rstrip(),
             first_line=start + 1,
-            results=_collect_results(lines, start, boundaries[i + 1]),
-            mutation=_last_mutation(lines[start : boundaries[i + 1]]),
+            results=_collect_results(lines, start, ends[start]),
+            mutation=_last_mutation(lines[start : ends[start]]),
         )
-        for i, (start, step_id, title) in enumerate(openings)
+        for start, step_id, title in openings
+    )
+
+
+def non_step_headings(text: str) -> tuple[tuple[int, str], ...]:
+    """`(1-based line, text)` of each level-2 heading outside a code fence that is no step."""
+    lines = text.splitlines()
+    fence_lines = (bool(_CODE_FENCE_RE.match(line)) for line in lines)
+    fenced = list(accumulate(fence_lines, bool.__xor__, initial=False))
+    return tuple(
+        (idx + 1, _heading_title(line))
+        for idx, line in enumerate(lines)
+        if not fenced[idx] and _heading_level(line) == 2 and step_id_from_heading(line) is None
     )
 
 

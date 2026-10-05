@@ -15,6 +15,7 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -757,7 +758,8 @@ run_command((sys.executable, "-c", runner), Path({cwd!r}), 120)
 """
 
 
-def test_an_interrupt_inside_a_run_takes_the_runner_down_with_it(tmp_path: Path) -> None:
+def signal_driver_mid_run(tmp_path: Path, signum: signal.Signals) -> tuple[bool, bool]:
+    """Send `signum` to a driver whose runner is live: (driver exited non-zero, runner gone)."""
     pid_file = tmp_path / "runner.pid"
     driver = subprocess.Popen(
         py(
@@ -772,10 +774,36 @@ def test_an_interrupt_inside_a_run_takes_the_runner_down_with_it(tmp_path: Path)
         time.sleep(0.05)
     runner_pid = int(pid_file.read_text())
 
-    os.kill(driver.pid, signal.SIGINT)
+    os.kill(driver.pid, signum)
     exit_code = driver.wait(timeout=10)
 
-    assert (exit_code != 0, process_is_gone(runner_pid)) == (True, True)
+    return exit_code != 0, process_is_gone(runner_pid)
+
+
+def test_an_interrupt_inside_a_run_takes_the_runner_down_with_it(tmp_path: Path) -> None:
+    assert signal_driver_mid_run(tmp_path, signal.SIGINT) == (True, True)
+
+
+def test_a_terminate_inside_a_run_takes_the_runner_down_with_it(tmp_path: Path) -> None:
+    assert signal_driver_mid_run(tmp_path, signal.SIGTERM) == (True, True)
+
+
+def test_a_run_leaves_the_sigterm_handler_as_it_found_it(tmp_path: Path) -> None:
+    before = signal.getsignal(signal.SIGTERM)
+
+    run_command(py("pass"), tmp_path, 30)
+
+    assert signal.getsignal(signal.SIGTERM) is before
+
+
+def test_a_run_off_the_main_thread_still_completes_without_a_handler(tmp_path: Path) -> None:
+    runs: list[CommandRun] = []
+    worker = threading.Thread(target=lambda: runs.append(run_command(py("print(1)"), tmp_path, 30)))
+
+    worker.start()
+    worker.join(timeout=30)
+
+    assert [(run.returncode, run.output) for run in runs] == [(0, "1\n")]
 
 
 def test_a_command_that_cannot_start_reports_why(tmp_path: Path) -> None:

@@ -50,7 +50,12 @@ The step-schema pipeline turned the check, the attempt count and the ledger into
    - Contract: the module docstring and `--help`. Prose elsewhere points to it, and the loop procedure is `commands/step-loop.md`.
 2. **Responsibility moved.** Inside the loop, the driver selects the step (plan order, `[depends-on]`, `[parallel-group]` never waiting on a sibling), writes the attempt ahead, renders the prompt from a fixed template into `PROMPT_<request>.md`, and gates on ground truth. The gate runs the derived scope, then the step's `Check:`, and reads the verdict through `reconcile(..., assume_recorded={request})`. The driver commits by explicit pathspec (never outer-loop files), appends one ledger record per agent return, and enforces the cap. The orchestrator executes `request.agent_call` unchanged and calls `record` with the request id, the agent id and the marker, after the completion notification.
 3. **No private state.** Pending, attempts, the series, review state and iterations are re-derived on every call from `WIP.md`, the ledger, `TEST_RESULTS.md`, `LIGHT_REVIEW_step-<id>.md`, the reconciler and git. `next` is idempotent, and `record` is idempotent per phase, keyed by request id. A `record` cut off by a tool timeout completes when it is run again.
-4. **Steps outside the loop.** A step not assigned to the implementer, and not done (the reconciler reads `verified-complete` with a `COMPLETE` claim), stops the loop (exit 2, `not-driven`) for the orchestrator to run outside it. The planner keeps such steps outside the driven span.
+4. **Steps outside the loop.** A step not assigned to the implementer stops the loop (exit 2, `not-driven`) until it is done. The orchestrator runs it outside the loop, ticks its `WIP.md` line and resumes; every other exit 2 goes to the user. Such a step is done when:
+   - the reconciler reads `verified-complete` with a `COMPLETE` claim; or
+   - the step declares no `Files:` and no `Check:`, and its `WIP.md` line claims `COMPLETE`, since there is no ground truth to contradict the claim.
+
+   The planner keeps such steps outside the driven span where it can, and gives a non-implementer step that turns tests red a `Check: … pending=<n>`.
+7. **Invocation.** The `/step-loop <slug>` procedure is model-invocable. `then` and `stop.resume` echo the caller's invocation: `step_loop.py` through `PATH`, `python3 scripts/step_loop.py` otherwise.
 5. **Stops** persist while their evidence holds, and every exit 2 or 3 composes HANDOFF.md through `compose_handoff.write_handoff(..., next_action=<stop text>)`, rewriting only when § 2 changes.
 6. **Spawner seam.** `SpawnRequest` → `SpawnReturn = AgentRan | NotStarted`. v1: the orchestrator's Agent tool across `next` and `record`. v2 (designed): `claude -p --agent implementer --max-turns --max-budget-usd --output-format json`. v3 (designed): one `Workflow` run per parallel group. A test-only scripted spawner and the acceptance double prove the seam.
 
@@ -75,7 +80,7 @@ The step-schema pipeline turned the check, the attempt count and the ledger into
 
 **Positive:** the orchestrator's context grows by pointers only. There is one committer, and each verified step is one reviewable commit. Capped work reaches a human with what stopped each attempt. Verdicts and the gate agree by construction.
 
-**Negative:** about 2,000 new lines across seven modules, and the reconciler gains a ledger read. The envelope's `python3 scripts/step_loop.py` literal fits the self-host checkout; managed projects (PATH-installed `step_loop.py`) need a follow-up that makes the invocation prefix resolvable.
+**Negative:** about 2,000 new lines across seven modules, and the reconciler gains a ledger read. The managed-project invocation is resolved: the driver echoes the caller's invocation, so the `then` and resume commands are right both in the self-host checkout and where `step_loop.py` is installed on `PATH`. A model-invocable `/step-loop` costs about 31 listing tokens.
 
 ## Disconfirmation
 

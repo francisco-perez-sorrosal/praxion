@@ -13,6 +13,8 @@ pipeline_tier: full
 affected_files:
   - skills/software-planning/references/intra-step-review.md
   - agents/implementation-planner.md
+  - skills/software-planning/SKILL.md
+  - rules/swe/swe-agent-coordination-protocol.md
   - scripts/_plan_steps.py
 affected_reqs: [REQ-26, REQ-28]
 dissent: []
@@ -34,7 +36,14 @@ The trigger the driver (and a hand-run orchestrator) evaluates is per step:
 - `review: off` → no review;
 - `review: force` or `tier: H` → review.
 
-The planner turns an uncertainty flag below 7 into `review: force` on the steps that bear on that signal, and marks a one-way-door step `review: force`. `intra-step-review.md`'s auto-signal table and the planner prompt's risk-tag row say so, with no net line growth in the planner prompt.
+The planner turns an uncertainty flag below 7 into `review: force` on the steps that bear on that signal, and marks a one-way-door step `review: force`. Four sites state the trigger, and all change in one step so that they agree when committed:
+
+- `intra-step-review.md`'s trigger table;
+- the planner prompt's risk-tag rows, with no net line growth;
+- `skills/software-planning/SKILL.md`;
+- the always-loaded pipeline-rules row in `rules/swe/swe-agent-coordination-protocol.md`, which reads "Step carrying `review: force` or `tier: H` (the planner maps Uncertainty Flag < 7 and one-way doors to `force`)", about +3 tokens.
+
+Only the trigger-predicate reference lists signals; the other sites name the two tags and the mapping duty.
 
 ## Considered Options
 

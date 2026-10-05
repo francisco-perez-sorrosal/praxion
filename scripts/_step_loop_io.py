@@ -1,31 +1,32 @@
-"""The git and command adapters of the step-loop driver.
+"""The git and command adapters of the step-loop driver: the only module that touches the
+repository or runs a command.
 
-The driver's pure modules decide; this one touches the repository and runs commands, and
-nothing else in the driver does. Two halves:
+* **Git**: `commit_paths`, the commit by explicit path. A declared path (a file or a directory,
+  spelled any way git accepts) is normalised once and expanded to the changed files under it;
+  filtering, staging, the commit and the snapshots all work on those file names. A row already
+  staged outside them is refused up front, since a path-limited commit leaves it staged for the
+  next plain commit to sweep in. After the commit its file set must equal the staged files and
+  the tree outside them must be unchanged; otherwise the disturbance is reported with both
+  snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
+  `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:`) are withheld
+  whatever the plan declares.
+* **Runner**: the `Check:` command and the derived test scope. Each invocation the resolver
+  lists runs and comes back on its own; merging them is the caller's job. No runner is asked to
+  colour, and each command leads a process group that a timeout kills whole.
 
-* **Git**: which declared paths differ from HEAD, and `commit_paths`, the commit by explicit
-  path. A commit may only change the paths it was given. Before staging, the tree outside
-  those paths is snapshotted (the index rows, the unstaged edits and the untracked files);
-  an index row already staged outside them is refused as a disturbed tree, since a path-limited
-  commit leaves it staged and a later plain commit would sweep it in. After the commit, the
-  commit's file set must equal the paths and the snapshot must be unchanged. A disturbance is
-  reported with both snapshots; nothing is unstaged, reset or restored on the caller's behalf.
-  Outer-loop paths (under `tests/acceptance/` or `tests/e2e/`, or named by any step's
-  `Read-only:`) are withheld from the commit whatever the plan declares.
-* **Runner**: the `Check:` command and the derived test scope. The resolver lists several
-  invocations when the selected tests cannot share one process; each runs on its own and
-  its output comes back on its own. Merging them into one run is the caller's job, never a
-  concatenation of raw text. No runner is told to colour its output.
-
-Every git call goes through `_git_runner.run_git`; a git that cannot run propagates as
-`GitUnavailableError`, a git that refuses a command raises `GitCommandError`.
+Every git call goes through `_git_runner.run_git`; from `commit_paths`, a git that cannot run is
+`CommitInterrupted` and one that refuses a command is `CommitRefused`. Pathspecs are
+`:(literal)` magic, not a global flag, which git would export to every hook the commit runs.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import posixpath
 import shlex
+import signal
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -33,15 +34,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
 
-from _git_runner import run_git
+from _git_runner import GIT_TIMEOUT_SECONDS, GitUnavailableError, run_git
 
 OUTER_LOOP_PREFIXES = ("tests/acceptance/", "tests/e2e/")
+# The commit runs the repository's hooks (about twenty, installing environments on a first
+# run): a bound of its own, not the thirty seconds of plain plumbing.
+COMMIT_TIMEOUT_SECONDS = 600.0
 RUN_TIMEOUT_SECONDS = 540.0
 RESOLVER_TIMEOUT_SECONDS = 60.0
+KILL_GRACE_SECONDS = 5.0
 FAILURE_TAIL_LINES = 20
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
-LITERAL_PATHSPECS = "--literal-pathspecs"
-_NODE_BOUNDARIES = ("::", "[")
+_LITERAL_PATHSPEC = ":(literal)"
+_NODE_SEPARATOR = "::"
+_STATUS_PATH_OFFSET = 3  # porcelain v1: two status letters and a space precede the path
 _UNTRACKED_DIRECTORY_MARK = "/"
 _DELETED = "deleted"
 _NOT_A_FILE = "not-a-file"
@@ -55,16 +61,20 @@ class GitCommandError(RuntimeError):
     """git ran and refused a command the driver needs to succeed."""
 
 
+class OutsideRepoError(ValueError):
+    """A declared path (or `Read-only:` entry) that leaves the repository."""
+
+
 # --- The commit by explicit path ---------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class TreeSnapshot:
-    """The tree outside a pathspec: (path, token) pairs, and the unstaged diff as a patch.
+    """The tree outside a set of files: (path, token) pairs, and the unstaged diff as a patch.
 
-    `staged` holds the index rows (token: git's raw row, with both blob ids), `unstaged` the
-    modified tracked files (token: the worktree blob id) and `untracked` the new ones. The
-    patch text is for a human restoring the tree; it takes no part in equality.
+    Tokens: git's raw index row (`staged`), the worktree blob id (`unstaged`, `untracked`; the
+    blob is computed, not stored, so the patch text restores no untracked file). The patch
+    takes no part in equality.
     """
 
     staged: Entries
@@ -77,7 +87,7 @@ class TreeSnapshot:
         return tuple(sorted({path for _, path, _ in mine ^ theirs}))
 
     def patch_text(self) -> str:
-        """The snapshot as text for `TREE_SNAPSHOT_<request>.patch`."""
+        """The snapshot as text for `TREE_SNAPSHOT_<request>.patch`: hashes, and the diff."""
         lines = ["# staged outside the pathspec"]
         lines += [f"#   {path}  {row}" for path, row in self.staged]
         lines.append("# untracked outside the pathspec (path, blob id)")
@@ -96,7 +106,7 @@ class TreeSnapshot:
 
 @dataclass(frozen=True)
 class Committed:
-    """The commit holds exactly the paths and the tree outside them is as it was."""
+    """The commit holds exactly the files and the tree outside them is as it was."""
 
     sha: str
     files: tuple[str, ...]
@@ -105,25 +115,38 @@ class Committed:
 
 @dataclass(frozen=True)
 class NothingToCommit:
-    """None of the paths differs from HEAD once the outer-loop paths are withheld."""
+    """None of the paths differs from HEAD once the outer-loop files are withheld."""
 
     withheld: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class CommitRefused:
-    """The hooks (or git) refused the commit, after the one re-stage retry when files moved."""
+    """The hooks, git or a lock refused (after the one re-stage retry when files moved).
+
+    The declared files stay staged; the next attempt reads them as pre-staged until unstaged.
+    """
 
     detail: str
 
 
 @dataclass(frozen=True)
-class TreeDisturbed:
-    """The commit touched, or would touch, more than its paths.
+class CommitInterrupted:
+    """git could not run to completion (the commit outlived its bound, or git vanished).
 
-    `sha` is the commit when one was made. `paths` names what moved outside the pathspec (or
-    was already staged there); `before` and `after` are the two snapshots, equal when nothing
-    was run.
+    The declared files stay staged, `index.lock` may be left behind (`index_locked`), and the
+    hooks git started may still be running and writing. `after` is the snapshot taken then.
+    """
+
+    detail: str
+    after: TreeSnapshot
+    index_locked: bool
+
+
+@dataclass(frozen=True)
+class TreeDisturbed:
+    """The commit touched, or would touch, more than its files: `paths` names what moved
+    (or was already staged), `sha` the commit if one was made, `before`/`after` the snapshots.
     """
 
     before: TreeSnapshot
@@ -132,131 +155,178 @@ class TreeDisturbed:
     sha: str | None
 
 
-CommitOutcome = Union[Committed, NothingToCommit, CommitRefused, TreeDisturbed]  # noqa: UP007 -- runtime value, 3.9 floor
+CommitOutcome = Union[  # noqa: UP007 -- runtime value, 3.9 floor
+    Committed, NothingToCommit, CommitRefused, CommitInterrupted, TreeDisturbed
+]
+
+
+@dataclass(frozen=True)
+class _Job:
+    paths: tuple[str, ...]
+    withheld: tuple[str, ...]
+    message: str
+    before: TreeSnapshot
+    timeout: float
 
 
 def commit_paths(
-    repo: Path, paths: Iterable[str], message: str, read_only: Iterable[str] = ()
+    repo: Path,
+    paths: Iterable[str],
+    message: str,
+    read_only: Iterable[str] = (),
+    commit_timeout: float = COMMIT_TIMEOUT_SECONDS,
 ) -> CommitOutcome:
-    """Commit `paths` (minus the outer-loop paths) with `message`, touching nothing else."""
-    kept, withheld = split_outer_loop(paths, read_only)
+    """Commit the changed files under `paths` (minus the outer-loop files), touching no other."""
+    kept, withheld = split_outer_loop(paths_differing_from_head(repo, paths), read_only, repo)
     if not kept:
         return NothingToCommit(withheld)
-    pathset = frozenset(kept)
-    before = snapshot_outside(repo, pathset)
+    before = snapshot_outside(repo, frozenset(kept))
     if before.staged:
-        staged = tuple(path for path, _ in before.staged)
-        return TreeDisturbed(before, before, staged, None)
-    _stage(repo, kept)
-    expected = frozenset(_lines(_git(repo, "diff", "--cached", "--name-only", "-z", "--", *kept)))
-    if not expected:
-        return NothingToCommit(withheld)
-    refused = _commit_with_retry(repo, message, kept)
-    after = snapshot_outside(repo, pathset)
-    if after != before:
-        sha = _head_sha(repo) if refused is None else None
-        return TreeDisturbed(before, after, before.paths_differing(after), sha)
-    if refused is not None:
-        return CommitRefused(refused)
-    return _verified(repo, before, expected, withheld)
+        return TreeDisturbed(before, before, tuple(path for path, _ in before.staged), None)
+    return _commit_and_judge(repo, _Job(kept, withheld, message, before, commit_timeout))
 
 
 def paths_differing_from_head(repo: Path, paths: Iterable[str]) -> tuple[str, ...]:
-    """The given paths that differ from HEAD: modified, staged, untracked or deleted."""
-    wanted = tuple(paths)
+    """The files under the given paths (directories expand) that differ from HEAD, sorted."""
+    wanted = tuple(normalise_path(p, repo) for p in paths)
     if not wanted:
         return ()
     status = _git(
         repo,
-        "status",
-        "--porcelain=v1",
-        "-z",
-        "--untracked-files=all",
-        "--no-renames",
+        *("status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"),
         "--",
-        *wanted,
+        *_specs(wanted),
     )
-    changed = {entry[3:] for entry in _lines(status)}
-    return tuple(path for path in wanted if path in changed)
+    return tuple(sorted({entry[_STATUS_PATH_OFFSET:] for entry in _lines(status)}))
+
+
+def normalise_path(raw: str, root: Path | None = None) -> str:
+    """The repo-relative, `normpath`-clean form of a path (absolute ones relate to `root`).
+
+    A path that leaves the repository raises `OutsideRepoError`.
+    """
+    relative = raw
+    if root is not None and os.path.isabs(raw):  # the shorter relpath is the one that stays inside
+        relative = min((os.path.relpath(raw, base) for base in (root, root.resolve())), key=len)
+    clean = posixpath.normpath(relative)
+    if clean.startswith("/") or clean == ".." or clean.startswith("../"):
+        raise OutsideRepoError(f"{raw!r} is outside the repository")
+    return clean
 
 
 def split_outer_loop(
-    paths: Iterable[str], read_only: Iterable[str] = ()
+    paths: Iterable[str], read_only: Iterable[str] = (), root: Path | None = None
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """(kept, withheld): outer-loop paths leave the set whatever the plan declares.
+    """(kept, withheld), both normalised: outer-loop files leave the set whatever the plan says.
 
-    An entry names an outer-loop path as a path, `path::function` or a node id, or as a
-    directory ending in a slash.
+    `paths` are files (`commit_paths` expands directories first). A `Read-only:` entry is a
+    path, a directory or `path::node`, cut at the first `::` only, so `weird[1].txt` is a path.
     """
-    named = tuple(_entry_path(entry) for entry in read_only)
-    withheld = tuple(p for p in paths if _is_outer_loop(p, named))
-    kept = tuple(p for p in paths if p not in withheld)
-    return kept, withheld
+    named = tuple(normalise_path(entry.split(_NODE_SEPARATOR, 1)[0], root) for entry in read_only)
+    clean = tuple(normalise_path(p, root) for p in paths)
+    withheld = tuple(p for p in clean if _is_outer_loop(p, named))
+    return tuple(p for p in clean if p not in withheld), withheld
 
 
-def snapshot_outside(repo: Path, pathspec: frozenset[str]) -> TreeSnapshot:
-    """The index rows, unstaged edits and untracked files of every path not in `pathspec`."""
+def snapshot_outside(repo: Path, files: frozenset[str]) -> TreeSnapshot:
+    """The index rows, unstaged edits and untracked files of every path not in `files`."""
     raw = _lines(_git(repo, "diff", "--cached", "--raw", "-z", "--no-renames", "--no-abbrev"))
     staged = tuple(sorted(zip(raw[1::2], raw[0::2])))  # noqa: B905 -- strict= is 3.10+
-    modified = [p for p in _lines(_git(repo, "diff", "--name-only", "-z")) if p not in pathspec]
+    modified = [p for p in _lines(_git(repo, "diff", "--name-only", "-z")) if p not in files]
     others = _lines(_git(repo, "ls-files", "--others", "--exclude-standard", "-z"))
-    untracked = [
-        p for p in others if not p.endswith(_UNTRACKED_DIRECTORY_MARK) and p not in pathspec
-    ]
-    diff = _git(repo, "diff", "--binary", "--", *modified) if modified else ""
+    untracked = [p for p in others if not p.endswith(_UNTRACKED_DIRECTORY_MARK) and p not in files]
+    diff = _git(repo, "diff", "--binary", "--", *_specs(modified)) if modified else ""
     return TreeSnapshot(
-        staged=tuple((path, row) for path, row in staged if path not in pathspec),
+        staged=tuple((path, row) for path, row in staged if path not in files),
         unstaged=_worktree_blobs(repo, modified),
         untracked=_worktree_blobs(repo, untracked),
         unstaged_diff=diff,
     )
 
 
-def _entry_path(entry: str) -> str:
-    cut = min((entry.find(mark) for mark in _NODE_BOUNDARIES if mark in entry), default=len(entry))
-    return entry[:cut]
+def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:
+    try:
+        _stage(repo, job.paths)
+        staged = _git(
+            repo, "diff", "--cached", "--name-only", "--no-renames", "-z", "--", *_specs(job.paths)
+        )
+        expected = frozenset(_lines(staged))
+        refused = _commit_with_retry(repo, job) if expected else None
+    except GitCommandError as exc:
+        return CommitRefused(str(exc))
+    except GitUnavailableError as exc:
+        after = snapshot_outside(repo, frozenset(job.paths))
+        return CommitInterrupted(str(exc), after, _index_locked(repo))
+    if not expected:
+        return NothingToCommit(job.withheld)
+    after = snapshot_outside(repo, frozenset(job.paths))
+    if after != job.before:
+        sha = _head_sha(repo) if refused is None else None
+        return TreeDisturbed(job.before, after, job.before.paths_differing(after), sha)
+    if refused is not None:
+        return CommitRefused(refused)
+    return _verified(repo, job, expected)
 
 
 def _is_outer_loop(path: str, named: tuple[str, ...]) -> bool:
-    if path.startswith(OUTER_LOOP_PREFIXES):
+    if (path + "/").startswith(OUTER_LOOP_PREFIXES):
         return True
-    return any(path == one or path.startswith(one.rstrip("/") + "/") for one in named)
+    return any(path == one or path.startswith(one + "/") for one in named)
+
+
+def _specs(paths: Iterable[str]) -> tuple[str, ...]:
+    return tuple(_LITERAL_PATHSPEC + path for path in paths)
 
 
 def _stage(repo: Path, paths: tuple[str, ...]) -> None:
-    _git(repo, "add", "--all", "--", *paths)
+    _git(repo, "add", "--all", "--", *_specs(paths))
 
 
-def _commit_with_retry(repo: Path, message: str, paths: tuple[str, ...]) -> str | None:
+def _commit_with_retry(repo: Path, job: _Job) -> str | None:
     """None on success, else git's own words. Hooks that rewrote files get one re-stage."""
-    attempt = _try_commit(repo, message, paths)
-    if attempt is not None and _lines(_git(repo, "diff", "--name-only", "-z", "--", *paths)):
-        _stage(repo, paths)
-        attempt = _try_commit(repo, message, paths)
+    attempt = _try_commit(repo, job)
+    if attempt is not None and _lines(
+        _git(repo, "diff", "--name-only", "-z", "--", *_specs(job.paths))
+    ):
+        _stage(repo, job.paths)
+        attempt = _try_commit(repo, job)
     return attempt
 
 
-def _try_commit(repo: Path, message: str, paths: tuple[str, ...]) -> str | None:
-    done = _run(repo, "commit", "-m", message, "--", *paths)
+def _try_commit(repo: Path, job: _Job) -> str | None:
+    done = _run(repo, "commit", "-m", job.message, "--", *_specs(job.paths), timeout=job.timeout)
     if done.returncode == 0:
         return None
     return _tail(done.stdout + done.stderr)
 
 
-def _verified(
-    repo: Path, snapshot: TreeSnapshot, expected: frozenset[str], withheld: tuple[str, ...]
-) -> Union[Committed, TreeDisturbed]:  # noqa: UP007 -- runtime value, 3.9 floor
+def _verified(repo: Path, job: _Job, expected: frozenset[str]) -> Union[Committed, TreeDisturbed]:  # noqa: UP007 -- runtime value, 3.9 floor
     """The commit just made, if its file set is exactly what was staged."""
     sha = _head_sha(repo)
-    listing = _git(repo, "diff-tree", "--root", "-r", "--no-commit-id", "--name-only", "-z", sha)
+    listing = _git(
+        repo,
+        "diff-tree",
+        "--root",
+        "-r",
+        "--no-renames",
+        "--no-commit-id",
+        "--name-only",
+        "-z",
+        sha,
+    )
     files = frozenset(_lines(listing))
     if files != expected:
-        return TreeDisturbed(snapshot, snapshot, tuple(sorted(files ^ expected)), sha)
-    return Committed(sha, tuple(sorted(files)), withheld)
+        return TreeDisturbed(job.before, job.before, tuple(sorted(files ^ expected)), sha)
+    return Committed(sha, tuple(sorted(files)), job.withheld)
 
 
 def _head_sha(repo: Path) -> str:
     return _git(repo, "rev-parse", "--verify", "HEAD").strip()
+
+
+def _index_locked(repo: Path) -> bool:
+    done = run_git(repo, "rev-parse", "--git-path", "index.lock")
+    return done.returncode == 0 and (repo / done.stdout.strip()).exists()
 
 
 def _worktree_blobs(repo: Path, paths: list[str]) -> Entries:
@@ -272,9 +342,10 @@ def _worktree_blobs(repo: Path, paths: list[str]) -> Entries:
     return tuple(sorted(marked.items()))
 
 
-def _run(repo: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
-    """`git`, with every pathspec literal: a declared name is never a glob."""
-    return run_git(repo, LITERAL_PATHSPECS, *args, stdin=stdin)
+def _run(
+    repo: Path, *args: str, stdin: str | None = None, timeout: float = GIT_TIMEOUT_SECONDS
+) -> subprocess.CompletedProcess[str]:
+    return run_git(repo, *args, stdin=stdin, timeout=timeout)
 
 
 def _git(repo: Path, *args: str, stdin: str | None = None) -> str:
@@ -345,18 +416,36 @@ def run_derived_scope(
 
 
 def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
-    """Run `argv` under a timeout with colour off; a run that cannot finish says why."""
+    """Run `argv` under a timeout with colour off; a run that cannot finish says why.
+
+    The command leads its own process group and a timeout kills the whole group: a
+    `uv run pytest` or a shell wrapper must not leave workers editing the tree after the
+    driver has reported the run as over.
+    """
     try:
-        done = subprocess.run(
-            argv, cwd=str(cwd), env=_no_colour_env(), capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=timeout, check=False,
+        proc = subprocess.Popen(
+            argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+            start_new_session=True,
         )  # fmt: skip
-    except subprocess.TimeoutExpired as exc:
-        partial = _text(exc.stdout) + _text(exc.stderr)
-        return CommandRun(argv, str(cwd), partial, None, f"timed out after {timeout:g}s")
     except OSError as exc:
         return CommandRun(argv, str(cwd), "", None, f"could not start: {exc}")
-    return CommandRun(argv, str(cwd), done.stdout + done.stderr, done.returncode)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        out, err = _kill_group(proc)
+        return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
+    return CommandRun(argv, str(cwd), out + err, proc.returncode)
+
+
+def _kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:
+    """Kill the command's whole process group; what it had printed comes back."""
+    with contextlib.suppress(ProcessLookupError):  # the group may already be gone
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        return proc.communicate(timeout=KILL_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:  # a descendant left the group and holds the pipes
+        return "", ""
 
 
 def _read_plan(resolver: CommandRun) -> dict | None:
@@ -372,9 +461,3 @@ def _read_plan(resolver: CommandRun) -> dict | None:
 def _no_colour_env() -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k not in _FORCED_COLOUR_VARS}
     return {**env, **_NO_COLOUR_ENV}
-
-
-def _text(captured: str | bytes | None) -> str:
-    if isinstance(captured, bytes):
-        return captured.decode("utf-8", errors="replace")
-    return captured or ""

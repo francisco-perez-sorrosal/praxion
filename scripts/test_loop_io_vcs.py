@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 import shlex
 import stat
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -23,13 +25,16 @@ import _step_loop_io as step_io  # noqa: E402
 from _git_runner import run_git  # noqa: E402
 from _step_loop_io import (  # noqa: E402
     CommandRun,
+    CommitInterrupted,
     CommitRefused,
     Committed,
     NothingToCommit,
+    OutsideRepoError,
     ScopeRuns,
     ScopeUnresolved,
     TreeDisturbed,
     commit_paths,
+    normalise_path,
     paths_differing_from_head,
     run_check,
     run_command,
@@ -137,14 +142,56 @@ def test_outer_loop_directories_are_withheld_whatever_the_plan_says(path: str) -
         "docs/outer.md",
         "docs/outer.md::check_it",
         "docs/outer.md::check_it[case 1]",
-        "docs/outer.md[case]",
         "docs/",
+        "docs",
+        "./docs/outer.md",
+        "docs/../docs/outer.md::check_it",
     ],
 )
 def test_a_read_only_entry_withholds_its_path_in_every_form(entry: str) -> None:
     kept, withheld = split_outer_loop(["docs/outer.md", "src/a.py"], [entry])
 
     assert (kept, withheld) == (("src/a.py",), ("docs/outer.md",))
+
+
+@pytest.mark.parametrize(
+    ("spelling", "name"),
+    [
+        ("./tests/acceptance/x.py", "tests/acceptance/x.py"),
+        ("scripts/../tests/e2e/x.py", "tests/e2e/x.py"),
+        ("tests/acceptance", "tests/acceptance"),
+        ("tests/e2e/", "tests/e2e"),
+    ],
+)
+def test_outer_loop_files_are_found_under_every_spelling_of_their_path(
+    spelling: str, name: str
+) -> None:
+    assert split_outer_loop([spelling, "src/a.py"]) == (("src/a.py",), (name,))
+
+
+def test_a_bracketed_file_name_is_a_path_not_a_node_id() -> None:
+    kept, withheld = split_outer_loop(["weird[1].txt", "weird1.txt"], ["weird[1].txt"])
+
+    assert (kept, withheld) == (("weird1.txt",), ("weird[1].txt",))
+
+
+@pytest.mark.parametrize("spelling", ["a.py", "./a.py", "x/../a.py", "./x/./../a.py"])
+def test_every_spelling_of_a_path_normalises_to_one_name(spelling: str) -> None:
+    assert normalise_path(spelling) == "a.py"
+
+
+def test_a_directory_loses_its_trailing_slash() -> None:
+    assert normalise_path("tests/acceptance/") == "tests/acceptance"
+
+
+def test_an_absolute_path_is_made_relative_to_the_root(repo: Path) -> None:
+    assert normalise_path(str(repo / "tests" / ".." / "a.py"), repo) == "a.py"
+
+
+@pytest.mark.parametrize("escaping", ["../a.py", "x/../../a.py", "/etc/passwd"])
+def test_a_path_that_leaves_the_repository_is_refused(escaping: str) -> None:
+    with pytest.raises(OutsideRepoError, match="outside the repository"):
+        normalise_path(escaping)
 
 
 def test_a_read_only_entry_does_not_withhold_a_longer_name() -> None:
@@ -170,13 +217,34 @@ def test_modified_staged_untracked_and_deleted_paths_differ_from_head(repo: Path
     (repo / "decoy.txt").unlink()
     declared = ["new.py", "decoy.txt", "b.py", "a.py"]
 
-    assert paths_differing_from_head(repo, declared) == tuple(declared)
+    assert paths_differing_from_head(repo, declared) == ("a.py", "b.py", "decoy.txt", "new.py")
 
 
-def test_unchanged_paths_are_left_out_in_the_declared_order(repo: Path) -> None:
+def test_unchanged_paths_are_left_out(repo: Path) -> None:
     write(repo, "b.py", "b = 2\n")
 
     assert paths_differing_from_head(repo, ["a.py", "b.py", "notes.txt"]) == ("b.py",)
+
+
+@pytest.mark.parametrize("spelling", ["tests", "./tests/", "tests/../tests"])
+def test_a_declared_directory_expands_to_the_changed_files_under_it(
+    repo: Path, spelling: str
+) -> None:
+    write(repo, "tests/test_inner.py", "inner = 2\n")
+    write(repo, "tests/new_test.py", "new = 1\n")
+    write(repo, "a.py", "a = 2\n")
+
+    assert paths_differing_from_head(repo, [spelling]) == (
+        "tests/new_test.py",
+        "tests/test_inner.py",
+    )
+
+
+@pytest.mark.parametrize("spelling", ["./a.py", "x/../a.py", "{root}/a.py"])
+def test_a_differently_spelled_path_still_reads_as_changed(repo: Path, spelling: str) -> None:
+    write(repo, "a.py", "a = 2\n")
+
+    assert paths_differing_from_head(repo, [spelling.format(root=repo)]) == ("a.py",)
 
 
 def test_no_declared_path_asks_git_nothing(repo: Path) -> None:
@@ -339,6 +407,93 @@ def test_paths_that_do_not_differ_commit_nothing(repo: Path, paths: list[str]) -
     assert (commit_paths(repo, paths, MESSAGE), head(repo)) == (NothingToCommit(()), before)
 
 
+def test_a_differently_spelled_path_commits_under_its_clean_name(surrounded: Path) -> None:
+    outcome = commit_paths(surrounded, ["./x/../a.py"], MESSAGE)
+
+    assert (outcome, committed_files(surrounded)) == (
+        Committed(head(surrounded), ("a.py",), ()),
+        {"a.py"},
+    )
+
+
+def test_a_declared_directory_never_sweeps_an_outer_loop_file_in(repo: Path) -> None:
+    write(repo, OUTER, "outer = 2\n")
+    write(repo, "tests/test_inner.py", "inner = 2\n")
+
+    outcome = commit_paths(repo, ["tests"], MESSAGE)
+
+    assert (outcome, committed_files(repo), git(repo, "diff", "--name-only")) == (
+        Committed(head(repo), ("tests/test_inner.py",), (OUTER,)),
+        {"tests/test_inner.py"},
+        f"{OUTER}\n",
+    )
+
+
+def test_an_outer_loop_directory_declared_alone_commits_nothing(repo: Path) -> None:
+    write(repo, OUTER, "outer = 2\n")
+    write(repo, "tests/acceptance/new_driver.py", "new = 1\n")
+    before = head(repo)
+
+    outcome = commit_paths(repo, ["tests/acceptance"], MESSAGE)
+
+    assert (outcome, head(repo)) == (
+        NothingToCommit(("tests/acceptance/new_driver.py", OUTER)),
+        before,
+    )
+
+
+@pytest.mark.parametrize(
+    "entry", ["./tests/test_inner.py::test_it", "tests/test_inner.py", "tests", "tests/../tests/"]
+)
+def test_a_read_only_entry_in_any_spelling_keeps_a_declared_directory_file_out(
+    repo: Path, entry: str
+) -> None:
+    write(repo, "tests/test_inner.py", "inner = 2\n")
+    write(repo, "a.py", "a = 2\n")
+
+    outcome = commit_paths(repo, ["tests", "a.py"], MESSAGE, read_only=[entry])
+
+    assert (outcome.files, outcome.withheld) == (("a.py",), ("tests/test_inner.py",))
+
+
+def test_a_moved_file_with_identical_content_commits_without_a_false_disturbance(
+    repo: Path,
+) -> None:
+    (repo / "a.py").rename(repo / "moved.py")
+
+    outcome = commit_paths(repo, ["a.py", "moved.py"], MESSAGE)
+
+    assert outcome == Committed(head(repo), ("a.py", "moved.py"), ())
+
+
+def test_a_lock_that_stops_the_staging_is_a_refusal_not_an_exception(surrounded: Path) -> None:
+    (surrounded / ".git" / "index.lock").write_text("")
+    before = head(surrounded)
+
+    outcome = commit_paths(surrounded, ["a.py"], MESSAGE)
+
+    assert (
+        isinstance(outcome, CommitRefused),
+        "index.lock" in outcome.detail,
+        head(surrounded),
+    ) == (
+        True,
+        True,
+        before,
+    )
+
+
+def test_hooks_see_no_global_literal_pathspec_setting(surrounded: Path) -> None:
+    seen = surrounded.parent / "seen.txt"
+    install_hook(
+        surrounded, f'echo "${{GIT_LITERAL_PATHSPECS:-unset}}" > {shlex.quote(str(seen))}\n'
+    )
+
+    commit_paths(surrounded, ["a.py"], MESSAGE)
+
+    assert seen.read_text() == "unset\n"
+
+
 def test_a_deleted_and_a_new_path_commit_as_a_deletion_and_an_addition(repo: Path) -> None:
     (repo / "b.py").unlink()
     write(repo, "c.py", "c = 1\n")
@@ -449,6 +604,24 @@ def test_a_hook_that_adds_a_file_to_the_commit_breaks_the_file_set_check(surroun
     )
 
 
+def test_a_commit_that_outlives_its_bound_is_reported_with_the_lock_and_the_staged_files(
+    surrounded: Path,
+) -> None:
+    install_hook(surrounded, "sleep 3\n")
+    before = head(surrounded)
+
+    outcome = commit_paths(surrounded, ["a.py"], MESSAGE, commit_timeout=0.5)
+
+    assert (
+        isinstance(outcome, CommitInterrupted),
+        "exceeded" in outcome.detail,
+        outcome.index_locked,
+        outcome.after == snapshot_outside(surrounded, frozenset({"a.py"})),
+        staged_names(surrounded),
+        head(surrounded),
+    ) == (True, True, True, True, "a.py\n", before)
+
+
 def test_a_disturbance_hands_back_both_snapshots_for_the_caller_to_save(surrounded: Path) -> None:
     install_hook(surrounded, "echo more >> notes.txt\n")
 
@@ -501,6 +674,37 @@ def test_a_command_that_outlives_its_timeout_reports_why_and_keeps_what_it_print
     run = run_command(py(code), tmp_path, SHORT_TIMEOUT)
 
     assert (run.returncode, run.problem, run.output) == (None, "timed out after 0.5s", "started\n")
+
+
+def process_is_gone(pid: int, seconds: float = 5.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        state = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True
+        )
+        if state.stdout.strip() == "" or state.stdout.strip().startswith("Z"):
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_a_timeout_kills_the_commands_whole_process_group(tmp_path: Path) -> None:
+    pid_file = tmp_path / "grandchild.pid"
+    code = (
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        "print('ready', flush=True)\n"
+        "time.sleep(60)\n"
+    )
+
+    run = run_command(py(code), tmp_path, 1.5)
+
+    assert (run.problem, run.output, process_is_gone(int(pid_file.read_text()))) == (
+        "timed out after 1.5s",
+        "ready\n",
+        True,
+    )
 
 
 def test_a_command_that_cannot_start_reports_why(tmp_path: Path) -> None:

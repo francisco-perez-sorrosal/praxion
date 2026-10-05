@@ -24,6 +24,20 @@ from typing import Any
 from _git_runner import git_output
 from _step_verdict import HUMAN_VERDICTS
 
+
+class HandoffError(Exception):
+    """A refusal. The composer never writes over what it could not read."""
+
+
+class HandoffBlockedError(HandoffError):
+    """The readiness gate blocked the write; carries what the CLI reports."""
+
+    def __init__(self, verdict: dict[str, Any], dirty_step_paths: Sequence[str]) -> None:
+        super().__init__("not ready: " + ", ".join(verdict.get("reasons", [])))
+        self.verdict = verdict
+        self.dirty_step_paths = tuple(dirty_step_paths)
+
+
 VERIFIED_COMPLETE = "verified-complete"
 # The reconciler's own "unknown" verdict value -- claimed complete, no
 # attributable ground truth. Named apart from a merely-unreadable world fact
@@ -236,3 +250,47 @@ def declared_files(verdict: dict[str, Any] | None) -> list[str]:
 
 def _is_pipeline_bookkeeping(path: str) -> bool:
     return path.startswith(BOOKKEEPING_PREFIXES) or path in BOOKKEEPING_PATHS
+
+
+def read_existing(path: Path) -> str | None:
+    """The prior handoff's text, or None when there genuinely is none.
+
+    Absence and unreadability are different answers and only one of them is
+    safe to act on. A file that exists but cannot be read -- permissions, a bad
+    mount -- would classify as `Absent` and be overwritten with a fresh
+    skeleton, destroying carried instructions nobody ever saw. That is the same
+    destruction the unparseable path refuses, so it takes the same exit.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise HandoffError(
+            f"the existing {path} exists but could not be read ({exc.strerror or exc}); "
+            "refusing to overwrite it"
+        ) from exc
+
+
+def _render_step_action(verdict: dict[str, Any]) -> str:
+    files = verdict.get("resume_scope") or verdict.get("tier1", {}).get("files_unchanged", [])
+    scope = ", ".join(f"`{path}`" for path in files) or "see the plan's `Files:` field"
+    return (
+        f"`{verdict.get('step', '?')}` — {verdict.get('verdict', '?')}. File scope: {scope}.\n"
+        f"Evidence: {verdict.get('evidence', '')}"
+    )
+
+
+def render_next_action(verdicts: Sequence[dict[str, Any]]) -> str:
+    if not verdicts:
+        return "No tracked steps yet — read `WIP.md` § Next Action and start there."
+    owed = render_owed(verdicts)
+    nxt = pick_next_step(verdicts)
+    if nxt is None:
+        return (
+            "Every tracked step is verified-complete against ground truth. The next action is "
+            "the phase's own next move — see the plan's remaining steps."
+        )
+    if nxt.get("verdict") in HUMAN_OWED:
+        return f"No step is actionable beyond human verification. {owed}"
+    return "\n".join(filter(None, [_render_step_action(nxt), owed]))

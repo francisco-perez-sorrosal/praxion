@@ -44,7 +44,7 @@ Three functions, and the split between them is the design:
       forward byte-for-byte from a prior handoff, because a carried-forward
       instruction that was reflowed is a changed instruction.
 
-`main()` is the only writer.
+`write_handoff()` is the only writer; `main()` and the step-loop driver both call it.
 
 Exit codes: 0 written, 1 refused (not ready), 2 nothing to compose, 3 error.
 
@@ -72,17 +72,22 @@ from _git_runner import git_output
 # The world-reading layer; the composer renders what these return and never
 # reaches past them. One-way: nothing there imports from here.
 from _handoff_inputs import (
-    HUMAN_OWED,
+    HUMAN_OWED,  # noqa: F401 -- re-exported; the picker's vocabulary tests read it here
     SCOPE_CURRENT_STEP,
     SCOPE_DIRTY_SOURCE,
     SCOPE_UNFINISHED_STEPS,
+    HandoffBlockedError,
+    HandoffError,
     artifact_names,
     pick_next_step,
     recent_log,
-    render_owed,
     resolve_base_ref,
     step_file_scope,
 )
+
+# Private names kept: the session composer and the tests reach the readers through them.
+from _handoff_inputs import read_existing as _read_existing
+from _handoff_inputs import render_next_action as _render_next_action
 from _handoff_prompt import continuation_prompt
 
 # The readiness gate lives in its own module; these names are re-exported here
@@ -173,10 +178,6 @@ RECENT_LOG_ADVISORY = "a test run may still be in progress"
 MISMATCH = "mismatch"
 
 
-class HandoffError(Exception):
-    """A refusal. The composer never writes over what it could not read."""
-
-
 class InputState(Enum):
     """The four legal states of the composer's input, as a sum type.
 
@@ -208,7 +209,9 @@ class ComposeContext:
     context renders the same bytes, today and tomorrow. Each field defaults to
     a world-free value, so `compose()` stays callable with nothing but its four
     arguments -- a default is never a reading of the world, only the absence of
-    one. `artifact_names` distinguishes "listed, and empty" (``()``) from
+    one. `next_action`, when set, is the whole of section 2: a caller that has
+    decided the next move (the step-loop driver at a stop) states it itself.
+    `artifact_names` distinguishes "listed, and empty" (``()``) from
     "could not be listed" (``None``).
     """
 
@@ -222,6 +225,7 @@ class ComposeContext:
     base_sha: str = UNKNOWN
     worktree_path: str = UNKNOWN
     composed_at: str = UNKNOWN
+    next_action: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +427,11 @@ def _section_bodies(
     bodies = {
         SECTION_HEADINGS[0]: _render_preflight(slug, context),
         SECTION_HEADINGS[1]: _render_state(context, conflicts),
-        SECTION_HEADINGS[2]: _render_next_action(context.verdicts),
+        SECTION_HEADINGS[2]: (
+            _render_next_action(context.verdicts)
+            if context.next_action is None
+            else context.next_action
+        ),
         SECTION_HEADINGS[7]: _render_start_here(slug),
     }
     bodies.update(_judgement_bodies(state, prior))
@@ -482,30 +490,6 @@ def _render_state(context: ComposeContext, conflicts: Sequence[dict[str, Any]]) 
     if advisory:
         lines.append(advisory)
     return "\n".join(lines)
-
-
-def _render_step_action(verdict: dict[str, Any]) -> str:
-    files = verdict.get("resume_scope") or verdict.get("tier1", {}).get("files_unchanged", [])
-    scope = ", ".join(f"`{path}`" for path in files) or "see the plan's `Files:` field"
-    return (
-        f"`{verdict.get('step', '?')}` — {verdict.get('verdict', '?')}. File scope: {scope}.\n"
-        f"Evidence: {verdict.get('evidence', '')}"
-    )
-
-
-def _render_next_action(verdicts: Sequence[dict[str, Any]]) -> str:
-    if not verdicts:
-        return "No tracked steps yet — read `WIP.md` § Next Action and start there."
-    owed = render_owed(verdicts)
-    nxt = pick_next_step(verdicts)
-    if nxt is None:
-        return (
-            "Every tracked step is verified-complete against ground truth. The next action is "
-            "the phase's own next move — see the plan's remaining steps."
-        )
-    if nxt.get("verdict") in HUMAN_OWED:
-        return f"No step is actionable beyond human verification. {owed}"
-    return "\n".join(filter(None, [_render_step_action(nxt), owed]))
 
 
 def _render_start_here(slug: str) -> str:
@@ -578,6 +562,7 @@ def gather(
     repo_root: Path,
     *,
     force: bool,
+    base_ref: str | None = None,
     _changed_files_override: list[str] | None = None,
     _wal_rows_override: list[dict[str, Any]] | None = None,
     _test_status_override: str | None = None,
@@ -591,6 +576,7 @@ def gather(
     facts = _read_render_context(
         slug,
         repo_root,
+        base_ref=base_ref,
         _changed_files_override=_changed_files_override,
         _wal_rows_override=_wal_rows_override,
         _test_status_override=_test_status_override,
@@ -612,6 +598,7 @@ def _read_render_context(
     slug: str,
     repo_root: Path,
     *,
+    base_ref: str | None = None,
     _changed_files_override: list[str] | None = None,
     _wal_rows_override: list[dict[str, Any]] | None = None,
     _test_status_override: str | None = None,
@@ -621,9 +608,10 @@ def _read_render_context(
     The base ref is resolved once and used twice -- as the reconciler's diff
     base and as the header's `base_sha` -- so the document names the very
     commit its position was computed against, rather than two different SHAs.
+    A caller that already holds the fork point passes it as `base_ref`.
     """
     task_dir = repo_root / ".ai-work" / slug
-    base_ref = resolve_base_ref(repo_root)
+    base_ref = base_ref or resolve_base_ref(repo_root)
     return ComposeContext(
         verdicts=reconcile(
             slug,
@@ -648,29 +636,51 @@ def _default_boundary(verdicts: Sequence[dict[str, Any]]) -> str | None:
     return f"{MID_PHASE_PREFIX}{step}" if step else None
 
 
-def _read_existing(path: Path) -> str | None:
-    """The prior handoff's text, or None when there genuinely is none.
+# ---------------------------------------------------------------------------
+# The writer, and the CLI over it
+# ---------------------------------------------------------------------------
 
-    Absence and unreadability are different answers and only one of them is
-    safe to act on. A file that exists but cannot be read -- permissions, a bad
-    mount -- would classify as `Absent` and be overwritten with a fresh
-    skeleton, destroying carried instructions nobody ever saw. That is the same
-    destruction the unparseable path refuses, so it takes the same exit.
+
+def write_handoff(
+    slug: str,
+    repo_root: Path | str,
+    *,
+    boundary: str | None,
+    force: bool,
+    base_ref: str | None = None,
+    next_action: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Gather, gate, compose and write ``.ai-work/<slug>/HANDOFF.md``.
+
+    Returns ``compose()``'s result plus ``path``; ``boundary=None`` means mid-phase at
+    the current step and ``next_action`` replaces section 2 verbatim. The gate applies:
+    a tree dirty in the step's files raises `HandoffBlockedError` unless ``force`` (the
+    override is recorded in the header). Any other refusal raises `HandoffError`.
     """
+    root = Path(repo_root)
+    context = gather(slug, root, force=force, base_ref=base_ref)
+    boundary = boundary or _default_boundary(context.verdicts)
+    if boundary is None:
+        raise HandoffError("no tracked step to name a mid-phase boundary from; pass --boundary")
+    verdict = context.readiness_verdict or {"state": READY, "reasons": []}
+    if verdict["state"] == BLOCKED:
+        raise HandoffBlockedError(verdict, context.dirty_step_paths)
+
+    handoff_path = root / ".ai-work" / slug / "HANDOFF.md"
     try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
-    except OSError as exc:
-        raise HandoffError(
-            f"the existing {path} exists but could not be read ({exc.strerror or exc}); "
-            "refusing to overwrite it"
-        ) from exc
-
-
-# ---------------------------------------------------------------------------
-# CLI -- the only writer
-# ---------------------------------------------------------------------------
+        result = compose(
+            slug,
+            root,
+            boundary,
+            _read_existing(handoff_path),
+            context=replace(context, next_action=next_action),
+        )
+    except Exception as exc:  # noqa: BLE001 -- a composer refusal must not crash the seam
+        raise HandoffError(str(exc)) from exc
+    if not dry_run:
+        handoff_path.write_text(result["text"], encoding="utf-8")
+    return {**result, "path": handoff_path}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -688,27 +698,20 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"compose_handoff: nothing to compose — no {task_dir / 'WIP.md'}\n")
         return 2
 
-    context = gather(args.slug, repo_root, force=args.force)
-    boundary = args.boundary or _default_boundary(context.verdicts)
-    if boundary is None:
-        return _fail("no tracked step to name a mid-phase boundary from; pass --boundary")
-
-    verdict = context.readiness_verdict or {"state": READY, "reasons": []}
-    if verdict["state"] == BLOCKED:
-        _report_refusal(verdict, context.dirty_step_paths)
-        return 1
-
-    handoff_path = task_dir / "HANDOFF.md"
     try:
-        result = compose(
-            args.slug, repo_root, boundary, _read_existing(handoff_path), context=context
+        result = write_handoff(
+            args.slug,
+            repo_root,
+            boundary=args.boundary,
+            force=args.force,
+            dry_run=args.dry_run,
         )
-    except Exception as exc:  # noqa: BLE001 — a composer refusal must not crash the seam
+    except HandoffBlockedError as refused:
+        _report_refusal(refused.verdict, refused.dirty_step_paths)
+        return 1
+    except HandoffError as exc:
         return _fail(str(exc))
-
-    if not args.dry_run:
-        handoff_path.write_text(result["text"], encoding="utf-8")
-    _report(args, handoff_path, result)
+    _report(args, result["path"], result)
     return 0
 
 

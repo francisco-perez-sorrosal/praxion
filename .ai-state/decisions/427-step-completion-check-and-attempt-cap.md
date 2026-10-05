@@ -25,7 +25,7 @@ affected_files:
   - skills/software-planning/references/agent-pipeline-details.md
   - skills/software-planning/references/coordination-details.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-12, REQ-13]
-superseded_in_part_by: [dec-draft-53a46554, dec-draft-61d28fbc]
+superseded_in_part_by: [dec-432, dec-428]
 ---
 
 ## Context

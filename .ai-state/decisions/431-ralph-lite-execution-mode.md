@@ -1,7 +1,8 @@
 ---
-id: dec-draft-72288a3b
+id: dec-431
+draft_id: dec-draft-72288a3b
 title: Ralph-lite is an execution mode named in the Lightweight tier row, with its /goal recipe in tier-templates — recommended over a sixth tier row, pending the user's confirmation
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-05
 summary: The /goal-based Ralph-lite recipe for one well-gated single-behaviour task is reachable from tier selection through one clause in the always-loaded Lightweight row and lives in tier-templates.md (scratch worktree, auto mode or an allow-listed check, never acceptEdits alone, the derived test command printed every turn, a turn clause, the impossible exit, not for Standard/Full or background agents); a sixth tier row is the documented alternative.

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-99b3a8b9
+id: dec-429
+draft_id: dec-draft-99b3a8b9
 title: Driver-emitted spawns are budgeted as iterations against a plan-derived budget; spawn_count reports them apart from charged spawns
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-05
 summary: Inside the step loop an iteration is one driver request that started an agent (implement, revise or review); the budget is the attempt cap per driven step plus one per review-triggered step, derived from the plan; spawn_count.py reads the task's iteration ledger and reports those agents as iterations, not charged spawns; quality bounds the loop (cap then surface, never grind); cost is observed per record (turns), never capped in dollars; the authoritative statement is coordination-details § Spawn Budget.

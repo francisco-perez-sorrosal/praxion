@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5a49f9df
+id: dec-430
+draft_id: dec-draft-5a49f9df
 title: The light-review trigger is plan-local — the planner turns the brief's uncertainty flags and one-way doors into review force; the driver reads only review and tier H
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-05
 summary: The intra-step light review fires when a step carries review force or tier H and not review off; the task-wide Uncertainty Flag below 7 and one-way-door steps no longer auto-signal at step completion, because the planner marks the steps they bear on with review force at planning time, which makes the trigger deterministic, visible at the pre-mortem gate and derivable from the plan alone.

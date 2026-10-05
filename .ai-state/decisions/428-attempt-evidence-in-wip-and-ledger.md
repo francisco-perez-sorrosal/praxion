@@ -1,7 +1,8 @@
 ---
-id: dec-draft-61d28fbc
+id: dec-428
+draft_id: dec-draft-61d28fbc
 title: Attempt evidence — the WIP Attempts line names the driver's request, the ledger records every agent return with its request, step digest and turns, and an outstanding attempt reads in-flight
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-05
 summary: The Attempts grammar gains an optional request=<id> token written ahead by the driver; parse_attempts with the ledger's recorded request ids yields OutstandingAttempt, which the verdict policy reads as in-flight instead of attempts-exhausted; the ledger gains optional request, step_digest, turns and max_turns plus the stop reasons partial and conflict; a plan revision opens a new attempt series keyed by the step digest; reconcile() gains assume_recorded so the driver's gate verdict equals the post-record verdict.

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-4629985f
+id: dec-433
+draft_id: dec-draft-4629985f
 title: A synchronous PreToolUse hook reminds a capped subagent at 60 and 80 percent of its declared maxTurns, counting distinct requests in its own transcript
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-05
 summary: New hooks/remind_turn_budget.py registered under PreToolUse with matcher "" emits one additionalContext line per agent and threshold, reading the cap from the agent definition by agent_type and the turn count from the agent's own transcript through the shared hooks/_agent_transcript.py; silent for the main session, uncapped agents and every error.

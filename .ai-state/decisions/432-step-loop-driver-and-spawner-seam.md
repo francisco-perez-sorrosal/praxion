@@ -1,7 +1,8 @@
 ---
-id: dec-draft-53a46554
+id: dec-432
+draft_id: dec-draft-53a46554
 title: A deterministic step-loop driver owns the crank between the pre-mortem gate and the pre-verification checkpoint; the orchestrator relays spawn requests through a spawner seam
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-05
 summary: New scripts/step_loop.py (next/record/status) over pure _step_loop_{state,render,gate} modules, an I/O adapter, _plan_steps.py and hooks/_agent_transcript.py; selection, prompt composition, write-ahead attempts, ground-truth gating, pathspec commits, ledger appends and the attempt cap move from the orchestrator's prose procedure into the driver; v1 spawner is the orchestrator's Agent tool across two CLI calls, v2 headless and v3 Workflow are designed implementations of the same seam.

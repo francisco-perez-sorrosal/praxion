@@ -57,6 +57,7 @@ ALLOWED_IMPORTS = {
     "typing",
     "_loop_fields",
     "_plan_steps",
+    "_step_loop_review",
     "iteration_ledger",
 }
 IMPLEMENTER = "**Assignee**: implementer"

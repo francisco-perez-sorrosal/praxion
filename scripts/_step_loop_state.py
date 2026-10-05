@@ -30,11 +30,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Union
 
 from _loop_fields import ATTEMPT_CAP, AnyAttempt, OutstandingAttempt
 from _plan_steps import Implementer, PlanStep
+from _step_loop_review import NotRequired, ReviewState, needs_review, review_state, satisfied
 
 if TYPE_CHECKING:
     from iteration_ledger import IterationRecord
@@ -72,6 +73,8 @@ class LoopInputs:
     attempts: Mapping[str, AnyAttempt]
     records: tuple[IterationRecord, ...]
     verdicts: Mapping[str, Mapping[str, Any]]
+    reviews: Mapping[str, str] = field(default_factory=dict)  # review file text by step id
+    unnamed: tuple[str, ...] = ()  # `Attempts:` lines that name no step
 
     @classmethod
     def read(
@@ -80,6 +83,8 @@ class LoopInputs:
         attempts: Mapping[str, AnyAttempt],
         records: Iterable[IterationRecord],
         verdicts: Iterable[Mapping[str, Any]],
+        reviews: Mapping[str, str] | None = None,
+        unnamed: Iterable[str] = (),
     ) -> LoopInputs:
         """Parse the `Step <id>` keys of WIP, ledger and reconciler once, at the boundary."""
         return cls(
@@ -87,6 +92,8 @@ class LoopInputs:
             {bare_id(key): attempt for key, attempt in attempts.items()},
             tuple(records),
             {bare_id(verdict["step"]): verdict for verdict in verdicts},
+            dict(reviews or {}),
+            tuple(unnamed),
         )
 
     def driver_records(self, step_id: str) -> tuple[IterationRecord, ...]:
@@ -113,6 +120,7 @@ class Running:
 
     n: int
     request: str
+    series: int = 1
 
 
 def spent(attempts: tuple[IterationRecord, ...]) -> int:
@@ -160,6 +168,7 @@ class Verified:
     n: int
     series: int
     commit: str | None
+    review: ReviewState = NotRequired()
 
 
 @dataclass(frozen=True)
@@ -188,15 +197,22 @@ Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 def is_done(state: Series) -> bool:
-    """A step is done once it is done outside the loop or the driver verified it."""
-    return isinstance(state, (DoneOutside, Verified))
+    """Done outside the loop, or verified by the driver with its light review satisfied."""
+    return isinstance(state, DoneOutside) or (
+        isinstance(state, Verified) and satisfied(state.review)
+    )
+
+
+def is_driven(step: PlanStep) -> bool:
+    """Whether the loop runs the step (it is the implementer's)."""
+    return isinstance(step.assignee, Implementer)
 
 
 def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
     """Where one step stands (see the module docstring for the order of the rules)."""
     verdict = inputs.verdicts.get(step.id, {})
     word, claimed = verdict.get("verdict"), verdict.get("wip_claim") == CLAIMED_COMPLETE
-    driven = isinstance(step.assignee, Implementer)
+    driven = is_driven(step)
     if not driven and not step.files and step.check is None and claimed:
         return DoneOutside()
     if word in HUMAN_WORDS:
@@ -204,13 +220,12 @@ def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
     if not driven:
         done = claimed and word == VERIFIED
         return DoneOutside() if done else NotDriven(getattr(step.assignee, "name", ""))
-    attempt = inputs.attempts.get(step.id)
+    attempt, own = inputs.attempts.get(step.id), inputs.driver_records(step.id)
     if isinstance(attempt, OutstandingAttempt):
-        return Running(attempt.count, attempt.request)
-    own = inputs.driver_records(step.id)
+        return Running(attempt.count, attempt.request, _series_index(own, step.digest))
     if not own:
         return _without_driver_record(word, claimed, verdict)
-    return _series_of_records(step.digest, own)
+    return _series_of_records(step, own, inputs.reviews.get(step.id))
 
 
 def _without_driver_record(word: str | None, claimed: bool, verdict: Mapping[str, Any]) -> Series:
@@ -221,10 +236,17 @@ def _without_driver_record(word: str | None, claimed: bool, verdict: Mapping[str
     return Fresh(1)
 
 
-def _series_of_records(digest: str, own: tuple[IterationRecord, ...]) -> Series:
+def _series_index(own: tuple[IterationRecord, ...], digest: str) -> int:
+    """The order of first appearance of the digest among the step's records, 1-based."""
     digests = list(dict.fromkeys(r.step_digest for r in own if r.step_digest))
-    index = digests.index(digest) + 1 if digest in digests else len(digests) + 1
-    current = tuple(r for r in own if r.step_digest == digest)
+    return digests.index(digest) + 1 if digest in digests else len(digests) + 1
+
+
+def _series_of_records(
+    step: PlanStep, own: tuple[IterationRecord, ...], review_text: str | None
+) -> Series:
+    index = _series_index(own, step.digest)
+    current = tuple(r for r in own if r.step_digest == step.digest)
     implement = tuple(r for r in current if request_kind(r) == "implement")
     work = [r for r in current if request_kind(r) in WORK_KINDS]
     if not implement:
@@ -233,10 +255,20 @@ def _series_of_records(digest: str, own: tuple[IterationRecord, ...]) -> Series:
         return Marked(MARKED_STOPS[work[-1].stop_reason], implement)
     verified = [r for r in implement if r.verdict == VERIFIED]
     if verified:
-        return Verified(verified[-1].attempt, index, verified[-1].commit)
+        review = _review_of(step, current, review_text)
+        return Verified(verified[-1].attempt, index, verified[-1].commit, review)
     if spent(implement) >= ATTEMPT_CAP:
         return Exhausted(implement)
     return Failed(index, implement)
+
+
+def _review_of(
+    step: PlanStep, current: tuple[IterationRecord, ...], review_text: str | None
+) -> ReviewState:
+    reviews = [r for r in current if request_kind(r) == "review"]
+    revises = [r for r in current if request_kind(r) == "revise"]
+    failed = bool(revises) and revises[-1].verdict != VERIFIED
+    return review_state(needs_review(step), len(reviews), len(revises), failed, review_text)
 
 
 def series_states(inputs: LoopInputs) -> dict[str, Series]:

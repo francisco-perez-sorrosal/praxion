@@ -56,7 +56,6 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -71,14 +70,13 @@ from _loop_fields import (
     parse_attempts,
     parse_step_checks,
 )
+from _plan_steps import scan_step_files, split_files
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _step_schema import (
     RecordedRun,
-    checklist_step_id,
     mutation_block_reasons,
     parse_wip_claims,
     recorded_runs,
-    step_id_from_heading,
     step_sort_key,
     step_test_status,
 )
@@ -111,9 +109,6 @@ STEP_EXECUTING_AGENT_TYPES = frozenset(
         "implementation-planner",
     }
 )
-
-# A "**Files**:" field line under a plan step.
-_FILES_FIELD_RE = re.compile(r"^\s*\*{0,2}Files\*{0,2}\s*:\s*(?P<files>.+)$", re.IGNORECASE)
 
 # ---------------------------------------------------------------------------
 # Public entry point — pure, side-effect-free
@@ -317,96 +312,15 @@ def _parse_plan_files(plan_path: Path, wip_path: Path) -> dict[str, list[str]]:
     carry per-step Files). Missing/empty is the common case and is handled by
     the classifier (-> unknown), never papered over.
     """
-    files = _scan_step_files(plan_path)
-    if not files:
-        files = _scan_step_files(wip_path)
-    return files
+    return _scan_step_files(plan_path) or _scan_step_files(wip_path)
 
 
 def _scan_step_files(path: Path) -> dict[str, list[str]]:
-    """Scan a plan/WIP doc: associate each ``**Files**:`` line with its step.
-
-    A ``Files:`` field that wraps mid-value ends its line with a trailing
-    comma; every further line ending in a comma continues the same logical
-    value, so the admission predicate in ``_split_files`` sees the whole
-    declaration rather than losing everything after the wrap.
-    """
-    lines = _read_text(path).splitlines()
-    result: dict[str, list[str]] = {}
-    current: str | None = None
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        step_id = step_id_from_heading(line) or checklist_step_id(line)
-        if step_id is not None:
-            current = step_id
-            index += 1
-            continue
-        fm = _FILES_FIELD_RE.match(line)
-        if fm and current:
-            value, index = _collect_files_value(fm.group("files"), lines, index)
-            result.setdefault(current, []).extend(_split_files(value))
-            continue
-        index += 1
-    return result
+    """Scan a plan/WIP doc on disk for each step's declared ``Files:``."""
+    return scan_step_files(_read_text(path))
 
 
-def _collect_files_value(first: str, lines: list[str], index: int) -> tuple[str, int]:
-    """Join a ``Files:`` value with its trailing-comma continuation lines,
-    stopping at a step heading or checklist step line even when the current
-    line still ends in a comma -- a plan heading always opens its own step.
-
-    Returns the joined value and the index of the first line not consumed.
-    """
-    parts = [first]
-    index += 1
-    while parts[-1].rstrip().endswith(",") and index < len(lines):
-        line = lines[index]
-        if step_id_from_heading(line) is not None or checklist_step_id(line) is not None:
-            break
-        parts.append(line)
-        index += 1
-    return " ".join(parts), index
-
-
-# A field value that, once leading markdown emphasis is stripped, declares no
-# files at all.
-_FILES_NONE_RE = re.compile(r"^(none|n/a)\b", re.IGNORECASE)
-# A path-safe token — letters, digits, the punctuation a path or glob uses.
-_FILE_CANDIDATE_RE = re.compile(r"^[A-Za-z0-9_./*?\[\]-]+$")
-# A parenthetical span in a Files: value is rationale ("(see WIP.md)"), never
-# a path — dropped before tokenizing so its contents can't be mistaken for one.
-_RATIONALE_RE = re.compile(r"\([^)]*\)")
-
-
-def _split_files(raw: str) -> list[str]:
-    """Split a ``Files:`` field value into the individual paths it declares.
-
-    A bare ``none``/``n/a`` — after stripping a bolded label's leading ``*``
-    captured along with it — declares zero files. Otherwise: strip
-    parenthetical rationale spans; tokenize on backtick-quoted spans when the
-    value contains any backtick, else on commas/whitespace; admit a candidate
-    only when it looks like a path — path-safe characters, a ``/`` or ``.``
-    somewhere in it, no trailing ``/``, and no pointer into this pipeline's own
-    ``.ai-work/`` bookkeeping (a step may legitimately cite its own artifacts
-    as rationale, but that is not a file it changed).
-    """
-    value = raw.strip().lstrip("*").strip()
-    if _FILES_NONE_RE.match(value):
-        return []
-    value = _RATIONALE_RE.sub(" ", value)
-    tokens = re.findall(r"`([^`]+)`", value) if "`" in value else re.split(r"[,\s]+", value)
-    candidates = (token.strip().strip("`").rstrip(".,;:") for token in tokens)
-    return [c for c in candidates if c and _is_admitted_file(c)]
-
-
-def _is_admitted_file(candidate: str) -> bool:
-    return (
-        bool(_FILE_CANDIDATE_RE.match(candidate))
-        and ("/" in candidate or "." in candidate)
-        and not candidate.endswith("/")
-        and not candidate.startswith(".ai-work/")
-    )
+_split_files = split_files  # the reader moved to _plan_steps; the old private name stays
 
 
 def _read_text(path: Path) -> str:

@@ -63,8 +63,9 @@ one process: one single-line schema-2 object per distinct path, in sorted
 order, each exactly what `--changed <path> --json` prints for that path alone
 (the same payload, compactly serialized). Selected tests that cannot share one
 pytest process (`_import_claims`) come out as several invocations; a selection
-without such a clash is one. Any other combination is a usage error. Exit codes: 0 resolved (widened included), 2 usage or
-internal error -- callers treat 2 as "run the full suite".
+without such a clash is one. Any other combination is a usage error. Exit codes:
+0 resolved (widened included), 2 usage or internal error -- callers treat 2 as
+"run the full suite".
 
 Stdlib-only: agent prose and hooks invoke it through a bare `python3`, so a
 third-party import here or in a private sibling would be a gate-liveness GL05

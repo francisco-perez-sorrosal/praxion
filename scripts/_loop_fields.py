@@ -30,12 +30,20 @@ absent means 0.
 Normative grammar of the `Attempts:` line -- a self-naming sub-bullet, never a
 checkbox, one line outside code fences, anywhere in `WIP.md`:
 
-    - Attempts: Step <id> count=<n> [[BLOCKED] replan: <text>]
+    - Attempts: Step <id> count=<n> [request=<id>] [[BLOCKED] replan: <text>]
 
-with `<n>` a decimal integer of at least 1. Two lines for one step keep the
-highest count and its replan text. A line that names its step but breaks the
-grammar is unreadable for that step; a line under the label that names no step
-(`step 3 count=2`, `3 count=2`) belongs to none, so it is listed apart as unnamed.
+with `<n>` a decimal integer of at least 1 and `<id>` a request id of lowercase
+letters, digits and hyphens. Two lines for one step keep the highest count and
+its replan text. A line that names its step but breaks the grammar is unreadable
+for that step; a line under the label that names no step (`step 3 count=2`,
+`3 count=2`) belongs to none, so it is listed apart as unnamed.
+
+A line without `request=` always reads as an `Attempt`, so a `WIP.md` written
+without the step-loop driver reads as it always did. A line naming a request the
+iteration ledger has no record of is an `OutstandingAttempt`: the attempt was
+started and has not ended. WIP records what was started and the ledger what
+ended, so "in flight" is their difference and no flag is ever rewritten. An
+outstanding attempt carries no replan text; such a line is unreadable.
 """
 
 from __future__ import annotations
@@ -56,6 +64,7 @@ _CHECK_LINE_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*{0,2}Check\*{0,2}\s*:\s*\*{0,2}
 _EXPECTS_RE = re.compile(r"^\s+expects(?:\s+(?P<rest>.*))?$")
 _EXPECTATION_RE = re.compile(r"^(?P<key>[a-z]+)(?P<op>>=|=)(?P<count>[0-9]+)$")
 _PENDING_TOKEN_RE = re.compile(r"(?:^|\s)pending=(?P<value>\S*)")
+_DRIVER_RUN_RE = re.compile(r"(?:^|\s)by=step-loop(?:\s|$)")
 _CODE_FENCE_RE = re.compile(r"^[ \t]{0,3}(```|~~~)")
 _STEP_ID_CORE = STEP_ID_RE.pattern.strip("^$")
 
@@ -186,7 +195,9 @@ class UnmetExpectation:
 
 @dataclass(frozen=True)
 class Met:
-    """Every declared expectation holds."""
+    """Every declared expectation holds; `by_step_loop` says the driver ran the deciding line."""
+
+    by_step_loop: bool = False
 
 
 @dataclass(frozen=True)
@@ -194,6 +205,7 @@ class Unmet:
     """At least one declared expectation fails; `unmet` lists each in declared order."""
 
     unmet: tuple[UnmetExpectation, ...]
+    by_step_loop: bool = False
 
 
 @dataclass(frozen=True)
@@ -234,7 +246,8 @@ def evaluate_check(check: Check, step: str, test_results_text: str) -> CheckOutc
             return NoResult(f"pending= on the Result: line recorded for {label} is not a count")
         if not (value >= item.count if item.op == ">=" else value == item.count):
             unmet.append(UnmetExpectation(item.key, item.op, item.count, value))
-    return Unmet(tuple(unmet)) if unmet else Met()
+    by_step_loop = _DRIVER_RUN_RE.search(raw_line) is not None
+    return Unmet(tuple(unmet), by_step_loop) if unmet else Met(by_step_loop)
 
 
 def latest_result(label: str, results_text: str) -> tuple[Counts | NoRun, str] | None:
@@ -270,26 +283,65 @@ def _observed_pending(raw_line: str) -> int | None:
 # attempt-cap paragraph in agent-pipeline-details, section "Completion handshake".
 ATTEMPT_CAP = 2
 
+# A request id is a short, shell- and path-safe token the step-loop driver derives.
+REQUEST_ID_PATTERN = "[a-z0-9][a-z0-9-]*"
+REQUEST_ID_RE = re.compile(REQUEST_ID_PATTERN)
+
 _ATTEMPTS_LABEL_RE = re.compile(
     r"^\s*[-*+]\s+\*{0,2}Attempts\*{0,2}\s*:\s*\*{0,2}\s*(?P<value>.*)$"
 )
 _ATTEMPTS_VALUE_RE = re.compile(
     rf"^Step\s+(?P<id>{_STEP_ID_CORE})\s+count=(?P<count>0*[1-9][0-9]*)"
+    rf"(?:\s+request=(?P<request>{REQUEST_ID_PATTERN}))?"
     r"(?:\s+\[BLOCKED\]\s+replan:\s*(?P<replan>\S.*?))?\s*$"
 )
 _ATTEMPTS_STEP_RE = re.compile(rf"^Step\s+(?P<id>{_STEP_ID_CORE})\b")
 
 
+def _require_attempt_fields(count: int, request: str | None, replan: str | None) -> None:
+    """The one enforcement point for what an `Attempts:` line can say."""
+    if count < 1:
+        raise ValueError(f"an attempt count is at least 1, got {count}")
+    if request is not None and not REQUEST_ID_RE.fullmatch(request):
+        raise ValueError(f"a request id is lowercase letters, digits and hyphens, got {request!r}")
+    if replan is not None and (not replan or replan != replan.strip() or "\n" in replan):
+        raise ValueError(f"a replan is one non-blank line without edge spaces, got {replan!r}")
+
+
 @dataclass(frozen=True)
 class Attempt:
-    """A step's fresh-attempt count (at least 1) and the replan request, when recorded."""
+    """A started attempt that ended or was written without the driver.
+
+    `count` is at least 1; `request` is the driver's request id when the line
+    names one; `replan` is the replan request, when recorded.
+    """
 
     count: int
     replan: str | None = None
+    request: str | None = None
 
     def __post_init__(self) -> None:
-        if self.count < 1:
-            raise ValueError(f"an attempt count is at least 1, got {self.count}")
+        _require_attempt_fields(self.count, self.request, self.replan)
+
+
+@dataclass(frozen=True)
+class OutstandingAttempt:
+    """An attempt the driver started whose request the ledger has not recorded.
+
+    It has not ended, so there is no replan to carry: a text here is refused.
+    """
+
+    count: int
+    request: str
+    replan: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_attempt_fields(self.count, self.request, self.replan)
+        if self.replan is not None:
+            raise ValueError("an outstanding attempt cannot carry a replan")
+
+
+AnyAttempt = Union[Attempt, OutstandingAttempt]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 @dataclass(frozen=True)
@@ -298,20 +350,38 @@ class AttemptsReading:
     step in neither has no count. A broken line that names no step is kept in
     `unnamed` as the line's text, since it cannot be tied to any step."""
 
-    counts: dict[str, Attempt]
+    counts: dict[str, AnyAttempt]
     unreadable: dict[str, str]
     unnamed: tuple[str, ...] = ()
 
 
-def parse_attempts(wip_text: str) -> AttemptsReading:
-    """Read every `- Attempts:` line outside code fences, merging per step."""
-    counts: dict[str, Attempt] = {}
+def render_attempts_line(step_id: str, attempt: AnyAttempt) -> str:
+    """The one writer-side renderer; `parse_attempts` reads back exactly what it writes."""
+    if not STEP_ID_RE.fullmatch(step_id):
+        raise ValueError(f"not a step id: {step_id!r}")
+    line = f"- Attempts: Step {step_id} count={attempt.count}"
+    if attempt.request is not None:
+        line += f" request={attempt.request}"
+    if attempt.replan is not None:
+        line += f" [BLOCKED] replan: {attempt.replan}"
+    return line
+
+
+def parse_attempts(
+    wip_text: str, recorded_requests: frozenset[str] = frozenset()
+) -> AttemptsReading:
+    """Read every `- Attempts:` line outside code fences, merging per step.
+
+    `recorded_requests` is the set of request ids the iteration ledger holds; a line
+    naming any other request reads as outstanding.
+    """
+    counts: dict[str, AnyAttempt] = {}
     unreadable: dict[str, str] = {}
     unnamed: list[str] = []
     labelled = (_ATTEMPTS_LABEL_RE.match(line) for line in _unfenced_lines(wip_text))
     for value in (match["value"].strip() for match in labelled if match):
         try:
-            step, attempt = _read_attempt(value)
+            step, attempt = _read_attempt(value, recorded_requests)
             counts[step] = _higher(counts.get(step), attempt)
         except _UnreadableError as broken:
             named = _ATTEMPTS_STEP_RE.match(value)
@@ -322,16 +392,23 @@ def parse_attempts(wip_text: str) -> AttemptsReading:
     return AttemptsReading(counts, unreadable, tuple(unnamed))
 
 
-def _read_attempt(value: str) -> tuple[str, Attempt]:
+def _read_attempt(value: str, recorded: frozenset[str]) -> tuple[str, AnyAttempt]:
     match = _ATTEMPTS_VALUE_RE.match(value)
     if match is None:
-        raise _UnreadableError("expected `Step <id> count=<n>` and an optional replan")
-    return f"Step {match['id']}", Attempt(int(match["count"]), match["replan"])
+        raise _UnreadableError(
+            "expected `Step <id> count=<n>`, a request and a replan, both optional"
+        )
+    count, request, replan = int(match["count"]), match["request"], match["replan"]
+    if request is None or request in recorded:
+        return f"Step {match['id']}", Attempt(count, replan, request)
+    if replan is not None:
+        raise _UnreadableError("an outstanding attempt cannot carry a replan")
+    return f"Step {match['id']}", OutstandingAttempt(count, request)
 
 
-def _higher(kept: Attempt | None, candidate: Attempt) -> Attempt:
+def _higher(kept: AnyAttempt | None, candidate: AnyAttempt) -> AnyAttempt:
     """The highest count wins (attempts only grow, so a stale line understates), then a replan."""
     return max(
         (kept or candidate, candidate),
-        key=lambda a: (a.count, a.replan is not None, a.replan or ""),
+        key=lambda a: (a.count, a.replan is not None, a.replan or "", a.request or ""),
     )

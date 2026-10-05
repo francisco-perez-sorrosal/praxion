@@ -121,11 +121,9 @@ def test_every_selected_test_lands_in_exactly_one_invocation_in_selection_order(
     pocket = _pocket(capsys, repo, PACKAGE_TEST, NAMESPACE_TEST, SOLO_TEST, *TWIN_TESTS)
 
     selected = [t["path"] for t in pocket["tests"]]
-    grouped = [path for i in pocket["invocations"] for path in _paths(i["argv"])]
-    assert sorted(grouped) == sorted(selected)
-    for invocation in pocket["invocations"]:
-        paths = _paths(invocation["argv"])
-        assert paths == [path for path in selected if path in paths]
+    groups = [_paths(i["argv"]) for i in pocket["invocations"]]
+    assert sorted(path for group in groups for path in group) == sorted(selected)
+    assert groups == [sorted(group, key=selected.index) for group in groups]
 
 
 def test_a_selection_without_a_clash_is_the_single_invocation_it_always_was(

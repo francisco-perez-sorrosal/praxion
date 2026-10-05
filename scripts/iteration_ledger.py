@@ -12,6 +12,10 @@ Normative shape: one JSON object per line, every key required (shown wrapped)::
      "test_result": "Result: pass=12 fail=0 skip=0", "commit": "04569546",
      "stop_reason": "completed"}
 
+The step-loop driver adds optional keys, absent on a hand-appended record: ``request``,
+``step_digest`` (hex of the step block: a revision opens a fresh attempt series), ``turns``
+and ``max_turns`` (integer or ``null``); the last three need a ``request``.
+
 Every rule is enforced where a line is parsed, so a record that reads back is valid:
 
 - ``v``: the integer 1 (a breaking change to the shape bumps it); unknown extra
@@ -24,7 +28,7 @@ Every rule is enforced where a line is parsed, so a record that reads back is va
 - ``test_result``: the step's recorded ``Result:`` line, a count line or a no-run.
 - ``commit``: a 7 to 40 character lowercase hex sha, or JSON ``null`` stating that
   no commit holds the work. An absent key is a finding, never read as ``null``.
-- ``stop_reason``: ``completed``, ``turn-cap``, ``blocked`` or ``no-marker``.
+- ``stop_reason``: completed, turn-cap, blocked, conflict, partial or no-marker.
 
 A line that breaks the shape becomes a finding at its append position (1-based among
 non-blank lines): reported, never skipped, never guessed. The orchestrator is the writer.
@@ -48,19 +52,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from _loop_fields import latest_result
+from _loop_fields import REQUEST_ID_RE, latest_result
 from _repo_root import git_toplevel_from_cwd, is_plugin_cache_path
 from _step_schema import STEP_ID_RE, Counts, NoRun, parse_result_line
 from _step_verdict import VERDICT_WORDS
 
 LEDGER_FILE = "ITERATION_LEDGER.jsonl"
 SCHEMA_VERSION = 1
-STOP_REASONS = ("completed", "turn-cap", "blocked", "no-marker")
+STOP_REASONS = ("completed", "turn-cap", "blocked", "conflict", "partial", "no-marker")
 DECIDED_BY = ("check", "fallback", "none")
 
 UNSTAMPED = ""  # a record not yet written; the writer replaces it with the append time
 _STAMP_FORMAT = "%Y-%m-%dT%H:%MZ"
 _COMMIT_RE = re.compile(r"[0-9a-f]{7,40}")
+_DIGEST_RE = re.compile(r"[0-9a-f]{6,64}")
+_DRIVER_KEYS = ("request", "step_digest", "turns", "max_turns")  # the last three need a request
 NO_RESULT_RECORDED = "Result: none — no result recorded"
 EXIT_CLEAN, EXIT_FINDINGS, EXIT_INPUT_ERROR = 0, 1, 2
 _STEP_LABEL = "Step "
@@ -84,6 +90,14 @@ class IterationRecord:
     stop_reason: str
     v: int = SCHEMA_VERSION
     recorded_at: str = UNSTAMPED
+    request: str | None = None  # the step-loop driver's keys; turns None: unknown
+    step_digest: str | None = None
+    turns: int | None = None
+    max_turns: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.request is None and any(getattr(self, key) is not None for key in _DRIVER_KEYS):
+            raise ShapeError("step_digest, turns and max_turns need a request")
 
 
 @dataclass(frozen=True)
@@ -96,6 +110,10 @@ class LedgerFinding:
 class LedgerReading:
     records: tuple[IterationRecord, ...]
     findings: tuple[LedgerFinding, ...]
+
+    @property
+    def requests(self) -> frozenset[str]:
+        return frozenset(item.request for item in self.records if item.request is not None)
 
 
 def ledger_path(task_dir: Path) -> Path:
@@ -137,6 +155,10 @@ def parse_record_line(text: str) -> IterationRecord:
         commit=_commit(raw),
         stop_reason=_one_of(raw, "stop_reason", STOP_REASONS),
         recorded_at=_recorded_at(raw),
+        request=_optional_text(raw, "request", REQUEST_ID_RE),
+        step_digest=_optional_text(raw, "step_digest", _DIGEST_RE),
+        turns=_optional_count(raw, "turns", 0),
+        max_turns=_optional_count(raw, "max_turns", 1),
     )
 
 
@@ -208,10 +230,22 @@ def _test_result(raw: dict[str, Any]) -> str:
 
 def _commit(raw: dict[str, Any]) -> str | None:
     value = _field(raw, "commit")
-    if value is None:
-        return None
-    if not isinstance(value, str) or not _COMMIT_RE.fullmatch(value):
+    if value is not None and not (isinstance(value, str) and _COMMIT_RE.fullmatch(value)):
         raise ShapeError(f"commit must be 7 to 40 lowercase hex characters or null; got {value!r}")
+    return value
+
+
+def _optional_text(raw: dict[str, Any], key: str, pattern: re.Pattern[str]) -> str | None:
+    value = raw.get(key)
+    if value is not None and not (isinstance(value, str) and pattern.fullmatch(value)):
+        raise ShapeError(f"{key} must match {pattern.pattern} or be null; got {value!r}")
+    return value
+
+
+def _optional_count(raw: dict[str, Any], key: str, least: int) -> int | None:
+    value = raw.get(key)
+    if value is not None and (type(value) is not int or value < least):
+        raise ShapeError(f"{key} must be an integer of at least {least} or null; got {value!r}")
     return value
 
 
@@ -242,20 +276,21 @@ def append_record(task_dir: Path, record: IterationRecord) -> None:
 
 
 def render_record_line(record: IterationRecord) -> str:
-    return json.dumps(
-        {
-            "v": record.v,
-            "recorded_at": record.recorded_at,
-            "step": record.step,
-            "attempt": record.attempt,
-            "agent_id": record.agent_id,
-            "verdict": record.verdict,
-            "decided_by": record.decided_by,
-            "test_result": record.test_result,
-            "commit": record.commit,
-            "stop_reason": record.stop_reason,
-        }
-    )
+    body = {
+        "v": record.v,
+        "recorded_at": record.recorded_at,
+        "step": record.step,
+        "attempt": record.attempt,
+        "agent_id": record.agent_id,
+        "verdict": record.verdict,
+        "decided_by": record.decided_by,
+        "test_result": record.test_result,
+        "commit": record.commit,
+        "stop_reason": record.stop_reason,
+    }
+    if record.request is not None:  # a driver record states all four, null where unknown
+        body.update({key: getattr(record, key) for key in _DRIVER_KEYS})
+    return json.dumps(body)
 
 
 def _utc_minute() -> str:

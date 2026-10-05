@@ -373,6 +373,8 @@ def test_a_closed_vocabulary_finding_lists_the_allowed_words(tmp_path):
 
     assert ledger.read_ledger(tmp_path).findings == (
         ledger.LedgerFinding(
-            1, "stop_reason must be one of completed, turn-cap, blocked, no-marker; got 'crashed'"
+            1,
+            "stop_reason must be one of completed, turn-cap, blocked, conflict, partial, "
+            "no-marker; got 'crashed'",
         ),
     )

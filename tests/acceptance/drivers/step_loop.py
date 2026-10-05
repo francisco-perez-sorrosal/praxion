@@ -11,9 +11,17 @@ orchestrator and a human do: as commands, parsing what they print.
 
 The test double for the Agent tool lives here too (`work_on`): it edits the tree
 the way an implementer would and leaves behind what a finished agent leaves. Two
-parts of that are not yet bound to a designed surface -- where the command looks
-for a spawned agent's own transcript, and where a light reviewer leaves its
-verdict -- and raise `UnboundDriverError` until a driver-binding step binds them.
+parts of that touch the harness's file layout and are bound here:
+
+- A spawned agent's own transcript sits under the sandbox's config directory, at
+  `projects/-sandbox/<session>/subagents/agent-<agent id>.jsonl`, opened by the user
+  line that carries the request's three-line prompt. Each API request is two
+  assistant entries sharing a `requestId` (a text block, then a `tool_use`); an
+  ended agent's transcript closes on one more request whose content is text only.
+  The sandbox's config directory and a zero end-wait are exported in `task.env`, so
+  the command reads this layout and never waits for an agent that is not coming.
+- A light reviewer's verdict is `.ai-work/<slug>/LIGHT_REVIEW_step-<id>.md`, in the
+  verifier's own block shape, beside an ended transcript for the review request.
 """
 
 from __future__ import annotations
@@ -37,6 +45,12 @@ IMPLEMENTER_DEFINITION = REPO_ROOT / "agents" / "implementer.md"
 SLUG = "loop-task"
 PYTHON = sys.executable
 
+# Where the command looks for a spawned agent's own transcript, and how long it waits for one to end.
+CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
+END_WAIT_VARIABLE = "PRAXION_STEP_LOOP_END_WAIT_SECONDS"
+SANDBOX_PROJECT_DIR = "-sandbox"
+SANDBOX_SESSION = "session-loop-acceptance"
+
 # Text placed in the task's documents so a scenario can tell where a prompt's parts came from.
 HEALTH_GUARD = "Every widget module stays importable without side effects (brief guard 41)."
 INTENT_TEXT = "The loop widget exists so the acceptance suite can drive a plan (brief intent 29)."
@@ -45,10 +59,6 @@ GOAL_TEXT = "Build the loop widget one step at a time (plan goal 53)."
 EXIT_CODES = frozenset({0, 1, 2, 3, 4})
 _EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
 _COMMAND_TIMEOUT = 900
-
-
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
 
 
 # -- The plan a scenario describes ---------------------------------------------------
@@ -185,7 +195,7 @@ class LoopTask:
     base: str
     steps: tuple[Step, ...]
     env: dict[str, str] = field(default_factory=dict)
-    sandbox_home: Path | None = None  # for the transcript binding, should it need one
+    sandbox_home: Path | None = None  # holds the config directory the transcripts live under
 
     @property
     def task_dir(self) -> Path:
@@ -282,6 +292,8 @@ def build_loop(
 
     task = LoopTask(root=root, slug=SLUG, base=base, steps=tuple(steps), env=_clean_env())
     task.sandbox_home = workspace / "home"
+    task.env[CONFIG_DIR_VARIABLE] = str(task.sandbox_home / ".claude")
+    task.env[END_WAIT_VARIABLE] = "0"
     task.task_dir.mkdir(parents=True)
     task.plan_path.write_text(_plan(task.steps), encoding="utf-8")
     task.wip_path.write_text(
@@ -527,6 +539,51 @@ def work_on(task: LoopTask, request: dict[str, Any], work: Work = DEFAULT_WORK) 
     return agent_id
 
 
+def agent_transcript_path(task: LoopTask, agent_id: str) -> Path:
+    """Where a spawned agent's own transcript lives under the task's sandbox config directory."""
+    assert task.sandbox_home is not None, "the loop's checkout was not built by build_loop"
+    return (
+        task.sandbox_home
+        / ".claude"
+        / "projects"
+        / SANDBOX_PROJECT_DIR
+        / SANDBOX_SESSION
+        / "subagents"
+        / f"agent-{agent_id}.jsonl"
+    )
+
+
+def _assistant_entry(agent_id: str, request_id: str, block: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "assistant",
+        "requestId": request_id,
+        "agentId": agent_id,
+        "isSidechain": True,
+        "message": {"role": "assistant", "content": [block]},
+    }
+
+
+def _user_entry(agent_id: str, content: Any) -> dict[str, Any]:
+    return {
+        "type": "user",
+        "agentId": agent_id,
+        "isSidechain": True,
+        "message": {"role": "user", "content": content},
+    }
+
+
+def _tool_request_lines(agent_id: str, n: int, *, text: str, answered: bool) -> list[str]:
+    """One API request that calls a tool: a text block, then the `tool_use`, then its result."""
+    request_id = f"req_{agent_id}_{n:04d}"
+    entries = [
+        _assistant_entry(agent_id, request_id, {"type": "text", "text": text}),
+        _assistant_entry(agent_id, request_id, {"type": "tool_use", "name": "Bash"}),
+    ]
+    if answered:
+        entries.append(_user_entry(agent_id, [{"type": "tool_result"}]))
+    return [json.dumps(entry) for entry in entries]
+
+
 def leave_agent_transcript(
     task: LoopTask,
     request: dict[str, Any],
@@ -541,21 +598,62 @@ def leave_agent_transcript(
     prompt, holding `requests` distinct API requests and ending with `final_text`; and, when
     `ended`, whatever shows the agent has ended. `readable=False` leaves a transcript that
     cannot be parsed.
+
+    An ended transcript closes on one request whose content is text only (the final text);
+    a running one closes on a `tool_use` whose text is `final_text`.
     """
-    raise UnboundDriverError(
-        "not yet bound: where the step-loop command finds a spawned agent's own transcript "
-        "from its agent id, how that transcript is tied to the spawn request it answers, "
-        "and how the command tells an agent that has ended from one still running"
-    )
+    if ended and requests < 1:
+        raise ValueError("an ended agent made at least its final request")
+    tool_requests = requests - 1 if ended else requests
+    lines = [json.dumps(_user_entry(agent_id, request["agent_call"]["prompt"]))]
+    for n in range(tool_requests):
+        running_last = not ended and n == tool_requests - 1
+        lines += _tool_request_lines(
+            agent_id, n, text=final_text if running_last else "Working.", answered=not running_last
+        )
+    if not readable:
+        lines.append("{this line was cut off mid-flush")
+    if ended:
+        final_request = f"req_{agent_id}_{tool_requests:04d}"
+        final_block = {"type": "text", "text": final_text}
+        lines.append(json.dumps(_assistant_entry(agent_id, final_request, final_block)))
+    transcript = agent_transcript_path(task, agent_id)
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+REVIEW_BODY = {
+    "accept": "verdict: accept\nnotes: nothing to change.\n",
+    "revise": (
+        "verdict: revise\n"
+        "findings:\n"
+        "  - id: F1\n"
+        "    severity: FAIL\n"
+        "    location: src/step_{step}.py:1\n"
+        "    evidence: the module returns a constant instead of deriving the value.\n"
+        "    criterion: the step's Done when clause.\n"
+    ),
+    "unfinished": "verdict: [PARTIAL]\n",
+}
+REVIEW_TURNS = 6
 
 
 def leave_review_verdict(task: LoopTask, request: dict[str, Any], verdict: str) -> str:
     """A light reviewer answers `request` with `verdict` (accept, revise or unfinished) and
     ends; return its agent id."""
-    raise UnboundDriverError(
-        "not yet bound: where a light reviewer spawned by the step loop leaves its accept or "
-        "revise verdict for a step, and how a review still marked unfinished looks"
+    step_id = str(request["step"])
+    body = REVIEW_BODY[verdict].replace("{step}", step_id)
+    (task.task_dir / f"LIGHT_REVIEW_step-{step_id}.md").write_text(body, encoding="utf-8")
+    agent_id = new_agent_id()
+    leave_agent_transcript(
+        task,
+        request,
+        agent_id,
+        requests=REVIEW_TURNS,
+        final_text=f"{body.rstrip()}\n[COMPLETE]",
+        ended=True,
     )
+    return agent_id
 
 
 def attempt(task: LoopTask, work: Work = DEFAULT_WORK, *, marker: str | None = None) -> Envelope:

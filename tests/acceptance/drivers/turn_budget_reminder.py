@@ -7,10 +7,10 @@ session's transcript at `<project>/<session>.jsonl`, and each subagent's own tra
 at `<project>/<session>/subagents/agent-<agent id>.jsonl`, one line per transcript
 entry, with every line of one API request sharing that request's `requestId`.
 
-Bound by assumption, and to be confirmed against the live hooks reference: a subagent's
-tool-call payload carries `agent_id` and `agent_type` beside the session's
-`transcript_path`; the main session's payload carries neither. Not yet bound: which
-script the plugin registers as the reminder.
+Confirmed against the live harness (2.1.289): a subagent's tool-call payload carries
+`agent_id` and `agent_type` beside the session's `transcript_path`, and the main
+session's payload carries neither. The reminder is `hooks/remind_turn_budget.py`, the
+script the plugin registers for PreToolUse.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 HOOKS_MANIFEST = REPO_ROOT / "hooks" / "hooks.json"
+REMINDER_SCRIPT = REPO_ROOT / "hooks" / "remind_turn_budget.py"
 AGENTS_DIR = REPO_ROOT / "agents"
 
 # The agent types a payload names: a plugin agent by its namespaced name, and a built-in
@@ -37,16 +38,9 @@ UNCAPPED_AGENT_TYPE = "general-purpose"
 LINE_PATTERN = re.compile(r"^\[turn-budget\] (\d+) of (\d+) turns used\. (.+)$", re.DOTALL)
 
 
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
-
-
 def reminder_script() -> Path:
     """The hook script the plugin registers as the turn-budget reminder."""
-    raise UnboundDriverError(
-        "not yet bound: which script under the plugin's hooks the turn-budget reminder is, "
-        "as registered for PreToolUse in hooks/hooks.json"
-    )
+    return REMINDER_SCRIPT
 
 
 def declared_max_turns(agent_name: str) -> int:

@@ -8,6 +8,7 @@ every case passes document text, never a path.
 
 from __future__ import annotations
 
+import ast
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import _plan_steps as plan_steps  # noqa: E402
 
 STEP = "Step "
+PURE_IMPORTS = {"__future__", "re", "_step_schema"}
 
 
 def heading(number: str, title: str = "t") -> str:
@@ -124,7 +126,17 @@ def test_collect_files_value_returns_the_joined_value_and_the_next_unread_index(
     assert plan_steps.collect_files_value(lines[0], lines, 0) == ("src/a.py, src/b.py", 2)
 
 
-def test_the_module_does_no_io():
-    source = (SCRIPT_DIR / "_plan_steps.py").read_text(encoding="utf-8")
-    for forbidden in ("subprocess", "open(", "read_text", "pathlib", "os."):
-        assert forbidden not in source
+def test_the_module_imports_nothing_that_does_io():
+    tree = ast.parse((SCRIPT_DIR / "_plan_steps.py").read_text(encoding="utf-8"))
+    imported = {
+        name.split(".")[0]
+        for node in ast.walk(tree)
+        for name in (
+            [alias.name for alias in node.names]
+            if isinstance(node, ast.Import)
+            else [node.module or ""]
+            if isinstance(node, ast.ImportFrom)
+            else []
+        )
+    }
+    assert imported <= PURE_IMPORTS

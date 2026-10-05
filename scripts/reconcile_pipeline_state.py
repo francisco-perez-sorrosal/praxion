@@ -42,9 +42,8 @@ An `Attempts:` line that names a step but breaks the grammar (a zero or
 non-numeric count) makes that step `unknown`, with exit status 2. A line under
 another label (`Attempt:`) is not an attempts line by the grammar and is
 ignored, by design. A labelled line that names no step (`step 3 count=2`) binds
-to no step, so it is listed apart: `main` emits it as a top-level
-`unnamed_attempts` list (the JSON report becomes an object with `verdicts` and
-`unnamed_attempts`; with none, it stays the verdict array) and exits 2.
+to no step, so it is reported apart: `main` writes it to stderr, in both output
+modes, and exits 2. The JSON output on stdout is the verdict array in every case.
 
 Exit codes: 0 nothing to recover; 1 >=1 step needs recovery
 (mismatch/partial/in-flight); 2 >=1 unknown, blocked or attempts-exhausted
@@ -576,7 +575,7 @@ def _build_parser() -> argparse.ArgumentParser:
             f"Verdicts: {', '.join(VERDICT_WORDS)}; attempts-exhausted exits 2 (a human decides). "
             "A declared Check: is judged against the recorded Result:, never run. Each verdict "
             "carries decided_by, outcome_source (when a check decided) and attempt (when recorded). "
-            "An Attempts: line naming no step is reported as unnamed_attempts and exits 2."
+            "An Attempts: line naming no step is reported on stderr and exits 2."
         )
     )
     parser.add_argument("slug", help="task slug under .ai-work/<slug>/")
@@ -587,7 +586,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="root holding .ai-state/ and .ai-work/ (default: --repo-root)",
     )
     parser.add_argument("--base-ref", default=None, help="git ref to diff against (e.g. main)")
-    parser.add_argument("--json", action="store_true", help="emit verdict JSON array on stdout")
+    parser.add_argument("--json", action="store_true", help="emit the verdict JSON array on stdout")
     parser.add_argument("--quiet", action="store_true", help="suppress the human summary")
     parser.add_argument(
         "--max-age-days",
@@ -635,12 +634,11 @@ def main(argv: list[str] | None = None) -> int:
 
     unnamed = unnamed_attempts(args.slug, state_root)
     if args.json:
-        report = {"verdicts": verdicts, "unnamed_attempts": unnamed} if unnamed else verdicts
-        print(json.dumps(report, indent=2))
+        print(json.dumps(verdicts, indent=2))
     elif not args.quiet:
         print("\n".join(map(_readable_line, verdicts)))
-        for text in unnamed:
-            print(f"WIP.md attempts line names no step: {text}")
+    for text in unnamed:
+        sys.stderr.write(f"reconcile_pipeline_state: WIP.md Attempts line names no step: {text}\n")
 
     return _exit_code(verdicts, unnamed)
 

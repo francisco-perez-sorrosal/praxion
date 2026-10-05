@@ -93,7 +93,7 @@ a convenience document from becoming a correctness hazard.
    `tier1`, `tier2`, `evidence`, `resume_scope` and `decided_by` (`check`, `fallback`
    or `none`: what decided it), plus `outcome_source` (when a declared check decided)
    and `attempt` (when `WIP.md` records a fresh-attempt count for the step). When an `Attempts:` line names
-   no step, the output is an object instead: `verdicts` (that array) plus `unnamed_attempts`, the lines to surface.
+   no step, the array is unchanged: the lines go to stderr, one per line, and the exit status is 2.
 4. **Act per verdict** (skip all actions under `--dry-run` — print the plan instead):
 
    | Verdict | Action |

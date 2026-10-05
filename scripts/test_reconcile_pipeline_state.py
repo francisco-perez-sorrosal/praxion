@@ -2026,28 +2026,34 @@ _UNNAMED_LINES = ["step 3 count=5", "3 count=2"]
 
 
 @pytest.mark.parametrize("text", _UNNAMED_LINES)
-def test_main_json_lists_an_attempts_line_that_names_no_step(tmp_path, capsys, monkeypatch, text):
+def test_main_json_keeps_the_verdict_array_and_reports_an_attempts_line_that_names_no_step_on_stderr(
+    tmp_path, capsys, monkeypatch, text
+):
     wip = f"- [x] Step 1: build\n  - Attempts: {text}\n"
 
     exit_code = _run_main(tmp_path, monkeypatch, wip, "--json")
 
-    report = json.loads(capsys.readouterr().out)
-    assert report["unnamed_attempts"] == [text]
-    assert [v["step"] for v in report["verdicts"]] == ["Step 1"]
+    captured = capsys.readouterr()
+    verdicts = json.loads(captured.out)
+    assert [v["step"] for v in verdicts] == ["Step 1"]
+    assert [ln for ln in captured.err.splitlines() if "names no step" in ln] == [
+        f"reconcile_pipeline_state: WIP.md Attempts line names no step: {text}"
+    ]
     assert exit_code == 2
 
 
-def test_main_prints_one_readable_line_per_attempts_line_that_names_no_step(
+def test_main_reports_one_stderr_line_per_attempts_line_that_names_no_step(
     tmp_path, capsys, monkeypatch
 ):
     wip = "- [x] Step 1: build\n" + "".join(f"  - Attempts: {t}\n" for t in _UNNAMED_LINES)
 
     exit_code = _run_main(tmp_path, monkeypatch, wip)
 
-    lines = capsys.readouterr().out.splitlines()
-    assert [ln for ln in lines if "names no step" in ln] == [
-        f"WIP.md attempts line names no step: {t}" for t in _UNNAMED_LINES
+    captured = capsys.readouterr()
+    assert [ln for ln in captured.err.splitlines() if "names no step" in ln] == [
+        f"reconcile_pipeline_state: WIP.md Attempts line names no step: {t}" for t in _UNNAMED_LINES
     ]
+    assert "names no step" not in captured.out
     assert exit_code == 2
 
 

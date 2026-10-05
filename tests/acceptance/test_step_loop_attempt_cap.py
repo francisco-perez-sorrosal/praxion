@@ -127,7 +127,7 @@ def test_no_request_beyond_the_cap_is_ever_emitted_however_often_next_is_asked(t
 
 
 def test_a_plan_revision_reopens_an_exhausted_step_with_a_fresh_attempt_series(tmp_path):
-    task = build_loop(tmp_path, Step("1"))
+    task = build_loop(tmp_path, Step("1"), Step("2"))
     _exhaust(task)
     next_action(task)
     revise_step(task, "1", "Write `src/step_1.py` returning the step id, smaller this time.")

@@ -13,11 +13,9 @@ Defaults: `--repo-root` is the git top level of the current directory, `--worktr
 root holding `.ai-work/`) is `--repo-root`, `--base-ref` is the merge-base with the default
 branch. `IMPLEMENTATION_PLAN.md` and `WIP.md` must exist; `TASK_BRIEF.md` is optional.
 
-stdout: `next` and `record` print one JSON envelope on one line, errors included:
-`schema`, `outcome`, `slug`, then `request` and `then` for a spawn, `recorded` for a `record`
-that is not an error, `stop` for a needs-human or budget-exhausted outcome, `error` for an
-error, `iterations` (`used`, `budget`) on every outcome but a usage or missing-artifact error,
-and `warnings`. `status` prints a table, or with `--json` its own object.
+stdout: `next` and `record` print one JSON envelope on one line, errors included (one
+constructor per outcome in `_step_loop_cli.py`; `record` adds `recorded` unless it is an error).
+`status` prints a table, or with `--json` its own object.
 stderr: lines that begin `step_loop: ` (a summary, warnings, and the stop block on a stop).
 
 Outcome and exit code: spawn or complete 0; needs-human 2; budget-exhausted 3; an error 4, or 1
@@ -32,7 +30,8 @@ Guarantees:
 * `next` twice with no `record` between prints the same request, `reissued` false and then
   true, and the second call writes nothing. A stop repeats byte for byte.
 * No request exceeds the attempt cap. A stop leaves `HANDOFF.md` whose section 2 names it.
-* A request that is neither pending nor recorded is refused (exit 4, `request-not-pending`).
+* `record` gates, commits and records an ended agent's return once per request (see
+  `_step_loop_record.py`); a request neither pending nor recorded is refused (exit 4).
 
 `then` and a stop's `resume` echo how this command was started: `step_loop.py` when its
 directory is a `PATH` entry, else `python3 scripts/step_loop.py`.
@@ -51,6 +50,7 @@ from pathlib import Path
 from typing import Any, NoReturn, Protocol, Union
 
 import _step_loop_cli as cli
+import _step_loop_record as rec
 from _handoff_inputs import resolve_base_ref
 from _loop_fields import ATTEMPT_CAP, OutstandingAttempt, parse_attempts
 from _plan_steps import parse_plan_steps
@@ -114,6 +114,7 @@ class Task:
     repo: Path
     work: Path
     dir: Path
+    base_ref: str
     wip_text: str
     brief_text: str
     inputs: LoopInputs
@@ -183,13 +184,14 @@ def read_task(args: argparse.Namespace) -> Task:
         for step in steps
         if (path := directory / REVIEW_FILE.format(step.id)).is_file()
     }
-    verdicts = reconcile(args.slug, repo, args.base_ref or resolve_base_ref(repo), state_root=work)
+    base_ref = args.base_ref or resolve_base_ref(repo)
+    verdicts = reconcile(args.slug, repo, base_ref, state_root=work)
     inputs = LoopInputs.read(
         steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed
     )
     brief = directory / BRIEF_FILE
     brief_text = brief.read_text("utf-8") if brief.is_file() else ""
-    return Task(args.slug, repo, work, directory, wip_text, brief_text, inputs)
+    return Task(args.slug, repo, work, directory, base_ref, wip_text, brief_text, inputs)
 
 
 def _required(path: Path) -> str:
@@ -205,20 +207,27 @@ def _required(path: Path) -> str:
 # --- The verbs --------------------------------------------------------------------------------
 
 
-def run_next(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
+def run_next(
+    task: Task, args: argparse.Namespace, invoke: str, took: rec.Taken | None = None
+) -> Reply:
+    """The next action, carrying what a `record` took back (a disturbed commit stops)."""
     action, counts = next_action(task.inputs), cli.iterations_of(task.inputs)
+    frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
+    if took is not None and took.disturbed is not None:
+        action = rec.disturbed_stop(task.inputs, took.step, took.disturbed)
+    lines = cli.warning_lines(frame.warnings)
     if isinstance(action, Spawn):
-        return _issue(task, action, counts, invoke)
+        return _issue(task, action, frame, invoke)
     if isinstance(action, Complete):
-        frame = cli.Frame(task.slug, counts)
-        return Reply(cli.complete_envelope(frame), (cli.complete_line(task.inputs.steps, counts),))
+        line = cli.complete_line(task.inputs.steps, counts)
+        return Reply(cli.complete_envelope(frame), (line, *lines))
     view = cli.stop_view(action, task.slug, invoke)
     write_stop_handoff(task.slug, task.work, stop_next_action(view))
-    doc = cli.stop_envelope(cli.Frame(task.slug, counts), action, invoke, task.dir / HANDOFF_FILE)
-    return Reply(doc, (stop_stderr(view),))
+    doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
+    return Reply(doc, (stop_stderr(view), *lines))
 
 
-def _issue(task: Task, action: Spawn, counts: cli.Iterations, invoke: str) -> Reply:
+def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: str) -> Reply:
     request = spawn_request(task.slug, action.step, action.key, ATTEMPT_CAP, str(task.dir))
     request = replace(request, reissued=action.reissued)
     path = Path(request.prompt_path)
@@ -231,8 +240,9 @@ def _issue(task: Task, action: Spawn, counts: cli.Iterations, invoke: str) -> Re
         write_prompt(
             task.dir, action.key.id, render_prompt(_prompt_inputs(task, action, request))[0]
         )
-    lines = (cli.spawn_line(request, counts), *cli.warning_lines(warnings))
-    return Reply(cli.spawn_envelope(cli.Frame(task.slug, counts, warnings), request, invoke), lines)
+    frame = frame._replace(warnings=(*frame.warnings, *warnings))
+    lines = (cli.spawn_line(request, frame.iterations), *cli.warning_lines(frame.warnings))
+    return Reply(cli.spawn_envelope(frame, request, invoke), lines)
 
 
 def _prompt_inputs(task: Task, action: Spawn, request: SpawnRequest) -> PromptInputs:
@@ -255,12 +265,8 @@ def _prompt_inputs(task: Task, action: Spawn, request: SpawnRequest) -> PromptIn
 
 
 def _write_ahead(task: Task, action: Spawn) -> None:
-    """Count the attempt in `WIP.md` before its request is printed.
-
-    The count is the attempt's number within its series, so a fresh series after a plan
-    revision restarts at 1 whatever the old line said; a review or revise request has no
-    attempt of its own and keeps the count of the line it follows.
-    """
+    """Count the attempt in `WIP.md` before its request is printed: its number within its
+    series (a plan revision's fresh series restarts at 1); a review or revise keeps the count."""
     key, existing = action.key, task.inputs.attempts.get(action.step.id)
     count = key.attempt if key.kind == "implement" or existing is None else existing.count
     set_attempts_line(task.dir / WIP_FILE, action.step.id, OutstandingAttempt(count, key.id))
@@ -290,19 +296,14 @@ def _next_line(task: Task, action: Union[Spawn, Complete, Stop], invoke: str) ->
 
 
 def run_record(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
-    pending = sorted(
-        a.request for a in task.inputs.attempts.values() if isinstance(a, OutstandingAttempt)
-    )
-    recorded = {record.request for record in task.inputs.records}
-    if args.request not in (*pending, *recorded):
-        state = f"the pending request is {pending[0]}" if pending else "none is pending"
-        raise CallerError(
-            "request-not-pending",
-            f"record failed because {args.request} is neither pending nor recorded ({state})."
-            " To fix: record the pending request, or run next to get one.",
-            cli.iterations_of(task.inputs),
-        )
-    raise NotImplementedError("record gates a returned attempt in the next increment")
+    try:
+        rec.require_known(task.inputs, args.request)
+        if args.not_started is not None:
+            raise NotImplementedError("record --not-started lands in a later increment")
+        took = rec.record_return(task, args.request, args.agent_id, args.marker)
+    except rec.RecordRefusedError as refused:
+        raise CallerError(refused.code, refused.message, cli.iterations_of(task.inputs)) from None
+    return run_next(read_task(args), args, invoke, took)
 
 
 _VERBS: Mapping[str, Callable[[Task, argparse.Namespace, str], Reply]] = {

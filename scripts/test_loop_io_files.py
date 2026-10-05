@@ -380,9 +380,21 @@ def test_the_handoff_is_composed_mid_phase_with_the_gate_overridden_and_nothing_
         (
             "slug",
             tmp_path,
-            {"boundary": None, "force": True, "next_action": "stop one", "dry_run": True},
+            {
+                "boundary": None,
+                "force": True,
+                "base_ref": None,
+                "next_action": "stop one",
+                "dry_run": True,
+            },
         )
     ]
+
+
+def test_the_handoff_carries_the_base_ref_it_is_given(tmp_path: Path, composer: dict) -> None:
+    files.write_stop_handoff("slug", tmp_path, "stop one", base_ref="cb14bddc")
+
+    assert composer["calls"][0][2]["base_ref"] == "cb14bddc"
 
 
 def test_a_first_handoff_is_written(tmp_path: Path, composer: dict) -> None:

@@ -70,6 +70,22 @@ def build(tmp_path, plan=PLAN, wip=WIP, ledger=()):
     return tmp_path
 
 
+def git_head(root):
+    done = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+    )
+    return done.stdout.strip()
+
+
+def commit_empty(root, message):
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty"]
+        + ["-m", message],
+        cwd=root,
+        check=True,
+    )
+
+
 def where(root):
     return ["--repo-root", str(root), "--base-ref", "HEAD"]
 
@@ -291,6 +307,17 @@ def test_a_stop_repeats_byte_for_byte_and_rewrites_the_handoff_only_when_it_chan
     assert second.doc == first.doc
     assert snapshot(root) == written
     assert f"step_loop.py next {SLUG}" in handoff.read_text(encoding="utf-8")
+
+
+def test_a_stop_composes_its_handoff_against_the_tasks_base_ref(tmp_path):
+    root = build(tmp_path, STUCK_PLAN)
+    fork = git_head(root)
+    commit_empty(root, "later")
+
+    step_loop.execute(["next", SLUG, "--repo-root", str(root), "--base-ref", fork])
+
+    handoff = root / ".ai-work" / SLUG / "HANDOFF.md"
+    assert f"base_sha: {fork}" in handoff.read_text(encoding="utf-8")
 
 
 def test_a_fresh_series_after_a_plan_revision_restarts_its_count_at_one(tmp_path):

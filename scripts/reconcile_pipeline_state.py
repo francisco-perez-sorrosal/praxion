@@ -164,16 +164,8 @@ def reconcile(
     if not claims:
         return []
 
-    changed_files = (
-        set(_changed_files_override)
-        if _changed_files_override is not None
-        else _git_changed_files(repo_root, base_ref, include_untracked)
-    )
-    wal_rows = (
-        _wal_rows_override
-        if _wal_rows_override is not None
-        else _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
-    )
+    changed_files = _changed_files(repo_root, base_ref, include_untracked, _changed_files_override)
+    wal_rows = _wal_rows(state_root, max_age_days, _wal_rows_override)
     ledger = read_ledger(task_dir)
     recorded = _RecordedRequests(ledger.requests | assume_recorded, _findings_text(ledger))
     gathered = _gather(task_dir, changed_files, wal_rows, _test_status_override, recorded)
@@ -181,6 +173,24 @@ def reconcile(
         _reconcile_step(step_id, claims[step_id], gathered)
         for step_id in sorted(claims, key=step_sort_key)
     ]
+
+
+def _changed_files(
+    repo_root: Path, base_ref: str | None, include_untracked: bool, override: list[str] | None
+) -> set[str]:
+    """The files changed since ``base_ref``, or the injected ``override`` for a hermetic run."""
+    if override is not None:
+        return set(override)
+    return _git_changed_files(repo_root, base_ref, include_untracked)
+
+
+def _wal_rows(
+    state_root: Path, max_age_days: int, override: list[dict[str, Any]] | None
+) -> list[dict[str, Any]]:
+    """The recent WAL rows, or the injected ``override`` for a hermetic run."""
+    if override is not None:
+        return override
+    return _read_wal(reader.log_path(state_root / ".ai-state"), max_age_days=max_age_days)
 
 
 def _gather(

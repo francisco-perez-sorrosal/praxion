@@ -221,7 +221,7 @@ def run_next(
         line = cli.complete_line(task.inputs.steps, counts)
         return Reply(cli.complete_envelope(frame), (line, *lines))
     view = cli.stop_view(action, task.slug, invoke)
-    write_stop_handoff(task.slug, task.work, stop_next_action(view), action.cause)
+    write_stop_handoff(task.slug, task.work, stop_next_action(view), action.cause, task.base_ref)
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
     return Reply(doc, (stop_stderr(view), *lines))
 

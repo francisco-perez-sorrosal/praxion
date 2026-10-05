@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from _git_runner import git_output
+from _git_runner import GitUnavailableError, git_output, run_git
 from _step_verdict import HUMAN_VERDICTS
 
 
@@ -77,29 +77,50 @@ BOOKKEEPING_PATHS = frozenset({"coverage.xml"})
 
 
 def resolve_base_ref(repo_root: Path) -> str | None:
-    """The pipeline's fork point: `git merge-base HEAD <default-branch>`.
+    """The pipeline's fork point: the newest `git merge-base HEAD <default-branch>`.
 
     Without it the reconciler diffs the working tree alone, so every *committed*
     step reads as a disagreement -- and a resuming window would be told that
     finished work contradicts the record, which is worse than being told
-    nothing. Returns None when no candidate resolves; the composer then says so
-    rather than presenting the over-report as fact.
+    nothing. Of the default-branch refs that resolve, the fork point nearest
+    HEAD wins: a pipeline branched from a local default branch that is ahead of
+    its remote forks later than the remote-tracking ref says. Returns None when
+    no candidate resolves; the composer then says so rather than presenting the
+    over-report as fact.
     """
-    for candidate in _base_ref_candidates(repo_root):
-        base_ref = git_output(repo_root, "merge-base", "HEAD", candidate)
-        if base_ref:
-            return base_ref
-    return None
+    forks = [
+        fork
+        for candidate in _base_ref_candidates(repo_root)
+        if (fork := git_output(repo_root, "merge-base", "HEAD", candidate))
+    ]
+    if not forks:
+        return None
+    newest = forks[0]
+    for fork in forks[1:]:
+        if _is_ancestor(repo_root, newest, fork):
+            newest = fork
+    return newest
+
+
+def _is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:
+    try:
+        return (
+            run_git(repo_root, "merge-base", "--is-ancestor", ancestor, descendant).returncode == 0
+        )
+    except GitUnavailableError:
+        return False
 
 
 def _base_ref_candidates(repo_root: Path) -> tuple[str, ...]:
-    """Default-branch refs to fork from, best first.
+    """Default-branch refs to fork from.
 
     `refs/remotes/origin/HEAD` is the ref a clone populates from the remote's
     own HEAD -- a local read, never a fetch -- and is what the finalize chain
-    resolves the default branch from too. The remote-tracking ref is tried
-    before the bare branch name because pipeline worktrees branch from
-    `origin/<default>`, which is therefore the more recent common ancestor.
+    resolves the default branch from too. Both the remote-tracking ref and the
+    bare branch name are candidates because neither is always the more recent
+    ancestor: a pipeline worktree branched from `origin/<default>` forks at the
+    remote-tracking side, one branched from a local default branch that is ahead
+    of its remote forks at the local side. `resolve_base_ref` picks the newer.
     """
     ref = git_output(repo_root, "symbolic-ref", "refs/remotes/origin/HEAD")
     if ref:

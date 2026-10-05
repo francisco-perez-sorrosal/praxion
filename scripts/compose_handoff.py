@@ -704,6 +704,7 @@ def main(argv: list[str] | None = None) -> int:
             repo_root,
             boundary=args.boundary,
             force=args.force,
+            base_ref=args.base_ref,
             dry_run=args.dry_run,
         )
     except HandoffBlockedError as refused:
@@ -726,6 +727,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=None,
         help=f"one of {', '.join(FIXED_BOUNDARIES)}, or {MID_PHASE_PREFIX}<step-id> "
         "(default: mid-phase at the current step)",
+    )
+    parser.add_argument(
+        "--base-ref",
+        default=None,
+        help="git ref the reconciler diffs against "
+        "(default: the most recent common ancestor with the default branch)",
     )
     parser.add_argument("--dry-run", action="store_true", help="compose but write nothing")
     parser.add_argument(

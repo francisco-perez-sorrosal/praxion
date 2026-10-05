@@ -211,17 +211,29 @@ def append_ledger_record(task_dir: Path, record: IterationRecord) -> bool:
 
 
 def write_stop_handoff(
-    slug: str, repo_root: Path, next_action: str, cause: str | None = None
+    slug: str,
+    repo_root: Path,
+    next_action: str,
+    cause: str | None = None,
+    base_ref: str | None = None,
 ) -> bool:
     """Compose `HANDOFF.md` with `next_action` as section 2 and write it only if section 2 moved.
 
     A stop's boundary is `mid-phase:<cause>`: the composer must name one once every step reads
     verified, and the cause (unlike a request id) repeats. Without one the composer picks its
     own. The readiness gate is overridden on purpose: a stop leaves the step's files uncommitted.
+    `base_ref` is the pipeline's own fork point, so the composed reconciler rows read the same
+    ground truth the driver gated on.
     """
     boundary = None if cause is None else f"{MID_PHASE_PREFIX}{cause}"
     composed = write_handoff(
-        slug, repo_root, boundary=boundary, force=True, next_action=next_action, dry_run=True
+        slug,
+        repo_root,
+        boundary=boundary,
+        force=True,
+        base_ref=base_ref,
+        next_action=next_action,
+        dry_run=True,
     )
     path: Path = composed["path"]
     existing = read_existing(path)

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-05T16:16:19Z'
+generated_at: '2026-10-05T16:19:52Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-04'
+  last_modified: '2026-10-05'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3171,7 +3171,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-04'
+  last_modified: '2026-10-05'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3435,6 +3435,12 @@ surfaces:
   type: markdown
   title: 'Spec: Sidecar Placement (P0 hook chaining + P1 sidecar placement axis)'
   last_modified: '2026-09-04'
+  renderer: default_markdown
+- id: ai-state-specs-spec-step-loop-driver-2026-10-05
+  path: .ai-state/specs/SPEC_step-loop-driver_2026-10-05.md
+  type: markdown
+  title: 'Spec: step-loop-driver (a deterministic step-loop driver for the span between the pre-mortem gate and the pre-verification checkpoint)'
+  last_modified: '2026-10-05'
   renderer: default_markdown
 - id: ai-state-specs-spec-wal-modes-core-2026-09-27
   path: .ai-state/specs/SPEC_wal-modes-core_2026-09-27.md
@@ -3974,6 +3980,7 @@ groups:
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
+  - ai-state-specs-spec-step-loop-driver-2026-10-05
   - ai-state-specs-spec-wal-modes-core-2026-09-27
   - ai-state-specs-spec-wal-retention-2026-10-03
   - ai-state-system-deployment

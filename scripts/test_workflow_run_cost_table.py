@@ -119,3 +119,94 @@ def test_disp_renders_zero_as_a_digit_not_a_dash():
 def test_disp_stringifies_numbers_and_passes_text_through():
     cost = _cost()
     assert (cost._disp(1200), cost._disp("agree")) == ("1200", "agree")
+
+
+def _build_row_kwargs(**overrides) -> dict:
+    kwargs = {
+        "label": "alpha",
+        "phase": "Collect",
+        "journal_result": "done",
+        "transcript_stats": None,
+        "meta": None,
+        "wal_row": None,
+        "kind": "workflow-agent",
+    }
+    return {**kwargs, **overrides}
+
+
+def _transcript_stats(**overrides) -> dict:
+    stats = {
+        "path": Path("/t/agent-a1.jsonl"),
+        "model": "claude-x",
+        "peak_context_tokens": 1200,
+        "output_tokens": 300,
+        "turns": 4,
+        "tool_uses": 9,
+    }
+    return {**stats, **overrides}
+
+
+def test_build_row_joins_transcript_wal_and_meta_into_one_row():
+    wal = {"tokens_out": 300, "duration_ms": 5000}
+
+    row = _cost()._build_row(
+        "a1",
+        **_build_row_kwargs(
+            transcript_stats=_transcript_stats(),
+            meta={"agentType": "researcher"},
+            wal_row=wal,
+        ),
+    )
+
+    assert row == {
+        "agent_id": "a1",
+        "kind": "workflow-agent",
+        "label": "alpha",
+        "phase": "Collect",
+        "agent_type": "researcher",
+        "model": "claude-x",
+        "peak_context_tokens": 1200,
+        "output_tokens": 300,
+        "turns": 4,
+        "tool_uses": 9,
+        "duration_ms": 5000,
+        "transcript": "/t/agent-a1.jsonl",
+        "journal_result": "done",
+        "wal": {"tokens_out": 300, "duration_ms": 5000},
+        "wal_agreement": "agree",
+    }
+
+
+def test_build_row_without_transcript_wal_or_meta_nulls_every_derived_field():
+    row = _cost()._build_row(
+        "a2", **_build_row_kwargs(label=None, phase=None, kind="unobserved-helper")
+    )
+
+    assert row == {
+        "agent_id": "a2",
+        "kind": "unobserved-helper",
+        "label": None,
+        "phase": None,
+        "agent_type": None,
+        "model": None,
+        "peak_context_tokens": None,
+        "output_tokens": None,
+        "turns": None,
+        "tool_uses": None,
+        "duration_ms": None,
+        "transcript": None,
+        "journal_result": "done",
+        "wal": None,
+        "wal_agreement": "transcript-missing",
+    }
+
+
+def test_build_row_copies_the_wal_row_rather_than_aliasing_it():
+    wal = {"tokens_out": 300, "duration_ms": 2}
+
+    row = _cost()._build_row(
+        "a3",
+        **_build_row_kwargs(transcript_stats=_transcript_stats(), wal_row=wal),
+    )
+
+    assert (row["wal"] == wal, row["wal"] is wal) == (True, False)

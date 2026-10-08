@@ -451,6 +451,11 @@ def warning_codes(done) -> list[str]:
     return [warning["code"] for warning in done.doc["warnings"]]
 
 
+def settings_warning(done) -> dict:
+    (warning,) = [w for w in done.doc["warnings"] if w["code"] == "settings-not-ignored"]
+    return warning
+
+
 def early_warning(done) -> dict:
     (warning,) = [w for w in done.doc["warnings"] if w["code"] == EARLY]
     return warning
@@ -503,6 +508,19 @@ def test_a_check_with_no_failing_target_at_the_baseline_is_not_warned(tmp_path, 
 
     assert done.exit == 0
     assert EARLY not in warning_codes(done)
+
+
+def test_the_warning_says_run_refuses_until_the_settings_file_is_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, ignored=IGNORED.replace(SETTINGS_FILE, ""))
+    monkeypatch.chdir(root)
+
+    done = scaffold()
+
+    warning = settings_warning(done)["message"]
+    assert "run refuses to start until it does" in warning
+    assert "add it to .gitignore and commit that change" in warning
+    assert "first iteration" not in warning
 
 
 def test_git_not_ignoring_the_settings_file_is_warned_in_the_printed_object_too(

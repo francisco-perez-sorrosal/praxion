@@ -22,6 +22,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import _goal_run  # noqa: E402
 import _goal_worker  # noqa: E402
+import step_loop  # noqa: E402
 from _goal_run import Preconditions, Reporter, Treatment, classify  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_cli import error_line  # noqa: E402
@@ -52,6 +53,7 @@ RESOLVER = "python3 scripts/resolve_test_scope.py"
 READ_TOOLS = ["Read", "Glob", "Grep"]
 PUSH, REPO_ADMIN = "Bash(git push *)", "Bash(gh repo *)"
 PROJECT_SETTINGS = ".claude/settings.json"
+INTERNAL_FAULT = "the record verb broke"
 
 
 def user_settings() -> Path:
@@ -140,6 +142,15 @@ def test_a_worker_with_nothing_to_deny_gets_no_deny_list_but_still_no_servers(sc
     argv = only_argv(scratch)
     assert "--disallowedTools" not in argv
     assert "--strict-mcp-config" in argv
+
+
+@pytest.mark.parametrize("rule", ["WebFetch", "WebSearch", "Agent"])
+def test_a_pre_approval_of_a_tool_the_worker_is_not_granted_is_denied_to_it(scratch, rule):
+    pre_approve_for_the_user(rule)
+
+    scratch.run()
+
+    assert option_values(only_argv(scratch), "--disallowedTools") == [rule]
 
 
 def test_the_project_and_local_pre_approvals_are_denied_after_the_users(scratch):
@@ -232,12 +243,41 @@ def test_a_rule_that_grants_the_worker_nothing_is_not_refused(scratch, rule):
         ("Write(/src/**)", Treatment.IGNORE),
         ("MultiEdit(src/**)", Treatment.IGNORE),
         ("Read(~/notes/**)", Treatment.IGNORE),
-        ("WebFetch(domain:example.com)", Treatment.IGNORE),
-        ("mcp__server__tool", Treatment.IGNORE),
+        ("Read", Treatment.IGNORE),
+        ("Glob(src/**)", Treatment.IGNORE),
+        ("Grep", Treatment.IGNORE),
+        ("WebFetch", Treatment.MIRROR),
+        ("WebFetch(domain:example.com)", Treatment.MIRROR),
+        ("WebSearch", Treatment.MIRROR),
+        ("Agent", Treatment.MIRROR),
+        ("mcp__server__tool", Treatment.MIRROR),
     ],
 )
 def test_each_inherited_rule_is_mirrored_ignored_or_refused(rule, treatment):
     assert classify(rule, (PYTEST_CHECK, RESOLVER)) is treatment
+
+
+@pytest.mark.parametrize(
+    ("rule", "treatment"),
+    [
+        ("Bash(git push:*)", Treatment.MIRROR),
+        ("Bash(git push *)", Treatment.MIRROR),
+        ("Bash(uv run pytest:*)", Treatment.REFUSE),
+        ("Bash(uv run pytest *)", Treatment.REFUSE),
+        ("Bash(uv run pytest tests/test_widget.py:*)", Treatment.REFUSE),
+        ("Bash(uv run pytest tests/test_widget.py *)", Treatment.REFUSE),
+        ("Bash(python3 scripts/resolve_test_scope.py:*)", Treatment.REFUSE),
+        ("Bash(python3 scripts/resolve_test_scope.py *)", Treatment.REFUSE),
+        ("Bash( *)", Treatment.REFUSE),
+    ],
+)
+def test_the_two_spellings_of_one_bash_rule_get_one_treatment(rule, treatment):
+    assert classify(rule, (PYTEST_CHECK, RESOLVER)) is treatment
+
+
+@pytest.mark.parametrize("rule", ["Bash(uv run pytest:*)", "Bash(uv run pytest *)"])
+def test_a_check_that_is_exactly_a_rules_head_is_refused_in_both_spellings(rule):
+    assert classify(rule, ("uv run pytest", RESOLVER)) is Treatment.REFUSE
 
 
 def test_the_progress_file_outside_the_repository_is_allowed_by_its_absolute_path(tmp_path):
@@ -482,6 +522,23 @@ def test_another_tasks_directory_refuses_when_not_ignored(scratch):
     assert scratch.calls() == []
 
 
+def stop_ignoring_the_settings_file(scratch: Scratch) -> None:
+    put(scratch.root, UNIGNORED, "__pycache__/\n.pytest_cache/\n.ai-work/\n")
+    git(scratch.root, "commit", "-qam", "stop ignoring the settings file")
+
+
+def test_a_settings_file_git_does_not_ignore_is_refused_naming_the_ignore_commit(scratch):
+    stop_ignoring_the_settings_file(scratch)
+
+    reply = scratch.run()
+
+    message = reply.doc["error"]["message"]
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "usage")
+    assert f"add {SETTINGS} to .gitignore and commit the ignore change" in message, message
+    assert "add them to the step's Files" not in message, message
+    assert scratch.calls() == []
+
+
 def test_a_change_inside_the_step_files_does_not_refuse(scratch):
     put(scratch.root, WIDGET, widget_source() + "# edited\n")
 
@@ -626,6 +683,24 @@ def test_a_refusal_inside_the_loop_is_printed_as_an_error_line_and_exits_four(sc
     assert reply.exit == 4
     assert reply.doc["outcome"] == "error"
     assert tuple(reply.lines) == (error_line(reply.doc["error"]["message"]),)
+
+
+def test_an_internal_error_inside_the_loop_prints_its_traceback_on_standard_error(
+    scratch, monkeypatch
+):
+    def fail(*_args, **_kwargs):
+        raise RuntimeError(INTERNAL_FAULT)
+
+    monkeypatch.setitem(step_loop._VERBS, "record", fail)
+
+    reply = scratch.run()
+
+    shown = "\n".join(reply.lines)
+    assert (reply.exit, reply.doc["error"]["code"]) == (1, "internal")
+    assert shown.startswith("step_loop: error: ")
+    assert f"RuntimeError: {INTERNAL_FAULT}" in shown
+    assert "Traceback (most recent call last)" in shown
+    assert "read stderr" not in shown
 
 
 def test_a_claude_that_cannot_be_executed_ends_the_run_as_not_started(scratch):

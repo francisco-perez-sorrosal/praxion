@@ -55,6 +55,7 @@ PROJECT_SETTINGS = ".claude/settings.json"
 CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 _RULE_RE = re.compile(r"(?P<tool>\w+)(?:\((?P<pattern>.*)\))?", re.DOTALL)
 _PATH_RULE_TOOLS = ("Write", "MultiEdit", "NotebookEdit")  # accepted, never consulted
+_READ_TOOLS = ("Read", "Glob", "Grep")  # the worker holds these: a rule adds nothing
 _WIDE_PATTERNS = ("", "*", ":*")
 
 
@@ -223,15 +224,21 @@ def _outside_files(goal: PlanStep, repo: Path, directory: Path) -> tuple[Failure
         stray = changed_outside_files(repo, directory, goal.files)
     except (GitCommandError, OSError) as error:
         return (Failure(f"the tree cannot be read ({error})", "make the repository readable"),)
-    if not stray:
-        return ()
-    return (
+    others = tuple(path for path in stray if path != SETTINGS_FILE)
+    unignored = (
+        Failure(
+            f"git does not ignore {SETTINGS_FILE}, which holds the worker's deny rules",
+            f"add {SETTINGS_FILE} to .gitignore and commit the ignore change",
+        ),
+    )
+    changed = (
         Failure(
             f"the tree holds changes outside step {goal.id}'s Files: and the task directory:"
-            f" {_named(stray)}",
+            f" {_named(others)}",
             "commit or remove them, or add them to the step's Files:",
         ),
     )
+    return (unignored if SETTINGS_FILE in stray else ()) + (changed if others else ())
 
 
 def _edited_plan(goal: PlanStep, directory: Path) -> tuple[Failure, ...]:
@@ -323,18 +330,23 @@ def classify(rule: str, commands: Sequence[str]) -> Treatment:
     """The treatment of one allow rule, given the check and resolver commands the worker runs.
 
     A scoped `Bash` rule that cannot approve either command is mirrored; one that could, or
-    that covers every command, is refused, as is any rule granting edits at large. A path rule
-    of a tool the harness never consults for paths, a read rule and any other tool's rule are
-    ignored."""
+    that covers every command, is refused, as is any rule granting edits at large. A rule of a
+    tool the worker is not granted (a web fetch, a search, an agent, an MCP tool) is mirrored.
+    A path rule of a tool the harness never consults for paths and a read rule are ignored.
+
+    `Bash(X:*)` and `Bash(X *)` are one rule to the harness, so a rule's head is its pattern up
+    to the first `*` without the trailing `:` or space, and both spellings get one treatment."""
     parsed = _RULE_RE.fullmatch(rule)
     if parsed is None:
         return Treatment.IGNORE
     tool, pattern = parsed["tool"], parsed["pattern"]
     if tool == "Edit" or (tool in _PATH_RULE_TOOLS and pattern is None):
         return Treatment.REFUSE
-    if tool != "Bash":
+    if tool in _PATH_RULE_TOOLS or tool in _READ_TOOLS:
         return Treatment.IGNORE
-    head = (pattern or "").partition("*")[0].removesuffix(":")
+    if tool != "Bash":
+        return Treatment.MIRROR
+    head = (pattern or "").partition("*")[0].removesuffix(":").rstrip()
     if pattern in _WIDE_PATTERNS or not head or any(c.startswith(head) for c in commands):
         return Treatment.REFUSE
     return Treatment.MIRROR

@@ -297,8 +297,8 @@ _PRIMARY_MESSAGE = (
     "started in it. To fix: scaffold from a linked worktree, or remove the rules after the run"
 )
 _NOT_IGNORED_MESSAGE = (
-    f"git does not ignore {SETTINGS_FILE}, so the first iteration would stop on it as a "
-    "protected change. To fix: add it to .gitignore"
+    f"git does not ignore {SETTINGS_FILE}, and run refuses to start until it does. "
+    "To fix: add it to .gitignore and commit that change"
 )
 
 

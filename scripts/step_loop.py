@@ -304,9 +304,8 @@ def execute(argv: Sequence[str], *, echo: Sequence[str] = ()) -> Reply:
     except CallerError as error:
         return _failure(args, error.code, error.message, error.counts)
     except Exception:  # noqa: BLE001 -- the contract: any failure is one internal envelope
-        message = "step_loop failed because of an unexpected error. To fix: read stderr."
-        reply = _failure(args, cli.INTERNAL, message, None)
-        return replace(reply, lines=(*reply.lines, traceback.format_exc().rstrip()))
+        trace = traceback.format_exc().rstrip()  # the envelope carries it: `drive` keeps no lines
+        return _failure(args, cli.INTERNAL, f"step_loop failed unexpectedly:\n{trace}", None)
 
 
 def _failure(

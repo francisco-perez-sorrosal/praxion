@@ -110,7 +110,8 @@ Safety profile, unattended:
 - Deny rules on the protected paths hold in every permission mode.
 - Each iteration is bounded by a turn bound and a dollar fuse, and the loop by the `Iterations:` budget.
 - The worker may edit only the goal's paths and its progress record, and holds no pre-approval but the check and the resolver.
-- `run` refuses before any worker when a settings file pre-approves a tool-wide `Bash` rule or an edit rule, and denies the worker every other inherited `Bash` pre-approval.
+- `run` refuses before any worker when a settings file pre-approves a tool-wide `Bash` rule, an edit rule, or a `Bash` rule that is a prefix of the check or of the resolver, in either spelling (`X:*` or `X *`).
+- `run` denies the worker every other inherited `Bash` pre-approval, and the pre-approval of any tool it is not granted.
 - Code the check runs is not fenced by permission rules, so read the kept commits before the scratch branch is merged.
 - Nothing removes the deny rules but the person: they stay in that checkout's `.claude/settings.local.json` until the person deletes them when the goal is done, and in a scratch worktree they go with the worktree.
 - **Fallback**: the harness's `/goal` command is the fallback for a repository without Praxion; it keeps one context for the whole run and judges printed output, not the check's result.

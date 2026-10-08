@@ -47,7 +47,8 @@ Hand one well-gated goal to the step-loop driver's goal mode: a fresh worker per
 - The worker may edit only the goal's paths and its progress record.
 - The worker holds no pre-approval but the check and the resolver.
 - `run` refuses before any worker when a settings file pre-approves a tool-wide `Bash` rule or an edit rule.
-- `run` denies the worker every other inherited `Bash` pre-approval.
+- `run` refuses as well when an inherited `Bash` rule is a prefix of the check or of the resolver, in either spelling (`X:*` or `X *`).
+- `run` denies the worker every other inherited `Bash` pre-approval, and the pre-approval of any tool it is not granted.
 - Code the check runs is not fenced by permission rules.
 - Read the kept commits before the scratch branch is merged.
 - Each iteration is bounded by a turn bound and a dollar fuse.

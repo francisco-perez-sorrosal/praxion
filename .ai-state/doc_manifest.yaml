@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-08T08:13:30Z'
+generated_at: '2026-10-08T21:28:18Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -542,7 +542,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3093,7 +3093,7 @@ surfaces:
   path: .ai-state/decisions/421-tagged-step-blocks-without-a-mutation-reading.md
   type: markdown
   title: A step tagged mutation on completes only on a mutation reading; the step-completion reconciler owns the block and the step-document schema owns the Mutation line
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: adr_card
 - id: ai-state-decisions-422-state-data-does-not-fan-out
   path: .ai-state/decisions/422-state-data-does-not-fan-out.md
@@ -3160,7 +3160,7 @@ surfaces:
   path: .ai-state/decisions/432-step-loop-driver-and-spawner-seam.md
   type: markdown
   title: A deterministic step-loop driver owns the crank between the pre-mortem gate and the pre-verification checkpoint; the orchestrator relays spawn requests through a spawner seam
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: adr_card
 - id: ai-state-decisions-433-turn-budget-reminder-hook
   path: .ai-state/decisions/433-turn-budget-reminder-hook.md
@@ -3173,7 +3173,7 @@ surfaces:
   type: markdown
   title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
     \ stall cap"
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: adr_card
 - id: ai-state-decisions-435-mutation-line-grammar-leaf-module
   path: .ai-state/decisions/435-mutation-line-grammar-leaf-module.md
@@ -3197,7 +3197,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3449,6 +3449,12 @@ surfaces:
   type: markdown
   title: "SPEC: `/project-metrics` Command \u2014 Project Complexity/Health Metrics"
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-ralph-lite-2026-10-08
+  path: .ai-state/specs/SPEC_ralph-lite_2026-10-08.md
+  type: markdown
+  title: "Spec: ralph-lite (the step-loop driver's goal mode \u2014 Ralph-lite \u2014 built per dec-434)"
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: ai-state-specs-spec-sentinel-phase-b-2026-09-13
   path: .ai-state/specs/SPEC_sentinel-phase-b_2026-09-13.md
@@ -4014,6 +4020,7 @@ groups:
   - ai-state-specs-spec-process-economy-p3-1-2026-09-18
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-metrics-2026-04-23
+  - ai-state-specs-spec-ralph-lite-2026-10-08
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
   - ai-state-specs-spec-step-loop-dogfood-2026-10-08

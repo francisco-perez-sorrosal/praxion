@@ -53,7 +53,9 @@ HOOK_WORDS_LIMIT = 300
 HOOK_WORDS_FALLBACK_LINES = 5
 _CUT_MARKER = "…"
 _COLOUR = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
-_HOOK_STATUS = re.compile(r"^.+?\.{3,}(?:\(.*?\))?(Passed|Failed|Skipped)$")
+_HOOK_VERDICTS = ("Passed", "Failed", "Skipped")
+_HOOK_FAILED = "Failed"
+_DOT_RUN = "..."
 _HOOK_BOOKKEEPING = ("- hook id:", "- exit code:")
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
 _LITERAL_PATHSPEC = ":(literal)"
@@ -465,13 +467,29 @@ def hook_words(output: str) -> str:
     return words[: HOOK_WORDS_LIMIT - len(_CUT_MARKER)] + _CUT_MARKER
 
 
+def _hook_verdict(line: str) -> str | None:
+    """The verdict of a pre-commit status line (`name....(note)Verdict`), else None.
+
+    Plain suffix tests, not a pattern: a hook may print an unbroken run of dots, and a pattern
+    that backtracks on it would stall the driver after the commit's own timeout has closed.
+    """
+    verdict = next((word for word in _HOOK_VERDICTS if line.endswith(word)), None)
+    if verdict is None:
+        return None
+    head = line[: -len(verdict)]
+    if head.endswith(")") and "(" in head:
+        head = head[: head.rfind("(")]
+    named = head.rstrip(".")
+    return verdict if named and head.endswith(_DOT_RUN) else None
+
+
 def _failed_sections(lines: list[str]) -> list[str]:
     kept: list[str] = []
     failing = False
     for line in lines:
-        found = _HOOK_STATUS.match(line)
-        if found:
-            failing = found.group(1) == "Failed"
+        verdict = _hook_verdict(line)
+        if verdict:
+            failing = verdict == _HOOK_FAILED
         if failing and line and not line.startswith(_HOOK_BOOKKEEPING):
             kept.append(line)
     return kept

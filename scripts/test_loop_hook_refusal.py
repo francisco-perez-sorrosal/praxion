@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import stat
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,8 @@ from _git_runner import run_git  # noqa: E402
 from _step_loop_io import CommitRefused, commit_paths, hook_words  # noqa: E402
 
 LIMIT = 300
+PROMPT_SECONDS = 1.0
+LONG_RUN = 50_000
 MARKER = "…"
 DOTS = "." * 40
 MESSAGE = "Add the thing\n\nStep-Loop-Request: abc123\n"
@@ -129,6 +132,14 @@ def test_an_over_long_section_is_cut_at_the_limit_with_the_marker() -> None:
     words = hook_words("\n".join(failing("ruff", "x" * 1000)))
 
     assert (len(words), words.endswith(MARKER)) == (LIMIT, True)
+
+
+@pytest.mark.parametrize("tail", ["progress", "x Passed", "x Failed"])
+def test_a_long_run_of_dots_is_read_promptly(tail: str) -> None:
+    started = time.monotonic()
+    hook_words("." * LONG_RUN + tail + "\nlast words")
+
+    assert time.monotonic() - started < PROMPT_SECONDS
 
 
 def test_a_real_hook_refusal_reaches_the_caller_as_the_hooks_own_words(scratch: Path) -> None:

@@ -47,7 +47,7 @@ import traceback
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, NoReturn, Protocol, Union
+from typing import Any, Protocol, Union
 
 import _step_loop_cli as cli
 import _step_loop_record as rec
@@ -56,6 +56,7 @@ from _loop_fields import ATTEMPT_CAP, OutstandingAttempt, parse_attempts
 from _plan_steps import parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
 from _step_loop_action import Complete, Spawn, Stop, issuable_action
+from _step_loop_cli import CallerError
 from _step_loop_files import set_attempts_line, snapshot_requests, write_prompt, write_stop_handoff
 from _step_loop_io import paths_differing_from_head
 from _step_loop_render import (
@@ -77,16 +78,6 @@ PLAN_FILE, WIP_FILE, BRIEF_FILE, HANDOFF_FILE = (
     "HANDOFF.md",
 )
 REVIEW_FILE = "LIGHT_REVIEW_step-{}.md"
-VERBS = ("next", "record", "status")
-MARKERS = ("complete", "blocked", "conflict", "partial", "none")
-
-
-class CallerError(Exception):
-    """A call the driver refuses: it names its code, says how to fix it, and wrote nothing."""
-
-    def __init__(self, code: str, message: str, counts: cli.Iterations | None = None) -> None:
-        super().__init__(message)
-        self.code, self.message, self.counts = code, message, counts
 
 
 @dataclass(frozen=True)
@@ -118,52 +109,6 @@ class Task:
     wip_text: str
     brief_text: str
     inputs: LoopInputs
-
-
-# --- The command line -------------------------------------------------------------------------
-
-
-class _Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> NoReturn:
-        raise CallerError(
-            "usage",
-            f"The arguments could not be read because {message}. To fix: see {self.prog} --help.",
-        )
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="step_loop.py", description=__doc__)
-    parser.formatter_class = argparse.RawDescriptionHelpFormatter
-    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{" + ",".join(VERBS) + "}")
-    for verb in VERBS:
-        sub = verbs.add_parser(verb)
-        sub.add_argument("slug", help="task slug under .ai-work/<slug>/")
-        sub.add_argument("--repo-root", help="git repo root (default: from git)")
-        sub.add_argument("--worktree-root", help="root holding .ai-work/ (default: --repo-root)")
-        sub.add_argument("--base-ref", help="git ref the reconciler diffs against")
-    verbs.choices["status"].add_argument("--json", action="store_true", help="print the object")
-    record = verbs.choices["record"]
-    record.add_argument("--request", required=True, help="the pending request's id")
-    record.add_argument("--agent-id", help="the agentId the Agent tool result carries")
-    record.add_argument("--marker", choices=MARKERS, help="the agent's terminal marker")
-    record.add_argument("--not-started", metavar="REASON", help="the Agent call never started")
-    return parser
-
-
-def _parse(argv: Sequence[str]) -> argparse.Namespace:
-    args = _build_parser().parse_args(argv)
-    if args.verb == "record":
-        relayed = args.agent_id is not None or args.marker is not None
-        if relayed == (args.not_started is not None):
-            problem = "give --agent-id with --marker, or --not-started, and not both"
-        elif relayed and not (args.agent_id and args.marker):
-            problem = "--agent-id and --marker go together, and the id is not empty"
-        elif args.not_started is not None and not args.not_started.strip():
-            problem = "--not-started needs a reason"
-        else:
-            return args
-        _Parser(prog="step_loop.py record").error(problem)
-    return args
 
 
 # --- Reading the task -------------------------------------------------------------------------
@@ -318,7 +263,7 @@ def execute(argv: Sequence[str]) -> Reply:
     """Run one call; every failure becomes the one envelope its code names."""
     args = None
     try:
-        args = _parse(argv)
+        args = cli.parse(argv, __doc__)
         invoke = cli.invocation(sys.argv[0], os.environ.get("PATH", ""))
         return _VERBS[args.verb](read_task(args), args, invoke)
     except CallerError as error:

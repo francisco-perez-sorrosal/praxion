@@ -1,6 +1,7 @@
-"""The envelope layer of the step-loop command: what a call prints and what it exits with.
+"""The command-line layer of the step-loop command: what a call reads, prints and exits with.
 
-Pure: the loop's decision and its inputs come in; the JSON envelope, its exit code, the stderr
+The arguments come in through `parse`, which refuses a bad call as a `CallerError`. Then pure:
+the loop's decision and its inputs come in; the JSON envelope, its exit code, the stderr
 lines and the `status` object and table go out. Nothing here reads a file or the clock, so a
 stop repeats byte for byte. An envelope is built only by the four constructors below, one per
 kind of outcome, so a field is present exactly when its outcome says it is.
@@ -8,10 +9,11 @@ kind of outcome, so a field is present exactly when its outcome says it is.
 
 from __future__ import annotations
 
+import argparse
 import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, NoReturn
 
 from _loop_fields import ATTEMPT_CAP
 from _plan_steps import Implementer, PlanStep
@@ -56,6 +58,8 @@ DASH = "—"
 SHORT_SHA = 7
 PENDING = "pending"
 IN_FLIGHT = "in-flight"
+VERBS = ("next", "record", "status")
+MARKERS = ("complete", "blocked", "conflict", "partial", "none")
 RECORD_PLACEHOLDERS = "--agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
 EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
 EXIT_CALLER_ERROR, EXIT_INTERNAL = 4, 1
@@ -106,6 +110,61 @@ def invocation(argv0: str, path: str) -> str:
     here = os.path.dirname(os.path.abspath(argv0))
     entries = (os.path.abspath(entry) for entry in path.split(os.pathsep) if entry)
     return SCRIPT if here in entries else SELF_HOST_INVOCATION
+
+
+# --- The command line -------------------------------------------------------------------------
+
+
+class CallerError(Exception):
+    """A call the driver refuses: it names its code, says how to fix it, and wrote nothing."""
+
+    def __init__(self, code: str, message: str, counts: Iterations | None = None) -> None:
+        super().__init__(message)
+        self.code, self.message, self.counts = code, message, counts
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise CallerError(
+            "usage",
+            f"The arguments could not be read because {message}. To fix: see {self.prog} --help.",
+        )
+
+
+def _build_parser(description: str | None) -> argparse.ArgumentParser:
+    parser = _Parser(prog=SCRIPT, description=description)
+    parser.formatter_class = argparse.RawDescriptionHelpFormatter
+    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{" + ",".join(VERBS) + "}")
+    for verb in VERBS:
+        sub = verbs.add_parser(verb)
+        sub.add_argument("slug", help="task slug under .ai-work/<slug>/")
+        sub.add_argument("--repo-root", help="git repo root (default: from git)")
+        sub.add_argument("--worktree-root", help="root holding .ai-work/ (default: --repo-root)")
+        sub.add_argument("--base-ref", help="git ref the reconciler diffs against")
+    verbs.choices["status"].add_argument("--json", action="store_true", help="print the object")
+    record = verbs.choices["record"]
+    record.add_argument("--request", required=True, help="the pending request's id")
+    record.add_argument("--agent-id", help="the agentId the Agent tool result carries")
+    record.add_argument("--marker", choices=MARKERS, help="the agent's terminal marker")
+    record.add_argument("--not-started", metavar="REASON", help="the Agent call never started")
+    return parser
+
+
+def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
+    """Read one call's arguments; `description` is the help text the entry script carries."""
+    args = _build_parser(description).parse_args(argv)
+    if args.verb == "record":
+        relayed = args.agent_id is not None or args.marker is not None
+        if relayed == (args.not_started is not None):
+            problem = "give --agent-id with --marker, or --not-started, and not both"
+        elif relayed and not (args.agent_id and args.marker):
+            problem = "--agent-id and --marker go together, and the id is not empty"
+        elif args.not_started is not None and not args.not_started.strip():
+            problem = "--not-started needs a reason"
+        else:
+            return args
+        _Parser(prog=f"{SCRIPT} record").error(problem)
+    return args
 
 
 # --- The four constructors, one per kind of outcome ----------------------------------------

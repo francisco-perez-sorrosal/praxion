@@ -192,6 +192,19 @@ def test_an_unreadable_or_unsafe_agent_has_no_cap(isolated_state, agent_type):
     assert declared_cap(agent_type, str(isolated_state / "repo")) is None
 
 
+@pytest.mark.parametrize("definition", [b"\xff\xfe\x00 maxTurns: 40", b"---\n\xc3(\n---\n"])
+def test_an_undecodable_definition_has_no_cap(isolated_state, definition):
+    path = isolated_state / "repo" / ".claude" / "agents" / f"{BARE_AGENT}.md"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(definition)
+
+    assert declared_cap(BARE_AGENT, str(isolated_state / "repo")) is None
+
+
+def test_a_working_directory_no_file_can_have_gives_no_cap(isolated_state):
+    assert declared_cap(BARE_AGENT, "/repo\x00/x") is None
+
+
 # --- the reminder decision ----------------------------------------------------------------
 
 
@@ -286,9 +299,11 @@ def test_a_transcript_with_an_unidentified_request_gives_nothing(implementer):
 
 
 def test_a_transcript_in_another_session_is_not_searched_for(implementer):
-    other = implementer / "projects" / "q" / "other-session" / "subagents"
+    other = implementer / "config" / "projects" / "q" / "other-session" / "subagents"
     other.mkdir(parents=True)
-    (other / f"agent-{AGENT}.jsonl").write_text("")
+    own = _transcript(implementer, 90)
+    (other / own.name).write_text(own.read_text())
+    own.unlink()
 
     assert reminder_line(_call(implementer)) is None
 
@@ -361,24 +376,30 @@ def test_the_main_session_path_never_loads_the_transcript_reader():
     assert "_agent_transcript" not in run.stderr
 
 
-def test_the_script_fails_open_when_the_work_raises(tmp_path):
-    runner = tmp_path / "boom.py"
+def test_the_script_fails_open_when_the_work_raises(implementer, monkeypatch):
+    """A reminder is due, then claiming its marker raises; the script must still exit 0."""
+    cap = hook._max_turns(IMPLEMENTER_DEFINITION.read_text(encoding="utf-8"))
+    _transcript(implementer, cap)
+    runner = implementer / "boom.py"
     runner.write_text(
-        "import runpy, sys\n"
+        "import os, runpy, sys\n"
         f"sys.path.insert(0, {str(HOOKS_DIR)!r})\n"
-        "import remind_turn_budget as hook\n"
-        "hook.reminder_line = lambda call: 1 / 0\n"
-        f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__', init_globals=vars(hook))\n"
+        "def boom(*args, **kwargs):\n"
+        "    raise PermissionError('injected')\n"
+        "os.open = boom\n"
+        f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n"
     )
+    parent = implementer / "projects" / "p" / f"{SESSION}.jsonl"
+    monkeypatch.setenv("TMPDIR", str(implementer / "tmp"))
     run = subprocess.run(
         [sys.executable, str(runner)],
-        input=_payload(),
+        input=_payload(transcript_path=str(parent)),
         capture_output=True,
         text=True,
         timeout=30,
     )
 
-    assert (run.returncode, run.stdout) == (0, "")
+    assert (run.returncode, run.stdout, run.stderr) == (0, "", "")
 
 
 # --- shipped texts and registration -------------------------------------------------------

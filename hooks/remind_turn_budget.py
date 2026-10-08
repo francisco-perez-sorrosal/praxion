@@ -11,8 +11,8 @@ at 60 percent and one at 80 percent of that cap, once per agent and threshold, a
 Advisory by construction: it exits 0 on every path, so a failure of any kind is a missed
 reminder and never a blocked tool call. It is silent for the main session (the payload carries
 no `agent_id`, even for a `--agent` session, which carries `agent_type` only) and for an agent
-whose definition declares no cap. The main-session path opens no file and imports nothing
-heavier than the opt-out helper: the hook runs on every tool call of every session.
+whose definition declares no cap. The main-session path opens no file and never loads the
+transcript reader: the hook runs on every tool call of every session.
 
 The once-state is an empty marker file per agent and threshold, claimed with `O_EXCL` so that
 concurrent calls emit at most once. Stdlib only and 3.9-safe.
@@ -117,7 +117,7 @@ def declared_cap(agent_type: str, cwd: str) -> int | None:
     for path in _definition_paths(agent_type, cwd):
         try:
             text = path.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, ValueError):  # unreadable, undecodable, or a path no file can have
             continue
         return _max_turns(text)
     return None

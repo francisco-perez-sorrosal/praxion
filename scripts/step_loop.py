@@ -4,10 +4,14 @@
     step_loop.py next   <slug> [--repo-root DIR] [--worktree-root DIR] [--base-ref REF]
     step_loop.py record <slug> --request ID (--agent-id ID --marker MARKER | --not-started REASON)
     step_loop.py status <slug> [--json]
+    step_loop.py goal   <slug> --goal S --check C --expects E --paths P... [--protect P...]
+                        --iterations N
 
 `next` reads the plan, `WIP.md`, the iteration ledger, the light-review files and the task brief,
 asks the reconciler for ground truth and prints the loop's one next action. `record` takes back
-what an agent left. `status` reports without writing. There are exactly these three verbs.
+what an agent left. `status` reports without writing. `goal` scaffolds a one-step goal plan in
+the repository it is run from (no location options) and prints `{"schema", "slug", "files",
+"warnings"}`, or refuses and writes nothing. There are exactly these four verbs.
 
 Defaults: `--repo-root` is the git top level of the current directory, `--worktree-root` (the
 root holding `.ai-work/`) is `--repo-root`, `--base-ref` is the merge-base with the default
@@ -52,6 +56,7 @@ from typing import Any, Protocol, Union
 import _step_loop_cli as cli
 import _step_loop_record as rec
 from _goal_record import protected_set
+from _goal_scaffold import scaffold
 from _handoff_inputs import resolve_base_ref
 from _loop_fields import GoalBudget, OutstandingAttempt, parse_attempts
 from _plan_steps import PlanStep, parse_plan_steps
@@ -282,6 +287,8 @@ def execute(argv: Sequence[str], *, echo: Sequence[str] = ()) -> Reply:
         args = cli.parse(argv, __doc__)
         program = cli.invocation(sys.argv[0], os.environ.get("PATH", ""))
         invoke = Invocation(program, tuple(echo))
+        if args.verb == cli.GOAL_VERB:  # there is no plan to read yet
+            return Reply(*scaffold(args))
         return _VERBS[args.verb](read_task(args), args, invoke)
     except CallerError as error:
         return _failure(args, error.code, error.message, error.counts)

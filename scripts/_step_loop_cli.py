@@ -59,6 +59,7 @@ SHORT_SHA = 7
 PENDING = "pending"
 IN_FLIGHT = "in-flight"
 VERBS = ("next", "record", "status")
+GOAL_VERB = "goal"
 MARKERS = ("complete", "blocked", "conflict", "partial", "none")
 RECORD_PLACEHOLDERS = "--agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
 EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
@@ -134,7 +135,8 @@ class _Parser(argparse.ArgumentParser):
 def _build_parser(description: str | None) -> argparse.ArgumentParser:
     parser = _Parser(prog=SCRIPT, description=description)
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
-    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{" + ",".join(VERBS) + "}")
+    offered = (*VERBS, GOAL_VERB)
+    verbs = parser.add_subparsers(dest="verb", required=True, metavar="{" + ",".join(offered) + "}")
     for verb in VERBS:
         sub = verbs.add_parser(verb)
         sub.add_argument("slug", help="task slug under .ai-work/<slug>/")
@@ -147,7 +149,20 @@ def _build_parser(description: str | None) -> argparse.ArgumentParser:
     record.add_argument("--agent-id", help="the agentId the Agent tool result carries")
     record.add_argument("--marker", choices=MARKERS, help="the agent's terminal marker")
     record.add_argument("--not-started", metavar="REASON", help="the Agent call never started")
+    _add_goal_verb(verbs)
     return parser
+
+
+def _add_goal_verb(verbs: Any) -> None:
+    """`goal` takes no location options: it scaffolds in the repository it is run from."""
+    goal = verbs.add_parser(GOAL_VERB)
+    goal.add_argument("slug", help="task slug under .ai-work/<slug>/")
+    goal.add_argument("--goal", required=True, help="the goal, one sentence")
+    goal.add_argument("--check", required=True, help="the command whose pytest summary judges it")
+    goal.add_argument("--expects", required=True, help="what the check must show, pass=3 fail=0")
+    goal.add_argument("--paths", nargs="+", help="the files an iteration may change")
+    goal.add_argument("--protect", nargs="+", default=[], help="paths no iteration may change")
+    goal.add_argument("--iterations", required=True, help="how many iterations the loop may spend")
 
 
 def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
@@ -221,7 +236,10 @@ def error_envelope(frame: Frame, code: str, message: str) -> dict[str, Any]:
 
 
 def exit_code(doc: Mapping[str, Any]) -> int:
-    """A total function of the outcome and, for an error, its code."""
+    """A total function of the outcome and, for an error, its code; an object with no outcome
+    (the scaffold `goal` prints) is a success."""
+    if "outcome" not in doc:
+        return 0
     if doc["outcome"] == "error":
         return EXIT_INTERNAL if doc["error"]["code"] == INTERNAL else EXIT_CALLER_ERROR
     return EXIT_BY_OUTCOME[doc["outcome"]]

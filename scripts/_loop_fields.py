@@ -27,6 +27,17 @@ Only the keys a check declares are judged. `pending` is read from the raw text
 of the `Result:` line, because the shared result parser does not know that key;
 absent means 0.
 
+Normative grammar of the `Iterations:` line -- one logical line in the step block,
+at column 0 or as a list item, the label optionally bold and case-insensitive,
+outside code fences:
+
+    Iterations: <n>
+
+with `<n>` a whole number of at least 1. A step that declares it is a goal step
+whose budget is `<n>` iterations; a step that does not is bound by the attempt
+cap. A value that is not such a number, or a step holding two `Iterations:`
+lines, reads as unreadable, never as a default.
+
 Normative grammar of the `Attempts:` line -- a self-naming sub-bullet, never a
 checkbox, one line outside code fences, anywhere in `WIP.md`:
 
@@ -49,6 +60,7 @@ outstanding attempt carries no replan text; such a line is unreadable.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Union
 
@@ -282,6 +294,91 @@ def _observed_pending(raw_line: str) -> int | None:
 # Fresh attempts before a step goes to a human; the authoritative prose is the
 # attempt-cap paragraph in agent-pipeline-details, section "Completion handshake".
 ATTEMPT_CAP = 2
+
+
+@dataclass(frozen=True)
+class AttemptCap:
+    """An ordinary step: bounded by `ATTEMPT_CAP` fresh attempts."""
+
+
+@dataclass(frozen=True)
+class GoalBudget:
+    """A goal step: bounded by `iterations` iterations, or earlier by a stall."""
+
+    iterations: int
+
+    def __post_init__(self) -> None:
+        if self.iterations < 1:
+            raise ValueError(f"an iteration budget is at least 1, got {self.iterations}")
+
+
+@dataclass(frozen=True)
+class UnreadableIterations:
+    """An `Iterations:` value that is no whole number of at least 1, as written."""
+
+    text: str
+
+
+Bound = Union[AttemptCap, GoalBudget]  # noqa: UP007 -- runtime value, 3.9 floor
+BoundReading = Union[AttemptCap, GoalBudget, UnreadableIterations]  # noqa: UP007 -- ditto
+
+# Consecutive implement records that kept no commit before a goal step is stalled.
+STALL_RUN = 2
+
+_ITERATIONS_LINE_RE = re.compile(
+    r"^\s*(?:[-*+]\s+)?\*{0,2}Iterations\*{0,2}\s*:\s*\*{0,2}\s*(?P<value>.*)$", re.IGNORECASE
+)
+_ITERATIONS_VALUE_RE = re.compile(r"^[0-9]+$")
+
+
+def parse_iterations(value: str) -> int | UnreadableIterations:
+    """An `Iterations:` value -> its count, or `UnreadableIterations` quoting it."""
+    text = value.strip().rstrip("*").strip()
+    if _ITERATIONS_VALUE_RE.match(text) and int(text) >= 1:
+        return int(text)
+    return UnreadableIterations(value.strip())
+
+
+def parse_step_iterations(plan_text: str) -> dict[str, int | UnreadableIterations]:
+    """Map each `"Step <id>"` that declares `Iterations:` to its count; others have no entry.
+
+    Reads each step block of the plan outside code fences. A step holding two
+    `Iterations:` lines reads as unreadable.
+    """
+    declared: dict[str, list[str]] = {}
+    for block in split_step_blocks(plan_text):
+        found = [
+            match["value"]
+            for match in map(_ITERATIONS_LINE_RE.match, _unfenced_lines(block.text))
+            if match
+        ]
+        if found and block.step is not None:
+            declared.setdefault(block.step, []).extend(found)
+    return {
+        step: parse_iterations(values[0])
+        if len(values) == 1
+        else UnreadableIterations("; ".join(value.strip() for value in values))
+        for step, values in declared.items()
+    }
+
+
+def request_cap(bound: Bound) -> int:
+    """The highest `attempt` a request for a step with this bound may carry."""
+    return bound.iterations if isinstance(bound, GoalBudget) else ATTEMPT_CAP
+
+
+def is_spent(bound: Bound, implement_records: Sequence[tuple[int, str | None]]) -> bool:
+    """Whether a series' implement records, as `(attempt, commit)` in ledger order, spend the bound.
+
+    An ordinary step is spent at the attempt cap. A goal step is spent when it
+    stalls: its last `STALL_RUN` records all kept no commit, so any kept
+    iteration resets the run. The budget itself is the action layer's stop.
+    """
+    if isinstance(bound, GoalBudget):
+        last = implement_records[-STALL_RUN:]
+        return len(last) == STALL_RUN and all(commit is None for _, commit in last)
+    return max((attempt for attempt, _ in implement_records), default=0) >= ATTEMPT_CAP
+
 
 # A request id is a short, shell- and path-safe token the step-loop driver derives.
 REQUEST_ID_PATTERN = "[a-z0-9][a-z0-9-]*"

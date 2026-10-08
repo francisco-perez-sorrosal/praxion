@@ -13,11 +13,15 @@ label optionally bold and case-insensitive; a line in a code fence is no field:
     ### Step <id>: <title> [depends-on: <id>, <id>] [parallel-group: <name>]
     **Assignee**: implementer
     **Read-only**: `tests/a.py`, `tests/b.py::test_x`
+    **Iterations**: 5
 
 Any assignee but `implementer` (or none) is another assignee: the loop never runs
 the step. A `tier: H` line routes to `opus`, else `sonnet`, never `haiku`; a
 `review:` line reads `force` or `off`, else absent. A dependency that names no step, or a cycle,
-is recorded as written: whoever selects a step reports it. `Read-only:` entries
+is recorded as written: whoever selects a step reports it. An `Iterations:` line (a
+whole number of at least 1, grammar in `_loop_fields`) makes the step a goal step
+with that budget; without one the step is bound by the attempt cap, and a value
+that breaks the grammar is kept as an unreadable bound, never defaulted. `Read-only:` entries
 are the backticked spans (a path, `path::function` or a node id) or, with no
 backtick, the comma-separated words; each holds a `/` or `::`. A `contract:`
 clause names a contract the step uses and never turns green, so it is no entry.
@@ -42,7 +46,15 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Union
 
-from _loop_fields import CheckLine, parse_step_checks
+from _loop_fields import (
+    AttemptCap,
+    BoundReading,
+    CheckLine,
+    GoalBudget,
+    UnreadableIterations,
+    parse_step_checks,
+    parse_step_iterations,
+)
 from _step_schema import (
     STEP_ID_RE,
     StepBlock,
@@ -93,6 +105,7 @@ class PlanStep:
     files: tuple[str, ...]
     read_only: tuple[str, ...]
     check: CheckLine | None
+    bound: BoundReading = AttemptCap()
 
     def __post_init__(self) -> None:
         if STEP_ID_RE.match(self.id) is None:
@@ -133,7 +146,16 @@ def _read_step(opening: StepBlock, label: str) -> PlanStep:
             entry for value in fields.get("read-only", []) for entry in _node_entries(value)
         ),
         check=parse_step_checks(block).get(label),
+        bound=_read_bound(block, label),
     )
+
+
+def _read_bound(block: str, label: str) -> BoundReading:
+    """The step's bound: its `Iterations:` budget, or the attempt cap when it declares none."""
+    declared = parse_step_iterations(block).get(label)
+    if declared is None:
+        return AttemptCap()
+    return declared if isinstance(declared, UnreadableIterations) else GoalBudget(declared)
 
 
 _HEADING_RE = re.compile(r"^(#{1,6})[ \t]")

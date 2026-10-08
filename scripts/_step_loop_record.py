@@ -8,8 +8,7 @@ derived here, in phases:
    `agent_stop` row), waiting at most `PRAXION_STEP_LOOP_END_WAIT_SECONDS` for it. Until then
    the call is refused and nothing is written, so the request stays pending.
 2. **Return**: the turns (its distinct API requests; unknown when a line did not parse), the
-   agent definition's `maxTurns`, the marker (the transcript's wins over the relay) and the
-   stop reason.
+   agent definition's `maxTurns`, the marker (the transcript's over the relay) and the stop reason.
 3. **Gate**: the derived test scope of the declared files that differ from HEAD, and the
    step's `Check:`, run here and never colour-forced; both land in one `TEST_RESULTS.md`
    block ending on the deciding line, and the reconciler reads the verdict as if the request
@@ -48,7 +47,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     request_count,
 )
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
-from _loop_fields import OutstandingAttempt  # noqa: E402
+from _loop_fields import GoalBudget, OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
 from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
 from _step_loop_files import (  # noqa: E402
@@ -142,6 +141,10 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
         return record_review(task, spawn, agent_id, relayed)
+    if isinstance(step.bound, GoalBudget):  # judged by progress, never by verification
+        from _goal_record import record_goal
+
+        return record_goal(task, spawn, agent_id, relayed)
     asked = spawn_request(task.slug, step, key, step_cap(step), str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
     seen = await_end(task.repo, request, agent_id, max_turns)
@@ -356,7 +359,7 @@ def await_end(
 
 def sight(repo: Path, agent_id: str, max_turns: int | None) -> Sighting:
     """The transcript now, and whether the gate's evidence shows the agent has ended."""
-    path, raw = read_agent(agent_id)
+    path, raw = read_agent(agent_id, cwd=repo)
     reading = salvaged(path, raw)
     evidence = end_evidence(reading, max_turns, agent_stopped(repo, agent_id))
     unreadable = isinstance(raw, Unreadable) or (isinstance(raw, Read) and raw.malformed)

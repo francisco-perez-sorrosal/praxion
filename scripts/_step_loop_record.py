@@ -98,6 +98,10 @@ POLL_SECONDS = 0.5
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 WIP_FILE = "WIP.md"
 TRAILER = "Step-Loop-Request: "
+_HOOKS_REFUSED = "the gate passed, but the repository's hooks refused the step-loop driver's commit"
+_HOOK_FIX = (
+    "To fix: make the declared files pass that hook; they stay staged as the attempt left them"
+)
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
 _MARKER_OF_STOP = {"completed": "complete", **{m: m for m in ("blocked", "conflict", "partial")}}
 
@@ -464,8 +468,7 @@ def judge_commit(task: TaskView, request: str, outcome: CommitOutcome) -> Commit
     if isinstance(outcome, NothingToCommit):
         return Committing(None, None)
     if isinstance(outcome, CommitRefused):
-        refused = "the step-loop driver's commit was refused by the repository's hooks"
-        return Committing(None, f"{refused}: {_first_line(outcome.detail)}")
+        return Committing(None, f"{_HOOKS_REFUSED}: {_one_line(outcome.detail)}. {_HOOK_FIX}")
     if isinstance(outcome, CommitInterrupted):
         why = f"the step-loop driver's commit did not finish: {_first_line(outcome.detail)}"
         _save_snapshot(task, request, outcome.after.patch_text(), why)
@@ -496,6 +499,10 @@ def _lock_note(repo: Path) -> str:
     found = run_git(repo, "rev-parse", "--git-path", "index.lock")
     lock = repo / found.stdout.strip() if found.returncode == 0 else None
     return f"; {lock} exists: remove it once no git is running" if lock and lock.exists() else ""
+
+
+def _one_line(text: str) -> str:
+    return " ".join(text.split()) or "no detail"
 
 
 def _first_line(text: str) -> str:

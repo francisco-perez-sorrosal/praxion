@@ -2,13 +2,16 @@
 
 A block already written under a goal request's heading is replaced by the gate's own run, so a
 worker that can write the task directory cannot decide an iteration with a forged green line. An
-ordinary step still reads its written block back. The scratch goal checkout and the verbs come
-from ``scripts/test_goal_record.py``, which holds the recorder's behaviour through the `record`
-verb.
+ordinary step still reads its written block back. An iteration whose commit the repository's hooks
+refuse keeps its work in the tree and carries the hook's words to the next worker and to the
+stall. The scratch goal checkout and the verbs come from ``scripts/test_goal_record.py``, which
+holds the recorder's behaviour through the `record` verb.
 """
 
 from __future__ import annotations
 
+import json
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,7 +27,10 @@ from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_files import gate_heading, write_gate_block  # noqa: E402
 from _step_loop_state import LoopInputs  # noqa: E402
 from test_goal_record import (  # noqa: E402,F401
+    EXIT_STOP,
+    SLUG,
     STEP_NUMBER,
+    WIDGET,
     Goal,
     Work,
     ask,
@@ -33,10 +39,21 @@ from test_goal_record import (  # noqa: E402,F401
     do_work,
     effects,
     head,
+    iterate,
     leave_transcript,
     ledger,
     record,
     sandbox,  # the autouse environment of the scratch checkout
+    tree_text,
+    verb,
+    widget_source,
+)
+from test_loop_hook_refusal import (  # noqa: E402
+    GATE_PASSED,
+    LINT_WORDS,
+    THE_FIX,
+    failing,
+    refuse_commits,
 )
 
 STEP_LABEL = "Step " + STEP_NUMBER
@@ -144,3 +161,55 @@ def test_a_record_run_again_over_a_rewritten_block_appends_nothing_twice(
         settled,
     )
     assert reading in block_deciding_line(goal, request)
+
+
+# --- A commit the repository's hooks refuse -------------------------------------------------------
+
+FIRST_WIDGET = ("one",)
+
+
+def refused_goal(tmp_path: Path) -> Goal:
+    """A goal checkout whose every commit meets a failing hook."""
+    goal = build_goal(tmp_path)
+    refuse_commits(goal.root, failing("lint", LINT_WORDS))
+    return goal
+
+
+def latest_reading_slot(goal: Goal) -> str:
+    """The goal prompt's latest-reading slot, for the request `next` issues now."""
+    issued = verb(goal, "next", SLUG).doc["request"]
+    prompt = (goal.task_dir / f"PROMPT_{issued['id']}.md").read_text(encoding="utf-8")
+    found = re.search(r"<latest-reading[^>]*>\n(.*?)\n</latest-reading>", prompt, re.DOTALL)
+    assert found is not None
+    return found.group(1)
+
+
+def test_an_iteration_the_hooks_refuse_commits_nothing_and_leaves_its_work_in_the_tree(tmp_path):
+    goal = refused_goal(tmp_path)
+    before = head(goal)
+
+    _, reply = iterate(goal, Work(implemented=FIRST_WIDGET))
+
+    assert (reply.recorded["commit"], head(goal), ledger(goal)[0]["commit"]) == (None, before, None)
+    assert tree_text(goal, WIDGET) == widget_source(FIRST_WIDGET)
+
+
+def test_the_next_goal_prompt_reads_the_hooks_words_in_its_latest_reading(tmp_path):
+    goal = refused_goal(tmp_path)
+    iterate(goal, Work(implemented=FIRST_WIDGET))
+
+    slot = latest_reading_slot(goal)
+
+    assert (GATE_PASSED in slot, LINT_WORDS in slot, THE_FIX in slot) == (True,) * 3
+
+
+def test_two_iterations_in_a_row_the_hooks_refuse_stop_as_a_stall_that_names_the_hook(tmp_path):
+    goal = refused_goal(tmp_path)
+    iterate(goal, Work(implemented=FIRST_WIDGET))
+    iterate(goal, Work(implemented=FIRST_WIDGET))
+
+    stopped = verb(goal, "next", SLUG)
+
+    shown = json.dumps([stopped.stop["attempts"], stopped.stop["replan_request"]])
+    assert (stopped.code, stopped.stop["cause"]) == (EXIT_STOP, "stalled")
+    assert (GATE_PASSED in shown, LINT_WORDS in shown) == (True, True)

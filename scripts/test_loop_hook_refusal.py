@@ -1,7 +1,10 @@
-"""Tests for the words a refused commit is reduced to (``scripts/_step_loop_io.py``).
+"""Tests for the words a refused commit is reduced to (``scripts/_step_loop_io.py``) and for
+what an ordinary step's record says about them (``scripts/_step_loop_record.py``).
 
 The excerpt function is tested on output text alone; one case runs a real hook in a scratch
-repository and reads the refusal back through ``commit_paths``.
+repository and reads the refusal back through ``commit_paths``. The record cases run the `record`
+and `next` verbs over the scratch checkout of ``scripts/test_goal_record.py``, with an ordinary
+step in its plan.
 """
 
 from __future__ import annotations
@@ -18,6 +21,24 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from _git_runner import run_git  # noqa: E402
 from _step_loop_io import CommitRefused, commit_paths, hook_words  # noqa: E402
+from test_goal_record import (  # noqa: E402,F401
+    CHECK_COMMAND,
+    FUNCTIONS,
+    SHARED,
+    SLUG,
+    STEP_LABEL,
+    WIDGET,
+    Work,
+    ask,
+    build_goal,
+    do_work,
+    leave_transcript,
+    ledger,
+    put,
+    record,
+    sandbox,  # the autouse environment of the scratch checkout
+    verb,
+)
 
 LIMIT = 300
 PROMPT_SECONDS = 1.0
@@ -26,6 +47,19 @@ MARKER = "…"
 DOTS = "." * 40
 MESSAGE = "Add the thing\n\nStep-Loop-Request: abc123\n"
 IDENTITY = {"user.name": "Tester", "user.email": "tester@example.invalid"}
+ALL_WIDGETS = tuple(name for name, _ in FUNCTIONS)
+AGENT = "a1b2c3d4e5f60718"
+ORDINARY_PLAN = (
+    f"# Plan: ordinary task\n\n## Steps\n\n### {STEP_LABEL}: Make every widget test pass\n\n"
+    "**Assignee**: implementer\n"
+    f"**Files**: `{WIDGET}`, `{SHARED}`\n"
+    f"**Check**: `{CHECK_COMMAND}` expects pass=3 fail=0\n"
+)
+LINT_WORDS = "lint says no"
+GATE_PASSED = "the gate passed, but the repository's hooks refused the step-loop driver's commit"
+THE_FIX = (
+    "To fix: make the declared files pass that hook; they stay staged as the attempt left them"
+)
 
 
 def status(name: str, verdict: str, note: str = "") -> str:
@@ -154,3 +188,39 @@ def test_a_real_hook_refusal_reaches_the_caller_as_the_hooks_own_words(scratch: 
         "Passed" in outcome.detail,
         "\n" in outcome.detail,
     ) == (True, False, False)
+
+
+def refuse_commits(root: Path, lines: list[str]) -> None:
+    """Make every commit in the scratch checkout fail a pre-commit hook printing `lines`."""
+    install_hook(root, hook_script(lines))
+    git(root, "config", "core.hooksPath", str(root / ".git" / "hooks"))
+
+
+def refused_attempt(tmp_path: Path):
+    """An ordinary step whose attempt passes the gate and meets a refusing hook; its checkout."""
+    goal = build_goal(tmp_path)
+    put(goal.task_dir, "IMPLEMENTATION_PLAN.md", ORDINARY_PLAN)
+    refuse_commits(goal.root, failing("lint", LINT_WORDS))
+    request = ask(goal)
+    do_work(goal, Work(implemented=ALL_WIDGETS, progress=False))
+    leave_transcript(goal, request, AGENT, Work())
+    return goal, record(goal, request)
+
+
+def test_an_ordinary_attempt_whose_commit_the_hooks_refuse_says_the_gate_passed(tmp_path: Path):
+    goal, reply = refused_attempt(tmp_path)
+
+    deciding = ledger(goal)[0]["test_result"]
+    said = positions(deciding, "Result: none", GATE_PASSED, "lint", LINT_WORDS, THE_FIX)
+    assert (said == sorted(said), "\n" in deciding, reply.recorded["commit"]) == (True, False, None)
+
+
+def test_the_next_prompt_carries_the_hook_refusal_as_the_previous_attempts_evidence(
+    tmp_path: Path,
+):
+    goal, _ = refused_attempt(tmp_path)
+
+    again = verb(goal, "next", SLUG).doc["request"]
+
+    prompt = (goal.task_dir / f"PROMPT_{again['id']}.md").read_text(encoding="utf-8")
+    assert (GATE_PASSED in prompt, LINT_WORDS in prompt, THE_FIX in prompt) == (True,) * 3

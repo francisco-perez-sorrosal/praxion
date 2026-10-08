@@ -645,7 +645,7 @@ Direct and Lightweight tiers have no phases. The discipline collapses to the int
 
 ### Automated mode
 
-Interactive (pauses on) is the default. When the user **explicitly** requests an automated run, the pauses are suppressed — but assumption capture and digest composition are **retained**: the digest is written as a post-hoc record for review instead of presented as a live pause. The loop degrades to a record; it is not deleted. Automated is an execution mode orthogonal to the Direct/Lightweight/Standard/Full tier.
+Interactive (pauses on) is the default. When the user **explicitly** requests an automated run, the pauses are suppressed — but assumption capture and digest composition are **retained**: the digest is written as a post-hoc record for review instead of presented as a live pause. The loop degrades to a record; it is not deleted. Automated and Ralph-lite are execution modes orthogonal to the Direct/Lightweight/Standard/Full tier.
 
 ## Doc-Engineer Parallel Execution
 

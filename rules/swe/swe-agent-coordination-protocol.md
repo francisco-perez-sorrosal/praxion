@@ -15,7 +15,7 @@ Assess the task before starting work. Each tier prescribes what to do — higher
 | Tier | Signals | Process |
 |------|---------|---------|
 | **Direct** | Single-file fix, config, doc, typo | Fix → verify → commit. No agents, no planning documents, no spec. |
-| **Lightweight** | 2-3 files, single behavior, clear scope | Optional researcher; no other agents (escalate to Standard if architect/planner needed). Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. |
+| **Lightweight** | 2-3 files, single behavior, clear scope | Optional researcher; no other agents (escalate to Standard if architect/planner needed). Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. A single pytest-checkable behaviour may run as [Ralph-lite](../../skills/software-planning/references/tier-templates.md#ralph-lite) (`/praxion:ralph-lite`), an execution mode, not a tier. |
 | **Standard** | 4-8 files, 2-4 behaviors, architectural decisions | Full agent pipeline. [SDD](../../skills/spec-driven-development/SKILL.md) behavioral spec with REQ IDs. [Three-document model](../../skills/software-planning/SKILL.md). |
 | **Full** | 9+ files, 5+ behaviors, cross-cutting | Standard plus parallel execution, doc-engineer in groups, context-engineer shadowing, structured decisions, spec archival. |
 | **Spike** | Exploratory, outcome uncertain | Timeboxed researcher. Decision in LEARNINGS.md. No implementation until resolved. |
@@ -124,7 +124,7 @@ The human-in-the-loop half of the Conversation discipline (the agent-side half i
 
 Full digest-curation, acknowledgement-shape, rollback-routing, and degraded-mode procedure for every checkpoint above: [`coordination-details.md#conversation-checkpoints`](../../skills/software-planning/references/coordination-details.md#conversation-checkpoints).
 
-Direct/Lightweight tiers have no phases — the discipline collapses to the Intake Clarity Gate (Lightweight; Direct uses only intake `Surface Assumptions`) plus a pre-commit digest. Interactive (pauses on) is the default; an explicitly requested automated run suppresses the pauses but still captures assumptions and writes the digest as a post-hoc record. Automated is an execution mode orthogonal to the tier.
+Direct/Lightweight tiers have no phases — the discipline collapses to the Intake Clarity Gate (Lightweight; Direct uses only intake `Surface Assumptions`) plus a pre-commit digest. Interactive (pauses on) is the default; an explicitly requested automated run suppresses the pauses but still captures assumptions and writes the digest as a post-hoc record. Automated and Ralph-lite are execution modes orthogonal to the tier.
 
 ### Agent Selection Criteria
 

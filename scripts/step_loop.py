@@ -60,6 +60,7 @@ from _step_loop_cli import CallerError
 from _step_loop_files import set_attempts_line, snapshot_requests, write_prompt, write_stop_handoff
 from _step_loop_io import paths_differing_from_head
 from _step_loop_render import (
+    Invocation,
     PromptInputs,
     SpawnRequest,
     render_prompt,
@@ -154,7 +155,7 @@ def _required(path: Path) -> str:
 
 
 def run_next(
-    task: Task, args: argparse.Namespace, invoke: str, took: rec.Taken | None = None
+    task: Task, args: argparse.Namespace, invoke: Invocation, took: rec.Taken | None = None
 ) -> Reply:
     """The next action, carrying what a `record` took back."""
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
@@ -171,7 +172,7 @@ def run_next(
     return Reply(doc, (stop_stderr(view), *lines))
 
 
-def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: str) -> Reply:
+def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: Invocation) -> Reply:
     request = spawn_request(task.slug, action.step, action.key, ATTEMPT_CAP, str(task.dir))
     request = replace(request, reissued=action.reissued)
     path = Path(request.prompt_path)
@@ -217,7 +218,7 @@ def _write_ahead(task: Task, action: Spawn) -> None:
     set_attempts_line(task.dir / WIP_FILE, action.step.id, OutstandingAttempt(count, key.id))
 
 
-def run_status(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
+def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
     inputs, action = task.inputs, issuable_action(task.inputs)
     stop = None
     lines: tuple[str, ...] = ()
@@ -227,20 +228,10 @@ def run_status(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
     status = cli.status_object(task.slug, inputs, series_states(inputs), action, stop)
     if args.json:
         return Reply(status, lines)
-    return Reply(status, lines, cli.status_table(status, _next_line(task, action, invoke)))
+    return Reply(status, lines, cli.status_table(status, cli.next_line(task.slug, action, invoke)))
 
 
-def _next_line(task: Task, action: Union[Spawn, Complete, Stop], invoke: str) -> str:  # noqa: UP007
-    if isinstance(action, Spawn) and action.reissued:
-        return f"the Agent call for {action.key.id} is pending; record it when it ends"
-    if isinstance(action, Spawn):
-        return f"run `{invoke} next {task.slug}` to start {action.key.id}"
-    if isinstance(action, Complete):
-        return "every step is done"
-    return f"stopped ({action.cause}): {action.evidence}"
-
-
-def run_record(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
+def run_record(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
     try:
         rec.require_known(task.inputs, args.request)
         took = rec.take_back(task, args.request, args.agent_id, args.marker)
@@ -249,7 +240,7 @@ def run_record(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
     return run_next(read_task(args), args, invoke, took)
 
 
-_VERBS: Mapping[str, Callable[[Task, argparse.Namespace, str], Reply]] = {
+_VERBS: Mapping[str, Callable[[Task, argparse.Namespace, Invocation], Reply]] = {
     "next": run_next,
     "record": run_record,
     "status": run_status,
@@ -259,12 +250,14 @@ _VERBS: Mapping[str, Callable[[Task, argparse.Namespace, str], Reply]] = {
 # --- One call, and the loop a test drives -------------------------------------------------------
 
 
-def execute(argv: Sequence[str]) -> Reply:
-    """Run one call; every failure becomes the one envelope its code names."""
+def execute(argv: Sequence[str], *, echo: Sequence[str] = ()) -> Reply:
+    """Run one call; every failure becomes the one envelope its code names. The commands it
+    prints end with `echo`, the options this call was given that the person should repeat."""
     args = None
     try:
         args = cli.parse(argv, __doc__)
-        invoke = cli.invocation(sys.argv[0], os.environ.get("PATH", ""))
+        program = cli.invocation(sys.argv[0], os.environ.get("PATH", ""))
+        invoke = Invocation(program, tuple(echo))
         return _VERBS[args.verb](read_task(args), args, invoke)
     except CallerError as error:
         return _failure(args, error.code, error.message, error.counts)
@@ -307,10 +300,24 @@ class Spawner(Protocol):
     def spawn(self, request: Mapping[str, Any]) -> SpawnReturn: ...
 
 
-def drive(spawner: Spawner, slug: str, location: Sequence[str] = ()) -> Mapping[str, Any]:
+Observer = Callable[[Mapping[str, Any], SpawnReturn, Mapping[str, Any]], None]
+
+
+def drive(
+    spawner: Spawner,
+    slug: str,
+    location: Sequence[str] = (),
+    *,
+    echo: bool = False,
+    observe: Observer | None = None,
+) -> Mapping[str, Any]:
     """Relay `next` and `record` through `spawner` until the outcome is not a spawn, or until a
-    request never started (the withdrawal's envelope returns: whether to retry is the caller's)."""
-    doc = execute(["next", slug, *location]).doc
+    request never started (the withdrawal's envelope returns: whether to retry is the caller's).
+
+    With `echo` every command a call prints ends with `location`; `observe` hears each
+    request, the spawner's return and the envelope its `record` printed, once per record."""
+    shown = tuple(location) if echo else ()
+    doc = execute(["next", slug, *location], echo=shown).doc
     while doc["outcome"] == "spawn" and doc.get("recorded", {}).get("stop_reason") != "not-started":
         request = doc["request"]
         returned = spawner.spawn(request)
@@ -318,7 +325,11 @@ def drive(spawner: Spawner, slug: str, location: Sequence[str] = ()) -> Mapping[
             relay = ["--agent-id", returned.agent_id, "--marker", returned.marker]
         else:
             relay = ["--not-started", returned.reason]
-        doc = execute(["record", slug, "--request", request["id"], *relay, *location]).doc
+        doc = execute(
+            ["record", slug, "--request", request["id"], *relay, *location], echo=shown
+        ).doc
+        if observe is not None:
+            observe(request, returned, doc)
     return doc
 
 

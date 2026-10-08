@@ -26,7 +26,7 @@ from _step_loop_action import (
     iteration_budget,
     iterations_used,
 )
-from _step_loop_render import PriorAttempt, SpawnRequest, StopView
+from _step_loop_render import Invocation, PriorAttempt, SpawnRequest, StopView
 from _step_loop_review import (
     Accepted,
     Due,
@@ -180,7 +180,7 @@ def _envelope(frame: Frame, outcome: str, **parts: Any) -> dict[str, Any]:
     return doc
 
 
-def spawn_envelope(frame: Frame, request: SpawnRequest, invoke: str) -> dict[str, Any]:
+def spawn_envelope(frame: Frame, request: SpawnRequest, invoke: str | Invocation) -> dict[str, Any]:
     """A request is pending: the Agent call to make and the `record` call that follows it."""
     key, call = request.key, request.agent_call
     shown = {
@@ -198,7 +198,9 @@ def spawn_envelope(frame: Frame, request: SpawnRequest, invoke: str) -> dict[str
         "prompt_path": request.prompt_path,
         "reissued": request.reissued,
     }
-    then = f"{invoke} record {frame.slug} --request {key.id} {RECORD_PLACEHOLDERS}"
+    then = Invocation.of(invoke).command(
+        "record", frame.slug, "--request", key.id, RECORD_PLACEHOLDERS
+    )
     return _envelope(frame, "spawn", request=shown, then=then)
 
 
@@ -206,7 +208,9 @@ def complete_envelope(frame: Frame) -> dict[str, Any]:
     return _envelope(frame, "complete")
 
 
-def stop_envelope(frame: Frame, stop: Stop, invoke: str, handoff: Path) -> dict[str, Any]:
+def stop_envelope(
+    frame: Frame, stop: Stop, invoke: str | Invocation, handoff: Path
+) -> dict[str, Any]:
     """The loop has stopped: `needs-human`, or `budget-exhausted` for the budget cause."""
     outcome = "budget-exhausted" if stop.cause == BUDGET_CAUSE else "needs-human"
     return _envelope(frame, outcome, stop=stop_object(frame.slug, stop, invoke, handoff))
@@ -238,12 +242,12 @@ def prior_attempt(record: IterationRecord) -> PriorAttempt:
     )
 
 
-def stop_view(stop: Stop, slug: str, invoke: str) -> StopView:
+def stop_view(stop: Stop, slug: str, invoke: str | Invocation) -> StopView:
     attempts = tuple(prior_attempt(record) for record in stop.attempts)
     return StopView(stop.cause, stop.step, stop.evidence, attempts, slug, invoke)
 
 
-def stop_object(slug: str, stop: Stop, invoke: str, handoff: Path) -> dict[str, Any]:
+def stop_object(slug: str, stop: Stop, invoke: str | Invocation, handoff: Path) -> dict[str, Any]:
     return {
         "cause": stop.cause,
         "step": stop.step,
@@ -251,7 +255,7 @@ def stop_object(slug: str, stop: Stop, invoke: str, handoff: Path) -> dict[str, 
         "attempts": [_attempt_object(record) for record in stop.attempts],
         "replan_request": stop.replan_request,
         "handoff": str(handoff),
-        "resume": f"{invoke} next {slug}",
+        "resume": Invocation.of(invoke).command("next", slug),
     }
 
 
@@ -355,6 +359,17 @@ def _attempts_of(state: Series) -> int:
     if isinstance(state, (Failed, Exhausted, Marked)):
         return spent(state.attempts)
     return 0
+
+
+def next_line(slug: str, action: Action, invoke: str | Invocation) -> str:
+    """The status table's last line: what to run, or what is pending, done or stopped."""
+    if isinstance(action, Spawn) and action.reissued:
+        return f"the Agent call for {action.key.id} is pending; record it when it ends"
+    if isinstance(action, Spawn):
+        return f"run `{Invocation.of(invoke).command('next', slug)}` to start {action.key.id}"
+    if isinstance(action, Complete):
+        return "every step is done"
+    return f"stopped ({action.cause}): {action.evidence}"
 
 
 def status_table(status: Mapping[str, Any], next_line: str) -> str:

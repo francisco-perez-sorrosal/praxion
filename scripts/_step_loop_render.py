@@ -14,6 +14,7 @@ text outside the step block or a second `Read-only:` line.
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 from typing import Literal, NamedTuple, cast, get_args
 
@@ -272,6 +273,27 @@ def attempt_columns(attempt: PriorAttempt, agent_label: str) -> list[str]:
     ]
 
 
+@dataclass(frozen=True)
+class Invocation:
+    """How the command was started and the options a printed command echoes (empty unless asked).
+
+    `command` is the one place a printed command is built. It lives here, beside the texts that
+    embed it, because the CLI module imports this one and not the reverse.
+    """
+
+    program: str
+    location: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, invoke: str | Invocation) -> Invocation:
+        """A plain program string stands for an invocation with no options to echo."""
+        return invoke if isinstance(invoke, cls) else cls(invoke)
+
+    def command(self, verb: str, slug: str, *rest: str) -> str:
+        quoted = tuple(shlex.quote(option) for option in self.location)
+        return " ".join((self.program, verb, slug, *rest, *quoted))
+
+
 class StopView(NamedTuple):
     """A stop as its surfaces show it; `evidence` is the one line the loop state wrote."""
 
@@ -280,7 +302,7 @@ class StopView(NamedTuple):
     evidence: str
     attempts: tuple[PriorAttempt, ...]
     slug: str
-    invoke: str
+    invoke: str | Invocation
 
 
 _ACTIONS = {  # `{step}` is the stop's step id
@@ -312,14 +334,15 @@ def stop_stderr(stop: StopView) -> str:
         f"step_loop: stopped — {what} ({stop.cause}).",
         *("  " + "  ".join(attempt_columns(a, "")) for a in stop.attempts),
         f"  Why: {stop.evidence}",
-        f"  Next: {action}, then run: {stop.invoke} next {stop.slug}",
+        f"  Next: {action}, then run: {Invocation.of(stop.invoke).command('next', stop.slug)}",
         f"  Handoff: .ai-work/{stop.slug}/HANDOFF.md (§2 carries this stop)",
     ])  # fmt: skip
 
 
 def stop_next_action(stop: StopView) -> str:
     """The paragraph that becomes the handoff's next-action section."""
-    budget, resume = stop.cause == "iteration-budget", f"{stop.invoke} next {stop.slug}"
+    budget = stop.cause == "iteration-budget"
+    resume = Invocation.of(stop.invoke).command("next", stop.slug)
     what = "iteration budget used up" if budget else stop.cause
     action = _ACTIONS[stop.cause].format(step=stop.step)
     owed = "Orchestrator action owed" if stop.cause == "not-driven" else "Human decision owed"

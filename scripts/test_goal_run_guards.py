@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import _goal_run  # noqa: E402
-from _goal_run import Treatment, classify  # noqa: E402
+from _goal_run import Preconditions, Reporter, Treatment, classify  # noqa: E402
+from _plan_steps import parse_plan_steps  # noqa: E402
+from _step_loop_files import worker_marker_path, worker_result_path  # noqa: E402
 from test_goal_run import (  # noqa: E402
     CHECK_COMMAND,
     PROTECTED_DOC,
@@ -248,7 +251,9 @@ def test_the_progress_file_outside_the_repository_is_allowed_by_its_absolute_pat
 
 BASE_PROGRAM = "claude-base"
 STRAY = "conftest.py"
-TOLERATED_STRAYS = ("src/__pycache__/widget.pyc", ".ai-work/other/notes.txt")
+IGNORED_STRAYS = ("src/__pycache__/widget.pyc", ".ai-work/other/notes.txt")
+OTHER_TASK_FILE = ".ai-work/other/notes.txt"
+UNIGNORED = ".gitignore"
 EXTRA_DENY = "Bash(git commit *)"
 RAISED_BUDGET = 9
 PLAN = "IMPLEMENTATION_PLAN.md"
@@ -289,7 +294,7 @@ def writes(path: str, text: str) -> str:
     )
 
 
-def settings_with(scratch: Scratch, allow: list[str], extra_deny: list[str] = ()) -> str:
+def settings_with(scratch: Scratch, allow: list[str], extra_deny: Sequence[str] = ()) -> str:
     deny = [*deny_rules(scratch.root), *extra_deny]
     return writes(SETTINGS, json.dumps({"permissions": {"deny": deny, "allow": allow}}))
 
@@ -302,6 +307,18 @@ def raises_the_budget(scratch: Scratch) -> str:
 
 def commit_files(scratch: Scratch) -> list[str]:
     return git(scratch.root, "show", "--name-only", "--format=", "HEAD").splitlines()
+
+
+def attempt_lines(scratch: Scratch) -> list[str]:
+    wip = (scratch.task_dir / "WIP.md").read_text("utf-8")
+    return [line.strip() for line in wip.splitlines() if "- Attempts:" in line]
+
+
+def stop_ignoring_the_task_directories(scratch: Scratch) -> None:
+    """A checkout whose `.gitignore` no longer hides `.ai-work/`: its files count unless they
+    lie in the goal's own task directory."""
+    put(scratch.root, UNIGNORED, "__pycache__/\n.pytest_cache/\n.claude/\n")
+    git(scratch.root, "commit", "-qam", "stop ignoring the task directories")
 
 
 def ledger_requests(scratch: Scratch) -> list[str]:
@@ -337,6 +354,18 @@ def test_the_iteration_that_left_the_file_is_kept_by_its_step_files_only(looped)
     assert commit_files(looped) == [WIDGET]
     assert len(ledger_stop_reasons(looped)) == 1
     assert (looped.root / STRAY).exists()
+
+
+def test_the_request_that_would_have_followed_is_withdrawn_unspent(looped):
+    after_call(looped, 1, writes(STRAY, "x = 1\n"))
+    second = f"s{STEP}-a2-implement"
+
+    looped.run()
+
+    assert ledger_requests(looped) == [f"s{STEP}-a1-implement"]
+    assert attempt_lines(looped) == [f"- Attempts: Step {STEP} count=2 request={second}"]
+    assert not worker_marker_path(looped.task_dir, second).exists()
+    assert not worker_result_path(looped.task_dir, second).exists()
 
 
 def test_the_request_that_would_have_followed_is_issued_again_once_the_file_is_gone(looped):
@@ -419,14 +448,35 @@ def test_a_change_outside_the_step_files_is_refused_before_any_worker(scratch, p
     assert scratch.calls() == []
 
 
-@pytest.mark.parametrize("path", TOLERATED_STRAYS)
-def test_an_ignored_file_and_the_task_directories_do_not_refuse(scratch, path):
+@pytest.mark.parametrize("path", IGNORED_STRAYS)
+def test_an_ignored_file_does_not_refuse(scratch, path):
     put(scratch.root, path, "x\n")
 
     reply = scratch.run()
 
     assert reply.exit != 4, reply.doc
     assert len(scratch.calls()) == 1
+
+
+def test_the_goals_own_task_directory_does_not_refuse_even_when_not_ignored(scratch):
+    stop_ignoring_the_task_directories(scratch)
+    put(scratch.task_dir, "notes.txt", "x\n")
+
+    reply = scratch.run()
+
+    assert reply.exit != 4, reply.doc
+    assert len(scratch.calls()) == 1
+
+
+def test_another_tasks_directory_refuses_when_not_ignored(scratch):
+    stop_ignoring_the_task_directories(scratch)
+    put(scratch.root, OTHER_TASK_FILE, "x\n")
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "usage")
+    assert OTHER_TASK_FILE in reply.doc["error"]["message"], reply.doc
+    assert scratch.calls() == []
 
 
 def test_a_change_inside_the_step_files_does_not_refuse(scratch):
@@ -453,3 +503,45 @@ def test_a_completed_run_names_the_file_no_commit_holds(tmp_path):
     assert line.startswith("step_loop: "), line
     assert STRAY in line
     assert "no commit holds" in line
+
+
+# --- A tree or plan that cannot be read comes back as a failure, never as an exception --------
+
+
+def unreadable_repository(tmp_path: Path) -> Path:
+    repo = tmp_path / "broken"
+    repo.mkdir()
+    (repo / ".git").write_text("not a git file\n", encoding="utf-8")
+    return repo
+
+
+def guard_for(scratch: Scratch, repo: Path | None = None) -> Preconditions:
+    plan = (scratch.task_dir / PLAN).read_text("utf-8")
+    (goal,) = (step for step in parse_plan_steps(plan) if step.id == STEP)
+    return Preconditions(goal, repo or scratch.root, scratch.task_dir, (CHECK_COMMAND, RESOLVER))
+
+
+def causes_naming(standing, text: str) -> list[str]:
+    return [failure.cause for failure in standing.failures if text in failure.cause]
+
+
+def test_a_plan_that_is_not_text_is_a_failure_naming_it(scratch):
+    guard = guard_for(scratch)
+    (scratch.task_dir / PLAN).write_bytes(b"\xff\xfe\x00 not utf-8")
+
+    assert causes_naming(guard.standing(), PLAN)
+
+
+def test_a_tree_git_cannot_read_is_a_failure_not_an_exception(scratch, tmp_path):
+    guard = guard_for(scratch, unreadable_repository(tmp_path))
+
+    assert causes_naming(guard.standing(), "tree cannot be read")
+
+
+def test_a_tree_git_cannot_read_does_not_turn_a_completed_run_into_an_error(tmp_path):
+    reporter = Reporter(tmp_path, unreadable_repository(tmp_path), (WIDGET,))
+
+    (line,) = reporter.closing({"outcome": "complete"})
+
+    assert line.startswith("step_loop: complete")
+    assert "could not be read" in line

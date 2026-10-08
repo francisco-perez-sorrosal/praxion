@@ -43,7 +43,7 @@ from _step_loop_files import (
     worker_marker_path,
     worker_result_path,
 )
-from _step_loop_io import paths_differing_from_head
+from _step_loop_io import GitCommandError, paths_differing_from_head
 
 SHORT_SHA = 7
 SUCCESS = "success"
@@ -218,7 +218,10 @@ def _missing_rules(goal: PlanStep, repo: Path) -> tuple[Failure, ...]:
 
 
 def _outside_files(goal: PlanStep, repo: Path, directory: Path) -> tuple[Failure, ...]:
-    stray = changed_outside_files(repo, directory, goal.files)
+    try:
+        stray = changed_outside_files(repo, directory, goal.files)
+    except (GitCommandError, OSError) as error:
+        return (Failure(f"the tree cannot be read ({error})", "make the repository readable"),)
     if not stray:
         return ()
     return (
@@ -233,8 +236,8 @@ def _outside_files(goal: PlanStep, repo: Path, directory: Path) -> tuple[Failure
 def _edited_plan(goal: PlanStep, directory: Path) -> tuple[Failure, ...]:
     try:
         steps = parse_plan_steps((directory / PLAN_FILE).read_text("utf-8"))
-    except OSError as error:
-        return (Failure(f"{PLAN_FILE} cannot be read ({error.strerror})", "restore the plan"),)
+    except (OSError, ValueError) as error:
+        return (Failure(f"{PLAN_FILE} cannot be read ({error})", "restore the plan"),)
     if any(step.id == goal.id and step.digest == goal.digest for step in steps):
         return ()
     return (
@@ -409,7 +412,13 @@ class Reporter:
             return (said, f"{SUMMARY_PREFIX}to resume, run: {stop['resume']}")
         if self.repo is None or doc.get("outcome") != "complete":
             return ()
-        stray = changed_outside_files(self.repo, self.directory, self.files)
+        try:
+            stray = changed_outside_files(self.repo, self.directory, self.files)
+        except (GitCommandError, OSError) as error:
+            unread = (
+                f"complete, but the tree could not be read for changes outside Files: ({error})"
+            )
+            return (f"{SUMMARY_PREFIX}{unread}",)
         if not stray:
             return ()
         left = f"{SUMMARY_PREFIX}complete, but changes outside the goal step's Files: stand"

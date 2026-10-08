@@ -27,6 +27,7 @@ from _step_loop_render import (  # noqa: E402
     SpawnRequest,
     StopView,
     commit_message,
+    parse_request_id,
     render_prompt,
     section_body,
     spawn_request,
@@ -205,6 +206,42 @@ def test_a_request_id_uses_only_lowercase_letters_digits_and_hyphens():
 def test_a_key_that_breaks_the_grammar_is_refused(bad, complaint):
     with pytest.raises(ValueError, match=complaint):
         RequestKey(**bad)
+
+
+ROUND_TRIP_KEYS = [
+    RequestKey("7", 1, "implement"),
+    RequestKey("12b", 2, "implement"),
+    RequestKey("7", 3, "implement", series=2),
+    RequestKey("1", 1, "review", round=1),
+    RequestKey("1", 2, "review", series=3, round=2),
+    RequestKey("1", 1, "revise", round=1),
+    RequestKey("12b", 2, "revise", series=2, round=1),
+]
+
+
+@pytest.mark.parametrize("key", ROUND_TRIP_KEYS, ids=[key.id for key in ROUND_TRIP_KEYS])
+def test_parsing_a_request_id_gives_back_the_key_that_wrote_it(key):
+    assert parse_request_id(key.id) == key
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "not-a-request",
+        "s1-a1-implement-r1",
+        "s1-a1-review",
+        "s1-a0-implement",
+        "s1-p1-a1-implement",
+        "s1-a01-implement",
+        "s1-a1-review-r0",
+        "S1-a1-implement",
+        "s1-a1-implement ",
+        "s1-a1-bogus",
+    ],
+)
+def test_text_that_is_the_id_of_no_key_parses_to_none(text):
+    assert parse_request_id(text) is None
 
 
 # --- The Agent call and the request ---

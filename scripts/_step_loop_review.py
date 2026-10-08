@@ -24,10 +24,11 @@ Normative reading of the state, first match wins:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Union
 
 from _plan_steps import PlanStep
+from iteration_ledger import IterationRecord
 
 REVIEW_FORCED = "force"
 REVIEW_OFF = "off"
@@ -121,3 +122,26 @@ def review_state(
             return Unfinished()
         return ReviseDue(reviews) if revises == 0 else RevisedTwice()
     return Requested(reviews + 1) if verdict == UNFINISHED else Due(reviews + 1)
+
+
+def review_record(
+    reviewed: IterationRecord,
+    request: str,
+    agent_id: str,
+    stop_reason: str,
+    turns: int | None,
+    max_turns: int | None,
+) -> IterationRecord:
+    """The ledger record of a reviewer's return. The review does not re-judge the work: the
+    attempt, verdict, deciding source and evidence are the reviewed record's, and no commit
+    holds the review (it changed nothing the loop commits). What the reviewer decided is in
+    its file, read by `file_verdict`."""
+    return replace(
+        reviewed,
+        agent_id=agent_id,
+        commit=None,
+        stop_reason=stop_reason,
+        request=request,
+        turns=turns,
+        max_turns=max_turns,
+    )

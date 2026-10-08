@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal, NamedTuple, get_args
+from typing import Literal, NamedTuple, cast, get_args
 
 from _markdown_tables import find_section, split_lines
 from _plan_steps import PlanStep
@@ -57,6 +57,30 @@ class RequestKey:
         series = f"-p{self.series}" if self.series >= 2 else ""
         round_ = f"-r{self.round}" if self.round else ""
         return f"s{self.step}{series}-a{self.attempt}-{self.kind}{round_}"
+
+
+_REQUEST_RE = re.compile(
+    r"s(?P<step>[0-9]+[a-z]?)(?:-p(?P<series>[0-9]+))?-a(?P<attempt>[0-9]+)"
+    r"-(?P<kind>implement|revise|review)(?:-r(?P<round>[0-9]+))?"
+)
+
+
+def parse_request_id(text: str) -> RequestKey | None:
+    """The key whose `id` is `text`, or None when `text` is the id of no key."""
+    found = _REQUEST_RE.fullmatch(text)
+    if found is None:
+        return None
+    try:
+        key = RequestKey(
+            found["step"],
+            int(found["attempt"]),
+            cast(Kind, found["kind"]),
+            int(found["series"] or 1),
+            int(found["round"]) if found["round"] else None,
+        )
+    except ValueError:
+        return None
+    return key if key.id == text else None
 
 
 @dataclass(frozen=True)

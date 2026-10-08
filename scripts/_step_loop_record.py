@@ -20,7 +20,7 @@ derived here, in phases:
    sees the attempt unverified; the last two (and a repository whose commands cannot run) also
    leave a `TREE_SNAPSHOT_<request>.patch`, which keeps the loop stopped for a person until
    they delete it.
-5. **Ledger**: exactly one record per return.
+5. **Ledger**: exactly one record per return (a light reviewer's skips phases 3 and 4).
 
 Every phase is keyed by the request, so a call cut off part-way completes when run again: a
 gate block for the request reuses its runs, a HEAD commit naming the request reuses its sha,
@@ -81,6 +81,7 @@ from _step_loop_io import (  # noqa: E402
 )
 from _step_loop_record_gate import TaskView, add_refusal, read_verdict, run_gate  # noqa: E402
 from _step_loop_render import SpawnRequest, commit_message, spawn_request  # noqa: E402
+from _step_loop_review import file_verdict, review_record  # noqa: E402
 from _step_loop_settle import (  # noqa: E402
     PROMPT_FILE,
     Warnings,
@@ -89,7 +90,7 @@ from _step_loop_settle import (  # noqa: E402
     tick_step,
     withdraw_line,
 )
-from _step_loop_state import VERIFIED, LoopInputs, bare_id  # noqa: E402
+from _step_loop_state import VERIFIED, LoopInputs, bare_id, series_work  # noqa: E402
 from iteration_ledger import IterationRecord  # noqa: E402
 
 END_WAIT_VARIABLE = "PRAXION_STEP_LOOP_END_WAIT_SECONDS"
@@ -140,7 +141,7 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     spawn = _pending(task.inputs, request)
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
-        raise NotImplementedError("recording a light review lands in a later increment")
+        return record_review(task, spawn, agent_id, relayed)
     asked = spawn_request(task.slug, step, key, ATTEMPT_CAP, str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
     seen = await_end(task.repo, request, agent_id, max_turns)
@@ -177,6 +178,33 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     warnings += edit_warnings(task, step, request)
     taken = recorded_object(record, marker, summary)
     return Taken(taken, step.id, warnings)
+
+
+def record_review(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> Taken:
+    """A light reviewer's return: neither gated nor committed, one ledger record that carries
+    the reviewed work's verdict. What the reviewer decided is the verdict word of its file."""
+    step, key = spawn.step, spawn.key
+    reviewed = next(
+        (r for r in reversed(series_work(task.inputs, step)) if r.verdict == VERIFIED), None
+    )
+    if reviewed is None:
+        raise RecordRefusedError(
+            "request-not-pending",
+            f"record failed because {key.id} reviews no verified work. To fix: run status.",
+        )
+    asked = spawn_request(task.slug, step, key, ATTEMPT_CAP, str(task.dir))
+    max_turns = declared_max_turns(asked.agent_call.subagent_type)
+    seen = await_end(task.repo, key.id, agent_id, max_turns)
+    marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)
+    record = review_record(reviewed, key.id, agent_id, stop_reason, seen.turns, max_turns)
+    append_ledger_record(task.dir, record)
+    verdict = file_verdict(task.inputs.reviews.get(step.id))
+    summary = (
+        f"appended {record.step} attempt {record.attempt}: review {verdict or 'without a verdict'}"
+    )
+    return Taken(
+        recorded_object(record, marker, summary, review_verdict=verdict), step.id, warnings
+    )
 
 
 def withdraw_request(task: TaskView, request: str) -> Taken:
@@ -244,9 +272,15 @@ def _pending(inputs: LoopInputs, request: str) -> Spawn:
 
 
 def recorded_object(
-    record: IterationRecord, marker: str, ledger: str | None, *, replayed: bool = False
+    record: IterationRecord,
+    marker: str,
+    ledger: str | None,
+    *,
+    replayed: bool = False,
+    review_verdict: str | None = None,
 ) -> dict[str, Any]:
-    """The envelope's `recorded` object for a ledger record."""
+    """The envelope's `recorded` object for a ledger record; `review_verdict` is the reviewer's
+    verdict word (accept, revise or partial), none for any other kind of return."""
     return {
         "request": record.request,
         "agent_id": record.agent_id,
@@ -259,7 +293,7 @@ def recorded_object(
             "decided_by": record.decided_by,
             "evidence": record.test_result,
         },
-        "review_verdict": None,
+        "review_verdict": review_verdict,
         "commit": record.commit,
         "ledger": ledger,
         "replayed": replayed,

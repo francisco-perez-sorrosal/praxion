@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Union
 
 from _loop_fields import ATTEMPT_CAP, OutstandingAttempt
 from _plan_steps import PlanStep
-from _step_loop_render import Kind, RequestKey
+from _step_loop_render import Kind, RequestKey, parse_request_id
 from _step_loop_review import (
     Due,
     Requested,
@@ -57,6 +57,7 @@ from _step_loop_state import (
     Selection,
     Verified,
     is_driven,
+    review_range,
     select_step,
     series_states,
     spent,
@@ -139,6 +140,18 @@ def next_action(inputs: LoopInputs) -> Action:
     return _human_stop(inputs, selection) or _budget_stop(inputs) or _spawn(selection)
 
 
+def issuable_action(inputs: LoopInputs) -> Action:
+    """The action a call can issue: `next_action`, except that a review request whose series
+    holds no commit is a stop, because the reviewer's prompt names the diff to read."""
+    action = next_action(inputs)
+    if not (isinstance(action, Spawn) and action.key.kind == "review"):
+        return action
+    if review_range(inputs, action.step) is not None:
+        return action
+    why = f"{STEP_LABEL}{action.step.id} is due a light review and no commit holds its work"
+    return Stop("loop-state-defect", None, why)
+
+
 def _human_stop(inputs: LoopInputs, selection: Next | Defects) -> Stop | None:
     outstanding = sorted(s for s, a in inputs.attempts.items() if isinstance(a, OutstandingAttempt))
     if len(outstanding) > 1:
@@ -215,6 +228,11 @@ def _budget_stop(inputs: LoopInputs) -> Stop | None:
 
 
 def _running_key(step: PlanStep, state: Running) -> RequestKey:
+    """The outstanding request, of any kind, when its id names this step and series; else the
+    series' own implement request, which the caller finds different from the id WIP names."""
+    named = parse_request_id(state.request)
+    if named is not None and named.step == step.id and named.series == state.series:
+        return named
     return RequestKey(step.id, state.n, "implement", state.series)
 
 

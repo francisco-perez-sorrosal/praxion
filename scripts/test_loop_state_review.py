@@ -25,6 +25,7 @@ from _step_loop_action import (  # noqa: E402
     Complete,
     Spawn,
     Stop,
+    issuable_action,
     iteration_budget,
     iterations_used,
     next_action,
@@ -50,7 +51,9 @@ from _step_loop_state import (  # noqa: E402
     Next,
     Verified,
     is_done,
+    review_range,
     select_step,
+    series_work,
     step_series,
 )
 from iteration_ledger import IterationRecord  # noqa: E402
@@ -807,3 +810,99 @@ def test_the_snapshot_stop_comes_before_a_marker():
     stop = next_action(disturbed(marked, snapshots=[marked.request]))
 
     assert stop.cause == "commit-disturbed-tree"
+
+
+# --- the range a review reads, and the requests a review leaves outstanding --------------------
+
+FIRST_SHA, SECOND_SHA, THIRD_SHA = "a" * 40, "b" * 40, "c" * 40
+
+
+def committed(record, sha):
+    return replace(record, commit=sha)
+
+
+def ranged(*records, step=FORCED_STEP):
+    return review_range(read([step], records=records), step)
+
+
+def test_a_review_reads_from_before_the_first_commit_of_the_work_to_the_last():
+    work = [committed(verified(FORCED_STEP), FIRST_SHA)]
+
+    assert ranged(*work) == (f"{FIRST_SHA}^", FIRST_SHA)
+
+
+def test_the_range_spans_the_commits_of_the_implement_and_the_revisions_of_the_series():
+    work = [
+        committed(verified(FORCED_STEP), FIRST_SHA),
+        reviewed(FORCED_STEP),
+        committed(revised(FORCED_STEP), SECOND_SHA),
+    ]
+
+    assert ranged(*work) == (f"{FIRST_SHA}^", SECOND_SHA)
+
+
+def test_a_failed_attempt_and_a_review_add_no_commit_to_the_range():
+    work = [rec(FORCED_STEP, 1), committed(verified(FORCED_STEP, 2), FIRST_SHA)]
+    work.append(committed(reviewed(FORCED_STEP), THIRD_SHA))
+
+    assert ranged(*work) == (f"{FIRST_SHA}^", FIRST_SHA)
+
+
+def test_work_that_holds_no_commit_leaves_the_review_no_range():
+    assert ranged(verified(FORCED_STEP)) is None
+
+
+def test_the_work_of_an_earlier_series_is_not_in_the_range():
+    original = one(IMPL, FILES, FORCED, "Original wording.")
+    revised_step = one(IMPL, FILES, FORCED, "Revised wording.")
+    records = [
+        committed(verified(original), FIRST_SHA),
+        committed(verified(revised_step), SECOND_SHA),
+    ]
+
+    assert ranged(*records, step=revised_step) == (f"{SECOND_SHA}^", SECOND_SHA)
+    assert series_work(read([revised_step], records=records), revised_step) == (records[1],)
+
+
+def test_a_review_that_is_due_over_work_with_a_commit_is_issued():
+    inputs = read(PLAN, records=[committed(verified(FORCED_STEP), FIRST_SHA)])
+
+    assert issuable_action(inputs) == Spawn(FORCED_STEP, RequestKey("1", 1, "review", 1, 1))
+
+
+def test_a_review_that_is_due_over_work_with_no_commit_is_a_stop_not_a_spawn():
+    inputs = read(PLAN, records=[verified(FORCED_STEP)])
+
+    stop = issuable_action(inputs)
+
+    assert (stop.cause, stop.step) == ("loop-state-defect", None)
+    assert "no commit holds its work" in stop.evidence
+
+
+def test_an_action_that_is_not_a_review_is_the_next_action_whatever_the_commits():
+    inputs = read(PLAN)
+
+    assert issuable_action(inputs) == next_action(inputs)
+    assert next_action(inputs) == Spawn(FORCED_STEP, RequestKey("1", 1, "implement", 1))
+
+
+@pytest.mark.parametrize("request_id", ["s1-a1-review-r1", "s1-a1-revise-r1", "s1-a1-implement"])
+def test_an_outstanding_request_of_any_kind_naming_the_step_is_reissued(request_id):
+    records = [committed(verified(FORCED_STEP), FIRST_SHA)]
+    waiting = {STEP + "1": OutstandingAttempt(1, request_id)}
+
+    action = act(PLAN, records=records, attempts=waiting)
+
+    assert (action.key.id, action.reissued) == (request_id, True)
+
+
+@pytest.mark.parametrize(
+    "request_id", ["s2-a1-review-r1", "s1-p2-a1-review-r1", "s1-a1-review", "review"]
+)
+def test_an_outstanding_request_naming_another_step_or_series_or_nothing_is_a_defect(request_id):
+    records = [committed(verified(FORCED_STEP), FIRST_SHA)]
+    waiting = {STEP + "1": OutstandingAttempt(1, request_id)}
+
+    action = act(PLAN, records=records, attempts=waiting)
+
+    assert (action.cause, action.step) == ("loop-state-defect", None)

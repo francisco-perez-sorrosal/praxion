@@ -53,6 +53,7 @@ _KIND_RE = re.compile(r"-(implement|revise|review)(?:-r\d+)?$")
 Marker = Literal["BLOCKED", "CONFLICT"]
 MARKED_STOPS: dict[str, Marker] = {"blocked": "BLOCKED", "conflict": "CONFLICT"}  # stop -> marker
 DefectKind = Literal["missing", "cycle", "held"]
+ReviewRange = tuple[str, str]  # (the revision before the work, the last commit of the work)
 
 
 def bare_id(key: str) -> str:
@@ -273,6 +274,22 @@ def _series_of_records(
     if spent(implement) >= ATTEMPT_CAP:
         return Exhausted(implement)
     return Failed(index, implement)
+
+
+def series_work(inputs: LoopInputs, step: PlanStep) -> tuple[IterationRecord, ...]:
+    """The implement and revise records of the step's current series, in ledger order."""
+    return tuple(
+        r
+        for r in inputs.driver_records(step.id)
+        if r.step_digest == step.digest and request_kind(r) in WORK_KINDS
+    )
+
+
+def review_range(inputs: LoopInputs, step: PlanStep) -> ReviewRange | None:
+    """What a light review reads: from the first commit of the series' work to its last (None
+    when none of that work holds a commit). Derived on demand, never stored."""
+    commits = [r.commit for r in series_work(inputs, step) if r.commit]
+    return (f"{commits[0]}^", commits[-1]) if commits else None
 
 
 def _review_of(

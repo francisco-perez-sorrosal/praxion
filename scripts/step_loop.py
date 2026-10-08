@@ -55,7 +55,7 @@ from _handoff_inputs import resolve_base_ref
 from _loop_fields import ATTEMPT_CAP, OutstandingAttempt, parse_attempts
 from _plan_steps import parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
-from _step_loop_action import Complete, Spawn, Stop, next_action
+from _step_loop_action import Complete, Spawn, Stop, issuable_action
 from _step_loop_files import set_attempts_line, snapshot_requests, write_prompt, write_stop_handoff
 from _step_loop_io import paths_differing_from_head
 from _step_loop_render import (
@@ -66,7 +66,7 @@ from _step_loop_render import (
     stop_next_action,
     stop_stderr,
 )
-from _step_loop_state import LoopInputs, request_kind, series_states
+from _step_loop_state import LoopInputs, request_kind, review_range, series_states
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
 
@@ -212,7 +212,7 @@ def run_next(
     task: Task, args: argparse.Namespace, invoke: str, took: rec.Taken | None = None
 ) -> Reply:
     """The next action, carrying what a `record` took back."""
-    action, counts = next_action(task.inputs), cli.iterations_of(task.inputs)
+    action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
     lines = cli.warning_lines(frame.warnings)
     if isinstance(action, Spawn):
@@ -260,6 +260,7 @@ def _prompt_inputs(task: Task, action: Spawn, request: SpawnRequest) -> PromptIn
         findings_text=inputs.reviews.get(step.id, ""),
         previous=previous,
         dirty_files=paths_differing_from_head(task.repo, step.files) if previous else (),
+        review_range=review_range(inputs, step),
     )
 
 
@@ -272,7 +273,7 @@ def _write_ahead(task: Task, action: Spawn) -> None:
 
 
 def run_status(task: Task, args: argparse.Namespace, invoke: str) -> Reply:
-    inputs, action = task.inputs, next_action(task.inputs)
+    inputs, action = task.inputs, issuable_action(task.inputs)
     stop = None
     lines: tuple[str, ...] = ()
     if isinstance(action, Stop):

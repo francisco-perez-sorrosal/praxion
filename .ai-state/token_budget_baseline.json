@@ -167,8 +167,8 @@
     },
     {
       "date": "2026-10-08",
-      "governed_tokens": 16760,
-      "governed_bytes": 65506,
+      "governed_tokens": 16816,
+      "governed_bytes": 65708,
       "basis": "tokenizer"
     }
   ]

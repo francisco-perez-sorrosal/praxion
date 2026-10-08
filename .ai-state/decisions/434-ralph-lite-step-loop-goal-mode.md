@@ -93,3 +93,54 @@ Ralph-lite is **the step-loop driver running a one-step goal plan through a fres
 **`dec-432` is re-affirmed.** The v2 spawner lands as designed behind the same seam, with a process-exit end-evidence source and a second transcript lookup arm; the orchestrator's relay stays the v1 spawner for Standard and Full. Evidence that would justify a future supersession: the live dogfood showing the headless worker's transcript unreadable by the shared reader.
 
 **`dec-262` is re-affirmed.** The tier still measures size and Ralph-lite is still an execution mode; the artifacts a goal plan creates are the loop's state, not process weight. Evidence that would justify a future supersession: a calibration log in which goal-mode runs cannot be told from Lightweight tasks run by hand.
+
+## Status note (orchestrator, 2026-10-08) — built; five narrowings; first live run
+
+Built by the `ralph-lite` pipeline as decided (Claude Code 2.1.293): the `goal` and `run` verbs, the headless
+`claude -p` spawner behind the existing seam, the session-transcript lookup arm, goal mode in the state, gate and
+verdict readers, the skill `skills/ralph-lite/SKILL.md`, the recipe and the Lightweight-row clause, the launch-policy
+clause. Five narrowings of the text above, recorded at design and held through verification: N1 the ledger's turns
+are the transcript's distinct-request count, the one definition, not the result object's `num_turns` (clause 2);
+N2 the goal's targets that read pending are the tests the goal's own check fails, never an error and never a
+`Read-only` entry as such (clause 2); N3 `run` saves each worker's result object as `WORKER_<request>.json` beside
+the task files and `record` reads the worker's end from it (clause 2); N4 `run` never passes `--bare` in this
+increment (clause 8's opt-in lever is a later increment's); N5 `run` is the shipped `drive` loop with the headless
+spawner, and the skill scaffolds and prints the terminal-form command for the person rather than starting it
+(clauses 4 and 5). The planner split the spawner into `scripts/_goal_worker.py` (the headless worker) and `scripts/_goal_run.py` (the `run` verb) instead of the one module named above. Two additions the live run taught: the goal's test module must exist before `goal` runs (pytest
+prints no summary for a missing path, and the scaffold refuses a check the gate could never read), and the goal's
+expectation must encode the whole intent, because the check decides completion. First live run (td-265, a scratch
+worktree, five iterations allowed): the check met in three iterations (the expectation pass>=8 was reached with three of the four named functions pinned; `compute` stayed unpinned, so the reading is "three iterations to the check", not to the whole goal), three pathspec commits with the request trailer,
+no protected path changed, one permission denial absorbed by the worktree's own deny rules; cost $1.35 in total with
+a fixed cost of $0.14 per iteration (ratio 0.46 to 1 against the 3 to 1 trigger); the hand-run comparator (td-301)
+took 35 requests. The falsifier is judged over three runs; this is the first. The frontmatter's `affected_reqs` names the step-loop-driver spec's REQ-34 and REQ-35, the requirements the decision answered when it was written; in the ralph-lite spec that built it, the decision is REQ-23 to REQ-27 (the skill, its two forms, the recipe, the fallback, safe unattended).
+
+## Status note (orchestrator, 2026-10-08, rework round) — eight narrowings from the first verification
+
+The first verification pass (PASS WITH FINDINGS) found that an unattended worker could forge a green gate or loosen
+the loop's bounds through the task directory, that a goal check's `fail=0` constrains nothing, that an interrupt
+orphaned a paid worker, and — surfaced by the architect at the rework — that the headless worker inherited the
+person's own `permissions.allow` rules from the settings files (on the machine that built it: `git add`, `git push`,
+`gh repo` among them). The rework round (Band D, sixteen steps in the same pipeline, Claude Code 2.1.293) narrowed
+the text above in eight further points, held through the second verification pass (PASS WITH FINDINGS at 99e57ebb: 0 FAIL, 9 WARN open and ledgered, after a third round closed the one failed criterion): N6 the worker's
+`--allowedTools` is a write allow-list — the read tools, one `Edit(/<path>)` per entry of the goal step's `Files:`,
+the task's progress file, and the check and resolver shell prefixes; no bare `Edit` or `Write` (clause 2); N7 the
+worker holds only the pre-approvals `run` grants it: `run` reads the user, project and local settings' allow rules,
+mirrors each scoped shell rule as a `--disallowedTools` deny of the same text, refuses before any worker on a
+tool-wide shell rule or any edit rule it cannot mirror, and passes `--strict-mcp-config` (clause 2); N8 `record`
+never reuses a gate block already written for a goal step — the gate runs on every record of a goal iteration,
+whoever wrote the earlier block (clause 2); N9 `run` re-checks its preconditions before every worker, not once: the
+deny rules present, the inherited allows neutralisable, the tree outside the goal's paths and the task directory
+unchanged, the goal step's block at its starting digest; a failure withdraws the request and ends the run before a
+further worker is paid for (clause 6); N10 an edit outside `Files:` is never committed and never restored — the
+restore keeps its declared scope — and it stops the terminal form before the next worker; a run that ends complete
+with one standing discloses it on a closing line (clause 2); N11 the scaffold warns (`check-completes-early`) when a
+goal's expectation can be met with the check's own failing targets still failing; a goal check's `fail=0` is always
+met, `pending=0` makes the goal's own tests part of completion, and requiring it is a later spec amendment
+(clause 2); N12 the unattended-safety claim covers the worker's tool surface: code the check runs is fenced by the
+scratch worktree, the per-iteration and per-loop fuses, N8 and N9, and a person reading the kept commits before the
+scratch branch is merged — a sandbox for the worker's shell and the gate's check run is a later increment
+(clause 6); N13 a hook refusal of work the gate passed is a non-progressing attempt whose evidence names the
+refusing hook's own words and says the gate passed (clause 3). Live evidence of N6 and N7 on 2.1.293: a worker
+under the new argv was denied a write outside its list while its named edits landed, a mirrored `git push *` rule
+denied a dry-run push, and the harness accepted `--strict-mcp-config` with eleven mirrored denies ($0.46 in three
+probes). One reading stays unprobed: whether a new file named in `Files:` can be created through the Write tool under an `Edit(/<path>)` allow (the probes edited existing files); the next live goal that creates a file reads it. The first live run's reading stands as recorded above; no second loop was run in the rework.

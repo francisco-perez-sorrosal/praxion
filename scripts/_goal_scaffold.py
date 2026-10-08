@@ -21,7 +21,14 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from _git_runner import GitUnavailableError, run_git
-from _goal_record import BASELINE_REQUEST, PROGRESS_HEADING, is_protected, protected_set
+from _goal_record import (
+    BASELINE_REQUEST,
+    PROGRESS_HEADING,
+    entry_path,
+    is_protected,
+    names_directory,
+    protected_set,
+)
 from _loop_fields import (
     Check,
     GoalBudget,
@@ -45,8 +52,6 @@ _TASK_FILES = (PLAN_FILE, WIP_FILE, BRIEF_FILE, RESULTS_FILE)
 STEP_ID, TITLE_LIMIT = "1", 60
 PRIMARY_CHECKOUT, SETTINGS_NOT_IGNORED = "primary-checkout", "settings-not-ignored"
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-_DIRECTORY_SUFFIXES = ("/**", "/*", "/")
-_NODE_SEPARATOR = "::"
 
 
 @dataclass(frozen=True)
@@ -79,7 +84,7 @@ def scaffold(args: argparse.Namespace) -> tuple[dict[str, Any], tuple[str, ...]]
     plan = _plan_text(spec)
     _require_reads_back(spec, plan)
     settings = repo / SETTINGS_FILE
-    rules = tuple(_deny_rule(entry, repo) for entry in protected_set(spec.protect))
+    rules = tuple(edit_rule(entry, repo) for entry in protected_set(spec.protect))
     merged = _merged_settings(settings, rules)
     baseline = _baseline(repo, spec)
     task.mkdir(parents=True, exist_ok=True)
@@ -222,13 +227,11 @@ def _baseline(repo: Path, spec: GoalSpec) -> tuple[str, ...]:
     return body
 
 
-def _deny_rule(entry: str, repo: Path) -> str:
+def edit_rule(entry: str, repo: Path) -> str:
     """An edit rule anchored with `/`: a bare file name would match at any depth."""
-    base = entry.partition(_NODE_SEPARATOR)[0].removeprefix("./")
-    directory = base.endswith(_DIRECTORY_SUFFIXES)
-    for suffix in _DIRECTORY_SUFFIXES:
-        base = base.removesuffix(suffix)
-    return f"Edit(/{base}/**)" if directory or (repo / base).is_dir() else f"Edit(/{base})"
+    base = entry_path(entry)
+    directory = names_directory(entry) or (repo / base).is_dir()
+    return f"Edit(/{base}/**)" if directory else f"Edit(/{base})"
 
 
 def _merged_settings(path: Path, rules: tuple[str, ...]) -> dict[str, Any]:

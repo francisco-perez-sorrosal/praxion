@@ -48,6 +48,7 @@ STEP_LABEL = "Step "
 PROMPT_STEM, PROMPT_SUFFIX = "PROMPT", ".md"
 ITERATION_PATCH_STEM, PATCH_SUFFIX = "ITERATION", ".patch"
 WORKER_STEM, WORKER_SUFFIX, WORKER_FILE_VERSION = "WORKER", ".json", 1
+STARTED_SUFFIX = ".started"
 META_UNREADABLE, REQUEST_FIDELITY = "meta-unreadable", "request-fidelity"
 DEFAULT_FILE_MODE, MODE_MASK = 0o644, 0o777
 _RESULT_PREFIX, _BLOCK_HEADING_PREFIX, _COMMAND_PREFIX = "Result:", "## ", "Command:"
@@ -319,6 +320,16 @@ class WorkerEnd:
     max_turns: int
 
 
+def worker_result_path(task_dir: Path, request: str) -> Path:
+    """The file a headless worker's end is written to."""
+    return task_dir / f"{WORKER_STEM}_{request}{WORKER_SUFFIX}"
+
+
+def worker_marker_path(task_dir: Path, request: str) -> Path:
+    """The marker written before a worker is launched, so a launch is never repeated blind."""
+    return task_dir / f"{WORKER_STEM}_{request}{STARTED_SUFFIX}"
+
+
 def write_worker_end(
     task_dir: Path,
     request: str,
@@ -330,7 +341,7 @@ def write_worker_end(
     stdout_tail: str,
     result: dict[str, object] | None,
 ) -> Path:
-    """`WORKER_<request>.json`: the exited process's end; `result` is the object it printed."""
+    """The exited process's end, in its result file; `result` is the object it printed."""
     document = {
         "v": WORKER_FILE_VERSION,
         "argv": list(argv),
@@ -346,7 +357,7 @@ def write_worker_end(
 
 def read_worker_end(task_dir: Path, request: str) -> NoWorkerResult | WorkerEnd | None:
     """Parse the file once: `None` is no file (relayed); short of a usable result is `NoWorkerResult`."""
-    path = task_dir / f"{WORKER_STEM}_{request}{WORKER_SUFFIX}"
+    path = worker_result_path(task_dir, request)
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:

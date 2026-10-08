@@ -26,7 +26,7 @@ Acted on as follows:
   `TREE_SNAPSHOT_<request>.patch` and a refusal line names the paths, which stops the loop for
   a person (the same stop a disturbed commit makes).
 
-A worker that left a `WORKER_<request>.json` has exited: it is never waited for, only its
+A worker that left its result file has exited: it is never waited for, only its
 transcript is, for the flush. Its file gives the turn bound, the cost and, for the three
 `error_*` subtypes, the stop reason. Every effect is keyed by the request, so a call cut off
 part-way completes when run again: a HEAD commit with the trailer means `Progressing`, an
@@ -94,7 +94,7 @@ KEPT_WORDS = "kept as progress"
 NOT_KEPT_PREFIX = "not kept: "
 SUMMARY_SEPARATOR = "; "
 
-_DIRECTORY_SUFFIXES = ("/**", "/*", "/")
+_DIRECTORY_END_RE = re.compile(r"(?:/\*\*|/\*|/)+$")
 _GLOB_CHARACTERS = frozenset("*?[")
 _PENDING_TOKEN_RE = re.compile(r"(?:^|\s)pending=(?P<count>[0-9]+)(?:\s|$)")
 _SECTION_END_RE = re.compile(r"^#{1,2}[ \t]")
@@ -165,18 +165,24 @@ def changed_protected(changed: Iterable[str], protected: Iterable[str]) -> tuple
     return tuple(path for path in changed if is_protected(path, entries))
 
 
+def entry_path(entry: str) -> str:
+    """The path an entry names, spelled one way: a test node id is cut to its file, a leading
+    `./` is dropped and every trailing `/**`, `/*` and `/` is removed."""
+    return _DIRECTORY_END_RE.sub("", _named(entry))
+
+
+def names_directory(entry: str) -> bool:
+    """Whether the entry is spelled as a directory: it ends in `/`, `/*` or `/**`."""
+    return _DIRECTORY_END_RE.search(_named(entry)) is not None
+
+
+def _named(entry: str) -> str:
+    return entry.partition(NODE_SEPARATOR)[0].removeprefix("./")
+
+
 def _covers(entry: str, path: str) -> bool:
-    base = _entry_base(entry)
+    base = entry_path(entry)
     return path == base or path.startswith(f"{base}/") or _glob_covers(entry, path)
-
-
-def _entry_base(entry: str) -> str:
-    """The path an entry names: a test node id protects its whole file."""
-    base = entry.partition(NODE_SEPARATOR)[0].removeprefix("./")
-    for suffix in _DIRECTORY_SUFFIXES:
-        if base.endswith(suffix):
-            return base.removesuffix(suffix)
-    return base
 
 
 def _glob_covers(entry: str, path: str) -> bool:

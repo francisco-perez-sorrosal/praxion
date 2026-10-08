@@ -25,24 +25,26 @@ from typing import Any
 
 from _goal_record import KEPT_WORDS, judgement_words, protected_set
 from _goal_scaffold import SETTINGS_FILE
-from _goal_scaffold import _deny_rule as deny_rule  # noqa: PLC2701 -- one rule, one spelling
+from _goal_scaffold import edit_rule as deny_rule
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
 from _step_loop_cli import SUMMARY_PREFIX, CallerError, warning_lines
 from _step_loop_files import (
-    WORKER_STEM,
-    WORKER_SUFFIX,
+    STARTED_SUFFIX as STARTED_SUFFIX,  # re-exported: callers name the marker by this suffix
+)
+from _step_loop_files import (
     NoWorkerResult,
     WorkerEnd,
     read_worker_end,
+    worker_marker_path,
+    worker_result_path,
 )
 
 SHORT_SHA = 7
 SUCCESS = "success"
 NOT_STARTED_CODE = "worker-not-started"
 MIN_BUDGET_USD = 0.01  # the smallest the worker's `.2f` bound still states
-STARTED_SUFFIX = ".started"
 
 
 def _refuse(why: str, fix: str) -> CallerError:
@@ -93,10 +95,9 @@ def start_worker(
 
 @dataclass(frozen=True)
 class MarkedWorker:
-    """The headless worker behind a start marker, `WORKER_<request>.started`, written before
-    its process is launched. A request that comes again with no worker file was only previewed
-    (a `next` wrote its attempt) when it has no marker, and starts fresh; with a marker its
-    worker may have run, so it is not started a second time. A worker file that holds no result
+    """The headless worker behind a start marker, written before its process is launched.
+    A request that comes again with no worker file was only previewed (a `next` wrote its
+    attempt) when it has no marker, and starts fresh; with a marker its worker may have run, so it is not started a second time. A worker file that holds no result
     is a process that ended without one and whose request was withdrawn (the next `next` issues
     the same request again, reissued): that is the retry, and the old file and marker go first."""
 
@@ -105,10 +106,10 @@ class MarkedWorker:
     def spawn(self, request: Mapping[str, Any]) -> Any:
         directory, name = self.inner.task_dir, request["id"]
         reissued = bool(request.get("reissued"))
-        marker = directory / f"{WORKER_STEM}_{name}{STARTED_SUFFIX}"
+        marker = worker_marker_path(directory, name)
         found = read_worker_end(directory, name)
         if isinstance(found, NoWorkerResult):
-            (directory / f"{WORKER_STEM}_{name}{WORKER_SUFFIX}").unlink(missing_ok=True)
+            worker_result_path(directory, name).unlink(missing_ok=True)
             marker.unlink(missing_ok=True)
             found = None
         if found is not None or (reissued and marker.exists()):

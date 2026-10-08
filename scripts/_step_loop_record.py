@@ -69,6 +69,7 @@ from _step_loop_gate import (  # noqa: E402
     resolve_marker,
 )
 from _step_loop_io import (  # noqa: E402
+    HOOK_WORDS_LIMIT,
     CommitInterrupted,
     CommitOutcome,
     CommitRefused,
@@ -502,7 +503,9 @@ def _lock_note(repo: Path) -> str:
 
 
 def _one_line(text: str) -> str:
-    return " ".join(text.split()) or "no detail"
+    """The text as one line of at most the hook-words limit (git's own failures run longer)."""
+    line = " ".join(text.split()) or "no detail"
+    return line if len(line) <= HOOK_WORDS_LIMIT else line[: HOOK_WORDS_LIMIT - 1] + "…"
 
 
 def _first_line(text: str) -> str:

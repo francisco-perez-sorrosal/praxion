@@ -13,12 +13,14 @@ import stat
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import _step_loop_record as rec  # noqa: E402
 from _git_runner import run_git  # noqa: E402
 from _step_loop_io import CommitRefused, commit_paths, hook_words  # noqa: E402
 from test_goal_record import (  # noqa: E402,F401
@@ -224,3 +226,14 @@ def test_the_next_prompt_carries_the_hook_refusal_as_the_previous_attempts_evide
 
     prompt = (goal.task_dir / f"PROMPT_{again['id']}.md").read_text(encoding="utf-8")
     assert (GATE_PASSED in prompt, LINT_WORDS in prompt, THE_FIX in prompt) == (True,) * 3
+
+
+def test_a_multi_line_over_long_git_failure_is_recorded_as_one_bounded_line(tmp_path: Path):
+    detail = "\n".join(["fatal: could not stage the file " + "x" * LIMIT] * 3)
+    task = SimpleNamespace(dir=tmp_path, repo=tmp_path)
+
+    failure = rec.judge_commit(task, "s1-a1-implement", CommitRefused(detail)).failure
+
+    start = failure.index(": ") + 2
+    words = failure[start : failure.index(f". {THE_FIX}")]
+    assert ("\n" in failure, len(words) <= LIMIT, words.endswith(MARKER)) == (False, True, True)

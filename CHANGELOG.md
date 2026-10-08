@@ -1,3 +1,54 @@
+## v0.46.0 (2026-10-08)
+
+### Feat
+
+- **pipeline**: Make record enforce the cap and stop the loop for a human or the budget
+- **pipeline**: Make record gate an ended attempt on ground truth and commit it
+- **pipeline**: Land the step-loop command with next and status
+- **pipeline**: Add the step-loop driver's file and transcript adapters
+- **pipeline**: Add the step-loop driver's git and command adapters
+- **handoff**: Let the composer take the driver's next action
+- **hooks**: Add the shared reader of a subagent's own transcript
+- **pipeline**: Add the step-loop state, part two: reviews, budget, precedence
+- **pipeline**: Add the step-loop state, part one: series, selection, done-ness
+- **pipeline**: Add the step-loop driver's pure render module
+- **pipeline**: Add the step-loop driver's pure gate module
+- **pipeline**: Parse a plan step into a typed record
+- **reconciler**: Read an outstanding attempt as in-flight
+- **pipeline**: Let the Attempts line and the ledger carry a request id
+- **instrument**: Count implementer cap-outs per agent type in the context baseline
+- **pipeline**: State the attempt cap once and give the implementer its Check consumer clause
+- **agents**: Pin the fill-as-you-check sentence across the three report agents
+- **planning**: Author the Check field and the attempt line in the plan and WIP templates
+- **registry**: Register the iteration ledger and guard the inventory tree against drift
+- **ledger**: Add the iteration ledger library and CLI
+- **pipeline**: Teach every reader of the verdict vocabulary the attempts-exhausted verdict
+- **reconciler**: Judge each step from its declared check and attempt count
+- **reconciler**: Decide a step from its declared check first, then apply the attempt cap
+- **reconciler**: Parse a step's attempt count and name the attempt cap
+- **reconciler**: Parse and evaluate a plan step's Check line
+- **planning**: Bound the Fix Cycle and in-place verifier rework rounds
+- **planning**: Size plan steps to one agent window, not a file count
+
+### Fix
+
+- **pipeline**: Keep a non-step heading out of a step's verdict and take the runner down on SIGTERM
+- **pipeline**: Resolve the handoff's fork point nearest HEAD and pass the driver's base ref
+- **pipeline**: Close the record pipeline's light-review findings
+- **pipeline**: Harden the step-loop git and command adapters
+- **pipeline**: Make the gate module fail closed on inconsistent pytest output
+- **reconciler**: Route an unreadable ledger record to a human
+- **test-scope**: Split a pocket's selection into collision-free invocations
+- **reconciler**: Emit one JSON shape and report unnamed attempt lines on stderr
+- **reconciler**: Surface an attempts line that names no step and route it to a human
+- **pipeline**: Close the verifier's findings on the step-loop data structures
+- **agents**: Stop the implementer at a committable state, never a commit
+
+### Refactor
+
+- **reconciler**: Move the Files: reader into a plan-step module
+- **reconciler**: Extract the verdict state machine into _step_verdict
+
 ## v0.45.0 (2026-10-04)
 
 ### Feat

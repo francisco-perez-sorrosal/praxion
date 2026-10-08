@@ -24,6 +24,7 @@ affected_files:
   - skills/testing-strategy/references/python-testing.md
 affected_reqs: [REQ-10, REQ-11]
 supersedes_in_part: [dec-388]
+superseded_in_part_by: [dec-draft-304df110]
 ---
 
 ## Context

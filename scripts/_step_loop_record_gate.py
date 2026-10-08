@@ -20,14 +20,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from _loop_fields import Check
+from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
 from _step_loop_files import gate_heading, write_gate_block
 from _step_loop_gate import (
     GateRun,
+    GoalTargets,
     Ownership,
+    PendingRule,
     classify_run,
     gate_result_lines,
+    parse_pytest_summary,
     render_result_line,
 )
 from _step_loop_io import (
@@ -97,8 +100,11 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     done = frozenset(step_id for step_id, state in states.items() if is_done(state))
     ownership = Ownership(step.id, {s.id: s.read_only for s in task.inputs.steps}, done)
     changed = paths_differing_from_head(task.repo, step.files) if step.files else ()
-    scope = scope_run(task.repo, changed, ownership) if changed else None
-    check = check_run(task.repo, step, ownership)
+    if isinstance(step.bound, GoalBudget):
+        scope, check = goal_runs(task.repo, step, changed)
+    else:
+        scope = scope_run(task.repo, changed, ownership) if changed else None
+        check = check_run(task.repo, step, ownership)
     runs = tuple(run for run in (scope, check) if run is not None)
     if not runs:
         runs = (GateRun("", NoRun(NOTHING_SELECTED if changed else NOTHING_RAN)),)
@@ -112,7 +118,28 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     return Gate(body, any(run.red for run in runs))
 
 
-def scope_run(repo: Path, changed: Sequence[str], ownership: Ownership) -> GateRun | None:
+def goal_runs(
+    repo: Path, step: PlanStep, changed: Sequence[str]
+) -> tuple[GateRun | None, GateRun | None]:
+    """A goal step's derived-scope run and check run, the check run first.
+
+    The check's own failing nodes are the goal's targets: both runs pend them and nothing
+    else, so a failure the goal did not ask to fix keeps the iteration red. The check's
+    run decides the targets, which is why it cannot wait behind the scope's.
+    """
+    targets = GoalTargets(frozenset())
+    check: GateRun | None
+    if isinstance(step.check, Check):
+        ran = run_check(repo, step.check.command)
+        summary = None if ran.problem is not None else parse_pytest_summary(ran.output)
+        targets = GoalTargets(frozenset(summary.failed_ids if summary else ()))
+        check = classified(ran, targets, step.check.command)
+    else:
+        check = check_run(repo, step, targets)
+    return (scope_run(repo, changed, targets) if changed else None), check
+
+
+def scope_run(repo: Path, changed: Sequence[str], rule: PendingRule) -> GateRun | None:
     """The derived scope of `changed`, every invocation it lists merged into one run; None when
     the resolver decides no test is needed (a run that failed is red, a run never asked is not)."""
     resolved = run_derived_scope(repo, changed)
@@ -123,7 +150,7 @@ def scope_run(repo: Path, changed: Sequence[str], ownership: Ownership) -> GateR
         if resolved.decision == NOTHING_TO_RUN:
             return None
         return GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))
-    return merge_runs(tuple(classified(run, ownership) for run in resolved.runs))
+    return merge_runs(tuple(classified(run, rule) for run in resolved.runs))
 
 
 def carried_mutation(results: Path, step_id: str) -> tuple[str, ...]:
@@ -137,20 +164,20 @@ def carried_mutation(results: Path, step_id: str) -> tuple[str, ...]:
     return () if reading is None else (render_mutation_line(reading),)
 
 
-def check_run(repo: Path, step: PlanStep, ownership: Ownership) -> GateRun | None:
+def check_run(repo: Path, step: PlanStep, rule: PendingRule) -> GateRun | None:
     if step.check is None:
         return None
     if not isinstance(step.check, Check):
         return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
-    return classified(run_check(repo, step.check.command), ownership, step.check.command)
+    return classified(run_check(repo, step.check.command), rule, step.check.command)
 
 
-def classified(run: CommandRun, ownership: Ownership, command: str = "") -> GateRun:
+def classified(run: CommandRun, rule: PendingRule, command: str = "") -> GateRun:
     """One finished command's run as the gate reads it; one that never exited is no run."""
     shown = command or shlex.join(run.argv)
     if run.problem is not None:
         return GateRun(shown, NoRun(f"the run {run.problem}"))
-    return classify_run(shown, run.output, ownership)
+    return classify_run(shown, run.output, rule)
 
 
 def merge_runs(runs: Sequence[GateRun]) -> GateRun:

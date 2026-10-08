@@ -35,14 +35,20 @@ elsewhere in the text, read as no marker.
 
 `Ownership.step`, `done_steps` and the map keys share one id form; `step` must be a key of
 the map (a step with no entries maps to `()`).
+
+A goal step has no other owner: the failing nodes of its own check run are its targets, and
+`GoalTargets` pends exactly those, in the check's run and the derived scope's alike. An `ERROR`
+node is never a target -- a collection or fixture error is no failing test -- and stays a
+failure, so a module that no longer imports cannot pass for progress. `classify_run` reads
+either rule.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import Literal, Union
+from typing import Literal, Protocol, Union
 
 from _step_schema import RED, Counts, NoRun
 
@@ -164,6 +170,10 @@ class Ownership:
         if self.step not in self.read_only_by_step:
             raise ValueError(f"step {self.step!r} is not a key of the Read-only map")
 
+    def is_pending_error(self, node_id: str) -> bool:
+        """An errored node is owned like a failed one."""
+        return self.is_pending(node_id)
+
     def is_pending(self, node_id: str) -> bool:
         """True when only other steps that are not done own `node_id` (longest entry wins)."""
         claims = [
@@ -177,6 +187,28 @@ class Ownership:
         longest = max(length for length, _ in claims)
         owners = {owner for length, owner in claims if length == longest}
         return all(owner != self.step and owner not in self.done_steps for owner in owners)
+
+
+@dataclass(frozen=True)
+class GoalTargets:
+    """The failing tests of a goal step's own check run: the nodes it is working to turn green."""
+
+    failed: frozenset[str]
+
+    def is_pending(self, node_id: str) -> bool:
+        return node_id in self.failed
+
+    def is_pending_error(self, node_id: str) -> bool:
+        """An error is never a target."""
+        return False
+
+
+class PendingRule(Protocol):
+    """What `classify_run` asks of a rule: which failed and which errored nodes are pending."""
+
+    def is_pending(self, node_id: str) -> bool: ...
+
+    def is_pending_error(self, node_id: str) -> bool: ...
 
 
 # --- One run, classified; its Result: line; the order of two ---
@@ -208,13 +240,13 @@ class GateRun:
         return isinstance(self.counts, NoRun) or self.counts.status == RED
 
 
-def classify_run(command: str, output: str, ownership: Ownership) -> GateRun:
-    """Read `output` into a `GateRun`, moving later steps' failures from fail to pending."""
+def classify_run(command: str, output: str, rule: PendingRule) -> GateRun:
+    """Read `output` into a `GateRun`, moving the failures `rule` pends from fail to pending."""
     summary = parse_pytest_summary(output)
     if summary is None:
         return GateRun(command, NoRun(NO_SUMMARY_RATIONALE))
-    failed, pending_failed = _split_pending(summary.failed_ids, ownership)
-    errored, pending_errored = _split_pending(summary.error_ids, ownership)
+    failed, pending_failed = _split_pending(summary.failed_ids, rule.is_pending)
+    errored, pending_errored = _split_pending(summary.error_ids, rule.is_pending_error)
     counts = replace(
         summary.counts,
         failed=max(summary.counts.failed - len(pending_failed), len(failed)),
@@ -224,8 +256,8 @@ def classify_run(command: str, output: str, ownership: Ownership) -> GateRun:
     return GateRun(command, counts, failed + errored, pending)
 
 
-def _split_pending(ids: Nodes, ownership: Ownership) -> tuple[Nodes, Nodes]:
-    pending = tuple(node for node in ids if ownership.is_pending(node))
+def _split_pending(ids: Nodes, is_pending: Callable[[str], bool]) -> tuple[Nodes, Nodes]:
+    pending = tuple(node for node in ids if is_pending(node))
     return tuple(node for node in ids if node not in pending), pending
 
 

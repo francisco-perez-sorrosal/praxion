@@ -251,6 +251,8 @@ def test_a_rule_that_grants_the_worker_nothing_is_not_refused(scratch, rule):
         ("WebSearch", Treatment.MIRROR),
         ("Agent", Treatment.MIRROR),
         ("mcp__server__tool", Treatment.MIRROR),
+        ("mcp__plugin_praxion_task-chronograph__get_pipeline_status", Treatment.MIRROR),
+        ("mcp__github__*", Treatment.MIRROR),
     ],
 )
 def test_each_inherited_rule_is_mirrored_ignored_or_refused(rule, treatment):
@@ -296,6 +298,7 @@ BASE_PROGRAM = "claude-base"
 STRAY = "conftest.py"
 IGNORED_STRAYS = ("src/__pycache__/widget.pyc", ".ai-work/other/notes.txt")
 OTHER_TASK_FILE = ".ai-work/other/notes.txt"
+STRAY_FILE = "stray_notes.txt"
 UNIGNORED = ".gitignore"
 EXTRA_DENY = "Bash(git commit *)"
 RAISED_BUDGET = 9
@@ -536,6 +539,33 @@ def test_a_settings_file_git_does_not_ignore_is_refused_naming_the_ignore_commit
     assert (reply.exit, reply.doc["error"]["code"]) == (4, "usage")
     assert f"add {SETTINGS} to .gitignore and commit the ignore change" in message, message
     assert "add them to the step's Files" not in message, message
+    assert scratch.calls() == []
+
+
+def test_a_tracked_settings_file_is_told_to_stop_tracking_it_first(scratch):
+    stop_ignoring_the_settings_file(scratch)
+    git(scratch.root, "add", "-f", SETTINGS)
+    git(scratch.root, "commit", "-qm", "track the settings file")
+    put(scratch.root, SETTINGS, (scratch.root / SETTINGS).read_text("utf-8") + "\n")
+
+    reply = scratch.run()
+
+    message = reply.doc["error"]["message"]
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "usage")
+    assert f"stop tracking {SETTINGS} with git rm --cached, add it to .gitignore" in message
+    assert scratch.calls() == []
+
+
+def test_the_fix_for_other_changes_stands_alone_beside_the_settings_file_fix(scratch):
+    stop_ignoring_the_settings_file(scratch)
+    put(scratch.root, STRAY_FILE, "x\n")
+
+    reply = scratch.run()
+
+    message = reply.doc["error"]["message"]
+    assert f"add {SETTINGS} to .gitignore and commit the ignore change" in message, message
+    assert "commit or remove those changes, or add those paths to the step's Files:" in message
+    assert "commit or remove them" not in message, message
     assert scratch.calls() == []
 
 

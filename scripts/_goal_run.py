@@ -27,8 +27,9 @@ from typing import Any
 
 from _goal_record import KEPT_WORDS, judgement_words, protected_set
 from _goal_record import is_protected as is_covered
-from _goal_scaffold import PLAN_FILE, SETTINGS_FILE, WIP_FILE, edit_rule
+from _goal_scaffold import PLAN_FILE, SETTINGS_FILE, WIP_FILE, edit_rule, settings_tracked
 from _goal_scaffold import edit_rule as deny_rule
+from _goal_worker import _READ_TOOLS as READ_TOOLS  # the worker holds these: a rule adds nothing
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep, parse_plan_steps
@@ -53,9 +54,8 @@ MAX_NAMED_PATHS = 5  # a message names this many changed paths, then counts the 
 USER_SETTINGS = "settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
 CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
-_RULE_RE = re.compile(r"(?P<tool>\w+)(?:\((?P<pattern>.*)\))?", re.DOTALL)
+_RULE_RE = re.compile(r"(?P<tool>[^()\s]+)(?:\((?P<pattern>.*)\))?", re.DOTALL)
 _PATH_RULE_TOOLS = ("Write", "MultiEdit", "NotebookEdit")  # accepted, never consulted
-_READ_TOOLS = ("Read", "Glob", "Grep")  # the worker holds these: a rule adds nothing
 _WIDE_PATTERNS = ("", "*", ":*")
 
 
@@ -225,17 +225,22 @@ def _outside_files(goal: PlanStep, repo: Path, directory: Path) -> tuple[Failure
     except (GitCommandError, OSError) as error:
         return (Failure(f"the tree cannot be read ({error})", "make the repository readable"),)
     others = tuple(path for path in stray if path != SETTINGS_FILE)
+    ignore_fix = (
+        f"stop tracking {SETTINGS_FILE} with git rm --cached, add it to .gitignore, and commit"
+        " both changes"
+        if settings_tracked(repo)
+        else f"add {SETTINGS_FILE} to .gitignore and commit the ignore change"
+    )
     unignored = (
         Failure(
-            f"git does not ignore {SETTINGS_FILE}, which holds the worker's deny rules",
-            f"add {SETTINGS_FILE} to .gitignore and commit the ignore change",
+            f"git does not ignore {SETTINGS_FILE}, which holds the worker's deny rules", ignore_fix
         ),
     )
     changed = (
         Failure(
             f"the tree holds changes outside step {goal.id}'s Files: and the task directory:"
             f" {_named(others)}",
-            "commit or remove them, or add them to the step's Files:",
+            "commit or remove those changes, or add those paths to the step's Files:",
         ),
     )
     return (unignored if SETTINGS_FILE in stray else ()) + (changed if others else ())
@@ -342,7 +347,7 @@ def classify(rule: str, commands: Sequence[str]) -> Treatment:
     tool, pattern = parsed["tool"], parsed["pattern"]
     if tool == "Edit" or (tool in _PATH_RULE_TOOLS and pattern is None):
         return Treatment.REFUSE
-    if tool in _PATH_RULE_TOOLS or tool in _READ_TOOLS:
+    if tool in _PATH_RULE_TOOLS or tool in READ_TOOLS:
         return Treatment.IGNORE
     if tool != "Bash":
         return Treatment.MIRROR

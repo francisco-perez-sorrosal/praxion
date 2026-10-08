@@ -523,6 +523,22 @@ def test_the_warning_says_run_refuses_until_the_settings_file_is_ignored(tmp_pat
     assert "first iteration" not in warning
 
 
+def test_a_tracked_settings_file_is_told_to_stop_tracking_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, ignored=IGNORED.replace(SETTINGS_FILE, ""))
+    (root / SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (root / SETTINGS_FILE).write_text("{}\n", encoding="utf-8")
+    _run(root, "add", "-f", SETTINGS_FILE)
+    _run(root, "commit", "-qm", "track the settings file")
+    monkeypatch.chdir(root)
+
+    done = scaffold()
+
+    warning = settings_warning(done)["message"]
+    assert "stop tracking it with git rm --cached, add it to .gitignore, and commit both" in warning
+    assert "run refuses to start until it does" in warning
+
+
 def test_git_not_ignoring_the_settings_file_is_warned_in_the_printed_object_too(
     tmp_path, monkeypatch
 ):

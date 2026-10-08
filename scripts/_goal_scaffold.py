@@ -278,7 +278,7 @@ def _report(
         warnings.append((PRIMARY_CHECKOUT, _PRIMARY_MESSAGE))
     ignored = _git(repo, "check-ignore", "-q", SETTINGS_FILE)
     if ignored is not None and ignored.returncode == 1:
-        warnings.append((SETTINGS_NOT_IGNORED, _NOT_IGNORED_MESSAGE))
+        warnings.append((SETTINGS_NOT_IGNORED, _not_ignored_message(repo)))
     early = early_completion_message(spec.check, baseline.passes, baseline.targets)
     if early is not None:
         warnings.append((CHECK_COMPLETES_EARLY, early))
@@ -296,10 +296,24 @@ _PRIMARY_MESSAGE = (
     f"this is a primary checkout, and the deny rules in {SETTINGS_FILE} bind every session "
     "started in it. To fix: scaffold from a linked worktree, or remove the rules after the run"
 )
-_NOT_IGNORED_MESSAGE = (
-    f"git does not ignore {SETTINGS_FILE}, and run refuses to start until it does. "
-    "To fix: add it to .gitignore and commit that change"
+_NOT_IGNORED_UNTRACKED = "add it to .gitignore and commit that change"
+_NOT_IGNORED_TRACKED = (
+    "stop tracking it with git rm --cached, add it to .gitignore, and commit both"
 )
+
+
+def _not_ignored_message(repo: Path) -> str:
+    fix = _NOT_IGNORED_TRACKED if settings_tracked(repo) else _NOT_IGNORED_UNTRACKED
+    return (
+        f"git does not ignore {SETTINGS_FILE}, and run refuses to start until it does. "
+        f"To fix: {fix}"
+    )
+
+
+def settings_tracked(repo: Path) -> bool:
+    """Whether git tracks the settings file: an ignore entry alone then leaves it unignored."""
+    tracked = _git(repo, "ls-files", "--error-unmatch", SETTINGS_FILE)
+    return tracked is not None and tracked.returncode == 0
 
 
 def early_completion_message(check: Check, passes: int, targets: int) -> str | None:

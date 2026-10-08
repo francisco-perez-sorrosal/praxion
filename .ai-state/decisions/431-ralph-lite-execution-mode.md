@@ -2,7 +2,7 @@
 id: dec-431
 draft_id: dec-draft-72288a3b
 title: Ralph-lite is an execution mode named in the Lightweight tier row, with its recipe in tier-templates — recommended over a sixth tier row; confirmed by the user on 2026-10-07 on condition that the recipe carries the loop's two durable ideas (a fresh context per iteration, state on disk)
-status: accepted
+status: superseded
 category: behavioral
 date: 2026-10-05
 summary: The Ralph-lite recipe for one well-gated single-behaviour task (a fresh-context iteration loop over a goal file on disk, with the single-session /goal form only as the labelled degraded variant) is reachable from tier selection through one clause in the always-loaded Lightweight row and lives in tier-templates.md (scratch worktree, auto mode or an allow-listed check, never acceptEdits alone, the derived test command printed every turn, a turn clause, the impossible exit, not for Standard/Full or background agents); a sixth tier row is the documented alternative.
@@ -16,6 +16,7 @@ affected_files:
   - skills/software-planning/references/tier-templates.md
 affected_reqs: [REQ-34, REQ-35]
 re_affirms: dec-262
+superseded_by: dec-draft-1c61d1e2
 dissent: []
 ---
 

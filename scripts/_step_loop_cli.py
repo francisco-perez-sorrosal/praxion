@@ -60,6 +60,9 @@ PENDING = "pending"
 IN_FLIGHT = "in-flight"
 VERBS = ("next", "record", "status")
 GOAL_VERB = "goal"
+RUN_VERB = "run"
+RUN_DEFAULT_MAX_TURNS = 40  # one unit of work: the 30-45 tool calls a step is sized to
+RUN_DEFAULT_MAX_BUDGET_USD = 2.00  # a fuse, not an estimate: an iteration is expected at $0.3-$1
 MARKERS = ("complete", "blocked", "conflict", "partial", "none")
 RECORD_PLACEHOLDERS = "--agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
 EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
@@ -135,9 +138,9 @@ class _Parser(argparse.ArgumentParser):
 def _build_parser(description: str | None) -> argparse.ArgumentParser:
     parser = _Parser(prog=SCRIPT, description=description)
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
-    offered = (*VERBS, GOAL_VERB)
+    offered = (*VERBS, GOAL_VERB, RUN_VERB)
     verbs = parser.add_subparsers(dest="verb", required=True, metavar="{" + ",".join(offered) + "}")
-    for verb in VERBS:
+    for verb in (*VERBS, RUN_VERB):
         sub = verbs.add_parser(verb)
         sub.add_argument("slug", help="task slug under .ai-work/<slug>/")
         sub.add_argument("--repo-root", help="git repo root (default: from git)")
@@ -149,8 +152,25 @@ def _build_parser(description: str | None) -> argparse.ArgumentParser:
     record.add_argument("--agent-id", help="the agentId the Agent tool result carries")
     record.add_argument("--marker", choices=MARKERS, help="the agent's terminal marker")
     record.add_argument("--not-started", metavar="REASON", help="the Agent call never started")
+    _add_run_bounds(verbs.choices[RUN_VERB])
     _add_goal_verb(verbs)
     return parser
+
+
+def _add_run_bounds(run: argparse.ArgumentParser) -> None:
+    """The per-iteration fuses of `run`, handed to every headless worker it starts."""
+    run.add_argument(
+        "--max-turns",
+        type=int,
+        default=RUN_DEFAULT_MAX_TURNS,
+        help=f"turn bound of each worker (default {RUN_DEFAULT_MAX_TURNS})",
+    )
+    run.add_argument(
+        "--max-budget-usd",
+        type=float,
+        default=RUN_DEFAULT_MAX_BUDGET_USD,
+        help=f"dollar fuse of each worker (default {RUN_DEFAULT_MAX_BUDGET_USD:.2f})",
+    )
 
 
 def _add_goal_verb(verbs: Any) -> None:

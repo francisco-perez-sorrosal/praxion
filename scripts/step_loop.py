@@ -6,26 +6,34 @@
     step_loop.py status <slug> [--json]
     step_loop.py goal   <slug> --goal S --check C --expects E --paths P... [--protect P...]
                         --iterations N
+    step_loop.py run    <slug> [--repo-root DIR] [--worktree-root DIR] [--base-ref REF]
+                        [--max-turns T (40)] [--max-budget-usd X (2.00)]
 
 `next` reads the plan, `WIP.md`, the iteration ledger, the light-review files and the task brief,
 asks the reconciler for ground truth and prints the loop's one next action. `record` takes back
 what an agent left. `status` reports without writing. `goal` scaffolds a one-step goal plan in
 the repository it is run from (no location options) and prints `{"schema", "slug", "files",
-"warnings"}`, or refuses and writes nothing. There are exactly these four verbs.
+"warnings"}`, or refuses and writes nothing. `run` repeats `next`, a fresh headless `claude -p`
+worker (each bounded by `--max-turns` and `--max-budget-usd`) and `record` until the outcome is
+not a spawn, then prints that envelope. It prints a stderr line per iteration (commit or why
+none, turns, cost, denials), and every command it prints carries the base and roots it was
+given. Exit 4, no worker started: no goal step, no deny rule in `.claude/settings.local.json`
+for a protected path, or a worker that cannot start. There are exactly these five verbs.
 
 Defaults: `--repo-root` is the git top level of the current directory, `--worktree-root` (the
 root holding `.ai-work/`) is `--repo-root`, `--base-ref` is the merge-base with the default
 branch. `IMPLEMENTATION_PLAN.md` and `WIP.md` must exist; `TASK_BRIEF.md` is optional.
 
-stdout: `next` and `record` print one JSON envelope on one line, errors included (one
+stdout: `next`, `record` and `run` print one JSON envelope on one line, errors included (one
 constructor per outcome in `_step_loop_cli.py`; `record` adds `recorded` unless it is an error).
 `status` prints a table, or with `--json` its own object.
 stderr: lines that begin `step_loop: ` (a summary, warnings, and the stop block on a stop).
 
-Outcome and exit code: spawn or complete 0; needs-human 2; budget-exhausted 3; an error 4, or 1
-for the code `internal`. Outcome precedence: complete, then needs-human, then budget-exhausted,
-then spawn. Error codes: usage, missing-artifact, request-not-pending, not-started-but-ran,
-agent-not-found, agent-not-for-request, agent-running, internal.
+Outcome and exit code: spawn or complete 0; needs-human 2 (a stalled goal among its causes);
+budget-exhausted 3; an error 4, or 1 for the code `internal`. Outcome precedence: complete, then
+needs-human, then budget-exhausted, then spawn. Error codes: usage, missing-artifact,
+request-not-pending, not-started-but-ran, agent-not-found, agent-not-for-request, agent-running,
+worker-not-started (`run`), internal.
 
 Guarantees:
 * A spawn that is new has its attempt written to `WIP.md` (`- Attempts: Step <id> count=<n>
@@ -53,6 +61,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol, Union
 
+import _goal_run
 import _step_loop_cli as cli
 import _step_loop_record as rec
 from _goal_record import protected_set
@@ -289,6 +298,8 @@ def execute(argv: Sequence[str], *, echo: Sequence[str] = ()) -> Reply:
         invoke = Invocation(program, tuple(echo))
         if args.verb == cli.GOAL_VERB:  # there is no plan to read yet
             return Reply(*scaffold(args))
+        if args.verb == cli.RUN_VERB:
+            return run_goal(args)
         return _VERBS[args.verb](read_task(args), args, invoke)
     except CallerError as error:
         return _failure(args, error.code, error.message, error.counts)
@@ -362,6 +373,18 @@ def drive(
         if observe is not None:
             observe(request, returned, doc)
     return doc
+
+
+def run_goal(args: argparse.Namespace) -> Reply:
+    """The terminal form of the goal loop: `drive` with a headless worker; its last envelope."""
+    task = read_task(args)
+    worker = _goal_run.start_worker(task.inputs.steps, task.repo, task.dir, args)
+    reporter = _goal_run.Reporter(task.dir)
+    location = _goal_run.location(task.repo, task.base_ref, args)
+    doc = drive(worker, args.slug, location, echo=True, observe=reporter)
+    if doc["outcome"] == "spawn":  # the loop ends on a spawn only when its worker never started
+        raise reporter.refusal()
+    return Reply(doc)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

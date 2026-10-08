@@ -59,7 +59,7 @@ from _step_loop_files import (
     write_iteration_patch,
     write_tree_snapshot,
 )
-from _step_loop_gate import Marker
+from _step_loop_gate import Marker, derive_stop_reason, parse_marker
 from _step_loop_io import paths_differing_from_head, restore_paths, tree_patch
 from _step_loop_record_gate import (
     RESULTS_FILE,
@@ -338,7 +338,8 @@ class Ending(NamedTuple):
 
 def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -> Ending:
     """Wait for the end as an ordinary return does, unless a worker file shows the process has
-    exited. A worker that ended on an error without a marker stopped for the error's reason."""
+    exited; then the marker is the relayed one (the worker's result text), never the transcript's.
+    A worker that ended on an error without a marker stopped for the error's reason."""
     request = asked.key.id
     found = read_worker_end(task.dir, request)
     worker = exited_worker(found, request, agent_id)
@@ -352,9 +353,21 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
     marker, stop_reason, warnings = ordinary.read_return(
         seen, cast(Marker, relayed), asked, max_turns
     )
-    if worker is not None and marker == "none":  # a real marker still wins: it may be a stop
-        stop_reason = _STOP_OF_SUBTYPE.get(worker.subtype, stop_reason)
+    if worker is not None:
+        marker = _worker_marker(seen, cast(Marker, relayed))
+        stop_reason = derive_stop_reason(marker, seen.turns, max_turns)
+        warnings = tuple(w for w in warnings if w[0] != "marker-disagreement")
+        if marker == "none":  # a real marker may be a stop; none leaves the error's reason
+            stop_reason = _STOP_OF_SUBTYPE.get(worker.subtype, stop_reason)
     return Ending(seen, worker, marker, stop_reason, max_turns, warnings)
+
+
+def _worker_marker(seen: ordinary.Sighting, relayed: Marker) -> Marker:
+    """The marker of an exited worker is the relayed one, read from its result text; the
+    transcript never supplies or replaces it, and can only show that it was not there (a
+    transcript that ends without a marker withholds it)."""
+    shown = None if seen.unreadable else parse_marker(seen.final_text)
+    return "none" if shown == "none" else relayed
 
 
 def exited_worker(

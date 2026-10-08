@@ -28,6 +28,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     Read,
     TranscriptReading,
     locate,
+    locate_session,
     read_transcript,
     request_count,
 )
@@ -258,9 +259,13 @@ def read_agent(
     session_id: str | None = None,
     transcript_path: str | None = None,
     config: Path | None = None,
+    cwd: Path | None = None,
 ) -> tuple[Path | None, TranscriptReading]:
-    """(where the agent's transcript is, or None; what it reads as)."""
+    """(where the agent's transcript is, or None; what it reads as). With a `cwd`, an id no
+    subagent carries is looked up as a top-level session's id (`locate_session`)."""
     path = locate(agent_id, session_id=session_id, transcript_path=transcript_path, config=config)
+    if path is None and cwd is not None:
+        path = locate_session(agent_id, cwd, config)
     return path, read_transcript(path)
 
 

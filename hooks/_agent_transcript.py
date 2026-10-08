@@ -5,7 +5,8 @@ Agent-tool spawn) or under `subagents/workflows/<run>/` (a Workflow-tool spawn).
 driver's adapter (has the agent ended? how many requests?) and the turn-budget reminder hook (how
 many requests so far?) must agree on what it says, so both read it here. `locate` finds it by
 session and agent id, else by agent id across every project directory under the config directory
-(`search_all=False` keeps a hot caller to the session's own directory). A transcript is JSON Lines
+(`search_all=False` keeps a hot caller to the session's own directory); `locate_session` finds
+a top-level session's own transcript, which is not a subagent's. A transcript is JSON Lines
 split on `"\n"` alone: a record holds no raw newline, but its strings can hold U+2028 and U+2029,
 which `str.splitlines()` would cut at. It reads as:
 
@@ -115,6 +116,20 @@ def locate(
         searched += sorted(config.glob("projects/*/*/subagents"))
     found = (_first_file(subagents, name) for subagents in searched)
     return next((path for path in found if path is not None), None)
+
+
+def locate_session(session_id: str, cwd: Path, config: Path | None = None) -> Path | None:
+    """A top-level session's transcript, or `None`: `<config>/projects/<slug of cwd>/<id>.jsonl`,
+    else the first `<config>/projects/*/<id>.jsonl` (session ids are unique, so the glob absorbs
+    a slug that drifts: a truncation hash, an overridden project dir name, a symlinked root).
+    Reached only by an explicit call, never from `locate`: the reminder's lookup is unchanged."""
+    if not _AGENT_ID.fullmatch(session_id):
+        return None
+    config = config or Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
+    name = f"{session_id}.jsonl"
+    derived = config / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(cwd.resolve())) / name
+    candidates = [derived, *sorted(config.glob(f"projects/*/{name}"))]
+    return next((path for path in candidates if path.is_file()), None)
 
 
 def request_count(reading: TranscriptReading) -> int | None:

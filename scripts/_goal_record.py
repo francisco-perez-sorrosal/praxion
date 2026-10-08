@@ -21,7 +21,8 @@ Acted on as follows:
   (outer-loop and `Read-only:` paths never), and the step is ticked when its check is met.
 * `Unkept`: nothing is committed; the whole tree's diff is saved as `ITERATION_<request>.patch`
   and the step's `Files:` return to the last kept unit (a change outside them is neither
-  committed nor restored). A gate that was not red gains a refusal line saying why, so it is never verified.
+  committed nor restored). A gate that was not red gains a refusal line saying why, so it is
+  never verified.
 * `Protected`: nothing is committed or restored; the tree is saved as
   `TREE_SNAPSHOT_<request>.patch` and a refusal line names the paths, which stops the loop for
   a person (the same stop a disturbed commit makes).

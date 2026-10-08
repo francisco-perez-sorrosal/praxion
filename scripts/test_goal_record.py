@@ -11,6 +11,7 @@ The judgement alone is in ``scripts/test_goal_judgement.py``.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -31,6 +32,7 @@ sys.path.insert(0, str(REPO_ROOT / "hooks"))
 
 import step_loop  # noqa: E402
 from _step_loop_files import write_gate_block, write_worker_end  # noqa: E402
+from _step_loop_record import declared_max_turns  # noqa: E402
 
 PYTHON = sys.executable
 SLUG = "goal-task"
@@ -363,6 +365,53 @@ def test_an_iteration_that_regresses_the_last_committed_reading_commits_nothing(
     assert (reply.recorded["commit"], head(goal)) == (None, after_progress)
 
 
+def test_an_iteration_after_a_kept_one_that_adds_no_progress_line_commits_nothing(tmp_path):
+    goal = build_goal(tmp_path)
+    iterate(goal, Work(implemented=("one",)))
+    after_progress = head(goal)
+
+    request, reply = iterate(goal, Work(implemented=("one", "two"), progress=False))
+
+    assert (reply.recorded["commit"], head(goal)) == (None, after_progress)
+    assert patch_of(goal, request).stat().st_size > 0
+    assert "gained no line" in reply.recorded["gate"]["evidence"]
+
+
+DISTURBING_HOOK = "#!/bin/sh\necho disturbed >> README.md\n"
+
+
+def disturb_commits(goal: Goal) -> None:
+    """Make every commit rewrite a file outside its paths, as a repository hook might."""
+    hooks = goal.root.parent / "hooks"
+    put(hooks, "pre-commit", DISTURBING_HOOK)
+    (hooks / "pre-commit").chmod(0o755)
+    git(goal.root, "config", "core.hooksPath", str(hooks))
+
+
+def let_commits_be(goal: Goal) -> None:
+    git(goal.root, "config", "core.hooksPath", "/dev/null")
+    for snapshot in goal.task_dir.glob("TREE_SNAPSHOT_*.patch"):
+        snapshot.unlink()
+
+
+def test_a_kept_commit_whose_line_is_a_refusal_does_not_switch_the_regression_guard_off(
+    tmp_path,
+):
+    goal = build_goal(tmp_path, implemented=("one", "two"))
+    disturb_commits(goal)
+    iterate(
+        goal, Work(implemented=None, edits=((SHARED, "def shared():\n    return 1  # tidy\n"),))
+    )
+    let_commits_be(goal)
+    after_disturbance = head(goal)
+
+    request, reply = iterate(goal, Work(implemented=("one",)))
+
+    assert (reply.recorded["commit"], head(goal)) == (None, after_disturbance)
+    assert patch_of(goal, request).stat().st_size > 0
+    assert "regressed" in reply.recorded["gate"]["evidence"]
+
+
 # --- What is left as a patch ------------------------------------------------------------------
 
 BROKEN_SHARED = "def shared():\n    return 2\n"
@@ -639,10 +688,16 @@ def test_a_worker_file_for_another_session_is_refused_and_writes_nothing(tmp_pat
     request = worked(goal)
     leave_worker(goal, request, session="someone-elses-session")
 
+    before = head(goal)
+
     reply = record(goal, request)
 
     assert (reply.code, reply.doc["error"]["code"]) == (EXIT_REFUSED, "agent-not-for-request")
     assert not (goal.task_dir / "ITERATION_LEDGER.jsonl").exists()
+    assert (head(goal), tree_text(goal, WIDGET)) == (before, widget_source(("one",)))
+    assert not patch_of(goal, request).exists()
+    assert not snapshot_of(goal, request).exists()
+    assert request["id"] not in (goal.task_dir / "TEST_RESULTS.md").read_text(encoding="utf-8")
 
 
 def test_a_worker_file_that_shows_no_result_leaves_the_relays_evidence_to_decide(tmp_path):
@@ -664,6 +719,27 @@ def test_a_worker_file_that_shows_no_result_leaves_the_relays_evidence_to_decide
     assert ("cost_usd" in ledger(goal)[0], reply.recorded["stop_reason"]) == (False, "partial")
 
 
+def test_a_worker_file_that_shows_no_result_still_means_the_process_has_exited(tmp_path):
+    goal = build_goal(tmp_path)
+    request = worked(goal, STILL_WORKING)
+    write_worker_end(
+        goal.task_dir,
+        request["id"],
+        argv=["claude"],
+        exit_code=1,
+        max_turns=40,
+        max_budget_usd=2.0,
+        stdout_tail="killed",
+        result=None,
+    )
+
+    reply = record(goal, request)
+
+    kept = ledger(goal)[0]
+    declared = declared_max_turns(request["agent_call"]["subagent_type"])
+    assert (reply.code, "cost_usd" in kept, kept["max_turns"]) == (0, False, declared)
+
+
 def test_a_top_level_sessions_transcript_is_found_by_the_repository_root(tmp_path):
     goal = build_goal(tmp_path)
     request = ask(goal)
@@ -674,3 +750,62 @@ def test_a_top_level_sessions_transcript_is_found_by_the_repository_root(tmp_pat
     reply = record(goal, request)
 
     assert (reply.code, reply.recorded["turns"]) == (0, DEFAULT_WORK.requests)
+
+
+# --- The judgement half of the recorder stays pure -----------------------------------------------
+
+EFFECTFUL_MODULES = {
+    "os", "io", "subprocess", "pathlib", "shutil", "tempfile", "socket", "time", "datetime", "glob",
+}  # fmt: skip
+SHELL_STARTS_AT = "BASELINE_REQUEST"  # the first name of the shell section of the module
+
+
+def recorder_tree() -> ast.Module:
+    return ast.parse((SCRIPT_DIR / "_goal_record.py").read_text(encoding="utf-8"))
+
+
+def is_effectful(module: str) -> bool:
+    root = module.split(".")[0]
+    return root in EFFECTFUL_MODULES or root.startswith("_step_loop") or root == "iteration_ledger"
+
+
+def effectful_names(tree: ast.Module) -> set[str]:
+    """Every name the module binds from a module that reads files, a repository, a process or
+    the clock: the standard ones above and the driver's own adapters and ledger."""
+    imports = [n for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))]
+    return {
+        (alias.asname or alias.name.split(".")[0])
+        for node in imports
+        for alias in node.names
+        if is_effectful(node.module or "" if isinstance(node, ast.ImportFrom) else alias.name)
+    }
+
+
+def names_used(nodes: list[ast.stmt]) -> set[str]:
+    return {n.id for node in nodes for n in ast.walk(node) if isinstance(n, ast.Name)}
+
+
+def halves(tree: ast.Module) -> tuple[list[ast.stmt], list[ast.stmt]]:
+    """The module's top-level statements before and after the shell section starts."""
+    code = [n for n in tree.body if not isinstance(n, (ast.Import, ast.ImportFrom, ast.If))]
+    edge = next(
+        n.lineno
+        for n in code
+        if isinstance(n, ast.Assign)
+        and any(getattr(t, "id", "") == SHELL_STARTS_AT for t in n.targets)
+    )
+    return [n for n in code if n.lineno < edge], [n for n in code if n.lineno >= edge]
+
+
+def test_the_judgement_half_of_the_recorder_uses_nothing_that_has_an_effect():
+    tree = recorder_tree()
+    judgement, _ = halves(tree)
+
+    assert names_used(judgement).isdisjoint(effectful_names(tree))
+
+
+def test_the_shell_half_of_the_recorder_does_use_effects_so_the_guard_can_fail():
+    tree = recorder_tree()
+    _, shell = halves(tree)
+
+    assert names_used(shell) & effectful_names(tree)

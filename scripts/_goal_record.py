@@ -50,6 +50,7 @@ from _step_loop_files import (
     ITERATION_PATCH_STEM,
     PATCH_SUFFIX,
     STEP_LABEL,
+    NoWorkerResult,
     WorkerEnd,
     append_ledger_record,
     gate_heading,
@@ -339,12 +340,14 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
     """Wait for the end as an ordinary return does, unless a worker file shows the process has
     exited. A worker that ended on an error without a marker stopped for the error's reason."""
     request = asked.key.id
-    worker = ended_worker(task, request, agent_id)
-    if worker is None:
-        max_turns = ordinary.declared_max_turns(asked.agent_call.subagent_type)
+    found = read_worker_end(task.dir, request)
+    worker = exited_worker(found, request, agent_id)
+    max_turns = (
+        worker.max_turns if worker else ordinary.declared_max_turns(asked.agent_call.subagent_type)
+    )
+    if found is None:
         seen = ordinary.await_end(task.repo, request, agent_id, max_turns)
     else:
-        max_turns = worker.max_turns
         seen = await_exited(task, request, agent_id, max_turns)
     marker, stop_reason, warnings = ordinary.read_return(
         seen, cast(Marker, relayed), asked, max_turns
@@ -354,10 +357,13 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
     return Ending(seen, worker, marker, stop_reason, max_turns, warnings)
 
 
-def ended_worker(task: TaskView, request: str, agent_id: str) -> WorkerEnd | None:
-    """The exited worker of `request`, or None when the relay's evidence decides: no worker file,
-    or one that shows no result. A file written for another session is refused."""
-    found = read_worker_end(task.dir, request)
+def exited_worker(
+    found: NoWorkerResult | WorkerEnd | None, request: str, agent_id: str
+) -> WorkerEnd | None:
+    """The worker's result when its file holds one. A file that shows none (exit 1, killed) still
+    means the process has exited, so the end is not waited for, but the turn bound, the cost and
+    the stop reason are the relay's: the transcript and the subagent's declared bound decide.
+    A file written for another session is refused."""
     if not isinstance(found, WorkerEnd):
         return None
     if found.session_id != agent_id:
@@ -467,12 +473,15 @@ def gather_evidence(task: TaskView, step: PlanStep, gate: Gate, progress: int) -
 
 
 def reference_reading(task: TaskView, step: PlanStep) -> Reading | None:
-    """The check's reading to hold the iteration to: the series' latest committed iteration's,
+    """The check's reading to hold the iteration to: the latest committed iteration's of the
+    series whose line is a count line (a commit refused after the fact leaves one that is not),
     else the scaffold's baseline."""
-    kept = [r.test_result for r in series_work(task.inputs, step) if r.commit is not None]
+    for record in reversed(series_work(task.inputs, step)):
+        reading = reading_from_result(record.test_result) if record.commit is not None else None
+        if reading is not None:
+            return reading
     baseline = recorded_gate(task.dir / RESULTS_FILE, gate_heading(step.id, BASELINE_REQUEST))
-    line = kept[-1] if kept else (baseline.deciding if baseline else None)
-    return reading_from_result(line) if line else None
+    return reading_from_result(baseline.deciding) if baseline else None
 
 
 def progress_before(task: TaskView, step: PlanStep) -> int:

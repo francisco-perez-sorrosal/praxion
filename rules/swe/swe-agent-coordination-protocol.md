@@ -70,7 +70,7 @@ Spawn agents without waiting for the user to ask:
 
 - Complex feature --> `researcher` (skip if codebase context suffices), then `systems-architect` spec phase, then `test-engineer` acceptance design (most capable tier; [stage](../../skills/software-planning/references/coordination-details.md#acceptance-design-stage)), then the architect's design phase
 - Architecture approved --> `implementation-planner`; resuming work --> same agent to re-assess `WIP.md`
-- Plan ready --> `implementer` per step, **owning its unit tests** (acceptance tests are read-only to it); done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, don't spawn `test-engineer`
+- Plan ready --> `implementer` per step via `/praxion:step-loop <slug>` (the driver gates and commits; the orchestrator relays), **owning its unit tests** (acceptance tests are read-only to it); done --> run tests --> fix cycle if needed --> `verifier`. Direct/Lightweight rarely reach the planner; if they do, don't spawn `test-engineer`
 - Context artifacts stale/conflicting or plan touches them --> `context-engineer` (parallel with `researcher`/`systems-architect` as shadow; see context-engineer shadowing rule below)
 - Ecosystem health or regression check --> `sentinel`; stale check: `.ai-state/sentinel_reports/SENTINEL_LOG.md` vs `git log -1 --format=%ci`
 - Documentation impact likely --> `doc-engineer`: at pipeline checkpoints (after planning, after implementation, after refactoring), or in parallel with `implementer` + `test-engineer` when the planner assigns a doc step to the parallel group

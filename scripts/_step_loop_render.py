@@ -329,7 +329,7 @@ def stop_next_action(stop: StopView) -> str:
         stop.evidence,
         *(f"- {' · '.join(attempt_columns(a, 'agent '))}" for a in stop.attempts),
         f"{owed}: {action}.",
-        f"Then resume the loop: `/step-loop {stop.slug}` (it runs `{resume}`).",
+        f"Then resume the loop: `/praxion:step-loop {stop.slug}` (it runs `{resume}`).",
     ])  # fmt: skip
 
 

@@ -662,7 +662,7 @@ def test_the_handoff_paragraph_carries_the_stop_each_attempt_and_the_resume_line
         "- attempt 2 · agent b81d0c44aa02f9c3 · completed 23/100 · "
         "check unmet: pending=: expected =17 · 3f9c2e1",
         "Human decision owed: revise the step block (split it, or fix its Check: line).",
-        f"Then resume the loop: `/step-loop {SLUG}` (it runs `{INVOKE} next {SLUG}`).",
+        f"Then resume the loop: `/praxion:step-loop {SLUG}` (it runs `{INVOKE} next {SLUG}`).",
     ]
 
 

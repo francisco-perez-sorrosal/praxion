@@ -39,9 +39,15 @@ whatever order the logs delivered it in; a row with no readable time keeps its r
 after the dated ones. A merged and removed worktree is reached through the main log it
 was merged into.
 
-Budget verdict: `charged` is every attributed spawn (definite) plus every heavy resume;
-unsized resumes, every unattributed spawn in the log and each resume of one form the
-pending pool, each of which could still turn out to be charged to this slug. `within`
+Loop iterations: an attributed agent that the task's iteration ledger
+(`.ai-work/<slug>/ITERATION_LEDGER.jsonl`) records under a request id is an iteration of the
+step loop, not a spawn: it is listed under the conditional `iterations` key and left out of
+`charged`; `spawns` still counts it. An agent the ledger has not recorded yet, a record with no
+request id and a line the ledger reader rejects leave the agent charged.
+
+Budget verdict: `charged` is every attributed spawn that is not an iteration (definite) plus
+every heavy resume; unsized resumes, every unattributed spawn in the log and each resume of
+one form the pending pool, each of which could still turn out to be charged to this slug. `within`
 needs `charged + unsized + pending unattributed <= budget`; `over` is `charged > budget`;
 `indeterminate` is the remainder; `no-budget` when `--budget` is omitted. Exit 0 for
 within/indeterminate/no-budget, 1 for over, 2 for withheld (`wal-absent`, `slug-unseen`,
@@ -63,6 +69,7 @@ from pathlib import Path
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _script_cli import configure_logging
+from iteration_ledger import read_ledger
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -223,12 +230,14 @@ def verdict(
     budget: int | None,
     threshold: int,
     pending_spawns: int = 0,
+    iterations: frozenset[str] = frozenset(),
 ) -> Verdict:
     """Compute the budget verdict for `tallies` at `threshold` against `budget`.
 
     `pending_spawns` counts every item not yet attributed to any slug (an unattributed spawn
     and each resume of one): each could still turn out to belong to these `tallies`, so it
-    holds the verdict like an unsized resume.
+    holds the verdict like an unsized resume. The agents named in `iterations` are not spawns
+    to charge; their heavy resumes still are.
     """
     classifications = [
         classify_resume(resume.context_tokens, threshold)
@@ -240,7 +249,8 @@ def verdict(
     resumes_unsized = classifications.count("unsized")
 
     # Every attributed spawn is definite; an unsized resume or an unattributed spawn is not.
-    charged = len(tallies) + resumes_heavy
+    in_loop = sum(1 for t in tallies if t.agent_id in iterations)
+    charged = len(tallies) - in_loop + resumes_heavy
     if budget is None:
         label = "no-budget"
     elif charged > budget:
@@ -449,6 +459,16 @@ def resolve_owner(agent_tally: AgentTally, projects_dir: Path) -> AgentTally:
     return replace(agent_tally, owner=owner)
 
 
+def _ledger_requests(repo_root: Path, slug: str) -> dict[str, str]:
+    """`agent_id -> request` for each record of the task's ledger that carries a request.
+
+    A line the ledger reader rejects is a finding there and is ignored here, so its agent
+    stays charged: the conservative direction.
+    """
+    records = read_ledger(repo_root / ".ai-work" / slug).records
+    return {r.agent_id: r.request for r in records if r.request is not None}
+
+
 def _source_label(path: Path, repo_root: Path) -> str:
     """`path` relative to `repo_root` when it lies under it, absolute otherwise."""
     try:
@@ -466,6 +486,7 @@ def _build_envelope(
     result: Verdict,
     threshold: int,
     unattributed: tuple[AgentTally, ...] = (),
+    iterations: dict[str, str] | None = None,
 ) -> dict:
     by_agent_type: dict[str, int] = {}
     agents: list[dict] = []
@@ -514,6 +535,17 @@ def _build_envelope(
             }
             for t in unattributed
         ]
+    if iterations:  # likewise, so a task with no loop agent reports what it always did
+        envelope["iterations"] = [
+            {
+                "agent_id": t.agent_id,
+                "agent_type": t.agent_type,
+                "spawned_at": t.spawned_at,
+                "request": iterations[t.agent_id],
+            }
+            for t in tallies
+            if t.agent_id in iterations
+        ]
     return envelope
 
 
@@ -527,6 +559,8 @@ def _format_human(envelope: dict) -> str:
     ]
     if "unattributed" in envelope:
         lines.append(f"  unattributed={len(envelope['unattributed'])}")
+    if "iterations" in envelope:
+        lines.append(f"  iterations={len(envelope['iterations'])}")
     return "\n".join(lines)
 
 
@@ -600,7 +634,9 @@ def _run(args: argparse.Namespace) -> int:
         tallies = tuple(resolve_resume_context(t, projects_dir) for t in tallies)
     # Each unattributed spawn, and each resume of one, could still be charged to this slug.
     pending = sum(1 + len(t.resumes) for t in unattributed)
-    result = verdict(tallies, args.budget, args.heavy_context, pending_spawns=pending)
+    requests = _ledger_requests(repo_root, args.slug)
+    in_loop = {t.agent_id: requests[t.agent_id] for t in tallies if t.agent_id in requests}
+    result = verdict(tallies, args.budget, args.heavy_context, pending, frozenset(in_loop))
     envelope = _build_envelope(
         args.slug,
         sources,
@@ -610,6 +646,7 @@ def _run(args: argparse.Namespace) -> int:
         result,
         args.heavy_context,
         unattributed,
+        in_loop,
     )
     print(json.dumps(envelope, indent=2) if args.json else _format_human(envelope))
     return 1 if result.label == "over" else 0

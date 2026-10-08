@@ -334,32 +334,48 @@ def await_end(
     max_turns: int | None,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    *,
+    exited: bool = False,
 ) -> Sighting:
-    """The agent's transcript once it shows the end, or a refusal when the wait runs out."""
+    """The agent's transcript once it shows the end, or a refusal when the wait runs out.
+
+    With `exited` the end is already known, because the process that ran the agent has exited:
+    only the flush is waited for, until the transcript names the request, within the same bounded
+    wait, and a transcript that does not show the end is not a refusal. The two refusals about
+    the transcript are then worded for a session, not for an agent."""
+    who, id_given, id_relayed = _SESSION_WORDS if exited else _AGENT_WORDS
     deadline = clock() + end_wait_seconds()
     seen = sight(repo, agent_id, max_turns)
-    while not seen.ended and clock() < deadline:
+    while not (names_request(seen.reading, request) if exited else seen.ended):
+        if clock() >= deadline:
+            break
         sleep(POLL_SECONDS)
         seen = sight(repo, agent_id, max_turns)
     if seen.path is None:
         raise RecordRefusedError(
             "agent-not-found",
-            f"record failed because no transcript of agent {agent_id} was found. To fix: pass"
-            " the agentId the Agent tool returned, under the config directory the harness uses.",
+            f"record failed because no transcript of {who} {agent_id} was found. To fix: pass"
+            f" {id_given}, under the config directory the harness uses.",
         )
     if not names_request(seen.reading, request):
         raise RecordRefusedError(
             "agent-not-for-request",
-            f"record failed because agent {agent_id} was not started on {request}. To fix:"
-            " relay the agentId of the Agent call made for this request.",
+            f"record failed because {who} {agent_id} was not started on {request}. To fix:"
+            f" relay {id_relayed} made for this request.",
         )
-    if not seen.ended:
+    if not (exited or seen.ended):
         raise RecordRefusedError(
             "agent-running",
             f"record failed because agent {agent_id} has not ended; {request} stays pending."
             " To fix: wait for its completion notification, then run the same record again.",
         )
     return seen
+
+
+# What a refusal about the transcript calls the thing it is about: (who, the id to pass, the id
+# to relay).
+_AGENT_WORDS = ("agent", "the agentId the Agent tool returned", "the agentId of the Agent call")
+_SESSION_WORDS = ("session", "the session id the run reported", "the session id of the run")
 
 
 def sight(repo: Path, agent_id: str, max_turns: int | None) -> Sighting:

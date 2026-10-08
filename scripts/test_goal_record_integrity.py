@@ -21,15 +21,19 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import _step_loop_record as ordinary  # noqa: E402
 import _step_loop_record_gate as gating  # noqa: E402
 from _loop_fields import Check  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_files import gate_heading, write_gate_block  # noqa: E402
 from _step_loop_state import LoopInputs  # noqa: E402
 from test_goal_record import (  # noqa: E402,F401
+    AGENT,
+    EXIT_REFUSED,
     EXIT_STOP,
     SLUG,
     STEP_NUMBER,
+    STILL_WORKING,
     WIDGET,
     Goal,
     Work,
@@ -41,12 +45,16 @@ from test_goal_record import (  # noqa: E402,F401
     head,
     iterate,
     leave_transcript,
+    leave_worker,
     ledger,
+    patch_of,
     record,
     sandbox,  # the autouse environment of the scratch checkout
+    snapshot_of,
     tree_text,
     verb,
     widget_source,
+    worked,
 )
 from test_loop_hook_refusal import (  # noqa: E402
     GATE_PASSED,
@@ -213,3 +221,68 @@ def test_two_iterations_in_a_row_the_hooks_refuse_stop_as_a_stall_that_names_the
     shown = json.dumps([stopped.stop["attempts"], stopped.stop["replan_request"]])
     assert (stopped.code, stopped.stop["cause"]) == (EXIT_STOP, "stalled")
     assert (GATE_PASSED in shown, LINT_WORDS in shown) == (True, True)
+
+
+# --- An exited worker: one wait for its transcript to name the request ----------------------------
+
+GOAL_RECORDER = SCRIPT_DIR / "_goal_record.py"
+ANOTHER_REQUEST = {"agent_call": {"prompt": "Spawn request: s9-a9-another-request"}}
+
+
+def left_in_place(goal: Goal, request) -> tuple[object, ...]:
+    """Everything a `record` could write: the checkout, the ledger, the patches, the gate block."""
+    task_dir = goal.task_dir
+    return (
+        head(goal),
+        tree_text(goal, WIDGET),
+        (task_dir / "ITERATION_LEDGER.jsonl").exists(),
+        patch_of(goal, request).exists(),
+        snapshot_of(goal, request).exists(),
+        request["id"] in (task_dir / "TEST_RESULTS.md").read_text(encoding="utf-8"),
+    )
+
+
+def test_the_goal_recorder_keeps_no_wait_of_its_own_for_an_exited_worker():
+    source = GOAL_RECORDER.read_text(encoding="utf-8")
+
+    assert ("await_exited" in source, "ordinary.time" in source) == (False, False)
+
+
+def test_an_exited_workers_transcript_that_names_the_request_ends_the_wait_on_a_tool_call(
+    tmp_path,
+):
+    goal = build_goal(tmp_path)
+    request = worked(goal, STILL_WORKING)
+
+    seen = ordinary.await_end(goal.root, request["id"], AGENT, 40, exited=True)
+
+    assert (seen.path is not None, seen.ended) == (True, False)
+
+
+def test_an_exited_workers_missing_transcript_is_refused_as_a_session_and_writes_nothing(tmp_path):
+    goal = build_goal(tmp_path)
+    request = ask(goal)
+    do_work(goal, Work())
+    leave_worker(goal, request)
+    before = left_in_place(goal, request)
+
+    reply = record(goal, request)
+
+    assert (reply.code, reply.doc["error"]["code"]) == (EXIT_REFUSED, "agent-not-found")
+    assert f"no transcript of session {AGENT}" in reply.doc["error"]["message"]
+    assert left_in_place(goal, request) == before
+
+
+def test_an_exited_workers_transcript_of_another_request_is_refused_and_writes_nothing(tmp_path):
+    goal = build_goal(tmp_path)
+    request = ask(goal)
+    do_work(goal, Work())
+    leave_transcript(goal, ANOTHER_REQUEST, AGENT, Work())
+    leave_worker(goal, request)
+    before = left_in_place(goal, request)
+
+    reply = record(goal, request)
+
+    assert (reply.code, reply.doc["error"]["code"]) == (EXIT_REFUSED, "agent-not-for-request")
+    assert f"session {AGENT} was not started on {request['id']}" in reply.doc["error"]["message"]
+    assert left_in_place(goal, request) == before

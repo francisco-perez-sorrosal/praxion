@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, NamedTuple, Union, cast
 
@@ -55,7 +55,6 @@ from _step_loop_files import (
     WorkerEnd,
     append_ledger_record,
     gate_heading,
-    names_request,
     read_worker_end,
     write_iteration_patch,
     write_tree_snapshot,
@@ -364,10 +363,7 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
     max_turns = (
         worker.max_turns if worker else ordinary.declared_max_turns(asked.agent_call.subagent_type)
     )
-    if found is None:
-        seen = ordinary.await_end(task.repo, request, agent_id, max_turns)
-    else:
-        seen = await_exited(task, request, agent_id, max_turns)
+    seen = ordinary.await_end(task.repo, request, agent_id, max_turns, exited=found is not None)
     marker, stop_reason, warnings = ordinary.read_return(
         seen, cast(Marker, relayed), asked, max_turns
     )
@@ -407,36 +403,6 @@ def exited_worker(
             f" {found.session_id}, not {agent_id}. To fix: relay the session id the run reported.",
         )
     return found
-
-
-def await_exited(
-    task: TaskView,
-    request: str,
-    agent_id: str,
-    max_turns: int | None,
-    clock: Callable[[], float] = ordinary.time.monotonic,
-    sleep: Callable[[float], None] = ordinary.time.sleep,
-) -> ordinary.Sighting:
-    """The exited worker's transcript once it names the request: its end is known from the file,
-    so only the flush is waited for, within the bounded end wait."""
-    deadline = clock() + ordinary.end_wait_seconds()
-    seen = ordinary.sight(task.repo, agent_id, max_turns)
-    while not names_request(seen.reading, request) and clock() < deadline:
-        sleep(ordinary.POLL_SECONDS)
-        seen = ordinary.sight(task.repo, agent_id, max_turns)
-    if seen.path is None:
-        raise ordinary.RecordRefusedError(
-            "agent-not-found",
-            f"record failed because no transcript of session {agent_id} was found. To fix: pass"
-            " the session id the run reported, under the config directory the harness uses.",
-        )
-    if not names_request(seen.reading, request):
-        raise ordinary.RecordRefusedError(
-            "agent-not-for-request",
-            f"record failed because session {agent_id} was not started on {request}. To fix:"
-            " relay the session id of the run made for this request.",
-        )
-    return seen
 
 
 # --- Acting on the judgement ---

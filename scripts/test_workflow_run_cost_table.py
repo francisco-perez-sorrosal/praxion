@@ -106,3 +106,16 @@ def test_render_table_with_no_agents_prints_only_header_and_orchestrator():
         "\n"
         "orchestrator: launch=7 next=9 delta=2"
     )
+
+
+def test_disp_renders_none_as_a_dash():
+    assert _cost()._disp(None) == "-"
+
+
+def test_disp_renders_zero_as_a_digit_not_a_dash():
+    assert _cost()._disp(0) == "0"
+
+
+def test_disp_stringifies_numbers_and_passes_text_through():
+    cost = _cost()
+    assert (cost._disp(1200), cost._disp("agree")) == ("1200", "agree")

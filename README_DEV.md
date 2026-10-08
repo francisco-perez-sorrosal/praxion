@@ -192,7 +192,7 @@ Makefile                             # Development targets
 
 ## Per-Project Hook Opt-Outs
 
-Four env-var flags let a downstream project disable Praxion hooks that cost tokens or block behavior. Absence of the flag preserves default behavior — set to `1`, `true`, or `yes` in the target project's `.claude/settings.json` `env` block for Claude or `.codex/praxion/settings.json` `env` block for Codex.
+Five env-var flags let a downstream project disable Praxion hooks that cost tokens or block behavior. Absence of the flag preserves default behavior — set to `1`, `true`, or `yes` in the target project's `.claude/settings.json` `env` block for Claude or `.codex/praxion/settings.json` `env` block for Codex.
 
 | Flag | What it disables | When to use |
 |------|------------------|-------------|
@@ -200,6 +200,7 @@ Four env-var flags let a downstream project disable Praxion hooks that cost toke
 | `PRAXION_DISABLE_EVENT_POSTING` | `send_event.py` only | Disables chronograph telemetry POSTs while `observations.jsonl` keeps being written. The live eval sandbox sets it. |
 | `PRAXION_DISABLE_PROCESS_INJECT` | `inject_process_framing.py` (UserPromptSubmit) | Disables the compact process-framing reminder that reinforces the tier selector and behavioral contract. No prompt-token impact; use when you want Codex or Claude to stay silent on that reminder. |
 | `PRAXION_DISABLE_RULE_INJECTION` | `inject_rules.py` (SessionStart) | Escape hatch for the per-project rules disable mechanism. Skips the hook entirely, so the 2 hook-deliver rules (`agent-model-routing`, `vcs/git-conventions`) are absent from `additionalContext` AND no `claudeMdExcludes` reconciliation runs — existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled. Use when debugging the hook, or when a project wants hook-deliver rules out of all sessions without authoring a per-project disable list. See `docs/rules-taxonomy.md`. |
+| `PRAXION_DISABLE_TURN_BUDGET_REMINDER` | `remind_turn_budget.py` (PreToolUse) | Disables the subagent turn-budget reminder, which injects one line at 60 and one at 80 percent of an agent's declared `maxTurns`. Use when a project wants subagents to receive no budget nudges, or to rule the hook out while debugging a slow tool call. |
 
 Example `.claude/settings.json` for a project that wants Praxion skills/agents but **no observability telemetry**:
 

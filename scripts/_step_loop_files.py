@@ -356,7 +356,10 @@ def write_worker_end(
 
 
 def read_worker_end(task_dir: Path, request: str) -> NoWorkerResult | WorkerEnd | None:
-    """Parse the file once: `None` is no file (relayed); short of a usable result is `NoWorkerResult`."""
+    """Parse the file once: `None` is no file (relayed).
+
+    Short of a usable result is `NoWorkerResult`.
+    """
     path = worker_result_path(task_dir, request)
     try:
         document = json.loads(path.read_text(encoding="utf-8"))

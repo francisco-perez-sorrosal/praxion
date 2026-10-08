@@ -19,7 +19,9 @@ import re
 import sys
 import tempfile
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 from _agent_transcript import (  # noqa: E402 (after sys.path injection)
@@ -44,6 +46,8 @@ from iteration_ledger import IterationRecord, append_record, read_ledger  # noqa
 
 STEP_LABEL = "Step "
 PROMPT_STEM, PROMPT_SUFFIX = "PROMPT", ".md"
+ITERATION_PATCH_STEM, PATCH_SUFFIX = "ITERATION", ".patch"
+WORKER_STEM, WORKER_SUFFIX, WORKER_FILE_VERSION = "WORKER", ".json", 1
 META_UNREADABLE = "meta-unreadable"
 REQUEST_FIDELITY = "request-fidelity"
 DEFAULT_FILE_MODE, MODE_MASK = 0o644, 0o777
@@ -134,7 +138,7 @@ def _fenced_flags(lines: Sequence[str]) -> list[bool]:
     return flags
 
 
-# --- TEST_RESULTS.md, the prompt, the snapshot, the ledger, the handoff -------------------
+# --- The results, the prompt, the snapshot, the ledger, the handoff, the worker's end -----
 
 
 def gate_heading(step_id: str, request: str) -> str:
@@ -194,6 +198,11 @@ def snapshot_requests(task_dir: Path) -> tuple[str, ...]:
     return tuple(sorted(request for request in found if REQUEST_ID_RE.fullmatch(request)))
 
 
+def write_iteration_patch(task_dir: Path, request: str, patch_text: str) -> Path:
+    """`ITERATION_<request>.patch`: an iteration that kept nothing, before the restore."""
+    return _write_request_file(task_dir, ITERATION_PATCH_STEM, request, PATCH_SUFFIX, patch_text)
+
+
 def _write_request_file(task_dir: Path, stem: str, request: str, suffix: str, text: str) -> Path:
     if not REQUEST_ID_RE.fullmatch(request):
         raise ValueError(f"not a request id: {request!r}")
@@ -248,6 +257,85 @@ def _next_action_of(handoff_text: str) -> str | None:
     start = handoff_text.find(f"## {_NEXT_ACTION}")
     end = handoff_text.find(f"## {_NEXT_SECTION}", start)
     return handoff_text[start:end].strip() if start >= 0 and end > start else None
+
+
+@dataclass(frozen=True)
+class NoResult:
+    """The worker file shows no ended worker; `detail` says what it shows instead."""
+
+    detail: str
+
+
+@dataclass(frozen=True)
+class WorkerEnd:
+    """An ended headless worker; a field its result object did not report is `None`."""
+
+    session_id: str
+    subtype: str
+    final_text: str | None
+    cost_usd: float | None
+    denials: int
+    num_turns: int | None
+    max_turns: int
+
+
+def write_worker_end(
+    task_dir: Path,
+    request: str,
+    *,
+    argv: Sequence[str],
+    exit_code: int,
+    max_turns: int,
+    max_budget_usd: float,
+    stdout_tail: str,
+    result: dict[str, object] | None,
+) -> Path:
+    """`WORKER_<request>.json`: the exited process's end; `result` is the object it printed."""
+    document = {
+        "v": WORKER_FILE_VERSION,
+        "argv": list(argv),
+        "exit": exit_code,
+        "max_turns": max_turns,
+        "max_budget_usd": max_budget_usd,
+        "stdout_tail": stdout_tail,
+        "result": result,
+    }
+    text = json.dumps(document, indent=2) + "\n"
+    return _write_request_file(task_dir, WORKER_STEM, request, WORKER_SUFFIX, text)
+
+
+def read_worker_end(task_dir: Path, request: str) -> NoResult | WorkerEnd | None:
+    """Parse the worker file once: `None` is no file (the agent was relayed), and anything short
+    of a result object with a session id and a subtype is `NoResult`, never an ended worker."""
+    path = task_dir / f"{WORKER_STEM}_{request}{WORKER_SUFFIX}"
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as exc:  # unreadable bytes and broken JSON are both ValueErrors
+        return NoResult(f"the worker file cannot be read: {exc}")
+    if not isinstance(document, dict) or document.get("v") != WORKER_FILE_VERSION:
+        return NoResult("the worker file is not a version-1 worker document")
+    result = _typed(document, "result", dict) or {}
+    session_id, subtype = _typed(result, "session_id", str), _typed(result, "subtype", str)
+    max_turns = _typed(document, "max_turns", int)
+    if not session_id or not subtype or max_turns is None:
+        return NoResult(f"exit {document.get('exit')} left no usable result; see {path.name}")
+    cost = _typed(result, "total_cost_usd", (int, float))
+    return WorkerEnd(
+        session_id=session_id,
+        subtype=subtype,
+        final_text=_typed(result, "result", str),
+        cost_usd=float(cost) if cost is not None and 0 <= cost < float("inf") else None,
+        denials=len(_typed(result, "permission_denials", list) or ()),
+        num_turns=_typed(result, "num_turns", int),
+        max_turns=max_turns,
+    )
+
+
+def _typed(source: dict, key: str, kind: type | tuple[type, ...]) -> Any:
+    value = source.get(key)
+    return value if isinstance(value, kind) and not isinstance(value, bool) else None
 
 
 # --- The agent's transcript ---------------------------------------------------------------

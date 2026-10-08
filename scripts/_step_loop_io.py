@@ -10,6 +10,8 @@ repository or runs a command.
   snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
   `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:`) are withheld
   whatever the plan declares.
+* **Scope**: `tree_patch`, the whole tree's difference from `HEAD` (the index untouched), and
+  `restore_paths`, which returns a declared scope to `HEAD` and touches nothing else.
 * **Runner**: the `Check:` command and the derived test scope. Each invocation the resolver
   lists runs and comes back on its own; merging them is the caller's job. No runner is asked to
   colour, and each command leads a process group that a timeout kills whole.
@@ -50,6 +52,10 @@ _LITERAL_PATHSPEC = ":(literal)"
 _NODE_SEPARATOR = "::"
 _STATUS_PATH_OFFSET = 3  # porcelain v1: two status letters and a space precede the path
 _UNTRACKED_DIRECTORY_MARK = "/"
+_GIT_DIRECTORY = ".git/"
+_SCRATCH_DIRECTORY = ".ai-work"  # pipeline documents: never part of a tree patch
+_EXCLUDE_AI_WORK = f":(exclude,literal){_SCRATCH_DIRECTORY}"
+_MISSING = " missing"  # the end of `git cat-file --batch-check`'s line for an absent object
 _DELETED = "deleted"
 _NOT_A_FILE = "not-a-file"
 _NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
@@ -233,6 +239,63 @@ def snapshot_outside(repo: Path, files: frozenset[str]) -> TreeSnapshot:
         untracked=_worktree_blobs(repo, untracked),
         unstaged_diff=diff,
     )
+
+
+def restore_paths(repo: Path, paths: Iterable[str]) -> tuple[str, ...]:
+    """Return the changed files under `paths` to `HEAD` and name them.
+
+    A tracked file goes back in the index and the work tree; an untracked one is removed.
+    Nothing outside `paths` is touched. This is the driver's one destructive operation: it
+    runs over a step's declared `Files:` only, and only after `tree_patch` has been written.
+    A path that is absolute, climbs out of the repository, is the repository itself or lies
+    under `.git/` is refused before anything is touched.
+    """
+    scope = tuple(_restorable(p) for p in paths)
+    changed = paths_differing_from_head(repo, scope)
+    tracked = _present_in_head(repo, changed)
+    gone = tuple(p for p in changed if p not in tracked)
+    if tracked:
+        _git(repo, "restore", "--source=HEAD", "--staged", "--worktree", "--", *_specs(tracked))
+    if gone:
+        _git(repo, "rm", "--cached", "--force", "--quiet", "--ignore-unmatch", "--", *_specs(gone))
+        for path in gone:
+            (repo / path).unlink(missing_ok=True)
+    return changed
+
+
+def tree_patch(repo: Path) -> str:
+    """The whole tree's difference from `HEAD` as one patch: staged, unstaged and untracked
+    files alike, nothing under `.ai-work/`. The index is read, never written."""
+    tracked = _git(repo, "diff", "HEAD", "--binary", "--no-renames", "--", _EXCLUDE_AI_WORK)
+    others = _lines(_git(repo, "ls-files", "--others", "--exclude-standard", "-z"))
+    new_files = [p for p in others if not (p.endswith(_UNTRACKED_DIRECTORY_MARK) or _is_scratch(p))]
+    return tracked + "".join(_new_file_patch(repo, path) for path in new_files)
+
+
+def _restorable(raw: str) -> str:
+    clean = normalise_path(raw)
+    if clean == "." or (clean + "/").lower().startswith(_GIT_DIRECTORY):
+        raise OutsideRepoError(f"{raw!r} is not a path a restore may touch")
+    return clean
+
+
+def _present_in_head(repo: Path, paths: tuple[str, ...]) -> tuple[str, ...]:
+    if not paths:
+        return ()
+    asked = "".join(f"HEAD:{path}\n" for path in paths)
+    answers = _git(repo, "cat-file", "--batch-check", stdin=asked).splitlines()
+    return tuple(paths[i] for i, answer in enumerate(answers) if not answer.endswith(_MISSING))
+
+
+def _is_scratch(path: str) -> bool:
+    return (path + "/").startswith(_SCRATCH_DIRECTORY + "/")
+
+
+def _new_file_patch(repo: Path, path: str) -> str:
+    done = _run(repo, "diff", "--no-index", "--binary", "--", os.devnull, path)
+    if done.returncode not in (0, 1):  # 1 is "the files differ"
+        raise GitCommandError(f"git diff --no-index failed: {_tail(done.stderr)}")
+    return done.stdout
 
 
 def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:

@@ -29,8 +29,10 @@ from test_goal_record import (  # noqa: E402,F401
     Work,
     ask,
     build_goal,
+    cut_off,
     do_work,
     effects,
+    head,
     leave_transcript,
     ledger,
     record,
@@ -91,20 +93,15 @@ def test_a_forged_green_block_is_replaced_by_the_real_reading_in_the_block_and_t
     assert (reply.recorded["commit"] is not None) is kept
 
 
-@pytest.mark.parametrize(("before", "work", "reading", "kept"), REAL_READINGS)
-def test_a_judgement_on_a_forged_block_reads_the_real_counts(tmp_path, before, work, reading, kept):
-    goal = build_goal(tmp_path, before)
-    request = forged_before_record(goal, work)
+def test_a_forged_green_block_does_not_keep_an_iteration_whose_real_check_regressed(tmp_path):
+    goal = build_goal(tmp_path, ("one", "two"))
+    request = forged_before_record(goal, Work(implemented=("one",)))
+    before = head(goal)
 
     reply = record(goal, request)
 
-    assert (
-        reading in reply.recorded["gate"]["evidence"],
-        "99" in reply.recorded["gate"]["evidence"],
-    ) == (
-        True,
-        False,
-    )
+    assert (reply.recorded["commit"], head(goal)) == (None, before)
+    assert "regressed" in reply.recorded["gate"]["evidence"]
 
 
 def test_an_ordinary_steps_written_block_is_read_back_without_running_the_check(
@@ -129,19 +126,21 @@ def test_an_ordinary_steps_written_block_is_read_back_without_running_the_check(
 
 
 @pytest.mark.parametrize(("before", "work", "reading", "kept"), REAL_READINGS)
-def test_a_second_record_after_the_gate_rewrote_its_block_appends_nothing_twice(
+def test_a_record_run_again_over_a_rewritten_block_appends_nothing_twice(
     tmp_path, before, work, reading, kept
 ):
     goal = build_goal(tmp_path, before)
     request = forged_before_record(goal, work)
     first = record(goal, request)
     settled = effects(goal, request)
+    cut_off(goal, request)
 
     again = record(goal, request)
 
-    assert again.recorded["replayed"] is True
+    assert again.recorded["replayed"] is False
     assert (len(ledger(goal)), again.recorded["commit"], effects(goal, request)) == (
         1,
         first.recorded["commit"],
         settled,
     )
+    assert reading in block_deciding_line(goal, request)

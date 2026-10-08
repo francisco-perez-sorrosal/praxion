@@ -501,7 +501,7 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
     `uv run pytest` or a shell wrapper must not leave workers editing the tree after the
     driver has reported the run as over or been interrupted.
     """
-    with _sigterm_as_exit():
+    with sigterm_as_exit():
         try:
             proc = subprocess.Popen(
                 argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
@@ -513,16 +513,16 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
         try:
             out, err = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            out, err = _kill_group(proc)
+            out, err = kill_group(proc)
             return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
         except BaseException:  # an interrupt must not leave the runner editing the tree
-            _kill_group(proc)
+            kill_group(proc)
             raise
         return CommandRun(argv, str(cwd), out + err, proc.returncode)
 
 
 @contextlib.contextmanager
-def _sigterm_as_exit() -> Iterator[None]:
+def sigterm_as_exit() -> Iterator[None]:
     """Let a SIGTERM reach `run_command`'s kill path as an exit, not as the default action."""
     if threading.current_thread() is not threading.main_thread():
         yield  # `signal.signal` works on the main thread only
@@ -534,7 +534,7 @@ def _sigterm_as_exit() -> Iterator[None]:
         signal.signal(signal.SIGTERM, previous or signal.SIG_DFL)
 
 
-def _kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:
+def kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:
     """Kill the command's whole process group; what it had printed comes back."""
     with contextlib.suppress(ProcessLookupError):  # the group may already be gone
         os.killpg(proc.pid, signal.SIGKILL)

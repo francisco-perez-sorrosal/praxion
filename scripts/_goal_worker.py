@@ -9,10 +9,12 @@ never widens the worker's permissions. The profile it starts with:
 - it is denied what `denied` lists, which beats every pre-approval its settings files grant;
 - it loads no MCP server the person did not name on this command line (`--strict-mcp-config`).
 
-After the process exits, its standard output is parsed once at this boundary into the result
-object, written to the task directory's worker file before `record` is called, and read back
-from that file when a request comes again, so a request whose worker may have run is never
-started a second time.
+The process leads its own group and writes to a file, so an interrupt or the wall-clock bound
+kills the whole group and a descendant that keeps the output open cannot hold the driver. After
+the process ends, however it ended, its standard output is parsed once at this boundary into the
+result object (a worker killed after it printed one keeps it), written to the task
+directory's worker file before `record` is called, and read back from that file when a request
+comes again, so a request whose worker may have run is never started a second time.
 
 Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """
@@ -20,11 +22,11 @@ Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runti
 from __future__ import annotations
 
 import json
-import os
 import re
 import signal
 import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +35,7 @@ from typing import Any
 from _step_loop_cli import SCRIPT as DRIVER_SCRIPT
 from _step_loop_cli import invocation
 from _step_loop_files import NoWorkerResult, WorkerEnd, read_worker_end, write_worker_end
+from _step_loop_io import kill_group, sigterm_as_exit
 
 DEFAULT_MAX_TURNS = 40
 DEFAULT_MAX_BUDGET_USD = 2.00
@@ -138,14 +141,23 @@ class HeadlessWorker:
             return self.not_started(earlier.detail)
         if request.get("reissued"):
             return self.not_started(
-                "a reissued request has no worker file, so its worker may have run"
+                "a reissued request has no worker file, so its worker may have run."
+                " To fix: inspect the repository for what that worker changed, then decide"
+                " whether to run again"
             )
         argv = self.argv(request)
         try:
             ended = self._run(argv)
         except FileNotFoundError:
-            return self.not_started(f"no `{PROGRAM}` on PATH")
-        result = None if ended.timed_out else _result_object(ended.stdout)
+            return self.not_started(
+                f"no `{PROGRAM}` on PATH. To fix: install it or put it on PATH, then run again"
+            )
+        except OSError as exc:
+            return self.not_started(
+                f"`{PROGRAM}` could not be started: {exc}."
+                f" To fix: make `{PROGRAM}` on PATH an executable program, then run again"
+            )
+        result = _result_object(ended.stdout)
         write_worker_end(
             self.task_dir,
             request["id"],
@@ -160,27 +172,43 @@ class HeadlessWorker:
             cause = (
                 f"stopped after {self.timeout:g} s" if ended.timed_out else f"exited {ended.code}"
             )
-            return self.not_started(f"the worker {cause} and printed no result object")
+            return self.not_started(
+                f"the worker {cause} and printed no result object."
+                " To fix: read the worker file in the task directory for what it printed,"
+                " then run again"
+            )
         return ran(result["session_id"], terminal_marker(result.get("result")))
 
     def _run(self, argv: list[str]) -> _Exit:
-        """Start the process in its own group, input closed; kill the group at the bound."""
-        process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
-            argv,
-            cwd=self.repo,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            start_new_session=True,
-        )
-        try:
-            stdout, _ = process.communicate(timeout=self.timeout)
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            stdout, _ = process.communicate()
-            return _Exit(process.returncode, stdout or "", timed_out=True)
-        return _Exit(process.returncode, stdout, timed_out=False)
+        """Start the process in its own group, input closed, output in a file; wait for it.
+
+        The group dies at the wall-clock bound and on any interrupt, so no worker (nor a
+        process it started) outlives the driver. A worker that exits on its own is not followed
+        by a group kill. Its output is read once, whatever ended it.
+        """
+        with tempfile.TemporaryFile() as output, sigterm_as_exit():
+            process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
+                argv,
+                cwd=self.repo,
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                start_new_session=True,
+            )
+            timed_out = False
+            try:
+                process.wait(timeout=self.timeout)
+            except subprocess.TimeoutExpired:
+                kill_group(process)
+                timed_out = True
+            except BaseException:  # an interrupt must not leave the worker editing the tree
+                kill_group(process)
+                raise
+            output.seek(0)
+            stdout = output.read().decode("utf-8", errors="replace")
+        code = process.returncode if process.returncode is not None else -signal.SIGKILL
+        return _Exit(code, stdout, timed_out)
 
 
 def _return_types() -> tuple[Any, Any]:

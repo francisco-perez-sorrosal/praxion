@@ -4,8 +4,10 @@ Claude Code files it at `<session dir>/<session id>/subagents/agent-<agent id>.j
 Agent-tool spawn) or under `subagents/workflows/<run>/` (a Workflow-tool spawn). The step-loop
 driver's adapter (has the agent ended? how many requests?) and the turn-budget reminder hook (how
 many requests so far?) must agree on what it says, so both read it here. `locate` finds it by
-session and agent id, else by agent id across every project directory under the config directory.
-It reads as:
+session and agent id, else by agent id across every project directory under the config directory
+(`search_all=False` keeps a hot caller to the session's own directory). A transcript is JSON Lines
+split on `"\n"` alone: a record holds no raw newline, but its strings can hold U+2028 and U+2029,
+which `str.splitlines()` would cut at. It reads as:
 
   * `Missing` -- no such file (not flushed yet, or an id from another config directory);
   * `Unreadable(lines_ok, last_ok)` -- a line is not a JSON object, so nothing is trusted:
@@ -16,6 +18,10 @@ It reads as:
     `last_turn` is the last well-formed request: `Final(text)` when it holds no tool call,
     `Calling(tool)` when it ends on one; a `SubagentHandback` call hands the result back, so it
     reads as `Final(message)`.
+
+`request_count` is the one definition of an agent's count of requests, read by the step-loop
+driver, the turn-budget reminder and the context instrument alike: the `requests` of a `Read`,
+`None` for anything else, so a reader that cannot parse a transcript gives no count.
 
 Stdlib only and 3.9-safe: the hook runs under whatever interpreter the harness finds."""
 
@@ -94,19 +100,27 @@ def locate(
     session_id: str | None = None,
     transcript_path: str | None = None,
     config: Path | None = None,
+    search_all: bool = True,
 ) -> Path | None:
     """The agent's transcript file, or `None`: beside the parent transcript when the session is
-    known, else searched by agent id under `<config>/projects/*/*/`."""
+    known, else (when `search_all`) searched by agent id under `<config>/projects/*/*/`."""
     if not _AGENT_ID.fullmatch(agent_id):
         return None
     name = f"agent-{agent_id}.jsonl"
     searched = []
     if session_id and transcript_path:
         searched.append(Path(transcript_path).parent / session_id / "subagents")
-    config = config or Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
-    searched += sorted(config.glob("projects/*/*/subagents"))
+    if search_all:
+        config = config or Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
+        searched += sorted(config.glob("projects/*/*/subagents"))
     found = (_first_file(subagents, name) for subagents in searched)
     return next((path for path in found if path is not None), None)
+
+
+def request_count(reading: TranscriptReading) -> int | None:
+    """The agent's distinct requests, or `None` when the transcript is missing, unreadable or
+    holds an assistant record without a request id."""
+    return reading.requests if isinstance(reading, Read) else None
 
 
 def _first_file(subagents: Path, name: str) -> Path | None:
@@ -115,7 +129,7 @@ def _first_file(subagents: Path, name: str) -> Path | None:
 
 
 def parse_transcript(text: str) -> Union[Unreadable, Read]:  # noqa: UP007 -- runtime, 3.9 floor
-    lines = [line for line in text.splitlines() if line.strip()]
+    lines = [line for line in text.split("\n") if line.strip()]
     parsed = [_as_record(line) for line in lines]
     records = [record for record in parsed if record is not None]
     if len(records) < len(lines):

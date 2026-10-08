@@ -45,6 +45,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     TranscriptReading,
     Unreadable,
     parse_transcript,
+    request_count,
 )
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
 from _loop_fields import ATTEMPT_CAP, OutstandingAttempt  # noqa: E402
@@ -281,7 +282,7 @@ class Sighting:
 
     @property
     def turns(self) -> int | None:
-        return self.reading.requests if isinstance(self.reading, Read) else None
+        return request_count(self.reading)
 
 
 def await_end(

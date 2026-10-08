@@ -28,6 +28,7 @@ from _agent_transcript import (  # noqa: E402
     locate,
     parse_transcript,
     read_transcript,
+    request_count,
 )
 
 
@@ -401,3 +402,86 @@ def test_an_agent_the_double_never_spawned_reads_as_missing_in_the_same_sandbox(
     monkeypatch.setenv(transcript.CONFIG_DIR_VARIABLE, str(task.sandbox_home / ".claude"))
 
     assert read_transcript(locate(new_agent_id())) == Missing()
+
+
+# -- one count of an agent's requests ------------------------------------------------------
+
+LINE_BREAKS_BEYOND_NEWLINE = ["\u2028", "\u2029", "\x0b", "\x0c", "\x1c", "\x85"]
+
+
+def _verbatim_jsonl(*entries) -> str:
+    """JSON Lines the way a record with a raw separator inside a string is written."""
+    return "\n".join(json.dumps(entry, ensure_ascii=False) for entry in entries) + "\n"
+
+
+@pytest.mark.parametrize("separator", LINE_BREAKS_BEYOND_NEWLINE)
+def test_a_line_break_other_than_newline_inside_a_string_stays_inside_its_record(separator):
+    prompt, reply = f"before{separator}after", f"one{separator}two"
+    text = _verbatim_jsonl(_user(prompt), _assistant("r1", _text(reply)))
+
+    reading = parse_transcript(text)
+
+    assert reading == Read(
+        requests=1, first_user_text=prompt, last_turn=Final(reply), malformed=False
+    )
+
+
+def test_only_a_newline_ends_a_record():
+    text = (
+        '{"type": "user", "message": {"content": "a"}}\n{"type": "assistant",\n"requestId": "r1"}'
+    )
+
+    assert isinstance(parse_transcript(text), Unreadable)
+
+
+@pytest.mark.parametrize("requests", [0, 1, 5])
+def test_the_count_of_a_clean_transcript_is_its_distinct_requests(requests):
+    records = [_assistant(f"r{n}", _text("turn")) for n in range(requests)]
+
+    assert request_count(_parse(_user(PROMPT), *records)) == requests
+
+
+def test_a_repeated_line_or_request_does_not_raise_the_count():
+    records = [_assistant("r1", _text("a")), _assistant("r2", _tool("Bash"))]
+
+    assert request_count(_parse(*records, *records, records[0])) == 2
+
+
+def test_a_malformed_assistant_record_gives_no_count():
+    assert (
+        request_count(_parse(_assistant("r1", _text("ok")), _assistant(None, _text("x")))) is None
+    )
+
+
+def test_a_partial_transcript_with_a_cut_off_line_gives_no_count():
+    text = _jsonl(_assistant("r1", _text("ok"))) + '{"type": "assistant", "requestId": "r2", "mess'
+
+    assert request_count(parse_transcript(text)) is None
+
+
+@pytest.mark.parametrize("reading", [Missing(), Unreadable(lines_ok=3, last_ok=True)])
+def test_a_transcript_that_was_not_read_gives_no_count(reading):
+    assert request_count(reading) is None
+
+
+def test_the_count_of_a_file_is_the_count_of_its_text(tmp_path):
+    body = _jsonl(_user(PROMPT), _assistant("r1", _text("a")), _assistant("r2", _text("b")))
+
+    assert request_count(read_transcript(_file_at(tmp_path, body=body))) == request_count(
+        parse_transcript(body)
+    )
+
+
+def test_a_search_confined_to_the_session_does_not_look_in_other_projects(tmp_path):
+    _file_at(_subagents(tmp_path, "-proj-b", "s2"))
+
+    assert locate(AGENT_ID, config=tmp_path, search_all=False) is None
+
+
+def test_a_search_confined_to_the_session_still_finds_the_agent_beside_the_parent(tmp_path):
+    expected = _file_at(tmp_path / "elsewhere" / SESSION_ID / "subagents")
+    parent = tmp_path / "elsewhere" / "parent.jsonl"
+
+    found = locate(AGENT_ID, session_id=SESSION_ID, transcript_path=str(parent), search_all=False)
+
+    assert found == expected

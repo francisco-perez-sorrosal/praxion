@@ -29,6 +29,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     TranscriptReading,
     locate,
     read_transcript,
+    request_count,
 )
 from _handoff_inputs import read_existing  # noqa: E402
 from _handoff_readiness import WAL_AGENT_STOP, session_wal_rows  # noqa: E402
@@ -270,7 +271,7 @@ def end_evidence(
     if not isinstance(reading, Read):
         return EndEvidence(None, None, max_turns, agent_stopped)
     final = reading.last_turn.text if isinstance(reading.last_turn, Final) else None
-    return EndEvidence(final, reading.requests, max_turns, agent_stopped)
+    return EndEvidence(final, request_count(reading), max_turns, agent_stopped)
 
 
 def names_request(reading: TranscriptReading, request: str) -> bool:

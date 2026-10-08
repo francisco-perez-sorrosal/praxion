@@ -30,16 +30,18 @@ Instrument limit: `~/.claude/projects/<project>/` is keyed by the *current
 working directory's* mangled path, so a pipeline run from a git worktree (the
 Standard/Full-tier default) writes its transcripts under a sibling directory
 such as `<project>--claude-worktrees-<name>/`, invisible to a single
-`--project-root` pointed at the primary checkout. This script does not read
-across worktree-mangled siblings; a complete accounting needs either several
-`--project-root` invocations (one per worktree used) or a future
-`--include-worktrees` flag that globs the sibling directories -- neither is
-implemented here.
+`--project-root` pointed at the primary checkout. The default reading does not
+cross worktree-mangled siblings; `--transcripts-dir DIR` names the directory to
+read instead (the one holding `<session>.jsonl` files and `<session>/subagents/`),
+so a worktree's sessions are measured with one invocation each, and
+`source_root` echoes the directory read.
 
 Cap-outs: the report's `cap_outs` object counts, per agent type, the spawns
 that stopped at their turn cap. The harness leaves no stop marker in a
 transcript or its `.meta.json` sidecar, so a spawn counts as capped when its
-`requests` -- distinct API requests, the harness's own turn unit -- reach the
+`requests` -- distinct API requests, the harness's own turn unit, counted by
+`hooks/_agent_transcript.request_count` like the step-loop driver and the
+turn-budget reminder -- reach the
 `maxTurns` declared in its agent file's frontmatter (read from this checkout's
 `agents/` at measure time). It is therefore always an `estimate`: a spawn that
 finishes naturally on its cap-th request reads as capped, a resumed spawn counts
@@ -50,7 +52,11 @@ is not the `turns` field: one request is split across several assistant records
 (thinking, then tool use), so `turns` runs well past the cap and stays as it was
 because the published `turns_p50` is built on it. The worktree-sibling limit
 above applies to `cap_outs` too, and a subagent transcript that cannot be read
-is skipped with a named warning on stderr, so it is in no aggregate.
+is skipped with a named warning on stderr, so it is in no aggregate. A transcript
+that reads but yields no request count (a line that does not parse, or an
+assistant record with no request id) keeps its row in the peak, turn and pipeline
+aggregates and is left out of `cap_outs` with a named warning: no count rather
+than a guessed one.
 
 Tests are fixture-only (`scripts/test_context_baseline.py`) -- real
 transcripts are never committed or read in CI; reproducing the published
@@ -62,8 +68,8 @@ back to prompt-regex classification and the run proceeds. An *unreadable* one
 stderr and no report on stdout, rather than silently mislabelling the
 per-agent-type percentiles this instrument publishes.
 
-Run: `python3 scripts/context_baseline.py --project-root DIR [--band TOKENS]
-[--json] [--table]`
+Run: `python3 scripts/context_baseline.py --project-root DIR [--transcripts-dir DIR]
+[--band TOKENS] [--json] [--table]`
 """
 
 from __future__ import annotations
@@ -81,6 +87,7 @@ from _repo_root import git_toplevel_from_cwd
 # hooks/_observation_log is a sibling package to this file's own scripts/
 # directory -- both live one level under the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
+from _agent_transcript import parse_transcript, request_count  # noqa: E402
 from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
 # Declared turn caps live in the frontmatter of the agent files this script ships
@@ -248,8 +255,10 @@ def _context_tokens(usage: dict) -> int:
     )
 
 
-def _iter_records(path: Path):
-    for line in path.read_text(encoding="utf-8").splitlines():
+def _records_of(text: str):
+    """Every line of `text` that parses, skipping the rest -- the tolerant pass that feeds
+    peak, turns, tools and compactions. Request counting is not its job (`request_count`)."""
+    for line in text.splitlines():
         try:
             yield json.loads(line)
         except json.JSONDecodeError:
@@ -284,23 +293,22 @@ def _start_day(records: list[dict]) -> date | None:
 
 
 def _parse_subagent_transcript(path: Path) -> dict | None:
-    """One pass over a subagent transcript. Returns `None` when the agent
-    never reached an assistant turn with usage (dropped, mirroring
-    `baseline.py`'s `if turns == 0: continue`)."""
-    records = list(_iter_records(path))
+    """One read of a subagent transcript, two views of its text: the tolerant pass
+    (peak, turns, tools, compactions) and the shared request count. Returns `None`
+    when the agent never reached an assistant turn with usage and has no counted
+    request (dropped, mirroring `baseline.py`'s `if turns == 0: continue`); the row's
+    `requests` is `None` when the transcript yields no count."""
+    text = path.read_text(encoding="utf-8")
+    records = list(_records_of(text))
     compactions = sum(1 for r in records if r.get("isCompactSummary") or r.get("type") == "summary")
     turns = peak = tools = 0
     first_turn: int | None = None
-    request_ids: set = set()
     for record in records:
         message = _message_of(record)
         usage = (message or {}).get("usage")
         if record.get("type") != "assistant" or not usage:
             continue
         turns += 1
-        # One API request spans several assistant records; a record with no id
-        # at all is its own request.
-        request_ids.add(record.get("requestId") or message.get("id") or turns)
         ctx = _context_tokens(usage)
         peak = max(peak, ctx)
         if first_turn is None and usage.get("cache_creation_input_tokens") is not None:
@@ -309,7 +317,8 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         if isinstance(content, list):
             tools += sum(1 for b in content if isinstance(b, dict) and b.get("type") == "tool_use")
 
-    if turns == 0:
+    requests = request_count(parse_transcript(text))
+    if turns == 0 and not requests:
         return None
     first_prompt = _first_user_prompt(records)
     slug_match = _SLUG_RE.search(first_prompt)
@@ -320,7 +329,7 @@ def _parse_subagent_transcript(path: Path) -> dict | None:
         "peak": peak,
         "first_turn": first_turn or 0,
         "turns": turns,
-        "requests": len(request_ids),
+        "requests": requests,
         "max_turns": None,
         "started": _start_day(records),
         "tools": tools,
@@ -334,7 +343,7 @@ def _parse_main_transcript(path: Path) -> dict | None:
     turns = peak = compactions = 0
     first_turn: int | None = None
     spawns: list[list] = []
-    for record in _iter_records(path):
+    for record in _records_of(path.read_text(encoding="utf-8")):
         if record.get("isCompactSummary"):
             compactions += 1
         message = record.get("message") or {}
@@ -382,8 +391,11 @@ def _content_text(content) -> str:
     return ""
 
 
-def load(project_root: Path, agents_dir: Path = _AGENTS_DIR) -> list[dict]:
-    """Walk this project's transcripts + WAL into `compute()`'s row shape.
+def load(
+    project_root: Path, agents_dir: Path = _AGENTS_DIR, transcripts_dir: Path | None = None
+) -> list[dict]:
+    """Walk the project's transcripts + WAL into `compute()`'s row shape. The transcripts
+    come from `transcripts_dir`, else the directory derived from `project_root`.
 
     Impure: the only function in this module that touches the filesystem.
     Raises `_WalUnreadableError` when the WAL exists but cannot be read --
@@ -391,7 +403,7 @@ def load(project_root: Path, agents_dir: Path = _AGENTS_DIR) -> list[dict]:
     transcript is walked so `wal-unreadable` wins over a later "no
     transcripts" report.
     """
-    transcripts_dir = _transcripts_dir(project_root)
+    transcripts_dir = transcripts_dir or _transcripts_dir(project_root)
     id2type = _agent_types_from_wal(reader.log_path(project_root / ".ai-state"))
 
     rows: list[dict] = []
@@ -405,6 +417,12 @@ def load(project_root: Path, agents_dir: Path = _AGENTS_DIR) -> list[dict]:
             continue
         if row is None:
             continue
+        if row["requests"] is None:
+            print(
+                f"warning: no request count for transcript {path} (a line did not parse or an "
+                "assistant record has no request id); left out of cap_outs",
+                file=sys.stderr,
+            )
         agent_id = path.name[len("agent-") : -len(".jsonl")]
         wal_type = id2type.get(agent_id)
         if wal_type:
@@ -480,10 +498,10 @@ def _aggregate_by_agent_type(subagent_rows: list[dict]) -> dict:
 def _aggregate_cap_outs(subagent_rows: list[dict]) -> dict:
     """Per agent type with a declared `maxTurns`: how many spawns reached the
     cap they ran under. The reported `max_turns` is the highest in the group,
-    which is the current one."""
+    which is the current one. A spawn with no request count is not judged."""
     by_type: dict[str, list[dict]] = defaultdict(list)
     for row in subagent_rows:
-        if row["max_turns"] is not None:
+        if row["max_turns"] is not None and row["requests"] is not None:
             by_type[row["atype"]].append(row)
 
     result = {}
@@ -607,6 +625,12 @@ def main(argv: list[str] | None = None) -> int:
         "--project-root", default=None, help="Project root; defaults to git toplevel of CWD."
     )
     parser.add_argument(
+        "--transcripts-dir",
+        default=None,
+        help="Directory holding the project's <session>.jsonl files and <session>/subagents/; "
+        "defaults to the one derived from --project-root.",
+    )
+    parser.add_argument(
         "--band",
         type=int,
         default=None,
@@ -625,12 +649,14 @@ def main(argv: list[str] | None = None) -> int:
         print("error: not inside a git worktree and no --project-root given", file=sys.stderr)
         return 2
 
+    transcripts_dir = (
+        Path(args.transcripts_dir) if args.transcripts_dir else _transcripts_dir(project_root)
+    )
     try:
-        rows = load(project_root)
+        rows = load(project_root, transcripts_dir=transcripts_dir)
     except _WalUnreadableError as exc:
         print(f"error: wal-unreadable: {exc}", file=sys.stderr)
         return 2
-    transcripts_dir = _transcripts_dir(project_root)
     report = compute(
         rows,
         band=args.band,

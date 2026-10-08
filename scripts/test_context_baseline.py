@@ -640,3 +640,159 @@ def test_load_skips_an_unreadable_transcript_and_names_it_on_stderr(tmp_path, mo
 
     assert len(rows) == 1
     assert "unreadable transcript" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- #
+# one count of an agent's requests, and --transcripts-dir
+# --------------------------------------------------------------------------- #
+USAGE = {"input_tokens": 1, "cache_creation_input_tokens": 1, "cache_read_input_tokens": 0}
+PROMPT_LINE = {"type": "user", "message": {"content": "You are the implementer. Task slug: s"}}
+
+
+def _assistant_line(request_id: str | None, usage: dict | None = USAGE, text: str = "") -> dict:
+    message: dict = {"content": [{"type": "text", "text": text}]}
+    if usage is not None:
+        message["usage"] = usage
+    line: dict = {"type": "assistant", "message": message}
+    if request_id is not None:
+        line["requestId"] = request_id
+    return line
+
+
+def _write_lines(path: Path, lines: list, raw_tail: str = "") -> None:
+    """A transcript written verbatim (non-ASCII kept raw), plus an unterminated `raw_tail`."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = "\n".join(json.dumps(line, ensure_ascii=False) for line in lines) + "\n"
+    path.write_text(body + raw_tail, encoding="utf-8")
+
+
+def _capped_agents(tmp_path, cap: int = 2) -> Path:
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    (agents_dir / "implementer.md").write_text(f"---\nmaxTurns: {cap}\n---\n", encoding="utf-8")
+    return agents_dir
+
+
+def test_transcripts_dir_names_the_directory_read_and_is_echoed_as_source_root(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(ctx.Path, "home", lambda: tmp_path / "home")
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    transcripts = tmp_path / "elsewhere"
+    _write_transcript(transcripts / "sess-1" / "subagents" / "agent-a1.jsonl", [("req_1", 1)])
+
+    exit_code = ctx.main(
+        ["--project-root", str(project_root), "--transcripts-dir", str(transcripts), "--json"]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert (exit_code, report["source_root"], report["subagents"]) == (0, str(transcripts), 1)
+
+
+def test_without_transcripts_dir_the_directory_derived_from_the_project_root_is_read(
+    tmp_path, monkeypatch, capsys
+):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_transcript(subagents / "agent-a1.jsonl", [("req_1", 1)])
+
+    ctx.main(["--project-root", str(project_root), "--json"])
+
+    report = json.loads(capsys.readouterr().out)
+    assert (report["source_root"], report["subagents"]) == (
+        str(ctx._transcripts_dir(project_root)),
+        1,
+    )
+
+
+def test_load_reads_the_given_transcripts_dir_instead_of_the_derived_one(tmp_path, monkeypatch):
+    project_root, derived = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_transcript(derived / "agent-derived.jsonl", [("req_1", 1)])
+    given = tmp_path / "given"
+    _write_transcript(given / "sess-9" / "subagents" / "agent-given.jsonl", [("req_1", 1)])
+
+    rows = ctx.load(project_root, tmp_path / "agents", transcripts_dir=given)
+
+    assert [row["requests"] for row in rows] == [1]
+
+
+def test_a_row_without_a_request_count_stays_in_the_aggregates_but_not_in_cap_outs():
+    counted = _subagent_row(peak=200_000, requests=3, max_turns=3)
+    uncounted = {**_subagent_row(peak=400_000, max_turns=3), "requests": None}
+
+    report = ctx.compute([counted, uncounted], generated_at=GENERATED_AT, source_root=SOURCE_ROOT)
+
+    assert (report["by_agent_type"]["implementer"]["n"], report["cap_outs"]) == (
+        2,
+        {"implementer": {"n": 1, "capped": 1, "rate": 1.0, "max_turns": 3, "basis": "estimate"}},
+    )
+
+
+def test_a_transcript_with_a_line_that_did_not_parse_keeps_its_row_and_warns_by_name(
+    tmp_path, monkeypatch, capsys
+):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    cut_off = subagents / "agent-cut.jsonl"
+    _write_lines(cut_off, [PROMPT_LINE, _assistant_line("req_1")], raw_tail='{"type": "assis')
+
+    (row,) = ctx.load(project_root, _capped_agents(tmp_path))
+
+    assert (row["requests"], row["turns"], row["peak"]) == (None, 1, 2)
+    assert str(cut_off) in capsys.readouterr().err
+    assert _cap_outs([row]) == {}
+
+
+def test_an_assistant_record_without_a_request_id_leaves_the_spawn_out_of_cap_outs(
+    tmp_path, monkeypatch
+):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_lines(
+        subagents / "agent-a1.jsonl",
+        [PROMPT_LINE, _assistant_line("req_1"), _assistant_line(None)],
+    )
+
+    (row,) = ctx.load(project_root, _capped_agents(tmp_path))
+
+    assert (row["requests"], _cap_outs([row])) == (None, {})
+
+
+def test_the_count_comes_from_the_shared_definition_not_a_private_one(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_lines(subagents / "agent-a1.jsonl", [PROMPT_LINE, _assistant_line("req_1")])
+    monkeypatch.setattr(ctx, "request_count", lambda reading: 41)
+
+    (row,) = ctx.load(project_root, _capped_agents(tmp_path))
+
+    assert row["requests"] == 41
+
+
+def test_a_line_separator_inside_a_string_does_not_make_the_count_unknown(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_lines(
+        subagents / "agent-a1.jsonl",
+        [PROMPT_LINE, _assistant_line("req_1", text="one\u2028two"), _assistant_line("req_2")],
+    )
+
+    (row,) = ctx.load(project_root, _capped_agents(tmp_path))
+
+    assert row["requests"] == 2
+
+
+def test_a_transcript_with_requests_but_no_usage_still_has_a_row(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_lines(
+        subagents / "agent-a1.jsonl",
+        [PROMPT_LINE, _assistant_line("req_1", usage=None), _assistant_line("req_2", usage=None)],
+    )
+
+    (row,) = ctx.load(project_root, _capped_agents(tmp_path))
+
+    assert (row["requests"], row["turns"], row["peak"]) == (2, 0, 0)
+    assert _cap_outs([row])["implementer"]["capped"] == 1
+
+
+def test_a_transcript_with_neither_usage_nor_requests_has_no_row(tmp_path, monkeypatch):
+    project_root, subagents = _project_with_transcripts(tmp_path, monkeypatch)
+    _write_lines(subagents / "agent-a1.jsonl", [PROMPT_LINE])
+
+    assert ctx.load(project_root, _capped_agents(tmp_path)) == []

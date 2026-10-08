@@ -26,7 +26,7 @@ affected_files:
   - skills/software-planning/references/agent-pipeline-details.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-10, REQ-12, REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20, REQ-21, REQ-22, REQ-23, REQ-24, REQ-25, REQ-27, REQ-28, REQ-29, REQ-30, REQ-38]
 supersedes_in_part: [dec-426, dec-427]
-re_affirmed_by: [dec-draft-1c61d1e2]
+re_affirmed_by: [dec-434]
 dissent: []
 ---
 

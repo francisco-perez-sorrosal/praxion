@@ -1,7 +1,8 @@
 ---
-id: dec-draft-1c61d1e2
+id: dec-434
+draft_id: dec-draft-1c61d1e2
 title: Ralph-lite is the step-loop driver's goal mode — a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration stall cap
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-08
 summary: The Ralph-lite loop for one well-gated single-behaviour task is the step-loop driver running a one-step goal plan — a `goal` verb scaffolds the plan (Files, protected paths as Read-only, the Check, an Iterations budget, a progress record in WIP.md), a `run` verb loops next, spawn, record with a new `claude -p` spawner module (dec-432's v2) so every iteration is a fresh process, the gate excludes the goal's own targets as pending and requires monotone counts, a progressing green iteration is committed by pathspec, two consecutive non-progressing iterations stop for a human, the Iterations field is the loop's budget; the entry is a user- and model-invocable skill, never a command; the single-session `/goal` form is a one-line no-artifact fallback. Replaces the `/goal` prose recipe of dec-431; keeps the execution-mode placement of dec-262.

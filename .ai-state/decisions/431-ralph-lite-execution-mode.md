@@ -16,7 +16,7 @@ affected_files:
   - skills/software-planning/references/tier-templates.md
 affected_reqs: [REQ-34, REQ-35]
 re_affirms: dec-262
-superseded_by: dec-draft-1c61d1e2
+superseded_by: dec-434
 dissent: []
 ---
 

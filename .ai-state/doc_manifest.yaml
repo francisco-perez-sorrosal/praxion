@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-08T03:02:22Z'
+generated_at: '2026-10-08T03:53:51Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -2138,7 +2138,7 @@ surfaces:
   path: .ai-state/decisions/262-tier-vs-execution-mode-taxonomy.md
   type: markdown
   title: "Tier is not execution mode \u2014 pipeline_tier semantics + orchestrator as Direct/Lightweight ADR author"
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-263-retire-future-designed-producers
   path: .ai-state/decisions/263-retire-future-designed-producers.md
@@ -3129,7 +3129,7 @@ surfaces:
   path: .ai-state/decisions/427-step-completion-check-and-attempt-cap.md
   type: markdown
   title: Plan steps declare a machine-checked completion criterion that the reconciler judges first from the step's recorded result, and a step at two fresh attempts gets its own human-routed verdict
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-428-attempt-evidence-in-wip-and-ledger
   path: .ai-state/decisions/428-attempt-evidence-in-wip-and-ledger.md
@@ -3141,7 +3141,7 @@ surfaces:
   path: .ai-state/decisions/429-loop-iteration-budget.md
   type: markdown
   title: Driver-emitted spawns are budgeted as iterations against a plan-derived budget; spawn_count reports them apart from charged spawns
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-430-plan-local-light-review-trigger
   path: .ai-state/decisions/430-plan-local-light-review-trigger.md
@@ -3160,12 +3160,19 @@ surfaces:
   path: .ai-state/decisions/432-step-loop-driver-and-spawner-seam.md
   type: markdown
   title: A deterministic step-loop driver owns the crank between the pre-mortem gate and the pre-verification checkpoint; the orchestrator relays spawn requests through a spawner seam
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-433-turn-budget-reminder-hook
   path: .ai-state/decisions/433-turn-budget-reminder-hook.md
   type: markdown
   title: A synchronous PreToolUse hook reminds a capped subagent at 60 and 80 percent of its declared maxTurns, counting distinct requests in its own transcript
+  last_modified: '2026-10-07'
+  renderer: adr_card
+- id: ai-state-decisions-434-ralph-lite-step-loop-goal-mode
+  path: .ai-state/decisions/434-ralph-lite-step-loop-goal-mode.md
+  type: markdown
+  title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
+    \ stall cap"
   last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
@@ -3935,6 +3942,7 @@ groups:
   - ai-state-decisions-431-ralph-lite-execution-mode
   - ai-state-decisions-432-step-loop-driver-and-spawner-seam
   - ai-state-decisions-433-turn-budget-reminder-hook
+  - ai-state-decisions-434-ralph-lite-step-loop-goal-mode
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

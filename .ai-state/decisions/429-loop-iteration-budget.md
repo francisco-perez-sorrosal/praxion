@@ -17,7 +17,7 @@ affected_files:
   - skills/software-planning/references/coordination-details.md
 affected_reqs: [REQ-26, REQ-36]
 supersedes_in_part: [dec-394]
-re_affirmed_by: [dec-draft-1c61d1e2]
+re_affirmed_by: [dec-434]
 dissent: []
 ---
 

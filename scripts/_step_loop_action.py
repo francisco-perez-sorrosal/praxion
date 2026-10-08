@@ -26,7 +26,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
-from _loop_fields import ATTEMPT_CAP, OutstandingAttempt
+from _loop_fields import OutstandingAttempt, request_cap
 from _plan_steps import PlanStep
 from _step_loop_render import Kind, RequestKey, parse_request_id
 from _step_loop_review import (
@@ -61,6 +61,7 @@ from _step_loop_state import (
     select_step,
     series_states,
     spent,
+    step_cap,
 )
 
 if TYPE_CHECKING:
@@ -123,8 +124,8 @@ Action = Union[Spawn, Complete, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 def iteration_budget(steps: Iterable[PlanStep]) -> int:
-    """The cap for each driven step, plus one review for each the trigger marks."""
-    return sum(ATTEMPT_CAP + needs_review(step) for step in steps if is_driven(step))
+    """The request cap of each driven step's bound, plus one review for each the trigger marks."""
+    return sum(step_cap(step) + needs_review(step) for step in steps if is_driven(step))
 
 
 def iterations_used(inputs: LoopInputs) -> int:
@@ -202,7 +203,8 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
     step, state = selection.step, selection.state
     where = f"{STEP_LABEL}{step.id}"
     if isinstance(state, Exhausted):
-        evidence = f"{ATTEMPT_CAP} of {ATTEMPT_CAP} fresh attempts at {where} ended unverified"
+        cap = request_cap(state.bound)
+        evidence = f"{cap} of {cap} fresh attempts at {where} ended unverified"
         replan = getattr(inputs.attempts.get(step.id), "replan", None) or evidence
         return Stop("attempts-exhausted", step.id, evidence, state.attempts, replan)
     if isinstance(state, HumanVerdict):

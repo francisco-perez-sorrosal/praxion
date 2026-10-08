@@ -78,9 +78,11 @@ from _loop_fields import (
     Check,
     CheckLine,
     OutstandingAttempt,
+    UnreadableIterations,
     evaluate_check,
     parse_attempts,
     parse_step_checks,
+    parse_step_iterations,
 )
 from _plan_steps import scan_step_files, split_files
 from _repo_root import is_plugin_cache_path, resolve_repo_root
@@ -221,6 +223,7 @@ def _gather(
         test_status_override=test_status_override,
         mutation_blocks=mutation_block_reasons(plan_text or wip_text, results_text),
         checks=parse_step_checks(plan_text),
+        iterations=parse_step_iterations(plan_text),
         results_text=results_text,
         attempts=_attempt_records(wip_text, recorded_requests),
     )
@@ -237,6 +240,7 @@ class _Gathered:
     test_status_override: str | None
     mutation_blocks: dict[str, str]
     checks: dict[str, CheckLine]
+    iterations: dict[str, int | UnreadableIterations]
     results_text: str
     attempts: dict[str, AttemptRecord]
 
@@ -285,6 +289,7 @@ def _reconcile_step(step_id: str, claim: str, gathered: _Gathered) -> dict[str, 
         tier2=_correlate_agents(files, gathered.wal_rows),
         earlier_declarers=_earlier_declarers(step_id, declared) if not files else [],
         mutation_block=gathered.mutation_blocks.get(step_id),
+        iterations=gathered.iterations.get(step_id),
     )
     return classify_step(
         evidence, _declared_check(step_id, gathered), gathered.attempts.get(step_id)

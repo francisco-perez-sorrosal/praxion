@@ -52,7 +52,7 @@ from typing import Any, Protocol, Union
 import _step_loop_cli as cli
 import _step_loop_record as rec
 from _handoff_inputs import resolve_base_ref
-from _loop_fields import ATTEMPT_CAP, OutstandingAttempt, parse_attempts
+from _loop_fields import OutstandingAttempt, parse_attempts
 from _plan_steps import parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
 from _step_loop_action import Complete, Spawn, Stop, issuable_action
@@ -68,7 +68,7 @@ from _step_loop_render import (
     stop_next_action,
     stop_stderr,
 )
-from _step_loop_state import LoopInputs, request_kind, review_range, series_states
+from _step_loop_state import LoopInputs, request_kind, review_range, series_states, step_cap
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
 
@@ -173,7 +173,8 @@ def run_next(
 
 
 def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: Invocation) -> Reply:
-    request = spawn_request(task.slug, action.step, action.key, ATTEMPT_CAP, str(task.dir))
+    cap = step_cap(action.step)
+    request = spawn_request(task.slug, action.step, action.key, cap, str(task.dir))
     request = replace(request, reissued=action.reissued)
     path = Path(request.prompt_path)
     warnings: Sequence[tuple[str, str]] = ()
@@ -228,7 +229,8 @@ def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
     status = cli.status_object(task.slug, inputs, series_states(inputs), action, stop)
     if args.json:
         return Reply(status, lines)
-    return Reply(status, lines, cli.status_table(status, cli.next_line(task.slug, action, invoke)))
+    table = cli.status_table(status, cli.next_line(task.slug, action, invoke), inputs.steps)
+    return Reply(status, lines, table)
 
 
 def run_record(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:

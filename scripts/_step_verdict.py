@@ -17,7 +17,8 @@ Policy, in order:
    blocker applies); an unmet check, or no recorded result, never does, and
    a claim of completion cannot outrank it. A stopped agent's partial verdict
    names what the check lacks and says to run it and record its result. A
-   check that cannot be read is surfaced to a human.
+   check that cannot be read is surfaced to a human, and so is an ``Iterations:``
+   value that cannot be read, whatever the check says.
 2. A step that declares no check is decided by the file and test evidence.
 3. A step not verified complete whose latest attempt is outstanding (started by
    the step-loop driver, not yet in the iteration ledger) is ``in-flight``
@@ -31,7 +32,9 @@ Policy, in order:
    count that cannot be read cannot be trusted to be below the cap. That covers
    an outstanding attempt while the iteration ledger holds a line that breaks its
    shape: that line may be the attempt's end, so the attempt cannot be read as
-   still running either.
+   still running either. A goal step (one with an ``Iterations:`` budget) has no
+   count cap: it is routed to a human exactly when its ``Attempts:`` line carries
+   the replan request the step-loop driver writes when the loop stalls.
 
 ``make_verdict`` is the only place a verdict dict is built, so the stamps
 (``decided_by``, ``outcome_source``, ``attempt``) follow from its inputs.
@@ -45,14 +48,16 @@ from dataclasses import dataclass, field
 from typing import Any, Union
 
 from _loop_fields import (
-    ATTEMPT_CAP,
     Attempt,
+    AttemptCap,
     CheckOutcome,
     Met,
     NoResult,
     OutstandingAttempt,
     Unmet,
     UnreadableCheck,
+    UnreadableIterations,
+    request_cap,
 )
 
 # Every verdict word. `partial` is written `partial@<last write>` in a verdict.
@@ -91,7 +96,8 @@ class StepEvidence:
 
     ``changed`` and ``unchanged`` partition ``files``: every file is in exactly
     one of them. ``earlier_declarers`` names every step that absorbed a shared
-    file, when any.
+    file, when any. ``iterations`` is a goal step's ``Iterations:`` budget, the
+    value that could not be read, or None for an ordinary step.
     """
 
     step_id: str
@@ -103,6 +109,7 @@ class StepEvidence:
     tier2: dict[str, Any]
     earlier_declarers: list[str] = field(default_factory=list)
     mutation_block: str | None = None
+    iterations: int | UnreadableIterations | None = None
 
     def __post_init__(self) -> None:
         if sorted(self.changed + self.unchanged) != sorted(self.files):
@@ -206,14 +213,20 @@ def _decided_by(decision: Decision, check_outcome: DeclaredCheck) -> str:
 
 def _read_attempts(evidence: StepEvidence, decision: Decision, attempt: AttemptRecord) -> Decision:
     """A step not verified complete is in flight while its attempt is outstanding, and
-    goes to a human at the cap or on an unreadable record."""
+    goes to a human at the cap (a goal step: at its published stall) or on an unreadable
+    record."""
     if decision.verdict == "verified-complete" or attempt is None:
         return decision
     if isinstance(attempt, OutstandingAttempt):
         return _outstanding(decision, attempt)
     if isinstance(attempt, UnreadableAttempts):
         return _unreadable_attempts(evidence, decision, attempt)
-    return _exhausted(decision, attempt) if attempt.count >= ATTEMPT_CAP else decision
+    if evidence.iterations is None:
+        cap = request_cap(AttemptCap())  # an ordinary step's bound
+        return _exhausted(decision, attempt, cap) if attempt.count >= cap else decision
+    if isinstance(evidence.iterations, UnreadableIterations):
+        return decision  # already `unknown`: no count is judged against a bound nobody can read
+    return _stalled(decision, attempt, evidence.iterations) if attempt.replan else decision
 
 
 def _outstanding(decision: Decision, attempt: OutstandingAttempt) -> Decision:
@@ -237,12 +250,12 @@ def _unreadable_attempts(
     return Decision("unknown", text, decision.resume_scope)
 
 
-def _exhausted(decision: Decision, attempt: Attempt) -> Decision:
+def _exhausted(decision: Decision, attempt: Attempt, cap: int) -> Decision:
     replan = (
         f"replan requested: {attempt.replan}" if attempt.replan else "no replan request recorded"
     )
     evidence = (
-        f"{attempt.count} fresh attempt(s) used (cap {ATTEMPT_CAP}) without verified completion; "
+        f"{attempt.count} fresh attempt(s) used (cap {cap}) without verified completion; "
         f"{replan}; underlying verdict {decision.verdict}: {decision.evidence}"
     )
     return Decision(
@@ -250,7 +263,21 @@ def _exhausted(decision: Decision, attempt: Attempt) -> Decision:
     )
 
 
+def _stalled(decision: Decision, attempt: Attempt, iterations: int) -> Decision:
+    """A goal step is spent when the driver has published its stall, never by its count."""
+    evidence = (
+        f"{attempt.count} of {iterations} iteration(s) used and the loop stalled without "
+        f"verified completion; replan requested: {attempt.replan}; underlying verdict "
+        f"{decision.verdict}: {decision.evidence}"
+    )
+    return Decision(
+        "attempts-exhausted", evidence, decision.resume_scope, underlying=decision.verdict
+    )
+
+
 def _decide(evidence: StepEvidence, check_outcome: DeclaredCheck) -> Decision:
+    if isinstance(evidence.iterations, UnreadableIterations):
+        return _decide_unreadable_iterations(evidence, evidence.iterations)
     if check_outcome is None:
         return _decide_by_files(evidence)
     if isinstance(check_outcome, UnreadableCheck):
@@ -296,6 +323,15 @@ def _decide_unreadable_check(evidence: StepEvidence, check: UnreadableCheck) -> 
     text = (
         f"the step's declared check cannot be read ({check.reason}): {check.line} — "
         f"WIP claim={evidence.claim}; surfaced for human verification"
+    )
+    return Decision("unknown", text, [])
+
+
+def _decide_unreadable_iterations(evidence: StepEvidence, value: UnreadableIterations) -> Decision:
+    text = (
+        f"the step's Iterations: value cannot be read ({value.text!r} is no whole number of at "
+        f"least 1), so its bound is unknown — WIP claim={evidence.claim}; surfaced for human "
+        "verification"
     )
     return Decision("unknown", text, [])
 

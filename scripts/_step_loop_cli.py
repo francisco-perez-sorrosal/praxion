@@ -15,7 +15,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, NoReturn
 
-from _loop_fields import ATTEMPT_CAP
 from _plan_steps import Implementer, PlanStep
 from _step_loop_action import (
     BUDGET_CAUSE,
@@ -47,6 +46,7 @@ from _step_loop_state import (
     Series,
     Verified,
     spent,
+    step_cap,
 )
 from iteration_ledger import IterationRecord
 
@@ -372,14 +372,16 @@ def next_line(slug: str, action: Action, invoke: str | Invocation) -> str:
     return f"stopped ({action.cause}): {action.evidence}"
 
 
-def status_table(status: Mapping[str, Any], next_line: str) -> str:
-    """The human table: a header, one row per plan step, and the next action."""
+def status_table(status: Mapping[str, Any], next_line: str, steps: Sequence[PlanStep]) -> str:
+    """The human table: a header, one row per plan step, and the next action; a step's
+    attempts read against its own bound's cap."""
+    caps = {step.id: step_cap(step) for step in steps}
     rows = [
         (
             row["step"],
             row["assignee"],
             row["verdict"],
-            f"{row['attempts']}/{ATTEMPT_CAP}" if row["attempts"] else DASH,
+            f"{row['attempts']}/{caps[row['step']]}" if row["attempts"] else DASH,
             row["review"] or DASH,
             row["commit"] or DASH,
         )

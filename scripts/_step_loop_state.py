@@ -11,15 +11,17 @@ Normative reading of a step's series -- first match wins:
 2. Reconciler verdict `unknown` or `blocked`: a human verdict, whoever the assignee.
 3. Not driven otherwise: done outside only with the claim AND `verified-complete` (a step that
    declares files can be credited a commit it never made); else not driven.
-4. Driven, WIP names an unrecorded request: running. A driver that died between that
-   write-ahead and its record leaves it so: `next` derives the same request id again and
-   `record` refuses until the agent's end shows.
+4. Driven with an `Iterations:` value that cannot be read: a human verdict, since the step's
+   bound is unknown. Driven, WIP names an unrecorded request: running. A driver that died
+   between that write-ahead and its record leaves it so: `next` derives the same request id
+   again and `record` refuses until the agent's end shows.
 5. Driven with no driver record in any series: claimed and `verified-complete` is done outside,
    `attempts-exhausted` (a line written without the loop) a human verdict, else a fresh series.
 6. Otherwise the series is the driver records whose `step_digest` equals the step's current
    digest, so revising the step block opens a fresh series and reverting it restores the old
    one. A `[BLOCKED]` or `[CONFLICT]` on its latest implement or revise return marks it; else
-   a verified implement record verifies it; else the cap exhausts it; else it failed.
+   a verified implement record verifies it; else a spent bound exhausts it (an ordinary step at
+   the attempt cap, a goal step at a stall); else it failed.
 
 Selection is the first step in plan order not done whose `[depends-on]` steps are all done; a
 `[parallel-group]` never makes a step wait for a sibling. When steps remain but none can
@@ -33,7 +35,15 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Union
 
-from _loop_fields import ATTEMPT_CAP, AnyAttempt, OutstandingAttempt
+from _loop_fields import (
+    AnyAttempt,
+    AttemptCap,
+    Bound,
+    OutstandingAttempt,
+    UnreadableIterations,
+    is_spent,
+    request_cap,
+)
 from _plan_steps import Implementer, PlanStep
 from _step_loop_review import NotRequired, ReviewState, needs_review, review_state, satisfied
 
@@ -135,27 +145,35 @@ def spent(attempts: tuple[IterationRecord, ...]) -> int:
     return max(record.attempt for record in attempts)
 
 
+def _attempt_commits(attempts: tuple[IterationRecord, ...]) -> tuple[tuple[int, str | None], ...]:
+    """A series' implement records as the bound reads them: `(attempt, commit)`, ledger order."""
+    return tuple((record.attempt, record.commit) for record in attempts)
+
+
 @dataclass(frozen=True)
 class Failed:
-    """The last recorded attempt did not verify and the cap is not reached."""
+    """The last recorded attempt did not verify and the step's bound is not spent: an ordinary
+    step under the attempt cap, or a goal step short of a stall whatever its count."""
 
     series: int
     attempts: tuple[IterationRecord, ...]
+    bound: Bound = AttemptCap()
 
     def __post_init__(self) -> None:
-        if not 1 <= spent(self.attempts) < ATTEMPT_CAP:
-            raise ValueError("a failed series is under the attempt cap")
+        if spent(self.attempts) < 1 or is_spent(self.bound, _attempt_commits(self.attempts)):
+            raise ValueError("a failed series is under the attempt cap, or short of a stall")
 
 
 @dataclass(frozen=True)
 class Exhausted:
-    """The cap is reached without verification."""
+    """The step's bound is spent without verification: the attempt cap, or a goal's stall."""
 
     attempts: tuple[IterationRecord, ...]
+    bound: Bound = AttemptCap()
 
     def __post_init__(self) -> None:
-        if spent(self.attempts) < ATTEMPT_CAP:
-            raise ValueError("an exhausted series has reached the attempt cap")
+        if not is_spent(self.bound, _attempt_commits(self.attempts)):
+            raise ValueError("an exhausted series has reached the attempt cap, or stalled")
 
 
 @dataclass(frozen=True)
@@ -234,6 +252,10 @@ def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
     if not driven:
         done = claimed and word == VERIFIED
         return DoneOutside() if done else NotDriven(getattr(step.assignee, "name", ""))
+    if isinstance(step.bound, UnreadableIterations):
+        return HumanVerdict(
+            "unknown", f"the step's Iterations: value cannot be read: {step.bound.text}"
+        )
     attempt, own = inputs.attempts.get(step.id), inputs.driver_records(step.id)
     if isinstance(attempt, OutstandingAttempt):
         return Running(attempt.count, attempt.request, _series_index(own, step.digest))
@@ -271,9 +293,21 @@ def _series_of_records(
     verified = [r for r in implement if r.verdict == VERIFIED]
     if verified:
         return Verified(verified[-1].attempt, index, verified[-1].commit, review)
-    if spent(implement) >= ATTEMPT_CAP:
-        return Exhausted(implement)
-    return Failed(index, implement)
+    bound = step_bound(step)
+    if is_spent(bound, _attempt_commits(implement)):
+        return Exhausted(implement, bound)
+    return Failed(index, implement, bound)
+
+
+def step_bound(step: PlanStep) -> Bound:
+    """The bound every reader sizes the step by. An unreadable `Iterations:` value never runs a
+    series (`step_series` reads it as a human verdict first), so it sizes as the attempt cap."""
+    return AttemptCap() if isinstance(step.bound, UnreadableIterations) else step.bound
+
+
+def step_cap(step: PlanStep) -> int:
+    """The highest attempt a request for the step may carry, read from its bound."""
+    return request_cap(step_bound(step))
 
 
 def series_work(inputs: LoopInputs, step: PlanStep) -> tuple[IterationRecord, ...]:

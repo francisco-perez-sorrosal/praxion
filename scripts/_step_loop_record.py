@@ -48,7 +48,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     request_count,
 )
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
-from _loop_fields import ATTEMPT_CAP, OutstandingAttempt  # noqa: E402
+from _loop_fields import OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
 from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
 from _step_loop_files import (  # noqa: E402
@@ -90,7 +90,7 @@ from _step_loop_settle import (  # noqa: E402
     tick_step,
     withdraw_line,
 )
-from _step_loop_state import VERIFIED, LoopInputs, bare_id, series_work  # noqa: E402
+from _step_loop_state import VERIFIED, LoopInputs, bare_id, series_work, step_cap  # noqa: E402
 from iteration_ledger import IterationRecord  # noqa: E402
 
 END_WAIT_VARIABLE = "PRAXION_STEP_LOOP_END_WAIT_SECONDS"
@@ -142,7 +142,7 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
         return record_review(task, spawn, agent_id, relayed)
-    asked = spawn_request(task.slug, step, key, ATTEMPT_CAP, str(task.dir))
+    asked = spawn_request(task.slug, step, key, step_cap(step), str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
     seen = await_end(task.repo, request, agent_id, max_turns)
     marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)
@@ -192,7 +192,7 @@ def record_review(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> 
             "request-not-pending",
             f"record failed because {key.id} reviews no verified work. To fix: run status.",
         )
-    asked = spawn_request(task.slug, step, key, ATTEMPT_CAP, str(task.dir))
+    asked = spawn_request(task.slug, step, key, step_cap(step), str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
     seen = await_end(task.repo, key.id, agent_id, max_turns)
     marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)

@@ -27,6 +27,7 @@ import contextlib
 import json
 import os
 import posixpath
+import re
 import shlex
 import signal
 import subprocess
@@ -48,6 +49,12 @@ RUN_TIMEOUT_SECONDS = 540.0
 RESOLVER_TIMEOUT_SECONDS = 60.0
 KILL_GRACE_SECONDS = 5.0
 FAILURE_TAIL_LINES = 20
+HOOK_WORDS_LIMIT = 300
+HOOK_WORDS_FALLBACK_LINES = 5
+_CUT_MARKER = "…"
+_COLOUR = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+_HOOK_STATUS = re.compile(r"^.+?\.{3,}(?:\(.*?\))?(Passed|Failed|Skipped)$")
+_HOOK_BOOKKEEPING = ("- hook id:", "- exit code:")
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
 _LITERAL_PATHSPEC = ":(literal)"
 _NODE_SEPARATOR = "::"
@@ -376,7 +383,7 @@ def _try_commit(repo: Path, job: _Job) -> str | None:
     done = _run(repo, "commit", "-m", job.message, "--", *_specs(job.paths), timeout=job.timeout)
     if done.returncode == 0:
         return None
-    return _tail(done.stdout + done.stderr)
+    return hook_words(done.stdout + done.stderr)
 
 
 def _verified(repo: Path, job: _Job, expected: frozenset[str]) -> Union[Committed, TreeDisturbed]:  # noqa: UP007 -- runtime value, 3.9 floor
@@ -440,6 +447,34 @@ def _lines(nul_separated: str) -> list[str]:
 
 def _tail(text: str) -> str:
     return "\n".join(text.strip().splitlines()[-FAILURE_TAIL_LINES:])
+
+
+def hook_words(output: str) -> str:
+    """The refusing hook's own words from a commit's whole output, as one bounded line.
+
+    pre-commit prints one status line per hook, then the failing hook's report; every section
+    that opens at a `Failed` status line and runs to the next status line is kept, minus its
+    bookkeeping and blank lines. Output with no such section (a plain hook, another hook
+    manager, git itself) yields its last non-blank lines.
+    """
+    lines = [_COLOUR.sub("", line).strip() for line in output.splitlines()]
+    kept = _failed_sections(lines) or [line for line in lines if line][-HOOK_WORDS_FALLBACK_LINES:]
+    words = " ".join(kept)
+    if len(words) <= HOOK_WORDS_LIMIT:
+        return words
+    return words[: HOOK_WORDS_LIMIT - len(_CUT_MARKER)] + _CUT_MARKER
+
+
+def _failed_sections(lines: list[str]) -> list[str]:
+    kept: list[str] = []
+    failing = False
+    for line in lines:
+        found = _HOOK_STATUS.match(line)
+        if found:
+            failing = found.group(1) == "Failed"
+        if failing and line and not line.startswith(_HOOK_BOOKKEEPING):
+            kept.append(line)
+    return kept
 
 
 # --- The runner --------------------------------------------------------------------------

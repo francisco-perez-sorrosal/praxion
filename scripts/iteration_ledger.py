@@ -14,7 +14,9 @@ Normative shape: one JSON object per line, every key required (shown wrapped)::
 
 The step-loop driver adds optional keys, absent on a hand-appended record: ``request``,
 ``step_digest`` (hex of the step block: a revision opens a fresh attempt series), ``turns``
-and ``max_turns`` (integer or ``null``); the last three need a ``request``.
+and ``max_turns`` (integer or ``null``); the last three need a ``request``. A goal-mode
+record may add ``cost_usd`` (a number of at least 0) and ``progress_lines`` (an integer of
+at least 0): present only when known, never ``null``, and needing a ``request``.
 
 Every rule is enforced where a line is parsed, so a record that reads back is valid:
 
@@ -45,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from dataclasses import asdict, dataclass, replace
@@ -67,6 +70,7 @@ _STAMP_FORMAT = "%Y-%m-%dT%H:%MZ"
 _COMMIT_RE = re.compile(r"[0-9a-f]{7,40}")
 _DIGEST_RE = re.compile(r"[0-9a-f]{6,64}")
 _DRIVER_KEYS = ("request", "step_digest", "turns", "max_turns")  # the last three need a request
+_GOAL_KEYS = ("cost_usd", "progress_lines")  # written only when known; need a request
 NO_RESULT_RECORDED = "Result: none — no result recorded"
 EXIT_CLEAN, EXIT_FINDINGS, EXIT_INPUT_ERROR = 0, 1, 2
 _STEP_LABEL = "Step "
@@ -94,10 +98,13 @@ class IterationRecord:
     step_digest: str | None = None
     turns: int | None = None
     max_turns: int | None = None
+    cost_usd: float | None = None  # a goal record's keys: None leaves the key out of the line
+    progress_lines: int | None = None
 
     def __post_init__(self) -> None:
-        if self.request is None and any(getattr(self, key) is not None for key in _DRIVER_KEYS):
-            raise ShapeError("step_digest, turns and max_turns need a request")
+        keyed = _DRIVER_KEYS[1:] + _GOAL_KEYS
+        if self.request is None and any(getattr(self, key) is not None for key in keyed):
+            raise ShapeError(f"{', '.join(keyed)} need a request")
 
 
 @dataclass(frozen=True)
@@ -159,6 +166,8 @@ def parse_record_line(text: str) -> IterationRecord:
         step_digest=_optional_text(raw, "step_digest", _DIGEST_RE),
         turns=_optional_count(raw, "turns", 0),
         max_turns=_optional_count(raw, "max_turns", 1),
+        cost_usd=_optional_cost(raw, "cost_usd"),
+        progress_lines=_optional_count(raw, "progress_lines", 0),
     )
 
 
@@ -249,6 +258,15 @@ def _optional_count(raw: dict[str, Any], key: str, least: int) -> int | None:
     return value
 
 
+def _optional_cost(raw: dict[str, Any], key: str) -> float | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+        raise ShapeError(f"{key} must be a number of at least 0; got {value!r}")
+    return float(value)
+
+
 def _recorded_at(raw: dict[str, Any]) -> str:
     value = _text(raw, "recorded_at")
     try:
@@ -290,6 +308,7 @@ def render_record_line(record: IterationRecord) -> str:
     }
     if record.request is not None:  # a driver record states all four, null where unknown
         body.update({key: getattr(record, key) for key in _DRIVER_KEYS})
+    body.update({k: getattr(record, k) for k in _GOAL_KEYS if getattr(record, k) is not None})
     return json.dumps(body)
 
 

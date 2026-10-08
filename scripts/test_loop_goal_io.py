@@ -8,6 +8,7 @@ files in ``tmp_path``.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +19,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import _step_loop_files as files  # noqa: E402
 from _git_runner import run_git  # noqa: E402
-from _step_loop_files import NoResult, WorkerEnd  # noqa: E402
+from _step_loop_files import NoWorkerResult, WorkerEnd  # noqa: E402
 from _step_loop_io import OutsideRepoError, restore_paths, tree_patch  # noqa: E402
 
 REQUEST = "s7-a2-implement"
@@ -139,6 +140,24 @@ def test_restore_leaves_a_staged_file_outside_the_scope_staged(repo: Path) -> No
     assert status(repo) == "M  keep.txt\n"
 
 
+def test_restore_removes_the_directories_an_untracked_package_leaves_empty(repo: Path) -> None:
+    write(repo, "src/newpkg/__init__.py", "")
+    write(repo, "src/newpkg/deep/mod.py", "mod = 1\n")
+
+    restore_paths(repo, SCOPE)
+
+    assert sorted(path.name for path in (repo / "src").iterdir()) == ["one.py", "two.py"]
+
+
+def test_restore_keeps_a_directory_that_still_holds_a_file_it_did_not_remove(repo: Path) -> None:
+    write(repo, "src/newpkg/mod.py", "mod = 1\n")
+    write(repo, "src/newpkg/other.py", "other = 1\n")
+
+    restore_paths(repo, ["src/newpkg/mod.py"])
+
+    assert sorted(path.name for path in (repo / "src/newpkg").iterdir()) == ["other.py"]
+
+
 def test_restore_accepts_single_files_and_names_what_it_acted_on(repo: Path) -> None:
     write(repo, "src/one.py", "one = 2\n")
     write(repo, "src/two.py", "two = 2\n")
@@ -245,6 +264,66 @@ def test_applying_the_patch_after_a_restore_brings_the_iteration_back(repo: Path
     assert not (repo / "src/two.py").exists()
 
 
+def carry_back(repo: Path, task_dir: Path) -> None:
+    """Patch the tree, write the record, restore the scope, then apply the record."""
+    path = files.write_iteration_patch(task_dir, REQUEST, tree_patch(repo))
+    restore_paths(repo, SCOPE)
+    git(repo, "apply", "--whitespace=nowarn", str(path))
+
+
+def test_a_crlf_file_and_a_latin_1_file_come_back_byte_for_byte(repo: Path, tmp_path: Path) -> None:
+    (repo / "src/crlf.txt").write_bytes(b"one\r\ntwo\r\n")
+    (repo / "src/latin.txt").write_bytes("caf\xe9\n".encode("latin-1"))
+    git(repo, "add", "src")
+    git(repo, "commit", "-q", "-m", "more")
+    (repo / "src/crlf.txt").write_bytes(b"one\r\ntwo\r\nthree\r\n")
+    (repo / "src/latin.txt").write_bytes("caf\xe9 au lait\n".encode("latin-1"))
+    (repo / "src/new_crlf.txt").write_bytes(b"new\r\nfile\r\n")
+    write(repo, "src/one.py", "one = 2\n")
+
+    carry_back(repo, tmp_path)
+
+    assert (repo / "src/crlf.txt").read_bytes() == b"one\r\ntwo\r\nthree\r\n"
+    assert (repo / "src/latin.txt").read_bytes() == "caf\xe9 au lait\n".encode("latin-1")
+    assert (repo / "src/new_crlf.txt").read_bytes() == b"new\r\nfile\r\n"
+    assert (repo / "src/one.py").read_text() == "one = 2\n"
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("diff.external", "true"),
+        ("diff.noprefix", "true"),
+        ("diff.mnemonicPrefix", "true"),
+        ("color.diff", "always"),
+        ("color.ui", "always"),
+    ],
+)
+def test_the_patch_is_the_same_whatever_the_users_diff_config_says(
+    repo: Path, tmp_path: Path, key: str, value: str
+) -> None:
+    write(repo, "src/one.py", "one = 2\n")
+    write(repo, "src/fresh.py", "fresh = 1\n")
+    plain = tree_patch(repo)
+    git(repo, "config", key, value)
+
+    configured = tree_patch(repo)
+
+    assert configured == plain
+    assert "--- a/src/one.py\n+++ b/src/one.py" in configured
+    assert "+++ b/src/fresh.py" in configured
+    carry_back(repo, tmp_path)
+    assert (repo / "src/fresh.py").read_text() == "fresh = 1\n"
+
+
+def test_the_patch_ignores_a_textconv_filter_the_users_attributes_name(repo: Path) -> None:
+    (repo / ".gitattributes").write_text("*.py diff=shout\n")
+    git(repo, "config", "diff.shout.textconv", "tr a-z A-Z <")
+    write(repo, "src/one.py", "one = 2\n")
+
+    assert "+one = 2" in tree_patch(repo)
+
+
 # --- ITERATION_<request>.patch ------------------------------------------------------------
 
 
@@ -267,12 +346,14 @@ def test_writing_the_iteration_patch_again_changes_nothing_and_leaves_no_tempora
     assert [p.name for p in tmp_path.iterdir()] == [path.name]
 
 
-def test_a_different_patch_replaces_the_file_whole(tmp_path: Path) -> None:
-    files.write_iteration_patch(tmp_path, REQUEST, "first, and long\n")
+def test_a_patch_already_written_stands_when_the_call_runs_again_with_an_empty_one(
+    tmp_path: Path,
+) -> None:
+    files.write_iteration_patch(tmp_path, REQUEST, "the iteration's work\n")
 
-    path = files.write_iteration_patch(tmp_path, REQUEST, "second\n")
+    path = files.write_iteration_patch(tmp_path, REQUEST, "")
 
-    assert path.read_text() == "second\n"
+    assert path.read_text() == "the iteration's work\n"
 
 
 def test_the_iteration_patch_refuses_a_name_that_is_not_a_request_id(tmp_path: Path) -> None:
@@ -339,7 +420,7 @@ def test_a_worker_that_exited_without_a_result_object_reads_as_no_result(
 
     read = files.read_worker_end(tmp_path, REQUEST)
 
-    assert isinstance(read, NoResult)
+    assert isinstance(read, NoWorkerResult)
     assert f"left no usable result; see WORKER_{REQUEST}.json" in read.detail
 
 
@@ -359,7 +440,7 @@ def test_a_worker_that_exited_without_a_result_object_reads_as_no_result(
 def test_a_malformed_worker_file_is_never_an_ended_worker(tmp_path: Path, text: str) -> None:
     (tmp_path / f"WORKER_{REQUEST}.json").write_text(text)
 
-    assert isinstance(files.read_worker_end(tmp_path, REQUEST), NoResult)
+    assert isinstance(files.read_worker_end(tmp_path, REQUEST), NoWorkerResult)
 
 
 def test_a_result_object_without_the_optional_fields_reads_them_as_unknown(
@@ -400,13 +481,32 @@ def test_an_integer_cost_reads_as_a_float(tmp_path: Path) -> None:
     assert isinstance(read.cost_usd, float)
 
 
-def test_the_worker_file_is_written_once_and_replaced_atomically(tmp_path: Path) -> None:
+def test_writing_the_same_worker_file_again_changes_nothing_and_leaves_no_temporary(
+    tmp_path: Path,
+) -> None:
     path = write_worker(tmp_path)
     stamp = path.stat().st_mtime_ns
 
     write_worker(tmp_path)
 
     assert path.stat().st_mtime_ns == stamp
+    assert [p.name for p in tmp_path.iterdir()] == [path.name]
+
+
+def test_a_write_that_fails_part_way_leaves_the_old_worker_file_and_no_temporary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = write_worker(tmp_path)
+    before = path.read_bytes()
+
+    def refuse(source: object, target: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "replace", refuse)
+    with pytest.raises(OSError, match="disk full"):
+        write_worker(tmp_path, {**RESULT_OBJECT, "result": "a different ending"})
+
+    assert path.read_bytes() == before
     assert [p.name for p in tmp_path.iterdir()] == [path.name]
 
 

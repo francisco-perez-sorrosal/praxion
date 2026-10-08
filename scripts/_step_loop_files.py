@@ -48,13 +48,10 @@ STEP_LABEL = "Step "
 PROMPT_STEM, PROMPT_SUFFIX = "PROMPT", ".md"
 ITERATION_PATCH_STEM, PATCH_SUFFIX = "ITERATION", ".patch"
 WORKER_STEM, WORKER_SUFFIX, WORKER_FILE_VERSION = "WORKER", ".json", 1
-META_UNREADABLE = "meta-unreadable"
-REQUEST_FIDELITY = "request-fidelity"
+META_UNREADABLE, REQUEST_FIDELITY = "meta-unreadable", "request-fidelity"
 DEFAULT_FILE_MODE, MODE_MASK = 0o644, 0o777
-_RESULT_PREFIX = "Result:"
-_BLOCK_HEADING_PREFIX = "## "
-_FENCES = ("```", "~~~")
-_CHILD_INDENT = "  "
+_RESULT_PREFIX, _BLOCK_HEADING_PREFIX = "Result:", "## "
+_FENCES, _CHILD_INDENT = ("```", "~~~"), "  "
 _TRANSCRIPT_GLOBS = (
     "projects/*/*/subagents/agent-*.jsonl",
     "projects/*/*/subagents/workflows/*/agent-*.jsonl",
@@ -67,13 +64,14 @@ _NEXT_ACTION, _NEXT_SECTION = SECTION_HEADINGS[2], SECTION_HEADINGS[3]
 
 def write_atomic(path: Path, text: str) -> bool:
     """Replace `path` with `text` in one rename; False, and no write, when it holds it already."""
+    data = text.encode("utf-8", "surrogateescape")
     with contextlib.suppress(FileNotFoundError):
-        if path.read_text(encoding="utf-8") == text:
+        if path.read_bytes() == data:
             return False
     handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(text)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(data)
         os.chmod(temporary, path.stat().st_mode & MODE_MASK if path.exists() else DEFAULT_FILE_MODE)
         os.replace(temporary, path)
     except BaseException:
@@ -199,15 +197,21 @@ def snapshot_requests(task_dir: Path) -> tuple[str, ...]:
 
 
 def write_iteration_patch(task_dir: Path, request: str, patch_text: str) -> Path:
-    """`ITERATION_<request>.patch`: an iteration that kept nothing, before the restore."""
-    return _write_request_file(task_dir, ITERATION_PATCH_STEM, request, PATCH_SUFFIX, patch_text)
+    """`ITERATION_<request>.patch`, written before the restore; the first write stands, since a
+    rerun computes its patch from the restored tree and would erase the only record."""
+    return _write_request_file(
+        task_dir, ITERATION_PATCH_STEM, request, PATCH_SUFFIX, patch_text, keep=True
+    )
 
 
-def _write_request_file(task_dir: Path, stem: str, request: str, suffix: str, text: str) -> Path:
+def _write_request_file(
+    task_dir: Path, stem: str, request: str, suffix: str, text: str, keep: bool = False
+) -> Path:
     if not REQUEST_ID_RE.fullmatch(request):
         raise ValueError(f"not a request id: {request!r}")
     path = task_dir / f"{stem}_{request}{suffix}"
-    write_atomic(path, text)
+    if not (keep and path.exists()):
+        write_atomic(path, text)
     return path
 
 
@@ -260,10 +264,8 @@ def _next_action_of(handoff_text: str) -> str | None:
 
 
 @dataclass(frozen=True)
-class NoResult:
-    """The worker file shows no ended worker; `detail` says what it shows instead."""
-
-    detail: str
+class NoWorkerResult:
+    detail: str  # what the worker file shows where an ended worker should be
 
 
 @dataclass(frozen=True)
@@ -304,23 +306,22 @@ def write_worker_end(
     return _write_request_file(task_dir, WORKER_STEM, request, WORKER_SUFFIX, text)
 
 
-def read_worker_end(task_dir: Path, request: str) -> NoResult | WorkerEnd | None:
-    """Parse the worker file once: `None` is no file (the agent was relayed), and anything short
-    of a result object with a session id and a subtype is `NoResult`, never an ended worker."""
+def read_worker_end(task_dir: Path, request: str) -> NoWorkerResult | WorkerEnd | None:
+    """Parse the file once: `None` is no file (relayed); short of a usable result is `NoWorkerResult`."""
     path = task_dir / f"{WORKER_STEM}_{request}{WORKER_SUFFIX}"
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
     except (OSError, ValueError) as exc:  # unreadable bytes and broken JSON are both ValueErrors
-        return NoResult(f"the worker file cannot be read: {exc}")
+        return NoWorkerResult(f"the worker file cannot be read: {exc}")
     if not isinstance(document, dict) or document.get("v") != WORKER_FILE_VERSION:
-        return NoResult("the worker file is not a version-1 worker document")
+        return NoWorkerResult("the worker file is not a version-1 worker document")
     result = _typed(document, "result", dict) or {}
     session_id, subtype = _typed(result, "session_id", str), _typed(result, "subtype", str)
     max_turns = _typed(document, "max_turns", int)
     if not session_id or not subtype or max_turns is None:
-        return NoResult(f"exit {document.get('exit')} left no usable result; see {path.name}")
+        return NoWorkerResult(f"exit {document.get('exit')} left no usable result; see {path.name}")
     cost = _typed(result, "total_cost_usd", (int, float))
     return WorkerEnd(
         session_id=session_id,

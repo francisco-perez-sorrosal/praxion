@@ -31,6 +31,7 @@ import shlex
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -55,6 +56,10 @@ _UNTRACKED_DIRECTORY_MARK = "/"
 _GIT_DIRECTORY = ".git/"
 _SCRATCH_DIRECTORY = ".ai-work"  # pipeline documents: never part of a tree patch
 _EXCLUDE_AI_WORK = f":(exclude,literal){_SCRATCH_DIRECTORY}"
+# Fixed whatever the user's git config says: `git apply -p1` reads no colour, helper or prefix.
+_PATCH_FORMAT = (
+    "--binary --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/"
+).split()
 _MISSING = " missing"  # the end of `git cat-file --batch-check`'s line for an absent object
 _DELETED = "deleted"
 _NOT_A_FILE = "not-a-file"
@@ -244,11 +249,12 @@ def snapshot_outside(repo: Path, files: frozenset[str]) -> TreeSnapshot:
 def restore_paths(repo: Path, paths: Iterable[str]) -> tuple[str, ...]:
     """Return the changed files under `paths` to `HEAD` and name them.
 
-    A tracked file goes back in the index and the work tree; an untracked one is removed.
-    Nothing outside `paths` is touched. This is the driver's one destructive operation: it
-    runs over a step's declared `Files:` only, and only after `tree_patch` has been written.
-    A path that is absolute, climbs out of the repository, is the repository itself or lies
-    under `.git/` is refused before anything is touched.
+    A tracked file goes back in the index and the work tree; an untracked one is removed, and
+    so is each directory that removal left empty (an empty directory still imports as a
+    namespace package). Nothing outside `paths` is touched. This is the driver's one
+    destructive operation: it runs over a step's declared `Files:` only, and only after
+    `tree_patch` has been written. A path that is absolute, climbs out of the repository, is
+    the repository itself or lies under `.git/` is refused before anything is touched.
     """
     scope = tuple(_restorable(p) for p in paths)
     changed = paths_differing_from_head(repo, scope)
@@ -259,17 +265,17 @@ def restore_paths(repo: Path, paths: Iterable[str]) -> tuple[str, ...]:
     if gone:
         _git(repo, "rm", "--cached", "--force", "--quiet", "--ignore-unmatch", "--", *_specs(gone))
         for path in gone:
-            (repo / path).unlink(missing_ok=True)
+            _remove_with_empty_parents(repo, path)
     return changed
 
 
 def tree_patch(repo: Path) -> str:
     """The whole tree's difference from `HEAD` as one patch: staged, unstaged and untracked
     files alike, nothing under `.ai-work/`. The index is read, never written."""
-    tracked = _git(repo, "diff", "HEAD", "--binary", "--no-renames", "--", _EXCLUDE_AI_WORK)
+    tracked = _patch(repo, "HEAD", "--no-renames", "--", _EXCLUDE_AI_WORK)
     others = _lines(_git(repo, "ls-files", "--others", "--exclude-standard", "-z"))
     new_files = [p for p in others if not (p.endswith(_UNTRACKED_DIRECTORY_MARK) or _is_scratch(p))]
-    return tracked + "".join(_new_file_patch(repo, path) for path in new_files)
+    return tracked + "".join(_patch(repo, "--no-index", "--", os.devnull, p) for p in new_files)
 
 
 def _restorable(raw: str) -> str:
@@ -291,11 +297,25 @@ def _is_scratch(path: str) -> bool:
     return (path + "/").startswith(_SCRATCH_DIRECTORY + "/")
 
 
-def _new_file_patch(repo: Path, path: str) -> str:
-    done = _run(repo, "diff", "--no-index", "--binary", "--", os.devnull, path)
-    if done.returncode not in (0, 1):  # 1 is "the files differ"
-        raise GitCommandError(f"git diff --no-index failed: {_tail(done.stderr)}")
-    return done.stdout
+def _patch(repo: Path, *args: str) -> str:
+    """`git diff` as the bytes git wrote, decoded losslessly: the runner's text mode would
+    turn a bare CR or a non-UTF-8 byte into text `git apply` rejects. Write it back with
+    `surrogateescape`."""
+    with tempfile.TemporaryDirectory() as scratch:
+        target = Path(scratch) / "patch"
+        done = _run(repo, "diff", *_PATCH_FORMAT, f"--output={target}", *args)
+        if done.returncode not in (0, 1):  # 1 is "the files differ" under --no-index
+            raise GitCommandError(f"git diff failed: {_tail(done.stderr)}")
+        return target.read_bytes().decode("utf-8", "surrogateescape")
+
+
+def _remove_with_empty_parents(repo: Path, path: str) -> None:
+    (repo / path).unlink(missing_ok=True)
+    for parent in Path(path).parents[:-1]:  # the last one is the repository itself
+        try:
+            (repo / parent).rmdir()
+        except OSError:  # not empty (or gone): what is left is not ours
+            return
 
 
 def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:

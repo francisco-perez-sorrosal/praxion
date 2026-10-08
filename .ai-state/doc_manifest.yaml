@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-05T16:19:52Z'
+generated_at: '2026-10-08T03:02:22Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3152,8 +3152,9 @@ surfaces:
 - id: ai-state-decisions-431-ralph-lite-execution-mode
   path: .ai-state/decisions/431-ralph-lite-execution-mode.md
   type: markdown
-  title: "Ralph-lite is an execution mode named in the Lightweight tier row, with its /goal recipe in tier-templates \u2014 recommended over a sixth tier row, pending the user's confirmation"
-  last_modified: '2026-10-05'
+  title: "Ralph-lite is an execution mode named in the Lightweight tier row, with its recipe in tier-templates \u2014 recommended over a sixth tier row; confirmed by the user on 2026-10-07 on condition\
+    \ that the recipe carries the loop's two durable ideas (a fresh context per iteration, state on disk)"
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-432-step-loop-driver-and-spawner-seam
   path: .ai-state/decisions/432-step-loop-driver-and-spawner-seam.md
@@ -3165,13 +3166,13 @@ surfaces:
   path: .ai-state/decisions/433-turn-budget-reminder-hook.md
   type: markdown
   title: A synchronous PreToolUse hook reminds a capped subagent at 60 and 80 percent of its declared maxTurns, counting distinct requests in its own transcript
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3440,7 +3441,7 @@ surfaces:
   path: .ai-state/specs/SPEC_step-loop-driver_2026-10-05.md
   type: markdown
   title: 'Spec: step-loop-driver (a deterministic step-loop driver for the span between the pre-mortem gate and the pre-verification checkpoint)'
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-07'
   renderer: default_markdown
 - id: ai-state-specs-spec-wal-modes-core-2026-09-27
   path: .ai-state/specs/SPEC_wal-modes-core_2026-09-27.md

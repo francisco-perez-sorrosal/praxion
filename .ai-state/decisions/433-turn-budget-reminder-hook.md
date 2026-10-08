@@ -67,3 +67,19 @@ Add `hooks/remind_turn_budget.py`, registered in `hooks/hooks.json` under `PreTo
 ## Status note (user, 2026-10-07)
 
 Accepted as the design decision, not yet in force. The user ruled on 2026-10-07 that this record stands as the decision the follow-up pipeline implements, and that it is not in force until the component ships within its bounds; a finalized record cannot return to `proposed`, so the status stays `accepted` and this note carries the condition. The finalize at merge promoted the record with the pipeline's other drafts, but the component it decides (`hooks/remind_turn_budget.py`, its registration and its live probe) moved to the follow-up pipeline with the split, so no reading of its latency or of its effect on cap-outs exists yet. The follow-up pipeline's hook step builds it against this record as written, its probe step measures the two latency bounds the spec carries for it (0.2 s on a main-session payload, 0.3 s on a subagent payload whose transcript holds 100 requests), and that pipeline's orchestrator records the readings here and re-affirms the decision when both bounds hold, or applies the reversal trigger above (retire in favour of the static finish ordering, or ship the `sh` pre-filter first when latency is the only failure). Until then the rendered prompt's `<finish>` block and the driver's `turn-cap` stop reason are the only guard against a cap-out.
+
+## Status note (orchestrator, 2026-10-08) — in force
+
+Re-affirmed with measurements by the `step-loop-dogfood` pipeline (Claude Code 2.1.293). The hook
+`hooks/remind_turn_budget.py` is built as this record decides and registered in `hooks/hooks.json`
+(one synchronous PreToolUse group, matcher `""`, timeout 5). Readings on the measuring machine, the
+command as registered through `sh -c`, the median of three consecutive runs: a main-session payload
+0.15 s (bound 0.2 s; the hook printed nothing), a subagent payload for `praxion:implementer` whose
+transcript holds 100 distinct requests cut from a real implementer transcript 0.16 s (bound 0.3 s;
+the 80 percent line emitted). A live probe from a scratch repository — a nested headless session
+loading the worktree's plugin and spawning a throwaway agent capped at 10 turns — left
+`[turn-budget] 6 of 10 turns used` and `[turn-budget] 8 of 10 turns used` in the subagent's
+transcript and nothing in the main session's. Both bounds hold and the lines reach the agent, so the
+reversal trigger does not fire and this decision is in force from the pipeline's merge; the earlier
+status note of 2026-10-07 is superseded by this one. Its falsifier (the implementer cap-out rate
+over the three-pipeline window) is judged by the calibration rows that follow.

@@ -31,6 +31,7 @@ from _goal_record import (
 )
 from _loop_fields import (
     Check,
+    Expectation,
     GoalBudget,
     Met,
     UnreadableCheck,
@@ -51,7 +52,17 @@ SETTINGS_FILE = ".claude/settings.local.json"
 _TASK_FILES = (PLAN_FILE, WIP_FILE, BRIEF_FILE, RESULTS_FILE)
 STEP_ID, TITLE_LIMIT = "1", 60
 PRIMARY_CHECKOUT, SETTINGS_NOT_IGNORED = "primary-checkout", "settings-not-ignored"
+CHECK_COMPLETES_EARLY = "check-completes-early"
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+@dataclass(frozen=True)
+class Baseline:
+    """The check run once: the gate block's lines, the tests passing and the targets failing."""
+
+    lines: tuple[str, ...]
+    passes: int
+    targets: int
 
 
 @dataclass(frozen=True)
@@ -91,10 +102,10 @@ def scaffold(args: argparse.Namespace) -> tuple[dict[str, Any], tuple[str, ...]]
     write_atomic(task / PLAN_FILE, plan)
     write_atomic(task / WIP_FILE, _wip_text(spec))
     write_atomic(task / BRIEF_FILE, _brief_text(spec))
-    write_gate_block(task / RESULTS_FILE, STEP_ID, BASELINE_REQUEST, baseline)
+    write_gate_block(task / RESULTS_FILE, STEP_ID, BASELINE_REQUEST, baseline.lines)
     settings.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(settings, json.dumps(merged, indent=2) + "\n")
-    return _report(repo, spec)
+    return _report(repo, spec, baseline)
 
 
 def _refuse(why: str, fix: str) -> NoReturn:
@@ -204,8 +215,8 @@ def _require_reads_back(spec: GoalSpec, plan: str) -> None:
         )
 
 
-def _baseline(repo: Path, spec: GoalSpec) -> tuple[str, ...]:
-    """The check run once: the lines of the gate block that reads as the goal's unmet start."""
+def _baseline(repo: Path, spec: GoalSpec) -> Baseline:
+    """The check run once: the gate block that reads as the goal's unmet start, and its counts."""
     command = spec.check.command
     ran = run_check(repo, command)
     if ran.problem is not None:
@@ -224,7 +235,7 @@ def _baseline(repo: Path, spec: GoalSpec) -> tuple[str, ...]:
             "the check already meets what it expects, so no iteration could complete it",
             "state a goal the check does not yet meet",
         )
-    return body
+    return Baseline(body, summary.counts.passed, run.pending)
 
 
 def edit_rule(entry: str, repo: Path) -> str:
@@ -258,18 +269,25 @@ def _read_settings(path: Path) -> dict[str, Any]:
     return loaded
 
 
-def _report(repo: Path, spec: GoalSpec) -> tuple[dict[str, Any], tuple[str, ...]]:
+def _report(
+    repo: Path, spec: GoalSpec, baseline: Baseline
+) -> tuple[dict[str, Any], tuple[str, ...]]:
     written = [f".ai-work/{spec.slug}/{name}" for name in _TASK_FILES] + [SETTINGS_FILE]
-    warnings = [(PRIMARY_CHECKOUT, _PRIMARY_MESSAGE)] if _in_primary_checkout(repo) else []
+    warnings = []
+    if _in_primary_checkout(repo):
+        warnings.append((PRIMARY_CHECKOUT, _PRIMARY_MESSAGE))
+    ignored = _git(repo, "check-ignore", "-q", SETTINGS_FILE)
+    if ignored is not None and ignored.returncode == 1:
+        warnings.append((SETTINGS_NOT_IGNORED, _NOT_IGNORED_MESSAGE))
+    early = early_completion_message(spec.check, baseline.passes, baseline.targets)
+    if early is not None:
+        warnings.append((CHECK_COMPLETES_EARLY, early))
     doc = {
         "schema": SCHEMA,
         "slug": spec.slug,
         "files": written,
         "warnings": [{"code": code, "message": message} for code, message in warnings],
     }
-    ignored = _git(repo, "check-ignore", "-q", SETTINGS_FILE)
-    if ignored is not None and ignored.returncode == 1:
-        warnings.append((SETTINGS_NOT_IGNORED, _NOT_IGNORED_MESSAGE))
     summary = f"{SUMMARY_PREFIX}scaffolded the goal plan {spec.slug}: {len(written)} files"
     return doc, (summary, *warning_lines(warnings))
 
@@ -282,6 +300,28 @@ _NOT_IGNORED_MESSAGE = (
     f"git does not ignore {SETTINGS_FILE}, so the first iteration would stop on it as a "
     "protected change. To fix: add it to .gitignore"
 )
+
+
+def early_completion_message(check: Check, passes: int, targets: int) -> str | None:
+    """Why the check could be met with some of the goal's own failing tests still failing, or
+    None when its expectation binds every target. Pure in the parsed check and the baseline.
+
+    A goal check's `fail=0` is always met, because the failing tests the goal is working on
+    read `pending`; only `pending=0`, or a pass count of every test, says they all pass."""
+    wanted = next((e.count for e in check.expectations if e.key == "pass"), 0)
+    total = passes + targets
+    if targets == 0 or wanted >= total or _binds_pending(check):
+        return None
+    open_targets = min(targets, total - wanted)
+    return (
+        f"the check can be met with up to {open_targets} of the {targets} failing tests still "
+        "failing: fail=0 is always met, because the goal's own failing tests read pending. "
+        f"To fix: expect pending=0, or pass={total}"
+    )
+
+
+def _binds_pending(check: Check) -> bool:
+    return Expectation("pending", "=", 0) in check.expectations
 
 
 def _in_primary_checkout(repo: Path) -> bool:

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-08T04:03:53Z'
+generated_at: '2026-10-08T08:13:30Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-04'
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -126,7 +126,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-04'
+  last_modified: '2026-10-08'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -503,7 +503,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-08'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -534,7 +534,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-05'
+  last_modified: '2026-10-08'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -548,7 +548,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3093,7 +3093,7 @@ surfaces:
   path: .ai-state/decisions/421-tagged-step-blocks-without-a-mutation-reading.md
   type: markdown
   title: A step tagged mutation on completes only on a mutation reading; the step-completion reconciler owns the block and the step-document schema owns the Mutation line
-  last_modified: '2026-10-02'
+  last_modified: '2026-10-07'
   renderer: adr_card
 - id: ai-state-decisions-422-state-data-does-not-fan-out
   path: .ai-state/decisions/422-state-data-does-not-fan-out.md
@@ -3166,7 +3166,7 @@ surfaces:
   path: .ai-state/decisions/433-turn-budget-reminder-hook.md
   type: markdown
   title: A synchronous PreToolUse hook reminds a capped subagent at 60 and 80 percent of its declared maxTurns, counting distinct requests in its own transcript
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-08'
   renderer: adr_card
 - id: ai-state-decisions-434-ralph-lite-step-loop-goal-mode
   path: .ai-state/decisions/434-ralph-lite-step-loop-goal-mode.md
@@ -3174,6 +3174,24 @@ surfaces:
   title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
     \ stall cap"
   last_modified: '2026-10-07'
+  renderer: adr_card
+- id: ai-state-decisions-435-mutation-line-grammar-leaf-module
+  path: .ai-state/decisions/435-mutation-line-grammar-leaf-module.md
+  type: markdown
+  title: The mutation line and tag grammar moves from scripts/_step_schema.py into the leaf scripts/_mutation_grammar.py, re-exported unchanged
+  last_modified: '2026-10-08'
+  renderer: adr_card
+- id: ai-state-decisions-436-one-request-count-shared-transcript-reader
+  path: .ai-state/decisions/436-one-request-count-shared-transcript-reader.md
+  type: markdown
+  title: An agent's distinct-request count has one definition in hooks/_agent_transcript.py, read by the driver, the turn-budget reminder and the context instrument; JSON Lines split on newline only
+  last_modified: '2026-10-08'
+  renderer: adr_card
+- id: ai-state-decisions-437-step-loop-procedure-is-a-skill
+  path: .ai-state/decisions/437-step-loop-procedure-is-a-skill.md
+  type: markdown
+  title: The step-loop relay procedure is the skill skills/step-loop/SKILL.md, invocable by the user and the model, never a command
+  last_modified: '2026-10-08'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3443,6 +3461,12 @@ surfaces:
   type: markdown
   title: 'Spec: Sidecar Placement (P0 hook chaining + P1 sidecar placement axis)'
   last_modified: '2026-09-04'
+  renderer: default_markdown
+- id: ai-state-specs-spec-step-loop-dogfood-2026-10-08
+  path: .ai-state/specs/SPEC_step-loop-dogfood_2026-10-08.md
+  type: markdown
+  title: 'Spec: step-loop-dogfood (the step-loop driver''s live run, the eight deferred increments and the two conditional decisions)'
+  last_modified: '2026-10-08'
   renderer: default_markdown
 - id: ai-state-specs-spec-step-loop-driver-2026-10-05
   path: .ai-state/specs/SPEC_step-loop-driver_2026-10-05.md
@@ -3943,6 +3967,9 @@ groups:
   - ai-state-decisions-432-step-loop-driver-and-spawner-seam
   - ai-state-decisions-433-turn-budget-reminder-hook
   - ai-state-decisions-434-ralph-lite-step-loop-goal-mode
+  - ai-state-decisions-435-mutation-line-grammar-leaf-module
+  - ai-state-decisions-436-one-request-count-shared-transcript-reader
+  - ai-state-decisions-437-step-loop-procedure-is-a-skill
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -3989,6 +4016,7 @@ groups:
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
+  - ai-state-specs-spec-step-loop-dogfood-2026-10-08
   - ai-state-specs-spec-step-loop-driver-2026-10-05
   - ai-state-specs-spec-wal-modes-core-2026-09-27
   - ai-state-specs-spec-wal-retention-2026-10-03

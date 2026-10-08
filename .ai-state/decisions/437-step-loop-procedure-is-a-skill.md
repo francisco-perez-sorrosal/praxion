@@ -1,7 +1,8 @@
 ---
-id: dec-draft-533770d5
+id: dec-437
+draft_id: dec-draft-533770d5
 title: The step-loop relay procedure is the skill skills/step-loop/SKILL.md, invocable by the user and the model, never a command
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-07
 summary: The orchestrator's relay procedure for the step-loop driver lands as skills/step-loop/SKILL.md (/praxion:step-loop <task-slug>, user- and model-invocable, slug through $ARGUMENTS, narrow allowed-tools, a description of about 25 tokens), named in the coordination protocol's Plan ready bullet; commands/step-loop.md is never created, and the driver's stop and handoff text names the skill. Narrows dec-432's clause naming the procedure a command; the rest of dec-432 stands.

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-2dc56cc3
+id: dec-436
+draft_id: dec-draft-2dc56cc3
 title: An agent's distinct-request count has one definition in hooks/_agent_transcript.py, read by the driver, the turn-budget reminder and the context instrument; JSON Lines split on newline only
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-07
 summary: The context instrument's private distinct-request counter is retired; hooks/_agent_transcript.py's request_count(reading) becomes the one definition (distinct requestId over assistant records of a transcript whose every line parses, else no count), read by the step-loop driver's record and end evidence, the turn-budget reminder and context_baseline.py's cap-out count; the reader splits JSON Lines on newline only (str.splitlines cut real transcripts at raw U+2028/U+2029); the instrument gains --transcripts-dir as the stated surface for where it reads a project's sessions, its default unchanged.

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-304df110
+id: dec-435
+draft_id: dec-draft-304df110
 title: The mutation line and tag grammar moves from scripts/_step_schema.py into the leaf scripts/_mutation_grammar.py, re-exported unchanged
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-07
 summary: scripts/_step_schema.py (821 lines, over the 800 ceiling) is split by cohesion — the one-line grammar of the mutation contract (the MutationReading sum type, parse and render of the Mutation line, DECLARED_LIMIT_REASONS, mutation_block_reason, parse_mutation_tag) moves to a new stdlib leaf scripts/_mutation_grammar.py that imports nothing local; _step_schema keeps document structure (step grammar, block splitter, WIP claims, recorded runs, which step a mutation line or tag belongs to) and re-exports every moved name, so no importer or test changes.

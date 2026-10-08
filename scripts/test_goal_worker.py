@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -466,11 +467,6 @@ sys.stdout.flush()
 time.sleep(behaviour["linger"])
 """
 
-needs_default_interrupt = pytest.mark.skipif(
-    signal.getsignal(signal.SIGINT) is not signal.default_int_handler,
-    reason="an ignored interrupt cannot be raised into the test",
-)
-
 
 def lingering_stand_in(
     harness: Harness, *, stdout: str = "", grandchild: bool = False, linger: float = 0
@@ -506,18 +502,13 @@ def all_gone_within_the_kill_grace(pids: list[int]) -> bool:
     return not any(is_alive(pid) for pid in pids)
 
 
-def interrupt_once_started(harness: Harness) -> None:
-    """Raise `KeyboardInterrupt` in the main thread once the stand-in has started its
-    background process."""
-    started = harness.bin_dir / GRANDCHILD_PID_FILE
-
-    def wait_then_interrupt() -> None:
-        deadline = time.monotonic() + START_LIMIT_SECONDS
-        while not started.exists() and time.monotonic() < deadline:
-            time.sleep(POLL_SECONDS)
-        _thread.interrupt_main()
-
-    threading.Thread(target=wait_then_interrupt, daemon=True).start()
+@pytest.fixture
+def default_interrupt():
+    """An interrupt raised into the test is delivered even when the run inherited an ignored
+    one (a detached run); the earlier disposition comes back afterwards."""
+    previous = signal.signal(signal.SIGINT, signal.default_int_handler)
+    yield
+    signal.signal(signal.SIGINT, previous)
 
 
 @pytest.fixture
@@ -529,12 +520,33 @@ def stand_in_pids(harness):
             os.kill(pid, signal.SIGKILL)
 
 
-@needs_default_interrupt
+@pytest.fixture
+def interrupt_once_started(harness, stand_in_pids, default_interrupt):
+    """Returns a function that arms a timer thread: it raises `KeyboardInterrupt` in the main
+    thread once the stand-in has started its background process. The thread is stopped when
+    the test ends, so a late interrupt never lands in another test."""
+    started = harness.bin_dir / GRANDCHILD_PID_FILE
+    stopped = threading.Event()
+
+    def wait_then_interrupt() -> None:
+        deadline = time.monotonic() + START_LIMIT_SECONDS
+        while not (started.exists() or stopped.is_set() or time.monotonic() > deadline):
+            time.sleep(POLL_SECONDS)
+        if not stopped.is_set():
+            _thread.interrupt_main()
+
+    thread = threading.Thread(target=wait_then_interrupt, daemon=True)
+    yield thread.start
+    stopped.set()
+    if thread.is_alive():
+        thread.join()
+
+
 def test_an_interrupt_leaves_neither_the_worker_nor_its_background_process_alive(
-    harness, stand_in_pids
+    harness, interrupt_once_started
 ):
     lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
-    interrupt_once_started(harness)
+    interrupt_once_started()
 
     with pytest.raises(KeyboardInterrupt):
         harness.spawn()
@@ -544,10 +556,9 @@ def test_an_interrupt_leaves_neither_the_worker_nor_its_background_process_alive
     assert all_gone_within_the_kill_grace(pids)
 
 
-@needs_default_interrupt
-def test_an_interrupted_worker_leaves_no_worker_file(harness, stand_in_pids):
+def test_an_interrupted_worker_leaves_no_worker_file(harness, interrupt_once_started):
     lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
-    interrupt_once_started(harness)
+    interrupt_once_started()
 
     with pytest.raises(KeyboardInterrupt):
         harness.spawn()
@@ -629,3 +640,32 @@ def test_a_reissued_request_without_a_worker_file_is_refused_with_a_fix_sentence
     returned = harness.spawn(reissued=True)
 
     assert "To fix:" in returned.reason
+
+
+def test_a_group_that_answers_not_permitted_to_the_kill_does_not_replace_the_interrupt(
+    harness, interrupt_once_started
+):
+    def refuse_after_killing(process):
+        kill_group(process)
+        raise PermissionError(errno.EPERM, os.strerror(errno.EPERM))
+
+    harness.monkeypatch.setattr(worker_module, "kill_group", refuse_after_killing)
+    lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
+    interrupt_once_started()
+
+    with pytest.raises(KeyboardInterrupt):
+        harness.spawn()
+
+
+def test_a_failure_to_open_the_output_file_is_raised_not_reported_as_a_missing_claude(harness):
+    harness.print_result()
+
+    def no_temporary_directory(*args):
+        raise FileNotFoundError(errno.ENOENT, "no usable temporary directory")
+
+    unusable = SimpleNamespace(TemporaryFile=no_temporary_directory)
+    harness.monkeypatch.setattr(worker_module, "tempfile", unusable)
+
+    with pytest.raises(FileNotFoundError):
+        harness.spawn()
+    assert harness.calls() == []

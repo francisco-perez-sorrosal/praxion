@@ -90,6 +90,10 @@ def _result_object(stdout: str) -> dict[str, Any] | None:
     return document if usable else None
 
 
+class _LaunchError(Exception):
+    """The process never started; the message is the `NotStarted` reason."""
+
+
 @dataclass(frozen=True)
 class _Exit:
     code: int
@@ -148,15 +152,8 @@ class HeadlessWorker:
         argv = self.argv(request)
         try:
             ended = self._run(argv)
-        except FileNotFoundError:
-            return self.not_started(
-                f"no `{PROGRAM}` on PATH. To fix: install it or put it on PATH, then run again"
-            )
-        except OSError as exc:
-            return self.not_started(
-                f"`{PROGRAM}` could not be started: {exc}."
-                f" To fix: make `{PROGRAM}` on PATH an executable program, then run again"
-            )
+        except _LaunchError as failed:
+            return self.not_started(str(failed))
         result = _result_object(ended.stdout)
         write_worker_end(
             self.task_dir,
@@ -184,31 +181,52 @@ class HeadlessWorker:
 
         The group dies at the wall-clock bound and on any interrupt, so no worker (nor a
         process it started) outlives the driver. A worker that exits on its own is not followed
-        by a group kill. Its output is read once, whatever ended it.
+        by a group kill. Its output is read once, whatever ended it. Only a failure to launch
+        is reported as `_LaunchError`; any later error propagates, since the worker may have run.
         """
         with tempfile.TemporaryFile() as output, sigterm_as_exit():
-            process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
-                argv,
-                cwd=self.repo,
-                stdin=subprocess.DEVNULL,
-                stdout=output,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                start_new_session=True,
-            )
+            try:
+                process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
+                    argv,
+                    cwd=self.repo,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                raise _LaunchError(_launch_reason(exc)) from exc
             timed_out = False
             try:
                 process.wait(timeout=self.timeout)
             except subprocess.TimeoutExpired:
-                kill_group(process)
+                _kill_worker_group(process)
                 timed_out = True
             except BaseException:  # an interrupt must not leave the worker editing the tree
-                kill_group(process)
+                _kill_worker_group(process)
                 raise
             output.seek(0)
             stdout = output.read().decode("utf-8", errors="replace")
         code = process.returncode if process.returncode is not None else -signal.SIGKILL
         return _Exit(code, stdout, timed_out)
+
+
+def _launch_reason(exc: OSError) -> str:
+    if isinstance(exc, FileNotFoundError):
+        return f"no `{PROGRAM}` on PATH. To fix: install it or put it on PATH, then run again"
+    return (
+        f"`{PROGRAM}` could not be started: {exc}."
+        f" To fix: make `{PROGRAM}` on PATH an executable program, then run again"
+    )
+
+
+def _kill_worker_group(process: subprocess.Popen[bytes]) -> None:
+    """Kill the worker's group. A group left holding only a zombie answers "not permitted" to
+    the signal; it is as good as gone, and must not replace the interrupt being handled."""
+    try:
+        kill_group(process)
+    except PermissionError:
+        process.poll()
 
 
 def _return_types() -> tuple[Any, Any]:

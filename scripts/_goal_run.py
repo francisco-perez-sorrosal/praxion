@@ -32,7 +32,7 @@ from _goal_scaffold import edit_rule as deny_rule
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep, parse_plan_steps
-from _step_loop_cli import SUMMARY_PREFIX, CallerError, warning_lines
+from _step_loop_cli import SUMMARY_PREFIX, CallerError, error_line, warning_lines
 from _step_loop_files import (
     STARTED_SUFFIX as STARTED_SUFFIX,  # re-exported: callers name the marker by this suffix
 )
@@ -147,10 +147,11 @@ class MarkedWorker:
                 return self.inner.not_started("; ".join(f.said() for f in standing.failures))
             worker = replace(self.inner, denied=standing.denied)
         marker.write_text(f"{name}\n", encoding="utf-8")
-        outcome = worker.spawn({**request, "reissued": False})
-        if read_worker_end(directory, name) is None:  # the process never ran: nothing to guard
-            marker.unlink(missing_ok=True)
-        return outcome
+        try:
+            return worker.spawn({**request, "reissued": False})
+        finally:  # no worker file: the process never ran or was interrupted, nothing to guard
+            if read_worker_end(directory, name) is None:
+                marker.unlink(missing_ok=True)
 
     def reporter(self) -> Reporter:
         """The `observe` callback for this worker's run, aware of the goal step's `Files:`."""
@@ -404,8 +405,11 @@ class Reporter:
             print(*lines, sep="\n", file=sys.stderr, flush=True)
 
     def closing(self, doc: Mapping[str, Any]) -> tuple[str, ...]:
-        """The lines the run ends with on standard error: where a stop left the task, or the
-        changes outside `Files:` that a completed run left uncommitted."""
+        """The lines the run ends with on standard error: the refusal an `error` envelope
+        carries, where a stop left the task, or the changes outside `Files:` that a completed
+        run left uncommitted."""
+        if doc.get("outcome") == "error":
+            return (error_line(doc["error"]["message"]),)
         stop = doc.get("stop")
         if stop:
             said = f"{SUMMARY_PREFIX}stopped ({stop['cause']}): {stop['evidence']}"
@@ -428,9 +432,7 @@ class Reporter:
         """The error for a loop that ended because a worker could not start."""
         return CallerError(
             NOT_STARTED_CODE,
-            f"run failed because a worker could not be started: {self.not_started}."
-            " To fix: remove that cause (a worker file in the task directory shows what it"
-            " printed), then run it again.",
+            f"run failed because a worker could not be started: {self.not_started}.",
         )
 
 

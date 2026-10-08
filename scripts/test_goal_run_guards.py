@@ -21,8 +21,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import _goal_run  # noqa: E402
+import _goal_worker  # noqa: E402
 from _goal_run import Preconditions, Reporter, Treatment, classify  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
+from _step_loop_cli import error_line  # noqa: E402
 from _step_loop_files import worker_marker_path, worker_result_path  # noqa: E402
 from test_goal_run import (  # noqa: E402
     CHECK_COMMAND,
@@ -41,6 +43,7 @@ from test_goal_run import (  # noqa: E402
     put,
     sandbox,  # noqa: F401 -- the autouse fixture of the suite whose harness this one reuses
     widget_source,
+    without_claude,
 )
 from test_goal_worker import option_values  # noqa: E402
 
@@ -545,3 +548,90 @@ def test_a_tree_git_cannot_read_does_not_turn_a_completed_run_into_an_error(tmp_
 
     assert line.startswith("step_loop: complete")
     assert "could not be read" in line
+
+
+# --- A worker start that is interrupted, and a refusal inside the loop -------------------------
+
+REQUEST_ID = f"s{STEP}-a1-implement"
+SILENT_SESSION = "99999999-8888-7777-6666-555555555555"
+SILENT_WORKER = """#!{python}
+import json
+
+print(json.dumps({{
+    "type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+    "session_id": "{session}", "total_cost_usd": 0.01, "permission_denials": [],
+}}))
+"""
+
+
+def start_markers(scratch: Scratch) -> list[Path]:
+    return sorted(scratch.task_dir.glob(f"WORKER_*{_goal_run.STARTED_SUFFIX}"))
+
+
+def start_name(scratch: Scratch) -> str:
+    return worker_marker_path(scratch.task_dir, REQUEST_ID).name
+
+
+def interrupt(self, request):
+    raise KeyboardInterrupt
+
+
+def run_interrupted_before_any_worker_file(scratch: Scratch, monkeypatch) -> None:
+    with monkeypatch.context() as patched:
+        patched.setattr(_goal_worker.HeadlessWorker, "spawn", interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            scratch.run()
+
+
+def install_worker_without_transcript(scratch: Scratch) -> None:
+    scratch.bin_dir.mkdir(exist_ok=True)
+    program = scratch.bin_dir / "claude"
+    program.write_text(SILENT_WORKER.format(python=PYTHON, session=SILENT_SESSION), "utf-8")
+    program.chmod(0o755)
+    os.environ["PATH"] = f"{scratch.bin_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+def install_claude_that_cannot_be_executed(scratch: Scratch) -> None:
+    without_claude()
+    scratch.bin_dir.mkdir(exist_ok=True)
+    program = scratch.bin_dir / "claude"
+    program.write_text("#!/bin/sh\n", encoding="utf-8")
+    program.chmod(0o644)
+    os.environ["PATH"] = f"{scratch.bin_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+def test_an_interrupt_before_any_worker_file_leaves_no_start_marker(scratch, monkeypatch):
+    run_interrupted_before_any_worker_file(scratch, monkeypatch)
+
+    assert start_markers(scratch) == []
+    assert not worker_result_path(scratch.task_dir, REQUEST_ID).exists()
+
+
+def test_the_request_an_interrupt_cut_short_starts_one_fresh_worker_on_the_next_run(
+    scratch, monkeypatch
+):
+    run_interrupted_before_any_worker_file(scratch, monkeypatch)
+
+    scratch.run()
+
+    assert len(scratch.calls()) == 1
+    assert [call["started"] for call in scratch.calls()] == [[start_name(scratch)]]
+
+
+def test_a_refusal_inside_the_loop_is_printed_as_an_error_line_and_exits_four(scratch):
+    install_worker_without_transcript(scratch)
+
+    reply = scratch.run()
+
+    assert reply.exit == 4
+    assert reply.doc["outcome"] == "error"
+    assert tuple(reply.lines) == (error_line(reply.doc["error"]["message"]),)
+
+
+def test_a_claude_that_cannot_be_executed_ends_the_run_as_not_started(scratch):
+    install_claude_that_cannot_be_executed(scratch)
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "worker-not-started")
+    assert start_markers(scratch) == []

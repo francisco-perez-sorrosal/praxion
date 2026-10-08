@@ -176,35 +176,20 @@ Tests run in two loops — procedure in [`coordination-details.md § BDD/TDD Exe
 
 ### Phase 4b — Step Risk Tagging and Intra-Step Review Annotation
 
-After pairing test steps (Phase 4), scan each step for RISKY signals and annotate accordingly. This is what the orchestrator reads at step completion to decide whether to spawn a light-review pass.
+After pairing test steps (Phase 4), scan each step for RISKY signals and annotate accordingly. The plan alone decides which steps get a light-review pass: the driver inside the step loop, the orchestrator outside it, reads the annotations.
 
 **RISKY signals — tag the step when any applies:**
 
 | Signal | How to detect | Tag action |
 |--------|--------------|-----------|
-| **One-way-door** | Step description includes: schema migration, deletion, permission grant, external API write, irreversible data transform | Note in the step description; orchestrator auto-signals on this pattern |
+| **One-way-door** | Step description includes: schema migration, deletion, permission grant, external API write, irreversible data transform | Add `review: force` to the step block |
+| **Uncertainty Flag < 7** | The flag in `TASK_BRIEF.md` is below 7 | Add `review: force` to the steps the flag bears on |
 | **`tier: H`** (cross-cutting, high complexity) | Step touches 4+ files across package boundaries; or refactors a core abstraction used by many consumers; or is a critical-path change the architect flagged as high-risk | Add `tier: H` annotation to the step block |
 | **Planner override** | Planner judges a step risky independent of signals, or judges it safe despite signals | Add `review: force` or `review: off` to the step block |
 | **World-read step** | RISKY step, or a step whose `Files:` wrap a subprocess/git/filesystem/network/env/clock read | Tag `mutation: on` per [`decomposition-guide.md § Step Risk Tagging`](../skills/software-planning/references/decomposition-guide.md#step-risk-tagging) |
 
-**`review:` field** — add to a step block in `IMPLEMENTATION_PLAN.md` when an override is warranted:
-
-```markdown
-### Step N: [description]
-
-**Implementation**: ...
-**Files**: ...
-**review**: force | off
-**Done when**: ...
-```
-
-- `review: force` — pass runs regardless of auto-signals
-- `review: off` — pass suppressed regardless of auto-signals
-- *(omit field)* — auto-signal logic governs
-
-**Important**: The planner annotates `review:`. The implementer does not set it. Non-RISKY steps with no `review:` field incur zero added cost — no reviewer spawn.
-
-Full procedure (trigger predicate, reviewer contract, iteration bound, escalation, composition table): [`skills/software-planning/references/intra-step-review.md`](../skills/software-planning/references/intra-step-review.md).
+**`review:` field** — `review: force` or `review: off` on the step block; the schema is in [`intra-step-review.md § review: Field Schema`](../skills/software-planning/references/intra-step-review.md#review-field-schema).
+The planner annotates `review:`; the implementer does not set it. Unmarked steps incur zero added cost.
 
 ### Phase 5 — Phase Detection
 

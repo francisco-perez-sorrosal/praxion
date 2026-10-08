@@ -81,7 +81,7 @@ After a spike, update the plan: document findings in LEARNINGS.md, propose plan 
 <a id="step-risk-tagging"></a>
 ## Step Risk Tagging
 
-The planner annotates steps with risk signals so the orchestrator can decide at step completion whether to spawn an intra-step pair-review. This annotation is part of step decomposition (Phase 3–4 of the implementation-planner process).
+The planner annotates steps with risk signals so the plan alone decides which steps an intra-step pair-review covers. This annotation is part of step decomposition (Phase 3–4 of the implementation-planner process).
 
 ### `tier: H` — High-complexity step
 
@@ -103,15 +103,15 @@ tier: H
 **Done when**: ...
 ```
 
-The `tier: H` annotation is already used by `agent-model-routing.md` to route the implementer to `opus`. The intra-step pair-review feature additionally reads this tag as a RISKY signal to spawn a reviewer.
+The `tier: H` annotation is already used by `agent-model-routing.md` to route the implementer to `opus`. The intra-step pair-review feature additionally reviews every step carrying this tag, unless it carries `review: off`.
 
 ### `review: force` and `review: off`
 
-Planner overrides — higher precedence than every auto-signal:
+Planner annotations — `review: off` wins over `tier: H`; mark `review: force` on every step an Uncertainty Flag below 7 or a one-way door bears on:
 
 ```markdown
-**review**: force   # spawn reviewer regardless of signals
-**review**: off     # suppress reviewer regardless of signals
+**review**: force   # review this step
+**review**: off     # do not review this step, even with `tier: H`
 ```
 
 When to use `force`: the planner judges the step risky independent of signals (e.g., a simple-looking step that changes a critical invariant).
@@ -133,9 +133,9 @@ mutation: on
 **Done when**: ...
 ```
 
-Precedence mirrors `review: force`/`review: off` exactly: the planner field wins over every auto-signal, and — unlike `review:` — there are no auto-signals in this tag's first version, so an absent field always means off. The tag costs nothing when absent: no invocation, no line, no reader action. When present, the step's canonical `TEST_RESULTS.md` writer runs `scripts/mutation_sensor.py` against the step's targets and tests and copies its stdout `Mutation:` line verbatim into the step's section (see [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](agent-pipeline-details.md#test_resultsmd-reconciliation) for the line's two shapes and placement). A tagged step completes only on a `survivors=` reading or the declared `not-flat-layout` refusal: a missing or unreadable `Mutation:` line, or any other refusal, blocks the step until the sensor is restored and re-run, or the plan drops the tag with a recorded reason.
+Precedence mirrors `review: force`/`review: off` exactly: the planner field decides, and — unlike `review:` — no other input triggers it in this tag's first version, so an absent field always means off. The tag costs nothing when absent: no invocation, no line, no reader action. When present, the step's canonical `TEST_RESULTS.md` writer runs `scripts/mutation_sensor.py` against the step's targets and tests and copies its stdout `Mutation:` line verbatim into the step's section (see [`agent-pipeline-details.md § TEST_RESULTS.md Reconciliation`](agent-pipeline-details.md#test_resultsmd-reconciliation) for the line's two shapes and placement). A tagged step completes only on a `survivors=` reading or the declared `not-flat-layout` refusal: a missing or unreadable `Mutation:` line, or any other refusal, blocks the step until the sensor is restored and re-run, or the plan drops the tag with a recorded reason.
 
-**Reversal trigger**: if two consecutive Standard/Full pipelines complete with zero steps tagged `mutation: on`, convert the tag to an auto-signal (mirroring `tier: H`'s detection table) rather than leaving it a planner-only opt-in the ecosystem never exercises.
+**Reversal trigger**: if two consecutive Standard/Full pipelines complete with zero steps tagged `mutation: on`, convert the tag to automatic detection (mirroring `tier: H`'s detection table) rather than leaving it a planner-only opt-in the ecosystem never exercises.
 
 | Value | Effect |
 |-------|--------|

@@ -38,9 +38,9 @@ from _handoff_inputs import read_existing  # noqa: E402
 from _handoff_readiness import WAL_AGENT_STOP, session_wal_rows  # noqa: E402
 from _loop_fields import REQUEST_ID_RE, AnyAttempt, render_attempts_line  # noqa: E402
 from _step_loop_gate import EndEvidence  # noqa: E402
-from _step_loop_render import AgentCall  # noqa: E402
+from _step_loop_render import AgentCall, parse_request_id  # noqa: E402
 from _step_loop_state import SNAPSHOT_STEM, SNAPSHOT_SUFFIX  # noqa: E402
-from _step_schema import checklist_step_id  # noqa: E402
+from _step_schema import Counts, NoRun, checklist_step_id, parse_result_line  # noqa: E402
 from compose_handoff import MID_PHASE_PREFIX, SECTION_HEADINGS, write_handoff  # noqa: E402
 from iteration_ledger import IterationRecord, append_record, read_ledger  # noqa: E402
 
@@ -50,7 +50,8 @@ ITERATION_PATCH_STEM, PATCH_SUFFIX = "ITERATION", ".patch"
 WORKER_STEM, WORKER_SUFFIX, WORKER_FILE_VERSION = "WORKER", ".json", 1
 META_UNREADABLE, REQUEST_FIDELITY = "meta-unreadable", "request-fidelity"
 DEFAULT_FILE_MODE, MODE_MASK = 0o644, 0o777
-_RESULT_PREFIX, _BLOCK_HEADING_PREFIX = "Result:", "## "
+_RESULT_PREFIX, _BLOCK_HEADING_PREFIX, _COMMAND_PREFIX = "Result:", "## ", "Command:"
+_PENDING_RE = re.compile(r"(?:^|\s)pending=(?P<count>[0-9]+)(?:\s|$)")
 _FENCES, _CHILD_INDENT = ("```", "~~~"), "  "
 _TRANSCRIPT_GLOBS = (
     "projects/*/*/subagents/agent-*.jsonl",
@@ -174,6 +175,35 @@ def _with_block(text: str, block: list[str]) -> str:
     return "\n".join([*spaced_before, *block, *spaced_after]) + "\n"
 
 
+def latest_reading(results_path: Path, step_id: str) -> tuple[str, ...]:
+    """The step's latest gate block as lines to show: the check's command, then each `Result:`
+    line restated. The latest block is the last in the file, so the scaffold's baseline block,
+    written first, reads until a gate block follows it; empty when the step has none."""
+    lines = results_path.read_text("utf-8").splitlines() if results_path.is_file() else []
+    prefix = gate_heading(step_id, "")
+    start = next((i for i in reversed(range(len(lines))) if lines[i].startswith(prefix)), None)
+    if start is None:
+        return ()
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith(_BLOCK_HEADING_PREFIX)),
+        len(lines),
+    )
+    block = lines[start + 1 : end]
+    commands = [line for line in block if line.startswith(_COMMAND_PREFIX)]
+    results = [restate_result(line) for line in block if line.startswith(_RESULT_PREFIX)]
+    return (*commands[-1:], *results)  # the check's command is the gate's last
+
+
+def restate_result(line: str) -> str:
+    """A `Result:` line as `<p> passed, <f> failed`, the goal's pending tests counted as failed."""
+    parsed = parse_result_line(line)
+    if isinstance(parsed, Counts):
+        pended = _PENDING_RE.search(line)
+        failed = parsed.failed + parsed.errors + (int(pended["count"]) if pended else 0)
+        return f"{parsed.passed} passed, {failed} failed"
+    return f"no run: {parsed.rationale}" if isinstance(parsed, NoRun) else "unreadable result"
+
+
 def write_prompt(task_dir: Path, request: str, text: str) -> Path:
     """`PROMPT_<request>.md`, flat beside the task documents."""
     return _write_request_file(task_dir, PROMPT_STEM, request, PROMPT_SUFFIX, text)
@@ -202,6 +232,14 @@ def write_iteration_patch(task_dir: Path, request: str, patch_text: str) -> Path
     return _write_request_file(
         task_dir, ITERATION_PATCH_STEM, request, PATCH_SUFFIX, patch_text, keep=True
     )
+
+
+def iteration_patches(task_dir: Path, step_id: str) -> tuple[str, ...]:
+    """The names of the step's `ITERATION_<request>.patch` files beside the task documents."""
+    stem, suffix = f"{ITERATION_PATCH_STEM}_", PATCH_SUFFIX
+    names = sorted(path.name for path in task_dir.glob(f"{stem}*{suffix}") if path.is_file())
+    keys = ((name, parse_request_id(name[len(stem) : -len(suffix)])) for name in names)
+    return tuple(name for name, key in keys if key is not None and key.step == step_id)
 
 
 def _write_request_file(

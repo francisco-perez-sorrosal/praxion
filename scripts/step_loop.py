@@ -51,15 +51,25 @@ from typing import Any, Protocol, Union
 
 import _step_loop_cli as cli
 import _step_loop_record as rec
+from _goal_record import protected_set
 from _handoff_inputs import resolve_base_ref
-from _loop_fields import OutstandingAttempt, parse_attempts
-from _plan_steps import parse_plan_steps
+from _loop_fields import GoalBudget, OutstandingAttempt, parse_attempts
+from _plan_steps import PlanStep, parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
 from _step_loop_action import Complete, Spawn, Stop, issuable_action
 from _step_loop_cli import CallerError
-from _step_loop_files import set_attempts_line, snapshot_requests, write_prompt, write_stop_handoff
+from _step_loop_files import (
+    iteration_patches,
+    latest_reading,
+    set_attempts_line,
+    snapshot_requests,
+    write_prompt,
+    write_stop_handoff,
+)
 from _step_loop_io import paths_differing_from_head
+from _step_loop_record_gate import RESULTS_FILE
 from _step_loop_render import (
+    GoalState,
     Invocation,
     PromptInputs,
     SpawnRequest,
@@ -208,6 +218,18 @@ def _prompt_inputs(task: Task, action: Spawn, request: SpawnRequest) -> PromptIn
         previous=previous,
         dirty_files=paths_differing_from_head(task.repo, step.files) if previous else (),
         review_range=review_range(inputs, step),
+        goal=_goal_state(task, step) if action.key.kind == "implement" else None,
+    )
+
+
+def _goal_state(task: Task, step: PlanStep) -> GoalState | None:
+    """What a goal step's prompt reads from the files; None for an ordinary step."""
+    if not isinstance(step.bound, GoalBudget):
+        return None
+    return GoalState(
+        latest_reading(task.dir / RESULTS_FILE, step.id),
+        protected_set(step.read_only),
+        iteration_patches(task.dir, step.id),
     )
 
 

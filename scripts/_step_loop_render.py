@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple, cast, get_args
 
@@ -30,7 +31,11 @@ SLOT_BOUNDS = {  # characters; a slot named here is cut to its bound
     "key-signals": 2_000,
     "corrections": 1_500,
     "previous-attempts": 1_000,
+    "latest-reading": 1_500,
+    "protected-paths": 1_500,
+    "iteration-patches": 1_000,
 }
+PROGRESS_BOUND = 2_500  # a goal prompt keeps the newest progress lines within this
 
 Kind = Literal["implement", "revise", "review"]
 Model = Literal["opus", "sonnet"]
@@ -148,6 +153,15 @@ class PriorAttempt(NamedTuple):  # one earlier driver attempt, as the ledger and
 
 
 @dataclass(frozen=True)
+class GoalState:
+    """What a goal step's prompt reads from the files besides its step block."""
+
+    reading: tuple[str, ...] = ()
+    protected: tuple[str, ...] = ()
+    patches: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class PromptInputs:
     """Everything a prompt is a function of; the texts are document contents (or "")."""
 
@@ -160,6 +174,7 @@ class PromptInputs:
     previous: tuple[PriorAttempt, ...] = ()
     dirty_files: tuple[str, ...] = ()
     review_range: tuple[str, str] | None = None
+    goal: GoalState | None = None  # for a goal step's implement request
 
 
 # (tag, the tag's `source` attribute or "", text, the path holding the full text a cut names)
@@ -170,13 +185,14 @@ def render_prompt(inputs: PromptInputs) -> tuple[str, tuple[tuple[str, str], ...
     """The prompt file of a request and its (code, message) warnings; nothing timestamped."""
     step, request = inputs.step, inputs.request
     key, cap, sid = request.key, request.attempt_cap, f"Step {inputs.step.id}"
-    opening = _OPENING[key.kind].format(sid=sid, n=key.attempt, cap=cap, r=key.round)
+    kind = "goal" if inputs.goal is not None and key.kind == "implement" else key.kind
+    opening = _OPENING[kind].format(sid=sid, n=key.attempt, cap=cap, r=key.round)
     shown = [_render_slot(slot) for slot in _slots(inputs)]
     sections = [
         "\n".join([*request.agent_call.prompt.splitlines()[:2], opening]),
         f'<step id="{step.id}">\n{step.block}\n</step>',
         *(element for element, _ in shown if element),
-        _FINISH[key.kind].format(sid=sid, id=step.id, work=inputs.work_dir),
+        _FINISH[kind].format(sid=sid, id=step.id, work=inputs.work_dir),
     ]
     text, warnings = "\n\n".join(sections) + "\n", tuple(w for _, w in shown if w)
     if len(text) > PROMPT_CEILING:
@@ -199,13 +215,32 @@ _FINISH_REVIEW = """\
 2. Review only the change in <diff> against the step above; edit no other file.
 3. End with at most 15 lines: the verdict block, then one marker last: [COMPLETE] or [PARTIAL].
 </finish>"""
+_FINISH_GOAL = """\
+<finish>
+1. Pick one unit of the goal, finish it, and leave the tree committable.
+2. Append one line to `## Progress record` in {work}/WIP.md: what was done, what remains and
+   what was learned. Record nothing in TEST_RESULTS.md and tick nothing: the step-loop driver
+   runs the gate.
+3. Run the check exactly as written above, with no pipe: no other shell command is permitted.
+   Quote its last lines.
+4. Edit only the step's files; never commit, the step-loop driver commits once it keeps the unit.
+5. End with at most 5 lines whose last line is one marker: [COMPLETE], [PARTIAL], [CONFLICT] or
+   [BLOCKED] (when the goal cannot be met as stated).
+</finish>"""
 _OPENING = {
     "implement": "You are implementing {sid} of IMPLEMENTATION_PLAN.md, attempt {n} of {cap}.",
     "revise": "You are revising {sid} of IMPLEMENTATION_PLAN.md after its light review "
     "(round {r}). Address only the findings below.",
     "review": "You are the light reviewer for {sid} of IMPLEMENTATION_PLAN.md, round {r}.",
+    "goal": "You are working toward the goal of {sid} of IMPLEMENTATION_PLAN.md, "
+    "iteration {n} of {cap}.",
 }
-_FINISH = {"implement": _FINISH_WORK, "revise": _FINISH_WORK, "review": _FINISH_REVIEW}
+_FINISH = {
+    "implement": _FINISH_WORK,
+    "revise": _FINISH_WORK,
+    "review": _FINISH_REVIEW,
+    "goal": _FINISH_GOAL,
+}
 
 
 def _slots(inputs: PromptInputs) -> list[_Slot]:
@@ -221,6 +256,8 @@ def _slots(inputs: PromptInputs) -> list[_Slot]:
             raise ValueError("a review prompt needs the commit range to review")
         diff = f"git diff {'..'.join(inputs.review_range)} -- {' '.join(step.files)}"
         return [section("key-signals", "TASK_BRIEF.md", "Key Signals"), ("diff", "", diff, "")]
+    if inputs.goal is not None and kind == "implement":
+        return _goal_slots(inputs, inputs.goal)
     if kind == "revise":
         file = f"LIGHT_REVIEW_step-{step.id}.md"
         lead = ("review-findings", file, inputs.findings_text.strip(), f"{work}/{file}")
@@ -235,6 +272,38 @@ def _slots(inputs: PromptInputs) -> list[_Slot]:
         section("health-guards", "TASK_BRIEF.md", "Health Guards"),
         section("corrections", "WIP.md", "Corrections in force"),
     ]
+
+
+def _goal_slots(inputs: PromptInputs, goal: GoalState) -> list[_Slot]:
+    """A goal step's slots. The step block already carries the goal, its check and its files."""
+    work = inputs.work_dir
+    wip, plan, results = (
+        f"{work}/{name}.md" for name in ("WIP", "IMPLEMENTATION_PLAN", "TEST_RESULTS")
+    )
+    progress = section_body(inputs.wip_text, "Progress record").splitlines()
+    return [
+        ("latest-reading", "TEST_RESULTS.md", "\n".join(goal.reading) or "No reading yet.", results),
+        ("progress-record", "WIP.md, Progress record, newest first",
+         _newest_first([line for line in progress if line.strip()], PROGRESS_BOUND, wip), wip),
+        ("protected-paths", "", "\n".join(f"- {path}" for path in goal.protected), plan),
+        ("iteration-patches", work,"\n".join(goal.patches), work),
+    ]  # fmt: skip
+
+
+_LINES_CUT = "[{count} earlier lines cut: full record in {path}]"
+
+
+def _newest_first(lines: Sequence[str], bound: int, path: str) -> str:
+    """`lines` newest first, whole lines only, the newest always; a cut says how many it dropped."""
+    kept: list[str] = []
+    for line in reversed(lines):
+        left = len(lines) - len(kept) - 1
+        tail = [_LINES_CUT.format(count=left, path=path)] if left else []
+        if kept and len("\n".join([*kept, line, *tail])) > bound:
+            break
+        kept.append(line)
+    cut = len(lines) - len(kept)
+    return "\n".join([*kept, *([_LINES_CUT.format(count=cut, path=path)] if cut else [])])
 
 
 def section_body(text: str, title: str) -> str:

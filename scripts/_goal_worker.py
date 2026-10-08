@@ -1,11 +1,18 @@
 """The headless worker: one fresh `claude -p` process per spawn request, its result read once.
 
 `HeadlessWorker` is a `Spawner` (see `step_loop.py`). It never continues an earlier session and
-never widens the worker's permissions: the worker may read and edit files, and run the goal's
-check and the test-scope resolver, nothing else. After the process exits, its standard output
-is parsed once at this boundary into the result object, written to `WORKER_<request>.json`
-before `record` is called, and read back from that file when a request comes again, so a
-request whose worker may have run is never started a second time.
+never widens the worker's permissions. The profile it starts with:
+
+- it reads (`Read`, `Glob`, `Grep`) and runs the goal's check and the test-scope resolver;
+- it edits only the paths in `writable`, as `Edit(...)` rules (one rule covers every tool that
+  edits files); an empty `writable` is a read-only worker;
+- it is denied what `denied` lists, which beats every pre-approval its settings files grant;
+- it loads no MCP server the person did not name on this command line (`--strict-mcp-config`).
+
+After the process exits, its standard output is parsed once at this boundary into the result
+object, written to the task directory's worker file before `record` is called, and read back
+from that file when a request comes again, so a request whose worker may have run is never
+started a second time.
 
 Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """
@@ -29,11 +36,11 @@ from _step_loop_files import NoWorkerResult, WorkerEnd, read_worker_end, write_w
 
 DEFAULT_MAX_TURNS = 40
 DEFAULT_MAX_BUDGET_USD = 2.00
-WORKER_TIMEOUT_SECONDS = 3600
+WALL_CLOCK_SECONDS = 3600
 STDOUT_TAIL_CHARS = 2000
 PROGRAM = "claude"
 RESOLVER_SCRIPT = "resolve_test_scope.py"
-_FILE_TOOLS = ("Read", "Edit", "Write", "Glob", "Grep")
+_READ_TOOLS = ("Read", "Glob", "Grep")
 _TERMINAL_MARKERS = ("complete", "blocked", "conflict", "partial")
 _RESULT_KEYS = ("session_id", "subtype")
 _PYTEST_PREFIX = re.compile(r"(.*?(?:^|[\s/])pytest)(?=\s|$)")
@@ -97,10 +104,14 @@ class HeadlessWorker:
     resolver: str
     max_turns: int = DEFAULT_MAX_TURNS
     max_budget_usd: float = DEFAULT_MAX_BUDGET_USD
-    timeout: float = WORKER_TIMEOUT_SECONDS
+    timeout: float = WALL_CLOCK_SECONDS
+    writable: tuple[str, ...] = ()
+    denied: tuple[str, ...] = ()
 
     def argv(self, request: Mapping[str, Any]) -> list[str]:
         call = request["agent_call"]
+        allowed = (*_READ_TOOLS, *self.writable, shell_rule(self.check), shell_rule(self.resolver))
+        refused = ["--disallowedTools", *self.denied] if self.denied else []
         return [
             PROGRAM, "-p", call["prompt"],
             "--model", call["model"],
@@ -108,24 +119,32 @@ class HeadlessWorker:
             "--max-budget-usd", f"{self.max_budget_usd:.2f}",
             "--permission-mode", "dontAsk",
             "--permission-prompts", "none",
-            "--allowedTools", *_FILE_TOOLS, shell_rule(self.check), shell_rule(self.resolver),
+            "--allowedTools", *allowed,
+            *refused,
+            "--strict-mcp-config",
             "--output-format", "json",
         ]  # fmt: skip
 
+    def not_started(self, reason: str) -> Any:
+        """The driver's `NotStarted` for a request this worker could not start."""
+        return _return_types()[1](reason)
+
     def spawn(self, request: Mapping[str, Any]) -> Any:
-        ran, not_started = _return_types()
+        ran = _return_types()[0]
         earlier = read_worker_end(self.task_dir, request["id"])
         if isinstance(earlier, WorkerEnd):
             return ran(earlier.session_id, terminal_marker(earlier.final_text))
         if isinstance(earlier, NoWorkerResult):
-            return not_started(earlier.detail)
+            return self.not_started(earlier.detail)
         if request.get("reissued"):
-            return not_started("a reissued request has no worker file, so its worker may have run")
+            return self.not_started(
+                "a reissued request has no worker file, so its worker may have run"
+            )
         argv = self.argv(request)
         try:
             ended = self._run(argv)
         except FileNotFoundError:
-            return not_started(f"no `{PROGRAM}` on PATH")
+            return self.not_started(f"no `{PROGRAM}` on PATH")
         result = None if ended.timed_out else _result_object(ended.stdout)
         write_worker_end(
             self.task_dir,
@@ -141,7 +160,7 @@ class HeadlessWorker:
             cause = (
                 f"stopped after {self.timeout:g} s" if ended.timed_out else f"exited {ended.code}"
             )
-            return not_started(f"the worker {cause} and printed no result object")
+            return self.not_started(f"the worker {cause} and printed no result object")
         return ran(result["session_id"], terminal_marker(result.get("result")))
 
     def _run(self, argv: list[str]) -> _Exit:

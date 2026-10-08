@@ -16,15 +16,17 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from _goal_record import KEPT_WORDS, judgement_words, protected_set
-from _goal_scaffold import SETTINGS_FILE
+from _goal_scaffold import SETTINGS_FILE, WIP_FILE, edit_rule
 from _goal_scaffold import edit_rule as deny_rule
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
 from _loop_fields import Check, GoalBudget
@@ -45,6 +47,12 @@ SHORT_SHA = 7
 SUCCESS = "success"
 NOT_STARTED_CODE = "worker-not-started"
 MIN_BUDGET_USD = 0.01  # the smallest the worker's `.2f` bound still states
+USER_SETTINGS = "settings.json"
+PROJECT_SETTINGS = ".claude/settings.json"
+CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
+_RULE_RE = re.compile(r"(?P<tool>\w+)(?:\((?P<pattern>.*)\))?", re.DOTALL)
+_PATH_RULE_TOOLS = ("Write", "MultiEdit", "NotebookEdit")  # accepted, never consulted
+_WIDE_PATTERNS = ("", "*", ":*")
 
 
 def _refuse(why: str, fix: str) -> CallerError:
@@ -86,9 +94,17 @@ def start_worker(
             "scaffold the goal with the goal verb, or add the rules there",
         )
     resolver = resolver_invocation(sys.argv[0], os.environ.get("PATH", ""))
+    mirrored = _mirrored_denials(repo, (goal.check.command, resolver))
     return MarkedWorker(
         HeadlessWorker(
-            repo, directory, goal.check.command, resolver, args.max_turns, args.max_budget_usd
+            repo,
+            directory,
+            goal.check.command,
+            resolver,
+            args.max_turns,
+            args.max_budget_usd,
+            writable=writable_rules(goal.files, repo, directory),
+            denied=mirrored,
         )
     )
 
@@ -119,6 +135,89 @@ class MarkedWorker:
         if read_worker_end(directory, name) is None:  # the process never ran: nothing to guard
             marker.unlink(missing_ok=True)
         return outcome
+
+
+# --- What the worker may write, and what it would inherit -----------------------------------
+
+
+def writable_rules(files: Sequence[str], repo: Path, directory: Path) -> tuple[str, ...]:
+    """The edit rules the worker is granted: each `Files:` entry, then the task's progress file
+    (written as an absolute rule when the task directory lies outside the repository)."""
+    root, task = repo.resolve(), directory.resolve()
+    try:
+        progress = edit_rule(str((task / WIP_FILE).relative_to(root)), repo)
+    except ValueError:
+        progress = f"Edit(/{task / WIP_FILE})"
+    return tuple(dict.fromkeys((*(edit_rule(entry, repo) for entry in files), progress)))
+
+
+@dataclass(frozen=True)
+class Inherited:
+    """A rule of some settings file's `permissions.allow`, and the file that holds it."""
+
+    rule: str
+    file: Path
+
+
+def inherited_rules(repo: Path) -> tuple[Inherited, ...]:
+    """The allow rules of the user, project and local settings, which the worker loads and
+    which `dontAsk` honours as pre-approvals. A file that is missing, unreadable or not a JSON
+    object holds no rules."""
+    config = os.environ.get(CONFIG_DIR_VARIABLE)
+    user = (Path(config) if config else Path.home() / ".claude") / USER_SETTINGS
+    files = (user, repo / PROJECT_SETTINGS, repo / SETTINGS_FILE)
+    return tuple(Inherited(rule, file) for file in files for rule in _allow_rules(file))
+
+
+def _allow_rules(file: Path) -> tuple[str, ...]:
+    try:
+        allow = json.loads(file.read_text("utf-8"))["permissions"]["allow"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ()
+    return tuple(rule for rule in allow if isinstance(rule, str)) if isinstance(allow, list) else ()
+
+
+class Treatment(Enum):
+    """What `run` does with one inherited allow rule."""
+
+    MIRROR = "mirror"  # the worker gets a deny rule of the same text
+    IGNORE = "ignore"  # it grants the worker nothing it could use
+    REFUSE = "refuse"  # it cannot be neutralised, so `run` does not start
+
+
+def classify(rule: str, commands: Sequence[str]) -> Treatment:
+    """The treatment of one allow rule, given the check and resolver commands the worker runs.
+
+    A scoped `Bash` rule that cannot approve either command is mirrored; one that could, or
+    that covers every command, is refused, as is any rule granting edits at large. A path rule
+    of a tool the harness never consults for paths, a read rule and any other tool's rule are
+    ignored."""
+    parsed = _RULE_RE.fullmatch(rule)
+    if parsed is None:
+        return Treatment.IGNORE
+    tool, pattern = parsed["tool"], parsed["pattern"]
+    if tool == "Edit" or (tool in _PATH_RULE_TOOLS and pattern is None):
+        return Treatment.REFUSE
+    if tool != "Bash":
+        return Treatment.IGNORE
+    head = (pattern or "").partition("*")[0].removesuffix(":")
+    if pattern in _WIDE_PATTERNS or not head or any(c.startswith(head) for c in commands):
+        return Treatment.REFUSE
+    return Treatment.MIRROR
+
+
+def _mirrored_denials(repo: Path, commands: Sequence[str]) -> tuple[str, ...]:
+    """The deny rules that neutralise the inherited pre-approvals, or the refusal naming each
+    one that cannot be neutralised and its file."""
+    treated = [(i, classify(i.rule, commands)) for i in inherited_rules(repo)]
+    refused = [f"{i.rule} in {i.file}" for i, treatment in treated if treatment is Treatment.REFUSE]
+    if refused:
+        raise _refuse(
+            f"the worker would inherit pre-approvals it must not hold: {'; '.join(refused)}",
+            "remove them from those files, or narrow each to a command that is neither the"
+            " check nor the test-scope resolver nor a file edit",
+        )
+    return tuple(i.rule for i, treatment in treated if treatment is Treatment.MIRROR)
 
 
 def location(repo: Path, base_ref: str, args: argparse.Namespace) -> tuple[str, ...]:

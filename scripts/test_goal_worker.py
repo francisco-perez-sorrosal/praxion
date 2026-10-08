@@ -20,6 +20,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import _goal_worker as worker_module  # noqa: E402
 import step_loop  # noqa: E402
+from _goal_run import writable_rules  # noqa: E402
 from _goal_worker import (  # noqa: E402
     HeadlessWorker,
     resolver_invocation,
@@ -46,7 +47,9 @@ FORBIDDEN_OPTIONS = (
     "--bare",
     "--agent",
 )
-FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"]
+READ_TOOLS = ["Read", "Glob", "Grep"]
+SLUG = "demo"
+WIDGET = "src/widget.py"
 
 _STAND_IN = """#!{python}
 import json, os, subprocess, sys, time
@@ -211,13 +214,53 @@ def test_no_forbidden_option_is_ever_passed(harness, forbidden):
     assert forbidden not in harness.only_call()["argv"]
 
 
-def test_the_allow_list_names_the_file_tools_the_check_and_the_resolver_only(harness):
+def the_allow_list_for(harness, *files: str) -> list[str]:
+    """Spawn a worker whose edits are those the goal grants for `files`; its allow-list."""
+    task_dir = harness.repo / ".ai-work" / SLUG
+    harness.print_result()
+    harness.spawn(writable=writable_rules(files, harness.repo, task_dir))
+    return option_values(harness.only_call()["argv"], "--allowedTools")
+
+
+def test_the_allow_list_names_the_read_tools_the_files_the_check_and_the_resolver_only(harness):
+    allowed = the_allow_list_for(harness, WIDGET)
+
+    assert allowed == [
+        *READ_TOOLS,
+        f"Edit(/{WIDGET})",
+        f"Edit(/.ai-work/{SLUG}/WIP.md)",
+        f"Bash({CHECK}:*)",
+        f"Bash({RESOLVER}:*)",
+    ]
+
+
+def test_a_directory_among_the_files_is_allowed_whole(harness):
+    allowed = the_allow_list_for(harness, "pkg/")
+
+    assert allowed[len(READ_TOOLS)] == "Edit(/pkg/**)"
+
+
+def test_a_task_directory_outside_the_repository_is_allowed_by_its_absolute_path(harness):
+    rules = writable_rules((WIDGET,), harness.repo, harness.task_dir)
+
+    assert rules == (f"Edit(/{WIDGET})", f"Edit(/{harness.task_dir.resolve()}/WIP.md)")
+
+
+def test_a_worker_with_nothing_writable_is_read_only(harness):
     harness.print_result()
 
     harness.spawn()
 
     allowed = option_values(harness.only_call()["argv"], "--allowedTools")
-    assert allowed == [*FILE_TOOLS, f"Bash({CHECK}:*)", f"Bash({RESOLVER}:*)"]
+    assert allowed == [*READ_TOOLS, f"Bash({CHECK}:*)", f"Bash({RESOLVER}:*)"]
+
+
+def test_no_server_of_the_persons_own_reaches_the_worker(harness):
+    harness.print_result()
+
+    harness.spawn()
+
+    assert "--strict-mcp-config" in harness.only_call()["argv"]
 
 
 def test_a_parenthesised_check_is_allowed_up_to_its_pytest_token():

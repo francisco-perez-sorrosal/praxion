@@ -80,7 +80,7 @@ Check: `<command>` expects <key><op><count> [<key><op><count> ...]
 **Check**: `uv run pytest tests/test_widget.py -q` expects pass>=4 fail=0 pending=2
 ```
 
-Each step's `WIP.md` checklist line also carries one `Attempts:` sub-bullet: no checkbox, a single line, written by the orchestrator before each fresh start (`- Attempts: Step <id> count=<n>`). The grammar is normative in the `scripts/_loop_fields.py` docstring; the planner prompt and `SKILL.md` point here rather than restate it.
+Each step's `WIP.md` checklist line also carries one `Attempts:` sub-bullet: no checkbox, a single line, written before each fresh start (`- Attempts: Step <id> count=<n>`). Inside the loop the step-loop driver writes the `Attempts:` line ahead, commits a verified step and records the return; outside the loop the orchestrator does. The grammar is normative in the `scripts/_loop_fields.py` docstring; the planner prompt and `SKILL.md` point here rather than restate it.
 
 **Measurement step — canonical shape.** A step that takes the readings behind a footprint criterion (the spec's `### Footprint Criteria` table; workflow and worked example in [`footprint-criteria.md`](../../spec-driven-development/references/footprint-criteria.md)). It changes no file and runs no test:
 
@@ -125,7 +125,7 @@ Step N of M: [Description]
 - [x] Step 1: [Description]
 - [x] Step 2: [Description]
 - [ ] Step 3: [Description] <- current
-  - Attempts: Step 3 count=1
+  - Attempts: Step 3 count=1 request=s3-a1-implement
 - [ ] Step 4: [Description]
 
 ## Blockers
@@ -173,7 +173,7 @@ Status: in-progress
 - [x] Step 1: [Description]
 - [x] Step 2: [Description]
 - [~] Step 3: [Description] <- parallel batch
-  - Attempts: Step 3 count=1
+  - Attempts: Step 3 count=1 request=s3-a1-implement
 - [~] Step 4: [Description] <- parallel batch
 - [ ] Step 5: [Description]
 

@@ -161,7 +161,7 @@ When running concurrently (parallel mode), write to `LEARNINGS_implementer.md` i
 ### With the Planner
 
 - The planner provides your step via `WIP.md` and `IMPLEMENTATION_PLAN.md`
-- The planner advances to the next step after you report — you do not
+- Inside the loop the step-loop driver writes the `Attempts:` line ahead, commits a verified step and records the return; outside the loop the orchestrator does.
 - If you encounter a blocker that requires plan changes, report `[BLOCKED]` with evidence; the planner decides the resolution
 
 ### With the Verifier
@@ -204,7 +204,7 @@ Keep the return to ≤5 lines. Do not echo diff content, test output, or `LEARNI
 
 - **Single-step scope.** Implement only the step assigned to you. Do not look ahead or implement the next step.
 - **No plan modification.** If the plan is wrong, report `[BLOCKED]` — do not fix the plan.
-- **No git commits.** Write code and update planning documents, but never commit. The user or planner handles commits, staging by explicit pathspec per [`rules/swe/vcs/git-conventions.md` § Staging Discipline](../rules/swe/vcs/git-conventions.md#staging-discipline) — never `git add -A`.
+- **No git commits.** Write code and update planning documents, but never commit. Inside the loop the step-loop driver writes the `Attempts:` line ahead, commits a verified step and records the return; outside the loop the orchestrator does, staging by explicit pathspec per [`rules/swe/vcs/git-conventions.md` § Staging Discipline](../rules/swe/vcs/git-conventions.md#staging-discipline) — never `git add -A`.
 - **File conflict stop.** If you discover you need to modify a file outside your step's declared `Files` set (parallel mode), stop immediately and report `[CONFLICT]` with the file path and reason.
 - **Outer loop is read-only.** If a due outer-loop test cannot pass without contradicting the spec, report `[BLOCKED]` with a Spec Question (test node, requirement, conflict) in your return and under `WIP.md § Blockers`. The orchestrator routes it; never edit the test or its driver to make it pass.
 - **Read before write.** Never modify a file you have not read in this session.

@@ -9,21 +9,25 @@ variant and reads its distinct-request count three ways:
 - the loop's `record`, whose envelope carries the turns it derived;
 - the context instrument's cap-out count (`context_baseline.py --json`, `cap_outs`).
 
-Each reading is a count, or `None` when the reader declines to count. The first two are
-bound. The instrument is not: the transcript layout and session shape it reads are not a
-stated surface, so `instrument_reading` raises until a binding step places the corpus
-where the instrument reads transcripts.
+Each reading is a count, or `None` when the reader declines to count. The instrument is
+pointed at the sandbox's project transcript directory through its `--transcripts-dir`
+flag, and tells the implementer spawn by the `agent_start` row the hooks write for it.
 """
 
 from __future__ import annotations
 
+import json
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from tests.acceptance.drivers import observation_harness as harness
 from tests.acceptance.drivers import step_loop as loop
 from tests.acceptance.drivers import turn_budget_reminder as reminder
 
+INSTRUMENT = loop.REPO_ROOT / "scripts" / "context_baseline.py"
+INSTRUMENT_TIMEOUT = 300
 CUT_OFF_LINE = '{"type": "assistant", "requestId": "req_cut_off_mid_fl'
 MALFORMED_LINE = "this line is not JSON at all"
 
@@ -108,15 +112,56 @@ def loop_reading(task: loop.LoopTask, request: dict[str, Any], agent_id: str) ->
     return (recorded or {}).get("turns")
 
 
+def _record_the_spawn(task: loop.LoopTask, agent_id: str) -> None:
+    """Leave the `agent_start` row the hooks write when the harness starts this implementer."""
+    (task.root / harness.STATE_DIR).mkdir(exist_ok=True)
+    scratch = task.root.parent / "hook-scratch"
+    session = harness.Session(harness.HookHarness(scratch), loop.SANDBOX_SESSION, task.root)
+    session.subagent_start(agent_id, reminder.IMPLEMENTER_AGENT_TYPE, cwd=task.root)
+    started = [
+        row
+        for row in harness.log_rows(task.root / harness.STATE_DIR)
+        if row.get("event_type") == "agent_start" and row.get("agent_id") == agent_id
+    ]
+    assert started, f"the hooks left no agent_start row for {agent_id}: {session.hook_failures()}"
+
+
+def _instrument_report(task: loop.LoopTask) -> dict[str, Any]:
+    """The report the instrument prints for the sandbox's transcripts, whatever its exit code
+    (exit 2 there means "no rows", and the report is still printed)."""
+    transcripts_dir = task.sandbox_home / ".claude" / "projects" / loop.SANDBOX_PROJECT_DIR
+    run = subprocess.run(
+        [
+            loop.PYTHON,
+            str(INSTRUMENT),
+            "--project-root",
+            str(task.root),
+            "--transcripts-dir",
+            str(transcripts_dir),
+            "--json",
+        ],
+        cwd=task.root,
+        capture_output=True,
+        text=True,
+        timeout=INSTRUMENT_TIMEOUT,
+        env=task.env,
+    )
+    try:
+        return json.loads(run.stdout)
+    except json.JSONDecodeError:
+        raise AssertionError(
+            f"the instrument printed no report (exit {run.returncode}):\n{run.stderr.strip()}"
+        ) from None
+
+
 def instrument_reading(task: loop.LoopTask, agent_id: str) -> str | None:
     """`capped` or `not-capped` as the context instrument judges this implementer spawn
     against its cap, or `None` when it leaves the spawn out of every aggregate."""
-    raise NotImplementedError(
-        "unbound: the context instrument reads an implementer's own transcript from a "
-        "session layout no stated surface describes; bind where it finds a project's "
-        "sessions and how it tells an implementer spawn, then read "
-        "cap_outs.implementer.capped for this one spawn"
-    )
+    _record_the_spawn(task, agent_id)
+    implementer = _instrument_report(task).get("cap_outs", {}).get("implementer")
+    if implementer is None:
+        return None
+    return "capped" if implementer["capped"] >= 1 else "not-capped"
 
 
 def as_cap_judgement(count: int | None, cap: int) -> str | None:

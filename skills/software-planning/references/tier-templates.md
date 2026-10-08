@@ -76,10 +76,31 @@ Return findings in your response (no file); cite paths.
 ### Lightweight tier specifics
 
 - **Criteria-first, in one line** — at Direct and Lightweight tiers there is no `WIP.md` / `SYSTEMS_PLAN.md` acceptance-criteria / `traceability.yml` machinery (those only run at Standard/Full). The stand-in: *before touching code*, state in one line what "done" looks like as a testable assertion — *"`parse_config` returns a `Config` for valid YAML and raises `ConfigError` naming the offending key for invalid"*, not "make it work". For multi-step work, list the steps with a `→ verify: <check>` per step. Same verify-before-done discipline, no ceremony.
-- **No `TEST_RESULTS.md`** — Lightweight test runs use whatever test command the project defines; the canonical handoff artifact is created only when work escalates to Standard.
+- **No `TEST_RESULTS.md`** (except a Ralph-lite goal run) — Lightweight test runs use whatever test command the project defines; the canonical handoff artifact is created only when work escalates to Standard.
 - **Temporal-only acceptance tests** — the Standard/Full acceptance-design stage ([`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage)) does not run at Lightweight: no stage, no `ACCEPTANCE_TESTS.md`. What survives is the ordering. Before any code, the orchestrator writes failing tests from the `TASK_BRIEF.md` Key Signals and commits them alone, with a subject that says `temporal-only`. Test-first order holds; independence from the design does not, since the orchestrator has already seen the code's neighbourhood — the subject line records that honestly.
 - **Architecture-doc update on structural change** — Lightweight respects the same `.ai-state/DESIGN.md` / `docs/architecture.md` update expectation as Standard when the change is structural; trivial-bug Lightweight work does not trigger doc edits.
 - **Mid-task escalation, not silent scope-creep** — when scope grows past 3 files or starts requiring architect/planner input, stop and re-scope to Standard rather than expanding silently. Escalation is a controlled transition; the new tier inherits the work-in-progress and the calibration log records both the original tier and the escalation.
+
+## Ralph-lite
+
+Ralph-lite is the step-loop driver's goal mode: an execution mode inside Lightweight, not a tier, for one well-gated single-behaviour task that a pytest command checks. Enter it through `/praxion:ralph-lite <slug> --goal <sentence> --check <command> --expects <expectations> --paths <path>...` in one of two forms: terminal (a person runs `step_loop.py run <slug>` from a scratch worktree) or in-session (the goal plan driven through `/praxion:step-loop <slug>`).
+
+- **Fresh context**: every iteration is a new headless worker with a fresh context; its state lives in the goal plan, the progress record, the ledger and git.
+- **The gate decides, never the worker's claim**: the driver runs the derived test scope and the goal's check after each iteration.
+- **One committer**: the worker never commits; the driver commits each progressing iteration by pathspec.
+- **Bounds**: the `Iterations:` budget bounds the loop; each iteration has a turn bound and a dollar fuse; two non-progressing iterations in a row stop it.
+- **Exits to a person**: a `[BLOCKED]` return, the "impossible" verdict or a stall stops the loop with a handoff.
+- **Documents**: a goal run writes a plan, a `WIP.md` and a `TEST_RESULTS.md` for its one step, although the task is Lightweight-sized; the calibration row's Source cell names Ralph-lite.
+- **Not for** Standard and Full step loops, which run through the `/praxion:step-loop` relay, or goals no pytest command can check.
+
+Safety profile, unattended:
+
+- Run from a scratch worktree.
+- The worker runs under `dontAsk` with the check and the `resolve_test_scope.py` resolver allow-listed; `acceptEdits` alone denies the test command, so never use it alone.
+- Never use `bypassPermissions` outside a container.
+- Deny rules on the protected paths hold in every permission mode.
+- Each iteration is bounded by a turn bound and a dollar fuse, and the loop by the `Iterations:` budget.
+- **Fallback**: the harness's `/goal` command is the fallback for a repository without Praxion; it keeps one context for the whole run and judges printed output, not the check's result.
 
 ## Full-Tier Multi-Instance Fan-Out
 
@@ -124,4 +145,4 @@ Coordinator responsibility: after all variants complete, compare the per-variant
 
 ## DRY Boundary
 
-This reference defines **prompt structure only**. Every `<!-- Paste ... -->` marker points the main agent at [coordination-details.md § Delegation Checklists](coordination-details.md#delegation-checklists) as the single source of truth for per-agent deliverables. Copying the checklists here would duplicate them across two files — coordination-details is authoritative. Add new placeholders here only when a new delegation pattern emerges; add new deliverables to coordination-details, not here.
+This reference defines **prompt structure only**, except the Ralph-lite section, which describes an execution mode. Every `<!-- Paste ... -->` marker points the main agent at [coordination-details.md § Delegation Checklists](coordination-details.md#delegation-checklists) as the single source of truth for per-agent deliverables. Copying the checklists here would duplicate them across two files — coordination-details is authoritative. Add new placeholders here only when a new delegation pattern emerges; add new deliverables to coordination-details, not here.

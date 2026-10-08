@@ -138,6 +138,7 @@ same mechanical/judge seam `/eval-praxion` uses — so live and frozen grading n
 - **Opt-in and paid**: every session costs real API credits; run it deliberately, never from a hook,
   a pipeline step, or CI. A run-level spend cap (`$50` by default) is enforced before every launch,
   on top of each session's own per-session budget.
+- **Ralph-lite follows the same policy**: a Ralph-lite run (`step_loop.py run`) is launched by a person, opt-in and paid, bounded per iteration and per loop, and never started from a hook, a pipeline step or CI.
 - **Cost**: roughly $15-40 for a full run with `--canary` at the default repeat count. `--dry-run`
   prints one representative session's argv and environment keys per scenario (not every repeat) and
   spawns nothing — it is a preview of the shape, not an exact session count.

@@ -384,7 +384,7 @@ def run_goal(args: argparse.Namespace) -> Reply:
     doc = drive(worker, args.slug, location, echo=True, observe=reporter)
     if doc["outcome"] == "spawn":  # the loop ends on a spawn only when its worker never started
         raise reporter.refusal()
-    return Reply(doc)
+    return Reply(doc, reporter.closing(doc))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

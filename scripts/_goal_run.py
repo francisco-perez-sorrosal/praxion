@@ -4,8 +4,8 @@ line it prints for each iteration.
 `run` is the driver's own `drive` loop with a `HeadlessWorker` behind the `Spawner` seam, so
 this module holds no loop. A refusal here is a `CallerError` raised before any worker starts;
 a worker that could not be started is raised after the loop returns, naming its cause. The
-driver passes its `drive` in and calls this module, never the other way round, because the
-driver started as a script is `__main__` and a fresh `import step_loop` would be a second copy.
+driver calls this module and never the other way round: the driver started as a script is
+`__main__`, and a fresh `import step_loop` here would be a second copy of it.
 
 Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from collections.abc import Mapping, Sequence
@@ -22,21 +23,25 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from _goal_record import protected_set
+from _goal_record import KEPT_WORDS, judgement_words, protected_set
 from _goal_scaffold import SETTINGS_FILE
 from _goal_scaffold import _deny_rule as deny_rule  # noqa: PLC2701 -- one rule, one spelling
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
-from _goal_worker import _return_types as spawn_return_types  # noqa: PLC2701
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
-from _step_loop_cli import SUMMARY_PREFIX, CallerError
-from _step_loop_files import WORKER_STEM, NoWorkerResult, WorkerEnd, read_worker_end
+from _step_loop_cli import SUMMARY_PREFIX, CallerError, warning_lines
+from _step_loop_files import (
+    WORKER_STEM,
+    WORKER_SUFFIX,
+    NoWorkerResult,
+    WorkerEnd,
+    read_worker_end,
+)
 
 SHORT_SHA = 7
 SUCCESS = "success"
 NOT_STARTED_CODE = "worker-not-started"
-_LEDGER_SEPARATOR = "; "
-_NOT_KEPT = "not kept: "
+MIN_BUDGET_USD = 0.01  # the smallest the worker's `.2f` bound still states
 STARTED_SUFFIX = ".started"
 
 
@@ -59,8 +64,15 @@ def start_worker(
         )
     if not isinstance(goal.check, Check):
         raise _refuse(f"step {goal.id} has no readable Check: line", "write the goal's check")
-    if args.max_turns < 1 or args.max_budget_usd <= 0:
-        raise _refuse("--max-turns and --max-budget-usd must be positive", "give a bound above 0")
+    if (
+        args.max_turns < 1
+        or not math.isfinite(args.max_budget_usd)
+        or (args.max_budget_usd < MIN_BUDGET_USD)
+    ):
+        raise _refuse(
+            f"--max-turns must be 1 or more and --max-budget-usd {MIN_BUDGET_USD} or more",
+            "give bounds the worker can run within",
+        )
     try:
         shell_rule(goal.check.command)
     except ValueError as error:
@@ -84,20 +96,23 @@ class MarkedWorker:
     """The headless worker behind a start marker, `WORKER_<request>.started`, written before
     its process is launched. A request that comes again with no worker file was only previewed
     (a `next` wrote its attempt) when it has no marker, and starts fresh; with a marker its
-    worker may have run, so it is not started a second time."""
+    worker may have run, so it is not started a second time. A worker file that holds no result
+    is a process that ended without one and whose request was withdrawn (the next `next` issues
+    the same request again, reissued): that is the retry, and the old file and marker go first."""
 
     inner: HeadlessWorker
 
     def spawn(self, request: Mapping[str, Any]) -> Any:
         directory, name = self.inner.task_dir, request["id"]
-        if read_worker_end(directory, name) is not None:  # the file answers; no process starts
-            return self.inner.spawn(request)
+        reissued = bool(request.get("reissued"))
         marker = directory / f"{WORKER_STEM}_{name}{STARTED_SUFFIX}"
-        if request.get("reissued") and marker.exists():
-            return spawn_return_types()[1](
-                "a reissued request has a start marker and no worker file, so its worker may"
-                " have run"
-            )
+        found = read_worker_end(directory, name)
+        if isinstance(found, NoWorkerResult):
+            (directory / f"{WORKER_STEM}_{name}{WORKER_SUFFIX}").unlink(missing_ok=True)
+            marker.unlink(missing_ok=True)
+            found = None
+        if found is not None or (reissued and marker.exists()):
+            return self.inner.spawn(request)  # answers from its file, or refuses a reissue
         marker.write_text(f"{name}\n", encoding="utf-8")
         outcome = self.inner.spawn({**request, "reissued": False})
         if read_worker_end(directory, name) is None:  # the process never ran: nothing to guard
@@ -142,7 +157,16 @@ class Reporter:
             self.not_started = reason
         elif "recorded" in doc:  # an `error` envelope recorded nothing
             end = read_worker_end(self.directory, request["id"])
-            print(iteration_line(request["id"], doc["recorded"], end), file=sys.stderr, flush=True)
+            lines = (iteration_line(request["id"], doc["recorded"], end), *_warnings_of(doc))
+            print(*lines, sep="\n", file=sys.stderr, flush=True)
+
+    def closing(self, doc: Mapping[str, Any]) -> tuple[str, ...]:
+        """The lines the run ends with on standard error: where a stop left the task."""
+        stop = doc.get("stop")
+        if not stop:
+            return ()
+        said = f"{SUMMARY_PREFIX}stopped ({stop['cause']}): {stop['evidence']}"
+        return (said, f"{SUMMARY_PREFIX}to resume, run: {stop['resume']}")
 
     def refusal(self) -> CallerError:
         """The error for a loop that ended because a worker could not start."""
@@ -152,6 +176,11 @@ class Reporter:
             " To fix: remove that cause (a worker file in the task directory shows what it"
             " printed), then run it again.",
         )
+
+
+def _warnings_of(doc: Mapping[str, Any]) -> list[str]:
+    """What the call's reply said on standard error besides the iteration: its warnings."""
+    return warning_lines(tuple((w["code"], w["message"]) for w in doc.get("warnings", ())))
 
 
 def iteration_line(
@@ -173,10 +202,13 @@ def iteration_line(
 
 
 def _why(recorded: Mapping[str, Any]) -> str:
-    """Why nothing was committed: the judgement's own words, else the gate's verdict."""
-    _, _, said = (recorded.get("ledger") or "").partition(_LEDGER_SEPARATOR)
-    reason = said.split(_LEDGER_SEPARATOR)[0].removeprefix(_NOT_KEPT)
-    return reason or str((recorded.get("gate") or {}).get("verdict"))
+    """Why nothing was committed: the judgement's own words, and for work it kept but could not
+    commit the gate's refusal, else the gate's verdict."""
+    gate = recorded.get("gate") or {}
+    reason = judgement_words(recorded.get("ledger"))
+    if reason == KEPT_WORDS:
+        return f"{reason}, but the commit was refused: {gate.get('evidence')}"
+    return reason or str(gate.get("verdict"))
 
 
 def _decimal(cost: float) -> str:

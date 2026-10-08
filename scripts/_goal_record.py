@@ -90,6 +90,9 @@ DEFAULT_PROTECTED = (
 )
 PROGRESS_HEADING = "## Progress record"
 NODE_SEPARATOR = "::"
+KEPT_WORDS = "kept as progress"
+NOT_KEPT_PREFIX = "not kept: "
+SUMMARY_SEPARATOR = "; "
 
 _DIRECTORY_SUFFIXES = ("/**", "/*", "/")
 _GLOB_CHARACTERS = frozenset("*?[")
@@ -313,12 +316,19 @@ def record_goal(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> or
 def describe(judgement: Judgement, worker: WorkerEnd | None) -> str:
     """The judgement in words for the call's summary, naming how an `error_*` worker ended."""
     if isinstance(judgement, Progressing):
-        said = "kept as progress"
+        said = KEPT_WORDS
     elif isinstance(judgement, Protected):
         said = f"stopped on a protected change: {', '.join(judgement.paths)}"
     else:
-        said = f"not kept: {judgement.reason}"
-    return said if worker is None else f"{said}; the worker ended {worker.subtype}"
+        said = f"{NOT_KEPT_PREFIX}{judgement.reason}"
+    return said if worker is None else f"{said}{SUMMARY_SEPARATOR}the worker ended {worker.subtype}"
+
+
+def judgement_words(summary: str | None) -> str | None:
+    """The words `describe` put in a ledger summary, without the prefix of an unkept judgement;
+    None for a summary that carries none (a replay has no summary)."""
+    parts = (summary or "").split(SUMMARY_SEPARATOR)
+    return parts[1].removeprefix(NOT_KEPT_PREFIX) if len(parts) > 1 else None
 
 
 # --- The worker's end ---
@@ -338,8 +348,9 @@ class Ending(NamedTuple):
 
 def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -> Ending:
     """Wait for the end as an ordinary return does, unless a worker file shows the process has
-    exited; then the marker is the relayed one (the worker's result text), never the transcript's.
-    A worker that ended on an error without a marker stopped for the error's reason."""
+    exited; then the marker is the one the worker's result text carries (see `_worker_marker`),
+    never one the transcript supplies. A worker that ended on an error without a marker stopped
+    for the error's reason."""
     request = asked.key.id
     found = read_worker_end(task.dir, request)
     worker = exited_worker(found, request, agent_id)
@@ -354,20 +365,23 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
         seen, cast(Marker, relayed), asked, max_turns
     )
     if worker is not None:
-        marker = _worker_marker(seen, cast(Marker, relayed))
+        said = cast(Marker, relayed) if relayed != "none" else parse_marker(worker.final_text)
+        marker = _worker_marker(seen, said)
         stop_reason = derive_stop_reason(marker, seen.turns, max_turns)
-        warnings = tuple(w for w in warnings if w[0] != "marker-disagreement")
+        if marker == said:  # only a withheld marker is the transcript's doing, and is announced
+            warnings = tuple(w for w in warnings if w[0] != "marker-disagreement")
         if marker == "none":  # a real marker may be a stop; none leaves the error's reason
             stop_reason = _STOP_OF_SUBTYPE.get(worker.subtype, stop_reason)
     return Ending(seen, worker, marker, stop_reason, max_turns, warnings)
 
 
-def _worker_marker(seen: ordinary.Sighting, relayed: Marker) -> Marker:
-    """The marker of an exited worker is the relayed one, read from its result text; the
-    transcript never supplies or replaces it, and can only show that it was not there (a
-    transcript that ends without a marker withholds it)."""
+def _worker_marker(seen: ordinary.Sighting, said: Marker) -> Marker:
+    """The marker of an exited worker is `said`, the relayed one or else the one its result text
+    carries read as an in-session return's final text is; the transcript never supplies or
+    replaces it, and can only show that it was not there (a transcript that ends without a
+    marker withholds it)."""
     shown = None if seen.unreadable else parse_marker(seen.final_text)
-    return "none" if shown == "none" else relayed
+    return "none" if shown == "none" else said
 
 
 def exited_worker(

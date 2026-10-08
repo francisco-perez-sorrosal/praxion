@@ -25,11 +25,12 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import _goal_record  # noqa: E402
 import _goal_run  # noqa: E402
 import _goal_worker  # noqa: E402
 import _step_loop_cli as cli  # noqa: E402
 import step_loop  # noqa: E402
-from _goal_record import protected_set  # noqa: E402
+from _goal_record import Unkept, describe, judgement_words, protected_set  # noqa: E402
 from _step_loop_files import WorkerEnd, write_gate_block  # noqa: E402
 
 PYTHON = sys.executable
@@ -118,10 +119,53 @@ def test_the_cost_is_the_reported_decimal_never_an_exponent(cost, tail) -> None:
     assert line.endswith(tail)
 
 
+@pytest.mark.parametrize("worker", [None, ended(subtype="error_max_turns")], ids=["none", "ended"])
+def test_the_words_of_an_unkept_judgement_are_read_back_from_what_describe_wrote(worker) -> None:
+    summary = f"appended 1 attempt 1: unverified (check); {describe(Unkept('no progress'), worker)}"
+
+    assert judgement_words(summary) == "no progress"
+
+
+def test_work_kept_but_not_committed_names_the_refusal_the_gate_recorded() -> None:
+    kept = describe(_goal_record.Progressing(), None)
+    gate = {"verdict": "unverified", "evidence": "Result: none (the commit hook refused)"}
+    done = {**recorded(None, f"appended 1 attempt 1: unverified (check); {kept}"), "gate": gate}
+
+    line = _goal_run.iteration_line(REQUEST, done, ended())
+
+    assert "kept as progress, but the commit was refused: Result: none (the commit" in line
+
+
 def test_turns_the_transcript_could_not_count_read_as_unknown() -> None:
     line = _goal_run.iteration_line(REQUEST, recorded(turns=None), ended())
 
     assert " · unknown turns · " in line
+
+
+def test_the_warnings_of_a_recorded_iteration_follow_its_line(capsys) -> None:
+    reporter = _goal_run.Reporter(Path("/nowhere"))
+    doc = {"recorded": recorded(), "warnings": [{"code": "stray-edit", "message": "left a file"}]}
+
+    reporter({"id": REQUEST}, step_loop.AgentRan(SESSION, "none"), doc)
+
+    lines = capsys.readouterr().err.splitlines()
+    assert lines[0].startswith(f"step_loop: {REQUEST} committed ")
+    assert lines[1:] == ["step_loop: warning: stray-edit — left a file"]
+
+
+def test_a_stop_ends_the_run_with_its_cause_and_the_command_that_resumes_it() -> None:
+    stop = {"cause": "blocked", "evidence": "the worker said so", "resume": "step_loop.py next x"}
+
+    lines = _goal_run.Reporter(Path("/nowhere")).closing({"stop": stop})
+
+    assert lines == (
+        "step_loop: stopped (blocked): the worker said so",
+        "step_loop: to resume, run: step_loop.py next x",
+    )
+
+
+def test_a_run_that_did_not_stop_closes_with_nothing_more() -> None:
+    assert _goal_run.Reporter(Path("/nowhere")).closing({"outcome": "complete"}) == ()
 
 
 # --- The options every printed command ends with ----------------------------------------
@@ -161,7 +205,7 @@ def test_the_location_keeps_the_roots_as_given_and_the_base_it_read_against(give
         ({"outcome": "error", "error": {"code": cli.INTERNAL}}, 1),
     ],
 )
-def test_every_way_a_run_ends_has_its_exit_code(doc, code) -> None:
+def test_each_envelope_a_run_can_end_with_maps_to_its_exit_code(doc, code) -> None:
     assert cli.exit_code(doc) == code
 
 
@@ -324,16 +368,21 @@ import json, os, re, sys, uuid
 from pathlib import Path
 
 here = Path(__file__).resolve().parent
+started = sorted(p.name for p in Path(".ai-work").glob("*/WORKER_*.started"))
 with (here / "calls.jsonl").open("a") as log:
-    log.write(json.dumps({{"argv": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
+    log.write(json.dumps({{"argv": sys.argv[1:], "cwd": os.getcwd(), "started": started}}) + "\\n")
 if (here / "crash").exists():
     print("the worker crashed before it could report")
     sys.exit(1)
 prompt = sys.argv[sys.argv.index("-p") + 1]
 slug = re.search(r"^Task slug:\\s*(\\S+)", prompt, re.MULTILINE).group(1)
 widget = Path("src/widget.py")
-widget.write_text(widget.read_text().replace(
-    "def two():\\n    raise NotImplementedError", "def two():\\n    return 2"))
+source = widget.read_text().replace(
+    "def two():\\n    raise NotImplementedError", "def two():\\n    return 2")
+if (here / "finish").exists():
+    source = source.replace(
+        "def three():\\n    raise NotImplementedError", "def three():\\n    return 3")
+widget.write_text(source)
 wip = Path(".ai-work") / slug / "WIP.md"
 wip.write_text(wip.read_text().rstrip("\\n") + "\\n{progress}\\n")
 session, cwd = str(uuid.uuid4()), os.getcwd()
@@ -367,10 +416,17 @@ print(json.dumps({{
 
 
 def install_stand_in(
-    scratch: Scratch, *, crashes: bool = False, subtype: str = SUBTYPE, result: str | None = None
+    scratch: Scratch,
+    *,
+    crashes: bool = False,
+    finishes: bool = False,
+    subtype: str = SUBTYPE,
+    result: str | None = None,
+    transcript: str | None = None,
 ) -> None:
     """Put a `claude` first on `PATH` that does one scripted iteration, or crashes. Its result
-    object carries `result` as the worker's final text when one is given."""
+    object carries `result` as the worker's final text when one is given; its transcript ends
+    on `transcript`, else on the same text. `finishes` makes the iteration meet the check."""
     scratch.bin_dir.mkdir()
     program = scratch.bin_dir / "claude"
     program.write_text(
@@ -382,13 +438,15 @@ def install_stand_in(
             cost=COST,
             denials=DENIALS,
             result_field=repr({} if result is None else {"result": result}),
-            final_text=repr(result or ""),
+            final_text=repr((result if transcript is None else transcript) or ""),
         ),
         encoding="utf-8",
     )
     program.chmod(0o755)
     if crashes:
         (scratch.bin_dir / "crash").touch()
+    if finishes:
+        (scratch.bin_dir / "finish").touch()
     os.environ["PATH"] = f"{scratch.bin_dir}{os.pathsep}{os.environ['PATH']}"
 
 
@@ -458,7 +516,15 @@ def test_a_check_that_cannot_be_allow_listed_is_refused_before_any_worker(tmp_pa
 
 
 @pytest.mark.parametrize(
-    "bound", [("--max-turns", "0"), ("--max-turns", "-3"), ("--max-budget-usd", "0")]
+    "bound",
+    [
+        ("--max-turns", "0"),
+        ("--max-turns", "-3"),
+        ("--max-budget-usd", "0"),
+        ("--max-budget-usd", "0.004"),
+        ("--max-budget-usd", "nan"),
+        ("--max-budget-usd", "inf"),
+    ],
 )
 def test_a_bound_that_leaves_the_worker_nothing_is_refused_before_any_worker(scratch, bound):
     install_stand_in(scratch)
@@ -497,6 +563,18 @@ def test_a_worker_that_crashes_is_not_an_iteration(scratch, capsys):
     assert "exited 1" in reply.doc["error"]["message"], reply.doc
     assert not (scratch.task_dir / "ITERATION_LEDGER.jsonl").exists()
     assert " turns" not in capsys.readouterr().err
+
+
+def test_a_run_after_a_crashed_one_starts_a_worker_again(scratch):
+    install_stand_in(scratch, crashes=True)
+    scratch.run()
+    (scratch.bin_dir / "crash").unlink()
+
+    again = scratch.run("--max-turns", "12")
+
+    assert (again.exit, again.doc["outcome"]) == (3, "budget-exhausted")
+    assert len(scratch.calls()) == 2
+    assert len(ledger_stop_reasons(scratch)) == 1
 
 
 # --- A worker that runs ------------------------------------------------------------------
@@ -557,6 +635,39 @@ def test_a_stop_resumes_with_the_base_and_roots_it_was_given(scratch):
     assert f"--worktree-root {scratch.root}" in resume, resume
 
 
+def test_a_run_whose_iteration_meets_the_check_ends_complete_with_exit_zero(scratch, capsys):
+    install_stand_in(scratch, subtype="success", finishes=True, result="Done.\n[COMPLETE]")
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["outcome"]) == (0, "complete")
+    assert "stopped at" not in capsys.readouterr().err
+
+
+def test_a_run_whose_worker_says_blocked_ends_for_a_human_with_exit_two(scratch):
+    install_stand_in(scratch, subtype="success", result="Stuck.\n[BLOCKED]")
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["outcome"]) == (2, "needs-human")
+    assert reply.lines[0].startswith("step_loop: stopped (")
+    assert reply.lines[1].startswith("step_loop: to resume, run: ")
+
+
+def test_an_unexpected_failure_inside_a_run_is_exit_one(scratch, monkeypatch):
+    install_stand_in(scratch)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(step_loop, "drive", fail)
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (1, cli.INTERNAL)
+    assert scratch.calls() == []
+
+
 # --- The marker a worker's result text carries ---------------------------------------------
 
 
@@ -567,8 +678,14 @@ def ledger_stop_reasons(scratch: Scratch) -> list[str]:
 
 @pytest.mark.parametrize(
     ("result", "stop_reason"),
-    [(None, "no-marker"), ("Done.\n[COMPLETE]", "completed"), ("Stuck.\n[BLOCKED]", "blocked")],
-    ids=["no-result-text", "complete", "blocked"],
+    [
+        (None, "no-marker"),
+        ("Done.\n[COMPLETE]", "completed"),
+        ("Stuck.\n[BLOCKED]", "blocked"),
+        ("Stuck.\n**[BLOCKED]**", "blocked"),
+        ("Done. [COMPLETE]", "completed"),
+    ],
+    ids=["no-result-text", "complete", "blocked", "emphasised", "inline"],
 )
 def test_the_stop_reason_comes_from_the_workers_result_text(scratch, result, stop_reason):
     install_stand_in(scratch, subtype="success", result=result)
@@ -576,6 +693,15 @@ def test_the_stop_reason_comes_from_the_workers_result_text(scratch, result, sto
     scratch.run()
 
     assert ledger_stop_reasons(scratch) == [stop_reason]
+
+
+def test_a_transcript_that_ends_without_a_marker_withholds_it_and_says_so(scratch, capsys):
+    install_stand_in(scratch, subtype="success", result="Done.\n[COMPLETE]", transcript="Stopping.")
+
+    scratch.run()
+
+    assert ledger_stop_reasons(scratch) == ["no-marker"]
+    assert "step_loop: warning: marker-disagreement" in capsys.readouterr().err
 
 
 # --- A request that comes again ------------------------------------------------------------
@@ -630,11 +756,11 @@ def test_a_request_with_a_worker_file_is_read_from_it_with_no_new_process(scratc
 
 
 def test_the_marker_is_written_before_the_process_is_launched(scratch):
-    install_stand_in(scratch, crashes=True)
+    install_stand_in(scratch)
 
     marked_worker(scratch).spawn(spawn_request(reissued=False))
 
-    assert started_marker(scratch).exists()
+    assert scratch.calls()[0]["started"] == [started_marker(scratch).name]
 
 
 def test_a_worker_that_never_started_leaves_no_marker(scratch):

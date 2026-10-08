@@ -19,18 +19,19 @@ import os
 import re
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from _goal_record import KEPT_WORDS, judgement_words, protected_set
-from _goal_scaffold import SETTINGS_FILE, WIP_FILE, edit_rule
+from _goal_record import is_protected as is_covered
+from _goal_scaffold import PLAN_FILE, SETTINGS_FILE, WIP_FILE, edit_rule
 from _goal_scaffold import edit_rule as deny_rule
 from _goal_worker import HeadlessWorker, resolver_invocation, shell_rule
 from _loop_fields import Check, GoalBudget
-from _plan_steps import PlanStep
+from _plan_steps import PlanStep, parse_plan_steps
 from _step_loop_cli import SUMMARY_PREFIX, CallerError, warning_lines
 from _step_loop_files import (
     STARTED_SUFFIX as STARTED_SUFFIX,  # re-exported: callers name the marker by this suffix
@@ -42,11 +43,13 @@ from _step_loop_files import (
     worker_marker_path,
     worker_result_path,
 )
+from _step_loop_io import paths_differing_from_head
 
 SHORT_SHA = 7
 SUCCESS = "success"
 NOT_STARTED_CODE = "worker-not-started"
 MIN_BUDGET_USD = 0.01  # the smallest the worker's `.2f` bound still states
+MAX_NAMED_PATHS = 5  # a message names this many changed paths, then counts the rest
 USER_SETTINGS = "settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
 CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
@@ -87,14 +90,14 @@ def start_worker(
         shell_rule(goal.check.command)
     except ValueError as error:
         raise _refuse(str(error), "state the check as one pytest command") from error
-    missing = missing_deny_rules(goal, repo)
-    if missing:
-        raise _refuse(
-            f"{SETTINGS_FILE} lacks the deny rule for {', '.join(missing)}",
-            "scaffold the goal with the goal verb, or add the rules there",
-        )
     resolver = resolver_invocation(sys.argv[0], os.environ.get("PATH", ""))
-    mirrored = _mirrored_denials(repo, (goal.check.command, resolver))
+    guard = Preconditions(goal, repo, directory, (goal.check.command, resolver))
+    standing = guard.standing()
+    if standing.failures:
+        raise _refuse(
+            "; ".join(f.cause for f in standing.failures),
+            "; ".join(f.fix for f in standing.failures),
+        )
     return MarkedWorker(
         HeadlessWorker(
             repo,
@@ -104,8 +107,9 @@ def start_worker(
             args.max_turns,
             args.max_budget_usd,
             writable=writable_rules(goal.files, repo, directory),
-            denied=mirrored,
-        )
+            denied=standing.denied,
+        ),
+        guard,
     )
 
 
@@ -113,11 +117,17 @@ def start_worker(
 class MarkedWorker:
     """The headless worker behind a start marker, written before its process is launched.
     A request that comes again with no worker file was only previewed (a `next` wrote its
-    attempt) when it has no marker, and starts fresh; with a marker its worker may have run, so it is not started a second time. A worker file that holds no result
-    is a process that ended without one and whose request was withdrawn (the next `next` issues
-    the same request again, reissued): that is the retry, and the old file and marker go first."""
+    attempt) when it has no marker, and starts fresh; with a marker its worker may have run, so
+    it is not started a second time. A worker file that holds no result is a process that ended
+    without one and whose request was withdrawn (the next `next` issues the same request again,
+    reissued): that is the retry, and the old file and marker go first.
+
+    Every new process is first checked against `guard`, as the files stand at that moment: a
+    failure withdraws the request, so no worker is paid for, and the process that does start is
+    denied what that moment's inherited pre-approvals call for."""
 
     inner: HeadlessWorker
+    guard: Preconditions | None = None
 
     def spawn(self, request: Mapping[str, Any]) -> Any:
         directory, name = self.inner.task_dir, request["id"]
@@ -130,11 +140,131 @@ class MarkedWorker:
             found = None
         if found is not None or (reissued and marker.exists()):
             return self.inner.spawn(request)  # answers from its file, or refuses a reissue
+        worker = self.inner
+        if self.guard is not None:
+            standing = self.guard.standing()
+            if standing.failures:
+                return self.inner.not_started("; ".join(f.said() for f in standing.failures))
+            worker = replace(self.inner, denied=standing.denied)
         marker.write_text(f"{name}\n", encoding="utf-8")
-        outcome = self.inner.spawn({**request, "reissued": False})
+        outcome = worker.spawn({**request, "reissued": False})
         if read_worker_end(directory, name) is None:  # the process never ran: nothing to guard
             marker.unlink(missing_ok=True)
         return outcome
+
+    def reporter(self) -> Reporter:
+        """The `observe` callback for this worker's run, aware of the goal step's `Files:`."""
+        if self.guard is None:
+            return Reporter(self.inner.task_dir)
+        return Reporter(self.inner.task_dir, self.inner.repo, self.guard.goal.files)
+
+
+# --- What must hold before every worker --------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Failure:
+    """One precondition that does not hold: what is wrong and what to do about it."""
+
+    cause: str
+    fix: str
+
+    def said(self) -> str:
+        return f"{self.cause}; to fix: {self.fix}"
+
+
+@dataclass(frozen=True)
+class Standing:
+    """The preconditions as the files stand at one moment: what fails, and the deny rules that
+    neutralise the inherited pre-approvals."""
+
+    failures: tuple[Failure, ...]
+    denied: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Preconditions:
+    """What `run` holds true before each worker, read from the files each time it is asked:
+    the goal's protected paths are denied, no inherited pre-approval is beyond neutralising,
+    the tree holds no change outside the goal step's `Files:` and the task directory, and the
+    plan still holds the goal step's block as `run` found it."""
+
+    goal: PlanStep
+    repo: Path
+    directory: Path
+    commands: tuple[str, str]  # the check and the test-scope resolver the worker may run
+
+    def standing(self) -> Standing:
+        denied, refused = _inherited_denials(self.repo, self.commands)
+        failures = (
+            *_missing_rules(self.goal, self.repo),
+            *refused,
+            *_outside_files(self.goal, self.repo, self.directory),
+            *_edited_plan(self.goal, self.directory),
+        )
+        return Standing(failures, denied)
+
+
+def _missing_rules(goal: PlanStep, repo: Path) -> tuple[Failure, ...]:
+    missing = missing_deny_rules(goal, repo)
+    if not missing:
+        return ()
+    return (
+        Failure(
+            f"{SETTINGS_FILE} lacks the deny rule for {', '.join(missing)}",
+            "scaffold the goal with the goal verb, or add the rules there",
+        ),
+    )
+
+
+def _outside_files(goal: PlanStep, repo: Path, directory: Path) -> tuple[Failure, ...]:
+    stray = changed_outside_files(repo, directory, goal.files)
+    if not stray:
+        return ()
+    return (
+        Failure(
+            f"the tree holds changes outside step {goal.id}'s Files: and the task directory:"
+            f" {_named(stray)}",
+            "commit or remove them, or add them to the step's Files:",
+        ),
+    )
+
+
+def _edited_plan(goal: PlanStep, directory: Path) -> tuple[Failure, ...]:
+    try:
+        steps = parse_plan_steps((directory / PLAN_FILE).read_text("utf-8"))
+    except OSError as error:
+        return (Failure(f"{PLAN_FILE} cannot be read ({error.strerror})", "restore the plan"),)
+    if any(step.id == goal.id and step.digest == goal.digest for step in steps):
+        return ()
+    return (
+        Failure(
+            f"{PLAN_FILE} no longer holds step {goal.id} as this run found it",
+            "restore the step's block, or run again to take the edited one",
+        ),
+    )
+
+
+def changed_outside_files(repo: Path, directory: Path, files: Sequence[str]) -> tuple[str, ...]:
+    """The paths that differ from HEAD (untracked ones that are not ignored included) outside
+    the given `Files:` entries and the task directory."""
+    declared = list(files)
+    try:
+        declared.append(str(directory.resolve().relative_to(repo.resolve())))
+    except ValueError:  # a task directory outside the repository holds no path of its tree
+        pass
+    return tuple(
+        path for path in paths_differing_from_head(repo, ["."]) if not is_covered(path, declared)
+    )
+
+
+def _named(paths: Sequence[str]) -> str:
+    shown = ", ".join(paths[:MAX_NAMED_PATHS])
+    return (
+        shown
+        if len(paths) <= MAX_NAMED_PATHS
+        else f"{shown} and {len(paths) - MAX_NAMED_PATHS} more"
+    )
 
 
 # --- What the worker may write, and what it would inherit -----------------------------------
@@ -206,18 +336,22 @@ def classify(rule: str, commands: Sequence[str]) -> Treatment:
     return Treatment.MIRROR
 
 
-def _mirrored_denials(repo: Path, commands: Sequence[str]) -> tuple[str, ...]:
-    """The deny rules that neutralise the inherited pre-approvals, or the refusal naming each
+def _inherited_denials(
+    repo: Path, commands: Sequence[str]
+) -> tuple[tuple[str, ...], tuple[Failure, ...]]:
+    """The deny rules that neutralise the inherited pre-approvals, and a failure naming each
     one that cannot be neutralised and its file."""
     treated = [(i, classify(i.rule, commands)) for i in inherited_rules(repo)]
     refused = [f"{i.rule} in {i.file}" for i, treatment in treated if treatment is Treatment.REFUSE]
-    if refused:
-        raise _refuse(
-            f"the worker would inherit pre-approvals it must not hold: {'; '.join(refused)}",
-            "remove them from those files, or narrow each to a command that is neither the"
-            " check nor the test-scope resolver nor a file edit",
-        )
-    return tuple(i.rule for i, treatment in treated if treatment is Treatment.MIRROR)
+    denied = tuple(i.rule for i, treatment in treated if treatment is Treatment.MIRROR)
+    if not refused:
+        return denied, ()
+    failure = Failure(
+        f"the worker would inherit pre-approvals it must not hold: {'; '.join(refused)}",
+        "remove them from those files, or narrow each to a command that is neither the"
+        " check nor the test-scope resolver nor a file edit",
+    )
+    return denied, (failure,)
 
 
 def location(repo: Path, base_ref: str, args: argparse.Namespace) -> tuple[str, ...]:
@@ -245,10 +379,16 @@ def missing_deny_rules(goal: PlanStep, repo: Path) -> tuple[str, ...]:
 
 class Reporter:
     """The `observe` callback: one stderr line per recorded iteration, and the reason the last
-    request could not start (the withdrawal of a request records no iteration)."""
+    request could not start (the withdrawal of a request records no iteration). Given the
+    repository and the goal step's `Files:`, it also says what a completed run left that no
+    commit holds."""
 
-    def __init__(self, directory: Path) -> None:
+    def __init__(
+        self, directory: Path, repo: Path | None = None, files: Sequence[str] = ()
+    ) -> None:
         self.directory = directory
+        self.repo = repo
+        self.files = tuple(files)
         self.not_started = "no reason was given"
 
     def __call__(self, request: Mapping[str, Any], returned: Any, doc: Mapping[str, Any]) -> None:
@@ -261,12 +401,19 @@ class Reporter:
             print(*lines, sep="\n", file=sys.stderr, flush=True)
 
     def closing(self, doc: Mapping[str, Any]) -> tuple[str, ...]:
-        """The lines the run ends with on standard error: where a stop left the task."""
+        """The lines the run ends with on standard error: where a stop left the task, or the
+        changes outside `Files:` that a completed run left uncommitted."""
         stop = doc.get("stop")
-        if not stop:
+        if stop:
+            said = f"{SUMMARY_PREFIX}stopped ({stop['cause']}): {stop['evidence']}"
+            return (said, f"{SUMMARY_PREFIX}to resume, run: {stop['resume']}")
+        if self.repo is None or doc.get("outcome") != "complete":
             return ()
-        said = f"{SUMMARY_PREFIX}stopped ({stop['cause']}): {stop['evidence']}"
-        return (said, f"{SUMMARY_PREFIX}to resume, run: {stop['resume']}")
+        stray = changed_outside_files(self.repo, self.directory, self.files)
+        if not stray:
+            return ()
+        left = f"{SUMMARY_PREFIX}complete, but changes outside the goal step's Files: stand"
+        return (f"{left} and no commit holds them: {_named(stray)}",)
 
     def refusal(self) -> CallerError:
         """The error for a loop that ended because a worker could not start."""

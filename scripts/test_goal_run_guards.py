@@ -23,15 +23,21 @@ import _goal_run  # noqa: E402
 from _goal_run import Treatment, classify  # noqa: E402
 from test_goal_run import (  # noqa: E402
     CHECK_COMMAND,
+    PROTECTED_DOC,
+    PYTHON,
     SETTINGS,
     SLUG,
+    STEP,
     WIDGET,
     Scratch,
     build_scratch,
     deny_rules,
+    git,
     install_stand_in,
+    ledger_stop_reasons,
     put,
     sandbox,  # noqa: F401 -- the autouse fixture of the suite whose harness this one reuses
+    widget_source,
 )
 from test_goal_worker import option_values  # noqa: E402
 
@@ -236,3 +242,214 @@ def test_the_progress_file_outside_the_repository_is_allowed_by_its_absolute_pat
     rules = _goal_run.writable_rules((WIDGET,), repo, task)
 
     assert rules == (f"Edit(/{WIDGET})", f"Edit(/{task.resolve()}/WIP.md)")
+
+
+# --- A tree and a scratch checkout the worker's own process changes -------------------------
+
+BASE_PROGRAM = "claude-base"
+STRAY = "conftest.py"
+TOLERATED_STRAYS = ("src/__pycache__/widget.pyc", ".ai-work/other/notes.txt")
+EXTRA_DENY = "Bash(git commit *)"
+RAISED_BUDGET = 9
+PLAN = "IMPLEMENTATION_PLAN.md"
+
+WRAPPER = """#!{python}
+import subprocess, sys
+from pathlib import Path
+
+here = Path(__file__).resolve().parent
+done = subprocess.run([str(here / "{base}"), *sys.argv[1:]])
+calls = (here / "calls.jsonl").read_text().count("\\n")
+after = here / f"after-{{calls}}.py"
+if after.exists():
+    subprocess.run([{python!r}, str(after)], check=True)
+sys.exit(done.returncode)
+"""
+
+
+def install_scripted(scratch: Scratch, **options) -> None:
+    """The stand-in `claude`, run through a wrapper that then runs the script a test left for
+    that call (``after-<n>.py`` beside it) in the checkout, as code the check runs could."""
+    install_stand_in(scratch, **options)
+    program = scratch.bin_dir / "claude"
+    program.rename(scratch.bin_dir / BASE_PROGRAM)
+    program.write_text(WRAPPER.format(python=PYTHON, base=BASE_PROGRAM), encoding="utf-8")
+    program.chmod(0o755)
+
+
+def after_call(scratch: Scratch, number: int, source: str) -> None:
+    (scratch.bin_dir / f"after-{number}.py").write_text(source, encoding="utf-8")
+
+
+def writes(path: str, text: str) -> str:
+    return (
+        "from pathlib import Path\n"
+        f"Path({path!r}).parent.mkdir(parents=True, exist_ok=True)\n"
+        f"Path({path!r}).write_text({text!r})\n"
+    )
+
+
+def settings_with(scratch: Scratch, allow: list[str], extra_deny: list[str] = ()) -> str:
+    deny = [*deny_rules(scratch.root), *extra_deny]
+    return writes(SETTINGS, json.dumps({"permissions": {"deny": deny, "allow": allow}}))
+
+
+def raises_the_budget(scratch: Scratch) -> str:
+    plan = (scratch.task_dir / PLAN).read_text("utf-8")
+    raised = plan.replace("**Iterations**: 3", f"**Iterations**: {RAISED_BUDGET}")
+    return writes(f".ai-work/{SLUG}/{PLAN}", raised)
+
+
+def commit_files(scratch: Scratch) -> list[str]:
+    return git(scratch.root, "show", "--name-only", "--format=", "HEAD").splitlines()
+
+
+def ledger_requests(scratch: Scratch) -> list[str]:
+    lines = (scratch.task_dir / "ITERATION_LEDGER.jsonl").read_text("utf-8").splitlines()
+    return [json.loads(line)["request"] for line in lines]
+
+
+@pytest.fixture
+def looped(tmp_path) -> Scratch:
+    ready = build_scratch(tmp_path, iterations=3)
+    install_scripted(ready)
+    return ready
+
+
+# --- A worker that leaves a file outside its step's files ------------------------------------
+
+
+def test_a_file_left_outside_the_step_files_stops_the_run_before_a_second_worker(looped):
+    after_call(looped, 1, writes(STRAY, "x = 1\n"))
+
+    reply = looped.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "worker-not-started")
+    assert STRAY in reply.doc["error"]["message"], reply.doc
+    assert len(looped.calls()) == 1
+
+
+def test_the_iteration_that_left_the_file_is_kept_by_its_step_files_only(looped):
+    after_call(looped, 1, writes(STRAY, "x = 1\n"))
+
+    looped.run()
+
+    assert commit_files(looped) == [WIDGET]
+    assert len(ledger_stop_reasons(looped)) == 1
+    assert (looped.root / STRAY).exists()
+
+
+def test_the_request_that_would_have_followed_is_issued_again_once_the_file_is_gone(looped):
+    after_call(looped, 1, writes(STRAY, "x = 1\n"))
+    looped.run()
+    (looped.root / STRAY).unlink()
+
+    looped.run()
+
+    assert ledger_requests(looped) == [f"s{STEP}-a{n}-implement" for n in (1, 2, 3)]
+
+
+# --- A worker that undoes what the run set up ------------------------------------------------
+
+
+@pytest.mark.parametrize("content", [json.dumps({"permissions": {"deny": []}}), "[]"])
+def test_a_removed_deny_rule_stops_the_run_before_a_second_worker(looped, content):
+    after_call(looped, 1, writes(SETTINGS, content))
+
+    reply = looped.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "worker-not-started")
+    assert PROTECTED_DOC in reply.doc["error"]["message"], reply.doc
+    assert len(looped.calls()) == 1
+
+
+def test_an_edited_goal_step_stops_the_run_before_a_second_worker(looped):
+    after_call(looped, 1, raises_the_budget(looped))
+
+    reply = looped.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "worker-not-started")
+    assert PLAN in reply.doc["error"]["message"], reply.doc
+    assert len(looped.calls()) == 1
+
+
+def test_a_pre_approval_that_appeared_and_cannot_be_denied_stops_the_run(looped):
+    after_call(looped, 1, settings_with(looped, allow=["Edit"]))
+
+    reply = looped.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "worker-not-started")
+    assert "Edit" in reply.doc["error"]["message"], reply.doc
+    assert len(looped.calls()) == 1
+
+
+def test_a_pre_approval_that_appeared_is_denied_to_the_next_worker(looped):
+    after_call(looped, 1, settings_with(looped, allow=[PUSH]))
+
+    looped.run()
+
+    first, second = (call["argv"] for call in looped.calls()[:2])
+    assert "--disallowedTools" not in first
+    assert option_values(second, "--disallowedTools") == [PUSH]
+
+
+def test_an_added_deny_rule_changes_nothing(looped):
+    after_call(looped, 1, settings_with(looped, allow=[], extra_deny=[EXTRA_DENY]))
+
+    looped.run()
+
+    assert len(looped.calls()) == 3
+
+
+# --- A tree that is not as the goal expects before the first worker ---------------------------
+
+
+@pytest.mark.parametrize(
+    ("path", "text"),
+    [("pyproject.toml", "# edited\n"), ("notes.txt", "a note\n")],
+    ids=["modified-tracked", "untracked"],
+)
+def test_a_change_outside_the_step_files_is_refused_before_any_worker(scratch, path, text):
+    put(scratch.root, path, text)
+
+    reply = scratch.run()
+
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "usage")
+    assert path in reply.doc["error"]["message"], reply.doc
+    assert scratch.calls() == []
+
+
+@pytest.mark.parametrize("path", TOLERATED_STRAYS)
+def test_an_ignored_file_and_the_task_directories_do_not_refuse(scratch, path):
+    put(scratch.root, path, "x\n")
+
+    reply = scratch.run()
+
+    assert reply.exit != 4, reply.doc
+    assert len(scratch.calls()) == 1
+
+
+def test_a_change_inside_the_step_files_does_not_refuse(scratch):
+    put(scratch.root, WIDGET, widget_source() + "# edited\n")
+
+    reply = scratch.run()
+
+    assert reply.exit != 4, reply.doc
+    assert len(scratch.calls()) == 1
+
+
+# --- A run that completes with a file no commit holds ----------------------------------------
+
+
+def test_a_completed_run_names_the_file_no_commit_holds(tmp_path):
+    ready = build_scratch(tmp_path, iterations=1)
+    install_scripted(ready, subtype="success", finishes=True, result="Done.\n[COMPLETE]")
+    after_call(ready, 1, writes(STRAY, "x = 1\n"))
+
+    reply = ready.run()
+
+    assert (reply.exit, reply.doc["outcome"]) == (0, "complete")
+    (line,) = reply.lines
+    assert line.startswith("step_loop: "), line
+    assert STRAY in line
+    assert "no commit holds" in line

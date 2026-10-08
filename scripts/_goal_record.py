@@ -20,8 +20,8 @@ Acted on as follows:
 * `Progressing`: the step's `Files:` are committed by explicit path with the request's trailer
   (outer-loop and `Read-only:` paths never), and the step is ticked when its check is met.
 * `Unkept`: nothing is committed; the whole tree's diff is saved as `ITERATION_<request>.patch`
-  and the `Files:` return to the last commit, so the next iteration starts from the last kept
-  unit. A gate that was not red gains a refusal line saying why, so it is never verified.
+  and the step's `Files:` return to the last kept unit (a change outside them is neither
+  committed nor restored). A gate that was not red gains a refusal line saying why, so it is never verified.
 * `Protected`: nothing is committed or restored; the tree is saved as
   `TREE_SNAPSHOT_<request>.patch` and a refusal line names the paths, which stops the loop for
   a person (the same stop a disturbed commit makes).
@@ -30,7 +30,8 @@ A worker that left its result file has exited: it is never waited for, only its
 transcript is, for the flush. Its file gives the turn bound, the cost and, for the three
 `error_*` subtypes, the stop reason. Every effect is keyed by the request, so a call cut off
 part-way completes when run again: a HEAD commit with the trailer means `Progressing`, an
-`ITERATION_<request>.patch` means `Unkept`, and a gate block already written is reused.
+`ITERATION_<request>.patch` means `Unkept`, and, for an ordinary step, a gate block already
+written is reused.
 
 Runs on the bare `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """

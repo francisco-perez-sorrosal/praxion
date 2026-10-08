@@ -379,7 +379,7 @@ def run_goal(args: argparse.Namespace) -> Reply:
     """The terminal form of the goal loop: `drive` with a headless worker; its last envelope."""
     task = read_task(args)
     worker = _goal_run.start_worker(task.inputs.steps, task.repo, task.dir, args)
-    reporter = _goal_run.Reporter(task.dir)
+    reporter = worker.reporter()
     location = _goal_run.location(task.repo, task.base_ref, args)
     doc = drive(worker, args.slug, location, echo=True, observe=reporter)
     if doc["outcome"] == "spawn":  # the loop ends on a spawn only when its worker never started

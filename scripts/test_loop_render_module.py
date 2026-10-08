@@ -599,7 +599,7 @@ def test_an_ordinary_prompt_raises_no_warning():
 # --- The stop text ---
 
 CAUSES = {
-    "attempts-exhausted", "blocked-marker", "conflict-marker", "human-verdict",
+    "attempts-exhausted", "stalled", "blocked-marker", "conflict-marker", "human-verdict",
     "unnamed-attempts", "review-revised-twice", "review-unfinished", "revision-failed",
     "not-driven", "dependency-defect", "commit-disturbed-tree", "loop-state-defect",
     "iteration-budget",

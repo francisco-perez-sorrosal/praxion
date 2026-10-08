@@ -727,7 +727,7 @@ def test_a_stop_cannot_be_built_against_its_invariants(build, message):
 
 def test_the_causes_are_the_closed_set_the_stop_texts_cover():
     assert set(HUMAN_CAUSES) | {BUDGET_CAUSE} == set(_ACTIONS)
-    assert len(HUMAN_CAUSES) == len(set(HUMAN_CAUSES)) == 12
+    assert len(HUMAN_CAUSES) == len(set(HUMAN_CAUSES)) == 13
 
 
 # --- A marked series is done only when its review is satisfied -------------------------------

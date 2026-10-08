@@ -227,7 +227,7 @@ def test_two_unkept_iterations_in_a_row_read_spent_through_all_five_readers(tmp_
 
     spent = {
         "state": type(state) is Exhausted,
-        "action": getattr(stop, "cause", None) == EXHAUSTED,
+        "action": getattr(stop, "cause", None) == "stalled",
         "record's replan line": attempt.replan is not None,
         "verdict policy": verdict["verdict"] == EXHAUSTED,
         "status table": f" {EXHAUSTED} " in row,

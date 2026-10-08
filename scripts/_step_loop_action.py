@@ -12,12 +12,15 @@ Normative precedence, a total function of the inputs, first match wins:
 2. A human stop, in this order: `loop-state-defect` (more than one outstanding request),
    `unnamed-attempts`, `dependency-defect`, `commit-disturbed-tree`, a marker, then the stop of
    the selected step, which is the earliest step in plan order that is not done.
-3. `iteration-budget` when the iterations used have reached the budget.
+3. `iteration-budget` when the iterations used have reached the budget, or when the selected
+   goal step has used its own `Iterations:` without a stall or a verification.
 4. A `Spawn` for the selected step.
 
-The budget is derived from the plan alone, so a plan revision opens a new series without
-growing it. `commit-disturbed-tree` holds while the tree snapshot of the step's latest
-recorded request exists beside the task documents, and clears when a person deletes the file.
+A goal step whose bound is spent is the stop `stalled`, an ordinary one `attempts-exhausted`;
+the stall outranks a spent budget because the human stops come first. The budget is derived
+from the plan alone, so a plan revision opens a new series without growing it.
+`commit-disturbed-tree` holds while the tree snapshot of the step's latest recorded request
+exists beside the task documents, and clears when a person deletes the file.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
-from _loop_fields import OutstandingAttempt, request_cap
+from _loop_fields import STALL_RUN, GoalBudget, OutstandingAttempt, request_cap
 from _plan_steps import PlanStep
 from _step_loop_render import Kind, RequestKey, parse_request_id
 from _step_loop_review import (
@@ -69,11 +72,12 @@ if TYPE_CHECKING:
 
 BUDGET_CAUSE = "iteration-budget"
 HUMAN_CAUSES = tuple(
-    """attempts-exhausted blocked-marker conflict-marker human-verdict unnamed-attempts
+    """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed not-driven dependency-defect
     commit-disturbed-tree loop-state-defect""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
+REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
 _REVIEW_STOPS = {
     RevisedTwice: ("review-revised-twice", "the light review asked for revision twice"),
     Unfinished: ("review-unfinished", "the light reviewer ended without a verdict"),
@@ -103,7 +107,7 @@ class Complete:
 @dataclass(frozen=True)
 class Stop:
     """The loop halts. `step` is None exactly for the causes that belong to no one step, and a
-    replan request exists exactly for an exhausted step."""
+    replan request exists exactly for a step whose bound is spent."""
 
     cause: str
     step: str | None
@@ -116,8 +120,8 @@ class Stop:
             raise ValueError(f"not a stop cause: {self.cause!r}")
         if (self.step is None) != (self.cause in NULL_STEP_CAUSES):
             raise ValueError(f"cause {self.cause!r} and step {self.step!r} disagree")
-        if (self.replan_request is not None) != (self.cause == "attempts-exhausted"):
-            raise ValueError("a replan request goes with attempts-exhausted and nothing else")
+        if (self.replan_request is not None) != (self.cause in REPLAN_CAUSES):
+            raise ValueError("a replan request goes with attempts-exhausted or stalled, no other")
 
 
 Action = Union[Spawn, Complete, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
@@ -138,7 +142,7 @@ def next_action(inputs: LoopInputs) -> Action:
     selection = select_step(inputs)
     if isinstance(selection, AllDone):
         return Complete()
-    return _human_stop(inputs, selection) or _budget_stop(inputs) or _spawn(selection)
+    return _human_stop(inputs, selection) or _budget_stop(inputs, selection) or _spawn(selection)
 
 
 def issuable_action(inputs: LoopInputs) -> Action:
@@ -203,10 +207,7 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
     step, state = selection.step, selection.state
     where = f"{STEP_LABEL}{step.id}"
     if isinstance(state, Exhausted):
-        cap = request_cap(state.bound)
-        evidence = f"{cap} of {cap} fresh attempts at {where} ended unverified"
-        replan = getattr(inputs.attempts.get(step.id), "replan", None) or evidence
-        return Stop("attempts-exhausted", step.id, evidence, state.attempts, replan)
+        return _spent_stop(inputs, step, state)
     if isinstance(state, HumanVerdict):
         evidence = state.evidence or f"the reconciler reads {where} {state.verdict}"
         if state.verdict == EXHAUSTED:
@@ -222,11 +223,36 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
     return None
 
 
-def _budget_stop(inputs: LoopInputs) -> Stop | None:
+def _spent_stop(inputs: LoopInputs, step: PlanStep, state: Exhausted) -> Stop:
+    """The stop of a spent bound: a goal step stalled (its last `STALL_RUN` iterations are the
+    attempts shown), an ordinary step used its fresh attempts."""
+    where = f"{STEP_LABEL}{step.id}"
+    replan = getattr(inputs.attempts.get(step.id), "replan", None)
+    if isinstance(state.bound, GoalBudget):
+        evidence = f"the last {STALL_RUN} iterations at {where} kept nothing"
+        return Stop("stalled", step.id, evidence, state.attempts[-STALL_RUN:], replan or evidence)
+    cap = request_cap(state.bound)
+    evidence = f"{cap} of {cap} fresh attempts at {where} ended unverified"
+    return Stop("attempts-exhausted", step.id, evidence, state.attempts, replan or evidence)
+
+
+def _budget_stop(inputs: LoopInputs, selection: Selection) -> Stop | None:
     used, budget = iterations_used(inputs), iteration_budget(inputs.steps)
-    return (
-        Stop(BUDGET_CAUSE, None, f"{used} of {budget} iterations used") if used >= budget else None
-    )
+    if used >= budget:
+        return Stop(BUDGET_CAUSE, None, f"{used} of {budget} iterations used")
+    return _goal_budget_stop(selection)
+
+
+def _goal_budget_stop(selection: Selection) -> Stop | None:
+    """A goal step that has used its own `Iterations:` unstalled and unverified: no request goes
+    past the number its plan states, whatever budget the other steps of the plan leave over."""
+    if not (isinstance(selection, Next) and isinstance(selection.state, Failed)):
+        return None
+    bound, used = selection.state.bound, spent(selection.state.attempts)
+    if not (isinstance(bound, GoalBudget) and used >= bound.iterations):
+        return None
+    evidence = f"{used} of {bound.iterations} iterations used at {STEP_LABEL}{selection.step.id}"
+    return Stop(BUDGET_CAUSE, None, evidence)
 
 
 def _running_key(step: PlanStep, state: Running) -> RequestKey:

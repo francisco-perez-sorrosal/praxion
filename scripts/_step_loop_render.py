@@ -307,6 +307,9 @@ class StopView(NamedTuple):
 
 _ACTIONS = {  # `{step}` is the stop's step id
     "attempts-exhausted": "revise the step block (split it, or fix its Check: line)",
+    "stalled": (
+        "read ITERATION_*.patch and the progress record, then reset the goal or take it by hand"
+    ),
     "blocked-marker": "resolve the blocker, then record the resolution in the step block",
     "conflict-marker": "add the path to the step's Files: or split the step",
     "human-verdict": "verify the step by hand and correct WIP.md, or restore the mutation sensor",

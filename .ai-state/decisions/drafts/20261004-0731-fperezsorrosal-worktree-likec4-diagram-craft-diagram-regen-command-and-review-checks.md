@@ -4,14 +4,16 @@ title: Diagram regeneration command interface and review-check list format
 status: proposed
 category: behavioral
 date: 2026-10-04
-summary: "One command (python3 scripts/regenerate_diagrams.py [ROOT...] [--staged|--check] [--json]) serves the hook, CI and docs; exit codes 0/1/2/3; regeneration failures are three-line stderr messages of four named kinds; findings are '<CHECK-ID> <VIEW> <PASS|FAIL> <evidence>' lines; the review checks are one Markdown table DRC-01..DRC-12 linked from the diagram conventions rule"
+summary: "One command (python3 scripts/regenerate_diagrams.py [ROOT...] [--staged|--check] [--json]) serves the hook, CI and docs; exit codes 0/1/2/3; regeneration failures are three-line stderr messages of four named kinds; findings are '<CHECK-ID> <VIEW> <PASS|FAIL> <evidence>' lines; the review checks are one Markdown table DRC-01..DRC-12 linked from the diagram conventions rule; under --staged an absent or off-pin likec4/d2 is refused: one warning names the pinned and the found versions, nothing is regenerated or staged, exit 0 (default and --check keep exit 3)"
 tags: [diagrams, cli, pre-commit, ci, review-checks, likec4, agents]
 made_by: agent
 agent_type: interface-designer
 branch: worktree-likec4-diagram-craft
 pipeline_tier: full
 affected_files:
+  - scripts/regenerate_diagrams.py
   - scripts/diagram-regen-hook.sh
+  - tests/test_diagram_regen_hook.sh
   - .pre-commit-config.yaml
   - .github/workflows/architecture.yml
   - claude/aac-templates/architecture.yml.tmpl
@@ -34,10 +36,10 @@ The spec requires four things here:
 
 - **One command:** `python3 scripts/regenerate_diagrams.py [ROOT ...] [--staged] [--check] [--json]`. Its modes:
   - default renders in place;
-  - `--staged` is pre-commit mode: staged roots only, `git add` of the renders, and a warn-and-exit-0 when `likec4`/`d2` is not on PATH;
+  - `--staged` is pre-commit mode: staged roots only, then `git add` of the renders. When `likec4` or `d2` is absent from PATH **or off its pinned version**, the command refuses: it prints one warning naming the pinned and the found versions, regenerates and stages nothing, and exits 0, so the commit proceeds and the CI drift gate judges the renders. (Amended at execution, 2026-10-04: the first draft let an off-pin toolchain warn and regenerate, which would have committed renders from a toolchain other than the pin; the refusal gives `--staged` the same shape as the absent-toolchain path.)
   - `--check` renders into a temporary directory, compares byte-for-byte, runs the review checks and writes nothing.
 - **Exit codes:**
-  - 0: success, or the toolchain is absent in `--staged` mode;
+  - 0: success, or the toolchain is absent or off its pin in `--staged` mode (nothing regenerated or staged);
   - 1: regeneration failure, or drift or a FAIL finding under `--check`;
   - 2: usage error;
   - 3: toolchain absent or not the pinned version (default and `--check` modes).
@@ -62,6 +64,6 @@ The spec requires four things here:
 
 ## Consequences
 
-- **Positive:** contributors type one command; failures name the view and the fix; reviewers and agents share check ids.
+- **Positive:** contributors type one command; failures name the view and the fix; reviewers and agents share check ids; a commit never carries renders from a toolchain other than the pin, because every mode checks the pin at the same place.
 - **Negative:** a managed project's CI needs the command in-repo (vendored by onboarding). Placement is the architect's decision.
 - **Category:** `behavioral`. This fixes the command's interface and the guidance format. Whether a new script component exists, and where it lives, is the systems-architect's render-route decision.

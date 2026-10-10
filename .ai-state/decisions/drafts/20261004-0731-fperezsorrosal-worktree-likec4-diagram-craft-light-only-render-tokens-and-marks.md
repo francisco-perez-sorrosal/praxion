@@ -4,7 +4,7 @@ title: Light-only C4 render tokens with one non-colour mark per category
 status: proposed
 category: configuration
 date: 2026-10-04
-summary: "Committed architecture renders use a tint-fill/strong-stroke/slate-text token set on an opaque white canvas, a unique non-colour mark per category and form, a single vendored Person glyph, an in-image title block and Legend container, and no dark-mode CSS in this change"
+summary: "Committed architecture renders use a tint-fill/strong-stroke/slate-text token set on an opaque white canvas, a unique non-colour mark per category and form, a single vendored Person glyph, an in-image title block and Legend container, three line meanings as a closed set (acts: solid; reads: dashed, in element views; numbered dynamic step: the solid accent line, whatever relationship kind the step restates), and no dark-mode CSS in this change"
 tags: [diagrams, design-tokens, accessibility, wcag, colour-blind, c4, d2]
 made_by: agent
 agent_type: interface-designer
@@ -32,6 +32,7 @@ Today every element in every render is the same blue rectangle. There is no lege
   - boxes: person = square + glyph; system = square, stroke 3; external = dashed; knowledge = package; agent = rounded r16; document = document; store = cylinder; tooling = 3d; layer = double-border;
   - frames: system = solid; layer = dashed square; runtime agent = dashed rounded;
   - the onboarded floor adds container = rounded r8 and component = double-border.
+- **Line meanings.** A closed set of three, each with one legend sample: an arrow that acts on its target is the solid edge line (`#475569`, 2 px); a `reads` relationship in an element view is the same line dashed; a step in a dynamic view is the solid accent line (`#4338CA`, 3 px) labelled `<n> · <title>`, whatever relationship kind the step restates. (Amended at execution, 2026-10-04: the first implementation drew a step over a `reads` relationship dashed, which needed a fourth legend meaning; a dynamic view carries the order of its steps, and read-only against acting is the element views' job, so the dashed step drawing was removed and `Edge.reads` stays recorded on the step.)
 - **Icons:** only the Person glyph, vendored and embedded as a data URI. Product identity goes in the category line as text.
 - **Typography:** element labels are 15 px (14 px floor); the title block is one line `<view title> — <C4 type> diagram` at 24 px bold, `near: top-center`.
 - **Legend:** a D2 container labelled exactly `Legend` at `near: bottom-center`, holding one sample per (category, form) drawn and one arrow sample per line meaning.

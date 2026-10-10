@@ -5,7 +5,9 @@ byte. When a model source change is staged, the pre-commit regeneration refreshe
 and stages the renders, lets the commit proceed with a warning when the toolchain
 is absent, and aborts with the failing step's message when regeneration fails. The
 CI drift gate fails a change whose committed renders differ from a fresh
-regeneration and passes one whose renders match.
+regeneration and passes one whose renders match. A real commit from a linked worktree,
+where git exports `GIT_DIR` to its hooks, commits the refreshed renders beside the model
+change and nothing else.
 """
 
 from __future__ import annotations
@@ -15,12 +17,17 @@ import shutil
 import pytest
 
 from tests.acceptance.drivers.diagram_regen import (
+    HOOK_VARIABLES,
     MODEL_SOURCE,
     RENDER_DIR,
     add_empty_view,
     changed_renders,
+    commit_through_the_hook,
+    committed_paths,
     empty_the_model,
     git,
+    hook_saw,
+    linked_worktree,
     rename_developer,
     require_pinned_toolchain,
     run_drift_gate,
@@ -48,6 +55,14 @@ def staged_model_change(checkout):
     rename_developer(checkout, NEW_NAME)
     git(checkout, "add", MODEL_SOURCE.as_posix())
     return checkout
+
+
+@pytest.fixture
+def staged_model_change_in_a_linked_worktree(checkout):
+    worktree = linked_worktree(checkout)
+    rename_developer(worktree, NEW_NAME)
+    git(worktree, "add", MODEL_SOURCE.as_posix())
+    return worktree
 
 
 @pytest.fixture
@@ -110,6 +125,33 @@ def test_staging_a_model_change_regenerates_and_stages_the_renders(staged_model_
         for p in staged_renders
     ), "no staged render draws an element named after the changed model"
     assert unstaged_render_changes(staged_model_change) == []
+
+
+def test_a_real_commit_from_a_linked_worktree_commits_the_renders_beside_the_model_and_nowhere_else(
+    staged_model_change_in_a_linked_worktree,
+) -> None:
+    require_pinned_toolchain()
+    worktree = staged_model_change_in_a_linked_worktree
+
+    result = commit_through_the_hook(worktree, "rename the developer")
+
+    assert result.returncode == 0, f"the commit failed:\n{result.stdout}{result.stderr}"
+    assert hook_saw(worktree) == set(HOOK_VARIABLES), (
+        f"git exported {sorted(hook_saw(worktree))} to the hook, not a hook's environment"
+    )
+    committed = committed_paths(worktree)
+    renders = [p for p in committed if p.startswith(f"{RENDER_DIR.as_posix()}/")]
+    assert renders, f"the commit holds no refreshed render: {committed}"
+    beyond = sorted(set(committed) - {MODEL_SOURCE.as_posix(), *renders})
+    assert not beyond, f"the commit holds paths beyond the model and its renders: {beyond}"
+    assert any(
+        read_render(worktree / p).element_block(NEW_NAME) is not None
+        for p in renders
+        if p.endswith(".svg")
+    ), "no committed render draws the renamed element"
+    assert git(worktree, "status", "--porcelain", "--untracked-files=all").stdout == "", (
+        "the hook left changes outside the commit"
+    )
 
 
 def test_a_commit_proceeds_with_a_warning_when_the_toolchain_is_absent(staged_model_change) -> None:

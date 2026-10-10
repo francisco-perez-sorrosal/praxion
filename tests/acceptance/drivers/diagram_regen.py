@@ -4,7 +4,8 @@ A scratch checkout is a fresh git repository holding a copy of every file of thi
 repository that git tracks or would track (working-tree contents, ignored files left
 out), committed once. Scenarios act on that copy, never on the repository itself.
 
-Two gates are driven through their declared entry points:
+Two gates are driven through their declared entry points (the pre-commit regeneration also
+through a real `git commit`, see `commit_through_the_hook`):
 
 * the pre-commit regeneration: the `entry` of the hook whose id is `diagram-regen` in
   `.pre-commit-config.yaml`, run from the checkout root the way pre-commit runs a
@@ -25,6 +26,7 @@ import atexit
 import functools
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -247,6 +249,69 @@ def run_precommit_regeneration(
         text=True,
         timeout=600,
     )
+
+
+HOOK_VARIABLES = ("GIT_DIR", "GIT_INDEX_FILE")
+_HOOK = """#!/bin/sh
+: > RECORD
+[ "${GIT_DIR+set}" = set ] && echo GIT_DIR >> RECORD
+[ "${GIT_INDEX_FILE+set}" = set ] && echo GIT_INDEX_FILE >> RECORD
+exec ENTRY
+"""
+
+
+def linked_worktree(repo: Path) -> Path:
+    """A linked worktree of `repo` on its own branch: the shape a pipeline commits from.
+
+    Git exports an absolute `GIT_DIR` (under the main repository's `.git/worktrees/`) to a hook
+    run from a linked worktree; from the main work tree it exports none.
+    """
+    worktree = repo.parent / f"{repo.name}-worktree"
+    git(repo, "worktree", "add", "-q", str(worktree), "-b", "regeneration-probe")
+    return worktree
+
+
+def commit_through_the_hook(repo: Path, message: str) -> subprocess.CompletedProcess[str]:
+    """`git commit` in `repo` with the regeneration hook installed as its pre-commit hook.
+
+    Git runs the hook as it runs any pre-commit hook: from the work tree's top, with the
+    environment it exports to hooks (`GIT_INDEX_FILE`, plus `GIT_DIR` in a linked worktree).
+    The hook records which of `HOOK_VARIABLES` it received before handing over to the hook
+    entry, so a scenario can confirm what it tested under (`hook_saw`).
+    """
+    hooks = repo.parent / f"{repo.name}-hooks"
+    hooks.mkdir(exist_ok=True)
+    hook = hooks / "pre-commit"
+    hook.write_text(
+        _HOOK.replace("RECORD", shlex.quote(str(_hook_record(repo)))).replace(
+            "ENTRY", precommit_entry(repo)
+        ),
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    env = offline_env()
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    return subprocess.run(
+        ["git", *_IDENTITY, "-c", f"core.hooksPath={hooks}", "commit", "-q", "-m", message],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+
+
+def hook_saw(repo: Path) -> set[str]:
+    """The `HOOK_VARIABLES` git exported to the last hook `commit_through_the_hook` ran in `repo`."""
+    return set(_hook_record(repo).read_text(encoding="utf-8").split())
+
+
+def _hook_record(repo: Path) -> Path:
+    return repo.parent / f"{repo.name}-hook-variables"
+
+
+def committed_paths(repo: Path, revision: str = "HEAD") -> list[str]:
+    return git(repo, "show", "--name-only", "--format=", revision).stdout.split()
 
 
 def staged_paths(repo: Path) -> list[str]:

@@ -1,3 +1,9 @@
+## v0.48.1 (2026-10-10)
+
+### Fix
+
+- **diagrams**: Point the off-pin d2 hint at the release tarball install
+
 ## v0.48.0 (2026-10-10)
 
 ### Feat

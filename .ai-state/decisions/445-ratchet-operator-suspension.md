@@ -1,7 +1,8 @@
 ---
-id: dec-draft-f9795b0a
+id: dec-445
+draft_id: dec-draft-f9795b0a
 title: The always-loaded byte ratchet honours an explicit, dated operator suspension recorded in the committed baseline
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-10
 summary: "`measure_token_budget.ratchet()` reads a `ratchet_suspended` block (`until`, `reason`, `set_on`, `by`) from `.ai-state/token_budget_baseline.json`; while today is on or before `until` the governed-byte delta is reported but not enforced, the frozen listing ceiling keeps biting, the gate prints the suspension on every commit, and an expired or malformed block enforces again. Set until 2026-11-30 by user decision for the commands-to-skills and skill-crafting-refresh pipelines."

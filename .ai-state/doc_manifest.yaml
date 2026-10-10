@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-10T07:41:45Z'
+generated_at: '2026-10-10T20:16:06Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -547,7 +547,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-09'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3240,11 +3240,17 @@ surfaces:
   title: Light-only C4 render tokens with one non-colour mark per category
   last_modified: '2026-10-10'
   renderer: adr_card
+- id: ai-state-decisions-445-ratchet-operator-suspension
+  path: .ai-state/decisions/445-ratchet-operator-suspension.md
+  type: markdown
+  title: The always-loaded byte ratchet honours an explicit, dated operator suspension recorded in the committed baseline
+  last_modified: '2026-10-10'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4030,6 +4036,7 @@ groups:
   - ai-state-decisions-442-render-route-d2-emitter
   - ai-state-decisions-443-diagram-regen-command-and-review-checks
   - ai-state-decisions-444-light-only-render-tokens-and-marks
+  - ai-state-decisions-445-ratchet-operator-suspension
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

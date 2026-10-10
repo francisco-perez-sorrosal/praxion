@@ -142,7 +142,7 @@ def test_a_tool_missing_from_path_exits_3_naming_what_to_install(go, tools, proj
 
     assert code == 3
     assert "d2 is not installed (not on PATH); 0.7.1 is required" in err
-    assert f"--version v{D2_PIN}" in err
+    assert f"d2 v{D2_PIN} release tarball" in err
     assert "likec4" not in err
 
 

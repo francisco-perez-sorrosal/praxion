@@ -129,8 +129,8 @@ SKIPPING = "skipping diagram regeneration"
 DRIFT_CHECK = "DRC-10"
 INSTALL = {
     "likec4": f"npm install --global likec4@{LIKEC4_VERSION}",
-    "d2": "curl -fsSL https://d2lang.com/install.sh"
-    f" | sh -s -- --version v{D2_VERSION} --method standalone",
+    "d2": f"install the d2 v{D2_VERSION} release tarball for your platform, checksum-verified"
+    " (docs/architecture-diagrams.md, section D2)",
 }
 
 # --- command line ----------------------------------------------------------------------------

@@ -206,13 +206,14 @@ class Toolchain:
 
 # --- the core tests' shared reading and finders ---------------------------------------------
 
-CORE_EXPORT = (
-    Path(__file__).resolve().parent.parent
-    / "tests"
-    / "fixtures"
-    / "diagram_regen"
-    / "export_small.json"
+FIXTURES = next(
+    parent / "tests" / "fixtures"
+    for parent in Path(__file__).resolve().parents
+    if (parent / "tests" / "fixtures").is_dir()
 )
+"""The repository's `tests/fixtures/`, found by walking up: a runner that copies this directory
+elsewhere (the mutation sensor's mutmut copy) still finds the fixtures through a parent."""
+CORE_EXPORT = FIXTURES / "diagram_regen" / "export_small.json"
 
 
 def small_export() -> dict:

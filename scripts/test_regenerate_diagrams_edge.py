@@ -22,7 +22,7 @@ from pathlib import Path
 
 import _diagram_edge as edge
 import pytest
-from _diagram_testkit import D2_PIN, LIKEC4_PIN
+from _diagram_testkit import D2_PIN, FIXTURES, LIKEC4_PIN
 
 IDENTITY = (
     "-c",
@@ -33,7 +33,7 @@ IDENTITY = (
     "commit.gpgsign=false",
 )
 INHERITED_GIT_VARIABLES = ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE")
-MINIMAL_MODEL = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "minimal.c4"
+MINIMAL_MODEL = FIXTURES / "minimal.c4"
 RENDERED = "docs/diagrams/x/rendered"
 SOURCE = "docs/diagrams/x/src/x.c4"
 

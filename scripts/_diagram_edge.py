@@ -7,7 +7,7 @@ raised as `RegenerationError`, carrying the record the command prints.
 
 from __future__ import annotations
 
-import html
+import base64
 import json
 import os
 import re
@@ -18,8 +18,10 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from xml.etree import ElementTree
 
 from _diagram_core import Projection, RegenerationFailure, View, emit_d2, project
+from _diagram_legend import LEGEND_KEY, TITLE_KEY
 from _diagram_tokens import DEFAULT_TOKENS, Token, UsageError, load_style
 
 SOURCE_DIR = "src"
@@ -33,7 +35,6 @@ RENDER_SUFFIXES = (".svg", ".d2")
 D2_STAMP = re.compile(rb'data-d2-version="[^"]*"')
 SCRUBBED_D2_STAMP = b'data-d2-version="pinned"'
 VERSION_NUMBER = re.compile(r"\bv?(\d+\.\d+\.\d+)\b")
-MARKUP_TAG = re.compile(r"<[^>]*>")
 
 STAGED_CHANGES = ("diff", "--cached", "--name-only", "--diff-filter=ACMRD", "-z")
 
@@ -208,14 +209,46 @@ def _render_view(toolchain: Toolchain, view: View, built: Path) -> None:
 
 
 def _require_names(view: View, svg: bytes) -> None:
-    """The render must spell at least one of the view's element names."""
-    text = html.unescape(MARKUP_TAG.sub("", svg.decode("utf-8", errors="replace")))
-    drawn = "".join(text.split())
+    """The render must spell at least one of the view's element names.
+
+    The title block and the legend are drawn from the view's own title and vocabulary, so
+    their text proves nothing about the elements and is left out of the reading.
+    """
+    drawn = "".join("".join(_element_texts(_parse_svg(view, svg))).split())
     if not any("".join(node.name.split()) in drawn for node in view.nodes):
         what = f"the render of view '{view.id}' shows no element's name"
         cause = f"none of its {len(view.nodes)} element names appears in {view.id}.svg"
         fix = "give the view's elements titles in the model, or report the renderer fault"
         raise _failure("render-without-names", view.id, what, cause, fix)
+
+
+def _parse_svg(view: View, svg: bytes) -> ElementTree.Element:
+    try:
+        return ElementTree.fromstring(svg)
+    except ElementTree.ParseError as error:
+        what = f"the render of view '{view.id}' is not readable SVG"
+        cause = f"{view.id}.svg does not parse: {error}"
+        fix = "report the renderer fault"
+        raise _failure("render-without-names", view.id, what, cause, fix) from error
+
+
+def _element_texts(node: ElementTree.Element) -> list[str]:
+    """The text of every `<text>` outside the title block and the legend."""
+    if _is_chrome(node):
+        return []
+    if node.tag.rpartition("}")[2] == "text":
+        return ["".join(node.itertext())]
+    return [text for child in node for text in _element_texts(child)]
+
+
+def _is_chrome(node: ElementTree.Element) -> bool:
+    """d2 names a drawn object's group by the base64 of its key path: `Title`, `Legend`, `Legend.x`."""
+    first = (node.get("class") or "").split(" ")[0]
+    try:
+        key = base64.b64decode(first, validate=True).decode("utf-8")
+    except ValueError:
+        return False
+    return key == TITLE_KEY or key == LEGEND_KEY or key.startswith(f"{LEGEND_KEY}.")
 
 
 # --- publishing ------------------------------------------------------------------------------

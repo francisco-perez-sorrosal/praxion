@@ -7,6 +7,7 @@ Praxion's own model twice, with a proxy pointing at a closed port, and compares 
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
 import os
@@ -288,6 +289,70 @@ def test_a_render_that_spells_no_element_name_is_render_without_names(go, tools,
     assert cause == f"{CAUSE}none of its 3 element names appears in index.svg"
     assert fix == f"{FIX}give the view's elements titles in the model, or report the renderer fault"
     assert rendered(project) == {}
+
+
+def _drawn(key: str, text: str) -> str:
+    """A d2 object's group: its class is the base64 of its key path, as d2 writes it."""
+    path = base64.b64encode(key.encode("utf-8")).decode("ascii")
+    return f'<g class="{path}"><g class="shape"/><text>{text}</text></g>'
+
+
+def draw(tools: Toolchain, *objects: str) -> None:
+    """Make the stub `d2` write an SVG of the given drawn objects."""
+    body = "".join(objects).replace("'", "'\\''")
+    script = (
+        "#!/bin/sh\n"
+        f'if [ "$1" = "--version" ]; then echo "v{D2_PIN}"; exit 0; fi\n'
+        f'printf \'<svg data-d2-version="v0.7.1">{body}</svg>\' > "$2"\n'
+    )
+    stub = tools.directory / "d2"
+    stub.write_text(script, encoding="utf-8")
+    stub.chmod(0o755)
+
+
+def test_names_only_in_the_title_block_and_the_legend_do_not_count_as_shown(go, tools, project):
+    draw(
+        tools,
+        _drawn("Title", "Developer — system context diagram"),
+        _drawn("Legend", "Legend"),
+        _drawn("Legend.category_person", "Praxion"),
+        _drawn("Legend.line_acts_on_sample.tail", "Claude Code"),
+    )
+
+    code, _, err = go()
+
+    head, _, _ = failure(err)
+    assert code == 1
+    assert head.startswith(f"{FAIL}render-without-names index:")
+    assert rendered(project) == {}
+
+
+def test_a_name_drawn_as_an_element_counts_beside_a_title_that_spells_other_names(
+    go, tools, project
+):
+    draw(
+        tools,
+        _drawn("Title", "Praxion — system context diagram"),
+        _drawn('"developer"', "Developer"),
+    )
+
+    code, _, _ = go()
+
+    assert code == 0
+    assert "index.svg" in rendered(project)
+
+
+def test_a_render_that_is_not_svg_is_render_without_names(go, tools, project):
+    draw(tools, "<g>")
+
+    code, _, err = go()
+
+    head, cause, _ = failure(err)
+    assert code == 1
+    assert (
+        head == f"{FAIL}render-without-names index: the render of view 'index' is not readable SVG"
+    )
+    assert "index.svg does not parse" in cause
 
 
 def test_a_wrapped_and_escaped_element_name_still_counts_as_shown(go, tools, project):

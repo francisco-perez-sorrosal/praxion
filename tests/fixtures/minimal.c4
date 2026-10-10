@@ -5,10 +5,10 @@
  * in a LikeC4 workspace. This fixture is intentionally minimal: one actor element
  * kind, one system element kind, two instances, one relationship, one view.
  *
- * Used by test case T5 (happy-path: both binaries present + DSL valid).
- * When likec4 and d2 are installed, `likec4 gen d2 minimal.c4 -o minimal/`
- * should produce `minimal/index.d2` and `d2 minimal/index.d2 minimal/index.svg`
- * should produce a valid SVG.
+ * Used by the hook test cases that stage a valid model: the harness copies it to
+ * `docs/diagrams/minimal/src/minimal.c4` in a sandbox repository, and with the pinned
+ * likec4 and d2 on PATH `python3 scripts/regenerate_diagrams.py --staged` renders and
+ * stages `docs/diagrams/minimal/rendered/index.svg` (and its `index.d2`).
  *
  * DSL reference: https://likec4.dev/llms-full.txt
  */

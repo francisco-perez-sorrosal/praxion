@@ -712,17 +712,17 @@ complete_uninstall_from_plugin() {
 #
 # `bash install.sh` performs a marketplace fetch (`claude plugin install`),
 # which clones a pinned copy into ~/.claude/plugins/cache/<marketplace>/
-# <plugin>/<version>/. Local edits to hooks/, scripts/, or commands/ never
+# <plugin>/<version>/. Local edits to hooks/, scripts/, commands/ or skills/ never
 # reach that cache, so contributors testing plugin-cache-resolved code paths
 # (${CLAUDE_PLUGIN_ROOT}-based hooks, `claude --bg` sessions, etc.) have had
 # to manually `cp` files into the cache between iterations — see td-036 in
 # .ai-state/TECH_DEBT_LEDGER.md.
 #
-# `--dev-link` replaces the cache copies of the three plugin-cache-resolved
-# runtime surfaces (hooks/, scripts/, commands/ — the directories Claude Code
-# actually loads through ${CLAUDE_PLUGIN_ROOT}/<surface>/...) with
-# directory-level symlinks back to this repo's own hooks/, scripts/,
-# commands/. Edits then take effect immediately, no copy step needed.
+# `--dev-link` replaces the cache copies of the four plugin-cache-resolved
+# runtime surfaces (hooks/, scripts/, commands/, skills/ — the directories
+# Claude Code actually loads through ${CLAUDE_PLUGIN_ROOT}/<surface>/...) with
+# directory-level symlinks back to this repo's own copies of them. Edits then
+# take effect immediately, no copy step needed.
 # `--dev-link=off` reverses it, restoring the pre-link cache contents from a
 # sibling `.pre-dev-link` backup taken at link time — a plain marketplace
 # re-fetch is also expected to overwrite the cache wholesale, but that
@@ -732,9 +732,9 @@ complete_uninstall_from_plugin() {
 #
 # Test-only override: lets scripts/test_install_dev_link.py point dev-link's
 # "source of truth" at a synthetic tree instead of this repo's own hooks/,
-# scripts/, commands/. Production runs always resolve to SCRIPT_DIR.
+# scripts/, commands/, skills/. Production runs always resolve to SCRIPT_DIR.
 DEV_LINK_SOURCE_DIR="${PRAXION_DEV_LINK_SOURCE_DIR:-$SCRIPT_DIR}"
-DEV_LINK_SURFACES=(hooks scripts commands)
+DEV_LINK_SURFACES=(hooks scripts commands skills)
 
 # Resolves the pinned praxion install path + version from the plugin registry —
 # same registry and lookup shape as scripts/upgrade_project_pins.sh's
@@ -802,7 +802,7 @@ dev_link_install() {
     done
 
     printf "\n"
-    info "Dev-link active — edits to hooks/, scripts/, commands/ now take effect immediately"
+    info "Dev-link active — edits to hooks/, scripts/, commands/, skills/ now take effect immediately"
     step "Restore the fetched copies with: ./install.sh --dev-link=off"
 }
 
@@ -1491,8 +1491,8 @@ Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--reli
   --relink       Re-symlink config, rules, and scripts (no prompts)
   --reconfigure  Re-prompt for personal identifiers (username/email/github)
                  even if saved values exist in .personal_info.env
-  --dev-link     Symlink the pinned plugin cache's hooks/, scripts/, and
-                 commands/ back to this working tree (code mode only)
+  --dev-link     Symlink the pinned plugin cache's hooks/, scripts/,
+                 commands/ and skills/ back to this working tree (code mode only)
   --dev-link=off Reverse of --dev-link: restore fetched cache copies
   --help         Show this help
 EOF

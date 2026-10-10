@@ -10,10 +10,11 @@ file, rule file, plugin manifest) carry the shape its own crafting spec demands.
 * **C02** (warn) -- every `SKILL.md` declares `description` in frontmatter.
 * **C03** (fail) -- every `agents/*.md` (excl. `README.md`) declares `name`,
   `description`, `tools` in frontmatter.
-* **C04** (warn) -- every `commands/*.md` carries a non-empty, non-placeholder
-  `description` (frontmatter field, or a header comment when frontmatter is
-  absent). Placeholder = empty, `TODO`, `TBD`, or an angle-bracket stub
-  (`<...>`). Whether the text is *accurate* is C02/S01's judgment -- this
+* **C04** (warn) -- every workflow entry file (`skills/*/SKILL.md`, and
+  `commands/*.md` while that family still exists) carries a non-empty,
+  non-placeholder `description` (frontmatter field, or a header comment when
+  frontmatter is absent). Placeholder = empty, `TODO`, `TBD`, or an
+  angle-bracket stub (`<...>`). Whether the text is *accurate* is C02/S01's judgment -- this
   guarantees there is something for them to judge.
 * **C05** (fail) -- `.claude-plugin/plugin.json`'s `agents` array count equals
   the `agents/*.md` file count (excl. `README.md`).
@@ -42,15 +43,19 @@ file, rule file, plugin manifest) carry the shape its own crafting spec demands.
   present and non-empty.
 * **S03** (fail) -- `rules/**/*.md` (excl. `README.md`) starts with a `##`
   heading as its first non-blank line.
-* **S04** (warn) -- a command using `$ARGUMENTS`-style substitution names it in
-  content. This check only has evidence of *presence*: a command that uses
+* **S04** (warn) -- a workflow entry file (same scope as C04) using
+  `$ARGUMENTS`-style substitution names it in content. This check only has
+  evidence of *presence*: a body that uses
   `$ARGUMENTS`/`$1`/`$name` substitution necessarily contains the token, so
   there is nothing to flag from the content side. What it actually checks is
   the declared-but-unused direction -- an `argument-hint` frontmatter field
   promising arguments that the body never substitutes -- since a command can
   declare a hint for autocomplete purposes alone. Limitation: it cannot detect
   a command that consumes `$ARGUMENTS` without ever declaring `argument-hint`;
-  that shape has no unused-declaration signal to key on.
+  that shape has no unused-declaration signal to key on. A harness path
+  variable (`${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`) names a location,
+  not an argument, so a body whose only dollar-brace text is one of those
+  still counts as never reading its arguments.
 
 **Parsing boundary.** This script re-implements (does not import) the minimal
 frontmatter splitter `check_frontmatter_parses.py` uses (`---` delimited
@@ -109,6 +114,10 @@ CHECK_IDS: tuple[str, ...] = (
 # project-instructions file, not an agent/command/rule (same exclusion
 # check_registry_projection.py applies to agents/commands).
 _EXCLUDED_META_FILES = {"README.md", "CLAUDE.md"}
+
+# A skill's entry file: what a skill is invoked through, and therefore the one
+# file of a skill directory that C04 and S04 read.
+_SKILL_ENTRY_FILE = "SKILL.md"
 
 # -- frontmatter splitter (mirrors check_frontmatter_parses.py; not imported --
 # that script owns parseability, this one owns presence/shape) --------------
@@ -245,7 +254,7 @@ def _check_agent_required_fields(
     return findings, None, {"agent_files": len(files)}
 
 
-# -- C04: command description non-empty and non-placeholder -----------------
+# -- C04: workflow description non-empty and non-placeholder ----------------
 
 _PLACEHOLDER_RE = re.compile(r"^\s*(TODO|TBD)\s*$", re.IGNORECASE)
 _ANGLE_STUB_RE = re.compile(r"^\s*<.*>\s*$")
@@ -266,10 +275,36 @@ def _command_files(repo_root: Path) -> list[Path] | None:
     return sorted(f for f in commands_dir.glob("*.md") if f.name not in _EXCLUDED_META_FILES)
 
 
+def _skill_files(repo_root: Path) -> list[Path] | None:
+    """The workflow entry files C04 and S04 read, or None when none can exist.
+
+    Every `skills/*/SKILL.md`, plus every `commands/*.md` for as long as the
+    command family is still on disk; once it is gone this is the skill list.
+    """
+    skills = _skill_md_files(repo_root)
+    commands = _command_files(repo_root)
+    if skills is None and commands is None:
+        return None
+    return [*(skills or []), *(commands or [])]
+
+
+def _counts_by_family(files: list[Path], suffix: str = "") -> dict[str, int]:
+    """Count `files` per family, so `command_files*` keeps its original meaning."""
+    skills = sum(1 for path in files if path.name == _SKILL_ENTRY_FILE)
+    return {f"skill_files{suffix}": skills, f"command_files{suffix}": len(files) - skills}
+
+
+def _entry_label(path: Path) -> str:
+    """Name a workflow file the way a reader finds it: a skill by its directory."""
+    if path.name == _SKILL_ENTRY_FILE:
+        return f"{path.parent.name}/{path.name}"
+    return path.name
+
+
 def _check_c04(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
-    files = _command_files(repo_root)
+    files = _skill_files(repo_root)
     if files is None:
-        return [], {"reason": "substrate-absent", "path": str(repo_root / "commands")}, None
+        return [], {"reason": "substrate-absent", "path": str(repo_root / "skills")}, None
     findings: list[dict] = []
     for path in files:
         text = _read_text(path) or ""
@@ -286,11 +321,12 @@ def _check_c04(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
                 "severity": "warn",
                 "entity": str(path.relative_to(repo_root)),
                 "message": (
-                    f"{path.name} has no non-placeholder `description` field or header comment"
+                    f"{_entry_label(path)} has no non-placeholder `description` field "
+                    "or header comment"
                 ),
             }
         )
-    return findings, None, {"command_files": len(files)}
+    return findings, None, _counts_by_family(files)
 
 
 def _leading_header_comment(text: str, fm: dict[str, Any]) -> str | None:
@@ -579,27 +615,29 @@ def _check_s03(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     return findings, None, {"rule_files": len(files)}
 
 
-# -- S04: commands with argument-hint actually substitute it -----------------
+# -- S04: workflows with argument-hint actually read their arguments ---------
 
-# Any of these appearing in a command body is evidence the command consumes
-# positional/named arguments. Limitation (see module docstring): a command
-# that uses one of these WITHOUT declaring `argument-hint` has no signal here.
-_SUBSTITUTION_RE = re.compile(r"\$ARGUMENTS\b|\$\d+\b|\$\{CLAUDE_[A-Z_]+\}")
+# Either of these appearing in a body is evidence it consumes its arguments
+# (`$ARGUMENTS[N]` matches the first form). A harness path variable such as
+# `${CLAUDE_SKILL_DIR}` is deliberately absent: it names a location, not an
+# argument. Limitation (see module docstring): a body that uses one of these
+# WITHOUT declaring `argument-hint` has no signal here.
+_SUBSTITUTION_RE = re.compile(r"\$ARGUMENTS\b|\$\d+\b")
 
 
 def _check_s04(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
-    files = _command_files(repo_root)
+    files = _skill_files(repo_root)
     if files is None:
-        return [], {"reason": "substrate-absent", "path": str(repo_root / "commands")}, None
+        return [], {"reason": "substrate-absent", "path": str(repo_root / "skills")}, None
     findings: list[dict] = []
-    examined = 0
+    hinted: list[Path] = []
     for path in files:
         text = _read_text(path) or ""
         fm = _load_frontmatter(text)
         hint = fm.get("argument-hint")
         if not (isinstance(hint, str) and hint.strip()):
             continue
-        examined += 1
+        hinted.append(path)
         if not _SUBSTITUTION_RE.search(text):
             findings.append(
                 {
@@ -607,12 +645,12 @@ def _check_s04(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
                     "severity": "warn",
                     "entity": str(path.relative_to(repo_root)),
                     "message": (
-                        f"{path.name} declares `argument-hint` but its content never "
-                        "substitutes $ARGUMENTS/$N"
+                        f"{_entry_label(path)} declares `argument-hint` but its content "
+                        "never substitutes $ARGUMENTS/$N"
                     ),
                 }
             )
-    return findings, None, {"command_files_with_hint": examined}
+    return findings, None, _counts_by_family(hinted, "_with_hint")
 
 
 # -- Envelope (DS-A, keyed) -----------------------------------------------------
@@ -654,7 +692,7 @@ def classify(repo_root: Path) -> dict:
             "C01": "C01 clean means every skills/*/ dir has a SKILL.md.",
             "C02": "C02 clean means every SKILL.md declares a description field.",
             "C03": "C03 clean means every agents/*.md declares name/description/tools.",
-            "C04": "C04 clean means every command has a non-placeholder description or header comment.",
+            "C04": "C04 clean means every skill and command has a non-placeholder description or header comment.",
             "C05": "C05 clean means plugin.json's agents count equals agents/*.md's file count.",
             "N01": "N01 clean means skill dirs are kebab-case with the right family suffix.",
             "N02": "N02 clean means agent file stems are kebab-case.",
@@ -662,7 +700,7 @@ def classify(repo_root: Path) -> dict:
             "S01": "S01 clean means every SKILL.md description is present and non-empty.",
             "S02": "S02 clean means every agent's name/description/tools are present and non-empty.",
             "S03": "S03 clean means every rule file's first non-blank line is a `##` heading.",
-            "S04": "S04 clean means every command declaring argument-hint substitutes it in content.",
+            "S04": "S04 clean means every skill and command declaring argument-hint reads its arguments.",
         },
     }
 

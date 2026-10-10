@@ -1,9 +1,9 @@
 """Tests for install_claude.sh's --dev-link / --dev-link=off mode.
 
-Resolves td-036: contributors editing hooks/, scripts/, or commands/ locally
+Resolves td-036: contributors editing hooks/, scripts/, commands/ or skills/ locally
 could not test against plugin-cache-resolved code paths without manually
 `cp`-ing files into the installed plugin cache between iterations.
-`--dev-link` replaces the cache copies of the three cache-resolved runtime
+`--dev-link` replaces the cache copies of the four cache-resolved runtime
 surfaces with directory-level symlinks back to the working tree; `--dev-link=off`
 restores the pre-link cache contents from a `.pre-dev-link` backup.
 
@@ -15,7 +15,7 @@ HOME (registry + cache dir) and a synthetic source tree — hermetic, no real
     (production always uses the script's own SCRIPT_DIR)
 
 Key cases:
-  - --dev-link symlinks hooks/, scripts/, commands/ and backs up originals
+  - --dev-link symlinks hooks/, scripts/, commands/, skills/ and backs up originals
   - a symlinked hook still executes through its ${CLAUDE_PLUGIN_ROOT} path
     (gate-liveness for the directory-symlink mechanism itself)
   - a second --dev-link is idempotent (no re-backup, no error)
@@ -36,6 +36,7 @@ from pathlib import Path
 import pytest
 
 _SCRIPT = Path(__file__).resolve().parent.parent / "install_claude.sh"
+_SURFACES = ("hooks", "scripts", "commands", "skills")
 
 
 def _run(home: Path, source_dir: Path | None, *args: str) -> subprocess.CompletedProcess:
@@ -82,15 +83,14 @@ def env(tmp_path: Path) -> dict:
     """A synthetic HOME with a pinned praxion install + a synthetic source tree."""
     home = tmp_path / "home"
     cache = _cache_dir(home)
-    for surface in ("hooks", "scripts", "commands"):
+    for surface in _SURFACES:
         (cache / surface).mkdir(parents=True)
     (cache / "hooks" / "marker.txt").write_text("fetched-copy\n")
     _write_registry(home, cache)
 
     source = tmp_path / "src"
-    (source / "hooks").mkdir(parents=True)
-    (source / "scripts").mkdir(parents=True)
-    (source / "commands").mkdir(parents=True)
+    for surface in _SURFACES:
+        (source / surface).mkdir(parents=True)
     hook = source / "hooks" / "my_hook.sh"
     hook.write_text(
         '#!/usr/bin/env bash\necho "hello from working tree via ${CLAUDE_PLUGIN_ROOT:-unset}"\n'
@@ -98,11 +98,12 @@ def env(tmp_path: Path) -> dict:
     hook.chmod(hook.stat().st_mode | stat.S_IEXEC)
     (source / "scripts" / "marker.txt").write_text("source-copy\n")
     (source / "commands" / "marker.txt").write_text("source-copy\n")
+    (source / "skills" / "marker.txt").write_text("source-copy\n")
 
     return {"home": home, "cache": cache, "source": source}
 
 
-@pytest.mark.parametrize("surface", ["hooks", "scripts", "commands"])
+@pytest.mark.parametrize("surface", _SURFACES)
 def test_dev_link_symlinks_surface_and_backs_up_original(env, surface):
     r = _run(env["home"], env["source"], "--dev-link")
     assert r.returncode == 0, r.stderr
@@ -147,7 +148,7 @@ def test_dev_link_is_idempotent(env):
     assert os.readlink(env["cache"] / "hooks") == str(env["source"] / "hooks")
 
 
-@pytest.mark.parametrize("surface", ["hooks", "scripts", "commands"])
+@pytest.mark.parametrize("surface", _SURFACES)
 def test_dev_link_off_restores_surface_from_backup(env, surface):
     _run(env["home"], env["source"], "--dev-link")
     r = _run(env["home"], env["source"], "--dev-link=off")
@@ -176,7 +177,7 @@ def test_dev_link_off_when_not_linked_is_noop(env):
 def test_missing_source_surface_warns_and_skips(env, tmp_path):
     sparse_source = tmp_path / "sparse-src"
     (sparse_source / "hooks").mkdir(parents=True)
-    # scripts/ and commands/ intentionally absent
+    # scripts/, commands/ and skills/ intentionally absent
 
     r = _run(env["home"], sparse_source, "--dev-link")
     assert r.returncode == 0, r.stderr

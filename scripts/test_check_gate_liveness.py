@@ -171,6 +171,25 @@ def test_a_gate_imported_by_a_sibling_script_is_not_flagged(tmp_path: Path) -> N
     assert gl.check_uninvoked_gate(tmp_path) == []
 
 
+def test_a_gate_whose_only_caller_is_a_skill_body_is_not_flagged(tmp_path: Path) -> None:
+    """A skill body instructs a model to run the gate, which is an invocation."""
+    _write(tmp_path, "scripts/check_wired.py", "# a gate\n")
+    _write(tmp_path, "skills/auditing/SKILL.md", "Run `python3 scripts/check_wired.py`.\n")
+    assert gl.check_uninvoked_gate(tmp_path) == []
+
+
+def test_canary_a_skill_reference_file_is_not_an_invocation_site(tmp_path: Path) -> None:
+    """Only `SKILL.md` is a call site; reference files stay outside the scope."""
+    _write(tmp_path, "scripts/check_orphan.py", "# a gate\n")
+    _write(
+        tmp_path,
+        "skills/auditing/references/notes.md",
+        "Run `python3 scripts/check_orphan.py`.\n",
+    )
+    findings = gl.check_uninvoked_gate(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_orphan.py"]
+
+
 # -- GL05: ambient-import ------------------------------------------------------
 
 
@@ -220,6 +239,28 @@ def test_canary_a_fallback_import_in_the_handler_is_still_checked(tmp_path: Path
     _write(tmp_path, "scripts/spec_lib.py", "import yaml\n\n\ndef detect():\n    return []\n")
     _invokes(tmp_path, "scripts/check_wrapper.py")
     assert [f["file"] for f in gl.check_ambient_import(tmp_path)] == ["scripts/check_wrapper.py"]
+
+
+def test_canary_flags_a_gate_a_skill_body_runs_that_the_ambient_interpreter_cannot_load(
+    tmp_path: Path,
+) -> None:
+    """A skill body is model-read prose exactly like an agent definition."""
+    _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
+    _write(tmp_path, "skills/auditing/SKILL.md", "Run `python3 scripts/check_thing.py`.\n")
+    findings = gl.check_ambient_import(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_thing.py"]
+    assert "skills/auditing/SKILL.md:1" in findings[0]["evidence"]
+
+
+def test_a_skill_reference_file_is_outside_the_ambient_scope(tmp_path: Path) -> None:
+    """Reference-file call sites are a declared limit, not part of the scope."""
+    _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
+    _write(
+        tmp_path,
+        "skills/auditing/references/notes.md",
+        "Run `python3 scripts/check_thing.py`.\n",
+    )
+    assert gl.check_ambient_import(tmp_path) == []
 
 
 def test_a_stdlib_only_gate_is_not_flagged(tmp_path: Path) -> None:
@@ -272,7 +313,7 @@ def test_canary_a_third_party_import_inside_a_hooks_package_is_still_flagged(
 def test_an_invocation_that_resolves_its_own_interpreter_is_out_of_scope(
     tmp_path: Path,
 ) -> None:
-    """Documented scope is agent and command prose; hooks resolve an interpreter.
+    """Documented scope is agent, skill and command prose; hooks resolve an interpreter.
 
     Scope fidelity runs both ways. This asserts the computed scope is no *wider*
     than the documented one, so the check cannot quietly start reporting call

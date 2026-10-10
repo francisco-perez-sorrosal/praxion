@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -199,6 +201,39 @@ def test_c04_flags_no_description_and_no_header_comment(tmp_path: Path) -> None:
     report = classify(tmp_path)
     findings = [f for f in report["findings"] if f["check"] == "C04"]
     assert any("bare.md" in f["entity"] for f in findings)
+
+
+def _c04_entities(report: dict) -> list[str]:
+    return [f["entity"] for f in report["findings"] if f["check"] == "C04"]
+
+
+@pytest.mark.parametrize("description", ["", "TODO", "<fill this in>"])
+def test_c04_flags_a_skill_with_an_empty_or_placeholder_description(
+    tmp_path: Path, description: str
+) -> None:
+    _write(
+        tmp_path / "skills" / "stub" / "SKILL.md", _skill_md(name="stub", description=description)
+    )
+    assert _c04_entities(classify(tmp_path)) == ["skills/stub/SKILL.md"]
+
+
+def test_c04_passes_a_skill_with_a_real_description(tmp_path: Path) -> None:
+    _write(tmp_path / "skills" / "real" / "SKILL.md", _skill_md(name="real"))
+    assert _c04_entities(classify(tmp_path)) == []
+
+
+def test_c04_examines_skills_and_commands_under_their_own_keys(tmp_path: Path) -> None:
+    _write(tmp_path / "skills" / "real" / "SKILL.md", _skill_md(name="real"))
+    _write(tmp_path / "commands" / "release.md", '---\ndescription: "Cut it."\n---\n')
+    report = classify(tmp_path)
+    assert report["examined"]["C04"] == {"skill_files": 1, "command_files": 1}
+    assert report["skipped"]["C04"] is None
+
+
+def test_c04_skips_only_when_neither_skills_nor_commands_exist(tmp_path: Path) -> None:
+    report = classify(tmp_path)
+    assert report["skipped"]["C04"]["reason"] == "substrate-absent"
+    assert report["examined"]["C04"] is None
 
 
 # -- C05 ------------------------------------------------------------------------
@@ -409,3 +444,46 @@ def test_s04_does_not_examine_commands_without_hint(tmp_path: Path) -> None:
     report = classify(tmp_path)
     assert [f for f in report["findings"] if f["check"] == "S04"] == []
     assert report["examined"]["S04"]["command_files_with_hint"] == 0
+
+
+def _hinted_skill(tmp_path: Path, body: str) -> None:
+    _write(
+        tmp_path / "skills" / "greet" / "SKILL.md",
+        f'---\nname: greet\ndescription: "Greet someone."\nargument-hint: "[name]"\n---\n\n{body}\n',
+    )
+
+
+def _s04_entities(report: dict) -> list[str]:
+    return [f["entity"] for f in report["findings"] if f["check"] == "S04"]
+
+
+@pytest.mark.parametrize("body", ["Hello $ARGUMENTS.", "Hello $ARGUMENTS[1].", "Hello $0."])
+def test_s04_passes_a_hinted_skill_that_reads_its_arguments(tmp_path: Path, body: str) -> None:
+    _hinted_skill(tmp_path, body)
+    assert _s04_entities(classify(tmp_path)) == []
+
+
+def test_s04_flags_a_hinted_skill_that_never_reads_its_arguments(tmp_path: Path) -> None:
+    _hinted_skill(tmp_path, "Greet whoever is around.")
+    assert _s04_entities(classify(tmp_path)) == ["skills/greet/SKILL.md"]
+
+
+def test_s04_names_a_skill_by_its_directory_in_the_message(tmp_path: Path) -> None:
+    _hinted_skill(tmp_path, "Greet whoever is around.")
+    (finding,) = [f for f in classify(tmp_path)["findings"] if f["check"] == "S04"]
+    assert finding["message"].startswith("greet/SKILL.md declares `argument-hint`")
+
+
+@pytest.mark.parametrize("variable", ["${CLAUDE_PLUGIN_ROOT}", "${CLAUDE_SKILL_DIR}"])
+def test_s04_does_not_count_a_harness_path_variable_as_argument_use(
+    tmp_path: Path, variable: str
+) -> None:
+    _hinted_skill(tmp_path, f"Run `{variable}/scripts/greet.py`.")
+    assert _s04_entities(classify(tmp_path)) == ["skills/greet/SKILL.md"]
+
+
+def test_s04_examines_hinted_skills_and_commands_under_their_own_keys(tmp_path: Path) -> None:
+    _hinted_skill(tmp_path, "Hello $ARGUMENTS.")
+    _write(tmp_path / "commands" / "no-args.md", "---\ndescription: no args\n---\n\nBody.\n")
+    report = classify(tmp_path)
+    assert report["examined"]["S04"] == {"skill_files_with_hint": 1, "command_files_with_hint": 0}

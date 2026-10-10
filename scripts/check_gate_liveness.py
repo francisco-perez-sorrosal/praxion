@@ -202,6 +202,7 @@ _INVOCATION_GLOBS = (
     ".pre-commit-config.yaml",
     "hooks/**/*",
     "agents/*.md",
+    "skills/*/SKILL.md",
     "commands/*.md",
     ".github/workflows/*.yml",
     "scripts/*.sh",
@@ -261,7 +262,7 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
                     line=1,
                     evidence=gate.name,
                     why=(
-                        "no hook, command, agent, workflow, or sibling script "
+                        "no hook, skill, command, agent, workflow, or sibling script "
                         "invokes this gate — it catches nothing, and its own "
                         "tests cannot reveal that"
                     ),
@@ -270,9 +271,11 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
     return findings
 
 
-# Surfaces where a script runs under the *ambient* interpreter: an agent or
-# command instructs a model to type `python3 <script>` into a shell, and nothing
-# between the instruction and the process declares which interpreter that is.
+# Surfaces where a script runs under the *ambient* interpreter: an agent, skill
+# or command instructs a model to type `python3 <script>` into a shell, and
+# nothing between the instruction and the process declares which interpreter
+# that is. A skill counts by its `SKILL.md` only; a call written in one of its
+# reference files is outside this scope (a declared limit, not an oversight).
 #
 # Everything else is excluded because it resolves its own interpreter and so
 # cannot exhibit this failure: hooks and shell scripts go through
@@ -280,9 +283,9 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
 # the project environment first; and `.pre-commit-config.yaml` names its
 # interpreter in the `language:` key (`python` for a hook needing third-party
 # packages, `system` for a stdlib-only one) -- a distinction this repo already
-# draws correctly. Documented scope and computed scope are the same two globs,
+# draws correctly. Documented scope and computed scope are the same globs,
 # per the rule's own scope-fidelity clause.
-_AMBIENT_INVOCATION_GLOBS = ("agents/*.md", "commands/*.md")
+_AMBIENT_INVOCATION_GLOBS = ("agents/*.md", "skills/*/SKILL.md", "commands/*.md")
 _AMBIENT_INVOCATION = re.compile(r"\bpython3?\s+(scripts/[A-Za-z0-9_]+\.py)")
 _MISSING_MODULE_ERRORS = frozenset(
     {"ImportError", "ModuleNotFoundError", "Exception", "BaseException"}

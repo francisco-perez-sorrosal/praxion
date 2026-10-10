@@ -362,10 +362,12 @@ def test_listing_reports_a_labelled_estimate_without_an_api_key(tmp_path: Path) 
 _TODAY = date(2026, 1, 31)
 
 
-def _seed_baseline(path: Path, *, listing_ceiling: int, samples: list[dict]) -> None:
+def _seed_baseline(
+    path: Path, *, listing_ceiling: int, samples: list[dict], **extra: object
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps({"schema": 1, "listing_ceiling": listing_ceiling, "samples": samples})
+        json.dumps({"schema": 1, "listing_ceiling": listing_ceiling, "samples": samples, **extra})
     )
 
 
@@ -413,6 +415,104 @@ def test_ratchet_positive_byte_delta_blocks(
 
     assert result["governed_delta_bytes"] == 200
     assert result["ratchet_ok"] is False
+
+
+def test_ratchet_active_operator_suspension_waives_a_positive_byte_delta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dated, committed waiver turns growth into a reported note, not a block."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        ratchet_suspended={"until": "2026-02-28", "reason": "operator decision"},
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["governed_delta_bytes"] == 200
+    assert result["ratchet_ok"] is True
+    assert result["suspended_until"] == "2026-02-28"
+    assert any("not enforced" in note and "operator decision" in note for note in result["notes"])
+
+
+def test_ratchet_expired_operator_suspension_enforces_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The waiver is self-expiring: the day after `until`, growth blocks and the note says why."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        ratchet_suspended={"until": "2026-01-30", "reason": "operator decision"},
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["ratchet_ok"] is False
+    assert result["suspended_until"] is None
+    assert any("expired on 2026-01-30" in note for note in result["notes"])
+
+
+def test_ratchet_malformed_operator_suspension_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A waiver the gate cannot read enforces rather than silently honouring it."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        ratchet_suspended={"until": "soon", "reason": "operator decision"},
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["ratchet_ok"] is False
+    assert any("malformed" in note for note in result["notes"])
+
+
+def test_ratchet_suspension_does_not_waive_the_listing_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the byte delta is waived; the frozen listing ceiling is a separate tripwire."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=10,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        ratchet_suspended={"until": "2026-02-28", "reason": "operator decision"},
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=11)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["listing_over_ceiling"] is True
+    assert result["ratchet_ok"] is False
+
+
+def test_ratchet_suspension_survives_the_sample_rewrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recording today's sample rewrites the baseline; the waiver block must ride along."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        ratchet_suspended={"until": "2026-02-28", "reason": "operator decision"},
+    )
+    _stub_measurements(monkeypatch, governed_tokens=150, governed_bytes=600, listing_tokens=10)
+
+    mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    written = json.loads(baseline.read_text())
+    assert written["ratchet_suspended"] == {"until": "2026-02-28", "reason": "operator decision"}
 
 
 def test_ratchet_relocation_that_nets_non_positive_bytes_passes(

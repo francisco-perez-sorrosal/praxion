@@ -564,6 +564,28 @@ def ratchet(
     )
     governed_delta_bytes, notes = _governed_byte_delta(prior_samples, governed, today)
 
+    suspended_until = None
+    suspension = _ratchet_suspension(baseline, today)
+    if suspension is not None:
+        state, until, reason = suspension
+        if state == "active":
+            suspended_until = until
+            shown = f"{governed_delta_bytes:+d}" if governed_delta_bytes is not None else "none yet"
+            notes.append(
+                f"governed-byte delta ({shown}) not enforced: the ratchet is suspended until "
+                f"{until} by operator -- {reason}"
+            )
+        elif state == "expired":
+            notes.append(
+                f"the operator suspension recorded in the baseline expired on {until}; the "
+                "governed-byte delta is enforced again -- remove or extend `ratchet_suspended`"
+            )
+        else:
+            notes.append(
+                "`ratchet_suspended` in the baseline is malformed (it needs an ISO `until` "
+                "date); enforcing the governed-byte delta"
+            )
+
     listing_basis = _basis_label(listing)
     listing_ceiling = baseline.get("listing_ceiling")
     listing_ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
@@ -581,7 +603,10 @@ def ratchet(
         "skipped": False,
         "reason": None,
         "ratchet_ok": not listing_over_ceiling
-        and (governed_delta_bytes is None or governed_delta_bytes <= 0),
+        and (
+            suspended_until is not None or governed_delta_bytes is None or governed_delta_bytes <= 0
+        ),
+        "suspended_until": suspended_until,
         "governed_delta_bytes": governed_delta_bytes,
         "listing_over_ceiling": listing_over_ceiling,
         "governed_tokens": governed["tokens"],
@@ -590,6 +615,32 @@ def ratchet(
         "listing_ceiling": listing_ceiling,
         "notes": notes,
     }
+
+
+def _ratchet_suspension(baseline: dict, today: date) -> tuple[str, str, str] | None:
+    """The operator's `ratchet_suspended` block, classified as (state, until, reason).
+
+    An operator waives the governed-byte delta for a dated window by recording
+    `"ratchet_suspended": {"until": "YYYY-MM-DD", "reason": "...", ...}` in the
+    committed baseline -- reviewable in the diff, self-expiring, and announced by
+    the gate on every commit. Only the byte delta is waived: the frozen listing
+    ceiling is a separate tripwire and keeps biting. `state` is `active` (today is
+    on or before `until`), `expired`, or `malformed`; the last two enforce. A
+    broken waiver fails closed, unlike an absent baseline, which fails open: an
+    absent waiver is the normal state, a broken one is an operator error worth
+    surfacing rather than silently honouring or silently ignoring.
+    """
+    block = baseline.get("ratchet_suspended")
+    if block is None:
+        return None
+    if not isinstance(block, dict) or not isinstance(block.get("until"), str):
+        return ("malformed", "", "")
+    try:
+        until = date.fromisoformat(block["until"])
+    except ValueError:
+        return ("malformed", block["until"], "")
+    reason = str(block.get("reason", "")).strip() or "no reason recorded"
+    return ("active" if today <= until else "expired", block["until"], reason)
 
 
 def _governed_byte_delta(
@@ -628,6 +679,7 @@ def _ratchet_skip(reason: str) -> dict:
         "skipped": True,
         "reason": reason,
         "ratchet_ok": True,
+        "suspended_until": None,
         "governed_delta_bytes": None,
         "listing_over_ceiling": False,
         "notes": [],

@@ -2,6 +2,12 @@
   "schema": 1,
   "listing_ceiling": 9243,
   "listing_ceiling_basis": "tokenizer",
+  "ratchet_suspended": {
+    "until": "2026-11-30",
+    "reason": "user decision 2026-10-10: the always-loaded byte ratchet is circumvented for this session and the following ones while the commands-to-skills and skill-crafting-refresh pipelines run; the oldest window sample drops below today's 65,708 bytes on 2026-10-13 for reasons unrelated to that work. The pipelines' own footprint bound (bytes at or below 65,708) is graded by the verifier instead. Remove or extend this block when the window has rolled past.",
+    "set_on": "2026-10-10",
+    "by": "fperez"
+  },
   "samples": [
     {
       "date": "2026-09-07",

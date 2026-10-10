@@ -279,8 +279,9 @@ views {
 }
 ```
 
-- Steps are numbered by order of appearance; there is no syntax to set a number. A step's `-[kind]->` selects
-  its relationship kind, so a read-only step draws dashed.
+- Steps are numbered by order of appearance; there is no syntax to set a number. A step's `-[kind]->` records
+  its relationship kind, but every step draws as the one solid numbered-step line: a dynamic view carries the
+  order of its steps, and read-only against acting is the element views' job.
 - Use a dynamic view for one scenario whose order matters and is not obvious, and never to restate a static
   view. Keep it to the steps that tell the story.
 - `variant sequence` draws the same steps as a sequence diagram and needs leaf elements only; `parallel { }`

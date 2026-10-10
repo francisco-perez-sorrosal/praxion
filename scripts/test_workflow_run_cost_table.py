@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -210,3 +211,93 @@ def test_build_row_copies_the_wal_row_rather_than_aliasing_it():
     )
 
     assert (row["wal"] == wal, row["wal"] is wal) == (True, False)
+
+
+def _loaded(**overrides) -> dict:
+    loaded = {
+        "wf_id": "wf9",
+        "roster": {},
+        "transcripts": {},
+        "meta": {},
+        "wal_rows": {},
+        "unobserved_ids": [],
+        "unobserved_transcripts": {},
+        "window": None,
+        "orchestrator": _orchestrator(10, 12, 2),
+    }
+    return {**loaded, **overrides}
+
+
+def test_compute_tags_an_unobserved_helper_and_renders_the_window():
+    start = datetime(2026, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 10, 1, 12, 5, 30, tzinfo=timezone.utc)
+    loaded = _loaded(
+        roster={"a1": {"label": "alpha", "phase": "Collect", "journal_result": "done"}},
+        transcripts={"a1": _transcript_stats()},
+        meta={"a1": {"agentType": "researcher"}},
+        wal_rows={"a1": {"tokens_out": 300, "duration_ms": 5000}},
+        unobserved_ids=["h1"],
+        window={"start": start, "end": end},
+    )
+
+    report = _cost().compute(loaded)
+
+    assert report == {
+        "wf_id": "wf9",
+        "agents": [
+            {
+                "agent_id": "a1",
+                "kind": "workflow-agent",
+                "label": "alpha",
+                "phase": "Collect",
+                "agent_type": "researcher",
+                "model": "claude-x",
+                "peak_context_tokens": 1200,
+                "output_tokens": 300,
+                "turns": 4,
+                "tool_uses": 9,
+                "duration_ms": 5000,
+                "transcript": "/t/agent-a1.jsonl",
+                "journal_result": "done",
+                "wal": {"tokens_out": 300, "duration_ms": 5000},
+                "wal_agreement": "agree",
+            }
+        ],
+        "unobserved": [
+            {
+                "agent_id": "h1",
+                "kind": "unobserved-helper",
+                "label": None,
+                "phase": None,
+                "agent_type": None,
+                "model": None,
+                "peak_context_tokens": None,
+                "output_tokens": None,
+                "turns": None,
+                "tool_uses": None,
+                "duration_ms": None,
+                "transcript": None,
+                "journal_result": None,
+                "wal": None,
+                "wal_agreement": "transcript-missing",
+                "attribution": "time-window-heuristic",
+            }
+        ],
+        "window": {
+            "start": "2026-10-01T12:00:00+00:00",
+            "end": "2026-10-01T12:05:30+00:00",
+        },
+        "orchestrator": _orchestrator(10, 12, 2),
+    }
+
+
+def test_compute_with_an_empty_roster_reports_no_agents_and_a_null_window():
+    report = _cost().compute(_loaded())
+
+    assert report == {
+        "wf_id": "wf9",
+        "agents": [],
+        "unobserved": [],
+        "window": None,
+        "orchestrator": _orchestrator(10, 12, 2),
+    }

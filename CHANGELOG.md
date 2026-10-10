@@ -1,3 +1,18 @@
+## v0.47.0 (2026-10-10)
+
+### Feat
+
+- Run light reviews inside the step loop
+- Report loop agents as iterations in the spawn counter
+
+### Fix
+
+- Count an agent's distinct requests in one place
+
+### Refactor
+
+- Move the mutation-line grammar into its own leaf module
+
 ## v0.46.0 (2026-10-08)
 
 ### Feat

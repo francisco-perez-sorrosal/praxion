@@ -430,3 +430,123 @@ def test_the_goal_verb_accepts_no_location_options(repo):
 
     assert refused.exit == 4
     assert refused.doc["error"]["code"] == "usage"
+
+
+# --- The check that can complete early ------------------------------------------------------------
+
+EARLY = "check-completes-early"
+
+
+@pytest.fixture
+def two_targets(tmp_path, monkeypatch):
+    """A checkout with one passing test and two failing ones: the check can stop at two passes."""
+    monkeypatch.delenv("PYTEST_ADDOPTS", raising=False)
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, implemented=("one",))
+    monkeypatch.chdir(root)
+    return root
+
+
+def warning_codes(done) -> list[str]:
+    return [warning["code"] for warning in done.doc["warnings"]]
+
+
+def settings_warning(done) -> dict:
+    (warning,) = [w for w in done.doc["warnings"] if w["code"] == "settings-not-ignored"]
+    return warning
+
+
+def early_warning(done) -> dict:
+    (warning,) = [w for w in done.doc["warnings"] if w["code"] == EARLY]
+    return warning
+
+
+@pytest.mark.parametrize("expects", ["pass=2 fail=0", "pass>=2 fail=0", "pass=2 fail=0 pending>=0"])
+def test_a_check_that_can_complete_with_its_own_failing_test_still_failing_is_warned(
+    two_targets, expects
+):
+    done = scaffold(expects=expects)
+
+    assert done.exit == 0
+    message = early_warning(done)["message"]
+    assert "up to 1 of the 2 failing" in message
+    assert "pending=0" in message
+    assert "pass=3" in message
+    assert mentions(done.lines, EARLY)
+
+
+def test_the_warning_leaves_the_check_line_as_given(two_targets):
+    scaffold(expects="pass=2 fail=0")
+
+    plan = task_text(two_targets, "IMPLEMENTATION_PLAN.md")
+    assert f"**Check**: `{CHECK}` expects pass=2 fail=0" in plan
+
+
+@pytest.mark.parametrize(
+    "expects", ["pass=2 fail=0 pending=0", "pass>=2 fail=0 pending=0"], ids=["exact", "at-least"]
+)
+def test_a_check_that_expects_no_pending_test_is_not_warned(two_targets, expects):
+    done = scaffold(expects=expects)
+
+    assert EARLY not in warning_codes(done)
+    assert not mentions(done.lines, EARLY)
+
+
+@pytest.mark.parametrize("expects", ["pass=3 fail=0", "pass>=3 fail=0", "pass>=5 fail=0"])
+def test_a_check_that_expects_every_test_to_pass_is_not_warned(two_targets, expects):
+    done = scaffold(expects=expects)
+
+    assert EARLY not in warning_codes(done)
+
+
+def test_a_check_with_no_failing_target_at_the_baseline_is_not_warned(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, implemented=tuple(name for name, _ in FUNCTIONS))
+    monkeypatch.chdir(root)
+
+    done = scaffold(expects="pass=2 fail=0")
+
+    assert done.exit == 0
+    assert EARLY not in warning_codes(done)
+
+
+def test_the_warning_says_run_refuses_until_the_settings_file_is_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, ignored=IGNORED.replace(SETTINGS_FILE, ""))
+    monkeypatch.chdir(root)
+
+    done = scaffold()
+
+    warning = settings_warning(done)["message"]
+    assert "run refuses to start until it does" in warning
+    assert "add it to .gitignore and commit that change" in warning
+    assert "first iteration" not in warning
+
+
+def test_a_tracked_settings_file_is_told_to_stop_tracking_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, ignored=IGNORED.replace(SETTINGS_FILE, ""))
+    (root / SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (root / SETTINGS_FILE).write_text("{}\n", encoding="utf-8")
+    _run(root, "add", "-f", SETTINGS_FILE)
+    _run(root, "commit", "-qm", "track the settings file")
+    monkeypatch.chdir(root)
+
+    done = scaffold()
+
+    warning = settings_warning(done)["message"]
+    assert "stop tracking it with git rm --cached, add it to .gitignore, and commit both" in warning
+    assert "run refuses to start until it does" in warning
+
+
+def test_git_not_ignoring_the_settings_file_is_warned_in_the_printed_object_too(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    root = build_repo(tmp_path, ignored=IGNORED.replace(SETTINGS_FILE, ""))
+    monkeypatch.chdir(root)
+
+    done = scaffold()
+
+    assert "settings-not-ignored" in warning_codes(done)
+    assert mentions(done.lines, "settings-not-ignored")

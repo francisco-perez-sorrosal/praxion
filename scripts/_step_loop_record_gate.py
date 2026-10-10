@@ -1,10 +1,14 @@
 """The gate phase of `record`: run the derived scope and the step's `Check:`, write one block,
 and read the reconciler's verdict as if the request were recorded.
 
-Both runs land in one `TEST_RESULTS.md` block that ends on the deciding line, and a block already
-written for the request is read back instead of run again, so a call cut off part-way completes
-when run again. A red run fails the attempt whatever the check's expectations say: the check
-grammar has no error key, so a run red only by errors would otherwise meet it.
+Both runs land in one `TEST_RESULTS.md` block that ends on the deciding line. An ordinary step's
+block already written for the request is read back instead of run again, so a call cut off
+part-way completes when run again. A goal step's is never read back: the scope and the check run
+and the block is rewritten, whoever wrote the earlier one, because a worker that can write the task
+directory could forge a green block. Running again is safe for a goal iteration, whose effects are
+idempotent without the reuse: an applied commit is recognised by its trailer and an applied unkept
+judgement by its patch. A red run fails the attempt whatever the check's expectations say: the
+check grammar has no error key, so a run red only by errors would otherwise meet it.
 
 The reconciler reads a step's latest block for its `Mutation:` line, so the block carries the
 step's latest earlier one, set before the `Result:` lines to keep the deciding line last. A derived
@@ -91,16 +95,18 @@ class Gate:
 
 
 def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
-    """The request's gate: read back from its block when written, else run and written now."""
+    """The request's gate: an ordinary step's is read back from its block when written; else
+    (and always for a goal step) the runs are made and the block written now."""
     results = task.dir / RESULTS_FILE
-    written = recorded_gate(results, gate_heading(step.id, request))
+    goal = isinstance(step.bound, GoalBudget)
+    written = None if goal else recorded_gate(results, gate_heading(step.id, request))
     if written is not None:
         return written
     states = series_states(task.inputs)
     done = frozenset(step_id for step_id, state in states.items() if is_done(state))
     ownership = Ownership(step.id, {s.id: s.read_only for s in task.inputs.steps}, done)
     changed = paths_differing_from_head(task.repo, step.files) if step.files else ()
-    if isinstance(step.bound, GoalBudget):
+    if goal:
         scope, check = goal_runs(task.repo, step, changed)
     else:
         scope = scope_run(task.repo, changed, ownership) if changed else None

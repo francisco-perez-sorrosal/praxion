@@ -69,6 +69,7 @@ from _step_loop_gate import (  # noqa: E402
     resolve_marker,
 )
 from _step_loop_io import (  # noqa: E402
+    HOOK_WORDS_LIMIT,
     CommitInterrupted,
     CommitOutcome,
     CommitRefused,
@@ -98,6 +99,10 @@ POLL_SECONDS = 0.5
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 WIP_FILE = "WIP.md"
 TRAILER = "Step-Loop-Request: "
+_HOOKS_REFUSED = "the gate passed, but the repository's hooks refused the step-loop driver's commit"
+_HOOK_FIX = (
+    "To fix: make the declared files pass that hook; they stay staged as the attempt left them"
+)
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
 _MARKER_OF_STOP = {"completed": "complete", **{m: m for m in ("blocked", "conflict", "partial")}}
 
@@ -329,32 +334,48 @@ def await_end(
     max_turns: int | None,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
+    *,
+    exited: bool = False,
 ) -> Sighting:
-    """The agent's transcript once it shows the end, or a refusal when the wait runs out."""
+    """The agent's transcript once it shows the end, or a refusal when the wait runs out.
+
+    With `exited` the end is already known, because the process that ran the agent has exited:
+    only the flush is waited for, until the transcript names the request, within the same bounded
+    wait, and a transcript that does not show the end is not a refusal. The two refusals about
+    the transcript are then worded for a session, not for an agent."""
+    who, id_given, id_relayed = _SESSION_WORDS if exited else _AGENT_WORDS
     deadline = clock() + end_wait_seconds()
     seen = sight(repo, agent_id, max_turns)
-    while not seen.ended and clock() < deadline:
+    while not (names_request(seen.reading, request) if exited else seen.ended):
+        if clock() >= deadline:
+            break
         sleep(POLL_SECONDS)
         seen = sight(repo, agent_id, max_turns)
     if seen.path is None:
         raise RecordRefusedError(
             "agent-not-found",
-            f"record failed because no transcript of agent {agent_id} was found. To fix: pass"
-            " the agentId the Agent tool returned, under the config directory the harness uses.",
+            f"record failed because no transcript of {who} {agent_id} was found. To fix: pass"
+            f" {id_given}, under the config directory the harness uses.",
         )
     if not names_request(seen.reading, request):
         raise RecordRefusedError(
             "agent-not-for-request",
-            f"record failed because agent {agent_id} was not started on {request}. To fix:"
-            " relay the agentId of the Agent call made for this request.",
+            f"record failed because {who} {agent_id} was not started on {request}. To fix:"
+            f" relay {id_relayed} made for this request.",
         )
-    if not seen.ended:
+    if not (exited or seen.ended):
         raise RecordRefusedError(
             "agent-running",
             f"record failed because agent {agent_id} has not ended; {request} stays pending."
             " To fix: wait for its completion notification, then run the same record again.",
         )
     return seen
+
+
+# What a refusal about the transcript calls the thing it is about: (who, the id to pass, the id
+# to relay).
+_AGENT_WORDS = ("agent", "the agentId the Agent tool returned", "the agentId of the Agent call")
+_SESSION_WORDS = ("session", "the session id the run reported", "the session id of the run")
 
 
 def sight(repo: Path, agent_id: str, max_turns: int | None) -> Sighting:
@@ -464,8 +485,7 @@ def judge_commit(task: TaskView, request: str, outcome: CommitOutcome) -> Commit
     if isinstance(outcome, NothingToCommit):
         return Committing(None, None)
     if isinstance(outcome, CommitRefused):
-        refused = "the step-loop driver's commit was refused by the repository's hooks"
-        return Committing(None, f"{refused}: {_first_line(outcome.detail)}")
+        return Committing(None, f"{_HOOKS_REFUSED}: {_one_line(outcome.detail)}. {_HOOK_FIX}")
     if isinstance(outcome, CommitInterrupted):
         why = f"the step-loop driver's commit did not finish: {_first_line(outcome.detail)}"
         _save_snapshot(task, request, outcome.after.patch_text(), why)
@@ -496,6 +516,12 @@ def _lock_note(repo: Path) -> str:
     found = run_git(repo, "rev-parse", "--git-path", "index.lock")
     lock = repo / found.stdout.strip() if found.returncode == 0 else None
     return f"; {lock} exists: remove it once no git is running" if lock and lock.exists() else ""
+
+
+def _one_line(text: str) -> str:
+    """The text as one line of at most the hook-words limit (git's own failures run longer)."""
+    line = " ".join(text.split()) or "no detail"
+    return line if len(line) <= HOOK_WORDS_LIMIT else line[: HOOK_WORDS_LIMIT - 1] + "…"
 
 
 def _first_line(text: str) -> str:

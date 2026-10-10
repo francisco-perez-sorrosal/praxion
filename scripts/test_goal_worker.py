@@ -6,12 +6,19 @@ started and prints what the test scripted. A real `claude` is never started.
 
 from __future__ import annotations
 
+import _thread
+import contextlib
+import errno
 import json
 import os
+import signal
 import stat
+import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +27,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import _goal_worker as worker_module  # noqa: E402
 import step_loop  # noqa: E402
+from _goal_run import writable_rules  # noqa: E402
 from _goal_worker import (  # noqa: E402
     HeadlessWorker,
     resolver_invocation,
@@ -27,6 +35,7 @@ from _goal_worker import (  # noqa: E402
     terminal_marker,
 )
 from _step_loop_files import WorkerEnd, read_worker_end  # noqa: E402
+from _step_loop_io import KILL_GRACE_SECONDS, kill_group  # noqa: E402
 
 REQUEST_ID = "s1-a1-implement"
 PROMPT = f"Task slug: demo\nSpawn request: {REQUEST_ID}\nRead the files, then stop."
@@ -46,7 +55,9 @@ FORBIDDEN_OPTIONS = (
     "--bare",
     "--agent",
 )
-FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"]
+READ_TOOLS = ["Read", "Glob", "Grep"]
+SLUG = "demo"
+WIDGET = "src/widget.py"
 
 _STAND_IN = """#!{python}
 import json, os, subprocess, sys, time
@@ -211,13 +222,53 @@ def test_no_forbidden_option_is_ever_passed(harness, forbidden):
     assert forbidden not in harness.only_call()["argv"]
 
 
-def test_the_allow_list_names_the_file_tools_the_check_and_the_resolver_only(harness):
+def the_allow_list_for(harness, *files: str) -> list[str]:
+    """Spawn a worker whose edits are those the goal grants for `files`; its allow-list."""
+    task_dir = harness.repo / ".ai-work" / SLUG
+    harness.print_result()
+    harness.spawn(writable=writable_rules(files, harness.repo, task_dir))
+    return option_values(harness.only_call()["argv"], "--allowedTools")
+
+
+def test_the_allow_list_names_the_read_tools_the_files_the_check_and_the_resolver_only(harness):
+    allowed = the_allow_list_for(harness, WIDGET)
+
+    assert allowed == [
+        *READ_TOOLS,
+        f"Edit(/{WIDGET})",
+        f"Edit(/.ai-work/{SLUG}/WIP.md)",
+        f"Bash({CHECK}:*)",
+        f"Bash({RESOLVER}:*)",
+    ]
+
+
+def test_a_directory_among_the_files_is_allowed_whole(harness):
+    allowed = the_allow_list_for(harness, "pkg/")
+
+    assert allowed[len(READ_TOOLS)] == "Edit(/pkg/**)"
+
+
+def test_a_task_directory_outside_the_repository_is_allowed_by_its_absolute_path(harness):
+    rules = writable_rules((WIDGET,), harness.repo, harness.task_dir)
+
+    assert rules == (f"Edit(/{WIDGET})", f"Edit(/{harness.task_dir.resolve()}/WIP.md)")
+
+
+def test_a_worker_with_nothing_writable_is_read_only(harness):
     harness.print_result()
 
     harness.spawn()
 
     allowed = option_values(harness.only_call()["argv"], "--allowedTools")
-    assert allowed == [*FILE_TOOLS, f"Bash({CHECK}:*)", f"Bash({RESOLVER}:*)"]
+    assert allowed == [*READ_TOOLS, f"Bash({CHECK}:*)", f"Bash({RESOLVER}:*)"]
+
+
+def test_no_server_of_the_persons_own_reaches_the_worker(harness):
+    harness.print_result()
+
+    harness.spawn()
+
+    assert "--strict-mcp-config" in harness.only_call()["argv"]
 
 
 def test_a_parenthesised_check_is_allowed_up_to_its_pytest_token():
@@ -380,4 +431,241 @@ def test_a_reissued_request_without_a_worker_file_is_refused_not_started_blind(h
 
     assert isinstance(returned, step_loop.NotStarted)
     assert "may have run" in returned.reason
+    assert harness.calls() == []
+
+
+# --- A worker's process: interrupt, bound, and a descendant holding the output ---------------
+
+LINGERING_FILE = "lingering.json"
+WORKER_PID_FILE = "worker.pid"
+GRANDCHILD_PID_FILE = "grandchild.pid"
+GRANDCHILD_SLEEP_SECONDS = 60
+START_LIMIT_SECONDS = 20
+POLL_SECONDS = 0.02
+RESULT_BOUND_SECONDS = 3
+PROMPT_RETURN_SECONDS = 10
+
+_LINGERING_STAND_IN = """#!{python}
+import json, os, subprocess, sys, time
+here = os.path.dirname(os.path.abspath(__file__))
+behaviour = json.load(open(os.path.join(here, "lingering.json")))
+
+
+def note(name, pid):
+    path = os.path.join(here, name)
+    with open(path + ".tmp", "w") as handle:
+        handle.write(str(pid))
+    os.replace(path + ".tmp", path)
+
+
+note("worker.pid", os.getpid())
+if behaviour["grandchild"]:
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep({sleep})"])
+    note("grandchild.pid", child.pid)
+sys.stdout.write(behaviour["stdout"])
+sys.stdout.flush()
+time.sleep(behaviour["linger"])
+"""
+
+
+def lingering_stand_in(
+    harness: Harness, *, stdout: str = "", grandchild: bool = False, linger: float = 0
+) -> None:
+    """A `claude` that records its pid, optionally starts a long-lived background process that
+    inherits its output, prints `stdout` and stays alive `linger` seconds."""
+    behaviour = {"stdout": stdout, "grandchild": grandchild, "linger": linger}
+    (harness.bin_dir / LINGERING_FILE).write_text(json.dumps(behaviour), encoding="utf-8")
+    program = harness.bin_dir / "claude"
+    source = _LINGERING_STAND_IN.format(python=PYTHON, sleep=GRANDCHILD_SLEEP_SECONDS)
+    program.write_text(source, encoding="utf-8")
+    program.chmod(program.stat().st_mode | stat.S_IXUSR)
+
+
+def recorded_pids(harness: Harness) -> list[int]:
+    names = (WORKER_PID_FILE, GRANDCHILD_PID_FILE)
+    files = [harness.bin_dir / name for name in names]
+    return [int(file.read_text(encoding="utf-8")) for file in files if file.exists()]
+
+
+def is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def all_gone_within_the_kill_grace(pids: list[int]) -> bool:
+    deadline = time.monotonic() + KILL_GRACE_SECONDS
+    while any(is_alive(pid) for pid in pids) and time.monotonic() < deadline:
+        time.sleep(POLL_SECONDS)
+    return not any(is_alive(pid) for pid in pids)
+
+
+@pytest.fixture
+def default_interrupt():
+    """An interrupt raised into the test is delivered even when the run inherited an ignored
+    one (a detached run); the earlier disposition comes back afterwards."""
+    previous = signal.signal(signal.SIGINT, signal.default_int_handler)
+    yield
+    signal.signal(signal.SIGINT, previous)
+
+
+@pytest.fixture
+def stand_in_pids(harness):
+    """Every process a stand-in started is killed when the test ends, whatever the outcome."""
+    yield
+    for pid in recorded_pids(harness):
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
+
+
+@pytest.fixture
+def interrupt_once_started(harness, stand_in_pids, default_interrupt):
+    """Returns a function that arms a timer thread: it raises `KeyboardInterrupt` in the main
+    thread once the stand-in has started its background process. The thread is stopped when
+    the test ends, so a late interrupt never lands in another test."""
+    started = harness.bin_dir / GRANDCHILD_PID_FILE
+    stopped = threading.Event()
+
+    def wait_then_interrupt() -> None:
+        deadline = time.monotonic() + START_LIMIT_SECONDS
+        while not (started.exists() or stopped.is_set() or time.monotonic() > deadline):
+            time.sleep(POLL_SECONDS)
+        if not stopped.is_set():
+            _thread.interrupt_main()
+
+    thread = threading.Thread(target=wait_then_interrupt, daemon=True)
+    yield thread.start
+    stopped.set()
+    if thread.is_alive():
+        thread.join()
+
+
+def test_an_interrupt_leaves_neither_the_worker_nor_its_background_process_alive(
+    harness, interrupt_once_started
+):
+    lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
+    interrupt_once_started()
+
+    with pytest.raises(KeyboardInterrupt):
+        harness.spawn()
+
+    pids = recorded_pids(harness)
+    assert len(pids) == 2
+    assert all_gone_within_the_kill_grace(pids)
+
+
+def test_an_interrupted_worker_leaves_no_worker_file(harness, interrupt_once_started):
+    lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
+    interrupt_once_started()
+
+    with pytest.raises(KeyboardInterrupt):
+        harness.spawn()
+
+    assert not list(harness.task_dir.iterdir())
+
+
+def test_a_worker_that_exited_with_its_result_is_recorded_while_a_descendant_holds_the_output(
+    harness, stand_in_pids
+):
+    lingering_stand_in(harness, stdout=json.dumps(result_object()), grandchild=True)
+    began = time.monotonic()
+
+    returned = harness.spawn(timeout=GRANDCHILD_SLEEP_SECONDS / 2)
+
+    assert returned == step_loop.AgentRan(SESSION, "complete")
+    assert time.monotonic() - began < PROMPT_RETURN_SECONDS
+
+
+def test_a_worker_killed_at_its_bound_after_printing_a_result_is_recorded_with_it(
+    harness, stand_in_pids
+):
+    lingering_stand_in(harness, stdout=json.dumps(result_object()), linger=30)
+
+    returned = harness.spawn(timeout=RESULT_BOUND_SECONDS)
+
+    assert returned == step_loop.AgentRan(SESSION, "complete")
+    document = harness.worker_file()
+    assert document["exit"] == -signal.SIGKILL
+    assert document["result"]["session_id"] == SESSION
+
+
+def test_a_worker_killed_at_its_bound_before_printing_any_result_is_not_started(
+    harness, stand_in_pids
+):
+    lingering_stand_in(harness, linger=30)
+
+    returned = harness.spawn(timeout=0.5)
+
+    assert isinstance(returned, step_loop.NotStarted)
+    assert "stopped after 0.5 s" in returned.reason
+    assert harness.worker_file()["result"] is None
+
+
+def test_killing_a_process_group_that_is_already_gone_raises_nothing():
+    process = subprocess.Popen([PYTHON, "-c", "pass"], start_new_session=True)
+    process.wait()
+
+    kill_group(process)
+
+    assert process.poll() == 0
+
+
+def test_a_claude_that_cannot_be_executed_is_not_started_and_names_the_error(harness):
+    program = harness.bin_dir / "claude"
+    program.write_text("#!/bin/sh\n", encoding="utf-8")
+    program.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    harness.monkeypatch.setenv("PATH", str(harness.bin_dir))
+
+    returned = harness.spawn()
+
+    assert isinstance(returned, step_loop.NotStarted)
+    assert os.strerror(errno.EACCES) in returned.reason
+    assert "To fix:" in returned.reason
+    assert not list(harness.task_dir.iterdir())
+
+
+def test_a_worker_that_printed_no_result_object_is_not_started_with_a_fix_sentence(harness):
+    harness.script("the worker crashed before it could report", code=3)
+
+    returned = harness.spawn()
+
+    assert "To fix:" in returned.reason
+
+
+def test_a_reissued_request_without_a_worker_file_is_refused_with_a_fix_sentence(harness):
+    harness.print_result()
+
+    returned = harness.spawn(reissued=True)
+
+    assert "To fix:" in returned.reason
+
+
+def test_a_group_that_answers_not_permitted_to_the_kill_does_not_replace_the_interrupt(
+    harness, interrupt_once_started
+):
+    def refuse_after_killing(process):
+        kill_group(process)
+        raise PermissionError(errno.EPERM, os.strerror(errno.EPERM))
+
+    harness.monkeypatch.setattr(worker_module, "kill_group", refuse_after_killing)
+    lingering_stand_in(harness, grandchild=True, linger=GRANDCHILD_SLEEP_SECONDS)
+    interrupt_once_started()
+
+    with pytest.raises(KeyboardInterrupt):
+        harness.spawn()
+
+
+def test_a_failure_to_open_the_output_file_is_raised_not_reported_as_a_missing_claude(harness):
+    harness.print_result()
+
+    def no_temporary_directory(*args):
+        raise FileNotFoundError(errno.ENOENT, "no usable temporary directory")
+
+    unusable = SimpleNamespace(TemporaryFile=no_temporary_directory)
+    harness.monkeypatch.setattr(worker_module, "tempfile", unusable)
+
+    with pytest.raises(FileNotFoundError):
+        harness.spawn()
     assert harness.calls() == []

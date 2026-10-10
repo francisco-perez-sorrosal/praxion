@@ -1,11 +1,20 @@
 """The headless worker: one fresh `claude -p` process per spawn request, its result read once.
 
 `HeadlessWorker` is a `Spawner` (see `step_loop.py`). It never continues an earlier session and
-never widens the worker's permissions: the worker may read and edit files, and run the goal's
-check and the test-scope resolver, nothing else. After the process exits, its standard output
-is parsed once at this boundary into the result object, written to `WORKER_<request>.json`
-before `record` is called, and read back from that file when a request comes again, so a
-request whose worker may have run is never started a second time.
+never widens the worker's permissions. The profile it starts with:
+
+- it reads (`Read`, `Glob`, `Grep`) and runs the goal's check and the test-scope resolver;
+- it edits only the paths in `writable`, as `Edit(...)` rules (one rule covers every tool that
+  edits files); an empty `writable` is a read-only worker;
+- it is denied what `denied` lists, which beats every pre-approval its settings files grant;
+- it loads no MCP server the person did not name on this command line (`--strict-mcp-config`).
+
+The process leads its own group and writes to a file, so an interrupt or the wall-clock bound
+kills the whole group and a descendant that keeps the output open cannot hold the driver. After
+the process ends, however it ended, its standard output is parsed once at this boundary into the
+result object (a worker killed after it printed one keeps it), written to the task
+directory's worker file before `record` is called, and read back from that file when a request
+comes again, so a request whose worker may have run is never started a second time.
 
 Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """
@@ -13,11 +22,11 @@ Runs on the plain `python3` the scripts are invoked with, so no `X | Y` at runti
 from __future__ import annotations
 
 import json
-import os
 import re
 import signal
 import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,14 +35,15 @@ from typing import Any
 from _step_loop_cli import SCRIPT as DRIVER_SCRIPT
 from _step_loop_cli import invocation
 from _step_loop_files import NoWorkerResult, WorkerEnd, read_worker_end, write_worker_end
+from _step_loop_io import kill_group, sigterm_as_exit
 
 DEFAULT_MAX_TURNS = 40
 DEFAULT_MAX_BUDGET_USD = 2.00
-WORKER_TIMEOUT_SECONDS = 3600
+WALL_CLOCK_SECONDS = 3600
 STDOUT_TAIL_CHARS = 2000
 PROGRAM = "claude"
 RESOLVER_SCRIPT = "resolve_test_scope.py"
-_FILE_TOOLS = ("Read", "Edit", "Write", "Glob", "Grep")
+_READ_TOOLS = ("Read", "Glob", "Grep")
 _TERMINAL_MARKERS = ("complete", "blocked", "conflict", "partial")
 _RESULT_KEYS = ("session_id", "subtype")
 _PYTEST_PREFIX = re.compile(r"(.*?(?:^|[\s/])pytest)(?=\s|$)")
@@ -80,6 +90,10 @@ def _result_object(stdout: str) -> dict[str, Any] | None:
     return document if usable else None
 
 
+class _LaunchError(Exception):
+    """The process never started; the message is the `NotStarted` reason."""
+
+
 @dataclass(frozen=True)
 class _Exit:
     code: int
@@ -97,10 +111,14 @@ class HeadlessWorker:
     resolver: str
     max_turns: int = DEFAULT_MAX_TURNS
     max_budget_usd: float = DEFAULT_MAX_BUDGET_USD
-    timeout: float = WORKER_TIMEOUT_SECONDS
+    timeout: float = WALL_CLOCK_SECONDS
+    writable: tuple[str, ...] = ()
+    denied: tuple[str, ...] = ()
 
     def argv(self, request: Mapping[str, Any]) -> list[str]:
         call = request["agent_call"]
+        allowed = (*_READ_TOOLS, *self.writable, shell_rule(self.check), shell_rule(self.resolver))
+        refused = ["--disallowedTools", *self.denied] if self.denied else []
         return [
             PROGRAM, "-p", call["prompt"],
             "--model", call["model"],
@@ -108,25 +126,35 @@ class HeadlessWorker:
             "--max-budget-usd", f"{self.max_budget_usd:.2f}",
             "--permission-mode", "dontAsk",
             "--permission-prompts", "none",
-            "--allowedTools", *_FILE_TOOLS, shell_rule(self.check), shell_rule(self.resolver),
+            "--allowedTools", *allowed,
+            *refused,
+            "--strict-mcp-config",
             "--output-format", "json",
         ]  # fmt: skip
 
+    def not_started(self, reason: str) -> Any:
+        """The driver's `NotStarted` for a request this worker could not start."""
+        return _return_types()[1](reason)
+
     def spawn(self, request: Mapping[str, Any]) -> Any:
-        ran, not_started = _return_types()
+        ran = _return_types()[0]
         earlier = read_worker_end(self.task_dir, request["id"])
         if isinstance(earlier, WorkerEnd):
             return ran(earlier.session_id, terminal_marker(earlier.final_text))
         if isinstance(earlier, NoWorkerResult):
-            return not_started(earlier.detail)
+            return self.not_started(earlier.detail)
         if request.get("reissued"):
-            return not_started("a reissued request has no worker file, so its worker may have run")
+            return self.not_started(
+                "a reissued request has no worker file, so its worker may have run."
+                " To fix: inspect the repository for what that worker changed, then decide"
+                " whether to run again"
+            )
         argv = self.argv(request)
         try:
             ended = self._run(argv)
-        except FileNotFoundError:
-            return not_started(f"no `{PROGRAM}` on PATH")
-        result = None if ended.timed_out else _result_object(ended.stdout)
+        except _LaunchError as failed:
+            return self.not_started(str(failed))
+        result = _result_object(ended.stdout)
         write_worker_end(
             self.task_dir,
             request["id"],
@@ -141,27 +169,64 @@ class HeadlessWorker:
             cause = (
                 f"stopped after {self.timeout:g} s" if ended.timed_out else f"exited {ended.code}"
             )
-            return not_started(f"the worker {cause} and printed no result object")
+            return self.not_started(
+                f"the worker {cause} and printed no result object."
+                " To fix: read the worker file in the task directory for what it printed,"
+                " then run again"
+            )
         return ran(result["session_id"], terminal_marker(result.get("result")))
 
     def _run(self, argv: list[str]) -> _Exit:
-        """Start the process in its own group, input closed; kill the group at the bound."""
-        process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
-            argv,
-            cwd=self.repo,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            start_new_session=True,
-        )
-        try:
-            stdout, _ = process.communicate(timeout=self.timeout)
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            stdout, _ = process.communicate()
-            return _Exit(process.returncode, stdout or "", timed_out=True)
-        return _Exit(process.returncode, stdout, timed_out=False)
+        """Start the process in its own group, input closed, output in a file; wait for it.
+
+        The group dies at the wall-clock bound and on any interrupt, so no worker (nor a
+        process it started) outlives the driver. A worker that exits on its own is not followed
+        by a group kill. Its output is read once, whatever ended it. Only a failure to launch
+        is reported as `_LaunchError`; any later error propagates, since the worker may have run.
+        """
+        with tempfile.TemporaryFile() as output, sigterm_as_exit():
+            try:
+                process = subprocess.Popen(  # noqa: S603 -- a fixed argument vector, no shell
+                    argv,
+                    cwd=self.repo,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                raise _LaunchError(_launch_reason(exc)) from exc
+            timed_out = False
+            try:
+                process.wait(timeout=self.timeout)
+            except subprocess.TimeoutExpired:
+                _kill_worker_group(process)
+                timed_out = True
+            except BaseException:  # an interrupt must not leave the worker editing the tree
+                _kill_worker_group(process)
+                raise
+            output.seek(0)
+            stdout = output.read().decode("utf-8", errors="replace")
+        code = process.returncode if process.returncode is not None else -signal.SIGKILL
+        return _Exit(code, stdout, timed_out)
+
+
+def _launch_reason(exc: OSError) -> str:
+    if isinstance(exc, FileNotFoundError):
+        return f"no `{PROGRAM}` on PATH. To fix: install it or put it on PATH, then run again"
+    return (
+        f"`{PROGRAM}` could not be started: {exc}."
+        f" To fix: make `{PROGRAM}` on PATH an executable program, then run again"
+    )
+
+
+def _kill_worker_group(process: subprocess.Popen[bytes]) -> None:
+    """Kill the worker's group. A group left holding only a zombie answers "not permitted" to
+    the signal; it is as good as gone, and must not replace the interrupt being handled."""
+    try:
+        kill_group(process)
+    except PermissionError:
+        process.poll()
 
 
 def _return_types() -> tuple[Any, Any]:

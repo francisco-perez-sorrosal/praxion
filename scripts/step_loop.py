@@ -304,9 +304,8 @@ def execute(argv: Sequence[str], *, echo: Sequence[str] = ()) -> Reply:
     except CallerError as error:
         return _failure(args, error.code, error.message, error.counts)
     except Exception:  # noqa: BLE001 -- the contract: any failure is one internal envelope
-        message = "step_loop failed because of an unexpected error. To fix: read stderr."
-        reply = _failure(args, cli.INTERNAL, message, None)
-        return replace(reply, lines=(*reply.lines, traceback.format_exc().rstrip()))
+        trace = traceback.format_exc().rstrip()  # the envelope carries it: `drive` keeps no lines
+        return _failure(args, cli.INTERNAL, f"step_loop failed unexpectedly:\n{trace}", None)
 
 
 def _failure(
@@ -379,7 +378,7 @@ def run_goal(args: argparse.Namespace) -> Reply:
     """The terminal form of the goal loop: `drive` with a headless worker; its last envelope."""
     task = read_task(args)
     worker = _goal_run.start_worker(task.inputs.steps, task.repo, task.dir, args)
-    reporter = _goal_run.Reporter(task.dir)
+    reporter = worker.reporter()
     location = _goal_run.location(task.repo, task.base_ref, args)
     doc = drive(worker, args.slug, location, echo=True, observe=reporter)
     if doc["outcome"] == "spawn":  # the loop ends on a spawn only when its worker never started

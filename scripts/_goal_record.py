@@ -20,17 +20,19 @@ Acted on as follows:
 * `Progressing`: the step's `Files:` are committed by explicit path with the request's trailer
   (outer-loop and `Read-only:` paths never), and the step is ticked when its check is met.
 * `Unkept`: nothing is committed; the whole tree's diff is saved as `ITERATION_<request>.patch`
-  and the `Files:` return to the last commit, so the next iteration starts from the last kept
-  unit. A gate that was not red gains a refusal line saying why, so it is never verified.
+  and the step's `Files:` return to the last kept unit (a change outside them is neither
+  committed nor restored). A gate that was not red gains a refusal line saying why, so it is
+  never verified.
 * `Protected`: nothing is committed or restored; the tree is saved as
   `TREE_SNAPSHOT_<request>.patch` and a refusal line names the paths, which stops the loop for
   a person (the same stop a disturbed commit makes).
 
-A worker that left a `WORKER_<request>.json` has exited: it is never waited for, only its
+A worker that left its result file has exited: it is never waited for, only its
 transcript is, for the flush. Its file gives the turn bound, the cost and, for the three
 `error_*` subtypes, the stop reason. Every effect is keyed by the request, so a call cut off
 part-way completes when run again: a HEAD commit with the trailer means `Progressing`, an
-`ITERATION_<request>.patch` means `Unkept`, and a gate block already written is reused.
+`ITERATION_<request>.patch` means `Unkept`, and, for an ordinary step, a gate block already
+written is reused.
 
 Runs on the bare `python3` the scripts are invoked with, so no `X | Y` at runtime.
 """
@@ -39,7 +41,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, NamedTuple, Union, cast
 
@@ -54,7 +56,6 @@ from _step_loop_files import (
     WorkerEnd,
     append_ledger_record,
     gate_heading,
-    names_request,
     read_worker_end,
     write_iteration_patch,
     write_tree_snapshot,
@@ -94,7 +95,7 @@ KEPT_WORDS = "kept as progress"
 NOT_KEPT_PREFIX = "not kept: "
 SUMMARY_SEPARATOR = "; "
 
-_DIRECTORY_SUFFIXES = ("/**", "/*", "/")
+_DIRECTORY_END_RE = re.compile(r"(?:/\*\*|/\*|/)+$")
 _GLOB_CHARACTERS = frozenset("*?[")
 _PENDING_TOKEN_RE = re.compile(r"(?:^|\s)pending=(?P<count>[0-9]+)(?:\s|$)")
 _SECTION_END_RE = re.compile(r"^#{1,2}[ \t]")
@@ -165,18 +166,24 @@ def changed_protected(changed: Iterable[str], protected: Iterable[str]) -> tuple
     return tuple(path for path in changed if is_protected(path, entries))
 
 
+def entry_path(entry: str) -> str:
+    """The path an entry names, spelled one way: a test node id is cut to its file, a leading
+    `./` is dropped and every trailing `/**`, `/*` and `/` is removed."""
+    return _DIRECTORY_END_RE.sub("", _named(entry))
+
+
+def names_directory(entry: str) -> bool:
+    """Whether the entry is spelled as a directory: it ends in `/`, `/*` or `/**`."""
+    return _DIRECTORY_END_RE.search(_named(entry)) is not None
+
+
+def _named(entry: str) -> str:
+    return entry.partition(NODE_SEPARATOR)[0].removeprefix("./")
+
+
 def _covers(entry: str, path: str) -> bool:
-    base = _entry_base(entry)
+    base = entry_path(entry)
     return path == base or path.startswith(f"{base}/") or _glob_covers(entry, path)
-
-
-def _entry_base(entry: str) -> str:
-    """The path an entry names: a test node id protects its whole file."""
-    base = entry.partition(NODE_SEPARATOR)[0].removeprefix("./")
-    for suffix in _DIRECTORY_SUFFIXES:
-        if base.endswith(suffix):
-            return base.removesuffix(suffix)
-    return base
 
 
 def _glob_covers(entry: str, path: str) -> bool:
@@ -357,10 +364,7 @@ def take_end(task: TaskView, asked: SpawnRequest, agent_id: str, relayed: str) -
     max_turns = (
         worker.max_turns if worker else ordinary.declared_max_turns(asked.agent_call.subagent_type)
     )
-    if found is None:
-        seen = ordinary.await_end(task.repo, request, agent_id, max_turns)
-    else:
-        seen = await_exited(task, request, agent_id, max_turns)
+    seen = ordinary.await_end(task.repo, request, agent_id, max_turns, exited=found is not None)
     marker, stop_reason, warnings = ordinary.read_return(
         seen, cast(Marker, relayed), asked, max_turns
     )
@@ -400,36 +404,6 @@ def exited_worker(
             f" {found.session_id}, not {agent_id}. To fix: relay the session id the run reported.",
         )
     return found
-
-
-def await_exited(
-    task: TaskView,
-    request: str,
-    agent_id: str,
-    max_turns: int | None,
-    clock: Callable[[], float] = ordinary.time.monotonic,
-    sleep: Callable[[float], None] = ordinary.time.sleep,
-) -> ordinary.Sighting:
-    """The exited worker's transcript once it names the request: its end is known from the file,
-    so only the flush is waited for, within the bounded end wait."""
-    deadline = clock() + ordinary.end_wait_seconds()
-    seen = ordinary.sight(task.repo, agent_id, max_turns)
-    while not names_request(seen.reading, request) and clock() < deadline:
-        sleep(ordinary.POLL_SECONDS)
-        seen = ordinary.sight(task.repo, agent_id, max_turns)
-    if seen.path is None:
-        raise ordinary.RecordRefusedError(
-            "agent-not-found",
-            f"record failed because no transcript of session {agent_id} was found. To fix: pass"
-            " the session id the run reported, under the config directory the harness uses.",
-        )
-    if not names_request(seen.reading, request):
-        raise ordinary.RecordRefusedError(
-            "agent-not-for-request",
-            f"record failed because session {agent_id} was not started on {request}. To fix:"
-            " relay the session id of the run made for this request.",
-        )
-    return seen
 
 
 # --- Acting on the judgement ---

@@ -21,9 +21,17 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from _git_runner import GitUnavailableError, run_git
-from _goal_record import BASELINE_REQUEST, PROGRESS_HEADING, is_protected, protected_set
+from _goal_record import (
+    BASELINE_REQUEST,
+    PROGRESS_HEADING,
+    entry_path,
+    is_protected,
+    names_directory,
+    protected_set,
+)
 from _loop_fields import (
     Check,
+    Expectation,
     GoalBudget,
     Met,
     UnreadableCheck,
@@ -44,9 +52,17 @@ SETTINGS_FILE = ".claude/settings.local.json"
 _TASK_FILES = (PLAN_FILE, WIP_FILE, BRIEF_FILE, RESULTS_FILE)
 STEP_ID, TITLE_LIMIT = "1", 60
 PRIMARY_CHECKOUT, SETTINGS_NOT_IGNORED = "primary-checkout", "settings-not-ignored"
+CHECK_COMPLETES_EARLY = "check-completes-early"
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-_DIRECTORY_SUFFIXES = ("/**", "/*", "/")
-_NODE_SEPARATOR = "::"
+
+
+@dataclass(frozen=True)
+class Baseline:
+    """The check run once: the gate block's lines, the tests passing and the targets failing."""
+
+    lines: tuple[str, ...]
+    passes: int
+    targets: int
 
 
 @dataclass(frozen=True)
@@ -79,17 +95,17 @@ def scaffold(args: argparse.Namespace) -> tuple[dict[str, Any], tuple[str, ...]]
     plan = _plan_text(spec)
     _require_reads_back(spec, plan)
     settings = repo / SETTINGS_FILE
-    rules = tuple(_deny_rule(entry, repo) for entry in protected_set(spec.protect))
+    rules = tuple(edit_rule(entry, repo) for entry in protected_set(spec.protect))
     merged = _merged_settings(settings, rules)
     baseline = _baseline(repo, spec)
     task.mkdir(parents=True, exist_ok=True)
     write_atomic(task / PLAN_FILE, plan)
     write_atomic(task / WIP_FILE, _wip_text(spec))
     write_atomic(task / BRIEF_FILE, _brief_text(spec))
-    write_gate_block(task / RESULTS_FILE, STEP_ID, BASELINE_REQUEST, baseline)
+    write_gate_block(task / RESULTS_FILE, STEP_ID, BASELINE_REQUEST, baseline.lines)
     settings.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(settings, json.dumps(merged, indent=2) + "\n")
-    return _report(repo, spec)
+    return _report(repo, spec, baseline)
 
 
 def _refuse(why: str, fix: str) -> NoReturn:
@@ -199,8 +215,8 @@ def _require_reads_back(spec: GoalSpec, plan: str) -> None:
         )
 
 
-def _baseline(repo: Path, spec: GoalSpec) -> tuple[str, ...]:
-    """The check run once: the lines of the gate block that reads as the goal's unmet start."""
+def _baseline(repo: Path, spec: GoalSpec) -> Baseline:
+    """The check run once: the gate block that reads as the goal's unmet start, and its counts."""
     command = spec.check.command
     ran = run_check(repo, command)
     if ran.problem is not None:
@@ -219,16 +235,14 @@ def _baseline(repo: Path, spec: GoalSpec) -> tuple[str, ...]:
             "the check already meets what it expects, so no iteration could complete it",
             "state a goal the check does not yet meet",
         )
-    return body
+    return Baseline(body, summary.counts.passed, run.pending)
 
 
-def _deny_rule(entry: str, repo: Path) -> str:
+def edit_rule(entry: str, repo: Path) -> str:
     """An edit rule anchored with `/`: a bare file name would match at any depth."""
-    base = entry.partition(_NODE_SEPARATOR)[0].removeprefix("./")
-    directory = base.endswith(_DIRECTORY_SUFFIXES)
-    for suffix in _DIRECTORY_SUFFIXES:
-        base = base.removesuffix(suffix)
-    return f"Edit(/{base}/**)" if directory or (repo / base).is_dir() else f"Edit(/{base})"
+    base = entry_path(entry)
+    directory = names_directory(entry) or (repo / base).is_dir()
+    return f"Edit(/{base}/**)" if directory else f"Edit(/{base})"
 
 
 def _merged_settings(path: Path, rules: tuple[str, ...]) -> dict[str, Any]:
@@ -255,18 +269,25 @@ def _read_settings(path: Path) -> dict[str, Any]:
     return loaded
 
 
-def _report(repo: Path, spec: GoalSpec) -> tuple[dict[str, Any], tuple[str, ...]]:
+def _report(
+    repo: Path, spec: GoalSpec, baseline: Baseline
+) -> tuple[dict[str, Any], tuple[str, ...]]:
     written = [f".ai-work/{spec.slug}/{name}" for name in _TASK_FILES] + [SETTINGS_FILE]
-    warnings = [(PRIMARY_CHECKOUT, _PRIMARY_MESSAGE)] if _in_primary_checkout(repo) else []
+    warnings = []
+    if _in_primary_checkout(repo):
+        warnings.append((PRIMARY_CHECKOUT, _PRIMARY_MESSAGE))
+    ignored = _git(repo, "check-ignore", "-q", SETTINGS_FILE)
+    if ignored is not None and ignored.returncode == 1:
+        warnings.append((SETTINGS_NOT_IGNORED, _not_ignored_message(repo)))
+    early = early_completion_message(spec.check, baseline.passes, baseline.targets)
+    if early is not None:
+        warnings.append((CHECK_COMPLETES_EARLY, early))
     doc = {
         "schema": SCHEMA,
         "slug": spec.slug,
         "files": written,
         "warnings": [{"code": code, "message": message} for code, message in warnings],
     }
-    ignored = _git(repo, "check-ignore", "-q", SETTINGS_FILE)
-    if ignored is not None and ignored.returncode == 1:
-        warnings.append((SETTINGS_NOT_IGNORED, _NOT_IGNORED_MESSAGE))
     summary = f"{SUMMARY_PREFIX}scaffolded the goal plan {spec.slug}: {len(written)} files"
     return doc, (summary, *warning_lines(warnings))
 
@@ -275,10 +296,46 @@ _PRIMARY_MESSAGE = (
     f"this is a primary checkout, and the deny rules in {SETTINGS_FILE} bind every session "
     "started in it. To fix: scaffold from a linked worktree, or remove the rules after the run"
 )
-_NOT_IGNORED_MESSAGE = (
-    f"git does not ignore {SETTINGS_FILE}, so the first iteration would stop on it as a "
-    "protected change. To fix: add it to .gitignore"
+_NOT_IGNORED_UNTRACKED = "add it to .gitignore and commit that change"
+_NOT_IGNORED_TRACKED = (
+    "stop tracking it with git rm --cached, add it to .gitignore, and commit both"
 )
+
+
+def _not_ignored_message(repo: Path) -> str:
+    fix = _NOT_IGNORED_TRACKED if settings_tracked(repo) else _NOT_IGNORED_UNTRACKED
+    return (
+        f"git does not ignore {SETTINGS_FILE}, and run refuses to start until it does. "
+        f"To fix: {fix}"
+    )
+
+
+def settings_tracked(repo: Path) -> bool:
+    """Whether git tracks the settings file: an ignore entry alone then leaves it unignored."""
+    tracked = _git(repo, "ls-files", "--error-unmatch", SETTINGS_FILE)
+    return tracked is not None and tracked.returncode == 0
+
+
+def early_completion_message(check: Check, passes: int, targets: int) -> str | None:
+    """Why the check could be met with some of the goal's own failing tests still failing, or
+    None when its expectation binds every target. Pure in the parsed check and the baseline.
+
+    A goal check's `fail=0` is always met, because the failing tests the goal is working on
+    read `pending`; only `pending=0`, or a pass count of every test, says they all pass."""
+    wanted = next((e.count for e in check.expectations if e.key == "pass"), 0)
+    total = passes + targets
+    if targets == 0 or wanted >= total or _binds_pending(check):
+        return None
+    open_targets = min(targets, total - wanted)
+    return (
+        f"the check can be met with up to {open_targets} of the {targets} failing tests still "
+        "failing: fail=0 is always met, because the goal's own failing tests read pending. "
+        f"To fix: expect pending=0, or pass={total}"
+    )
+
+
+def _binds_pending(check: Check) -> bool:
+    return Expectation("pending", "=", 0) in check.expectations
 
 
 def _in_primary_checkout(repo: Path) -> bool:

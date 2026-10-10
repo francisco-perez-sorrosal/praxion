@@ -27,6 +27,7 @@ import contextlib
 import json
 import os
 import posixpath
+import re
 import shlex
 import signal
 import subprocess
@@ -48,6 +49,14 @@ RUN_TIMEOUT_SECONDS = 540.0
 RESOLVER_TIMEOUT_SECONDS = 60.0
 KILL_GRACE_SECONDS = 5.0
 FAILURE_TAIL_LINES = 20
+HOOK_WORDS_LIMIT = 300
+HOOK_WORDS_FALLBACK_LINES = 5
+_CUT_MARKER = "…"
+_COLOUR = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+_HOOK_VERDICTS = ("Passed", "Failed", "Skipped")
+_HOOK_FAILED = "Failed"
+_DOT_RUN = "..."
+_HOOK_BOOKKEEPING = ("- hook id:", "- exit code:")
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
 _LITERAL_PATHSPEC = ":(literal)"
 _NODE_SEPARATOR = "::"
@@ -376,7 +385,7 @@ def _try_commit(repo: Path, job: _Job) -> str | None:
     done = _run(repo, "commit", "-m", job.message, "--", *_specs(job.paths), timeout=job.timeout)
     if done.returncode == 0:
         return None
-    return _tail(done.stdout + done.stderr)
+    return hook_words(done.stdout + done.stderr)
 
 
 def _verified(repo: Path, job: _Job, expected: frozenset[str]) -> Union[Committed, TreeDisturbed]:  # noqa: UP007 -- runtime value, 3.9 floor
@@ -442,6 +451,50 @@ def _tail(text: str) -> str:
     return "\n".join(text.strip().splitlines()[-FAILURE_TAIL_LINES:])
 
 
+def hook_words(output: str) -> str:
+    """The refusing hook's own words from a commit's whole output, as one bounded line.
+
+    pre-commit prints one status line per hook, then the failing hook's report; every section
+    that opens at a `Failed` status line and runs to the next status line is kept, minus its
+    bookkeeping and blank lines. Output with no such section (a plain hook, another hook
+    manager, git itself) yields its last non-blank lines.
+    """
+    lines = [_COLOUR.sub("", line).strip() for line in output.splitlines()]
+    kept = _failed_sections(lines) or [line for line in lines if line][-HOOK_WORDS_FALLBACK_LINES:]
+    words = " ".join(kept)
+    if len(words) <= HOOK_WORDS_LIMIT:
+        return words
+    return words[: HOOK_WORDS_LIMIT - len(_CUT_MARKER)] + _CUT_MARKER
+
+
+def _hook_verdict(line: str) -> str | None:
+    """The verdict of a pre-commit status line (`name....(note)Verdict`), else None.
+
+    Plain suffix tests, not a pattern: a hook may print an unbroken run of dots, and a pattern
+    that backtracks on it would stall the driver after the commit's own timeout has closed.
+    """
+    verdict = next((word for word in _HOOK_VERDICTS if line.endswith(word)), None)
+    if verdict is None:
+        return None
+    head = line[: -len(verdict)]
+    if head.endswith(")") and "(" in head:
+        head = head[: head.rfind("(")]
+    named = head.rstrip(".")
+    return verdict if named and head.endswith(_DOT_RUN) else None
+
+
+def _failed_sections(lines: list[str]) -> list[str]:
+    kept: list[str] = []
+    failing = False
+    for line in lines:
+        verdict = _hook_verdict(line)
+        if verdict:
+            failing = verdict == _HOOK_FAILED
+        if failing and line and not line.startswith(_HOOK_BOOKKEEPING):
+            kept.append(line)
+    return kept
+
+
 # --- The runner --------------------------------------------------------------------------
 
 
@@ -501,7 +554,7 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
     `uv run pytest` or a shell wrapper must not leave workers editing the tree after the
     driver has reported the run as over or been interrupted.
     """
-    with _sigterm_as_exit():
+    with sigterm_as_exit():
         try:
             proc = subprocess.Popen(
                 argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
@@ -513,16 +566,16 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
         try:
             out, err = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            out, err = _kill_group(proc)
+            out, err = kill_group(proc)
             return CommandRun(argv, str(cwd), out + err, None, f"timed out after {timeout:g}s")
         except BaseException:  # an interrupt must not leave the runner editing the tree
-            _kill_group(proc)
+            kill_group(proc)
             raise
         return CommandRun(argv, str(cwd), out + err, proc.returncode)
 
 
 @contextlib.contextmanager
-def _sigterm_as_exit() -> Iterator[None]:
+def sigterm_as_exit() -> Iterator[None]:
     """Let a SIGTERM reach `run_command`'s kill path as an exit, not as the default action."""
     if threading.current_thread() is not threading.main_thread():
         yield  # `signal.signal` works on the main thread only
@@ -534,7 +587,7 @@ def _sigterm_as_exit() -> Iterator[None]:
         signal.signal(signal.SIGTERM, previous or signal.SIG_DFL)
 
 
-def _kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:
+def kill_group(proc: subprocess.Popen[str]) -> tuple[str, str]:
     """Kill the command's whole process group; what it had printed comes back."""
     with contextlib.suppress(ProcessLookupError):  # the group may already be gone
         os.killpg(proc.pid, signal.SIGKILL)

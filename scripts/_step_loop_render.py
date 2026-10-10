@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple, cast, get_args
 
+from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
 from _plan_steps import PlanStep
 from _step_schema import STEP_ID_RE
@@ -282,7 +283,8 @@ def _goal_slots(inputs: PromptInputs, goal: GoalState) -> list[_Slot]:
     )
     progress = section_body(inputs.wip_text, "Progress record").splitlines()
     return [
-        ("latest-reading", "TEST_RESULTS.md", "\n".join(goal.reading) or "No reading yet.", results),
+        ("latest-reading", "TEST_RESULTS.md",
+         "\n".join(goal.reading) or "No reading yet.", results),
         ("progress-record", "WIP.md, Progress record, newest first",
          _newest_first([line for line in progress if line.strip()], PROGRESS_BOUND, wip), wip),
         ("protected-paths", "", "\n".join(f"- {path}" for path in goal.protected), plan),
@@ -380,7 +382,9 @@ _ACTIONS = {  # `{step}` is the stop's step id
         "read ITERATION_*.patch and the progress record, then reset the goal or take it by hand"
     ),
     "blocked-marker": "resolve the blocker, then record the resolution in the step block",
-    "conflict-marker": "add the path to the step's Files: or split the step",
+    "conflict-marker": (
+        "record the return first, then add the path to the step's Files: or split the step"
+    ),
     "human-verdict": "verify the step by hand and correct WIP.md, or restore the mutation sensor",
     "unnamed-attempts": "name the step on the Attempts: line or delete the line",
     "review-revised-twice": "set verdict: accept in LIGHT_REVIEW_step-{step}.md or revise the step",
@@ -428,12 +432,21 @@ def stop_next_action(stop: StopView) -> str:
     ])  # fmt: skip
 
 
+# What the driver says of a kept commit: a goal iteration is kept as progress, whether or not
+# the check also passes (its `Result:` line shows that); any other step is kept once verified.
+_KEPT_AS_PROGRESS = "kept by the step-loop driver as progress toward the goal."
+_KEPT_AS_VERIFIED = "verified by the step-loop driver."
+
+
 def commit_message(step: PlanStep, slug: str, request: SpawnRequest, result_line: str) -> str:
-    """The message of a verified step's commit: subject, one sentence, deciding line, trailer."""
+    """The message of a kept step's commit: subject, one sentence, deciding line, trailer."""
     key = request.key
     if key.kind == "review" or "\n" in result_line:
         raise ValueError("a commit follows an implement or revise request and one Result: line")
     subject = " ".join(re.sub(r"\[[^\]]*\]", " ", step.title).split()) or f"Step {step.id}"
     turn = f"attempt {key.attempt}" if key.kind == "implement" else f"review revision {key.round}"
-    sentence = f"Step {step.id} of {slug}, {turn}: verified by the step-loop driver."
+    kept = _KEPT_AS_VERIFIED
+    if isinstance(step.bound, GoalBudget):
+        turn, kept = f"iteration {key.attempt}", _KEPT_AS_PROGRESS
+    sentence = f"Step {step.id} of {slug}, {turn}: {kept}"
     return f"{subject}\n\n{sentence}\n{result_line}\n\nStep-Loop-Request: {key.id}"

@@ -93,6 +93,15 @@ Ralph-lite is the step-loop driver's goal mode: an execution mode inside Lightwe
 - **Documents**: a goal run writes a plan, a `WIP.md` and a `TEST_RESULTS.md` for its one step, although the task is Lightweight-sized; the calibration row's Source cell names Ralph-lite.
 - **Not for** Standard and Full step loops, which run through the `/praxion:step-loop` relay, or goals no pytest command can check.
 
+The goal's check, one statement per line:
+
+- The goal's test module exists before `goal` runs, and an empty module is enough: pytest prints no summary for a missing path, and the scaffold refuses a check it cannot read.
+- The check names the project's own test runner: `uv run pytest` where the project runs pytest through uv, never a bare interpreter that may lack pytest.
+- The expectation encodes the whole goal: a goal check's `fail=0` is always met, because the goal's own failing tests read `pending`.
+- `pending=0` makes the goal's own failing tests part of completion.
+- A goal whose tests the loop writes must count every test it asks for in the pass count.
+- The goal's oracle goes to `--protect`: the target tests of a make-green goal, the module under test of a test-writing goal.
+
 Safety profile, unattended:
 
 - Run from a scratch worktree.
@@ -100,6 +109,11 @@ Safety profile, unattended:
 - Never use `bypassPermissions` outside a container.
 - Deny rules on the protected paths hold in every permission mode.
 - Each iteration is bounded by a turn bound and a dollar fuse, and the loop by the `Iterations:` budget.
+- The worker may edit only the goal's paths and its progress record, and holds no pre-approval but the check and the resolver.
+- `run` refuses before any worker when a settings file pre-approves a tool-wide `Bash` rule, an edit rule, or a `Bash` rule that is a prefix of the check or of the resolver, in either spelling (`X:*` or `X *`).
+- `run` denies the worker every other inherited `Bash` pre-approval, and the pre-approval of any tool it is not granted.
+- Code the check runs is not fenced by permission rules, so read the kept commits before the scratch branch is merged.
+- Nothing removes the deny rules but the person: they stay in that checkout's `.claude/settings.local.json` until the person deletes them when the goal is done, and in a scratch worktree they go with the worktree.
 - **Fallback**: the harness's `/goal` command is the fallback for a repository without Praxion; it keeps one context for the whole run and judges printed output, not the check's result.
 
 ## Full-Tier Multi-Instance Fan-Out

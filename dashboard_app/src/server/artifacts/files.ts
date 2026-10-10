@@ -154,6 +154,19 @@ export async function walkRenderedSvgs(projectRoot: string): Promise<string[]> {
   return combined.sort((left, right) => left.localeCompare(right));
 }
 
+/** The `src/*.c4` model sources beside a `rendered/` directory, in name order; none without a `src/`. */
+export async function modelSourcesBeside(renderedDir: string): Promise<string[]> {
+  const sourceDir = path.join(path.dirname(renderedDir), "src");
+  if (!(await isDirectory(sourceDir))) {
+    return [];
+  }
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".c4"))
+    .map((entry) => path.join(sourceDir, entry.name))
+    .sort((left, right) => left.localeCompare(right));
+}
+
 export function isFinalizedAdr(filename: string): boolean {
   return FINALIZED_ADR.test(filename);
 }

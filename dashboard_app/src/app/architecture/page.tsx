@@ -14,28 +14,6 @@ import { getConfig } from "@/lib/config";
 import { getArchitectureData } from "@/server/view-models/architecture";
 import type { AacRegion } from "@/server/aac/parse-fences";
 
-// ─── Diagram ordering ─────────────────────────────────────────────────────────
-
-// Priority-first ordering by filename stem. Diagrams matching these stems
-// appear first (in this order); remaining diagrams sort alphabetically.
-const DIAGRAM_PRIORITY_ORDER = [
-  "deployment-system-context",
-  "agent-pipeline-execution"
-];
-
-function sortDiagrams(diagrams: Array<{ markup: string | null; path: string }>): typeof diagrams {
-  return [...diagrams].sort((a, b) => {
-    const stemA = path.basename(a.path, ".svg");
-    const stemB = path.basename(b.path, ".svg");
-    const idxA = DIAGRAM_PRIORITY_ORDER.indexOf(stemA);
-    const idxB = DIAGRAM_PRIORITY_ORDER.indexOf(stemB);
-    const rankA = idxA >= 0 ? idxA : DIAGRAM_PRIORITY_ORDER.length;
-    const rankB = idxB >= 0 ? idxB : DIAGRAM_PRIORITY_ORDER.length;
-    if (rankA !== rankB) return rankA - rankB;
-    return stemA.localeCompare(stemB);
-  });
-}
-
 function friendlyDiagramLabel(diagramPath: string, projectRoot: string): string {
   const rel = path.relative(projectRoot, diagramPath);
   const base = path.basename(diagramPath, ".svg");
@@ -114,8 +92,9 @@ export default async function ArchitecturePage() {
     );
   }
 
-  const sortedDiagrams = sortDiagrams(data.diagrams);
-  const diagramCount = sortedDiagrams.length;
+  // The view-model lists the renders in narrative order (each model's view declarations).
+  const diagrams = data.diagrams;
+  const diagramCount = diagrams.length;
   const hasDesign = data.design !== null;
   const hasGuide = data.guide !== null;
   const hasDiagrams = diagramCount > 0;
@@ -144,7 +123,7 @@ export default async function ArchitecturePage() {
           subtitle={`${diagramCount} ${diagramCount === 1 ? "diagram" : "diagrams"}`}
         >
           <div className="architecture-diagrams">
-            {sortedDiagrams.map((diagram, index) => {
+            {diagrams.map((diagram, index) => {
               if (diagram.markup === null) {
                 return null;
               }

@@ -90,6 +90,49 @@ describe("getArchitectureData", () => {
   });
 });
 
+describe("getArchitectureData diagram order", () => {
+  it("lists renders in the order their views are declared, undeclared renders last", async () => {
+    const root = await createTempProjectRoot("dashboard-architecture-order-");
+    const diagrams = path.join(root, "docs", "diagrams", "architecture");
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(path.join(diagrams, "rendered"), { recursive: true });
+    await mkdir(path.join(diagrams, "src"), { recursive: true });
+    await writeFile(
+      path.join(diagrams, "src", "architecture.c4"),
+      "views {\n  view index {\n  }\n  dynamic view flow {\n  }\n  view components {\n  }\n}\n"
+    );
+    for (const stem of ["components", "extra", "flow", "index"]) {
+      await writeFile(
+        path.join(diagrams, "rendered", `${stem}.svg`),
+        `<svg><title>${stem}</title></svg>`
+      );
+    }
+
+    const data = await getArchitectureData(root);
+
+    expect(data.diagrams.map((diagram) => path.basename(diagram.path))).toEqual([
+      "index.svg",
+      "flow.svg",
+      "components.svg",
+      "extra.svg"
+    ]);
+  });
+
+  it("keeps the alphabetical order when no model source declares the views", async () => {
+    const root = await createTempProjectRoot("dashboard-architecture-undeclared-");
+    const rendered = path.join(root, "docs", "diagrams", "rendered");
+    await mkdir(path.join(root, ".ai-state"), { recursive: true });
+    await mkdir(rendered, { recursive: true });
+    for (const stem of ["b", "a"]) {
+      await writeFile(path.join(rendered, `${stem}.svg`), `<svg><title>${stem}</title></svg>`);
+    }
+
+    const data = await getArchitectureData(root);
+
+    expect(data.diagrams.map((diagram) => path.basename(diagram.path))).toEqual(["a.svg", "b.svg"]);
+  });
+});
+
 describe("getArchitectureData dataAsOf", () => {
   const stamp = (iso: string) => new Date(iso);
 

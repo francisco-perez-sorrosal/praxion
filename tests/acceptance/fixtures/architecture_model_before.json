@@ -1,0 +1,773 @@
+{
+ "base_commit": "2d6ec71e",
+ "source": "docs/diagrams/architecture/src (likec4 export json --skip-layout at the base commit)",
+ "elements": [
+  {
+   "id": "anthropic_api",
+   "title": "Anthropic API",
+   "kind": "external"
+  },
+  {
+   "id": "arize_phoenix",
+   "title": "Arize Phoenix",
+   "kind": "external"
+  },
+  {
+   "id": "claude_code",
+   "title": "Claude Code",
+   "kind": "external"
+  },
+  {
+   "id": "claude_desktop",
+   "title": "Claude Desktop",
+   "kind": "external"
+  },
+  {
+   "id": "cursor",
+   "title": "Cursor",
+   "kind": "external"
+  },
+  {
+   "id": "developer",
+   "title": "Developer",
+   "kind": "person"
+  },
+  {
+   "id": "github",
+   "title": "GitHub",
+   "kind": "external"
+  },
+  {
+   "id": "praxion",
+   "title": "Praxion",
+   "kind": "system"
+  },
+  {
+   "id": "praxion.knowledge",
+   "title": "Knowledge Layer",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.knowledge.agents",
+   "title": "Agents",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.knowledge.commands",
+   "title": "Commands",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.knowledge.rules",
+   "title": "Rules",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.knowledge.skills",
+   "title": "Skills",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.orchestration",
+   "title": "Orchestration Layer",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.orchestration.aiwork",
+   "title": ".ai-work/",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.orchestration.doc_acceptance",
+   "title": "ACCEPTANCE_TESTS.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_context",
+   "title": "CONTEXT_REVIEW.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_findings",
+   "title": "VERIFIER_FINDINGS.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_idea",
+   "title": "IDEA_PROPOSAL.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_impl_plan",
+   "title": "IMPLEMENTATION_PLAN.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_interface",
+   "title": "INTERFACE_DESIGN.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_learnings",
+   "title": "LEARNINGS.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_research",
+   "title": "RESEARCH_FINDINGS.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_rework",
+   "title": "REWORK_MANIFEST.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_spec_extract",
+   "title": "SPEC_EXTRACT.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_systems",
+   "title": "SYSTEMS_PLAN.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_test",
+   "title": "TEST_RESULTS.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_transactions",
+   "title": "TRANSACTIONS_DESIGN.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_verify",
+   "title": "VERIFICATION_REPORT.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.doc_wip",
+   "title": "WIP.md",
+   "kind": "document"
+  },
+  {
+   "id": "praxion.orchestration.hooks",
+   "title": "Hooks",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.orchestration.orchestrator",
+   "title": "Main Agent (Orchestrator)",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline",
+   "title": "Agent Pipeline",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.arch_validator",
+   "title": "Architect Validator",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.architect",
+   "title": "Systems Architect",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.cicd_engineer",
+   "title": "CI/CD Engineer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.context_eng",
+   "title": "Context Engineer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.discipline_consultant",
+   "title": "Discipline Consultant",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.doc_engineer",
+   "title": "Doc Engineer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.implementer",
+   "title": "Implementer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.interface_des",
+   "title": "Interface Designer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.planner",
+   "title": "Implementation Planner",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.promethean",
+   "title": "Promethean",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.researcher",
+   "title": "Researcher",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.roadmap_cartographer",
+   "title": "Roadmap Cartographer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.sentinel",
+   "title": "Sentinel",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.skill_genesis",
+   "title": "Skill Genesis",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.test_engineer",
+   "title": "Test Engineer",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.transactions_arch",
+   "title": "Agentic Transactions Architect",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.orchestration.pipeline.verifier",
+   "title": "Verifier",
+   "kind": "agent"
+  },
+  {
+   "id": "praxion.persistence",
+   "title": "Persistence Layer",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.persistence.adrs",
+   "title": "ADR Fragments",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.persistence.aistate",
+   "title": ".ai-state/",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.persistence.chronograph",
+   "title": "Chronograph MCP",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.persistence.tdl",
+   "title": "Tech-Debt Ledger",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling",
+   "title": "Tooling",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling.dashboard",
+   "title": "Pipeline Dashboard",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling.evals",
+   "title": "Eval Framework",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling.installers",
+   "title": "Installers",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling.scripts",
+   "title": "Scripts",
+   "kind": "component"
+  },
+  {
+   "id": "praxion.tooling.versioning",
+   "title": "Versioning",
+   "kind": "component"
+  }
+ ],
+ "relationships": [
+  {
+   "source": "praxion.tooling.evals",
+   "target": "anthropic_api",
+   "title": "judges via the JudgeClient adapter"
+  },
+  {
+   "source": "praxion.persistence.chronograph",
+   "target": "arize_phoenix",
+   "title": "streams via OTLP"
+  },
+  {
+   "source": "developer",
+   "target": "praxion",
+   "title": "develops"
+  },
+  {
+   "source": "claude_code",
+   "target": "praxion",
+   "title": "executes agents"
+  },
+  {
+   "source": "claude_desktop",
+   "target": "praxion",
+   "title": "loads skills"
+  },
+  {
+   "source": "cursor",
+   "target": "praxion",
+   "title": "loads rules"
+  },
+  {
+   "source": "github",
+   "target": "praxion",
+   "title": "hosts"
+  },
+  {
+   "source": "praxion.knowledge.skills",
+   "target": "praxion.orchestration.pipeline",
+   "title": "injects"
+  },
+  {
+   "source": "praxion.knowledge.rules",
+   "target": "praxion.orchestration.pipeline",
+   "title": "constrains"
+  },
+  {
+   "source": "praxion.knowledge.commands",
+   "target": "praxion.orchestration.pipeline",
+   "title": "triggers"
+  },
+  {
+   "source": "praxion.knowledge.agents",
+   "target": "praxion.orchestration.pipeline",
+   "title": "spawns"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.promethean",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.researcher",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.interface_des",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.transactions_arch",
+   "title": "dispatches (shadow)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.discipline_consultant",
+   "title": "dispatches (gated, one discipline per spawn)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.context_eng",
+   "title": "dispatches (shadow)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.planner",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.implementer",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.test_engineer",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.doc_engineer",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.cicd_engineer",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.verifier",
+   "title": "dispatches"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.sentinel",
+   "title": "dispatches (independent)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.arch_validator",
+   "title": "dispatches (per-PR)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.skill_genesis",
+   "title": "dispatches (post-pipeline)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.pipeline.roadmap_cartographer",
+   "title": "dispatches (on-demand)"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.promethean",
+   "target": "praxion.orchestration.doc_idea",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_idea",
+   "target": "praxion.orchestration.pipeline.researcher",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.researcher",
+   "target": "praxion.orchestration.doc_research",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_research",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_systems",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_spec_extract",
+   "title": "writes spec extract"
+  },
+  {
+   "source": "praxion.orchestration.doc_spec_extract",
+   "target": "praxion.orchestration.pipeline.test_engineer",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.test_engineer",
+   "target": "praxion.orchestration.doc_acceptance",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_acceptance",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.doc_acceptance",
+   "target": "praxion.orchestration.pipeline.planner",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.doc_systems",
+   "target": "praxion.orchestration.pipeline.planner",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.planner",
+   "target": "praxion.orchestration.doc_impl_plan",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.planner",
+   "target": "praxion.orchestration.doc_wip",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_impl_plan",
+   "target": "praxion.orchestration.pipeline.implementer",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.doc_impl_plan",
+   "target": "praxion.orchestration.pipeline.test_engineer",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.doc_impl_plan",
+   "target": "praxion.orchestration.pipeline.doc_engineer",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.implementer",
+   "target": "praxion.orchestration.doc_wip",
+   "title": "updates"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.implementer",
+   "target": "praxion.orchestration.doc_test",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.test_engineer",
+   "target": "praxion.orchestration.doc_test",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.doc_engineer",
+   "target": "praxion.orchestration.doc_wip",
+   "title": "updates"
+  },
+  {
+   "source": "praxion.orchestration.doc_wip",
+   "target": "praxion.orchestration.pipeline.verifier",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.doc_test",
+   "target": "praxion.orchestration.pipeline.verifier",
+   "title": "reads"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.verifier",
+   "target": "praxion.orchestration.doc_verify",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.interface_des",
+   "target": "praxion.orchestration.doc_interface",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_interface",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "reads challenges"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_interface",
+   "title": "revises per architect re-eval"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.transactions_arch",
+   "target": "praxion.orchestration.doc_transactions",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.doc_transactions",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "reads challenges"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_transactions",
+   "title": "revises per architect re-eval"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.context_eng",
+   "target": "praxion.orchestration.doc_context",
+   "title": "writes (cumulative)"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.implementer",
+   "target": "praxion.orchestration.doc_learnings",
+   "title": "writes"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.planner",
+   "target": "praxion.orchestration.doc_learnings",
+   "title": "writes (pipeline-end)"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.researcher",
+   "target": "praxion.orchestration.doc_research",
+   "title": "surfaces CIS section"
+  },
+  {
+   "source": "praxion.orchestration.doc_research",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "reads CIS in Phase 7"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_systems",
+   "title": "records disposition per signal"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.persistence.adrs",
+   "title": "writes ADR fragment when load-bearing"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.verifier",
+   "target": "praxion.persistence.tdl",
+   "title": "files row from deferred CIS"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.sentinel",
+   "target": "praxion.persistence.tdl",
+   "title": "files row from deferred CIS"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.persistence.tdl",
+   "title": "files row from deferred CIS"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.verifier",
+   "target": "praxion.orchestration.doc_rework",
+   "title": "emits Phase 12.5"
+  },
+  {
+   "source": "praxion.orchestration.doc_rework",
+   "target": "praxion.orchestration.orchestrator",
+   "title": "reads manifest"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.tooling.scripts",
+   "title": "spawns rework worktree per row (EnterWorktree)"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.orchestration.doc_findings",
+   "title": "writes one VERIFIER_FINDINGS.md per worktree"
+  },
+  {
+   "source": "praxion.orchestration.orchestrator",
+   "target": "praxion.persistence.tdl",
+   "title": "flips linked td-NNN rows to in-flight"
+  },
+  {
+   "source": "praxion.orchestration.doc_findings",
+   "target": "praxion.knowledge.commands",
+   "title": "auto-discovered by /resume-rework"
+  },
+  {
+   "source": "praxion.knowledge.commands",
+   "target": "praxion.orchestration.pipeline.architect",
+   "title": "dispatches systems-architect (always-first)"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.architect",
+   "target": "praxion.orchestration.doc_systems",
+   "title": "re-enters pipeline at SYSTEMS_PLAN"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.arch_validator",
+   "target": "praxion.persistence.tdl",
+   "title": "files drift rows"
+  },
+  {
+   "source": "praxion.orchestration.pipeline.skill_genesis",
+   "target": "praxion.orchestration.doc_learnings",
+   "title": "reads at pipeline-end"
+  },
+  {
+   "source": "praxion.orchestration.hooks",
+   "target": "praxion.orchestration.pipeline",
+   "title": "enforces"
+  },
+  {
+   "source": "praxion.orchestration.hooks",
+   "target": "praxion.persistence.chronograph",
+   "title": "emits events (HTTP)"
+  },
+  {
+   "source": "praxion.orchestration.pipeline",
+   "target": "praxion.orchestration.aiwork",
+   "title": "reads/writes documents"
+  },
+  {
+   "source": "praxion.orchestration.pipeline",
+   "target": "praxion.persistence.aistate",
+   "title": "persists artifacts"
+  },
+  {
+   "source": "praxion.orchestration.pipeline",
+   "target": "praxion.persistence.adrs",
+   "title": "writes ADR fragments"
+  },
+  {
+   "source": "praxion.persistence.adrs",
+   "target": "praxion.persistence.aistate",
+   "title": "finalized at merge-to-main"
+  },
+  {
+   "source": "praxion.tooling.installers",
+   "target": "praxion.knowledge.skills",
+   "title": "deploys"
+  },
+  {
+   "source": "praxion.tooling.installers",
+   "target": "praxion.knowledge.rules",
+   "title": "deploys"
+  },
+  {
+   "source": "praxion.tooling.installers",
+   "target": "praxion.knowledge.commands",
+   "title": "deploys"
+  },
+  {
+   "source": "praxion.tooling.installers",
+   "target": "praxion.knowledge.agents",
+   "title": "deploys"
+  },
+  {
+   "source": "praxion.tooling.scripts",
+   "target": "praxion.persistence.adrs",
+   "title": "finalize_adrs.py promotes drafts to dec-NNN"
+  },
+  {
+   "source": "praxion.tooling.scripts",
+   "target": "praxion.persistence.tdl",
+   "title": "finalize_tech_debt_ledger.py reconciles"
+  },
+  {
+   "source": "praxion.tooling.dashboard",
+   "target": "praxion.persistence.aistate",
+   "title": "reads (read-only)"
+  },
+  {
+   "source": "praxion.tooling.dashboard",
+   "target": "praxion.orchestration.aiwork",
+   "title": "reads in-flight pipeline docs (read-only)"
+  },
+  {
+   "source": "praxion.tooling.evals",
+   "target": "praxion.persistence.aistate",
+   "title": "reads completed artifacts (read-only)"
+  }
+ ]
+}

@@ -7,9 +7,13 @@ scenarios rely on: elements (identity, name, kind, description or summary,
 technology), relationships (source, target, label) and views (title, the elements
 each one draws and the arrows between them).
 
-The model as it stood before this change is read the same way, from the base
-commit's copy of the workspace (`git archive`), so "still recorded" compares two
-readings by one instrument.
+The model as it stood before this change is a frozen reading of the base commit's
+workspace by the same instrument, kept at `fixtures/architecture_model_before.json`
+(elements by id, title and kind; relationships by source, target and title), so
+"still recorded" compares two readings by one instrument and needs no git history:
+a shallow CI clone judges it too. Regenerate the fixture from the base commit with
+`git archive --format=tar 2d6ec71e docs/diagrams/architecture/src`, `export_model`
+over the extracted workspace, and the snapshot's three fields.
 
 Isolation: `likec4` runs with no inherited `CLAUDE*`/`PRAXION_*` variables and with
 proxies pointing at a closed local port, so a reading never depends on the network.
@@ -17,14 +21,11 @@ proxies pointing at a closed local port, so a reading never depends on the netwo
 
 from __future__ import annotations
 
-import atexit
 import functools
-import io
 import json
 import os
 import shutil
 import subprocess
-import tarfile
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,7 @@ DIAGRAM_ROOT = REPO_ROOT / "docs" / "diagrams" / "architecture"
 MODEL_WORKSPACE = DIAGRAM_ROOT / "src"
 RENDER_DIR = DIAGRAM_ROOT / "rendered"
 BASE_COMMIT = "2d6ec71e"
+BASE_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "architecture_model_before.json"
 
 _DEAD_PROXY = "http://127.0.0.1:9"
 KIND_NOTATION_KEY = "kind_notation"  # where `_parse` leaves an element's kind notation in `raw`
@@ -223,20 +225,24 @@ def current_model() -> Model:
 
 @functools.cache
 def base_model() -> Model:
-    """The model as recorded at the base commit, read by the same instrument."""
-    rel = MODEL_WORKSPACE.relative_to(REPO_ROOT).as_posix()
-    archive = subprocess.run(
-        ["git", "archive", "--format=tar", BASE_COMMIT, rel],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        timeout=60,
+    """The model as recorded at the base commit: the frozen reading in `BASE_FIXTURE`.
+
+    The fixture carries what the identity scenarios compare (element ids, titles and
+    kinds; relationship source, target and title) and names the commit it was read
+    from, so the comparison never reaches into git history.
+    """
+    snapshot = json.loads(BASE_FIXTURE.read_text(encoding="utf-8"))
+    assert snapshot["base_commit"] == BASE_COMMIT, (
+        f"the frozen base model is from {snapshot['base_commit']}, not {BASE_COMMIT}"
     )
-    assert archive.returncode == 0, f"cannot read the base model: {archive.stderr.decode()[-800:]}"
-    scratch = Path(tempfile.mkdtemp(prefix="base-model-"))
-    atexit.register(shutil.rmtree, scratch, True)
-    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
-        tar.extractall(scratch, filter="data")
-    return export_model(scratch / rel)
+    elements = {
+        e["id"]: Element(e["id"], e["title"], e["kind"], None, None, None, {})
+        for e in snapshot["elements"]
+    }
+    relationships = tuple(
+        Relationship(r["source"], r["target"], r["title"]) for r in snapshot["relationships"]
+    )
+    return Model(elements, relationships, {})
 
 
 def category_of(element: Element) -> str:

@@ -5,6 +5,57 @@ told to find its tools on: they answer `--version`, copy a model reading to the 
 `export json` is given, and write a small SVG that spells the D2 text they received (or
 nothing, or an exit status), and they log every call, so the command's subprocess and file
 work runs offline and in milliseconds.
+
+The core tests (`test_regenerate_diagrams_tokens.py`, `_projection.py` and `_emission.py`) share
+`small_export`, `node_of` and `edge_of` from the end of this module. The fixture
+`tests/fixtures/diagram_regen/export_small.json` has the real keys of the
+`likec4 export json --skip-layout` reading, cut down to eleven elements, ten relationships
+and six views (an element view of each kind, a dynamic view, two views with a wrong number
+of C4 type tags, and a view of elements with no usable category).
+
+Public surface these tests assume (a disagreement is raised with the planner, not
+worked around here):
+
+    UsageError                      Exception: a refused `style.json`, the exit-2 class
+
+    Token (frozen dataclass)        one drawing per (category, form):
+        category: str               exact vocabulary name
+        frame: bool                 True when the element is drawn as an enclosing frame
+        drawing_class: str          "category_" + snake_case(category), plus "_frame" for frames
+        shape: str                  a D2 shape: rectangle, package, document, cylinder, queue
+        fill: str | None            "#RRGGBB"; None when the frame has no fill
+        stroke: str                 "#RRGGBB"
+        stroke_width: float
+        dash: int                   0 is solid, a positive value is the dash length
+        radius: int                 0 is square
+        extra: str                  "none", "3d" or "double-border"
+        icon: str                   "none" or "person"
+        text_colour: str            "#RRGGBB"
+    DEFAULT_TOKENS: tuple[Token, ...]    every (category, form) the command draws by default
+    UNCATEGORISED: Token                 category "Uncategorised", drawn when no category resolves
+    VOCABULARIES: dict[str, tuple[str, ...]]
+                                    "praxion" and "kit": the category names, in legend order
+    load_style(text, base=DEFAULT_TOKENS) -> tuple[Token, ...]
+                                    parse `style.json`; base tokens first, then the additions;
+                                    raises UsageError naming the entry that fails
+
+    resolve_category(element, specification) -> str | None
+                                    `element["metadata"]["category"]` when it is a string, else
+                                    the `notation` of its kind in `specification["elements"]`;
+                                    None when neither gives a string
+
+    project(model, tokens=DEFAULT_TOKENS) -> Projection
+        Projection.views: tuple[View, ...]          View.id, title, c4_type, nodes, edges
+        Projection.findings: tuple[Finding, ...]    Finding.check, view, status, evidence,
+                                                    measured, threshold
+        Node: id, name, category, technology, responsibility, is_frame
+        Edge: source, target, label, line ("acts-on" | "read-only" | "step"), step_no
+        All of these are frozen dataclasses.
+
+    wrap_text(text, width) -> list[str]
+    node_label_lines(node) -> list[str]
+    legend_entries(view) -> list[LegendEntry]       LegendEntry.label, drawing_class
+    emit_d2(view) -> str                            pure: no clock, no file, no network
 """
 
 from __future__ import annotations
@@ -151,3 +202,29 @@ class Toolchain:
     @property
     def renders_drawn(self) -> list[str]:
         return [call for call in self.calls if call.startswith("d2 ") and ".d2" in call]
+
+
+# --- the core tests' shared reading and finders ---------------------------------------------
+
+CORE_EXPORT = (
+    Path(__file__).resolve().parent.parent
+    / "tests"
+    / "fixtures"
+    / "diagram_regen"
+    / "export_small.json"
+)
+
+
+def small_export() -> dict:
+    """The small `likec4 export json --skip-layout` reading the core tests project (see above)."""
+    return json.loads(CORE_EXPORT.read_text(encoding="utf-8"))
+
+
+def node_of(view, element_id):
+    """The node `view` draws for `element_id`."""
+    return next(node for node in view.nodes if node.id == element_id)
+
+
+def edge_of(view, source, target):
+    """The edge `view` draws from `source` to `target`."""
+    return next(edge for edge in view.edges if (edge.source, edge.target) == (source, target))

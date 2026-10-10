@@ -129,7 +129,7 @@ def test_after_a_failed_attempt_the_reconciler_does_not_read_the_step_as_verifie
 
 
 def test_the_loop_runs_the_declared_check_and_the_reconciler_never_does(tmp_path):
-    task = build_loop(tmp_path, Step("1", check_prefix=f"touch {CHECK_RAN} && "))
+    task = build_loop(tmp_path, Step("1", check_marker=CHECK_RAN))
     attempt(task, Work())
     ran_during_gate = (task.root / CHECK_RAN).exists()
     (task.root / CHECK_RAN).unlink(missing_ok=True)

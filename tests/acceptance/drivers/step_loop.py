@@ -78,7 +78,7 @@ class Step:
     read_only: tuple[str, ...] = ()
     more_files: tuple[str, ...] = ()  # further declared files beyond the step's own pair
     implementation: str | None = None  # the step's Implementation text; a default names its file
-    check_prefix: str = ""  # shell text run before the check's pytest command
+    check_marker: str | None = None  # a file the check creates before pytest runs (no shell)
 
     @property
     def module(self) -> str:
@@ -98,7 +98,15 @@ class Step:
 
     @property
     def check_command(self) -> str:
-        return f"{self.check_prefix}{PYTHON} -m pytest {self.unit_test} -q -p no:cacheprovider"
+        if self.check_marker is None:
+            return f"{PYTHON} -m pytest {self.unit_test} -q -p no:cacheprovider"
+        # A Check runs without a shell, so the marker is written by the interpreter itself.
+        code = (
+            "import pathlib, sys, pytest; "
+            f"pathlib.Path({self.check_marker!r}).touch(); "
+            f"sys.exit(pytest.main([{self.unit_test!r}, '-q', '-p', 'no:cacheprovider']))"
+        )
+        return f'{PYTHON} -c "{code}"'
 
 
 def _heading(step: Step) -> str:

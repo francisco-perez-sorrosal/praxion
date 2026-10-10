@@ -128,16 +128,21 @@ installed_version() {
     "$1" --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | tail -n 1
 }
 
-# TOOLCHAIN_PATH holds the directories of likec4, d2 and node when the installed
-# likec4 and d2 match the pins, and stays empty otherwise.
+# TOOLCHAIN_PATH is one directory of links to the likec4, d2 and node the suite's own
+# PATH resolves, made when the installed likec4 and d2 match the pins, and empty
+# otherwise. Linking the resolved binaries rather than listing their directories keeps
+# another build of a tool that shares a directory with the right one (a package
+# manager's d2 beside the pinned likec4) from shadowing it inside the hook's PATH.
 TOOLCHAIN_PATH=""
 detect_pinned_toolchain() {
     command -v likec4 >/dev/null 2>&1 && command -v d2 >/dev/null 2>&1 || return 0
     [ "$(installed_version likec4)" = "$(pinned_version LIKEC4_VERSION)" ] || return 0
     [ "$(installed_version d2)" = "$(pinned_version D2_VERSION)" ] || return 0
-    TOOLCHAIN_PATH="$(dirname "$(command -v likec4)"):$(dirname "$(command -v d2)")"
+    TOOLCHAIN_PATH="$(mktemp -d "${WORK_ROOT}/toolchain.XXXXXX")"
+    ln -s "$(command -v likec4)" "${TOOLCHAIN_PATH}/likec4"
+    ln -s "$(command -v d2)" "${TOOLCHAIN_PATH}/d2"
     if command -v node >/dev/null 2>&1; then
-        TOOLCHAIN_PATH="${TOOLCHAIN_PATH}:$(dirname "$(command -v node)")"
+        ln -s "$(command -v node)" "${TOOLCHAIN_PATH}/node"
     fi
 }
 

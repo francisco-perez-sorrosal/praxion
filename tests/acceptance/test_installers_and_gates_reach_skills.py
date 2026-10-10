@@ -326,6 +326,11 @@ def test_no_gate_hook_or_pre_commit_pattern_names_the_retired_directory():
 _BEFORE = json.loads((FIXTURES / "selection_before.json").read_text(encoding="utf-8"))["selected"]
 
 
+# The one recorded test the change deletes on purpose: the Codex command-wrapper exporter goes
+# with its tests. The frozen record keeps the path as history; it is compared only while it exists.
+DELETED_ON_PURPOSE = {"scripts/test_export_codex_command_skills.py"}
+
+
 def _selected(changed: str) -> set[str] | None:
     result = subprocess.run(
         ["python3", "scripts/resolve_test_scope.py", "--changed", changed, "--json"],
@@ -341,9 +346,15 @@ def _selected(changed: str) -> set[str] | None:
     "name", ["co", "test", "resume-pipeline", "merge-worktree", "eval-praxion", "dashboard"]
 )
 def test_editing_a_moved_workflow_selects_narrowly_every_test_its_old_file_selected(name):
-    after = _selected(f"skills/{name}/SKILL.md")
-    expected = set(_BEFORE[name]["tests"])
+    recorded = set(_BEFORE[name]["tests"])
+    expected = {t for t in recorded if (REPO_ROOT / t).is_file()}
+    vanished = recorded - expected - DELETED_ON_PURPOSE
 
+    after = _selected(f"skills/{name}/SKILL.md")
+
+    assert not vanished, (
+        f"recorded tests missing from the tree for no stated reason: {sorted(vanished)}"
+    )
     assert after is not None, "the selection widened to the whole suite"
     assert not expected - after, sorted(expected - after)
 

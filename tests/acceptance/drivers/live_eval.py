@@ -20,6 +20,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EVAL_PROJECT = REPO_ROOT / "eval"
 EVAL_SRC = EVAL_PROJECT / "src"
+EVAL_PYTHON = "3.13"  # the evaluation's floor; pinned so uv never builds its env on a newer, wheel-less Python
 ENVELOPE = (
     REPO_ROOT / "eval" / "tests" / "fixtures" / "live_scenarios" / "lightweight_fix.stream.jsonl"
 )
@@ -57,7 +58,18 @@ def lightweight_fix_judgement(created: dict[str, str]) -> Judgement:
     }
     env["PYTHONPATH"] = str(EVAL_SRC)
     result = subprocess.run(
-        ["uv", "run", "--quiet", "--project", str(EVAL_PROJECT), "python", "-c", _CAPTURE],
+        [
+            "uv",
+            "run",
+            "--quiet",
+            "--python",
+            EVAL_PYTHON,
+            "--project",
+            str(EVAL_PROJECT),
+            "python",
+            "-c",
+            _CAPTURE,
+        ],
         input=json.dumps({"envelope": str(ENVELOPE), "created": created}),
         capture_output=True,
         text=True,

@@ -31,6 +31,7 @@ supersedes: dec-431
 supersedes_in_part: [dec-427]
 re_affirms: [dec-429, dec-432, dec-262]
 dissent: []
+re_affirmed_by: [dec-draft-83d80fb8]
 ---
 
 ## Context

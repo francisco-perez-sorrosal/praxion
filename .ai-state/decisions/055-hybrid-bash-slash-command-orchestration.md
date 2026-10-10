@@ -28,6 +28,7 @@ affected_reqs:
   - REQ-ONBOARD-09
   - REQ-ONBOARD-10
   - REQ-ONBOARD-11
+superseded_in_part_by: [dec-draft-83d80fb8]
 ---
 
 ## Context

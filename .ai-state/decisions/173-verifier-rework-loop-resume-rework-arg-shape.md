@@ -12,6 +12,7 @@ branch: worktree-verifier-rework-loop
 pipeline_tier: standard
 affected_files:
   - commands/resume-rework.md
+re_affirmed_by: [dec-draft-59b24004]
 ---
 
 ## Context

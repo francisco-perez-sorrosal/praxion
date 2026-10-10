@@ -10,6 +10,7 @@ made_by: agent
 agent_type: systems-architect
 pipeline_tier: standard
 affected_files: [skills/project-exploration/SKILL.md, commands/explore-project.md]
+superseded_in_part_by: [dec-draft-83d80fb8]
 ---
 
 ## Context

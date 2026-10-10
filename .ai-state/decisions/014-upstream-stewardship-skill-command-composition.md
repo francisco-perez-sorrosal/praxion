@@ -16,6 +16,7 @@ affected_files:
   - skills/upstream-stewardship/references/contribution-workflow.md
   - commands/report-upstream.md
   - .ai-state/UPSTREAM_ISSUES.md
+superseded_in_part_by: [dec-draft-83d80fb8]
 ---
 
 ## Context

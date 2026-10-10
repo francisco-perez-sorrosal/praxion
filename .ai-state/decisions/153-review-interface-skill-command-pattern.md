@@ -14,6 +14,7 @@ affected_files:
   - commands/review-interface.md
   - agents/interface-designer.md
   - commands/README.md
+superseded_in_part_by: [dec-draft-83d80fb8]
 ---
 
 ## Context

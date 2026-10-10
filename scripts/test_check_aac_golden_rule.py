@@ -166,6 +166,59 @@ def test_d2_staged_with_c4_passes(tmp_path: Path) -> None:
     assert _run_gate(repo) == 0
 
 
+@pytest.mark.parametrize("render", ["main.d2", "main.svg"])
+def test_rendered_output_staged_without_src_c4_fails(tmp_path: Path, render: str) -> None:
+    """A rendered/ output staged without any .c4 under its src/ must exit 1."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, f"docs/diagrams/system/rendered/{render}", "digraph {}\n")
+    assert _run_gate(repo) == 1
+
+
+@pytest.mark.parametrize("render", ["main.d2", "main.svg"])
+def test_rendered_output_staged_with_src_c4_passes(tmp_path: Path, render: str) -> None:
+    """A rendered/ output staged together with a .c4 under its src/ must exit 0."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, f"docs/diagrams/system/rendered/{render}", "digraph {}\n")
+    _stage_file(repo, "docs/diagrams/system/src/model.c4", "// source\n")
+    assert _run_gate(repo) == 0
+
+
+def test_rendered_output_finding_names_render_and_src_directory(
+    tmp_path: Path, capsys: Any
+) -> None:
+    """The finding for a rendered/ output names the render and its src/ directory."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, "docs/diagrams/system/rendered/main.d2", "digraph {}\n")
+    _run_gate(repo)
+    out = capsys.readouterr().out
+    assert "docs/diagrams/system/rendered/main.d2" in out
+    assert "docs/diagrams/system/src/" in out
+
+
+def test_rendered_output_not_satisfied_by_legacy_c4(tmp_path: Path) -> None:
+    """The legacy docs/diagrams/<name>.c4 is not the source of a rendered/ output."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, "docs/diagrams/system/rendered/main.d2", "digraph {}\n")
+    _stage_file(repo, "docs/diagrams/system.c4", "// source\n")
+    assert _run_gate(repo) == 1
+
+
+def test_rendered_output_not_satisfied_by_another_diagrams_src_c4(tmp_path: Path) -> None:
+    """A .c4 under a different diagram's src/ does not cover this diagram's render."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, "docs/diagrams/system/rendered/main.d2", "digraph {}\n")
+    _stage_file(repo, "docs/diagrams/other/src/model.c4", "// source\n")
+    assert _run_gate(repo) == 1
+
+
+def test_rendered_output_with_override_passes(tmp_path: Path) -> None:
+    """An aac-override on the staged rendered/ output still exits 0."""
+    repo = _make_repo(tmp_path)
+    content = "# aac-override: hand-fixing a render during migration\ndigraph {}\n"
+    _stage_file(repo, "docs/diagrams/system/rendered/main.d2", content)
+    assert _run_gate(repo) == 0
+
+
 def test_architecture_md_hunk_inside_generated_region_without_source_fails(
     tmp_path: Path,
 ) -> None:

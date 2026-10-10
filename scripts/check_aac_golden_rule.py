@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Enforce the AaC golden rule: generated artifacts cannot drift from their sources.
 
-A staged change that touches a generated artifact (rendered diagram outputs in
-docs/diagrams/<name>/<view>.{d2,svg}, or content inside an <!-- aac:generated -->
-fence in markdown) must EITHER include a corresponding source change (the .c4
-file driving the rendered output, or the source file declared in the fence's
-source= attribute) OR carry a line-adjacent `aac-override: <reason>` comment.
+A staged change that touches a generated artifact (rendered diagram outputs, or
+content inside an <!-- aac:generated --> fence in markdown) must EITHER include
+a corresponding source change OR carry a line-adjacent `aac-override: <reason>`
+comment. Two diagram layouts are recognised:
+
+- src/ plus rendered/: outputs at docs/diagrams/<name>/rendered/<view>.{d2,svg}
+  are generated from the .c4 files under docs/diagrams/<name>/src/, so at least
+  one .c4 under that src/ directory must be staged with them.
+- legacy: outputs at docs/diagrams/<name>/<view>.{d2,svg} are generated from
+  docs/diagrams/<name>.c4.
+
+For a markdown fence the source is the file declared in its source= attribute.
 
 Two modes:
 - --mode=gate (default): inspect staged changes (`git diff --cached`); exit 1 on
@@ -45,6 +52,10 @@ except ImportError:
 
 _ATTR_PATTERN = re.compile(r"(\w[\w-]*)=(\S+)")
 _DIAGRAM_OUTPUT_RE = re.compile(r"^docs/diagrams/(?P<name>[^/]+)/(?P<view>[^/]+)\.(?:d2|svg)$")
+_RENDERED_OUTPUT_RE = re.compile(
+    r"^docs/diagrams/(?P<name>[^/]+)/rendered/(?P<view>[^/]+)\.(?:d2|svg)$"
+)
+_C4_SUFFIX = ".c4"
 _ARCH_DOC_RE = re.compile(r"(?:^|/)(?:ARCHITECTURE\.md|docs/architecture\.md)$")
 _OVERRIDE_CODE_RE = re.compile(r"^\s*#\s*aac-override:\s+(\S.*)$")
 _OVERRIDE_HTML_RE = re.compile(r"<!--\s*aac-override:\s+(\S.*?)\s*-->")
@@ -130,7 +141,11 @@ def _parse_diff_into_per_file(diff_output: str) -> dict[str, list[str]]:
 
 
 def _is_relevant_path(path: str) -> bool:
-    return bool(_DIAGRAM_OUTPUT_RE.match(path) or _ARCH_DOC_RE.search(path))
+    return bool(
+        _DIAGRAM_OUTPUT_RE.match(path)
+        or _RENDERED_OUTPUT_RE.match(path)
+        or _ARCH_DOC_RE.search(path)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -234,15 +249,32 @@ def _parse_hunks(diff_lines: list[str]) -> list[DiffHunk]:
 # ---------------------------------------------------------------------------
 
 
+def _diagram_source(path: str, staged_paths: set[str]) -> tuple[str, bool] | None:
+    """Return (source description, is it staged) for a generated diagram output.
+
+    None when `path` is not a generated diagram output in either layout.
+    """
+    rendered = _RENDERED_OUTPUT_RE.match(path)
+    if rendered:
+        src_dir = f"docs/diagrams/{rendered.group('name')}/src/"
+        staged = any(p.startswith(src_dir) and p.endswith(_C4_SUFFIX) for p in staged_paths)
+        return f"a {_C4_SUFFIX} file under {src_dir}", staged
+    legacy = _DIAGRAM_OUTPUT_RE.match(path)
+    if legacy:
+        source = f"docs/diagrams/{legacy.group('name')}{_C4_SUFFIX}"
+        return f"'{source}'", source in staged_paths
+    return None
+
+
 def _check_path_pair(staged_paths: set[str], diff_by_path: dict[str, list[str]]) -> list[Finding]:
     """Return FAIL findings for diagram outputs staged without their .c4 source."""
     findings: list[Finding] = []
     for path in sorted(staged_paths):
-        m = _DIAGRAM_OUTPUT_RE.match(path)
-        if not m:
+        requirement = _diagram_source(path, staged_paths)
+        if requirement is None:
             continue
-        source = f"docs/diagrams/{m.group('name')}.c4"
-        if source in staged_paths:
+        source, source_staged = requirement
+        if source_staged:
             continue
         diff_lines = diff_by_path.get(path, [])
         if _diff_lines_have_override(diff_lines):
@@ -257,7 +289,7 @@ def _check_path_pair(staged_paths: set[str], diff_by_path: dict[str, list[str]])
                 line=None,
                 message=(
                     f"[FAIL] {path}:<none> — staged generated output without "
-                    f"staging its source '{source}'. "
+                    f"staging its source ({source}). "
                     f"Hint: stage {source} OR add `{hint}` on the line above."
                 ),
             )

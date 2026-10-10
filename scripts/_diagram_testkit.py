@@ -13,8 +13,10 @@ import json
 import textwrap
 from pathlib import Path
 
-LIKEC4_PIN = "1.59.4"
-D2_PIN = "0.7.1"
+from regenerate_diagrams import D2_VERSION, LIKEC4_VERSION
+
+LIKEC4_PIN = LIKEC4_VERSION
+D2_PIN = D2_VERSION
 FAILURE_MESSAGE = "simulated toolchain failure"
 VIEWS_KEPT = ("index", "structure")
 LONG_NAME = "Research & Development Platform Services"

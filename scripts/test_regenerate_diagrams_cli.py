@@ -127,6 +127,13 @@ def test_a_tool_that_prints_no_version_is_off_its_pin(go, tools, project):
     assert "d2 no version found but 0.7.1 is pinned" in err
 
 
+def test_the_kits_pins_are_the_commands_so_a_bump_cannot_leave_the_kit_behind(rd, tools):
+    assert LIKEC4_PIN == rd.LIKEC4_VERSION
+    assert tools.settings["likec4_version"] == rd.LIKEC4_VERSION
+    assert D2_PIN == rd.D2_VERSION
+    assert tools.settings["d2_version"] == f"v{rd.D2_VERSION}"
+
+
 @pytest.mark.parametrize("mode", [[], ["--check"]])
 def test_a_tool_missing_from_path_exits_3_naming_what_to_install(go, tools, project, mode):
     (tools.directory / "d2").unlink()

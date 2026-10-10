@@ -205,6 +205,8 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 
 The following rules are enforced by `scripts/validate.py`:
 
+The validator's accepted-field list lags the harness; see [Invocation Modes](user-invoked-skills.md#invocation-modes) for the unknown-field findings to expect.
+
 ### Required Checks
 
 | Check | Rule | Error |

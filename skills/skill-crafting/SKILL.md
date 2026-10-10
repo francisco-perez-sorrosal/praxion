@@ -12,6 +12,9 @@ staleness_sensitive_sections:
   - "Skill Content Lifecycle"
   - "Cross-Agent Portability"
   - "Context-Engineering Sources"
+  - "Arguments and Dynamic Context"
+  - "Discovery and Live Reload"
+  - "Permission Management"
 ---
 
 # Skill Creator
@@ -30,6 +33,7 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 - [references/workflows.md](references/workflows.md) -- sequential and conditional workflow patterns
 - [references/skill-categories.md](references/skill-categories.md) -- nine skill archetype categories from Anthropic's internal practice
 - [references/plugin-and-troubleshooting.md](references/plugin-and-troubleshooting.md) -- plugin mechanics, anti-patterns, troubleshooting
+- [references/user-invoked-skills.md](references/user-invoked-skills.md) -- user-invoked skills: description length, `argument-hint`, argument substitution, invocation modes, converting a command file
 
 ## About Skills
 
@@ -102,7 +106,7 @@ Write the body in imperative/infinitive form ("Extract text", "Run the script", 
 | `argument-hint`, `arguments` | | ✓ | ✗ | ✗ | Autocomplete hint + named positional args for `$name` substitution. |
 | `hooks`, `shell` | | ✓ | ✗ | ✗ | Lifecycle hooks scoped to the skill; `bash` (default) or `powershell` for bang-prefixed command-injection blocks. |
 
-Because commands [merged into skills](https://code.claude.com/docs/en/skills), every field applies to `commands/*.md` too (see the `command-crafting` skill). For portable skills, rely only on fields your target tools mark `✓`, and isolate Claude-only fields (those Cursor and Codex both mark `✗`) behind a clear heading. Complete field reference + interactions: [references/schema.md](references/schema.md).
+Skills a person types as `/name` (invocation modes, arguments, converting an old command file): [references/user-invoked-skills.md](references/user-invoked-skills.md). For portable skills, rely only on fields your target tools mark `✓`, and isolate Claude-only fields (those Cursor and Codex both mark `✗`) behind a clear heading. Complete field reference + interactions: [references/schema.md](references/schema.md).
 
 #### Directory Name Constraints
 

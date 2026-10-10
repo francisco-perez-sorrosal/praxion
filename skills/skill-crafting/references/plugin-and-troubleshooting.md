@@ -2,6 +2,16 @@
 
 Plugin-specific operational knowledge, anti-patterns to avoid, and troubleshooting common issues. Reference material for the [Skill Creator](../SKILL.md) skill.
 
+## Contents
+
+- [Plugin-Specific Progressive Disclosure](#plugin-specific-progressive-disclosure)
+- [Discovery and Live Reload](#discovery-and-live-reload)
+- [Permission Management](#permission-management)
+- [Recommended Hooks](#recommended-hooks)
+- [Persistent State](#persistent-state)
+- [Anti-Patterns](#anti-patterns)
+- [Troubleshooting](#troubleshooting)
+
 ## Plugin-Specific Progressive Disclosure
 
 ### How It Works from Plugins
@@ -28,6 +38,43 @@ Add a wildcard allowlist to avoid this:
 ### Debugging Tip
 
 Use `/context` to inspect what's currently loaded in the context window, including which skills and reference files have been read. Useful for verifying progressive disclosure is working as intended.
+
+## Discovery and Live Reload
+<!-- last-verified: 2026-05-25 -->
+
+Discovery timing depends on *where* the skill lives:
+
+- **Project / personal locations** (`.claude/skills/`, `~/.claude/skills/`) have **live change detection** — edits, adds, and removals take effect within the session, no restart. Creating a *new top-level* skills directory that did not exist at session start still requires a restart (so it can be watched).
+- **Plugin components** (Praxion's `skills/`, `agents/`) are scanned once at session start and cached for the session. A skill added mid-session — or installed via `bash install.sh` against a running session — is invisible until a fresh session. Symptom: `/my-new-skill` reports "unknown command" despite a valid `SKILL.md` at the right path. There is no plugin hot-reload — restart the session.
+
+(Subagents always require a restart on disk edits; the `/agents` interface takes effect immediately.)
+
+## Permission Management
+<!-- last-verified: 2026-05-25 -->
+
+Claude's invocation access to a skill is governed by `Skill(...)` permission rules (the older `SlashCommand:/name:*` form predates the merge of commands into skills):
+
+```text
+# In /permissions
+Skill(co)          # allow exactly /co
+Skill(review-pr *) # allow /review-pr with any arguments
+Skill(deploy *)    # (as a deny rule) block /deploy
+Skill              # (as a deny rule) Claude can invoke no skills
+```
+
+To stop Claude from auto-invoking a *specific* skill (e.g. a side-effecting one), set its frontmatter instead — this also removes its description from model context:
+
+```markdown
+---
+disable-model-invocation: true
+---
+```
+
+Note the two mechanisms differ in what they cost. A deny rule blocks invocation but the
+description still occupies the always-loaded listing budget; `disable-model-invocation: true`
+blocks invocation *and* reclaims the budget. Prefer the frontmatter field for skills that
+should never be model-invoked, and reserve deny rules for per-user or per-project policy over
+skills whose default is auto-invocable.
 
 ## Recommended Hooks
 
@@ -102,6 +149,7 @@ For plugin-distributed skills, store persistent data in `${CLAUDE_PLUGIN_DATA}` 
 - Use spaces, never tabs
 - Quote strings with special characters
 - `---` delimiters on their own lines
+- **Frontmatter that does not parse fails silently.** A skill whose YAML cannot load registers no `description` and no `allowed-tools`, but nothing announces the failure — presence-grepping for a field name succeeds on a file the parser rejects. Parse the frontmatter with a real YAML loader rather than grepping. Two shapes account for most failures: an **unindented block scalar** (`description: >` with continuation lines at column 0, so the parser is still inside the scalar when it meets the next key) and an **unquoted value** whose first character is YAML-significant (`[`, `{`, `*`, `&`, `>`, `|`) or that contains `: `. When a value could be mistaken for YAML syntax, quote it.
 
 ### Path Issues
 

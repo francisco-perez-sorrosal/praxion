@@ -253,7 +253,7 @@ WIDER_SCAN_ALLOWLIST: dict[str, str] = {
     "claude/canonical-blocks/hackathon-mode.md": "defines the orchestrator-owned journal",
     "skills/onboard-project/references/claude-md-blocks.md": "synced copy of the block above",
     # States that the agent no longer maintains the log -- a denial, not a mandate.
-    "commands/skill-genesis.md": "documents the retirement",
+    "skills/skill-genesis/SKILL.md": "documents the retirement",
     # Consumes orchestrator writes; the branch is live but narrow.
     "hooks/send_event.py": "reads the journal, never mandates a write",
     # A dashboard live-refresh example, not a write instruction.

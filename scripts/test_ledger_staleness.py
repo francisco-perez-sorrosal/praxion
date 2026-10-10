@@ -366,8 +366,8 @@ def test_the_apply_step_puts_a_live_peer_of_a_key_moving_realign_to_the_user(
         check=False,
     )
     (row,) = json.loads(result.stdout)["rows"]
-    command = (SCRIPT_PATH.parents[1] / "commands" / "triage-debt.md").read_text()
-    apply_step = command.split("### 4. Apply", 1)[1].split("### 5. Report", 1)[0]
+    skill = (SCRIPT_PATH.parents[1] / "skills" / "triage-debt" / "SKILL.md").read_text()
+    apply_step = skill.split("### 4. Apply", 1)[1].split("### 5. Report", 1)[0]
 
     assert row["context"]["same_base_peers"] == [{"id": "td-903", "status": "open"}]
     assert "possible-duplicate" in row["candidate_classes"]

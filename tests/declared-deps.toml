@@ -515,11 +515,11 @@ why = "the `/report-praxion-issue` command doc that drives the praxion-feedback 
 
 [[dep]]
 paths = [
-  "commands/resume-rework.md",
-  "commands/skill-genesis-review.md",
-  "commands/skill-genesis.md",
   "rules/swe/swe-agent-coordination-protocol.md",
   "scripts/dispatch-reworks",
+  "skills/resume-rework/SKILL.md",
+  "skills/skill-genesis-review/SKILL.md",
+  "skills/skill-genesis/SKILL.md",
   "skills/software-planning/references/*.md",
 ]
 tests = [

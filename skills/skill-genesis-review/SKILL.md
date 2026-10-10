@@ -1,4 +1,5 @@
 ---
+name: skill-genesis-review
 description: Disposition pending proposals from a skill-genesis report — batch multi-select; records approve/reject/refine/defer per proposal; surfaces delegation handoffs.
 argument-hint: "[--report <path>] [--show-completed]"
 allowed-tools: [Read, Glob, Grep, Bash, Edit, AskUserQuestion]
@@ -8,7 +9,7 @@ disable-model-invocation: true
 Work through pending proposals from the most recent (or specified) skill-genesis report.
 Presents every pending proposal in a single batch `AskUserQuestion` multi-select, records
 each disposition in the report's `## Disposition Log` section, and surfaces delegation
-handoffs for skill/rule/claude.md proposals. Re-running this command on a fully-reviewed
+handoffs for skill/rule/claude.md proposals. Re-running this skill on a fully-reviewed
 report is a no-op.
 
 ## Arguments
@@ -173,7 +174,7 @@ Review status: <pending | partial | complete>
 
 ## Idempotency contract
 
-The command is safe to re-run:
+The skill is safe to re-run:
 
 - It only presents proposals where `Disposition` is `pending` or `pending refinement`; already-dispositioned proposals are never re-presented.
 - Log rows are appended, never rewritten — the audit trail accumulates without duplication.

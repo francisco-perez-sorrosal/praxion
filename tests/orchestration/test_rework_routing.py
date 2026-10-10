@@ -1,11 +1,11 @@
 """Tests for the architect-always-first routing invariant.
 
-These tests validate that commands/resume-rework.md documents the routing
+These tests validate that skills/resume-rework/SKILL.md documents the routing
 contract: ALL rework rows — regardless of class (architecture or implementation)
 — dispatch to systems-architect first. The implementation-planner is only
 invoked downstream after the architect has produced SYSTEMS_PLAN.md.
 
-All tests are expected to FAIL until commands/resume-rework.md is created by
+All tests are expected to FAIL until skills/resume-rework/SKILL.md is created by
 the implementer.
 """
 
@@ -14,19 +14,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-COMMAND_FILE = Path(__file__).parents[2] / "commands" / "resume-rework.md"
+SKILL_FILE = Path(__file__).parents[2] / "skills" / "resume-rework" / "SKILL.md"
 
 
 def _body() -> str:
-    """Return the full command file content (imported lazily so collection succeeds)."""
-    return COMMAND_FILE.read_text(encoding="utf-8")
+    """Return the full skill file content (imported lazily so collection succeeds)."""
+    return SKILL_FILE.read_text(encoding="utf-8")
 
 
 def test_architecture_class_routes_to_architect() -> None:
     body = _body()
     # The command must document that architecture-class rows dispatch to systems-architect.
     assert "systems-architect" in body, (
-        "commands/resume-rework.md must document dispatch to 'systems-architect'"
+        "skills/resume-rework/SKILL.md must document dispatch to 'systems-architect'"
     )
     assert re.search(
         r"(architecture.{0,80}systems.architect|systems.architect.{0,80}architecture)",
@@ -65,9 +65,9 @@ def test_no_direct_planner_dispatch() -> None:
         re.IGNORECASE | re.DOTALL,
     )
     assert not direct_planner_dispatch, (
-        "commands/resume-rework.md must NOT dispatch implementation-planner directly. "
+        "skills/resume-rework/SKILL.md must NOT dispatch implementation-planner directly. "
         "The architect-always-first invariant means every dispatch arm names "
-        "systems-architect. The planner is invoked downstream, not by this command. "
+        "systems-architect. The planner is invoked downstream, not by this skill. "
         f"Found: {direct_planner_dispatch.group() if direct_planner_dispatch else ''}"
     )
 

@@ -1,4 +1,5 @@
 ---
+name: clean-work
 description: Safely clean .ai-work/ after pipeline completion — state-aware, with --dry-run
 argument-hint: "[--dry-run] [--force <slug>] [slug ...]"
 allowed-tools: [Bash(clean_work_safety.py:*), Bash(python3:*), Bash(rm:*), Bash(ls:*), Bash(cat:*), Read, AskUserQuestion]
@@ -7,7 +8,7 @@ disable-model-invocation: true
 
 Remove task-scoped subdirectories from `.ai-work/` — but never silently delete in-flight, unarchived, or audit state.
 
-`.ai-work/<task-slug>/` is gitignored, so `rm -rf` is irreversible. Some artifacts must reach a durable home before deletion (`LEARNINGS.md` → ADRs/specs/docs; `VERIFICATION_REPORT.md` patterns → `LEARNINGS.md`; `traceability.yml` → archived SPEC matrix; `RECOVERY_LOG.md` audit trail; `PRE_REFACTOR_PLAN.md` tech-debt transitions), and a directory with an active `WIP.md` or an open `REWORK_MANIFEST.md` is live pipeline state that must not be deleted at all. A deterministic scanner classifies each directory so this command can refuse, warn, or proceed.
+`.ai-work/<task-slug>/` is gitignored, so `rm -rf` is irreversible. Some artifacts must reach a durable home before deletion (`LEARNINGS.md` → ADRs/specs/docs; `VERIFICATION_REPORT.md` patterns → `LEARNINGS.md`; `traceability.yml` → archived SPEC matrix; `RECOVERY_LOG.md` audit trail; `PRE_REFACTOR_PLAN.md` tech-debt transitions), and a directory with an active `WIP.md` or an open `REWORK_MANIFEST.md` is live pipeline state that must not be deleted at all. A deterministic scanner classifies each directory so this skill can refuse, warn, or proceed.
 
 ## Arguments
 

@@ -1,16 +1,17 @@
 ---
+name: consult
 description: Convene a discipline consultant to challenge a target artifact
 argument-hint: "<discipline> [--on <artifact>]"
 allowed-tools: [Bash, Read, Write, Edit, Grep, Glob, Task, Skill]
 ---
 
-Run a discipline consultation using the [discipline-consultant](../agents/discipline-consultant.md) agent, human-convened — the third path alongside a registry trigger predicate firing and a pipeline agent self-nominating. Produces independent reading, falsifiable challenges, and per-challenge disposition for exactly one discipline resolved against the roster at `skills/multi-perspective-analysis/references/discipline-registry.md` (e.g. `statistician`; the roster is discipline-generic and grows by adding rows, never by naming disciplines here).
+Run a discipline consultation using the [discipline-consultant](../../agents/discipline-consultant.md) agent, human-convened — the third path alongside a registry trigger predicate firing and a pipeline agent self-nominating. Produces independent reading, falsifiable challenges, and per-challenge disposition for exactly one discipline resolved against the roster at `skills/multi-perspective-analysis/references/discipline-registry.md` (e.g. `statistician`; the roster is discipline-generic and grows by adding rows, never by naming disciplines here).
 
 ## Process
 
 1. **Resolve the discipline and target** from `$ARGUMENTS`:
 
-   - `<discipline>` (required, first token) — pass it through **verbatim, unresolved**. This command performs no registry lookup of its own; resolution against the roster is the consultant's own Phase 1 contract, and duplicating it here would risk a second, drifting source of truth.
+   - `<discipline>` (required, first token) — pass it through **verbatim, unresolved**. This skill performs no registry lookup of its own; resolution against the roster is the consultant's own Phase 1 contract, and duplicating it here would risk a second, drifting source of truth.
    - `[--on <artifact>]` (optional) — the file, PR, branch, or named surface to challenge. If omitted, default to the current branch diff against the repo's default branch.
 
 2. **Seal the prior list, before spawning** — having decided to convene, load the matched registry row's `binds-to` skill via the `Skill` tool, work that row's `challenge-obligations` against the target, and append what the pass surfaces to `.ai-state/CONSULT_PRIORS.md § Sealed Priors` — one row per concern, or one explicit `NONE` row. **Commit the file before spawning**: the seal is the commit, not the working-tree write. Schema: `.ai-state/CONSULT_PRIORS.md § Column Definitions`.

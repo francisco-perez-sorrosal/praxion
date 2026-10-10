@@ -1,4 +1,5 @@
 ---
+name: handoff
 description: "Compose HANDOFF.md at a pipeline boundary or a session's end so the next window inherits position, constraints and corrections."
 allowed-tools: [Read, Edit, Glob, Grep, Bash(compose_handoff.py:*), Bash(python3:*), Bash(git:*)]
 argument-hint: "<task-slug> [--session] [--boundary <enum>] [--dry-run] [--force]"
@@ -77,7 +78,7 @@ documented above.
 
 The plan on disk survives a lost orchestrator. The standing instructions the user
 gave in conversation, the corrections already applied, and the digest of what was
-just decided do not — they live only in the window. This command writes them down
+just decided do not — they live only in the window. This skill writes them down
 while the window still holds them, next to a mechanically computed position, so the
 next window starts from a document rather than a reconstruction.
 

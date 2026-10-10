@@ -1,12 +1,12 @@
-"""Behavioral tests for the /skill-genesis and /skill-genesis-review command files.
+"""Behavioral tests for the /skill-genesis and /skill-genesis-review skill files.
 
 These are static-analysis tests: YAML frontmatter parsing and grep-based body
-inspection of the two new command files, plus fixture-based simulation of the
+inspection of the two new skill files, plus fixture-based simulation of the
 disposition discovery logic. No runtime Claude Code session is involved.
 
-RED state on first run: commands/skill-genesis.md and commands/skill-genesis-review.md
+RED state on first run: skills/skill-genesis/SKILL.md and skills/skill-genesis-review/SKILL.md
 do not exist yet — all tests that read those files produce FileNotFoundError-equivalent
-failures via Path.exists() assertions. They go GREEN once the two command files exist.
+failures via Path.exists() assertions. They go GREEN once the two skill files exist.
 
 Test strategy: static analysis (YAML frontmatter parse + grep + fixture-based logic).
 Rationale is documented in ADR dec-187.
@@ -22,8 +22,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-REVIEW_COMMAND = REPO_ROOT / "commands" / "skill-genesis-review.md"
-GENESIS_COMMAND = REPO_ROOT / "commands" / "skill-genesis.md"
+REVIEW_SKILL = REPO_ROOT / "skills" / "skill-genesis-review" / "SKILL.md"
+GENESIS_SKILL = REPO_ROOT / "skills" / "skill-genesis" / "SKILL.md"
 FIXTURE_REPORT = REPO_ROOT / "tests" / "fixtures" / "skill_genesis_report_sample.md"
 
 
@@ -93,81 +93,81 @@ def _pending_proposals_from_report(report_text: str) -> list[str]:
 
 
 def test_review_command_file_exists() -> None:
-    """commands/skill-genesis-review.md must exist.
+    """skills/skill-genesis-review/SKILL.md must exist.
 
     This is the disposition command the user runs to batch-present pending
     proposals. Its absence means the review flow is entirely broken.
     """
-    assert REVIEW_COMMAND.exists(), (
-        f"commands/skill-genesis-review.md not found at {REVIEW_COMMAND}. "
+    assert REVIEW_SKILL.exists(), (
+        f"skills/skill-genesis-review/SKILL.md not found at {REVIEW_SKILL}. "
         "This command file must exist before tests can pass."
     )
 
 
 def test_review_command_frontmatter_parseable() -> None:
-    """commands/skill-genesis-review.md frontmatter must parse as valid YAML.
+    """skills/skill-genesis-review/SKILL.md frontmatter must parse as valid YAML.
 
     All Praxion command files use YAML frontmatter with required keys.
     A parse failure here means the command is not registered by Claude Code.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     required_keys = ["description", "argument-hint", "allowed-tools"]
     for key in required_keys:
         assert key in fm, (
-            f"Required frontmatter key '{key!r}' missing from commands/skill-genesis-review.md. "
+            f"Required frontmatter key '{key!r}' missing from skills/skill-genesis-review/SKILL.md. "
             f"Present keys: {list(fm.keys())}"
         )
 
 
 def test_review_command_description_is_non_empty() -> None:
-    """commands/skill-genesis-review.md must have a non-empty description field.
+    """skills/skill-genesis-review/SKILL.md must have a non-empty description field.
 
     The description appears in Claude Code's /command tab and is the user's
     primary discovery mechanism for what the command does.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     desc = fm.get("description", "")
     assert isinstance(desc, str), (
-        "The 'description' field in commands/skill-genesis-review.md must be a non-empty string. "
+        "The 'description' field in skills/skill-genesis-review/SKILL.md must be a non-empty string. "
         f"Got: {desc!r}"
     )
     assert desc.strip(), (
-        "The 'description' field in commands/skill-genesis-review.md must be a non-empty string. "
+        "The 'description' field in skills/skill-genesis-review/SKILL.md must be a non-empty string. "
         f"Got: {desc!r}"
     )
 
 
 def test_review_allowed_tools_include_askuserquestion() -> None:
-    """commands/skill-genesis-review.md must list AskUserQuestion in allowed-tools.
+    """skills/skill-genesis-review/SKILL.md must list AskUserQuestion in allowed-tools.
 
     The batch multi-select disposition flow requires AskUserQuestion to
     present pending proposals to the user and collect their choices.
     Without it, no interactive disposition is possible.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     tools = _allowed_tools_list(fm)
     assert any("AskUserQuestion" in t for t in tools), (
-        "AskUserQuestion must be in 'allowed-tools' for commands/skill-genesis-review.md. "
+        "AskUserQuestion must be in 'allowed-tools' for skills/skill-genesis-review/SKILL.md. "
         f"Current allowed-tools: {tools!r}. "
         "The review command uses AskUserQuestion for the batch multi-select disposition pass."
     )
 
 
 def test_review_allowed_tools_include_edit() -> None:
-    """commands/skill-genesis-review.md must list Edit in allowed-tools.
+    """skills/skill-genesis-review/SKILL.md must list Edit in allowed-tools.
 
     The review command appends rows to ## Disposition Log and updates the
     report's frontmatter fields (review_status, disposition_count) in place.
     Edit permission is required for this in-place mutation.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     tools = _allowed_tools_list(fm)
     assert any("Edit" in t for t in tools), (
-        "Edit must be in 'allowed-tools' for commands/skill-genesis-review.md. "
+        "Edit must be in 'allowed-tools' for skills/skill-genesis-review/SKILL.md. "
         f"Current allowed-tools: {tools!r}. "
         "The review command uses Edit to append rows to ## Disposition Log and "
         "update review_status in the report frontmatter."
@@ -175,20 +175,20 @@ def test_review_allowed_tools_include_edit() -> None:
 
 
 def test_review_argument_hint_present() -> None:
-    """commands/skill-genesis-review.md must have an argument-hint field.
+    """skills/skill-genesis-review/SKILL.md must have an argument-hint field.
 
     The argument-hint documents the command's optional flags in the Claude
     Code command tab. At minimum the hint must be a non-empty string.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = fm.get("argument-hint", "")
     assert isinstance(hint, str), (
-        "'argument-hint' in commands/skill-genesis-review.md must be a non-empty string. "
+        "'argument-hint' in skills/skill-genesis-review/SKILL.md must be a non-empty string. "
         f"Got: {hint!r}"
     )
     assert hint.strip(), (
-        "'argument-hint' in commands/skill-genesis-review.md must be a non-empty string. "
+        "'argument-hint' in skills/skill-genesis-review/SKILL.md must be a non-empty string. "
         f"Got: {hint!r}"
     )
 
@@ -205,10 +205,10 @@ def test_review_body_references_skill_genesis_reports_path() -> None:
     reports. If the path is not referenced, the discovery logic is absent
     or points at the wrong location.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     assert ".ai-state/skill_genesis_reports/" in body, (
-        "commands/skill-genesis-review.md body must reference '.ai-state/skill_genesis_reports/'. "
+        "skills/skill-genesis-review/SKILL.md body must reference '.ai-state/skill_genesis_reports/'. "
         "The report-discovery logic (step 1 of the command's 9 responsibilities) scans "
         "this path for the most recent unreviewed report."
     )
@@ -221,17 +221,17 @@ def test_review_body_states_disposition_log_append_contract() -> None:
     only new rows appended. This makes re-runs idempotent and preserves
     the audit trail.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     # Check that both "Disposition Log" and append semantics are present
     assert "Disposition Log" in body, (
-        "commands/skill-genesis-review.md body must mention 'Disposition Log' — "
+        "skills/skill-genesis-review/SKILL.md body must mention 'Disposition Log' — "
         "the section the command appends rows to after each disposition pass."
     )
     # The body must state the append-only / never-rewrite constraint
     has_append = any(kw in body.lower() for kw in ("append", "never rewrite", "never rewrites"))
     assert has_append, (
-        "commands/skill-genesis-review.md body must state the append-only contract for "
+        "skills/skill-genesis-review/SKILL.md body must state the append-only contract for "
         "the ## Disposition Log (e.g., 'append rows', 'never rewrite existing rows'). "
         "This is what makes re-running /skill-genesis-review idempotent."
     )
@@ -243,7 +243,7 @@ def test_review_body_states_idempotency_contract() -> None:
     When all proposals have been dispositioned (none remain with Disposition: pending),
     re-running the command must exit cleanly rather than presenting an empty selection.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     # Looking for language about pending filter, no-op, or idempotent re-run
     keywords = (
@@ -256,7 +256,7 @@ def test_review_body_states_idempotency_contract() -> None:
     )
     has_idempotency = any(kw in body.lower() for kw in keywords)
     assert has_idempotency, (
-        "commands/skill-genesis-review.md body must describe the idempotency behavior: "
+        "skills/skill-genesis-review/SKILL.md body must describe the idempotency behavior: "
         "when no pending proposals remain, the command exits with a no-op or summary message "
         "rather than presenting an empty multi-select. "
         f"Searched for keywords {keywords!r} in body — none found."
@@ -270,10 +270,10 @@ def test_review_body_references_pending_filter() -> None:
     Disposition: pending refinement. Without this filter, re-runs would
     re-present already-dispositioned proposals.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     assert "pending" in body.lower(), (
-        "commands/skill-genesis-review.md body must reference 'pending' proposals — "
+        "skills/skill-genesis-review/SKILL.md body must reference 'pending' proposals — "
         "the filter that determines which proposals to show in the multi-select. "
         "Without this filter, re-running the command presents already-dispositioned proposals."
     )
@@ -286,11 +286,11 @@ def test_review_body_lists_four_disposition_values() -> None:
     vocabulary. The body must document them so the user understands the
     options available in the AskUserQuestion multi-select.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     for value in ("approve", "reject", "refine", "defer"):
         assert value in body.lower(), (
-            f"Disposition value '{value}' not found in commands/skill-genesis-review.md body. "
+            f"Disposition value '{value}' not found in skills/skill-genesis-review/SKILL.md body. "
             f"All four disposition values (approve, reject, refine, defer) must be named "
             f"so the user understands the options in the batch multi-select."
         )
@@ -303,7 +303,7 @@ def test_review_body_describes_refine_as_pending_refinement() -> None:
     'pending refinement' rather than approved or rejected — it remains
     actionable in future review passes.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     # Check that refine semantics (pending refinement / re-run later) are documented
     has_refinement_semantics = (
@@ -312,7 +312,7 @@ def test_review_body_describes_refine_as_pending_refinement() -> None:
         or ("refine" in body.lower() and "later" in body.lower())
     )
     assert has_refinement_semantics, (
-        "commands/skill-genesis-review.md body must describe the 'refine' disposition as "
+        "skills/skill-genesis-review/SKILL.md body must describe the 'refine' disposition as "
         "producing a 'pending refinement' state that the user can revisit in a future pass. "
         "This ensures refine does not force an immediate approve/reject decision."
     )
@@ -326,13 +326,13 @@ def test_review_body_describes_delegation_handoff() -> None:
     executed directly (memory proposals via remember). This is the
     recommended-delegation surface step.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     has_delegation = any(
         kw in body.lower() for kw in ("delegation", "context-engineer", "handoff", "delegate")
     )
     assert has_delegation, (
-        "commands/skill-genesis-review.md body must describe surfacing delegation handoffs "
+        "skills/skill-genesis-review/SKILL.md body must describe surfacing delegation handoffs "
         "for approved proposals (context-engineer for skills/rules, remember for memory). "
         "Searched for 'delegation', 'context-engineer', 'handoff', 'delegate' — none found."
     )
@@ -344,108 +344,108 @@ def test_review_body_describes_delegation_handoff() -> None:
 
 
 def test_genesis_command_file_exists() -> None:
-    """commands/skill-genesis.md must exist.
+    """skills/skill-genesis/SKILL.md must exist.
 
     This is the on-demand invocation wrapper that spawns the skill-genesis
     agent in the background. Without it, users have no way to trigger a
     harvest pass via /skill-genesis.
     """
-    assert GENESIS_COMMAND.exists(), (
-        f"commands/skill-genesis.md not found at {GENESIS_COMMAND}. "
+    assert GENESIS_SKILL.exists(), (
+        f"skills/skill-genesis/SKILL.md not found at {GENESIS_SKILL}. "
         "This command file must exist before tests can pass."
     )
 
 
 def test_genesis_command_frontmatter_parseable() -> None:
-    """commands/skill-genesis.md frontmatter must parse as valid YAML.
+    """skills/skill-genesis/SKILL.md frontmatter must parse as valid YAML.
 
     A parse failure means the command is not registered by Claude Code.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     required_keys = ["description", "argument-hint", "allowed-tools"]
     for key in required_keys:
         assert key in fm, (
-            f"Required frontmatter key '{key!r}' missing from commands/skill-genesis.md. "
+            f"Required frontmatter key '{key!r}' missing from skills/skill-genesis/SKILL.md. "
             f"Present keys: {list(fm.keys())}"
         )
 
 
 def test_genesis_argument_hint_contains_since_flag() -> None:
-    """commands/skill-genesis.md argument-hint must document the --since flag.
+    """skills/skill-genesis/SKILL.md argument-hint must document the --since flag.
 
     --since <commit> scopes the harvest to learning sources newer than a
     given commit. It must be discoverable from the argument-hint.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = str(fm.get("argument-hint", ""))
     assert "--since" in hint, (
-        f"'--since' flag not found in argument-hint for commands/skill-genesis.md. "
+        f"'--since' flag not found in argument-hint for skills/skill-genesis/SKILL.md. "
         f"Current argument-hint: {hint!r}. "
         "The --since <commit> flag scopes the harvest to recent learning sources."
     )
 
 
 def test_genesis_argument_hint_contains_scope_flag() -> None:
-    """commands/skill-genesis.md argument-hint must document the --scope flag.
+    """skills/skill-genesis/SKILL.md argument-hint must document the --scope flag.
 
     --scope <area> narrows the harvest to a specific area of the codebase.
     It must be discoverable from the argument-hint.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = str(fm.get("argument-hint", ""))
     assert "--scope" in hint, (
-        f"'--scope' flag not found in argument-hint for commands/skill-genesis.md. "
+        f"'--scope' flag not found in argument-hint for skills/skill-genesis/SKILL.md. "
         f"Current argument-hint: {hint!r}. "
         "The --scope <area> flag narrows the harvest to a specific codebase area."
     )
 
 
 def test_genesis_argument_hint_contains_dry_run_flag() -> None:
-    """commands/skill-genesis.md argument-hint must document the --dry-run flag.
+    """skills/skill-genesis/SKILL.md argument-hint must document the --dry-run flag.
 
     --dry-run lets the user preview what sources would be harvested without
     actually spawning the agent. It must be discoverable from the argument-hint.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = str(fm.get("argument-hint", ""))
     assert "--dry-run" in hint, (
-        f"'--dry-run' flag not found in argument-hint for commands/skill-genesis.md. "
+        f"'--dry-run' flag not found in argument-hint for skills/skill-genesis/SKILL.md. "
         f"Current argument-hint: {hint!r}. "
         "The --dry-run flag previews harvest without spawning the agent."
     )
 
 
 def test_genesis_body_references_skill_genesis_agent() -> None:
-    """commands/skill-genesis.md body must reference the skill-genesis agent via Task.
+    """skills/skill-genesis/SKILL.md body must reference the skill-genesis agent via Task.
 
     The command is a thin wrapper: it spawns the skill-genesis agent in
     background mode. Without a Task delegation the agent is never invoked.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     has_agent_ref = "skill-genesis" in body and ("Task" in body or "background" in body.lower())
     assert has_agent_ref, (
-        "commands/skill-genesis.md body must reference the skill-genesis agent (via Task) "
+        "skills/skill-genesis/SKILL.md body must reference the skill-genesis agent (via Task) "
         "and spawn it in background mode. "
         "The command is a thin wrapper: parse flags → Task(skill-genesis, bg=True) → surface path."
     )
 
 
 def test_genesis_body_surfaces_report_path_or_review_reminder() -> None:
-    """commands/skill-genesis.md body must surface the expected report path or /skill-genesis-review.
+    """skills/skill-genesis/SKILL.md body must surface the expected report path or /skill-genesis-review.
 
     After spawning the agent, the command must tell the user where the report
     will land and remind them to run /skill-genesis-review once it completes.
     """
-    text = GENESIS_COMMAND.read_text(encoding="utf-8")
+    text = GENESIS_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     has_next_step = "skill-genesis-review" in body or "skill_genesis_reports" in body
     assert has_next_step, (
-        "commands/skill-genesis.md body must reference either 'skill-genesis-review' or "
+        "skills/skill-genesis/SKILL.md body must reference either 'skill-genesis-review' or "
         "'.ai-state/skill_genesis_reports/' so the user knows where the report lands and "
         "what to run next to disposition it."
     )
@@ -576,10 +576,10 @@ def test_review_body_references_skill_proposal_type() -> None:
     Skill proposals are delegated to context-engineer. The body must
     acknowledge this type so the delegation surface step handles it.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     assert "skill" in body.lower(), (
-        "commands/skill-genesis-review.md body must reference 'skill' proposals. "
+        "skills/skill-genesis-review/SKILL.md body must reference 'skill' proposals. "
         "Skill proposals are the most common type and route to context-engineer delegation."
     )
 
@@ -590,10 +590,10 @@ def test_review_body_references_rule_proposal_type() -> None:
     Rule proposals are also delegated to context-engineer. The body must
     distinguish them from skill proposals so the delegation surface is accurate.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     body = _command_body(text)
     assert "rule" in body.lower(), (
-        "commands/skill-genesis-review.md body must reference 'rule' proposals. "
+        "skills/skill-genesis-review/SKILL.md body must reference 'rule' proposals. "
         "Rule proposals are delegated to context-engineer alongside skill proposals."
     )
 
@@ -604,17 +604,17 @@ def test_review_body_references_rule_proposal_type() -> None:
 
 
 def test_review_argument_hint_documents_report_flag() -> None:
-    """commands/skill-genesis-review.md argument-hint must document --report flag.
+    """skills/skill-genesis-review/SKILL.md argument-hint must document --report flag.
 
     --report <path> lets the user override auto-discovery and specify a
     particular report file. Without documenting it, users must rely on
     auto-discovery even when they want to review a specific older report.
     """
-    text = REVIEW_COMMAND.read_text(encoding="utf-8")
+    text = REVIEW_SKILL.read_text(encoding="utf-8")
     fm = _parse_frontmatter(text)
     hint = str(fm.get("argument-hint", ""))
     assert "--report" in hint, (
-        f"'--report' flag not found in argument-hint for commands/skill-genesis-review.md. "
+        f"'--report' flag not found in argument-hint for skills/skill-genesis-review/SKILL.md. "
         f"Current argument-hint: {hint!r}. "
         "The --report <path> flag lets the user target a specific report for disposition."
     )

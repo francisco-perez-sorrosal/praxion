@@ -2,7 +2,7 @@
 
 The reconciler decides which verdict words exist (`VERDICT_WORDS`); three
 readers explain them to someone who acts on them: the `/resume-pipeline`
-command, the Mechanism paragraph of the completion handshake, and the
+skill, the Mechanism paragraph of the completion handshake, and the
 reconciler's own `--help` text. A verdict added to the vocabulary but missing
 from one of them leaves that reader unable to say what to do with it -- worst
 for a verdict that must never be resumed automatically. Each site is pinned
@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import reconcile_pipeline_state  # noqa: E402
 from _step_verdict import VERDICT_WORDS  # noqa: E402
 
-RESUME_COMMAND = REPO_ROOT / "commands" / "resume-pipeline.md"
+RESUME_SKILL = REPO_ROOT / "skills" / "resume-pipeline" / "SKILL.md"
 HANDSHAKE_DOC = (
     REPO_ROOT / "skills" / "software-planning" / "references" / "agent-pipeline-details.md"
 )
@@ -47,7 +47,7 @@ def help_text() -> str:
 
 
 SITES = {
-    "resume-pipeline command": lambda: RESUME_COMMAND.read_text(encoding="utf-8"),
+    "resume-pipeline skill": lambda: RESUME_SKILL.read_text(encoding="utf-8"),
     "handshake mechanism paragraph": mechanism_paragraph,
     "reconciler --help": help_text,
 }

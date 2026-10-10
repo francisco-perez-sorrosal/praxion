@@ -1131,7 +1131,7 @@ def test_class_filter_excludes_out_of_class_entries_from_both_streams(repo: Path
 
     Before this fix, `--class` filtered `decay_findings` only; the family
     `findings` stream came back unfiltered, so a single-class run returned
-    entries the run never asked for -- contradicting `commands/decisions.md`'s
+    entries the run never asked for -- contradicting `skills/decisions/SKILL.md`'s
     "a count from it must never be presented as one".
     """
     _mixed_class_repo(repo)
@@ -1151,7 +1151,7 @@ def test_json_payload_carries_both_streams_with_decay_findings_the_larger_set(
     `removed-by-self` never earns a family `check` tag, so on a fixture mixing
     it with two family-actionable classes `decay_findings` must outnumber
     `findings` -- pinning the size relationship a consumer like
-    `commands/decisions.md` relies on to know which stream is the full picture.
+    `skills/decisions/SKILL.md` relies on to know which stream is the full picture.
     """
     _mixed_class_repo(repo)
     adr_health.main(["--repo-root", str(repo), "--json"])
@@ -1164,7 +1164,7 @@ def test_json_payload_carries_both_streams_with_decay_findings_the_larger_set(
 def test_decay_findings_and_findings_key_names_are_the_public_contract(repo: Path) -> None:
     """Pins the two key names so a future rename or repurposing is loud, not silent.
 
-    `commands/decisions.md` reads `decay_findings` by name for the per-reference
+    `skills/decisions/SKILL.md` reads `decay_findings` by name for the per-reference
     decay list; `run_check_families.py` reads `findings` by name for the
     sentinel family stream. Handing the old `findings` name to a new, narrower
     meaning (as happened here) breaks the first consumer without either

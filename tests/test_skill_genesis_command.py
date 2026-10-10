@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-COMMAND_FILE = REPO_ROOT / "commands" / "skill-genesis.md"
+COMMAND_FILE = REPO_ROOT / "skills" / "skill-genesis" / "SKILL.md"
 AGENT_FILE = REPO_ROOT / "agents" / "skill-genesis.md"
 
 

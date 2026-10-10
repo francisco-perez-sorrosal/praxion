@@ -1,4 +1,5 @@
 ---
+name: triage-debt
 description: Judge tech-debt ledger candidates against the current project state and apply confirmed outcomes as dated stamps — repairs proposed per-row, discards judged against a confidence gate, unresolved rows escalated to the user rather than guessed.
 argument-hint: "[--all] [--ids <td-NNN,...>] [--limit <n>]"
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Task, AskUserQuestion]
@@ -8,9 +9,9 @@ disable-model-invocation: true
 Triage the tech-debt ledger against the project's *current* state. `scripts/ledger_health.py`
 reads the ledger, the ADR corpus and git history and computes, per active row, the delta
 between the state the row was filed against and the state now — it never edits anything. This
-command is the bridge: it judges each candidate, proposes an outcome, and applies only what the
+skill is the bridge: it judges each candidate, proposes an outcome, and applies only what the
 user confirms. See `skills/software-planning/references/tech-debt-ledger.md § Triage` for the
-outcome vocabulary and stamp grammar this command writes.
+outcome vocabulary and stamp grammar this skill writes.
 
 ## Arguments
 
@@ -214,7 +215,7 @@ both rows — apply only what they choose, nothing by default:
   now has the base key of a finding already closed. The choice:
   - **Keep the realign** — nothing more to write.
   - **Re-open the closed peer and fold this row into it** — the lifecycle's re-open on recurrence
-    (`tech-debt-ledger.md § Lifecycle conventions`). It is the one row move this command makes,
+    (`tech-debt-ledger.md § Lifecycle conventions`). It is the one row move this skill makes,
     and it runs only here, after every stamp above is written, so no stamp in the run cites the
     peer where it used to be:
     1. Cut the peer's row from the file that holds it and append it to `TECH_DEBT_LEDGER.md` with

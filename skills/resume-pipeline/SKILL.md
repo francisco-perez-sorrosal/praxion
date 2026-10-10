@@ -1,4 +1,5 @@
 ---
+name: resume-pipeline
 description: "Reconcile a pipeline's WIP.md against ground truth (git + tests + the observations.jsonl WAL) and auto-recover truncated steps — auto-mark verified-complete work, auto-resume partial work, surface the ambiguous — leaving a full audit trail on every action."
 allowed-tools: [Read, Edit, Glob, Grep, Bash(reconcile_pipeline_state.py:*), Bash(python3:*), Bash(git:*), Agent]
 argument-hint: "<task-slug> [--dry-run] [--base-ref <ref>]"
@@ -54,7 +55,7 @@ EXIT CODES
 
 A subagent hard-truncated at its context ceiling can finish real work but die
 before flipping its `WIP.md` checkbox — or leave a stale `[COMPLETE]` claim. The
-checkbox is a Tier-3 agent-authored claim and cannot be trusted. This command
+checkbox is a Tier-3 agent-authored claim and cannot be trusted. This skill
 re-derives the truth from the two strata that do not lie — **Tier 1** (codebase +
 `git diff` + `TEST_RESULTS.md`, the arbiter) and **Tier 2** (the harness WAL
 `.ai-state/observations.jsonl`, a localization hint) — and repairs the pipeline

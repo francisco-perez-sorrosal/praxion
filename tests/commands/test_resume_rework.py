@@ -1,11 +1,11 @@
-"""Structural tests for commands/resume-rework.md.
+"""Structural tests for skills/resume-rework/SKILL.md.
 
-Slash commands cannot be executed from pytest (they require a live Claude Code
-session). These tests validate the command's documented behavior by parsing the
+User-invoked skills cannot be executed from pytest (they require a live Claude Code
+session). These tests validate the skill's documented behavior by parsing the
 markdown body and asserting the right sections, fields, and documented contracts
 are present.
 
-All tests are expected to FAIL until commands/resume-rework.md is created by
+All tests are expected to FAIL until skills/resume-rework/SKILL.md is created by
 the implementer.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-COMMAND_FILE = Path(__file__).parents[2] / "commands" / "resume-rework.md"
+SKILL_FILE = Path(__file__).parents[2] / "skills" / "resume-rework" / "SKILL.md"
 
 EXIT_CODES_THAT_NEED_ERROR_GRAMMAR = (2, 3, 4, 5)
 REQUIRED_FINDINGS_SECTIONS = (
@@ -29,13 +29,13 @@ REQUIRED_FINDINGS_SECTIONS = (
 
 
 def _body() -> str:
-    """Return the full command file content (imported lazily so collection succeeds)."""
-    return COMMAND_FILE.read_text(encoding="utf-8")
+    """Return the full skill file content (imported lazily so collection succeeds)."""
+    return SKILL_FILE.read_text(encoding="utf-8")
 
 
 def test_command_file_exists() -> None:
-    assert COMMAND_FILE.exists(), (
-        f"commands/resume-rework.md not found at {COMMAND_FILE}. The implementer must create it."
+    assert SKILL_FILE.exists(), (
+        f"skills/resume-rework/SKILL.md not found at {SKILL_FILE}. The implementer must create it."
     )
 
 
@@ -44,7 +44,7 @@ def test_frontmatter_has_required_fields() -> None:
     assert "description:" in body, "frontmatter must have a 'description:' field"
     assert "allowed-tools:" in body, "frontmatter must have an 'allowed-tools:' field"
     assert "argument-hint:" in body, "frontmatter must have an 'argument-hint:' field"
-    assert "Agent" in body, "'Agent' must appear in 'allowed-tools' — the command spawns an agent"
+    assert "Agent" in body, "'Agent' must appear in 'allowed-tools' — the skill spawns an agent"
 
 
 def test_help_block_present() -> None:

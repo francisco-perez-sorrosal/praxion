@@ -1,17 +1,18 @@
 ---
+name: clean-auto-memory
 description: List orphan Claude Code auto-memory directories for worktrees and prompt for cleanup
 argument-hint: "[--dry-run]"
 allowed-tools: [Bash(ls:*), Bash(du:*), Bash(rm:*), Bash(git:*), Bash(basename:*), Read, AskUserQuestion]
 disable-model-invocation: true
 ---
 
-Enumerate orphan Claude Code auto-memory directories under `~/.claude/projects/` whose corresponding git worktree has been removed, and help the user delete them. **Opt-in only** — the command never deletes without explicit confirmation, and never touches auto-memory directories that do not match the `-worktrees-*` pattern.
+Enumerate orphan Claude Code auto-memory directories under `~/.claude/projects/` whose corresponding git worktree has been removed, and help the user delete them. **Opt-in only** — the skill never deletes without explicit confirmation, and never touches auto-memory directories that do not match the `-worktrees-*` pattern.
 
 ## Scope Boundary (read first)
 
 Claude Code stores per-cwd auto-memory in `~/.claude/projects/<slug>/`. When a git worktree is created, its auto-memory slug contains `-worktrees-<name>` as a substring (e.g., `-Users-fperez-dev-myrepo--claude-worktrees-feat-x`). When the worktree is removed, that directory is orphaned.
 
-This command **only** enumerates and deletes directories whose name contains `-worktrees-`. The main repo's auto-memory (no `-worktrees-` substring) is never listed and never deleted, regardless of user input.
+This skill **only** enumerates and deletes directories whose name contains `-worktrees-`. The main repo's auto-memory (no `-worktrees-` substring) is never listed and never deleted, regardless of user input.
 
 ## Arguments
 
@@ -76,9 +77,9 @@ Print `Removed <M> of <N> orphan directories.` where `M` is the count of success
 
 ## Safety Invariants
 
-- The command does nothing destructive without user confirmation (steps 5, 6).
-- The command never enumerates or deletes directories outside `~/.claude/projects/`.
-- The command never enumerates or deletes directories whose name lacks the `-worktrees-` substring.
-- The command never enumerates or deletes directories from other repos (repo-scope filter in step 3).
-- If `git worktree list` fails, the command exits without any deletions.
+- The skill does nothing destructive without user confirmation (steps 5, 6).
+- The skill never enumerates or deletes directories outside `~/.claude/projects/`.
+- The skill never enumerates or deletes directories whose name lacks the `-worktrees-` substring.
+- The skill never enumerates or deletes directories from other repos (repo-scope filter in step 3).
+- If `git worktree list` fails, the skill exits without any deletions.
 - `--dry-run` is a pure inspection mode; the filesystem is never modified.

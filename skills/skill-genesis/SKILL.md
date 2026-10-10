@@ -1,4 +1,5 @@
 ---
+name: skill-genesis
 description: Run skill-genesis as an on-demand autonomous learning harvest. Writes a timestamped report to .ai-state/skill_genesis_reports/. Disposition later via /skill-genesis-review.
 argument-hint: "[--since <commit>] [--scope <area>] [--sources <dir>] [--cap <bytes>] [--dry-run]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(python3:*), Task]
@@ -87,7 +88,7 @@ pipeline mode) and exit without spawning the agent.
 ### 4. Delegate to the skill-genesis agent in background mode
 
 Invoke the `skill-genesis` agent via the `Task` tool. The agent runs with `background: true`,
-so this command returns to the user immediately after spawning.
+so this skill returns to the user immediately after spawning.
 
 **Pipeline mode** — one spawn. Pass in the task prompt:
 

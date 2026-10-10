@@ -1,4 +1,5 @@
 ---
+name: decisions
 description: Disposition decision-health findings in batch — repairs first as grouped approvals, retirement candidates one at a time, never in bulk.
 argument-hint: "[--class <decay-class>] [--limit <n>]"
 allowed-tools: [Read, Glob, Grep, Bash, Edit, AskUserQuestion]
@@ -6,7 +7,7 @@ disable-model-invocation: true
 ---
 
 Work through the decision-health findings for this project and apply the dispositions the
-user approves. The detector emits candidates and never edits a decision record; this command
+user approves. The detector emits candidates and never edits a decision record; this skill
 is the bridge that turns a candidate into a change, and every change needs an explicit
 approval.
 
@@ -20,7 +21,7 @@ an unrecognised flag is an error to surface, not something to drop silently, bec
 | Flag | Description |
 |------|-------------|
 | `--class <decay-class>` | Work only one decay class (e.g. the rename class). Forward it verbatim to the detector, which takes the same flag. |
-| `--limit <n>` | Stop after `n` records are dispositioned. **This command enforces it — the detector has no such flag.** Useful for a first pass over a large corpus. |
+| `--limit <n>` | Stop after `n` records are dispositioned. **This skill enforces it — the detector has no such flag.** Useful for a first pass over a large corpus. |
 
 `--limit` counts records across the whole pass, not per class, and the count runs in the working
 order below — so a limit reached during the repair classes means retirement candidates are never
@@ -33,14 +34,14 @@ mechanical get exhausted before the class whose disposition is a judgment is eve
 
 Run `adr_health.py --json` from the project root, appending `--class <decay-class>` when the
 arguments supplied one. The Praxion installer links it onto `PATH`, which is what lets this
-command work in a managed project; if it is not found, fall back to
+skill work in a managed project; if it is not found, fall back to
 `python3 scripts/adr_health.py --json` from a Praxion checkout and mention that the installer
 has not been run.
 
-The decay findings this command works through are the `decay_findings` array of the payload —
+The decay findings this skill works through are the `decay_findings` array of the payload —
 every per-reference finding, every decay class. The payload's `findings` array is a different
 thing entirely: the sentinel's check-tagged family stream (`DH01`/`DH02`/`DH04`/`DH05`/`DH06`),
-consumed by `run_check_families.py`, not by this command.
+consumed by `run_check_families.py`, not by this skill.
 
 Under `--class`, say which class was scoped to when reporting. A single-class run is not a
 picture of the corpus, and a count from it must never be presented as one.
@@ -59,7 +60,7 @@ If `decay_findings` is empty, say so and stop. Re-running after a clean pass is 
 
 ### 2. Order the work — repairs first, retirement last
 
-**This ordering is the point of the command, not a presentation preference.**
+**This ordering is the point of the skill, not a presentation preference.**
 
 Findings are not homogeneous. Most classes describe a *stale reference* and their repair is
 mechanical, high-confidence, and reversible. One class describes a *decision that may no

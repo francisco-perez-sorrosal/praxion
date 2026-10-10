@@ -272,10 +272,10 @@ def test_an_unreadable_stamp_file_is_a_script_error(tmp_path: Path) -> None:
     assert "--stamp-file" in result.stderr
 
 
-def test_the_command_passes_every_stamp_through_a_file() -> None:
-    command = (SCRIPT_PATH.parents[1] / "commands" / "triage-debt.md").read_text()
-    assert "--stamp-file" in command
-    assert "--check-stamp" not in command
+def test_the_skill_passes_every_stamp_through_a_file() -> None:
+    skill = (SCRIPT_PATH.parents[1] / "skills" / "triage-debt" / "SKILL.md").read_text()
+    assert "--stamp-file" in skill
+    assert "--check-stamp" not in skill
 
 
 # -- Stamp check: every anchor is resolved against HEAD, through the real git adapters --------

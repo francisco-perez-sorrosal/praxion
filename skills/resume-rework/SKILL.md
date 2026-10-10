@@ -1,4 +1,5 @@
 ---
+name: resume-rework
 description: "Dispatch the appropriate agent for a rework worktree. Reads VERIFIER_FINDINGS.md from the current worktree's .ai-work/ tree. Run inside a rework worktree created by the main agent from REWORK_MANIFEST.md."
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Agent]
 argument-hint: "[--findings <path>] [--dry-run]"
@@ -50,7 +51,7 @@ argument is required; an empty `$ARGUMENTS` triggers auto-discovery below.
 
 ## Auto-discovery
 
-When `--findings` is not specified, the command resolves the findings file automatically:
+When `--findings` is not specified, the skill resolves the findings file automatically:
 
 1. Resolve worktree root: `git rev-parse --show-toplevel`
 2. Glob for findings: `.ai-work/*/VERIFIER_FINDINGS.md` under the worktree root
@@ -64,7 +65,7 @@ is provided, auto-discovery is skipped; if the path does not exist, exit 3 appli
 
 ## Schema validation
 
-After locating `VERIFIER_FINDINGS.md`, the command verifies all seven required
+After locating `VERIFIER_FINDINGS.md`, the skill verifies all seven required
 sections are present in the file body. A valid findings file contains:
 
 - `## Problem`
@@ -75,13 +76,13 @@ sections are present in the file body. A valid findings file contains:
 - `## Suggested Tier`
 - `## Provenance`
 
-If any section is missing, the command exits with exit code 5 (malformed). Section
+If any section is missing, the skill exits with exit code 5 (malformed). Section
 names must appear verbatim with the `##` heading marker.
 
 ## Manifest match
 
 The `## Provenance` section of the findings file contains a `Rework ID` field of
-the form `rw-<hash>`. The command reads this value and verifies it appears as a row
+the form `rw-<hash>`. The skill reads this value and verifies it appears as a row
 in the parent worktree's `REWORK_MANIFEST.md`.
 
 Steps:
@@ -92,7 +93,7 @@ Steps:
 4. If not found → exit 4 (stale findings); the verifier may have re-run and
    produced a new manifest
 
-On success, the command extracts the task slug and tier suggestion from the findings
+On success, the skill extracts the task slug and tier suggestion from the findings
 file for use in the dispatch step.
 
 ## Dispatch
@@ -125,10 +126,10 @@ the file against an unexpected working directory.
 
 ## --dry-run mode
 
-When `--dry-run` is passed, the command performs all validation steps (auto-discovery,
+When `--dry-run` is passed, the skill performs all validation steps (auto-discovery,
 schema validation, manifest match) but does not spawn any agent.
 
-The dispatch plan is printed to stdout and the command exits 0 without spawning:
+The dispatch plan is printed to stdout and the skill exits 0 without spawning:
 
 ```
 Would dispatch: systems-architect

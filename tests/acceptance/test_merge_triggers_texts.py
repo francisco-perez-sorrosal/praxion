@@ -45,7 +45,7 @@ def _design_merge_in_row() -> str:
 
 
 def _merge_worktree_command() -> str:
-    return _read("commands/merge-worktree.md")
+    return _read("skills/merge-worktree/SKILL.md")
 
 
 def _finalize_chain_comments() -> str:
@@ -125,7 +125,7 @@ HOOK_ENUMERATIONS = {
     "the onboarding Phase 4 section": _phase_four_section,
     "the onboarding manifest example": _manifest_example_hooks,
     "docs/onboarding.md": lambda: _read("docs/onboarding.md"),
-    "commands/upgrade-project.md": lambda: _read("commands/upgrade-project.md"),
+    "skills/upgrade-project/SKILL.md": lambda: _read("skills/upgrade-project/SKILL.md"),
     "README_DEV.md": lambda: _read("README_DEV.md"),
     "scripts/CLAUDE.md": lambda: _read("scripts/CLAUDE.md"),
     "docs/architecture.md": lambda: _read("docs/architecture.md"),

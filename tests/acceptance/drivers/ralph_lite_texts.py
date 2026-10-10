@@ -22,7 +22,7 @@ from tests.acceptance.drivers.shipped_texts import (
 RALPH_LITE_SKILL = "skills/ralph-lite/SKILL.md"
 RALPH_LITE_COMMAND = "commands/ralph-lite.md"
 TIER_TEMPLATES = "skills/software-planning/references/tier-templates.md"
-EVAL_COMMAND = "commands/eval-praxion.md"
+EVAL_COMMAND = "skills/eval-praxion/SKILL.md"
 RALPH_LITE = r"ralph[- ]lite"
 TIERS = ("Direct", "Lightweight", "Standard", "Full", "Spike")
 NEGATION = r"\b(never|not|no|don't|do not|must not|mustn't|isn't)\b"

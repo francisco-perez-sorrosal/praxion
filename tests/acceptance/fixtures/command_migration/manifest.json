@@ -1,0 +1,1869 @@
+{
+ "base_commit": "542f63f1",
+ "source": "commands/*.md at the base commit, excluding README.md and CLAUDE.md",
+ "totals": {
+  "entries": 44,
+  "user_only": 33,
+  "model_invocable": 11,
+  "with_argument_hint": 37
+ },
+ "workflows": [
+  {
+   "name": "add-rules",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Copy rules into the current project for customization",
+   "argument_hint": "[rule-names... | all]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(mkdir:*)",
+    "Bash(cp:*)",
+    "Bash(ls:*)",
+    "Bash(find:*)",
+    "Read",
+    "Glob",
+    "Grep"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "87440708a6c6ce970c725792965a9be491fe535e7b8c762440cb2c37d12cb682",
+   "body_lines": 30,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "## Important"
+   ]
+  },
+  {
+   "name": "check-experiment",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Poll or report an ML training run: in-flight status/metrics, or completed results with PASS/FAIL/WARN checks. Use after /run-experiment or before verifying.",
+   "argument_hint": "[<run_tag>] [--task-slug <slug>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Bash",
+    "Glob"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "3454518cffd86d23864ae5754de31c9e281cdf0f0f156a0bc662d83a4d6b0a56",
+   "body_lines": 167,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/llm-training-eval/references/training-results-schema.md",
+     "resolves_to": "skills/llm-training-eval/references/training-results-schema.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/neo-cloud-abstraction/SKILL.md",
+     "resolves_to": "skills/neo-cloud-abstraction/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../rules/ml/eval-driven-verification.md",
+     "resolves_to": "rules/ml/eval-driven-verification.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Step 1 — Identify the Run",
+    "## Step 2 — Read the Backend Configuration",
+    "## Step 3 — Poll In-Flight Runs",
+    "## Step 4 — Report Completed Runs",
+    "## Step 5 — Optional Acceptance Check",
+    "## Cross-References"
+   ]
+  },
+  {
+   "name": "clean-auto-memory",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "List orphan Claude Code auto-memory directories for worktrees and prompt for cleanup",
+   "argument_hint": "[--dry-run]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(ls:*)",
+    "Bash(du:*)",
+    "Bash(rm:*)",
+    "Bash(git:*)",
+    "Bash(basename:*)",
+    "Read",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "d1241a0d6a8429d51d8edee92e25ac2bc2573570cce0564db2c9a6b2b676599a",
+   "body_lines": 79,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Scope Boundary (read first)",
+    "## Arguments",
+    "## Process",
+    "### 1. Probe git worktree state",
+    "### 2. Derive the repo-scope prefix",
+    "### 3. Enumerate candidate directories",
+    "### 4. Compute orphan set",
+    "### 5. Display and confirm",
+    "### 6. Pattern-guarded deletion",
+    "### 7. Report",
+    "## Safety Invariants"
+   ]
+  },
+  {
+   "name": "clean-work",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Safely clean .ai-work/ after pipeline completion — state-aware, with --dry-run",
+   "argument_hint": "[--dry-run] [--force <slug>] [slug ...]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(clean_work_safety.py:*)",
+    "Bash(python3:*)",
+    "Bash(rm:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Read",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "7704d1ac64ea666c26ca83b7427100a01759c6755ffd4bb8df6593e8ba84165b",
+   "body_lines": 27,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/clean_work_safety.py"
+   ],
+   "heading_outline": [
+    "## Arguments",
+    "## Process"
+   ]
+  },
+  {
+   "name": "co",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Create a commit for staged (or all) changes",
+   "argument_hint": "[message]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(git:*)",
+    "Read",
+    "Grep"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "a1de163618ba18bf003c9b410281cc29e6359d4ee101d2b413f7598813f98a8f",
+   "body_lines": 20,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": true,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "consult",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Convene a discipline consultant to challenge a target artifact",
+   "argument_hint": "<discipline> [--on <artifact>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Task",
+    "Skill"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "f74b96253420123c4fd045be21bc4fe51d343235b528c58e34784c62ce70ab0d",
+   "body_lines": 26,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../agents/discipline-consultant.md",
+     "resolves_to": "agents/discipline-consultant.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "cop",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Create a commit and push to remote",
+   "argument_hint": "[message]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(git:*)",
+    "Read",
+    "Grep"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "46a1152fb3b74a9d527e583bf084491f6122e3f436883e17280dd8353a285029",
+   "body_lines": 21,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": true,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "create-simple-python-prj",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Create a basic Python project with pixi or uv package manager",
+   "argument_hint": "[project-name] [description] [package-manager] [target-dir]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(uv:*)",
+    "Bash(pixi:*)",
+    "Bash(git:*)",
+    "Bash(mkdir:*)",
+    "Bash(ls:*)",
+    "Bash(touch:*)",
+    "Write",
+    "Read",
+    "Edit"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "46249c05f90eb84635f08792e80b7eca231cd2d69f9d3a41625da6d2340745a7",
+   "body_lines": 40,
+   "placeholders": [
+    "$1",
+    "${2:-A simple Python project scaffolding}",
+    "${3:-pixi}",
+    "${4:-$HOME/dev}"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/python-prj-mgmt/SKILL.md",
+     "resolves_to": "skills/python-prj-mgmt/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/python-development/SKILL.md",
+     "resolves_to": "skills/python-development/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "# Create Simple Python Project",
+    "## Requirements",
+    "## Guidelines"
+   ]
+  },
+  {
+   "name": "create-worktree",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Create a new git worktree in .claude/worktrees/",
+   "argument_hint": "[branch-name]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(git:*)",
+    "Bash(ln:*)",
+    "Bash(ls:*)",
+    "Bash(test:*)",
+    "Bash(cursor:*)"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "b086f0fccb442d8abbece092cd0ade0e65fedc79761bae71d84429d8285b5cfb",
+   "body_lines": 13,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/migrate_worktree_home.sh"
+   ],
+   "heading_outline": [
+    "## Steps"
+   ]
+  },
+  {
+   "name": "dashboard",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Launch the Praxion pipeline dashboard for the current project. Opens the dashboard in your browser on macOS; prints the URL to open manually on other platforms. Shows architecture, documentation, in-flight workshops, ADRs, sentinel reports, roadmap, and metrics. Requires the dashboard to be installed (part of the Praxion plugin). Delegates to praxion-dashboard for process management.",
+   "argument_hint": "[project-root]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "f41776265258e9c391f4a83d39b1d87e36c81f8dd7ff477fb926348b51db4d6f",
+   "body_lines": 34,
+   "placeholders": [
+    "$ARGUMENTS",
+    "${ARGUMENTS:-$(pwd)}"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/praxion-dashboard"
+   ],
+   "heading_outline": [
+    "## Process",
+    "### 1. Resolve project root",
+    "### 2. Start the dashboard",
+    "### 3. Surface the result",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "decisions",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Disposition decision-health findings in batch — repairs first as grouped approvals, retirement candidates one at a time, never in bulk.",
+   "argument_hint": "[--class <decay-class>] [--limit <n>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash",
+    "Edit",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "99346cb72a92a20f1fa7c33e681d5cb40f203b6aefa95056a55131ff6f137179",
+   "body_lines": 136,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/adr_health.py"
+   ],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Gather",
+    "### 2. Order the work — repairs first, retirement last",
+    "### 3. Repairs — grouped approval",
+    "### 4. Retirement candidates — one at a time, and never a backlog",
+    "### 5. Re-open candidates",
+    "### 6. Apply and report",
+    "## Constraints"
+   ]
+  },
+  {
+   "name": "decontaminate-ids",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Detect and remediate REQ/AC/step citations in the current project's source code",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Edit",
+    "Write",
+    "Grep",
+    "Glob"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "5debc54e79224c017ced5b7f9ddb3bc1cc69ed41c6e4d46fa539371a9474c01d",
+   "body_lines": 50,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/id-decontamination/SKILL.md",
+     "resolves_to": "skills/id-decontamination/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": true,
+   "scripts_invoked": [
+    "scripts/check_id_citation_discipline.py"
+   ],
+   "heading_outline": [
+    "## Procedure",
+    "## Constraints"
+   ]
+  },
+  {
+   "name": "dispatch-reworks",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "argument-hint",
+    "disable-model-invocation"
+   ],
+   "description": "Fan out /resume-rework into all rework worktrees from REWORK_MANIFEST.md. Default mode is background (--bg); pass --terminals for visible windows.",
+   "argument_hint": "[--bg | --terminals] [--dry-run]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(scripts/dispatch-reworks:*)"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "ec624bfe39fe24ad53c366844975a3fe46b5d8feda3a9784358ca973991ce227",
+   "body_lines": 55,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/dispatch-reworks"
+   ],
+   "heading_outline": [
+    "## Help",
+    "## Invocation"
+   ]
+  },
+  {
+   "name": "document-api",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Scaffold best-in-class API documentation for a project's own API surface — detects language/protocol/surface, scaffolds the Diátaxis skeleton + Spectral ruleset + CI gate, idempotent (skip-or-merge, never clobbers authored content)",
+   "argument_hint": "[path] [--lang python|typescript] [--surface rest|graphql|mcp|library|asyncapi|grpc]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(find:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(grep:*)",
+    "Bash(test:*)",
+    "Bash(python3 scripts/build_doc_manifest.py:*)",
+    "AskUserQuestion",
+    "Task"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "e4b47143d5fa1e08f19cffef0274648311af777c9d490ae4729cf662aa9f1718",
+   "body_lines": 79,
+   "placeholders": [
+    "$1"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/build_doc_manifest.py"
+   ],
+   "heading_outline": [
+    "## Inputs",
+    "## Process",
+    "### 1. Load the skill",
+    "### 2. Detect the surface(s)",
+    "### 3. Report and confirm (no silent action)",
+    "### 4. Scaffold (idempotent)",
+    "### 5. Idempotency — skip-or-merge, never clobber",
+    "### 6. Registration — do NOT hand-write a manifest entry",
+    "### 7. Hand off and point to depth",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "eval-praxion",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Run out-of-band quality evaluation against Praxion pipeline artifacts (mechanical + LLM-as-judge). Opt-in, never hook-driven.",
+   "argument_hint": "[<target>] [--task-slug <slug>] [--tier lightweight|standard|full] [--mechanical-only] [--output-dir <dir>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(uv:*)",
+    "Bash(git:*)",
+    "Bash(python3:*)"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "1fb7dfdf75659c04570e24bc79c02ab2f696fd69b5f6d83a91a7e8c41c202c19",
+   "body_lines": 187,
+   "placeholders": [
+    "$15",
+    "$50",
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Argument Resolver",
+    "## Modes and Flags",
+    "## Auth Detection",
+    "## Families",
+    "## Report Destination",
+    "## Process",
+    "### 1. Resolve target",
+    "### 2. Run the eval",
+    "### 3. Surface the report",
+    "### 4. Flag anomalies",
+    "## Examples",
+    "## Notes",
+    "## Separate Entry: The Live Context-Layer Runner",
+    "## Eval Results Are Human-Gated by Design"
+   ]
+  },
+  {
+   "name": "explore-project",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Explore and understand an unfamiliar project's architecture, patterns, and workflow",
+   "argument_hint": "[guide|<focus-area>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git:*)",
+    "Bash(wc:*)",
+    "Bash(find:*)"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "f364a04e2ac10a67fb9fc1a38696d706e5731e9fa5af6e771548b92e46da784f",
+   "body_lines": 114,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/project-exploration/SKILL.md",
+     "resolves_to": "skills/project-exploration/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Modes",
+    "## Process",
+    "### 1. Parse Arguments and Verify",
+    "### 2. Load Skill and Characterize Project",
+    "### 3. Branch by Mode",
+    "#### Default Mode (Executive Summary)",
+    "#### Guided Mode",
+    "#### Focused Mode",
+    "### 4. Adapt Analysis"
+   ]
+  },
+  {
+   "name": "full-security-scan",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools"
+   ],
+   "description": "Run a full-project security audit against all security-critical paths",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git:*)",
+    "Bash(find:*)"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "d6546f94dac09508001bc31a7e6710cd4f97dd19d86a2d6d39efe124c5deacb6",
+   "body_lines": 29,
+   "placeholders": [],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "# Full Security Scan",
+    "## Process"
+   ]
+  },
+  {
+   "name": "handoff",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "argument-hint",
+    "disable-model-invocation"
+   ],
+   "description": "Compose HANDOFF.md at a pipeline boundary or a session's end so the next window inherits position, constraints and corrections.",
+   "argument_hint": "<task-slug> [--session] [--boundary <enum>] [--dry-run] [--force]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(compose_handoff.py:*)",
+    "Bash(python3:*)",
+    "Bash(git:*)"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "9aa238f238dacb1c86e637feb70847b228902036a3e9cca4abe37a2c97aef0a8",
+   "body_lines": 170,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/compose_handoff.py"
+   ],
+   "heading_outline": [
+    "## Help",
+    "## Arguments",
+    "## Why this exists",
+    "## Procedure",
+    "## --dry-run mode",
+    "## --force mode",
+    "## Error grammar"
+   ]
+  },
+  {
+   "name": "landscape-refresh",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Bootstrap or refresh the project's landscape watchlist — flag stale entries (>90 days) and optionally re-validate URLs",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "WebFetch",
+    "AskUserQuestion",
+    "Glob"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "e9cf00415310f749ed8251cb792eea1b64ff83d74dac6c0f3cabfd52b1b6182c",
+   "body_lines": 86,
+   "placeholders": [],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## When to run",
+    "## Procedure",
+    "### Step 1 — Detect file presence",
+    "### Bootstrap mode — file does not exist",
+    "### Refresh mode — file exists",
+    "## Constraints",
+    "## Implementation notes"
+   ]
+  },
+  {
+   "name": "manage-readme",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Create or refine README.md files with precision-first technical writing style",
+   "argument_hint": "[file-paths...]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(find:*)"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "e2d48493eda195a493f8bf3f386e8612da510e442ac650917076731b5f1c6676",
+   "body_lines": 17,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Requirements",
+    "## Process"
+   ]
+  },
+  {
+   "name": "merge-worktree",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Merge a worktree branch back into current branch",
+   "argument_hint": "[branch-name]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(git:*)",
+    "Bash(python*)",
+    "Bash(test:*)",
+    "Bash(command -v:*)",
+    "Bash(praxion-sidecar:*)",
+    "Read",
+    "Grep"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "1fd8c60559dd48357e778ce14191c889753b6539662f61f68415ea8f48054c5a",
+   "body_lines": 40,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": true,
+   "scripts_invoked": [
+    "scripts/_state_repo.py",
+    "scripts/finalize_adrs.py",
+    "scripts/merge_worktree_log.py",
+    "scripts/migrate_worktree_home.sh",
+    "scripts/reconcile_ai_state.py"
+   ],
+   "heading_outline": [
+    "## Steps"
+   ]
+  },
+  {
+   "name": "praxion-complete-install",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Reconfigure or recover a marketplace-installed Praxion setup — check its state, then hand you the exact command to run in your own terminal to symlink rules and CLI scripts (and remove leftover state from earlier Praxion versions, if any). Optional (auto-completes on first session).",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Bash"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "22ae3fa70e89890d7f94d38792ae57d9a93449f571f06ad1f69bd93b106582c9",
+   "body_lines": 41,
+   "placeholders": [],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": true,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Procedure",
+    "## Idempotence",
+    "## Reversal",
+    "## When to use this vs. `./install.sh code`"
+   ]
+  },
+  {
+   "name": "praxion-complete-uninstall",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Reverse /praxion-complete-install — check its state, then hand you the exact command to run in your own terminal to remove rule/script symlinks (and leftover state from earlier Praxion versions, if any). Plugin body is preserved.",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Bash"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "b43aa241d4e261fdbd3d643b61f320c83fdfff943fafabcd488358b76d0ab6c2",
+   "body_lines": 34,
+   "placeholders": [],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": true,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Procedure",
+    "## Safety",
+    "## Idempotence"
+   ]
+  },
+  {
+   "name": "project-coverage",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools"
+   ],
+   "description": "Run the project's canonical coverage target and render a terminal summary using the test-coverage skill",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "18d43fc6d47c2c050f62f260b2e09a65117bea7f96ff8d0f6c676aebfd262965",
+   "body_lines": 59,
+   "placeholders": [],
+   "relative_links": [
+    {
+     "target": "../skills/test-coverage/SKILL.md",
+     "resolves_to": "skills/test-coverage/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/test-coverage/SKILL.md",
+     "resolves_to": "skills/test-coverage/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process",
+    "### 1. Pre-flight",
+    "### 2. Load the Skill",
+    "### 3. Locate the Target",
+    "### 4. Invoke the Target",
+    "### 5. Render the Result",
+    "## Failure Modes",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "project-metrics",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to .ai-state/",
+   "argument_hint": "[--window-days N] [--top-n N] [--refresh-coverage] [--coverage-timeout SECONDS]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(python3:*)",
+    "Bash(git:*)",
+    "Read"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "1e1da18be1721fc68b32e703abe82c968f321c93819fa425d720f6ba323162ae",
+   "body_lines": 87,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/project_metrics/_path_filter.py",
+    "scripts/prune_reports.py"
+   ],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Pre-flight",
+    "### 2. Run",
+    "### 3. Post-run",
+    "### Failure modes",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "refresh-claude-blocks",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Refresh this project's onboarded CLAUDE.md canonical blocks against the currently installed praxion plugin, with an interactive disposition loop for locally customized blocks",
+   "argument_hint": "[--check | --apply]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(scripts/refresh_claude_blocks.py:*)",
+    "Bash(jq:*)",
+    "Bash(git:*)",
+    "Read",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "23afe116f5fbe2cbcbae1541507ee291c2c08bae3820b5fa62ae8a444e11742e",
+   "body_lines": 128,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/refresh_claude_blocks.py"
+   ],
+   "heading_outline": [
+    "# Refresh canonical CLAUDE.md blocks",
+    "## Arguments",
+    "## Process",
+    "### 1. Resolve the plugin path",
+    "### 2. Classify",
+    "### 3. Auto-apply safe actions",
+    "### 4. Disposition loop for modified blocks",
+    "### 5. Report the outcome",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "refresh-skill",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Refresh version-sensitive sections of a skill against current upstream documentation",
+   "argument_hint": "<skill-name>",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Grep",
+    "Glob",
+    "AskUserQuestion",
+    "WebFetch",
+    "WebSearch"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "38f0e4ce326156dfaba82dfdb00f5f51c862ac65065a2573edbb5ea93157a060",
+   "body_lines": 63,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis",
+     "resolves_to": "skills/software-planning/references/cross-agent-skill-conventions.md",
+     "anchor": "current-docs-for-external-apis"
+    },
+    {
+     "target": "../rules/swe/staleness-policy.md",
+     "resolves_to": "rules/swe/staleness-policy.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Parse Skill Frontmatter",
+    "### 2. Locate Each Section",
+    "### 3. Fetch Authoritative Docs",
+    "### 4. Diff and Prompt",
+    "### 5. Append Run Summary",
+    "## Exit Conditions"
+   ]
+  },
+  {
+   "name": "release",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Cut a stable release by dispatching the Release CI workflow (bump + changelog + tag + GitHub release)",
+   "argument_hint": "[patch|minor|major]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(gh:*)",
+    "Bash(git:*)",
+    "Read",
+    "Grep",
+    "Glob"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "cb3d760435c9724c877727ef43dc8530f89e4efd32f5412331e3f0e2593d1dc0",
+   "body_lines": 23,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/check_release_staleness.py"
+   ],
+   "heading_outline": [
+    "## Process",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "report-praxion-issue",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "File a Praxion-origin ecosystem-defect issue on the Praxion repo from a captured healing-sidecar candidate, with a human confirmation gate before every filing",
+   "argument_hint": "[fingerprint]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(gh:*)",
+    "Bash(python3:*)",
+    "Bash(uv run:*)",
+    "Read",
+    "Grep",
+    "Glob",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "c17258ce31697dd5e4821427f48f5d50be13cda065034c380e10999a025fd036",
+   "body_lines": 110,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/upstream-stewardship/SKILL.md",
+     "resolves_to": "skills/upstream-stewardship/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/report_praxion_issue.py"
+   ],
+   "heading_outline": [
+    "## Process",
+    "### 1. Validate",
+    "### 2. Dedup",
+    "### 3. Draft",
+    "### 4. Sanitize (judgment pass)",
+    "### 5. Security Gate",
+    "### 6. HITL File",
+    "### 7. Track"
+   ]
+  },
+  {
+   "name": "report-upstream",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "File a well-formed bug report on an upstream open-source project",
+   "argument_hint": "<owner/repo> [description or context]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(gh:*)",
+    "Bash(curl:*)",
+    "Read",
+    "Grep",
+    "Glob",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "9c2bb311781db0d92eadac051946a204c9c5612f1998c756b3d75cb5cbec8d1c",
+   "body_lines": 138,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/upstream-stewardship/SKILL.md",
+     "resolves_to": "skills/upstream-stewardship/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/upstream-stewardship/references/issue-templates.md",
+     "resolves_to": "skills/upstream-stewardship/references/issue-templates.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process",
+    "### 1. Parse and Validate",
+    "### 2. Reconnaissance",
+    "### 3. Deduplication",
+    "### 4. Draft",
+    "### 5. Sanitize",
+    "### 6. Security Gate",
+    "### 7. File",
+    "### 8. Track"
+   ]
+  },
+  {
+   "name": "resume-pipeline",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "argument-hint",
+    "disable-model-invocation"
+   ],
+   "description": "Reconcile a pipeline's WIP.md against ground truth (git + tests + the observations.jsonl WAL) and auto-recover truncated steps — auto-mark verified-complete work, auto-resume partial work, surface the ambiguous — leaving a full audit trail on every action.",
+   "argument_hint": "<task-slug> [--dry-run] [--base-ref <ref>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(reconcile_pipeline_state.py:*)",
+    "Bash(python3:*)",
+    "Bash(git:*)",
+    "Agent"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "5a87f8464ffd3665f7d1f2f1da0d53fabcec2100bc3686b6ea904a82fb5281da",
+   "body_lines": 205,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/reconcile_pipeline_state.py"
+   ],
+   "heading_outline": [
+    "## Help",
+    "## Arguments",
+    "## Why this exists",
+    "## Procedure",
+    "## Auto-resume contract (clobber-safety)",
+    "## Audit trail (five surfaces — recovery is never silent)",
+    "## --dry-run mode",
+    "## Error grammar"
+   ]
+  },
+  {
+   "name": "resume-rework",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "argument-hint"
+   ],
+   "description": "Dispatch the appropriate agent for a rework worktree. Reads VERIFIER_FINDINGS.md from the current worktree's .ai-work/ tree. Run inside a rework worktree created by the main agent from REWORK_MANIFEST.md.",
+   "argument_hint": "[--findings <path>] [--dry-run]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git:*)",
+    "Agent"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "50ef49cf86cfccc4d8792ca514b5e7b2ce67456723b4f2f0f6e223ce0cd1c616",
+   "body_lines": 204,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Help",
+    "## Arguments",
+    "## Auto-discovery",
+    "## Schema validation",
+    "## Manifest match",
+    "## Dispatch",
+    "## --dry-run mode",
+    "## Error grammar",
+    "## --json output"
+   ]
+  },
+  {
+   "name": "review-interface",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Run an interface design review on a file, PR, branch, or named surface",
+   "argument_hint": "[PR-number|branch|file|surface]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob",
+    "Task"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "5c904f18a0642f3c496ef8d9c06ef3b154a667c410919488a375c6546a17ad5e",
+   "body_lines": 29,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../agents/interface-designer.md",
+     "resolves_to": "agents/interface-designer.md",
+     "anchor": null
+    },
+    {
+     "target": "review-pr.md",
+     "resolves_to": "commands/review-pr.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [
+    "review-pr"
+   ],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "review-pr",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Code review a pull request",
+   "argument_hint": "[PR-number|branch|diff-target]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "dfaea3e56a5c968fff6710ae61e9cfe13a56ea894ab92156ab6eac672f0554df",
+   "body_lines": 35,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/code-review/SKILL.md",
+     "resolves_to": "skills/code-review/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/code-review/references/report-template.md",
+     "resolves_to": "skills/code-review/references/report-template.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "roadmap",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Produce a project-audited ROADMAP.md via a project-derived evaluation lens set — strengths, weaknesses, deprecations, phased improvements — through the roadmap-cartographer agent",
+   "argument_hint": "[fresh|diff|<focus-area>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git:*)",
+    "Bash(wc:*)",
+    "Task"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "65f20a1925d821d5f4a51b4d5c3e631385b02915b3832f4846cebb5a1b0b8b6d",
+   "body_lines": 76,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../agents/roadmap-cartographer.md",
+     "resolves_to": "agents/roadmap-cartographer.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/roadmap-planning/SKILL.md",
+     "resolves_to": "skills/roadmap-planning/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/roadmap-synthesis/references/lens-framework.md",
+     "resolves_to": "skills/roadmap-synthesis/references/lens-framework.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/roadmap-synthesis/references/grounding-protocol.md",
+     "resolves_to": "skills/roadmap-synthesis/references/grounding-protocol.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Modes",
+    "## Process",
+    "### 1. Parse mode",
+    "### 2. Pre-flight",
+    "### 3. Generate task slug",
+    "### 4. Delegate to the cartographer",
+    "### 5. Post-run",
+    "## Notes",
+    "## ROADMAP.md lifecycle"
+   ]
+  },
+  {
+   "name": "run-experiment",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Dispatch an ML training experiment to the configured backend (local, SkyPilot, RunPod, or Nebius), validate the compute budget, stream metrics, and write TRAINING_RESULTS.md.",
+   "argument_hint": "[--descriptor <path>] [--task-slug <slug>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "463e173ebe5e44097b3237a6ee7e45dc2efa981bcef737fb8d220ede0bed68e5",
+   "body_lines": 250,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/neo-cloud-abstraction/SKILL.md",
+     "resolves_to": "skills/neo-cloud-abstraction/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/llm-training-eval/SKILL.md",
+     "resolves_to": "skills/llm-training-eval/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/experiment-tracking/SKILL.md",
+     "resolves_to": "skills/experiment-tracking/SKILL.md",
+     "anchor": null
+    },
+    {
+     "target": "../rules/ml/gpu-budget-conventions.md",
+     "resolves_to": "rules/ml/gpu-budget-conventions.md",
+     "anchor": null
+    },
+    {
+     "target": "../rules/ml/gpu-budget-conventions.md",
+     "resolves_to": "rules/ml/gpu-budget-conventions.md",
+     "anchor": null
+    },
+    {
+     "target": "../skills/deployment/references/gpu-compute-budgeting.md",
+     "resolves_to": "skills/deployment/references/gpu-compute-budgeting.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Prerequisites",
+    "## Process",
+    "### 1. Read Experiment Configuration",
+    "### 2. Validate Compute Budget",
+    "### 3. Detect Backend and Load Reference",
+    "### 4. Dispatch",
+    "### 5. Stream Metrics",
+    "### 6. Write TRAINING_RESULTS.md",
+    "### 7. Archive on Kept Run (opt-in)",
+    "## Exit Conditions",
+    "## Cross-References"
+   ]
+  },
+  {
+   "name": "scores",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Read .ai-state/eval_ledger/EVAL_LOG.md and render a ranked leaderboard table of eval runs, with optional task filter and sort control.",
+   "argument_hint": "[--task <name>] [--sort <primary_metric|generation|cost_usd>] [--top <N>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "d440be9bb96e2b06461a48da7b2652c1b9c6699047bcb1ab667049423c218aac",
+   "body_lines": 104,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/agent-evals/SKILL.md",
+     "resolves_to": "skills/agent-evals/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Locate the log",
+    "### 2. Parse the table",
+    "### 3. Filter",
+    "### 4. Sort",
+    "### 5. Limit",
+    "### 6. Render the leaderboard",
+    "## Column Reference",
+    "## Notes"
+   ]
+  },
+  {
+   "name": "sdd-coverage",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Report spec-to-test and spec-to-code coverage for REQ IDs",
+   "argument_hint": "[spec-path]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "4d3518a1ac20af1db0bdd7c4362b66f37333f343b026ca97464f9c6a06442421",
+   "body_lines": 44,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../rules/swe/id-citation-discipline.md",
+     "resolves_to": "rules/swe/id-citation-discipline.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "skill-genesis-review",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Disposition pending proposals from a skill-genesis report — batch multi-select; records approve/reject/refine/defer per proposal; surfaces delegation handoffs.",
+   "argument_hint": "[--report <path>] [--show-completed]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash",
+    "Edit",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "a87503d092e084a3a01a783c6df8b6317784f1d8fb6a6ba52e4fa3d10c60281d",
+   "body_lines": 175,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Report discovery",
+    "### 2. Parse proposals",
+    "### 3. Batch presentation",
+    "### 4. Per-proposal disposition",
+    "### 5. Append to the Disposition Log",
+    "### 6. Update report frontmatter and run-log",
+    "### 7. Surface delegation handoffs",
+    "### 8. Final summary",
+    "## Proposal types and delegation routing",
+    "## Idempotency contract"
+   ]
+  },
+  {
+   "name": "skill-genesis",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Run skill-genesis as an on-demand autonomous learning harvest. Writes a timestamped report to .ai-state/skill_genesis_reports/. Disposition later via /skill-genesis-review.",
+   "argument_hint": "[--since <commit>] [--scope <area>] [--sources <dir>] [--cap <bytes>] [--dry-run]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git:*)",
+    "Bash(python3:*)",
+    "Task"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "89d7fa5b283cbd060bcc12a67c9e6d882a45c12a743565793d49ca01f511af87",
+   "body_lines": 138,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/list_harvest_sources.py"
+   ],
+   "heading_outline": [
+    "## Flags",
+    "## Process",
+    "### 1. Parse arguments",
+    "### 2. Generate task slug",
+    "### 3. Pre-flight — detect learning sources",
+    "### 4. Delegate to the skill-genesis agent in background mode",
+    "### 5. Surface the expected report path and next step"
+   ]
+  },
+  {
+   "name": "star-repo",
+   "frontmatter_keys": [
+    "description",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Star the Praxion repo on GitHub",
+   "argument_hint": null,
+   "argument_hint_type": null,
+   "allowed_tools": [
+    "Bash(gh:*)",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "ac16bb0d9e44e1d37f8e6542bbd90fbd9210202a9a0f364e67e13d4780950fe0",
+   "body_lines": 45,
+   "placeholders": [],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [],
+   "heading_outline": [
+    "## Procedure",
+    "## Constraints"
+   ]
+  },
+  {
+   "name": "test",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools"
+   ],
+   "description": "Run the tests a change needs, derived from layout, imports, path literals and the declared list",
+   "argument_hint": "[path|all]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob"
+   ],
+   "invocation": "model-invocable",
+   "body_sha256": "20dbaa837e751693f25ec1a3d72f1a6864cfe6b6461b182e9da267ddebe51b33",
+   "body_lines": 21,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [
+    {
+     "target": "../skills/testing-strategy/SKILL.md",
+     "resolves_to": "skills/testing-strategy/SKILL.md",
+     "anchor": null
+    }
+   ],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/resolve_test_scope.py"
+   ],
+   "heading_outline": [
+    "## Process"
+   ]
+  },
+  {
+   "name": "triage-debt",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Judge tech-debt ledger candidates against the current project state and apply confirmed outcomes as dated stamps — repairs proposed per-row, discards judged against a confidence gate, unresolved rows escalated to the user rather than guessed.",
+   "argument_hint": "[--all] [--ids <td-NNN,...>] [--limit <n>]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash",
+    "Write",
+    "Edit",
+    "Task",
+    "AskUserQuestion"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "f3118ebe30b74ba5359b23081391a32623374724e2fba8b788ab9dbe7ce61245",
+   "body_lines": 254,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/ledger_health.py"
+   ],
+   "heading_outline": [
+    "## Arguments",
+    "## Process",
+    "### 1. Gather",
+    "### 2. Judge — fan out to batches, never edit anything",
+    "### 3. Merge and confirm",
+    "### 4. Apply",
+    "### 5. Report",
+    "## Constraints"
+   ]
+  },
+  {
+   "name": "upgrade-project",
+   "frontmatter_keys": [
+    "description",
+    "argument-hint",
+    "allowed-tools",
+    "disable-model-invocation"
+   ],
+   "description": "Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver, CI callers, labels baseline, AaC surfaces) to the live plugin install after a praxion plugin upgrade",
+   "argument_hint": "[--check | --dry-run]",
+   "argument_hint_type": "str",
+   "allowed_tools": [
+    "Bash(bash:*)",
+    "Bash(git:*)",
+    "Bash(gh:*)",
+    "Bash(jq:*)",
+    "Read"
+   ],
+   "invocation": "user-only",
+   "body_sha256": "f6cee340cd7c37ccaddf17ff3f48638dfbc8ce9c4cb0af54d375f532c7dcf269",
+   "body_lines": 158,
+   "placeholders": [
+    "$ARGUMENTS"
+   ],
+   "relative_links": [],
+   "workflow_references": [],
+   "carries_commit_process": false,
+   "references_plugin_root": false,
+   "scripts_invoked": [
+    "scripts/reconcile_aac_surfaces.py",
+    "scripts/refresh_labels_baseline.py",
+    "scripts/upgrade_project_pins.sh"
+   ],
+   "heading_outline": [
+    "# Upgrade Praxion pins for this project",
+    "## Arguments",
+    "## Process",
+    "## Notes"
+   ]
+  }
+ ]
+}

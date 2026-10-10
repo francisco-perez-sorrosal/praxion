@@ -25,7 +25,7 @@ INTRA_STEP_REVIEW = "skills/software-planning/references/intra-step-review.md"
 SOFTWARE_PLANNING_SKILL = "skills/software-planning/SKILL.md"
 PLANNER_PROMPT = "agents/implementation-planner.md"
 IMPLEMENTER_PROMPT = "agents/implementer.md"
-RESUME_PIPELINE = "commands/resume-pipeline.md"
+RESUME_PIPELINE = "skills/resume-pipeline/SKILL.md"
 STEP_LOOP_SKILL = "skills/step-loop/SKILL.md"
 
 SENTENCE_BREAK = r"\n|;|\.\s"

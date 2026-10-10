@@ -124,6 +124,44 @@ def _read_count_line(lines: list[str]) -> Counts | None:
     return None
 
 
+# --- Reading a vitest run ---
+#
+# A derived scope can hold a pocket whose runner is vitest (the dashboard). Its final block has
+# no `in <n>s` tail, so the pytest reader sees no count line and the whole scope would read as
+# unverifiable; the gate must not fail a green batch on the runner's dialect. Vitest tallies
+# `<n> failed | <n> passed (<total>)` on a line headed `Tests`, and lists each failed case as
+# ` FAIL  <file> > <suite> > <name>`.
+
+_VITEST_TESTS_LINE_RE = re.compile(r"^\s*Tests\s+(?P<tallies>.+?)\s+\(\d+\)\s*$")
+_VITEST_COUNT_RE = re.compile(r"\b(\d+) (passed|failed|skipped|todo)\b")
+_VITEST_FAIL_LINE_RE = re.compile(r"^\s*FAIL\s+(?P<rest>\S.*)$")
+
+
+def parse_vitest_summary(output: str) -> PytestSummary | None:
+    """The run a vitest `Tests` count line shows, in the pytest summary's shape, or None.
+
+    `todo` cases count as skipped; vitest reports no error tally, so `errors` stays 0. The
+    failed ids are the ` FAIL ` lines, each once, so pending ownership reads them like any id.
+    """
+    lines = output.splitlines()
+    for line in reversed(lines):
+        match = _VITEST_TESTS_LINE_RE.match(line)
+        if match is None:
+            continue
+        tallies = {word: int(number) for number, word in _VITEST_COUNT_RE.findall(match["tallies"])}
+        if not tallies:
+            return None
+        counts = Counts(
+            passed=tallies.get("passed", 0),
+            failed=tallies.get("failed", 0),
+            skipped=tallies.get("skipped", 0) + tallies.get("todo", 0),
+        )
+        fails = (_VITEST_FAIL_LINE_RE.match(candidate) for candidate in lines)
+        failed_ids = tuple(dict.fromkeys(m["rest"].strip() for m in fails if m))
+        return PytestSummary(counts, failed_ids, ())
+    return None
+
+
 def _node_ids(lines: list[str], kind: str) -> tuple[str, ...]:
     named = (_NODE_LINE_RE.match(line) for line in lines)
     ids = (_cut_reason(match["rest"]) for match in named if match and match["kind"] == kind)
@@ -243,6 +281,8 @@ class GateRun:
 def classify_run(command: str, output: str, rule: PendingRule) -> GateRun:
     """Read `output` into a `GateRun`, moving the failures `rule` pends from fail to pending."""
     summary = parse_pytest_summary(output)
+    if summary is None:
+        summary = parse_vitest_summary(output)
     if summary is None:
         return GateRun(command, NoRun(NO_SUMMARY_RATIONALE))
     failed, pending_failed = _split_pending(summary.failed_ids, rule.is_pending)

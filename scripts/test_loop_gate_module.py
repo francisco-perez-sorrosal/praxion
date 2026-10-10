@@ -28,6 +28,7 @@ from _step_loop_gate import (  # noqa: E402
     gate_result_lines,
     parse_marker,
     parse_pytest_summary,
+    parse_vitest_summary,
     render_result_line,
     resolve_marker,
 )
@@ -542,3 +543,47 @@ def test_a_complete_marker_with_a_red_check_is_completed_but_not_a_pass():
     assert check_run.red
     assert isinstance(outcome, Unmet)
     assert [item.key for item in outcome.unmet] == ["fail"]
+
+
+# --- A vitest pocket in the derived scope ---
+
+VITEST_OUTPUT = """\
+ RUN  v2.1.8 /repo/dashboard_app
+
+ \u2713 src/a.test.ts (3 tests) 12ms
+ \u276f src/b.test.ts (2 tests | 1 failed) 20ms
+   \u00d7 suite > fails
+     \u2192 expected 1 to be 2
+
+ FAIL  src/b.test.ts > suite > fails
+AssertionError: expected 1 to be 2
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 4 passed (5)
+   Start at  16:11:22
+   Duration  7.91s (transform 3.22s, setup 0ms, import 19.42s, tests 26.67s, environment 18.29s)
+"""
+
+
+def test_a_vitest_run_reads_its_tests_line_and_fail_lines():
+    summary = parse_vitest_summary(VITEST_OUTPUT)
+    assert summary.counts == Counts(passed=4, failed=1)
+    assert summary.failed_ids == ("src/b.test.ts > suite > fails",)
+    assert summary.error_ids == ()
+
+
+def test_canary_a_green_vitest_pocket_classifies_green_not_no_run():
+    output = " Test Files  66 passed (66)\n      Tests  892 passed (892)\n   Duration  7.91s\n"
+    run = classify_run("pnpm exec vitest run", output, ownership())
+    assert run.counts == Counts(passed=892, failed=0)
+    assert run.red is False
+
+
+def test_a_vitest_todo_tally_counts_as_skipped():
+    output = "      Tests  2 todo | 1 skipped | 7 passed (10)\n"
+    assert parse_vitest_summary(output).counts == Counts(passed=7, failed=0, skipped=3)
+
+
+def test_a_vitest_block_without_a_tests_line_is_still_no_run():
+    assert parse_vitest_summary("   Duration  7.91s\n") is None
+    assert classify_run(COMMAND, "   Duration  7.91s\n", ownership()).counts == NoRun(NO_SUMMARY)

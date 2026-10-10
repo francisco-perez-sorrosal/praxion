@@ -45,11 +45,21 @@ likec4 --version
 
 ### D2
 
-Use the standalone build; the command scrubs the version stamp the standalone build writes, and
-a package-manager build stamps it differently.
+Install the release tarball of the pinned version, verified against its SHA-256, the way the CI job
+does; the command scrubs the version stamp this build writes, and a package-manager build stamps it
+differently. The tarballs are published under
+`https://github.com/terrastruct/d2/releases/download/v0.7.1/`:
+
+| Platform | Tarball | SHA-256 |
+|---|---|---|
+| Linux amd64 (the CI runner) | `d2-v0.7.1-linux-amd64.tar.gz` | `eb172adf59f38d1e5a70ab177591356754ffaf9bebb84e0ca8b767dfb421dad7` |
+| macOS arm64 | `d2-v0.7.1-macos-arm64.tar.gz` | `80de85f3b0ac7d9569acac0780ed65dd994ea78969b6b230c58bbb2c6113465b` |
 
 ```bash
-curl -fsSL https://d2lang.com/install.sh | sh -s -- --version v0.7.1 --method standalone
+version=v0.7.1; tarball="d2-${version}-macos-arm64.tar.gz"   # your platform's row
+curl -fsSL -o "${tarball}" "https://github.com/terrastruct/d2/releases/download/${version}/${tarball}"
+echo "80de85f3b0ac7d9569acac0780ed65dd994ea78969b6b230c58bbb2c6113465b  ${tarball}" | shasum -a 256 -c -
+tar -xzf "${tarball}" && sudo install -m 755 "d2-${version}/bin/d2" /usr/local/bin/d2
 ```
 
 Verify:

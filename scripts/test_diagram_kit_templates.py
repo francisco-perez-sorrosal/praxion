@@ -178,7 +178,11 @@ def test_the_ci_template_installs_the_pins_the_renderer_asserts(rd):
     likec4, d2 = _runs()[:2]
 
     assert likec4 == f"npm install -g likec4@{rd.LIKEC4_VERSION}"
-    assert f"--version v{rd.D2_VERSION} --method standalone" in d2
+    assert f"version=v{rd.D2_VERSION}\n" in d2
+    assert "releases/download/${version}/${tarball}" in d2
+    assert re.search(r'echo "[0-9a-f]{64}  \$\{tarball\}" \| sha256sum -c -', d2), (
+        "the d2 tarball is not verified against a SHA-256 before it is installed"
+    )
 
 
 def test_the_ci_template_job_is_installs_then_regenerate_then_status_gate_then_diff():

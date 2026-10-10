@@ -85,11 +85,18 @@ jobs:
 
       - name: Install d2
         # Pinned for GEOMETRY stability: a different d2 version can lay diagrams
-        # out differently. --method standalone forces the release tarball so the
-        # binary is identical regardless of a runner's Homebrew state.
+        # out differently. The binary is the release tarball of exactly this
+        # version, verified against its SHA-256 before it is installed, so neither
+        # an installer script fetched from a moving branch nor a runner's Homebrew
+        # state decides which d2 runs.
         run: |
-          curl -fsSL https://d2lang.com/install.sh \
-            | sh -s -- --version v0.7.1 --method standalone
+          version=v0.7.1
+          tarball="d2-${version}-linux-amd64.tar.gz"
+          curl -fsSL -o "${tarball}" "https://github.com/terrastruct/d2/releases/download/${version}/${tarball}"
+          echo "eb172adf59f38d1e5a70ab177591356754ffaf9bebb84e0ca8b767dfb421dad7  ${tarball}" | sha256sum -c -
+          tar -xzf "${tarball}"
+          sudo install -m 755 "d2-${version}/bin/d2" /usr/local/bin/d2
+          rm -r "${tarball}" "d2-${version}"
 
       - name: Regenerate diagrams from source .c4 files
         run: python3 scripts/regenerate_diagrams.py --diagrams-dir {{PROJECT_PATHS_DIAGRAMS}}

@@ -9,14 +9,14 @@ command, what the hook and the CI gate do with it, and how to reproduce a run by
 | Tool | Pinned version | Install |
 |---|---|---|
 | likec4 | 1.59.4 | `npm install -g likec4@1.59.4` |
-| d2 | 0.7.1 | `curl -fsSL https://d2lang.com/install.sh \| sh -s -- --version v0.7.1 --method standalone` |
+| d2 | 0.7.1 | the release tarball `d2-v0.7.1-<platform>.tar.gz`, SHA-256 verified; install lines in `docs/architecture-diagrams.md` |
 
 Both pins are exact. A different d2 can lay a diagram out differently and a different likec4 can export a
 different model, so the renders are only byte-reproducible at these two versions. This table is the pin
 statement for the guidance. Three places must carry the same two literals because they install the tools:
 the CI workflow, the workflow template onboarding installs, and the install lines of the architecture-diagrams
 how-to. Change a pin in this table and in all three together; every other file names the tools without a
-version. Use the standalone d2 build rather than a package-manager one: the two builds stamp the version
+version. Use the release-tarball d2 build rather than a package-manager one: the two builds stamp the version
 differently, and the command scrubs that stamp.
 
 ## The command

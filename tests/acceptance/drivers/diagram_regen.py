@@ -169,7 +169,10 @@ def _steps(workflow: Path, job: str) -> list[dict]:
 def _installs_toolchain(step: dict) -> bool:
     run = step.get("run") or ""
     return bool(
-        re.search(r"npm (install|i) |install\.sh|brew install|apt-get install|pnpm add", run)
+        re.search(
+            r"npm (install|i) |install\.sh|releases/download/|brew install|apt-get install|pnpm add",
+            run,
+        )
     )
 
 

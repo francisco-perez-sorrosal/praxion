@@ -1,7 +1,8 @@
 ---
-id: dec-draft-854e860b
+id: dec-443
+draft_id: dec-draft-854e860b
 title: Diagram regeneration command interface and review-check list format
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-04
 summary: "One command (python3 scripts/regenerate_diagrams.py [ROOT...] [--staged|--check] [--json]) serves the hook, CI and docs; exit codes 0/1/2/3; regeneration failures are three-line stderr messages of four named kinds; findings are '<CHECK-ID> <VIEW> <PASS|FAIL> <evidence>' lines; the review checks are one Markdown table DRC-01..DRC-12 linked from the diagram conventions rule; under --staged an absent or off-pin likec4/d2 is refused: one warning names the pinned and the found versions, nothing is regenerated or staged, exit 0 (default and --check keep exit 3)"

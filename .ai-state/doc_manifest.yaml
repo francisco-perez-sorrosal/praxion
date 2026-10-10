@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-08T21:28:18Z'
+generated_at: '2026-10-10T07:41:45Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -99,7 +99,7 @@ surfaces:
   path: docs/aac-dac.md
   type: markdown
   title: Architecture-as-Code + Documentation-as-Code
-  last_modified: '2026-09-06'
+  last_modified: '2026-10-10'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -118,15 +118,17 @@ surfaces:
   path: docs/architecture-diagrams.md
   type: markdown
   title: Architecture Diagrams
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: reference_shell
+  surfaces_referenced:
+  - docs-diagrams-readme
 - id: docs-architecture
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -135,6 +137,7 @@ surfaces:
   - ai-state-decisions-189-hackathon-mode-activation-and-tier-integration
   - ai-state-decisions-decisions-index
   - ai-state-design
+  - docs-architecture-diagrams
   - docs-onboarding
   - docs-rework-dispatch
 - id: docs-claude-code-limitations
@@ -301,13 +304,15 @@ surfaces:
   path: docs/diagrams/README.md
   type: markdown
   title: Diagrams
-  last_modified: '2026-06-25'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: reference_shell
   surfaces_referenced:
+  - ai-state-design
   - docs-aac-dac
   - docs-architecture
+  - docs-architecture-diagrams
   - docs-concepts
   - docs-getting-started
   - docs-rework-dispatch
@@ -503,13 +508,13 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
   diagrams:
   - docs/diagrams/architecture/rendered/components.svg
-  - docs/diagrams/architecture/rendered/context.svg
+  - docs/diagrams/architecture/rendered/index.svg
   - docs/diagrams/skill-genesis-harvest/rendered/skill-genesis-harvest.svg
   surfaces_referenced:
   - ai-state-decisions-164-architecture-c4-dual-agent-representation
@@ -534,7 +539,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -542,13 +547,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-09'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1130,13 +1135,13 @@ surfaces:
   path: .ai-state/decisions/094-render-storage-commit-both.md
   type: markdown
   title: Commit both diagram source DSL and rendered SVG; regenerate via repo hook
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-095-toolchain-likec4-d2
   path: .ai-state/decisions/095-toolchain-likec4-d2.md
   type: markdown
   title: LikeC4 + D2 chosen as C4-architectural diagramming toolchain
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-096-structurizr-d2-diagrams-step-ordering-constraint
   path: .ai-state/decisions/096-structurizr-d2-diagrams-step-ordering-constraint.md
@@ -1220,7 +1225,7 @@ surfaces:
   path: .ai-state/decisions/109-aac-likec4-querying-skill.md
   type: markdown
   title: "likec4-querying skill \u2014 path-scoped progressive-disclosure rubric for MCP-vs-direct-read decisions"
-  last_modified: '2026-05-08'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-110-aac-dac-v1-1-block-d-hook-slot-correction
   path: .ai-state/decisions/110-aac-dac-v1-1-block-d-hook-slot-correction.md
@@ -1244,7 +1249,7 @@ surfaces:
   path: .ai-state/decisions/113-aac-dac-onboarding-aac-onboarding-tier.md
   type: markdown
   title: "AaC tier integrates into onboarding via plugin-path-resolved scripts and templated artifacts \u2014 greenfield default-ON, existing-project default-OFF"
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-114-tech-debt-ledger-resolved-split
   path: .ai-state/decisions/114-tech-debt-ledger-resolved-split.md
@@ -1664,7 +1669,7 @@ surfaces:
   path: .ai-state/decisions/183-likec4-feedback-loop-modeling.md
   type: markdown
   title: "LikeC4 feedback-loop modeling \u2014 multiple focused views, tagged edges, document-substrate handoffs"
-  last_modified: '2026-05-14'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-184-hybrid-rework-dispatch
   path: .ai-state/decisions/184-hybrid-rework-dispatch.md
@@ -3173,7 +3178,7 @@ surfaces:
   type: markdown
   title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
     \ stall cap"
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-09'
   renderer: adr_card
 - id: ai-state-decisions-435-mutation-line-grammar-leaf-module
   path: .ai-state/decisions/435-mutation-line-grammar-leaf-module.md
@@ -3192,6 +3197,48 @@ surfaces:
   type: markdown
   title: The step-loop relay procedure is the skill skills/step-loop/SKILL.md, invocable by the user and the model, never a command
   last_modified: '2026-10-08'
+  renderer: adr_card
+- id: ai-state-decisions-438-architecture-view-set
+  path: .ai-state/decisions/438-architecture-view-set.md
+  type: markdown
+  title: Praxion's architecture model projects sixteen focused views sized to the legibility thresholds; `index` is the System Context
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-439-diagram-category-encoding
+  path: .ai-state/decisions/439-diagram-category-encoding.md
+  type: markdown
+  title: A diagram element's category is its kind's `notation`, overridden by element `metadata { category }`; a token table gives each category a distinct non-colour mark
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-440-likec4-diagramming-skill-merge
+  path: .ai-state/decisions/440-likec4-diagramming-skill-merge.md
+  type: markdown
+  title: Merge `likec4-querying` into one `likec4-diagramming` skill that owns authoring canon, review checks, render loop and the query rubric
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-441-onboarding-diagram-kit-installer
+  path: .ai-state/decisions/441-onboarding-diagram-kit-installer.md
+  type: markdown
+  title: Onboarding installs the diagram kit through a scripted idempotent installer, and managed projects render with a project-local renderer copy
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-442-render-route-d2-emitter
+  path: .ai-state/decisions/442-render-route-d2-emitter.md
+  type: markdown
+  title: A Praxion-owned D2 emitter over `likec4 export json` replaces native `likec4 gen d2` in every C4 render path
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-443-diagram-regen-command-and-review-checks
+  path: .ai-state/decisions/443-diagram-regen-command-and-review-checks.md
+  type: markdown
+  title: Diagram regeneration command interface and review-check list format
+  last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-444-light-only-render-tokens-and-marks
+  path: .ai-state/decisions/444-light-only-render-tokens-and-marks.md
+  type: markdown
+  title: Light-only C4 render tokens with one non-colour mark per category
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3976,6 +4023,13 @@ groups:
   - ai-state-decisions-435-mutation-line-grammar-leaf-module
   - ai-state-decisions-436-one-request-count-shared-transcript-reader
   - ai-state-decisions-437-step-loop-procedure-is-a-skill
+  - ai-state-decisions-438-architecture-view-set
+  - ai-state-decisions-439-diagram-category-encoding
+  - ai-state-decisions-440-likec4-diagramming-skill-merge
+  - ai-state-decisions-441-onboarding-diagram-kit-installer
+  - ai-state-decisions-442-render-route-d2-emitter
+  - ai-state-decisions-443-diagram-regen-command-and-review-checks
+  - ai-state-decisions-444-light-only-render-tokens-and-marks
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

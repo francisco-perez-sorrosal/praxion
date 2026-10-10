@@ -1,7 +1,8 @@
 ---
-id: dec-draft-971ab11d
+id: dec-440
+draft_id: dec-draft-971ab11d
 title: Merge `likec4-querying` into one `likec4-diagramming` skill that owns authoring canon, review checks, render loop and the query rubric
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
 summary: "Replace skills/likec4-querying with skills/likec4-diagramming (same path scope): body keeps the query rubric and adds the authoring loop and category rule; references hold the only copy of the review-check list and thresholds (review-checks.md), the graded style canon, authoring recipes, the one canonical regeneration statement and the MCP tool catalog; the path-scoped diagram rule links the check list one hop away and three agent prompts carry an in-place one-line directive."
@@ -48,7 +49,7 @@ Rename and merge into **`skills/likec4-diagramming/`**, with the same `paths:` s
 
 - **Body (≤ 150 lines):** the authoring loop (read `_spec.c4` → edit → `regenerate_diagrams.py --check` → fix → commit), the category rule and vocabularies, the view recipe, the twelve-row query rubric, kept, and gotchas.
 - **References:**
-  - `review-checks.md`: the check list `DRC-01`..`DRC-12` (format per `dec-draft-854e860b`), the **only** home of thresholds.
+  - `review-checks.md`: the check list `DRC-01`..`DRC-12` (format per `dec-443`), the **only** home of thresholds.
   - `style-canon.md`: graded canon, palette and shape semantics, anti-patterns, no numbers.
   - `likec4-authoring-recipes.md`.
   - `render-and-regen.md`: the **one** canonical pipeline statement.

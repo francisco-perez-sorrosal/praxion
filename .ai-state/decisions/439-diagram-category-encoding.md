@@ -1,10 +1,11 @@
 ---
-id: dec-draft-2fbfa6d3
+id: dec-439
+draft_id: dec-draft-2fbfa6d3
 title: A diagram element's category is its kind's `notation`, overridden by element `metadata { category }`; a token table gives each category a distinct non-colour mark
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
-summary: "Published contract shipped in the onboarding style kit: categories resolve as kind notation unless the element declares metadata.category; the kit's kinds person/system/external/container/component/datastore carry notations Person/System in scope/External system/Container/Component/Data store; Praxion keeps its kinds and overrides its 20 component elements (Layer, Knowledge asset, Runtime agent, Pipeline document, Tooling, Persistent store); a command-owned token table (values per dec-draft-026e4301), optionally extended per project by style.json, gives every category a non-colour mark that is distinct within its vocabulary, plus AA contrast."
+summary: "Published contract shipped in the onboarding style kit: categories resolve as kind notation unless the element declares metadata.category; the kit's kinds person/system/external/container/component/datastore carry notations Person/System in scope/External system/Container/Component/Data store; Praxion keeps its kinds and overrides its 20 component elements (Layer, Knowledge asset, Runtime agent, Pipeline document, Tooling, Persistent store); a command-owned token table (values per dec-444), optionally extended per project by style.json, gives every category a non-colour mark that is distinct within its vocabulary, plus AA contrast."
 tags: [diagrams, c4, likec4, categories, style-kit, onboarding, data-structures, legend]
 made_by: agent
 agent_type: systems-architect
@@ -47,7 +48,7 @@ Praxion's `component` kind spans four categories (layers, knowledge assets, stor
 | `hooks`, `chronograph`, `tooling.*` leaves | Tooling |
 | `aistate`, `adrs`, `tdl` | Persistent store |
 
-**Token table:** owned by the regeneration command. Values and marks are those of `dec-draft-026e4301` (interface designer). Within each vocabulary, box marks are pairwise distinct as the tuple (geometry, dash, stroke width, icon), and so are frame marks. Cross-vocabulary twins that never co-occur are allowed: Layer and Component are both double-border; Persistent store and Data store are both cylinder. The only icon is the Person glyph. Drawing class names are `category_<snake name>`.
+**Token table:** owned by the regeneration command. Values and marks are those of `dec-444` (interface designer). Within each vocabulary, box marks are pairwise distinct as the tuple (geometry, dash, stroke width, icon), and so are frame marks. Cross-vocabulary twins that never co-occur are allowed: Layer and Component are both double-border; Persistent store and Data store are both cylinder. The only icon is the Person glyph. Drawing class names are `category_<snake name>`.
 - **Extension:** a project may add or recolour categories in `<diagram-dir>/style.json` (`schema: 1`). The renderer validates contrast and mark distinctness for every addition.
 - **Native styling:** the kit's LikeC4-native kind styles use the same colours, checked by test.
 

@@ -13,7 +13,7 @@ affected_files:
   - skills/likec4-querying/SKILL.md
   - skills/likec4-querying/references/mcp-tool-recipes.md
   - skills/likec4-querying/README.md
-superseded_in_part_by: [dec-draft-971ab11d]
+superseded_in_part_by: [dec-440]
 ---
 
 ## Context

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-ffb3c58b
+id: dec-441
+draft_id: dec-draft-ffb3c58b
 title: Onboarding installs the diagram kit through a scripted idempotent installer, and managed projects render with a project-local renderer copy
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
 summary: "New component scripts/install_diagram_kit.py performs onboarding 8b.4 and 8b.5: writes, each only if absent, the _spec.c4 style kit plus an example model (only when no .c4 exists under the diagrams dir), a copy of scripts/regenerate_diagrams.py, and .github/workflows/architecture.yml rendered from the fixed template that pins the same toolchain as Praxion; CI and the developer run the same project-local renderer; no managed-project pre-commit block is added."

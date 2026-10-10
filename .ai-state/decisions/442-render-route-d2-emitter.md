@@ -1,7 +1,8 @@
 ---
-id: dec-draft-6aad9591
+id: dec-442
+draft_id: dec-draft-6aad9591
 title: A Praxion-owned D2 emitter over `likec4 export json` replaces native `likec4 gen d2` in every C4 render path
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-04
 summary: "New component scripts/regenerate_diagrams.py reads each LikeC4 workspace via `likec4 export json --skip-layout`, emits category-styled D2 (classes, plain multi-line labels, in-render title and legend, synthesized edge labels), renders with pinned d2 0.7.1, scrubs the version stamp, fails only on the four regeneration-failure kinds, and under --check reports review findings DRC-01..DRC-12; the hook, both CI drift gates and onboarding all call it; likec4 pinned to 1.59.4, d2 stays 0.7.1."
@@ -38,7 +39,7 @@ The committed-artifact contract (source + generated + rendered SVG committed; pr
 Add **`scripts/regenerate_diagrams.py`**: stdlib-only, Python 3.9-safe, a CLI over six flat sibling modules (`scripts/_diagram_*.py`). It is the one regeneration path for C4 views.
 
 1. Read each workspace with `likec4 export json --skip-layout`.
-2. Resolve every element's category (kind `notation`, overridden by `metadata.category`; see dec-draft-2fbfa6d3).
+2. Resolve every element's category (kind `notation`, overridden by `metadata.category`; see dec-439).
 3. Emit one `<view>.d2` per view:
    - token classes;
    - plain multi-line labels (`name` / `[category · technology]` / responsibility);
@@ -55,8 +56,8 @@ The pre-commit shim, Praxion's CI drift gate, the managed-project CI template an
 **Pins:** likec4 **1.59.4** (from 1.56.0); d2 **0.7.1**, kept. Dark-mode renders are deferred: opaque white canvas. The acceptance driver flattens `@media` rules, so a class-scoped dark layer would corrupt the text-only reading.
 
 **Companion drafts** (interface designer, complementary, not competing):
-- `dec-draft-854e860b` fixes this command's interface: flags, exit codes, failure and finding formats, and the review-check table.
-- `dec-draft-026e4301` fixes the light-only token values and the per-category marks the emitter applies.
+- `dec-443` fixes this command's interface: flags, exit codes, failure and finding formats, and the review-check table.
+- `dec-444` fixes the light-only token values and the per-category marks the emitter applies.
 
 ## Considered Options
 

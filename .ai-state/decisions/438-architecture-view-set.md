@@ -1,7 +1,8 @@
 ---
-id: dec-draft-c609547f
+id: dec-438
+draft_id: dec-draft-c609547f
 title: Praxion's architecture model projects sixteen focused views sized to the legibility thresholds; `index` is the System Context
-status: proposed
+status: accepted
 category: implementation
 date: 2026-10-04
 summary: "Six views become sixteen: index (System Context, replaces context), components (Container), one Component view per layer (knowledge, orchestration, persistence, tooling), the forward pipeline in four slices drawn without the implicit pipeline frame (ideation to design, acceptance tests and plan, plan to build, verification), supporting_agents (shadow and gated) and independent_agents, the feedback_loops overview, challenge_loop_detail, and the numbered dynamic views cis_loop_detail and rework_loop_detail; every non-dynamic view carries one #c4_* level tag and every view passes the review checks (text at least 10 px at 960 px, aspect 0.5-2.5, at most nine arrows per element); the orchestrator's dispatch fan draws as one aggregated edge in the orchestration view; no element or relationship is removed. Amended at execution (2026-10-04) from the twelve views of the first draft."
@@ -56,7 +57,7 @@ Project sixteen views. Every non-dynamic view carries exactly one `#c4_*` level 
 - The four forward-flow views `exclude praxion.orchestration.pipeline`, the implicit parent LikeC4 would otherwise draw as a frame around the agents; without the frame, ELK lays the agents and their documents out as one flow instead of routing every document arrow around a frame. The exclusion is view-level: the element and its relationships stay in the model.
 - The orchestrator's dispatch fan draws as one aggregated edge in `orchestration_components`, as individual edges only in `supporting_agents` and `independent_agents`, whose subject is those dispatches, and nowhere else: `feedback_loops` excludes `orchestrator -> pipeline.*`, and the forward-flow views do not include the orchestrator.
 - Dynamic steps mirror recorded relationships only; the renderer flags a step with no recorded pair.
-- Read-only relationships take the `reads` kind and draw dashed in element views; in a dynamic view every step draws as the solid numbered-step line (dec-draft-026e4301).
+- Read-only relationships take the `reads` kind and draw dashed in element views; in a dynamic view every step draws as the solid numbered-step line (dec-444).
 - The renderer gates each view on its checks (`python3 scripts/regenerate_diagrams.py --check`).
 
 **Amendment at execution (2026-10-04).** The first draft named twelve views and a split of `persistence_tooling_components` as its fallback. The legibility checks forced three splits, each recorded as an objection in the pipeline's `LEARNINGS.md`: `persistence_tooling_components` into `persistence_components` and `tooling_components` (the named fallback); `supporting_agents` into `supporting_agents` and `independent_agents` (seven sibling agents in one rank measured 1992 px wide, past the width at which 14 px edge labels still read at 10 px when the render is shown 960 px wide); the two forward-flow views into four (a frame of five agents beside six documents measured 1600-1900 px wide). The pipeline-frame exclusion above followed as the last model change before verification, once the four slices passed every check but still routed their document arrows around the frame. Every element and relationship of the model is unchanged.

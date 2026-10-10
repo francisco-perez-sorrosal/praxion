@@ -18,7 +18,7 @@ affected_files:
 re_affirmed_by:
   - dec-098
   - dec-099
-superseded_in_part_by: [dec-draft-6aad9591]
+superseded_in_part_by: [dec-442]
 ---
 
 ## Context

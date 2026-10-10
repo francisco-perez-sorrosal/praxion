@@ -18,7 +18,7 @@ affected_files:
   - docs/diagrams/architecture/rendered/rework_loop_detail.svg
   - .ai-state/DESIGN.md
 re_affirms: dec-164
-superseded_in_part_by: [dec-draft-c609547f]
+superseded_in_part_by: [dec-438]
 ---
 
 ## Context

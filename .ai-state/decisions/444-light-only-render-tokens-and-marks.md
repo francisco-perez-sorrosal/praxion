@@ -1,7 +1,8 @@
 ---
-id: dec-draft-026e4301
+id: dec-444
+draft_id: dec-draft-026e4301
 title: Light-only C4 render tokens with one non-colour mark per category
-status: proposed
+status: accepted
 category: configuration
 date: 2026-10-04
 summary: "Committed architecture renders use a tint-fill/strong-stroke/slate-text token set on an opaque white canvas, a unique non-colour mark per category and form, a single vendored Person glyph, an in-image title block and Legend container, three line meanings as a closed set (acts: solid; reads: dashed, in element views; numbered dynamic step: the solid accent line, whatever relationship kind the step restates), and no dark-mode CSS in this change"

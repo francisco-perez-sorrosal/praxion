@@ -1,3 +1,37 @@
+## v0.48.0 (2026-10-10)
+
+### Feat
+
+- **diagrams**: Draw the forward-flow views without the pipeline frame
+- **diagrams**: Complete the sixteen-view set with loop detail and layout-aware emission
+- **diagrams**: Author the restyled view set and tighten the legend (partial)
+- **onboarding**: Add the idempotent diagram-kit installer
+- **diagrams**: Switch the hook and the CI drift gate to the regeneration command
+- **onboarding**: Ship the LikeC4 style kit, example model and regeneration CI template
+- **diagrams**: Add the numeric review checks and the --check summary
+- **diagrams**: Add the structural review checks to the regeneration command
+- **diagrams**: Wire the regeneration command's toolchain edge and modes
+- **diagrams**: Add the regeneration command's pure core
+- **skills**: Add the style canon and LikeC4 authoring recipes to likec4-diagramming
+- **skills**: Merge likec4-querying into the likec4-diagramming skill
+
+### Fix
+
+- **aac**: Recognise the src/ plus rendered/ layout in the golden-rule gate
+- **dashboard**: Order architecture renders by their declared views
+- **ci**: Install d2 from its pinned release tarball with a checksum
+- **diagrams**: Read both toolchain pins from the command in the test kit
+- **diagrams**: Read element names outside the title and legend
+- **docs**: Embed the System Context view the kit renders
+- **diagrams**: Stage renders from the work tree's top under a git hook
+- **diagrams**: Refuse an off-pin toolchain under --staged
+
+### Refactor
+
+- **tests**: Split the regeneration core tests by subject
+- **diagrams**: Split the regeneration command into a CLI over tokens and core modules
+- **diagrams**: Split the model specification and record categories and read edges
+
 ## v0.47.0 (2026-10-10)
 
 ### Feat

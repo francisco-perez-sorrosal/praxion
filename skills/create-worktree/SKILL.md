@@ -1,4 +1,5 @@
 ---
+name: create-worktree
 description: Create a new git worktree in .claude/worktrees/
 argument-hint: "[branch-name]"
 allowed-tools: [Bash(git:*), Bash(ln:*), Bash(ls:*), Bash(test:*), Bash(cursor:*)]

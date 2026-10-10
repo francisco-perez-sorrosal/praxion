@@ -60,7 +60,6 @@ tests = [
   "scripts/test_check_template_mirrors.py",
   "scripts/test_check_test_results_shape.py",
   "scripts/test_export_codex_agents.py",
-  "scripts/test_export_codex_command_skills.py",
   "scripts/test_export_codex_pipeline_adapter.py",
   "scripts/test_export_codex_rules_bridge.py",
   "scripts/test_export_codex_skills.py",
@@ -138,7 +137,7 @@ why = "the autofix trigger policy and label taxonomy the ci-autofix and labels-r
 [[dep]]
 paths = [
   ".github/workflows/*.yml",
-  "commands/release.md",
+  "skills/release/SKILL.md",
   "skills/versioning/**",
 ]
 tests = [
@@ -413,7 +412,6 @@ paths = [
 tests = [
   "scripts/test_check_hook_installation.py",
   "scripts/test_export_codex_agents.py",
-  "scripts/test_export_codex_command_skills.py",
   "scripts/test_export_codex_pipeline_adapter.py",
   "scripts/test_export_codex_rules_bridge.py",
   "scripts/test_export_codex_skills.py",
@@ -452,7 +450,7 @@ why = "the rendered CLAUDE.md, its template, the doc corpus, and the skill-descr
 
 [[dep]]
 paths = [
-  "commands/*.md",
+  "skills/*/SKILL.md",
 ]
 tests = [
   "scripts/test_apply_skill_description_diet.py",
@@ -740,7 +738,6 @@ tests = [
   "scripts/test_check_spec_drift.py",
   "scripts/test_check_state_corpus.py",
   "scripts/test_export_codex_agents.py",
-  "scripts/test_export_codex_command_skills.py",
   "scripts/test_export_codex_pipeline_adapter.py",
   "scripts/test_export_codex_rules_bridge.py",
   "scripts/test_export_codex_skills.py",
@@ -887,15 +884,6 @@ why = "the live-tree check runs the ledger gate in a child process over every to
 
 [[dep]]
 paths = [
-  "commands/*.md",
-]
-tests = [
-  "scripts/test_export_codex_command_skills.py",
-]
-why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
-
-[[dep]]
-paths = [
   "claude/aac-templates/precommit-block-d.sh.frag",
 ]
 tests = [
@@ -905,7 +893,7 @@ why = "reads these files in a child process or by a directory scan; found unsele
 
 [[dep]]
 paths = [
-  "commands/*.md",
+  "skills/*/SKILL.md",
   "rules/eval/eval-data-governance.md",
   "rules/ml/eval-driven-verification.md",
   "rules/ml/experiment-commit-conventions.md",

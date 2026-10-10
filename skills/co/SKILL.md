@@ -1,4 +1,5 @@
 ---
+name: co
 description: Create a commit for staged (or all) changes
 argument-hint: "[message]"
 allowed-tools: [Bash(git:*), Read, Grep]

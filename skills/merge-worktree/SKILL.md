@@ -1,4 +1,5 @@
 ---
+name: merge-worktree
 description: Merge a worktree branch back into current branch
 argument-hint: "[branch-name]"
 allowed-tools: [Bash(git:*), Bash(python*), Bash(test:*), Bash(command -v:*), Bash(praxion-sidecar:*), Read, Grep]
@@ -7,7 +8,7 @@ disable-model-invocation: true
 
 Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is `.claude/worktrees/$ARGUMENTS`; `.trees/$ARGUMENTS` is supported as a transitional fallback during the deprecation window.
 
-> This command is the `.ai-state/` reconciliation point for a pipeline worktree — Steps 7–8 below are the contract (the SessionStart banner that used to announce it was retired together with the duplicate worktree guard, since native worktree isolation needs neither).
+> This skill is the `.ai-state/` reconciliation point for a pipeline worktree — Steps 7–8 below are the contract (the SessionStart banner that used to announce it was retired together with the duplicate worktree guard, since native worktree isolation needs neither).
 
 ## Steps
 
@@ -26,7 +27,7 @@ Merge the $ARGUMENTS worktree into the current branch. Primary worktree home is 
 5. Merge in the worktree. Default: `git merge --ff-only "$BRANCH"` to preserve a linear history. If `--ff-only` refuses because the branch has diverged from the target, stop and tell the user to rebase the branch on the target first (`git rebase <default-branch>` from inside the worktree) and re-run the merge. Do not silently fall back to a non-fast-forward merge commit. The user's explicit `--squash` or rebase choice (when it passed the check in Step 4) is honored.
 6. Check for merge conflicts using `git status`, `git diff --name-only --diff-filter=U`, or `git ls-files -u`.
 7. Run `.ai-state/` reconciliation: `python scripts/reconcile_ai_state.py` — this renumbers duplicate ADR sequence numbers and regenerates `DECISIONS_INDEX.md`. It acts only on paths git reports as conflicted, and git ignores the observation log, so it carries none of the worktree's log rows; Step 9.5 does.
-8. Promote any draft ADRs introduced by the merged branch: `python3 scripts/finalize_adrs.py --merged` (command-layer invocation complementing the post-merge git hook — idempotent; no-op when the hook already ran).
+8. Promote any draft ADRs introduced by the merged branch: `python3 scripts/finalize_adrs.py --merged` (skill-layer invocation complementing the post-merge git hook — idempotent; no-op when the hook already ran).
 9. Resolve any remaining conflicts based on your knowledge of the changes and continue the merging process.
    Then commit everything the merge left dirty under `.ai-state/` — reconciliation and finalize outputs, the observations-summary tail, the calibration row — as **one** `chore(state)` commit, staged by name. A finalize or ledger migration that surfaces after that commit rides the next state commit rather than getting one of its own.
 9.5. Merge the worktree's observation log into this checkout's log. A worktree's log is deleted with the worktree and git does not carry it, so this is the only point where the spawns, stops and costs it recorded are kept. The script ships with the plugin, so a managed project has no `scripts/merge_worktree_log.py` of its own. Resolve it, trying these in order and taking the first that exists:

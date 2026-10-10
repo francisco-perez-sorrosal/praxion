@@ -362,5 +362,5 @@ def test_precommit_pattern_covers_every_scanned_path() -> None:
 def test_precommit_pattern_misses_unrelated_paths() -> None:
     """The filter is a filter: it must not fire on every commit in the repo."""
     pattern = re.compile(_hook_files_pattern())
-    for unrelated in ("README.md", "skills/skill-crafting/SKILL.md", "commands/co.md"):
+    for unrelated in ("README.md", "skills/skill-crafting/SKILL.md", "skills/co/SKILL.md"):
         assert not pattern.search(unrelated), f"{unrelated} should not trigger this hook"

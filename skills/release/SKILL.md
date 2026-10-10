@@ -1,11 +1,12 @@
 ---
+name: release
 description: Cut a stable release by dispatching the Release CI workflow (bump + changelog + tag + GitHub release)
 argument-hint: "[patch|minor|major]"
 allowed-tools: [Bash(gh:*), Bash(git:*), Read, Grep, Glob]
 disable-model-invocation: true
 ---
 
-Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/workflows/release.yml`, `workflow_dispatch`) that runs Commitizen on a clean runner. This command **dispatches that workflow** -- it does NOT bump locally -- so the workflow stays the single mechanism that changes version strings (no local/CI double-bump). The workflow, in one tagged commit, updates the version files and regenerates `CHANGELOG.md` (`update_changelog_on_bump = true`), tags it, pushes, and publishes the GitHub release.
+Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/workflows/release.yml`, `workflow_dispatch`) that runs Commitizen on a clean runner. This skill **dispatches that workflow** -- it does NOT bump locally -- so the workflow stays the single mechanism that changes version strings (no local/CI double-bump). The workflow, in one tagged commit, updates the version files and regenerates `CHANGELOG.md` (`update_changelog_on_bump = true`), tags it, pushes, and publishes the GitHub release.
 
 ## Process
 

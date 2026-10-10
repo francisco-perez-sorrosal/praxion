@@ -122,15 +122,15 @@ repos:
       # Block B — canonical-block sync. Whole-repo --check; fires only when a
       # canonical block or one of its registered consumers (BLOCKS in
       # sync_canonical_blocks.py: the onboarding skill's consolidated
-      # claude-md-blocks.md, plus the commit-process pair commands/co.md and
-      # commands/cop.md) is staged. A test asserts this pattern matches every
+      # claude-md-blocks.md, plus the commit-process pair skills/co/SKILL.md
+      # and skills/cop/SKILL.md) is staged. A test asserts this pattern matches every
       # path COMMAND_FILES names, so a new consumer entry there fails here
       # instead of shipping ungated.
       - id: canonical-block-sync
         name: Canonical-block sync
         entry: python3 scripts/sync_canonical_blocks.py --check
         language: system
-        files: '^(claude/canonical-blocks/.*\.md|skills/onboard-project/references/claude-md-blocks\.md|commands/co\.md|commands/cop\.md)$'
+        files: '^(claude/canonical-blocks/.*\.md|skills/onboard-project/references/claude-md-blocks\.md|skills/co/SKILL\.md|skills/cop/SKILL\.md)$'
         pass_filenames: false
 
       # Block B2 — canonical-block history-manifest liveness. Whole-repo

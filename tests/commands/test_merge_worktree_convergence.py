@@ -1,11 +1,11 @@
 """Structural tests for `/merge-worktree`'s explicit-merge-back step.
 
-`/merge-worktree` is a slash command (Markdown body executed by a live
+`/merge-worktree` is a user-invoked skill (Markdown body executed by a live
 Claude Code session) — it cannot be invoked from pytest. These tests validate
-the documented contract by parsing `commands/merge-worktree.md` structurally,
+the documented contract by parsing `skills/merge-worktree/SKILL.md` structurally,
 matching the precedent set by `tests/commands/test_upgrade_project_command.py`.
 
-Under `ARCH_WT_RULING.md`'s state-convergence revision, this command's
+Under `ARCH_WT_RULING.md`'s state-convergence revision, this skill's
 explicit `merge-back --from` call is the *preferred* — not required — path
 for promoting a sidecar-placed worktree's `.ai-state/` writes: same-run
 promotion, earliest visibility, conflicts surfaced while an operator is
@@ -20,11 +20,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-MERGE_WORKTREE_FILE = Path(__file__).parents[2] / "commands" / "merge-worktree.md"
+MERGE_WORKTREE_FILE = Path(__file__).parents[2] / "skills" / "merge-worktree" / "SKILL.md"
 
 
 def _body() -> str:
-    """Return the full merge-worktree.md content (read lazily so collection succeeds)."""
+    """Return the full merge-worktree SKILL.md content (read lazily so collection succeeds)."""
     return MERGE_WORKTREE_FILE.read_text(encoding="utf-8")
 
 
@@ -61,7 +61,7 @@ def _convergence_step_text() -> str:
 def test_convergence_step_exists_and_names_the_explicit_merge_back_form() -> None:
     text = _convergence_step_text()
     assert text, (
-        "commands/merge-worktree.md must document a step that calls "
+        "skills/merge-worktree/SKILL.md must document a step that calls "
         "'praxion-sidecar merge-back --from wt/<name>' before the project "
         "merge — no such step found."
     )
@@ -74,7 +74,7 @@ def test_convergence_step_exists_and_names_the_explicit_merge_back_form() -> Non
 def test_convergence_step_precedes_the_project_branch_merge_step() -> None:
     steps = _numbered_steps()
     numbers = [number for number, _text in steps]
-    assert numbers, "commands/merge-worktree.md '## Steps' section must be non-empty."
+    assert numbers, "skills/merge-worktree/SKILL.md '## Steps' section must be non-empty."
 
     convergence_index = next(
         (i for i, (_n, text) in enumerate(steps) if "merge-back" in text and "--from" in text),
@@ -143,18 +143,18 @@ def test_convergence_step_proceeds_to_project_merge_regardless_of_outcome() -> N
     text = _convergence_step_text()
     assert text, "Convergence step text must be present (see prior test)."
     assert re.search(r"proceed to (S|s)tep 5|regardless of", text), (
-        "The convergence step must state that the command proceeds to the "
+        "The convergence step must state that the skill proceeds to the "
         "project-branch merge regardless of whether merge-back converged, "
         "found nothing to converge, or left conflict markers — the "
         "correctness backstop is the project's own post-merge convergence "
-        "channel, not this command."
+        "channel, not this skill."
     )
 
 
 def test_allowed_tools_grants_praxion_sidecar_for_the_merge_back_call() -> None:
     frontmatter = _frontmatter_block()
-    assert frontmatter, "commands/merge-worktree.md must have a YAML frontmatter block"
+    assert frontmatter, "skills/merge-worktree/SKILL.md must have a YAML frontmatter block"
     assert "Bash(praxion-sidecar:*)" in frontmatter, (
-        "commands/merge-worktree.md's 'allowed-tools' frontmatter must grant "
-        "'Bash(praxion-sidecar:*)' so the command can run the merge-back call."
+        "skills/merge-worktree/SKILL.md's 'allowed-tools' frontmatter must grant "
+        "'Bash(praxion-sidecar:*)' so the skill can run the merge-back call."
     )

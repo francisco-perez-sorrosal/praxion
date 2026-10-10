@@ -84,14 +84,22 @@ def test_does_not_match_the_retired_new_project_command() -> None:
     )
 
 
-def test_matches_commands_co_and_cop() -> None:
+def test_matches_the_co_and_cop_skills() -> None:
     pattern = _canonical_block_sync_files_regex()
-    for path in ("commands/co.md", "commands/cop.md"):
+    for path in ("skills/co/SKILL.md", "skills/cop/SKILL.md"):
         assert re.match(pattern, path), (
             f"{HOOK_ID}'s files regex {pattern!r} does not match {path!r} -- the "
             "commit-process consumer pair can drift out of sync with the canonical "
             "block undetected."
         )
+
+
+def test_does_not_match_the_onboarding_skill_entry_point() -> None:
+    pattern = _canonical_block_sync_files_regex()
+    assert not re.match(pattern, "skills/onboard-project/SKILL.md"), (
+        f"{HOOK_ID}'s files regex {pattern!r} matches the onboarding skill's own SKILL.md, "
+        "which embeds no canonical block -- the gate would fire on every edit to it."
+    )
 
 
 def test_canonical_block_sync_covers_every_registered_consumer() -> None:

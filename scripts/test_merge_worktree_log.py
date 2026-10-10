@@ -691,13 +691,13 @@ def test_the_human_form_names_a_settings_file_that_could_not_be_used(main: Path)
     assert ".claude/settings.json" in result.stderr
 
 
-# -- the command text names where the script is ------------------------------------------------
+# -- the skill text names where the script is --------------------------------------------------
 
-COMMAND = Path(__file__).resolve().parent.parent / "commands" / "merge-worktree.md"
+SKILL = Path(__file__).resolve().parent.parent / "skills" / "merge-worktree" / "SKILL.md"
 
 
 def _step_9_5() -> str:
-    text = COMMAND.read_text()
+    text = SKILL.read_text()
     return text[text.index("9.5.") : text.index("\n10.")]
 
 

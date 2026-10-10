@@ -6,13 +6,15 @@ Reusable skill modules following the Agent Skills standard. Each skill is a self
 
 - Each skill is a subdirectory containing at minimum a `SKILL.md` with YAML frontmatter
 - Optional subdirectories: `references/` (detailed docs), `scripts/` (tooling), `contexts/` (context-specific content)
-- Most skills also have a `README.md` for human-facing quick reference
+- Most skills also have a `README.md` for human-facing quick reference; user-invoked workflow skills carry none
+- User-invoked skills (slash workflows such as `/co` or `/release`): authoring details in `skill-crafting/references/user-invoked-skills.md`
+- `co` and `cop` embed `claude/canonical-blocks/commit-process.md` byte-identically (HTML-comment fence): edit the canonical file, then run `python3 scripts/sync_canonical_blocks.py --write`
 - `SKILL.md` target: under 500 lines. Move procedural depth to `references/` files
 - Reference file header: `# Title` + one-line description + recommended back-link to `../SKILL.md` (not yet universal — ~40% of existing references include it)
 
 ## Progressive Disclosure Model
 
-1. **Startup**: Only frontmatter `name` + `description` loaded (~1 line per skill, ~450 tokens total)
+1. **Startup**: Only frontmatter `name` + `description` loaded (~1 line per skill)
 2. **Activation**: Full `SKILL.md` body loaded when the skill is triggered or contextually relevant
 3. **On demand**: Reference files loaded only when Claude reads them explicitly
 

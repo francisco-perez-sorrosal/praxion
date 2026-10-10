@@ -66,7 +66,7 @@ This whole section should disappear too.
     assert "canonical Praxion project baseline" in rendered
     assert "install or refresh Praxion-managed assistant surfaces" in rendered
     assert "Run the `sentinel` agent" in rendered
-    assert "commands/create-worktree.md" in rendered
+    assert "skills/create-worktree/SKILL.md" in rendered
     assert "shared Praxion baseline philosophy" in rendered
     assert "Keep `tmp/` for temporary files." in rendered
 

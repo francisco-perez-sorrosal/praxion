@@ -1,4 +1,5 @@
 ---
+name: cop
 description: Create a commit and push to remote
 argument-hint: "[message]"
 allowed-tools: [Bash(git:*), Read, Grep]
@@ -22,5 +23,5 @@ Create a commit for the current staged changes (or all changes if nothing is sta
    - For each group in a sensible order (e.g. fix before feat, code before docs): stage only that group, craft a conventional commit message for that type, create the commit. Repeat until all changes are committed.
 6. **When not splitting**: Stage files if needed (prefer specific files over `git add -A`), craft the commit message following our commit conventions, create the commit.
 <!-- canonical-content-end -->
-7. **Push once**: Push to the remote repository with `git push --follow-tags` only after all local commits for this command have been created (single push for one commit, or one push after the last of multiple commits). The `--follow-tags` flag ensures any annotated or version tags pointing to pushed commits are included.
+7. **Push once**: Push to the remote repository with `git push --follow-tags` only after all local commits for this skill have been created (single push for one commit, or one push after the last of multiple commits). The `--follow-tags` flag ensures any annotated or version tags pointing to pushed commits are included.
 8. If `.ai-work/` exists with task-scoped subdirectories, ask the user whether to clean them up. Before deleting, check each subdirectory for `LEARNINGS.md` and remind the user to merge any valuable content into permanent locations first

@@ -15,10 +15,10 @@ Two fence styles are supported, configured per-block in ``BLOCKS`` below:
   payload to be copied verbatim.
 * **HTML-comment-fenced** (``<!-- canonical-content-start -->`` /
   ``<!-- canonical-content-end -->``) — for blocks whose content is the
-  command's own prose (e.g., the shared commit workflow embedded in
-  ``commands/co.md`` and ``commands/cop.md``). HTML comments are invisible
-  in rendered Markdown, so the embedded content reads as a normal part of
-  the command prompt rather than as a code block.
+  skill's own prose (e.g., the shared commit workflow embedded in
+  ``skills/co/SKILL.md`` and ``skills/cop/SKILL.md``). HTML comments are
+  invisible in rendered Markdown, so the embedded content reads as a normal
+  part of the skill prompt rather than as a code block.
 
 Five invocation modes:
 
@@ -100,8 +100,8 @@ _ONBOARDING_CONSUMERS = (
 )
 
 _COMMIT_PAIR = (
-    REPO_ROOT / "commands" / "co.md",
-    REPO_ROOT / "commands" / "cop.md",
+    REPO_ROOT / "skills" / "co" / "SKILL.md",
+    REPO_ROOT / "skills" / "cop" / "SKILL.md",
 )
 
 # Block registry. Order is preserved for deterministic help/error messages.

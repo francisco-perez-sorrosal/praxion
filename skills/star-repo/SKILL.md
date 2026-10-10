@@ -1,4 +1,5 @@
 ---
+name: star-repo
 description: Star the Praxion repo on GitHub
 allowed-tools: [Bash(gh:*), AskUserQuestion]
 disable-model-invocation: true

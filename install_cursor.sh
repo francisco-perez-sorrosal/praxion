@@ -47,10 +47,11 @@ sys.exit(0 if 'chub' in (j.get('mcpServers') or {}) else 1)
 # LEGACY-COMMAND-EXPORT: remove once no supported release exported .cursor/commands
 # Earlier releases copied every Praxion workflow into <cursor_dir>/commands/; the
 # workflows now reach Cursor as the linked skills, so a stale copy lists twice.
-# A file is Praxion's only when its stem is one of the 44 workflows those releases
-# exported: a frozen set, because the exports carried no marker and no release will
-# add to it. A user's own command named after any other skill survives; never rm -rf
-# the directory.
+# A file is Praxion's only when it is what those releases wrote: one of the 44
+# workflow stems (a frozen set no release will add to) whose first line is the
+# `**Description:**` header the exporter prepended, or the guidance page the exporter
+# copied as CLAUDE.md (first line `# Commands`). A user's own command survives, even
+# one written by hand under a workflow's name; never rm -rf the directory.
 # Usage: sweep_legacy_command_exports <commands_dir> <dry_run:true|false>
 LEGACY_WORKFLOW_EXPORTS=(
     add-rules
@@ -100,9 +101,19 @@ LEGACY_WORKFLOW_EXPORTS=(
 )
 
 _is_legacy_workflow_export() {
-    local name
+    local path="$1" stem first="" name
+    stem="$(basename "$path" .md)"
+    IFS= read -r first < "$path" || true
+    if [ "$stem" = "CLAUDE" ]; then
+        [ "$first" = "# Commands" ]
+        return
+    fi
+    case "$first" in
+        "**Description:**"*) ;;
+        *) return 1 ;;
+    esac
     for name in "${LEGACY_WORKFLOW_EXPORTS[@]}"; do
-        [ "$name" = "$1" ] && return 0
+        [ "$name" = "$stem" ] && return 0
     done
     return 1
 }
@@ -112,7 +123,7 @@ sweep_legacy_command_exports() {
     local stale=() file
     [ -d "$commands_dir" ] || return 0
     for file in "$commands_dir"/*.md; do
-        if [ -f "$file" ] && _is_legacy_workflow_export "$(basename "$file" .md)"; then
+        if [ -f "$file" ] && _is_legacy_workflow_export "$file"; then
             stale+=("$file")
         fi
     done

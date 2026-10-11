@@ -219,8 +219,6 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 
 `scripts/validate.py` checks the frontmatter and entry page of a skill. It prints each finding as a bullet under a `FAILED` (errors) or `WARNINGS` header.
 
-The validator's accepted-field list lags the harness; see [Invocation Modes](user-invoked-skills.md#invocation-modes) for the unknown-field findings to expect.
-
 ### Running the Validator
 
 ```bash

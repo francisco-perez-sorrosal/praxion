@@ -52,12 +52,15 @@ def _cursor_project_with(tmp_path, *stale, own=()):
 def test_a_cursor_reinstall_sweeps_stale_workflow_exports_and_keeps_the_users_own(tmp_path):
     # The user's own files survive: one with its own name, one named after a Praxion skill that
     # was never exported as a workflow, and one written by hand after upgrading under a workflow's
-    # name (it lacks the header every real export carried). The guidance page export goes too.
+    # name (it lacks the header every real export carried). The guidance page export goes too, and
+    # so do exports of workflows that releases before the last base wrote and retired since.
     project = _cursor_project_with(
         tmp_path,
         "co.md",
         "cop.md",
         "CLAUDE.md",
+        "refresh-topology.md",
+        "create_worktree.md",
         own=("my-own-shortcut.md", "code-review.md", "test.md"),
     )
 

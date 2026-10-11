@@ -5,7 +5,8 @@ description: >
   compatible agents: skill anatomy, progressive disclosure, SKILL.md frontmatter,
   init/validate/package workflow. Triggers: creating new skills, updating or
   modernizing existing skills, converting memory files to skills, debugging skill
-  activation, skill architecture and best practices.
+  activation, skill architecture and best practices, user-invoked skills,
+  argument-hint, argument substitution, converting command files to skills.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

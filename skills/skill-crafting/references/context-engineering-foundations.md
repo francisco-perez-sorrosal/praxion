@@ -114,8 +114,7 @@ The artifact is "done" when it passes real usage, not when it reads well.
 
 | Crafting skill | The same principle, applied |
 |---|---|
-| `skill-crafting` | Three-tier progressive disclosure; lean `SKILL.md`; description as the only always-loaded, high-signal trigger |
-| `command-crafting` | A command/skill description costs listing budget every session; `disable-model-invocation` keeps side-effect actions out of the model's attention |
+| `skill-crafting` | Three-tier progressive disclosure; lean `SKILL.md`; description as the only always-loaded, high-signal trigger; a description costs listing budget every session, and `disable-model-invocation` keeps side-effect actions out of the model's attention |
 | `agent-crafting` | One job per agent; clean context window; **pointer-not-payload** summary returns; tool allowlist = fewer distractors |
 | `rule-crafting` | Always-loaded budget discipline; `paths:`-scoped just-in-time loading; promote non-negotiables to hooks rather than bloating advisory context |
 | `hook-crafting` | The narrowest event + matcher; `additionalContext` is injected tokens — keep it minimal and high-signal |

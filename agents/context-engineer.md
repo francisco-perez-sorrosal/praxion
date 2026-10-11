@@ -10,7 +10,7 @@ description: >
   usage, grow the context ecosystem, resolve artifact conflicts, or when pipeline
   work involves context engineering.
 tools: Read, Glob, Grep, Bash, Write, Edit
-skills: skill-crafting, rule-crafting, command-crafting, agent-crafting
+skills: skill-crafting, rule-crafting, agent-crafting
 background: true
 model: sonnet
 effort: high

@@ -81,4 +81,4 @@ python skills/skill-crafting/scripts/validate.py ./my-skill
 ## Related Skills
 
 - [`agent-crafting`](../agent-crafting/SKILL.md) — building custom agents that consume skills via the `skills` frontmatter field
-- [`command-crafting`](../command-crafting/SKILL.md) — creating slash commands; understanding the distinction between commands and skills
+- [`user-invoked-skills`](references/user-invoked-skills.md) — skills a person types as `/name`: invocation modes, arguments, converting an old command file

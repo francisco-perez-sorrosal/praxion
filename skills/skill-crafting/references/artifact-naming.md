@@ -22,7 +22,7 @@ The directory name is the skill's identity -- Claude Code infers the `name` from
 
 | Category | Pattern | Examples |
 |----------|---------|----------|
-| Meta-crafting | `{artifact}-crafting` | `skill-crafting`, `agent-crafting`, `rule-crafting`, `command-crafting`, `mcp-crafting` |
+| Meta-crafting | `{artifact}-crafting` | `skill-crafting`, `agent-crafting`, `rule-crafting`, `mcp-crafting` |
 | Domain + activity | `{domain}-{activity}` | `python-development`, `code-review`, `software-planning` |
 | Domain + scope | `{domain}-{qualifier}` | `python-prj-mgmt` |
 | Single activity | `{gerund}` | `refactoring` |

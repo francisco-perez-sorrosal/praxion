@@ -108,4 +108,3 @@ After creating or modifying agents, verify:
 ## Related Skills
 
 - [`skill-crafting`](../skill-crafting/SKILL.md) — the spec for creating skills that agents can consume via the `skills` field
-- [`command-crafting`](../command-crafting/SKILL.md) — understanding the distinction between slash commands and agents

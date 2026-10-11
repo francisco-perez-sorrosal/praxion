@@ -1,6 +1,6 @@
 """Structural tests for the /skill-genesis command and its agent's queue mode.
 
-Cites: skills/command-crafting/SKILL.md § argument-hint -- a hint that omits
+Cites: skills/skill-crafting/references/user-invoked-skills.md § argument-hint -- a hint that omits
 half the accepted flags is worse than none, because it reads as exhaustive.
 
 The defect these guard: the harvest queue under `.ai-work/_harvest/` had no

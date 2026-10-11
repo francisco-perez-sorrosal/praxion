@@ -48,7 +48,7 @@ staleness_threshold_days: 120   # optional per-skill override
 ---
 ```
 
-Titles are matched **case-sensitively against the rendered h2/h3 text** — not against slug anchors. Rename a heading and the sentinel's F07 check catches the drift on the next pass.
+Titles are matched **case-sensitively against the rendered h2/h3 text** — not against slug anchors. Rename or delete a heading and its title matches nothing: the staleness checker lists it under `withheld`, never as an F07 finding, and the sentinel reports each `withheld` entry as an F07 WARN, a likely rename or deletion, on its next pass.
 
 ### Section Location
 

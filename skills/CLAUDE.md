@@ -9,8 +9,8 @@ Reusable skill modules following the Agent Skills standard. Each skill is a self
 - Most skills also have a `README.md` for human-facing quick reference; user-invoked workflow skills carry none
 - User-invoked skills (slash workflows such as `/co` or `/release`): authoring details in `skill-crafting/references/user-invoked-skills.md`
 - `co` and `cop` embed `claude/canonical-blocks/commit-process.md` byte-identically (HTML-comment fence): edit the canonical file, then run `python3 scripts/sync_canonical_blocks.py --write`
-- `SKILL.md` target: under 500 lines. Move procedural depth to `references/` files
-- Reference file header: `# Title` + one-line description + recommended back-link to `../SKILL.md` (not yet universal — ~40% of existing references include it)
+- `SKILL.md` target: under 500 lines. Move depth to `references/` pages
+- Reference file header: `# Title` + one-line description + recommended back-link to `../SKILL.md` (95% of existing references include it)
 
 ## Progressive Disclosure Model
 
@@ -24,8 +24,8 @@ Skills use a directory glob in `.claude-plugin/plugin.json`: `"skills": ["./skil
 
 ## Validation
 
-Run `skills/skill-crafting/scripts/validate.py` after modifying any skill to check frontmatter correctness and structural integrity.
+Run the validator after modifying any skill: `python3 skills/skill-crafting/scripts/validate.py --all` checks frontmatter correctness and structural integrity across every skill. Warnings do not fail the run; only errors set a non-zero exit.
 
 ## Modifying Skills
 
-Load the `skill-crafting` skill before creating or modifying skills. It covers activation triggers, content structure, and the init/validate/package workflow.
+Load the `skill-crafting` skill before creating or modifying skills. It covers activation triggers, content structure, invocation modes, the eval-first loop, and the init/validate/package workflow.

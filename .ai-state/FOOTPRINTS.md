@@ -19,7 +19,7 @@ they drift apart.
 |---|---|---|---|
 | test-selection-size | scripts/resolve_test_scope.py, scripts/_declared_deps.py, scripts/_test_inventory.py, scripts/_python_selection.py, scripts/_native_selection.py, scripts/_repo_root.py, tests/declared-deps.toml | `python3 scripts/measure_selection_size.py --compare-ref` | selection size against a reference revision |
 | always-loaded-tokens | CLAUDE.md, claude/config/CLAUDE.md.tmpl, rules/*.md, rules/_manifest.yaml | `python3 scripts/measure_token_budget.py --json` | token counts; call --json only, never --ratchet (it rewrites .ai-state/token_budget_baseline.json) |
-| listing-tokens | skills/*/SKILL.md, commands/*.md, agents/*.md | `python3 scripts/measure_token_budget.py --json` | token counts; call --json only, never --ratchet (it rewrites .ai-state/token_budget_baseline.json) |
+| listing-tokens | skills/*/SKILL.md, agents/*.md | `python3 scripts/measure_token_budget.py --json` | token counts; call --json only, never --ratchet (it rewrites .ai-state/token_budget_baseline.json) |
 | prompt-size | agents/*.md, skills/*.md | `python3 scripts/check_agent_prompt_size.py --json` | line counts against the warn and fail ceilings |
 | hook-latency | hooks/*.py, hooks/*.sh, hooks/hooks.json, !hooks/*test_*.py | none | no instrument |
 | observation-log-volume | hooks/_observation_log/*, !hooks/*test_*.py | none | no instrument |

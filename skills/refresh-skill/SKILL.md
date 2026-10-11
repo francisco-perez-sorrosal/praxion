@@ -31,7 +31,7 @@ For every entry in `staleness_sensitive_sections:`:
 - Identify the `<!-- last-verified: ... -->` marker directly below it (may be missing)
 - Capture the current section body — from the heading to the next heading of equal or greater level
 
-If a listed title has no matching heading, report it as a rename/delete drift and skip that entry (the sentinel's F07 will flag it independently).
+If a listed title has no matching heading, report it as rename or deletion drift and skip that entry; the staleness checker lists the same title under `withheld`, and the sentinel reports each `withheld` entry as an F07 WARN on its next pass.
 
 ### 3. Fetch Authoritative Docs
 

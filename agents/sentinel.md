@@ -91,7 +91,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | F04 | L | Agent prompts reflect current pipeline | Collaboration sections reference correct agent names, outputs, stages |
 | F05 | A | `SYSTEM_DEPLOYMENT.md` referenced file paths exist | Family: `python3 scripts/check_path_resolution.py --json`; FAIL per `findings` entry with `check: "F05"`. |
 | F06 | L | Deployment doc service list matches compose.yaml | Service names and ports in deployment doc consistent with actual compose files |
-| F07 | A | Cataloged section missing marker | Family: `python3 scripts/check_staleness_markers.py --json`; WARN per `check: "F07"` finding — a cataloged heading has no marker below it. |
+| F07 | A | Cataloged section missing marker | Family: `python3 scripts/check_staleness_markers.py --json`; WARN per `check: "F07"` finding — a cataloged heading has no marker below it; WARN per `withheld` entry — a cataloged title matching no heading, a likely rename or deletion. |
 | F08 | A | Marker age > threshold | Family: `python3 scripts/check_staleness_markers.py --json`; WARN per `check: "F08"` finding past threshold; FAIL beyond 2× threshold. |
 | F09 | A | Marker invalid format / future-dated | Family: `python3 scripts/check_staleness_markers.py --json`; FAIL per `findings` entry with `check: "F09"` — unparseable or future-dated, excluding the `_`-template `[YYYY-MM-DD]` placeholder. |
 | F10 | A | Git hook source matches installed copy(ies), resolved by content | Family: `python3 scripts/check_hook_installation.py --json`; WARN per `findings` entry — a git hook source, resolved by content not filename, matching no installed hook or one that differs. |

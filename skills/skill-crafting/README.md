@@ -26,17 +26,26 @@ Trigger explicitly by asking about "agent skills," "creating a skill," or refere
 
 | File | Purpose |
 |------|---------|
-| `SKILL.md` | Core reference: creation process, anatomy, progressive disclosure, principles, portability, checklist |
+| `SKILL.md` | Core reference: invocation modes, creation process, anatomy, progressive disclosure, principles, portability, checklist |
 | `README.md` | This file — overview and usage guide |
 | `references/cross-agent-portability.md` | Adopter list, discovery paths, portable vs. tool-specific |
-| `references/artifact-naming.md` | Naming conventions for skills, agents, commands, rules |
-| `references/content-and-development.md` | Content type selection, output templates and examples, workflow patterns, feedback loops, evaluation-driven development |
+| `references/artifact-naming.md` | Naming conventions for skills, agents, rules |
+| `references/schema.md` | Frontmatter field table, the Claude Code superset, validation rules |
+| `references/user-invoked-skills.md` | Skills a person types as `/name`: description length, `argument-hint`, argument substitution, invocation modes, converting an old command file |
+| `references/description-optimization.md` | Writing a description that triggers, and measuring and tuning it |
+| `references/evaluating-skills.md` | Testing skill output: the `evals/evals.json` loop and the case layout `claude plugin eval` runs |
+| `references/scripts-for-agents.md` | When to bundle a script, the contract an agent-facing script keeps, how instructions refer to it |
+| `references/content-and-development.md` | Content type selection, output templates and examples, workflow patterns, feedback loops, splitting content across files |
 | `references/skill-categories.md` | Nine skill archetype categories from Anthropic's internal practice |
 | `references/plugin-and-troubleshooting.md` | Plugin mechanics, anti-patterns, recommended hooks, persistent state, troubleshooting |
+| `references/context-engineering-foundations.md` | The shared "why" behind every `*-crafting` skill |
 | `scripts/init_skill.py` | Scaffold a new skill directory from template |
 | `scripts/package_skill.py` | Create a distributable .skill archive (validates first) |
+| `scripts/frontmatter_contract.py` | The accepted-frontmatter contract the validator checks against |
 | `scripts/validate.py` | Quick validation of skill structure and frontmatter |
 | `scripts/validate_references.py` | Validate intra-repo Markdown cross-references (paths, anchors) across skills/agents/rules/commands/docs. Stdlib-only. `--file` / `--all` modes; exit 0 clean, 1 FAIL, 2 error. Per-class severity: FAIL/WARN/OK. Ignore via inline `<!-- validate-references:ignore -->` or frontmatter `validate-references: off` |
+
+Trigger evals for plugin skills live outside the skill, in the repository-root `evals/` directory.
 
 ## Quick Start
 

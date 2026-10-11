@@ -1,3 +1,9 @@
+## v0.49.1 (2026-10-11)
+
+### Fix
+
+- Allow .ai-work edits with the rule the harness honours
+
 ## v0.49.0 (2026-10-11)
 
 All 44 slash workflows (`/praxion:co`, `/praxion:test`, `/praxion:release`, ...) now ship as skills under `skills/<name>/SKILL.md`, invoked by the same names and behaving as before; the `commands/` directory, the `commands` plugin key, the `command-crafting` skill and the Cursor and Codex command exporters are gone. Four argument fixes ride along (first positional argument in `create-simple-python-prj` and `document-api`, the dashboard's project root and launcher reach, literal dollar amounts in `eval-praxion`). Upgrading: update the marketplace and the plugin and restart; Cursor and Codex users re-run `install.sh cursor` / `install.sh codex`, which sweep the stale command exports earlier releases wrote and leave the user's own files alone.

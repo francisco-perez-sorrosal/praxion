@@ -12,18 +12,15 @@ Launch the Praxion pipeline dashboard for the current project. The dashboard is 
 
 ### 1. Resolve project root
 
-Use `$ARGUMENTS` as the project root if provided; otherwise default to `pwd`:
+Use `$ARGUMENTS` as the project root if provided; otherwise default to `pwd`. The block in step 2 resolves it and hands it to the launcher in the same Bash call, so the supplied root reaches `praxion-dashboard start`.
+
+### 2. Start the dashboard
+
+Delegate to `praxion-dashboard start`, resolving the launcher from the project's `scripts/`, then `PATH`, then the plugin's `scripts/`. Run the block as one Bash call:
 
 ```bash
 PROJECT_ROOT="$ARGUMENTS"
 [ -n "$PROJECT_ROOT" ] || PROJECT_ROOT="$(pwd)"
-```
-
-### 2. Start the dashboard
-
-Delegate to `praxion-dashboard start`, resolving the launcher from the project's `scripts/`, then `PATH`, then the plugin's `scripts/`:
-
-```bash
 if [ -x scripts/praxion-dashboard ]; then
   LAUNCHER=scripts/praxion-dashboard
 elif command -v praxion-dashboard >/dev/null 2>&1; then

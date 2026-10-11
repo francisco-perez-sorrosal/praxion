@@ -1,12 +1,6 @@
 ---
 name: skill-crafting
-description: >
-  Creating, updating, and optimizing Agent Skills for Claude Code, Cursor, and
-  compatible agents: skill anatomy, progressive disclosure, SKILL.md frontmatter,
-  init/validate/package workflow. Triggers: creating new skills, updating or
-  modernizing existing skills, converting memory files to skills, debugging skill
-  activation, skill architecture and best practices, user-invoked skills,
-  argument-hint, argument substitution, converting command files to skills.
+description: "Authoring Agent Skills for Claude Code, Cursor, and compatible agents: invocation modes, SKILL.md frontmatter, eval-first authoring. Triggers: creating new skills, updating or modernizing existing skills, converting memory files to skills, debugging skill activation, skill architecture and best practices, user-invoked skills, argument-hint, argument substitution, converting command files to skills, skill evals, description optimization."
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:

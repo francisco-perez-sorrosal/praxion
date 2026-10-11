@@ -344,7 +344,7 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 |------|-------------|-------------|
 | "Always use snake_case in Python" | Rule (too lightweight) | `CLAUDE.md` |
 | "SQL column naming, join conventions" | `CLAUDE.md` (too verbose) | Rule |
-| "How to create a git commit with conventions" | Rule (procedural) | Skill or Command |
+| "How to create a git commit with conventions" | Rule (procedural) | Skill |
 | "Commit messages must use imperative mood" | Skill (not procedural) | Rule |
 | "Security checklist for auth code" | `CLAUDE.md` (too detailed, not always relevant) | Rule |
 
@@ -382,13 +382,13 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
 | Generic filenames (`rules1.md`, `stuff.md`) | Hurts relevance matching | Use `<domain>-<rule-intent>.md` |
-| Procedural content (step-by-step) | Rules are knowledge, not workflows | Move to a Skill or Command |
+| Procedural content (step-by-step) | Rules are knowledge, not workflows | Move to a Skill |
 | Overly broad rules (everything in one file) | Loads unnecessary context | Split by domain |
 | Over-splitting (one constraint per file) | File proliferation, hard to maintain | Group related constraints |
 | Splitting into main + reference file | Reference file won't be installed; content lost in other projects | Keep rules self-contained |
 | "Always do X" directives | Belongs in always-loaded context | Move to `CLAUDE.md` |
 | Duplicating CLAUDE.md content | Redundant, may conflict | Keep in one place only |
-| Referencing rule filenames in commands | Filenames aren't invocable | Use semantic hints instead |
+| Referencing rule filenames in skills | Filenames aren't invocable | Use semantic hints instead |
 
 ## Resources
 

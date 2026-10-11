@@ -192,11 +192,11 @@ tools: Read, Glob, Grep
 ---
 ```
 
-### Agents + Slash Commands
+### Agents + User-Invoked Skills
 
-- Commands are user-invoked; agents are automatic or explicitly delegated
-- Commands can reference or trigger agents
-- Use commands for repeatable user actions, agents for delegated workflows
+- A skill with `disable-model-invocation: true` is user-invoked as `/name`; agents are automatic or explicitly delegated
+- Such skills can reference or trigger agents
+- Use them for repeatable user actions, agents for delegated workflows
 
 ### Agents + Hooks
 

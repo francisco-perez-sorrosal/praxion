@@ -214,7 +214,7 @@ When the `context-security-review` skill is available, perform a security review
    - **PASS**: No security-relevant changes, or changes with clear security justification
 5. Add findings to the Security Review section of VERIFICATION_REPORT.md
 
-SCOPE: Only files in the current change set. Never scan the full project -- that is the `/full-security-scan` command's domain.
+SCOPE: Only files in the current change set. Never scan the full project -- that is the `/full-security-scan` skill's domain.
 
 Skip this phase if the `context-security-review` skill is not loaded.
 

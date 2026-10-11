@@ -2,7 +2,7 @@
 name: sentinel
 description: >
   Read-only ecosystem quality auditor that scans every context artifact (skills,
-  agents, rules, commands, hooks, CLAUDE.md, plugin.json) and the persistent
+  agents, rules, hooks, CLAUDE.md, plugin.json) and the persistent
   .ai-state/ corpus against the check catalog embedded in its own definition:
   per-artifact quality (completeness, consistency, freshness, spec compliance,
   cross-reference integrity, token efficiency), code health, pipeline discipline,
@@ -79,7 +79,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | N03 | A | Frontmatter uses valid keys per spec | Family: `python3 scripts/check_artifact_conformance.py --json`; SKILL.md/agent frontmatter uses only spec-recognized keys. |
 | N04 | L | Terminology consistency across artifacts | Same concept uses same name everywhere (e.g., always "context artifact", never "context file") |
 | N05 | L | No contradictions between rules and agent prompts | Compare agent boundary descriptions against rule definitions; flag conflicts |
-| N06 | L | Style consistency in descriptions | Agent table, skill, and command descriptions follow similar tone and structure |
+| N06 | L | Style consistency in descriptions | Agent table and skill descriptions follow similar tone and structure |
 
 ### Freshness (F)
 
@@ -130,7 +130,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | T01 | A | Skill SKILL.md line count within guideline | Family: `python3 scripts/check_agent_prompt_size.py --json`; WARN per `check: "T01"` finding past 400 lines, FAIL past 600. |
-| T02 | A | Combined always-loaded content size, plus the listing (skill/command/agent `description:` frontmatter) surface | Family: `python3 scripts/measure_token_budget.py --json`; FAIL only when `examined.basis == "tokenizer"` and `over_by > 0` (or listing over ceiling); `ratio` basis (no API key) reads as **INFO** ("unmeasured"), never FAIL. `listing_tokens` is advisory — `check_token_ratchet.py` gates it. No divisor here — see `rules/CLAUDE.md § Token Budget`. |
+| T02 | A | Combined always-loaded content size, plus the listing (skill/agent `description:` frontmatter) surface | Family: `python3 scripts/measure_token_budget.py --json`; FAIL only when `examined.basis == "tokenizer"` and `over_by > 0` (or listing over ceiling); `ratio` basis (no API key) reads as **INFO** ("unmeasured"), never FAIL. `listing_tokens` is advisory — `check_token_ratchet.py` gates it. No divisor here — see `rules/CLAUDE.md § Token Budget`. |
 | T03 | A | Agent prompt size within range | Family: `python3 scripts/check_agent_prompt_size.py --json`; Standard warn 400/fail 500; `agents/verifier.md` fixed warn 550/fail 700; `agents/sentinel.md` **derived**: warn `S+300`/fail `S+400`, `S` = `## Check Catalog` span, recomputed each run. Advisory: exits 0 by default; `--check` opts into a blocking gate. |
 | T04 | A | Individual reference file sizes | Family: `python3 scripts/check_agent_prompt_size.py --json`; WARN per `check: "T04"` finding — a `references/*.md` file over 800 lines. |
 | T05 | L | Progressive disclosure used where appropriate | Monolithic artifacts that could split core vs. reference without losing coherence |

@@ -74,9 +74,8 @@ Build a picture of what exists from three information sources:
 
 **Source 1 — Filesystem scanning** (artifact inventory):
 - Project identity: `CLAUDE.md`, `README.md`, project config files
-- Skills: `Glob skills/*/SKILL.md` — list and count
+- Skills: `Glob skills/*/SKILL.md` — list and count (user-invoked workflows are the skills with `disable-model-invocation: true`)
 - Agents: `Glob agents/*.md` — list and count (exclude README.md)
-- Commands: `Glob commands/*` — list and count
 - Rules: `Glob rules/**/*.md` — list and count
 - Plugin config: `.claude-plugin/plugin.json`
 - Archived specs: `Glob .ai-state/specs/SPEC_*.md` — review completed feature specs for context on prior formal specifications and decisions
@@ -104,8 +103,7 @@ Summarize your discovery concisely: what the project does, what it has, and wher
 
 Analyze gaps, opportunities, and patterns across these categories:
 
-- **New skills** — missing procedural expertise that would benefit the workflow
-- **New commands** — repetitive user actions that could be automated
+- **New skills** — missing procedural expertise, or repetitive user actions that could become user-invoked workflows
 - **New agents** — complex workflows that would benefit from delegation
 - **New rules** — undocumented conventions or domain knowledge
 - **Workflow improvements** — friction points, missing integrations, handoff gaps
@@ -197,7 +195,7 @@ When an idea is validated, write `IDEA_PROPOSAL.md` to `.ai-work/<task-slug>/`:
 - [User benefit 2]
 
 ## Scope
-- **Artifact type(s)**: [skill / command / agent / rule / other]
+- **Artifact type(s)**: [skill / agent / rule / other]
 - **Estimated effort**: [small / medium / large]
 - **Affected areas**: [which parts of the project this touches]
 
@@ -274,7 +272,7 @@ The promethean consumes sentinel reports as input for ideation. The sentinel ope
 
 ### With the Context-Engineer
 
-When the idea involves context artifacts (new skills, rules, commands, agents), the context-engineer may review the proposal for:
+When the idea involves context artifacts (new skills, rules, agents), the context-engineer may review the proposal for:
 
 - Artifact type selection — is a skill the right choice, or should it be a rule?
 - Token impact — will this increase always-loaded context?

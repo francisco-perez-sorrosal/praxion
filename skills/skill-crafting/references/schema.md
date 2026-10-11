@@ -2,6 +2,16 @@
 
 Complete reference for SKILL.md frontmatter fields, validation rules, and examples. Back to [SKILL.md](../SKILL.md).
 
+## Contents
+
+- [Frontmatter Format](#frontmatter-format)
+- [Field Reference](#field-reference) -- the portable core fields
+- [Claude Code Frontmatter Superset](#claude-code-frontmatter-superset) -- the fields Claude Code adds, and Praxion's staleness fields
+- [Validation Rules](#validation-rules) -- how to run the validator, its exit status, every error and warning it prints
+- [Complete Example](#complete-example)
+- [Field Interaction Matrix](#field-interaction-matrix)
+- [Frontmatter vs Body](#frontmatter-vs-body)
+
 ## Frontmatter Format
 
 SKILL.md files begin with a YAML frontmatter block delimited by `---` lines:
@@ -29,8 +39,9 @@ The skill's unique identifier. Must match the directory name exactly.
 |-----------|------|
 | Type | String |
 | Length | 1-64 characters |
-| Characters | Lowercase alphanumeric + hyphens only |
-| Pattern | `/^[a-z0-9]+(-[a-z0-9]+)*$/` |
+| Characters | Lowercase letters, digits and hyphens only |
+| Pattern | `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` |
+| Starts with a letter | `1st-skill` is invalid |
 | No consecutive hyphens | `my--skill` is invalid |
 | No leading/trailing hyphens | `-my-skill` and `my-skill-` are invalid |
 | Directory match | Must equal the containing directory name |
@@ -206,39 +217,58 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 
 ## Validation Rules
 
-The following rules are enforced by `scripts/validate.py`:
+`scripts/validate.py` checks the frontmatter and entry page of a skill. It prints each finding as a bullet under a `FAILED` (errors) or `WARNINGS` header.
 
 The validator's accepted-field list lags the harness; see [Invocation Modes](user-invoked-skills.md#invocation-modes) for the unknown-field findings to expect.
 
-### Required Checks
-
-| Check | Rule | Error |
-|-------|------|-------|
-| Frontmatter present | File must start with `---` | `Missing YAML frontmatter` |
-| `name` present | Field must exist | `Missing required field: name` |
-| `name` matches directory | `name == dirname` | `Name 'X' does not match directory 'Y'` |
-| `name` format | Matches pattern `/^[a-z0-9]+(-[a-z0-9]+)*$/` | `Invalid name format` |
-| `name` length | 1-64 characters | `Name too long (max 64)` |
-| `description` present | Field must exist | `Missing required field: description` |
-| `description` length | 1-1024 characters | `Description too long (max 1024)` |
-
-### Warning Checks
-
-| Check | Threshold | Warning |
-|-------|-----------|---------|
-| SKILL.md length | >500 lines | `Consider moving content to references/` |
-| Description vagueness | No trigger terms detected | `Description may not trigger effectively` |
-| Missing README.md | File absent | `Skill lacks human-facing README` |
-
-### Running Validation
+### Running the Validator
 
 ```bash
-# Validate a single skill
-python skills/skill-crafting/scripts/validate.py skills/my-skill/
+# One skill
+python3 skills/skill-crafting/scripts/validate.py skills/my-skill/
 
-# Validate all skills
-python skills/skill-crafting/scripts/validate.py skills/
+# Every skills/<name>/ in the repository that holds the script
+python3 skills/skill-crafting/scripts/validate.py --all
 ```
+
+The exit status is 0 if and only if there is no error. Warnings never change it: a skill with warnings alone exits 0 and prints `PASSED` with the warning count. An argument that is not a directory prints `Error: <path> is not a directory` and exits 1; any other argument list prints `Usage: <script> <skill-directory> | --all` and exits 1.
+
+### Errors
+
+Each error marks the skill as malformed. A skill without `SKILL.md` stops at the first row; a skill without a usable frontmatter block stops at the next three rows; otherwise every error below is reported together.
+
+| Check | Message printed |
+|-------|-----------------|
+| No `SKILL.md` in the directory | `SKILL.md not found in <directory>` |
+| File does not start with `---` | `Frontmatter missing: file must start with '---'` |
+| No closing `---` line | `Frontmatter missing closing '---' delimiter` |
+| Nothing between the delimiters | `Frontmatter is empty` |
+| A frontmatter line that is neither `key: value`, an indented continuation, nor blank | `Unexpected frontmatter line: 'text'` |
+| A top-level key outside the [Field Reference](#field-reference) and [superset](#claude-code-frontmatter-superset) tables | `Unknown frontmatter fields: a, b` |
+| `name` absent | `Missing 'name' in frontmatter (required)` |
+| `name` differs from the directory name | `'name' ('X') does not match directory name ('Y')` |
+| `name` over 64 characters | `'name' exceeds 64 chars (got N)` |
+| `name` contains a run of hyphens | `'name' must not contain consecutive hyphens (got 'X')` |
+| `name` does not match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` | `'name' must be lowercase letters/digits/hyphens, no consecutive hyphens, no leading/trailing hyphens (got 'X')` |
+| `description` absent | `Missing 'description' in frontmatter (required)` |
+| `description` empty | `'description' is empty` |
+| `description` over 1024 characters | `'description' exceeds 1024 chars (got N)` |
+| `description` contains `<` or `>` | `'description' must not contain angle brackets (< or >)` |
+| `compatibility` over 500 characters | `'compatibility' exceeds 500 chars (got N)` |
+
+A run of hyphens draws its own message. The pattern is matched with each run collapsed to one hyphen, so `a--b` draws the hyphen message alone while `A--b` draws both.
+
+### Warnings
+
+Each warning reads `<hazard> — <fix>`. The skill still loads; the hazard is one that bites later.
+
+| Hazard | Message printed |
+|--------|-----------------|
+| `SKILL.md` over 500 lines | `SKILL.md is N lines, over 500 — move depth into references/` |
+| `argument-hint` with no value | `empty argument-hint — omit the key or give a quoted value` |
+| `argument-hint` value not quoted (YAML reads an unquoted `[path]` as a list) | `unquoted argument-hint — quote the value` |
+| `disable-model-invocation: true` with a `description` spanning several lines | `user-only skill's description spans N lines — write it on one line` |
+| `arguments` declared but the body has no `$ARGUMENTS`, `$N` or `$<name>` placeholder | `arguments declared but the body has no placeholder — add $ARGUMENTS or $<name>` |
 
 ## Complete Example
 

@@ -7,7 +7,7 @@ audience: developer
 
 This is the single documented home for three things, and it claims no enforcement of any of them: the measured
 baseline of how much context Praxion pipelines actually use, a target for the orchestrator's window going forward
-with the phase-boundary handoff (`/handoff`, see [`commands/handoff.md`](../commands/handoff.md)) named as the means
+with the phase-boundary handoff (`/handoff`, see [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md)) named as the means
 of reaching it, and the four operator-side controls that exist to lower the harness's own auto-compaction threshold.
 Praxion sets none of those controls, ships no threshold, and reads no utilisation: a Praxion-set band was considered
 and rejected, because forcing compaction at a token count does not preserve the orchestrator's judgement state (the

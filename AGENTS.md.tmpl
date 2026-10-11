@@ -2,7 +2,7 @@
 
 # Agent Instructions for Praxion
 
-Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md` — the skills, agents, rules, commands, and MCP servers that make it actionable across projects.
+Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md` — the skills, agents, rules, and MCP servers that make it actionable across projects.
 
 ## Reading Order
 
@@ -30,11 +30,11 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 ## Frequent operations
 
-- **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
+- **Craft or modify a component** (skill / rule / agent / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
 - **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write` (the sync-check is in *Build / test / lint* above; the sole embedding site is `skills/onboard-project/references/claude-md-blocks.md`).
 - **Run an audit or roadmap pass** — the `sentinel` agent (coherence; run `/skill-doctor` in the same session to see which loaded skills cost context unused), `/project-metrics` (health; also weekly via `.github/workflows/audits.yml`), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
 - **Work on the dashboard** — `dashboard_app/` (Next.js runtime over `.ai-state/`); its test + build commands are in *Build / test / lint* above.
-- **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `commands/README.md` / `rules/README.md`.
+- **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `rules/README.md`.
 
 ## Repository layout
 
@@ -52,7 +52,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 - **No AI authorship** in commit messages — see `rules/swe/vcs/git-conventions.md`.
 - **Build output to `/dev/null`**, temp files in `tmp/` (gitignored), debug prints prefixed `# DEBUG:` for grep-removal.
 - **Praxion-specific principles** (extend the shared Praxion baseline philosophy): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
-- **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
+- **Assistant-agnostic shared assets** at repo root (`skills/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
 - **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
 - No **MCP** memory tools are registered (`dec-225`) — do not call `remember`/`recall`/`search`. The harness agent-memory directory (`memory:` frontmatter, `~/.claude/projects/<p>/memory/`) is live.
 
@@ -66,7 +66,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 ## Project Operations
 
-**Component crafting**: load the matching skill before modifying any component — `skill-crafting`, `agent-crafting`, `command-crafting`, `rule-crafting`, `hook-crafting`.
+**Component crafting**: load the matching skill before modifying any component — `skill-crafting`, `agent-crafting`, `rule-crafting`, `hook-crafting`.
 
 **Worktrees**: Praxion's canonical worktree home is `.claude/worktrees/<name>/`. Follow the worktree workflows in `skills/create-worktree/SKILL.md` and `skills/merge-worktree/SKILL.md`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
 
@@ -86,7 +86,7 @@ Full mode table, phase engine, and gate detail: `docs/onboarding.md`. Canonical-
 - `docs/README.md` — long-form Diátaxis-shaped documentation index
 - `docs/architecture.md` — code-verified Praxion architecture (developer-facing)
 - `.ai-state/DESIGN.md` — design-target architecture (architect-facing)
-- `agents/README.md`, `skills/README.md`, `commands/README.md`, `rules/README.md` — component catalogs
+- `agents/README.md`, `skills/README.md`, `rules/README.md` — component catalogs
 - `.ai-state/decisions/DECISIONS_INDEX.md` — auto-generated ADR index
 
 ## Obsidian Integration

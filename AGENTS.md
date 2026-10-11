@@ -91,7 +91,7 @@ This agent operates within the Praxion Codex ecosystem. The toolbox exists to op
 | **Understand, Plan, Verify** | Agent pipeline - ideation through verification, each agent owning one phase |
 | **Conventions and consistency** | Rules - coding style, git hygiene, coordination protocols enforced automatically |
 | **Learning loop** | Memory MCP + LEARNINGS.md - persistent knowledge across sessions, ephemeral within pipelines |
-| **Frequent workflows** | Commands - commits, worktrees, scaffolding, memory management as repeatable actions |
+| **Frequent workflows** | Skills invoked by name - commits, worktrees, scaffolding, memory management as repeatable actions |
 | **Structural beauty** | All of the above - the ecosystem's own structure should exemplify its principles |
 
 The ecosystem is auto-discovered. Components are never enumerated in always-loaded context - the assistant finds them via filesystem scanning. This is itself a design principle: avoid maintaining two sources of truth.
@@ -136,7 +136,7 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 
 - Project-local `.codex/` contains Codex-native adapter surfaces and generated state
 - `claude/`, `cursor/`, and future assistant-specific directories keep their own adapters separate
-- Canonical `rules/`, `skills/`, `commands/`, and `agents/` remain the source of truth
+- Canonical `rules/`, `skills/`, and `agents/` remain the source of truth
 
 ### Platform Limits
 
@@ -176,8 +176,8 @@ When working in this project:
 3. Load relevant rules from `/Users/fperez/dev/praxion/rules/` by reading the files.
 4. Load matching skills from `/Users/fperez/dev/praxion/skills/<name>/SKILL.md` and
    skill references only when needed.
-5. Treat `/Users/fperez/dev/praxion/commands/*.md` and `/Users/fperez/dev/praxion/agents/*.md` as
-   workflow specs unless this agentic framework has a native adapter for them.
+5. Treat `/Users/fperez/dev/praxion/agents/*.md` as workflow specs unless this agentic
+   framework has a native adapter for them.
 6. If `.codex/praxion/pipeline_semantics.json` exists, read it before task
    sizing or delegation; it is the Codex-native translation of Praxion
    pipeline semantics.
@@ -210,14 +210,14 @@ Praxion skills are exposed to Codex through project-local `.agents/skills`
 wrapper skills. Load matching skills on demand; canonical skill files remain
 the source of truth.
 
-Do not copy Praxion rules, skills, commands, or agents into this file. Keep this
+Do not copy Praxion rules, skills, or agents into this file. Keep this
 adapter small and update Praxion at the source.
 
 
 
 # Agent Instructions for Praxion
 
-Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md` — the skills, agents, rules, commands, and MCP servers that make it actionable across projects.
+Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.md` — the skills, agents, rules, and MCP servers that make it actionable across projects.
 
 ## Reading Order
 
@@ -232,6 +232,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 ## Build / test / lint
 
 - **Runtime:** Python ≥3.11 required (root `requires-python`) — the suite imports stdlib `tomllib`; on 3.9/3.10 `scripts/` + `tests/` collection fails with `ModuleNotFoundError: No module named 'tomllib'`. `eval/` and `task-chronograph-mcp/` need ≥3.13. Use `uv run` or a 3.11+ interpreter for full-suite green claims.
+- `python3 scripts/resolve_test_scope.py | sh -e` — the tests a change needs, derived (inner loop; `/test` wraps this). Widens to the full suite for a change it cannot account for; never narrows.
 - `bash install.sh` — install or refresh Praxion-managed assistant surfaces
 - `bash install.sh --check` — verify install without applying
 - `python3 -m pytest tests/ -q` — Praxion's own tests
@@ -244,11 +245,11 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 ## Frequent operations
 
-- **Craft or modify a component** (skill / rule / agent / command / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
+- **Craft or modify a component** (skill / rule / agent / hook) — load the matching `*-crafting` skill first, then run that skill's validator.
 - **Update content shipped into managed projects** — edit `claude/canonical-blocks/<slug>.md`, run `python3 scripts/sync_canonical_blocks.py --write` (the sync-check is in *Build / test / lint* above; the sole embedding site is `skills/onboard-project/references/claude-md-blocks.md`).
-- **Run an audit or roadmap pass** — `/sentinel` (coherence), `/project-metrics` (health), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
+- **Run an audit or roadmap pass** — the `sentinel` agent (coherence; run `/skill-doctor` in the same session to see which loaded skills cost context unused), `/project-metrics` (health; also weekly via `.github/workflows/audits.yml`), `/eval-praxion` (single eval entrypoint: mechanical + LLM-as-judge quality checks; pass `--task-slug <slug>` to add the in-flight artifact-manifest scan; `--mechanical-only` for the free, auth-less structural surface), `/roadmap` (audit→roadmap; per `dec-092` Praxion does not carry a living `ROADMAP.md` instance — the cartographer regenerates on demand).
 - **Work on the dashboard** — `dashboard_app/` (Next.js runtime over `.ai-state/`); its test + build commands are in *Build / test / lint* above.
-- **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `commands/README.md` / `rules/README.md`.
+- **Add or refine docs** — long-form Diátaxis-shaped docs under `docs/` (index: `docs/README.md`); component catalogs in `agents/README.md` / `skills/README.md` / `rules/README.md`.
 
 ## Repository layout
 
@@ -266,7 +267,7 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 - **No AI authorship** in commit messages — see `rules/swe/vcs/git-conventions.md`.
 - **Build output to `/dev/null`**, temp files in `tmp/` (gitignored), debug prints prefixed `# DEBUG:` for grep-removal.
 - **Praxion-specific principles** (extend the shared Praxion baseline philosophy): token budget first-class, measure before optimize, standards convergence as opportunity, curiosity over dogma. Full rationale in `README.md#guiding-principles`.
-- **Assistant-agnostic shared assets** at repo root (`skills/`, `commands/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
+- **Assistant-agnostic shared assets** at repo root (`skills/`, `agents/`); assistant-specific config in subdirectories (`claude/config/`, `codex/config/`, `cursor/config/`).
 - **Progressive disclosure** in skills (metadata at startup, body on activation, references on demand) is a load-bearing pattern — preserve it when crafting new skills.
 - No **MCP** memory tools are registered (`dec-225`) — do not call `remember`/`recall`/`search`. The harness agent-memory directory (`memory:` frontmatter, `~/.claude/projects/<p>/memory/`) is live.
 
@@ -274,15 +275,15 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 
 - Run `pytest` over the relevant module(s) — behavior verification
 - `python3 scripts/sync_canonical_blocks.py --check` — shipped-block drift
-- Run the `sentinel` agent — ecosystem coherence audit
+- The `sentinel` agent — ecosystem coherence audit
 - For doc changes: render-time check via the dashboard; for HTML companions, browser preview
 - Anthropic's "single highest-leverage" practice: pair every claim a doc makes with a verification path
 
 ## Project Operations
 
-**Component crafting**: load the matching skill before modifying any component — `skill-crafting`, `agent-crafting`, `command-crafting`, `rule-crafting`, `hook-crafting`.
+**Component crafting**: load the matching skill before modifying any component — `skill-crafting`, `agent-crafting`, `rule-crafting`, `hook-crafting`.
 
-**Worktrees**: Praxion's canonical worktree home is `.claude/worktrees/<name>/`. Follow the worktree workflows in `commands/create-worktree.md` and `commands/merge-worktree.md`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
+**Worktrees**: Praxion's canonical worktree home is `.claude/worktrees/<name>/`. Follow the worktree workflows in `skills/create-worktree/SKILL.md` and `skills/merge-worktree/SKILL.md`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).
 
 **Onboarding artifacts dogfooding**: Praxion's own `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are products of the patterns `onboard-project` applies to user projects. When updating `skills/onboard-project/` or `scripts/onboard-project`, verify the change still produces what Praxion has on disk — or, if evolving the contract, propose what Praxion's own state must change.
 
@@ -300,7 +301,7 @@ Full mode table, phase engine, and gate detail: `docs/onboarding.md`. Canonical-
 - `docs/README.md` — long-form Diátaxis-shaped documentation index
 - `docs/architecture.md` — code-verified Praxion architecture (developer-facing)
 - `.ai-state/DESIGN.md` — design-target architecture (architect-facing)
-- `agents/README.md`, `skills/README.md`, `commands/README.md`, `rules/README.md` — component catalogs
+- `agents/README.md`, `skills/README.md`, `rules/README.md` — component catalogs
 - `.ai-state/decisions/DECISIONS_INDEX.md` — auto-generated ADR index
 
 ## Obsidian Integration

@@ -37,9 +37,9 @@ Skills use **progressive disclosure**: metadata loads at activation time, full c
 
 **Examples:** `python-development` (testing, type hints, tooling), `refactoring` (incremental improvement patterns), `spec-driven-development` (behavioral specifications for medium/large features), `cicd` (GitHub Actions, deployment strategies).
 
-### Commands
+### User-invoked skills
 
-Slash commands for frequent workflows. Invoke with `/<name>` (or `/praxion:<name>` in Claude Code plugin mode). Commands are user-initiated actions that automate repetitive tasks.
+Skills you run by name for frequent workflows. Invoke with `/<name>` (or `/praxion:<name>` in Claude Code plugin mode). They are user-initiated actions that automate repetitive tasks, and each can carry supporting reference files that load only when needed.
 
 **Examples:** `/co` (create a commit following project conventions), `/create-worktree` (set up an isolated git worktree), `/onboard-project` (set up a new project for the ecosystem).
 
@@ -61,11 +61,11 @@ External tool servers the assistant can call for capabilities beyond its built-i
 
 The components form a layered architecture, from always-loaded directives down to delegated complex work:
 
-![Praxion Component Layers — CLAUDE.md, Rules, Skills, Commands, Agents in descending load order](diagrams/concepts-component-layers/rendered/concepts-component-layers.svg)
+![Praxion Component Layers — CLAUDE.md, Rules, Skills, Agents in descending load order](diagrams/concepts-component-layers/rendered/concepts-component-layers.svg)
 
 **Rules vs. Skills:** Rules are brief, declarative, and auto-loaded -- they define *what* conventions to follow. Skills are richer, procedural, and loaded on demand -- they define *how* to do specific work. When deciding where knowledge belongs: if it's a constraint or convention that applies broadly, it's a rule. If it's a workflow or procedure for a specific domain, it's a skill.
 
-**Commands vs. Agents:** Commands are user-invoked single actions (create a commit, scaffold a project). Agents are delegated multi-step processes that run autonomously (research a technology, design an architecture, implement a feature). Use commands for quick actions; use agents when the task requires exploration, planning, or multiple coordinated steps.
+**User-invoked skills vs. Agents:** User-invoked skills are single actions (create a commit, scaffold a project). Agents are delegated multi-step processes that run autonomously (research a technology, design an architecture, implement a feature). Use a user-invoked skill for quick actions; use agents when the task requires exploration, planning, or multiple coordinated steps.
 
 ## The Agent Pipeline
 
@@ -108,7 +108,7 @@ The pipeline is shared, but the artifacts and rules it activates depend on the p
 - **Agentic-AI apps** — agents-as-products. Activated when the codebase imports an agent SDK or builds MCP servers. Adds the `agentic-sdks`, `agent-evals`, `mcp-crafting`, and `communicating-agents` skills to the active set.
 - **ML/AI training** — pre-training projects with compute budgets, eval thresholds, and iterative experiment loops. Activated when `train.py`, `prepare.py`, an ML framework dependency, or a `program.md` is detected. Adds the `ml-training`, `llm-training-eval`, `neo-cloud-abstraction`, and `experiment-tracking` skills, the three `rules/ml/` rules, and two slash commands (`/run-experiment`, `/check-experiment`). The `karpathy/autoresearch` project — which sits at the intersection of agentic-AI and ML training — is the canonical proof target. The full guide is [ML/AI Training Onramp](ml-training-onramp.md).
 
-The `/onboard-project` command's Phase 8c detects ML signals and scaffolds the conventions automatically; non-ML projects skip Phase 8c silently. The architecture is open: a fourth archetype with its own skill cluster, rules, and onboarding scaffold is a future-compatible extension, not a special case.
+The `/onboard-project` skill's Phase 8c detects ML signals and scaffolds the conventions automatically; non-ML projects skip Phase 8c silently. The architecture is open: a fourth archetype with its own skill cluster, rules, and onboarding scaffold is a future-compatible extension, not a special case.
 
 ## Architecture-as-Code and Documentation-as-Code
 

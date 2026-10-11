@@ -1,6 +1,6 @@
 # Contributing to Praxion
 
-Praxion is a structured layer of reusable expertise — skills, agents, commands, rules, and MCP servers — that operationalizes spec-driven development and context engineering for AI-assisted work.
+Praxion is a structured layer of reusable expertise — skills, agents, rules, and MCP servers — that operationalizes spec-driven development and context engineering for AI-assisted work.
 
 Contributions follow the conventions documented below. Read the full contributor guide in [`README_DEV.md`](README_DEV.md) for context on project structure and how components work together.
 
@@ -134,7 +134,7 @@ All PRs follow the workflow and safety conventions in [`rules/swe/vcs/pr-convent
 | [`README.md`](README.md) | Project pitch, quick start, guiding principles | First-time visitor or overview |
 | [`README_DEV.md`](README_DEV.md) | Project structure, dev workflow, hook opt-outs, plugin development | Setting up dev environment or modifying architecture |
 | [`docs/`](docs/README.md) | Long-form Diátaxis-shaped documentation (concepts, getting started, architecture) | Deep dive into a topic |
-| [`agents/README.md`](agents/README.md), [`skills/README.md`](skills/README.md), [`commands/README.md`](commands/README.md), [`rules/README.md`](rules/README.md) | Catalogs of all available components | Finding a skill/agent/command or adding a new one |
+| [`agents/README.md`](agents/README.md), [`skills/README.md`](skills/README.md), [`rules/README.md`](rules/README.md) | Catalogs of all available components | Finding a skill/agent or adding a new one |
 | [`.ai-state/DESIGN.md`](.ai-state/DESIGN.md) | Design-target architecture (architect-facing) | Understanding architectural decisions |
 | [`.ai-state/decisions/DECISIONS_INDEX.md`](.ai-state/decisions/DECISIONS_INDEX.md) | Index of all Architecture Decision Records | Researching prior decisions |
 
@@ -143,7 +143,6 @@ All PRs follow the workflow and safety conventions in [`rules/swe/vcs/pr-convent
 When adding or modifying any component type, load the matching skill first to verify spec compliance:
 
 - Adding/modifying a **skill** — load `skill-crafting`
-- Adding/modifying a **command** — load `command-crafting`
 - Adding/modifying an **agent** — load `agent-crafting`
 - Adding/modifying a **rule** — load `rule-crafting`
 - Adding/modifying a **hook** — load `hook-crafting`

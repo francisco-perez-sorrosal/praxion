@@ -53,7 +53,7 @@ The dispatcher is small but load-bearing — it is the *only* user touchpoint in
 > [!TIP]
 > Always run `scripts/dispatch-reworks --dry-run` before the first real dispatch of a session to confirm the manifest parsed correctly and the worktree paths look right.
 
-The slash-command wrapper `/dispatch-reworks` accepts the same flags as the script — use whichever surface is easier to discover from where you are.
+The user-invoked skill `/dispatch-reworks` accepts the same flags as the script — use whichever surface is easier to discover from where you are.
 
 ## Walkthrough — default `--bg` mode
 
@@ -67,7 +67,7 @@ The default mode runs all reworks as detached background sessions. You see no te
 scripts/dispatch-reworks
 ```
 
-Or via the slash command from inside the orchestrator session: `/dispatch-reworks`.
+Or via the skill from inside the orchestrator session: `/dispatch-reworks`.
 
 **Step 3**. The dispatcher prints one block per worktree:
 
@@ -123,7 +123,7 @@ scripts/dispatch-reworks --terminals
 **Step 4**. Press **Enter** in each window to start the rework. Yes, one keypress per window — the `claude-cli://` deep link does not auto-submit prompts by design (this is an upstream security posture, not something Praxion can route around).
 
 > [!WARNING]
-> If you're smoke-testing the dispatcher against a synthetic manifest, **do not press Enter in those test windows** — the `/praxion:resume-rework` slash command will run for real if you do. Close the test windows manually instead.
+> If you're smoke-testing the dispatcher against a synthetic manifest, **do not press Enter in those test windows** — the `/praxion:resume-rework` skill will run for real if you do. Close the test windows manually instead.
 
 ## Monitoring
 
@@ -249,7 +249,7 @@ This is an upstream design choice (preventing nested-session confusion) rather t
 
 - [`docs/architecture.md` § 10.1 Verifier Rework Loop](architecture.md#101-verifier-rework-loop) — the architectural design of the rework loop (what reworks are, when they fire, what the manifest contains)
 - [`agents/verifier.md`](../agents/verifier.md) Phase 12.5 — the verifier's manifest-emission and worktree-spawn protocol
-- [`commands/dispatch-reworks.md`](../commands/dispatch-reworks.md) — slash-command surface; same flag passthrough as the script
+- [`skills/dispatch-reworks/SKILL.md`](../skills/dispatch-reworks/SKILL.md) — user-invoked skill surface; same flag passthrough as the script
 - [`scripts/dispatch-reworks --help`](../scripts/dispatch-reworks) — authoritative flag and exit-code reference
 - [`hooks/notify_bg_session_state.py`](../hooks/notify_bg_session_state.py) — the osascript notification hook
 - [`README_DEV.md` § Dev-link mode](../README_DEV.md#dev-link-mode) — for contributors editing the hook locally

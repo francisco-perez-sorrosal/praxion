@@ -22,7 +22,7 @@ Step-by-step walkthroughs to build skill. Read these front-to-back; expect to ty
 
 Focused recipes assuming familiarity. Skim for the step you need.
 
-- [Project onboarding](onboarding.md) — bring a project into the Praxion ecosystem with `onboard-project` (empty directory, existing repo, or hackathon mode — one command detects the right one)
+- [Project onboarding](onboarding.md) — bring a project into the Praxion ecosystem with `onboard-project` (empty directory, existing repo, or hackathon mode — one skill detects the right one)
 - [Cursor compatibility](cursor-compat.md) — set up Praxion for Cursor in addition to Claude Code
 - [Observability](observability.md) — wire up Phoenix telemetry for a managed project
 - [Harvesting Learnings with Skill-Genesis](skill-genesis.md) — run `/skill-genesis` to autonomously harvest patterns, disposition proposals via `/skill-genesis-review`

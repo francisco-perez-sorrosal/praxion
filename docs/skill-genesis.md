@@ -35,7 +35,7 @@ Skill-genesis operates as a two-edge loop, temporally decoupled:
 
 **Edge 1 (Harvest):** You invoke `/skill-genesis`. The agent runs autonomously in the background, analyzes accumulated learning sources (LEARNINGS.md, verification reports, sentinel findings, decision records), triages them into artifact proposals, and writes a timestamped report to `.ai-state/skill_genesis_reports/`. The agent never blocks and never asks you a question.
 
-**Edge 2 (Disposition):** Later (minutes, hours, or days), when you're ready to decide which proposals matter, you invoke `/skill-genesis-review`. The command auto-discovers the latest unreviewed report, presents every pending proposal in a single batch multi-select, records your disposition (approve / reject / refine / defer) in an append-only log, and surfaces recommended delegations if any proposals were approved.
+**Edge 2 (Disposition):** Later (minutes, hours, or days), when you're ready to decide which proposals matter, you invoke `/skill-genesis-review`. The skill auto-discovers the latest unreviewed report, presents every pending proposal in a single batch multi-select, records your disposition (approve / reject / refine / defer) in an append-only log, and surfaces recommended delegations if any proposals were approved.
 
 The key insight: **the harvest is async and always-ready; the decision is sync and always-optional.** You run `/skill-genesis` when you expect signal from accumulated learnings. You run `/skill-genesis-review` when you have the cognitive space to approve artifacts. If neither happens, the report sits durably in `.ai-state/` — nothing is lost, and no merge is blocked.
 
@@ -54,7 +54,7 @@ Run `/skill-genesis` when accumulated learnings are worth harvesting:
 
 ## Quick start — first harvest
 
-**Step 1.** Run the command:
+**Step 1.** Run the skill:
 
 ```bash
 /skill-genesis
@@ -107,7 +107,7 @@ When you're ready to approve, refine, or reject proposals:
 /skill-genesis-review
 ```
 
-The command auto-discovers the most recent unreviewed report and presents a multi-select:
+The skill auto-discovers the most recent unreviewed report and presents a multi-select:
 
 ```
 Pending proposals from SKILL_GENESIS_REPORT_2026-05-15_14-32-58.md:
@@ -143,7 +143,7 @@ Refinement note for Proposal 1:
 and coordinate with the TUI-design skill's input-handling conventions"
 ```
 
-**Step 4.** After you disposition all selected proposals, the command updates the report in place:
+**Step 4.** After you disposition all selected proposals, the skill updates the report in place:
 
 - Appends rows to the `## Disposition Log` with timestamps and your choices
 - Updates the frontmatter `review_status` (pending → partial if some are dispositioned; partial → complete if all are done)
@@ -259,7 +259,7 @@ The multi-select is your friend. Toggle only the proposals you want to decide on
 <details>
 <summary>Re-running /skill-genesis-review shows the same proposals</summary>
 
-The command appends to the `## Disposition Log` when you disposition proposals. If you re-run and see the same proposals, either:
+The skill appends to the `## Disposition Log` when you disposition proposals. If you re-run and see the same proposals, either:
 
 1. The dispositions weren't persisted to the report file (check that the file is writable and the report path is correct)
 2. You're running against a different report (use `--report <path>` to force a specific one)
@@ -282,11 +282,11 @@ Check the background task's output for where it stopped. The report is only writ
 ## How it works under the hood
 
 <details>
-<summary>Why two commands instead of one?</summary>
+<summary>Why two skills instead of one?</summary>
 
 The harvest and disposition have orthogonal lifecycles. Harvest is async and may complete in the background after you've moved on to other work. Disposition is sync — you decide when to interrupt and answer the batch multi-select. Coupling them would reintroduce the cognitive-load problem this design exists to solve.
 
-**Sentinel follows the same pattern.** The agent runs autonomously and writes reports; the user consumes them later via direct reads or by asking Claude to analyze them. There is no `/sentinel-review` command because sentinel's findings are diagnostic (no artifact creation), but the temporal decoupling principle is the same: autonomous report-writing is always-ready; user decision-making is always-optional.
+**Sentinel follows the same pattern.** The agent runs autonomously and writes reports; the user consumes them later via direct reads or by asking Claude to analyze them. There is no `/sentinel-review` skill because sentinel's findings are diagnostic (no artifact creation), but the temporal decoupling principle is the same: autonomous report-writing is always-ready; user decision-making is always-optional.
 
 Skill-genesis is the first to add the disposition edge — this is a new pattern that other future harvesters may follow.
 
@@ -320,7 +320,7 @@ This is the "report accumulation" risk identified in the design; the run-log and
 ## Related
 
 - [`agents/skill-genesis.md`](../agents/skill-genesis.md) — the agent definition; describes what sources it reads and how triage works
-- [`commands/skill-genesis.md`](../commands/skill-genesis.md) — the `/skill-genesis` command; optional flags for scoping and previewing
-- [`commands/skill-genesis-review.md`](../commands/skill-genesis-review.md) — the `/skill-genesis-review` command; detailed disposition behavior and delegation routing
+- [`skills/skill-genesis/SKILL.md`](../skills/skill-genesis/SKILL.md) — the `/skill-genesis` skill; optional flags for scoping and previewing
+- [`skills/skill-genesis-review/SKILL.md`](../skills/skill-genesis-review/SKILL.md) — the `/skill-genesis-review` skill; detailed disposition behavior and delegation routing
 - [`docs/rework-dispatch.md`](rework-dispatch.md) — sibling precedent for the autonomous-then-review pattern; addresses a similar cognitive-load problem in the verifier rework loop
 - [`docs/architecture.md` § 10 Pipeline Feedback Loops](architecture.md#10-pipeline-feedback-loops) — architectural rationale for how skill-genesis fits into the larger pipeline graph

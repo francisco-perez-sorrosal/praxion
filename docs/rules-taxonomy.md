@@ -63,7 +63,7 @@ Thirteen rules load only when their `paths:` frontmatter matches a `Read` target
 |----------|------------|-------------------|---------|
 | **SWE** | `swe/coding-style` | `.py`, `.ts`, `.rs`, `.go`, etc. | Language-specific code formatting |
 | | `swe/id-citation-discipline` | Source files in language extensions | REQ-to-code traceability conventions |
-| | `swe/shipped-artifact-isolation` | Rules, skills, commands, agents | Constraints on project-portable artifacts |
+| | `swe/shipped-artifact-isolation` | Rules, skills, agents | Constraints on project-portable artifacts |
 | | `swe/staleness-policy` | `skills/**/SKILL.md` | Skill freshness conventions |
 | | `swe/testing-conventions` | Test code, test files | Testing strategy and terminology |
 | | `swe/vcs/pr-conventions` | `.github/`, PR-adjacent surfaces | Pull request workflow and merge policy |

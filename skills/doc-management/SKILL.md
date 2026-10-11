@@ -194,7 +194,6 @@ All catalog tables within the same project should use the same column structure.
 
 - Skills: Name, Description, When to Use
 - Agents: Name, Purpose, Output, Background Safe
-- Commands: Name, Description, Arguments
 - Rules: Name, Scope, Description
 
 ## Documentation Freshness

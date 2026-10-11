@@ -13,7 +13,7 @@ A walkthrough of developing a small application using the Praxion agent pipeline
 2. Verify: `./install.sh --check`
 3. Start a Claude Code session in your project directory
 
-One command, `onboard-project`, detects your starting point and resolves the right mode — see [Project Onboarding](onboarding.md) for the full contract:
+One skill, `onboard-project`, detects your starting point and resolves the right mode — see [Project Onboarding](onboarding.md) for the full contract:
 
 - **Empty directory**: `onboard-project my-app` scaffolds a Claude-ready Python starter app, then applies the remaining surfaces.
 - **Existing project (has code already)**: `onboard-project` (no positional arg) applies Praxion's surfaces — `.gitignore` block, `.ai-state/` skeleton, `.gitattributes` + merge drivers, git hooks (pre-commit + post-merge), `.claude/settings.json` toggles, `CLAUDE.md` blocks.
@@ -209,7 +209,7 @@ The implementation-planner reads the existing `WIP.md` in the task's `.ai-work/<
 
 ## Journey: PoC to Production
 
-The pipeline above takes you from idea to working code. Going from working code to production-ready involves several more milestones, each with its own agent or command. None is mandatory — pick the ones that match your release maturity.
+The pipeline above takes you from idea to working code. Going from working code to production-ready involves several more milestones, each with its own agent or skill. None is mandatory — pick the ones that match your release maturity.
 
 | # | Milestone | Trigger | Produces |
 |---|-----------|---------|----------|
@@ -219,7 +219,7 @@ The pipeline above takes you from idea to working code. Going from working code 
 | 4 | **ADR fleet accumulates** | `systems-architect` or user, every meaningful trade-off (seed writes the first; subsequent features add more) | New ADR drafts under `.ai-state/decisions/drafts/` → finalized `.ai-state/decisions/<NNN>-<slug>.md` at merge — Context, Decision, Considered Options, Consequences |
 | 5 | **CI/CD pipeline** | `cicd-engineer` agent — e.g., "Set up GitHub Actions for CI" | `.github/workflows/*.yml` — automated test, build, lint, security scan on every push |
 | 6 | **Deployment design** | `deployment` skill (consulted by systems-architect on demand) | `compose.yaml`, `Dockerfile`, `.ai-state/SYSTEM_DEPLOYMENT.md` — deployment runbook with section ownership across implementer + cicd-engineer + verifier |
-| 7 | **First release** | `/release` command | Bumped version in `pyproject.toml` (+ `.claude-plugin/plugin.json` for plugin projects), generated `CHANGELOG.md`, git tag, GitHub release |
+| 7 | **First release** | `/release` skill | Bumped version in `pyproject.toml` (+ `.claude-plugin/plugin.json` for plugin projects), generated `CHANGELOG.md`, git tag, GitHub release |
 | 8 | **Cross-session learning** | Automatic — the observability hook captures tool events; at end-of-feature, durable insights are promoted out of `LEARNINGS.md` into ADRs and specs | `.ai-state/observations.jsonl` (auto-captured tool events) + committed `.ai-state/` artifacts (ADRs, specs, promoted learnings) — survives across sessions, worktrees, and team members. dec-225 removed the in-house curated-memory subsystem; there is no `memory.json` (`sandbook` is the planned external backend). |
 
 ### Suggested order for a brand-new project
@@ -241,15 +241,15 @@ These agents operate alongside the main pipeline:
 
 | Agent | When to use | Example prompt |
 |-------|-------------|----------------|
-| **context-engineer** | Modifying skills, rules, commands, or CLAUDE.md. Automatically shadows researcher/architect stages when work involves context artifacts | "Audit the project's context artifacts" |
+| **context-engineer** | Modifying skills, rules, agents, or CLAUDE.md. Automatically shadows researcher/architect stages when work involves context artifacts | "Audit the project's context artifacts" |
 | **doc-engineer** | Documentation needs updating after changes. Runs in parallel during implementation when the planner assigns doc steps | "Update the README to reflect the new feature" |
 | **sentinel** | Ecosystem health check | "Run a sentinel audit" |
 | **skill-genesis** | After a pipeline run, harvest learnings into reusable artifacts | "Harvest learnings from the last implementation" |
 | **cicd-engineer** | Setting up CI/CD | "Create a GitHub Actions workflow for this project" |
 
-## Key Commands
+## Key User-Invoked Skills
 
-| Command | Purpose |
+| Skill | Purpose |
 |---------|---------|
 | `/co` | Create a commit following project conventions |
 | `/cop` | Commit and push |

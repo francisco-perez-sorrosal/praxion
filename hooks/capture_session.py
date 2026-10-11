@@ -151,8 +151,8 @@ give for it. `PostCompact` is therefore dispatched ahead of `EVENT_MAP` and
 writes its own row -- `{event_type: "compaction", timestamp, session_id,
 trigger, summary_bytes}` -- sharing only the append path with the lifecycle
 rows above. The key set is purely additive and no existing key changes
-meaning, which is load-bearing because this WAL is read as prose by slash
-commands and skills as well as parsed by code.
+meaning, which is load-bearing because this WAL is read as prose by
+skills and agents as well as parsed by code.
 
 `summary_bytes` is the *length of* the harness's own compaction summary, never
 the summary itself: the row is a signal that a compaction happened and on

@@ -1,6 +1,6 @@
 # Praxion Evals
 
-Out-of-band quality measurement for Praxion agent pipelines. Invoked via the single `/eval-praxion` slash command (CLI: `praxion-evals`) — never from a Claude Code hook. See [`dec-040`](../.ai-state/decisions/040-eval-framework-out-of-band.md) for the out-of-band invocation contract; `dec-204` (finalized at merge-to-main) narrows clause 3 to allow LLM-as-judge calls over completed artifacts.
+Out-of-band quality measurement for Praxion agent pipelines. Invoked via the single `/eval-praxion` skill (CLI: `praxion-evals`) — never from a Claude Code hook. See [`dec-040`](../.ai-state/decisions/040-eval-framework-out-of-band.md) for the out-of-band invocation contract; `dec-204` (finalized at merge-to-main) narrows clause 3 to allow LLM-as-judge calls over completed artifacts.
 
 The Tier 1 behavioral / artifact-manifest surface (formerly `/eval behavioral`) has been folded into Family 1; pass `--task-slug <slug>` to activate it and combine with `--mechanical-only` to reproduce the cheap, free verdict.
 
@@ -36,7 +36,7 @@ uv run praxion-evals --task-slug phase3-quality-automation --mechanical-only
 uv run praxion-evals my-feature-worktree
 ```
 
-The `/eval-praxion` slash command in Claude Code wraps the same CLI.
+The `/eval-praxion` skill in Claude Code wraps the same CLI.
 
 ## Auth for `/eval-praxion`
 

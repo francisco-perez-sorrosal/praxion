@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/francisco-perez-sorrosal/Praxion)](https://github.com/francisco-perez-sorrosal/Praxion/releases/latest)
 [![Last Commit](https://img.shields.io/github/last-commit/francisco-perez-sorrosal/Praxion)](https://github.com/francisco-perez-sorrosal/Praxion/commits/main)
 
-**A structured layer of reusable expertise — skills, agents, commands, rules, and memory — that operationalizes spec-driven development and context engineering into reliable, context-aware results.**
+**A structured layer of reusable expertise — skills, agents, rules, and memory — that operationalizes spec-driven development and context engineering into reliable, context-aware results.**
 
 This is my vision for turning AI assistance into a disciplined engineering system. There are many frameworks like this, but this one is mine: an orchestration of established engineering conventions, workflows, and architectural thinking into the assistant's loop, so it operates with continuity and stronger judgment.
 
@@ -26,10 +26,9 @@ Compatible with **Claude Code** (primary), **Claude Desktop**, **Cursor**, and A
 
 ## What You Get
 
-- **49 skills** — Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, security review, testing, ML/AI training, web/TUI/API interface design, and more. Loaded automatically when the task matches.
-- **15 specialized agents** — research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography. They collaborate on complex features through a shared-document pipeline.
-- **39 slash commands** — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch.
-- **20 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
+- **107 skills** — Python, API design, CI/CD, deployment, observability, refactoring, spec-driven development, security review, testing, ML/AI training, web/TUI/API interface design, and more. Loaded automatically when the task matches. 44 of them are user-invoked workflows — commits, worktrees, memory management, project scaffolding, testing, releases, code review, roadmap generation, metrics, ML experiment dispatch — invoked with `/<name>`.
+- **17 specialized agents** — research, architecture, interface design, planning, implementation, testing, verification, structural validation, roadmap cartography. They collaborate on complex features through a shared-document pipeline.
+- **23 rules** — coding style, git conventions, documentation standards, agent coordination. Auto-loaded by context.
 - **MCP servers** — agent-lifecycle observability via the Task Chronograph server.
 - **Multi-session launcher** — `praxion-parallel` spawns N Claude Code sessions in native Warp or iTerm2 tabs, each isolated in its own git worktree, each visually distinguished by per-tab color and role-pinned via `--append-system-prompt`. Comes with an ephemeral web launcher (`praxion-parallel --ui`) and six built-in recipes for common parallel patterns. See [Multi-Session Workflows](docs/multi-session.md).
 - **Architecture-as-Code + Documentation-as-Code stack** — fence convention, fitness functions, golden-rule pre-commit gate, `architect-validator` agent, architecture CI workflow, REQ↔architecture traceability, periodic `sentinel` audit, Diátaxis-aligned doc taxonomy. See [docs/aac-dac.md](docs/aac-dac.md) for how the mechanisms compose.
@@ -62,8 +61,7 @@ The ecosystem has five building blocks that layer from always-on background know
 
 - **Rules** — domain knowledge loaded automatically by relevance. Declarative constraints (coding style, git conventions) the assistant applies without explicit invocation.
 - **Skills** — reusable knowledge modules loaded on demand. Deeper than rules: workflows, procedures, and reference material for specific domains.
-- **Commands** — slash commands for frequent workflows. User-invoked quick actions (`/co` for commits, `/create-worktree` for git worktrees).
-- **Skills that are also entry points** — `onboard-project` (bringing a project into the ecosystem) ships as a user-invocable skill rather than a command, so it can carry supporting reference files loaded progressively.
+- **User-invoked skills** — the frequent workflows, run by name: `/co` for commits, `/create-worktree` for git worktrees, `/onboard-project` for bringing a project into the ecosystem. Each is a skill that can carry supporting reference files loaded progressively.
 - **Agents** — autonomous subprocesses for complex multi-step tasks. Each runs in its own context with a specialty and communicates through shared documents, forming a pipeline.
 - **MCP servers** — external tool servers for capabilities like persistent memory and task observability.
 
@@ -104,7 +102,7 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 
 | Category                 | Skills                                                                                                                                                                                        |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AI Assistant Crafting    | skill-crafting, agent-crafting, command-crafting, mcp-crafting, rule-crafting, hook-crafting                                                                                                   |
+| AI Assistant Crafting    | skill-crafting, agent-crafting, mcp-crafting, rule-crafting, hook-crafting                                                                                                   |
 | Platform Knowledge       | claude-ecosystem, agentic-sdks, communicating-agents, llm-prompt-engineering                                                                                                                  |
 | Planning & Communication | roadmap-planning, roadmap-synthesis, stakeholder-communications                                                                                                                               |
 | Design & Architecture    | api-design, data-modeling, deployment, observability, performance-architecture                                                                                                                |
@@ -115,25 +113,20 @@ Reusable knowledge modules loaded automatically based on context. See [skills/RE
 | OSS Contribution         | upstream-stewardship                                                                                                                                                                          |
 | Project                  | agent-readiness, id-decontamination                                                                                                                                                           |
 
-### Commands
-
-39 slash commands invoked with `/<name>` (`/praxion:<name>` in Claude Code plugin mode). Frequently used:
+User-invoked skills run by name with `/<name>` (`/praxion:<name>` in Claude Code plugin mode). Frequently used:
 
 - `/co`, `/cop` — create a commit (and push)
 - `/create-worktree`, `/merge-worktree` — git worktree lifecycle
-- `/onboard-project` — bring a project into the ecosystem (skill, not a command; invoked the same way)
+- `/onboard-project` — bring a project into the ecosystem
 - `/roadmap` — produce a lens-audited `ROADMAP.md`
 - `/project-metrics`, `/eval-praxion` — health metrics and out-of-band quality evals
 - `/run-experiment`, `/check-experiment` — ML training experiment dispatch
 
-See [commands/README.md](commands/README.md) for the complete list with descriptions.
-
-> [!NOTE]
-> **Commands are skills now (in Claude Code).** Claude Code [merged custom slash commands into skills](https://code.claude.com/docs/en/skills) — a `commands/<name>.md` file and a `skills/<name>/SKILL.md` directory both produce `/<name>`, and Claude Code already surfaces Praxion's commands through the skill system. Praxion keeps its slash commands as single-file `commands/*.md` because that directory is the **assistant-agnostic source** `install.sh` exports to Cursor and Codex (which don't share the merge). Rule of thumb: author a `commands/*.md` file for a portable single-file workflow; reach for a `skills/<name>/` directory when it needs bundled scripts/references or should auto-load. See the [`command-crafting`](skills/command-crafting/SKILL.md) skill for the decision.
+The [skills catalog](skills/README.md) lists every one with its activation triggers.
 
 ### Agents
 
-15 autonomous agents for complex, multi-step tasks, organized by pipeline role. See [agents/README.md](agents/README.md) for the pipeline diagram and usage patterns.
+17 autonomous agents for complex, multi-step tasks, organized by pipeline role. See [agents/README.md](agents/README.md) for the pipeline diagram and usage patterns.
 
 | Role            | Agents                                                                              |
 | --------------- | ----------------------------------------------------------------------------------- |
@@ -205,14 +198,14 @@ The main entry point is `install.sh`, which routes to `install_claude.sh` (Claud
 | 0    | Personal identifiers, rendered into `~/.claude/CLAUDE.md`                                                                 | Yes — defaults offered |
 | 1    | Symlinks: personal config, rules to `~/.claude/rules/`, CLI scripts to `~/.local/bin/`                                    | No — always            |
 | 2    | Git merge infrastructure (merge drivers + git hooks)                                                                      | No — always            |
-| 3    | praxion plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (skills, commands, agents, hooks incl. Task Chronograph) | Yes — recommended      |
+| 3    | praxion plugin via [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace (skills, agents, hooks incl. Task Chronograph) | Yes — recommended      |
 | 4    | Phoenix observability daemon (persistent trace backend at `http://localhost:6006`)                                        | Yes — recommended      |
 | 5    | Claude Desktop config link                                                                                                | Yes — default skip     |
 
-When installed as a plugin, commands are namespaced: `/co` becomes `/praxion:co`.
+When installed as a plugin, user-invoked skills are namespaced: `/co` becomes `/praxion:co`.
 
 > [!TIP]
-> Developing on Praxion itself? After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/`) to launch a session that loads the plugin from your working tree — edits to skills, commands, agents, and hooks are live. See [README_DEV.md](README_DEV.md#session-scoped-local-testing).
+> Developing on Praxion itself? After the standard install, use `praxion-claude-dev` (placed at `~/.local/bin/`) to launch a session that loads the plugin from your working tree — edits to skills, agents, and hooks are live. See [README_DEV.md](README_DEV.md#session-scoped-local-testing).
 
 <details>
 <summary><strong>Marketplace plugin install</strong> (Claude Code only)</summary>
@@ -234,11 +227,11 @@ To reconfigure personal settings or recover from corruption, `/praxion-complete-
 
 ### Claude Desktop
 
-`./install.sh desktop` links `claude_desktop_config.json` to the official Desktop location (`~/Library/Application Support/Claude/` on macOS, `~/.config/Claude/` on Linux). Skills, commands, and agents are Claude Code features — run `./install.sh code` for the full feature set.
+`./install.sh desktop` links `claude_desktop_config.json` to the official Desktop location (`~/Library/Application Support/Claude/` on macOS, `~/.config/Claude/` on Linux). Skills and agents are Claude Code features — run `./install.sh code` for the full feature set.
 
 ### Cursor
 
-`./install.sh cursor` installs skills, rules, commands, and MCP into Cursor's discovery paths — either the user profile (`~/.cursor/`, default) or per-project (`./install.sh cursor /path/to/repo` → `/path/to/repo/.cursor/`). Skills and rules are symlinked to this repo; commands are exported as plain Markdown; `mcp.json` registers task-chronograph and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp).
+`./install.sh cursor` installs skills, rules, and MCP into Cursor's discovery paths — either the user profile (`~/.cursor/`, default) or per-project (`./install.sh cursor /path/to/repo` → `/path/to/repo/.cursor/`). Skills and rules are symlinked to this repo; `mcp.json` registers task-chronograph and [sub-agents-mcp](https://github.com/shinpr/sub-agents-mcp).
 
 > [!NOTE]
 > Agents in Cursor use `cursor-agent` as the sub-agents-mcp backend — run `cursor-agent login` before using them.
@@ -247,7 +240,7 @@ Verify with `./install.sh cursor --check` (add a path for per-project). For Clau
 
 ### Codex / AGENTS.md-Aware Agents
 
-`./install.sh codex /path/repo` compiles the target project's `AGENTS.md` from the shared Praxion Codex philosophy plus a project adapter, and manages project-local adapter surfaces under `.codex/` and `.agents/` (thin agent/skill/command wrappers that point back to canonical Praxion sources, plus a rules bridge).
+`./install.sh codex /path/repo` compiles the target project's `AGENTS.md` from the shared Praxion Codex philosophy plus a project adapter, and manages project-local adapter surfaces under `.codex/` and `.agents/` (thin agent/skill wrappers that point back to canonical Praxion sources, plus a rules bridge).
 
 ```bash
 ./install.sh codex /path/to/repo --dry-run

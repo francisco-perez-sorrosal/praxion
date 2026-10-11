@@ -16,7 +16,6 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── cicd/
 ├── claude-ecosystem/
 ├── code-review/
-├── command-crafting/
 ├── communicating-agents/
 ├── context-security-review/
 ├── data-modeling/
@@ -42,30 +41,6 @@ skills/                              # Shared skill modules (assistant-agnostic)
 ├── testing-strategy/
 ├── upstream-stewardship/
 └── versioning/
-commands/                            # Shared slash commands
-├── CLAUDE.md                        # Command conventions (lazy loaded)
-├── add-rules.md
-├── clean-auto-memory.md
-├── clean-work.md
-├── co.md
-├── cop.md
-├── create-simple-python-prj.md
-├── create-worktree.md
-├── decontaminate-ids.md
-├── eval.md
-├── explore-project.md
-├── full-security-scan.md
-├── manage-readme.md
-├── merge-worktree.md
-├── onboard-project.md
-├── refresh-skill.md
-├── release.md
-├── report-upstream.md
-├── review-pr.md
-├── roadmap.md
-├── sdd-coverage.md
-├── star-repo.md
-└── test.md
 agents/                              # Shared agent definitions
 ├── CLAUDE.md                        # Agent conventions (lazy loaded)
 ├── promethean.md
@@ -82,7 +57,9 @@ agents/                              # Shared agent definitions
 ├── sentinel.md
 ├── skill-genesis.md
 ├── cicd-engineer.md
-└── roadmap-cartographer.md
+├── roadmap-cartographer.md
+├── discipline-consultant.md
+└── agentic-transactions-architect.md
 rules/                               # Rules (installed to ~/.claude/rules/ or .cursor/rules/)
 ├── CLAUDE.md                        # Rule conventions (lazy loaded)
 ├── swe/
@@ -136,7 +113,6 @@ codex/config/                        # Codex adapter sources, generators, and re
 cursor/config/                       # Cursor installer config
 ├── mcp.json.template
 ├── expected-mcp-servers.txt
-├── export-cursor-commands.py
 ├── export-cursor-rules.py
 └── README.md
 scripts/                             # Utility scripts
@@ -229,7 +205,6 @@ The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`, e
 ## Working on this Repo
 
 - When adding or modifying skills, load the `skill-crafting` skill for spec compliance
-- When adding or modifying commands, load the `command-crafting` skill
 - When adding or modifying agents, load the `agent-crafting` skill
 - When adding or modifying rules, load the `rule-crafting` skill
 - Follow commit conventions in `rules/` (auto-loaded by Claude when relevant); for PR workflow (branch naming, `.ai-state/` safety, merge policy), see [`rules/swe/vcs/pr-conventions.md`](rules/swe/vcs/pr-conventions.md) — path-scoped, loads only on PR-adjacent surfaces
@@ -240,13 +215,13 @@ The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`, e
 
 ## Design Intent
 
-- **Assistant-agnostic shared assets**: `skills/`, `commands/`, `agents/`, and `rules/` live at the repo root, reusable across any AI assistant
+- **Assistant-agnostic shared assets**: `skills/`, `agents/`, and `rules/` live at the repo root, reusable across any AI assistant
 - **AGENTS.md compatibility shim**: root `AGENTS.md` points AGENTS.md-aware tools to Praxion's canonical artifacts without copying their bodies
 - **Assistant-specific config**: Personal settings live in config directories (`claude/config/` for Claude, `codex/config/` for Codex, `cursor/config/` for Cursor, future tool directories as needed)
-- **Plugin distribution**: Skills, commands, and agents are installed via Claude Code's plugin system (`.claude-plugin/plugin.json`)
+- **Plugin distribution**: Skills and agents are installed via Claude Code's plugin system (`.claude-plugin/plugin.json`)
 - **Personal config ownership**: `install_claude.sh` symlinks Claude config to `~/.claude/`; `install_codex.sh` installs project-local adapter surfaces under the target repo's `.codex/` and `.agents/`; shared `~/.codex/` user surfaces remain user-owned; `install_cursor.sh` symlinks skills and rules into `.cursor/` or `~/.cursor/`
 - **Progressive disclosure**: Skills load metadata at startup, full content on activation, reference files on demand
-- **CLAUDE.md stays lean**: Skills, commands, agents, and rules are auto-discovered by Claude via filesystem scanning -- listing them in `CLAUDE.md` wastes always-loaded tokens and creates a sync burden. `README.md` and per-directory READMEs serve as the human-facing catalogs
+- **CLAUDE.md stays lean**: Skills, agents, and rules are auto-discovered by Claude via filesystem scanning -- listing them in `CLAUDE.md` wastes always-loaded tokens and creates a sync burden. `README.md` and per-directory READMEs serve as the human-facing catalogs
 - **Nested CLAUDE.md for progressive disclosure**: Each artifact directory has its own `CLAUDE.md` with conventions specific to that directory. These are lazily loaded -- Claude reads them only when it accesses files in that directory, adding zero cost to sessions that don't touch the directory
 
 ## AGENTS.md and Codex Interop
@@ -337,7 +312,6 @@ instead of extending adapter code.
 |---|---|
 | `~/.codex/AGENTS.md` | User-owned global Codex baseline; Praxion does not install or overwrite it in the current project-local flow |
 | `<project>/AGENTS.md.tmpl` | Project-local Codex source template; generated from `CLAUDE.md` on first install when missing |
-| `commands/*.md` | `install_codex.sh` generates `praxion-command-<name>` wrappers under project `.agents/skills/` |
 | `agents/*.md` | `install_codex.sh` generates thin `.codex/agents/*.toml` wrappers by default |
 | `rules/**/*.md` frontmatter | `install_codex.sh` now generates a hook-backed rules bridge under `.codex/praxion/` plus `.codex/hooks.json`; native `.codex/rules` stays reserved for approval policy |
 | `skills/*/SKILL.md` metadata | `install_codex.sh` generates project `.agents/skills/*` wrappers by default |
@@ -366,7 +340,7 @@ Claude Code discovers CLAUDE.md files through a bidirectional directory walk:
 - **Upward (eager)**: At session start, walks from cwd to the filesystem root, loading every CLAUDE.md found
 - **Downward (lazy)**: Subdirectory CLAUDE.md files load only when Claude reads files in that directory
 
-This project uses nested CLAUDE.md files as a progressive disclosure layer between the always-loaded root `CLAUDE.md` and the on-demand crafting skills. Each artifact directory (`agents/`, `skills/`, `commands/`, `rules/`, etc.) has its own `CLAUDE.md` with:
+This project uses nested CLAUDE.md files as a progressive disclosure layer between the always-loaded root `CLAUDE.md` and the on-demand crafting skills. Each artifact directory (`agents/`, `skills/`, `rules/`, etc.) has its own `CLAUDE.md` with:
 - Directory-specific conventions (structure, naming, registration)
 - Pointers to the relevant crafting skill for detailed guidance
 - Gotchas and constraints unique to that artifact type
@@ -453,17 +427,17 @@ Run `/context` inside Claude Code to inspect which skills and reference files ar
 - [Claude Code memory](https://code.claude.com/docs/en/memory#rules) — official docs; rules are loaded inline with no path context
 - [Reddit: Claude Code plugin permissions](https://www.reddit.com/r/ClaudeAI/) — plugin cache permission issues with `additionalDirectories` workaround
 
-## How Rules Interact with Commands
+## How Rules Interact with User-Invoked Skills
 
-Rules do **not** need to be referenced from slash commands. When `/co` triggers a commit workflow, Claude automatically loads relevant rules from `~/.claude/rules/` based on the task context -- no explicit binding required.
+Rules do **not** need to be referenced from user-invoked skills. When `/co` triggers a commit workflow, Claude automatically loads relevant rules from `~/.claude/rules/` based on the task context -- no explicit binding required.
 
-Commands can use **semantic hints** to help Claude disambiguate when multiple overlapping rules exist:
+A skill can use **semantic hints** to help Claude disambiguate when multiple overlapping rules exist:
 
 ```
 "Commit following our conventional commits standard."
 ```
 
-Never reference rule filenames directly in commands -- filenames have no special meaning to the command system.
+Never reference rule filenames directly in a skill's workflow -- filenames have no special meaning to the skill system.
 
 See [`rules/README.md`](rules/README.md) for the full rule specification, writing guidelines, and the rules-vs-skills-vs-CLAUDE.md decision model.
 
@@ -486,7 +460,7 @@ praxion-claude-dev       # installed by install.sh at ~/.local/bin/praxion-claud
 
 The working-tree copy is loaded via `--plugin-dir`, and a session-scoped `--settings` overlay disables the marketplace-installed `praxion@bit-agora` for the session. Without the overlay, the user-settings line `"praxion@bit-agora": true` in `enabledPlugins` force-enables the marketplace copy alongside the working tree (per Claude Code docs, force-enables override `--plugin-dir`'s shadowing) — so `/context` would load both copies and double the skill, agent, and command tokens. The overlay flips that one entry to `false` for the session only; your global `~/.claude/settings.json` is untouched, so non-Praxion sessions still get the marketplace copy as usual.
 
-Edits to skills, commands, agents, or hooks are live. Run `/reload-plugins` inside the session to re-read them without relaunching; a full restart is only needed when `plugin.json` itself changes.
+Edits to skills, agents, or hooks are live. Run `/reload-plugins` inside the session to re-read them without relaunching; a full restart is only needed when `plugin.json` itself changes.
 
 The launcher passes `--dangerously-skip-permissions` by default because dev loops against your own working tree rarely benefit from per-tool prompts. When you do want them — e.g., to test a hook's permission behavior — launch with `PRAXION_DEV_SAFE=1 praxion-claude-dev`.
 
@@ -503,10 +477,10 @@ claude plugin install praxion@bit-agora --scope user   # Or install directly fro
 
 ### Dev-link mode
 
-`./install.sh code` performs a marketplace fetch — local file edits in the worktree do not propagate to the installed plugin cache. `--dev-link` closes that gap: it replaces the cache copies of the three plugin-cache-resolved runtime surfaces (`hooks/`, `scripts/`, `commands/` — the directories Claude Code resolves through `${CLAUDE_PLUGIN_ROOT}`, e.g. `hooks/hooks.json` and `hooks/notify_bg_session_state.py`) with directory-level symlinks back to this working tree, so edits take effect immediately with no copy step.
+`./install.sh code` performs a marketplace fetch — local file edits in the worktree do not propagate to the installed plugin cache. `--dev-link` closes that gap: it replaces the cache copies of the three plugin-cache-resolved runtime surfaces (`hooks/`, `scripts/`, `skills/` — the directories Claude Code resolves through `${CLAUDE_PLUGIN_ROOT}`, e.g. `hooks/hooks.json` and `hooks/notify_bg_session_state.py`) with directory-level symlinks back to this working tree, so edits take effect immediately with no copy step.
 
 ```bash
-./install.sh --dev-link        # symlink hooks/, scripts/, commands/ into the pinned plugin cache
+./install.sh --dev-link        # symlink hooks/, scripts/, skills/ into the pinned plugin cache
 ./install.sh --dev-link=off    # restore the fetched copies from the pre-link backup
 ```
 
@@ -528,11 +502,11 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 
 - See `.claude-plugin/PLUGIN_SCHEMA_NOTES.md` for validator constraints
 - The plugin is distributed via the [`bit-agora`](https://github.com/francisco-perez-sorrosal/bit-agora) GitHub marketplace
-- When installed, commands are namespaced as `/praxion:<name>`
+- When installed, user-invoked skills are namespaced as `/praxion:<name>`
 
 ### Plugin cache contains the full repo
 
-When `claude plugin install praxion@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/praxion/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, commands, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
+When `claude plugin install praxion@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/praxion/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
 
 `/praxion-complete-install` relies on this. It resolves `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code) and prints the resolved `install.sh --complete-install` command for the user to run in their own terminal, which symlinks `${CLAUDE_PLUGIN_ROOT}/rules/` → `~/.claude/rules/` and `${CLAUDE_PLUGIN_ROOT}/scripts/` → `~/.local/bin/`. Source and destination are both local; no network, no extra clone.
 
@@ -542,7 +516,7 @@ The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't
 
 - `hooks/auto_complete_install.py` — SessionStart hook that detects missing surfaces and completes setup automatically on first session. Uses sensible defaults from `git config` (name, email) with optional operator override via single prompt.
 - `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts.
-- `commands/praxion-complete-install.md` — optional slash command for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT`, runs the cache's `install.sh code --check`, and prints `install.sh code --complete-install` for the user to run in their own terminal — the Bash tool has no TTY to answer the installer's consent prompts.
+- `skills/praxion-complete-install/SKILL.md` — optional user-invoked skill for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT`, runs the cache's `install.sh code --check`, and prints `install.sh code --complete-install` for the user to run in their own terminal — the Bash tool has no TTY to answer the installer's consent prompts.
 
 The inverse pair (`complete_uninstall_from_plugin()`, run through the command `/praxion-complete-uninstall` prints) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.
 
@@ -608,7 +582,7 @@ The `regression` sub-package was retired in the praxion-self-eval-v1 pipeline. B
 
 ### Scope
 
-Currently Praxion-internal: `/praxion:eval-praxion` resolves `Bash(uv run ...)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the command is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
+Currently Praxion-internal: `/praxion:eval-praxion` resolves `Bash(uv run ...)` in its `allowed-tools` frontmatter, which requires the `eval/` project on disk. When the plugin is installed in another project, the skill is exposed but invocation fails — there is no `eval/` directory and no `praxion-evals` binary on the path.
 
 Making the tooling portable would require bundling `eval/` inside the plugin or publishing `praxion-evals` to PyPI. Not in scope today — open an issue if you need to consume it downstream.
 

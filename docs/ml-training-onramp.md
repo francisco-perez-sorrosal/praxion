@@ -5,14 +5,14 @@ audience: developer
 
 # ML Training Onramp
 
-Companion doc for Praxion's third project archetype: ML/AI training. Where the SWE archetype reaches code via tests and the Agentic-AI archetype reaches deployable agents via behavioral acceptance, the ML archetype reaches a checkpoint that meets a metric threshold via evals. This doc covers the artifacts, modes, commands, and rules that make Praxion eval-aware. Pre-training v1; the [autoresearch case study](#the-autoresearch-case-study) is the proof target, not the only target.
+Companion doc for Praxion's third project archetype: ML/AI training. Where the SWE archetype reaches code via tests and the Agentic-AI archetype reaches deployable agents via behavioral acceptance, the ML archetype reaches a checkpoint that meets a metric threshold via evals. This doc covers the artifacts, modes, skills, and rules that make Praxion eval-aware. Pre-training v1; the [autoresearch case study](#the-autoresearch-case-study) is the proof target, not the only target.
 
 ## Quick links
 
 - **Skills:** [`ml-training`](../skills/ml-training/SKILL.md), [`llm-training-eval`](../skills/llm-training-eval/SKILL.md), [`neo-cloud-abstraction`](../skills/neo-cloud-abstraction/SKILL.md), [`experiment-tracking`](../skills/experiment-tracking/SKILL.md)
 - **Skill references:** [`gpu-compute-budgeting`](../skills/deployment/references/gpu-compute-budgeting.md) (under `deployment`), [`ml-experiment-ci`](../skills/cicd/references/ml-experiment-ci.md) (under `cicd`)
 - **Rules:** [`ml/eval-driven-verification`](../rules/ml/eval-driven-verification.md), [`ml/gpu-budget-conventions`](../rules/ml/gpu-budget-conventions.md), [`ml/experiment-tracking-conventions`](../rules/ml/experiment-tracking-conventions.md)
-- **Commands:** [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c
+- **User-invoked skills:** [`/run-experiment`](../skills/run-experiment/SKILL.md), [`/check-experiment`](../skills/check-experiment/SKILL.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c
 - **Architecture:** [`docs/architecture.md`](architecture.md), `.ai-state/DESIGN.md`
 
 ## The third archetype in context
@@ -74,8 +74,8 @@ verifier Phase 3a evaluates against ACs (PASS / FAIL / WARN with tolerance bands
 
 Four touch points:
 
-- **[`/run-experiment`](../commands/run-experiment.md)** — dispatches the run via the configured backend (local, SkyPilot, or a direct adapter). Writes `TRAINING_RESULTS.md` as the run progresses; the schema is owned by the [`llm-training-eval`](../skills/llm-training-eval/SKILL.md) skill (see [`training-results-schema.md`](../skills/llm-training-eval/references/training-results-schema.md)).
-- **[`/check-experiment`](../commands/check-experiment.md)** — reads `TRAINING_RESULTS.md`. Polls for in-flight runs; reports completed-run summaries (final metrics vs. ACs, wall-clock, dollars, checkpoints produced).
+- **[`/run-experiment`](../skills/run-experiment/SKILL.md)** — dispatches the run via the configured backend (local, SkyPilot, or a direct adapter). Writes `TRAINING_RESULTS.md` as the run progresses; the schema is owned by the [`llm-training-eval`](../skills/llm-training-eval/SKILL.md) skill (see [`training-results-schema.md`](../skills/llm-training-eval/references/training-results-schema.md)).
+- **[`/check-experiment`](../skills/check-experiment/SKILL.md)** — reads `TRAINING_RESULTS.md`. Polls for in-flight runs; reports completed-run summaries (final metrics vs. ACs, wall-clock, dollars, checkpoints produced).
 - **[`verifier` Phase 3a](../agents/verifier.md)** — eval-aware sub-branch of the existing verifier's Phase 3. Activates when `TRAINING_RESULTS.md` exists for the task slug; evaluates metric thresholds with tolerance bands per [`rules/ml/eval-driven-verification.md`](../rules/ml/eval-driven-verification.md).
 - **`program.md`** — project-local meta-prompt for an autonomous experiment loop. Sibling of `CLAUDE.md`; consumed by `implementation-planner` and `verifier` when present.
 
@@ -125,7 +125,7 @@ Three-tier backend strategy:
 | Skills | [`ml-training`](../skills/ml-training/SKILL.md), [`llm-training-eval`](../skills/llm-training-eval/SKILL.md), [`neo-cloud-abstraction`](../skills/neo-cloud-abstraction/SKILL.md), [`experiment-tracking`](../skills/experiment-tracking/SKILL.md) |
 | Skill references | [`operational-modes`](../skills/ml-training/references/operational-modes.md), [`training-results-schema`](../skills/llm-training-eval/references/training-results-schema.md), [`local-backend`](../skills/neo-cloud-abstraction/references/local-backend.md), [`skypilot-backend`](../skills/neo-cloud-abstraction/references/skypilot-backend.md), [`runpod-direct-adapter`](../skills/neo-cloud-abstraction/references/runpod-direct-adapter.md), [`gpu-compute-budgeting`](../skills/deployment/references/gpu-compute-budgeting.md), [`ml-experiment-ci`](../skills/cicd/references/ml-experiment-ci.md) |
 | Rules | [`ml/eval-driven-verification`](../rules/ml/eval-driven-verification.md), [`ml/gpu-budget-conventions`](../rules/ml/gpu-budget-conventions.md), [`ml/experiment-tracking-conventions`](../rules/ml/experiment-tracking-conventions.md) |
-| Commands | [`/run-experiment`](../commands/run-experiment.md), [`/check-experiment`](../commands/check-experiment.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c |
+| User-invoked skills | [`/run-experiment`](../skills/run-experiment/SKILL.md), [`/check-experiment`](../skills/check-experiment/SKILL.md), [`onboard-project`](../skills/onboard-project/SKILL.md) Phase 8c |
 | Architecture | [`docs/architecture.md`](architecture.md), `.ai-state/DESIGN.md` |
 | Verifier extension | [`agents/verifier.md`](../agents/verifier.md) Phase 3a |
 

@@ -1,13 +1,14 @@
 ---
+name: check-experiment
 description: "Poll or report an ML training run: in-flight status/metrics, or completed results with PASS/FAIL/WARN checks. Use after /run-experiment or before verifying."
 argument-hint: "[<run_tag>] [--task-slug <slug>]"
 allowed-tools: [Read, Bash, Glob]
 ---
 
 Poll or report on an ML training experiment. Reads
-[TRAINING_RESULTS.md](../skills/llm-training-eval/references/training-results-schema.md)
+[TRAINING_RESULTS.md](../llm-training-eval/references/training-results-schema.md)
 for completed runs; invokes
-[neo-cloud-abstraction](../skills/neo-cloud-abstraction/SKILL.md) lifecycle ops for
+[neo-cloud-abstraction](../neo-cloud-abstraction/SKILL.md) lifecycle ops for
 in-flight runs.
 
 ## Arguments
@@ -140,7 +141,7 @@ Scan the active `SYSTEMS_PLAN.md` (or `WIP.md`) for acceptance criteria containi
 metric threshold syntax (e.g., `val_bpb < 1.75`, `val_bpb < 1.75 ± 0.02`).
 
 If metric-threshold ACs are found, apply the
-[eval-driven-verification](../rules/ml/eval-driven-verification.md) PASS/FAIL/WARN
+[eval-driven-verification](../../rules/ml/eval-driven-verification.md) PASS/FAIL/WARN
 classification. **Do not redefine the classification logic here — cite the rule.**
 
 Surface the AC check results:
@@ -163,7 +164,7 @@ Then surface an actionable next-step based on the result:
 
 ## Cross-References
 
-| Artifact | Role in this command |
+| Artifact | Role in this skill |
 |---|---|
 | `skills/neo-cloud-abstraction/SKILL.md` | `status()`, `log_stream()`, `pricing_query()` lifecycle ops; Status enum |
 | `skills/llm-training-eval/references/training-results-schema.md` | Reader contract for TRAINING_RESULTS.md fields |

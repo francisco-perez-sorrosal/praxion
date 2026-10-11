@@ -1,13 +1,14 @@
 ---
+name: roadmap
 description: Produce a project-audited ROADMAP.md via a project-derived evaluation lens set — strengths, weaknesses, deprecations, phased improvements — through the roadmap-cartographer agent
 argument-hint: "[fresh|diff|<focus-area>]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Task]
 disable-model-invocation: true
 ---
 
-Produce a project-level `ROADMAP.md` via the [roadmap-cartographer](../agents/roadmap-cartographer.md) agent. The cartographer derives a **project-specific evaluation lens set** (4–8 lenses drawn from the project's own values + domain constraints + exemplar sets: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom), orchestrates one researcher per lens in parallel, synthesizes findings, and emits a user-gated roadmap matching the 10-section exemplar structure (Executive Summary, What's Working, Weaknesses, **Opportunities / Forward Lines**, Improvement Phases, Deprecation, Quality Metrics, Guiding Principles, Methodology Footer, Decision Log).
+Produce a project-level `ROADMAP.md` via the [roadmap-cartographer](../../agents/roadmap-cartographer.md) agent. The cartographer derives a **project-specific evaluation lens set** (4–8 lenses drawn from the project's own values + domain constraints + exemplar sets: SPIRIT, DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom), orchestrates one researcher per lens in parallel, synthesizes findings, and emits a user-gated roadmap matching the 10-section exemplar structure (Executive Summary, What's Working, Weaknesses, **Opportunities / Forward Lines**, Improvement Phases, Deprecation, Quality Metrics, Guiding Principles, Methodology Footer, Decision Log).
 
-Distinct from the [roadmap-planning](../skills/roadmap-planning/SKILL.md) skill — this command audits the project and generates fresh items; `roadmap-planning` prioritizes and sequences an existing backlog.
+Distinct from the [roadmap-planning](../roadmap-planning/SKILL.md) skill — this skill audits the project and generates fresh items; `roadmap-planning` prioritizes and sequences an existing backlog.
 
 ## Modes
 
@@ -67,9 +68,9 @@ Surface:
 
 ## Notes
 
-- The cartographer operates on any project type — **deterministic** (libraries, CLIs, services) or **agentic** (LLM apps, agent frameworks, plugins) or **hybrid**. Paradigm detection happens in Phase 1 and feeds the lens-set derivation (which exemplar fits, which sub-questions fire within each lens). SPIRIT is the exemplar Praxion uses for its own audits; other projects get other exemplars or Custom sets (see [`lens-framework.md`](../skills/roadmap-synthesis/references/lens-framework.md)).
+- The cartographer operates on any project type — **deterministic** (libraries, CLIs, services) or **agentic** (LLM apps, agent frameworks, plugins) or **hybrid**. Paradigm detection happens in Phase 1 and feeds the lens-set derivation (which exemplar fits, which sub-questions fire within each lens). SPIRIT is the exemplar Praxion uses for its own audits; other projects get other exemplars or Custom sets (see [`lens-framework.md`](../roadmap-synthesis/references/lens-framework.md)).
 - The audit involves external research (2026 state-of-the-art); expect several minutes for the parallel researcher fan-out.
-- Every quantitative claim in the output is grounded to a file, command, or cited source per the [grounding-protocol](../skills/roadmap-synthesis/references/grounding-protocol.md). If you see an ungrounded claim, flag it as a bug in the cartographer's Phase 7 self-verify.
+- Every quantitative claim in the output is grounded to a file, command, or cited source per the [grounding-protocol](../roadmap-synthesis/references/grounding-protocol.md). If you see an ungrounded claim, flag it as a bug in the cartographer's Phase 7 self-verify.
 
 ## ROADMAP.md lifecycle
 

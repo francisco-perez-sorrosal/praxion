@@ -1,5 +1,6 @@
 ---
-description: Bootstrap or refresh the project's landscape watchlist — flag stale entries (>90 days) and optionally re-validate URLs
+name: landscape-refresh
+description: Bootstrap or refresh the project's landscape watchlist — flag stale entries (older than 90 days) and optionally re-validate URLs
 allowed-tools: [Read, Write, Edit, Bash, WebFetch, AskUserQuestion, Glob]
 disable-model-invocation: true
 ---
@@ -72,10 +73,10 @@ Check for `.ai-state/LANDSCAPE_WATCHLIST.md`. If missing, go to **Bootstrap mode
 ## Constraints
 
 - **Do not invent entries.** Bootstrap mode leaves section scaffolds empty for the user to seed; refresh mode never adds entries on its own (it only mutates existing ones).
-- **Stale threshold is 90 days.** Hardcoded — adjust by editing this command file rather than introducing a configuration setting.
+- **Stale threshold is 90 days.** Hardcoded — adjust by editing this skill file rather than introducing a configuration setting.
 - **Inactive entries are tombstoned.** Once a user picks `inactivate`, the entry stays in `## Inactive / archived` and is not roll-checked again. Future refreshes ignore it.
 - **The `## Optional` section is rolled like any active section.** It is a relevance demotion, not an inactivity marker.
-- **No commit.** This command modifies the working tree and stops; the user commits when ready.
+- **No commit.** This skill modifies the working tree and stops; the user commits when ready.
 
 ## Implementation notes
 

@@ -3,7 +3,7 @@
 Tests cover the Python-level CLI module only: arg parsing, the 4-case arg
 resolver wiring, auth-mode detection, and the invalid-target error path.
 
-The slash-command registration (entry point script, commands/eval-praxion.md)
+The slash-command registration (entry point script, skills/eval-praxion/SKILL.md)
 is a separate surface and is not exercised here.
 
 All production imports are deferred inside each test body.

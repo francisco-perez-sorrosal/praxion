@@ -1,4 +1,5 @@
 ---
+name: scores
 description: Read .ai-state/eval_ledger/EVAL_LOG.md and render a ranked leaderboard table of eval runs, with optional task filter and sort control.
 argument-hint: "[--task <name>] [--sort <primary_metric|generation|cost_usd>] [--top <N>]"
 allowed-tools: [Read]
@@ -6,10 +7,10 @@ disable-model-invocation: true
 ---
 
 Display a ranked leaderboard of eval runs recorded in `.ai-state/eval_ledger/EVAL_LOG.md`.
-This command is read-only — it never writes files or executes shell commands.
+This skill is read-only — it never writes files or executes shell commands.
 
 For context on the eval loop that produces the log, see
-[`skills/agent-evals/SKILL.md`](../skills/agent-evals/SKILL.md).
+[`skills/agent-evals/SKILL.md`](../agent-evals/SKILL.md).
 
 ## Arguments
 
@@ -102,8 +103,8 @@ All 11 columns are defined in `skills/agent-evals/references/run-ledger-schema.m
 
 ## Notes
 
-- This command is read-only. It never modifies `EVAL_LOG.md` or any other file.
-- `EVAL_LOG.md` is an append-only log — rows accumulate across runs; this command reads
+- This skill is read-only. It never modifies `EVAL_LOG.md` or any other file.
+- `EVAL_LOG.md` is an append-only log — rows accumulate across runs; this skill reads
   the full log each time.
 - `prompt_hash` and `dataset_sha` in the table are short 8-character prefixes for
   readability. Full hashes live in the corresponding `EVAL_RESULTS.md` at project root.

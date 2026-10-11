@@ -1,11 +1,12 @@
 ---
+name: eval-praxion
 description: Run out-of-band quality evaluation against Praxion pipeline artifacts (mechanical + LLM-as-judge). Opt-in, never hook-driven.
 argument-hint: "[<target>] [--task-slug <slug>] [--tier lightweight|standard|full] [--mechanical-only] [--output-dir <dir>]"
 allowed-tools: [Bash(uv:*), Bash(git:*), Bash(python3:*)]
 disable-model-invocation: true
 ---
 
-Single user-invoked entrypoint for the `eval/` harness package. Runs two quality-check families against a resolved corpus of pipeline artifacts and emits a Markdown report. This command is opt-in; eval code never runs from hooks, never during a pipeline. The invocation contract is out-of-band by design — LLM-as-judge calls cost real tokens and must remain operator-triggered, never woven into automation.
+Single user-invoked entrypoint for the `eval/` harness package. Runs two quality-check families against a resolved corpus of pipeline artifacts and emits a Markdown report. This skill is opt-in; eval code never runs from hooks, never during a pipeline. The invocation contract is out-of-band by design — LLM-as-judge calls cost real tokens and must remain operator-triggered, never woven into automation.
 
 **Invariant**: if any hook or agent script references `praxion_evals.harness.*`, flag it as a bug.
 
@@ -123,12 +124,12 @@ If any check emits FAIL, surface the check name, the artifact path, and the verd
 
 - LLM judge calls cost real API credits (or subscription quota). The report header shows estimated cost per run. Use `--mechanical-only` to bound cost to zero when only the structural surface matters.
 - The PASS-only family-2 corpus available at v1 limits calibration for false-negative detection; the `## Calibration Notes` section in every report records this gap explicitly.
-- This command is the single eval entrypoint. The retired `/eval` Tier 1 surface has been folded into Family 1's mechanical artifact-manifest check — invoke via `--task-slug <slug>` to reproduce the old behavior; combine with `--mechanical-only` to keep it free.
+- This skill is the single eval entrypoint. The retired `/eval` Tier 1 surface has been folded into Family 1's mechanical artifact-manifest check — invoke via `--task-slug <slug>` to reproduce the old behavior; combine with `--mechanical-only` to keep it free.
 
 ## Separate Entry: The Live Context-Layer Runner
 
 `praxion-evals-live` is a **distinct console entry**, not a flag on `/eval-praxion` — `/eval-praxion`
-and its `--mechanical-only` route never start a live session, and this command never invokes it.
+and its `--mechanical-only` route never start a live session, and this skill never invokes it.
 Where `/eval-praxion`'s seeded-scenario family grades five **frozen, golden-fixture** captures, the
 live runner produces those `recorded_*` values fresh: for each seeded case it spawns real, isolated
 `claude -p` sessions against a chosen context-layer checkout, captures the observable from harness
@@ -136,10 +137,10 @@ telemetry or a filesystem delta (never from the model's own self-report), and gr
 same mechanical/judge seam `/eval-praxion` uses — so live and frozen grading never diverge.
 
 - **Opt-in and paid**: every session costs real API credits; run it deliberately, never from a hook,
-  a pipeline step, or CI. A run-level spend cap (`$50` by default) is enforced before every launch,
+  a pipeline step, or CI. A run-level spend cap (`\$50` by default) is enforced before every launch,
   on top of each session's own per-session budget.
 - **Ralph-lite follows the same policy**: a Ralph-lite run (`step_loop.py run`) is launched by a person, opt-in and paid, bounded per iteration and per loop, and never started from a hook, a pipeline step or CI.
-- **Cost**: roughly $15-40 for a full run with `--canary` at the default repeat count. `--dry-run`
+- **Cost**: roughly \$15-40 for a full run with `--canary` at the default repeat count. `--dry-run`
   prints one representative session's argv and environment keys per scenario (not every repeat) and
   spawns nothing — it is a preview of the shape, not an exact session count.
 - **Isolation**: before any scenario session runs, one preflight session over an identically built,

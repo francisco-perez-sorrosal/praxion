@@ -1,4 +1,5 @@
 ---
+name: run-experiment
 description: "Dispatch an ML training experiment to the configured backend (local, SkyPilot, RunPod, or Nebius), validate the compute budget, stream metrics, and write TRAINING_RESULTS.md."
 argument-hint: "[--descriptor <path>] [--task-slug <slug>]"
 allowed-tools: [Read, Write, Edit, Bash, Glob, AskUserQuestion]
@@ -6,10 +7,10 @@ disable-model-invocation: true
 ---
 
 Dispatch a training experiment, validate the compute budget, stream metrics, and write
-`TRAINING_RESULTS.md`. Integrates the [neo-cloud-abstraction](../skills/neo-cloud-abstraction/SKILL.md)
-backend operations, [llm-training-eval](../skills/llm-training-eval/SKILL.md) results schema,
-[experiment-tracking](../skills/experiment-tracking/SKILL.md) metric streaming, and
-[gpu-budget-conventions](../rules/ml/gpu-budget-conventions.md) enforcement in one workflow.
+`TRAINING_RESULTS.md`. Integrates the [neo-cloud-abstraction](../neo-cloud-abstraction/SKILL.md)
+backend operations, [llm-training-eval](../llm-training-eval/SKILL.md) results schema,
+[experiment-tracking](../experiment-tracking/SKILL.md) metric streaming, and
+[gpu-budget-conventions](../../rules/ml/gpu-budget-conventions.md) enforcement in one workflow.
 
 Covers operational modes **A** (co-located owned GPU), **B** (co-located rented GPU box), and
 **C** (separated cloud via SkyPilot, RunPod direct, or Nebius direct). The same
@@ -61,8 +62,8 @@ Record the full 40-character SHA as `git_commit`.
 ### 2. Validate Compute Budget
 
 **Before dispatching**, verify the compute budget is declared. Apply
-[rules/ml/gpu-budget-conventions.md](../rules/ml/gpu-budget-conventions.md) and
-[skills/deployment/references/gpu-compute-budgeting.md](../skills/deployment/references/gpu-compute-budgeting.md).
+[rules/ml/gpu-budget-conventions.md](../../rules/ml/gpu-budget-conventions.md) and
+[skills/deployment/references/gpu-compute-budgeting.md](../deployment/references/gpu-compute-budgeting.md).
 
 **Check `gpu_hours_budget` in the descriptor:**
 
@@ -238,7 +239,7 @@ and committed with the experiment-mode git convention
 
 ## Cross-References
 
-| Artifact | Role in this command |
+| Artifact | Role in this skill |
 |---|---|
 | `skills/neo-cloud-abstraction/SKILL.md` | Descriptor schema; 8 lifecycle operations; backend selection |
 | `skills/neo-cloud-abstraction/references/local-backend.md` | Dispatch + streaming for Mode A/B |

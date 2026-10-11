@@ -175,12 +175,23 @@ def test_rendered_output_staged_without_src_c4_fails(tmp_path: Path, render: str
 
 
 @pytest.mark.parametrize("render", ["main.d2", "main.svg"])
-def test_rendered_output_staged_with_src_c4_passes(tmp_path: Path, render: str) -> None:
-    """A rendered/ output staged together with a .c4 under its src/ must exit 0."""
+@pytest.mark.parametrize("source", ["model.c4", "diagram.mmd", "layout.d2"])
+def test_rendered_output_staged_with_a_src_source_passes(
+    tmp_path: Path, render: str, source: str
+) -> None:
+    """A rendered/ output staged with a LikeC4, Mermaid or D2 source under its src/ exits 0."""
     repo = _make_repo(tmp_path)
     _stage_file(repo, f"docs/diagrams/system/rendered/{render}", "digraph {}\n")
-    _stage_file(repo, "docs/diagrams/system/src/model.c4", "// source\n")
+    _stage_file(repo, f"docs/diagrams/system/src/{source}", "// source\n")
     assert _run_gate(repo) == 0
+
+
+def test_rendered_output_not_satisfied_by_a_non_source_file_under_src(tmp_path: Path) -> None:
+    """A file under src/ that is not a diagram source does not cover the render."""
+    repo = _make_repo(tmp_path)
+    _stage_file(repo, "docs/diagrams/system/rendered/main.svg", "<svg/>\n")
+    _stage_file(repo, "docs/diagrams/system/src/README.md", "notes\n")
+    assert _run_gate(repo) == 1
 
 
 def test_rendered_output_finding_names_render_and_src_directory(

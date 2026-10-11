@@ -7,8 +7,10 @@ a corresponding source change OR carry a line-adjacent `aac-override: <reason>`
 comment. Two diagram layouts are recognised:
 
 - src/ plus rendered/: outputs at docs/diagrams/<name>/rendered/<view>.{d2,svg}
-  are generated from the .c4 files under docs/diagrams/<name>/src/, so at least
-  one .c4 under that src/ directory must be staged with them.
+  are generated from the diagram sources under docs/diagrams/<name>/src/ (a
+  LikeC4 .c4, a Mermaid .mmd or a D2 .d2, the three toolchains
+  rules/writing/diagram-conventions.md admits), so at least one such source under
+  that src/ directory must be staged with them.
 - legacy: outputs at docs/diagrams/<name>/<view>.{d2,svg} are generated from
   docs/diagrams/<name>.c4.
 
@@ -56,6 +58,9 @@ _RENDERED_OUTPUT_RE = re.compile(
     r"^docs/diagrams/(?P<name>[^/]+)/rendered/(?P<view>[^/]+)\.(?:d2|svg)$"
 )
 _C4_SUFFIX = ".c4"
+# The source kinds a src/ directory may hold (rules/writing/diagram-conventions.md § Toolchain
+# Selection); the legacy flat layout stays LikeC4-only.
+_SOURCE_SUFFIXES = (".c4", ".mmd", ".d2")
 _ARCH_DOC_RE = re.compile(r"(?:^|/)(?:ARCHITECTURE\.md|docs/architecture\.md)$")
 _OVERRIDE_CODE_RE = re.compile(r"^\s*#\s*aac-override:\s+(\S.*)$")
 _OVERRIDE_HTML_RE = re.compile(r"<!--\s*aac-override:\s+(\S.*?)\s*-->")
@@ -257,8 +262,9 @@ def _diagram_source(path: str, staged_paths: set[str]) -> tuple[str, bool] | Non
     rendered = _RENDERED_OUTPUT_RE.match(path)
     if rendered:
         src_dir = f"docs/diagrams/{rendered.group('name')}/src/"
-        staged = any(p.startswith(src_dir) and p.endswith(_C4_SUFFIX) for p in staged_paths)
-        return f"a {_C4_SUFFIX} file under {src_dir}", staged
+        staged = any(p.startswith(src_dir) and p.endswith(_SOURCE_SUFFIXES) for p in staged_paths)
+        kinds = ", ".join(_SOURCE_SUFFIXES)
+        return f"a diagram source ({kinds}) under {src_dir}", staged
     legacy = _DIAGRAM_OUTPUT_RE.match(path)
     if legacy:
         source = f"docs/diagrams/{legacy.group('name')}{_C4_SUFFIX}"
@@ -267,7 +273,7 @@ def _diagram_source(path: str, staged_paths: set[str]) -> tuple[str, bool] | Non
 
 
 def _check_path_pair(staged_paths: set[str], diff_by_path: dict[str, list[str]]) -> list[Finding]:
-    """Return FAIL findings for diagram outputs staged without their .c4 source."""
+    """Return FAIL findings for diagram outputs staged without their diagram source."""
     findings: list[Finding] = []
     for path in sorted(staged_paths):
         requirement = _diagram_source(path, staged_paths)

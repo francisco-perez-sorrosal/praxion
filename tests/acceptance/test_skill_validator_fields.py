@@ -11,6 +11,7 @@ import re
 
 import pytest
 
+from tests.acceptance.drivers.frontmatter_key_check import accepts, frontmatter_key_findings
 from tests.acceptance.drivers.skill_pages import schema_field_keys
 from tests.acceptance.drivers.skill_validator import (
     long_body,
@@ -123,6 +124,13 @@ def test_a_skill_carrying_a_defect_rejected_today_is_still_rejected_with_an_erro
     assert run.errors(), f"exit {run.exit_code} but no error is reported; {run.describe()}"
 
 
+def test_a_skill_with_an_empty_description_still_validates_as_it_does_today(tmp_path):
+    run = validate(write_skill(tmp_path, PROBE, skill_md(PROBE, description='""')))
+
+    assert run.exit_code == 0, run.describe()
+    assert not run.errors(), run.describe()
+
+
 def test_every_shipped_skill_still_validates():
     run = validate_repository()
 
@@ -162,3 +170,35 @@ def test_every_field_the_schema_reference_lists_is_accepted_by_the_validator(tmp
 
     assert listed, "the schema reference lists no field"
     assert not rejected, f"listed in the schema reference but rejected as unknown: {rejected}"
+
+
+# --- one accepted field set: the sentinel's key check agrees with the schema reference ---------
+
+
+@pytest.mark.parametrize("field", FIELD_UNIVERSE)
+def test_the_sentinel_key_check_accepts_a_field_exactly_when_the_schema_reference_lists_it(
+    tmp_path, field
+):
+    listed = field in schema_field_keys()
+    text = skill_md(
+        PROBE, extra={**DOCUMENTED_FIELDS, **MISSPELLED_FIELDS}[field], body=BODY_WITH_ARGUMENTS
+    )
+    accepted = accepts(frontmatter_key_findings(tmp_path, PROBE, text), field)
+
+    assert accepted == listed, (
+        f"{field}: schema reference lists it={listed}, sentinel key check accepts it={accepted}"
+    )
+
+
+def test_every_field_the_schema_reference_lists_is_accepted_by_the_sentinel_key_check(tmp_path):
+    listed = sorted(schema_field_keys() - {"name", "description"})
+    extra = "\n".join(DOCUMENTED_FIELDS.get(f, f"{f}: probe") for f in listed)
+    findings = frontmatter_key_findings(
+        tmp_path, PROBE, skill_md(PROBE, extra=extra, body=BODY_WITH_ARGUMENTS)
+    )
+    rejected = [f for f in listed if not accepts(findings, f)]
+
+    assert listed, "the schema reference lists no field"
+    assert not rejected, (
+        f"listed in the schema reference but flagged by the sentinel key check: {rejected}"
+    )

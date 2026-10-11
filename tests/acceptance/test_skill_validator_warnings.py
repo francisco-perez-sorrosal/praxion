@@ -42,6 +42,11 @@ HAZARDS = {
         r"argument-hint",
         r"quot|value|empty",
     ),
+    "an argument-hint key with no value": Hazard(
+        skill_md(PROBE, extra="argument-hint:", body=USES_ARGUMENTS),
+        r"argument-hint",
+        r"quot|value|empty|remove|omit",
+    ),
     "an unquoted argument-hint": Hazard(
         skill_md(PROBE, extra="argument-hint: <path>", body=USES_ARGUMENTS),
         r"argument-hint",

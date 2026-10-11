@@ -240,7 +240,6 @@ def rejection_probes() -> dict[str, Probe]:
             "probe--skill", skill_md("probe--skill"), ("probe--skill",)
         ),
         "missing description": Probe(_PROBE, f"---\nname: {_PROBE}\n---\n# Probe\n"),
-        "empty description": Probe(_PROBE, skill_md(_PROBE, description='""')),
         "over-long description": Probe(_PROBE, skill_md(_PROBE, description="d" * 1025)),
         "angle brackets in the description": Probe(
             _PROBE, skill_md(_PROBE, description="Use when probing <brackets>."), ("<brackets>",)

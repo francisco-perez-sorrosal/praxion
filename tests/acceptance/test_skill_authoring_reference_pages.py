@@ -183,9 +183,10 @@ def test_a_folded_reference_page_no_longer_exists(name):
     assert not (REFERENCES / name).exists()
 
 
-# Frozen history: records of the past, never rewritten. Also exempt: this outer loop, which
-# names the retired pages in order to assert their absence, and the raw observation logs, which
-# record tool calls (the deletion itself among them) as they happened.
+# Frozen history, as the spec defines it: finalized and draft decision records, archived specs,
+# sentinel, metrics and skill-harvest reports, the changelog, tech-debt ledger rows, the tracked
+# observation logs of the persistent state directory, and the outer-loop acceptance tests (which
+# name the retired pages in order to assert their absence).
 FROZEN_HISTORY = re.compile(
     r"^(\.ai-state/(decisions|specs|sentinel_reports|metrics_reports|skill_genesis_reports)/"
     r"|\.ai-state/(TECH_DEBT_LEDGER|TECH_DEBT_RESOLVED)\.md$|CHANGELOG\.md$"

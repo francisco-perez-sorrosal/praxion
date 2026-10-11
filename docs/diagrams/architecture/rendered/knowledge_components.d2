@@ -81,16 +81,12 @@ Title: {
     label: "Agents\n[Knowledge asset]\nAuthored subprocess\nspecifications"
     class: category_knowledge_asset
   }
-  "el_praxion.knowledge.commands": {
-    label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
-    class: category_knowledge_asset
-  }
   "el_praxion.knowledge.rules": {
     label: "Rules\n[Knowledge asset]\nDeclarative conventions"
     class: category_knowledge_asset
   }
   "el_praxion.knowledge.skills": {
-    label: "Skills\n[Knowledge asset]\nDomain expertise modules"
+    label: "Skills\n[Knowledge asset]\nExpertise and user workflows"
     class: category_knowledge_asset
   }
 }
@@ -171,10 +167,8 @@ Legend: {
   }
 }
 "el_praxion.knowledge"."el_praxion.knowledge.agents" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "spawns" {class: line_acts_on}
-"el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "triggers" {class: line_acts_on}
 "el_praxion.knowledge"."el_praxion.knowledge.rules" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "constrains" {class: line_acts_on}
-"el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "injects" {class: line_acts_on}
+"el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline": "injects and triggers" {class: line_acts_on}
 "el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.agents": "deploys" {class: line_acts_on}
-"el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.commands": "deploys" {class: line_acts_on}
 "el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.rules": "deploys" {class: line_acts_on}
 "el_praxion.tooling"."el_praxion.tooling.installers" -> "el_praxion.knowledge"."el_praxion.knowledge.skills": "deploys" {class: line_acts_on}

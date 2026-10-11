@@ -11,7 +11,7 @@
  *   cis_loop_detail, rework_loop_detail — loop details (restyled by a later step)
  *
  * Layer structure (R1):
- *   Knowledge Layer      — Skills, Rules, Commands, Agents (authored definitions)
+ *   Knowledge Layer      — Skills, Rules, Agents (authored definitions)
  *   Orchestration Layer  — Agent Pipeline (runtime, with per-agent elements), Hooks, .ai-work/
  *   Persistence Layer    — Chronograph MCP, .ai-state/
  *   Tooling              — Installers, Scripts, Versioning
@@ -26,7 +26,7 @@
  * (the pre-commit hook and the Architecture CI workflow run the same command).
  *
  * Dual representation of Agents (R2): the authored Markdown family
- * (knowledge.agents) lives alongside skills/rules/commands as a deployable
+ * (knowledge.agents) lives alongside skills/rules as a deployable
  * knowledge surface; the runtime, spawned-subprocess side (orchestration.pipeline
  * and its per-agent children) lives in the orchestration layer where execution,
  * ephemeral state, and lifecycle wiring cohere. The two are linked by
@@ -59,16 +59,21 @@ model {
 
   // ── Praxion System ───────────────────────────────────────────────────────
   praxion = system "Praxion" {
-    description "Skills, rules, commands and agents that equip an AI coding assistant"
+    description "Skills, rules and agents that equip an AI coding assistant"
     technology "Markdown, Python and shell"
 
     // Knowledge Layer: static assets loaded into agent context
     knowledge = component "Knowledge" {
       metadata { category 'Layer' }
 
-      skills   = component "Skills"         { description "Domain expertise modules" metadata { category 'Knowledge asset' } }
+      // The summary is the one-line form the renders draw (labels wrap at 28 characters): the
+      // two-line description would push the feedback-loops view past its proportions bound.
+      skills   = component "Skills"         {
+        summary "Expertise and user workflows"
+        description "Domain expertise modules and user-invoked workflows"
+        metadata { category 'Knowledge asset' }
+      }
       rules    = component "Rules"          { description "Declarative conventions" metadata { category 'Knowledge asset' } }
-      commands = component "Commands"       { description "User-invoked workflows" metadata { category 'Knowledge asset' } }
       agents   = component "Agents"         { description "Authored subprocess specifications" metadata { category 'Knowledge asset' } }
     }
 
@@ -148,9 +153,8 @@ model {
 
     // ── Intra-system Relationships ──────────────────────────────────────────
     // Knowledge → Orchestration: authored surfaces shape / inject / constrain / trigger the runtime
-    knowledge.skills      -> orchestration.pipeline "injects"
+    knowledge.skills      -> orchestration.pipeline "injects and triggers"
     knowledge.rules       -> orchestration.pipeline "constrains"
-    knowledge.commands    -> orchestration.pipeline "triggers"
     knowledge.agents      -> orchestration.pipeline "spawns"
 
     // Orchestration internal — orchestrator dispatches pipeline agents
@@ -230,8 +234,8 @@ model {
     orchestration.orchestrator        -> tooling.scripts "spawns a worktree per row" { #rework_loop }
     orchestration.orchestrator        -> orchestration.doc_findings "writes a findings file per worktree" { #rework_loop }
     orchestration.orchestrator        -> persistence.tdl "flips linked td-NNN rows to in-flight" { #rework_loop }
-    orchestration.doc_findings        -> knowledge.commands "auto-discovered by /resume-rework" { #rework_loop }
-    knowledge.commands                -> orchestration.pipeline.architect "starts" { #rework_loop }
+    orchestration.doc_findings        -> knowledge.skills "auto-discovered by /resume-rework" { #rework_loop }
+    knowledge.skills                  -> orchestration.pipeline.architect "starts" { #rework_loop }
     orchestration.pipeline.architect  -> orchestration.doc_systems "re-enters pipeline at SYSTEMS_PLAN" { #rework_loop }
 
     // Validator + skill-genesis side-channels (post-pipeline)
@@ -250,7 +254,6 @@ model {
     // not the runtime (which is spawned per-task by the host).
     tooling.installers  -> knowledge.skills   "deploys"
     tooling.installers  -> knowledge.rules    "deploys"
-    tooling.installers  -> knowledge.commands "deploys"
     tooling.installers  -> knowledge.agents   "deploys"
     tooling.scripts     -> persistence.adrs   "promotes drafts"
     tooling.scripts     -> persistence.tdl    "reconciles"
@@ -306,10 +309,10 @@ views {
     description "The authored assets of the knowledge layer, the installers that deploy them and the runtime they shape"
 
     include
-      praxion.knowledge.skills, praxion.knowledge.rules, praxion.knowledge.commands, praxion.knowledge.agents,
+      praxion.knowledge.skills, praxion.knowledge.rules, praxion.knowledge.agents,
       praxion.tooling.installers,
       praxion.orchestration.pipeline
-    exclude praxion.knowledge.commands -> praxion.orchestration.pipeline.architect
+    exclude praxion.knowledge.skills -> praxion.orchestration.pipeline.architect
   }
 
   view orchestration_components {
@@ -435,7 +438,7 @@ views {
     include
       praxion.orchestration.pipeline.researcher, praxion.orchestration.pipeline.architect,
       praxion.orchestration.pipeline.verifier, praxion.orchestration.orchestrator,
-      praxion.knowledge.commands,
+      praxion.knowledge.skills,
       praxion.orchestration.doc_research, praxion.orchestration.doc_systems,
       praxion.orchestration.doc_rework, praxion.orchestration.doc_findings
     exclude * -> * where tag is #forward
@@ -482,8 +485,8 @@ views {
     praxion.orchestration.orchestrator -> praxion.tooling.scripts 'spawns a worktree per row'
     praxion.orchestration.orchestrator -> praxion.orchestration.doc_findings 'writes a findings file per worktree'
     praxion.orchestration.orchestrator -> praxion.persistence.tdl 'flips linked td-NNN rows to in-flight'
-    praxion.orchestration.doc_findings -> praxion.knowledge.commands 'is auto-discovered by /resume-rework'
-    praxion.knowledge.commands -> praxion.orchestration.pipeline.architect 'dispatches the architect first'
+    praxion.orchestration.doc_findings -> praxion.knowledge.skills 'is auto-discovered by /resume-rework'
+    praxion.knowledge.skills -> praxion.orchestration.pipeline.architect 'dispatches the architect first'
     praxion.orchestration.pipeline.architect -> praxion.orchestration.doc_systems 're-enters the pipeline at the plan'
   }
 }

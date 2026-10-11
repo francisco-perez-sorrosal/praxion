@@ -113,7 +113,7 @@ Title: {
   class: category_external_system
 }
 "el_praxion": {
-  label: "Praxion\n[System in scope · Markdown, Python and shell]\nSkills, rules, commands and\nagents that equip an AI\ncoding assistant"
+  label: "Praxion\n[System in scope · Markdown, Python and shell]\nSkills, rules and agents\nthat equip an AI coding\nassistant"
   class: category_system_in_scope_frame
   "el_praxion.knowledge": {
     label: "Knowledge\n[Layer]"
@@ -227,12 +227,12 @@ Legend: {
 "el_cursor" -> "el_praxion": "loads rules" {class: line_acts_on}
 "el_developer" -> "el_praxion": "develops" {class: line_acts_on}
 "el_github" -> "el_praxion": "hosts" {class: line_acts_on}
-"el_praxion"."el_praxion.knowledge" -> "el_praxion"."el_praxion.orchestration": "constrains +4 more" {class: line_acts_on}
+"el_praxion"."el_praxion.knowledge" -> "el_praxion"."el_praxion.orchestration": "constrains +3 more" {class: line_acts_on}
 "el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.knowledge": "auto-discovered by /resume-rework" {class: line_acts_on}
 "el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.persistence": "emits events (HTTP) +8 more" {class: line_acts_on}
 "el_praxion"."el_praxion.orchestration" -> "el_praxion"."el_praxion.tooling": "spawns a worktree per row" {class: line_acts_on}
 "el_praxion"."el_praxion.persistence" -> "el_arize_phoenix": "streams via OTLP" {class: line_acts_on}
 "el_praxion"."el_praxion.tooling" -> "el_anthropic_api": "judges via the JudgeClient adapter" {class: line_acts_on}
-"el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.knowledge": "deploys +3 more" {class: line_acts_on}
+"el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.knowledge": "deploys +2 more" {class: line_acts_on}
 "el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.orchestration": "reads in-flight documents" {class: line_read_only}
 "el_praxion"."el_praxion.tooling" -> "el_praxion"."el_praxion.persistence": "promotes drafts +3 more" {class: line_acts_on}

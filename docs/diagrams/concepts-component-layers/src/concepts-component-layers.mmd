@@ -1,8 +1,7 @@
 graph TD
     CM["CLAUDE.md Always loaded. Global directives, methodology, personal info."]
     RU["Rules Loaded when contextually relevant. Domain knowledge (coding style, git conventions, coordination protocols)."]
-    SK["Skills Activated for specific tasks. Expert workflows and procedures (Python, refactoring, CI/CD, SDD)."]
-    CO["Commands User-invoked. Quick actions for frequent workflows (commits, worktrees, memory management, scaffolding)."]
+    SK["Skills Activated for specific tasks or invoked by the user. Expert workflows and procedures (Python, refactoring, CI/CD, SDD) and quick actions (commits, worktrees, scaffolding)."]
     AG["Agents Delegated. Complex multi-step work in isolated contexts (research, architecture, implementation, testing, verification)."]
 
-    CM --> RU --> SK --> CO --> AG
+    CM --> RU --> SK --> AG

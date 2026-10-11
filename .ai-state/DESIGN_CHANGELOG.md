@@ -6,6 +6,12 @@ The current "Last verified" pointer in `.ai-state/DESIGN.md` § 1 is a one-liner
 
 ---
 
+## 2026-10-10 — commands-to-skills (Built)
+
+The **Commands** component leaves the model: every user-invoked workflow is a skill under its own name, reached as `/praxion:<name>`, so `knowledge.skills` now reads "Domain expertise modules and user-invoked workflows" (its diagram summary "Expertise and user workflows" keeps the feedback-loops view inside its proportions bound) and the system description drops "commands". The `triggers` edge folds into the skills edge ("injects and triggers"), the installers' `deploys` edge to commands is deleted, and the rework-loop edges and `rework_loop_detail` steps start from `knowledge.skills`. §3a loses the Commands row and the Skills row's user-invoked workflows flip to Built; §3b Key Files cells, §4 interface rows, §5 rework and skill-genesis prose and §6 repoint from `commands/<name>.md` to `skills/<name>/SKILL.md`. The concepts layer diagram and the two deployment diagrams drop the commands node, re-rendered with their sources. `docs/architecture.md` updated in lockstep.
+
+---
+
 ## 2026-07-01 — dashboard-debt-trio (Built)
 
 **Pipeline Dashboard** row: renderer registry extended to `resolveRenderer(renderer?, diataxis?, contentType?)` — the manifest `renderer:` field is now the highest-priority lookup key, ahead of the existing `diataxis` → `contentType` → `DefaultShell` fallback chain (all three fallback levels preserved; the new leading param is optional, so every existing call site kept working once updated to pass it through). Three Diátaxis shells (`tutorial`/`how-to`/`concepts`) flipped from `DefaultShell` aliases to dedicated components. Five new per-artifact renderers (`metrics_view`, `plan_view`, `verification_report`, `idea_grid`, `architecture_explorer`) added in a new `src/components/renderers/` package, each reached solely via the `renderer:` key and each degrading to `DefaultShell` on malformed/absent input; `metrics_view`/`architecture_explorer` are deliberately thin Pathway-B previews distinct from the existing Pathway-A full pages (`/metrics`, `/architecture`). No change to `src/server/view-models/documentation.ts` (kept off-limits for the concurrent td-029 hardening pass). Closes td-024/td-025/td-027. Draft ADR `dec-265` (renderer-field-resolver-key) awaiting finalize. `docs/architecture.md` updated in lockstep.

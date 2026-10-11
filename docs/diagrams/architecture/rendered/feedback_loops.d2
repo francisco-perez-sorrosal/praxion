@@ -98,8 +98,8 @@ Title: {
 "el_praxion.knowledge": {
   label: "Knowledge\n[Layer]"
   class: category_layer_frame
-  "el_praxion.knowledge.commands": {
-    label: "Commands\n[Knowledge asset]\nUser-invoked workflows"
+  "el_praxion.knowledge.skills": {
+    label: "Skills\n[Knowledge asset]\nExpertise and user workflows"
     class: category_knowledge_asset
   }
 }
@@ -237,8 +237,8 @@ Legend: {
     }
   }
 }
-"el_praxion.knowledge"."el_praxion.knowledge.commands" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "starts" {class: line_acts_on}
-"el_praxion.orchestration"."el_praxion.orchestration.doc_findings" -> "el_praxion.knowledge"."el_praxion.knowledge.commands": "auto-discovered by /resume-rework" {class: line_acts_on}
+"el_praxion.knowledge"."el_praxion.knowledge.skills" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "starts" {class: line_acts_on}
+"el_praxion.orchestration"."el_praxion.orchestration.doc_findings" -> "el_praxion.knowledge"."el_praxion.knowledge.skills": "auto-discovered by /resume-rework" {class: line_acts_on}
 "el_praxion.orchestration"."el_praxion.orchestration.doc_research" -> "el_praxion.orchestration"."el_praxion.orchestration.pipeline"."el_praxion.orchestration.pipeline.architect": "signals CIS to" {class: line_read_only}
 "el_praxion.orchestration"."el_praxion.orchestration.doc_rework" -> "el_praxion.orchestration"."el_praxion.orchestration.orchestrator": "hands the manifest to" {class: line_read_only}
 "el_praxion.orchestration"."el_praxion.orchestration.orchestrator" -> "el_praxion.orchestration"."el_praxion.orchestration.doc_findings": "writes a findings file per worktree" {class: line_acts_on}

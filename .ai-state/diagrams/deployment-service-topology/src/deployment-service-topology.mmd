@@ -2,7 +2,7 @@ graph TD
     subgraph Host["Developer machine"]
         CC[Claude Code]
         subgraph PluginSurface["Praxion plugin surface"]
-            Plugin[skills + agents + rules + commands Markdown, Python, Shell]
+            Plugin[skills + agents + rules Markdown, Python, Shell]
             Mem[memory-mcp Python stdio]
             Chron[task-chronograph-mcp Python stdio + HTTP :8765]
             Hooks[hooks/*.py, *.sh]

@@ -37,7 +37,7 @@ Match content depth to complexity:
 
 These signals reduce cognitive load only when used selectively, and add noise when overused. Praxion's voice is professional-technical — calibrate accordingly.
 
-- **Emojis**: status anchors (`✅`, `❌`, `⚠️`), category markers across a long list of similar rows, or a stable identifier for a recurring concept. At most one per heading, at most one per bullet, never in body prose. Pair every emoji with text so the meaning survives if the glyph fails to render. Never use in agent-intermediate documents (`.ai-work/`, `.ai-state/`) or in `CLAUDE.md` / `SKILL.md` / agent / rule / command files.
+- **Emojis**: status anchors (`✅`, `❌`, `⚠️`), category markers across a long list of similar rows, or a stable identifier for a recurring concept. At most one per heading, at most one per bullet, never in body prose. Pair every emoji with text so the meaning survives if the glyph fails to render. Never use in agent-intermediate documents (`.ai-work/`, `.ai-state/`) or in `CLAUDE.md` / `SKILL.md` / agent / rule files.
 - **Badges**: 3–4 maximum, single row directly under the title, status-only (build, license, version, coverage). Each badge must be a live link. Skip vanity badges (stars, follower counts).
 - **Color**: never use `<span style="color:...">` or other raw HTML for color. Color sources are limited to GitHub Alerts (theme-controlled), syntax-highlighted code blocks (set the language), badges (status-encoded), and inline `code` spans. Never rely on color alone — pair with shape, text, or icon.
 - **Tone**: calm, periods over exclamation points; one concern per alert; consistent vocabulary across the project.
@@ -69,7 +69,7 @@ For human-facing, GitHub-rendered documents only (`README.md`, `docs/*.md`, `CON
 
 **Anchor links** (`[text](#heading-slug)`) — for TL;DR sections, table-of-contents entries, and intra-document cross-references in documents with 4+ sections.
 
-**Scope constraint**: never apply to agent-intermediate documents (`.ai-work/`, `.ai-state/`), context artifacts (`CLAUDE.md`, `SKILL.md`), or agent/rule/command definitions — these are not GitHub-rendered and the markup adds noise.
+**Scope constraint**: never apply to agent-intermediate documents (`.ai-work/`, `.ai-state/`), context artifacts (`CLAUDE.md`, `SKILL.md`), or agent/rule definitions — these are not GitHub-rendered and the markup adds noise.
 
 ### Structural Integrity and Naming
 

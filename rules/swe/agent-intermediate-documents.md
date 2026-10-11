@@ -10,7 +10,7 @@ Agent documents live in two locations by lifecycle: **`.ai-work/<task-slug>/`** 
 
 ### `.ai-work/` — Ephemeral Pipeline Documents
 
-- **Exclusively for pipeline documents** — the outputs defined in the [SWE agent coordination protocol](swe-agent-coordination-protocol.md); never command scratch files, project docs, ADRs, build artifacts or tool caches.
+- **Exclusively for pipeline documents** — the outputs defined in the [SWE agent coordination protocol](swe-agent-coordination-protocol.md); never skill scratch files, project docs, ADRs, build artifacts or tool caches.
 
 #### Task Slug Convention
 

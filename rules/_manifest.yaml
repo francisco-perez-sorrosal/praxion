@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-11T02:55:22Z'
+generated_at: '2026-10-11T04:17:18Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -16,7 +16,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 8703
+  chars: 8694
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on
@@ -28,13 +28,13 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 4136
+  chars: 4134
 - id: swe/swe-agent-coordination-protocol
   path: rules/swe/swe-agent-coordination-protocol.md
   load: always_on
   core: true
   install: symlink
-  chars: 18639
+  chars: 18643
 - id: swe/agent-model-routing
   path: rules/swe/agent-model-routing.md
   load: always_on
@@ -166,7 +166,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 8874
+  chars: 8863
   paths:
   - '**/*.py'
   - '**/*.ts'
@@ -190,7 +190,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3643
+  chars: 3646
   paths:
   - install*.sh
   - scripts/install*.sh
@@ -213,7 +213,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 4927
+  chars: 4925
   paths:
   - skills/**/SKILL.md
 - id: swe/testing-conventions
@@ -289,7 +289,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 6181
+  chars: 6163
   paths:
   - '**/README.md'
   - '**/README_DEV.md'

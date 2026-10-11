@@ -30,7 +30,7 @@ Fields: `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by
 
 A decision is `architectural` **iff it changes what exists or what connects**:
 
-- **internal** — it adds, removes, merges, or splits a component in any artifact family (skill, agent, rule, command, hook, script, MCP server, package, service); moves a responsibility from one component to another; or introduces or removes a boundary or abstraction between them.
+- **internal** — it adds, removes, merges, or splits a component in any artifact family (skill, agent, rule, hook, script, MCP server, package, service); moves a responsibility from one component to another; or introduces or removes a boundary or abstraction between them.
 - **published** — it changes a canonical block, a shipped template, or an onboard-contract phase.
 
 If the component inventory and its boundaries are unchanged once the decision lands, it is **not** architectural — *however consequential the trade-off*.

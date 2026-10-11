@@ -63,10 +63,10 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 | `swe/gate-liveness.md` | A gate must be proven to bite: substance-over-structure, a named producer for every consumer, no self-contradiction, a verification path per gate (a canary for CODE gates, a golden bad-case for PROMPT gates), scope fidelity (documented scope vs. actual computed scope), and a named consumer for every gate output. Paths: gate-authoring surfaces (`fitness/**`, `scripts/check_*`/`validate_*`, `hooks/*.py`, sentinel/verifier/planner agents) |
 | `swe/id-citation-discipline.md` | Detection and remediation rules for ephemeral identifier citations (REQ, AC, step numbers) leaking into production source. Paths: source files across all tracked languages |
 | `swe/plugin-install-conventions.md` | Prefer upstream-documented plugin install methods (marketplace > npx skills add > manual); verification checklist for install workflows. Paths: `install*.sh`, `scripts/install*.sh`, `claude/canonical-blocks/**/*.md`, `skills/onboard-project/**/*.md`, `scripts/onboard-project` |
-| `swe/shipped-artifact-isolation.md` | Isolation rules preventing shipped artifacts (`rules/`, `skills/`, `agents/`, `commands/`) from referencing project-specific `.ai-state/` entries. Paths: `rules/**`, `skills/**`, `agents/**`, `commands/**`, `claude/config/**` |
+| `swe/shipped-artifact-isolation.md` | Isolation rules preventing shipped artifacts (`rules/`, `skills/`, `agents/`) from referencing project-specific `.ai-state/` entries. Paths: `rules/**`, `skills/**`, `agents/**`, `claude/config/**` |
 | `swe/staleness-policy.md` | Marker syntax and threshold protocol for drift-prone skill sections. Paths: `**/SKILL.md` |
 | `swe/testing-conventions.md` | Test file placement, naming, coverage expectations, and test isolation. Paths: `tests/**` |
-| `swe/vcs/pr-conventions.md` | PR workflow, merge policy, and the `.ai-state/` safety contract at PR time. Paths: `.github/**`, PR/merge/release commands, `git-conventions.md` |
+| `swe/vcs/pr-conventions.md` | PR workflow, merge policy, and the `.ai-state/` safety contract at PR time. Paths: `.github/**`, the PR-review, merge and release skills, `git-conventions.md` |
 | `writing/aac-dac-conventions.md` | Architecture-as-Code + Documentation-as-Code fence convention (`aac:generated` / `aac:authored`) for `.ai-state/DESIGN.md` and `.c4` sources. Paths: `**/DESIGN.md`, `docs/architecture.md`, `**/*.c4` |
 | `writing/diagram-conventions.md` | Mermaid syntax, layered decomposition (L0/L1/L2), diagram type selection. Paths: documentation-authoring surfaces (`docs/`, architecture docs, `.ai-state/`) |
 | `writing/html-output-conventions.md` | HTML output conventions for the dashboard runtime — Markdown stays source of truth; HTML is a presentation veneer. Paths: `dashboard_app/**`, `**/doc_manifest.yaml` |
@@ -123,7 +123,7 @@ Ask: **"Is this something Claude should _know_, or something Claude should _do_?
 | ---- | ----------- | ----------- |
 | "Always use snake_case in Python" | Rule (too lightweight) | `CLAUDE.md` |
 | "SQL column naming, join conventions, migration rules" | `CLAUDE.md` (too verbose) | Rule |
-| "How to create a git commit with conventions" | Rule (procedural) | Skill or Command |
+| "How to create a git commit with conventions" | Rule (procedural) | Skill |
 | "Commit messages must use imperative mood, type prefixes" | Skill (not procedural) | Rule |
 | "Security checklist for auth code" | `CLAUDE.md` (too detailed, not always relevant) | Rule |
 
@@ -134,10 +134,10 @@ CLAUDE.md          ← always in context (global directives)
     ↓
 Rules              ← loaded when relevant (domain knowledge)
     ↓
-Skills/Commands    ← activated for specific tasks (workflows)
+Skills            ← activated for specific tasks (workflows)
 ```
 
-Skills and commands **implicitly benefit** from rules — Claude has the rules in mind if they're relevant to the task a skill is performing. There is no explicit binding between them.
+Skills **implicitly benefit** from rules — Claude has the rules in mind if they're relevant to the task a skill is performing. There is no explicit binding between them.
 
 ## Writing Effective Rules
 
@@ -237,7 +237,7 @@ Naming directly affects Claude's relevance scoring. Use:
 | Output formatting directives | `CLAUDE.md` |
 | "Always do X in every response" | `CLAUDE.md` |
 | Multi-step automation workflows | Skill |
-| Repeatable procedural recipes | Skill or Command |
+| Repeatable procedural recipes | Skill |
 
 ## How Rules Reach Claude
 
@@ -268,7 +268,7 @@ Adding a new rule file here and re-running `install.sh` is all that's needed.
 
 When a project needs project-specific conventions (filled-in `[CUSTOMIZE]` sections, modified thresholds, domain-specific constraints), copy the rule into the project's `.claude/rules/` directory. The project copy takes precedence over the personal one.
 
-The `/add-rules` command automates this:
+The `/add-rules` skill automates this:
 
 ```bash
 /add-rules coding-style                     # Copy one rule for customization

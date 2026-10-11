@@ -81,15 +81,15 @@ Once a marker exists, F07 stops firing for that section and F08 takes over (age 
 
 ### Refresh Workflow
 
-To refresh one or more sensitive sections in a skill, invoke the slash command:
+To refresh one or more sensitive sections in a skill, invoke the skill:
 
 ```
 /refresh-skill <skill-name>
 ```
 
-The command iterates every section listed in `staleness_sensitive_sections:`, fetches current-state docs per the [current-docs protocol](../../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis), diffs against the section body, and prompts per-section: Accept / Revise / Skip / Permanent. Date bumps require explicit user confirmation — no silent refreshes.
+The skill iterates every section listed in `staleness_sensitive_sections:`, fetches current-state docs per the [current-docs protocol](../../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis), diffs against the section body, and prompts per-section: Accept / Revise / Skip / Permanent. Date bumps require explicit user confirmation — no silent refreshes.
 
-See [commands/refresh-skill.md](../../commands/refresh-skill.md).
+See [skills/refresh-skill/SKILL.md](../../skills/refresh-skill/SKILL.md).
 
 ### Sentinel Check IDs
 

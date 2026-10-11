@@ -17,7 +17,7 @@ and flags the anti-patterns that produce subtly broken installs.
    claude plugin marketplace add <github-source>
    claude plugin install <plugin-id>@<marketplace>
    ```
-   Bash-invocable non-interactively; the same code path the in-session slash commands
+   Bash-invocable non-interactively; the same code path the in-session built-in commands
    `/plugin marketplace add` and `/plugin install` reach. Do not fetch and place files
    manually when the upstream ships a marketplace manifest.
 

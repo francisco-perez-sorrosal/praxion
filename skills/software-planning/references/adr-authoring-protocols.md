@@ -140,7 +140,7 @@ of decisions tagged architectural qualified — which would mean the project mad
 decisions in four months.
 
 The cause is a **granularity mismatch**, not indiscipline. ADRs decide at the level of *capability
-composition* — should this be a skill, an agent, a command, or a hook; where does one agent's remit
+composition* — should this be a skill, an agent, or a hook; where does one agent's remit
 end; should this abstraction exist. The model describes *structural containment* — which boxes hold
 which. Those are different layers, and binding one to the other assumes a correspondence that is
 not there. A test built on it would demote an explicit agent-boundary decision while promoting
@@ -153,7 +153,7 @@ Architectural — each names a component that changed:
 | Decision shape | What changed |
 |---|---|
 | "prevent duplication via existing agents, **not a new dedicated agent**" | inventory (a component deliberately not added) |
-| "ship this capability as **agent + skill + command**" | inventory + composition across families |
+| "ship this capability as **agent + skill + hook**" | inventory + composition across families |
 | "the boundary between **these two agents**" | responsibility ownership |
 | "introduce a **pluggable backend abstraction**" | a boundary added |
 | "replace the bespoke gate with **the framework**" | a mechanism replaced wholesale |
@@ -260,7 +260,7 @@ Ask what fraction of the old record's *decision content* the new record actually
 
 ## Finalize at Merge-to-Main
 
-At merge-to-main, the post-merge finalize step promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records. The protocol is **idempotent** (running twice on the same state is a no-op), so duplicated invocations from the post-merge hook + `/merge-worktree` command are safe. Agents do not run finalize manually.
+At merge-to-main, the post-merge finalize step promotes drafts in `.ai-state/decisions/drafts/` to finalized `<NNN>-<slug>.md` records. The protocol is **idempotent** (running twice on the same state is a no-op), so duplicated invocations from the post-merge hook + `/merge-worktree` skill are safe. Agents do not run finalize manually.
 
 The finalize pipeline and the four relation protocols are **feature-complete**: new ADR-economy work goes to the read path (`query_adrs.py`) and authoring discipline, not to new lifecycle states or relation fields.
 

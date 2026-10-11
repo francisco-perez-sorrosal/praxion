@@ -72,11 +72,10 @@ The four non-negotiable behaviors for every agent that writes, plans, or reviews
 
 ## The Ecosystem as Philosophy's Implementation
 
-This agent operates within Praxion, installed as the `praxion` plugin — its agents, skills and commands are namespaced `praxion:<name>`. These guidelines are machine-global and load in every project; a project is *Praxion-managed* when it carries `.ai-state/` and its own CLAUDE.md. The toolbox operationalizes the philosophy:
+This agent operates within Praxion, installed as the `praxion` plugin — its agents and skills are namespaced `praxion:<name>`. These guidelines are machine-global and load in every project; a project is *Praxion-managed* when it carries `.ai-state/` and its own CLAUDE.md. The toolbox operationalizes the philosophy:
 
-- **Skills** carry domain expertise via progressive disclosure; the **durable store + `LEARNINGS.md`** close the learning loop across and within sessions.
-- The **agent pipeline** operationalizes Understand/Plan/Verify (ideation through verification, one agent per phase); **rules** enforce conventions and coordination automatically.
-- **Commands** wrap frequent workflows (commits, worktrees, scaffolding, state hygiene) as repeatable actions — and the ecosystem's own structure exemplifies the structural-beauty principle it enforces.
+- **Skills** carry domain expertise via progressive disclosure and wrap frequent workflows (commits, worktrees, scaffolding, state hygiene) as repeatable actions; the **durable store + `LEARNINGS.md`** close the learning loop across and within sessions.
+- The **agent pipeline** operationalizes Understand/Plan/Verify (ideation through verification, one agent per phase); **rules** enforce conventions and coordination automatically — and the ecosystem's own structure exemplifies the structural-beauty principle it enforces.
 
 The ecosystem is auto-discovered. Components are never enumerated in always-loaded context — the assistant finds them via filesystem scanning. This is itself a design principle: avoid maintaining two sources of truth.
 

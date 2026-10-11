@@ -16,6 +16,10 @@ finding of `check_gate_liveness.py`'s own `ambient-import` check. This script
 imports only that stdlib-only sibling, `_repo_root`, and `hooks/_hook_utils`
 (also stdlib-only) for `record_gate_fire`.
 
+Run with no arguments, as the commit gate does, it records today's sample into the baseline
+before judging. `--check` judges without writing, so a manual or step-level check leaves the
+state file alone.
+
 Exit codes: 0 clean or fail-open skip, 1 the ratchet breached, 3 script
 error -- an unhandled exception here must never resolve to 1 (findings) or
 2. Exit 2 is not merely "the code `--blocking` maps onto a block" -- it is
@@ -68,7 +72,11 @@ def _format_reasons(result: dict) -> str:
 def main() -> int:
     try:
         repo_root = resolve_repo_root(None, script_dir=SCRIPT_DIR)
-        result = mtb.ratchet(repo_root, api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        result = mtb.ratchet(
+            repo_root,
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            record="--check" not in sys.argv[1:],
+        )
     except Exception as exc:  # noqa: BLE001 - see module docstring on exit codes
         print(f"token ratchet: SCRIPT ERROR -- {exc}", file=sys.stderr)
         return _SCRIPT_ERROR

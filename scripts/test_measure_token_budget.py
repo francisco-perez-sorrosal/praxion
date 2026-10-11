@@ -745,6 +745,25 @@ def test_ratchet_records_todays_sample_idempotently(
     assert todays[0]["governed_bytes"] == 440
 
 
+def test_ratchet_without_record_leaves_the_baseline_file_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A read-only check judges today's reading but never rewrites the state file."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=999_999,
+        samples=[{"date": "2025-12-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    before = baseline.read_bytes()
+    _stub_measurements(monkeypatch, governed_tokens=110, governed_bytes=440, listing_tokens=10)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY, record=False)
+
+    assert baseline.read_bytes() == before
+    assert result["skipped"] is False
+
+
 def test_ratchet_cli_exits_zero_on_a_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`--ratchet` at the CLI must not block a commit when there is nothing to ratchet against."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

@@ -42,6 +42,26 @@ def test_exits_zero_on_a_fail_open_skip(monkeypatch: pytest.MonkeyPatch) -> None
     assert gate.main() == 0
 
 
+def test_check_flag_asks_the_ratchet_not_to_record_and_no_flag_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[bool] = []
+
+    def _spy(repo_root, **kw):
+        seen.append(kw["record"])
+        return {"skipped": True, "reason": "spy", "ratchet_ok": True}
+
+    monkeypatch.setattr(gate, "resolve_repo_root", lambda *a, **kw: Path("/unused"))
+    monkeypatch.setattr(gate.mtb, "ratchet", _spy)
+
+    monkeypatch.setattr(gate.sys, "argv", ["check_token_ratchet.py"])
+    gate.main()
+    monkeypatch.setattr(gate.sys, "argv", ["check_token_ratchet.py", "--check"])
+    gate.main()
+
+    assert seen == [True, False]
+
+
 def test_exits_zero_when_the_ratchet_is_clean(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_ratchet(
         monkeypatch,

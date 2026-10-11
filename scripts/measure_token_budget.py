@@ -506,6 +506,7 @@ def ratchet(
     api_key: str | None = None,
     baseline_path: Path | None = None,
     today: date | None = None,
+    record: bool = True,
 ) -> dict:
     """Today's token-budget ratchet reading against the committed baseline.
 
@@ -522,7 +523,8 @@ def ratchet(
     Records today's sample into the baseline on disk (idempotent -- at most
     one entry per calendar date; a same-day rerun overwrites with the same
     value) before computing the trailing-window delta, so the committed file
-    grows by ordinary use rather than a separate bookkeeping step.
+    grows by ordinary use rather than a separate bookkeeping step. `record=False`
+    computes the same reading without touching the file: a read-only check.
 
     The trailing-window trend compares **bytes**, not tokens (td-180): a
     project whose `ANTHROPIC_API_KEY` availability flips day to day (CI vs.
@@ -556,7 +558,8 @@ def ratchet(
         governed_bytes=governed["bytes"],
         basis=_basis_label(governed),
     )
-    _write_baseline(path, updated)
+    if record:
+        _write_baseline(path, updated)
 
     today_str = today.isoformat()
     prior_samples = sorted(

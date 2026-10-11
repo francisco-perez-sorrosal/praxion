@@ -33,7 +33,7 @@ Add `evals/` at the repository root as Praxion's plugin eval suite, with trigger
 
 ### Repository-root `evals/` (chosen)
 
-The runner finds it with no flag, from a checkout (`claude plugin eval .`) or from an installed plugin, and it is the layout the official docs and `claude plugin eval init` produce. Costs a name close to `eval/`.
+The runner finds it with no `--eval-dir` flag, from an installed plugin or from a directory holding the plugin's tracked files (a full checkout with dependency trees, such as this repository's root, holds more than the 20,000 entries the runner will scan and is refused; a live run therefore targets a trimmed copy of the tracked files), and it is the layout the official docs and `claude plugin eval init` produce. Costs a name close to `eval/`.
 
 ### `eval/plugin-cases/` with `--eval-dir`
 
@@ -45,12 +45,12 @@ Keeps the plugin clone clean, but the cases are deleted at pipeline cleanup and 
 
 ## Consequences
 
-**Positive:** a durable home for trigger probes that future skill description changes can re-run; zero-flag invocation; results and reports kept out of the tree and private.
+**Positive:** a durable home for trigger probes that future skill description changes can re-run; no `--eval-dir` flag needed once the runner can scan the plugin directory; results and reports kept out of the tree and private.
 
-**Negative:** the suite ships in the plugin clone (never injected into a context window, so shipped-artifact isolation does not apply); the `eval/` versus `evals/` distinction must be named in the developer docs.
+**Negative:** the suite ships in the plugin clone (never injected into a context window, so shipped-artifact isolation does not apply); the `eval/` versus `evals/` distinction must be named in the developer docs. The runner refuses a plugin directory over 20,000 entries and scores every run 0 with a zero exit, so running the suite from this repository's root needs a trimmed copy of the tracked plugin files; the authoring skill's evaluating page names the trap.
 
 ## Disconfirmation
 
-- **Falsifier:** a `claude plugin eval .` run from the checkout does not find the cases, or writes results into the tracked tree, or the runner's default directory changes so that `evals/` needs a flag after all.
+- **Falsifier:** a run against the plugin's tracked files (or an installed plugin) does not find the cases, or writes results into the tracked tree, or the runner's default directory changes so that `evals/` needs a flag after all.
 - **Steelmanned runner-up:** `eval/plugin-cases/` with the manifest's `experimental.evals` set, which keeps one evaluation tree and still runs without a flag; its cost is a manifest edit under an `experimental` key.
 - **Reversal trigger:** the `experimental.evals` manifest key stabilizes, or a second eval tool claims `evals/`; then move the suite under `eval/` and record the directory in the manifest.

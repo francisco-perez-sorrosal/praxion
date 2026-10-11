@@ -1145,3 +1145,16 @@ tests = [
   "tests/test_sentinel_check_triangle.py",
 ]
 why = "reads these files in a child process or by a directory scan; found unselected by the gate-liveness selection audit"
+
+[[dep]]
+paths = ["docs/diagrams/architecture/src/*.c4"]
+tests = [
+  "tests/acceptance/test_aac_onboarding_diagrams.py",
+  "tests/acceptance/test_architecture_model_coverage.py",
+  "tests/acceptance/test_architecture_render_categories.py",
+  "tests/acceptance/test_architecture_render_embeds.py",
+  "tests/acceptance/test_architecture_render_labels.py",
+  "tests/acceptance/test_architecture_render_legibility.py",
+  "tests/acceptance/test_command_family_is_retired.py",
+]
+why = "reads the model through a likec4 export of this directory, a source no path literal or import names; a change here selected none of them and two reds surfaced only in a full run"

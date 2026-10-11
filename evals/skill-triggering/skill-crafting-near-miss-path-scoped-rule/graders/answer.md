@@ -1,6 +1,6 @@
 ---
 type: regex
 target: last_message
-pattern: 'paths|glob|src/api'
+pattern: 'paths:|glob'
 flags: i
 ---

@@ -10,6 +10,8 @@ staleness_sensitive_sections:
   - "Claude Code Frontmatter Superset"
   - "Arguments and Dynamic Context"
   - "Plugin Eval Case Layout"
+  - "Where Skills Go Wrong by Default"
+  - "Reading a Run"
   - "Trigger Cases for Plugin Eval"
   - "Discovery and Live Reload"
   - "Permission Management"
@@ -35,6 +37,7 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 - [references/cross-agent-portability.md](references/cross-agent-portability.md) -- discovery paths and field support per host, skills vs. project instruction files
 
 ## Where Skills Go Wrong by Default
+<!-- last-verified: 2026-10-11 -->
 
 The non-obvious failures an agent hits without being told; each one was observed, and each links where it is worked through:
 

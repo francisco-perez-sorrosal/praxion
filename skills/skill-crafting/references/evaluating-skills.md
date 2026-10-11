@@ -84,6 +84,7 @@ A directory with a `prompt.md` or a `case.yaml` is a case, and a case with no gr
 **Results.** Each run writes `evals/results/<timestamp>/` with `aggregate-result.json` and a self-contained `report.html`; `--json [path]` prints the same document. When your account can publish, the report is also published as a private artifact; pass `--no-publish` to keep it local.
 
 ## Reading a Run
+<!-- last-verified: 2026-10-11 -->
 
 - **The plugin-fired indicator.** A `tool_used` grader on the `Skill` tool, and any grader marked `arm: with-only`, is excluded from the score in a two-arm run (it can never pass without the plugin) and shown as a pass/fail indicator only. A failing indicator means Claude never chose your skill: the next lever is its description.
 - **A delta near zero.** With the indicator failing, the skill is not triggering on the prompt's phrasing; adjust the description and rerun. With the indicator passing and the delta still near zero or negative, suspect the judge before the skill: rerun with a larger `--judge-model` and tighten the rubric so formatting does not decide the verdict. A case that scores 1.0 in both arms shows the model needed no help.

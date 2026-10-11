@@ -15,11 +15,13 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 VALIDATOR = SCRIPTS / "validate.py"
 PACKAGER = SCRIPTS / "package_skill.py"
+SCAFFOLD = SCRIPTS / "init_skill.py"
 
 # Each script's help names its accepted arguments.
 ACCEPTED_ARGUMENTS = [
     pytest.param(VALIDATOR, ["<skill-directory>", "--all"], id="validate"),
     pytest.param(PACKAGER, ["<path/to/skill-folder>", "[output-directory]"], id="package_skill"),
+    pytest.param(SCAFFOLD, ["<skill-name>", "--path <output-directory>"], id="init_skill"),
 ]
 
 

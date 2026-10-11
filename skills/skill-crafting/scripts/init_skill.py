@@ -281,13 +281,28 @@ def init_skill(skill_name: str, output_path: Path) -> int:
     return 0
 
 
+HELP_FLAGS = frozenset({"-h", "--help"})
+
+USAGE = """Usage: init_skill.py <skill-name> --path <output-directory>
+
+Creates <output-directory>/<skill-name>/ with a SKILL.md template.
+
+Options:
+  -h, --help   print this text and exit 0
+
+Exit status: an error (bad name, existing directory, unwritable path) sets a non-zero exit.
+
+Examples:
+  init_skill.py pdf-processing --path skills/
+  init_skill.py my-api-helper --path ~/.claude/skills"""
+
+
 def main() -> int:
+    if HELP_FLAGS.intersection(sys.argv[1:]):
+        print(USAGE)
+        return 0
     if len(sys.argv) != 4 or sys.argv[2] != "--path":
-        print("Usage: init_skill.py <skill-name> --path <output-directory>")
-        print()
-        print("Examples:")
-        print("  init_skill.py pdf-processing --path skills/")
-        print("  init_skill.py my-api-helper --path ~/.claude/skills")
+        print(USAGE)
         return 1
 
     skill_name = sys.argv[1]

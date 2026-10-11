@@ -151,7 +151,7 @@ The directory name is the skill's identity, and `name` must match it: lowercase 
 
 ### What Not to Include
 
-Only essential files: no INSTALLATION_GUIDE.md, QUICK_REFERENCE.md or CHANGELOG.md, no setup or testing procedures, no notes on how the skill was made. **README.md** is not part of the standard; in this plugin each skill carries one as a human-facing catalog entry never loaded into the agent's context (sections: When to Use, Activation, Skill Contents, then optional Quick Start, Testing, Related Skills).
+Only essential files: no INSTALLATION_GUIDE.md, QUICK_REFERENCE.md or CHANGELOG.md, no setup or testing procedures, no notes on how the skill was made. **README.md** is not part of the standard; in this plugin most skills carry one as a human-facing catalog entry (user-invoked workflow skills carry none), never loaded into the agent's context (sections: When to Use, Activation, Skill Contents, then optional Quick Start, Testing, Related Skills).
 
 ### Storage Locations and Composition
 
@@ -171,7 +171,7 @@ python scripts/package_skill.py <path/to/skill-folder> [output-directory]
 
 The validator reports **errors** (the skill is malformed: missing or invalid `name` or `description`, a field outside the accepted set) and **warnings** (an authoring hazard: a body over 500 lines, an empty or unquoted `argument-hint`, a multi-line user-only description, declared `arguments` with no placeholder). Only errors fail the run. The packager validates first and builds a distributable `.skill` file.
 
-`scripts/validate_references.py --all` checks intra-repo Markdown links and anchors across skills, agents, rules and docs (stdlib only); its modes, severities and ignore markers are documented by `--help`.
+`scripts/validate_references.py --all` checks intra-repo Markdown links and anchors across skills, agents, rules and docs (stdlib only); `--help` lists its modes (`--all`, `--file`, `--strict`, `--warn-only`), and the skill's [README.md](README.md) its per-class severities, exit codes and ignore markers.
 
 ## Cross-Agent Portability
 <!-- last-verified: 2026-10-11 -->

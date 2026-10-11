@@ -55,7 +55,6 @@ A skill name, then a list of evals; each has an `id`, a `prompt`, an `expected_o
 When improving the skill, generalize from the failures rather than patching the one prompt, keep the instructions lean, and explain the reason behind each rule.
 
 ## Plugin Eval Case Layout
-
 <!-- last-verified: 2026-10-11 -->
 
 `claude plugin eval` loads a plugin and runs the suite under its `evals/` directory (override with `--eval-dir` or the manifest's `experimental.evals`):

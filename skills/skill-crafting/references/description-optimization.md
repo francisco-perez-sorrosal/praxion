@@ -43,7 +43,6 @@ Wording that reads well is not evidence. Measure the trigger rate on a fixed que
 Choose the winning description by its pass rate on the held-out part. The best description is often not the last one; a later iteration may have fit the tuning queries and lost the held-out ones. If five iterations do not move the held-out rate, suspect the queries (too easy, too hard, mislabelled) before the description. Then write five to ten fresh queries that never entered the loop and run them once as a final check.
 
 ## Trigger Cases for Plugin Eval
-
 <!-- last-verified: 2026-10-11 -->
 
 A plugin-shipped skill can keep its trigger queries as `claude plugin eval` cases (layout and run options: [Evaluating Skills](evaluating-skills.md#plugin-eval-case-layout)). Each query becomes a case directory under `evals/`: a `prompt.md` holding the query as a user would type it, and a grader file for the verdict. The grader checks the transcript for a call to the `Skill` tool, so it costs no judge model.

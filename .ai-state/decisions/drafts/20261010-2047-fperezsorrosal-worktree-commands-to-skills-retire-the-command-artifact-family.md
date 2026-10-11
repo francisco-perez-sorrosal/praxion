@@ -34,7 +34,7 @@ Praxion carries 44 user- or model-invoked workflows as flat files in `commands/`
 
 1. Each workflow becomes `skills/<name>/SKILL.md` under the same name (`git mv`), with `name:` first, its invocation mode, tool set and argument hint preserved (one-line forms), its body normalized only in form; the only behaviour changes restore what the old form intended (first-token positional arguments in two workflows, the dashboard's root argument, escaped dollar amounts).
 2. `commands/` (its readme rows move to the skills catalog), the manifest `commands` key, keyword and description word, and the `knowledge.commands` element with its §3a row are removed; the rework-loop and installer edges re-point to `knowledge.skills`.
-3. The always-loaded set, agents, rules and the published hackathon block describe slash-invoked workflows as skills; Claude Code's own built-in commands stay platform vocabulary. Managed projects receive the block change as ordinary drift reconciled by `/refresh-claude-blocks`.
+3. The always-loaded set, agents, rules and the published hackathon block describe slash-invoked workflows as skills; Claude Code's own built-in commands stay platform vocabulary. Managed projects receive the block change as ordinary drift once the hackathon block joins the refreshable set, a separate decision recorded as a tech-debt deferral (td-403); until then the reworded block reaches only new onboardings.
 4. A file placed back in a `commands/` directory fails the test suite (the harness scans that location by default once the manifest stops naming it).
 
 ## Considered Options

@@ -4,7 +4,7 @@ title: Delete the Cursor and Codex command exporters; both assistants reach work
 status: proposed
 category: architectural
 date: 2026-10-10
-summary: "cursor/config/export-cursor-commands.py and codex/config/export-codex-command-skills.py are deleted with their tests; install_cursor.sh sweeps stem-matched stale .cursor/commands exports once, install_codex.sh keeps its legacy-marker prune, and the generic Codex skill wrapper carries the argument hint."
+summary: "cursor/config/export-cursor-commands.py and codex/config/export-codex-command-skills.py are deleted with their tests; install_cursor.sh sweeps once the stale .cursor/commands exports earlier releases wrote (a workflow file carrying the exporter's description header, or the exported guidance page), install_codex.sh keeps its legacy-marker prune, and the generic Codex skill wrapper carries the argument hint."
 tags: [cursor, codex, installers, adapters, skills, commands]
 made_by: agent
 agent_type: systems-architect
@@ -29,7 +29,7 @@ Two adapters projected `commands/*.md` into assistant-specific shapes: Cursor co
 ## Decision
 
 1. Delete both exporters and their tests; drop the count, verify and export steps from both installers.
-2. `install_cursor.sh` removes a `.cursor/commands/<stem>.md` only when `skills/<stem>/SKILL.md` exists in the Praxion source, never the directory wholesale (users keep their own commands), removes the directory only when left empty, prints a path-free count, and writes nothing on `--dry-run`. The block is marked as a legacy shim with its removal condition.
+2. `install_cursor.sh` removes a `.cursor/commands/<stem>.md` only when it is what the retired exporter wrote: one of the 44 workflow stems of the base commit whose first line is the `**Description:**` header the exporter prepended, or the guidance page exported as `CLAUDE.md` beginning `# Commands` (selector revised after verification through Spec Questions SQ-08 and SQ-09: matching a live skill name would have deleted a user's own command named after any skill, and a name alone a command written after upgrading; names older releases exported are td-408), never the directory wholesale (users keep their own commands), removes the directory only when left empty, prints a path-free count, and writes nothing on `--dry-run`. The block is marked as a legacy shim with its removal condition.
 3. `install_codex.sh` keeps the legacy wrapper-marker grep so the existing prune removes every `praxion-command-*` wrapper; marked the same way.
 4. `export-codex-skills.py` adds one line to a wrapper whose source declares `argument-hint`, telling Codex to treat the text after `$<name>` as the arguments — carrying over the argument semantics the command wrappers gave Codex users.
 

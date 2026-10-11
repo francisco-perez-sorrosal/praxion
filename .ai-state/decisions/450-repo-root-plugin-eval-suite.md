@@ -1,7 +1,8 @@
 ---
-id: dec-draft-246278b3
+id: dec-450
+draft_id: dec-draft-246278b3
 title: Praxion's plugin trigger evals live in the repository-root evals/ directory
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: "A plugin eval suite is added at evals/ (the claude plugin eval default directory), outside every shipped skill directory, grouped under evals/skill-triggering/ with one directory per case (prompt.md plus graders/*.md); evals/results/ is gitignored and pipeline runs write their results under .ai-work/."

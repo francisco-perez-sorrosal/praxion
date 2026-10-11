@@ -1,7 +1,8 @@
 ---
-id: dec-draft-92a84d08
+id: dec-452
+draft_id: dec-draft-92a84d08
 title: The skill frontmatter field set has one code source in the skill-crafting skill, and N03 derives from it
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: "A new data-only module, skills/skill-crafting/scripts/frontmatter_contract.py, defines the accepted SKILL.md frontmatter keys by tier, the required keys, the name pattern and the length limits; the validator and the scaffold import it, the sentinel's N03 check loads it from its own plugin tree instead of keeping its own list, and a parity test pins the schema reference to it."

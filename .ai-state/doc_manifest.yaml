@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-11T07:56:11Z'
+generated_at: '2026-10-11T15:19:58Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -128,7 +128,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -508,7 +508,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -553,7 +553,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3270,6 +3270,24 @@ surfaces:
   title: "Retire the command artifact family \u2014 every Praxion slash workflow is a skill under its own name"
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-450-repo-root-plugin-eval-suite
+  path: .ai-state/decisions/450-repo-root-plugin-eval-suite.md
+  type: markdown
+  title: Praxion's plugin trigger evals live in the repository-root evals/ directory
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-451-skill-crafting-reference-set-restructure
+  path: .ai-state/decisions/451-skill-crafting-reference-set-restructure.md
+  type: markdown
+  title: The skill-crafting reference set gains three pages and folds two into the content-guidance page
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-452-skill-frontmatter-field-set-single-source
+  path: .ai-state/decisions/452-skill-frontmatter-field-set-single-source.md
+  type: markdown
+  title: The skill frontmatter field set has one code source in the skill-crafting skill, and N03 derives from it
+  last_modified: '2026-10-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4071,6 +4089,9 @@ groups:
   - ai-state-decisions-447-gates-dev-link-and-arguments-follow-skil
   - ai-state-decisions-448-merge-command-crafting-into-skill-crafti
   - ai-state-decisions-449-retire-the-command-artifact-family
+  - ai-state-decisions-450-repo-root-plugin-eval-suite
+  - ai-state-decisions-451-skill-crafting-reference-set-restructure
+  - ai-state-decisions-452-skill-frontmatter-field-set-single-source
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

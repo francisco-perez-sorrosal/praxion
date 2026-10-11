@@ -1,7 +1,8 @@
 ---
-id: dec-draft-911fdeba
+id: dec-451
+draft_id: dec-draft-911fdeba
 title: The skill-crafting reference set gains three pages and folds two into the content-guidance page
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: "skills/skill-crafting gains description-optimization.md, evaluating-skills.md and scripts-for-agents.md; output-patterns.md and workflows.md are deleted and their content, with the entry page's multi-file design patterns, moves into content-and-development.md; script guidance moves to scripts-for-agents.md and the per-host field matrix to cross-agent-portability.md, leaving an entry page under 400 lines in the canonical topic order."

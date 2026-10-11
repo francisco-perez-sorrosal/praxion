@@ -174,6 +174,7 @@ Tool names are host-specific. Claude Code tools include: `Read`, `Write`, `Edit`
 In Claude Code `allowed-tools` **pre-approves** the listed tools (no permission prompt while the skill is active) — it does **not** restrict; every other tool stays callable, governed by your permission settings. Behavior still varies across non-Claude hosts, so treat it as a Claude Code field for portable skills.
 
 ## Claude Code Frontmatter Superset
+<!-- last-verified: 2026-10-11 -->
 
 The fields above are the portable Agent Skills core. Claude Code reads them **plus** the fields below. Since custom commands [merged into skills](https://code.claude.com/docs/en/skills), a user-invoked workflow is a skill carrying these same fields — see [user-invoked-skills.md](user-invoked-skills.md) for the user-invoked authoring angle.
 
@@ -185,11 +186,13 @@ The fields above are the portable Agent Skills core. Claude Code reads them **pl
 | `paths` | String / list | Glob patterns scoping auto-activation to matching files (same format as path-specific rules). |
 | `context` | String | `fork` runs the skill body as the prompt for a forked subagent. |
 | `agent` | String | Subagent type used when `context: fork` (e.g. `Explore`, `Plan`, `general-purpose`, or a custom agent). Default `general-purpose`. |
+| `background` | Boolean | Only with `context: fork`. `false` waits for the forked subagent's result in the invoking turn instead of running it in the background. Default `true`. Needs Claude Code 2.1.218 or later. |
 | `model` | String | Model while the skill is active (`inherit` keeps the session model). Override lasts the current turn only. |
 | `effort` | String | `low`/`medium`/`high`/`xhigh`/`max` while active; overrides session effort. |
+| `disallowed-tools` | String / list | Tools removed from Claude's pool while the skill is active (e.g. `AskUserQuestion` for an autonomous loop); the restriction clears with the next user message. Space- or comma-separated string, or a list. |
 | `argument-hint` | String | Autocomplete hint, e.g. `[issue-number]` or `[filename] [format]`. |
 | `arguments` | String / list | Named positional args for `$name` substitution; names map to positions in order. |
-| `hooks` | Object | Hooks scoped to the skill's lifecycle (all events; for subagents `Stop` auto-converts to `SubagentStop`). |
+| `hooks` | Object | Hooks registered when the skill is invoked; they keep running for the rest of the session. `once: true` on a hook removes it after its first successful run. |
 | `shell` | String | `bash` (default) or `powershell` for bang-prefixed inline injection and fenced ` ```! ` blocks. |
 
 **Praxion staleness fields** (validated by `validate.py`, per `rules/swe/staleness-policy.md`):

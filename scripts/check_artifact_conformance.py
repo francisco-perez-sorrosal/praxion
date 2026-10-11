@@ -29,10 +29,12 @@ file, plugin manifest) carry the shape its own crafting spec demands.
 * **N02** (warn) -- `agents/*.md` (excl. `README.md`) file stems are lowercase
   kebab-case.
 * **N03** (warn) -- SKILL.md and agent frontmatter use only keys the crafting
-  specs recognise (`_SKILL_FRONTMATTER_KEYS`, `_AGENT_FRONTMATTER_KEYS` below).
-  An unrecognized key is a WARN, not a FAIL -- the specs are read at commit
-  time, not live, so a legitimately new field would false-FAIL until this
-  script's constant is updated.
+  specs recognise: for skills, `ACCEPTED_FIELDS` of the skill-crafting skill's
+  frontmatter contract (`skills/skill-crafting/scripts/frontmatter_contract.py`,
+  the set its validator and schema reference share); for agents,
+  `_AGENT_FRONTMATTER_KEYS` below. An unrecognized key is a WARN, not a FAIL --
+  the specs are read at commit time, not live, so a legitimately new field
+  would false-FAIL until the contract or the constant is updated.
 
 **Spec Compliance (S)**
 
@@ -66,7 +68,9 @@ frontmatter here (empty dict) -- `check_frontmatter_parses.py` is the check
 that already reports the parse failure itself.
 
 Skip conditions (DS-A, keyed): each check skips independently when its own
-substrate dir/file is absent.
+substrate dir/file is absent. N03 also skips, with reason `contract-unavailable`
+and the contract's path, when the frontmatter contract cannot be loaded from
+this plugin's tree -- never an empty, clean-looking finding set.
 
 Invocation:
 
@@ -81,6 +85,7 @@ Exit code: 0 by default (advisory), 1 with --check when any finding is present.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import logging
 import re
@@ -455,33 +460,34 @@ def _check_n02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
 
 # -- N03: frontmatter uses only recognized keys ------------------------------
 
-# Source: skills/skill-crafting/references/schema.md -- portable core (name,
-# description, license, compatibility, metadata, allowed-tools) plus the
-# "Claude Code Frontmatter Superset" and "Praxion staleness fields" tables.
-_SKILL_FRONTMATTER_KEYS = frozenset(
-    {
-        "name",
-        "description",
-        "license",
-        "compatibility",
-        "metadata",
-        "allowed-tools",
-        "when_to_use",
-        "disable-model-invocation",
-        "user-invocable",
-        "paths",
-        "context",
-        "agent",
-        "model",
-        "effort",
-        "argument-hint",
-        "arguments",
-        "hooks",
-        "shell",
-        "staleness_sensitive_sections",
-        "staleness_threshold_days",
-    }
+# The accepted skill keys are the skill-crafting skill's frontmatter contract, the one set its
+# validator and schema reference also follow. It is loaded from this plugin's own tree -- never
+# from the inspected `--repo-root`, which may hold no such skill -- under a private module name,
+# so it cannot shadow or be shadowed by anything on `sys.path`.
+_FRONTMATTER_CONTRACT = (
+    SCRIPT_DIR.parent / "skills" / "skill-crafting" / "scripts" / "frontmatter_contract.py"
 )
+_CONTRACT_MODULE_NAME = "_check_artifact_conformance_frontmatter_contract"
+
+
+class _ContractUnavailableError(Exception):
+    """The frontmatter contract could not be read; N03 has no skill key set to judge by."""
+
+
+def _load_skill_frontmatter_keys(contract: Path) -> frozenset[str]:
+    spec = importlib.util.spec_from_file_location(_CONTRACT_MODULE_NAME, contract)
+    if spec is None or spec.loader is None:
+        raise _ContractUnavailableError("not loadable as a Python module")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # whatever stops the module loading leaves N03 without its key set
+        raise _ContractUnavailableError(f"{type(exc).__name__}: {exc}") from exc
+    keys = getattr(module, "ACCEPTED_FIELDS", None)
+    if not isinstance(keys, frozenset) or not keys:
+        raise _ContractUnavailableError("defines no non-empty ACCEPTED_FIELDS frozenset")
+    return keys
+
 
 # Source: skills/agent-crafting/SKILL.md "Configuration Fields Summary" table.
 _AGENT_FRONTMATTER_KEYS = frozenset(
@@ -506,7 +512,9 @@ _AGENT_FRONTMATTER_KEYS = frozenset(
 )
 
 
-def _check_n03(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
+def _check_n03(
+    repo_root: Path, contract: Path = _FRONTMATTER_CONTRACT
+) -> tuple[list[dict], dict | None, dict | None]:
     skill_files = _skill_md_files(repo_root)
     agent_files = _agent_files(repo_root)
     if skill_files is None and agent_files is None:
@@ -518,10 +526,19 @@ def _check_n03(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
             },
             None,
         )
+    try:
+        skill_keys = _load_skill_frontmatter_keys(contract)
+    except _ContractUnavailableError as exc:
+        # Skipped, never clean: an empty finding list here would read as "every key recognized".
+        return (
+            [],
+            {"reason": "contract-unavailable", "path": str(contract), "detail": str(exc)},
+            None,
+        )
     findings: list[dict] = []
     examined = {"skill_md_files": 0, "agent_files": 0}
     for path, allowed, label in (
-        *((f, _SKILL_FRONTMATTER_KEYS, "SKILL.md") for f in (skill_files or [])),
+        *((f, skill_keys, "SKILL.md") for f in (skill_files or [])),
         *((f, _AGENT_FRONTMATTER_KEYS, "agent") for f in (agent_files or [])),
     ):
         examined["skill_md_files" if label == "SKILL.md" else "agent_files"] += 1

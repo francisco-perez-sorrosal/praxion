@@ -8,7 +8,10 @@ catch.
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,7 +20,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from check_artifact_conformance import CHECK_IDS, classify  # noqa: E402
+from check_artifact_conformance import CHECK_IDS, _check_n03, classify  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -350,6 +353,100 @@ def test_n03_accepts_recognized_agent_keys(tmp_path: Path) -> None:
         "---\nname: clean-agent\ndescription: does things\ntools: Read\nmaxTurns: 50\nbackground: true\n---\n\nBody.\n",
     )
     report = classify(tmp_path)
+    assert [f for f in report["findings"] if f["check"] == "N03"] == []
+
+
+# -- N03 key source: the skill-crafting frontmatter contract ---------------------
+
+CONTRACT = REPO_ROOT / "skills" / "skill-crafting" / "scripts" / "frontmatter_contract.py"
+# Near misses of accepted keys, plus an agent-only key, none of them a skill field.
+_NON_SKILL_KEYS = {"user_invocable", "disallowedTools", "when-to-use", "bogus_field"}
+
+
+def _accepted_skill_fields() -> frozenset[str]:
+    spec = importlib.util.spec_from_file_location("_contract_for_n03_parity", CONTRACT)
+    assert spec is not None, f"cannot load {CONTRACT}"
+    assert spec.loader is not None, f"cannot load {CONTRACT}"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.ACCEPTED_FIELDS
+
+
+def _skill_with_keys(tmp_path: Path, keys: set[str]) -> None:
+    body = "".join(f"{key}: probe\n" for key in sorted(keys - {"name"}))
+    _write(tmp_path / "skills" / "probe" / "SKILL.md", f"---\nname: probe\n{body}---\n\nBody.\n")
+
+
+def _flagged_keys(findings: list[dict]) -> set[str]:
+    return {re.search(r"`([^`]+)`", f["message"]).group(1) for f in findings if f["check"] == "N03"}
+
+
+def test_n03_accepts_exactly_the_contract_accepted_fields(tmp_path: Path) -> None:
+    _skill_with_keys(tmp_path, set(_accepted_skill_fields()) | _NON_SKILL_KEYS)
+
+    report = classify(tmp_path)
+
+    assert report["skipped"]["N03"] is None
+    assert _flagged_keys(report["findings"]) == _NON_SKILL_KEYS
+
+
+def test_n03_skips_naming_the_contract_when_it_is_missing(tmp_path: Path) -> None:
+    _skill_with_keys(tmp_path, {"name", "bogus_field"})
+    missing = tmp_path / "absent" / "frontmatter_contract.py"
+
+    findings, skip, examined = _check_n03(tmp_path, contract=missing)
+
+    assert (findings, examined) == ([], None)
+    assert skip is not None
+    assert skip["reason"] == "contract-unavailable"
+    assert skip["path"] == str(missing)
+
+
+def test_n03_skips_when_the_contract_defines_no_accepted_fields(tmp_path: Path) -> None:
+    _skill_with_keys(tmp_path, {"name", "bogus_field"})
+    hollow = tmp_path / "frontmatter_contract.py"
+    _write(hollow, "ACCEPTED_FIELDS = frozenset()\n")
+
+    findings, skip, _ = _check_n03(tmp_path, contract=hollow)
+
+    assert findings == []
+    assert skip is not None
+    assert skip["reason"] == "contract-unavailable"
+
+
+def test_n03_skips_when_the_contract_fails_to_load(tmp_path: Path) -> None:
+    _skill_with_keys(tmp_path, {"name", "bogus_field"})
+    broken = tmp_path / "frontmatter_contract.py"
+    _write(broken, "ACCEPTED_FIELDS = frozenset({\n")
+
+    findings, skip, _ = _check_n03(tmp_path, contract=broken)
+
+    assert findings == []
+    assert skip is not None
+    assert skip["reason"] == "contract-unavailable"
+    assert "SyntaxError" in skip["detail"]
+
+
+def test_n03_run_from_a_tree_without_the_contract_reports_skipped_not_clean(
+    tmp_path: Path,
+) -> None:
+    # The script anchors the contract on its own location, so a copy of the scripts
+    # outside a plugin tree that holds the skill must skip N03 end to end.
+    plugin = tmp_path / "plugin"
+    for name in ("check_artifact_conformance.py", "_repo_root.py", "_script_cli.py"):
+        _write(plugin / "scripts" / name, (REPO_ROOT / "scripts" / name).read_text("utf-8"))
+    inspected = tmp_path / "inspected"
+    _skill_with_keys(inspected, {"name", "bogus_field"})
+
+    result = subprocess.run(
+        [sys.executable, str(plugin / "scripts" / "check_artifact_conformance.py"),
+         "--json", "--repo-root", str(inspected)],
+        cwd=inspected, capture_output=True, text=True, timeout=120,
+    )  # fmt: skip
+
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["skipped"]["N03"]["reason"] == "contract-unavailable"
     assert [f for f in report["findings"] if f["check"] == "N03"] == []
 
 

@@ -11,9 +11,8 @@ Validates:
   - Required fields: name, description
   - name matches parent directory, 1-64 chars, lowercase/digits/hyphens
   - description is 1-1024 chars, no angle brackets
-  - Optional fields: allowed-tools, license, metadata, compatibility,
-    staleness_sensitive_sections, staleness_threshold_days
-  - No unknown top-level fields
+  - compatibility is at most 500 chars
+  - No top-level field outside the accepted set (frontmatter_contract.py)
 
 Exit 0 on success, exit 1 on failure.
 """
@@ -22,26 +21,16 @@ import re
 import sys
 from pathlib import Path
 
-REQUIRED_FIELDS = {"name", "description"}
-OPTIONAL_FIELDS = {
-    "allowed-tools",
-    "license",
-    "metadata",
-    "compatibility",
-    "paths",  # path-scoped activation — Claude Code skill convention
-    "staleness_sensitive_sections",  # per rules/swe/staleness-policy.md
-    "staleness_threshold_days",  # per rules/swe/staleness-policy.md
-    "when_to_use",  # invocation-context hint for user-invoked skills
-    "argument-hint",  # slash-invocation argument hint, mirrors command frontmatter
-    "arguments",  # named-argument descriptions for slash-invoked skills
-    "disable-model-invocation",  # fail-closed: model cannot self-trigger this skill
-}
-ALL_KNOWN_FIELDS = REQUIRED_FIELDS | OPTIONAL_FIELDS
-
-NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
-NAME_MAX_LENGTH = 64
-DESCRIPTION_MAX_LENGTH = 1024
-COMPATIBILITY_MAX_LENGTH = 500
+# The contract is a sibling module: put this script's own directory on the path so the import
+# resolves however the validator is reached (run directly, or imported by package_skill.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frontmatter_contract import (  # noqa: E402
+    ACCEPTED_FIELDS,
+    COMPATIBILITY_MAX_LENGTH,
+    DESCRIPTION_MAX_LENGTH,
+    NAME_MAX_LENGTH,
+    NAME_PATTERN,
+)
 
 
 def extract_frontmatter(content: str) -> tuple[str | None, list[str]]:
@@ -165,7 +154,7 @@ def validate_skill(skill_dir: Path) -> list[str]:
     errors.extend(parse_errors)
 
     # Check for unknown fields
-    unknown = set(fields.keys()) - ALL_KNOWN_FIELDS
+    unknown = set(fields.keys()) - ACCEPTED_FIELDS
     if unknown:
         errors.append(f"Unknown frontmatter fields: {', '.join(sorted(unknown))}")
 

@@ -392,6 +392,7 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "revision-failed": "revise the step block, or finish the revision by hand and accept it",
     "not-driven": "run the step outside the loop as the plan says and tick its WIP.md line",
     "dependency-defect": "correct the [depends-on: ...] annotations in IMPLEMENTATION_PLAN.md",
+    "files-glob": "name each path, or a directory by its bare path, in the step's Files:",
     "commit-disturbed-tree": "restore what you need from the snapshot, then delete it",
     "loop-state-defect": "keep the request whose agent ran and remove request=<id> from the other",
     "iteration-budget": "re-tier or split the remaining steps with the user",

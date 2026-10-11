@@ -422,6 +422,16 @@ def test_a_dependency_defect_names_each_stuck_step_and_clears_when_the_plan_is_c
     assert isinstance(act(fixed), Spawn)
 
 
+def test_a_glob_in_files_stops_the_loop_until_the_plan_names_literal_paths():
+    globbed = steps_of(block("1", IMPL, "**Files**: `scripts/*.py`"))
+    literal = steps_of(block("1", IMPL, "**Files**: `scripts/a.py`, `docs/diagrams`"))
+
+    stop = act(globbed)
+    assert (stop.cause, stop.step) == ("files-glob", "1")
+    assert "scripts/*.py" in stop.evidence
+    assert isinstance(act(literal), Spawn)
+
+
 def test_an_exhausted_stop_carries_its_attempts_and_the_replan_text_from_wip():
     attempts = {STEP + "1": Attempt(2, replan="split the step")}
 
@@ -481,7 +491,7 @@ def test_a_stop_cannot_be_built_against_its_invariants(build, message):
 
 def test_the_causes_are_the_closed_set_the_stop_texts_cover():
     assert set(HUMAN_CAUSES) | {BUDGET_CAUSE} == set(_ACTIONS)
-    assert len(HUMAN_CAUSES) == len(set(HUMAN_CAUSES)) == 13
+    assert len(HUMAN_CAUSES) == len(set(HUMAN_CAUSES)) == 14
 
 
 # --- A disturbed tree keeps the loop stopped while its snapshot file stays -------------------

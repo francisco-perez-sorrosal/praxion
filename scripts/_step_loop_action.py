@@ -71,10 +71,11 @@ if TYPE_CHECKING:
     from iteration_ledger import IterationRecord
 
 BUDGET_CAUSE = "iteration-budget"
+GLOB_MARKS = "*?["
 HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed not-driven dependency-defect
-    commit-disturbed-tree loop-state-defect""".split()
+    commit-disturbed-tree loop-state-defect files-glob""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
@@ -215,6 +216,10 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
         return Stop("human-verdict", step.id, evidence)
     if isinstance(state, NotDriven):
         return Stop("not-driven", step.id, f"{where} is assigned to {state.assignee}")
+    globbed = [path for path in step.files if any(mark in path for mark in GLOB_MARKS)]
+    if globbed:
+        why = f"{where} names {', '.join(globbed)} in Files:, and the driver commits literal paths"
+        return Stop("files-glob", step.id, why)
     if isinstance(state, Running) and _running_key(step, state).id != state.request:
         return Stop("loop-state-defect", None, f"WIP.md names {state.request}, not the series' own")
     if isinstance(state, Verified) and type(state.review) in _REVIEW_STOPS:

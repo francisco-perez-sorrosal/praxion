@@ -602,7 +602,7 @@ CAUSES = {
     "attempts-exhausted", "stalled", "blocked-marker", "conflict-marker", "human-verdict",
     "unnamed-attempts", "review-revised-twice", "review-unfinished", "revision-failed",
     "not-driven", "dependency-defect", "commit-disturbed-tree", "loop-state-defect",
-    "iteration-budget",
+    "iteration-budget", "files-glob",
 }  # fmt: skip
 
 

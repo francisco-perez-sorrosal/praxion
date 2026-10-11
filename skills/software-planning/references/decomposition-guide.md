@@ -36,6 +36,8 @@ Before listing feature steps, check for **phase signals** -- does the current co
 
 Each step is one commit, leaves system working.
 
+In a step's `Files:` name each path, or a whole tree by its bare directory path (`docs/diagrams`, no trailing slash, no `*`). The step-loop driver commits literal paths, so a glob there stops the loop with `files-glob` rather than matching anything.
+
 ### Validate Step Size
 
 For each step, ask:

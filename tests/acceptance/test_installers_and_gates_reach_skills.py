@@ -32,28 +32,52 @@ def test_the_cursor_command_exporter_is_gone():
     assert not (REPO_ROOT / "cursor" / "config" / "export-cursor-commands.py").exists()
 
 
-def _cursor_project_with(tmp_path, *files):
+# What the retired exporter wrote: every workflow export began with the description header it
+# prepended; the guidance page was copied as CLAUDE.md and began with its own heading.
+_STALE_EXPORT = "**Description:** left by an earlier install\n---\nthe old body\n"
+_STALE_GUIDANCE = "# Commands\n\nSlash commands invocable during interactive sessions.\n"
+_USERS_OWN = "the user's own command\n"
+
+
+def _cursor_project_with(tmp_path, *stale, own=()):
     project = tmp_path / "project"
-    for name in files:
-        write(project, f".cursor/commands/{name}", "left by an earlier install\n")
+    for name in stale:
+        body = _STALE_GUIDANCE if name == "CLAUDE.md" else _STALE_EXPORT
+        write(project, f".cursor/commands/{name}", body)
+    for name in own:
+        write(project, f".cursor/commands/{name}", _USERS_OWN)
     return project
 
 
 def test_a_cursor_reinstall_sweeps_stale_workflow_exports_and_keeps_the_users_own(tmp_path):
-    # code-review.md is the user's own: it shares its name with a Praxion skill that was never
-    # exported as a workflow, so the sweep must leave it alone.
+    # The user's own files survive: one with its own name, one named after a Praxion skill that
+    # was never exported as a workflow, and one written by hand after upgrading under a workflow's
+    # name (it lacks the header every real export carried). The guidance page export goes too.
     project = _cursor_project_with(
-        tmp_path, "co.md", "cop.md", "my-own-shortcut.md", "code-review.md"
+        tmp_path,
+        "co.md",
+        "cop.md",
+        "CLAUDE.md",
+        own=("my-own-shortcut.md", "code-review.md", "test.md"),
     )
 
     result = run_cursor_install(tmp_path, project)
 
     commands = project / ".cursor" / "commands"
     assert result.returncode == 0, result.stdout[-1500:] + result.stderr[-1500:]
-    assert sorted(p.name for p in commands.iterdir()) == ["code-review.md", "my-own-shortcut.md"]
-    assert (commands / "my-own-shortcut.md").read_text(
-        encoding="utf-8"
-    ) == "left by an earlier install\n"
+    assert sorted(p.name for p in commands.iterdir()) == [
+        "code-review.md",
+        "my-own-shortcut.md",
+        "test.md",
+    ]
+    assert all(
+        (commands / name).read_text(encoding="utf-8") == _USERS_OWN
+        for name in (
+            "my-own-shortcut.md",
+            "code-review.md",
+            "test.md",
+        )
+    )
 
 
 def test_a_cursor_reinstall_removes_the_commands_directory_it_leaves_empty(tmp_path):

@@ -1,4 +1,5 @@
 ---
+name: upgrade-project
 description: Re-point this project's version-pinned Praxion surfaces (git hooks, merge driver, CI callers, labels baseline, AaC surfaces) to the live plugin install after a praxion plugin upgrade
 argument-hint: "[--check | --dry-run]"
 allowed-tools: [Bash(bash:*), Bash(git:*), Bash(gh:*), Bash(jq:*), Read]
@@ -13,13 +14,13 @@ Run this once after upgrading the praxion plugin (e.g. `0.25.0 → 0.26.0`): the
 per-project git-hook symlinks and merge-driver registration encode the old
 plugin-cache path, which is garbage-collected on upgrade, leaving them
 dangling. (On Praxion's own self-hosted checkout every surface is recognized
-as a dev install and the run is a no-op — the command targets onboarded
+as a dev install and the run is a no-op — the skill targets onboarded
 projects, not this repo.)
 
 This is the focused, gate-free counterpart to re-running the full
 `/onboard-project`. All reconciliation logic lives in the deterministic,
 idempotent, tested script `scripts/upgrade_project_pins.sh` (resolved from the
-live plugin install); this command is a thin wrapper that resolves the two
+live plugin install); this skill is a thin wrapper that resolves the two
 inputs the script must not fetch itself (the live plugin path and the current
 hub SHA), runs it, and surfaces the result. The script reconciles:
 
@@ -119,7 +120,7 @@ never goes stale and is left alone — only its appended Block D fragment
    — the touched `.github/` files. The hook/driver re-points take effect
    immediately.
 
-6. **Point at the companion steps.** This command covers path/SHA/namespace
+6. **Point at the companion steps.** This skill covers path/SHA/namespace
    pins; two sibling maintenance surfaces are intentionally out of its scope:
    - `/refresh-claude-blocks` — reconciles the four canonical `CLAUDE.md`
      blocks against the newly installed plugin (content-versioned, with an
@@ -127,7 +128,7 @@ never goes stale and is left alone — only its appended Block D fragment
      running it after any plugin upgrade.
    - If the plugin itself hasn't been refreshed yet, that comes first:
      `claude plugin marketplace update` then `claude plugin update praxion`,
-     and re-run this command afterwards.
+     and re-run this skill afterwards.
 
 ## Notes
 
@@ -147,7 +148,7 @@ never goes stale and is left alone — only its appended Block D fragment
   surfaces 5–7 — its idempotency predicates are file-existence guards that
   deliberately skip files that already exist, so the SHA-pinned callers, the
   labels baseline, and the instantiated AaC surfaces refresh **only** through
-  this command. The two paths are complements, not alternatives.
+  this skill. The two paths are complements, not alternatives.
 - **Block D repair history.** Every Block D installed from the pre-fix
   template resolves `PLUGIN_ROOT` by walking the top level of
   `installed_plugins.json` (whose real shape nests installs under `.plugins`),
@@ -157,7 +158,7 @@ never goes stale and is left alone — only its appended Block D fragment
   `grep -n 'data.items()' .git/hooks/pre-commit`. This particular repair also
   self-delivers: the finalize hook chain carries it as a backstop, so once the
   plugin is updated, the next merge/commit/checkout in a project heals its
-  hook even if this command is never run. The earlier namespace-rename
+  hook even if this skill is never run. The earlier namespace-rename
   staleness (a project onboarded under the old plugin name carrying
   `i-am:architect-validator` in `architecture.yml`) is handled by the same
   surface's token re-point.

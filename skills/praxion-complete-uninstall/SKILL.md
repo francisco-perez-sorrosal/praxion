@@ -1,4 +1,5 @@
 ---
+name: praxion-complete-uninstall
 description: Reverse /praxion-complete-install — check its state, then hand you the exact command to run in your own terminal to remove rule/script symlinks (and leftover state from earlier Praxion versions, if any). Plugin body is preserved.
 allowed-tools: [Bash]
 disable-model-invocation: true
@@ -27,7 +28,7 @@ Check the system-level symlinks that `/praxion-complete-install` created, then h
    "<resolved-plugin-root>/install.sh" code --complete-uninstall
    ```
 
-   Substitute `<resolved-plugin-root>` with the path resolved in step 1. Each removal (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions) is consent-gated behind its own prompt, and those prompts need an interactive terminal to answer. This command's own Bash tool invocation has no TTY, so running `--complete-uninstall` from here would abort at the first prompt (stdin EOF), possibly after partial setup — never run it yourself; only run `--check`.
+   Substitute `<resolved-plugin-root>` with the path resolved in step 1. Each removal (rules, scripts, and — only if present — legacy remnants from earlier Praxion versions) is consent-gated behind its own prompt, and those prompts need an interactive terminal to answer. This skill's own Bash tool invocation has no TTY, so running `--complete-uninstall` from here would abort at the first prompt (stdin EOF), possibly after partial setup — never run it yourself; only run `--check`.
 
 ## Safety
 

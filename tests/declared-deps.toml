@@ -171,14 +171,12 @@ paths = [
   ".github/workflows/cross-model-review.yml",
   ".github/workflows/labels-reconcile.yml",
   "claude/project-baseline/**",
-  "commands/new-project.md",
-  "commands/onboard-project.md",
-  "commands/upgrade-project.md",
   "new_project.sh",
   "scripts/onboard-project",
   "scripts/onboard_placement.sh",
   "skills/onboard-project/SKILL.md",
   "skills/onboard-project/references/*.md",
+  "skills/upgrade-project/SKILL.md",
 ]
 tests = [
   "scripts/test_onboard_placement_composition_agreement.py",
@@ -504,7 +502,7 @@ why = "every shipped slash command; the fitness and gate-check tests (frontmatte
 
 [[dep]]
 paths = [
-  "commands/report-praxion-issue.md",
+  "skills/report-praxion-issue/SKILL.md",
 ]
 tests = [
   "scripts/praxion_feedback/tests/**",

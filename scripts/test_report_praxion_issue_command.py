@@ -1,6 +1,6 @@
 """Structural tests for the ``/report-praxion-issue`` command definition.
 
-``commands/report-praxion-issue.md`` is a Markdown prompt, not executable code
+``skills/report-praxion-issue/SKILL.md`` is a Markdown prompt, not executable code
 -- its "tests" are grep-style assertions over frontmatter and body structure
 (the convention used by any command test in this repo), verifying: the HITL
 filing gate (no autonomous ``gh issue create``), the label-set invariant
@@ -9,9 +9,9 @@ security/responsible-disclosure path, the fingerprint-based dedup step run
 before filing, and the hardcoded Praxion target (never a templated
 ``owner/repo`` argument).
 
-Frontmatter parsing is reused from the Codex command exporter's own parser
-(dynamic import, mirroring ``test_export_codex_command_skills.py``'s
-convention) rather than reimplemented here.
+Frontmatter parsing is reused from the Codex skill exporter's own parser
+(dynamic import, mirroring ``test_export_codex_skills.py``'s convention)
+rather than reimplemented here.
 """
 
 from __future__ import annotations
@@ -21,15 +21,15 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PATH = REPO_ROOT / "commands" / "report-praxion-issue.md"
-EXPORTER_PATH = REPO_ROOT / "codex" / "config" / "export-codex-command-skills.py"
+COMMAND_PATH = REPO_ROOT / "skills" / "report-praxion-issue" / "SKILL.md"
+EXPORTER_PATH = REPO_ROOT / "codex" / "config" / "export-codex-skills.py"
 
 PRAXION_REPO_SLUG = "francisco-perez-sorrosal/praxion"
 ALLOWED_LABELS = "bug,auto-filed,category:<slug>,from-managed-project"
 
 
 def _load_exporter():
-    spec = importlib.util.spec_from_file_location("export_codex_command_skills", EXPORTER_PATH)
+    spec = importlib.util.spec_from_file_location("export_codex_skills", EXPORTER_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -39,7 +39,7 @@ def _load_exporter():
 
 def _frontmatter_and_body() -> tuple[dict[str, str], str]:
     exporter = _load_exporter()
-    return exporter.parse_frontmatter_command(COMMAND_PATH)
+    return exporter.parse_frontmatter_skill(COMMAND_PATH)
 
 
 # ---------------------------------------------------------------------------

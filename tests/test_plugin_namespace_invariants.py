@@ -62,7 +62,7 @@ def _names_retired_namespace(text: str) -> bool:
 # any *new* file naming it is precisely what this gate exists to catch. Entries
 # are validated below, so a stale one fails rather than silently widening scope.
 MIGRATION_REFERENCES: dict[str, str] = {
-    "commands/upgrade-project.md": (
+    "skills/upgrade-project/SKILL.md": (
         "documents the manual step for projects onboarded before the rename (td-145)"
     ),
     "claude/aac-templates/precommit-block-d.sh.frag": (
@@ -267,16 +267,16 @@ def test_upgrade_project_reconciles_the_instantiated_aac_templates():
     architecture sweep never running, and the golden-rule gate's skip notice
     misnames the plugin.
 
-    `commands/upgrade-project.md` is a thin wrapper (as of the refactor that
+    `skills/upgrade-project/SKILL.md` is a thin wrapper (as of the refactor that
     followed td-145's original fix) that delegates all reconciliation to
     `scripts/reconcile_aac_surfaces.py`; the drift-detection anchors --
     the two target paths and the two namespace-token regexes -- live in that
-    script now, not in the command doc. This canary pins the delegation
+    script now, not in the skill doc. This canary pins the delegation
     itself plus those anchors: if a future edit drops the delegation or
     either anchor, `/upgrade-project` silently stops detecting the drift and
     td-145 reopens with no test failing to say so.
     """
-    wrapper = (REPO_ROOT / "commands" / "upgrade-project.md").read_text(encoding="utf-8")
+    wrapper = (REPO_ROOT / "skills" / "upgrade-project" / "SKILL.md").read_text(encoding="utf-8")
     assert "scripts/reconcile_aac_surfaces.py" in wrapper
 
     reconciler = (REPO_ROOT / "scripts" / "reconcile_aac_surfaces.py").read_text(encoding="utf-8")

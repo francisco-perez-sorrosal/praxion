@@ -1,11 +1,12 @@
 ---
+name: refresh-skill
 description: Refresh version-sensitive sections of a skill against current upstream documentation
 argument-hint: "<skill-name>"
 allowed-tools: [Read, Edit, Write, Grep, Glob, AskUserQuestion, WebFetch, WebSearch]
 disable-model-invocation: true
 ---
 
-Refresh the drift-prone sections of a skill declared in its `staleness_sensitive_sections:` frontmatter. Driven by the [current-docs protocol](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) for fetching authoritative current-state docs. Gates every date bump on explicit user confirmation — never silently refreshes. See [rules/swe/staleness-policy.md](../rules/swe/staleness-policy.md) for the marker protocol.
+Refresh the drift-prone sections of a skill declared in its `staleness_sensitive_sections:` frontmatter. Driven by the [current-docs protocol](../software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) for fetching authoritative current-state docs. Gates every date bump on explicit user confirmation — never silently refreshes. See [rules/swe/staleness-policy.md](../../rules/swe/staleness-policy.md) for the marker protocol.
 
 ## Arguments
 

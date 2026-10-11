@@ -2,7 +2,7 @@
 
 `/upgrade-project` is a slash command (Markdown body executed by a live
 Claude Code session) — it cannot be invoked from pytest. These tests validate
-the documented contract by parsing `commands/upgrade-project.md` structurally,
+the documented contract by parsing `skills/upgrade-project/SKILL.md` structurally,
 matching the precedent set by `tests/commands/test_onboard_ci_autofix_install.py`.
 
 The command already resolves a hub SHA, forwards `--hub-sha`, degrades
@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-UPGRADE_FILE = Path(__file__).parents[2] / "commands" / "upgrade-project.md"
+UPGRADE_FILE = Path(__file__).parents[2] / "skills" / "upgrade-project" / "SKILL.md"
 
 
 def _upgrade_body() -> str:
@@ -72,7 +72,7 @@ def _gh_absence_context() -> str:
 def test_resolves_current_hub_sha_via_gh_api_commits_endpoint() -> None:
     context = _hub_sha_context()
     assert context, (
-        "commands/upgrade-project.md must document resolving a hub SHA — no "
+        "skills/upgrade-project/SKILL.md must document resolving a hub SHA — no "
         "'hub SHA'/'HUB_SHA' mention found yet. The implementer must add it."
     )
     assert re.search(r"gh api\s+repos/[\w./-]+/commits/main", context), (
@@ -87,22 +87,22 @@ def test_resolves_current_hub_sha_via_gh_api_commits_endpoint() -> None:
 
 def test_validates_resolved_sha_is_forty_hex_before_forwarding() -> None:
     context = _hub_sha_context()
-    assert context, "commands/upgrade-project.md must document resolving a hub SHA"
+    assert context, "skills/upgrade-project/SKILL.md must document resolving a hub SHA"
     assert re.search(r"40.?hex", context, re.IGNORECASE), (
-        "commands/upgrade-project.md must document validating the resolved "
+        "skills/upgrade-project/SKILL.md must document validating the resolved "
         "hub SHA is a 40-hex commit before forwarding it to the reconciler"
     )
 
 
 def test_documents_hub_sha_is_never_a_placeholder_or_mutable_ref() -> None:
     context = _hub_sha_context()
-    assert context, "commands/upgrade-project.md must document resolving a hub SHA"
+    assert context, "skills/upgrade-project/SKILL.md must document resolving a hub SHA"
     assert re.search(r"real|actual|resolved|current", context, re.IGNORECASE), (
-        "commands/upgrade-project.md must document resolving the hub SHA to a "
+        "skills/upgrade-project/SKILL.md must document resolving the hub SHA to a "
         "real, current commit SHA — not found near the hub-SHA mention"
     )
     assert re.search(r"never.{0,60}(placeholder|mutable|tag|branch)", context, re.IGNORECASE), (
-        "commands/upgrade-project.md must explicitly rule out a placeholder or "
+        "skills/upgrade-project/SKILL.md must explicitly rule out a placeholder or "
         "mutable tag/branch for the hub SHA, mirroring onboard sub-step 8e.8's "
         "resolution discipline (the SHA-rewrite script requires a real 40-hex "
         "value — a moving ref would break its determinism contract)"
@@ -112,7 +112,7 @@ def test_documents_hub_sha_is_never_a_placeholder_or_mutable_ref() -> None:
 def test_forwards_resolved_sha_to_reconciler_via_hub_sha_flag() -> None:
     body = _upgrade_body()
     assert re.search(r"upgrade_project_pins\.sh[^\n]*--hub-sha", body), (
-        "commands/upgrade-project.md must forward the resolved SHA to "
+        "skills/upgrade-project/SKILL.md must forward the resolved SHA to "
         "scripts/upgrade_project_pins.sh via a '--hub-sha <SHA>' argument on "
         "the script invocation line"
     )
@@ -121,7 +121,7 @@ def test_forwards_resolved_sha_to_reconciler_via_hub_sha_flag() -> None:
 def test_degrades_gracefully_when_gh_is_unavailable_but_core_surfaces_still_reconcile() -> None:
     context = _gh_absence_context()
     assert context, (
-        "commands/upgrade-project.md must document what happens when `gh` is "
+        "skills/upgrade-project/SKILL.md must document what happens when `gh` is "
         "unavailable/unauthenticated — no such mention found yet"
     )
     assert re.search(r"skip", context, re.IGNORECASE), (
@@ -158,7 +158,7 @@ def test_prints_cursor_api_key_setup_without_auto_running_it_when_cross_model_ca
 ):
     body = _upgrade_body()
     assert "gh secret set CURSOR_API_KEY" in body, (
-        "commands/upgrade-project.md must document the exact 'gh secret set "
+        "skills/upgrade-project/SKILL.md must document the exact 'gh secret set "
         "CURSOR_API_KEY' command, surfaced when the cross-model-review.yml "
         "caller is added"
     )
@@ -167,15 +167,15 @@ def test_prints_cursor_api_key_setup_without_auto_running_it_when_cross_model_ca
         "convention already used by onboard sub-step 8e.8 for the same secret"
     )
     assert not re.search(r"\brun\s+gh secret set", body, re.IGNORECASE), (
-        "commands/upgrade-project.md must never auto-run 'gh secret set' on "
+        "skills/upgrade-project/SKILL.md must never auto-run 'gh secret set' on "
         "the operator's behalf — only print it as a one-time manual step"
     )
 
 
 def test_allowed_tools_grants_gh_for_sha_resolution() -> None:
     frontmatter = _frontmatter_block()
-    assert frontmatter, "commands/upgrade-project.md must have a YAML frontmatter block"
+    assert frontmatter, "skills/upgrade-project/SKILL.md must have a YAML frontmatter block"
     assert "Bash(gh:*)" in frontmatter, (
-        "commands/upgrade-project.md's 'allowed-tools' frontmatter must grant "
+        "skills/upgrade-project/SKILL.md's 'allowed-tools' frontmatter must grant "
         "'Bash(gh:*)' so the command can resolve the hub SHA via `gh api`"
     )

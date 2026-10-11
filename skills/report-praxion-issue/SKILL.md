@@ -1,13 +1,14 @@
 ---
+name: report-praxion-issue
 description: File a Praxion-origin ecosystem-defect issue on the Praxion repo from a captured healing-sidecar candidate, with a human confirmation gate before every filing
 argument-hint: "[fingerprint]"
 allowed-tools: [Bash(gh:*), Bash(python3:*), Bash(uv run:*), Read, Grep, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---
 
-File an `ecosystem-defect` issue on the Praxion repo for a *Praxion-origin* defect (root cause in a shipped `hooks`/`blocks`/`agents`/`scripts`/`skills` artifact) that a Praxion capture point already recorded in `.ai-state/praxion_feedback/PENDING.md`. This command is an instance of the [upstream-stewardship](../skills/upstream-stewardship/SKILL.md) skill's pipeline shape (dedup → draft → sanitize → security-gate → HITL file → track) with the target fixed to the Praxion repo. It never accepts a fresh bug description as input -- scope filtering and mechanical sanitization already happened at capture time; this command only renders, reviews, and files an *already-captured* candidate.
+File an `ecosystem-defect` issue on the Praxion repo for a *Praxion-origin* defect (root cause in a shipped `hooks`/`blocks`/`agents`/`scripts`/`skills` artifact) that a Praxion capture point already recorded in `.ai-state/praxion_feedback/PENDING.md`. This skill is an instance of the [upstream-stewardship](../upstream-stewardship/SKILL.md) skill's pipeline shape (dedup → draft → sanitize → security-gate → HITL file → track) with the target fixed to the Praxion repo. It never accepts a fresh bug description as input -- scope filtering and mechanical sanitization already happened at capture time; this skill only renders, reviews, and files an *already-captured* candidate.
 
-**This command never files autonomously.** Every filing requires an explicit human confirmation, riding the operator's own `gh` authentication -- no PAT, no GitHub App, no new secret in this project.
+**This skill never files autonomously.** Every filing requires an explicit human confirmation, riding the operator's own `gh` authentication -- no PAT, no GitHub App, no new secret in this project.
 
 ## Process
 

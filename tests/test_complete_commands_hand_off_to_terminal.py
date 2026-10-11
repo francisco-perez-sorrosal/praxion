@@ -20,8 +20,8 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-INSTALL_COMMAND = REPO_ROOT / "commands" / "praxion-complete-install.md"
-UNINSTALL_COMMAND = REPO_ROOT / "commands" / "praxion-complete-uninstall.md"
+INSTALL_COMMAND = REPO_ROOT / "skills" / "praxion-complete-install" / "SKILL.md"
+UNINSTALL_COMMAND = REPO_ROOT / "skills" / "praxion-complete-uninstall" / "SKILL.md"
 README = REPO_ROOT / "commands" / "README.md"
 
 COMMAND_FILES = (INSTALL_COMMAND, UNINSTALL_COMMAND)

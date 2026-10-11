@@ -1,11 +1,12 @@
 ---
+name: report-upstream
 description: File a well-formed bug report on an upstream open-source project
 argument-hint: "<owner/repo> [description or context]"
 allowed-tools: [Bash(gh:*), Bash(curl:*), Read, Grep, Glob, AskUserQuestion]
 disable-model-invocation: true
 ---
 
-File a bug report on an upstream open-source repository using the [upstream-stewardship](../skills/upstream-stewardship/SKILL.md) skill. Guides the user through deduplication, sanitization, template compliance, and filing — with a human approval gate before every filing.
+File a bug report on an upstream open-source repository using the [upstream-stewardship](../upstream-stewardship/SKILL.md) skill. Guides the user through deduplication, sanitization, template compliance, and filing — with a human approval gate before every filing.
 
 ## Process
 
@@ -75,7 +76,7 @@ If the user chooses to comment or abort, follow their direction and stop.
 
 Construct the issue body:
 
-- **If a template was found** in step 2: parse the YAML form fields (see the skill's [issue-templates reference](../skills/upstream-stewardship/references/issue-templates.md)) and map the user's description to each required field
+- **If a template was found** in step 2: parse the YAML form fields (see the skill's [issue-templates reference](../upstream-stewardship/references/issue-templates.md)) and map the user's description to each required field
 - **If no template exists**: use the built-in bug report structure from the issue-templates reference
 
 Incorporate:

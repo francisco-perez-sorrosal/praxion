@@ -1,7 +1,8 @@
 ---
-id: dec-draft-83d80fb8
+id: dec-449
+draft_id: dec-draft-83d80fb8
 title: Retire the command artifact family — every Praxion slash workflow is a skill under its own name
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-10
 summary: "The 44 commands/*.md workflows move to skills/<name>/SKILL.md with unchanged names, invocation modes, tools and procedures; commands/, the plugin.json commands key and the knowledge.commands C4 element are removed, and no surface teaches a command family."

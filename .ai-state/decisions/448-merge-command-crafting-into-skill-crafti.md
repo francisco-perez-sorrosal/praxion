@@ -1,7 +1,8 @@
 ---
-id: dec-draft-654284cd
+id: dec-448
+draft_id: dec-draft-654284cd
 title: Merge command-crafting into skill-crafting — one reference owns user-invoked skill authoring
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-10
 summary: "skills/command-crafting/ is deleted; its still-valid content becomes skills/skill-crafting/references/user-invoked-skills.md plus three runtime sections in plugin-and-troubleshooting.md, written from the live-probed harness facts rather than copied."
@@ -20,7 +21,7 @@ dissent: "A separate user-invoked-skill authoring skill would keep slash-workflo
 
 ## Context
 
-With commands retired as a family (dec-draft-83d80fb8), `skills/command-crafting/` (SKILL 194 lines, REFERENCE 234, two references) teaches authors to create an artifact that no longer exists. Its content is of three kinds: unique (description length by consumer, `argument-hint` rules, argument substitution), duplicated in `skill-crafting` (field table, naming, structure, best practices), and obsolete (file-versus-directory choice, `.claude/commands/` locations). It also carries two defects found by the live probe: it documents `$1` as the first argument (the harness numbers from `$0`), and its own `$ARGUMENTS` examples are substituted when the skill loads. `context-engineer` injects it whole on every spawn.
+With commands retired as a family (dec-449), `skills/command-crafting/` (SKILL 194 lines, REFERENCE 234, two references) teaches authors to create an artifact that no longer exists. Its content is of three kinds: unique (description length by consumer, `argument-hint` rules, argument substitution), duplicated in `skill-crafting` (field table, naming, structure, best practices), and obsolete (file-versus-directory choice, `.claude/commands/` locations). It also carries two defects found by the live probe: it documents `$1` as the first argument (the harness numbers from `$0`), and its own `$ARGUMENTS` examples are substituted when the skill loads. `context-engineer` injects it whole on every spawn.
 
 **Activation:** no — a component merge with a single credible target.
 

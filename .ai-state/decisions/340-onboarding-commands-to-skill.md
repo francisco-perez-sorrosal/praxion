@@ -29,7 +29,7 @@ dissent: >
   /new-project, the pre-commit regex, and the ~/.local/bin/new-project symlink at near-zero
   migration cost — the duplication being removed lives in the phase bodies, not in the entry
   points, so deleting the entry points buys deduplication we would already have had.
-re_affirmed_by: [dec-draft-83d80fb8]
+re_affirmed_by: [dec-449]
 ---
 
 # Unify the two onboarding commands into one user-invocable skill plus one entry script

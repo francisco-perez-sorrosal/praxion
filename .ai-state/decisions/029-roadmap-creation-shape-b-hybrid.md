@@ -15,7 +15,7 @@ affected_files:
   - commands/roadmap.md
   - rules/swe/swe-agent-coordination-protocol.md
   - .claude-plugin/plugin.json
-superseded_in_part_by: [dec-draft-83d80fb8]
+superseded_in_part_by: [dec-449]
 ---
 
 ## Context

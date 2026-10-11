@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-10T20:16:06Z'
+generated_at: '2026-10-11T07:20:30Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-10-07'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -41,7 +41,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-09-28'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -49,7 +49,7 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-09-13'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
@@ -61,7 +61,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -158,7 +158,7 @@ surfaces:
   path: docs/concepts.md
   type: markdown
   title: Core Concepts
-  last_modified: '2026-09-25'
+  last_modified: '2026-10-10'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -172,7 +172,7 @@ surfaces:
   path: docs/context-economy.md
   type: markdown
   title: Context economy
-  last_modified: '2026-09-20'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -286,7 +286,7 @@ surfaces:
   path: docs/cursor-compat.md
   type: markdown
   title: 'Claude Code vs Cursor: differences'
-  last_modified: '2026-08-07'
+  last_modified: '2026-10-10'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -322,7 +322,7 @@ surfaces:
   path: docs/getting-started.md
   type: markdown
   title: Getting Started
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -412,7 +412,7 @@ surfaces:
   path: docs/ml-training-onramp.md
   type: markdown
   title: ML Training Onramp
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   diataxis: tutorial
   audience: developer
   renderer: tutorial_shell
@@ -431,7 +431,7 @@ surfaces:
   path: docs/multidisciplinary-identities-evidence.md
   type: markdown
   title: "Multidisciplinary Identities \u2014 Evidence Dossier"
-  last_modified: '2026-09-25'
+  last_modified: '2026-10-10'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -455,7 +455,7 @@ surfaces:
   path: docs/onboarding.md
   type: markdown
   title: Project Onboarding
-  last_modified: '2026-10-03'
+  last_modified: '2026-10-10'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -468,7 +468,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - claude
@@ -478,7 +478,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-09-13'
+  last_modified: '2026-10-10'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -489,7 +489,7 @@ surfaces:
   path: docs/skill-genesis.md
   type: markdown
   title: Harvesting Learnings with Skill-Genesis
-  last_modified: '2026-09-08'
+  last_modified: '2026-10-10'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -525,7 +525,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-09-27'
+  last_modified: '2026-10-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -559,7 +559,7 @@ surfaces:
   path: .ai-state/DESIGN_CHANGELOG.md
   type: markdown
   title: Architecture Changelog
-  last_modified: '2026-09-04'
+  last_modified: '2026-10-10'
   renderer: default_markdown
 - id: ai-state-landscape-watchlist
   path: .ai-state/LANDSCAPE_WATCHLIST.md
@@ -655,13 +655,13 @@ surfaces:
   path: .ai-state/decisions/014-upstream-stewardship-skill-command-composition.md
   type: markdown
   title: Skill + Command composition for upstream issue stewardship
-  last_modified: '2026-04-21'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-015-project-exploration-skill-command-composition
   path: .ai-state/decisions/015-project-exploration-skill-command-composition.md
   type: markdown
   title: Skill+Command composition for project exploration (no agent)
-  last_modified: '2026-04-12'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-016-explore-project-naming
   path: .ai-state/decisions/016-explore-project-naming.md
@@ -745,7 +745,7 @@ surfaces:
   path: .ai-state/decisions/029-roadmap-creation-shape-b-hybrid.md
   type: markdown
   title: Shape B-hybrid for roadmap-creation capability (agent + skill + command)
-  last_modified: '2026-04-12'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-030-roadmap-planning-skill-coexistence
   path: .ai-state/decisions/030-roadmap-planning-skill-coexistence.md
@@ -901,7 +901,7 @@ surfaces:
   path: .ai-state/decisions/055-hybrid-bash-slash-command-orchestration.md
   type: markdown
   title: Hybrid bash + slash-command orchestration for greenfield onboarding (Option C)
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-056-concurrency-collab-research-fragment-adr-naming
   path: .ai-state/decisions/056-concurrency-collab-research-fragment-adr-naming.md
@@ -1489,7 +1489,7 @@ surfaces:
   path: .ai-state/decisions/153-review-interface-skill-command-pattern.md
   type: markdown
   title: "`/review-interface` spawns the `interface-designer` agent in standalone mode \u2014 extending the Skill+Command family with a separate-context-window rule"
-  last_modified: '2026-08-05'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-154-specialist-sub-architects-active-advocates
   path: .ai-state/decisions/154-specialist-sub-architects-active-advocates.md
@@ -1609,7 +1609,7 @@ surfaces:
   path: .ai-state/decisions/173-verifier-rework-loop-resume-rework-arg-shape.md
   type: markdown
   title: /resume-rework takes no positional argument; reads VERIFIER_FINDINGS.md from cwd
-  last_modified: '2026-09-08'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-174-verifier-rework-loop-rework-manifest-format
   path: .ai-state/decisions/174-verifier-rework-loop-rework-manifest-format.md
@@ -2611,7 +2611,7 @@ surfaces:
   path: .ai-state/decisions/340-onboarding-commands-to-skill.md
   type: markdown
   title: Unify the two onboarding commands into one user-invocable skill plus one entry script
-  last_modified: '2026-08-30'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-341-onboarding-hackathon-mode-signal-promotion
   path: .ai-state/decisions/341-onboarding-hackathon-mode-signal-promotion.md
@@ -3178,7 +3178,7 @@ surfaces:
   type: markdown
   title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
     \ stall cap"
-  last_modified: '2026-10-09'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-435-mutation-line-grammar-leaf-module
   path: .ai-state/decisions/435-mutation-line-grammar-leaf-module.md
@@ -3196,7 +3196,7 @@ surfaces:
   path: .ai-state/decisions/437-step-loop-procedure-is-a-skill.md
   type: markdown
   title: The step-loop relay procedure is the skill skills/step-loop/SKILL.md, invocable by the user and the model, never a command
-  last_modified: '2026-10-08'
+  last_modified: '2026-10-10'
   renderer: adr_card
 - id: ai-state-decisions-438-architecture-view-set
   path: .ai-state/decisions/438-architecture-view-set.md
@@ -3245,6 +3245,30 @@ surfaces:
   type: markdown
   title: The always-loaded byte ratchet honours an explicit, dated operator suspension recorded in the committed baseline
   last_modified: '2026-10-10'
+  renderer: adr_card
+- id: ai-state-decisions-446-delete-cursor-and-codex-command-exporter
+  path: .ai-state/decisions/446-delete-cursor-and-codex-command-exporter.md
+  type: markdown
+  title: Delete the Cursor and Codex command exporters; both assistants reach workflows as native skills
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-447-gates-dev-link-and-arguments-follow-skil
+  path: .ai-state/decisions/447-gates-dev-link-and-arguments-follow-skil.md
+  type: markdown
+  title: Gates, dev-link, argument handling and the pull-request rule scope follow the workflows into skills
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-448-merge-command-crafting-into-skill-crafti
+  path: .ai-state/decisions/448-merge-command-crafting-into-skill-crafti.md
+  type: markdown
+  title: "Merge command-crafting into skill-crafting \u2014 one reference owns user-invoked skill authoring"
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-449-retire-the-command-artifact-family
+  path: .ai-state/decisions/449-retire-the-command-artifact-family.md
+  type: markdown
+  title: "Retire the command artifact family \u2014 every Praxion slash workflow is a skill under its own name"
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -4037,6 +4061,10 @@ groups:
   - ai-state-decisions-443-diagram-regen-command-and-review-checks
   - ai-state-decisions-444-light-only-render-tokens-and-marks
   - ai-state-decisions-445-ratchet-operator-suspension
+  - ai-state-decisions-446-delete-cursor-and-codex-command-exporter
+  - ai-state-decisions-447-gates-dev-link-and-arguments-follow-skil
+  - ai-state-decisions-448-merge-command-crafting-into-skill-crafti
+  - ai-state-decisions-449-retire-the-command-artifact-family
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

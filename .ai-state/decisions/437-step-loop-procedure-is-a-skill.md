@@ -21,7 +21,7 @@ affected_files:
 affected_reqs: [REQ-05, REQ-06, REQ-07]
 supersedes_in_part: [dec-432]
 dissent: []
-re_affirmed_by: [dec-draft-83d80fb8]
+re_affirmed_by: [dec-449]
 ---
 
 ## Context

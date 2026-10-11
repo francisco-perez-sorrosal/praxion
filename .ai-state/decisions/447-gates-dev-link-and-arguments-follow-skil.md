@@ -1,7 +1,8 @@
 ---
-id: dec-draft-59b24004
+id: dec-447
+draft_id: dec-draft-59b24004
 title: Gates, dev-link, argument handling and the pull-request rule scope follow the workflows into skills
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-10
 summary: "GL04/GL05/S04 scan skills/*/SKILL.md and C04 is re-scoped to skills rather than retired; S04 no longer counts harness path variables as argument use; --dev-link links skills; create-simple-python-prj and document-api read $ARGUMENTS with a documented token order; pr-conventions loads for exactly review-pr, merge-worktree and release."

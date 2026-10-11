@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d99bfb15
+id: dec-446
+draft_id: dec-draft-d99bfb15
 title: Delete the Cursor and Codex command exporters; both assistants reach workflows as native skills
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-10
 summary: "cursor/config/export-cursor-commands.py and codex/config/export-codex-command-skills.py are deleted with their tests; install_cursor.sh sweeps once the stale .cursor/commands exports earlier releases wrote (a workflow file carrying the exporter's description header, or the exported guidance page), install_codex.sh keeps its legacy-marker prune, and the generic Codex skill wrapper carries the argument hint."

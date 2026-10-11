@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-11T07:20:30Z'
+generated_at: '2026-10-11T07:56:11Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -539,7 +539,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -547,7 +547,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -655,13 +655,13 @@ surfaces:
   path: .ai-state/decisions/014-upstream-stewardship-skill-command-composition.md
   type: markdown
   title: Skill + Command composition for upstream issue stewardship
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-015-project-exploration-skill-command-composition
   path: .ai-state/decisions/015-project-exploration-skill-command-composition.md
   type: markdown
   title: Skill+Command composition for project exploration (no agent)
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-016-explore-project-naming
   path: .ai-state/decisions/016-explore-project-naming.md
@@ -745,7 +745,7 @@ surfaces:
   path: .ai-state/decisions/029-roadmap-creation-shape-b-hybrid.md
   type: markdown
   title: Shape B-hybrid for roadmap-creation capability (agent + skill + command)
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-030-roadmap-planning-skill-coexistence
   path: .ai-state/decisions/030-roadmap-planning-skill-coexistence.md
@@ -901,7 +901,7 @@ surfaces:
   path: .ai-state/decisions/055-hybrid-bash-slash-command-orchestration.md
   type: markdown
   title: Hybrid bash + slash-command orchestration for greenfield onboarding (Option C)
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-056-concurrency-collab-research-fragment-adr-naming
   path: .ai-state/decisions/056-concurrency-collab-research-fragment-adr-naming.md
@@ -1489,7 +1489,7 @@ surfaces:
   path: .ai-state/decisions/153-review-interface-skill-command-pattern.md
   type: markdown
   title: "`/review-interface` spawns the `interface-designer` agent in standalone mode \u2014 extending the Skill+Command family with a separate-context-window rule"
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-154-specialist-sub-architects-active-advocates
   path: .ai-state/decisions/154-specialist-sub-architects-active-advocates.md
@@ -1609,7 +1609,7 @@ surfaces:
   path: .ai-state/decisions/173-verifier-rework-loop-resume-rework-arg-shape.md
   type: markdown
   title: /resume-rework takes no positional argument; reads VERIFIER_FINDINGS.md from cwd
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-174-verifier-rework-loop-rework-manifest-format
   path: .ai-state/decisions/174-verifier-rework-loop-rework-manifest-format.md
@@ -2611,7 +2611,7 @@ surfaces:
   path: .ai-state/decisions/340-onboarding-commands-to-skill.md
   type: markdown
   title: Unify the two onboarding commands into one user-invocable skill plus one entry script
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-341-onboarding-hackathon-mode-signal-promotion
   path: .ai-state/decisions/341-onboarding-hackathon-mode-signal-promotion.md
@@ -3178,7 +3178,7 @@ surfaces:
   type: markdown
   title: "Ralph-lite is the step-loop driver's goal mode \u2014 a one-step goal plan driven by a fresh process per iteration, entered through a skill, bounded by an iteration budget and a two-iteration\
     \ stall cap"
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-435-mutation-line-grammar-leaf-module
   path: .ai-state/decisions/435-mutation-line-grammar-leaf-module.md
@@ -3196,7 +3196,7 @@ surfaces:
   path: .ai-state/decisions/437-step-loop-procedure-is-a-skill.md
   type: markdown
   title: The step-loop relay procedure is the skill skills/step-loop/SKILL.md, invocable by the user and the model, never a command
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-438-architecture-view-set
   path: .ai-state/decisions/438-architecture-view-set.md
@@ -3274,7 +3274,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3467,6 +3467,12 @@ surfaces:
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
   last_modified: '2026-09-04'
+  renderer: default_markdown
+- id: ai-state-specs-spec-commands-to-skills-2026-10-10
+  path: .ai-state/specs/SPEC_commands-to-skills_2026-10-10.md
+  type: markdown
+  title: 'Spec: commands-to-skills (the 44 slash workflows become skills; the command artifact family is retired)'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: ai-state-specs-spec-design-dialectic-2026-04-17
   path: .ai-state/specs/SPEC_design-dialectic_2026-04-17.md
@@ -4100,6 +4106,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-14-07-59-49
   - ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25
+  - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-merge-triggers-2026-10-03

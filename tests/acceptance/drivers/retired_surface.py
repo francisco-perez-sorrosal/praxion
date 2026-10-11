@@ -28,7 +28,11 @@ FROZEN_HISTORY = re.compile(
     r"|praxion_eval_reports)/"
     r"|\.ai-state/(TECH_DEBT_LEDGER|TECH_DEBT_RESOLVED|calibration_log|DESIGN_CHANGELOG)\.md$"
     r"|CHANGELOG\.md$|docs/independent-analysis/|docs/context-prj-comparison-[^/]*/"
-    r"|eval/.*(fixtures?|streams?)/)"
+    r"|eval/.*(fixtures?|streams?)/"
+    # The doc manifest is a generated index whose entries repeat the titles and paths of
+    # the records above (a finalized decision named after the retired skill among them);
+    # every surface it indexes is scanned on its own, so the index adds no live reference.
+    r"|\.ai-state/doc_manifest\.yaml$)"
 )
 
 # Named exceptions: the frozen before-state and the tests asserting a retired surface stays

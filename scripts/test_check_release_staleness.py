@@ -3,10 +3,10 @@
 Behavioral tests:
 
 1. Reports in-sync when HEAD registers the same artifacts as the last release.
-2. CANARY: flags agents/skills/commands added after the release tag, and
+2. CANARY: flags agents/skills added after the release tag, and
    ``--check`` exits non-zero on that known-bad input (gate-liveness proof it
    bites -- see rules/swe/gate-liveness.md).
-3. Excludes commands/README.md from the command set.
+3. A file under the retired commands/ directory is not a plugin artifact.
 4. Exits 0 when no release tag exists (advisory, never aborts).
 5. Auto-detects the newest v* tag as the baseline.
 
@@ -71,12 +71,6 @@ def _write_skill(repo: Path, name: str) -> None:
     path.write_text(f"# {name}\n")
 
 
-def _write_command(repo: Path, name: str) -> None:
-    path = repo / "commands" / f"{name}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"# {name}\n")
-
-
 def _commit(repo: Path, message: str) -> None:
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", message)
@@ -89,7 +83,6 @@ def test_in_sync_when_head_matches_release(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     _write_plugin(repo, ["researcher"])
     _write_skill(repo, "refactoring")
-    _write_command(repo, "sentinel")
     _commit(repo, "feat: baseline")
     _git(repo, "tag", "v0.1.0")
 
@@ -109,7 +102,6 @@ def test_flags_artifacts_added_after_release(tmp_path: Path) -> None:
 
     _write_plugin(repo, ["researcher", "interface-designer"])
     _write_skill(repo, "web-ui-design")
-    _write_command(repo, "review-interface")
     _commit(repo, "feat: add interface-designer")
 
     result = crs.compute_staleness(repo, "v0.1.0", "HEAD")
@@ -117,7 +109,6 @@ def test_flags_artifacts_added_after_release(tmp_path: Path) -> None:
     assert result.is_stale
     assert result.new_agents == ["interface-designer"]
     assert result.new_skills == ["web-ui-design"]
-    assert result.new_commands == ["review-interface"]
 
 
 def test_check_flag_exits_nonzero_when_stale(tmp_path: Path) -> None:
@@ -147,17 +138,18 @@ def test_check_flag_exits_zero_when_in_sync(tmp_path: Path) -> None:
     assert exc.value.code == 0
 
 
-def test_excludes_command_readme(tmp_path: Path) -> None:
+def test_a_retired_command_file_is_not_an_artifact(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     _write_plugin(repo, ["researcher"])
     _commit(repo, "feat: baseline")
     _git(repo, "tag", "v0.1.0")
-    _write_command(repo, "README")
-    _commit(repo, "docs: add commands readme")
+    path = repo / "commands" / "review-interface.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# review-interface\n")
+    _commit(repo, "docs: add a stray command file")
 
     result = crs.compute_staleness(repo, "v0.1.0", "HEAD")
 
-    assert result.new_commands == []
     assert not result.is_stale
 
 

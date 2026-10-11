@@ -3,7 +3,7 @@
 
 Praxion ships as a Claude Code plugin via an external marketplace manifest.
 Claude Code serves only *published releases* (the marketplace `version` field is
-a cache key tied to a git tag), so any agent / skill / command added after the
+a cache key tied to a git tag), so any agent or skill added after the
 last `v*` tag is invisible to every installed copy until a new release is cut.
 This is a silent failure: the source repo looks correct, `plugin.json` lists the
 artifact, yet `claude plugin install` users never see it.
@@ -18,14 +18,13 @@ commit between releases would contradict the pinned-stable version model.
 Artifact sources (mirroring `.claude-plugin/plugin.json`):
   - agents:   the explicit `agents` array in plugin.json
   - skills:   `skills/<name>/SKILL.md`
-  - commands: `commands/<name>.md` (excluding README.md)
 
 ## Named consumer
 
 This advisory is correct and deliberately non-blocking (see the rationale above) --
 but a correct-and-advisory gate is only useful if something reads its output before
 a human claim is made that the gate could contradict. The named reader is the
-release cut (`commands/release.md`): before that process declares a release
+release cut (`skills/release/SKILL.md`): before that process declares a release
 complete, it runs this check for the tag being cut and records the verdict.
 
 Nothing else is a substitute for that read. The failure mode this exists to catch:
@@ -68,8 +67,6 @@ REPO_ROOT = SCRIPT_DIR.parent
 PLUGIN_MANIFEST = ".claude-plugin/plugin.json"
 RELEASE_TAG_RE = re.compile(r"^v\d+\.\d+")
 SKILL_PATH_RE = re.compile(r"^skills/([^/]+)/SKILL\.md$")
-COMMAND_PATH_RE = re.compile(r"^commands/([^/]+)\.md$")
-COMMAND_EXCLUDE = {"README"}
 
 logger = logging.getLogger("check_release_staleness")
 
@@ -132,10 +129,6 @@ def skills_at(repo_root: Path, ref: str) -> set[str]:
     return _tree_names(repo_root, ref, "skills/", SKILL_PATH_RE)
 
 
-def commands_at(repo_root: Path, ref: str) -> set[str]:
-    return _tree_names(repo_root, ref, "commands/", COMMAND_PATH_RE) - COMMAND_EXCLUDE
-
-
 # -- Staleness computation ----------------------------------------------------
 
 
@@ -145,11 +138,10 @@ class Staleness:
     head_ref: str
     new_agents: list[str] = field(default_factory=list)
     new_skills: list[str] = field(default_factory=list)
-    new_commands: list[str] = field(default_factory=list)
 
     @property
     def total(self) -> int:
-        return len(self.new_agents) + len(self.new_skills) + len(self.new_commands)
+        return len(self.new_agents) + len(self.new_skills)
 
     @property
     def is_stale(self) -> bool:
@@ -163,7 +155,6 @@ def compute_staleness(repo_root: Path, base_ref: str, head_ref: str = "HEAD") ->
         head_ref=head_ref,
         new_agents=sorted(agents_at(repo_root, head_ref) - agents_at(repo_root, base_ref)),
         new_skills=sorted(skills_at(repo_root, head_ref) - skills_at(repo_root, base_ref)),
-        new_commands=sorted(commands_at(repo_root, head_ref) - commands_at(repo_root, base_ref)),
     )
 
 
@@ -172,10 +163,7 @@ def compute_staleness(repo_root: Path, base_ref: str, head_ref: str = "HEAD") ->
 
 def _format_report(s: Staleness) -> str:
     if not s.is_stale:
-        return (
-            f"check_release_staleness: in sync -- no agents/skills/commands added "
-            f"since {s.base_ref}."
-        )
+        return f"check_release_staleness: in sync -- no agents/skills added since {s.base_ref}."
     lines = [
         "",
         "=" * 72,
@@ -188,7 +176,6 @@ def _format_report(s: Staleness) -> str:
     for label, items in (
         ("agents", s.new_agents),
         ("skills", s.new_skills),
-        ("commands", s.new_commands),
     ):
         if items:
             lines.append(f"  {label} (+{len(items)}):")
@@ -218,7 +205,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "invisible to marketplace installs until a release is cut."
         ),
         epilog=(
-            "Named consumer: commands/release.md runs this check for the tag "
+            "Named consumer: skills/release/SKILL.md runs this check for the tag "
             "being cut and records its verdict before declaring a release "
             "complete -- see the module docstring's '## Named consumer' section."
         ),

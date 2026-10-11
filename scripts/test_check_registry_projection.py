@@ -1,7 +1,7 @@
 """Tests for check_registry_projection.py -- X01/X02/X05/X06/EC01/EC02 canary.
 
 Each test builds a minimal substrate tree under `tmp_path` (plugin.json / agents/ /
-coordination-details.md / README.md / diagram `.mmd` / skills/ / commands/ / rules/)
+coordination-details.md / README.md / diagram `.mmd` / skills/ / rules/)
 rather than pointing at the live repo -- the golden bad-cases construct the exact
 drifted shapes each check exists to catch.
 """
@@ -112,11 +112,11 @@ def test_x01_skips_when_plugin_json_absent(tmp_path: Path) -> None:
 # -- X02 --------------------------------------------------------------------
 
 
-def test_x02_passes_when_skills_and_commands_are_loadable(tmp_path: Path) -> None:
+def test_x02_passes_when_every_skill_dir_is_loadable(tmp_path: Path) -> None:
     _write(tmp_path / "skills" / "code-review" / "SKILL.md", "content\n")
-    _write(tmp_path / "commands" / "release.md", "content\n")
     report = classify(tmp_path)
     assert [f for f in report["findings"] if f["check"] == "X02"] == []
+    assert report["examined"]["X02"] == {"skill_dirs": 1}
 
 
 def test_x02_flags_skill_dir_missing_skill_md(tmp_path: Path) -> None:
@@ -126,11 +126,11 @@ def test_x02_flags_skill_dir_missing_skill_md(tmp_path: Path) -> None:
     assert any("hollow-skill" in f["entity"] for f in findings)
 
 
-def test_x02_flags_empty_command_file(tmp_path: Path) -> None:
+def test_x02_skips_when_skills_absent_even_with_a_retired_commands_dir(tmp_path: Path) -> None:
     _write(tmp_path / "commands" / "empty.md", "")
     report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "X02"]
-    assert any("empty.md" in f["entity"] for f in findings)
+    assert [f for f in report["findings"] if f["check"] == "X02"] == []
+    assert report["skipped"]["X02"]["reason"] == "substrate-absent"
 
 
 # -- X05 ----------------------------------------------------------------------
@@ -227,17 +227,17 @@ def _write_ec02_surfaces(tmp_path: Path, *, mentions: list[str]) -> None:
 
 def test_ec02_passes_when_all_artifacts_referenced(tmp_path: Path) -> None:
     _write(tmp_path / "skills" / "code-review" / "SKILL.md", "content\n")
-    _write(tmp_path / "commands" / "release.md", "content\n")
+    _write(tmp_path / "rules" / "swe" / "release.md", "## Release\n")
     _write_ec02_surfaces(tmp_path, mentions=["code-review", "release"])
     report = classify(tmp_path)
     assert [f for f in report["findings"] if f["check"] == "EC02"] == []
 
 
-def test_ec02_skill_referenced_only_by_a_command_is_not_flagged(tmp_path: Path) -> None:
-    """Widened surfaces: a command naming the skill is a reference (30 live false orphans
-    came from the narrower agents+CLAUDE.md+rules set)."""
+def test_ec02_skill_referenced_only_by_another_skill_is_not_flagged(tmp_path: Path) -> None:
+    """Widened surfaces: another skill naming the skill is a reference (30 live false
+    orphans came from the narrower agents+CLAUDE.md+rules set)."""
     _write(tmp_path / "skills" / "quiet-skill" / "SKILL.md", "content\n")
-    _write(tmp_path / "commands" / "use-it.md", "run the quiet-skill skill\n")
+    _write(tmp_path / "skills" / "use-it" / "SKILL.md", "run the quiet-skill skill\n")
     _write_ec02_surfaces(tmp_path, mentions=["use-it"])
     findings = [f for f in classify(tmp_path)["findings"] if f["check"] == "EC02"]
     assert not any("quiet-skill" in f["entity"] for f in findings)
@@ -261,12 +261,14 @@ def test_ec02_flags_orphaned_skill(tmp_path: Path) -> None:
     assert all(f["severity"] == "warn" for f in findings)
 
 
-def test_ec02_flags_orphaned_command(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "unmentioned-command.md", "content\n")
+def test_ec02_a_retired_command_file_is_neither_examined_nor_a_reference(tmp_path: Path) -> None:
+    _write(tmp_path / "skills" / "quiet-skill" / "SKILL.md", "content\n")
+    _write(tmp_path / "commands" / "use-it.md", "run the quiet-skill skill\n")
     _write_ec02_surfaces(tmp_path, mentions=[])
     report = classify(tmp_path)
     findings = [f for f in report["findings"] if f["check"] == "EC02"]
-    assert any("unmentioned-command" in f["entity"] for f in findings)
+    assert [f["entity"] for f in findings] == ["skills/quiet-skill"]
+    assert report["examined"]["EC02"] == {"skills": 1, "rules": 0}
 
 
 def test_ec02_flags_orphaned_rule(tmp_path: Path) -> None:

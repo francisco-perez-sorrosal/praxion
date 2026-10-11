@@ -7,9 +7,9 @@ detector (F01, F05) and a same-skill `references/` detector (F02) -- plus two
 one-off table/section walkers (X03, X09).
 
 * **F01** (warn) -- file paths referenced in `skills/*/SKILL.md`,
-  `agents/*.md`, `commands/*.md`, and `rules/**/*.md` resolve to existing
-  files. `README.md`/`CLAUDE.md` are excluded from the `agents/`/`commands/`
-  globs for the same reason X01's sibling C05 excludes them: neither is the
+  `agents/*.md`, and `rules/**/*.md` resolve to existing files.
+  `README.md`/`CLAUDE.md` are excluded from the `agents/` glob for the same
+  reason X01's sibling C05 excludes them: neither is the
   artifact type its directory's glob names.
 * **F02** (warn) -- every bare `references/<name>.md` path a `SKILL.md`
   names, that is genuinely a same-skill reference (see extraction below),
@@ -104,14 +104,13 @@ CHECK_IDS: tuple[str, ...] = ("F01", "F02", "F05", "X03", "X09")
 
 _SKILLS_DIR_REL = "skills"
 _AGENTS_DIR_REL = "agents"
-_COMMANDS_DIR_REL = "commands"
 _RULES_DIR_REL = "rules"
 _CLAUDE_MD_REL = "CLAUDE.md"
 _DEPLOYMENT_DOC_REL = ".ai-state/SYSTEM_DEPLOYMENT.md"
 _DECISIONS_DIR_REL = ".ai-state/decisions"
 
 # Neither file is the artifact type its directory's glob names: an index page
-# and a project-instructions file, not an agent/command/rule.
+# and a project-instructions file, not an agent/rule.
 _EXCLUDED_META_FILES = {"README.md", "CLAUDE.md"}
 
 _H2_HEADING = re.compile(r"^##\s")
@@ -193,17 +192,12 @@ def _f01_surface_files(repo_root: Path) -> list[Path]:
     files: list[Path] = []
     skills_dir = repo_root / _SKILLS_DIR_REL
     agents_dir = repo_root / _AGENTS_DIR_REL
-    commands_dir = repo_root / _COMMANDS_DIR_REL
     rules_dir = repo_root / _RULES_DIR_REL
     if skills_dir.is_dir():
         files.extend(sorted(skills_dir.glob("*/SKILL.md")))
     if agents_dir.is_dir():
         files.extend(
             sorted(p for p in agents_dir.glob("*.md") if p.name not in _EXCLUDED_META_FILES)
-        )
-    if commands_dir.is_dir():
-        files.extend(
-            sorted(p for p in commands_dir.glob("*.md") if p.name not in _EXCLUDED_META_FILES)
         )
     if rules_dir.is_dir():
         files.extend(sorted(rules_dir.glob("**/*.md")))
@@ -213,7 +207,7 @@ def _f01_surface_files(repo_root: Path) -> list[Path]:
 def _check_f01(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     files = _f01_surface_files(repo_root)
     if not files:
-        return [], {"reason": "substrate-absent", "path": "skills/agents/commands/rules"}, None
+        return [], {"reason": "substrate-absent", "path": "skills/agents/rules"}, None
 
     findings: list[dict] = []
     candidates_examined = 0

@@ -63,7 +63,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | C01 | A | Every skill dir has `SKILL.md` | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `skills/*/` dir has a `SKILL.md`. |
 | C02 | A | Every `SKILL.md` has `description` in frontmatter | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `SKILL.md` declares `description`. |
 | C03 | A | Every agent `.md` has `name`, `description`, `tools` in frontmatter | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `agents/*.md` declares `name`/`description`/`tools`. |
-| C04 | A | Every skill and command has a non-empty `description` field or header comment | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `skills/*/SKILL.md` and `commands/*.md` has a non-placeholder `description` or header comment. |
+| C04 | A | Every skill has a non-empty `description` field or header comment | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `skills/*/SKILL.md` has a non-placeholder `description` or header comment. |
 | C05 | A | `plugin.json` lists all agents by file path | Family: `python3 scripts/check_artifact_conformance.py --json`; plugin.json agents count equals `agents/*.md` file count. |
 | C06 | L | Skill descriptions enable activation | Could Claude load this skill based on description alone? Vague = fail |
 | C07 | L | Agent descriptions enable delegation | Could Claude select the right agent based on description alone? Overlap/thin = fail |
@@ -106,7 +106,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | S01 | A | `SKILL.md` frontmatter has `description` | Family: `python3 scripts/check_artifact_conformance.py --json`; Every SKILL.md `description` is present and non-empty. |
 | S02 | A | Agent frontmatter has `name`, `description`, `tools` | Family: `python3 scripts/check_artifact_conformance.py --json`; Every agent `name`/`description`/`tools` are present and non-empty. |
 | S03 | A | Rule files start with `##` heading | Family: `python3 scripts/check_artifact_conformance.py --json`; Every rule file's first non-blank body line is a `##` heading. |
-| S04 | A | Skills and commands read `$ARGUMENTS` when expected | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `skills/*/SKILL.md` and `commands/*.md` declaring `argument-hint` reads `$ARGUMENTS` or `$N`; a path variable is not a read. |
+| S04 | A | Skills read `$ARGUMENTS` when expected | Family: `python3 scripts/check_artifact_conformance.py --json`; Every `skills/*/SKILL.md` declaring `argument-hint` reads `$ARGUMENTS` or `$N`; a path variable is not a read. |
 | S05 | L | Skills follow progressive disclosure | Core in SKILL.md, detail in references/; monolithic skills >400 lines without references fail |
 | S06 | L | Agent prompts use numbered stages with completion criteria | Each agent's work is decomposed into **numbered stages, each with a stated completion criterion** — the substance being tested. The label is not: this repo carries at least three equally rigorous carriers, and a literal grep for any one of them false-flags agents that satisfy the intent completely. `### Phase N` is the majority form; `agents/discipline-consultant.md` uses `### Round N`, which is the correct vocabulary for an adversarial consult that iterates rather than advances; `agents/implementer.md` uses an explicitly ordered list (`1.` … `7.6.`) under a single `## Execution Workflow` heading, which is correct for a linear per-step workflow that would gain nothing from seven headings. Accept any of these; judge whether the stages are **numbered and terminated**, not how they are named. A check that reports correct work as drift teaches its reader to skip the dimension, which costs more than the check returns (the same reasoning that narrowed EC03 and retired AC11). Golden bad-case: an agent whose process is unnumbered prose with no stated point at which any stage is done — flag that, and only that |
 | S07 | L | Rules contain domain knowledge, not procedures | Rules reading like step-by-step procedures should be skills |
@@ -116,7 +116,7 @@ Convention: Each check has a unique ID, type (A=auto, L=llm), a rule, and a pass
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | X01 | A | plugin.json agent paths resolve | Family: `python3 scripts/check_registry_projection.py --json`; FAIL when a plugin.json agents-array path does not resolve to an existing `.md` file. |
-| X02 | A | plugin.json skill/command dirs contain loadable artifacts | Family: `python3 scripts/check_registry_projection.py --json`; FAIL when a skill dir has no `SKILL.md` or a command file is empty. |
+| X02 | A | Skill dirs contain loadable artifacts | Family: `python3 scripts/check_registry_projection.py --json`; FAIL when a skill dir has no `SKILL.md`. |
 | X03 | A | CLAUDE.md `## Structure` dirs exist | Family: `python3 scripts/check_path_resolution.py --json`; FAIL per `findings` entry with `check: "X03"`. |
 | X04 | L | Idea ledger implemented ideas reference real artifacts | Implemented ideas correspond to artifacts that exist |
 | X05 | A | Agent roster matches `agents/` | Family: `python3 scripts/check_registry_projection.py --json`; FAIL when the Agent Roster table and `agents/*.md` disagree in either direction. |
@@ -201,7 +201,7 @@ Surfaces grounded debt — problems anchored in current source code with respect
 | ID | Tp | Rule | Pass |
 |----|----|------|------|
 | EC01 | A | Pipeline diagram agents have files | Family: `python3 scripts/check_registry_projection.py --json`; FAIL when a pipeline-diagram node name has no matching `agents/*.md` file. |
-| EC02 | A | No orphaned artifacts | Family: `python3 scripts/check_registry_projection.py --json`; WARN when a skill, command, or rule is referenced by no agent, CLAUDE.md, rule, command, skill or doc (own files excluded). |
+| EC02 | A | No orphaned artifacts | Family: `python3 scripts/check_registry_projection.py --json`; WARN when a skill or rule is referenced by no agent, CLAUDE.md, rule, skill or doc (own files excluded). |
 | EC03 | L | Declared collaborations resolve to real, reachable artifacts | Every artifact named in a "collaborates with" / "works with" section must exist and be reachable in the pipeline. **Reciprocity is NOT required and must not be flagged.** Praxion's topology is orchestrator-mediated by construction — agents cannot spawn agents — so a downstream stage names the upstream whose artifact it consumes while the upstream does not enumerate every possible consumer. Demanding symmetric back-references produced 18 asymmetric pairs, every one of them the architecture working exactly as designed; a check that reports design as drift teaches its reader to skip the dimension, which costs more than the check ever returns. Flag only a named collaborator that does not exist, or one whose artifact no stage produces. Golden bad-case: a collaboration section naming an agent absent from `plugin.json` |
 | EC04 | L | Pipeline stages have complete handoff coverage | Every pipeline output doc has a producing and consuming agent; no dead ends |
 | EC05 | L | No structural gaps for stated purpose | Given CLAUDE.md description and Future Paths, are obvious artifact types missing? |
@@ -335,8 +335,8 @@ GL04 and GL05 are the two halves of one clause — *existence is not operation*.
 |----|----|------|------|
 | GL01 | L | No orphaned consumer: an instruction reads/harvests a named section/artifact no instruction produces | For each named section/artifact an agent is told to read, harvest, or digest, confirm some instruction is told to produce it (write/record/initialize/append). Use `grep` across `agents/`,`rules/` for the section name and judge whether any hit is a producer. WARN per consumed-but-unproduced section. Golden bad-case: a `### Foo` an agent is told to "harvest" that no agent is told to "write/record/initialize" |
 | GL02 | A | No forbidden-pattern contradiction: an instruction greps/asserts a pattern another rule forbids | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL02"` finding — an instruction searches test names for a `req{NN}_` prefix or another pattern a rule forbids; the check is dead. <!-- gate-liveness:ignore --> |
-| GL04 | A | No uninvoked gate: a gate nothing calls catches nothing | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL04"` finding — a gate no hook, `SKILL.md`, command, agent, workflow or sibling script invokes. |
-| GL05 | A | No unloadable gate: an interpreter that cannot import the gate runs nothing | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL05"` finding — a gate an agent, `SKILL.md` or command runs with an ambient `python3` that cannot import it; names the packages. |
+| GL04 | A | No uninvoked gate: a gate nothing calls catches nothing | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL04"` finding — a gate no hook, `SKILL.md`, agent, workflow or sibling script invokes. |
+| GL05 | A | No unloadable gate: an interpreter that cannot import the gate runs nothing | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL05"` finding — a gate an agent or `SKILL.md` runs with an ambient `python3` that cannot import it; names the packages. |
 | GL06 | A | No discarded verdict: a gate whose result the surface it runs on cannot transmit | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL06"` finding — a gate whose findings exit code its registration surface structurally cannot transmit. |
 | GL07 | A | No uncollected test: a test file no configured runner would ever collect | Family: `python3 scripts/check_gate_liveness.py --json`; FAIL per `check: "GL07"` finding — a test file no pocket's pytest config or CI workflow literal would ever collect. |
 | GL03 | L | Substance over structure in PROMPT gates | Sample this catalog's own checks and the verifier's phase gates; flag any whose Pass condition asserts a container *exists* without asserting it has substantive *content* (e.g., "section present" with no "≥1 row" clause). WARN per gate that checks presence where substance is the real contract. Golden bad-case: a spec-conformance gate that passes on an empty traceability matrix |
@@ -425,7 +425,6 @@ Build a filesystem map of all artifacts. **Batch inventory into 2-3 tool calls**
 echo "=== SKILLS ===" && ls -d skills/*/ 2>/dev/null | wc -l
 echo "=== AGENTS ===" && ls agents/*.md 2>/dev/null | grep -cv -E "(CLAUDE|README)"
 echo "=== RULES ===" && find rules -name "*.md" -not -name "CLAUDE.md" | wc -l
-echo "=== COMMANDS ===" && ls commands/*.md 2>/dev/null | grep -cv -E "(CLAUDE|README)"
 echo "=== HOOKS ===" && ls hooks/*.py hooks/*.sh 2>/dev/null | wc -l
 echo "=== ADRs (finalized) ===" && ls .ai-state/decisions/[0-9]*.md 2>/dev/null | wc -l
 echo "=== ADRs (drafts) ===" && ls .ai-state/decisions/drafts/*.md 2>/dev/null | grep -v '/CLAUDE\.md$' | wc -l
@@ -461,12 +460,12 @@ Run every `A` row: the family scripts first (table below), then the remaining sc
 | `.ai-state/decisions/` (either lifecycle stage) | `python3 scripts/check_adr_reciprocity.py --json` | DL06 |
 | `PRAXION_HACKATHON_MODE=1` | `python3 scripts/check_hackathon_graduation.py --json` | HK01 |
 | always (the sentinel's own definition) | `python3 scripts/check_sentinel_self_audit.py --json` | V01 V02 V03 V04 |
-| per check: `.claude-plugin/plugin.json` (X01) · `skills/`+`commands/` (X02) · the roster in `coordination-details.md` (X05) · `agents/README.md` (X06 EC01) · `agents/`+CLAUDE.md (EC02) | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
-| `skills/`/`agents/`/`commands/`/`rules/` (per check; `.ai-state/SYSTEM_DEPLOYMENT.md` and CLAUDE.md's Structure heading each conditional) | `python3 scripts/check_path_resolution.py --json` | F01 F02 F05 X03 X09 |
+| per check: `.claude-plugin/plugin.json` (X01) · `skills/` (X02) · the roster in `coordination-details.md` (X05) · `agents/README.md` (X06 EC01) · `agents/`+CLAUDE.md (EC02) | `python3 scripts/check_registry_projection.py --json` | X01 X02 X05 X06 EC01 EC02 |
+| `skills/`/`agents/`/`rules/` (per check; `.ai-state/SYSTEM_DEPLOYMENT.md` and CLAUDE.md's Structure heading each conditional) | `python3 scripts/check_path_resolution.py --json` | F01 F02 F05 X03 X09 |
 | always (contract is unconditional) | `python3 scripts/check_behavioral_contract.py --json` | BC01 BC03 BC04 BC05 |
 | `agents/` (T03) · `skills/` (T01 T04) | `python3 scripts/check_agent_prompt_size.py --json` | T01 T03 T04 |
 | `.ai-work/` | `python3 scripts/check_specialist_dispositions.py --json` | P07 |
-| `skills/` · `agents/` · `commands/` (per check) | `python3 scripts/check_artifact_conformance.py --json` | C01 C02 C03 C04 C05 N01 N02 N03 S01 S02 S03 S04 |
+| `skills/` · `agents/` · `rules/` · `.claude-plugin/plugin.json` (per check) | `python3 scripts/check_artifact_conformance.py --json` | C01 C02 C03 C04 C05 N01 N02 N03 S01 S02 S03 S04 |
 | `.c4` model + `.ai-state/DESIGN.md` (AC13); `.ai-state/DESIGN.md` + `docs/architecture.md` (per check) | `python3 scripts/check_architecture_projection.py --json` | AC03 AC04 AC05 AC06 AC07 AC13 |
 | `.ai-state/metrics_reports/` | `python3 scripts/check_readiness_feedback.py --json` | RD01 |
 | `.ai-state/specs/` | `python3 scripts/check_spec_archival_gap.py --json` | SH08 |

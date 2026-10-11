@@ -249,7 +249,7 @@ repos:
         name: PROGRESS.md writer discipline
         entry: python3 scripts/strip_progress_mandate.py --check
         language: system
-        files: '^(agents/.*\.md|commands/.*\.md|docs/.*\.md|claude/canonical-blocks/.*\.md|skills/.*\.md|hooks/send_event\.py|rules/writing/html-output-conventions\.md|scripts/strip_progress_mandate\.py)$'
+        files: '^(agents/.*\.md|docs/.*\.md|claude/canonical-blocks/.*\.md|skills/.*\.md|hooks/send_event\.py|rules/writing/html-output-conventions\.md|scripts/strip_progress_mandate\.py)$'
         pass_filenames: false
 
       - id: state-ledger-schema
@@ -264,7 +264,7 @@ repos:
       # for `description:` succeeds on a file no YAML parser can read: two
       # commands shipped an unquoted `argument-hint: [<a>] [--b <c>]` (two flow
       # sequences on one line), their whole frontmatter block unloadable, every
-      # presence-grep green throughout. A command whose frontmatter does not
+      # presence-grep green throughout. An artifact whose frontmatter does not
       # load cannot register its `description` — the sole model-invocation
       # mechanism. This is the parser those greps stand in for.
       #
@@ -288,7 +288,7 @@ repos:
         entry: python scripts/check_frontmatter_parses.py --repo-root .
         language: python
         additional_dependencies: ['pyyaml']
-        files: '^(commands/[^/]+\.md|agents/[^/]+\.md|skills/[^/]+/SKILL\.md|rules/.*\.md)$'
+        files: '^(agents/[^/]+\.md|skills/[^/]+/SKILL\.md|rules/.*\.md)$'
         pass_filenames: false
 
       # Block B6 — replicated agent prose blocks. Same defect class as Block B
@@ -509,7 +509,7 @@ repos:
         name: Registry projection (advisory)
         entry: python3 scripts/check_registry_projection.py --repo-root .
         language: system
-        files: '^(\.claude-plugin/plugin\.json|agents/[^/]+\.md|skills/software-planning/references/coordination-details\.md|skills/[^/]+/SKILL\.md|commands/[^/]+\.md|scripts/check_registry_projection\.py)$'
+        files: '^(\.claude-plugin/plugin\.json|agents/[^/]+\.md|skills/software-planning/references/coordination-details\.md|skills/[^/]+/SKILL\.md|scripts/check_registry_projection\.py)$'
         pass_filenames: false
 
       # Block T — path-resolution family (F01 F02 F05 X03 X09). Advisory
@@ -520,7 +520,7 @@ repos:
         name: Path resolution (advisory)
         entry: python3 scripts/check_path_resolution.py --repo-root .
         language: system
-        files: '^(skills/.*\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
+        files: '^(skills/.*\.md|agents/.*\.md|rules/.*\.md|\.ai-state/SYSTEM_DEPLOYMENT\.md|CLAUDE\.md|scripts/check_path_resolution\.py)$'
         pass_filenames: false
 
       # Block U — behavioral-contract family (BC01 BC03 BC04 BC05). Advisory
@@ -560,12 +560,12 @@ repos:
         # language: python (not system) -- reads YAML; see rules-manifest-drift.
         language: python
         additional_dependencies: ['pyyaml']
-        files: '^(skills/.*/SKILL\.md|agents/.*\.md|commands/.*\.md|rules/.*\.md|\.claude-plugin/plugin\.json|scripts/check_artifact_conformance\.py)$'
+        files: '^(skills/.*/SKILL\.md|agents/.*\.md|rules/.*\.md|\.claude-plugin/plugin\.json|scripts/check_artifact_conformance\.py)$'
         pass_filenames: false
 
       # Block V — the harness's own plugin validator beside Praxion's (process-
       # economy P3.7, native subsumption). `claude plugin validate` checks the
-      # manifest and every agent/command/skill it would load; its exit code
+      # manifest and every agent/skill it would load; its exit code
       # stands (0 with warnings today — five known layout warnings on the
       # catalog README/CLAUDE files and the root CLAUDE.md, which the harness
       # does not load as plugin context). Skips, exit 0, when the CLI is not
@@ -574,5 +574,5 @@ repos:
         name: Native plugin validate (advisory on warnings)
         entry: bash -c 'command -v claude >/dev/null 2>&1 || { echo "claude CLI not on PATH; skipping native plugin validate"; exit 0; }; claude plugin validate .'
         language: system
-        files: '^(\.claude-plugin/.*|agents/.*\.md|commands/.*\.md|skills/.*/SKILL\.md|hooks/hooks\.json)$'
+        files: '^(\.claude-plugin/.*|agents/.*\.md|skills/.*/SKILL\.md|hooks/hooks\.json)$'
         pass_filenames: false

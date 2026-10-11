@@ -1,7 +1,7 @@
 """Tests for check_path_resolution.py -- F01/F02/F05/X03/X09 canary.
 
 Each test builds a minimal substrate tree under `tmp_path` (skills/ / agents/ /
-commands/ / rules/ / CLAUDE.md / .ai-state/SYSTEM_DEPLOYMENT.md /
+rules/ / CLAUDE.md / .ai-state/SYSTEM_DEPLOYMENT.md /
 .ai-state/decisions/) rather than pointing at the live repo -- the golden
 bad-cases construct the exact drifted shapes each check exists to detect.
 """
@@ -56,6 +56,13 @@ def test_f01_ignores_bare_references_tokens(tmp_path: Path) -> None:
 
 def test_f01_skips_when_no_surface_present(tmp_path: Path) -> None:
     report = classify(tmp_path)
+    assert report["skipped"]["F01"]["reason"] == "substrate-absent"
+
+
+def test_f01_does_not_read_a_retired_command_file(tmp_path: Path) -> None:
+    _write(tmp_path / "commands" / "audit.md", "See `scripts/check_ghost.py` for details.\n")
+    report = classify(tmp_path)
+    assert [f for f in report["findings"] if f["check"] == "F01"] == []
     assert report["skipped"]["F01"]["reason"] == "substrate-absent"
 
 

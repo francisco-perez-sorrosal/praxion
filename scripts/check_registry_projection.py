@@ -6,10 +6,9 @@ reality.
 
 * **X01** (fail) -- every path in `.claude-plugin/plugin.json`'s `agents` array
   resolves to an existing `.md` file.
-* **X02** (fail) -- `skills/` has skill dirs, each holding a `SKILL.md`;
-  `commands/` has command files that are non-empty. A registered directory
-  holding nothing loadable is the failure this catches -- the directory
-  existing is not evidence it ships anything.
+* **X02** (fail) -- every `skills/` dir holds a `SKILL.md`. A registered
+  directory holding nothing loadable is the failure this catches -- the
+  directory existing is not evidence it ships anything.
 * **X05** (fail) -- agent names in the Agent Roster table
   (`skills/software-planning/references/coordination-details.md`'s
   `## Agent Roster`) match `agents/*.md` file stems 1:1, both directions.
@@ -23,7 +22,7 @@ reality.
   the *forward* pipeline only, so an agent legitimately absent from it (e.g.
   `roadmap-cartographer`, an on-demand audit tool outside the forward flow) is
   not itself a finding.
-* **EC02** (warn) -- every skill, command, and rule is referenced by at least
+* **EC02** (warn) -- every skill and rule is referenced by at least
   one of `agents/*.md`, root `CLAUDE.md`, `claude/config/CLAUDE.md.tmpl`, or
   `rules/**/*.md`. Reference detection is a plain substring search against the
   concatenated text of those surfaces -- deliberately liberal, since EC02 is
@@ -32,9 +31,9 @@ reality.
   reader to ignore the dimension. A rule is excluded from its own haystack
   when checked, so a rule cannot "reference" itself merely by existing.
 
-`agents/*.md` and `commands/*.md` each exclude `README.md` and `CLAUDE.md` --
-neither is the artifact type its glob names (an index page and a
-project-instructions file, respectively); the same exclusion X01's sibling
+`agents/*.md` excludes `README.md` and `CLAUDE.md` -- neither is the
+artifact type its glob names (an index page and a project-instructions file,
+respectively); the same exclusion X01's sibling
 C05 already applies to agents. `rules/**/*.md` excludes `README.md` from the
 *artifact* list (it is a catalog page, not a rule) but keeps it in the
 *surface* list EC02 searches, since it is a legitimate place a rule name
@@ -76,14 +75,13 @@ _ROSTER_REL = "skills/software-planning/references/coordination-details.md"
 _README_REL = "agents/README.md"
 _AGENTS_DIR_REL = "agents"
 _SKILLS_DIR_REL = "skills"
-_COMMANDS_DIR_REL = "commands"
 _RULES_DIR_REL = "rules"
 _DIAGRAM_REL = "agents/diagrams/agent-pipeline-flowchart/src/agent-pipeline-flowchart.mmd"
 _CLAUDE_MD_REL = "CLAUDE.md"
 _CLAUDE_TMPL_REL = "claude/config/CLAUDE.md.tmpl"
 
 # Neither file is the artifact type its directory's glob names: an index page
-# and a project-instructions file, not an agent/command/rule.
+# and a project-instructions file, not an agent/rule.
 _EXCLUDED_META_FILES = {"README.md", "CLAUDE.md"}
 
 _H2_HEADING = re.compile(r"^##\s")
@@ -150,51 +148,25 @@ def _check_x01(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     return findings, None, {"agents_count": len(agents)}
 
 
-# -- X02: skills/commands hold loadable artifacts --------------------------------
+# -- X02: skill dirs hold a loadable SKILL.md --------------------------------------
 
 
 def _check_x02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     skills_dir = repo_root / _SKILLS_DIR_REL
-    commands_dir = repo_root / _COMMANDS_DIR_REL
-    if not skills_dir.is_dir() and not commands_dir.is_dir():
-        return (
-            [],
-            {"reason": "substrate-absent", "path": f"{skills_dir} and {commands_dir}"},
-            None,
-        )
-
-    findings: list[dict] = []
-    examined: dict = {}
-
-    if skills_dir.is_dir():
-        skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir()]
-        examined["skill_dirs"] = len(skill_dirs)
-        for d in skill_dirs:
-            if not (d / "SKILL.md").is_file():
-                findings.append(
-                    {
-                        "check": "X02",
-                        "severity": "fail",
-                        "entity": f"skills/{d.name}",
-                        "message": f"skill dir '{d.name}' has no SKILL.md",
-                    }
-                )
-
-    if commands_dir.is_dir():
-        command_files = [f for f in commands_dir.glob("*.md") if f.name not in _EXCLUDED_META_FILES]
-        examined["command_files"] = len(command_files)
-        for f in command_files:
-            if f.stat().st_size == 0:
-                findings.append(
-                    {
-                        "check": "X02",
-                        "severity": "fail",
-                        "entity": f"commands/{f.name}",
-                        "message": f"command file '{f.name}' is empty",
-                    }
-                )
-
-    return findings, None, examined
+    if not skills_dir.is_dir():
+        return [], {"reason": "substrate-absent", "path": str(skills_dir)}, None
+    skill_dirs = [d for d in skills_dir.iterdir() if d.is_dir()]
+    findings = [
+        {
+            "check": "X02",
+            "severity": "fail",
+            "entity": f"skills/{d.name}",
+            "message": f"skill dir '{d.name}' has no SKILL.md",
+        }
+        for d in skill_dirs
+        if not (d / "SKILL.md").is_file()
+    ]
+    return findings, None, {"skill_dirs": len(skill_dirs)}
 
 
 # -- X05/X06: roster/README table matches agents/ 1:1 ----------------------------
@@ -349,12 +321,12 @@ def _reference_pairs(repo_root: Path) -> list[tuple[Path, str]]:
         candidate_paths.extend(sorted(agents_dir.glob("*.md")))
     if rules_dir.is_dir():
         candidate_paths.extend(sorted(rules_dir.glob("**/*.md")))
-    # Widened surfaces (P2.1 residual wrap-up): a skill named by a command, by another
-    # skill, or by the docs tree is not an orphan -- the narrower agents+CLAUDE.md+rules
+    # Widened surfaces (P2.1 residual wrap-up): a skill named by another skill or by
+    # the docs tree is not an orphan -- the narrower agents+CLAUDE.md+rules
     # set produced 30 false "orphans" per sweep against a corpus where every one of them
     # was referenced somewhere shipped. Each artifact's OWN files are excluded from its
     # haystack by the per-artifact callers below, so a skill cannot reference itself.
-    for rel in (_COMMANDS_DIR_REL, _SKILLS_DIR_REL, "docs"):
+    for rel in (_SKILLS_DIR_REL, "docs"):
         d = repo_root / rel
         if d.is_dir():
             candidate_paths.extend(sorted(d.glob("**/*.md")))
@@ -388,30 +360,7 @@ def _check_ec02_skills(repo_root: Path, pairs: list[tuple[Path, str]]) -> tuple[
                     "check": "EC02",
                     "severity": "warn",
                     "entity": f"skills/{d.name}",
-                    "message": f"skill '{d.name}' is not referenced by any agent, CLAUDE.md, rule, command, skill or doc",
-                }
-            )
-    return findings, examined
-
-
-def _check_ec02_commands(repo_root: Path, pairs: list[tuple[Path, str]]) -> tuple[list[dict], int]:
-    """`(findings, examined_count)` for every command file against the other surfaces' text."""
-    findings: list[dict] = []
-    examined = 0
-    commands_dir = repo_root / _COMMANDS_DIR_REL
-    if not commands_dir.is_dir():
-        return findings, examined
-    for f in sorted(commands_dir.glob("*.md")):
-        if f.name in _EXCLUDED_META_FILES:
-            continue
-        examined += 1
-        if f.stem not in _haystack_excluding(pairs, f):
-            findings.append(
-                {
-                    "check": "EC02",
-                    "severity": "warn",
-                    "entity": f"commands/{f.name}",
-                    "message": f"command '{f.stem}' is not referenced by any agent, CLAUDE.md, rule, command, skill or doc",
+                    "message": f"skill '{d.name}' is not referenced by any agent, CLAUDE.md, rule, skill or doc",
                 }
             )
     return findings, examined
@@ -449,13 +398,10 @@ def _check_ec02(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
             None,
         )
     findings: list[dict] = []
-    examined = {"skills": 0, "commands": 0, "rules": 0}
+    examined = {"skills": 0, "rules": 0}
 
     skill_findings, examined["skills"] = _check_ec02_skills(repo_root, pairs)
     findings.extend(skill_findings)
-
-    command_findings, examined["commands"] = _check_ec02_commands(repo_root, pairs)
-    findings.extend(command_findings)
 
     rule_findings, examined["rules"] = _check_ec02_rules(repo_root, pairs)
     findings.extend(rule_findings)
@@ -494,14 +440,11 @@ def classify(repo_root: Path) -> dict:
         "withheld": [],
         "bound": {
             "X01": "X01 clean means every plugin.json agents-array path resolves to a file.",
-            "X02": (
-                "X02 clean means every skill dir has a SKILL.md and every command "
-                "file is non-empty."
-            ),
+            "X02": "X02 clean means every skill dir has a SKILL.md.",
             "X05": "X05 clean means the Agent Roster table and agents/*.md agree 1:1.",
             "X06": "X06 clean means agents/README.md's agent table and agents/*.md agree 1:1.",
             "EC01": "EC01 clean means every pipeline-diagram node resolves to an agent file.",
-            "EC02": "EC02 clean means every skill/command/rule is referenced somewhere.",
+            "EC02": "EC02 clean means every skill/rule is referenced somewhere.",
         },
     }
 

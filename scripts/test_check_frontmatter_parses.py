@@ -104,9 +104,9 @@ def _gate() -> Any:
     return module
 
 
-def _write_command(root: Path, name: str, body: str) -> Path:
-    """Materialize one in-scope artifact under `root` and return its path."""
-    path = root / "commands" / name
+def _write_skill(root: Path, name: str, body: str) -> Path:
+    """Materialize one in-scope artifact, a skill's `SKILL.md`, and return its path."""
+    path = root / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
     return path
@@ -147,13 +147,13 @@ def test_real_repo_frontmatter_all_loads() -> None:
 
 def test_canary_flags_the_historical_defect(tmp_path: Path) -> None:
     """The two-unquoted-flow-sequences line that actually shipped is flagged."""
-    _write_command(tmp_path, "check-experiment.md", _HISTORICAL_DEFECT)
+    _write_skill(tmp_path, "check-experiment", _HISTORICAL_DEFECT)
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
     assert _kinds(report) == ["unparseable"]
     finding = report["findings"][0]
-    assert finding["file"] == "commands/check-experiment.md"
+    assert finding["file"] == "skills/check-experiment/SKILL.md"
     # The parser's own problem mark must survive into the finding: without the
     # line/column a reader cannot locate the defect in a 15-line block.
     assert "argument-hint" in finding["detail"] or "line 4" in finding["detail"]
@@ -161,7 +161,7 @@ def test_canary_flags_the_historical_defect(tmp_path: Path) -> None:
 
 def test_canary_flags_unindented_block_scalar(tmp_path: Path) -> None:
     """A folded scalar whose continuation sits at column 0 is flagged."""
-    _write_command(tmp_path, "run-experiment.md", _UNINDENTED_BLOCK_SCALAR)
+    _write_skill(tmp_path, "run-experiment", _UNINDENTED_BLOCK_SCALAR)
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -170,7 +170,7 @@ def test_canary_flags_unindented_block_scalar(tmp_path: Path) -> None:
 
 def test_canary_flags_missing_closing_delimiter(tmp_path: Path) -> None:
     """An unterminated block is named, not silently treated as body prose."""
-    _write_command(tmp_path, "unterminated.md", "---\ndescription: hello\n\nBody prose.\n")
+    _write_skill(tmp_path, "unterminated", "---\ndescription: hello\n\nBody prose.\n")
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -193,7 +193,7 @@ def test_canary_flags_non_mapping_frontmatter(
     Field lookup on a non-mapping returns nothing rather than raising, so this
     shape is indistinguishable from "declares no fields" to every consumer.
     """
-    _write_command(tmp_path, "shape.md", f"---\n{block}\n---\n\nBody.\n")
+    _write_skill(tmp_path, "shape", f"---\n{block}\n---\n\nBody.\n")
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -211,7 +211,7 @@ def test_canary_flags_bracket_form_argument_hint(tmp_path: Path) -> None:
     unnoticed.  It is also one edit from ``unparseable``: add a second group and
     the line becomes two flow sequences, the historical defect above.
     """
-    _write_command(tmp_path, "bracket.md", "---\nargument-hint: [--init]\n---\n\nBody.\n")
+    _write_skill(tmp_path, "bracket", "---\nargument-hint: [--init]\n---\n\nBody.\n")
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -224,9 +224,9 @@ def test_quoted_argument_hint_is_not_flagged(tmp_path: Path) -> None:
 
     Including the multi-group shape the bracket form cannot express at all.
     """
-    _write_command(
+    _write_skill(
         tmp_path,
-        "quoted.md",
+        "quoted",
         '---\nargument-hint: "[<tag>] [--slug <s>]"\n---\n\nBody.\n',
     )
 
@@ -240,7 +240,7 @@ def test_quoted_argument_hint_is_not_flagged(tmp_path: Path) -> None:
 
 def test_well_formed_frontmatter_is_not_flagged(tmp_path: Path) -> None:
     """The repaired form of the historical defect scans clean."""
-    _write_command(tmp_path, "check-experiment.md", _REPAIRED)
+    _write_skill(tmp_path, "check-experiment", _REPAIRED)
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -250,7 +250,7 @@ def test_well_formed_frontmatter_is_not_flagged(tmp_path: Path) -> None:
 
 def test_file_without_frontmatter_is_skipped_not_flagged(tmp_path: Path) -> None:
     """Absent frontmatter is counted and skipped -- it is another gate's question."""
-    _write_command(tmp_path, "README.md", "# Commands\n\nA catalog, no frontmatter.\n")
+    _write_skill(tmp_path, "catalog", "# Catalog\n\nProse only, no frontmatter.\n")
 
     report = _gate().check_frontmatter_parses(tmp_path)
 
@@ -265,11 +265,11 @@ def test_file_without_frontmatter_is_skipped_not_flagged(tmp_path: Path) -> None
 
 def test_canary_cli_exits_nonzero_on_defective_tree(tmp_path: Path, capsys) -> None:
     """The exit code -- the only thing pre-commit reads -- distinguishes the trees."""
-    _write_command(tmp_path, "broken.md", _HISTORICAL_DEFECT)
+    _write_skill(tmp_path, "broken", _HISTORICAL_DEFECT)
     assert _gate().main(["--repo-root", str(tmp_path)]) == 1
     assert "unparseable" in capsys.readouterr().out
 
-    _write_command(tmp_path, "broken.md", _REPAIRED)
+    _write_skill(tmp_path, "broken", _REPAIRED)
     assert _gate().main(["--repo-root", str(tmp_path)]) == 0
 
 
@@ -287,7 +287,7 @@ def test_canary_missing_pyyaml_raises_naming_the_interpreter(
     rather than an uninstalled package.
     """
     gate = _gate()
-    _write_command(tmp_path, "fine.md", _REPAIRED)
+    _write_skill(tmp_path, "fine", _REPAIRED)
     real_import = builtins.__import__
 
     def _no_yaml(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -334,6 +334,7 @@ def test_precommit_pattern_matches_every_scanned_path() -> None:
         "skills/refactoring/references/patterns.md",
         ".ai-state/DESIGN.md",
         "README.md",
+        "commands/release.md",
     ],
 )
 def test_precommit_pattern_does_not_match_unrelated_prose(unrelated: str) -> None:

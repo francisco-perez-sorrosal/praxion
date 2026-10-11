@@ -237,7 +237,6 @@ def apply_scattered_edits() -> list[tuple[str, str]]:
 # scanned for any PROGRESS.md mention, and every legitimate one must be
 # allowlisted below with the reason it is legitimate.
 WIDER_SCAN_GLOBS = (
-    "commands/*.md",
     "docs/*.md",
     "claude/canonical-blocks/*.md",
     "skills/*/SKILL.md",

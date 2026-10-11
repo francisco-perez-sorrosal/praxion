@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Parse the YAML frontmatter of every shipped artifact -- with a real parser.
 
-Nothing in this repository parsed command, agent, skill, or rule frontmatter.
+Before this gate, nothing in this repository parsed artifact frontmatter.
 The checks that exist -- the sentinel's ``C04``/``S01``/``S02`` -- grep for
 field *presence*, and a grep for ``description:`` succeeds on a file no YAML
 loader can read.  That is verbatim the anti-pattern
@@ -13,7 +13,7 @@ The defect that shipped: two command files carried
     argument-hint: [<run_tag>] [--task-slug <slug>]
 
 Unquoted, that is two flow sequences on one line, which no YAML parser accepts.
-The whole frontmatter block therefore failed to load, and a command whose
+The whole frontmatter block therefore failed to load, and an artifact whose
 frontmatter does not load cannot register its ``description`` -- the sole
 model-invocation mechanism.  Every presence-grep in the repo was green
 throughout.
@@ -30,12 +30,13 @@ that way keeps this gate's computed scope equal to its documented scope.
 "declared fields must carry their contracted type" principle -- such a rule
 would grow without bound and pull the sentinel's question back in here.  The
 field earns its own assertion for a reason no other field currently shares:
-the corpus is read by **two parser classes that disagree**.  The Cursor and
-Codex exporters parse frontmatter line-by-line with a regex and coerce every
-value to ``str``, so they never error; Claude Code and this gate use a real
-YAML loader, which sees ``argument-hint: [--init]`` as a one-element *list*.
-The divergence is therefore invisible from either side alone -- which is how
-21 string-valued and 15 list-valued hints coexisted unnoticed.  It is also the
+the corpus was read by **two parser classes that disagreed**.  The retired
+Cursor and Codex command exporters parsed frontmatter line-by-line with a regex
+and coerced every value to ``str``, so they never errored; Claude Code and this
+gate use a real YAML loader, which sees ``argument-hint: [--init]`` as a
+one-element *list*.  The divergence was therefore invisible from either side
+alone -- which is how 21 string-valued and 15 list-valued hints coexisted
+unnoticed.  It is also the
 near-miss of the defect above: a multi-group hint in bracket form is two flow
 sequences on one line, i.e. ``unparseable``, one edit away.  Asserting the type
 is mechanically decidable and closes the class; the enumeration stays at one
@@ -94,13 +95,12 @@ from _repo_root import resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-# The artifact surfaces whose frontmatter is load-bearing at runtime: commands
-# and agents register from it, skills gate activation on `description`, rules
-# scope injection on `paths`. Globs (not a recursive `**/*.md`) because the
+# The artifact surfaces whose frontmatter is load-bearing at runtime: agents
+# register from it, skills gate activation and invocation on it, rules scope
+# injection on `paths`. Globs (not a recursive `**/*.md`) because the
 # nested `references/` and `assets/` files under `skills/` are prose, and a
 # `README.md` in any of these directories carries no frontmatter by design.
 SCAN_GLOBS: tuple[str, ...] = (
-    "commands/*.md",
     "agents/*.md",
     "skills/*/SKILL.md",
     "rules/**/*.md",

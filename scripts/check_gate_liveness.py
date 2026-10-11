@@ -82,7 +82,7 @@ _EXCLUDE_SUBSTRINGS = (
     "shipped-artifact-isolation",
 )
 _IGNORE = "gate-liveness:ignore"
-_SCAN_DIRS = ("agents", "rules", "skills", "commands")
+_SCAN_DIRS = ("agents", "rules", "skills")
 
 # Each finding's `kind` (the detector's own vocabulary, e.g. "forbidden-pattern")
 # resolves to its sentinel GL id here -- the one non-additive change this family
@@ -203,7 +203,6 @@ _INVOCATION_GLOBS = (
     "hooks/**/*",
     "agents/*.md",
     "skills/*/SKILL.md",
-    "commands/*.md",
     ".github/workflows/*.yml",
     "scripts/*.sh",
     "scripts/*.py",
@@ -262,7 +261,7 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
                     line=1,
                     evidence=gate.name,
                     why=(
-                        "no hook, skill, command, agent, workflow, or sibling script "
+                        "no hook, skill, agent, workflow, or sibling script "
                         "invokes this gate — it catches nothing, and its own "
                         "tests cannot reveal that"
                     ),
@@ -271,8 +270,8 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
     return findings
 
 
-# Surfaces where a script runs under the *ambient* interpreter: an agent, skill
-# or command instructs a model to type `python3 <script>` into a shell, and
+# Surfaces where a script runs under the *ambient* interpreter: an agent or
+# skill instructs a model to type `python3 <script>` into a shell, and
 # nothing between the instruction and the process declares which interpreter
 # that is. A skill counts by its `SKILL.md` only; a call written in one of its
 # reference files is outside this scope (a declared limit, not an oversight).
@@ -285,7 +284,7 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
 # packages, `system` for a stdlib-only one) -- a distinction this repo already
 # draws correctly. Documented scope and computed scope are the same globs,
 # per the rule's own scope-fidelity clause.
-_AMBIENT_INVOCATION_GLOBS = ("agents/*.md", "skills/*/SKILL.md", "commands/*.md")
+_AMBIENT_INVOCATION_GLOBS = ("agents/*.md", "skills/*/SKILL.md")
 _AMBIENT_INVOCATION = re.compile(r"\bpython3?\s+(scripts/[A-Za-z0-9_]+\.py)")
 _MISSING_MODULE_ERRORS = frozenset(
     {"ImportError", "ModuleNotFoundError", "Exception", "BaseException"}

@@ -1,7 +1,7 @@
 """Tests for check_artifact_conformance.py -- C01-05/N01-03/S01-04 canary.
 
 Each test builds a minimal substrate tree under `tmp_path` (skills/, agents/,
-commands/, rules/, plugin.json) rather than pointing at the live repo -- the
+rules/, plugin.json) rather than pointing at the live repo -- the
 golden bad-cases construct the exact drifted shapes each check exists to
 catch.
 """
@@ -160,51 +160,20 @@ def test_s02_flags_empty_name(tmp_path: Path) -> None:
 # -- C04 ------------------------------------------------------------------------
 
 
-def test_c04_passes_with_frontmatter_description(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "commands" / "release.md", '---\ndescription: "Cut a release."\n---\n\nBody.\n'
-    )
-    report = classify(tmp_path)
-    assert [f for f in report["findings"] if f["check"] == "C04"] == []
-
-
-def test_c04_passes_with_header_comment_no_frontmatter(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "quick.md", "<!-- Cuts a release. -->\n\nBody.\n")
-    report = classify(tmp_path)
-    assert [f for f in report["findings"] if f["check"] == "C04"] == []
-
-
-def test_c04_flags_empty_description(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "empty.md", '---\ndescription: ""\n---\n\nBody.\n')
-    report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "C04"]
-    assert any("empty.md" in f["entity"] for f in findings)
-    assert all(f["severity"] == "warn" for f in findings)
-
-
-def test_c04_flags_todo_placeholder(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "stub.md", "---\ndescription: TODO\n---\n\nBody.\n")
-    report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "C04"]
-    assert any("stub.md" in f["entity"] for f in findings)
-
-
-def test_c04_flags_angle_bracket_stub(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "stub2.md", "---\ndescription: <fill this in>\n---\n\nBody.\n")
-    report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "C04"]
-    assert any("stub2.md" in f["entity"] for f in findings)
-
-
-def test_c04_flags_no_description_and_no_header_comment(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "bare.md", "Just body text, no comment or frontmatter.\n")
-    report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "C04"]
-    assert any("bare.md" in f["entity"] for f in findings)
-
-
 def _c04_entities(report: dict) -> list[str]:
     return [f["entity"] for f in report["findings"] if f["check"] == "C04"]
+
+
+def test_c04_passes_a_skill_with_a_header_comment_and_no_frontmatter(tmp_path: Path) -> None:
+    _write(tmp_path / "skills" / "quick" / "SKILL.md", "<!-- Cuts a release. -->\n\nBody.\n")
+    assert _c04_entities(classify(tmp_path)) == []
+
+
+def test_c04_flags_a_skill_with_no_description_and_no_header_comment(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "skills" / "bare" / "SKILL.md", "Just body text, no comment or frontmatter.\n"
+    )
+    assert _c04_entities(classify(tmp_path)) == ["skills/bare/SKILL.md"]
 
 
 @pytest.mark.parametrize("description", ["", "TODO", "<fill this in>"])
@@ -214,7 +183,9 @@ def test_c04_flags_a_skill_with_an_empty_or_placeholder_description(
     _write(
         tmp_path / "skills" / "stub" / "SKILL.md", _skill_md(name="stub", description=description)
     )
-    assert _c04_entities(classify(tmp_path)) == ["skills/stub/SKILL.md"]
+    (finding,) = [f for f in classify(tmp_path)["findings"] if f["check"] == "C04"]
+    assert finding["entity"] == "skills/stub/SKILL.md"
+    assert finding["severity"] == "warn"
 
 
 def test_c04_passes_a_skill_with_a_real_description(tmp_path: Path) -> None:
@@ -222,15 +193,16 @@ def test_c04_passes_a_skill_with_a_real_description(tmp_path: Path) -> None:
     assert _c04_entities(classify(tmp_path)) == []
 
 
-def test_c04_examines_skills_and_commands_under_their_own_keys(tmp_path: Path) -> None:
+def test_c04_examines_skill_files_and_ignores_a_retired_command_file(tmp_path: Path) -> None:
     _write(tmp_path / "skills" / "real" / "SKILL.md", _skill_md(name="real"))
-    _write(tmp_path / "commands" / "release.md", '---\ndescription: "Cut it."\n---\n')
+    _write(tmp_path / "commands" / "stub.md", "---\ndescription: TODO\n---\n")
     report = classify(tmp_path)
-    assert report["examined"]["C04"] == {"skill_files": 1, "command_files": 1}
-    assert report["skipped"]["C04"] is None
+    assert report["examined"]["C04"] == {"skill_files": 1}
+    assert _c04_entities(report) == []
 
 
-def test_c04_skips_only_when_neither_skills_nor_commands_exist(tmp_path: Path) -> None:
+def test_c04_skips_when_no_skills_exist_even_with_a_commands_dir(tmp_path: Path) -> None:
+    _write(tmp_path / "commands" / "release.md", '---\ndescription: "Cut it."\n---\n')
     report = classify(tmp_path)
     assert report["skipped"]["C04"]["reason"] == "substrate-absent"
     assert report["examined"]["C04"] is None
@@ -419,31 +391,11 @@ def test_s03_excludes_readme(tmp_path: Path) -> None:
 # -- S04 ------------------------------------------------------------------------
 
 
-def test_s04_passes_when_hint_is_substituted(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "commands" / "greet.md",
-        '---\nargument-hint: "[name]"\n---\n\nHello $ARGUMENTS.\n',
-    )
+def test_s04_does_not_examine_skills_without_hint(tmp_path: Path) -> None:
+    _write(tmp_path / "skills" / "plain" / "SKILL.md", _skill_md(name="plain"))
     report = classify(tmp_path)
     assert [f for f in report["findings"] if f["check"] == "S04"] == []
-
-
-def test_s04_flags_declared_hint_never_substituted(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "commands" / "unused-hint.md",
-        '---\nargument-hint: "[name]"\n---\n\nThis command never uses the argument.\n',
-    )
-    report = classify(tmp_path)
-    findings = [f for f in report["findings"] if f["check"] == "S04"]
-    assert any("unused-hint.md" in f["entity"] for f in findings)
-    assert all(f["severity"] == "warn" for f in findings)
-
-
-def test_s04_does_not_examine_commands_without_hint(tmp_path: Path) -> None:
-    _write(tmp_path / "commands" / "no-args.md", "---\ndescription: no args needed\n---\n\nBody.\n")
-    report = classify(tmp_path)
-    assert [f for f in report["findings"] if f["check"] == "S04"] == []
-    assert report["examined"]["S04"]["command_files_with_hint"] == 0
+    assert report["examined"]["S04"] == {"skill_files_with_hint": 0}
 
 
 def _hinted_skill(tmp_path: Path, body: str) -> None:
@@ -465,7 +417,9 @@ def test_s04_passes_a_hinted_skill_that_reads_its_arguments(tmp_path: Path, body
 
 def test_s04_flags_a_hinted_skill_that_never_reads_its_arguments(tmp_path: Path) -> None:
     _hinted_skill(tmp_path, "Greet whoever is around.")
-    assert _s04_entities(classify(tmp_path)) == ["skills/greet/SKILL.md"]
+    (finding,) = [f for f in classify(tmp_path)["findings"] if f["check"] == "S04"]
+    assert finding["entity"] == "skills/greet/SKILL.md"
+    assert finding["severity"] == "warn"
 
 
 def test_s04_names_a_skill_by_its_directory_in_the_message(tmp_path: Path) -> None:
@@ -482,8 +436,12 @@ def test_s04_does_not_count_a_harness_path_variable_as_argument_use(
     assert _s04_entities(classify(tmp_path)) == ["skills/greet/SKILL.md"]
 
 
-def test_s04_examines_hinted_skills_and_commands_under_their_own_keys(tmp_path: Path) -> None:
+def test_s04_examines_hinted_skills_and_ignores_a_retired_command_file(tmp_path: Path) -> None:
     _hinted_skill(tmp_path, "Hello $ARGUMENTS.")
-    _write(tmp_path / "commands" / "no-args.md", "---\ndescription: no args\n---\n\nBody.\n")
+    _write(
+        tmp_path / "commands" / "unused-hint.md",
+        '---\nargument-hint: "[name]"\n---\n\nNever uses the argument.\n',
+    )
     report = classify(tmp_path)
-    assert report["examined"]["S04"] == {"skill_files_with_hint": 1, "command_files_with_hint": 0}
+    assert report["examined"]["S04"] == {"skill_files_with_hint": 1}
+    assert _s04_entities(report) == []

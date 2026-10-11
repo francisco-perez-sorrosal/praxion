@@ -190,6 +190,14 @@ def test_canary_a_skill_reference_file_is_not_an_invocation_site(tmp_path: Path)
     assert [f["file"] for f in findings] == ["scripts/check_orphan.py"]
 
 
+def test_canary_a_retired_command_file_is_not_an_invocation_site(tmp_path: Path) -> None:
+    """The `commands/` family is retired; a stray file there invokes nothing."""
+    _write(tmp_path, "scripts/check_orphan.py", "# a gate\n")
+    _write(tmp_path, "commands/audit.md", "Run `python3 scripts/check_orphan.py`.\n")
+    findings = gl.check_uninvoked_gate(tmp_path)
+    assert [f["file"] for f in findings] == ["scripts/check_orphan.py"]
+
+
 # -- GL05: ambient-import ------------------------------------------------------
 
 
@@ -313,7 +321,7 @@ def test_canary_a_third_party_import_inside_a_hooks_package_is_still_flagged(
 def test_an_invocation_that_resolves_its_own_interpreter_is_out_of_scope(
     tmp_path: Path,
 ) -> None:
-    """Documented scope is agent, skill and command prose; hooks resolve an interpreter.
+    """Documented scope is agent and skill prose; hooks resolve an interpreter.
 
     Scope fidelity runs both ways. This asserts the computed scope is no *wider*
     than the documented one, so the check cannot quietly start reporting call

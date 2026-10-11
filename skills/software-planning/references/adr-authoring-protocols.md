@@ -64,6 +64,7 @@ The frontmatter schema is shared between draft and finalized ADRs (summary and t
 | `pipeline_tier` | string | No | `direct` / `lightweight` / `standard` / `full` / `spike` — the 5-tier calibration value (process weight actually used), never an execution-mode label ("no agent fan-out" notes belong in the calibration-log `Source` prose) |
 | `affected_files` | list | No | Paths impacted by the decision |
 | `affected_reqs` | list | No | REQ IDs linked to the decision |
+| `retires_elements` | list | No | Fully qualified ids of architecture-model elements this decision removes from the model. A removal-guard that compares the model against an earlier snapshot excuses an element only when an accepted record names it here |
 | `supersedes` | string \| list | No | id(s) of the prior decision(s) this one replaces. A **list** when one decision replaces several — same reason `retired_by` is a list: a scalar silently under-records the rest |
 | `superseded_by` | string | No | id of replacing decision |
 | `re_affirms` | string | No | id of prior decision this ADR re-affirms without superseding |

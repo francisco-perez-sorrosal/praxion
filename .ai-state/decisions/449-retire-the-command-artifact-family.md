@@ -11,6 +11,8 @@ made_by: agent
 agent_type: systems-architect
 branch: worktree-commands-to-skills
 pipeline_tier: full
+retires_elements:
+  - praxion.knowledge.commands
 affected_files:
   - .claude-plugin/plugin.json
   - skills/README.md

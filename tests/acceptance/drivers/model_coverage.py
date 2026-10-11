@@ -8,16 +8,35 @@ two elements. "Drawn" means a committed render shows the element under its name.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
+
+import yaml
 
 from tests.acceptance.drivers.architecture_model import Model
 from tests.acceptance.drivers.svg_render import normalise, read_render
 
-# Elements retired from the model on purpose after the before-state was frozen: a later
-# architectural decision removed them with their relationships, so their absence is not a loss
-# the identity scenarios guard against. Any other missing element or relationship still fails.
-RETIRED_ELEMENTS = frozenset({"praxion.knowledge.commands"})
+DECISIONS_DIR = Path(__file__).resolve().parents[3] / ".ai-state" / "decisions"
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+
+
+def retired_elements(decisions_dir: Path = DECISIONS_DIR) -> frozenset[str]:
+    """Elements an accepted decision records as retired from the model.
+
+    An element may be absent from the model only when an accepted decision names it in
+    `retires_elements`; any other missing element or relationship still fails the guard.
+    """
+    retired: set[str] = set()
+    for path in sorted(decisions_dir.glob("[0-9]*.md")):
+        match = _FRONTMATTER.match(path.read_text(encoding="utf-8"))
+        if match is None:
+            continue
+        meta = yaml.safe_load(match.group(1)) or {}
+        if meta.get("status") == "accepted":
+            retired.update(meta.get("retires_elements") or [])
+    return frozenset(retired)
+
 
 COVERED_SUBJECTS = {
     "the system context": ("context",),
@@ -42,16 +61,21 @@ def uncovered_subjects(model: Model, render_dir: Path) -> list[str]:
     ]
 
 
-def lost_elements(before: Model, after: Model) -> list[str]:
-    return sorted(set(before.elements) - set(after.elements) - RETIRED_ELEMENTS)
+def lost_elements(before: Model, after: Model, retired: frozenset[str] | None = None) -> list[str]:
+    retired = retired_elements() if retired is None else retired
+    return sorted(set(before.elements) - set(after.elements) - retired)
 
 
-def lost_relationships(before: Model, after: Model) -> list[str]:
+def lost_relationships(
+    before: Model, after: Model, retired: frozenset[str] | None = None
+) -> list[str]:
+    retired = retired_elements() if retired is None else retired
+
     def counted(model: Model) -> Counter[tuple[str, str]]:
         return Counter(
             (r.source, r.target)
             for r in model.relationships
-            if r.source not in RETIRED_ELEMENTS and r.target not in RETIRED_ELEMENTS
+            if r.source not in retired and r.target not in retired
         )
 
     missing = counted(before) - counted(after)

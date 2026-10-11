@@ -24,7 +24,7 @@ After finalize, the ADR lives at `.ai-state/decisions/<NNN>-<slug>.md`, `<NNN>` 
 
 The frontmatter schema is shared between draft and finalized ADRs; only `id` and the cross-reference fields (`supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`) differ in value form (`dec-draft-<hash>` during draft, `dec-NNN` after finalize).
 
-Fields: `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`, `agent_type`, `branch`, `pipeline_tier`, `affected_files`, `affected_reqs`, `supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`, `retired_by`, `supersedes_in_part`, `superseded_in_part_by`, `dissent`. Full table: [`adr-authoring-protocols.md` § Frontmatter Schema](../../skills/software-planning/references/adr-authoring-protocols.md#frontmatter-schema).
+Fields: `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`, `agent_type`, `branch`, `pipeline_tier`, `affected_files`, `affected_reqs`, `retires_elements`, `supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`, `retired_by`, `supersedes_in_part`, `superseded_in_part_by`, `dissent`. Full table: [`adr-authoring-protocols.md` § Frontmatter Schema](../../skills/software-planning/references/adr-authoring-protocols.md#frontmatter-schema).
 
 #### What makes a decision `architectural`
 

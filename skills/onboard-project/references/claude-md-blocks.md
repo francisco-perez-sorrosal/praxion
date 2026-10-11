@@ -67,7 +67,7 @@ Apply Praxion's tier-driven pipeline for non-trivial work. Use the tier selector
 ## Hackathon Mode
 
 This project is in **hackathon mode** (`PRAXION_HACKATHON_MODE=1` in `.claude/settings.json`).
-The mode applies to every agent and command in this project until the env var is removed
+The mode applies to every agent and skill in this project until the env var is removed
 and this block is deleted (see "To exit" below).
 
 ### Process — the Hackathon Spine

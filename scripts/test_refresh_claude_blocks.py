@@ -483,6 +483,58 @@ def test_apply_appends_current_canonical_block_when_absent(tmp_path: Path) -> No
     )
 
 
+_HACKATHON_OLD_BODY = "## Hackathon Mode\n\nThe mode applies to every agent and command.\n"
+_HACKATHON_NEW_BODY = "## Hackathon Mode\n\nThe mode applies to every agent and skill.\n"
+
+
+def _hackathon_blocks() -> dict:
+    return {
+        "hackathon-mode": {
+            "current": hash_block_body(_HACKATHON_NEW_BODY),
+            "history": [hash_block_body(_HACKATHON_OLD_BODY), hash_block_body(_HACKATHON_NEW_BODY)],
+        }
+    }
+
+
+def test_an_opt_in_block_a_project_does_not_carry_is_neither_reported_nor_appended(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A project that never entered hackathon mode must not gain the block from a refresh."""
+    before = "# Project\n\nProse.\n"
+    repo = _write_repo(tmp_path, before)
+    manifest_path = _write_manifest(tmp_path, _hackathon_blocks())
+    canonical_dir = _write_canonical_dir(tmp_path, {"hackathon-mode": _HACKATHON_NEW_BODY})
+
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+    args = ["--repo-root", str(repo), "--manifest", str(manifest_path)]
+
+    assert mod.main(["--json", *args]) == 0
+    assert json.loads(capsys.readouterr().out) == {}
+    assert mod.main(["--apply", *args]) == 0
+    assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == before
+
+
+def test_an_opt_in_block_a_project_carries_is_replaced_in_place_when_stale(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An onboarded hackathon project picks up the reworded block on refresh."""
+    repo = _write_repo(tmp_path, "# Project\n\nProse.\n\n" + _HACKATHON_OLD_BODY)
+    manifest_path = _write_manifest(tmp_path, _hackathon_blocks())
+    canonical_dir = _write_canonical_dir(tmp_path, {"hackathon-mode": _HACKATHON_NEW_BODY})
+
+    mod = _load_module()
+    mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
+    args = ["--repo-root", str(repo), "--manifest", str(manifest_path)]
+
+    mod.main(["--json", *args])
+    assert json.loads(capsys.readouterr().out) == {"hackathon-mode": "stale"}
+    mod.main(["--apply", *args])
+    assert (repo / "CLAUDE.md").read_text(encoding="utf-8") == (
+        "# Project\n\nProse.\n\n" + _HACKATHON_NEW_BODY
+    )
+
+
 # ---------------------------------------------------------------------------
 # --apply: stale -> in-place replacement, surrounding content untouched
 # ---------------------------------------------------------------------------

@@ -170,6 +170,15 @@ def test_refreshable_slugs_is_exactly_the_four_eligible_blocks() -> None:
     assert isinstance(mod.REFRESHABLE_SLUGS, frozenset)
 
 
+def test_the_hackathon_block_is_conditionally_refreshable_not_unconditionally() -> None:
+    """An opt-in block joins the manifest set without joining the set refresh may append."""
+    mod = _load_module()
+
+    assert mod.CONDITIONAL_REFRESHABLE_SLUGS == frozenset({"hackathon-mode"})
+    assert mod.CONDITIONAL_REFRESHABLE_SLUGS.isdisjoint(mod.REFRESHABLE_SLUGS)
+    assert mod.MANIFEST_SLUGS == mod.REFRESHABLE_SLUGS | mod.CONDITIONAL_REFRESHABLE_SLUGS
+
+
 # ---------------------------------------------------------------------------
 # extract_live_body: heading-to-next-heading-or-EOF boundary
 # ---------------------------------------------------------------------------

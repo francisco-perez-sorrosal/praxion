@@ -4,7 +4,7 @@ canonical-block history manifest (run-time consumer half of the refresh
 mechanism; ``sync_canonical_blocks.py --write-history`` is the build-time
 producer).
 
-For each refresh-eligible slug (``canonical_block_identity.REFRESHABLE_SLUGS``)
+For each refresh-eligible slug (``canonical_block_identity.MANIFEST_SLUGS``)
 present in the manifest, extracts the block's live body from the target
 project's ``CLAUDE.md`` and classifies it:
 
@@ -58,7 +58,8 @@ from typing import NoReturn
 import _sidecar_manifest
 import _state_repo
 from canonical_block_identity import (
-    REFRESHABLE_SLUGS,
+    CONDITIONAL_REFRESHABLE_SLUGS,
+    MANIFEST_SLUGS,
     extract_live_body,
     find_heading_span,
     hash_block_body,
@@ -193,15 +194,20 @@ def _read_claude_md(claude_md_path: Path) -> str:
 def _classify_all(claude_md_text: str, manifest: dict) -> dict[str, str]:
     """Classify every refresh-eligible slug present in the manifest.
 
-    Scoped to the intersection of the manifest's slugs and REFRESHABLE_SLUGS
+    Scoped to the intersection of the manifest's slugs and MANIFEST_SLUGS
     -- a hard membership boundary enforced here regardless of what a
-    hand-edited or malformed manifest might otherwise carry.
+    hand-edited or malformed manifest might otherwise carry. An opt-in
+    (conditional) block the project does not carry is left out of the result,
+    so it is neither reported as needing attention nor appended by --apply.
     """
-    eligible_slugs = sorted(set(manifest.get("blocks", {})) & REFRESHABLE_SLUGS)
+    eligible_slugs = sorted(set(manifest.get("blocks", {})) & MANIFEST_SLUGS)
     classifications: dict[str, str] = {}
     for slug in eligible_slugs:
         live_body = extract_live_body(claude_md_text, _heading_for_slug(slug))
-        classifications[slug] = classify_block(live_body, manifest["blocks"][slug])
+        classification = classify_block(live_body, manifest["blocks"][slug])
+        if classification == "absent" and slug in CONDITIONAL_REFRESHABLE_SLUGS:
+            continue
+        classifications[slug] = classification
     return classifications
 
 

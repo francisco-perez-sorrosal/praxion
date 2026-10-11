@@ -23,6 +23,9 @@ against Praxion's own repo required.
   paragraph must never be silently clobbered. This skill shows the diff and
   asks you to decide, per block.
 
+A fifth, opt-in block (`## Hackathon Mode`) is refreshed the same way when the
+project carries it, and is never appended when the project does not.
+
 Run this after upgrading the praxion plugin, or any time `/onboard-project`
 reports a block needs attention.
 

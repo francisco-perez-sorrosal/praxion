@@ -807,7 +807,7 @@ def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
 # Interface contract these tests pin (the history-manifest generator must satisfy):
 #   - CANONICAL_DIR / REPO_ROOT stay overridable module attributes (mirrors
 #     the existing SLUGS/CANONICAL_DIR override convention above).
-#   - REFRESHABLE_SLUGS (imported from canonical_block_identity) is a plain
+#   - MANIFEST_SLUGS (imported from canonical_block_identity) is a plain
 #     module-level binding on sync_canonical_blocks, overridable the same
 #     way SLUGS already is, so tests can scope a fixture to one slug.
 #   - The manifest's "current" hash must be computed from the canonical
@@ -819,7 +819,7 @@ def test_run_dry_run_does_not_modify_files(tmp_path: Path, capsys) -> None:
 #     manifest's producer-liveness gate exists for.
 
 sys.path.insert(0, str(SCRIPTS_DIR))  # ensure canonical_block_identity is importable
-from canonical_block_identity import REFRESHABLE_SLUGS, hash_block_body  # noqa: E402
+from canonical_block_identity import MANIFEST_SLUGS, hash_block_body  # noqa: E402
 
 
 def _git_history_repo(tmp_path: Path) -> Path:
@@ -874,7 +874,7 @@ def _load_module_for_synthetic_history(canonical_dir: Path, slugs: frozenset[str
     the implementation anchors git commands via cwd=CANONICAL_DIR or an
     explicit REPO_ROOT path (both resolve correctly here, since REPO_ROOT is
     the tmp repo's root and CANONICAL_DIR is one of its subdirectories). When
-    `slugs` is given, also restricts REFRESHABLE_SLUGS to that set -- mirrors
+    `slugs` is given, also restricts MANIFEST_SLUGS to that set -- mirrors
     the file's existing SLUGS-override convention used to scope fixtures to
     a minimal, focused subset.
     """
@@ -882,7 +882,7 @@ def _load_module_for_synthetic_history(canonical_dir: Path, slugs: frozenset[str
     mod.CANONICAL_DIR = canonical_dir  # type: ignore[attr-defined]
     mod.REPO_ROOT = canonical_dir.parent.parent  # type: ignore[attr-defined]
     if slugs is not None:
-        mod.REFRESHABLE_SLUGS = slugs  # type: ignore[attr-defined]
+        mod.MANIFEST_SLUGS = slugs  # type: ignore[attr-defined]
     return mod
 
 
@@ -933,15 +933,15 @@ def test_write_history_manifest_maps_slug_to_current_and_deduped_ordered_history
     )
 
 
-def test_write_history_manifest_excludes_slugs_outside_refreshable_set(
+def test_write_history_manifest_excludes_slugs_outside_the_manifest_set(
     tmp_path: Path,
 ) -> None:
     """A canonical file for a non-eligible slug (e.g. a template-filled or
     conditional block) present alongside the refresh-eligible files is never
-    included in the manifest -- REFRESHABLE_SLUGS is a hard membership
+    included in the manifest -- MANIFEST_SLUGS is a hard membership
     boundary, not a filter applied downstream of a naive directory scan."""
     canonical_dir = _git_history_repo(tmp_path)
-    for slug in REFRESHABLE_SLUGS:
+    for slug in MANIFEST_SLUGS:
         _commit_canonical_body(
             canonical_dir,
             slug,
@@ -956,13 +956,13 @@ def test_write_history_manifest_excludes_slugs_outside_refreshable_set(
         "init excluded",
     )
 
-    mod = _load_module_for_synthetic_history(canonical_dir)  # real REFRESHABLE_SLUGS
+    mod = _load_module_for_synthetic_history(canonical_dir)  # real MANIFEST_SLUGS
     exit_code = mod.run_write_history()
     assert exit_code == 0, f"run_write_history should return 0. Got {exit_code}."
 
     manifest = json.loads(_history_manifest_path(canonical_dir).read_text(encoding="utf-8"))
-    assert set(manifest["blocks"].keys()) == set(REFRESHABLE_SLUGS), (
-        f"manifest must map exactly REFRESHABLE_SLUGS, excluding "
+    assert set(manifest["blocks"].keys()) == set(MANIFEST_SLUGS), (
+        f"manifest must map exactly MANIFEST_SLUGS, excluding "
         f"'{excluded_slug}'. Got keys: {sorted(manifest['blocks'].keys())}"
     )
 

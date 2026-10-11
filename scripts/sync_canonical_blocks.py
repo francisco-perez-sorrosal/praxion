@@ -58,7 +58,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from canonical_block_identity import REFRESHABLE_SLUGS, hash_block_body
+from canonical_block_identity import MANIFEST_SLUGS, hash_block_body
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -469,7 +469,7 @@ def run_dry_run() -> int:
 # ---------------------------------------------------------------------------
 #
 # Builds claude/canonical-blocks/block-history.json: for each refresh-eligible
-# slug (REFRESHABLE_SLUGS, imported from canonical_block_identity -- the single
+# slug (MANIFEST_SLUGS, imported from canonical_block_identity -- the single
 # membership source), enumerates the canonical file's git history, normalizes
 # and hashes each historical body through the shared identity module, and
 # dedupes while preserving oldest-to-newest order. "current" always reflects
@@ -522,7 +522,7 @@ def _historical_hashes_for_slug(slug: str) -> list[str]:
 def _build_history_manifest() -> dict[str, object]:
     """Regenerate the full history manifest in-memory (no disk write)."""
     blocks: dict[str, object] = {}
-    for slug in sorted(REFRESHABLE_SLUGS):
+    for slug in sorted(MANIFEST_SLUGS):
         history = _historical_hashes_for_slug(slug)
         canonical_path = CANONICAL_DIR / f"{slug}.md"
         try:

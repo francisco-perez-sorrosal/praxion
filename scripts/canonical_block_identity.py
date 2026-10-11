@@ -11,7 +11,7 @@ misclassifies as locally customized (fails safe, but defeats the whole
 refresh mechanism) — so any change to normalization semantics must be made
 here, in one place, for both consumers to pick up.
 
-Three primitives:
+Four primitives:
 
 * ``normalize_block_body`` / ``hash_block_body`` — canonicalize a block's
   body text and hash it, so a block's on-disk shape (leading blank-line
@@ -21,6 +21,10 @@ Three primitives:
   refresh: the unconditional, byte-identical blocks. Conditional or
   template-filled blocks are excluded by membership, not by runtime
   classification.
+* ``CONDITIONAL_REFRESHABLE_SLUGS`` — opt-in blocks (today the hackathon block):
+  refreshed in place when a project carries them, never appended when absent,
+  because a project that did not opt in must not gain one. ``MANIFEST_SLUGS``
+  is the union the history manifest and the classifier both range over.
 * ``extract_live_body`` — pulls a block's live body out of a target
   CLAUDE.md by heading, bounded by the next top-level heading or EOF.
 """
@@ -37,6 +41,10 @@ REFRESHABLE_SLUGS: frozenset[str] = frozenset(
         "praxion-process",
     }
 )
+
+CONDITIONAL_REFRESHABLE_SLUGS: frozenset[str] = frozenset({"hackathon-mode"})
+
+MANIFEST_SLUGS: frozenset[str] = REFRESHABLE_SLUGS | CONDITIONAL_REFRESHABLE_SLUGS
 
 _SECTION_HEADING_PREFIX = "## "
 

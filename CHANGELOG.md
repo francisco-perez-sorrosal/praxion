@@ -1,3 +1,19 @@
+## v0.49.0 (2026-10-11)
+
+### Feat
+
+- **ratchet**: Honour a dated operator suspension of the byte ratchet
+
+### Fix
+
+- **install**: Sweep every workflow export a release ever wrote
+- **install**: Delete only the Cursor exports earlier releases wrote
+- **install**: Sweep only the 44 workflow exports earlier releases wrote
+- Clear the retired-directory residuals the sweep named
+- **gates**: Accept Mermaid and D2 sources in the AaC golden-rule gate
+- **step-loop**: Take back an agent whose session exited before it returned
+- **step-loop**: Read a vitest pocket's summary in the record gate
+
 ## v0.48.1 (2026-10-10)
 
 ### Fix

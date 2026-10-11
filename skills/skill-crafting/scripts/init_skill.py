@@ -9,11 +9,13 @@ Examples:
     python init_skill.py my-api-helper --path ~/.claude/skills
 """
 
-import re
 import sys
 from pathlib import Path
 
-NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
+# The contract is a sibling module: put this script's own directory on the path so the import
+# resolves however the scaffold is reached.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frontmatter_contract import name_errors  # noqa: E402
 
 EXAMPLE_SCRIPT = '''\
 #!/usr/bin/env python3
@@ -108,11 +110,30 @@ description: >
   Example: "Extract text from PDF files, fill forms, merge documents. Use when
   working with PDF files or when the user mentions PDFs, forms, or document
   extraction."
+disable-model-invocation: false
+user-invocable: true
 ---
 
 # {skill_title}
 
 [TODO: 1-2 sentences explaining what this skill enables.]
+
+## Invocation Mode
+
+The two frontmatter controls above sit at their defaults: the model may invoke this skill
+and the user may too. Change them only for a reason, and let the choice set the description's
+reader. Delete this section when done.
+
+- **Model-invocable** (both defaults): the model reads the description to decide when to
+  load the skill. Write it in third person: what the skill does, when to use it, the user
+  intent that should trigger it.
+- **User-only** (`disable-model-invocation: true`): make the skill user-only when it has side
+  effects or needs a human's timing, such as a commit, a release, or a deploy. The model never
+  sees the description, only the user does in the `/` menu, so one plain line saying what the
+  command does is enough.
+- **Hidden from the menu** (`user-invocable: false`): make the skill background knowledge the
+  model loads but the user never types as a command. The description stays model-facing, so
+  write it as for any model-invocable skill.
 
 ## Structuring This Skill
 
@@ -212,23 +233,15 @@ def title_case(name: str) -> str:
 
 
 def init_skill(skill_name: str, output_path: Path) -> int:
-    skill_dir = output_path / skill_name
+    errors = name_errors(skill_name)
+    if errors:
+        for message in errors:
+            print(f"Error: {message}", file=sys.stderr)
+        return 1
 
+    skill_dir = output_path / skill_name
     if skill_dir.exists():
         print(f"Error: directory already exists: {skill_dir}", file=sys.stderr)
-        return 1
-
-    # Validate name
-    if not NAME_PATTERN.match(skill_name):
-        print(
-            f"Error: name must be lowercase letters/digits/hyphens, "
-            f"no consecutive hyphens (got {skill_name!r})",
-            file=sys.stderr,
-        )
-        return 1
-
-    if len(skill_name) > 64:
-        print("Error: name exceeds 64 characters", file=sys.stderr)
         return 1
 
     # Create directory and SKILL.md

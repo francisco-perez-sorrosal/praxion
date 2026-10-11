@@ -24,6 +24,23 @@ sys.path.insert(0, str(SCRIPT_DIR))
 # Hoisting it to the top would make the script fail to start.
 from validate import validate_skill  # noqa: E402
 
+HELP_FLAGS = frozenset({"-h", "--help"})
+HELP_TEXT = """\
+Usage: package_skill.py <path/to/skill-folder> [output-directory]
+
+Validate a skill, then package it as <name>.skill (a zip archive).
+
+Arguments:
+  <path/to/skill-folder>  the skill directory; it must hold a SKILL.md
+  [output-directory]      where the .skill file goes (default: the current directory)
+  -h, --help              print this text and exit 0
+
+Exit status:
+  0  packaged
+  1  not a skill directory, or validation reported errors (non-zero; nothing is packaged)
+     Validation warnings do not change the exit status.
+"""
+
 
 def package_skill(skill_path: Path, output_dir: Path | None = None) -> int:
     if not skill_path.is_dir():
@@ -66,6 +83,10 @@ def package_skill(skill_path: Path, output_dir: Path | None = None) -> int:
 
 
 def main() -> int:
+    if HELP_FLAGS.intersection(sys.argv[1:]):
+        print(HELP_TEXT, end="")
+        return 0
+
     if len(sys.argv) < 2:
         print("Usage: package_skill.py <path/to/skill-folder> [output-directory]")
         print()

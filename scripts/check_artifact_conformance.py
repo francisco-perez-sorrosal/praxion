@@ -526,21 +526,22 @@ def _check_n03(
             },
             None,
         )
-    try:
-        skill_keys = _load_skill_frontmatter_keys(contract)
-    except _ContractUnavailableError as exc:
-        # Skipped, never clean: an empty finding list here would read as "every key recognized".
-        return (
-            [],
-            {"reason": "contract-unavailable", "path": str(contract), "detail": str(exc)},
-            None,
-        )
+    # The agent half needs no contract, so a missing one skips only the skill half.
+    work = [(f, _AGENT_FRONTMATTER_KEYS, "agent") for f in agent_files or []]
+    skip = None
+    if skill_files is not None:
+        try:
+            skill_keys = _load_skill_frontmatter_keys(contract)
+        except _ContractUnavailableError as exc:
+            # Skipped, never clean: an empty skill list here would read as "every key recognized".
+            skip = {"reason": "contract-unavailable", "path": str(contract), "detail": str(exc)}
+        else:
+            work = [(f, skill_keys, "SKILL.md") for f in skill_files] + work
+    if skip is not None and agent_files is None:
+        return [], skip, None
     findings: list[dict] = []
     examined = {"skill_md_files": 0, "agent_files": 0}
-    for path, allowed, label in (
-        *((f, skill_keys, "SKILL.md") for f in (skill_files or [])),
-        *((f, _AGENT_FRONTMATTER_KEYS, "agent") for f in (agent_files or [])),
-    ):
+    for path, allowed, label in work:
         examined["skill_md_files" if label == "SKILL.md" else "agent_files"] += 1
         fm = _load_frontmatter(_read_text(path) or "")
         for key in sorted(set(fm) - allowed):
@@ -552,7 +553,7 @@ def _check_n03(
                     "message": f"{label} frontmatter key `{key}` is not recognized by the crafting spec",
                 }
             )
-    return findings, None, examined
+    return findings, skip, examined
 
 
 # -- S03: rule files start with a `##` heading -------------------------------

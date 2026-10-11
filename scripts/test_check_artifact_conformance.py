@@ -427,6 +427,62 @@ def test_n03_skips_when_the_contract_fails_to_load(tmp_path: Path) -> None:
     assert "SyntaxError" in skip["detail"]
 
 
+def _agent_with_unknown_key(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "agents" / "odd-agent.md",
+        "---\nname: odd-agent\ndescription: does things\ntools: Read\nbogus_field: 1\n---\n\nBody.\n",
+    )
+
+
+def test_n03_still_checks_agent_keys_when_the_skill_contract_is_missing(tmp_path: Path) -> None:
+    _skill_with_keys(tmp_path, {"name", "bogus_field"})
+    _agent_with_unknown_key(tmp_path)
+    missing = tmp_path / "absent" / "frontmatter_contract.py"
+
+    findings, skip, examined = _check_n03(tmp_path, contract=missing)
+
+    assert [f["entity"] for f in findings] == ["agents/odd-agent.md"]
+    assert "bogus_field" in findings[0]["message"]
+    assert skip is not None
+    assert skip["reason"] == "contract-unavailable"
+    assert examined == {"skill_md_files": 0, "agent_files": 1}
+
+
+def test_n03_never_reads_a_skill_key_as_clean_while_the_contract_is_missing(
+    tmp_path: Path,
+) -> None:
+    _skill_with_keys(tmp_path, {"name", "bogus_field"})
+    _agent_with_unknown_key(tmp_path)
+    missing = tmp_path / "absent" / "frontmatter_contract.py"
+
+    findings, _, _ = _check_n03(tmp_path, contract=missing)
+
+    assert [f for f in findings if f["entity"].startswith("skills/")] == []
+
+
+def test_n03_run_end_to_end_without_the_contract_still_reports_the_agent_key(
+    tmp_path: Path,
+) -> None:
+    plugin = tmp_path / "plugin"
+    for name in ("check_artifact_conformance.py", "_repo_root.py", "_script_cli.py"):
+        _write(plugin / "scripts" / name, (REPO_ROOT / "scripts" / name).read_text("utf-8"))
+    inspected = tmp_path / "inspected"
+    _skill_with_keys(inspected, {"name", "bogus_field"})
+    _agent_with_unknown_key(inspected)
+
+    result = subprocess.run(
+        [sys.executable, str(plugin / "scripts" / "check_artifact_conformance.py"),
+         "--json", "--repo-root", str(inspected)],
+        cwd=inspected, capture_output=True, text=True, timeout=120,
+    )  # fmt: skip
+
+    report = json.loads(result.stdout)
+    assert report["skipped"]["N03"]["reason"] == "contract-unavailable"
+    assert [f["entity"] for f in report["findings"] if f["check"] == "N03"] == [
+        "agents/odd-agent.md"
+    ]
+
+
 def test_n03_run_from_a_tree_without_the_contract_reports_skipped_not_clean(
     tmp_path: Path,
 ) -> None:

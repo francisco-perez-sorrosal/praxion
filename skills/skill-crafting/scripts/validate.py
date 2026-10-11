@@ -37,6 +37,22 @@ from frontmatter_contract import (  # noqa: E402
 
 MAX_ENTRY_PAGE_LINES = 500
 
+HELP_FLAGS = frozenset({"-h", "--help"})
+HELP_TEXT = """\
+Usage: validate.py <skill-directory> | --all
+
+Validate SKILL.md structure and frontmatter.
+
+Arguments:
+  <skill-directory>  validate the one skill in that directory
+  --all              validate every skills/<name>/ under the repository root
+  -h, --help         print this text and exit 0
+
+Exit status:
+  0  no errors (warnings are printed but never change the exit status)
+  1  (non-zero) at least one error, or the arguments could not be used
+"""
+
 
 @dataclass(frozen=True)
 class RawField:
@@ -332,6 +348,10 @@ def _validate_all(repo_root: Path) -> int:
 
 
 def main() -> int:
+    if HELP_FLAGS.intersection(sys.argv[1:]):
+        print(HELP_TEXT, end="")
+        return 0
+
     if len(sys.argv) != 2:
         print(
             f"Usage: {sys.argv[0]} <skill-directory> | --all",

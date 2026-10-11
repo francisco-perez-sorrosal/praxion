@@ -47,15 +47,72 @@ sys.exit(0 if 'chub' in (j.get('mcpServers') or {}) else 1)
 # LEGACY-COMMAND-EXPORT: remove once no supported release exported .cursor/commands
 # Earlier releases copied every Praxion workflow into <cursor_dir>/commands/; the
 # workflows now reach Cursor as the linked skills, so a stale copy lists twice.
-# A file is Praxion's only when a skill of the same stem exists in the source, so
-# the user's own commands survive; never rm -rf the directory.
-# Usage: sweep_legacy_command_exports <commands_dir> <skills_dir> <dry_run:true|false>
+# A file is Praxion's only when its stem is one of the 44 workflows those releases
+# exported: a frozen set, because the exports carried no marker and no release will
+# add to it. A user's own command named after any other skill survives; never rm -rf
+# the directory.
+# Usage: sweep_legacy_command_exports <commands_dir> <dry_run:true|false>
+LEGACY_WORKFLOW_EXPORTS=(
+    add-rules
+    check-experiment
+    clean-auto-memory
+    clean-work
+    co
+    consult
+    cop
+    create-simple-python-prj
+    create-worktree
+    dashboard
+    decisions
+    decontaminate-ids
+    dispatch-reworks
+    document-api
+    eval-praxion
+    explore-project
+    full-security-scan
+    handoff
+    landscape-refresh
+    manage-readme
+    merge-worktree
+    praxion-complete-install
+    praxion-complete-uninstall
+    project-coverage
+    project-metrics
+    refresh-claude-blocks
+    refresh-skill
+    release
+    report-praxion-issue
+    report-upstream
+    resume-pipeline
+    resume-rework
+    review-interface
+    review-pr
+    roadmap
+    run-experiment
+    scores
+    sdd-coverage
+    skill-genesis
+    skill-genesis-review
+    star-repo
+    test
+    triage-debt
+    upgrade-project
+)
+
+_is_legacy_workflow_export() {
+    local name
+    for name in "${LEGACY_WORKFLOW_EXPORTS[@]}"; do
+        [ "$name" = "$1" ] && return 0
+    done
+    return 1
+}
+
 sweep_legacy_command_exports() {
-    local commands_dir="$1" skills_dir="$2" dry_run="$3"
+    local commands_dir="$1" dry_run="$2"
     local stale=() file
     [ -d "$commands_dir" ] || return 0
     for file in "$commands_dir"/*.md; do
-        if [ -f "$file" ] && [ -f "$skills_dir/$(basename "$file" .md)/SKILL.md" ]; then
+        if [ -f "$file" ] && _is_legacy_workflow_export "$(basename "$file" .md)"; then
             stale+=("$file")
         fi
     done
@@ -138,7 +195,7 @@ if $DO_DRY_RUN; then
     n_rules=$(find "$REPO_ROOT/rules" -name '*.md' -type f ! -path '*/references/*' ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' ')
     echo "Skills: $n_skills | Rules: $n_rules"
     echo "MCP: $CURSOR_DIR/mcp.json"
-    sweep_legacy_command_exports "$CURSOR_DIR/commands" "$REPO_ROOT/skills" true
+    sweep_legacy_command_exports "$CURSOR_DIR/commands" true
     exit 0
 fi
 
@@ -269,7 +326,7 @@ link_rules "$REPO_ROOT/rules" "$CURSOR_DIR/rules"
 info "Rules linked ($LINK_RULES_COUNT rules)"
 
 # 3. Sweep the workflow copies earlier releases exported into TARGET/commands/
-sweep_legacy_command_exports "$CURSOR_DIR/commands" "$REPO_ROOT/skills" false
+sweep_legacy_command_exports "$CURSOR_DIR/commands" false
 
 # 4. MCP: write mcp.json from cursor/config template
 step "Writing mcp.json..."

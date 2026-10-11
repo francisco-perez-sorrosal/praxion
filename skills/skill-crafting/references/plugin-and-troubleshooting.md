@@ -40,19 +40,19 @@ Add a wildcard allowlist to avoid this:
 Use `/context` to inspect what's currently loaded in the context window, including which skills and reference files have been read. Useful for verifying progressive disclosure is working as intended.
 
 ## Discovery and Live Reload
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-10-11 -->
 
 Discovery timing depends on *where* the skill lives:
 
-- **Project / personal locations** (`.claude/skills/`, `~/.claude/skills/`) have **live change detection** — edits, adds, and removals take effect within the session, no restart. Creating a *new top-level* skills directory that did not exist at session start still requires a restart (so it can be watched).
-- **Plugin components** (Praxion's `skills/`, `agents/`) are scanned once at session start and cached for the session. A skill added mid-session — or installed via `bash install.sh` against a running session — is invisible until a fresh session. Symptom: `/my-new-skill` reports "unknown command" despite a valid `SKILL.md` at the right path. There is no plugin hot-reload — restart the session.
+- **Project / personal locations** (`.claude/skills/`, `~/.claude/skills/`, and `.claude/skills/` inside an `--add-dir` directory) have **live change detection** — edits, adds, and removals take effect within the session, no restart. Creating a *new top-level* skills directory that did not exist at session start is not watched yet: run `/reload-skills` to pick it up, and again after each later change there.
+- **Plugin components** (Praxion's `skills/`, `agents/`) load at session start and on `/reload-plugins`; settings or disk changes do not reach a running session before then. A skill added mid-session — or installed via `bash install.sh` against a running session — is invisible until you run `/reload-plugins` or start a fresh session. Symptom: `/my-new-skill` reports "unknown command" despite a valid `SKILL.md` at the right path. Live detection covers `SKILL.md` text only; for a skill folder that is also a plugin, changes to `hooks/`, `.mcp.json`, `agents/`, and `output-styles/` need `/reload-plugins` too.
 
-(Subagents always require a restart on disk edits; the `/agents` interface takes effect immediately.)
+Subagent files in `~/.claude/agents/` and `.claude/agents/` are watched as well: an edit takes effect on the next delegation. A restart is still needed after creating a scope's first agent file in a new `agents` directory, or for `.claude/agents/` inside an `--add-dir` directory.
 
 ## Permission Management
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-10-11 -->
 
-Claude's invocation access to a skill is governed by `Skill(...)` permission rules (the older `SlashCommand:/name:*` form predates the merge of commands into skills):
+Claude's invocation access to a skill is governed by `Skill(...)` permission rules:
 
 ```text
 # In /permissions
@@ -60,6 +60,7 @@ Skill(co)          # allow exactly /co
 Skill(review-pr *) # allow /review-pr with any arguments
 Skill(deploy *)    # (as a deny rule) block /deploy
 Skill              # (as a deny rule) Claude can invoke no skills
+Skill(skill:deploy) # (as a deny rule) block the skill under any name it is called by, alias included
 ```
 
 To stop Claude from auto-invoking a *specific* skill (e.g. a side-effecting one), set its frontmatter instead — this also removes its description from model context:

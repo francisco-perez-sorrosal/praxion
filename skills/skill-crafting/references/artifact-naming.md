@@ -2,6 +2,15 @@
 
 Naming conventions for context engineering artifacts: skills, agents, commands, and rules. Consistent naming aids discoverability, relevance matching, and ecosystem coherence.
 
+## Contents
+
+- [Universal Constraints](#universal-constraints)
+- [Skills — Directory Names](#skills--directory-names)
+- [Agents — File Names](#agents--file-names)
+- [Commands — File Names](#commands--file-names)
+- [Rules — File Names and Directory Structure](#rules--file-names-and-directory-structure)
+- [Cross-Artifact Consistency](#cross-artifact-consistency)
+
 ### Universal Constraints
 
 All artifact identifiers (directory names, filenames, `name` fields):

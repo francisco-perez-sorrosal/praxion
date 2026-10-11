@@ -121,12 +121,12 @@ The artifact is "done" when it passes real usage, not when it reads well.
 | `mcp-crafting` | Fat workflow tools over primitive wrappers; token-aware responses (`concise`/`detailed`); natural-language identifiers over UUIDs; lazy tool loading |
 
 ## Context-Engineering Sources
-<!-- last-verified: 2026-05-25 -->
+<!-- last-verified: 2026-10-11 -->
 
 Primary (Anthropic-official):
 
 - [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) — 2025-09-29 — attention budget, right altitude, just-in-time retrieval, compaction, sub-agent summary returns, "smallest set of high-signal tokens."
-- [Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents) — 2025-09-11 — tool design, response shaping, error grammar, evaluation-driven iteration.
+- [Writing effective tools for agents — with agents](https://www.anthropic.com/engineering/writing-tools-for-agents) — 2025-09-11 — tool design, response shaping, error grammar, evaluation-driven iteration.
 - [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) — progressive disclosure, degrees of freedom, evaluation-first, the two-Claude loop.
 
 Empirical / practitioner (corroborating, named authors):

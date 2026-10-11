@@ -4,6 +4,19 @@ Nine recurring skill archetypes identified from Anthropic's internal practice of
 
 Use this taxonomy when planning a new skill to guide structural decisions: what content type to use, what resources to bundle, and how to verify the skill works.
 
+## Contents
+
+- [1. Library & API Reference](#1-library--api-reference)
+- [2. Product Verification](#2-product-verification)
+- [3. Data Fetching & Analysis](#3-data-fetching--analysis)
+- [4. Business Process & Team Automation](#4-business-process--team-automation)
+- [5. Code Scaffolding & Templates](#5-code-scaffolding--templates)
+- [6. Code Quality & Review](#6-code-quality--review)
+- [7. CI/CD & Deployment](#7-cicd--deployment)
+- [8. Runbooks](#8-runbooks)
+- [9. Infrastructure Operations](#9-infrastructure-operations)
+- [Choosing a Category](#choosing-a-category)
+
 ## 1. Library & API Reference
 
 Skills that explain how to correctly use a library, CLI, or SDK. Cover both internal libraries and common ones the agent has trouble with.

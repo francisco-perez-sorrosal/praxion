@@ -1,10 +1,11 @@
 ---
+name: decontaminate-ids
 description: Detect and remediate REQ/AC/step citations in the current project's source code
 allowed-tools: [Bash, Read, Edit, Write, Grep, Glob]
 disable-model-invocation: true
 ---
 
-Run the `check_id_citation_discipline.py` detector on the current project and remediate any findings following the methodology in the [`id-decontamination`](../skills/id-decontamination/SKILL.md) skill.
+Run the `check_id_citation_discipline.py` detector on the current project and remediate any findings following the methodology in the [`id-decontamination`](../id-decontamination/SKILL.md) skill.
 
 `$ARGUMENTS` — optional flags:
 - (empty) — detect and interactively remediate
@@ -13,7 +14,7 @@ Run the `check_id_citation_discipline.py` detector on the current project and re
 
 ## Procedure
 
-1. **Activate the `id-decontamination` skill** — its description-based trigger should fire automatically when this command runs; if not, load it explicitly. The skill contains the canonical six-step methodology.
+1. **Activate the `id-decontamination` skill** — its description-based trigger should fire automatically when this skill runs; if not, load it explicitly. The skill contains the canonical six-step methodology.
 
 2. **Locate and run the detector.** Try these in order until one succeeds:
 

@@ -1,17 +1,23 @@
 ---
+name: document-api
 description: Scaffold best-in-class API documentation for a project's own API surface — detects language/protocol/surface, scaffolds the Diátaxis skeleton + Spectral ruleset + CI gate, idempotent (skip-or-merge, never clobbers authored content)
 argument-hint: "[path] [--lang python|typescript] [--surface rest|graphql|mcp|library|asyncapi|grpc]"
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(grep:*), Bash(test:*), Bash(python3 scripts/build_doc_manifest.py:*), AskUserQuestion, Task]
 disable-model-invocation: true
 ---
 
-Scaffold documentation for the **current project's own API surface** so both humans and AI agents can consume it. This command operationalizes the `api-documentation` skill: it detects what kind of API the project exposes, confirms with you, then drops a Diátaxis doc skeleton, a Spectral ruleset, and a lint→diff→contract-test CI gate. It never invents the methodology — **load the `api-documentation` skill** when this command runs; that skill governs content quality, this command governs the scaffold.
+Scaffold documentation for the **current project's own API surface** so both humans and AI agents can consume it. This skill operationalizes the `api-documentation` skill: it detects what kind of API the project exposes, confirms with you, then drops a Diátaxis doc skeleton, a Spectral ruleset, and a lint→diff→contract-test CI gate. It never invents the methodology — **load the `api-documentation` skill** when this skill runs; that skill governs content quality, this skill governs the scaffold.
 
 This is a scaffolding action, not an auto-wire. It is the deliberate counterpart to `/onboard-project` (whose Phase 8 only *points* here). Re-running is safe.
 
 ## Inputs
 
-- **`$1` (optional)** — target project path. Defaults to the current working directory.
+Read the typed input, `$ARGUMENTS`, by position: the target path is the first token and the flags may follow it.
+
+| Token | Meaning | If it is empty, a `--` flag, or still a literal placeholder |
+|---|---|---|
+| `$ARGUMENTS[0]` (optional) | target project path | use the current working directory |
+
 - **`--lang`** — override language auto-detection (`python`, `typescript`).
 - **`--surface`** — override protocol/surface auto-detection (`rest`, `graphql`, `mcp`, `library`, `asyncapi`, `grpc`). Repeatable for multi-surface projects.
 
@@ -74,11 +80,11 @@ The doc manifest builder (`scripts/build_doc_manifest.py`) **auto-discovers** AP
 Close with pointers, not inlined methodology:
 
 - For **content** depth — the loaded `api-documentation` skill and its per-surface references.
-- For **MCP tool design** questions that surface during documentation (naming, schema, fat-vs-thin, error grammar) — route to `agentic-interface-design`. This command and the `api-documentation` skill *document* an existing MCP server; they do not *design* its tools.
+- For **MCP tool design** questions that surface during documentation (naming, schema, fat-vs-thin, error grammar) — route to `agentic-interface-design`. This skill and the `api-documentation` skill *document* an existing MCP server; they do not *design* its tools.
 - Mechanical, high-volume doc generation may be delegated to the `doc-engineer` agent (via `Task`); detection and scaffolding judgment stay inline here.
 
 ## Notes
 
 - Detection reports findings and confirms before scaffolding — there is no silent write path.
 - The scaffold is additive and idempotent; re-running reports existing artifacts rather than duplicating or clobbering them.
-- The methodology lives in the `api-documentation` skill — this command is the bootstrap, not the source of truth.
+- The methodology lives in the `api-documentation` skill — this skill is the bootstrap, not the source of truth.

@@ -1,4 +1,5 @@
 ---
+name: sdd-coverage
 description: Report spec-to-test and spec-to-code coverage for REQ IDs
 argument-hint: "[spec-path]"
 allowed-tools: [Read, Glob]
@@ -45,4 +46,4 @@ Below, "tested" means `tests:` or `acceptance:` is non-empty. The `Tests` cell l
    - "REQ-02: needs test coverage — add a behavioral test and record the mapping in `traceability.yml`"
    - "REQ-03: no implementation or tests found — may not have been started"
 
-6. **Never grep code for REQ IDs.** Code and tests do not contain REQ/AC references ([`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md)). The YAML and the archived SPEC matrix are the authoritative sources.
+6. **Never grep code for REQ IDs.** Code and tests do not contain REQ/AC references ([`rules/swe/id-citation-discipline.md`](../../rules/swe/id-citation-discipline.md)). The YAML and the archived SPEC matrix are the authoritative sources.

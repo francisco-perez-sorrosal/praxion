@@ -1,11 +1,12 @@
 ---
+name: project-coverage
 description: Run the project's canonical coverage target and render a terminal summary using the test-coverage skill
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
-Locate, invoke, and render the project's test coverage via the [test-coverage](../skills/test-coverage/SKILL.md) skill. This command is a **thin wrapper** — target discovery, invocation, and rendering live in the skill; this file only handles pre-flight sanity, skill activation, and surfacing the rendered output.
+Locate, invoke, and render the project's test coverage via the [test-coverage](../test-coverage/SKILL.md) skill. This skill is a **thin wrapper** — target discovery, invocation, and rendering live in the skill; this file only handles pre-flight sanity, skill activation, and surfacing the rendered output.
 
-Load the `test-coverage` skill when executing this command. Every non-trivial decision — which target to run, how to parse the artifact, what a "+2.1pp" delta means — is the skill's responsibility.
+Load the `test-coverage` skill when executing this skill. Every non-trivial decision — which target to run, how to parse the artifact, what a "+2.1pp" delta means — is the skill's responsibility.
 
 ## Process
 
@@ -25,7 +26,7 @@ Confirm the environment before activating the skill:
 
 ### 2. Load the Skill
 
-Activate [`test-coverage`](../skills/test-coverage/SKILL.md) and load its language reference for the detected language (e.g., `skills/test-coverage/references/python.md` for Python projects). The skill defines three responsibilities — **locate, invoke, render** — and this command exercises all three in order.
+Activate [`test-coverage`](../test-coverage/SKILL.md) and load its language reference for the detected language (e.g., `skills/test-coverage/references/python.md` for Python projects). The skill defines three responsibilities — **locate, invoke, render** — and this skill exercises all three in order.
 
 ### 3. Locate the Target
 
@@ -47,7 +48,7 @@ A short legend ("pp = percentage points") is helpful on first render for readers
 
 ## Failure Modes
 
-All three failure modes are visible to the user; this command never silently swallows errors.
+All three failure modes are visible to the user; this skill never silently swallows errors.
 
 - **No target found.** All four probes in the language reference failed. Surface the structured result from the skill and point the user at the language reference's setup guidance (for Python: the copy-pasteable default coverage config block in `skills/test-coverage/references/python.md`). Do **not** attempt to install `pytest-cov` or any other coverage tool — the skill is a dispatcher, not an installer.
 
@@ -58,5 +59,5 @@ All three failure modes are visible to the user; this command never silently swa
 ## Notes
 
 - **Thin wrapper, not a reimplementation.** Target-discovery order, invocation conventions, artifact-path contracts, and presentation invariants all live in the `test-coverage` skill and its language references. If behavior needs to change, change it in the skill — not here.
-- **Freshness owned by the caller.** `/project-coverage` always invokes the target (the user explicitly asked). Other callers of the skill (the `/project-metrics --refresh-coverage` flag, the verifier at its discretion) own their own freshness decisions; this command does not coordinate with them.
-- **Override points live in the skill.** Threshold cutoffs (60 / 80) and per-file column order are invariants the skill's render functions expose for per-project override. Projects that need different bands override them via the render API, not via this command's flags.
+- **Freshness owned by the caller.** `/project-coverage` always invokes the target (the user explicitly asked). Other callers of the skill (the `/project-metrics --refresh-coverage` flag, the verifier at its discretion) own their own freshness decisions; this skill does not coordinate with them.
+- **Override points live in the skill.** Threshold cutoffs (60 / 80) and per-file column order are invariants the skill's render functions expose for per-project override. Projects that need different bands override them via the render API, not via this skill's flags.

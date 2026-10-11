@@ -1,10 +1,11 @@
 ---
+name: explore-project
 description: Explore and understand an unfamiliar project's architecture, patterns, and workflow
 argument-hint: "[guide|<focus-area>]"
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(find:*)]
 ---
 
-Explore an unfamiliar software project using the [project-exploration](../skills/project-exploration/SKILL.md) skill. Produces a layered understanding from executive summary to deep architectural analysis, adapted to the project's size, type, and documentation quality.
+Explore an unfamiliar software project using the [project-exploration](../project-exploration/SKILL.md) skill. Produces a layered understanding from executive summary to deep architectural analysis, adapted to the project's size, type, and documentation quality.
 
 ## Modes
 

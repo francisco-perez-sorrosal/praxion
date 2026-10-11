@@ -1,10 +1,11 @@
 ---
+name: review-pr
 description: Code review a pull request
 argument-hint: "[PR-number|branch|diff-target]"
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
-Review a pull request using the [code-review](../skills/code-review/SKILL.md) skill in **standalone mode**. Produces a structured report with finding classification (PASS/FAIL/WARN), convention compliance, and test coverage assessment.
+Review a pull request using the [code-review](../code-review/SKILL.md) skill in **standalone mode**. Produces a structured report with finding classification (PASS/FAIL/WARN), convention compliance, and test coverage assessment.
 
 ## Process
 
@@ -28,7 +29,7 @@ Review a pull request using the [code-review](../skills/code-review/SKILL.md) sk
    - **Language adaptation**: Use language-specific idioms from the code-review skill's adaptation table
    - **Test coverage**: Check whether tests exist for critical paths introduced or modified in the diff. Note untested edge cases.
 
-4. **Produce the report** using the standalone template from the code-review skill's [report template](../skills/code-review/references/report-template.md):
+4. **Produce the report** using the standalone template from the code-review skill's [report template](../code-review/references/report-template.md):
 
    - Verdict (PASS / PASS WITH FINDINGS / FAIL)
    - Convention Compliance table with file:line locations

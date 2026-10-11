@@ -1,4 +1,5 @@
 ---
+name: project-metrics
 description: Compute project complexity/health metrics (churn, complexity, coupling, hot-spots, trends) and write a timestamped report triple to .ai-state/
 argument-hint: "[--window-days N] [--top-n N] [--refresh-coverage] [--coverage-timeout SECONDS]"
 allowed-tools: [Bash(python3:*), Bash(git:*), Read]
@@ -6,7 +7,7 @@ allowed-tools: [Bash(python3:*), Bash(git:*), Read]
 
 Compute a curated set of project complexity and health metrics — SLOC, churn, change entropy, ownership, truck factor, hot-spots, cyclic dependencies, test coverage — and write a timestamped report triple to the project's `.ai-state/` directory. Runs read-only against the working tree: never executes tests, never installs dependencies, never mutates project source.
 
-The command is a thin wrapper over the `scripts.project_metrics` Python CLI. Every metric, delta, hotspot, and trend is computed by a dedicated module in that package; this command file only handles argument passthrough, pre-flight sanity checks, and post-run surfacing.
+The skill is a thin wrapper over the `scripts.project_metrics` Python CLI. Every metric, delta, hotspot, and trend is computed by a dedicated module in that package; this skill file only handles argument passthrough, pre-flight sanity checks, and post-run surfacing.
 
 ## Arguments
 
@@ -71,7 +72,7 @@ Review the MD rendering. If it reflects project state accurately, stage and
 commit with `git add <paths> && git commit`.
 ```
 
-Then bound the directory: run `prune_reports.py --family .ai-state/metrics_reports:METRICS` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py --family .ai-state/metrics_reports:METRICS`) to retain the last 10 `METRICS_REPORT_*` runs — each run's `.md` + `.json` pair is kept or pruned together. Naming the family scopes the prune to this command's own reports — `.ai-state/metrics_reports` also hosts the `SELF_HEALING` family, which must not be touched here. It never touches `METRICS_LOG.md` (the full history stays); pruned reports remain in git history. Stage the pruned deletions in the same commit as the new report.
+Then bound the directory: run `prune_reports.py --family .ai-state/metrics_reports:METRICS` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py --family .ai-state/metrics_reports:METRICS`) to retain the last 10 `METRICS_REPORT_*` runs — each run's `.md` + `.json` pair is kept or pruned together. Naming the family scopes the prune to this skill's own reports — `.ai-state/metrics_reports` also hosts the `SELF_HEALING` family, which must not be touched here. It never touches `METRICS_LOG.md` (the full history stays); pruned reports remain in git history. Stage the pruned deletions in the same commit as the new report.
 
 ### Failure modes
 

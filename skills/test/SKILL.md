@@ -1,10 +1,11 @@
 ---
+name: test
 description: Run the tests a change needs, derived from layout, imports, path literals and the declared list
 argument-hint: "[path|all]"
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
-Run tests via the derived-selection resolver, `resolve_test_scope.py`. Load the [testing-strategy](../skills/testing-strategy/SKILL.md) skill for strategic guidance on test design and architecture decisions; runner and framework detection live inside the resolver's own inventory module, never re-derived here.
+Run tests via the derived-selection resolver, `resolve_test_scope.py`. Load the [testing-strategy](../testing-strategy/SKILL.md) skill for strategic guidance on test design and architecture decisions; runner and framework detection live inside the resolver's own inventory module, never re-derived here.
 
 ## Process
 

@@ -1,12 +1,13 @@
 ---
+name: review-interface
 description: Run an interface design review on a file, PR, branch, or named surface
 argument-hint: "[PR-number|branch|file|surface]"
 allowed-tools: [Bash, Read, Grep, Glob, Task]
 ---
 
-Run an interface design review using the [interface-designer](../agents/interface-designer.md) agent in **standalone mode**. Produces a structured Interface Design Review covering web UI, TUI/CLI, API, and/or agentic tool surfaces, with findings classified by severity (CRITICAL / IMPORTANT / SUGGESTED).
+Run an interface design review using the [interface-designer](../../agents/interface-designer.md) agent in **standalone mode**. Produces a structured Interface Design Review covering web UI, TUI/CLI, API, and/or agentic tool surfaces, with findings classified by severity (CRITICAL / IMPORTANT / SUGGESTED).
 
-Peer to [/review-pr](review-pr.md) (which reviews code quality); this command reviews interface design quality.
+Peer to [/review-pr](../review-pr/SKILL.md) (which reviews code quality); this skill reviews interface design quality.
 
 ## Process
 

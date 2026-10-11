@@ -274,7 +274,7 @@ def test_pipeline_completes_when_optional_tools_are_hidden(
 
 
 def test_shipped_artifact_isolation_passes_on_feature_surface() -> None:
-    """The feature's shipped surfaces (command file) must not reference
+    """The feature's shipped surfaces (skill file) must not reference
     project-specific ``.ai-state/`` or ``.ai-work/`` entries."""
 
     # Only include paths that actually fall under SHIPPED_ROOTS
@@ -282,15 +282,15 @@ def test_shipped_artifact_isolation_passes_on_feature_surface() -> None:
     # Docs and scripts are out of scope per SHIPPED_ROOTS (see
     # scripts/check_shipped_artifact_isolation.py).
     script = _REPO_ROOT / "scripts" / "check_shipped_artifact_isolation.py"
-    command_file = _REPO_ROOT / "commands" / "project-metrics.md"
+    skill_file = _REPO_ROOT / "skills" / "project-metrics" / "SKILL.md"
     completed = subprocess.run(
-        [sys.executable, str(script), "--files", str(command_file)],
+        [sys.executable, str(script), "--files", str(skill_file)],
         cwd=str(_REPO_ROOT),
         capture_output=True,
         text=True,
     )
     assert completed.returncode == 0, (
-        "Shipped-artifact isolation check must pass on commands/project-metrics.md; "
+        "Shipped-artifact isolation check must pass on skills/project-metrics/SKILL.md; "
         f"stdout={completed.stdout!r} stderr={completed.stderr!r}"
     )
 

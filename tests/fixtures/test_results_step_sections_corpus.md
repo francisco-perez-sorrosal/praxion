@@ -420,7 +420,7 @@ $ python3 skills/skill-crafting/scripts/validate_references.py --file docs/metri
 scanned 1 file(s); no findings
 no findings
 
-$ python3 skills/skill-crafting/scripts/validate_references.py --file commands/project-metrics.md
+$ python3 skills/skill-crafting/scripts/validate_references.py --file skills/project-metrics/SKILL.md
 scanned 1 file(s); no findings
 no findings
 
@@ -435,7 +435,7 @@ All nine paths cited in the new "Pipeline Cost Collector" row confirmed present 
 `scripts/project_metrics/_report_sections.py`, `scripts/project_metrics/report.py`,
 `scripts/project_metrics/tests/test_cost_collector.py`,
 `scripts/project_metrics/tests/test_cost_report_section.py`, `hooks/capture_session.py`,
-`docs/metrics/README.md`, `commands/project-metrics.md` — all OK.
+`docs/metrics/README.md`, `skills/project-metrics/SKILL.md` — all OK.
 
 ## Step 13 (health-guards gauntlet, orchestrator)
 

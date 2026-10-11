@@ -1,4 +1,5 @@
 ---
+name: full-security-scan
 description: Run a full-project security audit against all security-critical paths
 allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(find:*)]
 ---
@@ -7,7 +8,7 @@ allowed-tools: [Read, Glob, Grep, Bash(git:*), Bash(find:*)]
 
 Perform a comprehensive security audit of the entire project by loading the
 `context-security-review` skill in **full-scan mode**. Unlike the CI workflow
-and verifier (which review only changed files), this command reviews ALL files
+and verifier (which review only changed files), this skill reviews ALL files
 matching security-critical paths.
 
 ## Process

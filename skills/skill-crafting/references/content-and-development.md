@@ -1,6 +1,6 @@
 # Content Guidelines and Development Workflow
 
-Detailed guidance on choosing content types, shaping skill output with templates and examples, structuring multi-step workflows with feedback loops, and developing skills through evaluation-driven iteration. Reference material for the [Skill Creator](../SKILL.md) skill.
+Detailed guidance on choosing content types, shaping skill output with templates and examples, structuring multi-step workflows with feedback loops, splitting a skill's content across files, and iterating on a skill once its evaluations exist. Reference material for the [Skill Creator](../SKILL.md) skill.
 
 ## Contents
 
@@ -9,6 +9,7 @@ Detailed guidance on choosing content types, shaping skill output with templates
 - Output Templates
 - Examples Pattern
 - Workflow Patterns
+- Structuring Content Across Files
 - Evaluation-Driven Development
 - Iterative Author-Tester Workflow
 - Observe Navigation Patterns
@@ -195,17 +196,106 @@ Include validation loops: run validator -> fix errors -> repeat. This dramatical
 
 For high-stakes operations, use the **plan-validate-execute** pattern: create a structured plan file, validate it with a script, then execute. Catches errors before they happen.
 
+## Structuring Content Across Files
+
+### Pattern 1: High-level guide with references
+
+```markdown
+# PDF Processing
+
+## Quick start
+Extract text with pdfplumber: [code example]
+
+## Advanced features
+- **Form filling**: See [FORMS.md](FORMS.md) for complete guide
+- **API reference**: See [REFERENCE.md](REFERENCE.md) for all methods
+```
+
+### Pattern 2: Domain-specific organization
+
+Organize by domain when a skill covers multiple areas. The agent only reads the relevant domain file:
+
+```text
+bigquery-skill/
+├── SKILL.md (overview and navigation)
+└── references/
+    ├── finance.md, sales.md, product.md, marketing.md
+```
+
+### Pattern 2b: Language/context-specific references
+
+When a skill provides cross-cutting knowledge (e.g., testing strategy, API design), keep the SKILL.md body language-agnostic and place language-specific or context-specific content in separate reference files. The agent loads only the reference relevant to the active project:
+
+```text
+testing-strategy/
+├── SKILL.md (language-agnostic strategy)
+└── references/
+    ├── python-testing.md     # pytest, hypothesis, coverage
+    ├── typescript-testing.md  # vitest, jest, type-safe mocks (future)
+    └── rust-testing.md        # cargo test, proptest (future)
+```
+
+The SKILL.md lists all available references as satellite files. New language support is added by creating a reference file — no changes to the core SKILL.md. Use illustrative examples from specific languages (e.g., `tmp_path` in pytest) but frame them as instances of a general principle, not as the only valid approach.
+
+### Pattern 2c: Polyglot skill (mutually-exclusive contexts)
+
+When a skill covers multiple languages/runtimes/SDKs and each user is in exactly one at a time, place runnable mechanics under `contexts/` — distinct from Pattern 2b's references/-only approach for language-tinged conceptual depth.
+
+```text
+mcp-crafting/
+├── SKILL.md               # Language-agnostic protocol + decisions
+├── references/            # Cross-language conceptual depth (transports, primitives)
+└── contexts/
+    ├── python.md          # FastMCP commands, runnable Python examples
+    └── typescript.md      # @modelcontextprotocol/sdk commands, runnable TS examples
+```
+
+The SKILL.md body stays language-agnostic, carries a Language Contexts table (columns: Language | Context File | Tooling), and redirects at every divergence point ("see `contexts/<language>.md` for X"). Activation is local: the agent loads `contexts/typescript.md` without loading `contexts/python.md`. The frontmatter `description` ends with "Language modules available for `<list>`."
+
+**Decision rule** when authoring a file:
+
+- Does the content compile / run / install? → `contexts/`
+- Does the content explain a cross-language concept? → `references/`
+- Multi-language comparison? → SKILL.md body or `references/`
+
+A reference may *use* one language for illustrative examples, but its *claims* must be language-agnostic; otherwise the file is a context regardless of current directory.
+
+**File-naming convention:**
+
+- `contexts/<language>.md` — one-per-language (e.g., `contexts/python.md`)
+- `contexts/<framework>-<language>.md` — matrix cases (e.g., `contexts/openai-agents-typescript.md`)
+- `contexts/<framework>.md` — when the parent skill is language-rooted and frameworks layer above the baseline language context (e.g., `typescript-development/contexts/react.md`)
+
+**Body discipline:** Language-agnostic prose; no language-specific code blocks in SKILL.md except (a) one-line pseudocode showing *shape*, (b) "Python: X / TypeScript: Y" inline pairs for direct comparison. No version pins in the body — versions live in contexts.
+
+**Extension protocol** — to add a new language to an existing polyglot skill:
+
+1. Create `contexts/<language>.md`
+2. Add a row to the Language Contexts table
+3. Update the frontmatter `description` to include the new language
+4. Add language-specific gotchas only if any exist
+5. The body is NOT modified
+
+### Pattern 3: Conditional details
+
+Show basic content, link to advanced:
+
+```markdown
+## Creating documents
+Use docx-js. See [DOCX-JS.md](DOCX-JS.md).
+
+## Editing documents
+For simple edits, modify XML directly.
+**For tracked changes**: See [REDLINING.md](REDLINING.md)
+```
+
+--> See [plugin-and-troubleshooting.md](plugin-and-troubleshooting.md) for plugin-specific progressive disclosure mechanics (base path injection, permission caveats, debugging).
+
 ## Evaluation-Driven Development
 
-Start with a minimal SKILL.md addressing only observed gaps. Add content only when testing reveals the agent needs it -- not preemptively.
-
-Build evaluations BEFORE writing extensive documentation:
-
-1. **Identify gaps**: Run the agent on representative tasks without the skill. Note specific failures
-2. **Create evaluations**: Define three test scenarios covering those gaps
-3. **Establish baseline**: Measure performance without the skill
-4. **Write minimal instructions**: Just enough to address gaps and pass evaluations
-5. **Iterate**: Execute evaluations, compare against baseline, refine
+The eval-first creation loop is on the entry page: [Creating a Skill: the Eval-First Loop](../SKILL.md#creating-a-skill-the-eval-first-loop).
+Eval file formats, grading and the `claude plugin eval` case layout are in [evaluating-skills.md](evaluating-skills.md).
+The sections below cover iterating on a skill once its scenarios exist.
 
 ## Iterative Author-Tester Workflow
 

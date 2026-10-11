@@ -47,10 +47,11 @@ sys.exit(0 if 'chub' in (j.get('mcpServers') or {}) else 1)
 # LEGACY-COMMAND-EXPORT: remove once no supported release exported .cursor/commands
 # Earlier releases copied every Praxion workflow into <cursor_dir>/commands/; the
 # workflows now reach Cursor as the linked skills, so a stale copy lists twice.
-# A file is Praxion's only when it is what those releases wrote: one of the 44
-# workflow stems (a frozen set no release will add to) whose first line is the
-# `**Description:**` header the exporter prepended, or the guidance page the exporter
-# copied as CLAUDE.md (first line `# Commands`). A user's own command survives, even
+# A file is Praxion's only when it is what those releases wrote: a workflow stem a
+# release ever exported (the 44 of the last base plus eleven retired before it; a frozen
+# set no release will add to) whose first line is the `**Description:**` header the
+# exporter prepended, or the guidance page the exporter copied as CLAUDE.md (first line
+# `# Commands`). A user's own command survives, even
 # one written by hand under a workflow's name; never rm -rf the directory.
 # Usage: sweep_legacy_command_exports <commands_dir> <dry_run:true|false>
 LEGACY_WORKFLOW_EXPORTS=(
@@ -98,6 +99,18 @@ LEGACY_WORKFLOW_EXPORTS=(
     test
     triage-debt
     upgrade-project
+    # exported by releases before the last base and retired since (Feb to Sep 2026)
+    cajalogic
+    create_worktree
+    eval
+    memory
+    merge_worktree
+    new-cc-project
+    new-project
+    onboard-project
+    onboard-project-obsidian
+    refresh-topology
+    save-changes
 )
 
 _is_legacy_workflow_export() {

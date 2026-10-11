@@ -105,7 +105,7 @@ repos:
         name: Shipped-artifact isolation
         entry: python3 scripts/check_shipped_artifact_isolation.py --repo-root . --files
         language: system
-        files: '^(rules|skills|agents|commands|claude/config|claude/canonical-blocks)/.*\.md$'
+        files: '^(rules|skills|agents|claude/config|claude/canonical-blocks)/.*\.md$'
         exclude: '/tests/fixtures/'
         pass_filenames: true
 

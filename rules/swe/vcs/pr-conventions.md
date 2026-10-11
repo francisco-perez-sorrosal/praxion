@@ -1,16 +1,11 @@
 ---
-paths:
-- .github/**/*.md
-- commands/*pr*.md
-- commands/*merge*.md
-- commands/release.md
-- rules/swe/vcs/git-conventions.md
+paths: ["skills/review-pr/SKILL.md", "skills/merge-worktree/SKILL.md", "skills/release/SKILL.md", ".github/**/*.md", "rules/swe/vcs/git-conventions.md"]
 core: false
 ---
 
 ## PR Conventions
 
-Companion to `git-conventions.md`. This rule covers PR workflow and the safety contract for PRs that touch `.ai-state/`. Path-scoped — it loads only when you are editing PR-adjacent surfaces (GitHub metadata, merge/PR commands, the release command, or the sibling git-conventions rule).
+Companion to `git-conventions.md`. This rule covers PR workflow and the safety contract for PRs that touch `.ai-state/`. Path-scoped — it loads only when you are editing PR-adjacent surfaces (GitHub metadata, the PR-review, merge and release skills, or the sibling git-conventions rule).
 
 ### Branch Naming
 

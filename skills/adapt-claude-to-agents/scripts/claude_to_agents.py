@@ -45,18 +45,6 @@ LINE_REPLACEMENTS = (
         "**Worktrees**: `.claude/worktrees/<name>/`. Pipeline worktrees via `EnterWorktree`; scratch via `/create-worktree`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).",
         "**Worktrees**: Praxion's canonical worktree home is `.claude/worktrees/<name>/`. Follow the worktree workflows in `skills/create-worktree/SKILL.md` and `skills/merge-worktree/SKILL.md`. ADRs created in a pipeline land as fragments under `.ai-state/decisions/drafts/` and are promoted to `dec-NNN` at merge-to-main by `scripts/finalize_adrs.py`. PR-adjacent workflow conventions live in `rules/swe/vcs/pr-conventions.md` (path-scoped).",
     ),
-    (
-        "**Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of patterns `/onboard-project` applies to user projects. When updating `/onboard-project` or `/new-project`, verify the change still produces what Praxion has on disk (or, if evolving the contract, propose what changes Praxion's own state needs).",
-        "**Onboarding artifacts dogfooding**: Praxion uses its own onboarding tools — Praxion's `.ai-state/`, `.gitattributes`, git hooks, and `CLAUDE.md` blocks are all results of the patterns in `commands/onboard-project.md`. When updating `commands/onboard-project.md`, `commands/new-project.md`, or `new_project.sh`, verify the change still produces what Praxion has on disk (or, if evolving the contract, propose what changes Praxion's own state needs).",
-    ),
-    (
-        "- **Greenfield** (empty dir): `new_project.sh` + `/new-project` — bash entry validates prereqs and scaffolds, then `exec`s a Claude Code session that runs the seed pipeline and chains to `/onboard-project`. Companion: `docs/greenfield-onboarding.md`.",
-        "- **Greenfield** (empty dir): `new_project.sh` + the workflow in `commands/new-project.md` — the bash entry validates prereqs and scaffolds, then launches the seed workflow and chains to `commands/onboard-project.md`. Companion: `docs/greenfield-onboarding.md`.",
-    ),
-    (
-        "- **Existing project** (has code): `/onboard-project` — phased, gated, idempotent (10 phases, 9 gates). Phase 8 optionally produces `.ai-state/DESIGN.md` + `docs/architecture.md`; Phase 8b installs the AaC tier; Phase 8c scaffolds ML/AI training conventions when detected. Companion: `docs/existing-project-onboarding.md`.",
-        "- **Existing project** (has code): `commands/onboard-project.md` — phased, gated, idempotent (10 phases, 9 gates). Phase 8 optionally produces `.ai-state/DESIGN.md` + `docs/architecture.md`; Phase 8b installs the AaC tier; Phase 8c scaffolds ML/AI training conventions when detected. Companion: `docs/existing-project-onboarding.md`.",
-    ),
     (" (or `/dashboard` from a Claude Code session)", ""),
 )
 

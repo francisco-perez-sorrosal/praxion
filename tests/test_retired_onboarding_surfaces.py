@@ -10,8 +10,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 RETIRED = (
-    "commands/onboard-project.md",
-    "commands/new-project.md",
     "new_project.sh",
     "tests/new_project_test.sh",
 )

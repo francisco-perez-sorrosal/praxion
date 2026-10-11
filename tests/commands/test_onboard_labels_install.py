@@ -61,7 +61,7 @@ def _sub_step_8e9_section() -> str:
 def test_label_taxonomy_install_substep_is_documented() -> None:
     section = _sub_step_8e9_section()
     assert section, (
-        "commands/onboard-project.md must document a 'Sub-step 8e.9' for the "
+        "phases-optional.md must document a 'Sub-step 8e.9' for the "
         "label taxonomy manifest + reconciler caller install — not found. "
         "The implementer must add it immediately after sub-step 8e.8."
     )

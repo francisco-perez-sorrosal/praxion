@@ -4,11 +4,11 @@ Undocumented but strict constraints enforced by the Claude Code plugin validator
 
 ## Component Fields Must Be Arrays
 
-`commands`, `skills`, and `agents` must always be arrays, never strings:
+`skills` and `agents` must always be arrays, never strings:
 
 ```json
-"commands": ["./.claude/commands/"]   // correct
-"commands": "./.claude/commands/"     // fails on marketplace install
+"skills": ["./skills/"]   // correct
+"skills": "./skills/"     // fails on marketplace install
 ```
 
 ## Agents Require Explicit File Paths

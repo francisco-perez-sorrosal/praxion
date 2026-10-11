@@ -2,7 +2,7 @@
 """ADR reminder hook -- warns when architectural files are committed without an ADR.
 
 PreToolUse hook that checks staged files for architectural changes (CLAUDE.md,
-agents, skills, rules, commands, hooks, workflows) and emits a warning if no
+agents, skills, rules, hooks, workflows) and emits a warning if no
 ADR file in .ai-state/decisions/ was modified in the same session. The warning is
 emitted as `hookSpecificOutput.additionalContext` on stdout -- stderr at exit 0
 never reaches the model.
@@ -32,7 +32,6 @@ ARCHITECTURAL_PATTERNS = [
     "agents/*.md",
     "skills/*/SKILL.md",
     "rules/**/*.md",
-    "commands/*.md",
     "hooks/**",
     ".claude-plugin/plugin.json",
     ".github/workflows/**",

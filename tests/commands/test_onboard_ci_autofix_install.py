@@ -96,7 +96,7 @@ def _manifest_artifacts_snippet() -> str:
 def test_ci_autofix_install_substep_is_documented() -> None:
     section = _sub_step_8e8_section()
     assert section, (
-        "commands/onboard-project.md must document a 'Sub-step 8e.8' for the "
+        "phases-optional.md must document a 'Sub-step 8e.8' for the "
         "ci-autofix caller+policy install — not found. The implementer must add it."
     )
     assert re.search(r"ci-?autofix", section, re.IGNORECASE), (

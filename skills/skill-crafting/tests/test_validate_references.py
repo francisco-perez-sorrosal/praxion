@@ -10,7 +10,7 @@ surface is the documented contract -- flags (`--all`, `--file`, `--format`,
 outputs.
 
 Fixture corpus lives at `tests/fixtures/validate_references/` and mirrors a
-real repo layout (skills/, rules/, agents/, commands/, scripts/,
+real repo layout (skills/, rules/, agents/, scripts/,
 .ai-state/decisions/, .ai-work/). Each fixture file has a `<!-- SCENARIO: ...`
 header naming the spec row it exercises.
 
@@ -231,7 +231,7 @@ class TestSiblingSkillLinks:
 
 @skip_if_no_validator
 class TestCrossArtifactLinks:
-    """Row: Cross-artifact (rules/, agents/, commands/) -> file must exist -> FAIL.
+    """Row: Cross-artifact (rules/, agents/, skills/) -> file must exist -> FAIL.
 
     Parametrized across the three cross-artifact target directories named in
     §4.4 scope list.
@@ -242,7 +242,7 @@ class TestCrossArtifactLinks:
         [
             ("rules/swe/missing-rule.md", "rules"),
             ("agents/missing-agent.md", "agents"),
-            ("commands/missing-command.md", "commands"),
+            ("skills/missing-skill/SKILL.md", "skills"),
         ],
     )
     def test_broken_cross_artifact_link_is_fail(
@@ -262,7 +262,7 @@ class TestCrossArtifactLinks:
         [
             "rules/swe/sample-rule.md",
             "agents/sample-agent.md",
-            "commands/sample-command.md",
+            "skills/beta/SKILL.md",
         ],
     )
     def test_valid_cross_artifact_link_produces_no_finding(

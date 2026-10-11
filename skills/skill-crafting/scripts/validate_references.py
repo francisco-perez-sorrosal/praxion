@@ -4,7 +4,7 @@
 Six link classes:
   1. Intra-skill relative -- FAIL if broken
   2. Sibling-skill relative -- FAIL if broken
-  3. Cross-artifact (rules/**, agents/**, commands/**, docs/**) -- FAIL if broken
+  3. Cross-artifact (rules/**, agents/**, skills/**, docs/**) -- FAIL if broken
   4. Anchor same-file (#slug) -- FAIL if slug not found
   5. Anchor cross-file (path#slug) -- FAIL file missing; WARN slug missing
   6. Code-file allowlisted (.py/.yaml/.ts/...) -- FAIL if missing
@@ -28,13 +28,13 @@ from pathlib import Path
 
 # fmt: off
 CODE_EXTENSIONS = frozenset({".py", ".yaml", ".yml", ".ts", ".tsx", ".js", ".jsx", ".toml", ".json", ".sh"})
-ALLOWLIST_PREFIXES = ("task-chronograph-mcp/", "hooks/", "scripts/", "skills/", "agents/", "rules/", "commands/", ".ai-state/", "docs/")
+ALLOWLIST_PREFIXES = ("task-chronograph-mcp/", "hooks/", "scripts/", "skills/", "agents/", "rules/", ".ai-state/", "docs/")
 IGNORED_PATH_SEGMENTS = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/")
 EXCLUDED_GLOB_PREFIXES = (".ai-work/", "node_modules/", ".venv/", "target/", "dist/", "build/", "task-chronograph-mcp/")
 URL_SCHEMES = ("http://", "https://", "mailto:", "ftp://", "ftps://", "tel:")
 # skills/*/assets/*.md (templates) are intentionally excluded: their links are
 # instantiation-relative placeholders, unresolvable at the template's own path.
-INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "rules/**/*.md", "agents/*.md", "commands/**/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md")
+INCLUDE_PATTERNS = ("skills/*/SKILL.md", "skills/*/README.md", "skills/*/references/*.md", "skills/*/contexts/*.md", "skills/*/phases/*.md", "rules/**/*.md", "agents/*.md", "docs/**/*.md", ".ai-state/decisions/*.md", "CLAUDE.md", "README.md", "ROADMAP.md", "README_DEV.md", "CHANGELOG.md")
 # fmt: on
 
 INLINE_IGNORE_MARKER = "<!-- validate-references:ignore -->"

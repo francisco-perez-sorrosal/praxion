@@ -415,7 +415,7 @@ A **new** linked worktree starts with no mount of its own; `post-checkout` mater
 
 Nothing here is a one-way door. `publish` moves sidecar state into the project repo with history preserved; `absorb` moves it back out. `PRAXION_DISABLE_SIDECAR_BANNER=1` and `PRAXION_DISABLE_SIDECAR_AUTOCOMMIT=1` opt out of the SessionStart banner and the autocommit hook respectively. `praxion-sidecar link --prune` removes a stale mount entry after a worktree is gone.
 
-### Troubleshooting
+### Troubleshooting sidecar placement
 
 | Symptom | Cause | Fix |
 |---|---|---|

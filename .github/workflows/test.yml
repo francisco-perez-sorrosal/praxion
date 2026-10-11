@@ -254,7 +254,8 @@ jobs:
     # Strict since 2026-07-16 (ROADMAP item 1.1). Soft-launched 2026-04
     # (SYSTEMS_PLAN.md §4.4); the flip was verified against a local
     # `validate_references.py --all` exit-0 run and a green CI history
-    # before removing continue-on-error.
+    # before removing continue-on-error. Runs --strict, so an ambiguous
+    # anchor (a WARN otherwise) blocks the same way a broken link does.
     name: Validate Context Artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -273,12 +274,12 @@ jobs:
           enable-cache: false
 
       - name: Cross-reference validation
-        run: python skills/skill-crafting/scripts/validate_references.py --all --format text
+        run: python skills/skill-crafting/scripts/validate_references.py --all --strict --format text
 
   shipped-artifact-isolation:
     # Hard gate: blocks PRs that leak specific .ai-state/ or .ai-work/
-    # entries into shipped surfaces (rules/, skills/, agents/, commands/,
-    # claude/config/). See rules/swe/shipped-artifact-isolation.md.
+    # entries into shipped surfaces (rules/, skills/, agents/, claude/config/).
+    # See rules/swe/shipped-artifact-isolation.md.
     name: Shipped artifact isolation
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -349,8 +350,8 @@ jobs:
         run: python3 scripts/check_state_ledgers.py --check
 
   release-staleness:
-    # Advisory (never blocks): after a merge lands on main, report agents /
-    # skills / commands added since the last v* release tag -- they are
+    # Advisory (never blocks): after a merge lands on main, report agents
+    # and skills added since the last v* release tag -- they are
     # invisible to marketplace installs until a release is cut. The frozen
     # 0.2.0 cache (interface-designer not registering) is the failure this
     # surfaces. Push-only: noisy on PRs, meaningful post-merge on main.

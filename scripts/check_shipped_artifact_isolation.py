@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Shipped-artifact isolation checker.
 
-Scans shipped artifact surfaces (rules/, skills/, agents/, commands/,
-claude/config/) for references to specific ``.ai-state/`` or ``.ai-work/``
+Scans shipped artifact surfaces (rules/, skills/, agents/, claude/config/)
+for references to specific ``.ai-state/`` or ``.ai-work/``
 entries -- concrete ADR IDs, spec-tied REQ IDs, dated SPEC filenames, dated
 SENTINEL_REPORT / IDEA_LEDGER filenames, and direct paths into
 ``.ai-state/decisions/``. Those references dangle once the plugin is
@@ -33,7 +33,6 @@ SHIPPED_ROOTS = (
     "rules",
     "skills",
     "agents",
-    "commands",
     "claude/config",
     "claude/canonical-blocks",
 )

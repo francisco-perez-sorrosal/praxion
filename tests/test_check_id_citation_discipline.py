@@ -141,7 +141,6 @@ EXEMPT_DRAFT_ID_PREFIXES = (
     "rules",
     "skills",
     "agents",
-    "commands",
     "docs",
     ".ai-state",
     ".ai-work",
@@ -194,8 +193,8 @@ def test_ignore_marker_suppresses_draft_adr_id_flag(tmp_path: Path) -> None:
 @pytest.mark.parametrize("prefix", EXEMPT_DRAFT_ID_PREFIXES)
 def test_dec_draft_literal_under_exempt_path_is_not_flagged(tmp_path: Path, prefix: str) -> None:
     """A `dec-draft-<hash>` literal under a teaching-material or
-    pipeline-state path (`rules/`, `skills/`, `agents/`, `commands/`,
-    `docs/`, `.ai-state/`, `.ai-work/`) is out of the gate's scope, while an
+    pipeline-state path (`rules/`, `skills/`, `agents/`, `docs/`,
+    `.ai-state/`, `.ai-work/`) is out of the gate's scope, while an
     identical citation outside any exempt path is still flagged — the
     control file proves the exemption is path-scoped, not a blanket
     suppression that would pass this test vacuously today."""

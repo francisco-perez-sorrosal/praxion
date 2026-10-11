@@ -68,7 +68,7 @@ def _skeleton_block(path: str) -> str:
 
 def test_phase_2_documents_all_three_consult_ledger_skeletons() -> None:
     section = _phase_2_section()
-    assert section, "§Phase 2 section not found in commands/onboard-project.md"
+    assert section, "§Phase 2 section not found in phases-core.md"
     missing = [path for path in LEDGER_PATHS if path not in section]
     assert not missing, (
         f"§Phase 2 must document creating these consult ledgers as skeletons: {missing}. "

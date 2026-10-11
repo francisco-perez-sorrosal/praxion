@@ -63,7 +63,7 @@ def _granted_entries() -> list[str]:
 
 def test_phase_5_installs_a_permissions_allow_baseline() -> None:
     section = _phase_5_section()
-    assert section, "§Phase 5 section not found in commands/onboard-project.md"
+    assert section, "§Phase 5 section not found in phases-core.md"
     assert "permissions.allow" in section, (
         "§Phase 5 must install a permissions.allow baseline — onboarding previously "
         "only preserved an existing array and never created one, so managed projects "

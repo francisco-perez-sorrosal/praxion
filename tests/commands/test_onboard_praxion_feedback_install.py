@@ -48,13 +48,13 @@ def _manifest_artifacts_snippet() -> str:
     """
     body = _onboard_body()
     idx = body.find('"artifacts"')
-    assert idx != -1, "commands/onboard-project.md must document an 'artifacts' manifest key"
+    assert idx != -1, "phases-core.md must document an 'artifacts' manifest key"
     return body[idx : idx + 700]
 
 
 def test_phase_2_documents_the_pending_ledger_skeleton() -> None:
     section = _phase_2_section()
-    assert section, "§Phase 2 section not found in commands/onboard-project.md"
+    assert section, "§Phase 2 section not found in phases-core.md"
     assert PENDING_PATH in section, (
         f"§Phase 2 must document creating '{PENDING_PATH}' as a header-only "
         "skeleton — not found. The implementer must add it."

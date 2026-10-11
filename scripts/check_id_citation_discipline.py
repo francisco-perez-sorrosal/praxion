@@ -21,7 +21,7 @@ intentional reference (comment syntax varies by language — the check only
 requires the literal substring to be present on the line).
 
 Exempt paths (teaching materials handled by shipped-artifact-isolation):
-  rules/, skills/, agents/, commands/, claude/config/
+  rules/, skills/, agents/, claude/config/
 Exempt paths (pipeline/history/docs state):
   .ai-work/, .ai-state/, docs/, CHANGELOG.md, ROADMAP.md
 Exempt paths (test fixtures/data):
@@ -57,7 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 try:
     from _hook_utils import record_gate_fire  # noqa: E402
 except ImportError:
-    # `commands/decontaminate-ids.md` runs this script under the ambient
+    # `skills/decontaminate-ids/SKILL.md` runs this script under the ambient
     # `python3`, and a PATH-installed or plugin-cache copy has no `hooks/`
     # sibling to resolve. A raw traceback there reads as a crash and gets
     # ignored, so the gate would die on import and catch nothing
@@ -101,7 +101,6 @@ EXEMPT_PATH_PREFIXES = (
     "rules/",
     "skills/",
     "agents/",
-    "commands/",
     "claude/config/",
     "cursor/config/",
 )

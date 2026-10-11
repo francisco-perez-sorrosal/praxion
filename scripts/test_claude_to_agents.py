@@ -92,3 +92,11 @@ def test_praxion_root_agents_template_matches_generator() -> None:
     expected = (REPO_ROOT / "AGENTS.md.tmpl").read_text(encoding="utf-8")
 
     assert rendered == expected
+
+
+def test_line_replacements_point_at_no_retired_command_file() -> None:
+    module = load_module()
+
+    retired = [new for _, new in module.LINE_REPLACEMENTS if "commands/" in new]
+
+    assert retired == [], f"replacements still send readers to the retired commands/: {retired}"

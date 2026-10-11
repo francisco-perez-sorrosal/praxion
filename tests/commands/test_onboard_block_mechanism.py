@@ -1,6 +1,6 @@
 """Successor to hooks/test_onboard_praxion_block.py after the onboarding unification.
 
-That file parsed commands/onboard-project.md and commands/new-project.md — both
+That file parsed the onboard-project and new-project command files — both
 retired by the atomic cut — and mostly asserted byte-identity of canonical blocks
 across the two commands, a duplication the unification removed (the blocks now
 have one embedding site, checked against claude/canonical-blocks/ by

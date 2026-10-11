@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-10T07:27:12Z'
+generated_at: '2026-10-11T02:55:22Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -202,12 +202,11 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3427
+  chars: 3400
   paths:
   - rules/**
   - skills/**
   - agents/**
-  - commands/**
   - claude/config/**
 - id: swe/staleness-policy
   path: rules/swe/staleness-policy.md
@@ -239,12 +238,12 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 6695
+  chars: 6726
   paths:
+  - skills/review-pr/SKILL.md
+  - skills/merge-worktree/SKILL.md
+  - skills/release/SKILL.md
   - .github/**/*.md
-  - commands/*pr*.md
-  - commands/*merge*.md
-  - commands/release.md
   - rules/swe/vcs/git-conventions.md
 - id: writing/aac-dac-conventions
   path: rules/writing/aac-dac-conventions.md

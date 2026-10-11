@@ -3,14 +3,13 @@ paths:
 - rules/**
 - skills/**
 - agents/**
-- commands/**
 - claude/config/**
 core: false
 ---
 
 ## Shipped Artifact Isolation
 
-Shipped artifacts — the contents of `rules/`, `skills/`, `agents/`, `commands/`, and `claude/config/` that `install_claude.sh` installs into a user's global Claude config — must not reference **specific entries** inside `.ai-state/` or `.ai-work/`.
+Shipped artifacts — the contents of `rules/`, `skills/`, `agents/`, and `claude/config/` that `install_claude.sh` installs into a user's global Claude config — must not reference **specific entries** inside `.ai-state/` or `.ai-work/`.
 
 `.ai-state/` is a per-project meta-instrument (Praxion's own dogfooding state when working on this repo; the *user's* state once the plugin is installed elsewhere). `.ai-work/` is ephemeral per-pipeline-run state. Neither location is part of the Praxion product. Any specific `dec-NNN`, `ADR-NN`, `REQ-<slug>-NN`, `SPEC_<name>_YYYY-MM-DD.md`, `sentinel_reports/SENTINEL_REPORT_<timestamp>.md`, or `idea_ledgers/IDEA_LEDGER_<timestamp>.md` embedded in a shipped artifact dangles the moment the plugin lands in another project.
 

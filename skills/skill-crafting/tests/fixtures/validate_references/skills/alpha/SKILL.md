@@ -23,8 +23,8 @@ description: Fixture skill hosting link-class scenarios for validate_references
 - FAIL rules/: [broken rule](../../rules/swe/missing-rule.md)
 - OK agents/: [sample agent](../../agents/sample-agent.md)
 - FAIL agents/: [broken agent](../../agents/missing-agent.md)
-- OK commands/: [sample command](../../commands/sample-command.md)
-- FAIL commands/: [broken command](../../commands/missing-command.md)
+- OK skills/: [beta skill](../../skills/beta/SKILL.md)
+- FAIL skills/: [broken skill](../../skills/missing-skill/SKILL.md)
 
 ## Same-file anchors
 

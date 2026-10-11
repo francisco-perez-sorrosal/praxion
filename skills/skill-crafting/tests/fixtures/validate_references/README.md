@@ -24,14 +24,12 @@ validate_references/
 │   │   └── assets/
 │   │       └── sample-template.md   # walk-exclusion: assets/ not validated
 │   └── beta/
-│       └── SKILL.md                 # sibling-skill link target
+│       └── SKILL.md                 # sibling-skill and cross-artifact target
 ├── rules/
 │   └── swe/
 │       └── sample-rule.md           # cross-artifact target
 ├── agents/
 │   └── sample-agent.md              # cross-artifact target
-├── commands/
-│   └── sample-command.md            # cross-artifact target
 ├── scripts/
 │   └── sample.py                    # code-file (allowlisted) target
 ├── .ai-state/

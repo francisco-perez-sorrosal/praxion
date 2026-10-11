@@ -55,7 +55,7 @@ def _substep_block() -> str:
 
 def test_phase_2_documents_the_principles_seed() -> None:
     section = _phase_2_section()
-    assert section, "§Phase 2 section not found in commands/onboard-project.md"
+    assert section, "§Phase 2 section not found in phases-core.md"
     assert PRINCIPLES_PATH in section, (
         f"§Phase 2 must seed {PRINCIPLES_PATH}: the planner Phase 1b / verifier "
         "Phase 4.5 consumers ship with the plugin, so a managed project without "

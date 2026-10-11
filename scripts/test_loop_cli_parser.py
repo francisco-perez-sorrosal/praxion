@@ -61,6 +61,13 @@ def test_record_reads_a_call_that_never_started() -> None:
     args = parse("record", SLUG, "--request", "r1", "--not-started", "the call failed")
 
     assert (args.not_started, args.agent_id, args.marker) == ("the call failed", None, None)
+    assert args.session_exited is False
+
+
+def test_record_reads_that_the_calling_session_exited() -> None:
+    args = parse("record", SLUG, "--request", "r1", *RELAY, "--session-exited")
+
+    assert (args.agent_id, args.marker, args.session_exited) == ("a1", "complete", True)
 
 
 @pytest.mark.parametrize(("extra", "expected"), [((), False), (("--json",), True)])
@@ -80,6 +87,7 @@ def test_status_reads_whether_the_object_is_asked_for(extra, expected) -> None:
         ("record", SLUG, "--request", "r1", "--agent-id", "", "--marker", "complete"),
         ("record", SLUG, "--request", "r1", *RELAY, "--not-started", "why"),
         ("record", SLUG, "--request", "r1", "--not-started", "  "),
+        ("record", SLUG, "--request", "r1", "--not-started", "why", "--session-exited"),
         ("record", SLUG, "--request", "r1", "--agent-id", "a1", "--marker", "finished"),
     ],
 )

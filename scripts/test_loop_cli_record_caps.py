@@ -222,6 +222,25 @@ def test_a_withdrawn_second_request_is_issued_again_byte_for_byte(tmp_path):
     assert "previous-attempts" in written.decode("utf-8")
 
 
+def test_a_session_exited_record_asks_the_wait_for_the_transcript_as_it_stands(
+    tmp_path, monkeypatch
+):
+    root = build(tmp_path)
+    request = call(root, "next").doc["request"]
+    asked = {}
+
+    def waited(repo, request_id, agent_id, max_turns, **options):
+        asked.update(options)
+        raise rec.RecordRefusedError("agent-not-found", "stop here")
+
+    monkeypatch.setattr(rec, "await_end", waited)
+
+    with pytest.raises(rec.RecordRefusedError):
+        rec.take_back(task_of(root), request["id"], "gone", "none", session_exited=True)
+
+    assert asked == {"exited": True}
+
+
 def test_the_withdrawal_envelope_is_the_next_action_with_a_recorded_object_and_no_ledger(tmp_path):
     root = build(tmp_path)
     request = call(root, "next").doc["request"]

@@ -122,7 +122,7 @@ def reviewer_ends(monkeypatch, request, final="[COMPLETE]"):
     """The wait for the reviewer's transcript finds it ended, with `final` as its last text."""
     reading = Read(REVIEWER_REQUESTS, f"Spawn request: {request}", Final(final), False)
     seen = rec.Sighting(Path("reviewer.jsonl"), reading, False, final, True)
-    monkeypatch.setattr(rec, "await_end", lambda *_: seen)
+    monkeypatch.setattr(rec, "await_end", lambda *_, **__: seen)
 
 
 def leave_verdict(root, text):

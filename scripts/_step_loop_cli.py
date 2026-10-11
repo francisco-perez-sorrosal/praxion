@@ -152,6 +152,11 @@ def _build_parser(description: str | None) -> argparse.ArgumentParser:
     record.add_argument("--agent-id", help="the agentId the Agent tool result carries")
     record.add_argument("--marker", choices=MARKERS, help="the agent's terminal marker")
     record.add_argument("--not-started", metavar="REASON", help="the Agent call never started")
+    record.add_argument(
+        "--session-exited",
+        action="store_true",
+        help="the session that made the Agent call exited before the agent returned",
+    )
     _add_run_bounds(verbs.choices[RUN_VERB])
     _add_goal_verb(verbs)
     return parser
@@ -196,6 +201,8 @@ def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
             problem = "--agent-id and --marker go together, and the id is not empty"
         elif args.not_started is not None and not args.not_started.strip():
             problem = "--not-started needs a reason"
+        elif args.session_exited and not relayed:
+            problem = "--session-exited goes with --agent-id and --marker, never --not-started"
         else:
             return args
         _Parser(prog=f"{SCRIPT} record").error(problem)

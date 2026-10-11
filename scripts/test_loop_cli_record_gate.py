@@ -81,6 +81,34 @@ def test_a_record_the_transcript_does_not_support_is_refused_with_its_code(monke
     )
 
 
+def test_an_exited_session_is_taken_back_as_it_stands_without_waiting_for_an_end(monkeypatch):
+    monkeypatch.setenv(rec.END_WAIT_VARIABLE, "0")
+    monkeypatch.setattr(rec, "sight", lambda *_: sighting(ended=False))
+
+    seen = rec.await_end(Path("."), REQUEST, AGENT, 100, sleep=lambda _: None, exited=True)
+
+    assert seen.ended is False
+
+
+@pytest.mark.parametrize(
+    ("seen", "code"),
+    [
+        (sighting(path=None), "agent-not-found"),
+        (sighting(first="Spawn request: s9-a1-implement"), "agent-not-for-request"),
+    ],
+)
+def test_an_exited_session_whose_transcript_is_missing_or_another_request_is_refused_as_a_session(
+    monkeypatch, seen, code
+):
+    monkeypatch.setenv(rec.END_WAIT_VARIABLE, "0")
+    monkeypatch.setattr(rec, "sight", lambda *_: seen)
+
+    with pytest.raises(rec.RecordRefusedError) as refused:
+        rec.await_end(Path("."), REQUEST, AGENT, 100, sleep=lambda _: None, exited=True)
+
+    assert (refused.value.code, "session" in refused.value.message) == (code, True)
+
+
 def test_the_wait_polls_until_the_transcript_shows_the_end(monkeypatch):
     seen = iter([sighting(ended=False), sighting(ended=False), sighting()])
     monkeypatch.setattr(rec, "sight", lambda *_: next(seen))

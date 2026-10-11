@@ -127,14 +127,26 @@ class Taken:
 # --- The call --------------------------------------------------------------------------------
 
 
-def take_back(task: TaskView, request: str, agent_id: str | None, relayed: str | None) -> Taken:
-    """The `record` verb: an agent's return, or, with no agent id, a request that never started."""
+def take_back(
+    task: TaskView,
+    request: str,
+    agent_id: str | None,
+    relayed: str | None,
+    session_exited: bool = False,
+) -> Taken:
+    """The `record` verb: an agent's return, or, with no agent id, a request that never started.
+
+    `session_exited` is the relay's assertion that the session which made the Agent call has
+    exited (a restart): the agent can no longer end, so its transcript is taken back as it
+    stands instead of waiting for an end that never comes."""
     if agent_id is None or relayed is None:
         return withdraw_request(task, request)
-    return record_return(task, request, agent_id, relayed)
+    return record_return(task, request, agent_id, relayed, exited=session_exited)
 
 
-def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> Taken:
+def record_return(
+    task: TaskView, request: str, agent_id: str, relayed: str, *, exited: bool = False
+) -> Taken:
     """Take back the agent's return for `request`, or replay the record it already has."""
     done = next((r for r in task.inputs.records if r.request == request), None)
     if done is not None:
@@ -145,14 +157,14 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     spawn = _pending(task.inputs, request)
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
-        return record_review(task, spawn, agent_id, relayed)
+        return record_review(task, spawn, agent_id, relayed, exited=exited)
     if isinstance(step.bound, GoalBudget):  # judged by progress, never by verification
         from _goal_record import record_goal
 
         return record_goal(task, spawn, agent_id, relayed)
     asked = spawn_request(task.slug, step, key, step_cap(step), str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
-    seen = await_end(task.repo, request, agent_id, max_turns)
+    seen = await_end(task.repo, request, agent_id, max_turns, exited=exited)
     marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)
     gate = run_gate(task, step, request)
     verdict = read_verdict(task, step.id, request, gate)
@@ -188,7 +200,9 @@ def record_return(task: TaskView, request: str, agent_id: str, relayed: str) -> 
     return Taken(taken, step.id, warnings)
 
 
-def record_review(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> Taken:
+def record_review(
+    task: TaskView, spawn: Spawn, agent_id: str, relayed: str, *, exited: bool = False
+) -> Taken:
     """A light reviewer's return: neither gated nor committed, one ledger record that carries
     the reviewed work's verdict. What the reviewer decided is the verdict word of its file."""
     step, key = spawn.step, spawn.key
@@ -202,7 +216,7 @@ def record_review(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> 
         )
     asked = spawn_request(task.slug, step, key, step_cap(step), str(task.dir))
     max_turns = declared_max_turns(asked.agent_call.subagent_type)
-    seen = await_end(task.repo, key.id, agent_id, max_turns)
+    seen = await_end(task.repo, key.id, agent_id, max_turns, exited=exited)
     marker, stop_reason, warnings = read_return(seen, cast(Marker, relayed), asked, max_turns)
     record = review_record(reviewed, key.id, agent_id, stop_reason, seen.turns, max_turns)
     append_ledger_record(task.dir, record)

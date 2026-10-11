@@ -2,7 +2,8 @@
 """The step-loop driver: the command that tells an orchestrator which agent to start next.
 
     step_loop.py next   <slug> [--repo-root DIR] [--worktree-root DIR] [--base-ref REF]
-    step_loop.py record <slug> --request ID (--agent-id ID --marker MARKER | --not-started REASON)
+    step_loop.py record <slug> --request ID (--agent-id ID --marker MARKER [--session-exited]
+                        | --not-started REASON)
     step_loop.py status <slug> [--json]
     step_loop.py goal   <slug> --goal S --check C --expects E --paths P... [--protect P...]
                         --iterations N
@@ -272,7 +273,9 @@ def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
 def run_record(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
     try:
         rec.require_known(task.inputs, args.request)
-        took = rec.take_back(task, args.request, args.agent_id, args.marker)
+        took = rec.take_back(
+            task, args.request, args.agent_id, args.marker, session_exited=args.session_exited
+        )
     except rec.RecordRefusedError as refused:
         raise CallerError(refused.code, refused.message, cli.iterations_of(task.inputs)) from None
     return run_next(read_task(args), args, invoke, took)

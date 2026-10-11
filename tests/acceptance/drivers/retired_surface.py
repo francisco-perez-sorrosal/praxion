@@ -33,10 +33,15 @@ FROZEN_HISTORY = re.compile(
 
 # Named exceptions: the frozen before-state and the tests asserting a retired surface stays
 # absent (this outer loop), the installers' legacy cleanup and its tests, and the conversion
-# recipe that names the legacy file shape as its input.
+# recipe that names the legacy file shape as its input. Every other test module and the frozen
+# fixture snapshots join them: once the directory is gone a test can only name it as a negative
+# case (a stray file there is ignored, a replacement must not send readers there), and a
+# fixture snapshot is a before-state.
 NAMED_EXCEPTIONS = re.compile(
     r"^(tests/acceptance/|install_cursor\.sh$|install_codex\.sh$|scripts/test_install_(cursor|codex)[\w]*\.py$"
-    r"|tests/test_legacy_\w+\.sh$|skills/skill-crafting/references/user-invoked-skills\.md$)"
+    r"|tests/test_legacy_\w+\.sh$|skills/skill-crafting/references/user-invoked-skills\.md$"
+    r"|scripts/test_\w+\.py$|scripts/[\w/]+/tests/test_\w+\.py$|tests/(?:[\w-]+/)*test_\w+\.py$"
+    r"|scripts/test_fixtures/|tests/fixtures/)"
 )
 
 

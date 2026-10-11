@@ -140,12 +140,12 @@ def _load_skill_config(skill_md: Path, yaml_module: Any) -> tuple[list[str], int
 
 
 def _line_below_heading(text: str, heading: str) -> str | None:
-    """Return the line directly below the first h2/h3 `heading`, or None if absent.
+    """Return the line directly below the first h1-h3 `heading`, or None if absent.
 
     An empty string is a legal return (the heading is the file's last line --
     no marker line follows, which is itself a missing-marker state).
     """
-    pattern = re.compile(rf"^#{{2,3}}\s+{re.escape(heading)}\s*$")
+    pattern = re.compile(rf"^#{{1,3}}\s+{re.escape(heading)}\s*$")
     lines = text.splitlines()
     for index, line in enumerate(lines):
         if pattern.match(line):

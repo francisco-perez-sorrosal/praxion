@@ -198,6 +198,21 @@ def test_heading_resolves_via_references_when_absent_from_skill_md(tmp_path: Pat
     assert report["examined"]["F07"]["sections"] == 1
 
 
+def test_a_reference_files_own_title_resolves_as_a_cataloged_heading(tmp_path: Path) -> None:
+    """A reference page's `#` title, with the marker below it, is a heading the catalog can name."""
+    skill_dir = _make_skill(
+        tmp_path, "sample-skill", "No matching heading in SKILL.md.\n", sections=["Page Title"]
+    )
+    references = skill_dir / "references"
+    references.mkdir()
+    (references / "page.md").write_text(
+        f"# Page Title\n{_marker(days_ago=10)}\n\nBody.\n", encoding="utf-8"
+    )
+    report = classify(tmp_path)
+    assert report["withheld"] == []
+    assert report["examined"]["F07"]["sections"] == 1
+
+
 def test_unresolvable_heading_is_withheld_not_flagged(tmp_path: Path) -> None:
     """A cataloged heading found nowhere is withheld, not a false F07."""
     _make_skill(

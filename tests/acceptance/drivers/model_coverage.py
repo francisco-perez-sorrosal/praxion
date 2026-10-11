@@ -14,6 +14,11 @@ from pathlib import Path
 from tests.acceptance.drivers.architecture_model import Model
 from tests.acceptance.drivers.svg_render import normalise, read_render
 
+# Elements retired from the model on purpose after the before-state was frozen: a later
+# architectural decision removed them with their relationships, so their absence is not a loss
+# the identity scenarios guard against. Any other missing element or relationship still fails.
+RETIRED_ELEMENTS = frozenset({"praxion.knowledge.commands"})
+
 COVERED_SUBJECTS = {
     "the system context": ("context",),
     "the system's internal building blocks": ("component", "container", "building block"),
@@ -38,12 +43,16 @@ def uncovered_subjects(model: Model, render_dir: Path) -> list[str]:
 
 
 def lost_elements(before: Model, after: Model) -> list[str]:
-    return sorted(set(before.elements) - set(after.elements))
+    return sorted(set(before.elements) - set(after.elements) - RETIRED_ELEMENTS)
 
 
 def lost_relationships(before: Model, after: Model) -> list[str]:
     def counted(model: Model) -> Counter[tuple[str, str]]:
-        return Counter((r.source, r.target) for r in model.relationships)
+        return Counter(
+            (r.source, r.target)
+            for r in model.relationships
+            if r.source not in RETIRED_ELEMENTS and r.target not in RETIRED_ELEMENTS
+        )
 
     missing = counted(before) - counted(after)
     return sorted(f"{source} -> {target} (x{n})" for (source, target), n in missing.items())

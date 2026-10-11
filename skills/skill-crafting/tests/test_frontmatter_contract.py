@@ -129,7 +129,7 @@ def test_a_name_over_the_length_limit_draws_a_length_message() -> None:
     assert contract.name_errors("a" * 65) == ("'name' exceeds 64 chars (got 65)",)
 
 
-@pytest.mark.parametrize("name", ["Skill", "-skill", "skill-", "1skill"])
+@pytest.mark.parametrize("name", ["Skill", "-skill", "skill-", "1skill", "skill\n"])
 def test_a_name_breaking_the_pattern_draws_the_pattern_message(name: str) -> None:
     assert contract.name_errors(name) == (
         f"'name' must be lowercase letters/digits/hyphens, no consecutive "

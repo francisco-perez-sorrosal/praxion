@@ -56,7 +56,7 @@ PRAXION_FIELDS = frozenset(
 REQUIRED_FIELDS = frozenset({"name", "description"})
 ACCEPTED_FIELDS = OPEN_STANDARD_FIELDS | CLAUDE_CODE_FIELDS | PRAXION_FIELDS
 
-NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
+NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
 NAME_MAX_LENGTH = 64
 DESCRIPTION_MAX_LENGTH = 1024
 COMPATIBILITY_MAX_LENGTH = 500
@@ -76,7 +76,7 @@ def name_errors(name: str) -> tuple[str, ...]:
         errors.append(f"'name' exceeds {NAME_MAX_LENGTH} chars (got {len(name)})")
     if _HYPHEN_RUN.search(name):
         errors.append(f"'name' must not contain consecutive hyphens (got {name!r})")
-    if not NAME_PATTERN.match(_HYPHEN_RUN.sub("-", name)):
+    if not NAME_PATTERN.fullmatch(_HYPHEN_RUN.sub("-", name)):
         errors.append(
             f"'name' must be lowercase letters/digits/hyphens, no consecutive "
             f"hyphens, no leading/trailing hyphens (got {name!r})"

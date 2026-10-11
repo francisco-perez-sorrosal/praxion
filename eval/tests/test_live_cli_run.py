@@ -296,9 +296,24 @@ def test_default_target_resolves_to_head_not_main(monkeypatch, capsys, repo_root
     head_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=True
     ).stdout.strip()
-    main_sha = subprocess.run(
-        ["git", "rev-parse", "main"], cwd=repo_root, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    # A CI checkout of a PR ref never creates a local `main` branch, only
+    # the origin/main remote-tracking ref, so the unconditional
+    # `git rev-parse main` crashed the test with CalledProcessError before
+    # its assertions ran. Fall back to origin/main, and skip when neither
+    # resolves.
+    main_ref = subprocess.run(
+        ["git", "rev-parse", "--verify", "main"], cwd=repo_root, capture_output=True, text=True
+    )
+    if main_ref.returncode != 0:
+        main_ref = subprocess.run(
+            ["git", "rev-parse", "--verify", "origin/main"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+    if main_ref.returncode != 0:
+        pytest.skip("no local or remote-tracking `main` ref in this checkout")
+    main_sha = main_ref.stdout.strip()
 
     assert exit_code == 0
     assert head_sha in printed

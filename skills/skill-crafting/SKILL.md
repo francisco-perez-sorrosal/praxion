@@ -34,6 +34,17 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 - [references/plugin-and-troubleshooting.md](references/plugin-and-troubleshooting.md) -- plugin mechanics, discovery and reload, permissions, troubleshooting
 - [references/cross-agent-portability.md](references/cross-agent-portability.md) -- discovery paths and field support per host, skills vs. project instruction files
 
+## Where Skills Go Wrong by Default
+
+The non-obvious failures an agent hits without being told; each one was observed, and each links where it is worked through:
+
+- **A misspelled frontmatter key does nothing.** An unknown key is ignored silently, so `disable-model-invokation` draws no error and changes nothing; run the validator ([schema](references/schema.md)).
+- **A skill built in a worktree is invisible to the session that built it.** Plugin skills are discovered at session start; test one from a fresh session started on that tree ([discovery](references/plugin-and-troubleshooting.md#discovery-and-live-reload)).
+- **Declaring `arguments:` switches off the automatic argument append.** The input is dropped unless the body carries a placeholder such as `$ARGUMENTS` ([arguments](references/user-invoked-skills.md#arguments-and-dynamic-context)).
+- **A description that summarizes the procedure makes the agent skip the body.** It acts on the summary; state when to use the skill instead ([description](references/description-optimization.md)).
+- **A skill's listing description is the only thing seen before invocation.** Everything about when to use it belongs there, none of it in the body.
+- **A plugin directory over 20,000 entries scores every eval run 0, with exit status 0.** Evaluate a trimmed copy ([eval runs](references/evaluating-skills.md#reading-a-run)).
+
 ## Invocation Modes: Who Invokes, Who Reads
 <!-- last-verified: 2026-10-11 -->
 
@@ -84,7 +95,7 @@ A skill shares the context window with the system prompt, the conversation, ever
 
 **Offer one default with an escape hatch, not a menu.** "Use pdfplumber; for scanned PDFs needing OCR, use pdf2image with pytesseract" beats a list of five libraries.
 
-**Lead the body with gotchas.** The highest-signal content is the list of non-obvious failure points the agent gets wrong by default. Start the list from the failures recorded in the eval loop and grow it from failures you observe in use; one targeted gotcha prevents more errors than a page of general guidance. Format: [references/content-and-development.md](references/content-and-development.md#gotchas-sections).
+**Lead the body with gotchas.** The highest-signal content is the list of non-obvious failure points the agent gets wrong by default; this skill leads with its own in [Where Skills Go Wrong by Default](#where-skills-go-wrong-by-default). Start the list from the failures recorded in the eval loop and grow it, in that block, from failures you observe in use; one targeted gotcha prevents more errors than a page of general guidance. Format: [references/content-and-development.md](references/content-and-development.md#gotchas-sections).
 
 **Put load-bearing instructions near the top of the body.** After compaction only the start of an invoked skill survives (see [Skill Content Lifecycle](#skill-content-lifecycle)), and every added instruction dilutes the others.
 

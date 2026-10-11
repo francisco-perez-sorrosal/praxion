@@ -29,10 +29,12 @@ PROMPT_KEYS = {"description", "tags", "allowed_tools", "max_turns", "expected_ou
 SHOULD_TRIGGER = [
     ("test", "test-runs-what-a-change-needs"),
     ("skill-crafting", "skill-crafting-user-invoked-argument"),
+    ("skill-crafting", "skill-crafting-description-not-picked-up"),
 ]
 MUST_NOT_INVOKE = [
     ("test", "test-near-miss-test-design"),
     ("co", "co-commit-message-request"),
+    ("skill-crafting", "skill-crafting-near-miss-path-scoped-rule"),
 ]
 EXPECTED = SHOULD_TRIGGER + MUST_NOT_INVOKE
 CASE_IDS = [name for _, name in EXPECTED]

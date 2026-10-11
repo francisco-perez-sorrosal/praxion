@@ -33,15 +33,19 @@ FROZEN_HISTORY = re.compile(
 
 # Named exceptions: the frozen before-state and the tests asserting a retired surface stays
 # absent (this outer loop), the installers' legacy cleanup and its tests, and the conversion
-# recipe that names the legacy file shape as its input. Every other test module and the frozen
-# fixture snapshots join them: once the directory is gone a test can only name it as a negative
-# case (a stray file there is ignored, a replacement must not send readers there), and a
-# fixture snapshot is a before-state.
+# recipe that names the legacy file shape as its input. The test modules whose purpose is to
+# assert that the retired directory stays absent or inert are named one by one, so a new test
+# that points at it by mistake is still caught: the six gate tests that plant a stray file
+# under it and expect the gate to ignore it, the canonical-block sync tests' synthetic trees,
+# the template generator's guard against replacements that send readers there, and the
+# onboarding-regex negative case; the ledger-triage fixture tree is a frozen before-state.
 NAMED_EXCEPTIONS = re.compile(
     r"^(tests/acceptance/|install_cursor\.sh$|install_codex\.sh$|scripts/test_install_(cursor|codex)[\w]*\.py$"
     r"|tests/test_legacy_\w+\.sh$|skills/skill-crafting/references/user-invoked-skills\.md$"
-    r"|scripts/test_\w+\.py$|scripts/[\w/]+/tests/test_\w+\.py$|tests/(?:[\w-]+/)*test_\w+\.py$"
-    r"|scripts/test_fixtures/|tests/fixtures/)"
+    r"|scripts/test_check_(artifact_conformance|frontmatter_parses|gate_liveness|path_resolution"
+    r"|registry_projection|release_staleness)\.py$"
+    r"|scripts/test_sync_canonical_blocks\.py$|scripts/test_claude_to_agents\.py$"
+    r"|tests/test_pre_commit_onboarding_regex\.py$|scripts/test_fixtures/ledger_triage/)"
 )
 
 

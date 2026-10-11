@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-11T10:48:03Z'
+generated_at: '2026-10-11T16:12:15Z'
 rules:
 - id: CLAUDE
   path: rules/CLAUDE.md
@@ -152,7 +152,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 8434
+  chars: 8414
   paths:
   - fitness/**
   - scripts/check_*.py

@@ -1,12 +1,5 @@
 ---
-paths:
-  - "fitness/**"
-  - "scripts/check_*.py"
-  - "scripts/validate_*.py"
-  - "hooks/*.py"
-  - "agents/sentinel.md"
-  - "agents/verifier.md"
-  - "agents/implementation-planner.md"
+paths: ["fitness/**", "scripts/check_*.py", "scripts/validate_*.py", "hooks/*.py", "agents/sentinel.md", "agents/verifier.md", "agents/implementation-planner.md"]
 ---
 
 ## Gate Liveness

@@ -1,3 +1,19 @@
+## v0.50.0 (2026-10-11)
+
+### Feat
+
+- Excuse a retired model element only when an accepted decision names it
+- Stop the step loop on a glob in a step's Files
+- Refresh the opt-in hackathon block where a project carries it
+
+### Fix
+
+- Phrase the test trigger case as an action request
+- Let the token ratchet be checked without recording a sample
+- Declare the gate-liveness rule paths as an inline array
+- Reject a skill name with a trailing newline
+- Resolve a reference page's own title as a cataloged heading
+
 ## v0.49.1 (2026-10-11)
 
 ### Fix

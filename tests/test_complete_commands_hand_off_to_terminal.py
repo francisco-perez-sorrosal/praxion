@@ -22,7 +22,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL_COMMAND = REPO_ROOT / "skills" / "praxion-complete-install" / "SKILL.md"
 UNINSTALL_COMMAND = REPO_ROOT / "skills" / "praxion-complete-uninstall" / "SKILL.md"
-README = REPO_ROOT / "commands" / "README.md"
+README = REPO_ROOT / "skills" / "README.md"
 
 COMMAND_FILES = (INSTALL_COMMAND, UNINSTALL_COMMAND)
 
@@ -126,7 +126,7 @@ def test_frontmatter_tool_and_invocation_restrictions_are_unchanged(command_file
 def _readme_row(command_name: str) -> str:
     text = README.read_text()
     pattern = re.compile(
-        rf"^\|\s*`{re.escape(command_name)}`\s*\|\s*(.+?)\s*\|\s*$",
+        rf"^\|\s*\*\*\[{re.escape(command_name)}\]\([^)]*\)\*\*\s*\|\s*(.+?)\s*\|[^|]*\|\s*$",
         re.MULTILINE,
     )
     match = pattern.search(text)
@@ -134,9 +134,7 @@ def _readme_row(command_name: str) -> str:
     return match.group(1)
 
 
-@pytest.mark.parametrize(
-    "command_name", ["/praxion-complete-install", "/praxion-complete-uninstall"]
-)
+@pytest.mark.parametrize("command_name", ["praxion-complete-install", "praxion-complete-uninstall"])
 def test_readme_row_describes_the_terminal_hand_off(command_name: str) -> None:
     row = _readme_row(command_name)
     assert TERMINAL_HANDOFF_PHRASE in row.lower(), (

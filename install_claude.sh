@@ -166,6 +166,7 @@ clean_stale_symlinks() {
             fi
         done < "$list_file"
     fi
+    # `commands` no longer ships; installs from earlier versions may still hold links there.
     for subdir in skills commands; do
         local dest_subdir="$dest_dir/$subdir"
         if [ -d "$dest_subdir" ]; then
@@ -505,11 +506,11 @@ prompt_plugin_install() {
     cat <<EOF
 
   ${B}[1] Install plugin (recommended)${R}
-      ${D}Skills, commands, and agents auto-discovered. Managed package${R}
+      ${D}Skills and agents auto-discovered. Managed package${R}
       ${D}with updates via 'claude plugin update'. Works from any directory.${R}
 
   ${B}[2] Skip plugin${R}
-      ${D}No skills, commands, or agents in this session. Use --plugin-dir${R}
+      ${D}No skills or agents in this session. Use --plugin-dir${R}
       ${D}for development testing (see README_DEV.md).${R}
       ${D}Install later by re-running: ./install.sh code${R}
 EOF
@@ -573,7 +574,7 @@ complete_install_from_plugin() {
 
     printf "\n  This finishes the Praxion setup for marketplace-only installs.\n"
     printf "  You already ran 'claude plugin install praxion@bit-agora'. That installed\n"
-    printf "  the plugin body (skills, commands, agents, hooks, MCP servers). This\n"
+    printf "  the plugin body (skills, agents, hooks, MCP servers). This\n"
     printf "  command adds the surfaces the plugin mechanism does not cover natively:\n"
     printf "    • Rules (auto-loaded by Claude Code — shape agent behavior globally)\n"
     printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n\n"
@@ -712,14 +713,14 @@ complete_uninstall_from_plugin() {
 #
 # `bash install.sh` performs a marketplace fetch (`claude plugin install`),
 # which clones a pinned copy into ~/.claude/plugins/cache/<marketplace>/
-# <plugin>/<version>/. Local edits to hooks/, scripts/, commands/ or skills/ never
+# <plugin>/<version>/. Local edits to hooks/, scripts/ or skills/ never
 # reach that cache, so contributors testing plugin-cache-resolved code paths
 # (${CLAUDE_PLUGIN_ROOT}-based hooks, `claude --bg` sessions, etc.) have had
 # to manually `cp` files into the cache between iterations — see td-036 in
 # .ai-state/TECH_DEBT_LEDGER.md.
 #
-# `--dev-link` replaces the cache copies of the four plugin-cache-resolved
-# runtime surfaces (hooks/, scripts/, commands/, skills/ — the directories
+# `--dev-link` replaces the cache copies of the three plugin-cache-resolved
+# runtime surfaces (hooks/, scripts/, skills/ — the directories
 # Claude Code actually loads through ${CLAUDE_PLUGIN_ROOT}/<surface>/...) with
 # directory-level symlinks back to this repo's own copies of them. Edits then
 # take effect immediately, no copy step needed.
@@ -732,9 +733,9 @@ complete_uninstall_from_plugin() {
 #
 # Test-only override: lets scripts/test_install_dev_link.py point dev-link's
 # "source of truth" at a synthetic tree instead of this repo's own hooks/,
-# scripts/, commands/, skills/. Production runs always resolve to SCRIPT_DIR.
+# scripts/, skills/. Production runs always resolve to SCRIPT_DIR.
 DEV_LINK_SOURCE_DIR="${PRAXION_DEV_LINK_SOURCE_DIR:-$SCRIPT_DIR}"
-DEV_LINK_SURFACES=(hooks scripts commands skills)
+DEV_LINK_SURFACES=(hooks scripts skills)
 
 # Resolves the pinned praxion install path + version from the plugin registry —
 # same registry and lookup shape as scripts/upgrade_project_pins.sh's
@@ -802,7 +803,7 @@ dev_link_install() {
     done
 
     printf "\n"
-    info "Dev-link active — edits to hooks/, scripts/, commands/, skills/ now take effect immediately"
+    info "Dev-link active — edits to hooks/, scripts/, skills/ now take effect immediately"
     step "Restore the fetched copies with: ./install.sh --dev-link=off"
 }
 
@@ -1428,7 +1429,7 @@ install_claude_desktop() {
 
     printf "\n"
     info "Installation complete"
-    step "Skills, commands, and agents require Claude Code"
+    step "Skills and agents require Claude Code"
     step "Run ./install.sh code for the full feature set"
 }
 
@@ -1451,11 +1452,7 @@ dry_run_claude_code() {
     fi
     printf "\n"
     printf "  ${B}Skills:${R}\n"
-    find "${SCRIPT_DIR}/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sed 's/^/    /' || step "(none)"
-    printf "\n  ${B}Commands:${R}\n"
-    find "${SCRIPT_DIR}/commands" -name '*.md' -type f ! -name 'README.md' 2>/dev/null | while read -r f; do
-        printf "    /%s\n" "$(basename "$f" .md)"
-    done
+    find "${SCRIPT_DIR}/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null | sed 's|.*/skills/||;s|/SKILL\.md$||' | sort | sed 's/^/    /' || step "(none)"
     printf "\n  ${B}Agents:${R}\n"
     find "${SCRIPT_DIR}/agents" -name '*.md' -type f ! -name 'README.md' 2>/dev/null | sed 's|.*/||;s|\.md$||' | sed 's/^/    /' || step "(none)"
     printf "\n  ${B}Scripts:${R}\n"
@@ -1492,7 +1489,7 @@ Usage: $(basename "$0") code|desktop [--check] [--dry-run] [--uninstall] [--reli
   --reconfigure  Re-prompt for personal identifiers (username/email/github)
                  even if saved values exist in .personal_info.env
   --dev-link     Symlink the pinned plugin cache's hooks/, scripts/,
-                 commands/ and skills/ back to this working tree (code mode only)
+                 and skills/ back to this working tree (code mode only)
   --dev-link=off Reverse of --dev-link: restore fetched cache copies
   --help         Show this help
 EOF

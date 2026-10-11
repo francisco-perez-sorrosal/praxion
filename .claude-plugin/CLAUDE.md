@@ -4,7 +4,7 @@ Plugin infrastructure for the `praxion` Claude Code plugin. Contains the manifes
 
 ## Key Files
 
-- `plugin.json` — Plugin manifest defining MCP servers, skills, commands, and agents
+- `plugin.json` — Plugin manifest defining MCP servers, skills, and agents
 - `PLUGIN_SCHEMA_NOTES.md` — Schema documentation for plugin.json
 - Hooks live at `<repo-root>/hooks/` (not here) — see `hooks/hooks.json`
 
@@ -13,7 +13,6 @@ Plugin infrastructure for the `praxion` Claude Code plugin. Contains the manifes
 | Component | Registration in plugin.json | Discovery |
 |---|---|---|
 | Skills | Directory glob: `"./skills/"` | Automatic |
-| Commands | Directory glob: `"./commands/"` | Automatic |
 | Agents | Explicit file paths (no globs) | Manual — update array |
 | MCP servers | Named entries with command + args | Manual |
 

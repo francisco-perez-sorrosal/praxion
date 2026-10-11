@@ -27,7 +27,7 @@ COORDINATION_DETAILS = REFERENCES / "coordination-details.md"
 
 # The prose an agent loads. `docs/architecture.md` describes the constant for
 # developers and states the number beside it; it is not read by the orchestrator.
-PROSE_ROOTS = ("skills", "agents", "rules", "commands", "claude")
+PROSE_ROOTS = ("skills", "agents", "rules", "claude")
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
 _NUMBER_BEFORE_ATTEMPTS = r"\b(" + "|".join(NUMBER_WORDS) + r"|\d+)\s+fresh\s+attempts?\b"
 _STATED_NUMBER_RE = re.compile(_NUMBER_BEFORE_ATTEMPTS, re.IGNORECASE)

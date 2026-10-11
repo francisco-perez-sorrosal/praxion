@@ -397,11 +397,11 @@ def measure(repo_root: Path, *, api_key: str | None = None, timeout: float = _TI
     }
 
 
-_LISTING_GLOBS = ("skills/*/SKILL.md", "commands/*.md", "agents/*.md")
+_LISTING_GLOBS = ("skills/*/SKILL.md", "agents/*.md")
 
 
 def listing_files(repo_root: Path) -> list[Path]:
-    """Skill/command/agent files whose `description:` frontmatter Claude Code loads
+    """Skill and agent files whose `description:` frontmatter Claude Code loads
     into every session's tool/skill listing -- a second always-loaded surface,
     disjoint from the rule/CLAUDE.md set `always_loaded_files()` measures."""
     files: list[Path] = []
@@ -422,7 +422,7 @@ def _extract_description(frontmatter: str) -> str:
     """The `description:` value only -- a single-line scalar or a `>`/`|` block.
 
     Deliberately not a YAML parse (this module is stdlib-only by construction,
-    see the module docstring): frontmatter across skills/commands/agents uses
+    see the module docstring): frontmatter across skills and agents uses
     only these two shapes in practice, and a body line can never look like a
     `description:` key because this only ever scans the fenced frontmatter.
     """
@@ -830,7 +830,7 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=_LISTING_TARGET_CEILING_DEFAULT,
         help=(
-            "absolute token ceiling for the skill/command/agent description listing, "
+            "absolute token ceiling for the skill and agent description listing, "
             f"checked alongside --ratchet (default {_LISTING_TARGET_CEILING_DEFAULT}, "
             "~1%% of a 200k window); reported only unless --enforce-listing-ceiling is "
             "also passed"

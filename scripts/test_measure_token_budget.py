@@ -274,19 +274,13 @@ def test_count_tokens_is_memoized_per_text_and_key(monkeypatch: pytest.MonkeyPat
     assert calls["n"] == 1, "a repeated identical request must not re-hit the network"
 
 
-# -- The listing surface (skill/command/agent `description:` frontmatter) ------
+# -- The listing surface (skill and agent `description:` frontmatter) ------
 
 
 def _skill(root: Path, name: str, description: str, body: str) -> None:
     path = root / "skills" / name / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\nname: {name}\ndescription: {description}\n---\n\n{body}\n")
-
-
-def _command(root: Path, name: str, description: str, body: str) -> None:
-    path = root / "commands" / f"{name}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f'---\ndescription: "{description}"\n---\n\n{body}\n')
 
 
 def _agent(root: Path, name: str, description_lines: list[str], body: str) -> None:
@@ -299,7 +293,6 @@ def _agent(root: Path, name: str, description_lines: list[str], body: str) -> No
 def test_listing_counts_only_frontmatter_descriptions_not_body_text(tmp_path: Path) -> None:
     """The counter's whole job: description in, body out."""
     _skill(tmp_path, "a-skill", "short skill description", "z" * 5000)
-    _command(tmp_path, "a-command", "short command description", "z" * 5000)
     _agent(
         tmp_path,
         "an-agent",
@@ -311,14 +304,13 @@ def test_listing_counts_only_frontmatter_descriptions_not_body_text(tmp_path: Pa
     without_bodies = "\n".join(
         [
             "short skill description",
-            "short command description",
             "a folded agent description",
         ]
     )
     expected_bytes = len(without_bodies.encode("utf-8"))
 
     assert with_body["bytes"] == expected_bytes
-    assert with_body["file_count"] == 3
+    assert with_body["file_count"] == 2
 
 
 def test_listing_folded_block_scalar_description_is_joined_on_one_line(tmp_path: Path) -> None:
@@ -326,7 +318,6 @@ def test_listing_folded_block_scalar_description_is_joined_on_one_line(tmp_path:
     _agent(tmp_path, "folded-agent", ["line one of the", "folded description"], "body\n")
 
     (tmp_path / "skills").mkdir(exist_ok=True)
-    (tmp_path / "commands").mkdir(exist_ok=True)
 
     descriptions_only = mtb.listing_files(tmp_path)
     text = (tmp_path / "agents" / "folded-agent.md").read_text(encoding="utf-8")
@@ -336,19 +327,16 @@ def test_listing_folded_block_scalar_description_is_joined_on_one_line(tmp_path:
     assert mtb._extract_description(frontmatter) == "line one of the folded description"
 
 
-def test_listing_single_line_quoted_description_is_unquoted(tmp_path: Path) -> None:
-    """The single-line `"..."` shape used across most commands."""
-    _command(tmp_path, "quoted-command", "a quoted description", "body\n")
-
-    text = (tmp_path / "commands" / "quoted-command.md").read_text(encoding="utf-8")
-    frontmatter = mtb._frontmatter_block(text)
+def test_listing_single_line_quoted_description_is_unquoted() -> None:
+    """The single-line `"..."` shape used across the migrated workflow skills."""
+    frontmatter = mtb._frontmatter_block('---\ndescription: "a quoted description"\n---\n')
 
     assert mtb._extract_description(frontmatter) == "a quoted description"
 
 
 def test_listing_reports_a_labelled_estimate_without_an_api_key(tmp_path: Path) -> None:
     """Same estimate-labelling discipline as the governed reading."""
-    _command(tmp_path, "solo-command", "a description", "body\n")
+    _skill(tmp_path, "solo-skill", "a description", "body")
 
     listing = mtb.measure_listing(tmp_path, api_key=None)
 

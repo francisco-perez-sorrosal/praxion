@@ -1,4 +1,4 @@
-"""Corpus guard: a skill or command that declares `arguments:` must receive them.
+"""Corpus guard: a skill that declares `arguments:` must receive them.
 
 Claude Code appends `ARGUMENTS: <input>` to a skill body only when nothing else
 receives the typed input -- and declaring an `arguments:` frontmatter field
@@ -56,9 +56,7 @@ def undelivered_arguments(text: str) -> bool:
 
 
 def _corpus() -> list[Path]:
-    return sorted(
-        [*REPO_ROOT.glob("skills/*/SKILL.md"), *REPO_ROOT.glob("commands/*.md")],
-    )
+    return sorted(REPO_ROOT.glob("skills/*/SKILL.md"))
 
 
 def _declaring_files() -> list[Path]:

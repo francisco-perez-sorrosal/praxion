@@ -40,6 +40,11 @@ _TIMESTAMPS = [
 ]
 
 
+def _case_id(path: Path) -> str:
+    """Label a case by the skill directory when the file is a SKILL.md, else by file name."""
+    return path.parent.name if path.name == "SKILL.md" else path.name
+
+
 def _load_module() -> Any:
     sys.modules.pop("prune_reports", None)
     spec = importlib.util.spec_from_file_location("prune_reports", _SCRIPT_PATH)
@@ -409,7 +414,7 @@ def _assert_family_tokens_bind_to_known_labels(doc_name: str, text: str, known: 
         )
 
 
-@pytest.mark.parametrize("doc_path", _CALLER_DOCS, ids=lambda p: p.name)
+@pytest.mark.parametrize("doc_path", _CALLER_DOCS, ids=_case_id)
 def test_caller_doc_family_flags_bind_to_known_labels(doc_path: Path) -> None:
     """Every --family value hardcoded in a caller doc must resolve to a
     label prune_reports actually derives from `_REPORT_FAMILIES` -- closing

@@ -43,6 +43,11 @@ _FENCE_RE = re.compile(
 _INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 
 
+def _case_id(path: Path) -> str:
+    """Label a case by the skill directory when the file is a SKILL.md, else by file name."""
+    return path.parent.name if path.name == "SKILL.md" else path.name
+
+
 def _split_frontmatter(path: Path) -> tuple[dict, str]:
     text = path.read_text()
     match = _FRONTMATTER_RE.match(text)
@@ -59,7 +64,7 @@ def _bash_blocks(body: str) -> list[str]:
     return [content for lang, content in _fenced_blocks(body) if lang == "bash"]
 
 
-@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=_case_id)
 def test_no_bash_block_runs_a_mutating_installer_flag(command_file: Path) -> None:
     _, body = _split_frontmatter(command_file)
     bash_blocks = _bash_blocks(body)
@@ -71,7 +76,7 @@ def test_no_bash_block_runs_a_mutating_installer_flag(command_file: Path) -> Non
     )
 
 
-@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=_case_id)
 def test_at_least_one_bash_block_runs_the_read_only_health_check(command_file: Path) -> None:
     _, body = _split_frontmatter(command_file)
     bash_blocks = _bash_blocks(body)
@@ -87,7 +92,7 @@ OWN_MUTATING_FLAG = {
 }
 
 
-@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=_case_id)
 def test_mutating_command_appears_only_as_text_for_the_user_to_run(command_file: Path) -> None:
     """The file's own mutating flag must be mentioned somewhere as text shown
     to the user -- a non-bash fence or inline code -- so the user actually
@@ -105,7 +110,7 @@ def test_mutating_command_appears_only_as_text_for_the_user_to_run(command_file:
     )
 
 
-@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=_case_id)
 def test_states_the_user_runs_the_mutating_command_in_their_own_terminal(
     command_file: Path,
 ) -> None:
@@ -116,7 +121,7 @@ def test_states_the_user_runs_the_mutating_command_in_their_own_terminal(
     )
 
 
-@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("command_file", COMMAND_FILES, ids=_case_id)
 def test_frontmatter_tool_and_invocation_restrictions_are_unchanged(command_file: Path) -> None:
     frontmatter, _ = _split_frontmatter(command_file)
     assert frontmatter["allowed-tools"] == ["Bash"]

@@ -10,7 +10,7 @@
   },
   "permissions": {
     "allow": [
-      "Write(.ai-work/**)"
+      "Edit(.ai-work/**)"
     ],
     "deny": [
       "Bash(obsidian delete --permanent*)",

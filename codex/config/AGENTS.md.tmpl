@@ -95,7 +95,7 @@ This agent operates within the Praxion Codex ecosystem. The toolbox exists to op
 | **Understand, Plan, Verify** | Agent pipeline - ideation through verification, each agent owning one phase |
 | **Conventions and consistency** | Rules - coding style, git hygiene, coordination protocols enforced automatically |
 | **Learning loop** | Memory MCP + LEARNINGS.md - persistent knowledge across sessions, ephemeral within pipelines |
-| **Frequent workflows** | Commands - commits, worktrees, scaffolding, memory management as repeatable actions |
+| **Frequent workflows** | Skills invoked by name - commits, worktrees, scaffolding, memory management as repeatable actions |
 | **Structural beauty** | All of the above - the ecosystem's own structure should exemplify its principles |
 
 The ecosystem is auto-discovered. Components are never enumerated in always-loaded context - the assistant finds them via filesystem scanning. This is itself a design principle: avoid maintaining two sources of truth.
@@ -140,7 +140,7 @@ Delegate to the coding-style rule and language-specific toolchains. The philosop
 
 - Project-local `.codex/` contains Codex-native adapter surfaces and generated state
 - `claude/`, `cursor/`, and future assistant-specific directories keep their own adapters separate
-- Canonical `rules/`, `skills/`, `commands/`, and `agents/` remain the source of truth
+- Canonical `rules/`, `skills/`, and `agents/` remain the source of truth
 
 ### Platform Limits
 

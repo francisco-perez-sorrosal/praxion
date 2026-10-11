@@ -431,7 +431,6 @@ EOF
   Components:
     • skills/   (symlinks to repo skills/)
     • rules/   (symlinks to repo rules/)
-    • commands/ (exported from commands/*.md)
     • mcp.json  (task-chronograph, memory, sub-agents)
 EOF
             ;;

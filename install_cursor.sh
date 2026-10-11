@@ -44,6 +44,33 @@ sys.exit(0 if 'chub' in (j.get('mcpServers') or {}) else 1)
 " "$1" 2>/dev/null
 }
 
+# LEGACY-COMMAND-EXPORT: remove once no supported release exported .cursor/commands
+# Earlier releases copied every Praxion workflow into <cursor_dir>/commands/; the
+# workflows now reach Cursor as the linked skills, so a stale copy lists twice.
+# A file is Praxion's only when a skill of the same stem exists in the source, so
+# the user's own commands survive; never rm -rf the directory.
+# Usage: sweep_legacy_command_exports <commands_dir> <skills_dir> <dry_run:true|false>
+sweep_legacy_command_exports() {
+    local commands_dir="$1" skills_dir="$2" dry_run="$3"
+    local stale=() file
+    [ -d "$commands_dir" ] || return 0
+    for file in "$commands_dir"/*.md; do
+        if [ -f "$file" ] && [ -f "$skills_dir/$(basename "$file" .md)/SKILL.md" ]; then
+            stale+=("$file")
+        fi
+    done
+    [ "${#stale[@]}" -gt 0 ] || return 0
+    if [ "$dry_run" = true ]; then
+        step "Would remove ${#stale[@]} stale Praxion command exports"
+        return 0
+    fi
+    rm -f "${stale[@]}"
+    if [ -z "$(ls -A "$commands_dir")" ]; then
+        rmdir "$commands_dir"
+    fi
+    info "Removed ${#stale[@]} stale Praxion command exports"
+}
+
 show_usage() {
     cat <<EOF
 Usage: $(basename "$0") [path] [--check] [--dry-run] [--uninstall] [--help]
@@ -109,9 +136,9 @@ if $DO_DRY_RUN; then
     echo "Target: $CURSOR_DIR ($INSTALL_MODE)"
     n_skills=$(find "$REPO_ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
     n_rules=$(find "$REPO_ROOT/rules" -name '*.md' -type f ! -path '*/references/*' ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' ')
-    n_commands=$(find "$REPO_ROOT/commands" -name '*.md' -type f ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' ')
-    echo "Skills: $n_skills | Rules: $n_rules | Commands: $n_commands"
+    echo "Skills: $n_skills | Rules: $n_rules"
     echo "MCP: $CURSOR_DIR/mcp.json"
+    sweep_legacy_command_exports "$CURSOR_DIR/commands" "$REPO_ROOT/skills" true
     exit 0
 fi
 
@@ -146,20 +173,6 @@ if $DO_CHECK; then
         fi
     else
         warn "rules/ not found"
-        healthy=false
-    fi
-
-    printf "\n  ${B}Commands:${R}\n"
-    if [ -d "$CURSOR_DIR/commands" ]; then
-        count=$(find "$CURSOR_DIR/commands" -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
-        if [ "${count:-0}" -gt 0 ]; then
-            info "${count} commands"
-        else
-            warn "No commands found"
-            healthy=false
-        fi
-    else
-        warn "commands/ not found"
         healthy=false
     fi
 
@@ -255,10 +268,8 @@ step "Linking rules..."
 link_rules "$REPO_ROOT/rules" "$CURSOR_DIR/rules"
 info "Rules linked ($LINK_RULES_COUNT rules)"
 
-# 3. Commands: export plain .md into TARGET/commands/
-step "Exporting commands..."
-python3 "$CURSOR_CONFIG_DIR/export-cursor-commands.py" "$REPO_ROOT" "$CURSOR_DIR/commands"
-info "Commands exported"
+# 3. Sweep the workflow copies earlier releases exported into TARGET/commands/
+sweep_legacy_command_exports "$CURSOR_DIR/commands" "$REPO_ROOT/skills" false
 
 # 4. MCP: write mcp.json from cursor/config template
 step "Writing mcp.json..."

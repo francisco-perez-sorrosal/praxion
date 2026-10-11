@@ -179,8 +179,8 @@ When working in this project:
 3. Load relevant rules from \`$PRAXION_ROOT/rules/\` by reading the files.
 4. Load matching skills from \`$PRAXION_ROOT/skills/<name>/SKILL.md\` and
    skill references only when needed.
-5. Treat \`$PRAXION_ROOT/commands/*.md\` and \`$PRAXION_ROOT/agents/*.md\` as
-   workflow specs unless this agentic framework has a native adapter for them.
+5. Treat \`$PRAXION_ROOT/agents/*.md\` as workflow specs unless this agentic
+   framework has a native adapter for them.
 6. If \`.codex/praxion/pipeline_semantics.json\` exists, read it before task
    sizing or delegation; it is the Codex-native translation of Praxion
    pipeline semantics.
@@ -213,7 +213,7 @@ Praxion skills are exposed to Codex through project-local \`.agents/skills\`
 wrapper skills. Load matching skills on demand; canonical skill files remain
 the source of truth.
 
-Do not copy Praxion rules, skills, commands, or agents into this file. Keep this
+Do not copy Praxion rules, skills, or agents into this file. Keep this
 adapter small and update Praxion at the source.
 EOF
 }
@@ -308,9 +308,6 @@ install_native_codex() {
     python3 "$PRAXION_ROOT/codex/config/export-codex-skills.py" \
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$AGENT_SKILLS_DIR" >/dev/null
-    python3 "$PRAXION_ROOT/codex/config/export-codex-command-skills.py" \
-        --repo-root "$PRAXION_ROOT" \
-        --out-dir "$AGENT_SKILLS_DIR" >/dev/null
     install_codex_rules_bridge
     install_codex_pipeline_adapter
     install_codex_mcp
@@ -323,6 +320,8 @@ is_generated_agent_wrapper() {
 is_generated_skill_wrapper() {
     [ -f "$1" ] && {
         grep -qF "This is a Codex skill wrapper for Praxion." "$1" ||
+        # LEGACY-COMMAND-WRAPPER: remove once no supported release exported praxion-command-* wrappers.
+        # Recognising the retired marker lets the prune, check and uninstall paths remove them.
         grep -qF "This is a Codex command-skill wrapper for a Praxion slash command." "$1"
     }
 }
@@ -333,9 +332,6 @@ export_expected_native_codex() {
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$expected_root/agents" >/dev/null
     python3 "$PRAXION_ROOT/codex/config/export-codex-skills.py" \
-        --repo-root "$PRAXION_ROOT" \
-        --out-dir "$expected_root/skills" >/dev/null
-    python3 "$PRAXION_ROOT/codex/config/export-codex-command-skills.py" \
         --repo-root "$PRAXION_ROOT" \
         --out-dir "$expected_root/skills" >/dev/null
 }
@@ -627,7 +623,7 @@ check_native_codex() {
 
     if [ "$check_rc" -eq 0 ]; then
         info "Codex native agents present in $CODEX_AGENTS_DIR"
-        info "Codex skill and command wrappers present in $AGENT_SKILLS_DIR"
+        info "Codex skill wrappers present in $AGENT_SKILLS_DIR"
         info "Codex rules bridge present in $CODEX_DIR"
         info "Codex pipeline adapter present in $CODEX_PRAXION_DIR"
         info "Codex project MCP config present in $CODEX_DIR/config.toml"
@@ -653,7 +649,7 @@ if $DO_DRY_RUN; then
     fi
     if $DO_NATIVE; then
         step "Would export Praxion agents to $CODEX_AGENTS_DIR"
-        step "Would export Praxion skill and command wrappers to $AGENT_SKILLS_DIR"
+        step "Would export Praxion skill wrappers to $AGENT_SKILLS_DIR"
         step "Would export Praxion rules bridge to $CODEX_DIR"
         step "Would export Praxion pipeline adapter to $CODEX_PRAXION_DIR"
         step "Would update project Codex config in $CODEX_DIR/config.toml"
@@ -693,7 +689,7 @@ info "Compiled Praxion AGENTS.md written to $AGENTS_FILE"
 if $DO_NATIVE; then
     install_native_codex
     info "Codex native agents exported to $CODEX_AGENTS_DIR"
-    info "Codex skill and command wrappers exported to $AGENT_SKILLS_DIR"
+    info "Codex skill wrappers exported to $AGENT_SKILLS_DIR"
     info "Codex rules bridge exported to $CODEX_DIR"
     info "Codex pipeline adapter exported to $CODEX_PRAXION_DIR"
     info "Codex project config updated in $CODEX_DIR/config.toml"

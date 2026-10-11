@@ -89,25 +89,15 @@ The exporter preserves:
 - the canonical skill name
 - the full canonical description
 - a thin wrapper body that points back to the canonical Praxion skill file
+- when the skill declares `argument-hint`, one line telling Codex to treat the
+  text after `$<name>` as `$ARGUMENTS`, split on shell-style whitespace into
+  `$ARGUMENTS[0]`, `$ARGUMENTS[1]`, and so on
 
 It intentionally does not copy canonical skill bodies into the wrapper. Codex
 loads the wrapper at startup and can read the canonical skill on activation.
-
-## Command-Skill Export
-
-`export-codex-command-skills.py` converts `commands/*.md` into Codex skill
-wrappers under the same target `.agents/skills/` directory.
-
-The exporter preserves:
-
-- the canonical slash-command description
-- the canonical command name as a `praxion-command-<name>` skill
-- a thin wrapper body that points back to the canonical Praxion command file
-- argument-substitution guidance for `$ARGUMENTS` and positional arguments
-
-It intentionally does not copy canonical command bodies into the wrapper. Codex
-gets a documented project-skill activation surface while Praxion keeps
-`commands/*.md` as the single source of truth.
+Every Praxion workflow is a skill, so it reaches Codex through this wrapper
+under its own name. `install_codex.sh` still recognises the marker of the
+retired `praxion-command-<name>` wrappers and prunes them on reinstall.
 
 ## Rules Bridge
 

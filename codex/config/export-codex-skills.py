@@ -86,22 +86,34 @@ def yaml_single_quote(value: str) -> str:
 def render_codex_skill(metadata: dict[str, str], source_path: Path) -> str:
     name = metadata["name"]
     description = metadata["description"]
+    argument_hint = metadata.get("argument-hint", "")
 
-    return "\n".join(
-        [
-            "---",
-            f"name: {name}",
-            f"description: {yaml_single_quote(description)}",
-            "---",
-            "",
-            f"# {name}",
-            "",
-            "This is a Codex skill wrapper for Praxion.",
-            "",
-            f"Before using this skill, read the canonical skill definition at `{source_path.as_posix()}` and follow it as the authoritative source.",
-            "Do not treat this wrapper as a fork; it exists only to expose Codex startup metadata.",
-            "",
-        ]
+    lines = [
+        "---",
+        f"name: {name}",
+        f"description: {yaml_single_quote(description)}",
+        "---",
+        "",
+        f"# {name}",
+        "",
+        "This is a Codex skill wrapper for Praxion.",
+        "",
+        f"Before using this skill, read the canonical skill definition at `{source_path.as_posix()}` and follow it as the authoritative source.",
+        "Do not treat this wrapper as a fork; it exists only to expose Codex startup metadata.",
+    ]
+    if argument_hint:
+        lines.append(argument_instruction(name, argument_hint))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def argument_instruction(name: str, argument_hint: str) -> str:
+    # Carries the retired command wrappers' argument semantics over to the skill's
+    # `$ARGUMENTS`/`$ARGUMENTS[N]` placeholders, which Codex does not substitute itself.
+    return (
+        f"Treat any user text after `${name}` as `$ARGUMENTS`; derive `$ARGUMENTS[0]`, "
+        "`$ARGUMENTS[1]`, and later positional arguments by splitting it on shell-style "
+        f"whitespace (argument hint: `{argument_hint}`)."
     )
 
 

@@ -239,7 +239,7 @@ def build_keywords(relpath: str, title: str, globs: list[str]) -> set[str]:
         "testing": {"test", "tests", "pytest", "spec"},
         "staleness": {"skill", "skills", "skill_md"},
         "agent": {"agent", "agents"},
-        "command": {"command", "commands"},
+        "command": {"commands", "command"},
         "rule": {"rule", "rules"},
         "html": {"html", "jinja", "template"},
         "citation": {"citation", "traceability"},

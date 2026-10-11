@@ -64,3 +64,29 @@ def test_parse_rejects_missing_frontmatter(tmp_path: Path):
 
     with pytest.raises(exporter.SkillParseError, match="missing YAML frontmatter"):
         exporter.parse_frontmatter_skill(path)
+
+
+def _argument_lines(text: str) -> list[str]:
+    return [line for line in text.splitlines() if "$ARGUMENTS" in line]
+
+
+def test_wrapper_tells_codex_the_trailing_text_is_the_arguments_when_a_hint_is_declared():
+    exporter = load_exporter()
+    metadata = {"name": "co", "description": "Commit", "argument-hint": "[message]"}
+
+    text = exporter.render_codex_skill(metadata, Path("/opt/praxion/skills/co/SKILL.md"))
+
+    lines = _argument_lines(text)
+    assert len(lines) == 1
+    assert "user text after `$co`" in lines[0]
+    assert "shell-style whitespace" in lines[0]
+    assert "`[message]`" in lines[0]
+
+
+def test_wrapper_carries_no_argument_line_when_no_hint_is_declared():
+    exporter = load_exporter()
+    metadata = {"name": "ml-training", "description": "Train models"}
+
+    text = exporter.render_codex_skill(metadata, Path("/opt/praxion/skills/ml-training/SKILL.md"))
+
+    assert _argument_lines(text) == []

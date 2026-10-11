@@ -233,7 +233,7 @@ The worked example of a full exemplar lens set. This is the content originally i
 - Are build, test, lint, and release steps scripted end-to-end (no manual glue)?
 - Does CI run the full quality gate (format, lint, type check, test) on every change?
 - Are deployments automated behind a user-gated promotion step?
-- Are repetitive developer tasks (scaffolding, migrations) codified as commands/scripts rather than tribal knowledge?
+- Are repetitive developer tasks (scaffolding, migrations) codified as scripts or commands rather than tribal knowledge?
 - Where is the user required in the loop, and is that gate intentional or an automation gap?
 
 **Sub-questions — agentic projects**:

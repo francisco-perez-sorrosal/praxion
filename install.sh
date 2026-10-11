@@ -495,7 +495,7 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
                context-hub state from earlier Praxion versions. Only
                valid with 'code'.
   --dev-link   Symlink the pinned plugin cache's hooks/, scripts/, and
-               commands/ back to this working tree's own copies, so local
+               skills/ back to this working tree's own copies, so local
                edits take effect immediately without a manual cp between
                iterations. Only valid with 'code'.
   --dev-link=off

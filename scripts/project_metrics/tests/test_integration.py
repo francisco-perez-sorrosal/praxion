@@ -278,7 +278,7 @@ def test_shipped_artifact_isolation_passes_on_feature_surface() -> None:
     project-specific ``.ai-state/`` or ``.ai-work/`` entries."""
 
     # Only include paths that actually fall under SHIPPED_ROOTS
-    # (commands/, rules/, skills/, agents/, claude/config/).
+    # (rules/, skills/, agents/, claude/config/, claude/canonical-blocks/).
     # Docs and scripts are out of scope per SHIPPED_ROOTS (see
     # scripts/check_shipped_artifact_isolation.py).
     script = _REPO_ROOT / "scripts" / "check_shipped_artifact_isolation.py"

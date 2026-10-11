@@ -175,7 +175,7 @@ In Claude Code `allowed-tools` **pre-approves** the listed tools (no permission 
 
 ## Claude Code Frontmatter Superset
 
-The fields above are the portable Agent Skills core. Claude Code reads them **plus** the fields below. Since custom commands [merged into skills](https://code.claude.com/docs/en/skills), these apply equally to legacy `commands/*.md` files — see [user-invoked-skills.md](user-invoked-skills.md) for the user-invoked authoring angle.
+The fields above are the portable Agent Skills core. Claude Code reads them **plus** the fields below. Since custom commands [merged into skills](https://code.claude.com/docs/en/skills), a user-invoked workflow is a skill carrying these same fields — see [user-invoked-skills.md](user-invoked-skills.md) for the user-invoked authoring angle.
 
 | Field | Type | Purpose / constraint |
 |-------|------|----------------------|

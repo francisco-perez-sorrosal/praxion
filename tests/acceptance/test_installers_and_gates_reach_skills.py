@@ -40,13 +40,17 @@ def _cursor_project_with(tmp_path, *files):
 
 
 def test_a_cursor_reinstall_sweeps_stale_workflow_exports_and_keeps_the_users_own(tmp_path):
-    project = _cursor_project_with(tmp_path, "co.md", "cop.md", "my-own-shortcut.md")
+    # code-review.md is the user's own: it shares its name with a Praxion skill that was never
+    # exported as a workflow, so the sweep must leave it alone.
+    project = _cursor_project_with(
+        tmp_path, "co.md", "cop.md", "my-own-shortcut.md", "code-review.md"
+    )
 
     result = run_cursor_install(tmp_path, project)
 
     commands = project / ".cursor" / "commands"
     assert result.returncode == 0, result.stdout[-1500:] + result.stderr[-1500:]
-    assert sorted(p.name for p in commands.iterdir()) == ["my-own-shortcut.md"]
+    assert sorted(p.name for p in commands.iterdir()) == ["code-review.md", "my-own-shortcut.md"]
     assert (commands / "my-own-shortcut.md").read_text(
         encoding="utf-8"
     ) == "left by an earlier install\n"

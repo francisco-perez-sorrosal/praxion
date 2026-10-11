@@ -221,7 +221,7 @@ The filename is the single most important factor in whether Claude loads the rul
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
 | Splitting into main + reference | Reference file will not be loaded | Keep rule self-contained |
-| Writing procedures ("Step 1: ...") | Rules are knowledge, not workflows | Move procedure to a skill or command |
+| Writing procedures ("Step 1: ...") | Rules are knowledge, not workflows | Move procedure to a skill |
 | Including all related context | Bloats token budget, dilutes other rules | Focus on constraints, link to skills for depth |
 | Duplicating CLAUDE.md content | Redundant, risk of conflict | Keep in one place only |
 | Extremely long rules (500+ lines) | Token cost, diluted attention | Compress (tables), split by sub-domain, or move to a skill |

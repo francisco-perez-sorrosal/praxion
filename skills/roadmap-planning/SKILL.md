@@ -49,7 +49,7 @@ Choose a framework based on context. Use this decision table:
 | Early-stage or rapid triage | **ICE** | Fast; minimal data required |
 | Small backlog (< 10 items) | **Simple rank** | Direct comparison; frameworks add overhead |
 
-When uncertain, default to **ICE** for speed or **RICE** for rigor. For this ecosystem's typical workload (skills, agents, rules, commands), **ICE** or **simple rank** usually suffice.
+When uncertain, default to **ICE** for speed or **RICE** for rigor. For this ecosystem's typical workload (skills, agents, rules), **ICE** or **simple rank** usually suffice.
 
 --> See [references/prioritization-frameworks.md](references/prioritization-frameworks.md) for detailed mechanics, scoring scales, and worked examples.
 
@@ -184,7 +184,7 @@ The promethean's `IDEA_LEDGER_*.md` is the primary input. Each pending idea has:
 - **Title and description**: what the idea is
 - **Impact/Effort**: from Phase 4 assessment (maps to framework scoring dimensions)
 - **Dependencies**: from Phase 4 analysis
-- **Category**: skill / command / agent / rule / other
+- **Category**: skill / agent / rule / other
 
 The roadmap planning skill does NOT replace the promethean's ideation. It takes the promethean's output and applies structured prioritization, dependency analysis, and sequencing that the promethean does not perform.
 

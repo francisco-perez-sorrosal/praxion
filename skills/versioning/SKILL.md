@@ -36,7 +36,7 @@ Detect the active versioning tool from project configuration files. Check in pri
 
 ## Flag Mapping
 
-Map user intent to tool-specific CLI flags. The `/release` command uses this table to translate intent into the correct invocation.
+Map user intent to tool-specific CLI flags. The `/release` skill uses this table to translate intent into the correct invocation.
 
 | Intent | Commitizen | python-semantic-release | bump-my-version | Knope | semantic-release (JS) |
 |--------|-----------|------------------------|----------------|-------|----------------------|
@@ -53,19 +53,19 @@ Map user intent to tool-specific CLI flags. The `/release` command uses this tab
 
 ## Breaking Change Guidelines
 
-For textual and configuration projects (Markdown skills, agent prompts, rules, commands, hooks, plugin manifests), "breaking" requires an explicit definition since there is no compiled API to analyze.
+For textual and configuration projects (Markdown skills, agent prompts, rules, hooks, plugin manifests), "breaking" requires an explicit definition since there is no compiled API to analyze.
 
 ### MAJOR (breaking)
 
 - Skill or agent renamed or removed (breaks activation by name)
-- Command renamed or removed (breaks `/<command>` invocation)
+- User-invoked skill renamed or removed (breaks `/<skill>` invocation)
 - Rule file renamed or removed (breaks `rules/` symlink paths)
 - MCP server API changed (breaks hook integrations and client callers)
 - `plugin.json` structural change (breaks marketplace install or plugin cache resolution)
 
 ### MINOR (feature)
 
-- New skill, agent, command, or rule added
+- New skill, agent, or rule added
 - New reference file added to an existing skill
 - New MCP server tool or resource
 - Enhanced prompt or instruction that adds capability without changing existing behavior

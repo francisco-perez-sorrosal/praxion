@@ -23,7 +23,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 
 **Implementer step-level override.** Planner annotates `WIP.md` with `tier: H` (cross-cutting refactor) or `tier: L` (typo/mechanical); no hint = `sonnet`.
 
-**Direct-invocation entry points.** Slash commands and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, `/eval-praxion`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
+**Direct-invocation entry points.** User-invoked skills and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, `/eval-praxion`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
 
 ## Operator Kill Switch — `CLAUDE_CODE_SUBAGENT_MODEL`
 

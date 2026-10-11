@@ -12,7 +12,7 @@ capability — a Factory-aligned rubric that scores a project's readiness for
 autonomous agent collaboration across 8 industry-standard pillars and one
 Praxion-native sub-score.
 
-**This skill does NOT have a standalone `/readiness` command.** Readiness runs
+**This skill does NOT have a standalone `/readiness` skill.** Readiness runs
 through `/project-metrics`, writing its results into the `readiness` block of
 `METRICS_REPORT_*.json`.
 
@@ -247,10 +247,10 @@ When a project is at level N and you want to reach level N+1:
   even if level-2 criteria represent the minority. The gate requires ≥80% of
   *all applicable criteria at level 1 and below* — levels are additive.
 
-## Related Skills and Commands
+## Related Skills
 
-- **`/project-metrics`** — the command that runs the readiness engine. All
-  readiness flags are arguments to this command.
+- **`/project-metrics`** — the user-invoked skill that runs the readiness engine. All
+  readiness flags are arguments to this skill.
 - **`/onboard-project` Phase 8e** — installs the universal code-quality baselines
   (linter/formatter/editorconfig, pre-commit, type-check config, `CONTRIBUTING.md`)
   from canonical assets; the fastest path to the L1–L3 Style/Code-Quality/Docs

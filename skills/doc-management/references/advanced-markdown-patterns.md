@@ -10,7 +10,7 @@ Apply these patterns **only to human-facing, GitHub-rendered documents**: `READM
 
 **Never apply** to:
 - Agent-intermediate documents (`.ai-work/`, `.ai-state/` files)
-- Context artifacts (`CLAUDE.md`, `SKILL.md`, agent/rule/command definitions)
+- Context artifacts (`CLAUDE.md`, `SKILL.md`, agent/rule definitions)
 - Any file primarily consumed by terminal `cat` or plain-text processors
 
 ---
@@ -175,7 +175,7 @@ Screen readers announce each emoji by its Unicode name. `✅` reads as "check ma
 - **At most one emoji per heading**, and only when the emoji adds a non-redundant signal
 - **At most one emoji per bullet** in a scannable list; never every bullet — the marker only stands out when it's selective
 - **No emojis in agent-intermediate documents** (`.ai-work/`, `.ai-state/`) — agents do not benefit from visual anchors, and the bytes are waste in tight context windows
-- **No emojis in `CLAUDE.md`, `SKILL.md`, or agent/rule/command definitions** — same reason, plus these files set the project's writing tone for agents
+- **No emojis in `CLAUDE.md`, `SKILL.md`, or agent/rule definitions** — same reason, plus these files set the project's writing tone for agents
 
 ### Tone calibration
 

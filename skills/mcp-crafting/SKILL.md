@@ -54,7 +54,7 @@ Widely-circulated "MCP costs ~30× more tokens than a CLI" figures come from thi
 
 So, in order:
 
-1. **Can a CLI tool do it?** LLMs already know how to call `some-tool --help`. A well-documented CLI (or a Praxion command/skill that wraps one) is often cheaper and simpler than an MCP server. Reach for MCP when you need a *typed, discoverable* contract a model invokes directly, OAuth-mediated remote access, or resources/prompts — not merely to wrap an API.
+1. **Can a CLI tool do it?** LLMs already know how to call `some-tool --help`. A well-documented CLI (or a Praxion skill that wraps one) is often cheaper and simpler than an MCP server. Reach for MCP when you need a *typed, discoverable* contract a model invokes directly, OAuth-mediated remote access, or resources/prompts — not merely to wrap an API.
 2. **If you do build MCP, install few servers and scope narrowly.** Three focused servers beat thirteen; fewer, sharper tools choose better.
 3. **At large tool counts, prefer code-execution mode** (see [Code Execution with MCP](#code-execution-with-mcp-emerging)).
 

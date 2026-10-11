@@ -46,7 +46,7 @@ Run the located target when the caller asks. The caller — not the skill — ow
 
 | Caller | Ownership of freshness |
 |--------|------------------------|
-| `/project-coverage` command | Command (user explicitly asked) |
+| `/project-coverage` skill | User (explicitly asked) |
 | `/project-metrics --refresh-coverage` flag | User (via flag) |
 | `verifier` agent | Verifier (at its discretion, not a hard trigger) |
 

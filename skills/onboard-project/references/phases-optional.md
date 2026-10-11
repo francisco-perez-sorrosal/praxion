@@ -400,7 +400,7 @@ Print: `8d.4: .obsidian/app.json link-safety keys pinned (useMarkdownLinks=true,
 
 **Predicate.** `grep -q '^## Obsidian Integration$' CLAUDE.md`. If present: skip with notice `8d.5: skipped (## Obsidian Integration block already in CLAUDE.md)`.
 
-**Action.** `CLAUDE.md` is guaranteed present (bootstrapped at §Phase 0.5). Append the §Obsidian Integration Block verbatim from this command's body at the end of the file with one blank line separating from preceding content.
+**Action.** `CLAUDE.md` is guaranteed present (bootstrapped at §Phase 0.5). Append the §Obsidian Integration Block verbatim from this skill's body at the end of the file with one blank line separating from preceding content.
 
 Print: `8d.5: ## Obsidian Integration block appended to CLAUDE.md`.
 

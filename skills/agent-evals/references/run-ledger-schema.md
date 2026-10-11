@@ -32,7 +32,7 @@ for agentic/eval-bearing managed projects:
 | `EVAL_LOG.md` | `.ai-state/eval_ledger/EVAL_LOG.md` | 2b (aggregate) | Append-only run leaderboard |
 
 **Writers:** the project's eval loop (when a run is *kept*)
-**Readers:** `verifier` (metric-threshold evaluation), `/scores` command,
+**Readers:** `verifier` (metric-threshold evaluation), `/scores` skill,
 dashboard eval panel
 
 **Invariant:** heavy per-run artifacts (generated code, logs, submissions, trajectories,

@@ -199,7 +199,7 @@ A pure function of the path; the first match wins, so every path lands in exactl
 2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`
 3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file with a `tests/`, `test/`, `spec/` or `__tests__/` directory segment at any depth. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production. In Praxion, `claude/project-baseline/tests/` is shipped product and belongs to class 5, not here
 4. *state/doc*: `.ai-state/**`, `docs/**`
-5. *production*: everything else — in Praxion this includes agent, skill, rule and command Markdown, because they are the product
+5. *production*: everything else — in Praxion this includes agent, skill and rule Markdown, because they are the product
 
 The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a class-5 path. The AD commit must be strictly earlier; afterwards any change to an outer-loop file (scenario or driver) belongs to a commit tied to an answered Spec Question (`Resolved in:` sha) or to a planned driver-binding step, and an outer-loop file that first appears after the first production commit is such a change. The Base commit is the one the orchestrator recorded at the Gate.
 
@@ -285,14 +285,14 @@ Never meet the budget by:
 
 ## Context-Engineer Shadowing
 
-When work involves context artifacts (skills, rules, agents, commands, CLAUDE.md files), the context-engineer runs in parallel with the researcher (research-stage shadow) and/or systems-architect (architecture-stage shadow), appending stage-delimited sections to a cumulative `CONTEXT_REVIEW.md`.
+When work involves context artifacts (skills, rules, agents, CLAUDE.md files), the context-engineer runs in parallel with the researcher (research-stage shadow) and/or systems-architect (architecture-stage shadow), appending stage-delimited sections to a cumulative `CONTEXT_REVIEW.md`.
 
 ### Activation
 
 Shadowing is **conditional** — it activates only when the task creates, modifies, or restructures context artifacts. For pure application code, no shadowing occurs.
 
 Signals that shadowing is needed:
-- The task will add, move, rename, or delete a skill, rule, agent, or command.
+- The task will add, move, rename, or delete a skill, rule, or agent.
 - The task touches CLAUDE.md files, plugin.json, or the always-loaded token budget.
 - The research stage surfaces findings about context artifacts (placement, scope, token cost).
 - The architect's plan introduces new context conventions or cross-artifact dependencies.

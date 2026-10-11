@@ -13,7 +13,7 @@ Systematic methodology for understanding any unfamiliar software project — fro
 
 ## Activation
 
-Load explicitly with `project-exploration` or reference trigger phrases: joining a new project, exploring an unfamiliar codebase, project overview, architecture understanding, codebase orientation, codebase walkthrough, code exploration, project analysis, developer onboarding. The `/explore-project` command drives the workflow interactively.
+Load explicitly with `project-exploration` or reference trigger phrases: joining a new project, exploring an unfamiliar codebase, project overview, architecture understanding, codebase orientation, codebase walkthrough, code exploration, project analysis, developer onboarding. The `/explore-project` skill drives the workflow interactively.
 
 ## Skill Contents
 

@@ -114,7 +114,7 @@ Load only the references your surface requires. A Python REST service loads `pyt
 
 ## Scaffolding
 
-The `/document-api` command operationalizes this skill: it detects the target's language/protocol/surface, scaffolds the matching `assets/api-docs-skeleton/` subtree plus the Spectral ruleset and CI gate, and cross-links multi-surface projects. Run it to bootstrap; this skill governs the content quality.
+The `/document-api` skill operationalizes this skill: it detects the target's language/protocol/surface, scaffolds the matching `assets/api-docs-skeleton/` subtree plus the Spectral ruleset and CI gate, and cross-links multi-surface projects. Run it to bootstrap; this skill governs the content quality.
 
 ## Related Skills
 

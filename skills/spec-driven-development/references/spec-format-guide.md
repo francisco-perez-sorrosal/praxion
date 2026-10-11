@@ -132,7 +132,7 @@ A requirement is written for an outside observer, so it names nothing the archit
 ```markdown
 ### Observable Surface
 
-- `/sdd-coverage` — the existing coverage command
+- `/sdd-coverage` — the existing coverage skill
 - `--check` — the flag the user asked for
 ```
 

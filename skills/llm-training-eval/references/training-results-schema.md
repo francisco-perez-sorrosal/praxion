@@ -25,7 +25,7 @@ is the machine-readable contract (consumed by verifier and `/check-experiment`).
 Markdown body is the human-readable narrative (written by `/run-experiment` or the
 autonomous experiment loop).
 
-**Writer:** `/run-experiment` command (or the project's autonomous experiment loop)
+**Writer:** `/run-experiment` skill (or the project's autonomous experiment loop)
 **Readers:** `verifier` (Phase 3a metric threshold evaluation), `/check-experiment`
 
 ---

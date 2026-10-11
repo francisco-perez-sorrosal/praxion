@@ -253,18 +253,18 @@ The worked example of a full exemplar lens set. This is the content originally i
 
 ### Coordinator Awareness
 
-**Definition**: The main coordinator agent (Claude Code, Cursor, or equivalent) must surface and wield the project's capabilities — skills, agents, commands, rules, MCP servers — without the user re-teaching them each session.
+**Definition**: The main coordinator agent (Claude Code, Cursor, or equivalent) must surface and wield the project's capabilities — skills, agents, rules, MCP servers — without the user re-teaching them each session.
 
 **Sub-questions — deterministic projects**:
 - Does `README.md` map capabilities to tasks (decision tree or index)?
 - Is onboarding documentation current, or does it describe a prior architecture?
-- Do tooling discoverability aids exist (`make help`, `scripts/README.md`, command catalogs)?
+- Do tooling discoverability aids exist (`make help`, `scripts/README.md`, skill catalogs)?
 - Are conventions captured as enforceable rules (linter configs, pre-commit hooks) rather than prose?
 - Can a new contributor ship a change without reading every file?
 
 **Sub-questions — agentic projects**:
 - Is there an `AGENTS.md`, `CLAUDE.md`, or equivalent loaded automatically that covers available capabilities?
-- Does the coordinator proactively recommend the right agent/skill/command, or wait to be told?
+- Does the coordinator proactively recommend the right agent or skill, or wait to be told?
 - Is pipeline topology documented and discoverable (coordination-protocol rule, pipeline diagram)?
 - Are delegation deliverables documented where the coordinator sees them (always-loaded config, not deep references)?
 - Does the coordinator have a way to verify subagent deliverables landed on disk?

@@ -44,7 +44,7 @@ Every path referenced in documentation must resolve to an existing file or direc
 | Pattern | Cause | Fix |
 |---------|-------|-----|
 | `skills/old-name/` referenced | Skill directory renamed | Update to new directory name |
-| `commands/create_worktree.md` | Naming convention changed (underscore to hyphen) | Update to `commands/create-worktree.md` |
+| `agents/code_reviewer.md` | Naming convention changed (underscore to hyphen) | Update to `agents/code-reviewer.md` |
 | Relative path wrong depth | File moved to different nesting level | Recalculate relative path |
 | Missing trailing slash on directory | Inconsistent convention | Standardize: no trailing slash for files, optional for directories |
 
@@ -59,7 +59,7 @@ Catalog READMEs must list every artifact in their directory. Sync failures creat
    # List all artifact directories (for skills, agents, etc.)
    ls -1d skills/*/
 
-   # List all artifact files (for rules, commands)
+   # List all artifact files (for rules)
    ls -1 rules/swe/*.md rules/writing/*.md
    ```
 
@@ -87,10 +87,6 @@ Maintain consistent column structure per artifact type:
 <!-- Rules catalog -->
 | Rule | Scope | Description |
 |------|-------|-------------|
-
-<!-- Commands catalog -->
-| Command | Description | Arguments |
-|---------|-------------|-----------|
 ```
 
 ## Name Consistency Checks
@@ -196,7 +192,7 @@ grep -oP '\[.*?\]\(.*?\)' README.md
 grep -oP '`[a-zA-Z0-9_./-]+`' README.md
 
 # Find count words
-grep -oiP '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)\s+(skills?|agents?|commands?|rules?)' README.md
+grep -oiP '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)\s+(skills?|agents?|rules?)' README.md
 ```
 
 ### Using Bash

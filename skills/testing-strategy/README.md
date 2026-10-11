@@ -33,5 +33,5 @@ Trigger explicitly by mentioning "testing-strategy skill" or referencing it by n
 
 - [`testing-conventions` rule](../../rules/swe/testing-conventions.md) -- Declarative constraints for test code (what must be true)
 - [`test-engineer` agent](../../agents/test-engineer.md) -- Pipeline agent for test execution workflow
-- [`/test` command](../../commands/test.md) -- Auto-detect test framework and run tests
+- [`/test` skill](../test/SKILL.md) -- Auto-detect test framework and run tests
 - [`python-development` skill](../python-development/) -- Python language patterns (cross-references this skill for advanced pytest)

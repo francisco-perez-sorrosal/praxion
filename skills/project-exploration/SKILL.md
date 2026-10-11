@@ -8,7 +8,7 @@ compatibility: Claude Code
 
 # Project Exploration
 
-Methodology for understanding any software project you encounter -- from a tiny CLI tool to a massive monorepo. The `/explore-project` command drives the exploration workflow; this skill provides the analysis methodology that any agent or command can reference.
+Methodology for understanding any software project you encounter -- from a tiny CLI tool to a massive monorepo. The `/explore-project` skill drives the exploration workflow; this skill provides the analysis methodology that any agent or skill can reference.
 
 **Satellite files** (loaded on-demand):
 

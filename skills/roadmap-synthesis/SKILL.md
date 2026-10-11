@@ -41,7 +41,7 @@ The two skills **compose**: `roadmap-synthesis` runs Phases 1–5 and 7; it dele
 
 Standalone capability — not inserted into the `promethean → researcher → systems-architect` chain. Activated by:
 
-- `/roadmap` command with optional mode argument (`fresh` / `diff` / `<focus-area>`)
+- `/roadmap` skill with optional mode argument (`fresh` / `diff` / `<focus-area>`)
 - Explicit `@roadmap-cartographer` delegation
 - Main agent recognizing roadmap intent (trigger phrases above)
 
@@ -52,7 +52,7 @@ The `roadmap-cartographer` agent owns the end-to-end workflow and loads this ski
 Seven phases. The cartographer mirrors this structure; procedural depth lives in the linked references, not here.
 
 1. **Scope, Paradigm & Lens Derivation** — classify target as deterministic / agentic / hybrid → [paradigm-detection.md](references/paradigm-detection.md), then derive the project-specific lens set (4-8 lenses drawn from project values + domain constraints + exemplar lens sets) → [lens-framework.md](references/lens-framework.md). Surface paradigm **and** proposed lens set to the user (Gate 1).
-2. **Ecosystem Inventory** — filesystem scan of skills, agents, rules, commands, hooks, tests, CI, `AGENTS.md`/`CLAUDE.md`, `.ai-state/DESIGN.md`, `.ai-state/decisions/`, memory; read the latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` if present; detect an existing `ROADMAP.md` for `diff` mode.
+2. **Ecosystem Inventory** — filesystem scan of skills, agents, rules, hooks, tests, CI, `AGENTS.md`/`CLAUDE.md`, `.ai-state/DESIGN.md`, `.ai-state/decisions/`, memory; read the latest `.ai-state/sentinel_reports/SENTINEL_REPORT_*.md` if present; detect an existing `ROADMAP.md` for `diff` mode.
 3. **Parallel Audit Fan-out** — spawn N researcher agents (N = lens_count, capped at 6) in parallel, one per lens from the derived set; each writes an `AUDIT_<lens>.md` fragment via the fragment template → [audit-methodology.md](references/audit-methodology.md).
 4. **Lens Synthesis** — reduce fragments into draft roadmap sections through the derived lens set → [lens-framework.md](references/lens-framework.md).
 5. **Multi-Angle Reframe** — for each of the top 3 weaknesses, articulate ≥2 framings; record the runners-up as *Considered Angles*. Universal step regardless of lens set.
@@ -141,7 +141,7 @@ Distilled from pre-design research and validated by context-engineer review. Eac
 
 | Dimension | Reference |
 |---|---|
-| Core commands | `/roadmap` (fresh \| diff \| `<focus-area>`) |
+| Entry point | `/roadmap` (fresh \| diff \| `<focus-area>`) |
 | Default mode | `fresh` — full audit, writes new `ROADMAP.md` |
 | Incremental mode | `diff` — re-audits, preserves Decision Log, surfaces deltas |
 | Focused mode | `<area>` — narrows audit weighting to a focus area; still produces full structure |

@@ -138,7 +138,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
   **Note:** The interactive metrics viewer lives in the dashboard. Launch it with `praxion-dashboard start <project-path>` or `/dashboard` in Claude Code, then open the Metrics tab. Offline reading is available via the `METRICS_REPORT_*.md` files in the same directory.
 
-- `.ai-state/praxion_feedback/PENDING.md` (header-only skeleton) — the managed-project-side capture ledger for the healing sidecar (`/report-praxion-issue`, a Praxion-origin ecosystem-defect reporting channel). The reporter script and the command are plugin-global (no per-project copy needed); the SessionStart advisory hook ships with the plugin via `hooks/hooks.json` (already registered — no additional per-project wiring required). This skeleton is the entire per-project install footprint for the sidecar.
+- `.ai-state/praxion_feedback/PENDING.md` (header-only skeleton) — the managed-project-side capture ledger for the healing sidecar (`/report-praxion-issue`, a Praxion-origin ecosystem-defect reporting channel). The reporter script and the skill are plugin-global (no per-project copy needed); the SessionStart advisory hook ships with the plugin via `hooks/hooks.json` (already registered — no additional per-project wiring required). This skeleton is the entire per-project install footprint for the sidecar.
 
   **Predicate (skip if present).** If `.ai-state/praxion_feedback/PENDING.md` already exists, skip — never overwrite (the project may already hold captured candidates).
 
@@ -151,7 +151,7 @@ If the user agrees, remove that line. If they decline, proceed without changing 
 
 - **The three consult ledgers** — `.ai-state/CONSULT_LEDGER.md`, `.ai-state/CONSULT_COSTS.md`, `.ai-state/CONSULT_PRIORS.md`.
 
-  **Why these ship.** The discipline-consult mechanism's *producer* is plugin-global: `agents/discipline-consultant.md`, `commands/consult.md`, and the convening rules all install with the plugin, so any managed project can convene a consult on day one. Its convener is then instructed to append rows to these three files, and to read their `## Column Definitions` as the schema. Without the skeletons the producer ships and the consumer does not — the convener is told to append to files that do not exist, and the schema pointer in its own instructions dangles. These are the entire per-project install footprint for the mechanism; nothing else is copied.
+  **Why these ship.** The discipline-consult mechanism's *producer* is plugin-global: `agents/discipline-consultant.md`, `skills/consult/SKILL.md`, and the convening rules all install with the plugin, so any managed project can convene a consult on day one. Its convener is then instructed to append rows to these three files, and to read their `## Column Definitions` as the schema. Without the skeletons the producer ships and the consumer does not — the convener is told to append to files that do not exist, and the schema pointer in its own instructions dangles. These are the entire per-project install footprint for the mechanism; nothing else is copied.
 
   **Predicate (skip if present).** Each file is checked individually with `test -e`. An existing file is never overwritten — it already holds committed observations, and these ledgers are append-only.
 
@@ -553,7 +553,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
    ```
    Verify the onboarding:
      1. Run /sentinel for an ecosystem health baseline (writes .ai-state/sentinel_reports/SENTINEL_REPORT_<timestamp>.md).
-     2. Run 'git status' to review staged work — every file this command modified is staged for review.
+     2. Run 'git status' to review staged work — every file this skill modified is staged for review.
      3. Run /co to commit (the git-conventions rule will write a precise commit message), or unstage and review individually.
 
    Resources:
@@ -590,7 +590,7 @@ Do not recommend tools the user already has, and do not recommend `uv` if no Pyt
 
    Add `.ai-state/.praxion-onboard.json` to the staged set.
 
-4. **Stage modified files**: run `git add` with the explicit list of files this command touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
+4. **Stage modified files**: run `git add` with the explicit list of files this skill touched (built up through phases 1–6, plus `.ai-state/.praxion-onboard.json`). Do NOT run `git add -A`. Do NOT commit. The user reviews staging and decides.
 
 **Sidecar placement.** Under `--placement sidecar`, staging splits across two repositories: step 4's `git add` list touches only **project**-side files — any `share`-intent path (e.g. `docs/architecture.md`); `.git/info/exclude` is per-clone and is never staged at all. Everything shadowed (`.ai-state/`, `CLAUDE.local.md`, `.claude/settings.local.json`) is committed separately, via `praxion-sidecar commit`, against the mount at `<project>/.praxion-state` — never against this repository's own index. `praxion-sidecar link` (this phase's own reconciler, and the SessionStart self-heal channel) also runs a convergence pass in the main checkout every time it runs, so a worktree's state that was merged by hand — a manual `git merge`, a GitHub squash-and-pull — promotes without a separate step.
 

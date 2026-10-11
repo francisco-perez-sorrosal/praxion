@@ -13,7 +13,7 @@ compatibility: Claude Code
 
 # Upstream Stewardship
 
-Methodology for being a responsible open-source citizen: reporting bugs effectively, protecting sensitive information, respecting project conventions, and contributing fixes upstream. The `/report-upstream` command drives the filing workflow; this skill provides the methodology that any agent or command can reference.
+Methodology for being a responsible open-source citizen: reporting bugs effectively, protecting sensitive information, respecting project conventions, and contributing fixes upstream. The `/report-upstream` skill drives the filing workflow; this skill provides the methodology that any agent or skill can reference.
 
 **Satellite files** (loaded on-demand):
 
@@ -167,4 +167,4 @@ All filed issues are recorded in `.ai-state/UPSTREAM_ISSUES.md` — an append-on
 - What local workarounds are in use for open upstream issues
 - The current status of previously filed issues
 
-The tracker is written by the `/report-upstream` command workflow. Agents should grep it before recommending a new filing.
+The tracker is written by the `/report-upstream` skill workflow. Agents should grep it before recommending a new filing.

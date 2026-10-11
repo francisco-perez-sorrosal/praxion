@@ -136,7 +136,7 @@ Any file containing these keys in a JSON/YAML/JSONL structure, outside `data/pri
 
 - Test fixture files under `tests/` with expected values — these are test code, not benchmark data
 - Unit test assertions — these are deterministic code checks, not scored eval data
-- Example outputs in skill or command documentation
+- Example outputs in skill documentation
 
 The activation gate for this check is the presence of `evaluate.py` + `data/private/` +
 `tasks/` in the same project. A project without this layout is not subject to eval-data

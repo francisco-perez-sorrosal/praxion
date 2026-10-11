@@ -36,7 +36,7 @@ predicate resolves through the *effective* hooks directory first: run
 
 **Predicate.** `test -e .claude-plugin/plugin.json` succeeds AND the environment variable `PRAXION_ALLOW_SELF_ONBOARD` is not set to `1`.
 
-**Why this guard exists.** Detect whether the user has invoked onboarding on a Claude Code plugin source repo (Praxion itself, or any plugin in development that ships skills/agents/rules/commands). Plugin source repos curate their own `CLAUDE.md`, `.ai-state/` skeleton, and onboarding artifacts as the **canonical** sources of those patterns; running onboarding against them would either duplicate content under conflicting headings (the repo's bespoke sections plus newly-injected blocks like `## Agent Pipeline` / `## Praxion Process`) or skew bespoke sections from their downstream-injected counterparts as edits land in only one of the two locations.
+**Why this guard exists.** Detect whether the user has invoked onboarding on a Claude Code plugin source repo (Praxion itself, or any plugin in development that ships skills/agents/rules). Plugin source repos curate their own `CLAUDE.md`, `.ai-state/` skeleton, and onboarding artifacts as the **canonical** sources of those patterns; running onboarding against them would either duplicate content under conflicting headings (the repo's bespoke sections plus newly-injected blocks like `## Agent Pipeline` / `## Praxion Process`) or skew bespoke sections from their downstream-injected counterparts as edits land in only one of the two locations.
 
 **Action on match.** Abort with:
 

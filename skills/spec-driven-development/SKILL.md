@@ -108,7 +108,7 @@ Status values: `PASS` (test exists and passes), `FAIL` (test fails or implementa
 
 **Union coverage.** A requirement counts as tested when `tests` and `acceptance` together are non-empty: a requirement proven only by outer-loop tests is tested, and one with `tests` only is unchanged. The matrix header stays as shown; the `Test(s)` cell lists both kinds of node. `/sdd-coverage`, the verifier, the planner's checkpoints and archival status all classify on this union, stated here once.
 
-**Mid-flight coverage**: The `/sdd-coverage` command reads `traceability.yml` (during pipeline) or the archived SPEC's matrix (post-archive) and produces this table at any time during development — not just at verification. The test-engineer also includes a coverage check when reporting step completion. Use these to catch gaps early rather than discovering them at the verifier stage.
+**Mid-flight coverage**: The `/sdd-coverage` skill reads `traceability.yml` (during pipeline) or the archived SPEC's matrix (post-archive) and produces this table at any time during development — not just at verification. The test-engineer also includes a coverage check when reporting step completion. Use these to catch gaps early rather than discovering them at the verifier stage.
 
 ## Traceability Threading
 

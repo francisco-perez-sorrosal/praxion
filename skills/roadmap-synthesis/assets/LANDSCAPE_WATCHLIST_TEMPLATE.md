@@ -29,7 +29,7 @@ PRAXION-SPECIFIC EXTENSION
 Per-entry `last-checked YYYY-MM-DD` is appended to the description after a
 ` · ` separator. The base llms.txt spec defines no temporal field; this
 extension fits inside the spec's free-form colon-notes affordance but is
-non-standard. The /landscape-refresh command relies on it to flag entries
+non-standard. The /landscape-refresh skill relies on it to flag entries
 older than 90 days. Entries under `## Inactive / archived` omit this field —
 they are tombstoned.
 
@@ -118,7 +118,7 @@ Section discipline:
     holding pen for "maybe drop these later".
 
 Refresh discipline:
-  - The /landscape-refresh command flags entries with last-checked > 90 days.
+  - The /landscape-refresh skill flags entries with last-checked > 90 days.
   - When an entry is flagged, the user decides: keep + bump date · drop · move
     to Inactive.
 -->

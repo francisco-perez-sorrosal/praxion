@@ -6,4 +6,4 @@ max_turns: 8
 expected_outcome: The skill is invoked and the answer names resolve_test_scope
 ---
 
-I just edited scripts/check_staleness_markers.py. Which tests does that change need, and how do I run only those?
+I just edited scripts/check_staleness_markers.py. Run just the tests that change needs.

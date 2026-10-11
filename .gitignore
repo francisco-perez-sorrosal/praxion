@@ -99,3 +99,6 @@ ROADMAP.md
 # Release-workflow console capture (release.yml tees cz bump output here on the
 # runner); must stay untracked or cz's `git commit -a` folds it into the bump commit
 bump_output.txt
+
+# Plugin trigger-eval results (cost and run output; never committed)
+evals/results/

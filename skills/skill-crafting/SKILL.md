@@ -29,9 +29,7 @@ Guide for creating effective Agent Skills. Official specification at [agentskill
 - [references/context-engineering-foundations.md](references/context-engineering-foundations.md) -- context-engineering foundations (shared spine for all six crafting skills)
 - [references/cross-agent-portability.md](references/cross-agent-portability.md) -- discovery paths per tool, portability guidance
 - [references/artifact-naming.md](references/artifact-naming.md) -- naming conventions for all artifact types
-- [references/content-and-development.md](references/content-and-development.md) -- content type selection, feedback loops, evaluation-driven development
-- [references/output-patterns.md](references/output-patterns.md) -- template and examples patterns for skill output
-- [references/workflows.md](references/workflows.md) -- sequential and conditional workflow patterns
+- [references/content-and-development.md](references/content-and-development.md) -- content type selection, output templates and examples, workflow patterns, feedback loops, evaluation-driven development
 - [references/skill-categories.md](references/skill-categories.md) -- nine skill archetype categories from Anthropic's internal practice
 - [references/plugin-and-troubleshooting.md](references/plugin-and-troubleshooting.md) -- plugin mechanics, anti-patterns, troubleshooting
 - [references/user-invoked-skills.md](references/user-invoked-skills.md) -- user-invoked skills: description length, `argument-hint`, argument substitution, invocation modes, converting a command file
@@ -327,9 +325,7 @@ Start with the reusable resources identified in Step 2 (scripts, references, ass
 
 Consult these guides for content patterns:
 
-- **Output format requirements**: See [references/output-patterns.md](references/output-patterns.md) for template and examples patterns
-- **Multi-step processes**: See [references/workflows.md](references/workflows.md) for sequential and conditional patterns
-- **Content type selection**: See [references/content-and-development.md](references/content-and-development.md) for choosing between scripts, worked examples, and prose instructions
+- **Content type selection**: See [references/content-and-development.md](references/content-and-development.md) for choosing between scripts, worked examples, and prose instructions, and for output template, examples, and workflow patterns
 
 ### Step 5: Validate and Package
 

@@ -30,9 +30,7 @@ Trigger explicitly by asking about "agent skills," "creating a skill," or refere
 | `README.md` | This file — overview and usage guide |
 | `references/cross-agent-portability.md` | Adopter list, discovery paths, portable vs. tool-specific |
 | `references/artifact-naming.md` | Naming conventions for skills, agents, commands, rules |
-| `references/content-and-development.md` | Content type selection, feedback loops, evaluation-driven development |
-| `references/output-patterns.md` | Template and examples patterns for skill output |
-| `references/workflows.md` | Sequential and conditional workflow patterns |
+| `references/content-and-development.md` | Content type selection, output templates and examples, workflow patterns, feedback loops, evaluation-driven development |
 | `references/skill-categories.md` | Nine skill archetype categories from Anthropic's internal practice |
 | `references/plugin-and-troubleshooting.md` | Plugin mechanics, anti-patterns, recommended hooks, persistent state, troubleshooting |
 | `scripts/init_skill.py` | Scaffold a new skill directory from template |

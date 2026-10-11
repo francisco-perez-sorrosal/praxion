@@ -1,6 +1,21 @@
 # Content Guidelines and Development Workflow
 
-Detailed guidance on choosing content types, building workflows with feedback loops, and developing skills through evaluation-driven iteration. Reference material for the [Skill Creator](../SKILL.md) skill.
+Detailed guidance on choosing content types, shaping skill output with templates and examples, structuring multi-step workflows with feedback loops, and developing skills through evaluation-driven iteration. Reference material for the [Skill Creator](../SKILL.md) skill.
+
+## Contents
+
+- Choosing Content Type
+- Gotchas Sections
+- Output Templates
+- Examples Pattern
+- Workflow Patterns
+- Evaluation-Driven Development
+- Iterative Author-Tester Workflow
+- Observe Navigation Patterns
+- Visual Analysis
+- Deprecated Content
+- Configuration and Setup
+- Measurement and Tracking
 
 ## Choosing Content Type
 
@@ -34,7 +49,136 @@ Structure:
 
 Gotchas accumulate over time. Each iteration of the author-tester workflow may surface new ones. Keep the section near the top of the skill body -- it is the content most likely to prevent errors.
 
-## Workflows with Feedback Loops
+## Output Templates
+
+Use templates when the skill's output must follow a specific structure. Match template strictness to requirements.
+
+### Strict Template
+
+When the output format is non-negotiable (reports, compliance documents, structured data):
+
+```markdown
+Use this EXACT template for every security audit report:
+
+# Security Audit Report
+
+## Executive Summary
+[2-3 sentence overview of findings]
+
+## Key Findings
+- Finding 1: [description] | Severity: [Critical/High/Medium/Low]
+- Finding 2: [description] | Severity: [Critical/High/Medium/Low]
+
+## Recommendations
+1. [Immediate action items]
+2. [Short-term improvements]
+3. [Long-term architectural changes]
+
+## Methodology
+[Brief description of audit approach]
+```
+
+### Flexible Template
+
+When a sensible default exists but adaptation is expected:
+
+```markdown
+Use this format as a sensible default, adapting sections as needed
+for the specific context:
+
+# [Component] Design Document
+
+## Problem Statement
+## Proposed Solution
+## Alternatives Considered
+## Implementation Plan
+```
+
+## Examples Pattern
+
+Use input/output pairs when the desired style and detail level are easier to show than describe. Examples help the agent understand conventions more clearly than prose descriptions alone.
+
+### Showing Desired Style
+
+Provide concrete before/after pairs that demonstrate the target quality:
+
+```markdown
+Format commit messages following this pattern:
+
+type(scope): brief description
+
+Examples:
+- feat(auth): add OAuth2 token refresh flow
+- fix(parser): handle empty input without panic
+- refactor(db): extract connection pooling to module
+- docs(api): document rate limiting headers
+```
+
+### Showing Detail Level
+
+When the expected depth of output matters, include examples at the target level:
+
+```markdown
+When documenting a function, match this level of detail:
+
+Input: `def retry(fn, max_attempts=3, backoff=1.0)`
+
+Output:
+Retry a callable with exponential backoff.
+- `fn`: Zero-argument callable to retry
+- `max_attempts`: Maximum number of attempts before raising (default: 3)
+- `backoff`: Initial delay in seconds, doubled after each failure (default: 1.0)
+- Raises the last exception if all attempts fail
+```
+
+## Workflow Patterns
+
+### Sequential Workflows
+
+Use sequential workflows when the task has clear, ordered steps where each depends on the previous one. Provide an overview of the process early in SKILL.md so the agent understands the full picture before starting.
+
+```markdown
+## PDF Form Filling Process
+
+Follow these steps in order:
+
+1. **Analyze** the blank PDF form -- identify all fillable fields
+2. **Map** source data to form fields -- create a field mapping
+3. **Validate** the mapping -- run `scripts/validate_mapping.py`
+4. **Fill** the form -- apply mapped values to fields
+5. **Verify** the output -- confirm all fields populated correctly
+
+After each step, check results before proceeding. If validation
+fails, return to the mapping step and correct errors.
+```
+
+Include validation loops (run validator, fix errors, repeat) between steps where errors are likely. This dramatically improves output quality.
+
+### Conditional Workflows
+
+Use conditional workflows when the task has branching logic based on the current situation. Guide the agent through decision points with clear criteria.
+
+```markdown
+## Content Workflow
+
+Determine the starting point:
+
+**Creating new content?**
+1. Gather requirements from the user
+2. Create outline with target audience and scope
+3. Draft content following the style guide
+4. Run `scripts/check_style.py` on the draft
+
+**Editing existing content?**
+1. Read the current document and identify the change scope
+2. Preserve voice and terminology already established
+3. Make targeted edits -- avoid rewriting sections unnecessarily
+4. Run `scripts/check_style.py` on changed sections only
+```
+
+Frame decision points as questions the agent can answer from context. Avoid deeply nested branches -- flatten with guard clauses or split into separate workflows when complexity grows.
+
+### Feedback Loops and Checklists
 
 For complex tasks, provide step-by-step checklists the agent can track:
 
@@ -81,27 +225,6 @@ Watch how the agent uses the skill:
 - Missed references -> links need to be more explicit
 - Overreliance on one file -> content should be in `SKILL.md`
 - Ignored files -> unnecessary or poorly signaled
-
-## Executable Code Best Practices
-
-**Solve, Don't Punt**: Handle error conditions explicitly rather than letting scripts fail for the agent to debug.
-
-**Justify Constants**: Document why values exist -- no voodoo numbers:
-
-```python
-# Three retries balances reliability vs speed
-# Most intermittent failures resolve by second retry
-MAX_RETRIES = 3
-```
-
-**Execution vs Reference**: Be explicit about intent:
-
-- "Run `analyze_form.py` to extract fields" (execute)
-- "See `analyze_form.py` for the extraction algorithm" (read as reference)
-
-**Package Dependencies**: List required packages and verify availability.
-
-**MCP Tool Names**: Use fully qualified format: `ServerName:tool_name`
 
 ## Visual Analysis
 

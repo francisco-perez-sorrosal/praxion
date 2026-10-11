@@ -132,8 +132,8 @@ When writing Interface Design Review findings for this checklist, use the format
 
 Example:
 ```
-[FAIL] Focus Management — Modal Dialog in src/components/DeleteConfirmDialog.tsx does not 
-       return focus to the trigger element on close. Focus is lost entirely. 
+[FAIL] Focus Management — Modal Dialog in src/components/DeleteConfirmDialog.tsx does not
+       return focus to the trigger element on close. Focus is lost entirely.
        File: src/components/DeleteConfirmDialog.tsx:47
 
 [WARN] Motion — PageTransition component uses 600ms duration (exceeds 500ms maximum).

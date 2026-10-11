@@ -233,20 +233,20 @@ class ADRViewer(App):
     DataTable { height: 1fr; }
     #detail { width: 50; border: round $primary; }
     """
-    
+
     selected_id: reactive[str | None] = reactive(None)
-    
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield DataTable()
         yield Footer()
-    
+
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
         table.add_columns("ID", "Status", "Title")
         for adr in self.load_adrs():
             table.add_row(adr.id, adr.status, adr.title)
-    
+
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self.selected_id = event.row_key.value
 ```
@@ -276,12 +276,12 @@ import { Box, Text, useInput } from 'ink';
 
 function ItemList({ items }: { items: string[] }) {
   const [cursor, setCursor] = useState(0);
-  
+
   useInput((input, key) => {
     if (key.downArrow) setCursor(c => Math.min(c + 1, items.length - 1));
     if (key.upArrow) setCursor(c => Math.max(c - 1, 0));
   });
-  
+
   return (
     <Box flexDirection="column">
       {items.map((item, i) => (

@@ -19,9 +19,16 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # Generated and tool-owned files that legitimately lack a final newline:
+      # rendered diagram SVGs, metrics reports, Obsidian's own config, and verbatim
+      # third-party source captures.
       - id: trailing-whitespace
+        exclude: '(^|/)rendered/.*\.svg$|^\.ai-state/metrics_reports/|^\.obsidian/|^docs/context-prj-comparison-[^/]+/sources/'
       - id: end-of-file-fixer
+        exclude: '(^|/)rendered/.*\.svg$|^\.ai-state/metrics_reports/|^\.obsidian/'
       - id: check-yaml
+        # Deliberately malformed YAML kept as negative-case fixtures.
+        exclude: '^tests/fixtures/.*malformed'
       - id: check-added-large-files
         # Generated project-intelligence artifacts under .ai-state/ are
         # intentionally large (full per-file metrics + readiness payloads) and

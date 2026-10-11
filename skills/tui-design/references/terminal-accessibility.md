@@ -172,7 +172,7 @@ For streaming output (LLM tokens, log tails, build output), the budget is per-li
 class TerminalRenderer:
     def __init__(self):
         self._previous: list[str] = []
-    
+
     def render(self, lines: list[str]) -> None:
         for i, (old, new) in enumerate(zip_longest(self._previous, lines, fillvalue="")):
             if old != new:
@@ -198,12 +198,12 @@ SYNCHRONIZED_OUTPUT_END = "\033[?2026l"
 def render_frame(lines: list[str]) -> None:
     sys.stdout.write(SYNCHRONIZED_OUTPUT_BEGIN)
     sys.stdout.flush()
-    
+
     # Move to home, write all lines
     sys.stdout.write("\033[H")
     for line in lines:
         sys.stdout.write(line + "\n")
-    
+
     sys.stdout.write(SYNCHRONIZED_OUTPUT_END)
     sys.stdout.flush()
 ```

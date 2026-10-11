@@ -197,6 +197,6 @@ Use this collection to deepen your understanding of Claude's capabilities and in
 
 ---
 
-**Last updated:** 2026-04-13  
-**Source collection:** The AI Corner  
+**Last updated:** 2026-04-13
+**Source collection:** The AI Corner
 **Praxion integration:** Curated for alignment with agentic architecture, skills, and cowork methodology

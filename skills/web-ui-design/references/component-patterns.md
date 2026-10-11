@@ -168,7 +168,7 @@ Personal Information
   First name   [___]   Last name   [___]
   Email        [_________________________________]
 
-Contact Preferences  
+Contact Preferences
   Notify by email    [checkbox]
   Notify by SMS      [checkbox]
 ```

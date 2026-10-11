@@ -166,7 +166,7 @@ The latency designer models both costs and finds the minimum:
 
 **Chattiness cost** = round-trip latency × number of requests
 
-Each HTTP round-trip: 50–200ms (depending on geography, connection type). 
+Each HTTP round-trip: 50–200ms (depending on geography, connection type).
 
 | Number of requests | Minimum latency from round-trips |
 |-------------------|----------------------------------|

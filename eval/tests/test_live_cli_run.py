@@ -296,12 +296,20 @@ def test_default_target_resolves_to_head_not_main(monkeypatch, capsys, repo_root
     head_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=True
     ).stdout.strip()
-    main_sha = subprocess.run(
-        ["git", "rev-parse", "main"], cwd=repo_root, capture_output=True, text=True, check=True
-    ).stdout.strip()
 
     assert exit_code == 0
     assert head_sha in printed
+
+    main_lookup = subprocess.run(
+        ["git", "rev-parse", "main"], cwd=repo_root, capture_output=True, text=True
+    )
+    if main_lookup.returncode != 0:
+        # A CI checkout fetching only the PR's own commit (fetch-depth: 1)
+        # never has a resolvable local `main` ref; without it we can't
+        # perform the negative check below, but the positive assertion
+        # above already proves the default target is HEAD, not `main`.
+        return
+    main_sha = main_lookup.stdout.strip()
     if head_sha != main_sha:
         assert main_sha not in printed
 

@@ -338,8 +338,7 @@ def kit_for(role: Role) -> Kit:
     if role in FULL_SET_ROLES and len(templates) < MIN_TEMPLATES:
         raise ValueError(f"{role} has {len(templates)} templates, fewer than {MIN_TEMPLATES}")
     for template in templates:
-        if spec.brief not in dict(template.inputs):
-            raise ValueError(f"{role} template {template.template_id} lacks {spec.brief}")
+        _require_brief(role, spec, template)
     _require_fixture_material(role, spec)
     kit = Kit(role, spec, templates)
     if kit.producible < DEFAULT_TARGET:
@@ -347,6 +346,19 @@ def kit_for(role: Role) -> Kit:
             f"{role} can produce {kit.producible} tasks, fewer than the {DEFAULT_TARGET} a kit owes"
         )
     return kit
+
+
+def _require_brief(role: Role, spec: RoleKit, template: Template) -> None:
+    """The brief exists and carries every token a variant fills: the plant, and the sources page."""
+    brief = dict(template.inputs).get(spec.brief)
+    if brief is None:
+        raise ValueError(f"{role} template {template.template_id} lacks {spec.brief}")
+    tokens = (_TOKEN_PLANT, _TOKEN_SOURCES) if role in WEBFETCH_ROLES else (_TOKEN_PLANT,)
+    for token in tokens:
+        if token not in brief:
+            raise ValueError(
+                f"{role} template {template.template_id}: {spec.brief} lacks the {token} token"
+            )
 
 
 def _require_fixture_material(role: Role, spec: RoleKit) -> None:
@@ -688,7 +700,7 @@ def allowed_tools(arm_copy: ArmBuild) -> tuple[str, ...]:
     granted = [SPAWN_TOOL]
     for tool in _role_tools(arm_copy.copy_root / "agents" / f"{arm_copy.role}.md"):
         granted.extend(READ_ONLY_BASH if tool.startswith("Bash") else [tool])
-    return tuple(granted)
+    return tuple(dict.fromkeys(granted))  # a role with several Bash lines gets each grant once
 
 
 def _role_tools(definition: Path) -> list[str]:

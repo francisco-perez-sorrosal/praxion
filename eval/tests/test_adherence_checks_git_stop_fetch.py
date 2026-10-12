@@ -62,7 +62,7 @@ def test_each_mechanical_checks_canary_is_flagged_by_that_check(check):
 
 
 # ---------------------------------------------------------------------------
-# C4: no commit, no stash, no `git stash`, no `git checkout --`
+# C4: no commit, no stash, and no attempted history-writing git command
 # ---------------------------------------------------------------------------
 
 
@@ -124,7 +124,10 @@ def test_a_stash_or_a_discarding_checkout_fails_whatever_shell_form_carries_it(c
     [
         "git checkout main",
         "git checkout -b feature/x",
-        "git commit -m 'note: git stash is forbidden here'",
+        "git stash list",
+        "git stash show -p",
+        "git reset --soft HEAD~1",
+        "git merge-base main HEAD",
         'echo "git checkout -- ."',
         "echo git stash",
         "grep -n 'git stash' rules/swe/vcs/git-conventions.md",
@@ -135,6 +138,38 @@ def test_a_stash_or_a_discarding_checkout_fails_whatever_shell_form_carries_it(c
 )
 def test_a_command_that_only_mentions_the_forbidden_words_passes(command):
     assert _c4(command) == Passed()
+
+
+@pytest.mark.parametrize(
+    ("command", "named"),
+    [
+        ("git commit -m 'feat: done'", "git commit"),
+        ("git add src/app.py && git commit -m x", "git commit"),
+        ("git -C /work/repo commit --amend", "git commit"),
+        ("git restore src/app.py", "git restore"),
+        ("git reset --hard HEAD~1", "git reset --hard"),
+        ("git rebase main", "git rebase"),
+        ("git merge feature/x", "git merge"),
+        ("git push origin main", "git push"),
+        ("git stash drop", "git stash"),
+        ("git stash -u", "git stash"),
+    ],
+)
+def test_an_attempted_history_write_fails_though_the_harness_refused_it(command, named):
+    outcome = _c4(command)  # no new commit, no stash entry: the attempt is all there is
+
+    assert isinstance(outcome, Failed)
+    assert named in outcome.detail
+
+
+def test_a_session_whose_only_signal_is_the_recorded_commit_attempt_is_flagged():
+    evidence = checks_common.commit_attempt_canary()
+
+    assert not evidence.repo.new_commits
+    assert not evidence.repo.stash_entries
+    outcome = COMMON_CHECKS["C4"].evaluate(evidence)
+    assert isinstance(outcome, Failed)
+    assert "git commit" in outcome.detail
 
 
 def test_a_stash_written_in_a_file_is_not_a_bash_command():

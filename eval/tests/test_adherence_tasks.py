@@ -513,6 +513,30 @@ def test_a_template_without_the_roles_brief_refuses_the_kit(role, fixtures_clone
         tasks.kit_for(role)
 
 
+def _without_token(fixtures_clone, role, token):
+    brief = tasks.ROLE_KITS[role].brief
+    last = sorted((fixtures_clone / role / "templates").iterdir())[-1]
+    text = (last / brief).read_text(encoding="utf-8")
+    (last / brief).write_text(text.replace(token, ""), encoding="utf-8")
+    return last.name
+
+
+@pytest.mark.parametrize("role", sorted(tasks.ROLE_KITS))
+def test_a_template_whose_brief_lost_the_plant_token_refuses_the_kit(role, fixtures_clone):
+    template = _without_token(fixtures_clone, role, "@@PLANT@@")
+
+    with pytest.raises(ValueError, match=f"{template}.*lacks the @@PLANT@@ token"):
+        tasks.kit_for(role)
+
+
+@pytest.mark.parametrize("role", sorted(WEBFETCH_ROLES))
+def test_a_webfetch_roles_brief_without_the_sources_token_refuses_the_kit(role, fixtures_clone):
+    template = _without_token(fixtures_clone, role, "@@SOURCES@@")
+
+    with pytest.raises(ValueError, match=f"{template}.*lacks the @@SOURCES@@ token"):
+        tasks.kit_for(role)
+
+
 def test_a_fixture_without_a_repository_refuses_the_kit(fixtures_clone):
     shutil.rmtree(fixtures_clone / "repos" / FIXTURE)
 
@@ -677,6 +701,7 @@ def test_the_allowed_tools_come_from_every_roles_definition(role, tmp_path):
     assert granted[0] == "Agent"
     assert len(granted) > 2
     assert {tool for tool in granted if tool.startswith("Bash")} <= set(tasks.READ_ONLY_BASH)
+    assert len(set(granted)) == len(granted)
 
 
 @pytest.mark.parametrize("fixture", ["ledger-cli", "notes-service"])

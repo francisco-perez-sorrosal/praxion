@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 import os
 import random
+import re
 import subprocess
 import tomllib
 from collections.abc import Iterator, Mapping, Sequence
@@ -57,6 +58,10 @@ SCRATCH_DIRNAME = "fixture"
 
 DEFAULT_TARGET = 20
 SMOKE_TASKS = 3
+# The default slack over the target absorbs tasks a run drops: a fifth of the target,
+# never fewer than four.
+SLACK_FLOOR = 4
+SLACK_DIVISOR = 5
 # Roles whose full task set is authored; every other role runs smoke tasks only.
 FULL_SET_ROLES: frozenset[str] = frozenset({"researcher", "verifier", "implementer"})
 MIN_TEMPLATES = 5
@@ -98,7 +103,7 @@ PERMISSION_MODE = "acceptEdits"
 _TOKEN_SLUG = "@@SLUG@@"
 _TOKEN_PLANT = "@@PLANT@@"
 _TOKEN_SOURCES = "@@SOURCES@@"
-_TOKEN_MARK = "@@"
+_TOKEN_PATTERN = re.compile(r"@@[A-Z]+@@")  # not a diff hunk header such as `@@ -1 +1 @@`
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +116,9 @@ class RoleKit:
     brief: str  # the input file the task prompt points the role at
     prompt: str  # the task prompt, with ``{slug}`` and ``{brief}`` slots
     fixtures: tuple[str, ...]  # repository ids under ``fixtures/repos``
+    # Files every fixture contributes under ``<role>/inputs/<fixture>``: the planning
+    # documents the role's own definition expects. Empty when the role needs none.
+    fixture_inputs: tuple[str, ...] = ()
 
 
 ROLE_KITS: Mapping[str, RoleKit] = {
@@ -130,6 +138,7 @@ ROLE_KITS: Mapping[str, RoleKit] = {
             "and the implemented change is in the repository you are in."
         ),
         fixtures=("ledger-cli", "notes-service"),
+        fixture_inputs=("SYSTEMS_PLAN.md", "IMPLEMENTATION_PLAN.md", "WIP.md"),
     ),
 }
 
@@ -173,9 +182,25 @@ def kit_for(role: Role) -> Kit:
     templates = tuple(_load_template(path) for path in sorted(root.iterdir()) if path.is_dir())
     if len(templates) < MIN_TEMPLATES:
         raise ValueError(f"{role} has {len(templates)} templates, fewer than {MIN_TEMPLATES}")
-    if spec.brief not in dict(templates[0].inputs):
-        raise ValueError(f"{role}'s templates must carry the {spec.brief} input")
+    for template in templates:
+        if spec.brief not in dict(template.inputs):
+            raise ValueError(f"{role} template {template.template_id} lacks {spec.brief}")
+    _require_fixture_material(role, spec)
     return Kit(role, spec, templates)
+
+
+def _require_fixture_material(role: Role, spec: RoleKit) -> None:
+    """Every fixture a kit names exists on disk with the inputs the role needs."""
+    for fixture in spec.fixtures:
+        if not (REPOS_DIR / fixture).is_dir():
+            raise ValueError(f"{role} names fixture {fixture!r}, which has no repository")
+        for name in spec.fixture_inputs:
+            if not (_inputs_dir(role, fixture) / name).is_file():
+                raise ValueError(f"{role} fixture {fixture!r} lacks the input {name}")
+
+
+def _inputs_dir(role: Role, fixture_id: str) -> Path:
+    return FIXTURES_DIR / role / "inputs" / fixture_id
 
 
 def _load_template(directory: Path) -> Template:
@@ -240,6 +265,10 @@ def make_task(
             pass
         case _:
             assert_never(variant)
+    kit = kit_for(role)
+    kit.template(template_id)
+    if fixture_id not in kit.spec.fixtures:
+        raise ValueError(f"{role} has no fixture {fixture_id!r}")
     slug = f"{template_id}-{fixture_id}"
     return TaskSpec(
         task_id=task_id(role, template_id, fixture_id, variant),
@@ -281,7 +310,7 @@ def list_size(role: Role, target: int = DEFAULT_TARGET) -> int:
     """How many tasks a default run takes: the target plus slack, or three smoke tasks."""
     if role not in FULL_SET_ROLES:
         return SMOKE_TASKS
-    return target + max(4, math.ceil(target / 5))
+    return target + max(SLACK_FLOOR, math.ceil(target / SLACK_DIVISOR))
 
 
 def task_ids(role: Role, seed: int, target: int = DEFAULT_TARGET) -> list[str]:
@@ -353,8 +382,9 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
         raise FileExistsError(f"{dest} already holds files")
     kit = kit_for(task.role)
     dest.mkdir(parents=True, exist_ok=True)
-    _copy_repo(REPOS_DIR / task.fixture_id, dest)
-    _copy_repo(FIXTURES_DIR / task.role / "inputs" / task.fixture_id, dest / AI_WORK / task.slug)
+    _copy_tree(REPOS_DIR / task.fixture_id, dest)
+    if kit.spec.fixture_inputs:
+        _copy_tree(_inputs_dir(task.role, task.fixture_id), dest / AI_WORK / task.slug)
     for name, text in kit.template(task.template_id).inputs:
         target = dest / AI_WORK / task.slug / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -362,10 +392,10 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
     return _commit_fixture(dest)
 
 
-def _copy_repo(source: Path, dest: Path) -> None:
+def _copy_tree(source: Path, dest: Path) -> None:
     """Copy a tree, dropping the ``.tmpl`` suffix that keeps linters off fixture code."""
     if not source.is_dir():
-        return
+        raise FileNotFoundError(f"fixture material {source} is missing")
     for path in sorted(source.rglob("*")):
         if path.is_file():
             relative = path.relative_to(source).as_posix().removesuffix(TEMPLATE_SUFFIX)
@@ -384,7 +414,7 @@ def _fill(text: str, task: TaskSpec, page_url: str | None) -> str:
         .replace(_TOKEN_PLANT, plant.text if plant else "")
         .replace(_TOKEN_SOURCES, sources)
     )
-    if _TOKEN_MARK in filled:
+    if _TOKEN_PATTERN.search(filled):
         raise ValueError(f"template {task.template_id} leaves a token unfilled")
     return filled
 
@@ -398,8 +428,6 @@ def _commit_fixture(root: Path) -> str:
             "user.name=fixture",
             "-c",
             "user.email=fixture@example.invalid",
-            "-c",
-            "commit.gpgsign=false",
             "commit",
             "-q",
             "-m",
@@ -411,10 +439,20 @@ def _commit_fixture(root: Path) -> str:
 
 
 def _git(root: Path, *args: str) -> str:
-    # An inherited GIT_DIR (set inside a hook) would point git at the wrong repository.
+    """Run git on the fixture alone: no inherited repository, no host configuration.
+
+    An inherited GIT_DIR (set inside a hook) would point git at the wrong repository; a
+    host ignore file, hooks path or signing setting would change what the one fixture
+    commit holds, and so what the session is later measured against.
+    """
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env |= {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
     done = subprocess.run(
-        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True, env=env
+        ["git", "-c", f"core.excludesFile={os.devnull}", "-C", str(root), *args],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
     )
     return done.stdout
 
@@ -430,6 +468,15 @@ _MAIN_PROMPT = (
     "of the work yourself and spawn no other agent. Wait for the subagent to finish, "
     "then reply with the text it returned, unchanged.\n\nTask text:\n<<<\n{task}\n>>>"
 )
+
+
+def turn_cap_of(task: TaskSpec) -> int | None:
+    """The ``maxTurns`` both arms' copies carry for this task: set exactly for an early stop.
+
+    The cap reaches the session through the plugin copy, not ``SessionSpec``, so
+    ``session_spec`` is where a copy and a task are checked to agree.
+    """
+    return task.variant.turn_cap if isinstance(task.variant, EarlyStop) else None
 
 
 def main_prompt(task: TaskSpec) -> str:
@@ -453,6 +500,12 @@ def session_spec(
     """The main session for one task in one arm; only ``arm_copy`` differs between arms."""
     if arm_copy.role != task.role:
         raise ValueError(f"a {arm_copy.role} plugin copy cannot run a {task.role} task")
+    wanted_cap = turn_cap_of(task)
+    if arm_copy.turn_cap != wanted_cap:
+        raise ValueError(
+            f"{task.task_id} needs a plugin copy capped at {wanted_cap} turns, "
+            f"not {arm_copy.turn_cap}"
+        )
     return SessionSpec(
         prompt=main_prompt(task),
         model=model,

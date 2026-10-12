@@ -28,6 +28,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED = 7
 KIT_ROLES = ["researcher", "verifier"]
 ARM_WORDS = re.compile(r"lean|full", re.IGNORECASE)
+UNFILLED_TOKEN = re.compile(r"@@[A-Z]+@@")
+TEMPLATE = {"researcher": "module-boundaries", "verifier": "plan-adherence"}
+FIXTURE = "ledger-cli"
 PAGE_URL = "https://raw.githubusercontent.com/example/repo/abc123/page.md"
 
 
@@ -122,7 +125,8 @@ def test_asking_for_more_tasks_than_the_kit_produces_is_refused():
 def test_the_list_size_is_target_plus_slack_or_three_smoke_tasks():
     assert tasks.list_size("researcher", 20) == 24
     assert tasks.list_size("implementer", 60) == 72
-    assert tasks.list_size("implementer", 5) == 9  # slack never drops below four
+    assert tasks.list_size("implementer", 5) == 5 + tasks.SLACK_FLOOR
+    assert tasks.list_size("implementer", 100) == 100 + 100 // tasks.SLACK_DIVISOR
     assert tasks.list_size("sentinel", 20) == 3
 
 
@@ -159,30 +163,43 @@ def test_every_early_stop_cap_is_at_least_the_write_early_window(role):
     assert min(caps) >= 6
 
 
+TPL = TEMPLATE["researcher"]
+FIX = FIXTURE
+
+
+def test_a_task_naming_a_template_or_fixture_the_kit_lacks_is_refused():
+    plant = Standard(Ambiguity("a gap"))
+
+    with pytest.raises(ValueError, match="no template"):
+        tasks.make_task("researcher", "mistyped", FIX, plant, SEED)
+    with pytest.raises(ValueError, match="no fixture"):
+        tasks.make_task("researcher", TPL, "mistyped", plant, SEED)
+
+
 def test_a_cap_below_the_write_early_window_is_refused():
     with pytest.raises(ValueError, match="below"):
-        tasks.make_task("researcher", "t", "f", EarlyStop(turn_cap=5), SEED)
-    assert tasks.make_task("researcher", "t", "f", EarlyStop(turn_cap=6), SEED).variant == (
+        tasks.make_task("researcher", TPL, FIX, EarlyStop(turn_cap=5), SEED)
+    assert tasks.make_task("researcher", TPL, FIX, EarlyStop(turn_cap=6), SEED).variant == (
         EarlyStop(turn_cap=6)
     )
 
 
 def test_an_early_stop_for_a_role_with_no_recorded_window_is_refused():
     with pytest.raises(ValueError, match="write-early window"):
-        tasks.make_task("sentinel", "t", "f", EarlyStop(turn_cap=50), SEED)
+        tasks.make_task("sentinel", TPL, FIX, EarlyStop(turn_cap=50), SEED)
 
 
 def test_a_standard_task_without_a_plant_is_refused():
     with pytest.raises(ValueError, match="C3 plant"):
-        tasks.make_task("researcher", "t", "f", Standard(), SEED)
+        tasks.make_task("researcher", TPL, FIX, Standard(), SEED)
 
 
 def test_an_injection_is_only_for_a_role_that_holds_webfetch():
     injected = Standard(Ambiguity("a gap"), tasks.PLANTED_INJECTION)
 
-    assert tasks.make_task("researcher", "t", "f", injected, SEED).variant == injected
+    assert tasks.make_task("researcher", TPL, FIX, injected, SEED).variant == injected
     with pytest.raises(ValueError, match="WebFetch"):
-        tasks.make_task("verifier", "t", "f", injected, SEED)
+        tasks.make_task("verifier", TEMPLATE["verifier"], FIX, injected, SEED)
 
 
 def test_only_the_researcher_kit_has_an_injection_variant():
@@ -225,7 +242,7 @@ def test_no_task_prompt_names_an_arm(role):
 
 @pytest.mark.parametrize("role", KIT_ROLES)
 def test_a_task_is_the_same_for_both_arms_down_to_the_session_prompt(role, tmp_path):
-    task = tasks.generate(role, SEED, 1)[0]
+    task = _find(role, label="ambiguity")
     full, lean = _arm_pair(role, tmp_path)
     sandbox = SandboxPaths(tmp_path / "sandbox")
 
@@ -287,7 +304,7 @@ def test_the_brief_carries_the_plant_unless_the_task_stops_early(tmp_path):
     brief_b = (tmp_path / "b" / ".ai-work" / stopped.slug / "RESEARCH_BRIEF.md").read_text()
     assert plant in brief_a
     assert "Restructure the modules" not in brief_b
-    assert "@@" not in brief_a + brief_b
+    assert not UNFILLED_TOKEN.search(brief_a + brief_b)
 
 
 def test_an_injection_task_names_the_page_only_when_the_run_can_serve_it(tmp_path):
@@ -317,10 +334,20 @@ def test_every_template_fills_every_token_for_every_variant(role):
         task.task_id
         for task in _pool(role)
         for _, text in tasks.kit_for(role).template(task.template_id).inputs
-        if "@@" in tasks._fill(text, task, PAGE_URL)
+        if UNFILLED_TOKEN.search(tasks._fill(text, task, PAGE_URL))
     ]
 
     assert leaking == []
+
+
+def test_a_diff_hunk_header_in_a_template_is_not_an_unfilled_token():
+    task = _find("verifier", label="ambiguity")
+
+    filled = tasks._fill("@@ -1,3 +1,4 @@ keep @@SLUG@@", task, None)
+
+    assert filled == f"@@ -1,3 +1,4 @@ keep {task.slug}"
+    with pytest.raises(ValueError, match="unfilled"):
+        tasks._fill("@@MYSTERY@@", task, None)
 
 
 def test_building_into_a_directory_that_holds_files_is_refused(tmp_path):
@@ -328,6 +355,31 @@ def test_building_into_a_directory_that_holds_files_is_refused(tmp_path):
 
     with pytest.raises(FileExistsError):
         tasks.build_scratch_repo(tasks.generate("researcher", SEED, 1)[0], tmp_path)
+
+
+@pytest.mark.parametrize("role", KIT_ROLES)
+def test_the_fixture_commit_ignores_the_hosts_git_configuration(role, tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    (home / ".config" / "git").mkdir(parents=True)
+    (home / ".config" / "git" / "ignore").write_text(".ai-work\n", encoding="utf-8")
+    refusing = home / "hooks"
+    refusing.mkdir()
+    hook = refusing / "pre-commit"
+    hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    (home / ".gitconfig").write_text(
+        f"[core]\n\texcludesFile = {home / '.config' / 'git' / 'ignore'}\n"
+        f"\thooksPath = {refusing}\n[commit]\n\tgpgsign = true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
+    task = _find(role, label="ambiguity")
+
+    commit = tasks.build_scratch_repo(task, tmp_path / "scratch")
+
+    held = _git(tmp_path / "scratch", "ls-tree", "-r", "--name-only", commit).splitlines()
+    assert f".ai-work/{task.slug}/{tasks.ROLE_KITS[role].brief}" in held
 
 
 def test_fixture_code_is_stored_only_as_template_files():
@@ -341,20 +393,20 @@ def test_fixture_code_is_stored_only_as_template_files():
 # ---------------------------------------------------------------------------
 
 
-def _arm_pair(role: str, tmp_path: Path) -> tuple[ArmBuild, ArmBuild]:
+def _arm_pair(role: str, tmp_path: Path, turn_cap: int | None = None) -> tuple[ArmBuild, ArmBuild]:
     builds = []
     for arm in ("full", "lean"):
         root = tmp_path / f"copy-{arm}"
         (root / "agents").mkdir(parents=True)
         shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
-        patched = (f"agents/{role}.md",) if arm == "lean" else ()
-        builds.append(ArmBuild(role, arm, root, None, f"digest-{arm}", patched))  # type: ignore[arg-type]
+        patched = (f"agents/{role}.md",) if arm == "lean" or turn_cap else ()
+        builds.append(ArmBuild(role, arm, root, turn_cap, f"digest-{arm}", patched))  # type: ignore[arg-type]
     return builds[0], builds[1]
 
 
 @pytest.mark.parametrize("role", KIT_ROLES)
 def test_the_main_session_is_told_to_spawn_the_role_through_the_agent_tool(role, tmp_path):
-    task = tasks.generate(role, SEED, 1)[0]
+    task = _find(role, label="ambiguity")
     full, _ = _arm_pair(role, tmp_path)
     sandbox = SandboxPaths(tmp_path / "sandbox")
 
@@ -389,10 +441,85 @@ def test_the_verifier_is_not_granted_edit(tmp_path):
 
 
 def test_a_plugin_copy_for_another_role_is_refused(tmp_path):
-    task = tasks.generate("researcher", SEED, 1)[0]
+    task = _find("researcher", label="ambiguity")
     other, _ = _arm_pair("verifier", tmp_path)
 
     with pytest.raises(ValueError, match="cannot run"):
         tasks.session_spec(
             task, other, SandboxPaths(tmp_path), model="m", effort="low", max_budget_usd=1.0
         )
+
+
+@pytest.mark.parametrize("role", KIT_ROLES)
+def test_an_early_stop_task_runs_only_in_copies_capped_at_its_turn_cap(role, tmp_path):
+    task = _find(role, label="early-stop")
+    sandbox = SandboxPaths(tmp_path / "sandbox")
+    cap = tasks.turn_cap_of(task)
+    assert cap is not None
+    capped, _ = _arm_pair(role, tmp_path / "capped", cap)
+    uncapped, _ = _arm_pair(role, tmp_path / "uncapped")
+    other, _ = _arm_pair(role, tmp_path / "other", cap + 1)
+
+    spec = tasks.session_spec(task, capped, sandbox, model="m", effort="low", max_budget_usd=1.0)
+
+    assert spec.plugin_dir == capped.copy_root
+    for wrong in (uncapped, other):
+        with pytest.raises(ValueError, match="capped at"):
+            tasks.session_spec(task, wrong, sandbox, model="m", effort="low", max_budget_usd=1.0)
+
+
+@pytest.mark.parametrize("role", KIT_ROLES)
+def test_a_standard_task_is_refused_a_capped_copy(role, tmp_path):
+    task = _find(role, label="conflict")
+    capped, _ = _arm_pair(role, tmp_path, 6)
+
+    assert tasks.turn_cap_of(task) is None
+    with pytest.raises(ValueError, match="capped at"):
+        tasks.session_spec(
+            task, capped, SandboxPaths(tmp_path), model="m", effort="low", max_budget_usd=1.0
+        )
+
+
+# ---------------------------------------------------------------------------
+# A kit refuses material that is missing, rather than building a bare fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fixtures_clone(tmp_path, monkeypatch):
+    clone = tmp_path / "fixtures"
+    shutil.copytree(tasks.FIXTURES_DIR, clone)
+    monkeypatch.setattr(tasks, "FIXTURES_DIR", clone)
+    monkeypatch.setattr(tasks, "REPOS_DIR", clone / "repos")
+    tasks.kit_for.cache_clear()
+    yield clone
+    tasks.kit_for.cache_clear()  # the clone's kits must not outlive the patch
+
+
+@pytest.mark.parametrize("role", KIT_ROLES)
+def test_a_template_without_the_roles_brief_refuses_the_kit(role, fixtures_clone):
+    brief = tasks.ROLE_KITS[role].brief
+    last = sorted((fixtures_clone / role / "templates").iterdir())[-1]
+    (last / brief).unlink()
+
+    with pytest.raises(ValueError, match=f"{last.name} lacks {brief}"):
+        tasks.kit_for(role)
+
+
+def test_a_fixture_without_a_repository_refuses_the_kit(fixtures_clone):
+    shutil.rmtree(fixtures_clone / "repos" / FIXTURE)
+
+    with pytest.raises(ValueError, match="no repository"):
+        tasks.kit_for("researcher")
+
+
+def test_a_verifier_fixture_without_its_planning_inputs_refuses_the_kit(fixtures_clone):
+    (fixtures_clone / "verifier" / "inputs" / FIXTURE / "WIP.md").unlink()
+
+    with pytest.raises(ValueError, match="lacks the input WIP.md"):
+        tasks.kit_for("verifier")
+
+
+def test_the_researcher_needs_no_fixture_inputs_and_the_verifier_needs_three():
+    assert tasks.ROLE_KITS["researcher"].fixture_inputs == ()
+    assert len(tasks.ROLE_KITS["verifier"].fixture_inputs) == 3

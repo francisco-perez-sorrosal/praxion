@@ -1,0 +1,12 @@
+from notes.model import Note
+from notes.search import containing, with_tag
+
+
+def test_with_tag_keeps_only_tagged_notes():
+    notes = [Note(1, "a", "x", ("work",)), Note(2, "b", "y")]
+    assert with_tag(notes, "work") == [notes[0]]
+
+
+def test_containing_matches_title_or_body_ignoring_case():
+    notes = [Note(1, "Plan", "x"), Note(2, "b", "a PLAN here")]
+    assert containing(notes, "plan") == notes

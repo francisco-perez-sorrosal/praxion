@@ -1,0 +1,18 @@
+"""The functions a future HTTP layer will call."""
+
+from notes.model import Note
+from notes.repository import Repository
+from notes.search import containing, with_tag
+
+
+def create_note(repo: Repository, title: str, body: str, tags: list[str]) -> Note:
+    return repo.add(title, body, tuple(tags))
+
+
+def list_notes(repo: Repository, tag: str | None = None, query: str | None = None) -> list[Note]:
+    notes = repo.all()
+    if tag is not None:
+        notes = with_tag(notes, tag)
+    if query is not None:
+        notes = containing(notes, query)
+    return notes

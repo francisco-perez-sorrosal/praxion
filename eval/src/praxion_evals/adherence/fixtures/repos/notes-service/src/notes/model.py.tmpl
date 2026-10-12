@@ -1,0 +1,11 @@
+"""The note type."""
+
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class Note:
+    note_id: int
+    title: str
+    body: str
+    tags: tuple[str, ...] = field(default=())

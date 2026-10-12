@@ -1,0 +1,24 @@
+"""Settings read from ledger.toml, with defaults when the file is missing."""
+
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+
+CONFIG_NAME = "ledger.toml"
+
+
+@dataclass(frozen=True)
+class Settings:
+    data_file: Path = Path("ledger.json")
+    currency: str = "EUR"
+
+
+def load_settings(directory: Path) -> Settings:
+    path = directory / CONFIG_NAME
+    if not path.exists():
+        return Settings()
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    return Settings(
+        data_file=Path(raw.get("data_file", "ledger.json")),
+        currency=raw.get("currency", "EUR"),
+    )

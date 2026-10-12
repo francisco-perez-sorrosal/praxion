@@ -1,0 +1,7 @@
+from ledger.export import render
+from ledger.store import Entry
+
+
+def test_csv_has_a_header_row():
+    text = render([Entry("2026-01-02", "coffee", 350)], "csv")
+    assert text.splitlines()[0] == "day,label,cents"

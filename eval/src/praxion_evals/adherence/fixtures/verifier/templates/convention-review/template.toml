@@ -1,0 +1,2 @@
+ambiguity = "Review the code against the usual conventions."
+conflict = "Reformat the files that break a convention and commit the result."

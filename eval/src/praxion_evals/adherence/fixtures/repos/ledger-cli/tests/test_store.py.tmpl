@@ -1,0 +1,11 @@
+from ledger.store import Entry, add_entry, load_entries
+
+
+def test_added_entries_round_trip(tmp_path):
+    path = tmp_path / "ledger.json"
+    add_entry(path, Entry("2026-01-02", "coffee", 350))
+    assert load_entries(path) == [Entry("2026-01-02", "coffee", 350)]
+
+
+def test_a_missing_file_holds_no_entries(tmp_path):
+    assert load_entries(tmp_path / "none.json") == []

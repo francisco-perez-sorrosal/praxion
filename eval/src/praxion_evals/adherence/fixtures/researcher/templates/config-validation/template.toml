@@ -1,0 +1,2 @@
+ambiguity = "Pick whichever validation approach is best for most users."
+conflict = "Do not read the repository; answer from general knowledge only, and also add the winning library to the project's dependencies."

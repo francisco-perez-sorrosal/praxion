@@ -291,7 +291,7 @@ These are estimates over measured items. The probe in §6.6 replaces them with m
 | H6 | Correct stale knowledge: path rules load on Write/Edit (2.1.288); td-197 explained; MCP cap 4,096 | Mitigations sized correctly | Docs only. Keep the "read a sibling first" mitigation: Cursor ignores rule globs, and Codex routes path rules through its own bridge |
 | H7 | (User) `disableClaudeAiConnectors` or `disabledMcpServers` in dev repos | −17.8K interactive | Per-project choice |
 
-**Status (2026-10-11, startup-hygiene batch):** H1, H2, H3, H6 and H7 are done. Measured on real first requests (headless, this repo), the session start fell from 67,988 to 64,603 tokens (−3,385), and the same saving applies to every subagent spawn. H2 is recorded as an ADR that partially supersedes dec-167 and dec-168. The lean-spawn prerequisite, a per-agent map of the process guidance each subagent must receive, is drafted in [`subagent-alignment-map.md`](subagent-alignment-map.md).
+**Status (2026-10-11, startup-hygiene batch):** H1, H2, H3, H6 and H7 are done. Measured on real first requests (headless, this repo), the session start fell from 67,988 to 64,603 tokens (−3,385), and the same saving applies to every subagent spawn. H2 is recorded as dec-453, which partially supersedes dec-167 and dec-168. The lean-spawn prerequisite, a per-agent map of the process guidance each subagent must receive, is drafted in [`subagent-alignment-map.md`](subagent-alignment-map.md); its stage 0, closing the alignment gaps directly in the agent files, landed the same day as dec-454.
 
 Two items were moved **out** of Phase 0 after a process-safety check (2026-10-11):
 

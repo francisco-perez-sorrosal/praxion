@@ -14,7 +14,7 @@ companion: startup-context-diet-research.md
 
 > **Why this exists.** Every Praxion subagent must know the guidance and steps for its own part of the Praxion process, not the whole process. Today that knowledge reaches it mostly by inheriting the orchestrator's full rulebook (~21K tokens), much of which it cannot act on, while parts it does need are missing. This map says, per agent, what that part is, where each line comes from, and how a future injected role kernel would deliver it without drift. It is the prerequisite for the "lean spawns" step in the [startup-context research](startup-context-diet-research.md) §6.1: alignment first, token savings second.
 
-Task slug: `startup-hygiene` · Date: 2026-10-11 · Praxion HEAD 6f5c538a (v0.50.0) · Read-only design draft; no repo artifact was changed.
+Task slug: `startup-hygiene` · Date: 2026-10-11 · Praxion HEAD 6f5c538a (v0.50.0) · Design draft; stage 0 (section 6) was applied on 2026-10-11, recorded as dec-454.
 
 **Ruler.** Token counts use the `count_tokens` endpoint through a scratch script that mirrors `scripts/measure_token_budget.py::count_tokens` (7-token request overhead subtracted; the script was not imported because it is being edited concurrently). **R2** = `claude-sonnet-5-5` (matches `/context`; used everywhere unless stated). **R1** = `claude-sonnet-4-5` (the script's current `_MODEL`). Section totals reproduce the context review's figures exactly (coordination rule 4,695 R1 / 6,985 R2; ADR rule 2,496 / 3,554; intermediate-documents 1,123 / 1,670; contract 363 / 542).
 
@@ -26,7 +26,7 @@ Task slug: `startup-hygiene` · Date: 2026-10-11 · Praxion HEAD 6f5c538a (v0.50
 - **Role modules are the real weight.** Two modules carry what is "buried in shared files": the ADR-author module (~4.0k R2; the three reference sections alone are 9,713 chars, so it needs its own injection string) and the ledger-writer module (4.0-4.6k R2). Kernel size per agent: 1.1k (RE, CE, DC, SG) up to 6.2k (IP) R2, including a ~0.5k project slice for IM, TE, IP and CI. Versus the ~21.3k R2 each spawn inherits today, every role stays under 6.3k.
 - **Orchestrator-only share.** Of the four always-on rules (12,751 R2), **~7.0k (55%) is orchestrator-only**, ~2.3k (18%) is actionable by every subagent, ~2.4k (19%) is ADR-author-only, the rest is reader- or ledger-specific. The coordination rule alone is 87% orchestrator-only (~6.1k of 6.99k).
 - **Gaps today: 10 classes** (section 6). The sharpest: 12 of 17 agents state no terminal marker of their own; 3 don't point at the contract at all; 15 never state the contract self-test; 3 never say "do not commit"; `agentic-transactions-architect` writes ADR fragments but is absent from both ADR "who writes" tables.
-- **Pointer-based alignment only works inside the Praxion checkout (ASSUMPTION).** Agent bodies link `../skills/software-planning/references/*.md` and `rules/swe/*.md`. A subagent's `Read` resolves against the consumer's working directory, not the plugin cache (`skills/agent-crafting/SKILL.md § Plugin agent self-containment`; `scripts/check_agent_shared_blocks.py:5-9`). Eight agents link `software-planning` references without preloading that skill (SA 9 links, VE 9, RE 5, DC 2, AV 1, SE 1, AT 1, CI 1; none lists `software-planning` in `skills:`). In a managed project the inherited rule text is today's only delivery path, which is why injection must carry text, not links.
+- **Pointer-based alignment only works inside the Praxion checkout (ASSUMPTION).** Agent bodies link `../skills/software-planning/references/*.md` and `rules/swe/*.md`. A subagent's `Read` resolves against the consumer's working directory, not the plugin cache (`skills/agent-crafting/SKILL.md § Plugin agent self-containment`; `scripts/check_agent_shared_blocks.py:5-9`). Eight agents link `software-planning` references without preloading that skill (SA 9 links, VE 9, RE 5, DC 2, AV 1, SE 1, AT 1, CI 1; none lists `software-planning` in `skills:`). In a managed project the inherited rule text is today's only delivery path, which is why injection must carry text, not links. **Probed 2026-10-11:** from a non-Praxion project, a `praxion:researcher` reached a linked reference only by inferring the plugin root from a preloaded skill's base directory. Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` in plugin agent bodies, and every agent now carries a links rule that uses it (dec-454).
 
 ## 1. Shared Praxion core
 
@@ -428,7 +428,7 @@ sections:
 | RC | Researcher fan-out ≤ 3 per wave; `check_lens_isolation.py` exit 0; spawn prompts carry slug and deliverables; Decision Log preserved in `diff` mode |
 | SG | Report under `.ai-state/skill_genesis_reports/`; all proposals `pending`; no artifact created |
 
-## 6. Gaps that could be closed now (documented, NOT applied)
+## 6. Gaps that could be closed now (stage 0, applied 2026-10-11)
 
 | # | Class | Agents | Additive edit | Evidence |
 |---|---|---|---|---|
@@ -442,6 +442,8 @@ sections:
 | G8 | Information barrier does not name a kernel | TE (acceptance-design A4) | Name "the injected Praxion kernel (process only)" in A4 and the paired authoritative copy `coordination-details.md § Acceptance-Design Stage` | `test-engineer.md:226` |
 | G9 | Delegator lacks the delegation checklist | RC | Three lines: slug, deliverables, pointer return in every researcher prompt; model hint | `roadmap-cartographer.md:108-112` |
 | G10 | Linked references unreachable (ASSUMPTION) | SA, VE, RE, DC, AV, SE, AT, CI | Inline the minimum (ADR creation steps, ledger schema row) or preload; the kernel makes this unnecessary for ADR and ledger | link counts in section 0 |
+
+**Status (2026-10-11).** Closed: G1, G2, G4 and G10 by dec-454 (three universal blocks in every agent definition: the contract with its self-test, the Praxion-links rule and the return contract; `scripts/check_agent_shared_blocks.py` now fails a definition that lacks one; promethean, roadmap-cartographer and skill-genesis joined the contract-bound roster in `check_behavioral_contract.py`). G3, G6, G7 and G9 by one line each in the named agents. G5 by listing agentic-transactions-architect in both authorship tables, as dec-211 had shaped it on interface-designer; interface-designer and AT also stopped hardcoding `category: architectural`. **Deferred:** G8. Naming an injected kernel in test-engineer's acceptance-design inputs before any kernel exists would reference a future capability as if it were live (`rules/swe/gate-liveness.md`); it lands with stage 2.
 
 Also noted: the claim in `claude/canonical-blocks/praxion-process.md` that "host-native subagents do not load CLAUDE.md" and `_PREAMBLE`'s comment that they do not load the always-on coordination rule conflict with `skills/agent-crafting/SKILL.md` ("subagents **do** inherit the `claudeMd` surface, 21,287 tokens"). Unsettled (Q5).
 
@@ -460,6 +462,8 @@ Also noted: the claim in `claude/canonical-blocks/praxion-process.md` that "host
 - **Listing:** a subagent sees the skill listing only if it has the `Skill` tool. Among Praxion agents, only `discipline-consultant` does.
 
 ## 8. Open questions for the user
+
+**Resolved 2026-10-11:** Q1 (every agent ends with a terminal marker; dec-454), Q2 (no agent commits; VE, SE and AV now say so), Q4 (AT is an ADR author), Q7 (relative references were reachable only by inference; the links rule makes them deterministic). Q5 and Q6 were settled by probe. **Still open:** Q3, Q8, Q9, Q10.
 
 1. **Markers for report producers.** Today the handshake binds step-executing agents; report producers are governed by the `[PARTIAL]` title (`agent-pipeline-details.md:206-210`). The core asks all 17 for a terminal marker. Extend the contract (stronger truncation check, one more line to obey), or keep two classes?
 2. **Never-commit for VE, SE, AV.** Confirm no agent may commit (the three that don't say it have `Bash`).

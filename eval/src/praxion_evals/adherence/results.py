@@ -250,6 +250,7 @@ def role_verdicts(results: RunResults) -> dict[str, RoleVerdict]:
             checks_by_kind(entries),
             pairs_of(results, role),
             results.settings,
+            role,
         )
         for role, entries in results.catalog.items()
     }

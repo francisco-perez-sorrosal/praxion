@@ -21,15 +21,60 @@ Bound here, because the specification or the base commit fixes them:
 - session envelopes in Claude Code's `stream-json` shape and scratch git
   repositories, both built per scenario.
 
-Not bound yet, so each raises `UnboundDriverError` naming the assumption it
-stands for: the console entry's remaining options, the dry run's printed form,
-the results file's fields, the task-set generator, the check grader, the check
-catalog, and the paired verdicts and report. A binding step maps each onto the
-designed surface without touching a scenario.
+Bound to the designed seams (the Seam Contract of `IMPLEMENTATION_PLAN.md`): the
+console entry's options, the dry run's printed form, the results file's fields,
+the task-set generator, the check grader, the check catalog, and the paired
+verdicts and report. No scenario knows a wire form; this module is the only
+consumer of them.
 
 The evaluation package needs Python 3.13 and its own dependencies, while this
 suite runs on the repository's floor, so every call into the package runs in a
 subprocess under the evaluation project's own `uv` environment.
+
+Pins the Seam Contract leaves open (package `praxion_evals.adherence`). A
+production step that finds one wrong stops with a plan amendment; it never edits
+this driver.
+
+- Console argv: `CHECKOUT --role R (repeated) --arm A (repeated) --output P
+  --seed N [--max-total-usd X] [--session-budget-usd Y] [--margin-pp M]
+  [--required-pairs P] [--dry-run] [--overwrite]`.
+- Dry run: one JSON object per line, `{"role","arm","task_id","argv","env_names"}`;
+  the main-session prompt is the argv element after `-p`.
+- Results file (`results.load(Path)`; written here only for the report): one JSON
+  document with `schema_version` "adherence/1"; `run` {id, model,
+  claude_code_version, complete, refused_launches: [..], earlier_runs: {role:
+  [{"run_id","flip"}]}}; `settings` {margin_pp, method, confidence, sidedness,
+  required_pairs, pair_slack, retry_policy, allowance_source (null without a
+  calibration run), allowances, declared_at}; `arms` {role: {arm: {"built"}}} (no
+  `proof` key: the loader tolerates its absence); `catalog` {role: [{name, kind,
+  rule: {file, section}, common, golden_bad_case}]}; `sessions` [{setup, status,
+  cost_usd, duration_ms, started_at}]; `verdicts` {} (recomputed from the
+  sessions, never read back); `golden_bad_case_verdicts` {"observed_error": x} or
+  null. A session is scored iff `status.kind == "measured"`.
+- Session setup: `model.SessionSetup(arm, checkout_commit, role, task_id,
+  template_id, seed)`; this driver passes the constant template id
+  `acceptance-template`.
+- Grading: `grade.evidence_from_recording(role, envelope, repo_root, fixture_commit,
+  sandbox, plugin_copy, slug, exit_code, timed_out, forced_stop, judging,
+  fetchable_page, planted_instruction, planted_effect, external_api_docs)`, all
+  keyword arguments, the paths as `pathlib.Path`; then `grade.grade(evidence,
+  check_names, None, setup)` (`judge=None`: no scenario requests judging) and
+  `model.status_to_json`. The JSON of a status carries an additive `"setup"` key
+  (the six setup fields) whenever `grade` was given a setup: that is how the setup
+  is echoed. An errored session's `error_kind` is a live `ErrorKind` (an isolation
+  breach reads `isolation_breach`); an errored check outcome is `"errored"`.
+- Catalog: `check_catalog(role)` items with `.name .kind .rule.file .rule.section
+  .common`, and `.golden_bad_case` on judged checks (a mechanical check may omit it).
+- Verdicts: `verdict.role_verdict(checks, pairs, settings)` with `checks` a
+  `{name: "mechanical" | "judged"}` mapping in order; pairs
+  `model.Pair(task_id, template_id, full, lean)` (keywords) of `model.status_from_json`
+  statuses (an errored arm is `{"kind": "errored", "error_kind": "exit_nonzero",
+  "detail": ..}`; a non-passed check outcome carries `reason`, a failed one `detail`);
+  `model.settings_from_json` of the dict `_settings_json` builds; the result
+  through `model.verdict_to_json`, whose check verdicts read "no regression",
+  "regression", "non-inferior" or "inferior", whose `flip` is absent or null for
+  an underpowered role, and which always carries `complete_pairs`.
+- Report: `report.render(results.load(path))`, text.
 """
 
 from __future__ import annotations
@@ -46,7 +91,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, NoReturn
+from typing import Any, Literal
 
 import yaml
 
@@ -143,14 +188,6 @@ DUMMY_CREDENTIAL = "sk-ant-acceptance-dummy-credential-0000"
 FAKE_CLAUDE_VERSION = "9.9.9-acceptance"
 _STRIPPED_PREFIXES = ("CLAUDE", "PRAXION_", "ANTHROPIC_", "VIRTUAL_ENV", "UV_", "PYTHONPATH")
 _SYSTEM_PATH = ("/usr/bin", "/bin", "/usr/sbin", "/sbin")
-
-
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
-
-
-def _unbound(assumption: str) -> NoReturn:
-    raise UnboundDriverError(f"not yet bound to the designed surface: {assumption}")
 
 
 # ---------------------------------------------------------------------------
@@ -306,12 +343,22 @@ class RunRequest:
 
 
 def designed_options(request: RunRequest) -> list[str]:
-    _unbound(
-        "the console entry takes options naming the roles, the plugin checkout (a path), the"
-        " arms, the results-file path, the seed, the run-level spend cap, the per-session"
-        " budget, the judged-check margin in percentage points and the required number of"
-        " complete pairs; an option the request leaves as None is omitted so its default holds"
+    args = [str(request.checkout)]
+    for role in request.roles:
+        args += ["--role", role]
+    for arm in request.arms:
+        args += ["--arm", arm]
+    args += ["--output", str(request.output), "--seed", str(request.seed)]
+    optional = (
+        ("--max-total-usd", request.run_cap_usd),
+        ("--session-budget-usd", request.session_budget_usd),
+        ("--margin-pp", request.margin_pp),
+        ("--required-pairs", request.required_pairs),
     )
+    for flag, value in optional:
+        if value is not None:
+            args += [flag, str(value)]
+    return args
 
 
 def command_arguments(request: RunRequest) -> list[str]:
@@ -378,11 +425,22 @@ class PlannedSession:
 
 
 def planned_sessions(stdout: str) -> list[PlannedSession]:
-    _unbound(
-        "a dry run prints, for each task, one representative session: the role, the arm and"
-        " the task identifier it belongs to, its full command line (including the main-session"
-        " prompt) and the names, never the values, of its environment variables"
-    )
+    sessions = []
+    for line in filter(str.strip, stdout.splitlines()):
+        entry = json.loads(line)
+        argv = tuple(entry["argv"])
+        assert "-p" in argv, f"a planned session's command line has no -p prompt: {argv}"
+        sessions.append(
+            PlannedSession(
+                entry["role"],
+                entry["arm"],
+                entry["task_id"],
+                argv,
+                frozenset(entry["env_names"]),
+                argv[argv.index("-p") + 1],
+            )
+        )
+    return sessions
 
 
 def _option_values(argv: Sequence[str], flag: str) -> list[str]:
@@ -398,16 +456,6 @@ def _option_values(argv: Sequence[str], flag: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # The results file
 # ---------------------------------------------------------------------------
-
-_RESULTS_FIELDS = (
-    "the results file is one JSON document recording its schema version; the run's identifier,"
-    " model and Claude Code version; the declared judged-check margin, comparison method,"
-    " confidence level of the reported interval, target complete pairs and the slack above it,"
-    " retry policy for errored sessions and source of the mechanical checks' noise allowances"
-    " (a same-arm calibration run's identifier, or none); whether the run completed; each launch the"
-    " spend cap refused; whether each named role's arm was built; and each session with its"
-    " outcome"
-)
 
 
 @dataclass(frozen=True)
@@ -428,31 +476,46 @@ class RunRecord:
     raw: Mapping[str, Any]
 
     def schema_version(self) -> str:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["schema_version"]
 
     def run_id(self) -> str:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["run"]["id"]
 
     def model(self) -> str:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["run"]["model"]
 
     def claude_code_version(self) -> str | None:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["run"]["claude_code_version"]
 
     def settings(self) -> DeclaredSettings:
-        _unbound(_RESULTS_FIELDS)
+        recorded = self.raw["settings"]
+        return DeclaredSettings(
+            margin_pp=recorded["margin_pp"],
+            method=recorded["method"],
+            confidence=recorded["confidence"],
+            required_pairs=recorded["required_pairs"],
+            pair_slack=recorded["pair_slack"],
+            retry_policy=recorded["retry_policy"],
+            allowance_source=recorded["allowance_source"],
+        )
 
     def complete(self) -> bool:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["run"]["complete"]
 
     def refused_launches(self) -> int:
-        _unbound(_RESULTS_FIELDS)
+        return len(self.raw["run"]["refused_launches"])
 
     def arm_built(self, role: str, arm: str) -> bool:
-        _unbound(_RESULTS_FIELDS)
+        return self.raw["arms"][role][arm]["built"]
 
     def scored_sessions(self, role: str, arm: str) -> int:
-        _unbound(_RESULTS_FIELDS)
+        return sum(
+            1
+            for session in self.raw["sessions"]
+            if session["setup"]["role"] == role
+            and session["setup"]["arm"] == arm
+            and session["status"]["kind"] == "measured"
+        )
 
 
 def read_results(path: Path) -> RunRecord:
@@ -963,7 +1026,10 @@ def session_places(workspace: Path) -> SessionPlaces:
 # Grading one recorded session
 # ---------------------------------------------------------------------------
 
-OutcomeKind = Literal["passed", "failed", "withheld", "not applicable"]
+OutcomeKind = Literal["passed", "failed", "withheld", "not applicable", "errored"]
+TEMPLATE_ID = (
+    "acceptance-template"  # the library records a template per task; no scenario varies it
+)
 
 
 @dataclass(frozen=True)
@@ -1016,16 +1082,84 @@ class GradedSession:
         return self.outcomes[check]
 
 
+_GRADE_CODE = """
+import json, sys
+from pathlib import Path
+from praxion_evals.adherence import grade, model
+
+p = json.load(sys.stdin)
+evidence = grade.evidence_from_recording(
+    role=p["role"],
+    envelope=p["envelope"],
+    repo_root=Path(p["repo_root"]),
+    fixture_commit=p["fixture_commit"],
+    sandbox=Path(p["sandbox"]),
+    plugin_copy=Path(p["plugin_copy"]),
+    slug=p["slug"],
+    exit_code=p["exit_code"],
+    timed_out=p["timed_out"],
+    forced_stop=p["forced_stop"],
+    judging=p["judging"],
+    fetchable_page=p["fetchable_page"],
+    planted_instruction=p["planted_instruction"],
+    planted_effect=p["planted_effect"],
+    external_api_docs=p["external_api_docs"],
+)
+setup = model.SessionSetup(**p["setup"]) if p["setup"] else None
+status = grade.grade(evidence, p["checks"], None, setup)
+print(json.dumps(model.status_to_json(status)))
+"""
+
+
+def _setup_json(setup: SessionSetup) -> dict[str, Any]:
+    return {
+        "arm": setup.arm,
+        "checkout_commit": setup.checkout_commit,
+        "role": setup.role,
+        "task_id": setup.task_id,
+        "template_id": TEMPLATE_ID,
+        "seed": setup.seed,
+    }
+
+
+def _graded_from_json(status: Mapping[str, Any]) -> GradedSession:
+    setup = dict(status.get("setup") or {})
+    if status["kind"] == "errored":
+        return GradedSession(status["error_kind"], False, {}, None, setup)
+    if status["kind"] == "not measured":
+        return GradedSession(None, True, {}, None, setup)
+    assert status["kind"] == "measured", f"the grader returned an unknown status: {status}"
+    outcomes = {
+        name: Outcome(recorded["outcome"], recorded.get("reason") or recorded.get("detail"))
+        for name, recorded in status["outcomes"].items()
+    }
+    return GradedSession(None, False, outcomes, status.get("first_request_tokens"), setup)
+
+
 def grade(evidence: SessionEvidence, checks: Sequence[str]) -> GradedSession:
-    _unbound(
-        "grading one recorded session of a role -- its stream-json envelope, its scratch"
-        " repository against the fixture commit, the sandbox and plugin copy it ran with, and"
-        " the task's facts -- yields, for each named check (C1 to C6, or a clause of the role"
-        " check table), exactly one outcome: passed, failed, withheld with a reason, or not"
-        " applicable; or marks the whole session errored with its kind, or not measured when"
-        " the role was never spawned; and carries the session's setup and the spawned role's"
-        " first-request tokens"
+    assert not evidence.judging, (
+        "no scenario requests judging; bind a fake judge here when one does"
     )
+    payload = {
+        "role": evidence.role,
+        "envelope": evidence.envelope,
+        "repo_root": str(evidence.repo.root),
+        "fixture_commit": evidence.repo.fixture_commit,
+        "sandbox": str(evidence.places.sandbox),
+        "plugin_copy": str(evidence.places.plugin_copy),
+        "slug": evidence.slug,
+        "exit_code": evidence.exit_code,
+        "timed_out": evidence.timed_out,
+        "forced_stop": evidence.forced_stop,
+        "judging": evidence.judging,
+        "fetchable_page": evidence.fetchable_page,
+        "planted_instruction": evidence.planted_instruction,
+        "planted_effect": evidence.planted_effect,
+        "external_api_docs": evidence.external_api_docs,
+        "setup": _setup_json(evidence.setup) if evidence.setup else None,
+        "checks": list(checks),
+    }
+    return _graded_from_json(run_in_eval(_GRADE_CODE, payload))
 
 
 # ---------------------------------------------------------------------------
@@ -1043,13 +1177,36 @@ class CatalogCheck:
     common: bool  # one of C1 to C6
 
 
+_CATALOG_CODE = """
+import json, sys
+from praxion_evals.adherence import catalog
+
+checks = catalog.check_catalog(json.load(sys.stdin))
+print(json.dumps([
+    {
+        "name": c.name,
+        "kind": c.kind,
+        "rule": {"file": c.rule.file, "section": c.rule.section},
+        "common": c.common,
+        "golden_bad_case": getattr(c, "golden_bad_case", None),
+    }
+    for c in checks
+]))
+"""
+
+
 def check_catalog(role: str) -> list[CatalogCheck]:
-    _unbound(
-        "the eval declares, for each role, its checks -- C1 to C6 and at least one per clause"
-        " of the role's row of the role check table -- each with its kind (mechanical or"
-        " judged), the rule it enforces as a repository file and a section heading in it, and"
-        " for a judged check the golden bad case it must rate a failure"
-    )
+    return [
+        CatalogCheck(
+            c["name"],
+            c["kind"],
+            c["rule"]["file"],
+            c["rule"]["section"],
+            c["golden_bad_case"],
+            c["common"],
+        )
+        for c in run_in_eval(_CATALOG_CODE, role)
+    ]
 
 
 def markdown_headings(path: Path) -> list[str]:
@@ -1066,18 +1223,29 @@ def markdown_headings(path: Path) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+_TASK_IDS_CODE = """
+import json, sys
+from praxion_evals.adherence import tasks
+
+role, seed = json.load(sys.stdin)
+print(json.dumps(tasks.task_ids(role, seed)))
+"""
+
+_PRODUCIBLE_CODE = """
+import json, sys
+from praxion_evals.adherence import tasks
+
+role, seed = json.load(sys.stdin)
+print(json.dumps(tasks.producible_task_count(role, seed)))
+"""
+
+
 def task_ids(role: str, seed: int) -> list[str]:
-    _unbound(
-        "the task-set generator lists, for a role and a seed, the identifiers of that role's"
-        " runnable paired tasks, in the order a run would take them"
-    )
+    return run_in_eval(_TASK_IDS_CODE, [role, seed])
 
 
 def producible_task_count(role: str, seed: int) -> int:
-    _unbound(
-        "the task-set generator states how many distinct tasks the role's templates, fixtures"
-        " and planted variations can produce for a seed"
-    )
+    return run_in_eval(_PRODUCIBLE_CODE, [role, seed])
 
 
 # ---------------------------------------------------------------------------
@@ -1152,18 +1320,94 @@ class RoleVerdict:
     judged_intervals: Mapping[str, Interval]  # reported beside each judged verdict, never deciding
 
 
+_VERDICT_CODE = """
+import json, sys
+from praxion_evals.adherence import model, verdict
+
+p = json.load(sys.stdin)
+pairs = [
+    model.Pair(
+        task_id=f"task-{i:03d}",
+        template_id=p["template_id"],
+        full=model.status_from_json(pair["full"]),
+        lean=model.status_from_json(pair["lean"]),
+    )
+    for i, pair in enumerate(p["pairs"])
+]
+result = verdict.role_verdict(p["checks"], pairs, model.settings_from_json(p["settings"]))
+print(json.dumps(model.verdict_to_json(result)))
+"""
+
+CALIBRATION_RUN_ID = "acceptance-calibration"
+
+
+def _settings_json(settings: FlipSettings) -> dict[str, Any]:
+    return {
+        "margin_pp": settings.margin_pp,
+        "method": "tango-score",
+        "confidence": 0.95,
+        "sidedness": "one-sided",
+        "required_pairs": settings.required_pairs,
+        "pair_slack": 0,
+        "retry_policy": "one retry per session, for infrastructure errors only",
+        "allowance_source": CALIBRATION_RUN_ID if settings.allowances else None,
+        "allowances": dict(settings.allowances),
+    }
+
+
+def _check_outcome_json(kind: OutcomeKind) -> dict[str, str]:
+    if kind == "passed":
+        return {"outcome": kind}
+    if kind == "failed":
+        return {"outcome": kind, "detail": "acceptance: the check failed"}
+    return {"outcome": kind, "reason": f"acceptance: the check is {kind}"}
+
+
+def _side_json(
+    outcomes: Mapping[str, OutcomeKind], errored: bool, first_request_tokens: int | None = None
+) -> dict[str, Any]:
+    if errored:
+        return {"kind": "errored", "error_kind": "exit_nonzero", "detail": "acceptance: crashed"}
+    return {
+        "kind": "measured",
+        "outcomes": {name: _check_outcome_json(kind) for name, kind in outcomes.items()},
+        "first_request_tokens": first_request_tokens,
+    }
+
+
+def _pair_json(pair: Pair, tokens: Mapping[str, int] | None = None) -> dict[str, Any]:
+    tokens = tokens or {}
+    return {
+        arm: _side_json(getattr(pair, arm), arm in pair.errored_arms, tokens.get(arm))
+        for arm in ARMS
+    }
+
+
+def _verdict_from_json(recorded: Mapping[str, Any]) -> RoleVerdict:
+    return RoleVerdict(
+        underpowered=recorded["underpowered"],
+        flip=recorded.get("flip"),
+        check_verdicts=recorded.get("check_verdicts", {}),
+        not_covered=frozenset(recorded.get("not_covered", ())),
+        complete_pairs=recorded["complete_pairs"],
+        worst_case_lean_failures=recorded.get("worst_case_lean_failures", {}),
+        judged_intervals={
+            check: Interval(bounds["lower"], bounds["upper"])
+            for check, bounds in recorded.get("judged_intervals", {}).items()
+        },
+    )
+
+
 def role_verdict(
     checks: Sequence[CheckSpec], pairs: Sequence[Pair], settings: FlipSettings
 ) -> RoleVerdict:
-    _unbound(
-        "the eval computes a role's paired verdicts from its pairs and the declared settings"
-        " (margin, target pairs, per-check noise allowances): a verdict per scored check (no"
-        " regression or regression for a mechanical check; non-inferior or inferior for a judged"
-        " check), the worst-case recount of lean failures per check, the reported interval of"
-        " each judged check, the withheld and not-applicable checks the verdict does not cover,"
-        " the number of complete pairs, whether the role is underpowered, and its flip verdict"
-        " (clear, not clear, or none)"
-    )
+    payload = {
+        "checks": {check.name: check.kind for check in checks},
+        "pairs": [_pair_json(pair) for pair in pairs],
+        "settings": _settings_json(settings),
+        "template_id": TEMPLATE_ID,
+    }
+    return _verdict_from_json(run_in_eval(_VERDICT_CODE, payload))
 
 
 @dataclass(frozen=True)
@@ -1176,17 +1420,109 @@ class RoleMeasurement:
     earlier_runs: Sequence[tuple[str, str]] = ()  # (run identifier, that run's flip verdict)
 
 
+_REPORT_CODE = """
+import json, sys
+from pathlib import Path
+from praxion_evals.adherence import report, results
+
+print(json.dumps(report.render(results.load(Path(json.load(sys.stdin))))))
+"""
+
+REPORT_CHECKOUT_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+REPORT_STARTED_AT = "2026-10-12T09:00:00Z"
+REPORT_DECLARED_AT = "2026-10-12T08:59:00Z"  # earlier than every session, as the reader checks
+
+
+def _session_record(role: str, arm: str, task_id: str, status: Mapping[str, Any]) -> dict[str, Any]:
+    setup = SessionSetup(arm, REPORT_CHECKOUT_COMMIT, role, task_id, SEED)
+    return {
+        "setup": _setup_json(setup),
+        "status": status,
+        "cost_usd": 0.01,
+        "duration_ms": 1000,
+        "started_at": REPORT_STARTED_AT,
+    }
+
+
+def _role_sessions(role: str, measurement: RoleMeasurement) -> list[dict[str, Any]]:
+    """The sessions that make `measurement` up.
+
+    Pairs come first. The errored and not-measured sessions the measurement counts
+    beyond those its pairs already hold are laid out two to a task, so they never
+    complete a pair or change a pair's outcome.
+    """
+    sessions = []
+    for i, pair in enumerate(measurement.pairs):
+        task_id = f"{role}-task-{i:03d}"
+        for arm, status in _pair_json(pair, measurement.first_request_tokens).items():
+            sessions.append(_session_record(role, arm, task_id, status))
+    errored_in_pairs = sum(len(pair.errored_arms) for pair in measurement.pairs)
+    extra_errored = measurement.errored_sessions - errored_in_pairs
+    assert extra_errored >= 0, "the measurement counts fewer errored sessions than its pairs hold"
+    extras = [_side_json({}, errored=True)] * extra_errored + [
+        {"kind": "not measured", "reason": "acceptance: the role was never spawned"}
+    ] * measurement.not_measured_sessions
+    for i, status in enumerate(extras):
+        task_id = f"{role}-unpaired-{i // 2:03d}"
+        sessions.append(_session_record(role, ARMS[i % 2], task_id, status))
+    return sessions
+
+
+def _results_document(
+    measurements: Mapping[str, RoleMeasurement],
+    settings: FlipSettings,
+    judge_golden_error: float | None,
+) -> dict[str, Any]:
+    kept_checks = {role: {check.name for check in m.checks} for role, m in measurements.items()}
+    return {
+        "schema_version": "adherence/1",
+        "run": {
+            "id": "acceptance-report-run",
+            "model": "claude-opus-5-5",
+            "claude_code_version": FAKE_CLAUDE_VERSION,
+            "complete": True,
+            "refused_launches": [],
+            "earlier_runs": {
+                role: [{"run_id": run_id, "flip": flip} for run_id, flip in m.earlier_runs]
+                for role, m in measurements.items()
+            },
+        },
+        "settings": {**_settings_json(settings), "declared_at": REPORT_DECLARED_AT},
+        "arms": {role: {arm: {"built": True} for arm in ARMS} for role in measurements},
+        "catalog": {
+            role: [
+                {
+                    "name": c.name,
+                    "kind": c.kind,
+                    "rule": {"file": c.rule_file, "section": c.rule_section},
+                    "common": c.common,
+                    "golden_bad_case": c.golden_bad_case,
+                }
+                for c in check_catalog(role)
+                if c.name in kept_checks[role]
+            ]
+            for role in measurements
+        },
+        "sessions": [
+            record for role, m in measurements.items() for record in _role_sessions(role, m)
+        ],
+        "verdicts": {},
+        "golden_bad_case_verdicts": (
+            None if judge_golden_error is None else {"observed_error": judge_golden_error}
+        ),
+    }
+
+
 def render_report(
     measurements: Mapping[str, RoleMeasurement],
     settings: FlipSettings,
     judge_golden_error: float | None = None,
 ) -> str:
-    _unbound(
-        "the eval renders its report, as text, from a results file holding these roles'"
-        " paired measurements, the earlier runs of each role on the same checkout with their"
-        " verdicts, the judge's observed error on the golden cases when a smoke run recorded it,"
-        " and the declared settings"
-    )
+    document = _results_document(measurements, settings, judge_golden_error)
+    with tempfile.TemporaryDirectory(prefix="adherence-report-") as scratch:
+        path = Path(scratch) / "results.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        return run_in_eval(_REPORT_CODE, str(path))
 
 
 # ---------------------------------------------------------------------------

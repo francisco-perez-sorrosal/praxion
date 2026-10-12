@@ -85,6 +85,7 @@ hooks/                               # Hook scripts (auto-discovered by Claude C
 ├── commit_gate.sh
 ├── detect_duplication.py
 ├── format_code.py
+├── guard_memory_index.py              # Gate: memory-index writes add only short pointers
 ├── inject_decisions.py
 ├── precompact_state.py
 ├── promote_learnings.py

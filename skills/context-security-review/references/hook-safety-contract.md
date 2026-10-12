@@ -12,6 +12,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `adr_reminder.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload), `.ai-state/decisions/` (file listing) | None | None | Fail-open (exit 0) |
 | `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
+| `guard_memory_index.py` | PreToolUse (Write\|Edit) | stdin, the target memory index (`MEMORY.md`) | stdout: JSON deny decision when the write adds a violation | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
 | `capture_observations.py` | PostToolUse (all tools; a fixed noise blocklist is skipped) | stdin (JSON payload), `.ai-state/` (existence + `stat`), `$TMPDIR` first-call markers (existence) | Observation log (`.ai-state/observations.jsonl`, its numbered rotation archives (`.1` to `.5`), `.ai-state/observations.lock`); empty `0o600` digest-named first-call markers under `$TMPDIR` | None | Fail-open (exit 0), async |
 | `capture_session.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostCompact | stdin (JSON payload), observation-log tail, session and subagent transcripts (usage fields only), `.ai-state/observations_summary.jsonl` | Observation log (as above); committed `.ai-state/observations_summary.jsonl` (+ `.ai-state/observations_summary.lock`, transient `.tmp` sibling) | None | Fail-open (exit 0), async |
@@ -131,6 +132,26 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Never processes files whose extension has no registry row (skips silently)
 - Never errors when the registry-resolved formatter is unreachable on this machine -- an unresolvable tool is a silent no-op
 - Never blocks agent execution (exit 0 unconditionally)
+
+### `guard_memory_index.py`
+
+**Purpose**: Refuse a Write or Edit to a memory index (`<config>/projects/<p>/memory/MEMORY.md` or `agent-memory/<agent>/MEMORY.md`) that would add a line over 150 characters, add content that is not a pointer, or grow the index past the harness load limit. Lines already in the index never block a write. Rules live in `scripts/check_memory_index.py`.
+
+**Reads**:
+- stdin: JSON hook payload (the pending Write or Edit)
+- The target memory index, to compute what the write would leave
+
+**Writes**:
+- stdout: a JSON `permissionDecision: deny` with the convention and the offending lines, only when the write adds a violation
+
+**External contact**:
+- None
+
+**Guarantees NOT to do**:
+- Never writes or edits any file, the index included
+- Never reads any file but the targeted index, and returns before importing its rules for any other path
+- Never blocks on debt the write does not add
+- Never blocks on its own errors (fail-open, exit 0)
 
 ### `precompact_state.py`
 

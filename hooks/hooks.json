@@ -256,6 +256,17 @@
         ]
       },
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/guard_memory_index.py",
+            "timeout": 5,
+            "async": false
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {

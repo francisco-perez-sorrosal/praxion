@@ -1,0 +1,369 @@
+{
+  "profiles": {
+    "managed|sonnet|default|mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "managed",
+        "key": "managed|sonnet|default|mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "main": {
+          "cache_creation": 49256,
+          "cache_read": 11102,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 60360
+        }
+      }
+    },
+    "managed|sonnet|default|no-mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "managed",
+        "key": "managed|sonnet|default|no-mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": true
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "main": {
+          "cache_creation": 46560,
+          "cache_read": 11102,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 57664
+        }
+      }
+    },
+    "praxion-repo|sonnet|default|mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "praxion-repo",
+        "key": "praxion-repo|sonnet|default|mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "agent:agentic-transactions-architect": {
+          "cache_creation": 57618,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 57620
+        },
+        "agent:architect-validator": {
+          "cache_creation": 42726,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 42728
+        },
+        "agent:cicd-engineer": {
+          "cache_creation": 45806,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 45808
+        },
+        "agent:context-engineer": {
+          "cache_creation": 61138,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 61140
+        },
+        "agent:discipline-consultant": {
+          "cache_creation": 55473,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 55475
+        },
+        "agent:doc-engineer": {
+          "cache_creation": 40532,
+          "cache_read": 0,
+          "input_tokens": 10,
+          "model": "claude-haiku-4-5-20251001",
+          "tokens": 40542
+        },
+        "agent:implementation-planner": {
+          "cache_creation": 59829,
+          "cache_read": 3101,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 62932
+        },
+        "agent:implementer": {
+          "cache_creation": 52435,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 55948
+        },
+        "agent:interface-designer": {
+          "cache_creation": 66096,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 66098
+        },
+        "agent:promethean": {
+          "cache_creation": 63900,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 67413
+        },
+        "agent:researcher": {
+          "cache_creation": 0,
+          "cache_read": 46930,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 46932
+        },
+        "agent:roadmap-cartographer": {
+          "cache_creation": 54699,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 54701
+        },
+        "agent:sentinel": {
+          "cache_creation": 70560,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 70562
+        },
+        "agent:skill-genesis": {
+          "cache_creation": 58326,
+          "cache_read": 2753,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 61081
+        },
+        "agent:systems-architect": {
+          "cache_creation": 58072,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 61585
+        },
+        "agent:test-engineer": {
+          "cache_creation": 54906,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 58419
+        },
+        "agent:verifier": {
+          "cache_creation": 65654,
+          "cache_read": 2753,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 68409
+        },
+        "main": {
+          "cache_creation": 51712,
+          "cache_read": 12635,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 64349
+        }
+      }
+    },
+    "praxion-repo|sonnet|default|no-mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "praxion-repo",
+        "key": "praxion-repo|sonnet|default|no-mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": true
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "agent:agentic-transactions-architect": {
+          "cache_creation": 57755,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 57757
+        },
+        "agent:architect-validator": {
+          "cache_creation": 42863,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 42865
+        },
+        "agent:cicd-engineer": {
+          "cache_creation": 45943,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 45945
+        },
+        "agent:context-engineer": {
+          "cache_creation": 61275,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 61277
+        },
+        "agent:discipline-consultant": {
+          "cache_creation": 55610,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 55612
+        },
+        "agent:doc-engineer": {
+          "cache_creation": 40634,
+          "cache_read": 0,
+          "input_tokens": 10,
+          "model": "claude-haiku-4-5-20251001",
+          "tokens": 40644
+        },
+        "agent:implementation-planner": {
+          "cache_creation": 59966,
+          "cache_read": 3101,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 63069
+        },
+        "agent:implementer": {
+          "cache_creation": 52572,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 56085
+        },
+        "agent:interface-designer": {
+          "cache_creation": 66233,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 66235
+        },
+        "agent:promethean": {
+          "cache_creation": 64037,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 67550
+        },
+        "agent:researcher": {
+          "cache_creation": 47067,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 47069
+        },
+        "agent:roadmap-cartographer": {
+          "cache_creation": 54836,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 54838
+        },
+        "agent:sentinel": {
+          "cache_creation": 70697,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 70699
+        },
+        "agent:skill-genesis": {
+          "cache_creation": 58463,
+          "cache_read": 2753,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 61218
+        },
+        "agent:systems-architect": {
+          "cache_creation": 58209,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 61722
+        },
+        "agent:test-engineer": {
+          "cache_creation": 55043,
+          "cache_read": 3511,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 58556
+        },
+        "agent:verifier": {
+          "cache_creation": 65791,
+          "cache_read": 2753,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 68546
+        },
+        "main": {
+          "cache_creation": 50736,
+          "cache_read": 12635,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 63373
+        }
+      }
+    },
+    "unmanaged|sonnet|default|mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "unmanaged",
+        "key": "unmanaged|sonnet|default|mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "main": {
+          "cache_creation": 44073,
+          "cache_read": 11102,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 55177
+        }
+      }
+    },
+    "unmanaged|sonnet|default|no-mcp|installed": {
+      "claude_code_version": "2.1.296",
+      "profile": {
+        "cwd_kind": "unmanaged",
+        "key": "unmanaged|sonnet|default|no-mcp|installed",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": true
+      },
+      "recorded": "2026-10-11",
+      "targets": {
+        "main": {
+          "cache_creation": 41375,
+          "cache_read": 11102,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 52479
+        }
+      }
+    }
+  },
+  "schema": 1
+}

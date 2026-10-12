@@ -69,7 +69,7 @@ See `eval/EVAL_PLAN.md` for the full design narrative, deferred families, and op
 > [!WARNING]
 > Every run spends API money. Start with `--dry-run`, which prints the sessions a run would launch and starts none. The run cap defaults to $50 and each session to $3.
 
-**Scope today.** Task kits and role check rows exist for the `researcher` and the `verifier`. `--role` accepts all 17 roles, but a role with no kit stops the run before anything launches. The remaining roles and the implementer kit are deferred.
+**Scope today.** Every role has its check rows and a task kit: the `researcher`, the `verifier` and the `implementer` have full kits (24 producible tasks each); the other fourteen have smoke kits (three runnable tasks by default, 24 producible). The main-session conditional-adherence eval is deferred (`EVAL_PLAN.md`).
 
 ```sh
 cd eval

@@ -402,7 +402,9 @@ def _option_values(argv: Sequence[str], flag: str) -> list[str]:
 _RESULTS_FIELDS = (
     "the results file is one JSON document recording its schema version; the run's identifier,"
     " model and Claude Code version; the declared judged-check margin, comparison method,"
-    " confidence level and required complete pairs; whether the run completed; each launch the"
+    " confidence level of the reported interval, target complete pairs and the slack above it,"
+    " retry policy for errored sessions and source of the mechanical checks' noise allowances"
+    " (a same-arm calibration run's identifier, or none); whether the run completed; each launch the"
     " spend cap refused; whether each named role's arm was built; and each session with its"
     " outcome"
 )
@@ -414,6 +416,11 @@ class DeclaredSettings:
     method: str
     confidence: float
     required_pairs: int
+    pair_slack: int
+    retry_policy: str
+    allowance_source: (
+        str | None
+    )  # a same-arm calibration run's identifier; None: every allowance is zero
 
 
 @dataclass(frozen=True)
@@ -1077,7 +1084,7 @@ def producible_task_count(role: str, seed: int) -> int:
 # Paired verdicts and the report
 # ---------------------------------------------------------------------------
 
-CheckVerdict = Literal["no regression", "regression", "non-inferior", "not non-inferior"]
+CheckVerdict = Literal["no regression", "regression", "non-inferior", "inferior"]
 
 
 @dataclass(frozen=True)
@@ -1088,11 +1095,15 @@ class CheckSpec:
 
 @dataclass(frozen=True)
 class Pair:
-    """One task's two sessions: each arm's outcome per check (empty when it errored)."""
+    """One task's two sessions: each arm's outcome per check (empty for an arm that errored)."""
 
     full: Mapping[str, OutcomeKind]
     lean: Mapping[str, OutcomeKind]
-    complete: bool = True
+    errored_arms: frozenset[str] = frozenset()
+
+    @property
+    def complete(self) -> bool:
+        return not self.errored_arms
 
 
 def repeated(
@@ -1102,13 +1113,30 @@ def repeated(
 
 
 def errored_pairs(count: int) -> list[Pair]:
-    return [Pair({}, {}, complete=False) for _ in range(count)]
+    """Pairs in which both arms' sessions errored."""
+    return [Pair({}, {}, frozenset(ARMS)) for _ in range(count)]
+
+
+def lean_errored_pairs(count: int, full: Mapping[str, OutcomeKind]) -> list[Pair]:
+    """Pairs in which only the lean arm's session errored."""
+    return [Pair(dict(full), {}, frozenset({"lean"})) for _ in range(count)]
 
 
 @dataclass(frozen=True)
 class FlipSettings:
     margin_pp: float = DEFAULT_MARGIN_PP
     required_pairs: int = DEFAULT_REQUIRED_PAIRS
+    allowances: Mapping[str, int] = field(
+        default_factory=dict
+    )  # mechanical check -> pairs; absent: 0
+
+
+@dataclass(frozen=True)
+class Interval:
+    """The reported one-sided interval on a judged check's paired difference (lean - full)."""
+
+    lower: float
+    upper: float
 
 
 @dataclass(frozen=True)
@@ -1116,19 +1144,25 @@ class RoleVerdict:
     underpowered: bool
     flip: Literal["clear", "not clear"] | None  # None: no flip verdict given
     check_verdicts: Mapping[str, CheckVerdict]
-    not_covered: frozenset[str]  # withheld checks the flip verdict does not cover
+    not_covered: frozenset[
+        str
+    ]  # withheld and not-applicable checks the flip verdict does not cover
     complete_pairs: int
+    worst_case_lean_failures: Mapping[str, int]  # per check, lean failures after the recount
+    judged_intervals: Mapping[str, Interval]  # reported beside each judged verdict, never deciding
 
 
 def role_verdict(
     checks: Sequence[CheckSpec], pairs: Sequence[Pair], settings: FlipSettings
 ) -> RoleVerdict:
     _unbound(
-        "the eval computes a role's paired verdicts from its pairs and the declared settings:"
-        " a verdict per scored check (no regression or regression for a mechanical check;"
-        " non-inferior or not for a judged check), the withheld checks the verdict does not"
-        " cover, the number of complete pairs, whether the role is underpowered, and its flip"
-        " verdict (clear, not clear, or none)"
+        "the eval computes a role's paired verdicts from its pairs and the declared settings"
+        " (margin, target pairs, per-check noise allowances): a verdict per scored check (no"
+        " regression or regression for a mechanical check; non-inferior or inferior for a judged"
+        " check), the worst-case recount of lean failures per check, the reported interval of"
+        " each judged check, the withheld and not-applicable checks the verdict does not cover,"
+        " the number of complete pairs, whether the role is underpowered, and its flip verdict"
+        " (clear, not clear, or none)"
     )
 
 
@@ -1139,12 +1173,19 @@ class RoleMeasurement:
     first_request_tokens: Mapping[str, int]  # by arm
     errored_sessions: int = 0
     not_measured_sessions: int = 0
+    earlier_runs: Sequence[tuple[str, str]] = ()  # (run identifier, that run's flip verdict)
 
 
-def render_report(measurements: Mapping[str, RoleMeasurement], settings: FlipSettings) -> str:
+def render_report(
+    measurements: Mapping[str, RoleMeasurement],
+    settings: FlipSettings,
+    judge_golden_error: float | None = None,
+) -> str:
     _unbound(
         "the eval renders its report, as text, from a results file holding these roles'"
-        " paired measurements and the declared settings"
+        " paired measurements, the earlier runs of each role on the same checkout with their"
+        " verdicts, the judge's observed error on the golden cases when a smoke run recorded it,"
+        " and the declared settings"
     )
 
 

@@ -3,7 +3,8 @@
 A launch whose worst-case budget would cross the run-level cap is refused, as is
 every later one; the refusal is recorded and the run marked incomplete. A session
 that reports no cost is counted at its full budget. The results file records,
-before any session launches, the flip rule's settings, and for the run its
+before any session launches, the flip rule's settings (margin, method, interval
+confidence, target pairs and slack, retry policy, noise-allowance source), and for the run its
 identifier, model and Claude Code version. An existing results file is replaced
 only with `--overwrite`; without it the run is refused at start, before any launch.
 """
@@ -66,6 +67,11 @@ def test_the_flip_rules_default_settings_are_recorded_before_any_session(tmp_pat
     assert settings.required_pairs == DEFAULT_REQUIRED_PAIRS
     assert settings.method.strip(), "the paired comparison's method is not recorded"
     assert 0 < settings.confidence < 1
+    assert settings.pair_slack >= 0
+    assert settings.retry_policy.strip(), "the retry policy for errored sessions is not recorded"
+    assert settings.allowance_source is None, (
+        "no calibration run was declared, so every allowance is zero"
+    )
 
 
 def test_declared_flip_settings_are_recorded_as_declared(tmp_path):

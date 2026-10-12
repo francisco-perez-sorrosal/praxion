@@ -183,9 +183,16 @@ def test_an_existing_output_is_refused_before_anything_else(
 
 @pytest.mark.usefixtures("no_launch")
 def test_a_role_with_no_task_kit_is_a_usage_error(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    code = cli.main([str(REPO_ROOT), "--role", "sentinel", "--output", str(tmp_path / "o.json")])
+    monkeypatch.setattr(tasks, "ROLE_KITS", {})
+    tasks.kit_for.cache_clear()
+    try:
+        code = cli.main(
+            [str(REPO_ROOT), "--role", "sentinel", "--output", str(tmp_path / "o.json")]
+        )
+    finally:
+        tasks.kit_for.cache_clear()  # the empty table's refusals must not outlive the patch
 
     assert code == 2
     assert "sentinel" in capsys.readouterr().err

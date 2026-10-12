@@ -13,15 +13,17 @@ import re
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
-from typing import assert_never, cast
+from typing import assert_never
 
-from praxion_evals.adherence.checks_common import COMMON_CHECKS
+from praxion_evals.adherence.checks_common import COMMON_CHECKS, judge_check
 from praxion_evals.adherence.model import (
     Binds,
+    CheckDef,
     CheckErrored,
     CheckOutcome,
     DoesNotBind,
     Errored,
+    JudgedCheck,
     Measured,
     MechanicalCheck,
     NotApplicable,
@@ -32,8 +34,8 @@ from praxion_evals.adherence.model import (
     SessionSetup,
     SessionStatus,
     TaskFacts,
-    TaskSpec,
 )
+from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.scenarios import _is_authored  # drops hook and toolchain byproducts
 from praxion_evals.live.session import (
     SessionEnvelope,
@@ -197,24 +199,22 @@ def _git_lines(repo_root: Path, *args: str) -> list[str]:
 def grade(
     evidence: SessionEvidence,
     check_names: Sequence[str],
-    judge: object | None,
+    judge: JudgeClient | None,
     setup: SessionSetup | None,
     *,
     real_home: Path | None = None,
 ) -> SessionStatus:
     """The session's one status. ``real_home``, when given, arms the real-home leak scan.
 
-    ``judge`` is accepted for the judged checks; the checks resolved here are all
-    mechanical, so it is not consulted yet.
+    ``judge`` rates the judged checks; given none, they are withheld as not requested.
     """
-    del judge
     failure = _infrastructure_error(evidence, setup, real_home)
     if failure is not None:
         return failure
     if evidence.spawn_id is None:
         return NotMeasured(f"the main session never spawned the {evidence.role}", setup)
     checks = [resolve_check(name) for name in check_names]
-    outcomes = {check.name: _outcome(check, evidence) for check in checks}
+    outcomes = {check.name: _outcome(check, evidence, judge) for check in checks}
     return Measured.for_checks(check_names, outcomes, first_request_tokens(evidence), setup)
 
 
@@ -228,26 +228,37 @@ def _infrastructure_error(
     return Errored(kind=error.kind, detail=error.detail, setup=setup)
 
 
-def resolve_check(name: str) -> MechanicalCheck:
+def resolve_check(name: str) -> CheckDef:
     try:
         return COMMON_CHECKS[name]
     except KeyError:
         raise ValueError(f"no check named {name!r}; known: {sorted(COMMON_CHECKS)}") from None
 
 
-def _outcome(check: MechanicalCheck, evidence: SessionEvidence) -> CheckOutcome:
-    """Bind first; a check that raises is an errored check, never a pass."""
+def _outcome(check: CheckDef, evidence: SessionEvidence, judge: JudgeClient | None) -> CheckOutcome:
+    """Bind first; a check or a judge that raises is an errored check, never a pass or a withhold."""
     try:
-        # The binding sees what the evidence knows of the task, not a generated task spec.
-        match check.binds(evidence.role, cast(TaskSpec, evidence.facts)):
+        match check.binds(evidence.role, evidence.facts):
             case DoesNotBind(reason=reason):
                 return NotApplicable(reason)
             case Binds():
-                return check.evaluate(evidence)
+                return _evaluate(check, evidence, judge)
             case binding:
                 assert_never(binding)
     except Exception as error:
         return CheckErrored(f"{check.name} raised {type(error).__name__}: {error}")
+
+
+def _evaluate(
+    check: CheckDef, evidence: SessionEvidence, judge: JudgeClient | None
+) -> CheckOutcome:
+    match check:
+        case MechanicalCheck():
+            return check.evaluate(evidence)
+        case JudgedCheck():
+            return judge_check(check, evidence, judge)
+        case _:
+            assert_never(check)
 
 
 def first_request_tokens(evidence: SessionEvidence) -> int | None:

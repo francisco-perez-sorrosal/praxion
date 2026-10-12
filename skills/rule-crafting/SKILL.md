@@ -5,7 +5,7 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 compatibility: Claude Code
 staleness_sensitive_sections:
   - "Context Hierarchy — What Loads, When, and Who Wins"
-  - "Path-Scoped Rules: Read-Only Loading Trigger"
+  - "Path-Scoped Rules: Loading Trigger"
 ---
 
 # Rules

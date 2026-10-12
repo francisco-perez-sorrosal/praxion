@@ -101,7 +101,7 @@ This is the load-bearing phase. **Decide** the transaction-layer architecture:
 ### Phase 4 — Trade-offs, ADR Fragments & Architecture Challenges
 
 1. For each load-bearing transaction decision, write the Options / Decision / Trade-offs block.
-2. Create ADR fragments in `.ai-state/decisions/drafts/` per `adr-conventions.md` (`made_by: agent`, `agent_type: agentic-transactions-architect`, `category: architectural`, `branch:` field from current git branch, full frontmatter + MADR body, `dec-draft-<sha1[:8]>` id derived from filename).
+2. Create ADR fragments in `.ai-state/decisions/drafts/` per `adr-conventions.md` (`made_by: agent`, `agent_type: agentic-transactions-architect`, `category:` set by the [`architectural` test](../rules/swe/adr-conventions.md#what-makes-a-decision-architectural), `branch:` field from current git branch, full frontmatter + MADR body, `dec-draft-<sha1[:8]>` id derived from filename). Filename and id construction: [`adr-authoring-protocols.md` § ADR Creation Protocol](../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create).
 3. For each architecture challenge drafted in Phase 3, write it into the `## Architecture Challenges` section of `TRANSACTIONS_DESIGN.md` (contested architectural decision / proposed alternative / safety rationale / blast-radius assessment / recommendation: adopt / adopt-with-modification / escalate-to-user). The orchestrator picks this up — you do not call the architect.
 4. Flag (do not write) that each ADR-fragment decision needs a `LEARNINGS.md ### Decisions Made` entry.
 

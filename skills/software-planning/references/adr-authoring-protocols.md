@@ -82,6 +82,8 @@ Not all agents create ADR fragments. The division follows decision-making author
 |-------|----------------------|-------------------------|
 | systems-architect | Yes | Yes |
 | implementation-planner | Yes | Yes |
+| interface-designer | Yes | Flags the entry; the orchestrator records it |
+| agentic-transactions-architect | Yes | Flags the entry; the orchestrator records it |
 | implementer | No | Yes |
 | test-engineer | No | Yes |
 | verifier | No | Yes |
@@ -93,13 +95,14 @@ User-authored direct-tier ADRs (no pipeline involvement) MAY be created directly
 
 ## Who Writes ADRs
 
-Per-agent when/scope/destination detail for the five ADR-creating roles (summary and the implementer's no-ADR rule live in the [adr-conventions rule § Who Writes ADRs](../../../rules/swe/adr-conventions.md#who-writes-adrs)):
+Per-agent when/scope/destination detail for the six ADR-creating roles (summary and the implementer's no-ADR rule live in the [adr-conventions rule § Who Writes ADRs](../../../rules/swe/adr-conventions.md#who-writes-adrs)):
 
 | Agent | When | Scope | Destination |
 |-------|------|-------|-------------|
 | systems-architect | Phase 4 (trade-off analysis) | Decisions meeting the [`architectural` test](../../../rules/swe/adr-conventions.md#what-makes-a-decision-architectural) — inventory, boundary, or published contract; lesser trade-offs are recorded at their true category | `.ai-state/decisions/drafts/` (fragment) |
 | implementation-planner | Step decomposition | Decisions affecting step ordering, module structure, approach | `.ai-state/decisions/drafts/` (fragment) |
 | interface-designer | Phase 4 (trade-off analysis) | Interface-layer decisions: UI framework / API paradigm / MCP tool decomposition / error format / pagination / component-pattern selection | `.ai-state/decisions/drafts/` (fragment) |
+| agentic-transactions-architect | Phase 4 (trade-off analysis) | Transaction-layer decisions: mandate model / HITL spend-gating / settlement and finality handling / broker or rail selection | `.ai-state/decisions/drafts/` (fragment) |
 | orchestrator | Direct/Lightweight tier, no pipeline agent spawned | Any decision worth preserving during an interactive session | `.ai-state/decisions/drafts/` (fragment; preferred) |
 | user | Manual (no session, no agent) | Any decision worth preserving | `.ai-state/decisions/drafts/` preferred; `<NNN>-<slug>.md` acceptable only for this manual path |
 

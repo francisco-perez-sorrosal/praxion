@@ -65,13 +65,13 @@ Finalize promotes drafts to finalized `<NNN>-<slug>.md` records at merge-to-main
 
 ### Who Writes ADRs
 
-Only systems-architect, implementation-planner, interface-designer, orchestrator (Direct/Lightweight, no pipeline agent spawned), and the user (manual) create ADR fragments, always under `.ai-state/decisions/drafts/`. **The implementer authors no ADR** and may apply only mechanical corpus edits a plan step specifies — flip a `status:`, set a cross-reference field, or correct malformed frontmatter; a new record, rationale, or category judgement returns to the architect or planner.
+Only systems-architect, implementation-planner, interface-designer, agentic-transactions-architect, orchestrator (Direct/Lightweight, no pipeline agent spawned), and the user (manual) create ADR fragments, always under `.ai-state/decisions/drafts/`. **The implementer authors no ADR** and may apply only mechanical corpus edits a plan step specifies — flip a `status:`, set a cross-reference field, or correct malformed frontmatter; a new record, rationale, or category judgement returns to the architect or planner.
 
 All ADR authors record decisions in `LEARNINGS.md ### Decisions Made`; `dec-draft-<hash>` references there rewrite to `dec-NNN` at finalize. Full per-agent When/Scope/Destination table: [`adr-authoring-protocols.md` § Who Writes ADRs](../../skills/software-planning/references/adr-authoring-protocols.md#who-writes-adrs).
 
 ### Agent Writing Protocol
 
-The fragment-creation procedure lives in [`adr-authoring-protocols.md § ADR Creation Protocol`](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create) — canonical for systems-architect and implementation-planner.
+The fragment-creation procedure lives in [`adr-authoring-protocols.md § ADR Creation Protocol`](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create) — canonical for every ADR-writing agent.
 
 ### Discovery Protocol
 

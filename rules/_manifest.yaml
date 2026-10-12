@@ -10,7 +10,7 @@ rules:
   load: always_on
   core: true
   install: symlink
-  chars: 2273
+  chars: 2487
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
   load: always_on

@@ -19,7 +19,7 @@ Contextual domain knowledge files loaded automatically based on relevance. Rules
 
 IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — each costs tokens every session. The always-loaded budget (CLAUDE.md files + unconditional rules) is **25,000 tokens** — a failure-mode guardrail, not a target. Every always-loaded token must earn its attention share: applied in >30% of sessions, or unconditionally relevant. Scope with `paths:`, or move to a skill, anything not universally needed.
 
-**Measure with `scripts/measure_token_budget.py`, never by hand.** The file set, the ceiling and the fallback all live there, and it counts real tokens when `ANTHROPIC_API_KEY` is set. That script is the authoritative basis — any site restating a divisor is a copy that will drift. Re-measure when touching an always-loaded rule. Measurement history (why the file set excludes catalog `README.md`s, why a divisor is not a measurement): `skills/rule-crafting/SKILL.md § Token budget measurement history`.
+**Measure with `scripts/measure_token_budget.py`, never by hand.** The file set, the ceiling and the fallback all live there, and it counts real tokens when `ANTHROPIC_API_KEY` is set. That script is the authoritative basis — any site restating a divisor is a copy that will drift. Re-measure when touching an always-loaded rule. Every reading names its tokenizer (`ruler`); the gate keeps the ruler its baseline was recorded on, and `--model <id>` gives a report-only reading on a current model's tokenizer, which counts the same text higher. Measurement history (why the file set excludes catalog `README.md`s, why a divisor is not a measurement): `skills/rule-crafting/SKILL.md § Token budget measurement history`.
 
 ## Installation
 

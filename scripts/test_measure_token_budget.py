@@ -1117,3 +1117,84 @@ def test_a_timed_out_count_falls_back_to_the_labelled_estimate(
     assert result.get("skipped") is not True, result
     samples = json.loads(baseline.read_text())["samples"]
     assert "estimate" in samples[-1]["basis"], samples[-1]
+
+
+# -- The ruler (which tokenizer a reading was taken on) -------------------------
+# Rulers differ by model generation, so a reading that does not name its ruler
+# cannot be compared with another; a non-default ruler must stay report-only.
+
+
+class _CountingResponse:
+    def __init__(self, tokens: int) -> None:
+        self._tokens = tokens
+
+    def __enter__(self) -> _CountingResponse:
+        return self
+
+    def __exit__(self, *exc_info: object) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps({"input_tokens": self._tokens}).encode()
+
+
+def _record_models(monkeypatch: pytest.MonkeyPatch, sent: list[str]) -> None:
+    def _fake_urlopen(request: object, timeout: float) -> _CountingResponse:
+        sent.append(json.loads(request.data)["model"])  # type: ignore[attr-defined]
+        return _CountingResponse(7)
+
+    monkeypatch.setattr(mtb.urllib.request, "urlopen", _fake_urlopen)
+
+
+def test_count_tokens_counts_on_the_requested_tokenizer(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: list[str] = []
+    _record_models(monkeypatch, sent)
+    mtb.count_tokens.cache_clear()
+    try:
+        mtb.count_tokens("text", "key", model="claude-opus-5-5")
+        mtb.count_tokens("text", "key")
+    finally:
+        mtb.count_tokens.cache_clear()
+
+    assert sent == ["claude-opus-5-5", mtb._MODEL], "each ruler is a separate count"
+
+
+def test_a_measured_reading_names_its_ruler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _repo(tmp_path)
+    _record_models(monkeypatch, [])
+    mtb.count_tokens.cache_clear()
+    try:
+        report = mtb.measure(tmp_path, api_key="key", model="claude-opus-5-5")
+    finally:
+        mtb.count_tokens.cache_clear()
+
+    assert report["ruler"] == "claude-opus-5-5"
+
+
+def test_an_estimate_names_no_ruler(tmp_path: Path) -> None:
+    """An estimate was taken on no tokenizer, so it must not claim one."""
+    _repo(tmp_path)
+
+    report = mtb.measure(tmp_path, api_key=None)
+
+    assert report["ruler"] is None
+
+
+def test_a_non_default_ruler_is_refused_alongside_the_ratchet(tmp_path: Path) -> None:
+    """The ratchet's samples and frozen ceiling were recorded on the default
+    ruler; a reading on another one would read as growth or shrinkage."""
+    with pytest.raises(SystemExit):
+        mtb.main(["--repo-root", str(tmp_path), "--ratchet", "--model", "claude-opus-5-5"])
+
+
+def test_a_non_default_ruler_skips_the_frozen_ceiling_envelope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _stub_report(monkeypatch, tokens=100, listing_tokens=10)
+    mtb.main(["--repo-root", str(tmp_path), "--json", "--model", "claude-opus-5-5"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert "t02_skipped" in payload
+    assert "findings" not in payload, "no T02 finding may come from a foreign ruler"

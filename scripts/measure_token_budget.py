@@ -38,6 +38,14 @@ is still an honest answer to "how many tokens right now," and the listing
 ceiling alone keeps its basis-mismatch guard (a mismatch there still fails
 open with an INFO note rather than diffing two different rulers).
 
+The tokenizer is a ruler, and rulers differ by model generation: the same
+bytes count about half again as many tokens on current models as on the
+gate's default `_MODEL`. The default stays fixed because every persisted
+sample and frozen ceiling was recorded on it -- switching it silently would
+read as corpus growth. Every measured reading names its `ruler`, and
+`--model` takes a report-only reading on another tokenizer; that reading
+never touches the ratchet, its baseline, or the frozen-ceiling comparisons.
+
 Stdlib-only, deliberately: the sentinel invokes this through the ambient
 interpreter, so a third-party import would make it a finding of the
 `ambient-import` gate-liveness check.
@@ -337,10 +345,12 @@ def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list
 
 
 @functools.lru_cache(maxsize=32)
-def count_tokens(text: str, api_key: str, timeout: float = _TIMEOUT) -> int | None:
-    """Real token count, or None when the API is unreachable.
+def count_tokens(
+    text: str, api_key: str, timeout: float = _TIMEOUT, model: str = _MODEL
+) -> int | None:
+    """Real token count on `model`'s tokenizer, or None when the API is unreachable.
 
-    Memoized per `(text, api_key)`: a process that ends up asking for the
+    Memoized per `(text, api_key, model)`: a process that ends up asking for the
     same corpus twice -- tests, or a future caller re-deriving an
     already-measured reading -- pays the network round-trip once, not twice.
     Use `count_tokens.cache_clear()` between tests that need a fresh call.
@@ -355,9 +365,7 @@ def count_tokens(text: str, api_key: str, timeout: float = _TIMEOUT) -> int | No
     """
     request = urllib.request.Request(  # noqa: S310 - fixed https endpoint
         _COUNT_TOKENS_URL,
-        data=json.dumps(
-            {"model": _MODEL, "messages": [{"role": "user", "content": text}]}
-        ).encode(),
+        data=json.dumps({"model": model, "messages": [{"role": "user", "content": text}]}).encode(),
         headers={
             "content-type": "application/json",
             "x-api-key": api_key,
@@ -371,13 +379,19 @@ def count_tokens(text: str, api_key: str, timeout: float = _TIMEOUT) -> int | No
         return None
 
 
-def measure(repo_root: Path, *, api_key: str | None = None, timeout: float = _TIMEOUT) -> dict:
+def measure(
+    repo_root: Path,
+    *,
+    api_key: str | None = None,
+    timeout: float = _TIMEOUT,
+    model: str = _MODEL,
+) -> dict:
     """Measure the always-loaded surface. Never raises on a missing key."""
     files = always_loaded_files(repo_root)
     blob = "\n".join(f.read_text(encoding="utf-8") for f in files)
     chars = len(blob.encode("utf-8"))
 
-    tokens = count_tokens(blob, api_key, timeout) if api_key else None
+    tokens = count_tokens(blob, api_key, timeout, model) if api_key else None
     measured = tokens is not None
     if not measured:
         tokens = round(chars / _FALLBACK_DIVISOR)
@@ -392,6 +406,7 @@ def measure(repo_root: Path, *, api_key: str | None = None, timeout: float = _TI
         "utilisation": round(tokens / BUDGET_TOKENS, 4),
         "basis": "tokenizer" if measured else f"estimate (bytes / {_FALLBACK_DIVISOR})",
         "measured": measured,
+        "ruler": model if measured else None,
         "chars_per_token": round(chars / tokens, 3) if measured else None,
         "reference_ratio": {"chars_per_token": _MEASURED_RATIO, "measured_on": _MEASURED_ON},
     }
@@ -450,7 +465,11 @@ _DISABLE_MODEL_INVOCATION_RE = re.compile(r"^disable-model-invocation:\s*true\s*
 
 
 def measure_listing(
-    repo_root: Path, *, api_key: str | None = None, timeout: float = _TIMEOUT
+    repo_root: Path,
+    *,
+    api_key: str | None = None,
+    timeout: float = _TIMEOUT,
+    model: str = _MODEL,
 ) -> dict:
     """Measure the listing surface as the model sees it: `description:` frontmatter only,
     minus entries `disable-model-invocation: true` removes outright.
@@ -475,7 +494,7 @@ def measure_listing(
     blob = "\n".join(descriptions)
     chars = len(blob.encode("utf-8"))
 
-    tokens = count_tokens(blob, api_key, timeout) if api_key else None
+    tokens = count_tokens(blob, api_key, timeout, model) if api_key else None
     measured = tokens is not None
     if not measured:
         tokens = round(chars / _FALLBACK_DIVISOR)
@@ -485,6 +504,7 @@ def measure_listing(
         "bytes": chars,
         "basis": "tokenizer" if measured else f"estimate (bytes / {_FALLBACK_DIVISOR})",
         "measured": measured,
+        "ruler": model if measured else None,
         "file_count": len(files),
     }
 
@@ -844,7 +864,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="fail --ratchet when --listing-ceiling is exceeded (default: report only)",
     )
+    parser.add_argument(
+        "--model",
+        default=_MODEL,
+        help=(
+            f"tokenizer to measure with (default {_MODEL}, the ruler every baseline sample "
+            "and frozen ceiling was recorded on); another model gives a report-only reading"
+        ),
+    )
     args = parser.parse_args(argv)
+    if args.ratchet and args.model != _MODEL:
+        parser.error(f"--model applies to the absolute reading only; --ratchet keeps {_MODEL}")
 
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -879,9 +909,15 @@ def main(argv: list[str] | None = None) -> int:
                 )
         return 0 if result["ratchet_ok"] else 1
 
-    report = measure(repo_root, api_key=api_key)
-    report["listing"] = measure_listing(repo_root, api_key=api_key)
-    report.update(_t02_envelope(report, repo_root))
+    report = measure(repo_root, api_key=api_key, model=args.model)
+    report["listing"] = measure_listing(repo_root, api_key=api_key, model=args.model)
+    if args.model == _MODEL:
+        report.update(_t02_envelope(report, repo_root))
+    else:
+        report["t02_skipped"] = (
+            f"the frozen ceilings were recorded on {_MODEL}; a {args.model} reading "
+            "is not comparable to them"
+        )
 
     if args.json:
         print(json.dumps(report, indent=2))
@@ -891,9 +927,13 @@ def main(argv: list[str] | None = None) -> int:
             f"{report['tokens']:,} / {report['budget']:,} tokens "
             f"({report['utilisation']:.1%}) — {verdict}"
         )
+        ruler = f" ({report['ruler']})" if report.get("ruler") else ""
         print(
-            f"  basis: {report['basis']} over {len(report['files'])} files, {report['bytes']:,} bytes"
+            f"  basis: {report['basis']}{ruler} over {len(report['files'])} files, "
+            f"{report['bytes']:,} bytes"
         )
+        if report.get("t02_skipped"):
+            print(f"  NOTE: report-only reading; {report['t02_skipped']}")
         if not report["measured"]:
             print(
                 "  NOTE: no ANTHROPIC_API_KEY — this is an estimate that errs high, not a measurement"

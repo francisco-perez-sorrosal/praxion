@@ -1,7 +1,8 @@
 ---
-id: dec-draft-b26172ec
+id: dec-455
+draft_id: dec-draft-b26172ec
 title: A PreToolUse gate keeps memory indexes to short pointers, backed by an audit command
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: "New hooks/guard_memory_index.py (PreToolUse Write|Edit) refuses a write to a Claude Code memory index (a project's auto-memory MEMORY.md or an agent-memory MEMORY.md) that would add a line over 150 characters, add content that is not a pointer, or grow the index past the harness load limit; existing debt never blocks a write. New scripts/check_memory_index.py holds the rules and audits whole indexes (too-long, not-a-pointer, dangling, duplicate, unindexed, over/near load limit). The live praxion-* agent indexes were shortened without loss (verifier 5,241 -> 2,920 tokens per spawn)."

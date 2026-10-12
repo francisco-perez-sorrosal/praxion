@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-12T00:25:31Z'
+generated_at: '2026-10-12T02:09:05Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -3363,6 +3363,12 @@ surfaces:
   title: Every Praxion agent carries the process core inline, and the shared-block gate requires it
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-455-memory-index-gate
+  path: .ai-state/decisions/455-memory-index-gate.md
+  type: markdown
+  title: A PreToolUse gate keeps memory indexes to short pointers, backed by an audit command
+  last_modified: '2026-10-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4171,6 +4177,7 @@ groups:
   - ai-state-decisions-452-skill-frontmatter-field-set-single-source
   - ai-state-decisions-453-rules-claude-md-is-a-directory-guide
   - ai-state-decisions-454-agents-carry-the-process-core
+  - ai-state-decisions-455-memory-index-gate
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -481,8 +481,9 @@ def measure_listing(
 
     Deliberately blind to `skillOverrides` in settings (td-197): an instrument that
     reads the same configuration as the thing it measures cannot confirm the
-    configuration took effect, and the `name-only` form was shown inert on two
-    independent instruments. Crediting it once reported 7,936 tokens for a listing
+    configuration took effect, and the Claude Code docs state plugin skills are not
+    affected by `skillOverrides` at all (the `name-only` form measured inert on two
+    independent instruments for exactly that reason). Crediting it once reported 7,936 tokens for a listing
     that measured 9,243 -- so this reading refuses to bank any override and reports
     the corpus the harness demonstrably renders."""
     files = listing_files(repo_root)

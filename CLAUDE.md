@@ -90,7 +90,7 @@ Full mode table, phase engine, and gate detail: `docs/onboarding.md`. Canonical-
 
 ## Known Claude Code Limitations
 
-Tracked Claude Code limitations and their workarounds — worktree nesting on the Agent tool, the `Explore` init crash in many-skill sessions, path-scoped rules injecting on Read (not Write/Edit), subagent `Write` denials to `.ai-work/`, and `claude agents` being refused inside a session — live in [`docs/claude-code-limitations.md`](docs/claude-code-limitations.md), each with its upstream issue and `td-NNN` ledger row. Revisit when Claude Code ships fixes.
+Tracked Claude Code limitations and their workarounds — worktree nesting on the Agent tool, the `Explore` init crash in many-skill sessions, path-scoped rules reaching a new file only after its first write, subagent `Write` denials to `.ai-work/`, and `claude agents` being refused inside a session — live in [`docs/claude-code-limitations.md`](docs/claude-code-limitations.md), each with its upstream issue and `td-NNN` ledger row. Revisit when Claude Code ships fixes.
 
 ## Obsidian Integration
 

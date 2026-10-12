@@ -159,7 +159,7 @@ Claude Code assembles always-loaded instruction context from a layered hierarchy
 | Project-local override | `./CLAUDE.local.md` | Always at launch; **`.gitignore` it** | Private per-project prefs (supported, not deprecated). Worktree caveat: exists only in the worktree where created — to share across worktrees, `@~/.claude/...`-import instead |
 | Subdirectory | `<subdir>/CLAUDE.md` | **On-demand** when Claude reads a file under `<subdir>/` — not at launch | Directory-local conventions (e.g. `scripts/CLAUDE.md`, `tests/CLAUDE.md`); keeps them off the launch-time always-loaded surface |
 
-Path-scoped rules (`paths:` frontmatter, in project or user `rules/`) sit alongside the project / user layers but load **on Read of a matching file** — see [Path-Scoped Rules: Read-Only Loading Trigger](#path-scoped-rules-read-only-loading-trigger).
+Path-scoped rules (`paths:` frontmatter, in project or user `rules/`) sit alongside the project / user layers but load **when a matching file is touched** (Read, Write/Edit, or a single-file Bash read) — see [Path-Scoped Rules: Loading Trigger](#path-scoped-rules-loading-trigger).
 
 - **`claudeMdExcludes`** — real setting (array; set in `.claude/settings.local.json` etc.; merges across layers): skip specific `CLAUDE.md` / rules files by absolute-path glob. Useful for monorepos with irrelevant ancestor files. Managed-policy `CLAUDE.md` can't be excluded.
 - **`InstructionsLoaded` hook** — the docs recommend it to log exactly which instruction files load, when, and why; it's the tool for debugging path-scoped rules and lazy-loaded subdirectory files. (`--add-dir` does *not* load `CLAUDE.md` from extra dirs unless `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`.)
@@ -242,17 +242,17 @@ The rule loads only when Claude is working on files matching the glob patterns.
 - `*.{ts,tsx}` — brace expansion for multiple extensions
 - `tests/` — all files under `tests/` directory
 
-### Path-Scoped Rules: Read-Only Loading Trigger
-<!-- last-verified: 2026-05-12 -->
+### Path-Scoped Rules: Loading Trigger
+<!-- last-verified: 2026-10-11 -->
 
-A path-scoped rule injects **only when Claude reads a file matching the glob** — not when it `Write`s, `Edit`s, or `MultiEdit`s one. This is a real gap, not a corner case:
+A path-scoped rule injects when Claude touches a file matching the glob: a Read, a `Write` or `Edit` (Claude Code 2.1.288 and later), or a single-file Bash read such as `cat`, `head` or `sed -n` (2.1.293). Before 2.1.288 only Read triggered it. One gap remains, and it is the one the mitigation exists for:
 
-- **Symptom**: an agent that *creates* a new file via `Write` without first reading a matching sibling never sees that file type's conventions. A new `.py`/`.ts` misses `coding-style.md`; a new doc misses `readme-style.md` / `diagram-conventions.md` / `html-output-conventions.md`; a new `.github/*.md` misses `pr-conventions.md`; a new file misses `id-citation-discipline.md`, `staleness-policy.md`, etc. The miss is **silent** — nothing warns you the rule didn't load.
-- **Why it's usually fine**: agents normally read existing files in a directory before working there, which incidentally loads the path-scoped rules. The gap bites on *greenfield file creation* in a directory the agent hasn't touched yet.
-- **Mitigation**: before creating a new file in a directory, read an existing sibling first (or, if the directory is empty, a canonical example of that file type elsewhere) so the path-scoped rules load into context. Praxion's `implementer`, `doc-engineer`, and `test-engineer` agent prompts carry this instruction.
-- **For a hard guarantee, use a hook** — a `PostToolUse(Write)` hook can re-inject the relevant rule deterministically. That's heavier to maintain; reach for it only if the prompt-level mitigation proves insufficient. (Rules shape behavior; hooks enforce it.)
+- **Symptom**: an agent that *creates* a new file composes the content inside its first `Write` call, so the rule that call triggers arrives after the content is written. A new `.py`/`.ts` is drafted without `coding-style.md`; a new doc without `readme-style.md` / `diagram-conventions.md` / `html-output-conventions.md`; a new `.github/*.md` without `pr-conventions.md`; any new file without `id-citation-discipline.md`, `staleness-policy.md`, etc. The miss is **silent**. Later edits of the same file do see the rule.
+- **Why it's usually fine**: agents normally read existing files in a directory before working there, which loads the path-scoped rules first. The gap bites on *greenfield file creation* in a directory the agent hasn't touched yet.
+- **Mitigation**: before creating a new file in a directory, read an existing sibling first (or, if the directory is empty, a canonical example of that file type elsewhere) so the path-scoped rules load before the content is composed. Praxion's `implementer`, `doc-engineer`, and `test-engineer` agent prompts carry this instruction. It also covers the other harnesses Praxion exports to: Cursor ignores rule globs, and Codex routes path rules through Praxion's rules bridge.
+- **For a hard guarantee, use a hook** — a `PreToolUse(Write)` hook that holds the first write of a new file until a matching rule has loaded is the deterministic version. That's heavier to maintain; reach for it only if the prompt-level mitigation proves insufficient. (Rules shape behavior; hooks enforce it.)
 
-Verified 2026-05-12 against `code.claude.com/docs/en/memory` + Claude Code issues [#23478](https://github.com/anthropics/claude-code/issues/23478), [#38487](https://github.com/anthropics/claude-code/issues/38487) (feature request — load path-scoped rules on Write/Edit), [#16853](https://github.com/anthropics/claude-code/issues/16853). **Windows note**: per [#21858](https://github.com/anthropics/claude-code/issues/21858), `paths:` frontmatter in `~/.claude/rules/` is ignored on Windows (closed-as-stale, not confirmed fixed; not reproduced on macOS/Linux) — on Windows, keep path-scoped rules under a project-level `.claude/rules/` instead.
+Verified 2026-10-11 against `code.claude.com/docs/en/memory` and the Claude Code changelog (2.1.288: path-scoped rules and nested CLAUDE.md load on Write/Edit; 2.1.293: on single-file Bash reads). Earlier history: [#23478](https://github.com/anthropics/claude-code/issues/23478) and the feature request [#38487](https://github.com/anthropics/claude-code/issues/38487) were closed before the behaviour shipped; [#16853](https://github.com/anthropics/claude-code/issues/16853) tracks multi-entry YAML `paths:` parsing. **Windows note**: per [#21858](https://github.com/anthropics/claude-code/issues/21858), `paths:` frontmatter in `~/.claude/rules/` is ignored on Windows (closed-as-stale, not confirmed fixed; not reproduced on macOS/Linux) — on Windows, keep path-scoped rules under a project-level `.claude/rules/` instead.
 
 ## Directory Organization
 

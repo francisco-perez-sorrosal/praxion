@@ -258,7 +258,7 @@ After completing the assessment, return a concise summary:
 ## Constraints
 
 - **Respect existing patterns.** Extend the project's documentation conventions, don't replace them.
-- **Path-scoped rules load on Read, not Write.** Before creating a *new* documentation file (README, architecture guide, etc.), read an existing sibling first (or, if there is none, a canonical example elsewhere) so the path-scoped writing conventions for that file type (`readme-style`, `diagram-conventions`, `html-output-conventions`, etc.) load into context — otherwise they silently do not.
+- **Path-scoped rules arrive only once a file is touched.** Before creating a *new* documentation file (README, architecture guide, etc.), read an existing sibling first (or, if there is none, a canonical example elsewhere) so the path-scoped writing conventions for that file type (`readme-style`, `diagram-conventions`, `html-output-conventions`, etc.) load into context before you write — a new file's first Write is otherwise composed without them.
 - **Right-size recommendations.** A small project with one README does not need a documentation overhaul. Match effort to the project's actual documentation needs.
 - **Don't over-engineer.** Do not create documentation for hypothetical future needs. Do not add sections that have no content.
 - **Filesystem is source of truth.** When documentation and the filesystem disagree, the filesystem wins.

@@ -74,8 +74,8 @@ SLACK_DIVISOR = 5
 FULL_SET_ROLES: frozenset[str] = frozenset({"researcher", "verifier", "implementer"})
 MIN_TEMPLATES = 5
 
-# A role writes its durable skeleton within its first three tool calls, so a cap below
-# this many turns would stop it before the form the early-stop check reads exists.
+# The harness floor for an early-stop cap: a lower cap stops a role before it can write
+# any partial form. Whether the early-stop check applies to a role is the check's call.
 WRITE_EARLY_TURNS = 6
 
 # The page the C6 variant points the researcher at, addressed as the raw GitHub file of
@@ -449,7 +449,7 @@ def _task_prompt(role: Role, slug: str) -> str:
     return spec.prompt.format(slug=slug, brief=spec.brief)
 
 
-def _variant_of(kit: Kit, template: Template, label: str) -> TaskVariant:
+def _variant_of(template: Template, label: str) -> TaskVariant:
     match label:
         case "ambiguity":
             return Standard(c3_plant=template.ambiguity)
@@ -501,7 +501,7 @@ def _pool(kit: Kit, template: Template, seed: int) -> list[TaskSpec]:
     offset = rng.randrange(len(kit.variants))
     labels = (*kit.variants[offset:], *kit.variants[:offset])
     return [
-        make_task(kit.role, template.template_id, fixture, _variant_of(kit, template, label), seed)
+        make_task(kit.role, template.template_id, fixture, _variant_of(template, label), seed)
         for fixture in fixtures
         for label in labels
     ]
@@ -684,10 +684,10 @@ def session_spec(
 
 
 def allowed_tools(arm_copy: ArmBuild) -> tuple[str, ...]:
-    """The spawn tool plus the role's own tool line, with its shell narrowed to read-only."""
+    """The spawn tool plus the role's own tool line, with any shell grant narrowed to read-only."""
     granted = [SPAWN_TOOL]
     for tool in _role_tools(arm_copy.copy_root / "agents" / f"{arm_copy.role}.md"):
-        granted.extend(READ_ONLY_BASH if tool == "Bash" else [tool])
+        granted.extend(READ_ONLY_BASH if tool.startswith("Bash") else [tool])
     return tuple(granted)
 
 

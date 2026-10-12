@@ -618,15 +618,22 @@ def test_an_interactive_role_is_told_it_runs_without_a_user(role):
 
 def test_the_consultant_is_given_a_registered_discipline_and_none_that_cannot_resolve():
     prompt = tasks.generate("discipline-consultant", SEED, 1)[0].main_prompt
+    registry = REPO_ROOT / "skills/multi-perspective-analysis/references/discipline-registry.md"
+    registered = set(re.findall(r"^\| ([a-z][a-z-]+) \|", registry.read_text(), re.MULTILINE))
 
-    assert prompt.startswith("Discipline: data-structure-specialist\n")
+    discipline = prompt.splitlines()[0].removeprefix("Discipline: ")
+    assert discipline in registered
     assert "unresolvable" not in prompt.lower()
 
 
 @pytest.mark.parametrize("role", ROLES)
 def test_every_template_builds_a_repository_with_its_inputs_and_overlays(role, tmp_path):
     kit = tasks.kit_for(role)
-    by_template = {task.template_id: task for task in _pool(role) if task.variant != EarlyStop(6)}
+    by_template = {
+        task.template_id: task
+        for task in _pool(role)
+        if task.variant != EarlyStop(tasks.WRITE_EARLY_TURNS)
+    }
 
     assert set(by_template) == {template.template_id for template in kit.templates}
     for template_id, task in by_template.items():
@@ -669,6 +676,7 @@ def test_the_allowed_tools_come_from_every_roles_definition(role, tmp_path):
 
     assert granted[0] == "Agent"
     assert len(granted) > 2
+    assert {tool for tool in granted if tool.startswith("Bash")} <= set(tasks.READ_ONLY_BASH)
 
 
 @pytest.mark.parametrize("fixture", ["ledger-cli", "notes-service"])

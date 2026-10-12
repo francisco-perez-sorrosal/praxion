@@ -11,6 +11,7 @@ from praxion_evals.adherence.checks_common import (
 )
 from praxion_evals.adherence.model import (
     Failed,
+    MechanicalCheck,
     NotApplicable,
     Passed,
     Withheld,
@@ -221,15 +222,17 @@ def test_a_forced_stop_with_no_recorded_return_is_not_applicable_either():
 # ---------------------------------------------------------------------------
 
 
-def test_the_table_holds_the_common_checks_by_name():
-    assert sorted(COMMON_CHECKS) == ["C1", "C2"]
-    assert all(check.common and check.kind == "mechanical" for check in COMMON_CHECKS.values())
+def test_the_table_holds_the_common_checks_by_name_and_only_c3_is_judged():
+    assert sorted(COMMON_CHECKS) == ["C1", "C2", "C3", "C4", "C5", "C6"]
+    assert all(check.common for check in COMMON_CHECKS.values())
+    assert {name for name, check in COMMON_CHECKS.items() if check.kind == "judged"} == {"C3"}
 
 
-@pytest.mark.parametrize("name", sorted(COMMON_CHECKS))
+@pytest.mark.parametrize("name", ["C1", "C2"])
 def test_each_checks_canary_is_flagged_failed(name):
     check = COMMON_CHECKS[name]
 
+    assert isinstance(check, MechanicalCheck)
     assert isinstance(check.evaluate(check.violation()), Failed)
 
 

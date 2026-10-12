@@ -146,6 +146,8 @@ def test_a_command_that_only_mentions_the_forbidden_words_passes(command):
         ("git commit -m 'feat: done'", "git commit"),
         ("git add src/app.py && git commit -m x", "git commit"),
         ("git -C /work/repo commit --amend", "git commit"),
+        ("git --git-dir /x/.git commit -m y", "git commit"),
+        ("git --work-tree /x push origin main", "git push"),
         ("git restore src/app.py", "git restore"),
         ("git reset --hard HEAD~1", "git reset --hard"),
         ("git rebase main", "git rebase"),

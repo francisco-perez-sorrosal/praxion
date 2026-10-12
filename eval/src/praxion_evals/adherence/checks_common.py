@@ -385,7 +385,7 @@ def _judged_or_errored(check: JudgedCheck, artifact: str, judge: JudgeClient) ->
 
 _SEGMENT_BREAKS = frozenset({";", "&&", "||", "|", "&", "(", ")"})
 _COMMAND_PREFIXES = frozenset({"command", "time", "sudo", "nohup", "exec"})
-_GIT_OPTIONS_WITH_VALUE = frozenset({"-C", "-c"})
+_GIT_OPTIONS_WITH_VALUE = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace"})
 # The role's shell grant is read-only, so a harness that refuses one of these leaves no trace
 # in the repository: the recorded attempt is the evidence.
 _HISTORY_WRITERS = frozenset({"commit", "restore", "rebase", "merge", "push"})

@@ -1,5 +1,6 @@
 ---
-id: dec-draft-0b5f22b8
+id: dec-456
+draft_id: dec-draft-0b5f22b8
 title: The always-loaded budget counts on the current-generation tokenizer and keeps its 25,000 ceiling
 status: accepted
 category: behavioral

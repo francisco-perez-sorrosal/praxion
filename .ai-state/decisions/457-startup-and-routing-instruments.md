@@ -1,5 +1,6 @@
 ---
-id: dec-draft-18262e44
+id: dec-457
+draft_id: dec-draft-18262e44
 title: Startup payload and agent routing are measured by two committed instruments
 status: accepted
 category: architectural

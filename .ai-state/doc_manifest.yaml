@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-12T02:09:05Z'
+generated_at: '2026-10-12T03:17:51Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -3369,6 +3369,18 @@ surfaces:
   title: A PreToolUse gate keeps memory indexes to short pointers, backed by an audit command
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-456-budget-ruler-current-generation
+  path: .ai-state/decisions/456-budget-ruler-current-generation.md
+  type: markdown
+  title: The always-loaded budget counts on the current-generation tokenizer and keeps its 25,000 ceiling
+  last_modified: '2026-10-11'
+  renderer: adr_card
+- id: ai-state-decisions-457-startup-and-routing-instruments
+  path: .ai-state/decisions/457-startup-and-routing-instruments.md
+  type: markdown
+  title: Startup payload and agent routing are measured by two committed instruments
+  last_modified: '2026-10-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4178,6 +4190,8 @@ groups:
   - ai-state-decisions-453-rules-claude-md-is-a-directory-guide
   - ai-state-decisions-454-agents-carry-the-process-core
   - ai-state-decisions-455-memory-index-gate
+  - ai-state-decisions-456-budget-ruler-current-generation
+  - ai-state-decisions-457-startup-and-routing-instruments
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

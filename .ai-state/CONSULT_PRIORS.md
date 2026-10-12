@@ -117,6 +117,12 @@ the first.
 | 2026-09-06T18:17:43Z | rust-first-class | evidence-appraiser | architecture | CH-06 | novel |  | d7b26028d29c61e1d6ae6e8c6394b57fad630dd2 | 5 |
 | 2026-09-06T18:17:43Z | rust-first-class | evidence-appraiser | architecture | CH-07 | novel |  | d7b26028d29c61e1d6ae6e8c6394b57fad630dd2 | 5 |
 | 2026-09-06T18:17:43Z | rust-first-class | evidence-appraiser | architecture | CH-08 | novel |  | d7b26028d29c61e1d6ae6e8c6394b57fad630dd2 | 5 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-01 | novel |  | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-02 | matched | P-04 | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-03 | matched | P-04 | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-04 | novel |  | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-05 | novel |  | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-06 | matched | P-06 | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
 
 ## Column Definitions
 

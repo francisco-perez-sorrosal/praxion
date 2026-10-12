@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-12T03:17:51Z'
+generated_at: '2026-10-12T12:02:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -130,7 +130,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -571,7 +571,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -602,7 +602,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -616,7 +616,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3381,6 +3381,18 @@ surfaces:
   title: Startup payload and agent routing are measured by two committed instruments
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-458-process-adherence-eval-family
+  path: .ai-state/decisions/458-process-adherence-eval-family.md
+  type: markdown
+  title: Process-adherence eval as a third opt-in console entry and package over the live runner's boundary layer
+  last_modified: '2026-10-12'
+  renderer: adr_card
+- id: ai-state-decisions-459-flip-rule-point-estimate-calibrated
+  path: .ai-state/decisions/459-flip-rule-point-estimate-calibrated.md
+  type: markdown
+  title: The lean-spawn flip rule gates on paired point estimates with a calibrated noise allowance, lists every run, and recounts lean-only errors as failures
+  last_modified: '2026-10-12'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4192,6 +4204,8 @@ groups:
   - ai-state-decisions-455-memory-index-gate
   - ai-state-decisions-456-budget-ruler-current-generation
   - ai-state-decisions-457-startup-and-routing-instruments
+  - ai-state-decisions-458-process-adherence-eval-family
+  - ai-state-decisions-459-flip-rule-point-estimate-calibrated
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-33a753e3
+id: dec-458
+draft_id: dec-draft-33a753e3
 title: Process-adherence eval as a third opt-in console entry and package over the live runner's boundary layer
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: Adds the praxion_evals.adherence package and its own opt-in console entry, praxion-evals-adherence, which measures per-role process adherence in paired full/lean arms (lean = runner-owned copy with omitClaudeMd on the measured role), spawning each role through a harness-fixed thin main session, grading C1-C6 plus the alignment map's role checks (each naming its rule file and section) into a closed outcome sum type, and computing per-role paired verdicts; it reuses live/session, materialize, spend and the error kinds, extends live/session.parse_stream additively, and narrows dec-040 clause 3 exactly as dec-392 did (isolated, operator-invoked sessions only).

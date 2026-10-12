@@ -1,7 +1,8 @@
 ---
-id: dec-draft-e471117c
+id: dec-459
+draft_id: dec-draft-e471117c
 title: The lean-spawn flip rule gates on paired point estimates with a calibrated noise allowance, lists every run, and recounts lean-only errors as failures
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-12
 summary: "After the applied-statistics consult (six challenges, all switch-now): a judged check is non-inferior when the lean arm's pass rate over complete pairs is no more than the declared margin (10 pp) below the full arm's, with the one-sided score interval reported and never claimed as a bound; a mechanical check regresses when lean fails more pairs than full by more than a per-check allowance derived from a same-arm calibration run (zero until calibrated, which is today's strict rule); the flip verdict uses the worst-case recount in which a pair errored on the lean side only counts as a lean failure; a role's task set carries slack above the target and an errored session gets one infrastructure-only retry; the report lists every run of the role on that checkout so a rerun cannot be read as a fresh draw; judge error is stated as attenuating, not conservative, and the smoke run judges a golden good case beside each golden bad case."

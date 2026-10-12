@@ -104,9 +104,10 @@ The first positional argument is the plugin checkout under test (default: this r
 | `--seed N` | Task-list seed (default 7); the same seed reproduces the same tasks |
 | `--max-total-usd`, `--session-budget-usd` | Run-level cap (default 50) and per-session budget (default 3) |
 | `--required-pairs N`, `--pair-slack N` | Target complete pairs per role (default 20) and slack above it (default a fifth of the target, at least four) |
+| `--max-tasks N` | Cap the tasks generated per role below the target plus slack; the declared target is unchanged, so a run capped under its target is underpowered by construction (a smoke run). `--dry-run` prints the planned count per role |
 | `--margin-pp`, `--confidence` | Judged-check non-inferiority margin in percentage points (default 10) and interval confidence (default 0.95); declared in the results file before the first session |
 | `--calibration` | Run the `full` arm against itself; mutually exclusive with `--calibration-run` |
-| `--calibration-run FILE` | Take each mechanical check's allowance from this calibration file; without it every allowance is zero |
+| `--calibration-run FILE` | Take each mechanical check's allowance, per role and check, from this calibration file; refused before any launch unless the file measured this checkout and has pairs of every named role. Without it every allowance is zero |
 | `--judge-golden` | Judge each judged check's golden good and bad case once and record both verdicts |
 | `--no-judge` | Withhold judged checks |
 | `--model`, `--effort` | Session model and effort (defaults `opus`, `medium`) |

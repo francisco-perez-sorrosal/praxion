@@ -117,6 +117,7 @@ class RunConfig:
     judge_golden: bool
     report: Path | None
     fixture_pages_base_url: str | None
+    max_tasks: int | None = None  # a cap on the tasks per role, below the target plus slack
 
 
 @dataclass(frozen=True)
@@ -176,14 +177,14 @@ def begin(
     config: RunConfig,
     checkout: Checkout,
     planned: Mapping[Role, list[TaskSpec]],
-    declare: Callable[[RunConfig], DeclaredSettings],
+    declare: Callable[[RunConfig, Checkout], DeclaredSettings],
 ) -> tuple[Context, RunState]:
     """Check the credential, declare the settings, write the provisional results file."""
     if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
         raise ValueError(
             f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
         )
-    settings = declare(config)
+    settings = declare(config, checkout)
     judge = _open_judge(config)
     version = query_claude_version()
     started = datetime.now(UTC)
@@ -633,7 +634,7 @@ def _attempt[R](
     settles at nothing. The sandbox outlives the assessment because a check may run a script
     against the scratch repository.
     """
-    config, budget = context.config, context.config.session_budget_usd
+    budget = context.config.session_budget_usd
     started_at, began = datetime.now(UTC).isoformat(), time.monotonic()
 
     def finish(result: R | Errored, charged: float) -> Attempt[R]:
@@ -642,50 +643,88 @@ def _attempt[R](
     reserved = ledger.reserve(budget)
     if isinstance(reserved, LiveErrored):
         return ledger, finish(Errored("launch_refused", reserved.detail), 0.0)
-    parent = context.run_root / task.role / "sessions"
-    parent.mkdir(parents=True, exist_ok=True)
-    root = Path(tempfile.mkdtemp(prefix="s-", dir=parent))
+    root = _new_sandbox_root(context, task)
     try:
-        sandbox = SandboxPaths(root)
         try:
-            populate(root)
-            commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
-            spec = tasks.session_spec(
-                task,
-                build,
-                sandbox,
-                model=config.model,
-                effort=config.effort,
-                max_budget_usd=budget,
-            )
-            run = run_session(spec, build_env(root, os.environ))
+            run, commit = _launch(context, task, build, populate, page_url, root)
         except Exception as error:  # nothing was started, so nothing was spent
-            crashed = Errored("evaluation_exception", f"{type(error).__name__}: {error}")
-            return reserved.settle(budget, 0.0), finish(crashed, 0.0)
-        final = parse_stream(run.stdout).final_result
-        cost = None if final is None else final.total_cost_usd
-        settled, charged = reserved.settle(budget, cost), budget if cost is None else cost
+            return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
+        settled, charged = _settle(reserved, budget, run)
         try:
-            evidence = grade.evidence_from_recording(
-                role=task.role,
-                envelope=run.stdout,
-                repo_root=tasks.scratch_dir(sandbox),
-                fixture_commit=commit,
-                sandbox=root,
-                plugin_copy=build.copy_root,
-                slug=task.slug,
-                exit_code=run.exit_code,
-                timed_out=run.timed_out,
-                judging=context.judge is not None,
-                **_task_facts(task, page_url is not None),
-            )
+            evidence = _evidence(context, task, build, page_url, root, run, commit)
             return settled, finish(assess(evidence), charged)
         except Exception as error:  # one unreadable session must not discard the paid run
-            crashed = Errored("evaluation_exception", f"{type(error).__name__}: {error}")
-            return settled, finish(crashed, charged)
+            return settled, finish(_crash(error), charged)
     finally:
-        if not config.keep_sandbox:
+        if not context.config.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
+
+
+def _crash(error: Exception) -> Errored:
+    return Errored("evaluation_exception", f"{type(error).__name__}: {error}")
+
+
+def _new_sandbox_root(context: Context, task: TaskSpec) -> Path:
+    parent = context.run_root / task.role / "sessions"
+    parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix="s-", dir=parent))
+
+
+def _launch(
+    context: Context,
+    task: TaskSpec,
+    build: ArmBuild,
+    populate: Callable[[Path], None],
+    page_url: str | None,
+    root: Path,
+) -> tuple[SessionRun, str]:
+    """Populate the sandbox, build the scratch repository, start the session and wait for it.
+
+    Returns the finished run and the fixture commit the scratch repository starts from.
+    """
+    config, sandbox = context.config, SandboxPaths(root)
+    populate(root)
+    commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
+    spec = tasks.session_spec(
+        task,
+        build,
+        sandbox,
+        model=config.model,
+        effort=config.effort,
+        max_budget_usd=config.session_budget_usd,
+    )
+    return run_session(spec, build_env(root, os.environ)), commit
+
+
+def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:
+    """Settle the reservation at the reported cost, or at the full budget when none was reported."""
+    final = parse_stream(run.stdout).final_result
+    cost = None if final is None else final.total_cost_usd
+    return ledger.settle(budget, cost), budget if cost is None else cost
+
+
+def _evidence(
+    context: Context,
+    task: TaskSpec,
+    build: ArmBuild,
+    page_url: str | None,
+    root: Path,
+    run: SessionRun,
+    commit: str,
+) -> SessionEvidence:
+    return grade.evidence_from_recording(
+        role=task.role,
+        envelope=run.stdout,
+        repo_root=tasks.scratch_dir(SandboxPaths(root)),
+        fixture_commit=commit,
+        sandbox=root,
+        plugin_copy=build.copy_root,
+        slug=task.slug,
+        exit_code=run.exit_code,
+        timed_out=run.timed_out,
+        judging=context.judge is not None,
+        **_task_facts(task, page_url is not None),
+    )
 
 
 def _task_facts(task: TaskSpec, page_available: bool) -> dict[str, Any]:

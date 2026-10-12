@@ -3,8 +3,8 @@
 Every sum is a closed set of frozen dataclasses and every invariant is
 enforced where the value is built, so the interior never re-validates: a
 ``Measured`` status holds the outcomes of its checks and nothing else, an
-``Underpowered`` role has no flip by construction, a ``Proven`` arm proof
-cannot be built unless the proof holds. Raw strings are parsed once, at the
+``Underpowered`` role has no flip by construction, an ``ArmBuild`` cannot
+patch a file it should not. Raw strings are parsed once, at the
 codecs at the bottom of this module.
 
 Pure: nothing here touches a process, a file or a clock.
@@ -392,32 +392,11 @@ class ArmBuild:
 
 
 @dataclass(frozen=True)
-class Proven:
-    """The lean arm is shown lean: its spawn missed the nonce and its first request is smaller."""
-
-    full_nonce_seen: bool
-    lean_nonce_seen: bool
-    full_tokens: int
-    lean_tokens: int
-
-    def __post_init__(self) -> None:
-        _require(self.full_nonce_seen, "the full spawn must echo the planted nonce")
-        _require(not self.lean_nonce_seen, "the lean spawn must not echo the planted nonce")
-        _require(
-            0 < self.lean_tokens < self.full_tokens,
-            "the lean first request must be smaller than the full one",
-        )
-
-
-@dataclass(frozen=True)
 class NotBuilt:
     reason: str
 
     def __post_init__(self) -> None:
         _non_empty(self.reason, "a not-built reason")
-
-
-ArmProof = Proven | NotBuilt
 
 
 # ---------------------------------------------------------------------------
@@ -533,7 +512,7 @@ class DeclaredSettings:
     pair_slack: int
     retry_policy: str
     allowance_source: str | None  # a same-arm calibration run id; None: every allowance is zero
-    allowances: Mapping[str, int]
+    allowances: Mapping[str, int]  # by `allowance_key(check, role)`
 
     def __post_init__(self) -> None:
         _require(0 < self.margin_pp < 100, "the margin is a percentage between 0 and 100")
@@ -554,8 +533,18 @@ class DeclaredSettings:
         _require(all(k >= 0 for k in self.allowances.values()), "an allowance is not negative")
         _frozen(self, "allowances", self.allowances)
 
-    def allowance(self, check: str) -> int:
-        return self.allowances.get(check, 0)
+    def allowance(self, check: str, role: str | None = None) -> int:
+        """The noise allowance of ``check`` as ``role`` measured it; zero when none is declared.
+
+        A calibration run declares one allowance per (role, check) and a role never reads
+        another's. A caller with no role reads the bare check name.
+        """
+        return self.allowances.get(allowance_key(check, role), 0)
+
+
+def allowance_key(check: str, role: str | None = None) -> str:
+    """The key of an allowance in ``DeclaredSettings.allowances``: ``role/check``, or the bare check."""
+    return check if role is None else f"{role}/{check}"
 
 
 # ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ from praxion_evals.adherence.model import (
     DeclaredSettings,
     Role,
     TaskSpec,
+    allowance_key,
 )
 from praxion_evals.adherence.session_loop import (
     EXIT_COMPLETE,
@@ -131,6 +132,12 @@ def _parser() -> argparse.ArgumentParser:
     add("--margin-pp", type=float, default=DEFAULT_MARGIN_PP)
     add("--required-pairs", type=_number(int, 1), default=tasks.DEFAULT_TARGET)
     add("--pair-slack", type=_number(int, 0), default=None)
+    add(
+        "--max-tasks",
+        type=_number(int, 1),
+        help="cap the tasks per role below the target plus slack; the target is unchanged, "
+        "so a run capped under its target is underpowered by construction (a smoke run)",
+    )
     add("--confidence", type=float, default=DEFAULT_CONFIDENCE)
     add("--no-judge", dest="judging", action="store_false")
     add("--model", default=DEFAULT_MODEL)
@@ -184,15 +191,23 @@ def declared_settings(
 
 
 def calibrated_allowances(
-    path: Path, roles: Sequence[Role], confidence: float
+    path: Path, roles: Sequence[Role], confidence: float, commit: str
 ) -> tuple[str, dict[str, int]]:
-    """The run id and each mechanical check's noise allowance from a same-arm calibration run.
+    """The run id and each role's mechanical-check noise allowances from a calibration run.
 
-    A check shared by several roles takes the widest allowance any of them showed.
+    An allowance is an absolute count measured on one checkout and one role, so the file is
+    refused when it measured another checkout or lacks pairs of a named role; a check
+    shared by several roles keeps one allowance per role, never the widest of them.
     """
     calibration = results.load(path)
     if not calibration.run.extra.get("calibration"):
         raise ValueError(f"{path} is not a calibration run")
+    measured = (calibration.run.extra.get("checkout") or {}).get("commit")
+    if measured != commit:
+        raise ValueError(
+            f"the calibration run {calibration.run.id} measured checkout {measured}, not "
+            f"{commit}: an allowance does not carry across checkouts"
+        )
     allowances: dict[str, int] = {}
     for role in roles:
         pairs = results.pairs_of(calibration, role)
@@ -201,26 +216,32 @@ def calibrated_allowances(
         mechanical = {e.name for e in calibration.catalog.get(role, ()) if e.kind == "mechanical"}
         for name, allowance in verdict.allowances_from_calibration(pairs, confidence).items():
             if name in mechanical:
-                allowances[name] = max(allowances.get(name, 0), allowance)
+                allowances[allowance_key(name, role)] = allowance
     return calibration.run.id, allowances
 
 
-def _declare(config: RunConfig) -> DeclaredSettings:
+def _declare(config: RunConfig, checkout: Checkout) -> DeclaredSettings:
     """The settings a paid run declares, with the noise allowances of its calibration run if any."""
     source, allowances = None, {}
     if config.calibration_run is not None:
         source, allowances = calibrated_allowances(
-            config.calibration_run, config.roles, config.confidence
+            config.calibration_run, config.roles, config.confidence, checkout.commit
         )
     return declared_settings(config, source, allowances)
 
 
 def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:
-    """Target plus slack for a full-set role, smoke tasks otherwise, never more than exist."""
+    """Target plus slack for a full-set role, smoke tasks otherwise, capped by ``--max-tasks``.
+
+    Never more than exist. The cap leaves the declared target alone, so a run capped under
+    its target cannot reach it and is reported underpowered.
+    """
     plan = {}
     for role in config.roles:
         wanted = config.required_pairs + config.pair_slack
         wanted = wanted if role in tasks.FULL_SET_ROLES else tasks.SMOKE_TASKS
+        if config.max_tasks is not None:
+            wanted = min(wanted, config.max_tasks)
         count = min(wanted, tasks.producible_task_count(role, config.seed))
         plan[role] = tasks.generate(role, config.seed, count)
     return plan
@@ -234,6 +255,7 @@ def _print_dry_run(
 ) -> int:
     run_root = Path(tempfile.gettempdir()) / f"{SANDBOX_PREFIX}<run>"
     for role, role_tasks in planned.items():
+        print(f"{role}: {len(role_tasks)} tasks (target {config.required_pairs})", file=sys.stderr)
         for index, task in enumerate(role_tasks):
             for arm in config.arms:
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")

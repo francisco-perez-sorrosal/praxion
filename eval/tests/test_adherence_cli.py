@@ -17,7 +17,14 @@ from praxion_evals.adherence import cli, results, session_loop, tasks
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
-from praxion_evals.adherence.model import CheckErrored, Errored, Failed, Measured, Passed
+from praxion_evals.adherence.model import (
+    CheckErrored,
+    Errored,
+    Failed,
+    Measured,
+    Passed,
+    allowance_key,
+)
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.harness.schemas import JudgeVerdict
 from praxion_evals.live.session import SessionRun, SessionSpec
@@ -34,6 +41,7 @@ SMALL_RUN = [
     "1",
 ]
 FULL_TOKENS, LEAN_TOKENS = 5000, 1000
+COMMIT = "f" * 40
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +106,7 @@ def test_a_calibration_run_measures_the_full_arm_only() -> None:
         ["--role", ROLE, "--confidence", "1.5"],
         ["--role", ROLE, "--max-total-usd", "0"],
         ["--role", ROLE, "--required-pairs", "0"],
+        ["--role", ROLE, "--max-tasks", "0"],
         ["--role", ROLE, "--calibration", "--arm", "lean"],
         ["--role", ROLE, "--calibration", "--calibration-run", "earlier.json"],
         ["--role", ROLE, "--judge-golden", "--no-judge"],
@@ -156,6 +165,28 @@ def test_a_dry_run_of_a_calibration_lists_the_full_arm_only(
     lines = _dry_run(capsys, tmp_path, "--role", ROLE, "--calibration")
 
     assert {line["arm"] for line in lines} == {"full"}
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_capped_dry_run_plans_that_many_tasks_per_role_per_arm_and_keeps_the_target(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    argv = [str(REPO_ROOT), "--output", str(tmp_path / "out.json"), "--dry-run", "--role", ROLE]
+
+    assert cli.main([*argv, "--max-tasks", "2", "--required-pairs", "20"]) == 0
+
+    captured = capsys.readouterr()
+    lines = [json.loads(line) for line in captured.out.splitlines()]
+    assert len(lines) == 2 * 2
+    assert len({line["task_id"] for line in lines}) == 2
+    assert "researcher: 2 tasks (target 20)" in captured.err
+
+
+def test_a_cap_above_the_target_plus_slack_changes_nothing() -> None:
+    capped = cli.plan_tasks(cli.parse_config(["--role", ROLE, "--max-tasks", "1000"]))
+    plain = cli.plan_tasks(cli.parse_config(["--role", ROLE]))
+
+    assert capped == plain
 
 
 @pytest.mark.usefixtures("no_launch")
@@ -451,9 +482,11 @@ def test_a_calibration_run_records_the_full_arm_twice_and_declares_the_allowance
     assert _sessions(calibration) == [("full", "Measured"), ("lean", "Measured")]
     assert {"lean" in s.plugin_dir.name for s in script.specs} == {False}
     source, allowances = cli.calibrated_allowances(
-        tmp_path / "calibration.json", (ROLE,), cli.DEFAULT_CONFIDENCE
+        tmp_path / "calibration.json", (ROLE,), cli.DEFAULT_CONFIDENCE, _commit(calibration)
     )
-    mechanical = {c.name for c in check_catalog(ROLE) if c.kind == "mechanical"}
+    mechanical = {
+        allowance_key(c.name, ROLE) for c in check_catalog(ROLE) if c.kind == "mechanical"
+    }
     assert source == calibration.run.id
     assert set(allowances) <= mechanical
     declared = _run(
@@ -475,7 +508,61 @@ def test_a_results_file_that_is_not_a_calibration_run_gives_no_allowances(
     _run(tmp_path, "--max-total-usd", "0.5", name="ordinary.json")
 
     with pytest.raises(ValueError, match="not a calibration run"):
-        cli.calibrated_allowances(tmp_path / "ordinary.json", (ROLE,), 0.95)
+        cli.calibrated_allowances(tmp_path / "ordinary.json", (ROLE,), 0.95, COMMIT)
+
+
+def _commit(loaded: results.RunResults) -> str:
+    return loaded.run.extra["checkout"]["commit"]
+
+
+def test_a_calibration_run_from_another_checkout_is_refused_with_the_reason(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    calibration = _run(tmp_path, "--calibration", name="calibration.json")[1]
+    elsewhere = "0" * 40
+
+    with pytest.raises(
+        ValueError, match=f"measured checkout {_commit(calibration)}, not {elsewhere}"
+    ):
+        cli.calibrated_allowances(tmp_path / "calibration.json", (ROLE,), 0.95, elsewhere)
+
+
+def test_a_calibration_run_that_lacks_a_named_role_is_refused_before_any_launch(
+    paid: Callable[[Script], None], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    script = Script()
+    paid(script)
+    _run(tmp_path, "--calibration", name="calibration.json")
+    launched = len(script.specs)
+    argv = [
+        str(REPO_ROOT),
+        "--role",
+        ROLE,
+        "--role",
+        "verifier",
+        "--output",
+        str(tmp_path / "flip.json"),
+        "--calibration-run",
+        str(tmp_path / "calibration.json"),
+        *SMALL_RUN,
+    ]
+
+    assert cli.main(argv) == cli.EXIT_USAGE
+    assert "has no pairs of verifier" in capsys.readouterr().err
+    assert len(script.specs) == launched
+    assert not (tmp_path / "flip.json").exists()
+
+
+def test_an_allowance_is_declared_per_role_and_check_and_read_by_that_role_only() -> None:
+    settings = cli.declared_settings(
+        cli.parse_config(["--role", ROLE, "--role", "verifier"]),
+        "calibration-1",
+        {allowance_key("C1", ROLE): 3},
+    )
+
+    assert settings.allowance("C1", ROLE) == 3
+    assert settings.allowance("C1", "verifier") == 0
 
 
 def test_golden_cases_are_judged_once_and_recorded_before_any_session(

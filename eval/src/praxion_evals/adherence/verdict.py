@@ -56,9 +56,15 @@ PARAMETER_CEILING = 1.0
 
 
 def role_verdict(
-    checks: Mapping[str, CheckKind], pairs: Sequence[Pair], settings: DeclaredSettings
+    checks: Mapping[str, CheckKind],
+    pairs: Sequence[Pair],
+    settings: DeclaredSettings,
+    role: str | None = None,
 ) -> RoleVerdict:
-    """The flip verdict for one role, from its checks (name -> kind) and its pairs."""
+    """The flip verdict for one role, from its checks (name -> kind) and its pairs.
+
+    ``role`` selects the role's own noise allowances; without it the bare check names are read.
+    """
     complete = sum(pair.complete for pair in pairs)
     if complete < settings.required_pairs:
         return Underpowered(
@@ -76,7 +82,7 @@ def role_verdict(
             not_covered[name] = _why_not_covered(name, recounted)
             continue
         lean_failures[name] = counts.lean_failures
-        verdicts[name] = _decide(name, kind, counts, settings)
+        verdicts[name] = _decide(name, kind, counts, settings, role)
     return Assessed(complete, verdicts, not_covered, lean_failures)
 
 
@@ -132,10 +138,12 @@ def _unscored_reason(status: SessionStatus, check: str) -> str | None:
     return None
 
 
-def _decide(name: str, kind: CheckKind, counts: Counts, settings: DeclaredSettings) -> CheckVerdict:
+def _decide(
+    name: str, kind: CheckKind, counts: Counts, settings: DeclaredSettings, role: str | None
+) -> CheckVerdict:
     match kind:
         case "mechanical":
-            allowance = settings.allowance(name)
+            allowance = settings.allowance(name, role)
             if counts.b - counts.c > allowance:
                 return Regression(counts, allowance)
             return NoRegression(counts, allowance)

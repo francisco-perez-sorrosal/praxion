@@ -116,6 +116,22 @@ def test_a_mechanical_check_regresses_only_beyond_its_declared_noise_allowance(a
     assert isinstance(result.check_verdicts["C1"], expected)
 
 
+@pytest.mark.parametrize(
+    ("role", "expected"), [("researcher", NoRegression), ("verifier", Regression)]
+)
+def test_a_role_reads_its_own_allowance_of_a_shared_check_and_no_other_roles(role, expected):
+    ok, bad = measured(C1=PASS), measured(C1=FAIL)
+
+    result = verdict.role_verdict(
+        MECHANICAL,
+        pairs(18, ok, ok) + pairs(2, ok, bad),
+        settings(allowances={"researcher/C1": 2}),
+        role,
+    )
+
+    assert isinstance(result.check_verdicts["C1"], expected)
+
+
 def test_a_check_with_no_allowance_declared_gets_zero():
     ok, bad = measured(C1=PASS, C2=PASS), measured(C1=PASS, C2=FAIL)
 

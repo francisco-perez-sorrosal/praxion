@@ -67,7 +67,8 @@ def build_arm(
 ) -> ArmBuild:
     """Copy ``original`` to ``dest`` as ``role``'s ``arm``, verified and read-only.
 
-    ``dest`` must not exist yet. ``original`` is only read. A build that fails
+    ``dest`` must not exist yet (an existing one is refused and left alone).
+    ``original`` is only read. A build that fails, the copy itself included,
     leaves nothing at ``dest``, so the caller can retry.
     """
     if turn_cap is not None and turn_cap < 1:
@@ -76,8 +77,10 @@ def build_arm(
     source = original.root / definition
     if source.is_symlink() or not source.is_file():
         raise ArmCopyError(f"the checkout has no regular file {definition}")
-    shutil.copytree(original.root, dest, symlinks=True)
+    if dest.exists() or dest.is_symlink():
+        raise ArmCopyError(f"{dest} already exists; a copy is built into a fresh directory")
     try:
+        shutil.copytree(original.root, dest, symlinks=True)
         return _patch_and_seal(original, dest, role, arm, turn_cap)
     except BaseException:
         make_writable(dest)
@@ -243,6 +246,15 @@ class ArmProven:
     first_request_tokens: int | None
     cross_checked: bool
 
+    def __post_init__(self) -> None:
+        if self.arm not in ARMS:
+            raise ValueError(f"a proven arm must be one of {list(ARMS)}, got {self.arm!r}")
+        tokens = self.first_request_tokens
+        if tokens is not None and tokens < 0:
+            raise ValueError(f"a first request cannot hold {tokens} tokens")
+        if self.cross_checked and tokens is None:
+            raise ValueError("a token cross-check needs the arm's first-request figure")
+
 
 ArmVerdict = ArmProven | NotBuilt
 
@@ -284,9 +296,9 @@ def _judge_arm(arm: Arm, nonce: str, seen: ProofObservation | None) -> ArmVerdic
         return NotBuilt("the full arm's role did not echo the planted nonce: it inherits nothing")
     if arm == "lean" and echoed:
         return NotBuilt("the lean arm's role echoed the planted nonce: omitClaudeMd had no effect")
-    if arm == "lean" and NO_MARKER_REPLY not in seen.answer:
+    if arm == "lean" and seen.answer.strip() != NO_MARKER_REPLY:
         return NotBuilt(
-            f"the lean arm's role did not answer {NO_MARKER_REPLY}: its search is unobserved"
+            f"the lean arm's role did not answer exactly {NO_MARKER_REPLY}: its search is unobserved"
         )
     return ArmProven(arm, seen.first_request_tokens, cross_checked=False)
 

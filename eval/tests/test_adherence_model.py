@@ -35,7 +35,6 @@ from praxion_evals.adherence.model import (
     NotBuilt,
     NotMeasured,
     Passed,
-    Proven,
     Regression,
     RuleRef,
     ScopeConflict,
@@ -187,11 +186,6 @@ REFUSED = [
         "patches",
         id="a lean arm patched on another role",
     ),
-    pytest.param(lambda: Proven(False, False, 9000, 4000), "nonce", id="no nonce in the full arm"),
-    pytest.param(lambda: Proven(True, True, 9000, 4000), "nonce", id="a nonce in the lean arm"),
-    pytest.param(lambda: Proven(True, False, 4000, 9000), "smaller", id="a lean arm that grew"),
-    pytest.param(lambda: Proven(True, False, 4000, 4000), "smaller", id="no token saving"),
-    pytest.param(lambda: Proven(True, False, 9000, 0), "smaller", id="a lean arm with no tokens"),
     pytest.param(
         lambda: SessionSetup("middle", "abc", "researcher", "t", "tmpl", 7), "arm", id="bad arm"
     ),
@@ -286,8 +280,7 @@ def test_a_lean_or_capped_arm_patches_the_role_definition_and_nothing_else(build
     assert build().role == "researcher"
 
 
-def test_an_arm_proof_is_proven_when_the_lean_spawn_is_lean():
-    assert Proven(True, False, full_tokens=9000, lean_tokens=4000).lean_tokens == 4000
+def test_a_not_built_arm_names_its_reason():
     assert NotBuilt("role never spawned").reason == "role never spawned"
 
 

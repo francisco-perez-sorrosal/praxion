@@ -599,22 +599,10 @@ def synthetic_evidence(
     session's spawn call, whose prompt is the task a judge reads; ``tool_results`` are the
     result texts of tool uses by id; ``places`` are the sandbox and plugin-copy paths.
     """
-    spawn = ToolUse("canary-spawn", "Agent", {"subagent_type": role, "prompt": spawn_prompt}, None)
-    envelope = SessionEnvelope(
-        init=None,
-        tool_uses=(*([spawn] if spawn_prompt is not None else []), *tool_uses),
-        subagent_texts=(),
-        task_notifications=(),
-        hook_outputs=(),
-        final_result=None,
-        result_count=0,
-        unparseable=False,
-        tool_results=MappingProxyType(dict(tool_results or {})),
-    )
     return SessionEvidence(
         role=role,
         slug=slug,
-        envelope=envelope,
+        envelope=_canary_envelope(role, tool_uses, spawn_prompt, tool_results),
         exit_code=0,
         timed_out=False,
         sandbox=places[0],
@@ -628,15 +616,38 @@ def synthetic_evidence(
             new_commits=tuple(new_commits),
             stash_entries=(),
         ),
-        facts=facts
-        or TaskFacts(
-            forced_stop=forced_stop,
-            judging=False,
-            fetchable_page=False,
-            planted_instruction=None,
-            planted_effect=None,
-            external_api_docs=None,
-        ),
+        facts=facts or _canary_facts(forced_stop=forced_stop),
+    )
+
+
+def _canary_envelope(
+    role: Role,
+    tool_uses: Sequence[ToolUse],
+    spawn_prompt: str | None,
+    tool_results: Mapping[str, str] | None,
+) -> SessionEnvelope:
+    spawn = ToolUse("canary-spawn", "Agent", {"subagent_type": role, "prompt": spawn_prompt}, None)
+    return SessionEnvelope(
+        init=None,
+        tool_uses=(*([spawn] if spawn_prompt is not None else []), *tool_uses),
+        subagent_texts=(),
+        task_notifications=(),
+        hook_outputs=(),
+        final_result=None,
+        result_count=0,
+        unparseable=False,
+        tool_results=MappingProxyType(dict(tool_results or {})),
+    )
+
+
+def _canary_facts(*, forced_stop: bool) -> TaskFacts:
+    return TaskFacts(
+        forced_stop=forced_stop,
+        judging=False,
+        fetchable_page=False,
+        planted_instruction=None,
+        planted_effect=None,
+        external_api_docs=None,
     )
 
 

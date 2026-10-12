@@ -181,6 +181,31 @@ def test_a_failed_build_leaves_nothing_behind_and_can_be_retried(original, tmp_p
     assert build_arm(checkout, dest, ROLE, "lean").patched == (DEFINITION,)
 
 
+def test_an_interrupted_copy_leaves_nothing_at_dest(original, tmp_path, monkeypatch):
+    dest = tmp_path / "copy"
+
+    def half_copy(source, target, **kwargs):
+        (Path(target) / "half").mkdir(parents=True)
+        (Path(target) / "half" / "file.md").write_text("partial", encoding="utf-8")
+        raise OSError("disk full")
+
+    monkeypatch.setattr("praxion_evals.adherence.arms.shutil.copytree", half_copy)
+
+    with pytest.raises(OSError, match="disk full"):
+        build_arm(original, dest, ROLE, "lean")
+    assert not dest.exists()
+
+
+def test_an_existing_dest_is_refused_and_left_as_it_was(original, tmp_path):
+    dest = tmp_path / "copy"
+    dest.mkdir()
+    (dest / "keep.md").write_text("mine", encoding="utf-8")
+
+    with pytest.raises(ArmCopyError, match="already exists"):
+        build_arm(original, dest, ROLE, "lean")
+    assert (dest / "keep.md").read_text(encoding="utf-8") == "mine"
+
+
 def test_a_definition_with_crlf_line_endings_keeps_them_outside_the_patched_line(
     original, tmp_path
 ):
@@ -396,7 +421,17 @@ def test_a_missing_token_figure_leaves_lean_unconfirmed():
     assert isinstance(verdicts["lean"], NotBuilt)
 
 
-@pytest.mark.parametrize("answer", ["", "   ", "I could not tell.", "Error: request failed"])
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "",
+        "   ",
+        "I could not tell.",
+        "Error: request failed",
+        f"I was told to reply with exactly {NO_MARKER_REPLY}, but I will not.",
+        f"{NO_MARKER_REPLY} and nothing else",
+    ],
+)
 @pytest.mark.parametrize("both_arms", [False, True], ids=["lean-only", "both"])
 def test_a_lean_answer_that_is_not_the_no_marker_reply_is_not_built(answer, both_arms):
     observed = {"lean": ProofObservation(answer, 4000)}
@@ -407,6 +442,25 @@ def test_a_lean_answer_that_is_not_the_no_marker_reply_is_not_built(answer, both
 
     assert isinstance(lean, NotBuilt)
     assert NO_MARKER_REPLY in lean.reason
+
+
+def test_a_lean_reply_is_the_declared_one_whatever_its_surrounding_whitespace():
+    padded = ProofObservation(f"\n  {NO_MARKER_REPLY}\n", 4000)
+
+    assert decide_proof(NONCE, {"lean": padded}) == {"lean": ArmProven("lean", 4000, False)}
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        (("middle", 4000, False), "must be one of"),
+        (("lean", -1, False), "cannot hold"),
+        (("lean", None, True), "cross-check"),
+    ],
+)
+def test_a_proven_arm_that_breaks_its_invariants_cannot_be_built(fields, message):
+    with pytest.raises(ValueError, match=message):
+        ArmProven(*fields)
 
 
 def test_a_single_lean_run_decides_on_the_nonce_and_records_the_figure():

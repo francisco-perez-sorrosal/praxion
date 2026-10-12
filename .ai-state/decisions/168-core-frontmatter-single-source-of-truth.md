@@ -22,7 +22,7 @@ affected_files:
 affected_reqs:
   - REQ-04
   - REQ-06
-superseded_in_part_by: [dec-draft-a0a1950f]
+superseded_in_part_by: [dec-453]
 ---
 
 ## Context

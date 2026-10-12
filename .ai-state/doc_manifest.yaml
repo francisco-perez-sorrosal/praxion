@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-11T15:19:58Z'
+generated_at: '2026-10-12T00:04:48Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -83,6 +83,8 @@ surfaces:
   - docs-getting-started
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
+  - docs-independent-analysis-startup-context-diet-research
+  - docs-independent-analysis-subagent-alignment-map
   - docs-metrics-readme
   - docs-ml-training-onramp
   - docs-multi-session
@@ -150,7 +152,7 @@ surfaces:
   path: docs/claude-ecosystem-learning-resources.md
   type: markdown
   title: Claude Ecosystem Learning Resources
-  last_modified: '2026-05-19'
+  last_modified: '2026-10-11'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -379,6 +381,42 @@ surfaces:
   surfaces_referenced:
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-independent-analysis-personal-software-factory-analysis
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-context-review
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/CONTEXT_REVIEW.md
+  type: markdown
+  title: 'Context Review: startup-context-diet (Praxion-originated resident content)'
+  last_modified: '2026-10-11'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-measurements
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/MEASUREMENTS.md
+  type: markdown
+  title: Startup-payload ablations (orchestrator, 2026-10-11, Claude Code on Opus 5.5, 1M window)
+  last_modified: '2026-10-11'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-harness-native
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/RESEARCH_FINDINGS_harness-native.md
+  type: markdown
+  title: 'Research Findings (harness-native lens): Startup-context levers in Claude Code'
+  last_modified: '2026-10-11'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-practitioner-patterns
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/RESEARCH_FINDINGS_practitioner-patterns.md
+  type: markdown
+  title: 'Research Findings: Practitioner patterns for lean resident context (lens: practitioner-patterns)'
+  last_modified: '2026-10-11'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-research-literature
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/RESEARCH_FINDINGS_research-literature.md
+  type: markdown
+  title: "Research Findings: Resident-context size and composition \u2014 what the literature says (research-literature lens)"
+  last_modified: '2026-10-11'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-task-brief
+  path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/TASK_BRIEF.md
+  type: markdown
+  title: "Task brief \u2014 startup-context-diet (Spike)"
+  last_modified: '2026-10-11'
+  renderer: default_markdown
 - id: docs-independent-analysis-self-healing-loop-implementation-brief
   path: docs/independent-analysis/self-healing-loop-implementation-brief.md
   type: markdown
@@ -387,6 +425,31 @@ surfaces:
   renderer: default_markdown
   surfaces_referenced:
   - docs-independent-analysis-cursor-ci-autofix-research-brief
+- id: docs-independent-analysis-startup-context-diet-research
+  path: docs/independent-analysis/startup-context-diet-research.md
+  type: markdown
+  title: "Scoping Every Resident Token \u2014 What Praxion Loads at Session Start, and How to Load Less Without Losing Guidance"
+  last_modified: '2026-10-11'
+  diataxis: explanation
+  audience: architect / maintainer
+  renderer: explanation_shell
+  surfaces_referenced:
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-context-review
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-measurements
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-harness-native
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-practitioner-patterns
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-research-literature
+  - docs-independent-analysis-subagent-alignment-map
+- id: docs-independent-analysis-subagent-alignment-map
+  path: docs/independent-analysis/subagent-alignment-map.md
+  type: markdown
+  title: "Subagent Alignment Map \u2014 the process guidance each Praxion agent must receive"
+  last_modified: '2026-10-11'
+  diataxis: reference
+  audience: architect / maintainer
+  renderer: reference_shell
+  surfaces_referenced:
+  - docs-independent-analysis-startup-context-diet-research
 - id: docs-independent-analysis-wave-1-3-external-audit
   path: docs/independent-analysis/wave-1-3-external-audit.md
   type: markdown
@@ -478,7 +541,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -1573,13 +1636,13 @@ surfaces:
   path: .ai-state/decisions/167-hook-delivered-blacklist-mechanism.md
   type: markdown
   title: Hook-delivered blacklist for always-loaded rules; symlink-based for core and path-scoped
-  last_modified: '2026-05-13'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-168-core-frontmatter-single-source-of-truth
   path: .ai-state/decisions/168-core-frontmatter-single-source-of-truth.md
   type: markdown
   title: 'Frontmatter `core: true` is the single source of truth for non-disableability'
-  last_modified: '2026-08-05'
+  last_modified: '2026-10-11'
   renderer: adr_card
 - id: ai-state-decisions-169-git-conventions-blacklistable
   path: .ai-state/decisions/169-git-conventions-blacklistable.md
@@ -3288,6 +3351,12 @@ surfaces:
   title: The skill frontmatter field set has one code source in the skill-crafting skill, and N03 derives from it
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-453-rules-claude-md-is-a-directory-guide
+  path: .ai-state/decisions/453-rules-claude-md-is-a-directory-guide.md
+  type: markdown
+  title: rules/CLAUDE.md is the rules tree's directory guide, not a core always-loaded rule
+  last_modified: '2026-10-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3614,6 +3683,7 @@ groups:
   - docs-context-economy
   - docs-context-prj-comparison-2026-05-12-08-claude-code-behavior-verification
   - docs-diagrams-readme
+  - docs-independent-analysis-subagent-alignment-map
   - docs-metrics-readme
   - docs-obsidian-integration
   - docs-readme
@@ -3634,6 +3704,7 @@ groups:
   - docs-decision-tracking
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
+  - docs-independent-analysis-startup-context-diet-research
   - docs-multidisciplinary-identities-evidence
 - id: other
   label: Other
@@ -4092,6 +4163,7 @@ groups:
   - ai-state-decisions-450-repo-root-plugin-eval-suite
   - ai-state-decisions-451-skill-crafting-reference-set-restructure
   - ai-state-decisions-452-skill-frontmatter-field-set-single-source
+  - ai-state-decisions-453-rules-claude-md-is-a-directory-guide
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4160,6 +4232,12 @@ groups:
   - docs-independent-analysis-linear-integration-analysis
   - docs-independent-analysis-praxion-artifact-lifecycle-audit
   - docs-independent-analysis-praxion-artifact-process-flow-analysis
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-context-review
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-measurements
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-harness-native
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-practitioner-patterns
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-research-literature
+  - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-task-brief
   - docs-independent-analysis-self-healing-loop-implementation-brief
   - docs-independent-analysis-wave-1-3-external-audit
   - docs-independent-analysis-wave-4-5-external-audit

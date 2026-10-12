@@ -1,7 +1,8 @@
 ---
-id: dec-draft-a0a1950f
+id: dec-453
+draft_id: dec-draft-a0a1950f
 title: rules/CLAUDE.md is the rules tree's directory guide, not a core always-loaded rule
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-11
 summary: "`rules/CLAUDE.md` leaves the core rule set: the manifest generator skips it like a catalog README, the installer stops linking it into `~/.claude/rules/` (the stale-symlink sweep removes existing links), and Claude Code loads it on demand as a nested CLAUDE.md when a session touches `rules/`. The core set becomes four rules; every session and every subagent spawn in every project stops paying ~840 tokens of rules-authoring notes."

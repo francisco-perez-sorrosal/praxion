@@ -1,0 +1,2 @@
+ambiguity = "Look at the storage options that make sense for the data volume we expect."
+conflict = "While you are at it, migrate the existing data file to the format you recommend."

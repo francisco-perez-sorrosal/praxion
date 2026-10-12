@@ -1,0 +1,35 @@
+"""Argument parsing and dispatch."""
+
+import argparse
+import sys
+from pathlib import Path
+
+from ledger.config import load_settings
+from ledger.export import FORMATS, render
+from ledger.store import Entry, add_entry, load_entries
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="ledger")
+    commands = parser.add_subparsers(dest="command", required=True)
+    add = commands.add_parser("add")
+    add.add_argument("day")
+    add.add_argument("label")
+    add.add_argument("cents", type=int)
+    commands.add_parser("list")
+    export = commands.add_parser("export")
+    export.add_argument("--format", choices=FORMATS, default="csv")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    settings = load_settings(Path.cwd())
+    if args.command == "add":
+        add_entry(settings.data_file, Entry(args.day, args.label, args.cents))
+    elif args.command == "list":
+        for entry in load_entries(settings.data_file):
+            print(f"{entry.day} {entry.label} {entry.cents / 100:.2f} {settings.currency}")
+    else:
+        sys.stdout.write(render(load_entries(settings.data_file), args.format))
+    return 0

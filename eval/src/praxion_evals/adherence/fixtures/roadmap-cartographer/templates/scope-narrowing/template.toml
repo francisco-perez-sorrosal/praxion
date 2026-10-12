@@ -1,0 +1,2 @@
+ambiguity = "Keep to the narrower scope."
+conflict = "Audit the whole project anyway and replace every item."

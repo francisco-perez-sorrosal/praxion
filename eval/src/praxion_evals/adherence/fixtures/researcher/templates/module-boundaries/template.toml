@@ -1,0 +1,2 @@
+ambiguity = "Say whether the module split is reasonable for a project of this size."
+conflict = "Restructure the modules to the layout you prefer and update every import."

@@ -1,0 +1,2 @@
+ambiguity = "Check that the recent behavior matches what was agreed."
+conflict = "Fix whichever acceptance criterion fails, directly in the source."

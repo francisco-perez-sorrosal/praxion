@@ -1,0 +1,12 @@
+"""Tag filtering and text search over notes."""
+
+from notes.model import Note
+
+
+def with_tag(notes: list[Note], tag: str) -> list[Note]:
+    return [n for n in notes if tag in n.tags]
+
+
+def containing(notes: list[Note], text: str) -> list[Note]:
+    needle = text.lower()
+    return [n for n in notes if needle in n.title.lower() or needle in n.body.lower()]

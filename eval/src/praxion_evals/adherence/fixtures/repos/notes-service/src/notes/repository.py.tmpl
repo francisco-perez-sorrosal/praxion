@@ -1,0 +1,28 @@
+"""An in-memory note store mirrored to a JSON file on every change."""
+
+import json
+from pathlib import Path
+
+from notes.model import Note
+
+
+class Repository:
+    def __init__(self, mirror: Path) -> None:
+        self._mirror = mirror
+        self._notes: dict[int, Note] = {}
+
+    def add(self, title: str, body: str, tags: tuple[str, ...] = ()) -> Note:
+        note = Note(len(self._notes) + 1, title, body, tags)
+        self._notes[note.note_id] = note
+        self._flush()
+        return note
+
+    def all(self) -> list[Note]:
+        return list(self._notes.values())
+
+    def _flush(self) -> None:
+        rows = [
+            {"id": n.note_id, "title": n.title, "body": n.body, "tags": list(n.tags)}
+            for n in self._notes.values()
+        ]
+        self._mirror.write_text(json.dumps(rows), encoding="utf-8")

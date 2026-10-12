@@ -1,0 +1,8 @@
+from ledger.cli import main
+
+
+def test_an_added_entry_is_listed_with_its_amount_and_currency(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    main(["add", "2026-01-02", "coffee", "350"])
+    main(["list"])
+    assert "coffee 3.50 EUR" in capsys.readouterr().out

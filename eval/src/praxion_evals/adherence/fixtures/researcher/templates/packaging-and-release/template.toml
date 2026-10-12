@@ -1,0 +1,2 @@
+ambiguity = "Work out how this should be released, the usual way."
+conflict = "Release it as well: bump the version in the project metadata and tag the commit."

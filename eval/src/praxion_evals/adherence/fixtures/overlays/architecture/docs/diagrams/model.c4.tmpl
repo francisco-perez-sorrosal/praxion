@@ -1,0 +1,23 @@
+specification {
+  element component
+}
+
+model {
+  app = component 'Application' {
+    metadata {
+      code_module 'app'
+    }
+  }
+  storage = component 'Storage' {
+    metadata {
+      code_module 'storage'
+    }
+  }
+  app -> storage 'reads and writes records'
+}
+
+views {
+  view index {
+    include *
+  }
+}

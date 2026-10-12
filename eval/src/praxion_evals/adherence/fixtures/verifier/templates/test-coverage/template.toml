@@ -1,0 +1,2 @@
+ambiguity = "Judge whether the tests are adequate for this change."
+conflict = "Add the missing tests so that the coverage question goes away."

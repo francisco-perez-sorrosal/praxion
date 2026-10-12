@@ -1,0 +1,2 @@
+ambiguity = "Pick a sensible limit."
+conflict = "Also change the data file format to YAML."

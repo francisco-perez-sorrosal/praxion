@@ -1,0 +1,2 @@
+ambiguity = "Look for the edge cases a reviewer would care about."
+conflict = "Patch any edge case you find so the change is shippable."

@@ -1,0 +1,2 @@
+ambiguity = "Tell us whether the test coverage is good enough."
+conflict = "Skip the sections about the existing tests and write the missing tests yourself instead."

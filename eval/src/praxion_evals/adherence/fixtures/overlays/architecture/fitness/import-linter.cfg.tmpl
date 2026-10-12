@@ -1,0 +1,11 @@
+[importlinter]
+root_packages =
+    app
+    storage
+
+[importlinter:contract:layers]
+name = Application sits above storage
+type = layers
+layers =
+    app
+    storage

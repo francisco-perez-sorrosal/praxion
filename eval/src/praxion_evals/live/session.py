@@ -19,8 +19,9 @@ import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, NamedTuple
 
 from praxion_evals.live.results import Errored, ErrorKind
@@ -256,6 +257,18 @@ class HookOutput(NamedTuple):
     output: str
 
 
+class RequestUsage(NamedTuple):
+    """The billed input of one model request, as ``assistant.message.usage`` reports it."""
+
+    input_tokens: int
+    cache_creation_tokens: int
+    cache_read_tokens: int
+
+    @property
+    def total(self) -> int:
+        return self.input_tokens + self.cache_creation_tokens + self.cache_read_tokens
+
+
 @dataclass(frozen=True)
 class ResultInfo:
     result_text: str | None
@@ -287,6 +300,13 @@ class SessionEnvelope:
     final_result: ResultInfo | None
     result_count: int
     unparseable: bool
+    # Added for the adherence eval; defaulted so every other construction is unchanged.
+    # Result text of each tool use, keyed by tool-use id (an Agent spawn included).
+    tool_results: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    # The first request a subagent made, keyed by the ``parent_tool_use_id`` that spawned it.
+    subagent_first_usage: Mapping[str, RequestUsage] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 UNPARSEABLE_ENVELOPE = SessionEnvelope(
@@ -321,6 +341,8 @@ def _assemble(events: Sequence[Mapping[str, Any]]) -> SessionEnvelope:
     notifications: list[TaskNotification] = []
     hook_outputs: list[HookOutput] = []
     results: list[ResultInfo] = []
+    tool_results: dict[str, str] = {}
+    first_usage: dict[str, RequestUsage] = {}
     for event in events:
         match event.get("type"), event.get("subtype"):
             case "system", "init":
@@ -332,6 +354,9 @@ def _assemble(events: Sequence[Mapping[str, Any]]) -> SessionEnvelope:
             case "assistant", _:
                 tool_uses.extend(_tool_uses(event))
                 subagent_texts.extend(_subagent_text(event))
+                _note_first_usage(first_usage, event)
+            case "user", _:
+                tool_results.update(_tool_results(event))
             case "result", _:
                 results.append(_result_info(event))
             case _:
@@ -347,6 +372,8 @@ def _assemble(events: Sequence[Mapping[str, Any]]) -> SessionEnvelope:
         final_result=results[-1] if results else None,
         result_count=len(results),
         unparseable=False,
+        tool_results=MappingProxyType(tool_results),
+        subagent_first_usage=MappingProxyType(first_usage),
     )
 
 
@@ -408,6 +435,42 @@ def _subagent_text(event: Mapping[str, Any]) -> list[SubagentText]:
     if not text:
         return []
     return [SubagentText(parent, _optional(event, "subagent_type", str) or "", text)]
+
+
+def _tool_results(event: Mapping[str, Any]) -> dict[str, str]:
+    """Result text per tool-use id; a result is a string or a list of text blocks."""
+    return {
+        _required(block, "tool_use_id", str): _result_text(block.get("content"))
+        for block in _content_blocks(event)
+        if block.get("type") == "tool_result"
+    }
+
+
+def _result_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    return "\n".join(
+        _required(block, "text", str)
+        for block in _mappings(content or [])
+        if block.get("type") == "text"
+    )
+
+
+def _note_first_usage(first_usage: dict[str, RequestUsage], event: Mapping[str, Any]) -> None:
+    """Keep a subagent's first request only; later ones read a warmed cache, not its startup."""
+    parent = _optional(event, "parent_tool_use_id", str)
+    usage = _optional(_required(event, "message", dict), "usage", dict)
+    if parent is None or parent in first_usage or usage is None:
+        return
+    first_usage[parent] = RequestUsage(
+        input_tokens=_token_count(usage, "input_tokens"),
+        cache_creation_tokens=_token_count(usage, "cache_creation_input_tokens"),
+        cache_read_tokens=_token_count(usage, "cache_read_input_tokens"),
+    )
+
+
+def _token_count(usage: Mapping[str, Any], key: str) -> int:
+    return _optional(usage, key, int) or 0
 
 
 def _task_notification(event: Mapping[str, Any]) -> TaskNotification:

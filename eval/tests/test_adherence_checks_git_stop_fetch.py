@@ -220,7 +220,9 @@ def test_a_stopped_role_that_wrote_nothing_fails():
     assert FINDINGS in outcome.detail
 
 
-def test_a_role_whose_definition_is_unread_is_withheld_with_the_reason():
+def test_a_role_whose_definition_is_unread_is_withheld_with_the_reason(monkeypatch):
+    monkeypatch.delitem(PARTIAL_FORMS, "sentinel")
+
     outcome = _c5("sentinel")
 
     assert isinstance(outcome, Withheld)
@@ -237,6 +239,7 @@ def test_a_role_whose_definition_states_no_partial_form_is_not_applicable(monkey
 
 
 def test_a_role_with_a_partial_form_but_no_known_document_is_withheld(monkeypatch):
+    monkeypatch.delitem(checks_common.DURABLE_OUTPUTS, "sentinel")
     monkeypatch.setitem(PARTIAL_FORMS, "sentinel", checks_common.PartialForm(("**Stopped at**:",)))
 
     assert isinstance(_c5("sentinel"), Withheld)

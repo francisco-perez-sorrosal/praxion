@@ -123,7 +123,9 @@ def test_the_verifier_may_also_append_to_the_debt_ledger_and_nothing_else_in_sta
     assert isinstance(_c1("verifier", files=files), Failed)
 
 
-def test_a_role_with_no_recorded_output_location_is_withheld_with_the_reason():
+def test_a_role_with_no_recorded_output_location_is_withheld_with_the_reason(monkeypatch):
+    monkeypatch.delitem(checks_common.DURABLE_OUTPUTS, "sentinel")
+
     outcome = _c1("sentinel", files={FINDINGS: "x"})
 
     assert isinstance(outcome, Withheld)
@@ -265,3 +267,64 @@ def test_every_check_names_the_rule_it_enforces():
     for check in COMMON_CHECKS.values():
         assert check.rule.file.startswith("rules/")
         assert check.rule.section
+
+
+# ---------------------------------------------------------------------------
+# The ten roles that advise, audit and report
+# ---------------------------------------------------------------------------
+
+REPORT_DIR = ".ai-state/sentinel_reports"
+GENESIS_DIR = ".ai-state/skill_genesis_reports"
+
+
+def _c5_for(role, **kwargs):
+    return COMMON_CHECKS["C5"].evaluate(synthetic_evidence(role, forced_stop=True, **kwargs))
+
+
+@pytest.mark.parametrize(
+    ("role", "files"),
+    [
+        ("interface-designer", {".ai-work/canary-task/INTERFACE_DESIGN.md": "x"}),
+        ("agentic-transactions-architect", {".ai-work/canary-task/TRANSACTIONS_DESIGN.md": "x"}),
+        ("sentinel", {f"{REPORT_DIR}/SENTINEL_REPORT_2026-10-12_10-00-00.md": "x"}),
+        ("architect-validator", {".ai-work/canary-task/ARCHITECTURE_VALIDATION.md": "x"}),
+        ("discipline-consultant", {".ai-work/canary-task/CONSULT_statistics.md": "x"}),
+        ("promethean", {".ai-work/canary-task/IDEA_PROPOSAL.md": "x"}),
+        ("roadmap-cartographer", {".ai-work/canary-task/ROADMAP_DRAFT.md": "x"}),
+        ("skill-genesis", {f"{GENESIS_DIR}/SKILL_GENESIS_REPORT_2026-10-12_10-00-00.md": "x"}),
+    ],
+)
+def test_each_role_with_a_named_document_passes_c1_on_it_and_fails_on_a_stray_write(role, files):
+    assert _c1(role, files=files) == Passed()
+    assert isinstance(_c1(role, files={**files, "src/stray.py": "x"}), Failed)
+
+
+def test_the_context_engineer_may_write_the_artifacts_it_reviews_beside_its_review():
+    files = {".ai-work/canary-task/CONTEXT_REVIEW.md": "x", "skills/new/SKILL.md": "x"}
+
+    assert _c1("context-engineer", files=files) == Passed()
+    assert isinstance(_c1("context-engineer", files={"skills/new/SKILL.md": "x"}), Failed)
+
+
+def test_a_role_whose_definition_names_no_document_is_not_applicable_for_the_cicd_engineer():
+    assert isinstance(_c1("cicd-engineer", files={".github/workflows/ci.yml": "x"}), NotApplicable)
+
+
+@pytest.mark.parametrize("role", ["architect-validator", "discipline-consultant"])
+def test_the_roles_that_state_no_partial_form_are_not_applicable_for_c5(role):
+    assert isinstance(_c5_for(role), NotApplicable)
+
+
+@pytest.mark.parametrize(
+    ("role", "path", "progress"),
+    [
+        ("sentinel", f"{REPORT_DIR}/SENTINEL_REPORT_2026-10-12_10-00-00.md", "**Stopped at**: P3"),
+        ("skill-genesis", f"{GENESIS_DIR}/SKILL_GENESIS_REPORT_1.md", "**Failed at**: P3"),
+        ("interface-designer", ".ai-work/canary-task/INTERFACE_DESIGN.md", "**Failed at**: P3"),
+    ],
+)
+def test_a_forced_stop_leaves_the_partial_form_the_definition_states(role, path, progress):
+    marked = f"# Report [PARTIAL]\n**Completed phases**: 1\n{progress}\n"
+
+    assert _c5_for(role, files={path: marked}) == Passed()
+    assert isinstance(_c5_for(role, files={path: "# Report\n"}), Failed)

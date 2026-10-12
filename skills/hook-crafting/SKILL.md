@@ -124,11 +124,16 @@ if __name__ == "__main__":
 For code quality hooks: fix what you can automatically, then only block on what's unfixable.
 
 ```
-1. Run formatter in fix mode (ruff format)
-2. Run linter in fix mode (ruff check --fix)
-3. Re-stage fixed files (git add)
-4. Run checks again — block only if violations remain
+1. Split staged files: fully staged (working tree == index) vs partially
+   staged (listed by `git diff --name-only`)
+2. Fully staged: formatter and linter in fix mode, re-stage (git add),
+   run the checks again
+3. Partially staged: never fix or re-stage; check the staged blob via stdin
+   (git show :<path> | ruff format --diff --stdin-filename <path> -)
+4. Block only if violations remain
 ```
+
+**Never `git add` a file that has unstaged changes.** Re-staging the whole file commits changes the user never staged; Praxion's own commit gate did this until 2026-10-11. Judge what the commit will carry, the staged blob, not the working-tree copy.
 
 ### Delegating Hook
 

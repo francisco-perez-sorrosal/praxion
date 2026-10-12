@@ -8,7 +8,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 |------|----------|-------|--------|-----------------|-----------|
 | `send_event.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostToolUse, PostToolUseFailure | stdin (JSON payload) | None (files) | localhost only (Chronograph HTTP) | Fail-open (exit 0) |
 | `commit_gate.sh` | PreToolUse (Bash) | stdin (JSON payload) | None | None | Fail-open (exit 0) |
-| `check_code_quality.py` | PreToolUse (Bash, commit-gated) | stdin, staged files via `git diff` | Staged files via `git add` | None | Fail-open (exit 0), blocks on unfixable violations (exit 2) |
+| `check_code_quality.py` | PreToolUse (Bash, commit-gated) | stdin, staged files via `git diff` | Fully staged files via `git add` | None | Fail-open (exit 0), blocks on unfixable violations (exit 2) |
 | `adr_reminder.py` | PreToolUse (Bash, commit-gated) | stdin (JSON payload), `.ai-state/decisions/` (file listing) | None | None | Fail-open (exit 0) |
 | `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
@@ -65,16 +65,16 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 
 ### `check_code_quality.py`
 
-**Purpose**: Run `ruff format` and `ruff check --fix` on staged Python files before git commit. Re-stages auto-fixed files.
+**Purpose**: Run `ruff format` and `ruff check --fix` on staged Python files before git commit. Re-stages auto-fixed files only when the whole file was staged; a partially staged file is checked through its staged content and left untouched.
 
 **Reads**:
 - stdin: JSON hook payload
 - Staged file list via `git diff --cached --name-only`
-- Staged file content (for formatting)
+- Staged file content (for formatting); a partially staged file's blob via `git show :<path>`
 
 **Writes**:
-- Staged Python files (auto-formatted in place via `ruff format`)
-- Git staging area (`git add` for reformatted files)
+- Fully staged Python files (auto-formatted in place via `ruff format`)
+- Git staging area (`git add` for those files only, so no unstaged change is ever staged)
 - stderr (diagnostic messages)
 
 **External contact**:

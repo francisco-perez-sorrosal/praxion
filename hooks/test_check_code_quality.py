@@ -18,6 +18,11 @@ Drives the fake `rustfmt` via a PATH shim (PM-2) rather than a real Rust
 toolchain, so these canaries run -- and bite -- on any machine. Staging
 happens in a throwaway git repo built at runtime under `tmp_path`, never
 this repo's own index.
+
+The Python partial-staging tests at the end pin the other half of the gate: a
+file staged only in part is never re-staged (which once swept its unstaged
+changes into commits) and is judged by its staged blob. A fake `ruff` on the
+same PATH shim drives them.
 """
 
 from __future__ import annotations
@@ -325,3 +330,112 @@ def test_helper_exception_does_not_change_exit_code_on_block(tmp_path: Path, mon
     with pytest.raises(SystemExit) as exc_info:
         module.main()
     assert exc_info.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# Partially staged Python files: the gate never sweeps unstaged changes into
+# the commit, and it judges the staged content -- the bytes being committed --
+# rather than the working-tree copy.
+# ---------------------------------------------------------------------------
+
+# A fake `ruff` driven by content markers. `format <files>` rewrites each file
+# (the auto-fix); any check -- on files or on stdin -- fails when the content it
+# examines contains BAD. Every invocation is logged to $FAKE_RUFF_LOG.
+FAKE_RUFF_SCRIPT = """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+log = os.environ.get("FAKE_RUFF_LOG")
+if log:
+    with open(log, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(args) + "\\n")
+files = [a for a in args[1:] if not a.startswith("-")]
+if "-" in args:
+    sys.exit(1 if "BAD" in sys.stdin.read() else 0)
+if args[:1] == ["format"] and "--check" not in args:
+    for path in files:
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("formatted = True\\n")
+    sys.exit(0)
+if args[:1] == ["check"] and "--fix" in args:
+    sys.exit(0)
+for path in files:
+    with open(path, encoding="utf-8") as handle:
+        if "BAD" in handle.read():
+            sys.exit(1)
+sys.exit(0)
+"""
+
+
+def _python_repo(tmp_path: Path, *, staged: str, working: str) -> tuple[Path, dict[str, str]]:
+    """A repo where `a.py` is staged as `staged` while its working tree holds `working`."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    _init_repo(repo_dir)
+    _stage_file(repo_dir, "a.py", "x = 0\n")
+    subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo_dir, check=True)
+    _stage_file(repo_dir, "a.py", staged)
+    (repo_dir / "a.py").write_text(working, encoding="utf-8")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "ruff"
+    fake.write_text(FAKE_RUFF_SCRIPT, encoding="utf-8")
+    fake.chmod(0o755)
+    env = {"PATH": _controlled_path(bin_dir), "FAKE_RUFF_LOG": str(tmp_path / "ruff.log")}
+    return repo_dir, env
+
+
+def _staged_text(repo_dir: Path, path: str) -> str:
+    return subprocess.run(
+        ["git", "show", f":{path}"], cwd=repo_dir, capture_output=True, text=True, check=True
+    ).stdout
+
+
+def test_partially_staged_python_keeps_its_unstaged_changes_out_of_the_index(
+    tmp_path: Path,
+) -> None:
+    """CANARY: the hook used to `git add` the working-tree copy of every staged file,
+    committing a partially staged file's unstaged changes along with it."""
+    repo_dir, env = _python_repo(tmp_path, staged="x = 1\n", working="x = 2\n")
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert _staged_text(repo_dir, "a.py") == "x = 1\n", "unstaged changes were swept into the index"
+    assert (repo_dir / "a.py").read_text(encoding="utf-8") == "x = 2\n", (
+        "the working-tree copy of a partially staged file must not be rewritten"
+    )
+
+
+def test_partially_staged_python_is_judged_by_its_staged_content(tmp_path: Path) -> None:
+    """Unformatted staged content blocks even when the working tree is clean."""
+    repo_dir, env = _python_repo(tmp_path, staged="BAD = 1\n", working="x = 2\n")
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env=env)
+
+    assert result.returncode == 2, result.stderr
+    assert "a.py" in result.stderr
+
+
+def test_partially_staged_python_ignores_problems_only_in_the_working_tree(
+    tmp_path: Path,
+) -> None:
+    """An unformatted working-tree copy does not block a commit of clean staged content."""
+    repo_dir, env = _python_repo(tmp_path, staged="x = 1\n", working="BAD = 2\n")
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env=env)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_fully_staged_python_is_still_auto_fixed_and_restaged(tmp_path: Path) -> None:
+    """A file whose working tree matches the index keeps the auto-fix-and-restage path."""
+    repo_dir, env = _python_repo(tmp_path, staged="x = 1\n", working="x = 1\n")
+
+    result = _run_hook(_commit_payload(), cwd=repo_dir, env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert _staged_text(repo_dir, "a.py") == "formatted = True\n", "the auto-fix was not re-staged"

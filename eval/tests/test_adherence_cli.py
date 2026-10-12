@@ -1,7 +1,7 @@
 """The adherence console entry: argument parsing, the dry run, the report option, and the paid loop.
 
 The paid loop runs over a real copy of this repository with a scripted stand-in for the
-one function that starts ``claude`` (``cli.run_session``); no process is ever started.
+one function that starts ``claude`` (``session_loop.run_session``); no process is ever started.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import cli, results, tasks
+from praxion_evals.adherence import cli, results, session_loop, tasks
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
@@ -128,7 +128,7 @@ def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(spec: SessionSpec, env: object) -> SessionRun:
         raise AssertionError("a session was started")
 
-    monkeypatch.setattr(cli, "run_session", refuse)
+    monkeypatch.setattr(session_loop, "run_session", refuse)
 
 
 def _dry_run(capsys: pytest.CaptureFixture[str], tmp_path: Path, *options: str) -> list[dict]:
@@ -194,7 +194,7 @@ def test_a_role_with_no_task_kit_is_a_usage_error(
 def test_a_paid_run_without_a_credential_is_a_usage_error(
     monkeypatch: pytest.MonkeyPatch, no_launch: None, tmp_path: Path
 ) -> None:
-    for key in cli.CREDENTIAL_KEYS:
+    for key in session_loop.CREDENTIAL_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(tmp_path / "o.json")])
@@ -212,7 +212,7 @@ def test_the_golden_record_counts_the_cases_the_judge_got_wrong() -> None:
     right = GoldenVerdicts(bad=Failed("missed"), good=Passed())
     wrong = GoldenVerdicts(bad=Passed(), good=Passed())
 
-    record = cli.golden_record({"C3": right, "C9": wrong})
+    record = session_loop.golden_record({"C3": right, "C9": wrong})
 
     assert record["observed_error"] == 0.25
     assert record["cases"]["C3"]["separates"] is True
@@ -222,9 +222,9 @@ def test_the_golden_record_counts_the_cases_the_judge_got_wrong() -> None:
 def test_an_errored_golden_case_is_recorded_but_neither_right_nor_wrong() -> None:
     errored = GoldenVerdicts(bad=CheckErrored("judge down"), good=Passed())
 
-    assert cli.golden_record({"C3": errored})["observed_error"] == 0.0
+    assert session_loop.golden_record({"C3": errored})["observed_error"] == 0.0
     assert (
-        cli.golden_record({"C3": GoldenVerdicts(CheckErrored("x"), CheckErrored("y"))})[
+        session_loop.golden_record({"C3": GoldenVerdicts(CheckErrored("x"), CheckErrored("y"))})[
             "observed_error"
         ]
         is None
@@ -323,10 +323,10 @@ class Script:
 @pytest.fixture
 def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
-    monkeypatch.setattr(cli, "query_claude_version", lambda: "9.9.9-test")
+    monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
 
     def install(script: Script) -> None:
-        monkeypatch.setattr(cli, "run_session", script)
+        monkeypatch.setattr(session_loop, "run_session", script)
 
     return install
 
@@ -475,7 +475,7 @@ def test_golden_cases_are_judged_once_and_recorded_before_any_session(
     paid: Callable[[Script], None], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     paid(Script())
-    monkeypatch.setattr(cli, "select_judge_client", _ScriptedJudge)
+    monkeypatch.setattr(session_loop, "select_judge_client", _ScriptedJudge)
     output = tmp_path / "golden.json"
 
     code = cli.main(
@@ -508,7 +508,7 @@ def test_judging_that_is_unavailable_is_a_usage_error_before_anything_is_written
     def unavailable() -> JudgeClient:
         raise RuntimeError("no judge credentials")
 
-    monkeypatch.setattr(cli, "select_judge_client", unavailable)
+    monkeypatch.setattr(session_loop, "select_judge_client", unavailable)
 
     code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(tmp_path / "o.json")])
 
@@ -547,15 +547,15 @@ def test_an_injection_task_tells_the_grader_what_was_planted_and_whether_the_pag
 ):
     task = _task_with("injection")
 
-    reachable = cli._task_facts(task, page_available=True)
-    unreachable = cli._task_facts(task, page_available=False)
+    reachable = session_loop._task_facts(task, page_available=True)
+    unreachable = session_loop._task_facts(task, page_available=False)
 
     assert reachable["planted_effect"] == tasks.PLANTED_INJECTION.effect_path
     assert (reachable["fetchable_page"], unreachable["fetchable_page"]) == (True, False)
 
 
 def test_an_early_stop_task_is_marked_as_forced_and_plants_nothing() -> None:
-    facts = cli._task_facts(_task_with("early-stop"), page_available=True)
+    facts = session_loop._task_facts(_task_with("early-stop"), page_available=True)
 
     assert facts["forced_stop"] is True
     assert (facts["planted_instruction"], facts["fetchable_page"]) == (None, False)
@@ -565,20 +565,24 @@ def test_the_page_is_probed_once_and_only_when_a_task_needs_it(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     probes: list[str] = []
-    monkeypatch.setattr(cli, "page_is_fetchable", lambda url: probes.append(url) or False)
+    monkeypatch.setattr(session_loop, "page_is_fetchable", lambda url: probes.append(url) or False)
     config = cli.parse_config(["--role", ROLE, "--output", str(tmp_path / "o.json")])
-    checkout = cli.Checkout(REPO_ROOT, "0" * 40, False)
+    checkout = session_loop.Checkout(REPO_ROOT, "0" * 40, False)
     planned = {ROLE: [_task_with("injection")]}
     output = tmp_path / "o.json"
     settings = cli.declared_settings(config)
-    started = cli.datetime.now(cli.UTC)
-    provisional = cli._provisional(config, checkout, planned, settings, "run", "1", started, output)
-    context = cli.Context(config, checkout, planned, None, output, tmp_path, "https://page", True)
-    state = cli.RunState(provisional, cli.SpendLedger(cap_usd=1.0))
+    started = session_loop.datetime.now(session_loop.UTC)
+    provisional = session_loop._provisional(
+        config, checkout, planned, settings, "run", "1", started, output
+    )
+    context = session_loop.Context(
+        config, checkout, planned, None, output, tmp_path, "https://page", True
+    )
+    state = session_loop.RunState(provisional, session_loop.SpendLedger(cap_usd=1.0))
 
-    unproven = cli._probe_page(context, state, [])
-    first = cli._probe_page(context, unproven, ["full"])
-    again = cli._probe_page(context, first, ["full", "lean"])
+    unproven = session_loop._probe_page(context, state, [])
+    first = session_loop._probe_page(context, unproven, ["full"])
+    again = session_loop._probe_page(context, first, ["full", "lean"])
 
     assert unproven.page_fetchable is None
     assert (first.page_fetchable, again.page_fetchable, probes) == (False, False, ["https://page"])

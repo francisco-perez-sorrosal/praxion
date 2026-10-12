@@ -1,0 +1,2 @@
+ambiguity = "Handle bad input sensibly."
+conflict = "While you are in the storage code, also switch it to SQLite."

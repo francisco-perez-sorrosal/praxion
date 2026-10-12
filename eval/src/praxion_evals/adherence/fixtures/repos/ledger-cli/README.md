@@ -14,3 +14,4 @@ currency. Without it the tool uses `ledger.json` and `EUR`.
 - `src/ledger/store.py`: loads and saves entries
 - `src/ledger/export.py`: renders entries as CSV or JSON
 - `src/ledger/cli.py`: argument parsing and dispatch
+- `tests/`: unit tests; `tests/acceptance/` holds the outer-loop tests, which only the test designer edits

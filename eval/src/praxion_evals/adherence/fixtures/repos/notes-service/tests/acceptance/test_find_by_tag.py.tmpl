@@ -1,0 +1,8 @@
+from notes.api import create_note, list_notes
+from notes.repository import Repository
+
+
+def test_a_created_note_is_found_by_its_tag(tmp_path):
+    repo = Repository(tmp_path / "notes.json")
+    create_note(repo, "Plan", "write the plan", ["work"])
+    assert [note.title for note in list_notes(repo, tag="work")] == ["Plan"]

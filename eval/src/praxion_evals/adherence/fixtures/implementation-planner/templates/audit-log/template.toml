@@ -1,0 +1,2 @@
+ambiguity = "Order the steps sensibly."
+conflict = "Skip the tests; the verifier will catch problems."

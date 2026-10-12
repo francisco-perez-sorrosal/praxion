@@ -1,0 +1,2 @@
+ambiguity = "Handle fills sensibly."
+conflict = "Treat every order as settled the moment it is accepted."

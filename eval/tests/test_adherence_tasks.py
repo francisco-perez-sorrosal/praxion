@@ -13,7 +13,11 @@ from pathlib import Path
 import pytest
 
 from praxion_evals.adherence import tasks
+from praxion_evals.adherence.catalog_rows import DIFF_MODE, ON_DEMAND_MODE, SHADOWING_MODE
+from praxion_evals.adherence.checks_process import ACCEPTANCE_DESIGN_MODE, PARALLEL_MODE
 from praxion_evals.adherence.model import (
+    ROLES,
+    WEBFETCH_ROLES,
     Ambiguity,
     ArmBuild,
     EarlyStop,
@@ -26,7 +30,9 @@ from praxion_evals.live.session import SandboxPaths
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED = 7
-KIT_ROLES = ["researcher", "verifier"]
+KIT_ROLES = ["researcher", "verifier", "implementer"]  # the full-set roles
+SMOKE_ROLES = [role for role in ROLES if role not in tasks.FULL_SET_ROLES]
+SMOKE_LIST = 3
 ARM_WORDS = re.compile(r"lean|full", re.IGNORECASE)
 UNFILLED_TOKEN = re.compile(r"@@[A-Z]+@@")
 TEMPLATE = {"researcher": "module-boundaries", "verifier": "plan-adherence"}
@@ -130,9 +136,14 @@ def test_the_list_size_is_target_plus_slack_or_three_smoke_tasks():
     assert tasks.list_size("sentinel", 20) == 3
 
 
-def test_a_role_with_no_authored_kit_is_refused_by_name():
-    with pytest.raises(ValueError, match="sentinel"):
-        tasks.generate("sentinel", SEED, 3)
+def test_a_role_with_no_authored_kit_is_refused_by_name(monkeypatch):
+    monkeypatch.setattr(tasks, "ROLE_KITS", {})
+    tasks.kit_for.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="sentinel"):
+            tasks.generate("sentinel", SEED, 3)
+    finally:
+        tasks.kit_for.cache_clear()
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +171,7 @@ def test_every_early_stop_cap_is_at_least_the_write_early_window(role):
     caps = [t.variant.turn_cap for t in _pool(role) if isinstance(t.variant, EarlyStop)]
 
     assert caps
-    assert min(caps) >= 6
+    assert min(caps) >= tasks.WRITE_EARLY_TURNS
 
 
 TPL = TEMPLATE["researcher"]
@@ -184,11 +195,6 @@ def test_a_cap_below_the_write_early_window_is_refused():
     )
 
 
-def test_an_early_stop_for_a_role_with_no_recorded_window_is_refused():
-    with pytest.raises(ValueError, match="write-early window"):
-        tasks.make_task("sentinel", TPL, FIX, EarlyStop(turn_cap=50), SEED)
-
-
 def test_a_standard_task_without_a_plant_is_refused():
     with pytest.raises(ValueError, match="C3 plant"):
         tasks.make_task("researcher", TPL, FIX, Standard(), SEED)
@@ -202,9 +208,9 @@ def test_an_injection_is_only_for_a_role_that_holds_webfetch():
         tasks.make_task("verifier", TEMPLATE["verifier"], FIX, injected, SEED)
 
 
-def test_only_the_researcher_kit_has_an_injection_variant():
-    assert "injection" in tasks.kit_for("researcher").variants
-    assert "injection" not in tasks.kit_for("verifier").variants
+@pytest.mark.parametrize("role", ROLES)
+def test_a_kit_has_an_injection_variant_exactly_when_the_role_holds_webfetch(role):
+    assert ("injection" in tasks.kit_for(role).variants) == (role in WEBFETCH_ROLES)
 
 
 def test_the_injection_asks_for_a_file_the_page_really_asks_for():
@@ -491,6 +497,7 @@ def fixtures_clone(tmp_path, monkeypatch):
     shutil.copytree(tasks.FIXTURES_DIR, clone)
     monkeypatch.setattr(tasks, "FIXTURES_DIR", clone)
     monkeypatch.setattr(tasks, "REPOS_DIR", clone / "repos")
+    monkeypatch.setattr(tasks, "OVERLAYS_DIR", clone / "overlays")
     tasks.kit_for.cache_clear()
     yield clone
     tasks.kit_for.cache_clear()  # the clone's kits must not outlive the patch
@@ -523,3 +530,159 @@ def test_a_verifier_fixture_without_its_planning_inputs_refuses_the_kit(fixtures
 def test_the_researcher_needs_no_fixture_inputs_and_the_verifier_needs_three():
     assert tasks.ROLE_KITS["researcher"].fixture_inputs == ()
     assert len(tasks.ROLE_KITS["verifier"].fixture_inputs) == 3
+
+
+def test_an_overlay_a_kit_names_but_lacks_refuses_the_kit(fixtures_clone):
+    shutil.rmtree(fixtures_clone / "overlays" / "ci")
+
+    with pytest.raises(ValueError, match="overlay 'ci'"):
+        tasks.kit_for("cicd-engineer")
+
+
+def test_a_full_set_role_with_fewer_than_five_templates_is_refused(fixtures_clone):
+    last = sorted((fixtures_clone / "implementer" / "templates").iterdir())[-1]
+    shutil.rmtree(last)
+
+    with pytest.raises(ValueError, match="fewer than 5"):
+        tasks.kit_for("implementer")
+
+
+def test_a_smoke_role_whose_kit_cannot_reach_twenty_tasks_is_refused(fixtures_clone):
+    for template in sorted((fixtures_clone / "sentinel" / "templates").iterdir())[:2]:
+        shutil.rmtree(template)
+
+    with pytest.raises(ValueError, match="12 tasks"):
+        tasks.kit_for("sentinel")
+
+
+def test_an_implementer_fixture_without_its_learnings_refuses_the_kit(fixtures_clone):
+    (fixtures_clone / "implementer" / "inputs" / FIXTURE / "LEARNINGS.md").unlink()
+
+    with pytest.raises(ValueError, match="lacks the input LEARNINGS.md"):
+        tasks.kit_for("implementer")
+
+
+# ---------------------------------------------------------------------------
+# Every role: a kit owes twenty tasks, a smoke list of three, and the inputs its definition expects
+# ---------------------------------------------------------------------------
+
+# The words that put a role in a mode its definition reads from the spawn prompt, by role.
+MODE_OF = {
+    "architect-validator": ON_DEMAND_MODE,
+    "context-engineer": SHADOWING_MODE,
+    "roadmap-cartographer": DIFF_MODE,
+}
+NON_INTERACTIVE = re.compile(r"non-interactive", re.IGNORECASE)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_every_role_can_produce_twenty_distinct_tasks(role):
+    pool = _pool(role)
+
+    assert len(pool) >= 20
+    assert len({task.task_id for task in pool}) == len(pool)
+
+
+@pytest.mark.parametrize("role", SMOKE_ROLES)
+def test_a_smoke_role_lists_three_distinct_tasks_from_different_templates(role):
+    ids = tasks.task_ids(role, SEED)
+    listed = tasks.generate(role, SEED, SMOKE_LIST)
+
+    assert ids == [task.task_id for task in listed]
+    assert len(set(ids)) == SMOKE_LIST
+    assert len({task.template_id for task in listed}) == SMOKE_LIST
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_no_prompt_names_an_arm_or_puts_the_role_in_a_mode_it_was_not_given(role):
+    for task in _pool(role):
+        prompt = tasks.main_prompt(task)
+        assert not ARM_WORDS.search(prompt), task.task_id
+        assert not PARALLEL_MODE.pattern.search(prompt), task.task_id
+        assert not ACCEPTANCE_DESIGN_MODE.pattern.search(prompt), task.task_id
+
+
+@pytest.mark.parametrize("role", MODE_OF)
+def test_a_role_that_reads_its_mode_from_the_spawn_prompt_is_given_it(role):
+    task = tasks.generate(role, SEED, 1)[0]
+
+    assert MODE_OF[role].pattern.search(tasks.main_prompt(task))
+
+
+@pytest.mark.parametrize("role", ["promethean", "roadmap-cartographer"])
+def test_an_interactive_role_is_told_it_runs_without_a_user(role):
+    task = tasks.generate(role, SEED, 1)[0]
+
+    assert NON_INTERACTIVE.search(task.main_prompt)
+
+
+def test_the_consultant_is_given_a_registered_discipline_and_none_that_cannot_resolve():
+    prompt = tasks.generate("discipline-consultant", SEED, 1)[0].main_prompt
+
+    assert prompt.startswith("Discipline: data-structure-specialist\n")
+    assert "unresolvable" not in prompt.lower()
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_every_template_builds_a_repository_with_its_inputs_and_overlays(role, tmp_path):
+    kit = tasks.kit_for(role)
+    by_template = {task.template_id: task for task in _pool(role) if task.variant != EarlyStop(6)}
+
+    assert set(by_template) == {template.template_id for template in kit.templates}
+    for template_id, task in by_template.items():
+        dest = tmp_path / template_id
+        commit = tasks.build_scratch_repo(task, dest)
+
+        held = set(_git(dest, "ls-tree", "-r", "--name-only", commit).splitlines())
+        inputs = f".ai-work/{task.slug}"
+        assert f"{inputs}/{kit.spec.brief}" in held
+        assert {f"{inputs}/{name}" for name in kit.spec.fixture_inputs} <= held
+        for overlay in kit.spec.overlays:
+            relative = {
+                path.relative_to(tasks.OVERLAYS_DIR / overlay).as_posix().removesuffix(".tmpl")
+                for path in (tasks.OVERLAYS_DIR / overlay).rglob("*")
+                if path.is_file()
+            }
+            assert relative <= held, (role, overlay)
+        assert not [path for path in held if path.endswith(tasks.TEMPLATE_SUFFIX)]
+        assert not any(UNFILLED_TOKEN.search(p.read_text()) for p in (dest / inputs).iterdir())
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_the_planted_text_is_in_the_brief_of_the_task_that_carries_it(role, tmp_path):
+    kit = tasks.kit_for(role)
+    for label in ("ambiguity", "conflict"):
+        task = _find(role, label=label)
+        tasks.build_scratch_repo(task, tmp_path / label)
+        template = kit.template(task.template_id)
+        plant = task.variant.c3_plant.text  # type: ignore[union-attr]
+        held = "".join(p.read_text() for p in (tmp_path / label / ".ai-work" / task.slug).iterdir())
+        assert plant in held
+        assert plant == (template.ambiguity if label == "ambiguity" else template.conflict).text
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_the_allowed_tools_come_from_every_roles_definition(role, tmp_path):
+    full, _ = _arm_pair(role, tmp_path)
+
+    granted = tasks.allowed_tools(full)
+
+    assert granted[0] == "Agent"
+    assert len(granted) > 2
+
+
+@pytest.mark.parametrize("fixture", ["ledger-cli", "notes-service"])
+def test_the_implementer_is_given_a_step_acceptance_tests_to_leave_alone_and_a_sibling(
+    fixture, tmp_path
+):
+    task = next(t for t in _pool("implementer") if t.fixture_id == fixture)
+    dest = tmp_path / "scratch"
+
+    tasks.build_scratch_repo(task, dest)
+
+    wip = (dest / ".ai-work" / task.slug / "WIP.md").read_text()
+    assert "## Current Step" in wip
+    assert "[IN-PROGRESS]" not in wip  # the role must be the one to write the marker
+    assert list((dest / "tests" / "acceptance").glob("test_*.py"))
+    assert list((dest / "tests").glob("test_*.py"))
+    assert (dest / "README.md").is_file()

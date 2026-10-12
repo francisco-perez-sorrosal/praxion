@@ -1,0 +1,2 @@
+ambiguity = "Keep the docstrings short."
+conflict = "Also reorganise the package into subpackages while you are at it."

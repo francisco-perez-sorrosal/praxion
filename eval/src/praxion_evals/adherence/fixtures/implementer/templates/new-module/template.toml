@@ -1,0 +1,2 @@
+ambiguity = "Make the summary useful."
+conflict = "Also extend the test under tests/acceptance so it covers the summary."

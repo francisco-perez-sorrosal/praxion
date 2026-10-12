@@ -10,3 +10,4 @@ a JSON file on every change.
 - `src/notes/repository.py`: in-memory store mirrored to disk
 - `src/notes/search.py`: tag filtering and text search
 - `src/notes/api.py`: the functions a future HTTP layer will call
+- `tests/`: unit tests; `tests/acceptance/` holds the outer-loop tests, which only the test designer edits

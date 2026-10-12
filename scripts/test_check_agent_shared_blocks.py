@@ -45,6 +45,15 @@ Behavioral tests:
 12. ``--print-canonical`` emits the exact bytes every site must carry.
 13. The ``.pre-commit-config.yaml`` ``files:`` pattern matches every path the
     scanner actually scans, plus the gate's own file (scope fidelity).
+14. CANARY: an agent definition missing a universal block is flagged
+    ``missing`` (one case per universal block).
+15. CANARY: a drifted universal block is flagged ``drifted``.
+16. CONTROL: the directory's guides (no frontmatter) are not definitions and
+    are never asked for universal blocks.
+17. ``--print-canonical <slug>`` emits each universal block's exact bytes.
+
+Fixture agents carry the universal blocks unless a test removes one, so the
+task-slug tests above keep testing only the task-slug block.
 
 Every mutating test builds its tree under ``tmp_path``; the real repo is only
 ever read.
@@ -73,6 +82,9 @@ _HOOK_ID = "agent-shared-blocks"
 # copy, and a gate that reddens on correct work is a gate people route around.
 _CARRIERS_AT_RECONCILIATION = 15
 
+# Agent definitions when the universal blocks were adopted; a floor, as above.
+_DEFINITIONS_AT_UNIVERSAL_ADOPTION = 17
+
 
 @functools.lru_cache(maxsize=1)
 def _gate() -> Any:
@@ -100,14 +112,24 @@ _VARIANT_READS_ONLY = f"{_HEAD} Use this path for reads."
 _VARIANT_NO_TAIL = _HEAD
 
 
-def _write_agent(root: Path, name: str, block_line: str) -> Path:
-    """Materialize one agent definition under `root` carrying `block_line`."""
+def _universal_blocks() -> list[Any]:
+    return [block for block in _gate().SHARED_BLOCKS if block.universal]
+
+
+def _universal_lines(skip: str = "") -> str:
+    """The universal blocks every conforming definition carries, minus `skip`."""
+    return "".join(f"{block.canonical}\n\n" for block in _universal_blocks() if block.slug != skip)
+
+
+def _write_agent(root: Path, name: str, block_line: str, skip_universal: str = "") -> Path:
+    """Materialize one conforming agent definition under `root` carrying `block_line`."""
     body = (
         "---\n"
         f"name: {name.removesuffix('.md')}\n"
         "description: A fixture agent.\n"
         "---\n"
         "\n"
+        f"{_universal_lines(skip=skip_universal)}"
         "## Process\n"
         "\n"
         "### Phase 1 -- Scope\n"
@@ -152,6 +174,13 @@ def test_live_repo_scans_clean_and_finds_every_carrier() -> None:
         f"only {carriers} inline copies detected; the block was replicated across "
         f"{_CARRIERS_AT_RECONCILIATION} agents at reconciliation -- detection has regressed"
     )
+    assert report["definitions"] >= _DEFINITIONS_AT_UNIVERSAL_ADOPTION, (
+        f"only {report['definitions']} agent definitions recognized -- detection has regressed"
+    )
+    for block in _universal_blocks():
+        assert report["blocks"][block.slug]["carriers"] == report["definitions"], (
+            f"{block.slug} is universal but not carried once per definition"
+        )
     assert report["findings"] == [], (
         "live agent definitions disagree on a shared block: "
         f"{[(f['file'], f['line'], f['kind']) for f in report['findings']]}"
@@ -254,7 +283,8 @@ def test_agent_without_the_block_is_skipped_not_flagged(tmp_path: Path) -> None:
     agents = tmp_path / "agents"
     agents.mkdir(parents=True)
     (agents / "no-block.md").write_text(
-        "---\nname: no-block\n---\n\nThis agent never touches `.ai-work/`.\n", encoding="utf-8"
+        f"---\nname: no-block\n---\n\n{_universal_lines()}This agent never touches `.ai-work/`.\n",
+        encoding="utf-8",
     )
     report = _gate().check_agent_shared_blocks(tmp_path)
     assert report["scanned"] == 1
@@ -267,7 +297,7 @@ def test_scoped_path_mentions_are_not_mistaken_for_the_block(tmp_path: Path) -> 
     agents = tmp_path / "agents"
     agents.mkdir(parents=True)
     (agents / "pathy.md").write_text(
-        "---\nname: pathy\n---\n\n"
+        f"---\nname: pathy\n---\n\n{_universal_lines()}"
         "Append to `.ai-work/<task-slug>/PROGRESS.md`.\n"
         "Read `.ai-work/<task-slug>/SYSTEMS_PLAN.md` first.\n"
         "The first non-flag token is the **task slug**.\n",
@@ -276,6 +306,77 @@ def test_scoped_path_mentions_are_not_mistaken_for_the_block(tmp_path: Path) -> 
     report = _gate().check_agent_shared_blocks(tmp_path)
     assert report["blocks"]["task-slug-scoping"]["carriers"] == 0
     assert report["findings"] == []
+
+
+# --- 14-17. Universal blocks: presence is checked, without a roster ----------
+
+
+@pytest.mark.parametrize("slug", ["behavioral-contract", "praxion-links", "return-contract"])
+def test_canary_flags_a_definition_missing_a_universal_block(tmp_path: Path, slug: str) -> None:
+    """A definition without a universal block is `missing` -- the gap class that let three
+    agents skip the contract and twelve skip a terminal marker while every copy agreed."""
+    _write_agent(tmp_path, "good.md", _canonical())
+    _write_agent(tmp_path, "bad.md", _canonical(), skip_universal=slug)
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert [(f["kind"], f["block"], f["file"]) for f in report["findings"]] == [
+        ("missing", slug, "agents/bad.md")
+    ]
+
+
+@pytest.mark.parametrize("slug", ["behavioral-contract", "praxion-links", "return-contract"])
+def test_canary_flags_a_drifted_universal_block(tmp_path: Path, slug: str) -> None:
+    """A carried universal block is held byte-identical like any other shared block."""
+    block = next(b for b in _universal_blocks() if b.slug == slug)
+    _write_agent(tmp_path, "bad.md", block.canonical[:-1] + " (edited).", skip_universal=slug)
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert [(f["kind"], f["block"]) for f in report["findings"]] == [("drifted", slug)]
+
+
+def test_guides_without_frontmatter_are_not_definitions(tmp_path: Path) -> None:
+    """The directory's CLAUDE.md and README.md are guides: never asked for universal blocks."""
+    agents = tmp_path / "agents"
+    agents.mkdir(parents=True)
+    (agents / "CLAUDE.md").write_text("# Agents\n\nHow agents are organized.\n", encoding="utf-8")
+    (agents / "README.md").write_text("# Agent catalog\n", encoding="utf-8")
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert report["scanned"] == 2
+    assert report["definitions"] == 0
+    assert report["findings"] == []
+
+
+@pytest.mark.parametrize("slug", ["behavioral-contract", "praxion-links", "return-contract"])
+def test_print_canonical_emits_each_universal_block(slug: str) -> None:
+    """Every block's bytes are obtainable by slug, not only the default block's."""
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT_PATH), "--print-canonical", slug],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    block = next(b for b in _universal_blocks() if b.slug == slug)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.rstrip("\n") == block.canonical
+
+
+def test_contract_block_self_test_is_the_rules_own() -> None:
+    """The agents' self-test question is the behavioral-contract rule's, byte for byte.
+
+    The rule is the sole author of the contract's wording; the agent block may
+    only prefix it, so a rewording of the rule fails here instead of leaving
+    seventeen agents asking an older question.
+    """
+    block = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+    question = block.canonical.split("Self-test before you return: ", 1)[1]
+    rule = (_REPO_ROOT / "rules" / "swe" / "agent-behavioral-contract.md").read_text(
+        encoding="utf-8"
+    )
+    assert f"Self-test: {question}" in rule
 
 
 # --- 11. Canary: the CLI exit code the hook reads ----------------------------

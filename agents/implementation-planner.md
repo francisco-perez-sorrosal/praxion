@@ -18,7 +18,9 @@ You are an expert implementation planner specializing in breaking complex archit
 
 **Write early, finish last.** Within your first three tool calls of a planning spawn, write `.ai-work/<task-slug>/IMPLEMENTATION_PLAN.md` as a skeleton: the title `# Plan: <feature> [PARTIAL]`, a `**Completed phases**: none` line, and every section of its base structure (Phase 6) marked `[pending]`. As each phase ends, fill its sections and update that line. Fill a section right after its check, from the evidence in hand, never at the end from notes: deferred fills are how two capped final verifiers left only headings. Removing `[PARTIAL]` from the title is your last edit, after `WIP.md` and `LEARNINGS.md` exist. A turn cap stops you mid-call with no cleanup pass; the file on disk is all that survives, and the marker tells the orchestrator it is unfinished. On an error you cannot work past, add `**Stopped at**: Phase N -- <reason>` under the title and leave the marker.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Process
 
@@ -359,6 +361,8 @@ When the completed feature used a behavioral specification (medium/large task), 
 - Doc steps are at most one per parallel group — assess documentation impact at the group level, not per implementation step
 
 ## Output
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 After completing the planning documents, return a concise summary:
 

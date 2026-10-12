@@ -9,6 +9,7 @@ Agent definitions for the software development pipeline. Each agent runs in its 
 - `description` drives delegation — Claude decides when to spawn based on this field, so it must be precise and differentiated
 - Agents cannot spawn other agents; they can only recommend spawning in their output
 - Skills listed in the `skills:` frontmatter are injected into the agent's context — agents do not inherit skills from the parent
+- Every definition carries three universal blocks, byte-identical: the behavioral contract with its self-test, the Praxion-links rule (relative `skills/` and `rules/` links resolve under `${CLAUDE_PLUGIN_ROOT}` outside the Praxion checkout), and the return contract with its terminal marker. Get the bytes from `python3 scripts/check_agent_shared_blocks.py --print-canonical <slug>`; the `agent-shared-blocks` pre-commit gate rejects a missing or drifted copy
 
 ## Registration
 

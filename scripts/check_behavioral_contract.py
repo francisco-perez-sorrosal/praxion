@@ -120,10 +120,15 @@ _BEHAVIOR_NAMES: tuple[str, ...] = (
 )
 
 # The canonical enumeration of the agents that write, plan, or review
-# code -- see the module docstring for the single-sourcing note.
+# code -- see the module docstring for the single-sourcing note. Today that is
+# every Praxion agent: promethean plans features, roadmap-cartographer plans
+# the roadmap, and skill-genesis reviews accumulated learnings.
 _BC03_EXPECTED_AGENTS = frozenset(
     {
         "researcher",
+        "promethean",
+        "roadmap-cartographer",
+        "skill-genesis",
         "systems-architect",
         "implementation-planner",
         "context-engineer",

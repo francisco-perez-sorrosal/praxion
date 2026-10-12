@@ -38,11 +38,30 @@ an author changing the block can paste the exact bytes into all fifteen sites
 instead of retyping them into a sixteenth variant.
 
 **Scope fidelity.** Documented scope and computed scope are the same glob:
-``agents/*.md``. This gate answers *"every site that carries this block carries
-it identically"* -- not *"every agent that should carry it does"*. The latter
-needs a hardcoded roster of which agents are in scope, and a hardcoded roster is
-itself the drift vector this gate exists to close. Carriers are detected, never
-enumerated.
+``agents/*.md``. For most blocks this gate answers *"every site that carries
+this block carries it identically"* -- not *"every agent that should carry it
+does"*. The latter would need a hardcoded roster of which agents are in scope,
+and a hardcoded roster is itself the drift vector this gate exists to close.
+Carriers are detected, never enumerated.
+
+**Universal blocks are the one exception, and they need no roster.** Three
+blocks are the Praxion process core every agent must carry: the behavioral
+contract with its self-test, the rule for resolving Praxion links, and the
+return contract with its terminal marker. Their scope is *every agent
+definition*, which is computed, not listed: a file under the glob whose
+frontmatter declares a ``name:``. The directory's ``CLAUDE.md`` and
+``README.md`` declare none, so they are guides, not definitions. A definition
+that lacks a universal block's anchor is a ``missing`` finding. This closes the
+gap class the presence-blind gate let through: three agents never cited the
+contract, and twelve never stated a terminal marker, while every copy that did
+exist agreed.
+
+**Plugin-root reads.** Claude Code substitutes ``${CLAUDE_PLUGIN_ROOT}`` in a
+plugin agent's body (probed 2026-10-11), so a link written against it resolves
+in any project, where a relative one does not. That is what the links block
+relies on. The blocks themselves stay inline anyway: they are a few sentences,
+and an agent that must read a file to learn how to finish has already failed
+once it skips the read.
 
 **Lead-ins are not drift.** Five agents open the line with their own clause
 (``Determine what you have to work with.``, ``Before gathering information,
@@ -52,7 +71,10 @@ therefore the canonical *sentence* anchored at ``The **task slug**``, not the
 whole line: anything before the anchor and anything after the sentence is free.
 A gate that reported correct work as drift would teach its reader to skip it.
 
-Two finding kinds:
+Three finding kinds:
+
+``missing``
+    An agent definition lacks a universal block's anchor entirely.
 
 ``drifted``
     The anchor is present and the bytes following it are not the canonical
@@ -101,7 +123,7 @@ class SharedBlock:
     is a per-agent lead-in and is not compared. ``tells`` are the loose
     fragments that mark a line as *claiming to be* this block; they exist so
     that drift in the anchor itself surfaces as a finding rather than as
-    silence.
+    silence. ``universal`` blocks must appear in every agent definition.
     """
 
     slug: str
@@ -109,6 +131,7 @@ class SharedBlock:
     anchor: str
     tells: tuple[str, ...]
     corroborators: tuple[str, ...] = ()
+    universal: bool = False
 
     def __post_init__(self) -> None:
         if not self.canonical.startswith(self.anchor):
@@ -121,6 +144,31 @@ class SharedBlock:
 _TASK_SLUG_SCOPING = (
     "The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all "
     "`.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes."
+)
+
+# The universal blocks: the process core every agent definition carries.
+_BEHAVIORAL_CONTRACT = (
+    "**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): "
+    "surface assumptions, register objections, stay surgical, simplicity first. "
+    "Self-test before you return: did I state my interpretation and assumptions, flag "
+    "conflicts with reasons, stay inside declared scope, and choose the simplest path?"
+)
+
+_PRAXION_LINKS = (
+    "**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, "
+    "names a Praxion file: read it from your working directory when it exists there (the "
+    "Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the "
+    "parent of the `agents/` directory this definition lives in."
+)
+
+_RETURN_CONTRACT = (
+    "**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines "
+    "(or your definition's tighter cap) naming the outcome, the key points and the artifact "
+    "path, never the artifact's body, tables or code. End it with exactly one terminal "
+    "marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), "
+    "`[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped "
+    "early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return "
+    "without a marker as a suspected truncation."
 )
 
 SHARED_BLOCKS: tuple[SharedBlock, ...] = (
@@ -136,6 +184,30 @@ SHARED_BLOCKS: tuple[SharedBlock, ...] = (
         # in the other.
         tells=("provided in your prompt as",),
         corroborators=("**task slug**", ".ai-work/"),
+    ),
+    SharedBlock(
+        slug="behavioral-contract",
+        canonical=_BEHAVIORAL_CONTRACT,
+        anchor="**Apply the behavioral contract**",
+        tells=("`rules/swe/agent-behavioral-contract.md`): surface assumptions",),
+        corroborators=("**Apply the behavioral contract**",),
+        universal=True,
+    ),
+    SharedBlock(
+        slug="praxion-links",
+        canonical=_PRAXION_LINKS,
+        anchor="**Praxion links.**",
+        tells=("names a Praxion file",),
+        corroborators=("**Praxion links.**",),
+        universal=True,
+    ),
+    SharedBlock(
+        slug="return-contract",
+        canonical=_RETURN_CONTRACT,
+        anchor="**Return contract.**",
+        tells=("treats a return without a marker as a suspected truncation",),
+        corroborators=("**Return contract.**",),
+        universal=True,
     ),
 )
 
@@ -215,11 +287,48 @@ def _inspect_line(line: str, lineno: int, rel: str, block: SharedBlock) -> Findi
     )
 
 
+def _is_definition(text: str) -> bool:
+    """True when `text` is an agent definition: frontmatter that declares a `name:`.
+
+    Computed from the file, never listed, so a new agent is in scope the moment
+    it exists and the directory's guides (no frontmatter) never are.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return False
+        if line.startswith("name:"):
+            return True
+    return False
+
+
+def _missing_universal(text: str, rel: str) -> list[Finding]:
+    """One `missing` finding per universal block whose anchor `text` never carries."""
+    return [
+        Finding(
+            kind="missing",
+            block=block.slug,
+            file=rel,
+            line=1,
+            detail=(
+                f"agent definition lacks the universal block anchored at {block.anchor!r}; "
+                "every agent carries it"
+            ),
+        )
+        for block in SHARED_BLOCKS
+        if block.universal and block.anchor not in text
+    ]
+
+
 def check_agent_shared_blocks(root: Path) -> dict[str, Any]:
-    """Verify every inline copy of every shared block matches its source of truth."""
+    """Verify every inline copy of every shared block matches its source of truth,
+    and that every agent definition carries each universal block."""
     targets = sorted(p for p in root.glob(SCAN_GLOB) if p.is_file())
     findings: list[Finding] = []
     carriers: dict[str, list[str]] = {block.slug: [] for block in SHARED_BLOCKS}
+    definitions = 0
 
     for path in targets:
         rel = path.relative_to(root).as_posix()
@@ -228,6 +337,9 @@ def check_agent_shared_blocks(root: Path) -> dict[str, Any]:
         except OSError as exc:
             findings.append(Finding("unreadable", "-", rel, 1, str(exc)))
             continue
+        if _is_definition(text):
+            definitions += 1
+            findings.extend(_missing_universal(text, rel))
         for lineno, line in enumerate(text.splitlines(), start=1):
             for block in SHARED_BLOCKS:
                 if not _is_candidate(line, block):
@@ -239,8 +351,10 @@ def check_agent_shared_blocks(root: Path) -> dict[str, Any]:
 
     return {
         "scanned": len(targets),
+        "definitions": definitions,
         "blocks": {
             block.slug: {
+                "universal": block.universal,
                 "carriers": len(carriers[block.slug]),
                 "files": sorted(set(carriers[block.slug])),
             }
@@ -251,9 +365,13 @@ def check_agent_shared_blocks(root: Path) -> dict[str, Any]:
 
 
 def _render_human(report: dict[str, Any]) -> str:
-    lines = [f"Scanned {report['scanned']} agent definition(s) under {SCAN_GLOB}."]
+    lines = [
+        f"Scanned {report['scanned']} file(s) under {SCAN_GLOB}, "
+        f"{report['definitions']} agent definition(s)."
+    ]
     for slug, info in report["blocks"].items():
-        lines.append(f"  {slug}: {info['carriers']} inline copy/copies")
+        scope = " (universal)" if info["universal"] else ""
+        lines.append(f"  {slug}{scope}: {info['carriers']} inline copy/copies")
     if not report["findings"]:
         lines.append("  every inline copy matches its canonical source of truth")
         return "\n".join(lines)
@@ -267,8 +385,9 @@ def _render_human(report: dict[str, Any]) -> str:
         for diff_line in finding["diff"]:
             lines.append(f"      {diff_line.rstrip()}")
     lines.append(
-        f"\n{len(report['findings'])} inline copy/copies drifted from the canonical text. "
-        f"Run `{Path(__file__).name} --print-canonical` for the exact bytes."
+        f"\n{len(report['findings'])} finding(s): a copy drifted from the canonical text or a "
+        f"universal block is missing. Run `{Path(__file__).name} --print-canonical <slug>` "
+        "for the exact bytes."
     )
     return "\n".join(lines)
 

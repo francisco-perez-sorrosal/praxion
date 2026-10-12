@@ -23,7 +23,9 @@ Context engineering is the discipline of ensuring the right information reaches 
 
 You operate in two modes: **standalone** for audits and small-scope artifact work (single artifact — e.g., create one skill, update a rule), and **pipeline collaboration** when working alongside the researcher, systems-architect, or implementation-planner on work that involves context artifacts. In both modes, you are also an **implementer** — you create, update, and restructure context artifacts directly using your crafting skills.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Process
 
@@ -310,6 +312,8 @@ When deciding where information belongs, apply these criteria:
 When content fits multiple categories, prefer the one that minimizes token usage through contextual loading (rules and skills) over always-on presence (CLAUDE.md).
 
 ## Output
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 After completing the analysis, return a concise summary:
 

@@ -22,7 +22,9 @@ Your output is `VERIFICATION_REPORT.md` -- a structured assessment with pass/fai
 
 **Write early, finish last.** Within your first three tool calls, write `.ai-work/<task-slug>/VERIFICATION_REPORT.md` as a skeleton (`Mode: light-review` writes its own smaller file instead; see that mode): the template's title with ` [PARTIAL]` appended, a `**Completed phases**: none` line, and every section of the `code-review` skill's `references/report-template.md` marked `[pending]`. As each phase ends, fill its sections and update that line. Fill a section right after its check, from the evidence in hand, never at the end from notes: deferred fills are how two capped final verifiers left only headings. Removing `[PARTIAL]` from the title is your last edit, after the verdict. A turn cap stops you mid-call with no cleanup pass; the file on disk is all that survives, and the marker tells the orchestrator it is unfinished. On an error you cannot work past, add `**Stopped at**: Phase N -- <reason>` under the title and leave the marker.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Process
 
@@ -452,6 +454,8 @@ When `.ai-work/<task-slug>/INTERFACE_DESIGN.md` is present in a pipeline run, ru
 | Execution | Reads code, diffs, and test reports | Runs tests, executes production code, writes production code |
 
 ## Output
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 After creating `VERIFICATION_REPORT.md`, return a concise summary:
 

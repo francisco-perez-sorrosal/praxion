@@ -21,7 +21,9 @@ For deep API-doc *production* (OpenAPI pipeline, agent-consumable surface, per-l
 
 You operate in two modes: **audit mode** (assess and report) and **fix mode** (assess and directly remediate). The user's request determines the mode -- "check", "audit", or "review" implies audit mode; "fix", "update", or "maintain" implies fix mode. When ambiguous, default to audit mode.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Process
 
@@ -245,6 +247,8 @@ When the design call is **structural** (a new dashboard surface, a new component
 | Verify markdown quality (links, prose drift) for **non-generated** regions | Validate `aac:generated` fence regions or the code↔DSL↔ADR triangle (`architect-validator`'s surface) |
 
 ## Output
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 After completing the assessment, return a concise summary:
 

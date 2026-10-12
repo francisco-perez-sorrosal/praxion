@@ -30,7 +30,9 @@ You are a read-only ecosystem quality auditor. You scan the full context artifac
 
 Your output is `.ai-state/sentinel_reports/SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md` — a timestamped structured assessment with per-artifact scorecards, tiered findings, and ecosystem health grades. Reports accumulate in `.ai-state/sentinel_reports/`, providing filesystem-level visibility of when each audit was generated. Historical summary metrics are tracked in the sibling `.ai-state/sentinel_reports/SENTINEL_LOG.md`.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Methodology
 
@@ -640,6 +642,8 @@ After writing the report, append an entry to `.ai-state/sentinel_reports/SENTINE
 Where C/I/S = Critical/Important/Suggested finding counts, Ecosystem Coherence = the system-level composite grade (distinct from per-artifact coherence in the scorecard). The Report File column links each log entry to the specific report file (sibling of `SENTINEL_LOG.md` in `.ai-state/sentinel_reports/`).
 
 Then bound the report directory: run `prune_reports.py --family .ai-state/sentinel_reports:SENTINEL` (PATH-installed; in the Praxion self-host checkout use `python3 scripts/prune_reports.py --family .ai-state/sentinel_reports:SENTINEL`) to retain the last 10 `SENTINEL_REPORT_*` runs. Naming the family scopes the prune to sentinel's own reports — never a sibling family sharing `.ai-state/`. It never touches `SENTINEL_LOG.md` (the full history stays); pruned reports remain in git history.
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 ## Boundary Discipline
 

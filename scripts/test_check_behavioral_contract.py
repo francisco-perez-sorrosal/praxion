@@ -110,16 +110,16 @@ def test_bc03_flags_missing_and_extra_citer(tmp_path: Path) -> None:
     )
     # "verifier" is contract-bound but does not cite the rule -- missing.
     _write(tmp_path / "agents" / "verifier.md", "No citation here.\n")
-    # "promethean" is not contract-bound but cites the rule anyway -- extra.
+    # "unlisted-agent" is not contract-bound but cites the rule anyway -- extra.
     _write(
-        tmp_path / "agents" / "promethean.md",
+        tmp_path / "agents" / "unlisted-agent.md",
         "See `rules/swe/agent-behavioral-contract.md` for the contract.\n",
     )
     report = classify(tmp_path)
     findings = [f for f in report["findings"] if f["check"] == "BC03"]
     entities = {f["entity"] for f in findings}
     assert "verifier" in entities
-    assert "promethean" in entities
+    assert "unlisted-agent" in entities
     assert all(f["severity"] == "fail" for f in findings)
 
 

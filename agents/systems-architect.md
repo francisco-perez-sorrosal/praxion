@@ -21,7 +21,9 @@ Your output is **SYSTEMS_PLAN.md** — Goal, Acceptance Criteria, Architecture, 
 
 **Write early, finish last.** Within your first three tool calls, write `.ai-work/<task-slug>/SYSTEMS_PLAN.md` as a skeleton: the title `# Plan: <feature> [PARTIAL]`, a `**Completed phases**: none` line, and every section of the Phase 10 structure marked `[pending]`. When it already exists (a `Mode: feature` resume after a spec phase), append ` [PARTIAL]` to its title instead. As each phase ends, fill its sections and update that line. Fill a section right after its check, from the evidence in hand, never at the end from notes: deferred fills are how two capped final verifiers left only headings. Removing `[PARTIAL]` from the title is your last edit in every spawn or resume. A turn cap stops you mid-call with no cleanup pass; the file on disk is all that survives, and the marker tells the orchestrator it is unfinished. On an error you cannot work past, add `**Stopped at**: Phase N -- <reason>` under the title and leave the marker. `Mode: baseline-audit` writes no `SYSTEMS_PLAN.md` and skips this.
 
-**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first.
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): surface assumptions, register objections, stay surgical, simplicity first. Self-test before you return: did I state my interpretation and assumptions, flag conflicts with reasons, stay inside declared scope, and choose the simplest path?
+
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.
 
 ## Process
 
@@ -424,6 +426,8 @@ Your `SYSTEMS_PLAN.md` is the implementation planner's primary input. Focus on:
 Structural coherence of the architect's outputs (DSL, `.ai-state/DESIGN.md`, ADR cross-references) is verified downstream by `architect-validator` once the design is committed; the architect does not run this check.
 
 ## Output
+
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
 
 After creating `SYSTEMS_PLAN.md` (and `SPEC_DELTA.md` for brownfield features, `.ai-state/DESIGN.md` + `docs/architecture.md` for Standard/Full pipelines), return a concise summary:
 

@@ -5,7 +5,7 @@ every later one; the refusal is recorded and the run marked incomplete. A sessio
 that reports no cost is counted at its full budget. The results file records,
 before any session launches, the flip rule's settings, and for the run its
 identifier, model and Claude Code version. An existing results file is replaced
-only with `--overwrite`.
+only with `--overwrite`; without it the run is refused at start, before any launch.
 """
 
 from __future__ import annotations
@@ -98,15 +98,17 @@ def test_a_run_records_its_identifier_model_and_claude_code_version(tmp_path):
     assert results.claude_code_version() == FAKE_CLAUDE_VERSION
 
 
-def test_an_existing_results_file_is_never_replaced_without_overwrite(tmp_path):
+def test_an_existing_results_file_is_refused_at_start_without_overwrite(tmp_path):
     journey = run_journey(
         tmp_path,
         roles=("researcher",),
         arms=("lean",),
-        run_cap_usd=BELOW_ONE_SESSION,
         existing_results=EARLIER_RUN,
     )
 
+    assert journey.launches == [], (
+        "a session launched although the results file could not be written"
+    )
     assert journey.cli.exit_code != 0, (
         "the run reported success although it could not write its results"
     )

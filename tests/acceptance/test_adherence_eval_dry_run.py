@@ -1,8 +1,9 @@
 """A dry run shows what a paid run would launch, and launches nothing.
 
 The operator names roles, a checkout and arms and adds `--dry-run`: the eval
-prints one representative session per task -- its command line and the names of
-its environment variables -- and starts no session and writes no results file.
+prints one representative session per task for each arm named -- its command
+line and the names of its environment variables -- and starts no session and
+writes no results file.
 The printed sessions show the isolation every session gets: a sandbox `HOME` and
 `CLAUDE_CONFIG_DIR`, the checkout passed only through `--plugin-dir`, MCP servers
 off, and a per-session budget.
@@ -74,6 +75,16 @@ def test_a_dry_run_prints_exactly_one_session_for_each_task_of_the_role(tmp_path
         "the dry run's sessions are not one per task of the verifier's task set"
     )
     assert len(printed) == len(set(printed)), "a task was printed more than once"
+
+
+def test_a_dry_run_naming_both_arms_prints_one_session_per_task_for_each_arm(tmp_path):
+    sessions = _sessions(tmp_path, ("verifier",), ("full", "lean"))
+
+    printed = sorted((s.task_id, s.arm) for s in sessions)
+
+    assert printed == sorted(
+        (task, arm) for task in task_ids("verifier", SEED) for arm in ("full", "lean")
+    ), "a two-arm dry run does not print exactly one session per task for each arm"
 
 
 def test_a_dry_run_names_environment_variables_and_never_prints_their_values(tmp_path):

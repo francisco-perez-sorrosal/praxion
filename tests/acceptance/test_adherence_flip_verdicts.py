@@ -4,9 +4,10 @@ A mechanical check shows no regression only when the lean arm passes it on at
 least as many complete pairs as the full arm. A judged check is non-inferior only
 when the paired comparison bounds the lean arm's pass rate within the declared
 margin below the full arm's. The role's flip verdict is clear only when every
-scored check holds, and it never covers a withheld check. A role with fewer
-complete pairs than declared, or whose settings could not show non-inferiority
-even if both arms agreed on every pair, is underpowered and gets no flip verdict.
+scored check holds, and it never covers a withheld check. A role that achieved
+fewer complete pairs than the declared target, or whose achieved pairs could not
+show non-inferiority even if both arms agreed on every pair, is underpowered and
+gets no flip verdict.
 """
 
 from __future__ import annotations
@@ -52,11 +53,11 @@ def test_a_mechanical_check_the_lean_arm_passes_at_least_as_often_shows_no_regre
     assert verdict.check_verdicts["C1"] == "no regression"
 
 
-def test_a_judged_check_both_arms_pass_on_two_hundred_pairs_is_non_inferior_and_the_flip_clear():
+def test_a_judged_check_both_arms_pass_on_two_hundred_achieved_pairs_is_non_inferior_and_the_flip_clear():
     pairs = repeated(200, {"C1": PASS, "C3": PASS}, {"C1": PASS, "C3": PASS})
 
     verdict = role_verdict(
-        [DURABLE_OUTPUT, SURFACED_ASSUMPTION], pairs, FlipSettings(required_pairs=200)
+        [DURABLE_OUTPUT, SURFACED_ASSUMPTION], pairs, FlipSettings(required_pairs=20)
     )
 
     assert verdict.check_verdicts["C3"] == "non-inferior"
@@ -98,7 +99,7 @@ def test_errored_pairs_neither_count_as_complete_nor_against_the_role():
     assert (verdict.underpowered, verdict.flip) == (False, "clear")
 
 
-def test_a_role_with_fewer_complete_pairs_than_declared_is_underpowered_with_no_flip_verdict():
+def test_a_role_short_of_the_declared_target_of_complete_pairs_is_underpowered_with_no_flip_verdict():
     pairs = repeated(19, {"C1": PASS}, {"C1": PASS}) + errored_pairs(3)
 
     verdict = role_verdict([DURABLE_OUTPUT], pairs, FlipSettings(required_pairs=20))
@@ -108,7 +109,7 @@ def test_a_role_with_fewer_complete_pairs_than_declared_is_underpowered_with_no_
     assert verdict.complete_pairs == 19, "an underpowered role still reports its counts"
 
 
-def test_settings_that_could_not_show_non_inferiority_even_with_full_agreement_are_underpowered():
+def test_achieved_pairs_too_few_to_show_non_inferiority_even_with_full_agreement_are_underpowered():
     pairs = repeated(3, {"C3": PASS}, {"C3": PASS})
 
     verdict = role_verdict(

@@ -467,6 +467,7 @@ After creating `VERIFICATION_REPORT.md`, return a concise summary:
 
 ## Constraints
 
+- **Do not commit.** Write `VERIFICATION_REPORT.md` and any ledger rows; the orchestrator commits them.
 - **Do not fix issues.** Your job is to identify and classify -- not to write corrective code.
 - **Do not run tests.** Read test results and coverage reports; never execute test suites.
 - **Do not assess design quality.** If the design was flawed, flag for systems-architect re-invocation.

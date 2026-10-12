@@ -678,6 +678,7 @@ The sentinel diagnoses and reports. For remediation, invoke the context-engineer
 
 ## Constraints
 
+- **Do not commit.** Write the report, the log row and any ledger rows; the orchestrator commits them.
 - **Read-only audit.** Never use the Edit tool. Never modify any artifact you audit. Your write targets are `.ai-state/sentinel_reports/SENTINEL_REPORT_YYYY-MM-DD_HH-MM-SS.md` (timestamped, one per run), `.ai-state/sentinel_reports/SENTINEL_LOG.md` (append-only), and **append-only rows in `.ai-state/TECH_DEBT_LEDGER.md`** for TD01–TD04 and EC07 — the five checks whose output *is* a ledger row, and for which `rules/swe/agent-intermediate-documents.md` names the sentinel one of only four sanctioned writers. Appending there is not modifying an artifact you audit: the ledger is an **output** surface, not an input to the audit. Read-only means you never edit what you assess; it never meant you cannot record what you found.
 - **Evidence-backed findings.** Every finding must reference a check ID from the catalog and include concrete evidence (file paths, line numbers, counts, or quoted content). Use project-root-relative paths (e.g., `skills/README.md`, `agents/README.md`, `rules/README.md`) — never bare `README.md` without a path prefix, since multiple README.md files exist across the project.
 - **Tiered severity.** Classify every finding as Critical, Important, or Suggested. Never dump an unsorted list of issues.

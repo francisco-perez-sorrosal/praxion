@@ -182,6 +182,8 @@ If no architecture markdown files exist: emit one INFO note `no fenced markdown 
 
 ### Phase 7 — Report write and TECH_DEBT_LEDGER rows
 
+In `--mode=on-demand`: The **task slug** (provided in your prompt as `Task slug: <slug>`) scopes all `.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes.
+
 Write `.ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md` (see Output section for structure).
 
 **When the harness grants no `Write`** — the usual case for a `--mode=pre-merge` CI invocation, which also has no task slug — emit the same report content as structured output instead. Do not treat this as a failure and do not skip the verdict: in that mode the report *is* the output, and the invoking job is its reader (see Consumers). If the harness supplies an output schema, return the report serialized to it — same three sections, same finding fields, same verdict, JSON in place of markdown. Do not write the file anyway on a CI runner: nothing uploads it and the filesystem is destroyed with the job, so the write would only cost turns.
@@ -273,6 +275,7 @@ not a second durable store.
 
 ## Constraints
 
+- **Do not commit.** Write the report and any ledger rows; the orchestrator or the invoking harness commits them.
 - **Do not fix issues.** Identify and classify only; never write corrective code or edit architectural files.
 - **Do not assess behavior.** If an import exists but produces wrong output, that is the verifier's domain.
 - **Do not review markdown prose.** Only the content inside `aac:generated` fences is in scope; prose quality in authored regions belongs to doc-engineer.

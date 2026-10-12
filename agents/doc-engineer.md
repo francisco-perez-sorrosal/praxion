@@ -80,6 +80,7 @@ Verify all links and references across documentation files:
 3. **Catalog completeness** -- for each catalog README, compare table entries against the directory listing. Flag phantom entries (listed but missing) and missing entries (exist but not listed).
 4. **Name consistency** -- verify names in documentation match actual filenames (hyphens vs. underscores, capitalization)
 5. **Inter-document references** -- verify links between documentation files resolve correctly
+6. **ADR links** -- a persistent doc links the finalized record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/` fragment, whose path stops resolving once finalize promotes it; mid-pipeline text cites the `dec-draft-<hash>` id instead
 
 Use the doc-management skill's cross-reference patterns for detailed validation procedures.
 

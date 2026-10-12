@@ -216,6 +216,7 @@ tools: Read, Glob, Grep
 - [ ] Single, clear responsibility
 - [ ] Descriptive name matching purpose
 - [ ] Specific description with trigger words
+- [ ] Routing checked for a Praxion agent: the `description` is the text that routes delegation, so run `python3 scripts/check_agent_routing.py --compare` before and after changing one; a route that moved since `.ai-state/agent_routing_baseline.json`, or a new miss, fails the check (`scripts/check_agent_routing.py` names each case's near misses)
 - [ ] Detailed system prompt with steps, checklist, output format, constraints
 - [ ] Appropriate tools granted (or inherited)
 - [ ] Correct model selected

@@ -213,6 +213,7 @@ Before shipping a skill, confirm each item:
 - [ ] A gotchas section leads the body, grown from observed failures
 - [ ] Load-bearing instructions sit near the top of the body and hold as standing guidance
 - [ ] At least three evaluation scenarios exist, including should-not-trigger cases, run against a no-skill baseline
+- [ ] For a Praxion skill whose description names a trigger an agent also claims (the near-miss pairs), `python3 scripts/check_agent_routing.py --compare` runs before and after the description change and reports no moved route
 - [ ] Every bundled script meets the agent-facing contract: non-interactive, solves its errors, justifies its constants
 - [ ] Each section stating a drift-prone external fact is cataloged for staleness and marked with a `last-verified` date
 - [ ] Consistent terminology, no time-sensitive statements, forward slashes in every path

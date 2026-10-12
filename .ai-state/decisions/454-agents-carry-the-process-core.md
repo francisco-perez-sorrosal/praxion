@@ -1,7 +1,8 @@
 ---
-id: dec-draft-03487ff2
+id: dec-454
+draft_id: dec-draft-03487ff2
 title: Every Praxion agent carries the process core inline, and the shared-block gate requires it
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-11
 summary: "All 17 agent definitions carry three byte-identical universal blocks whose canonical text lives in scripts/check_agent_shared_blocks.py: the behavioral contract with the rule's self-test, a Praxion-links rule (relative skills/ and rules/ links resolve under ${CLAUDE_PLUGIN_ROOT} outside the Praxion checkout), and a return contract (~15-line pointer, one terminal marker). The gate now fails a definition that lacks one, computed from frontmatter rather than a roster; the completion handshake's marker check covers report producers too; promethean, roadmap-cartographer and skill-genesis join the contract-bound roster."

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-12T00:04:48Z'
+generated_at: '2026-10-12T00:25:31Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -41,7 +41,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -61,7 +61,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-11'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -146,7 +146,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-09-08'
+  last_modified: '2026-10-11'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -3357,6 +3357,12 @@ surfaces:
   title: rules/CLAUDE.md is the rules tree's directory guide, not a core always-loaded rule
   last_modified: '2026-10-11'
   renderer: adr_card
+- id: ai-state-decisions-454-agents-carry-the-process-core
+  path: .ai-state/decisions/454-agents-carry-the-process-core.md
+  type: markdown
+  title: Every Praxion agent carries the process core inline, and the shared-block gate requires it
+  last_modified: '2026-10-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4164,6 +4170,7 @@ groups:
   - ai-state-decisions-451-skill-crafting-reference-set-restructure
   - ai-state-decisions-452-skill-frontmatter-field-set-single-source
   - ai-state-decisions-453-rules-claude-md-is-a-directory-guide
+  - ai-state-decisions-454-agents-carry-the-process-core
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

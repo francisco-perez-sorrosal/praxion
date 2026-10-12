@@ -17,6 +17,7 @@ dependencies = [
 [project.scripts]
 praxion-evals = "praxion_evals.harness.cli:main"
 praxion-evals-live = "praxion_evals.live.cli:main"
+praxion-evals-adherence = "praxion_evals.adherence.cli:main"
 
 [dependency-groups]
 dev = [

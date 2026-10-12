@@ -407,12 +407,17 @@ def _stub_measurements(
             "tokens": governed_tokens,
             "bytes": governed_bytes,
             "measured": governed_measured,
+            "ruler": mtb._MODEL if governed_measured else None,
         },
     )
     monkeypatch.setattr(
         mtb,
         "measure_listing",
-        lambda repo_root, **kw: {"tokens": listing_tokens, "measured": listing_measured},
+        lambda repo_root, **kw: {
+            "tokens": listing_tokens,
+            "measured": listing_measured,
+            "ruler": mtb._MODEL if listing_measured else None,
+        },
     )
 
 
@@ -502,6 +507,7 @@ def test_ratchet_suspension_does_not_waive_the_listing_ceiling(
     _seed_baseline(
         baseline,
         listing_ceiling=10,
+        listing_ceiling_ruler=mtb._MODEL,
         samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
         ratchet_suspended={"until": "2026-02-28", "reason": "operator decision"},
     )
@@ -558,6 +564,7 @@ def test_ratchet_listing_over_ceiling_blocks_independent_of_governed_byte_delta(
     _seed_baseline(
         baseline,
         listing_ceiling=100,
+        listing_ceiling_ruler=mtb._MODEL,
         samples=[{"date": "2026-01-01", "governed_tokens": 200, "governed_bytes": 800}],
     )
     _stub_measurements(monkeypatch, governed_tokens=195, governed_bytes=790, listing_tokens=101)
@@ -581,6 +588,7 @@ def test_ratchet_byte_delta_ignores_a_governed_basis_mismatch(
     _seed_baseline(
         baseline,
         listing_ceiling=999_999,
+        listing_ceiling_ruler=mtb._MODEL,
         samples=[
             {
                 "date": "2026-01-01",
@@ -1054,7 +1062,7 @@ def test_listing_over_frozen_ceiling_fails_on_matching_tokenizer_basis(
     """The frozen no-regression ceiling (not the report-only 2,000 target) is
     what T02 gates on — seeded here below today's listing reading."""
     baseline = tmp_path.joinpath(*mtb._BASELINE_RELATIVE_PATH)
-    _seed_baseline(baseline, listing_ceiling=50, samples=[])
+    _seed_baseline(baseline, listing_ceiling=50, samples=[], listing_ceiling_ruler=mtb._MODEL)
     _stub_report(monkeypatch, tokens=100, listing_tokens=200, listing_measured=True)
     mtb.main(["--repo-root", str(tmp_path), "--json"])
     payload = json.loads(capsys.readouterr().out)
@@ -1227,3 +1235,105 @@ def test_a_non_default_ruler_skips_the_frozen_ceiling_envelope(
 
     assert "t02_skipped" in payload
     assert "findings" not in payload, "no T02 finding may come from a foreign ruler"
+
+
+# -- The ruler moved to the current generation on 2026-10-11 --------------------
+# A ceiling frozen on the previous ruler is not comparable; a recording run
+# re-freezes it at today's reading and says so, a read-only run skips it.
+
+
+def test_the_default_ruler_is_the_current_generation() -> None:
+    """User decision 2026-10-11: count on the tokenizer the model actually
+    uses and keep the 25,000 ceiling; the old ruler read 65% of a ceiling that
+    was 94% full."""
+    assert mtb._MODEL == "claude-sonnet-5-5"
+    assert mtb._LEGACY_RULER == "claude-sonnet-4-5"
+    assert mtb._MODEL != mtb._LEGACY_RULER
+
+
+def test_a_ceiling_frozen_on_the_old_ruler_is_refrozen_when_recording(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=100,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=150)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["listing_over_ceiling"] is False, "an old-ruler ceiling is never a breach"
+    assert result["listing_ceiling"] == 150
+    assert any("re-frozen at today's 150" in note for note in result["notes"]), result["notes"]
+    written = json.loads(baseline.read_text())
+    assert written["listing_ceiling"] == 150
+    assert written["listing_ceiling_ruler"] == mtb._MODEL
+    assert written["listing_ceiling_basis"] == "tokenizer"
+
+
+def test_a_ceiling_frozen_on_the_old_ruler_is_skipped_without_recording(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=100,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=150)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY, record=False)
+
+    assert result["listing_over_ceiling"] is False
+    assert result["listing_ceiling"] is None
+    assert any("skipping the listing-ceiling check" in note for note in result["notes"])
+    assert json.loads(baseline.read_text())["listing_ceiling"] == 100, (
+        "read-only runs write nothing"
+    )
+
+
+def test_a_ceiling_frozen_on_the_current_ruler_still_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Inverse guard: the re-freeze must not swallow a real breach on a matching ruler."""
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(
+        baseline,
+        listing_ceiling=100,
+        samples=[{"date": "2026-01-01", "governed_tokens": 100, "governed_bytes": 400}],
+        listing_ceiling_ruler=mtb._MODEL,
+    )
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=150)
+
+    result = mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    assert result["listing_over_ceiling"] is True
+    assert json.loads(baseline.read_text())["listing_ceiling"] == 100
+
+
+def test_todays_sample_names_its_ruler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    baseline = tmp_path / "baseline.json"
+    _seed_baseline(baseline, listing_ceiling=999_999, samples=[], listing_ceiling_ruler=mtb._MODEL)
+    _stub_measurements(monkeypatch, governed_tokens=100, governed_bytes=400, listing_tokens=10)
+
+    mtb.ratchet(tmp_path, baseline_path=baseline, today=_TODAY)
+
+    samples = json.loads(baseline.read_text())["samples"]
+    assert samples[-1]["ruler"] == mtb._MODEL
+
+
+def test_t02_skips_the_frozen_ceiling_on_a_ruler_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The read-only T02 envelope never re-freezes; an old-ruler ceiling is simply not compared."""
+    baseline = tmp_path.joinpath(*mtb._BASELINE_RELATIVE_PATH)
+    _seed_baseline(baseline, listing_ceiling=50, samples=[])
+    _stub_report(monkeypatch, tokens=100, listing_tokens=200, listing_measured=True)
+    mtb.main(["--repo-root", str(tmp_path), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["examined"]["listing_ceiling"] is None
+    assert not any(f["entity"] == "listing surface" for f in payload["findings"])
+    assert json.loads(baseline.read_text())["listing_ceiling"] == 50

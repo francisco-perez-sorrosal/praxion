@@ -40,11 +40,16 @@ open with an INFO note rather than diffing two different rulers).
 
 The tokenizer is a ruler, and rulers differ by model generation: the same
 bytes count about half again as many tokens on current models as on the
-gate's default `_MODEL`. The default stays fixed because every persisted
-sample and frozen ceiling was recorded on it -- switching it silently would
-read as corpus growth. Every measured reading names its `ruler`, and
-`--model` takes a report-only reading on another tokenizer; that reading
-never touches the ratchet, its baseline, or the frozen-ceiling comparisons.
+previous generation (`_LEGACY_RULER`), which this gate counted with until
+2026-10-11 while reporting two thirds of a ceiling the model actually had
+nearly filled. `_MODEL` is now the current-generation ruler, the one
+`/context` uses, and the 25,000 ceiling stayed where it was (user decision,
+2026-10-11). Every measured reading and every persisted sample names its
+`ruler`. A listing ceiling frozen on another ruler is not comparable: a
+recording `ratchet()` run re-freezes it at today's reading on the current
+ruler and says so, a read-only run skips the comparison with a note. `--model`
+takes a report-only reading on another tokenizer; that reading never touches
+the ratchet, its baseline, or the frozen-ceiling comparisons.
 
 Stdlib-only, deliberately: the sentinel invokes this through the ambient
 interpreter, so a third-party import would make it a finding of the
@@ -102,7 +107,10 @@ _MEASURED_RATIO = 3.796
 _MEASURED_ON = "2026-08-05"
 
 _COUNT_TOKENS_URL = "https://api.anthropic.com/v1/messages/count_tokens"
-_MODEL = "claude-sonnet-4-5"
+_MODEL = "claude-sonnet-5-5"
+# The ruler every baseline recorded before 2026-10-11 was taken on; a frozen
+# listing ceiling that names no ruler was frozen on it.
+_LEGACY_RULER = "claude-sonnet-4-5"
 _TIMEOUT = 60
 # The commit gate runs `ratchet()` inside a 20s PreToolUse hook and makes two
 # sequential token-count calls; each gets this bound so both together fit.
@@ -583,7 +591,21 @@ def ratchet(
         governed_tokens=governed["tokens"],
         governed_bytes=governed["bytes"],
         basis=_basis_label(governed),
+        ruler=governed.get("ruler"),
     )
+    listing_ceiling, listing_note = _frozen_listing_ceiling(baseline, listing)
+    notes_from_listing: list[str] = []
+    if listing_note is not None and record and _ruler_changed(baseline, listing):
+        listing_ceiling = listing["tokens"]
+        updated = {
+            **updated,
+            "listing_ceiling": listing_ceiling,
+            "listing_ceiling_basis": "tokenizer",
+            "listing_ceiling_ruler": listing.get("ruler", _MODEL),
+        }
+        notes_from_listing.append(f"{listing_note} -- re-frozen at today's {listing_ceiling:,}")
+    elif listing_note is not None:
+        notes_from_listing.append(f"{listing_note} -- skipping the listing-ceiling check")
     if record:
         _write_baseline(path, updated)
 
@@ -615,18 +637,8 @@ def ratchet(
                 "date); enforcing the governed-byte delta"
             )
 
-    listing_basis = _basis_label(listing)
-    listing_ceiling = baseline.get("listing_ceiling")
-    listing_ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
-    listing_over_ceiling = False
-    if listing_ceiling is not None:
-        if listing_ceiling_basis == listing_basis:
-            listing_over_ceiling = listing["tokens"] > listing_ceiling
-        else:
-            notes.append(
-                f"listing ceiling was frozen on basis '{listing_ceiling_basis}' but today's "
-                f"listing reading is basis '{listing_basis}' -- skipping the listing-ceiling check"
-            )
+    notes.extend(notes_from_listing)
+    listing_over_ceiling = listing_ceiling is not None and listing["tokens"] > listing_ceiling
 
     return {
         "skipped": False,
@@ -725,14 +737,52 @@ def _load_baseline(path: Path) -> dict | None:
         return None
 
 
+def _frozen_listing_ceiling(baseline: dict, listing: dict) -> tuple[int | None, str | None]:
+    """The frozen listing ceiling comparable to `listing`, or None and why not.
+
+    Comparable means the same basis and, for a tokenizer reading, the same
+    ruler. A ceiling frozen before rulers were recorded was frozen on
+    `_LEGACY_RULER`; a measured reading from this module always names its
+    ruler, and one built elsewhere without a name is taken as `_MODEL`.
+    """
+    ceiling = baseline.get("listing_ceiling")
+    if ceiling is None:
+        return None, None
+    ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
+    listing_basis = _basis_label(listing)
+    if ceiling_basis != listing_basis:
+        return None, (
+            f"listing ceiling was frozen on basis '{ceiling_basis}' but today's listing "
+            f"reading is basis '{listing_basis}'"
+        )
+    if listing_basis == "tokenizer" and _ruler_changed(baseline, listing):
+        return None, (
+            f"listing ceiling of {ceiling:,} was frozen on ruler "
+            f"{baseline.get('listing_ceiling_ruler', _LEGACY_RULER)}; today's reading is on "
+            f"{listing.get('ruler', _MODEL)}"
+        )
+    return ceiling, None
+
+
+def _ruler_changed(baseline: dict, listing: dict) -> bool:
+    return baseline.get("listing_ceiling_ruler", _LEGACY_RULER) != listing.get("ruler", _MODEL)
+
+
 def _append_sample(
-    baseline: dict, *, today: date, governed_tokens: int, governed_bytes: int, basis: str
+    baseline: dict,
+    *,
+    today: date,
+    governed_tokens: int,
+    governed_bytes: int,
+    basis: str,
+    ruler: str | None = None,
 ) -> dict:
     """A new baseline dict with today's sample appended and old samples pruned.
 
-    `governed_tokens`/`basis` are kept for reporting (the absolute reading on
-    the day the sample was taken); `governed_bytes` is what `ratchet()`'s
-    trailing-window trend actually compares (td-180).
+    `governed_tokens`/`basis`/`ruler` are kept for reporting (the absolute
+    reading on the day the sample was taken, and the tokenizer it was taken
+    on); `governed_bytes` is what `ratchet()`'s trailing-window trend actually
+    compares (td-180).
     """
     today_str = today.isoformat()
     samples = [s for s in baseline.get("samples", []) if s["date"] != today_str]
@@ -742,6 +792,7 @@ def _append_sample(
             "governed_tokens": governed_tokens,
             "governed_bytes": governed_bytes,
             "basis": basis,
+            "ruler": ruler,
         }
     )
     cutoff = today - timedelta(days=_BASELINE_PRUNE_DAYS)
@@ -755,7 +806,7 @@ def _write_baseline(path: Path, baseline: dict) -> None:
     path.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
 
 
-def _t02_frozen_listing_ceiling(repo_root: Path, listing_basis: str) -> int | None:
+def _t02_frozen_listing_ceiling(repo_root: Path, listing: dict) -> int | None:
     """The `ratchet()`-frozen no-regression listing ceiling, read-only.
 
     Deliberately not `_LISTING_TARGET_CEILING_DEFAULT` (2,000): that is the
@@ -766,17 +817,13 @@ def _t02_frozen_listing_ceiling(repo_root: Path, listing_basis: str) -> int | No
     (`ratchet()`'s `listing_over_ceiling`); T02 mirrors its read, not its
     write -- a dispatch-table check must not mutate `token_budget_baseline.json`
     as a side effect of being asked "is this clean?". Returns None when no
-    baseline has been recorded yet, or its frozen basis disagrees with
-    today's reading (same guard `ratchet()` applies before comparing).
+    baseline has been recorded yet, or its frozen basis or ruler disagrees
+    with today's reading (same guard `ratchet()` applies before comparing).
     """
     baseline = _load_baseline(repo_root.joinpath(*_BASELINE_RELATIVE_PATH))
     if baseline is None:
         return None
-    ceiling = baseline.get("listing_ceiling")
-    ceiling_basis = baseline.get("listing_ceiling_basis", "tokenizer")
-    if ceiling is None or ceiling_basis != listing_basis:
-        return None
-    return ceiling
+    return _frozen_listing_ceiling(baseline, listing)[0]
 
 
 def _t02_findings(
@@ -824,8 +871,7 @@ def _t02_envelope(report: dict, repo_root: Path) -> dict:
     tokens/bytes/budget/basis payload, never replacing them."""
     listing = report["listing"]
     basis = "tokenizer" if report["measured"] else "ratio"
-    listing_basis = "tokenizer" if listing["measured"] else "ratio"
-    listing_ceiling = _t02_frozen_listing_ceiling(repo_root, listing_basis)
+    listing_ceiling = _t02_frozen_listing_ceiling(repo_root, listing)
     return {
         "check": CHECK_ID,
         "skipped": None,

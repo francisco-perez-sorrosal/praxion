@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "listing_ceiling": 9243,
+  "listing_ceiling": 14268,
   "listing_ceiling_basis": "tokenizer",
   "ratchet_suspended": {
     "until": "2026-11-30",
@@ -185,9 +185,11 @@
     },
     {
       "date": "2026-10-11",
-      "governed_tokens": 16197,
-      "governed_bytes": 63337,
-      "basis": "tokenizer"
+      "governed_tokens": 24729,
+      "governed_bytes": 66473,
+      "basis": "tokenizer",
+      "ruler": "claude-sonnet-5-5"
     }
-  ]
+  ],
+  "listing_ceiling_ruler": "claude-sonnet-5-5"
 }

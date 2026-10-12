@@ -21,6 +21,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -230,18 +231,51 @@ def remove_section(text: str, heading: str) -> tuple[str, int]:
     return "".join(lines[:start] + lines[end:]), len(removed.encode("utf-8"))
 
 
+def tree_entries(root: Path) -> dict[str, str]:
+    """Per-entry fingerprint of the tree: relative path -> ``kind\0sha256``.
+
+    Paths, entry kinds and bytes (a link's target for a symlink); never mtimes.
+    """
+    entries: dict[str, str] = {}
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            kind, payload = "link", os.readlink(path).encode()
+        elif path.is_file():
+            kind, payload = "file", path.read_bytes()
+        else:
+            continue
+        entries[path.relative_to(root).as_posix()] = (
+            f"{kind}\0{hashlib.sha256(payload).hexdigest()}"
+        )
+    return entries
+
+
+def digest_entries(entries: Mapping[str, str]) -> str:
+    """Fold ``tree_entries`` into the single tree digest."""
+    digest = hashlib.sha256()
+    for relpath in sorted(entries):
+        digest.update(f"{relpath}\0{entries[relpath]}\n".encode())
+    return digest.hexdigest()
+
+
 def tree_digest(root: Path) -> str:
     """Content hash of the tree — paths, entry kinds and bytes; never mtimes."""
-    digest = hashlib.sha256()
-    entries = (p for p in root.rglob("*") if p.is_symlink() or p.is_file())
-    for relpath, path in sorted((p.relative_to(root).as_posix(), p) for p in entries):
-        kind, payload = (
-            ("link", os.readlink(path).encode())
-            if path.is_symlink()
-            else ("file", path.read_bytes())
-        )
-        digest.update(f"{relpath}\0{kind}\0{hashlib.sha256(payload).hexdigest()}\n".encode())
-    return digest.hexdigest()
+    return digest_entries(tree_entries(root))
+
+
+def frontmatter_closing(lines: Sequence[str]) -> int:
+    """Index of the line that closes a leading ``---`` frontmatter block.
+
+    Raises ``ValueError`` when the text has no frontmatter or leaves it unclosed.
+    """
+    if not lines or lines[0].rstrip() != _FRONTMATTER_FENCE:
+        raise ValueError("no frontmatter")
+    closing = next(
+        (i for i in range(1, len(lines)) if lines[i].rstrip() == _FRONTMATTER_FENCE), None
+    )
+    if closing is None:
+        raise ValueError("unterminated frontmatter block")
+    return closing
 
 
 # ---------------------------------------------------------------------------
@@ -267,13 +301,10 @@ def _append_marker(path: Path, marker: str) -> None:
 def _plant_in_description(path: Path, marker: str) -> None:
     """Agent bodies never reach the top-level session; only the description does."""
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-    if not lines or lines[0].rstrip() != _FRONTMATTER_FENCE:
-        raise ValueError(f"{path} has no frontmatter to carry a description marker")
-    closing = next(
-        (i for i in range(1, len(lines)) if lines[i].rstrip() == _FRONTMATTER_FENCE), None
-    )
-    if closing is None:
-        raise ValueError(f"{path} has an unterminated frontmatter block")
+    try:
+        closing = frontmatter_closing(lines)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}, cannot carry a description marker") from exc
     description = next(
         (i for i in range(1, closing) if lines[i].startswith(_DESCRIPTION_KEY)), None
     )

@@ -531,3 +531,73 @@ def test_the_facts_a_matcher_reads_reach_the_canary():
 
     assert isinstance(check.evaluate(check.violation()), Failed)
     assert set(seen) == {"docs.example.com"}
+
+
+# ---------------------------------------------------------------------------
+# Documents named with a star or by repository path
+# ---------------------------------------------------------------------------
+
+REPORT_GLOB = ".ai-state/reports/REPORT_*.md"
+REPORT_FILE = ".ai-state/reports/REPORT_2026.md"
+
+
+def test_any_of_passes_when_one_section_has_content_and_fails_when_none_does():
+    sections = (Section("One"), Section("Two"))
+    check = required_sections("s", RULE, "researcher", document=DOC, sections=sections, any_of=True)
+    one = synthetic_evidence("researcher", slug=SLUG, files={DOC_PATH: "## One\n\ntext\n"})
+    none = synthetic_evidence("researcher", slug=SLUG, files={DOC_PATH: "## One\n\n[pending]\n"})
+
+    assert check.evaluate(one) == Passed()
+    assert isinstance(check.evaluate(none), Failed)
+
+
+def test_without_any_of_every_section_is_still_required():
+    sections = (Section("One"), Section("Two"))
+    check = required_sections("s", RULE, "researcher", document=DOC, sections=sections)
+    one = synthetic_evidence("researcher", slug=SLUG, files={DOC_PATH: "## One\n\ntext\n"})
+
+    assert isinstance(check.evaluate(one), Failed)
+
+
+def test_a_report_named_by_path_and_star_is_opened_marked_without_a_call_bound():
+    check = title_marker_first_unmarked_last(
+        "t", RULE, "sentinel", document=REPORT_GLOB, marker="[PARTIAL]"
+    )
+    opened = _use("Write", file_path=REPORT_FILE, content="# Report [PARTIAL]\n")
+    late = [_use("Read", file_path="a"), _use("Read", file_path="b")] * 3 + [opened]
+
+    done = synthetic_evidence(
+        "sentinel", slug=SLUG, files={REPORT_FILE: "# Report\n"}, tool_uses=late
+    )
+    unmarked = _use("Write", file_path=REPORT_FILE, content="# Report\n")
+    bad = synthetic_evidence(
+        "sentinel", slug=SLUG, files={REPORT_FILE: "# Report\n"}, tool_uses=[unmarked]
+    )
+
+    assert check.evaluate(done) == Passed()
+    assert isinstance(check.evaluate(bad), Failed)
+
+
+def test_the_canary_of_a_starred_document_is_written_at_a_path_the_star_matches():
+    check = required_sections(
+        "s", RULE, "researcher", document=REPORT_GLOB, sections=(Section("One"),)
+    )
+
+    assert isinstance(check.evaluate(check.violation()), Failed)
+
+
+def test_a_script_run_in_the_session_home_reads_the_transcripts_planted_there(tmp_path):
+    check = script_exits_zero(
+        "s",
+        RULE,
+        "researcher",
+        script="check_lens_isolation.py",
+        arguments=("--run", "latest", "--project-root", "{repo}"),
+        planted={},
+        planted_home=lambda repo: {"marker.txt": "x"},
+    )
+
+    outcome = check.evaluate(check.violation())
+
+    assert isinstance(outcome, CheckErrored)  # no workflow run is planted: the script refuses
+    assert "exited 2" in outcome.reason

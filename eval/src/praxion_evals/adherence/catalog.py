@@ -4,8 +4,9 @@ Every check names the rule it enforces as a file and a heading in it
 (:class:`~praxion_evals.adherence.model.RuleRef`); the catalog's tests fail when
 either does not exist. A role's row is a list of constructor applications from
 :mod:`~praxion_evals.adherence.checks_roles`, so a clause cannot be added without
-the canary that proves it fires. This module holds the rows built so far; a role with no row yet
-carries C1 to C6 alone.
+the canary that proves it fires. This module holds the rows of the seven pipeline roles; those
+of the ten roles that advise, audit and report are in
+:mod:`~praxion_evals.adherence.catalog_rows`.
 """
 
 from __future__ import annotations
@@ -14,6 +15,12 @@ import re
 from collections.abc import Mapping
 from urllib.parse import urlparse
 
+from praxion_evals.adherence.catalog_rows import (
+    MALFORMED_LEDGER,
+    PARTIAL_MARKER,
+    SUPPORT_ROLE_ROWS,
+    TECH_DEBT_LEDGER,
+)
 from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS
 from praxion_evals.adherence.checks_process import (
@@ -146,7 +153,6 @@ VERIFIER_PARTIAL = (
 VERIFIER_TAGS = "verifier: its behavioral-contract findings use exactly the six canonical tags"
 VERIFIER_LEDGER = "verifier: the ledger rows it writes pass check_state_ledgers.py --check"
 
-PARTIAL_MARKER = "[PARTIAL]"
 EARLY_TOOL_CALLS = 3  # "Within your first three tool calls, write ... as a skeleton"
 CANONICAL_TAGS = frozenset(
     {
@@ -158,17 +164,6 @@ CANONICAL_TAGS = frozenset(
         "DEAD-CODE-UNREMOVED",
     }
 )
-TECH_DEBT_LEDGER = ".ai-state/TECH_DEBT_LEDGER.md"
-_LEDGER_COLUMNS = (
-    "id | severity | class | direction | location | goal-ref-type | goal-ref-value | source"
-    " | first-seen | last-seen | owner-role | status | resolved-by | notes | dedup_key"
-)
-# The ledger's real header over a row with two cells where fifteen belong.
-MALFORMED_LEDGER = (
-    "# Technical Debt Ledger\n\n**Schema**: 14 row fields + 1 structural `dedup_key`.\n\n"
-    f"| {_LEDGER_COLUMNS} |\n|{'---|' * 15}\n| td-001 | suggested |\n"
-)
-
 VERIFIER_ROW: tuple[CheckDef, ...] = (
     title_marker_first_unmarked_last(
         VERIFIER_PARTIAL,
@@ -459,6 +454,7 @@ ROLE_ROWS: Mapping[str, tuple[CheckDef, ...]] = {
     "doc-engineer": DOC_ENGINEER_ROW,
     "systems-architect": ARCHITECT_ROW,
     "implementation-planner": PLANNER_ROW,
+    **SUPPORT_ROLE_ROWS,
 }
 
 

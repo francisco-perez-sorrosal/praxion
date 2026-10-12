@@ -18,6 +18,15 @@ from praxion_evals.adherence.catalog import (
     check_catalog,
     role_check,
 )
+from praxion_evals.adherence.catalog_rows import (
+    CARTOGRAPHER_DECISION_LOG,
+    CARTOGRAPHER_ISOLATION,
+    CONSULT_BLOCKED,
+    CONTEXT_STAGES,
+    DESIGN_SELF_TEST,
+    VALIDATOR_PRE_MERGE,
+    VALIDATOR_SECTIONS,
+)
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT, section_body
 from praxion_evals.adherence.model import (
@@ -78,14 +87,19 @@ def test_the_researcher_and_the_verifier_each_carry_their_three_clauses(role, cl
     assert all(check.name.startswith(f"{role}: ") for check in row)
 
 
-def test_a_role_without_a_row_yet_carries_the_common_checks_alone():
-    assert [c.name for c in check_catalog("sentinel")] == list(COMMON_CHECKS)
+def test_every_role_carries_a_row_of_its_own():
+    assert set(ROLE_ROWS) == set(ROLES)
 
 
 def test_the_only_judged_role_checks_are_the_adr_categories():
     judged = {role for role, row in ROLE_ROWS.items() for c in row if c.kind == "judged"}
 
-    assert judged == {"systems-architect", "implementation-planner"}
+    assert judged == {
+        "systems-architect",
+        "implementation-planner",
+        "interface-designer",
+        "agentic-transactions-architect",
+    }
 
 
 @pytest.mark.parametrize(
@@ -95,6 +109,33 @@ def test_the_only_judged_role_checks_are_the_adr_categories():
 def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     assert len(ROLE_ROWS[role]) == clauses
     assert all(check.name.startswith(f"{role}: ") for check in ROLE_ROWS[role])
+
+
+@pytest.mark.parametrize(
+    ("role", "clauses"),
+    [
+        ("sentinel", 4),
+        ("architect-validator", 3),
+        ("context-engineer", 2),
+        ("cicd-engineer", 1),
+        ("discipline-consultant", 3),
+        ("promethean", 3),
+        ("roadmap-cartographer", 4),
+        ("skill-genesis", 3),
+    ],
+)
+def test_each_remaining_role_carries_one_check_per_clause_of_its_row(role, clauses):
+    assert len(ROLE_ROWS[role]) == clauses
+    assert all(check.name.startswith(f"{role}: ") for check in ROLE_ROWS[role])
+
+
+@pytest.mark.parametrize("role", ["interface-designer", "agentic-transactions-architect"])
+def test_the_design_roles_share_the_adr_clauses_and_add_their_challenges_and_self_test(role):
+    names = [c.name.removeprefix(f"{role}: ") for c in ROLE_ROWS[role]]
+    architect = [c.name.removeprefix("systems-architect: ") for c in ROLE_ROWS["systems-architect"]]
+
+    assert names[: len(architect)] == architect
+    assert len(names) == len(architect) + 2
 
 
 def test_the_planner_shares_the_architects_adr_clauses_and_adds_its_own():
@@ -244,3 +285,49 @@ def test_a_clause_that_does_not_bind_is_not_applicable():
 
     assert isinstance(status, Measured)
     assert isinstance(status.outcomes[RESEARCHER_DOCS_FIRST], NotApplicable)
+
+
+# ---------------------------------------------------------------------------
+# The rows of the roles that advise, audit and report
+# ---------------------------------------------------------------------------
+
+
+def test_the_cartographers_lens_canary_reads_the_real_script_output():
+    check = role_check("roadmap-cartographer", CARTOGRAPHER_ISOLATION)
+
+    outcome = check.evaluate(check.violation())
+
+    assert isinstance(outcome, Failed)
+    assert "exited 1" in outcome.detail  # the script found the quoted sibling fragment
+
+
+@pytest.mark.parametrize("role", ["interface-designer", "agentic-transactions-architect"])
+def test_the_self_test_clause_is_reported_not_applicable_with_its_reason(role):
+    evidence = _gradable(role, slug="grade-task")
+    name = DESIGN_SELF_TEST.format(role=role)
+
+    status = grade.grade(evidence, [name], judge=None, setup=None)
+
+    assert isinstance(status, Measured)
+    outcome = status.outcomes[name]
+    assert isinstance(outcome, NotApplicable)
+    assert f"no rule requires the self-test in the {role}'s output" in outcome.reason
+
+
+@pytest.mark.parametrize(
+    ("role", "name", "prompt"),
+    [
+        ("architect-validator", VALIDATOR_PRE_MERGE, "Run the validator with --mode=on-demand."),
+        ("architect-validator", VALIDATOR_SECTIONS, "Run the validator with --mode=pre-merge."),
+        ("discipline-consultant", CONSULT_BLOCKED, "Discipline: statistics"),
+        ("context-engineer", CONTEXT_STAGES, "Audit the artifacts."),
+        ("roadmap-cartographer", CARTOGRAPHER_DECISION_LOG, "Mode: fresh"),
+    ],
+)
+def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, name, prompt):
+    evidence = _gradable(role, slug="grade-task", spawn_prompt=prompt)
+
+    status = grade.grade(evidence, [name], judge=None, setup=None)
+
+    assert isinstance(status, Measured)
+    assert isinstance(status.outcomes[name], NotApplicable)

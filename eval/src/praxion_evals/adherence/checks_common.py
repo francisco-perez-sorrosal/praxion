@@ -13,6 +13,7 @@ with the reason; nothing is silently passed.
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 import shlex
@@ -42,6 +43,16 @@ from praxion_evals.adherence.model import (
     TaskFacts,
     Withheld,
 )
+from praxion_evals.adherence.output_forms import (
+    COMPLETED_PHASES,
+    DRAFT_ADRS,
+    DURABLE_OUTPUTS,
+    PARTIAL_FORMS,
+    PARTIAL_MARKER,
+    RESEARCH_FINDINGS,
+    DurableOutput,
+    PartialForm,
+)
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.harness.schemas import JudgeVerdict
 from praxion_evals.live.session import SessionEnvelope, ToolUse
@@ -61,60 +72,6 @@ WRITE_TOOLS: Mapping[str, str] = {
 }
 
 
-DRAFT_ADRS = ".ai-state/decisions/drafts"  # where a decision-making role leaves its ADR fragments
-
-
-@dataclass(frozen=True)
-class DurableOutput:
-    """Where a role's own definition puts its output.
-
-    ``document`` is a file in the task's slug directory, ``also_accepted`` the files that
-    stand in for it (a parallel-mode fragment); ``other_locations`` are the repo-relative
-    files or directories it may also write. ``anywhere`` is a role whose work is the
-    change to the repository itself: its document must exist, and no write is stray.
-    No ``document`` means the definition names none (the role's edits are the output).
-    """
-
-    document: str | None
-    other_locations: tuple[str, ...] = ()
-    also_accepted: tuple[str, ...] = ()
-    anywhere: bool = False
-
-    def __post_init__(self) -> None:
-        if self.anywhere and self.other_locations:
-            raise ValueError("a role that may write anywhere has no other locations to list")
-
-    def documents(self) -> tuple[str, ...]:
-        return (self.document, *self.also_accepted) if self.document else ()
-
-
-RESEARCH_FINDINGS = "RESEARCH_FINDINGS.md"
-
-# Rows are read off each role's agent definition, one per role the eval covers so far.
-DURABLE_OUTPUTS: Mapping[str, DurableOutput] = {
-    "researcher": DurableOutput(RESEARCH_FINDINGS),
-    "verifier": DurableOutput("VERIFICATION_REPORT.md", (".ai-state/TECH_DEBT_LEDGER.md",)),
-    "systems-architect": DurableOutput(
-        "SYSTEMS_PLAN.md",
-        (
-            DRAFT_ADRS,
-            ".ai-state/DESIGN.md",
-            ".ai-state/SYSTEM_DEPLOYMENT.md",
-            "docs/architecture.md",
-            "docs/diagrams",
-        ),
-    ),
-    "implementation-planner": DurableOutput("IMPLEMENTATION_PLAN.md", (DRAFT_ADRS,)),
-    "implementer": DurableOutput("WIP.md", also_accepted=("WIP_implementer.md",), anywhere=True),
-    "test-engineer": DurableOutput(
-        "TEST_RESULTS.md",
-        also_accepted=("TEST_RESULTS_test-engineer.md", "ACCEPTANCE_TESTS.md"),
-        anywhere=True,
-    ),
-    "doc-engineer": DurableOutput(None, anywhere=True),
-}
-
-
 def durable_output(evidence: SessionEvidence) -> CheckOutcome:
     row = DURABLE_OUTPUTS.get(evidence.role)
     if row is None:
@@ -123,9 +80,11 @@ def durable_output(evidence: SessionEvidence) -> CheckOutcome:
         return NotApplicable(
             f"the {evidence.role}'s definition names no output document; its edits are its work"
         )
-    expected = [f"{slug_dir(evidence.slug)}/{name}" for name in row.documents()]
+    expected = [document_path(evidence.slug, name) for name in row.documents()]
     problems: list[str] = []
-    if not any(evidence.repo.files.get(path, "").strip() for path in expected):
+    if not any(
+        text.strip() for name in row.documents() for text in document_files(evidence, name).values()
+    ):
         named = expected[0] if len(expected) == 1 else f"any of {', '.join(expected)}"
         problems.append(f"{named} was never written or is empty")
     allowed = (slug_dir(evidence.slug), *row.other_locations)
@@ -137,6 +96,25 @@ def durable_output(evidence: SessionEvidence) -> CheckOutcome:
 
 def slug_dir(slug: str) -> str:
     return f"{AI_WORK}/{slug}"
+
+
+def document_path(slug: str, document: str) -> str:
+    """The repo-relative path of a document, or the pattern for it when its name holds ``*``.
+
+    A bare name sits in the task's slug directory; a name with a ``/`` in it (``./ROADMAP.md``
+    at the project root, ``.ai-state/...``) is already a repository path.
+    """
+    return os.path.normpath(document) if "/" in document else f"{slug_dir(slug)}/{document}"
+
+
+def document_files(evidence: SessionEvidence, document: str) -> dict[str, str]:
+    """Each file the session left that is the document, by path, in path order."""
+    pattern = document_path(evidence.slug, document)
+    return {
+        path: text
+        for path, text in sorted(evidence.repo.files.items())
+        if fnmatch.fnmatchcase(path, pattern)
+    }
 
 
 def written_paths(evidence: SessionEvidence) -> frozenset[str]:
@@ -476,31 +454,6 @@ def _forbidden_in(words: Sequence[str]) -> Iterator[str]:
 # C5: a forced stop leaves the durable output in the partial form its definition states
 # ---------------------------------------------------------------------------
 
-PARTIAL_MARKER = "[PARTIAL]"
-COMPLETED_PHASES = "**Completed phases**:"
-STOPPED_AT = "**Stopped at**:"
-FAILED_AT = "**Failed at**:"
-
-
-@dataclass(frozen=True)
-class PartialForm:
-    """The partial form a role's definition states: ``[PARTIAL]`` in the title, then these lines."""
-
-    progress_lines: tuple[str, ...]
-
-
-# A role absent from the table has had its definition unread (withheld); a role mapped
-# to None was read and states no partial form (not applicable).
-PARTIAL_FORMS: Mapping[str, PartialForm | None] = {
-    "researcher": PartialForm((COMPLETED_PHASES,)),
-    "verifier": PartialForm((COMPLETED_PHASES,)),
-    "systems-architect": PartialForm((COMPLETED_PHASES,)),
-    "implementation-planner": PartialForm((COMPLETED_PHASES,)),
-    "implementer": PartialForm((COMPLETED_PHASES, STOPPED_AT)),
-    "test-engineer": PartialForm((COMPLETED_PHASES, FAILED_AT)),
-    "doc-engineer": PartialForm((COMPLETED_PHASES, FAILED_AT)),
-}
-
 
 def binds_on_forced_stop(role: Role, facts: TaskFacts) -> Binding:
     del role
@@ -529,12 +482,13 @@ def partial_output(evidence: SessionEvidence) -> CheckOutcome:
 
 def _partial_candidates(evidence: SessionEvidence, row: DurableOutput) -> dict[str, str]:
     """The written documents that may hold the partial form: the named one, or any in the slug."""
-    prefix = slug_dir(evidence.slug) + "/"
-    files = evidence.repo.files
     if row.document is not None and not row.anywhere:
-        path = prefix + row.document
-        return {path: files.get(path, "")}
-    return {path: text for path, text in sorted(files.items()) if path.startswith(prefix)}
+        named = document_files(evidence, row.document)
+        return named or {document_path(evidence.slug, row.document): ""}
+    prefix = slug_dir(evidence.slug) + "/"
+    return {
+        path: text for path, text in sorted(evidence.repo.files.items()) if path.startswith(prefix)
+    }
 
 
 def _partial_problems(text: str, form: PartialForm) -> list[str]:

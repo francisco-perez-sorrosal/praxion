@@ -14,6 +14,8 @@ over the scratch repository (never imports it) and reads only its exit code.
 from __future__ import annotations
 
 import atexit
+import fnmatch
+import os
 import re
 import shutil
 import subprocess
@@ -28,6 +30,8 @@ from praxion_evals.adherence.checks_common import (
     _always_binds,  # the binding of a rule that holds for every task of the role
     _repo_relative,  # an absolute tool path as the scratch repository names it
     _within_any,  # a path equal to or under one of the places
+    document_files,
+    document_path,
     slug_dir,
     synthetic_evidence,
     written_paths,
@@ -48,6 +52,7 @@ from praxion_evals.adherence.model import (
 from praxion_evals.live.session import InitInfo, ToolUse
 
 CANARY_SLUG = "canary-task"
+SESSION_HOME = "home"  # the session's HOME inside its sandbox (SandboxPaths.home)
 CHECKOUT_ROOT = Path(__file__).resolve().parents[4]  # the checkout whose scripts a canary runs
 SCRIPT_TIMEOUT_S = 60
 SCRIPT_EXIT_CLEAN = 0
@@ -118,9 +123,18 @@ def first_line(text: str) -> str:
 
 
 def slug_document(evidence: SessionEvidence, document: str) -> tuple[str, str]:
-    """The repo-relative path of a document in the task's slug directory, and its text."""
-    path = f"{slug_dir(evidence.slug)}/{document}"
-    return path, evidence.repo.files.get(path, "")
+    """The path and text of the document the session left: the first with text when its name
+    holds ``*``; the path (the pattern) and no text when the session left none."""
+    files = document_files(evidence, document)
+    if not files:
+        return document_path(evidence.slug, document), ""
+    path = next((p for p, text in files.items() if text.strip()), next(iter(files)))
+    return path, files[path]
+
+
+def canary_path(document: str) -> str:
+    """Where a canary puts the document: its path in the canary task, a ``*`` filled in."""
+    return document_path(CANARY_SLUG, document).replace("*", "canary")
 
 
 def session_cwd(evidence: SessionEvidence) -> str | None:
@@ -166,17 +180,22 @@ def required_sections(
     document: str,
     sections: Sequence[Section],
     binds: BindsFor | None = None,
+    any_of: bool = False,
 ) -> MechanicalCheck:
+    """The document carries every one of ``sections``, or with ``any_of`` at least one."""
+
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         path, text = slug_document(evidence, document)
         if not text.strip():
             return Failed(f"{path} was never written or is empty")
         problems = [problem for s in sections if (problem := _section_problem(text, s))]
+        if any_of and len(problems) < len(sections):
+            return Passed()
         return Failed(f"{path}: {'; '.join(problems)}") if problems else Passed()
 
     def violation() -> SessionEvidence:
         unfilled = "\n\n".join(f"## {s.heading}\n\n[pending]" for s in sections)
-        path = f"{slug_dir(CANARY_SLUG)}/{document}"
+        path = canary_path(document)
         return synthetic_evidence(role, slug=CANARY_SLUG, files={path: unfilled})
 
     return clause(name, rule, binds, evaluate, violation)
@@ -205,11 +224,11 @@ def title_marker_first_unmarked_last(
     *,
     document: str,
     marker: str,
-    within_first: int,
+    within_first: int | None = None,
     binds: BindsFor | None = None,
 ) -> MechanicalCheck:
     """Its first recorded Write carries ``marker`` in the title, within the role's first
-    ``within_first`` tool calls, and the file the session leaves carries none."""
+    ``within_first`` tool calls when that is given, and the file the session leaves carries none."""
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         path, final = slug_document(evidence, document)
@@ -221,7 +240,7 @@ def title_marker_first_unmarked_last(
         return Failed("; ".join(problems)) if problems else Passed()
 
     def violation() -> SessionEvidence:
-        path = f"{slug_dir(CANARY_SLUG)}/{document}"
+        path = canary_path(document)
         opened = ToolUse("canary-open", "Write", {"file_path": path, "content": "# Report\n"}, None)
         return synthetic_evidence(
             role, slug=CANARY_SLUG, files={path: "# Report\n"}, tool_uses=[opened]
@@ -231,7 +250,7 @@ def title_marker_first_unmarked_last(
 
 
 def _opening_problems(
-    evidence: SessionEvidence, path: str, marker: str, within_first: int
+    evidence: SessionEvidence, path: str, marker: str, within_first: int | None
 ) -> list[str]:
     cwd = session_cwd(evidence)
     first = next(
@@ -239,7 +258,9 @@ def _opening_problems(
             (position, use)
             for position, use in enumerate(evidence.role_tool_uses, start=1)
             if use.name in WRITE_TOOLS
-            and _repo_relative(str(use.input.get(WRITE_TOOLS[use.name], "")), cwd) == path
+            and fnmatch.fnmatchcase(
+                _repo_relative(str(use.input.get(WRITE_TOOLS[use.name], "")), cwd), path
+            )
         ),
         None,
     )
@@ -249,7 +270,7 @@ def _opening_problems(
     if use.name != "Write":
         return [f"the first recorded change to {path} was an {use.name}, not a Write"]
     problems = []
-    if position > within_first:
+    if within_first is not None and position > within_first:
         problems.append(f"first written at tool call {position}, after the first {within_first}")
     if marker not in first_line(str(use.input.get("content", ""))):
         problems.append(f"opened without {marker} in its title")
@@ -365,7 +386,7 @@ def closed_tag_set(
         )
 
     def violation() -> SessionEvidence:
-        path = f"{slug_dir(CANARY_SLUG)}/{document}"
+        path = canary_path(document)
         invented = f"## {section}\n\n| 1 | WARN | [CANARY-INVENTED-TAG] an invented tag |\n"
         return synthetic_evidence(role, slug=CANARY_SLUG, files={path: invented})
 
@@ -418,6 +439,7 @@ def script_exits_zero(
     watched: Sequence[str] = (),
     documents: Sequence[str] = (),
     binds: BindsFor | None = None,
+    planted_home: Callable[[Path], Mapping[str, str]] | None = None,
 ) -> MechanicalCheck:
     """``scripts/<script>`` exits 0 over the scratch repository.
 
@@ -429,29 +451,52 @@ def script_exits_zero(
     changed one of them. Exit 1 is a violation (``failed``); a script that is absent,
     times out or exits otherwise cannot judge this repository, which is ``errored``,
     never ``failed``. ``planted`` is the scratch repository's files in the canary.
+
+    With ``planted_home`` the script runs with ``HOME`` set to the session's own home, where
+    Claude Code keeps the transcripts it reads; the canary plants there the files that
+    callable returns, given the scratch repository, relative to that home.
     """
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         if watched and not any(_within_any(path, watched) for path in written_paths(evidence)):
             return NotApplicable(f"the {role} changed none of {', '.join(watched)}")
-        return _run_script(evidence, script, arguments, documents)
+        return _run_script(
+            evidence, script, arguments, documents, in_session_home=bool(planted_home)
+        )
 
     def violation() -> SessionEvidence:
-        repo = Path(tempfile.mkdtemp(prefix="adherence-canary-"))
-        atexit.register(shutil.rmtree, repo, ignore_errors=True)
-        for relative, text in planted.items():
-            (repo / relative).parent.mkdir(parents=True, exist_ok=True)
-            (repo / relative).write_text(text, encoding="utf-8")
+        repo = _scratch_directory()
+        sandbox = _scratch_directory() if planted_home else repo
+        _plant(repo, planted)
+        if planted_home:
+            _plant(sandbox / SESSION_HOME, planted_home(repo))
         evidence = synthetic_evidence(
-            role, slug=CANARY_SLUG, files=planted, places=(repo, CHECKOUT_ROOT)
+            role, slug=CANARY_SLUG, files=planted, places=(sandbox, CHECKOUT_ROOT)
         )
         return with_cwd(evidence, repo)
 
     return clause(name, rule, binds, evaluate, violation)
 
 
+def _scratch_directory() -> Path:
+    directory = Path(tempfile.mkdtemp(prefix="adherence-canary-"))
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    return directory
+
+
+def _plant(root: Path, files: Mapping[str, str]) -> None:
+    for relative, text in files.items():
+        (root / relative).parent.mkdir(parents=True, exist_ok=True)
+        (root / relative).write_text(text, encoding="utf-8")
+
+
 def _run_script(
-    evidence: SessionEvidence, script: str, arguments: Sequence[str], documents: Sequence[str]
+    evidence: SessionEvidence,
+    script: str,
+    arguments: Sequence[str],
+    documents: Sequence[str],
+    *,
+    in_session_home: bool = False,
 ) -> CheckOutcome:
     repo = session_cwd(evidence)
     path = evidence.plugin_copy / "scripts" / script
@@ -463,9 +508,16 @@ def _run_script(
     if not isinstance(expanded, list):
         return expanded
     command = [sys.executable, str(path), *expanded]
+    env = {**os.environ, "HOME": str(evidence.sandbox / SESSION_HOME)} if in_session_home else None
     try:
         done = subprocess.run(  # cwd is the scratch repository: a gate's own log lands there
-            command, capture_output=True, text=True, timeout=SCRIPT_TIMEOUT_S, check=False, cwd=repo
+            command,
+            capture_output=True,
+            text=True,
+            timeout=SCRIPT_TIMEOUT_S,
+            check=False,
+            cwd=repo,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return CheckErrored(f"scripts/{script} could not run: {type(error).__name__}: {error}")
@@ -504,8 +556,8 @@ def _expand_arguments(
 
 def _first_written(evidence: SessionEvidence, documents: Sequence[str]) -> str | None:
     """The repo-relative path of the first of ``documents`` the session left with text."""
-    paths = (f"{slug_dir(evidence.slug)}/{name}" for name in documents)
-    return next((path for path in paths if evidence.repo.files.get(path, "").strip()), None)
+    found = (slug_document(evidence, name) for name in documents)
+    return next((path for path, text in found if text.strip()), None)
 
 
 # ---------------------------------------------------------------------------
@@ -556,7 +608,7 @@ def steps_carry_fields(
         return Failed(f"{path}: {'; '.join(gaps[:5])}") if gaps else Passed()
 
     def violation() -> SessionEvidence:
-        path = f"{slug_dir(CANARY_SLUG)}/{document}"
+        path = canary_path(document)
         lacking = (
             "### Step 1: a change\n\n**Implementation**: do it\n"  # id-citation-discipline:ignore
         )

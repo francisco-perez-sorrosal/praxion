@@ -1,6 +1,6 @@
 {
   "name": "praxion",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "description": "Skills and agents for AI coding workflows — Claude Code authoring, Python development, project management, and domain-specific tools",
   "author": {
     "name": "Francisco Perez-Sorrosal",

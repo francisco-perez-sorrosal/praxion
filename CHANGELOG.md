@@ -1,3 +1,21 @@
+## v0.51.0 (2026-10-12)
+
+### Feat
+
+- Gate memory-index writes to short pointers
+- Give every agent the Praxion process core
+- Name the tokenizer behind every budget reading
+
+### Fix
+
+- Keep unstaged changes out of the commit gate
+- List the transactions architect as an ADR author
+- Track the renamed path-scoped rules section
+
+### Refactor
+
+- Treat rules/CLAUDE.md as a directory guide
+
 ## v0.50.0 (2026-10-11)
 
 ### Feat

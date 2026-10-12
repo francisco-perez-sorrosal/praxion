@@ -216,7 +216,7 @@ fi
 if $DO_DRY_RUN; then
     echo "Target: $CURSOR_DIR ($INSTALL_MODE)"
     n_skills=$(find "$REPO_ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-    n_rules=$(find "$REPO_ROOT/rules" -name '*.md' -type f ! -path '*/references/*' ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' ')
+    n_rules=$(find "$REPO_ROOT/rules" -name '*.md' -type f ! -path '*/references/*' ! -name 'README.md' ! -name 'CLAUDE.md' 2>/dev/null | wc -l | tr -d ' ')
     echo "Skills: $n_skills | Rules: $n_rules"
     echo "MCP: $CURSOR_DIR/mcp.json"
     sweep_legacy_command_exports "$CURSOR_DIR/commands" true

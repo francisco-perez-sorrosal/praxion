@@ -328,6 +328,11 @@ def always_loaded_files(repo_root: Path, *, include_global: bool = True) -> list
         _add(rule_path, name=_rule_name(rule_path, project_rules))
     dogfood_rules = repo_root / "rules"
     for rule_path in _unscoped_rule_files(dogfood_rules):
+        # The tree's own CLAUDE.md is a directory guide Claude Code loads on
+        # demand, never at launch. A global symlink to it still loads, so the
+        # global scan below keeps counting it until a reinstall sweeps it.
+        if rule_path.name == "CLAUDE.md":
+            continue
         _add(rule_path, name=_rule_name(rule_path, dogfood_rules))
     if include_global:
         _add(Path.home() / ".claude" / "CLAUDE.md")

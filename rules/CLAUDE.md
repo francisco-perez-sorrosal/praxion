@@ -1,12 +1,8 @@
----
-core: true
-load: always_on
-install: symlink
----
-
 # Rules
 
 Contextual domain knowledge files loaded automatically based on relevance. Rules encode constraints and conventions — they are declarative, not procedural.
+
+This file is the rules tree's directory guide, not a rule: the installer does not link it into `~/.claude/rules/`, and Claude Code loads it on demand (as a nested `CLAUDE.md`) when a session touches a file under `rules/`.
 
 ## Conventions
 
@@ -23,7 +19,7 @@ IMPORTANT: Rules without `paths:` frontmatter are **always loaded** — each cos
 
 ## Installation
 
-`install_claude.sh` symlinks rules to `~/.claude/rules/` for global availability. `install.sh cursor` exports rules to `.cursor/rules/` with frontmatter preserved.
+`install_claude.sh` symlinks rules to `~/.claude/rules/` for global availability, driven by `rules/_manifest.yaml` (directory guides such as this file are not rules and are not linked). `install.sh cursor` exports rules to `.cursor/rules/`, replacing each rule's frontmatter with Cursor's `description` and `alwaysApply: false`; `paths:` globs are not carried over.
 
 ## Modifying Rules
 

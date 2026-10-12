@@ -50,7 +50,6 @@ _CORE_IDS = [
     "swe/swe-agent-coordination-protocol",
     "swe/agent-intermediate-documents",
     "swe/adr-conventions",
-    "CLAUDE",
 ]
 
 # Hook-deliver rule IDs (the three blacklistable always-loaded rules).
@@ -65,7 +64,7 @@ def _make_manifest(plugin_root: Path) -> None:
     """Write a synthetic rules/_manifest.yaml under plugin_root.
 
     Includes:
-    - 5 core rules (install: symlink, core: true)
+    - 4 core rules (install: symlink, core: true)
     - 3 hook-deliver rules with literal body content (install: hook-deliver, core: false)
     - 3 path-scoped ML rules (install: symlink, core: false, load: path_scoped)
       to validate that glob resolution against ml/* doesn't crash even though
@@ -91,7 +90,6 @@ def _make_manifest(plugin_root: Path) -> None:
         "swe/swe-agent-coordination-protocol": "rules/swe/swe-agent-coordination-protocol.md",
         "swe/agent-intermediate-documents": "rules/swe/agent-intermediate-documents.md",
         "swe/adr-conventions": "rules/swe/adr-conventions.md",
-        "CLAUDE": "rules/CLAUDE.md",
     }
     for rule_id, path in core_files.items():
         p = plugin_root / path

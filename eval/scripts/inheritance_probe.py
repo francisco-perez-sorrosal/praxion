@@ -156,7 +156,6 @@ def build_invocation(kind: Kind, prompt: str | None = None) -> list[str]:
 # that is this small and this stable.
 _EXPECTED_SUFFIXES: tuple[str, ...] = (
     "/.claude/CLAUDE.md",  # global CLAUDE.md (user scope)
-    "/rules/CLAUDE.md",  # rules catalog readme
     "agent-behavioral-contract.md",
     "adr-conventions.md",
     "swe-agent-coordination-protocol.md",

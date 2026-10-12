@@ -8,7 +8,8 @@ Tests are designed from the manifest generator's behavioral contract:
   4. A rule file with no core: frontmatter defaults to core: false in the output.
   5. The hardcoded core-rule validator catches a core rule missing core: true
      and exits 1 with the prescribed ERROR message.
-  6. rules/CLAUDE.md produces ID 'CLAUDE' (root-level, not swe/CLAUDE).
+  6. rules/CLAUDE.md is a directory guide, never a manifest rule, even when it
+     still carries core frontmatter.
   7. rules/swe/memory-protocol.md with merged codex: + core: frontmatter
      produces core: false, install: hook-deliver in the output.
 
@@ -144,7 +145,7 @@ def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
     _seed(
         rules_dir,
         {
-            # Root-level core rule — must produce ID 'CLAUDE'
+            # Directory guide carrying stale core frontmatter: must be skipped
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n\nSome content.\n",
             # swe/ core rules
             "swe": {
@@ -367,15 +368,16 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
 
 
 # ---------------------------------------------------------------------------
-# Test 6: rules/CLAUDE.md produces ID 'CLAUDE' (not 'swe/CLAUDE')
+# Test 6: rules/CLAUDE.md is the tree's directory guide, not a manifest rule
 # ---------------------------------------------------------------------------
 
 
-def test_root_level_claude_md_produces_id_CLAUDE(  # noqa: N802 — CLAUDE is the literal id under test, cased as it appears
+def test_the_rules_directory_guide_is_not_a_manifest_rule(
     monkeypatch: pytest.MonkeyPatch,
     minimal_rules_tree: tuple[Path, Path],
 ) -> None:
-    """rules/CLAUDE.md at the rules root produces ID 'CLAUDE', not 'swe/CLAUDE'."""
+    """rules/CLAUDE.md loads on demand as a nested CLAUDE.md; a manifest entry
+    would make the installer link it into every session of every project."""
     rules_dir, manifest_path = minimal_rules_tree
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
@@ -383,12 +385,9 @@ def test_root_level_claude_md_produces_id_CLAUDE(  # noqa: N802 — CLAUDE is th
     assert exit_code == 0, "Generator failed"
 
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    rule_ids = [r["id"] for r in manifest["rules"]]
+    rule_paths = [r["path"] for r in manifest["rules"]]
 
-    assert "CLAUDE" in rule_ids, f"Expected ID 'CLAUDE' in manifest. Found IDs: {rule_ids}"
-    assert "swe/CLAUDE" not in rule_ids, (
-        f"ID 'swe/CLAUDE' should not appear in manifest. Found IDs: {rule_ids}"
-    )
+    assert not any(p.endswith("CLAUDE.md") for p in rule_paths), rule_paths
 
 
 # ---------------------------------------------------------------------------

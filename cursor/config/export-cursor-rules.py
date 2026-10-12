@@ -19,7 +19,8 @@ def export_rules(repo_root: Path, out_dir: Path) -> None:
 
     for path in sorted(rules_dir.rglob("*.md")):
         rel = path.relative_to(rules_dir)
-        if rel.name == "README.md" or "references" in rel.parts:
+        # Directory guides (README.md, CLAUDE.md) are not rules.
+        if rel.name in {"README.md", "CLAUDE.md"} or "references" in rel.parts:
             continue
         text = path.read_text(encoding="utf-8")
         # Strip existing frontmatter so we don't double it

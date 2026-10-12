@@ -35,7 +35,6 @@ EXPECTED_CORE_IDS = frozenset(
         "swe/swe-agent-coordination-protocol",
         "swe/agent-intermediate-documents",
         "swe/adr-conventions",
-        "CLAUDE",
     }
 )
 
@@ -69,8 +68,10 @@ def _parse_frontmatter(text: str) -> dict[str, Any]:
 
 
 def _should_skip(rule_path: Path) -> bool:
-    """Return True for README.md and files under any references/ directory."""
-    if rule_path.name == "README.md":
+    """Return True for directory guides (README.md, CLAUDE.md) and files under
+    any references/ directory. A CLAUDE.md inside the rules tree is a nested
+    directory guide Claude Code loads on demand, never a rule to install."""
+    if rule_path.name in {"README.md", "CLAUDE.md"}:
         return True
     return any(part == "references" for part in rule_path.parts)
 

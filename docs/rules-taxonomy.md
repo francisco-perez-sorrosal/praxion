@@ -32,17 +32,18 @@ Together the two mechanisms give the YAML uniform reach: **any rule named in the
 
 ### 1. Core Rules (non-disableable, always-loaded)
 
-Five rules encode Praxion's operating contract. They are **immune to the disable mechanism** — attempting to disable one emits a stderr warning and the rule remains loaded.
+Four rules encode Praxion's operating contract. They are **immune to the disable mechanism** — attempting to disable one emits a stderr warning and the rule remains loaded.
 
 | ID | Rule file | Purpose | Token cost |
 |----|-----------|---------|------------|
-| `CLAUDE` | `rules/CLAUDE.md` | Agent reading order + build/test/lint + repo layout | ~602 tokens |
 | `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | ~2499 tokens |
 | `swe/agent-behavioral-contract` | `rules/swe/agent-behavioral-contract.md` | Four non-negotiable behaviors: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First | ~370 tokens |
 | `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~1130 tokens |
 | `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4573 tokens |
 
-**Total core tokens:** ~9,174 (tokenizer-measured; see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`)
+**Total core tokens:** ~8,572 on the gate's default tokenizer (see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`; `--model <id>` reads them on a current model's tokenizer, which counts higher).
+
+`rules/CLAUDE.md` is not a rule: it is the rules tree's directory guide, skipped by the manifest and the installer, and Claude Code loads it on demand as a nested `CLAUDE.md` when a session touches `rules/`. It was a core rule until 2026-10-11.
 
 ### 2. Always-Loaded Hook-Deliver Rules (disableable, biggest token savings)
 

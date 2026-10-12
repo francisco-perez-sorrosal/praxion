@@ -147,26 +147,19 @@ def test_hook_delivered_rules_are_added_from_the_manifest(
     assert delivered in files
 
 
-def test_praxion_shaped_tree_dedupes_symlinked_globals_to_nine_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Regression pin (td-179): Praxion's own tree -- a project-root `rules/**`
-    that global `~/.claude/rules/**` symlinks back into, plus the project and
-    global `CLAUDE.md` -- must still resolve to exactly 9 always-loaded files,
-    the gate's basis this whole fix must not move.
-
-    A synthetic fixture, not the live developer machine's `~/.claude/rules/`:
-    a regression test must not depend on where that symlink happens to point
-    on whichever machine or worktree runs it.
-    """
+def _praxion_shaped_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Praxion's own tree: a project-root `rules/**` that global
+    `~/.claude/rules/**` symlinks back into, plus the project and global
+    `CLAUDE.md`. A synthetic fixture, not the live developer machine's
+    `~/.claude/rules/`: a regression test must not depend on where that
+    symlink happens to point on whichever machine or worktree runs it."""
     monkeypatch.delenv("CLAUDE_PLUGIN_ROOT", raising=False)
     root = tmp_path / "proj"
     home = tmp_path / "home"
     root.mkdir()
     _repo(root)
-    always_on = [_rule(root, "CLAUDE.md", "# rules catalog\n")]
-    for name in ("a", "b", "c", "d"):
-        always_on.append(_rule(root, f"swe/{name}.md", f"# {name}\n"))
+    guide = _rule(root, "CLAUDE.md", "# rules directory guide\n")
+    always_on = [_rule(root, f"swe/{name}.md", f"# {name}\n") for name in ("a", "b", "c", "d")]
     hook_delivered = [
         _rule(root, "swe/hookA.md", "# hookA\n"),
         _rule(root, "swe/hookB.md", "# hookB\n"),
@@ -177,16 +170,52 @@ def test_praxion_shaped_tree_dedupes_symlinked_globals_to_nine_files(
     home_rules = home / ".claude" / "rules"
     (home_rules / "swe").mkdir(parents=True)
     (home / ".claude" / "CLAUDE.md").write_text("# global\n")
-    (home_rules / "CLAUDE.md").symlink_to(always_on[0])
-    for name, rule_path in zip(("a", "b", "c", "d"), always_on[1:], strict=True):
+    for name, rule_path in zip(("a", "b", "c", "d"), always_on, strict=True):
         (home_rules / "swe" / f"{name}.md").symlink_to(rule_path)
 
     monkeypatch.setenv("HOME", str(home))
+    return {
+        "root": root,
+        "guide": guide,
+        "home_rules": home_rules,
+        "always_on": always_on,
+        "hook_delivered": hook_delivered,
+    }
 
-    files = mtb.always_loaded_files(root)
 
-    assert len(files) == 9
-    assert all(f in files for f in [*always_on, *hook_delivered])
+def test_praxion_shaped_tree_dedupes_symlinked_globals_to_eight_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression pin (td-179): symlinked globals dedupe against the repo's own
+    rules, so the tree resolves to exactly 8 always-loaded files -- the two
+    CLAUDE.md singletons, four unscoped rules and two hook-delivered ones."""
+    tree = _praxion_shaped_tree(tmp_path, monkeypatch)
+
+    files = mtb.always_loaded_files(tree["root"])
+
+    assert len(files) == 8
+    assert all(f in files for f in [*tree["always_on"], *tree["hook_delivered"]])
+
+
+def test_the_rules_directory_guide_is_not_always_loaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`rules/CLAUDE.md` loads on demand as a nested CLAUDE.md, never at launch."""
+    tree = _praxion_shaped_tree(tmp_path, monkeypatch)
+
+    assert tree["guide"] not in mtb.always_loaded_files(tree["root"])
+
+
+def test_a_stale_global_link_to_the_guide_is_still_counted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Until a reinstall sweeps it, a global symlink to the guide is a rule the
+    harness loads at launch, so the measurement must keep counting it."""
+    tree = _praxion_shaped_tree(tmp_path, monkeypatch)
+    stale_link = tree["home_rules"] / "CLAUDE.md"
+    stale_link.symlink_to(tree["guide"])
+
+    assert stale_link in mtb.always_loaded_files(tree["root"])
 
 
 # -- The reading ---------------------------------------------------------------

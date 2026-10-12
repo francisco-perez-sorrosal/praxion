@@ -8,6 +8,7 @@ in its copy is proven only by the live smoke run.
 from __future__ import annotations
 
 import stat
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,7 @@ from praxion_evals.live.materialize import (
     make_writable,
     materialize_path,
     tree_digest,
+    tree_entries,
 )
 from praxion_evals.live.session import SandboxPaths
 
@@ -135,6 +137,64 @@ def test_an_unknown_role_is_refused(original, tmp_path):
         build_arm(original, tmp_path / "copy", "not-a-role", "lean")  # type: ignore[arg-type]
 
 
+def _fake_checkout(original: Materialization, root: Path, files: dict[str, str]) -> Materialization:
+    return replace(original, root=_tree(root, files))
+
+
+@pytest.mark.parametrize("cap", [0, -3])
+def test_a_turn_cap_below_one_is_refused_before_anything_is_copied(original, tmp_path, cap):
+    with pytest.raises(ArmCopyError, match="turn cap"):
+        build_arm(original, tmp_path / "copy", ROLE, "lean", turn_cap=cap)
+
+    assert not (tmp_path / "copy").exists()
+
+
+def test_a_checkout_without_the_roles_definition_is_refused(original, tmp_path):
+    checkout = _fake_checkout(original, tmp_path / "checkout", {"agents/verifier.md": "---\n---\n"})
+
+    with pytest.raises(ArmCopyError, match="no regular file"):
+        build_arm(checkout, tmp_path / "copy", ROLE, "lean")
+
+    assert not (tmp_path / "copy").exists()
+
+
+def test_a_definition_that_is_a_link_is_refused_and_its_target_left_alone(original, tmp_path):
+    checkout = _fake_checkout(original, tmp_path / "checkout", {"elsewhere.md": "---\n---\nB\n"})
+    (checkout.root / "agents").mkdir()
+    (checkout.root / DEFINITION).symlink_to("../elsewhere.md")
+
+    with pytest.raises(ArmCopyError, match="no regular file"):
+        build_arm(checkout, tmp_path / "copy", ROLE, "lean")
+
+    assert (checkout.root / "elsewhere.md").read_text(encoding="utf-8") == "---\n---\nB\n"
+
+
+def test_a_failed_build_leaves_nothing_behind_and_can_be_retried(original, tmp_path):
+    checkout = _fake_checkout(original, tmp_path / "checkout", {DEFINITION: "no frontmatter\n"})
+    dest = tmp_path / "copy"
+
+    with pytest.raises(ArmCopyError, match="frontmatter"):
+        build_arm(checkout, dest, ROLE, "lean")
+    assert not dest.exists()
+
+    (checkout.root / DEFINITION).write_text("---\nname: x\n---\nBody\n", encoding="utf-8")
+    assert build_arm(checkout, dest, ROLE, "lean").patched == (DEFINITION,)
+
+
+def test_a_definition_with_crlf_line_endings_keeps_them_outside_the_patched_line(
+    original, tmp_path
+):
+    checkout = _fake_checkout(
+        original, tmp_path / "checkout", {DEFINITION: "---\r\nname: x\r\n---\r\nBody\r\n"}
+    )
+
+    build = build_arm(checkout, tmp_path / "copy", ROLE, "lean")
+
+    assert (build.copy_root / DEFINITION).read_bytes() == (
+        b"---\r\nname: x\r\nomitClaudeMd: true\n---\r\nBody\r\n"
+    )
+
+
 # ---------------------------------------------------------------------------
 # The copy diff
 # ---------------------------------------------------------------------------
@@ -168,6 +228,17 @@ def test_a_stray_or_a_missing_file_is_a_difference(tmp_path, copy_files, culprit
 
     with pytest.raises(ArmCopyError, match=culprit):
         verify_copy_diff(original, copy, expected=())
+
+
+def test_a_retargeted_link_is_a_difference(tmp_path):
+    original = _tree(tmp_path / "original", {"a.md": "a", "b.md": "b"})
+    copy = _tree(tmp_path / "copy", {"a.md": "a", "b.md": "b"})
+    (original / "link.md").symlink_to("a.md")
+    (copy / "link.md").symlink_to("b.md")
+
+    with pytest.raises(ArmCopyError, match=r"link\.md"):
+        verify_copy_diff(original, copy, expected=())
+    assert verify_copy_diff(original, copy, expected=("link.md",)) == ("link.md",)
 
 
 def test_an_expected_path_that_did_not_change_is_an_error(tmp_path):
@@ -224,22 +295,24 @@ def test_a_definition_without_a_closed_frontmatter_is_refused(text):
 # ---------------------------------------------------------------------------
 
 
-def test_the_marker_lands_in_the_installed_instruction_file_only(original, arms, tmp_path):
+def test_the_marker_lands_in_the_installed_instruction_file_only(original, tmp_path):
     sandbox = SandboxPaths(tmp_path / "sandbox")
     install_user_scope(original.root, sandbox.root)
+    before_entries = tree_entries(sandbox.root)
     before = (sandbox.config_dir / "CLAUDE.md").read_text(encoding="utf-8")
 
     nonce = plant_proof_marker(sandbox)
 
+    after_entries = tree_entries(sandbox.root)
+    changed = {
+        path
+        for path in before_entries.keys() | after_entries.keys()
+        if before_entries.get(path) != after_entries.get(path)
+    }
+    assert changed == {sandbox.config_dir.relative_to(sandbox.root).as_posix() + "/CLAUDE.md"}
     after = (sandbox.config_dir / "CLAUDE.md").read_text(encoding="utf-8")
     assert after.startswith(before)
     assert after[len(before) :].strip() == f"{PROOF_LABEL}-{nonce}"
-    shipped = [
-        build.copy_root / relpath
-        for build in arms.values()
-        for relpath in (DEFINITION, "hooks/hooks.json")
-    ]
-    assert not any(nonce in path.read_text(encoding="utf-8") for path in shipped)
     assert tree_digest(original.root) == original.tree_digest
 
 
@@ -321,6 +394,19 @@ def test_a_missing_token_figure_leaves_lean_unconfirmed():
     verdicts = decide_proof(NONCE, {"full": ECHO, "lean": unknown})
 
     assert isinstance(verdicts["lean"], NotBuilt)
+
+
+@pytest.mark.parametrize("answer", ["", "   ", "I could not tell.", "Error: request failed"])
+@pytest.mark.parametrize("both_arms", [False, True], ids=["lean-only", "both"])
+def test_a_lean_answer_that_is_not_the_no_marker_reply_is_not_built(answer, both_arms):
+    observed = {"lean": ProofObservation(answer, 4000)}
+    if both_arms:
+        observed["full"] = ECHO
+
+    lean = decide_proof(NONCE, observed)["lean"]
+
+    assert isinstance(lean, NotBuilt)
+    assert NO_MARKER_REPLY in lean.reason
 
 
 def test_a_single_lean_run_decides_on_the_nonce_and_records_the_figure():

@@ -21,8 +21,6 @@ The builders touch files; ``decide_proof`` and the frontmatter patch are pure.
 
 from __future__ import annotations
 
-import hashlib
-import os
 import secrets
 import shutil
 from collections.abc import Collection, Mapping
@@ -32,9 +30,11 @@ from pathlib import Path
 from praxion_evals.adherence.model import ARMS, ROLES, Arm, ArmBuild, NotBuilt, Role
 from praxion_evals.live.materialize import (
     Materialization,
+    digest_entries,
+    frontmatter_closing,
     make_read_only,
     make_writable,
-    tree_digest,
+    tree_entries,
 )
 from praxion_evals.live.session import SandboxPaths
 
@@ -45,7 +45,6 @@ PROOF_LABEL = "PRXARM"
 NO_MARKER_REPLY = "NO-MARKER"
 NONCE_BYTES = 8
 
-_FRONTMATTER_FENCE = "---"
 _INSTRUCTION_FILE = "CLAUDE.md"
 
 
@@ -68,27 +67,45 @@ def build_arm(
 ) -> ArmBuild:
     """Copy ``original`` to ``dest`` as ``role``'s ``arm``, verified and read-only.
 
-    ``dest`` must not exist yet. ``original`` is only read.
+    ``dest`` must not exist yet. ``original`` is only read. A build that fails
+    leaves nothing at ``dest``, so the caller can retry.
     """
+    if turn_cap is not None and turn_cap < 1:
+        raise ArmCopyError(f"a turn cap must be at least 1, not {turn_cap}")
     definition = definition_path(role)
-    if not (original.root / definition).is_file():
-        raise ArmCopyError(f"the checkout has no {definition}")
+    source = original.root / definition
+    if source.is_symlink() or not source.is_file():
+        raise ArmCopyError(f"the checkout has no regular file {definition}")
     shutil.copytree(original.root, dest, symlinks=True)
+    try:
+        return _patch_and_seal(original, dest, role, arm, turn_cap)
+    except BaseException:
+        make_writable(dest)
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+
+
+def _patch_and_seal(
+    original: Materialization, dest: Path, role: Role, arm: Arm, turn_cap: int | None
+) -> ArmBuild:
+    definition = definition_path(role)
     make_writable(dest)
     settings = _settings_for(arm, turn_cap)
     if settings:
         path = dest / definition
-        path.write_text(
-            _with_settings(path.read_text(encoding="utf-8"), settings), encoding="utf-8"
-        )
-    patched = verify_copy_diff(original.root, dest, expected=(definition,) if settings else ())
+        patched_text = _with_settings(path.read_bytes().decode("utf-8"), settings)
+        path.write_bytes(patched_text.encode("utf-8"))
+    after = tree_entries(dest)
+    patched = _diff_entries(
+        tree_entries(original.root), after, expected=(definition,) if settings else ()
+    )
     make_read_only(dest)
     return ArmBuild(
         role=role,
         arm=arm,
         copy_root=dest,
         turn_cap=turn_cap,
-        tree_digest=tree_digest(dest),
+        tree_digest=digest_entries(after),
         patched=patched,
     )
 
@@ -122,7 +139,10 @@ def set_frontmatter_key(definition: str, key: str, value: str) -> str:
     last in the block. Raises ``ArmCopyError`` when there is no frontmatter.
     """
     lines = definition.splitlines(keepends=True)
-    closing = _frontmatter_end(lines)
+    try:
+        closing = frontmatter_closing(lines)
+    except ValueError as exc:
+        raise ArmCopyError(f"the agent definition has {exc}") from exc
     new_line = f"{key}: {value}\n"
     existing = next((i for i in range(1, closing) if lines[i].startswith(f"{key}:")), None)
     if existing is None:
@@ -130,17 +150,6 @@ def set_frontmatter_key(definition: str, key: str, value: str) -> str:
     else:
         lines[existing] = new_line
     return "".join(lines)
-
-
-def _frontmatter_end(lines: list[str]) -> int:
-    if not lines or lines[0].rstrip() != _FRONTMATTER_FENCE:
-        raise ArmCopyError("the agent definition has no frontmatter")
-    closing = next(
-        (i for i in range(1, len(lines)) if lines[i].rstrip() == _FRONTMATTER_FENCE), None
-    )
-    if closing is None:
-        raise ArmCopyError("the agent definition's frontmatter is unterminated")
-    return closing
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +165,12 @@ def verify_copy_diff(original: Path, copy: Path, *, expected: Collection[str]) -
     caught. An expected path that did not change is an error too: a lean copy
     identical to the full one would make the arms the same.
     """
-    before, after = _entry_digests(original), _entry_digests(copy)
+    return _diff_entries(tree_entries(original), tree_entries(copy), expected=expected)
+
+
+def _diff_entries(
+    before: Mapping[str, str], after: Mapping[str, str], *, expected: Collection[str]
+) -> tuple[str, ...]:
     differing = sorted(
         path for path in before.keys() | after.keys() if before.get(path) != after.get(path)
     )
@@ -168,17 +182,6 @@ def verify_copy_diff(original: Path, copy: Path, *, expected: Collection[str]) -
             f" and is unchanged where {unchanged or 'nothing'} should differ"
         )
     return tuple(differing)
-
-
-def _entry_digests(root: Path) -> dict[str, str]:
-    digests: dict[str, str] = {}
-    for path in root.rglob("*"):
-        if path.is_symlink():
-            digests[path.relative_to(root).as_posix()] = f"link:{os.readlink(path)}"
-        elif path.is_file():
-            payload = hashlib.sha256(path.read_bytes()).hexdigest()
-            digests[path.relative_to(root).as_posix()] = f"file:{payload}"
-    return digests
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +252,9 @@ def decide_proof(
 ) -> dict[Arm, ArmVerdict]:
     """One verdict per observed arm; ``None`` marks a role that was never spawned.
 
-    Full is proven when the role echoes the nonce, lean when it does not. When
+    Full is proven when the role echoes the nonce. Lean is proven when its answer
+    is the declared no-marker reply: the nonce's absence alone would also certify
+    a spawn that errored, came back empty or never looked at its context. When
     both arms were observed and spawned, lean must also have the smaller first
     request, else it alone is not built: the nonce is a self-report and the
     tokens are the telemetry that backs it. A single-arm run has nothing to
@@ -279,6 +284,10 @@ def _judge_arm(arm: Arm, nonce: str, seen: ProofObservation | None) -> ArmVerdic
         return NotBuilt("the full arm's role did not echo the planted nonce: it inherits nothing")
     if arm == "lean" and echoed:
         return NotBuilt("the lean arm's role echoed the planted nonce: omitClaudeMd had no effect")
+    if arm == "lean" and NO_MARKER_REPLY not in seen.answer:
+        return NotBuilt(
+            f"the lean arm's role did not answer {NO_MARKER_REPLY}: its search is unobserved"
+        )
     return ArmProven(arm, seen.first_request_tokens, cross_checked=False)
 
 

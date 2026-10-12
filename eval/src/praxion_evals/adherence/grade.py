@@ -15,7 +15,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import assert_never
 
-from praxion_evals.adherence.checks_common import COMMON_CHECKS, judge_check
+from praxion_evals.adherence.catalog import role_check
+from praxion_evals.adherence.checks_common import judge_check
 from praxion_evals.adherence.model import (
     Binds,
     CheckDef,
@@ -213,7 +214,7 @@ def grade(
         return failure
     if evidence.spawn_id is None:
         return NotMeasured(f"the main session never spawned the {evidence.role}", setup)
-    checks = [resolve_check(name) for name in check_names]
+    checks = [role_check(evidence.role, name) for name in check_names]
     outcomes = {check.name: _outcome(check, evidence, judge) for check in checks}
     return Measured.for_checks(check_names, outcomes, first_request_tokens(evidence), setup)
 
@@ -226,13 +227,6 @@ def _infrastructure_error(
     if error is None:
         return None
     return Errored(kind=error.kind, detail=error.detail, setup=setup)
-
-
-def resolve_check(name: str) -> CheckDef:
-    try:
-        return COMMON_CHECKS[name]
-    except KeyError:
-        raise ValueError(f"no check named {name!r}; known: {sorted(COMMON_CHECKS)}") from None
 
 
 def _outcome(check: CheckDef, evidence: SessionEvidence, judge: JudgeClient | None) -> CheckOutcome:

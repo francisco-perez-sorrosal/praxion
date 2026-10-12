@@ -4,8 +4,8 @@ Every check names the rule it enforces as a file and a heading in it
 (:class:`~praxion_evals.adherence.model.RuleRef`); the catalog's tests fail when
 either does not exist. A role's row is a list of constructor applications from
 :mod:`~praxion_evals.adherence.checks_roles`, so a clause cannot be added without
-the canary that proves it fires. This module holds the researcher's and the
-verifier's rows; a role with no row yet carries C1 to C6 alone.
+the canary that proves it fires. This module holds the rows built so far; a role with no row yet
+carries C1 to C6 alone.
 """
 
 from __future__ import annotations
@@ -14,12 +14,30 @@ import re
 from collections.abc import Mapping
 from urllib.parse import urlparse
 
+from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS
+from praxion_evals.adherence.checks_process import (
+    ACCEPTANCE_DESIGN_MODE,
+    PARALLEL_MODE,
+    change_confined_to,
+    forbidden_reads,
+    fragment_instead_of_canonical,
+    fragments_reconciled,
+    in_mode,
+    marker_written_first,
+    red_tests,
+    return_form,
+    sibling_read_before_create,
+)
 from praxion_evals.adherence.checks_roles import (
     Section,
     closed_tag_set,
+    documents_produced,
+    path_scope,
     required_sections,
     script_exits_zero,
+    steps_carry_fields,
+    text_excludes,
     title_marker_first_unmarked_last,
     tool_order,
 )
@@ -180,12 +198,267 @@ VERIFIER_ROW: tuple[CheckDef, ...] = (
 )
 
 # ---------------------------------------------------------------------------
+# The implementer
+# ---------------------------------------------------------------------------
+
+IMPLEMENTER_PROGRESS = "implementer: [IN-PROGRESS] is written to WIP.md before any code change"
+IMPLEMENTER_RETURN = (
+    "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]"
+)
+IMPLEMENTER_OUTER_LOOP = (
+    "implementer: nothing changes under the acceptance or end-to-end test directories"
+)
+IMPLEMENTER_ID_CITATIONS = "implementer: check_id_citation_discipline.py exits 0 on its change"
+IMPLEMENTER_FRAGMENT = "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md"
+IMPLEMENTER_TEST_RESULTS = "implementer: TEST_RESULTS.md has the shape its definition states"
+IMPLEMENTER_SIBLING = (
+    "implementer: an existing sibling file is read before a new file is created in a directory"
+)
+
+IN_PROGRESS = "[IN-PROGRESS]"
+IMPLEMENTER_RETURN_LINES = 5
+IMPLEMENTER_MARKERS = ("[COMPLETE]", "[BLOCKED]", "[CONFLICT]")
+OUTER_LOOP_DIRECTORIES = ("tests/acceptance", "tests/e2e")
+WIP_DOCUMENTS = ("WIP.md", "WIP_implementer.md")
+TEST_RESULTS_DOCUMENTS = ("TEST_RESULTS.md", "TEST_RESULTS_implementer.md")
+# A step section whose result line the shape checker cannot read: a count with no keys.
+MALFORMED_TEST_RESULTS = "## Step 1 -- a change\nCommand: `pytest -q`\nResult: 3 passed\n"  # id-citation-discipline:ignore
+CODE_WITH_A_CITATION = "# implements REQ-01\n"  # id-citation-discipline:ignore
+
+IMPLEMENTER_ROW: tuple[CheckDef, ...] = (
+    marker_written_first(
+        IMPLEMENTER_PROGRESS,
+        RuleRef("agents/implementer.md", "WIP.md Update Protocol"),
+        "implementer",
+        marker=IN_PROGRESS,
+        documents=WIP_DOCUMENTS,
+    ),
+    return_form(
+        IMPLEMENTER_RETURN,
+        RuleRef("agents/implementer.md", "Output"),
+        "implementer",
+        max_lines=IMPLEMENTER_RETURN_LINES,
+        markers=IMPLEMENTER_MARKERS,
+    ),
+    path_scope(
+        IMPLEMENTER_OUTER_LOOP,
+        RuleRef("agents/implementer.md", "Boundary Discipline"),
+        "implementer",
+        forbidden=OUTER_LOOP_DIRECTORIES,
+    ),
+    script_exits_zero(
+        IMPLEMENTER_ID_CITATIONS,
+        RuleRef("rules/swe/id-citation-discipline.md", "Enforcement"),
+        "implementer",
+        script="check_id_citation_discipline.py",
+        arguments=("--repo-root", "{repo}", "--files", "{changed}"),
+        planted={"src/app.py": CODE_WITH_A_CITATION},
+    ),
+    in_mode(
+        fragment_instead_of_canonical(
+            IMPLEMENTER_FRAGMENT,
+            RuleRef("agents/implementer.md", "WIP.md Update Protocol"),
+            "implementer",
+            fragment="WIP_implementer.md",
+            canonical="WIP.md",
+        ),
+        PARALLEL_MODE,
+    ),
+    script_exits_zero(
+        IMPLEMENTER_TEST_RESULTS,
+        RuleRef(
+            "skills/software-planning/references/agent-pipeline-details.md",
+            "TEST_RESULTS.md Reconciliation",
+        ),
+        "implementer",
+        script="check_test_results_shape.py",
+        arguments=("{document}",),
+        planted={".ai-work/canary-task/TEST_RESULTS.md": MALFORMED_TEST_RESULTS},
+        documents=TEST_RESULTS_DOCUMENTS,
+    ),
+    sibling_read_before_create(
+        IMPLEMENTER_SIBLING, RuleRef("agents/implementer.md", "Constraints"), "implementer"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# The test-engineer
+# ---------------------------------------------------------------------------
+
+TEST_ENGINEER_RED = "test-engineer: its RED tests are present and fail"
+TEST_ENGINEER_PRODUCTION = "test-engineer: its change touches no production file"
+TEST_ENGINEER_INPUTS = (
+    "test-engineer: in acceptance-design mode the session reads no input outside the allowed"
+    " classes A1 to A4"
+)
+TEST_ENGINEER_SECTIONS = (
+    "test-engineer: in acceptance-design mode ACCEPTANCE_TESTS.md has its five sections"
+)
+
+TEST_FILE = re.compile(
+    r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*\.py$|_test\.(py|go)$|\.(test|spec)\.[cm]?[jt]sx?$"
+)
+TEST_RUNNER = re.compile(
+    r"\b(pytest|unittest|vitest|jest|mocha|rspec|phpunit|go test|cargo test"
+    r"|(npm|pnpm|yarn)( run)? test)\b"
+)
+TEST_FAILURE = re.compile(r"\b[1-9]\d* (failed|errors?)\b|\bFAILED\b|\bFAIL\b|\bERROR\b")
+# The inputs the acceptance-design stage names as forbidden, so the audit is mechanical.
+# The rest of its rule (the working-tree files that differ from the base commit, the
+# parts of INTERFACE_DESIGN.md outside its public contract) is not readable from a stream.
+_PIPELINE_DOCS = (
+    "TASK_BRIEF|SYSTEMS_PLAN|SPEC_DELTA|RESEARCH_FINDINGS|IMPLEMENTATION_PLAN|WIP|LEARNINGS"
+    "|CONTEXT_REVIEW|TRANSACTIONS_DESIGN|PRE_REFACTOR_PLAN"
+)
+FORBIDDEN_DESIGN_INPUTS = (
+    re.compile(rf"\.ai-work/[^/\s]+/({_PIPELINE_DOCS}|CONSULT_[^/\s]*)\.md"),
+    re.compile(r"\.ai-work/[^/\s]+/traceability\.yml"),
+    re.compile(r"\.ai-state/decisions/drafts/"),
+)
+ACCEPTANCE_TESTS_SECTIONS = (
+    "Sources Read",
+    "Scenarios",
+    "Boundary Assumptions",
+    "Spec Questions",
+    "Not Black-Box Testable",
+)
+_TEST_ENGINEER = "agents/test-engineer.md"
+
+TEST_ENGINEER_ROW: tuple[CheckDef, ...] = (
+    red_tests(
+        TEST_ENGINEER_RED,
+        RuleRef(_TEST_ENGINEER, "Phase 3 — Test Implementation"),
+        "test-engineer",
+        is_test=TEST_FILE,
+        runner=TEST_RUNNER,
+        failure=TEST_FAILURE,
+    ),
+    change_confined_to(
+        TEST_ENGINEER_PRODUCTION,
+        RuleRef(_TEST_ENGINEER, "Constraints"),
+        "test-engineer",
+        allowed=TEST_FILE,
+        outside_sample="src/app.py",
+    ),
+    in_mode(
+        forbidden_reads(
+            TEST_ENGINEER_INPUTS,
+            RuleRef(_TEST_ENGINEER, "Inputs (closed set)"),
+            "test-engineer",
+            forbidden=FORBIDDEN_DESIGN_INPUTS,
+            sample=".ai-work/canary-task/SYSTEMS_PLAN.md",
+        ),
+        ACCEPTANCE_DESIGN_MODE,
+    ),
+    in_mode(
+        required_sections(
+            TEST_ENGINEER_SECTIONS,
+            RuleRef(_TEST_ENGINEER, "Mode: acceptance-design"),
+            "test-engineer",
+            document="ACCEPTANCE_TESTS.md",
+            sections=tuple(Section(heading) for heading in ACCEPTANCE_TESTS_SECTIONS),
+        ),
+        ACCEPTANCE_DESIGN_MODE,
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# The doc-engineer
+# ---------------------------------------------------------------------------
+
+DOC_ENGINEER_FRAGMENT = "doc-engineer: in parallel mode it writes WIP_doc-engineer.md, not WIP.md"
+DOC_ENGINEER_DOCS_ONLY = "doc-engineer: its change touches documentation only"
+DOC_ENGINEER_ADR_LINKS = "doc-engineer: links to ADRs point at finalized records, never at drafts"
+
+DOCUMENTATION = re.compile(r"\.(md|mdx|rst|txt|adoc)$|(^|/)docs/")
+DRAFT_LINK = re.compile(r"\]\([^)\s]*decisions/drafts/[^)\s]*\)")
+_DOC_ENGINEER = "agents/doc-engineer.md"
+
+DOC_ENGINEER_ROW: tuple[CheckDef, ...] = (
+    in_mode(
+        fragment_instead_of_canonical(
+            DOC_ENGINEER_FRAGMENT,
+            RuleRef(_DOC_ENGINEER, "Fragment Files"),
+            "doc-engineer",
+            fragment="WIP_doc-engineer.md",
+            canonical="WIP.md",
+        ),
+        PARALLEL_MODE,
+    ),
+    change_confined_to(
+        DOC_ENGINEER_DOCS_ONLY,
+        RuleRef(_DOC_ENGINEER, "File Disjointness"),
+        "doc-engineer",
+        allowed=DOCUMENTATION,
+        outside_sample="src/app.py",
+    ),
+    text_excludes(
+        DOC_ENGINEER_ADR_LINKS,
+        RuleRef("rules/swe/adr-conventions.md", "Linking to ADRs"),
+        "doc-engineer",
+        pattern=DRAFT_LINK,
+        within=DOCUMENTATION,
+        sample_path="docs/architecture.md",
+        sample_text="See [the decision](../.ai-state/decisions/drafts/20261011-0930-a-b-c.md).\n",
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# The systems-architect and the implementation-planner
+# ---------------------------------------------------------------------------
+
+ARCHITECT_ROW: tuple[CheckDef, ...] = adr_row("systems-architect")
+
+PLANNER_STEPS = (
+    "implementation-planner: every plan step carries its files and its done-when condition"
+)
+PLANNER_DOCUMENTS = "implementation-planner: WIP.md and TEST_BASELINE.md are produced"
+PLANNER_RECONCILED = (
+    "implementation-planner: in a parallel batch, fragments are reconciled into the canonical"
+    " documents"
+)
+STEP_FIELDS = ("Files", "Done when")
+BATCH_FRAGMENTS = re.compile(r"(WIP|LEARNINGS)_[a-z-]+\.md")
+_PLANNER = "agents/implementation-planner.md"
+
+PLANNER_ROW: tuple[CheckDef, ...] = (
+    *adr_row("implementation-planner"),
+    steps_carry_fields(
+        PLANNER_STEPS,
+        RuleRef(_PLANNER, "Phase 3 — Step Decomposition"),
+        "implementation-planner",
+        document="IMPLEMENTATION_PLAN.md",
+        fields=STEP_FIELDS,
+    ),
+    documents_produced(
+        PLANNER_DOCUMENTS,
+        RuleRef(_PLANNER, "Phase 6 — Document Completion"),
+        "implementation-planner",
+        documents=("WIP.md", "TEST_BASELINE.md"),
+    ),
+    in_mode(
+        fragments_reconciled(
+            PLANNER_RECONCILED,
+            RuleRef(_PLANNER, "Phase 7 — Execution Supervision"),
+            "implementation-planner",
+            canonical="WIP.md",
+            fragments=BATCH_FRAGMENTS,
+        ),
+        PARALLEL_MODE,
+    ),
+)
+# ---------------------------------------------------------------------------
 # The catalog
 # ---------------------------------------------------------------------------
 
 ROLE_ROWS: Mapping[str, tuple[CheckDef, ...]] = {
     "researcher": RESEARCHER_ROW,
     "verifier": VERIFIER_ROW,
+    "implementer": IMPLEMENTER_ROW,
+    "test-engineer": TEST_ENGINEER_ROW,
+    "doc-engineer": DOC_ENGINEER_ROW,
+    "systems-architect": ARCHITECT_ROW,
+    "implementation-planner": PLANNER_ROW,
 }
 
 

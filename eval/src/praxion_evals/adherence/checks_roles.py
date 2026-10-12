@@ -53,7 +53,10 @@ SCRIPT_TIMEOUT_S = 60
 SCRIPT_EXIT_CLEAN = 0
 SCRIPT_EXIT_VIOLATIONS = 1  # Praxion's check scripts: 0 clean, 1 violations, 2 script error
 REPO_PLACEHOLDER = "{repo}"
+CHANGED_PLACEHOLDER = "{changed}"
+DOCUMENT_PLACEHOLDER = "{document}"
 OUTPUT_TAIL_LINES = 6
+PIPELINE_STATE = (".ai-work/", ".ai-state/")  # where drafts and their records live
 
 ToolMatcher = Callable[[SessionEvidence, ToolUse], bool]
 
@@ -114,17 +117,17 @@ def first_line(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _document(evidence: SessionEvidence, document: str) -> tuple[str, str]:
+def slug_document(evidence: SessionEvidence, document: str) -> tuple[str, str]:
     """The repo-relative path of a document in the task's slug directory, and its text."""
     path = f"{slug_dir(evidence.slug)}/{document}"
     return path, evidence.repo.files.get(path, "")
 
 
-def _cwd(evidence: SessionEvidence) -> str | None:
+def session_cwd(evidence: SessionEvidence) -> str | None:
     return evidence.envelope.init.cwd if evidence.envelope.init else None
 
 
-def _clause(
+def clause(
     name: str,
     rule: RuleRef,
     binds: BindsFor | None,
@@ -165,7 +168,7 @@ def required_sections(
     binds: BindsFor | None = None,
 ) -> MechanicalCheck:
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
-        path, text = _document(evidence, document)
+        path, text = slug_document(evidence, document)
         if not text.strip():
             return Failed(f"{path} was never written or is empty")
         problems = [problem for s in sections if (problem := _section_problem(text, s))]
@@ -176,7 +179,7 @@ def required_sections(
         path = f"{slug_dir(CANARY_SLUG)}/{document}"
         return synthetic_evidence(role, slug=CANARY_SLUG, files={path: unfilled})
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 def _section_problem(text: str, section: Section) -> str | None:
@@ -209,7 +212,7 @@ def title_marker_first_unmarked_last(
     ``within_first`` tool calls, and the file the session leaves carries none."""
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
-        path, final = _document(evidence, document)
+        path, final = slug_document(evidence, document)
         problems = _opening_problems(evidence, path, marker, within_first)
         if not final.strip():
             problems.append(f"{path} is missing or empty at the end")
@@ -224,13 +227,13 @@ def title_marker_first_unmarked_last(
             role, slug=CANARY_SLUG, files={path: "# Report\n"}, tool_uses=[opened]
         )
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 def _opening_problems(
     evidence: SessionEvidence, path: str, marker: str, within_first: int
 ) -> list[str]:
-    cwd = _cwd(evidence)
+    cwd = session_cwd(evidence)
     first = next(
         (
             (position, use)
@@ -296,7 +299,7 @@ def tool_order(
             role, slug=CANARY_SLUG, tool_uses=[later_sample, earlier_sample], facts=facts
         )
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 def _first_index(uses: Sequence[ToolUse], matches: Callable[[ToolUse], bool]) -> int | None:
@@ -327,7 +330,7 @@ def path_scope(
         planted = f"{places[0]}/canary_planted_change.txt"
         return synthetic_evidence(role, slug=CANARY_SLUG, files={planted: "changed\n"})
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +353,7 @@ def closed_tag_set(
     """Every bracketed upper-case tag in the document's ``section`` is one of ``allowed``."""
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
-        path, text = _document(evidence, document)
+        path, text = slug_document(evidence, document)
         body = section_body(text, section)
         if body is None:
             return Failed(f"{path} has no section {section!r}")
@@ -366,7 +369,7 @@ def closed_tag_set(
         invented = f"## {section}\n\n| 1 | WARN | [CANARY-INVENTED-TAG] an invented tag |\n"
         return synthetic_evidence(role, slug=CANARY_SLUG, files={path: invented})
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 # ---------------------------------------------------------------------------
@@ -396,7 +399,7 @@ def count_limit(
         uses = [replace(sample, id=f"canary-use-{index}") for index in range(limit + 1)]
         return synthetic_evidence(role, slug=CANARY_SLUG, tool_uses=uses, facts=facts)
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
 # ---------------------------------------------------------------------------
@@ -413,21 +416,25 @@ def script_exits_zero(
     arguments: Sequence[str],
     planted: Mapping[str, str],
     watched: Sequence[str] = (),
+    documents: Sequence[str] = (),
     binds: BindsFor | None = None,
 ) -> MechanicalCheck:
-    """``scripts/<script>`` exits 0 over the scratch repository (``{repo}`` in ``arguments``).
+    """``scripts/<script>`` exits 0 over the scratch repository.
 
-    The script is the plugin copy's, run as a subprocess and never imported. With
-    ``watched`` paths given, the check applies only when the session changed one of
-    them. Exit 1 is a violation (``failed``); a script that is absent, times out or
-    exits otherwise cannot judge this repository, which is ``errored``, never ``failed``.
-    ``planted`` is the scratch repository's files in the canary.
+    In ``arguments`` ``{repo}`` is the session's directory, ``{changed}`` stands for every
+    file the session changed (none changed: not applicable) and ``{document}`` for the
+    first of ``documents`` (names in the slug directory) the session wrote; none written
+    fails the check. The script is the plugin copy's, run as a subprocess and never
+    imported. With ``watched`` paths given, the check applies only when the session
+    changed one of them. Exit 1 is a violation (``failed``); a script that is absent,
+    times out or exits otherwise cannot judge this repository, which is ``errored``,
+    never ``failed``. ``planted`` is the scratch repository's files in the canary.
     """
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         if watched and not any(_within_any(path, watched) for path in written_paths(evidence)):
             return NotApplicable(f"the {role} changed none of {', '.join(watched)}")
-        return _run_script(evidence, script, arguments)
+        return _run_script(evidence, script, arguments, documents)
 
     def violation() -> SessionEvidence:
         repo = Path(tempfile.mkdtemp(prefix="adherence-canary-"))
@@ -440,20 +447,25 @@ def script_exits_zero(
         )
         return with_cwd(evidence, repo)
 
-    return _clause(name, rule, binds, evaluate, violation)
+    return clause(name, rule, binds, evaluate, violation)
 
 
-def _run_script(evidence: SessionEvidence, script: str, arguments: Sequence[str]) -> CheckOutcome:
-    repo = _cwd(evidence)
+def _run_script(
+    evidence: SessionEvidence, script: str, arguments: Sequence[str], documents: Sequence[str]
+) -> CheckOutcome:
+    repo = session_cwd(evidence)
     path = evidence.plugin_copy / "scripts" / script
     if repo is None:
         return CheckErrored("the session's working directory was not recorded")
     if not path.is_file():
         return CheckErrored(f"scripts/{script} is not in the plugin copy {evidence.plugin_copy}")
-    command = [sys.executable, str(path), *(a.replace(REPO_PLACEHOLDER, repo) for a in arguments)]
+    expanded = _expand_arguments(evidence, Path(repo), arguments, documents)
+    if not isinstance(expanded, list):
+        return expanded
+    command = [sys.executable, str(path), *expanded]
     try:
-        done = subprocess.run(
-            command, capture_output=True, text=True, timeout=SCRIPT_TIMEOUT_S, check=False
+        done = subprocess.run(  # cwd is the scratch repository: a gate's own log lands there
+            command, capture_output=True, text=True, timeout=SCRIPT_TIMEOUT_S, check=False, cwd=repo
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return CheckErrored(f"scripts/{script} could not run: {type(error).__name__}: {error}")
@@ -463,3 +475,141 @@ def _run_script(evidence: SessionEvidence, script: str, arguments: Sequence[str]
     if done.returncode == SCRIPT_EXIT_VIOLATIONS:
         return Failed(f"scripts/{script} exited 1: {tail}")
     return CheckErrored(f"scripts/{script} exited {done.returncode}: {tail}")
+
+
+def _expand_arguments(
+    evidence: SessionEvidence, repo: Path, arguments: Sequence[str], documents: Sequence[str]
+) -> list[str] | CheckOutcome:
+    """The script's argument list, or the outcome that stops the run before it starts."""
+    written = _first_written(evidence, documents)
+    if documents and written is None:
+        return Failed(f"none of {', '.join(documents)} was written in {slug_dir(evidence.slug)}")
+    changed = sorted(
+        str((repo / path).resolve()) for path in evidence.repo.files
+    )  # as the script resolves its root
+    expanded: list[str] = []
+    for argument in arguments:
+        if argument == CHANGED_PLACEHOLDER:
+            expanded.extend(changed)
+        else:
+            expanded.append(
+                argument.replace(REPO_PLACEHOLDER, str(repo)).replace(
+                    DOCUMENT_PLACEHOLDER, str(repo / written) if written else ""
+                )
+            )
+    if CHANGED_PLACEHOLDER in arguments and not changed:
+        return NotApplicable(f"the {evidence.role} changed no file")
+    return expanded
+
+
+def _first_written(evidence: SessionEvidence, documents: Sequence[str]) -> str | None:
+    """The repo-relative path of the first of ``documents`` the session left with text."""
+    paths = (f"{slug_dir(evidence.slug)}/{name}" for name in documents)
+    return next((path for path in paths if evidence.repo.files.get(path, "").strip()), None)
+
+
+# ---------------------------------------------------------------------------
+# Documents are produced, and carry their fields
+# ---------------------------------------------------------------------------
+
+
+def documents_produced(
+    name: str, rule: RuleRef, role: Role, *, documents: Sequence[str], binds: BindsFor | None = None
+) -> MechanicalCheck:
+    """Every one of ``documents`` is in the task's slug directory, with text."""
+
+    def evaluate(evidence: SessionEvidence) -> CheckOutcome:
+        missing = [d for d in documents if not slug_document(evidence, d)[1].strip()]
+        return Failed(f"never written or empty: {', '.join(missing)}") if missing else Passed()
+
+    def violation() -> SessionEvidence:
+        return synthetic_evidence(role, slug=CANARY_SLUG)
+
+    return clause(name, rule, binds, evaluate, violation)
+
+
+_STEP_HEADING = re.compile(r"^#{2,4}\s+Step\b.*$", re.M)
+
+
+def steps_carry_fields(
+    name: str,
+    rule: RuleRef,
+    role: Role,
+    *,
+    document: str,
+    fields: Sequence[str],
+    binds: BindsFor | None = None,
+) -> MechanicalCheck:
+    """The plan has at least one ``Step`` section and each carries every one of ``fields``."""
+
+    def evaluate(evidence: SessionEvidence) -> CheckOutcome:
+        path, text = slug_document(evidence, document)
+        blocks = _step_blocks(text)
+        if not blocks:
+            return Failed(f"{path} has no step section")
+        gaps = [
+            f"{title} lacks {field}"
+            for title, body in blocks
+            for field in fields
+            if not _has_field(body, field)
+        ]
+        return Failed(f"{path}: {'; '.join(gaps[:5])}") if gaps else Passed()
+
+    def violation() -> SessionEvidence:
+        path = f"{slug_dir(CANARY_SLUG)}/{document}"
+        lacking = (
+            "### Step 1: a change\n\n**Implementation**: do it\n"  # id-citation-discipline:ignore
+        )
+        return synthetic_evidence(role, slug=CANARY_SLUG, files={path: lacking})
+
+    return clause(name, rule, binds, evaluate, violation)
+
+
+def _step_blocks(text: str) -> list[tuple[str, str]]:
+    """``(heading, body)`` of each step section, to the next step heading."""
+    marks = list(_STEP_HEADING.finditer(text))
+    if not marks:
+        return []
+    ends = [m.start() for m in marks[1:]] + [len(text)]
+    return [
+        (m.group(0).strip("# ").strip(), text[m.end() : end])
+        for m, end in zip(marks, ends, strict=True)
+    ]
+
+
+def _has_field(body: str, field: str) -> bool:
+    """A labelled line ``**Field**:``, ``**Field:**`` or ``Field:`` followed by something."""
+    label = re.escape(field)
+    return bool(re.search(rf"^\s*(?:[-*]\s+)?\**{label}(?::\**|\**:)\s*\S", body, re.M | re.I))
+
+
+# ---------------------------------------------------------------------------
+# A kind of text does not appear in the files of a kind
+# ---------------------------------------------------------------------------
+
+
+def text_excludes(
+    name: str,
+    rule: RuleRef,
+    role: Role,
+    *,
+    pattern: re.Pattern[str],
+    within: re.Pattern[str],
+    sample_path: str,
+    sample_text: str,
+    binds: BindsFor | None = None,
+) -> MechanicalCheck:
+    """No file the session changed at a path matching ``within`` holds text matching ``pattern``."""
+
+    def evaluate(evidence: SessionEvidence) -> CheckOutcome:
+        hits = sorted(
+            path
+            for path, text in evidence.repo.files.items()
+            if within.search(path) and not path.startswith(PIPELINE_STATE) and pattern.search(text)
+        )
+        return Failed(f"{', '.join(hits[:5])} holds {pattern.pattern!r}") if hits else Passed()
+
+    def violation() -> SessionEvidence:
+        return synthetic_evidence(role, slug=CANARY_SLUG, files={sample_path: sample_text})
+
+    return clause(name, rule, binds, evaluate, violation)

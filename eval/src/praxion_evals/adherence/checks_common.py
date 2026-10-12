@@ -16,9 +16,10 @@ from __future__ import annotations
 import os
 import re
 import shlex
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from praxion_evals.adherence.model import (
@@ -60,12 +61,31 @@ WRITE_TOOLS: Mapping[str, str] = {
 }
 
 
+DRAFT_ADRS = ".ai-state/decisions/drafts"  # where a decision-making role leaves its ADR fragments
+
+
 @dataclass(frozen=True)
 class DurableOutput:
-    """Where a role's own definition puts its output."""
+    """Where a role's own definition puts its output.
 
-    document: str  # a file name inside the task's slug directory
-    other_locations: tuple[str, ...] = ()  # repo-relative files or directories it may also write
+    ``document`` is a file in the task's slug directory, ``also_accepted`` the files that
+    stand in for it (a parallel-mode fragment); ``other_locations`` are the repo-relative
+    files or directories it may also write. ``anywhere`` is a role whose work is the
+    change to the repository itself: its document must exist, and no write is stray.
+    No ``document`` means the definition names none (the role's edits are the output).
+    """
+
+    document: str | None
+    other_locations: tuple[str, ...] = ()
+    also_accepted: tuple[str, ...] = ()
+    anywhere: bool = False
+
+    def __post_init__(self) -> None:
+        if self.anywhere and self.other_locations:
+            raise ValueError("a role that may write anywhere has no other locations to list")
+
+    def documents(self) -> tuple[str, ...]:
+        return (self.document, *self.also_accepted) if self.document else ()
 
 
 RESEARCH_FINDINGS = "RESEARCH_FINDINGS.md"
@@ -74,6 +94,24 @@ RESEARCH_FINDINGS = "RESEARCH_FINDINGS.md"
 DURABLE_OUTPUTS: Mapping[str, DurableOutput] = {
     "researcher": DurableOutput(RESEARCH_FINDINGS),
     "verifier": DurableOutput("VERIFICATION_REPORT.md", (".ai-state/TECH_DEBT_LEDGER.md",)),
+    "systems-architect": DurableOutput(
+        "SYSTEMS_PLAN.md",
+        (
+            DRAFT_ADRS,
+            ".ai-state/DESIGN.md",
+            ".ai-state/SYSTEM_DEPLOYMENT.md",
+            "docs/architecture.md",
+            "docs/diagrams",
+        ),
+    ),
+    "implementation-planner": DurableOutput("IMPLEMENTATION_PLAN.md", (DRAFT_ADRS,)),
+    "implementer": DurableOutput("WIP.md", also_accepted=("WIP_implementer.md",), anywhere=True),
+    "test-engineer": DurableOutput(
+        "TEST_RESULTS.md",
+        also_accepted=("TEST_RESULTS_test-engineer.md", "ACCEPTANCE_TESTS.md"),
+        anywhere=True,
+    ),
+    "doc-engineer": DurableOutput(None, anywhere=True),
 }
 
 
@@ -81,13 +119,18 @@ def durable_output(evidence: SessionEvidence) -> CheckOutcome:
     row = DURABLE_OUTPUTS.get(evidence.role)
     if row is None:
         return Withheld(f"no durable output location is recorded for {evidence.role} yet")
-    expected = f"{slug_dir(evidence.slug)}/{row.document}"
+    if row.document is None:
+        return NotApplicable(
+            f"the {evidence.role}'s definition names no output document; its edits are its work"
+        )
+    expected = [f"{slug_dir(evidence.slug)}/{name}" for name in row.documents()]
     problems: list[str] = []
-    if not evidence.repo.files.get(expected, "").strip():
-        problems.append(f"{expected} was never written or is empty")
+    if not any(evidence.repo.files.get(path, "").strip() for path in expected):
+        named = expected[0] if len(expected) == 1 else f"any of {', '.join(expected)}"
+        problems.append(f"{named} was never written or is empty")
     allowed = (slug_dir(evidence.slug), *row.other_locations)
     stray = sorted(path for path in written_paths(evidence) if not _within_any(path, allowed))
-    if stray:
+    if stray and not row.anywhere:
         problems.append(f"wrote outside {slug_dir(evidence.slug)}: {', '.join(stray[:5])}")
     return Failed("; ".join(problems)) if problems else Passed()
 
@@ -153,7 +196,7 @@ def pointer_return(evidence: SessionEvidence) -> CheckOutcome:
 JUDGING_NOT_REQUESTED = "judging not requested"
 JUDGE_CHAR_LIMIT = 20_000  # per section of the judge's input; a longer output is cut, with a note
 NO_TASK_RECORDED = "(the task prompt was not recorded)"
-NO_OUTPUT_RECORDED = "(the role wrote no file under its task directory)"
+NO_OUTPUT_RECORDED = "(the role wrote no file under its task directory or the ADR drafts)"
 NO_RETURN_RECORDED = "(no return was recorded)"
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -221,10 +264,40 @@ GOLDEN_GOOD_CASE = render_judge_input(
 )
 
 
+def _always_produced(evidence: SessionEvidence) -> bool:
+    del evidence
+    return True
+
+
+@dataclass(frozen=True)
+class ArtifactJudgedCheck(JudgedCheck):
+    """A judged check on an artifact a session may not have produced: with none, it does not bind.
+
+    ``produced`` reads the session's evidence; ``absent`` is the reason given when it is False.
+    """
+
+    produced: Callable[[SessionEvidence], bool] = _always_produced
+    absent: str = "the session produced nothing to judge"
+
+    def __post_init__(self) -> None:
+        JudgedCheck.__post_init__(self)
+        _require_text(self.absent, "an artifact check's reason for not applying")
+
+
+def _require_text(value: str, what: str) -> None:
+    if not value.strip():
+        raise ValueError(f"{what} must not be empty")
+
+
 def judge_check(
     check: JudgedCheck, evidence: SessionEvidence, judge: JudgeClient | None
 ) -> CheckOutcome:
-    """Judge one session. No judge: withheld. A judge that raises propagates; the grader errors it."""
+    """Judge one session. No artifact: not applicable. No judge: withheld.
+
+    A judge that raises propagates; the grader errors it.
+    """
+    if isinstance(check, ArtifactJudgedCheck) and not check.produced(evidence):
+        return NotApplicable(check.absent)
     if judge is None:
         return Withheld(JUDGING_NOT_REQUESTED)
     return rate(judge.judge(check.rubric, judge_input(evidence), JUDGE_SCHEMA))
@@ -246,14 +319,14 @@ def judge_input(evidence: SessionEvidence) -> str:
     replaced by placeholders wherever they appear.
     """
     artifact = render_judge_input(
-        _clip(_spawn_prompt(evidence) or NO_TASK_RECORDED),
+        _clip(spawn_prompt(evidence) or NO_TASK_RECORDED),
         _clip(_task_directory_text(evidence) or NO_OUTPUT_RECORDED),
         _clip(evidence.role_return or NO_RETURN_RECORDED),
     )
     return _without_places(artifact, evidence)
 
 
-def _spawn_prompt(evidence: SessionEvidence) -> str:
+def spawn_prompt(evidence: SessionEvidence) -> str:
     for use in evidence.envelope.tool_uses:
         if use.id == evidence.spawn_id:
             return str(use.input.get("prompt", ""))
@@ -261,11 +334,12 @@ def _spawn_prompt(evidence: SessionEvidence) -> str:
 
 
 def _task_directory_text(evidence: SessionEvidence) -> str:
-    prefix = slug_dir(evidence.slug) + "/"
+    """The text the role left in its slug directory, and the ADR fragments it drafted."""
+    prefixes = (slug_dir(evidence.slug) + "/", DRAFT_ADRS + "/")
     return "\n\n".join(
         f"### {path}\n\n{text.strip()}"
         for path, text in sorted(evidence.repo.files.items())
-        if path.startswith(prefix) and text.strip()
+        if path.startswith(prefixes) and text.strip()
     )
 
 
@@ -301,19 +375,22 @@ class GoldenVerdicts:
         return isinstance(self.bad, Failed) and isinstance(self.good, Passed)
 
 
-def judge_golden_cases(judge: JudgeClient) -> Mapping[str, GoldenVerdicts]:
-    """Both golden verdicts for every judged check, for the smoke run to report.
+def judge_golden_cases(
+    judge: JudgeClient, checks: Iterable[CheckDef] | None = None
+) -> Mapping[str, GoldenVerdicts]:
+    """Both golden verdicts for every judged check among ``checks`` (default: C1 to C6).
 
     A judge that raises on a case yields an errored outcome for it, so one crash
     never hides the other verdicts.
     """
+    pool = COMMON_CHECKS.values() if checks is None else checks
+    judged = [check for check in pool if isinstance(check, JudgedCheck)]
     return {
-        name: GoldenVerdicts(
+        check.name: GoldenVerdicts(
             bad=_judged_or_errored(check, check.golden_bad_case, judge),
             good=_judged_or_errored(check, check.golden_good_case, judge),
         )
-        for name, check in COMMON_CHECKS.items()
-        if isinstance(check, JudgedCheck)
+        for check in judged
     }
 
 
@@ -401,6 +478,8 @@ def _forbidden_in(words: Sequence[str]) -> Iterator[str]:
 
 PARTIAL_MARKER = "[PARTIAL]"
 COMPLETED_PHASES = "**Completed phases**:"
+STOPPED_AT = "**Stopped at**:"
+FAILED_AT = "**Failed at**:"
 
 
 @dataclass(frozen=True)
@@ -415,6 +494,11 @@ class PartialForm:
 PARTIAL_FORMS: Mapping[str, PartialForm | None] = {
     "researcher": PartialForm((COMPLETED_PHASES,)),
     "verifier": PartialForm((COMPLETED_PHASES,)),
+    "systems-architect": PartialForm((COMPLETED_PHASES,)),
+    "implementation-planner": PartialForm((COMPLETED_PHASES,)),
+    "implementer": PartialForm((COMPLETED_PHASES, STOPPED_AT)),
+    "test-engineer": PartialForm((COMPLETED_PHASES, FAILED_AT)),
+    "doc-engineer": PartialForm((COMPLETED_PHASES, FAILED_AT)),
 }
 
 
@@ -432,20 +516,40 @@ def partial_output(evidence: SessionEvidence) -> CheckOutcome:
     row = DURABLE_OUTPUTS.get(evidence.role)
     if row is None:
         return Withheld(f"no durable output location is recorded for {evidence.role} yet")
-    path = f"{slug_dir(evidence.slug)}/{row.document}"
-    lines = evidence.repo.files.get(path, "").splitlines()
+    candidates = _partial_candidates(evidence, row)
+    if not candidates:
+        return Failed(f"no document under {slug_dir(evidence.slug)} was written")
+    verdicts = {path: _partial_problems(text, form) for path, text in candidates.items()}
+    if any(not problems for problems in verdicts.values()):
+        return Passed()
+    return Failed(
+        "; ".join(f"{path}: {'; '.join(problems)}" for path, problems in verdicts.items())
+    )
+
+
+def _partial_candidates(evidence: SessionEvidence, row: DurableOutput) -> dict[str, str]:
+    """The written documents that may hold the partial form: the named one, or any in the slug."""
+    prefix = slug_dir(evidence.slug) + "/"
+    files = evidence.repo.files
+    if row.document is not None and not row.anywhere:
+        path = prefix + row.document
+        return {path: files.get(path, "")}
+    return {path: text for path, text in sorted(files.items()) if path.startswith(prefix)}
+
+
+def _partial_problems(text: str, form: PartialForm) -> list[str]:
+    lines = text.splitlines()
     if not any(line.strip() for line in lines):
-        return Failed(f"{path} was never written or is empty")
+        return ["was never written or is empty"]
     title = next(line for line in lines if line.strip())
     problems = (
         [] if PARTIAL_MARKER in title else [f"the title lacks {PARTIAL_MARKER}: {title[:80]!r}"]
     )
-    problems += [
+    return problems + [
         f"no line starts with {marker}"
         for marker in form.progress_lines
         if not any(line.startswith(marker) for line in lines)
     ]
-    return Failed(f"{path}: {'; '.join(problems)}") if problems else Passed()
 
 
 # ---------------------------------------------------------------------------
@@ -517,13 +621,14 @@ def synthetic_evidence(
     facts: TaskFacts | None = None,
     new_commits: Sequence[str] = (),
     spawn_prompt: str | None = None,
+    tool_results: Mapping[str, str] | None = None,
     places: tuple[Path, Path] = (Path("/canary/sandbox"), Path("/canary/plugin-copy")),
 ) -> SessionEvidence:
     """Evidence built in memory: no process, no repository; the canaries' only source.
 
     ``facts`` replaces the default task facts; ``spawn_prompt`` records the main
-    session's spawn call, whose prompt is the task a judge reads; ``places`` are the
-    sandbox and plugin-copy paths.
+    session's spawn call, whose prompt is the task a judge reads; ``tool_results`` are the
+    result texts of tool uses by id; ``places`` are the sandbox and plugin-copy paths.
     """
     spawn = ToolUse("canary-spawn", "Agent", {"subagent_type": role, "prompt": spawn_prompt}, None)
     envelope = SessionEnvelope(
@@ -535,6 +640,7 @@ def synthetic_evidence(
         final_result=None,
         result_count=0,
         unparseable=False,
+        tool_results=MappingProxyType(dict(tool_results or {})),
     )
     return SessionEvidence(
         role=role,

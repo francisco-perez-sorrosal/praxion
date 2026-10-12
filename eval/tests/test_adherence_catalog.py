@@ -82,8 +82,29 @@ def test_a_role_without_a_row_yet_carries_the_common_checks_alone():
     assert [c.name for c in check_catalog("sentinel")] == list(COMMON_CHECKS)
 
 
-def test_the_role_rows_hold_no_judged_check_yet():
-    assert {c.kind for row in ROLE_ROWS.values() for c in row} == {"mechanical"}
+def test_the_only_judged_role_checks_are_the_adr_categories():
+    judged = {role for role, row in ROLE_ROWS.items() for c in row if c.kind == "judged"}
+
+    assert judged == {"systems-architect", "implementation-planner"}
+
+
+@pytest.mark.parametrize(
+    ("role", "clauses"),
+    [("implementer", 7), ("test-engineer", 4), ("doc-engineer", 3), ("systems-architect", 6)],
+)
+def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
+    assert len(ROLE_ROWS[role]) == clauses
+    assert all(check.name.startswith(f"{role}: ") for check in ROLE_ROWS[role])
+
+
+def test_the_planner_shares_the_architects_adr_clauses_and_adds_its_own():
+    names = [
+        c.name.removeprefix("implementation-planner: ") for c in ROLE_ROWS["implementation-planner"]
+    ]
+    architect = [c.name.removeprefix("systems-architect: ") for c in ROLE_ROWS["systems-architect"]]
+
+    assert names[: len(architect)] == architect
+    assert len(names) == len(architect) + 3
 
 
 def test_an_unknown_role_is_refused():

@@ -1,0 +1,139 @@
+[
+  {
+    "id": "researcher-codebase-survey",
+    "request": "Before we design anything, investigate how the observation log is written and read across the hooks and scripts, and distil what you find into a findings document.",
+    "expect": "agent:praxion:researcher",
+    "near_miss": ["agent:praxion:systems-architect", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "researcher-external-options",
+    "request": "Compare the three Python packaging tools we could adopt for this repository and recommend one, with sources.",
+    "expect": "agent:praxion:researcher"
+  },
+  {
+    "id": "systems-architect-design",
+    "request": "Design how the dashboard should read .ai-state across several worktrees. Weigh the trade-offs, assess whether the codebase is ready, and record the decision.",
+    "expect": "agent:praxion:systems-architect",
+    "near_miss": ["agent:praxion:implementation-planner", "agent:praxion:interface-designer"]
+  },
+  {
+    "id": "systems-architect-technology-selection",
+    "request": "We need to pick between SQLite and DuckDB for the metrics store. Evaluate the trade-offs and produce the systems plan.",
+    "expect": "agent:praxion:systems-architect"
+  },
+  {
+    "id": "implementation-planner-decompose",
+    "request": "The architecture in SYSTEMS_PLAN.md is approved. Break it into small, safe, incremental steps with WIP tracking.",
+    "expect": "agent:praxion:implementation-planner",
+    "near_miss": ["agent:praxion:implementer", "agent:praxion:systems-architect"]
+  },
+  {
+    "id": "implementation-planner-resume",
+    "request": "We are resuming yesterday's multi-session work; re-assess WIP.md and tell me where the plan stands.",
+    "expect": "agent:praxion:implementation-planner"
+  },
+  {
+    "id": "implementer-execute-step",
+    "request": "Execute step 3 of the implementation plan in .ai-work/startup-probe/WIP.md: write the code, run the tests and report.",
+    "expect": "agent:praxion:implementer",
+    "near_miss": ["agent:praxion:implementation-planner", "agent:praxion:test-engineer"]
+  },
+  {
+    "id": "test-engineer-acceptance-design",
+    "request": "Design the acceptance tests for this behavioural spec before any implementation exists.",
+    "expect": "agent:praxion:test-engineer",
+    "near_miss": ["agent:praxion:implementer", "agent:praxion:verifier"]
+  },
+  {
+    "id": "test-engineer-refactor-suite",
+    "request": "Our test suite is brittle and coupled. Refactor it around fixtures and add property-based tests for the parser.",
+    "expect": "agent:praxion:test-engineer",
+    "near_miss": ["skill:praxion:refactoring", "agent:praxion:implementer"]
+  },
+  {
+    "id": "verifier-post-implementation",
+    "request": "The implementation is complete. Check it against the acceptance criteria, the coding conventions and the test coverage, and write the verification report.",
+    "expect": "agent:praxion:verifier",
+    "near_miss": ["agent:praxion:architect-validator", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "architect-validator-pre-merge",
+    "request": "Before this merges, check that the code, the LikeC4 model and the ADRs still agree with each other.",
+    "expect": "agent:praxion:architect-validator",
+    "near_miss": ["agent:praxion:verifier", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "sentinel-ecosystem-audit",
+    "request": "Audit the whole ecosystem of skills, agents, rules and hooks for drift, staleness and coherence, and write the report.",
+    "expect": "agent:praxion:sentinel",
+    "near_miss": ["agent:praxion:context-engineer", "agent:praxion:verifier"]
+  },
+  {
+    "id": "doc-engineer-stale-docs",
+    "request": "The README and the component catalogs are stale after the last changes. Fix the project documentation and its cross-references.",
+    "expect": "agent:praxion:doc-engineer",
+    "near_miss": ["agent:praxion:context-engineer"]
+  },
+  {
+    "id": "context-engineer-placement",
+    "request": "Audit our context artifacts: decide whether this guidance belongs in CLAUDE.md, a rule or a skill, and resolve the conflicts between them.",
+    "expect": "agent:praxion:context-engineer",
+    "near_miss": ["agent:praxion:doc-engineer", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "cicd-engineer-workflow",
+    "request": "Add a GitHub Actions workflow that runs the test suite weekly, caches the dependencies and hardens the token permissions.",
+    "expect": "agent:praxion:cicd-engineer"
+  },
+  {
+    "id": "promethean-ideation",
+    "request": "I have no specific task today. Look at the project and give me concrete feature-level improvement ideas.",
+    "expect": "agent:praxion:promethean",
+    "near_miss": ["agent:praxion:roadmap-cartographer"]
+  },
+  {
+    "id": "roadmap-cartographer-spring-cleaning",
+    "request": "Let's do spring cleaning on the whole project: a deep audit and a grounded ROADMAP.md.",
+    "expect": "agent:praxion:roadmap-cartographer",
+    "near_miss": ["skill:praxion:roadmap-planning", "agent:praxion:promethean", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "roadmap-planning-backlog",
+    "request": "Here is our backlog of twelve items. Help us prioritise and sequence them into milestones.",
+    "expect": "skill:praxion:roadmap-planning",
+    "near_miss": ["agent:praxion:roadmap-cartographer"]
+  },
+  {
+    "id": "skill-genesis-harvest",
+    "request": "Mine the accumulated LEARNINGS.md files, verification reports and sentinel findings, and propose the skills or rules they justify.",
+    "expect": "skill:praxion:skill-genesis",
+    "near_miss": ["agent:praxion:skill-genesis", "agent:praxion:context-engineer"]
+  },
+  {
+    "id": "interface-designer-api",
+    "request": "Design the REST API for the new service: resource model, endpoint shapes, error format and pagination.",
+    "expect": "agent:praxion:interface-designer",
+    "near_miss": ["agent:praxion:systems-architect", "skill:praxion:api-design"]
+  },
+  {
+    "id": "agentic-transactions-brokerage",
+    "request": "Design how our agent places brokerage orders on behalf of a user with a spend limit and a human approval step.",
+    "expect": "agent:praxion:agentic-transactions-architect",
+    "near_miss": ["agent:praxion:interface-designer", "agent:praxion:systems-architect"]
+  },
+  {
+    "id": "discipline-consultant-convene",
+    "request": "Convene an applied-statistics consultant to challenge the sample-size claim in this plan before we commit to it.",
+    "expect": "agent:praxion:discipline-consultant"
+  },
+  {
+    "id": "direct-typo",
+    "request": "Fix the typo on line 3 of README.md.",
+    "expect": "none"
+  },
+  {
+    "id": "direct-explain",
+    "request": "What does the resolve_test_scope function do?",
+    "expect": "none"
+  }
+]

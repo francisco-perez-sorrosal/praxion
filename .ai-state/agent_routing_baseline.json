@@ -1,0 +1,31 @@
+{
+  "model": "sonnet",
+  "recorded": "2026-10-11",
+  "routes": {
+    "agentic-transactions-brokerage": "agent:agentic-transactions-architect",
+    "architect-validator-pre-merge": "agent:architect-validator",
+    "cicd-engineer-workflow": "agent:cicd-engineer",
+    "context-engineer-placement": "agent:context-engineer",
+    "direct-explain": "none",
+    "direct-typo": "none",
+    "discipline-consultant-convene": "agent:discipline-consultant",
+    "doc-engineer-stale-docs": "agent:doc-engineer",
+    "implementation-planner-decompose": "agent:implementation-planner",
+    "implementation-planner-resume": "agent:implementation-planner",
+    "implementer-execute-step": "agent:implementer",
+    "interface-designer-api": "agent:interface-designer",
+    "promethean-ideation": "agent:promethean",
+    "researcher-codebase-survey": "agent:researcher",
+    "researcher-external-options": "agent:researcher",
+    "roadmap-cartographer-spring-cleaning": "agent:roadmap-cartographer",
+    "roadmap-planning-backlog": "agent:roadmap-cartographer",
+    "sentinel-ecosystem-audit": "agent:sentinel",
+    "skill-genesis-harvest": "skill:skill-genesis",
+    "systems-architect-design": "agent:systems-architect",
+    "systems-architect-technology-selection": "agent:systems-architect",
+    "test-engineer-acceptance-design": "agent:test-engineer",
+    "test-engineer-refactor-suite": "skill:refactoring",
+    "verifier-post-implementation": "agent:verifier"
+  },
+  "schema": 1
+}

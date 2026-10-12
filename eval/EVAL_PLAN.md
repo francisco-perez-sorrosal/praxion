@@ -148,7 +148,7 @@ transcripts, never hand-written JSON; no test in the suite starts a real `claude
 
 ### Process-adherence eval (startup-context diet, instrument I2)
 
-Source: `eval/src/praxion_evals/adherence/`; console entry `praxion-evals-adherence` (registered in `eval/pyproject.toml` under `[project.scripts]`). Decisions: `dec-draft-33a753e3` (the package and its entry), `dec-draft-e471117c` (the flip rule); both finalize at merge-to-main.
+Source: `eval/src/praxion_evals/adherence/`; console entry `praxion-evals-adherence` (registered in `eval/pyproject.toml` under `[project.scripts]`). Decisions: `dec-458` (the package and its entry), `dec-459` (the flip rule); both finalize at merge-to-main.
 
 **Purpose.** Measure, per Praxion role, whether a spawned agent still follows its own part of the process when it does not inherit the context layer. This is the no-regression half of the evidence a Phase 2 lean-spawn flip needs; the saving half is the first-request token figure the same runs record. It measures rules that already exist and never rewrites one. Verify: every check names its rule (`RuleRef(file, section)` in `adherence/catalog.py` and `checks_common.py`), and `eval/tests/test_adherence_catalog.py` fails when a named file or section does not exist.
 
@@ -173,7 +173,7 @@ Role rows exist for all 17 roles, collected by `adherence/catalog_rows.py`: the 
 
 **Tasks.** Seeded and reproducible: the same seed yields the same list. A kit is templates times fixtures times variants (ambiguity, conflict, early-stop, and injection for roles that hold `WebFetch`). The researcher kit produces 40 tasks and the verifier kit 30; a default run takes the target plus slack (24 at the default target of 20), or `--max-tasks N` of them when that is fewer; the cap leaves the declared target alone. Verify: `python3 -c "from praxion_evals.adherence import tasks; print(tasks.producible_task_count('researcher', 7), tasks.producible_task_count('verifier', 7))"` from `eval/` under `uv run`.
 
-**Statistics, as set by `dec-draft-e471117c`.** The user's ratification is still owed before any flip relies on these settings.
+**Statistics, as set by `dec-459`.** The user's ratification is still owed before any flip relies on these settings.
 
 - Judged checks gate on the point estimate: non-inferior when the `lean` pass rate is no more than the declared margin (10 percentage points by default) below the `full` rate over the recounted pairs. The one-sided 95 percent Tango score interval on the paired difference is reported beside it and never decides. The applied-statistics consult found that a confidence-bound reading cannot pass at 20 pairs even when the arms agree on every pair.
 - Mechanical checks gate on an allowance measured in a same-arm calibration run (`--calibration`, then `--calibration-run`); the allowance is zero until a calibration run is declared. An allowance belongs to one role and one check: a role never reads another's, and a calibration file is accepted only when it measured the run's checkout and has pairs of every named role, else the run refuses before any launch.

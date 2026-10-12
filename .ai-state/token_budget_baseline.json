@@ -189,6 +189,13 @@
       "governed_bytes": 66473,
       "basis": "tokenizer",
       "ruler": "claude-sonnet-5-5"
+    },
+    {
+      "date": "2026-10-12",
+      "governed_tokens": 24729,
+      "governed_bytes": 66473,
+      "basis": "tokenizer",
+      "ruler": "claude-sonnet-5-5"
     }
   ],
   "listing_ceiling_ruler": "claude-sonnet-5-5"

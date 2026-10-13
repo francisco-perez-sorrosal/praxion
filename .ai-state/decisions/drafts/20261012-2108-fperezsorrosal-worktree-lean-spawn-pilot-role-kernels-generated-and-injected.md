@@ -47,9 +47,9 @@ Activation: no -- the option set was fixed by the user-ratified scope and the or
 Add five components and move one responsibility:
 
 1. `rules/_audience.yaml`: every section, or part of a mixed section, of the six rule files with no path scope, `claude/config/CLAUDE.md.tmpl` and Praxion's `CLAUDE.md` gets exactly one closed scope (core; role, through a declared module; orchestrator-only; no-actor) and one form (verbatim, or condensed with a pinned sha).
-2. `scripts/generate_kernels.py`: emits `claude/kernels/<module>.md`, `claude/kernels/index.json` (role to ordered strings, with adoption statuses projected), the three universal blocks inside every `agents/*.md`, and the host-native preamble constant. **The universal blocks' canonical text moves from the shared-block checker to the generator**; the checker now verifies identity with the generator's output.
+2. `scripts/generate_kernels.py`: emits `claude/kernels/<module>.md`, `claude/kernels/index.json` (role to ordered strings; it carries no adoption status, the hook reads the plugin's own ledger), the three universal blocks inside every `agents/*.md`, and the host-native preamble constant. **The universal blocks' canonical text moves from the shared-block checker to the generator**; the checker now verifies identity with the generator's output.
 3. `scripts/check_kernel_manifest.py`: invariants I1-I9, one canary each, as a pre-commit gate; a `--liveness` mode for the flip record.
-4. `hooks/inject_kernel.py`: K synchronous `SubagentStart` slot entries inject the rest of the kernel (never what the definition already carries) and the project's root `CLAUDE.md`, for roles at `trial` or `switched`; one `kernel_injected` row per delivering spawn; no disable variable.
+4. `hooks/inject_kernel.py`: K synchronous `SubagentStart` slot entries inject the role's kernel (the first string carries the whole core, the three universal blocks included, a duplicate of what the definition carries) and the project's root `CLAUDE.md` (`@path` imports expanded once, inside the project), for roles at `trial` or `switched`; one `kernel_injected` row per delivering spawn; no disable variable.
 5. `.ai-state/kernel_adoption.yaml`: absent, then trial, then switched, forward only; `omitClaudeMd` only when switched; switched only for the five eligible pilot roles, with every run id, the probe readings and both user ratifications recorded.
 
 The Codex exporter embeds the same strings and strips `omitClaudeMd`; Cursor is untouched; the adherence eval refuses to score a lean session whose kernel did not arrive.
@@ -62,7 +62,7 @@ Pros: one channel per agent; about 0.4K tokens less per switched spawn. Cons: a 
 
 ### Generated blocks plus the hook's delta (chosen)
 
-Pros: a spawn always has the contract, the links rule and the return contract; every copy has one source; the hook adds only what the definition lacks. Cons: the verbatim contract enlarges every definition; two channels must stay consistent, which the generator and the freshness invariant handle.
+Pros: a spawn always has the contract, the links rule and the return contract; every copy has one source; the hook delivers the whole kernel, accepting a duplicate of the three blocks (under a thousand tokens per spawn, read by the startup probe). Cons: the verbatim contract enlarges every definition; two channels must stay consistent, which the generator and the freshness invariant handle.
 
 ### Whole kernel inline in every definition, no hook
 
@@ -71,8 +71,10 @@ Pros: no hook; works in every harness. Cons: role modules (up to about 6K tokens
 ## Consequences
 
 - Positive: the contract text has one source across definitions, kernels, the preamble and Codex; a lean spawn carries its process; flips are gated on a checked record; a silent hook failure cannot pass as a measured result.
-- Negative: every agent definition grows by the verbatim contract; K process starts per `praxion:*` spawn; a ledger edit requires regeneration; the order of strings across hook entries is unverified until a spike settles it.
-- The hook reads only the generated JSON index (stdlib-only in any project), never the YAML manifest or ledger.
+- Negative: every agent definition grows by the verbatim contract; K process starts per `praxion:*` spawn; a ledger edit requires regeneration; strings from separate hook entries arrive in completion order (spike S2), so every module fits one string and each injected string carries a one-line marker naming its slot.
+- The hook reads the generated JSON index and the running plugin's adoption ledger (a stdlib line scan of its generated shape, no PyYAML), never the YAML manifest, and never a ledger or kernel found in the project.
+- A sandboxed adherence session writes no observation row (spike S3), so the adherence eval reads delivery from the marker heading each injected string; the `kernel_injected` row remains the record for projects holding `.ai-state/` and the liveness check's input.
+- Three pilot definitions' stop line was aligned from `Failed at` to `Stopped at` (one word each) so the shared core contradicts none; five non-pilot definitions still say `Failed at` and are aligned before any is adopted.
 - dec-454's clauses 2-4 stand: presence is computed without a roster, report producers carry markers, and the widened roster stays. Its clause 1's canonical home moves here.
 
 ## Disconfirmation

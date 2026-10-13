@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import checks_common, grade
+from praxion_evals.adherence import checks_common, grade, session_loop
 from praxion_evals.adherence.model import (
     Binds,
     CheckErrored,
@@ -201,6 +201,7 @@ def _stream(
     extra_plugins: tuple[dict, ...] = (),
     is_error: bool = False,
     subtype: str = "success",
+    hook_outputs: tuple[str, ...] = (),
 ) -> str:
     spawn_input = spawn_input or {"subagent_type": f"praxion:{role}", "prompt": "go"}
     events = [
@@ -215,6 +216,15 @@ def _stream(
                 *extra_plugins,
             ],
         },
+        *(
+            {
+                "type": "system",
+                "subtype": "hook_response",
+                "hook_name": "SubagentStart:researcher",
+                "output": output,
+            }
+            for output in hook_outputs
+        ),
         _assistant(
             [{"type": "tool_use", "id": SPAWN, "name": "Agent", "input": spawn_input}],
             {"input_tokens": 2, "cache_creation_input_tokens": 5, "cache_read_input_tokens": 5},
@@ -523,3 +533,105 @@ def test_a_check_that_raises_is_errored_never_passed(repo, tmp_path, monkeypatch
     assert isinstance(status.outcomes["CX"], CheckErrored)
     assert "script crashed" in status.outcomes["CX"].reason
     assert status.outcomes["C2"] == Passed()
+
+
+# ---------------------------------------------------------------------------
+# The injected kernel: owed, delivered, or missing
+# ---------------------------------------------------------------------------
+
+MARKED = '{"additionalContext": "[praxion 0a1b2c3d #1]\\n\\nThe kernel."}'
+SECOND_MARKED = '{"additionalContext": "[praxion 0a1b2c3d #2]\\n\\nMore of it."}'
+
+
+def test_a_lean_session_owed_a_kernel_with_no_marker_errors_as_a_missing_kernel(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path, kernel_expected=True)
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Errored)
+    assert status.kind == "kernel_missing"
+
+
+def test_a_marker_in_the_streams_hook_output_is_the_deliverys_evidence(repo, tmp_path):
+    evidence = _evidence(
+        repo, tmp_path, {"hook_outputs": (MARKED, SECOND_MARKED)}, kernel_expected=True
+    )
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Measured)
+    assert [row["kernel_version"] for row in evidence.kernel.rows] == ["0a1b2c3d"] * 2
+    assert [row["slot"] for row in evidence.kernel.rows] == [1, 2]
+
+
+def test_marker_records_handed_in_replace_the_streams_markers(repo, tmp_path):
+    rows = [{"kernel_version": "v1", "role": "researcher"}]
+    given = _evidence(repo, tmp_path, kernel_expected=True, kernel_rows=rows)
+    emptied = _evidence(
+        repo, tmp_path, {"hook_outputs": (MARKED,)}, kernel_expected=True, kernel_rows=[]
+    )
+
+    assert isinstance(grade.grade(given, ["C2"], None, None), Measured)
+    assert grade.grade(emptied, ["C2"], None, None).kind == "kernel_missing"
+
+
+def test_a_session_owed_no_kernel_is_graded_with_no_kernel_evidence(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path)
+
+    assert evidence.kernel is None
+    assert isinstance(grade.grade(evidence, ["C2"], None, None), Measured)
+
+
+def test_an_isolation_breach_outranks_a_missing_kernel(repo, tmp_path):
+    foreign = {"name": "praxion", "path": "/Users/op/.claude/plugins/p", "source": "praxion@market"}
+    evidence = _evidence(repo, tmp_path, {"extra_plugins": (foreign,)}, kernel_expected=True)
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Errored)
+    assert status.kind == "isolation_breach"
+
+
+def test_a_role_never_spawned_is_not_measured_rather_than_missing_its_kernel(repo, tmp_path):
+    other = {"spawn_input": {"subagent_type": "general-purpose"}}
+    evidence = _evidence(repo, tmp_path, other, kernel_expected=True)
+
+    assert isinstance(grade.grade(evidence, ["C2"], None, None), NotMeasured)
+
+
+def test_a_missing_kernel_is_not_a_retryable_error():
+    assert "kernel_missing" not in session_loop.RETRYABLE_ERRORS
+
+
+def _adopt(plugin_copy: Path, text: str) -> None:
+    ledger = plugin_copy / ".ai-state" / "kernel_adoption.yaml"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(text, encoding="utf-8")
+
+
+@pytest.mark.parametrize("status", ["trial", "switched"])
+def test_a_role_at_an_active_adoption_status_is_owed_its_kernel(tmp_path, status):
+    _adopt(tmp_path, f"version: 1\nroles:\n  researcher:\n    status: {status}\n")
+
+    assert grade.kernel_adopted(tmp_path, "researcher")
+
+
+@pytest.mark.parametrize(
+    "ledger",
+    [
+        "version: 1\nroles: {}\n",
+        "version: 1\nroles:\n  verifier:\n    status: trial\n",
+        "version: 1\nroles:\n  researcher:\n    status: absent\n",
+        "roles: [not, a, mapping\n",
+        "just text\n",
+    ],
+    ids=["no-roles", "other-role", "inactive-status", "unreadable", "not-a-mapping"],
+)
+def test_a_role_the_ledger_does_not_adopt_is_owed_nothing(tmp_path, ledger):
+    _adopt(tmp_path, ledger)
+
+    assert not grade.kernel_adopted(tmp_path, "researcher")
+
+
+def test_a_plugin_copy_with_no_ledger_owes_no_kernel(tmp_path):
+    assert not grade.kernel_adopted(tmp_path, "researcher")

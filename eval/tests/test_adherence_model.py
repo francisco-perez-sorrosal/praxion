@@ -97,8 +97,9 @@ def test_the_arms_and_the_webfetch_roles_are_known_names():
     assert WEBFETCH_ROLES <= set(ROLES)
 
 
-def test_the_error_kinds_are_the_live_kinds_plus_a_refused_launch():
-    assert set(ERROR_KINDS) == set(get_args(LiveErrorKind)) | {"launch_refused"}
+def test_the_error_kinds_are_the_live_kinds_plus_a_refused_launch_and_a_missing_kernel():
+    assert set(ERROR_KINDS) == set(get_args(LiveErrorKind)) | {"launch_refused", "kernel_missing"}
+    assert "kernel_missing" not in get_args(LiveErrorKind)
 
 
 # ---------------------------------------------------------------------------

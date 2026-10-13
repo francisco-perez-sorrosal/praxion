@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, assert_never, get_args
+from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args
 
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
 from praxion_evals.live.session import SessionEnvelope, ToolUse
@@ -63,9 +63,11 @@ WEBFETCH_ROLES: frozenset[str] = frozenset(
     }
 )
 
-# The live runner's error kinds, plus the one a refused spend reservation adds.
-ERROR_KINDS: tuple[str, ...] = (*get_args(LiveErrorKind), "launch_refused")
-ErrorKind = LiveErrorKind | Literal["launch_refused"]
+# The live runner's error kinds, plus the two only the adherence eval can raise: a refused
+# spend reservation, and a lean session whose injected kernel never arrived.
+AdherenceErrorKind = Literal["launch_refused", "kernel_missing"]
+ERROR_KINDS: tuple[str, ...] = (*get_args(LiveErrorKind), *get_args(AdherenceErrorKind))
+ErrorKind = LiveErrorKind | AdherenceErrorKind
 
 
 def _require(condition: bool, message: str) -> None:
@@ -264,6 +266,18 @@ class TaskFacts:
 
 
 @dataclass(frozen=True)
+class KernelEvidence:
+    """Whether a session was owed an injected kernel, and the delivery markers it shows."""
+
+    expected: bool
+    rows: tuple[Mapping[str, Any], ...]  # one record per marker line found in the stream
+
+    @property
+    def missing(self) -> bool:
+        return self.expected and not self.rows
+
+
+@dataclass(frozen=True)
 class SessionEvidence:
     role: Role
     slug: str
@@ -277,6 +291,7 @@ class SessionEvidence:
     role_return: str | None  # the Agent tool result text, not the main session's relay
     repo: RepoFacts
     facts: TaskFacts
+    kernel: KernelEvidence | None = None  # None: no kernel was in play for this session
 
     def __post_init__(self) -> None:
         _one_of(self.role, ROLES, "evidence role")

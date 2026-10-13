@@ -3,17 +3,20 @@
 :func:`evidence_from_recording` is the one impure step: it parses the recorded
 stream and asks ``git`` what the session changed in the scratch repository.
 :func:`grade` is then a function of that evidence alone and returns exactly one
-status: ``Errored`` when infrastructure failed, ``NotMeasured`` when the main
-session never spawned the role, otherwise ``Measured`` with one outcome per check.
+status: ``Errored`` when infrastructure failed (a lean session whose kernel never
+arrived included), ``NotMeasured`` when the main session never spawned the role,
+otherwise ``Measured`` with one outcome per check.
 """
 
 from __future__ import annotations
 
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import assert_never
+from typing import Any, assert_never
+
+import yaml
 
 from praxion_evals.adherence.catalog import role_check
 from praxion_evals.adherence.checks_common import judge_check
@@ -25,6 +28,7 @@ from praxion_evals.adherence.model import (
     DoesNotBind,
     Errored,
     JudgedCheck,
+    KernelEvidence,
     Measured,
     MechanicalCheck,
     NotApplicable,
@@ -52,6 +56,13 @@ GIT_TIMEOUT_S = 60
 _AGENT_TRAILER = re.compile(r"^agentId:", re.MULTILINE)
 LAUNCH_STUB_PREFIX = "Async agent launched"
 
+# The delivering hook heads every injected string with `[praxion <version> #<slot>]`. A
+# sandbox keeps no observation log, so that marker, read from the stream's hook output, is
+# the eval's only delivery evidence. The shape is the hook's contract: change both together.
+_KERNEL_MARKER = re.compile(r"\[praxion (?P<version>[^\s\]]+) #(?P<slot>\d+)\]")
+KERNEL_ACTIVE_STATUSES = frozenset({"trial", "switched"})  # the adoption statuses that deliver
+KERNEL_LEDGER = Path(".ai-state") / "kernel_adoption.yaml"  # under the running plugin's root
+
 # ---------------------------------------------------------------------------
 # Reading the evidence
 # ---------------------------------------------------------------------------
@@ -74,10 +85,17 @@ def evidence_from_recording(
     planted_instruction: str | None = None,
     planted_effect: str | None = None,
     external_api_docs: str | None = None,
+    kernel_expected: bool = False,
+    kernel_rows: Sequence[Mapping[str, Any]] | None = None,
 ) -> SessionEvidence:
-    """Everything a grader may look at, from the stream text and the scratch repository."""
+    """Everything a grader may look at, from the stream text and the scratch repository.
+
+    ``kernel_expected`` says the session was owed an injected kernel. Its delivery evidence is
+    ``kernel_rows`` when given, otherwise the markers found in the stream's hook output.
+    """
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
+    rows = kernel_marker_records(parsed) if kernel_rows is None else tuple(kernel_rows)
     return SessionEvidence(
         role=role,
         slug=slug,
@@ -98,7 +116,32 @@ def evidence_from_recording(
             planted_effect=planted_effect,
             external_api_docs=external_api_docs,
         ),
+        kernel=KernelEvidence(kernel_expected, rows) if kernel_expected or rows else None,
     )
+
+
+def kernel_marker_records(envelope: SessionEnvelope) -> tuple[Mapping[str, Any], ...]:
+    """One record per kernel delivery marker in the stream's hook output."""
+    return tuple(
+        {"kernel_version": found["version"], "slot": int(found["slot"])}
+        for hook in envelope.hook_outputs
+        for found in _KERNEL_MARKER.finditer(hook.output)
+    )
+
+
+def kernel_adopted(plugin_copy: Path, role: str) -> bool:
+    """Whether the plugin copy's adoption ledger has ``role`` receiving a kernel at spawn.
+
+    Mirrors the delivering hook: a ledger that is absent or does not read, or a role at no
+    status, delivers nothing, so the lean arm of such a role is not owed a kernel.
+    """
+    try:
+        ledger = yaml.safe_load((plugin_copy / KERNEL_LEDGER).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    roles = ledger.get("roles") if isinstance(ledger, dict) else None
+    entry = roles.get(role) if isinstance(roles, dict) else None
+    return isinstance(entry, dict) and entry.get("status") in KERNEL_ACTIVE_STATUSES
 
 
 def _spawn_id(envelope: SessionEnvelope, role: str) -> str | None:
@@ -214,6 +257,12 @@ def grade(
         return failure
     if evidence.spawn_id is None:
         return NotMeasured(f"the main session never spawned the {evidence.role}", setup)
+    if evidence.kernel is not None and evidence.kernel.missing:
+        return Errored(
+            kind="kernel_missing",
+            detail=f"the {evidence.role} was owed an injected kernel and its stream shows no delivery marker",
+            setup=setup,
+        )
     checks = [role_check(evidence.role, name) for name in check_names]
     outcomes = {check.name: _outcome(check, evidence, judge) for check in checks}
     return Measured.for_checks(

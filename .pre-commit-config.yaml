@@ -334,7 +334,25 @@ repos:
         name: Agent shared-block agreement
         entry: python3 scripts/check_agent_shared_blocks.py --repo-root .
         language: system
-        files: '^(agents/[^/]+\.md|scripts/check_agent_shared_blocks\.py)$'
+        files: '^(agents/[^/]+\.md|claude/kernels/core-blocks\.md|scripts/check_agent_shared_blocks\.py)$'
+        pass_filenames: false
+
+      # Block B7 — the per-role kernels against the guidance they are cut from.
+      # Every section of every always-loaded source has an audience (I1), each
+      # agent has a kernel core (I2), the core's contract is the rule's own text
+      # (I3), no injected string passes the harness cap (I4), and the ADR-author
+      # and ledger-writer groups equal the agents that write those targets (I5).
+      # A whole-checkout scan, like agent-shared-blocks: the defect lives between
+      # a rule edit and a kernel nobody regenerated, so no single staged file
+      # shows it. `files:` lists every input the invariants read; a rule is any
+      # rules/ markdown file because the always-loaded set is the unscoped ones
+      # and a new unscoped rule must trigger the scan the day it is written.
+      - id: kernel-manifest
+        name: Kernel manifest agreement
+        entry: python scripts/check_kernel_manifest.py --repo-root .
+        language: python
+        additional_dependencies: ['pyyaml']
+        files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|hooks/hooks\.json|hooks/_kernel_preamble\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_model|kernel_sources|check_agent_shared_blocks|_markdown_tables|_repo_root)\.py)$'
         pass_filenames: false
 
       # Block G — ADR frontmatter promotion (td-103). Self-scans the staged

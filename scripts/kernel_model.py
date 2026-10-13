@@ -661,7 +661,7 @@ def stale_pins(
             "the source changed since it was condensed",
         )
         for entry, text in entry_texts(manifest, sections).items()
-        if isinstance(entry.form, Condensed) and ks.sha1_hex(text) != entry.form.pinned_sha
+        if isinstance(entry.form, Condensed) and ks.pin_sha(text) != entry.form.pinned_sha
     )
 
 

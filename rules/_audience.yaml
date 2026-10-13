@@ -57,17 +57,17 @@ authored:
     path: claude/kernels/src/cross-agent-skill-conventions.md
     module: core
     condenses: "rules/swe/swe-agent-coordination-protocol.md#Cross-Agent Skill Conventions"
-    pinned_sha: "7b35c926bb5bf84b27d728021f155ec58eef4b4f"
+    pinned_sha: "7aae82755e6eba647e89f8f44e4c7b984b93460b"
   - id: delegation-depth
     path: claude/kernels/src/delegation-depth.md
     module: core
     condenses: "rules/swe/swe-agent-coordination-protocol.md#Delegation Depth"
-    pinned_sha: "189aae5609b6cde280b2ae70ab24b21be0e72a6e"
+    pinned_sha: "94e885edf829c85da97cf816b77ae5114185646b"
   - id: ledger-writer
     path: claude/kernels/src/ledger-writer.md
     module: ledger-writer
     condenses: "rules/swe/agent-intermediate-documents.md#`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}"
-    pinned_sha: "b0144f88c554843e864b3f993710d6cdb152dd5d"
+    pinned_sha: "b8d60d49f5a19e6753115dae81aaf23baffa64be"
   - id: ledger-writer-verifier-overlay
     path: claude/kernels/src/ledger-writer-verifier-overlay.md
     module: local-verifier
@@ -108,7 +108,7 @@ authored:
     path: claude/kernels/src/task-slug-scoping.md
     module: core
     condenses: "rules/swe/agent-intermediate-documents.md#Task Slug Convention"
-    pinned_sha: "0c0e8708a9a95d7c00ce3af8c32020bc6b41e7ac"
+    pinned_sha: "2aef6255cf23b48f74309745c3bc4862487a8144"
   - id: user-file-sentence
     path: claude/kernels/src/user-file-sentence.md
     module: core
@@ -217,7 +217,7 @@ entries:
     scope: core
     form: condensed
     text: task-slug-scoping
-    pin: "0c0e8708a9a95d7c00ce3af8c32020bc6b41e7ac"
+    pin: "2aef6255cf23b48f74309745c3bc4862487a8144"
   - source: rules/swe/agent-intermediate-documents.md
     heading: "`.ai-state/` — Persistent Project Intelligence"
     part: "- **Always committed**"
@@ -235,7 +235,7 @@ entries:
     scope: role
     form: condensed
     text: ledger-writer
-    pin: "b0144f88c554843e864b3f993710d6cdb152dd5d"
+    pin: "b8d60d49f5a19e6753115dae81aaf23baffa64be"
     groups: [ledger-writer]
   - source: rules/swe/agent-intermediate-documents.md
     heading: "Document Lifecycle"
@@ -298,7 +298,7 @@ entries:
     scope: core
     form: condensed
     text: cross-agent-skill-conventions
-    pin: "7b35c926bb5bf84b27d728021f155ec58eef4b4f"
+    pin: "7aae82755e6eba647e89f8f44e4c7b984b93460b"
   - source: rules/swe/swe-agent-coordination-protocol.md
     heading: "Coordination Pipeline"
     part: "Agents communicate through shared documents"
@@ -329,7 +329,7 @@ entries:
     scope: core
     form: condensed
     text: delegation-depth
-    pin: "189aae5609b6cde280b2ae70ab24b21be0e72a6e"
+    pin: "94e885edf829c85da97cf816b77ae5114185646b"
   - source: rules/swe/swe-agent-coordination-protocol.md
     heading: "Background Agents"
     scope: orchestrator-only

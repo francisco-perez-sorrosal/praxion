@@ -23,10 +23,12 @@ How text is cut, so that a pin taken by one tool equals the pin checked by anoth
 
 - a *section* runs from a heading of level two to four (code fences respected,
   frontmatter skipped) to the line before the next such heading; its text is the
-  exact bytes of the file, and its sha is the sha1 of them;
+  exact bytes of the file;
 - a *part* of a section starts at the one line that begins with its prefix and
   runs to the next part or the section's end. Text between the heading and the
-  first part is a leading part with no prefix, unless it is only blank lines.
+  first part is a leading part with no prefix, unless it is only blank lines;
+- a *pin* is the sha1 of a section's or part's `pin_extent`: the text through its last
+  non-blank line, so appending a section to a file leaves the previous section's pin intact.
 
 Stdlib-only, like the generator it serves, so a bare `python3` can run it.
 """
@@ -83,7 +85,7 @@ class Section:
 
     @property
     def sha(self) -> str:
-        return sha1_hex(self.text)
+        return pin_sha(self.text)
 
 
 @dataclass(frozen=True)
@@ -95,11 +97,23 @@ class Part:
 
     @property
     def sha(self) -> str:
-        return sha1_hex(self.text)
+        return pin_sha(self.text)
 
 
 def sha1_hex(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()
+
+
+def pin_extent(text: str) -> str:
+    """`text` through its last non-blank line, ended by exactly one newline."""
+    kept = text.split("\n")
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return "\n".join(kept) + "\n"
+
+
+def pin_sha(text: str) -> str:
+    return sha1_hex(pin_extent(text))
 
 
 # -- Pure: cutting text -----------------------------------------------------------

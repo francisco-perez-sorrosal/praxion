@@ -25,8 +25,8 @@ Bound here, because the specification or the base commit fixes them:
 - the Codex exporter's `--repo-root/--out-dir` and the Cursor exporter's two
   positional arguments (repository root, output directory).
 
-Isolation: every process runs with its own HOME, a `python3`/`python` on PATH that
-is this suite's interpreter, and no inherited `CLAUDE*`, `PRAXION_*`, `GIT_*` or
+Isolation: every process runs with its own HOME, a `python3`/`python` on PATH (a
+shell shim exec-ing this suite's interpreter, so its venv resolves), and no inherited `CLAUDE*`, `PRAXION_*`, `GIT_*` or
 `ANTHROPIC_*` variables, so no gate can reach a tokenizer API or the user's files.
 """
 
@@ -108,7 +108,10 @@ def isolated_env(scratch: Path, **extra: str) -> dict[str, str]:
     for name in ("python3", "python"):
         shim = shims / name
         if not shim.exists():
-            shim.symlink_to(sys.executable)
+            # A script, not a symlink: a symlink living outside the venv runs the
+            # base interpreter, so the venv's site-packages (PyYAML) would be lost.
+            shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+            shim.chmod(0o755)
     env = {
         k: v
         for k, v in os.environ.items()

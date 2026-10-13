@@ -432,6 +432,15 @@ def test_a_source_changed_after_it_was_condensed_has_a_stale_pin() -> None:
     assert [(f.kind, f.subject) for f in found] == [("stale-pin", f"{SOURCE} 'Alpha'")]
 
 
+def test_a_section_appended_after_a_condensed_one_leaves_its_pin_fresh() -> None:
+    beta = SECTIONS[SOURCE][1]
+    row = condensed_entry(heading="Beta", pin=beta.sha)
+    parsed = parse(row, authored=[{**authored(pin=beta.sha), "condenses": f"{SOURCE}#Beta"}])
+    appended = {SOURCE: ks.split_sections(SOURCE, SOURCE_TEXT + "\n## Gamma\n\nGamma body.\n")}
+
+    assert km.stale_pins(parsed, appended) == ()
+
+
 def test_the_pin_of_a_part_covers_that_part_only() -> None:
     last = ks.split_parts(mixed_sections()[SOURCE][0], ["Alpha part:", "Beta part:"])[1]
     row = condensed_entry(heading="Mixed", part="Beta part:", pin=last.sha)

@@ -93,6 +93,19 @@ def test_the_section_sha_is_the_sha1_of_its_bytes_and_is_stable() -> None:
     assert [s.sha for s in first] == [s.sha for s in second]
 
 
+def test_the_sha_ignores_trailing_blank_lines_so_appending_a_section_keeps_the_pin() -> None:
+    alone = ks.split_sections("x.md", "## A\nbody\n")[0]
+    followed = ks.split_sections("x.md", "## A\nbody\n\n\n## B\nother\n")[0]
+    padded = ks.split_sections("x.md", "## A\nbody\n  \n\t\n")[0]
+
+    assert followed.sha == alone.sha == padded.sha == hashlib.sha1(b"## A\nbody\n").hexdigest()
+
+
+def test_the_pinned_extent_ends_in_one_newline_even_when_the_file_does_not() -> None:
+    assert ks.pin_extent("## A\nbody") == "## A\nbody\n"
+    assert ks.pin_extent("## A\nbody  \n\n") == "## A\nbody  \n"
+
+
 def test_one_changed_byte_changes_the_sha() -> None:
     before = ks.split_sections("x.md", "## A\nbody\n")[0]
     after = ks.split_sections("x.md", "## A\nbodY\n")[0]
@@ -148,7 +161,7 @@ def test_a_heading_followed_only_by_blank_lines_has_no_leading_part() -> None:
 def test_a_part_sha_covers_the_part_bytes_alone() -> None:
     part = ks.split_parts(_mixed(), ["Beta part:"])[-1]
 
-    assert part.sha == hashlib.sha1(part.text.encode("utf-8")).hexdigest()
+    assert part.sha == hashlib.sha1(ks.pin_extent(part.text).encode("utf-8")).hexdigest()
 
 
 @pytest.mark.parametrize(

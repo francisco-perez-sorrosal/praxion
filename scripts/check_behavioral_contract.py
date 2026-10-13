@@ -163,6 +163,8 @@ _HEADING_BOUNDARY = re.compile(r"^#{1,3}\s")
 _BC05_CONSUMERS: frozenset[str] = frozenset(
     {
         "claude/canonical-blocks/behavioral-contract.md",
+        "claude/kernels/core-blocks.md",
+        "claude/kernels/core.md",
         "skills/onboard-project/references/claude-md-blocks.md",
         "README.md",
         "codex/config/AGENTS.md.tmpl",

@@ -34,6 +34,7 @@ EXPECTED_ROWS = (
     "hook-latency",
     "observation-log-volume",
     "spawn-count",
+    "spawn-startup-tokens",
 )
 
 

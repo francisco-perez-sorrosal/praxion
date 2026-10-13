@@ -24,3 +24,4 @@ they drift apart.
 | hook-latency | hooks/*.py, hooks/*.sh, hooks/hooks.json, !hooks/*test_*.py | none | no instrument |
 | observation-log-volume | hooks/_observation_log/*, !hooks/*test_*.py | none | no instrument |
 | spawn-count | rules/swe/swe-agent-coordination-protocol.md, skills/software-planning/references/coordination-details.md, agents/implementation-planner.md | none | spawn_count.py counts a pipeline that has already run, not a change |
+| spawn-startup-tokens | agents/*.md, hooks/inject_subagent_context.py, hooks/hooks.json, rules/*.md, rules/_manifest.yaml, CLAUDE.md, claude/config/CLAUDE.md.tmpl | `python3 scripts/measure_startup_payload.py agent:<name> --strict-mcp-config --plugin-dir <checkout> --json` | first-request tokens (input + cache creation + cache read) of a spawned role, strict-MCP profile, comparable only within a profile; reproduces within 3 tokens, 2 percent tolerance in --compare |

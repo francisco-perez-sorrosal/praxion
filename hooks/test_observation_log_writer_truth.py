@@ -38,6 +38,7 @@ import re
 import sys
 from collections import namedtuple
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -91,6 +92,7 @@ DRIVEN_WRITER_MODULES = frozenset(
         "hooks/capture_observations.py",
         "hooks/measure_context_surface.py",
         "hooks/_hook_utils.py",
+        "hooks/inject_kernel.py",
     }
 )
 
@@ -114,6 +116,12 @@ SCENARIO: tuple[Step, ...] = (
         "capture_session",
         {"hook_event_name": "SubagentStart", "agent_id": "a1", "agent_type": "praxion:researcher"},
         (Expect("agent_start"),),
+    ),
+    Step(
+        "kernel_injected a1",
+        "inject_kernel",
+        {"hook_event_name": "SubagentStart", "agent_id": "a1", "agent_type": "praxion:researcher"},
+        (Expect("kernel_injected"),),
     ),
     Step(
         "agent_start a2",
@@ -300,7 +308,23 @@ def _build_project(tmp_path: Path) -> tuple[Path, Path, Path]:
     return proj, parent, marker_dir
 
 
-def _isolate_env(monkeypatch: pytest.MonkeyPatch, mode: str, marker_dir: Path) -> None:
+def _build_plugin(tmp_path: Path) -> Path:
+    """A plugin root whose kernel index puts the scenario's researcher at trial."""
+    index = tmp_path / "plugin" / "claude" / "kernels" / "index.json"
+    index.parent.mkdir(parents=True)
+    role = {"status": "trial", "modules": ["core"], "strings": ["the researcher's kernel"]}
+    index.write_text(
+        json.dumps(
+            {"schema": 1, "kernel_version": "v1", "slots": 7, "roles": {"researcher": role}}
+        ),
+        encoding="utf-8",
+    )
+    return index.parents[2]
+
+
+def _isolate_env(
+    monkeypatch: pytest.MonkeyPatch, mode: str, marker_dir: Path, plugin_root: Path
+) -> None:
     """No host `PRAXION_*` value, no network, and a private marker dir --
     `os.environ` is a single object, so this reaches both `writer.record`'s
     `env=os.environ` default and `capture_session`'s own `resolve_mode`.
@@ -311,16 +335,18 @@ def _isolate_env(monkeypatch: pytest.MonkeyPatch, mode: str, marker_dir: Path) -
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setenv("PRAXION_OBSERVATION_LOG", mode)
     monkeypatch.setenv("TMPDIR", str(marker_dir))
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(plugin_root))
 
 
 def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> dict:
     """Load the hooks, build the fixture tree, and isolate the environment
     for one test's scenario run under `mode`."""
     proj, parent, marker_dir = _build_project(tmp_path)
-    _isolate_env(monkeypatch, mode, marker_dir)
+    _isolate_env(monkeypatch, mode, marker_dir, _build_plugin(tmp_path))
     cs = _load("capture_session")
     co = _load("capture_observations")
     mc = _load("measure_context_surface")
+    ik = _load("inject_kernel")
     hu = importlib.import_module("_hook_utils")
     return {
         "cs": cs,
@@ -328,6 +354,8 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> dict
             "capture_session": cs,
             "capture_observations": co,
             "measure_context_surface": mc,
+            # The first slot is the one that writes the spawn's row.
+            "inject_kernel": SimpleNamespace(main=lambda: ik.main(["--slot", "1"])),
             "record_gate_fire": hu.record_gate_fire,
         },
         "base": {"session_id": "S1", "cwd": str(proj), "transcript_path": str(parent)},

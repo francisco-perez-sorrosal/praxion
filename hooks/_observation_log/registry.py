@@ -36,7 +36,7 @@ SPAWN_TOOLS = frozenset({"Agent", "Task"})
 
 
 class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ targets 3.9+
-    """The 14 recording classes. Many-to-one onto the written ``event_type``:
+    """The 15 recording classes. Many-to-one onto the written ``event_type``:
     four classes below write ``tool_use``, so every existing reader's
     ``event_type == "tool_use"`` filter stays valid across the split."""
 
@@ -54,6 +54,7 @@ class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ target
     CONTEXT_SURFACE = "context_surface_measurement"
     GATE_FIRE = "gate_fire"
     RECOVERY = "recovery"
+    KERNEL_INJECTED = "kernel_injected"
 
 
 # One entry per class: the ``event_type`` it writes, the producing hook or
@@ -210,6 +211,26 @@ EVENTS = MappingProxyType(
                 "log_mode",
             ),
         ),
+        # One per spawn that received a role kernel, written by the spawn hook's
+        # first slot. Read by the kernel manifest checker's liveness mode and by
+        # the flip record, never on a hot path.
+        EventClass.KERNEL_INJECTED: EventSpec(
+            "kernel_injected",
+            "inject_kernel",
+            _FULL_AND_STANDARD,
+            (
+                "timestamp",
+                "session_id",
+                "event_type",
+                "agent_type",
+                "agent_id",
+                "role",
+                "kernel_version",
+                "strings",
+                "project_file",
+                "log_mode",
+            ),
+        ),
         EventClass.RECOVERY: EventSpec(
             "recovery",
             "resume-pipeline (prose; bypasses the writer)",
@@ -304,7 +325,10 @@ CONSUMERS = (
     ConsumerSpec(
         "scripts/check_kernel_manifest.py",
         "code",
-        {EventClass.AGENT_START: ("agent_id", "agent_type", "event_type", "timestamp")},
+        {
+            EventClass.AGENT_START: ("agent_id", "agent_type", "event_type", "timestamp"),
+            EventClass.KERNEL_INJECTED: ("agent_id", "event_type"),
+        },
         Mode.STANDARD,
     ),
     ConsumerSpec(

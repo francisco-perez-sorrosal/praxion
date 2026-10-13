@@ -9,17 +9,20 @@ what the ledger adds to them, as values whose illegal states cannot be built.
 | only an eligible role is switched                                | `_parse_record`                  |
 | a role moves only absent -> trial -> switched                    | `ledger_transitions`             |
 | a record names when it began, readably, to bound what it judges  | `since_time`, both readers       |
+| the spawn hook reads every role's status as PyYAML does          | `hook_misreadings`               |
 
 The ledger has three readers, each for a caller that trusts different things: `load_ledger`
 builds the evidence-checked record (the commit gate); `load_adoptions` reads only each
 role's status and start (the liveness check); `kernel_model.load_statuses` reads only the
 status (the generator). The two lenient readers survive a record the gate is about to refuse.
+A fourth reader lives outside this module: the spawn hook scans the ledger's text line by
+line, without a YAML parser, so `hook_misreadings` holds its reading to PyYAML's.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from pathlib import Path
@@ -205,6 +208,29 @@ def ledger_transitions(
             move = f"{was or 'absent'} -> {now or 'absent'}"
             findings.append(km.Finding("ledger-transition", f"role {role}", move))
     return tuple(findings)
+
+
+def hook_misreadings(
+    statuses: Mapping[str, str],
+    ledger_text: str,
+    hook_status: Callable[[str, str], str | None],
+) -> tuple[km.Finding, ...]:
+    """Each role whose status `hook_status` reads from `ledger_text` otherwise than `statuses`.
+
+    `statuses` is PyYAML's reading of the same text; `hook_status` is the spawn hook's own
+    reader, which knows only the generated block shape. A record in any other layout (deeper
+    indentation, a quoted or flow-style value) parses here and injects nothing at spawn.
+    """
+    return tuple(
+        km.Finding(
+            "hook-misread",
+            f"role {role}",
+            f"the spawn hook reads status {read!r} where PyYAML reads {status!r}: "
+            "rewrite the record in the ledger's generated block shape",
+        )
+        for role, status in sorted(statuses.items())
+        if (read := hook_status(ledger_text, role)) != status
+    )
 
 
 # -- Edge: files -----------------------------------------------------------------------

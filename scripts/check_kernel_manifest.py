@@ -1,7 +1,7 @@
 """The kernel manifest checker: holds the always-loaded guidance, the manifest and the kernels together.
 
 `python3 scripts/check_kernel_manifest.py [--json] [--repo-root DIR]` is the commit gate behind the
-per-role kernels. It reads the repository once, then judges nine invariants; a finding's kind
+per-role kernels. It reads the repository once, then judges ten invariants; a finding's kind
 names the invariant it breaks. Exit 0 clean, 1 findings, 2 input error (no manifest, no plugin
 checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its input never passes.
 
@@ -24,6 +24,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-eligible-changed`        | the ledger's `eligible` list is the pilot's five roles, no more and no fewer |
 | `I9-ledger-transition`       | a role moves only absent -> trial -> switched since the parent commit's ledger |
 | `I9-ledger-deleted`          | a ledger present at the parent commit is still there                    |
+| `I10-hook-misread`           | the spawn hook reads every role's ledger status as PyYAML does          |
 
 `--liveness [--since REV] [--plugin-root DIR]` is a second mode, over an observation log instead
 of the kernels: `liveness-missing-row` names each spawn of a role at trial or switched (by the
@@ -66,6 +67,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 # hooks/_observation_log is the one reader of the observation log; it sits beside scripts/.
 sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
+import inject_kernel  # noqa: E402 (the spawn hook, whose ledger reader I10 holds to PyYAML's)
 from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
 REPORT_SCHEMA = 1
@@ -100,7 +102,7 @@ OMIT_KEY = (
 )
 
 
-# -- Pure: the nine invariants ---------------------------------------------------------
+# -- Pure: the ten invariants ---------------------------------------------------------
 
 
 def totality_findings(
@@ -333,6 +335,14 @@ def deletion_findings(
     return (km.Finding("I9-ledger-deleted", km.LEDGER_PATH, detail),)
 
 
+def misreading_findings(
+    statuses: Mapping[str, str], ledger_text: str | None
+) -> tuple[km.Finding, ...]:
+    """I10: the spawn hook reads each role's status from the ledger's text as PyYAML does."""
+    misread = kl.hook_misreadings(statuses, ledger_text or "", inject_kernel.adoption_status)
+    return tuple(km.Finding(f"I10-{found.kind}", found.subject, found.detail) for found in misread)
+
+
 def omitting_roles(definitions: Mapping[str, str]) -> frozenset[str]:
     """The agents whose definition sets `omitClaudeMd` to anything but false."""
     return frozenset(name for name, text in definitions.items() if _omits_claude_md(name, text))
@@ -506,6 +516,7 @@ class Evidence:
         tuple[str, ...] | km.KernelModelError
     )  # paths the generator would change, or why not
     statuses: Mapping[str, str]  # role -> trial or switched, whatever else the ledger holds
+    ledger_text: str | None  # the ledger as the spawn hook reads it; None: no ledger
     ledger: kl.Ledger | km.KernelModelError | None  # evidence-checked, the refusal, or no file
     parent_statuses: Mapping[str, str] | None  # the ledger's statuses at HEAD; None: no ledger
 
@@ -527,6 +538,7 @@ def gather(root: Path) -> Evidence:
         _read_text(root / gk.PREAMBLE_PATH),
         _regeneration(root),
         km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
+        _read_text(root / km.LEDGER_PATH),
         _evidence_checked_ledger(root, definitions),
         _parent_statuses(root),
     )
@@ -554,6 +566,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *record_findings(evidence.ledger),
         *transition_findings(evidence.parent_statuses, evidence.statuses),
         *deletion_findings(evidence.parent_statuses, evidence.ledger),
+        *misreading_findings(evidence.statuses, evidence.ledger_text),
     )
 
 
@@ -765,11 +778,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             findings = check(root)
             output = render_json(findings) if args.json else render_human(findings)
-    except (
-        ValueError,
-        km.MissingParserError,
-        OSError,
-    ) as exc:  # the model's errors are ValueErrors
+    except (ValueError, km.MissingParserError, OSError) as exc:  # model errors are ValueErrors
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(output)

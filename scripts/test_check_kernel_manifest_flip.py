@@ -1,4 +1,4 @@
-"""Canaries for I9: a role is flipped only with its adoption record, one rung at a time."""
+"""Canaries for I9 and I10: a role flips only with its record, a record the hook can read."""
 
 from __future__ import annotations
 
@@ -302,3 +302,35 @@ def test_a_checkout_that_never_had_a_ledger_has_none_to_lose(repo: Path) -> None
     commit_all(repo)
 
     assert subjects(repo, "I9-ledger-deleted") == []
+
+
+# -- I10: the spawn hook reads the ledger as the gate does ---------------------------------------
+
+LEDGER_HEAD = "version: 1\neligible:\n" + "".join(f"- {role}\n" for role in kit.PILOT) + "roles:\n"
+
+
+def test_a_ledger_in_its_generated_block_shape_is_read_alike_by_the_hook(repo: Path) -> None:
+    write_ledger(repo, researcher=trial_row(), verifier=trial_row())
+
+    assert subjects(repo, "I10-hook-misread") == []
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        "    researcher:\n        status: trial\n        since: '2026-10-12'\n        runs: []\n",
+        "  researcher:\n    status: 'trial'\n    since: '2026-10-12'\n    runs: []\n",
+    ],
+    ids=["indented four spaces", "a quoted status"],
+)
+def test_a_record_the_parser_reads_and_the_spawn_hook_cannot_is_reported(
+    repo: Path, record: str
+) -> None:
+    (repo / km.LEDGER_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (repo / km.LEDGER_PATH).write_text(LEDGER_HEAD + record, encoding="utf-8")
+
+    found = [f for f in cb.check(repo) if f.kind == "I10-hook-misread"]
+
+    assert [f.subject for f in found] == ["role researcher"]
+    assert "status None where PyYAML reads 'trial'" in found[0].detail
+    assert "generated block shape" in found[0].detail

@@ -151,6 +151,19 @@ def test_the_status_reader_survives_a_record_the_gate_would_refuse() -> None:
         kl.parse_ledger(wire, AGENTS)
 
 
+def test_a_role_the_hook_reads_otherwise_than_the_parser_is_named_with_both_readings() -> None:
+    hook_reading = {"verifier": "switched"}
+
+    found = kl.hook_misreadings(
+        {"researcher": "trial", "verifier": "switched"},
+        "ledger text",
+        lambda _, role: hook_reading.get(role),
+    )
+
+    assert [(f.kind, f.subject) for f in found] == [("hook-misread", "role researcher")]
+    assert "status None where PyYAML reads 'trial'" in found[0].detail
+
+
 # -- The ladder of moves -------------------------------------------------------------
 
 

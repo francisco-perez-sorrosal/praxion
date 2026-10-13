@@ -25,11 +25,16 @@ ledger's writers emit (``roles:`` then ``  <role>:`` then ``    status: <status>
 no YAML parser), the index is JSON. A status copied into the index is informative
 only; a stale index is the manifest checker's finding.
 
-The project file is delivered as the harness would load it, minus what the role
-does not inherit: a line of the form ``@<relative path>`` is replaced, once and
-not recursively, by that file's text when it is a regular file inside the project;
-the file itself is read only when it is a regular file inside the project after
-symlinks are resolved, and never beyond the bytes the reserved slots can carry.
+The project file is delivered with a narrower import expansion than the harness's
+own: only a line that is wholly ``@<relative path>`` is replaced, by that file's
+text, when it is a regular file inside the project, resolved from the project
+root (for the root file, also the importing file's directory); one level only,
+never inside a fenced code block, and at most ``IMPORT_ATTEMPT_LIMIT`` lines are
+tried. An inline ``@path``, an import inside an imported file and anything past
+the limit stay as written. The file itself is read only when it is a regular file
+inside the project after symlinks are resolved, never beyond the bytes the
+reserved slots can carry, and any failure reading it costs the file, never the
+kernel beside it.
 
 Every slot computes the whole delivery from the same inputs and prints its own
 part: a delivery any of whose strings passes the cap is refused by every slot
@@ -66,6 +71,9 @@ PROJECT_FILE_NAME = "CLAUDE.md"
 PROJECT_MODULE = "project-claude-md"
 KERNEL_ROW = "kernel_injected"
 GIT_TIMEOUT_SECONDS = 3
+# No real CLAUDE.md imports more than a few dozen files. The read bound caps the bytes imports
+# add; this caps how many lines are tried, since one that resolves to nothing still costs a lookup.
+IMPORT_ATTEMPT_LIMIT = 64
 
 # One injected string may not exceed the harness's inline limit; beyond it the
 # harness saves the text to a file and shows a preview, which is not delivery.
@@ -91,16 +99,20 @@ MARKER_GAP = "\n\n"
 # next string's marker.
 STRING_END = "\n\n"
 PART_HEADER = "[project CLAUDE.md, part {number} of {total}]"
-OMITTED_NOTICE = "\n[project CLAUDE.md: {qualifier}{omitted} further part(s) were not delivered; read {path} for the rest]\n"
+# Path-free, so a part's framing has a constant size the reserve covers wherever the project is.
+OMITTED_NOTICE = (
+    "\n[project CLAUDE.md: {qualifier}{omitted} further part(s) were not delivered;"
+    " read CLAUDE.md in the project root for the rest]\n"
+)
 AT_LEAST = "at least "
 
 # A kernel the hook may deliver, parsed once from the index: its version, how many
 # slots are registered, and its strings (each with the modules it packs).
 Kernel = namedtuple("Kernel", ("version", "slots", "strings"))
 KernelString = namedtuple("KernelString", ("text", "modules"))
-# The project's root instruction file as read: where, what it says, and whether that is all of
-# it (a file past the read bound is held only as far as the bound).
-ProjectFile = namedtuple("ProjectFile", ("path", "text", "complete"))
+# The project's root instruction file as read: what it says, and whether that is all of it (a
+# file past the read bound is held only as far as the bound).
+ProjectFile = namedtuple("ProjectFile", ("text", "complete"))
 # One string to inject (before its marker), and which module or part it carries.
 Piece = namedtuple("Piece", ("body", "module", "part"))
 # What a spawn receives: the pieces in slot order and, when a project file was
@@ -115,8 +127,10 @@ _LINE = re.compile(r"[^\n]*\n|[^\n]+")
 _LEDGER_ROLES = re.compile(r"roles:[ \t]*(#.*)?$")
 _LEDGER_ROLE = re.compile(r"  ([\w.-]+):[ \t]*(#.*)?$")
 _LEDGER_STATUS = re.compile(r"    status:[ \t]*([\w-]+)[ \t]*(#.*)?$")
-# A project-file line that imports another file, as the harness reads it: `@path` at line start.
-_IMPORT_LINE = re.compile(r"^@(?P<path>\S+)[ \t]*(?=\r?$)", re.MULTILINE)
+# A project-file line that is wholly an import: `@path`, then nothing but blanks to the line end.
+_IMPORT_LINE = re.compile(r"@(?P<path>\S+)[ \t]*(?=\r?$)")
+# A fence line of a fenced code block: three or more backticks or tildes after any indentation.
+_FENCE = re.compile(r"[ \t]*(?P<marker>`{3,}|~{3,})(?P<rest>[^\n]*)")
 _FINAL_LINE_END = re.compile(r"\r?\n\Z")
 
 
@@ -265,7 +279,7 @@ def project_parts(project, room):
     ]
     if omitted and parts:
         qualifier = "" if project.complete else AT_LEAST
-        notice = OMITTED_NOTICE.format(qualifier=qualifier, omitted=omitted, path=project.path)
+        notice = OMITTED_NOTICE.format(qualifier=qualifier, omitted=omitted)
         parts[-1] = parts[-1]._replace(body=parts[-1].body + notice)
     return parts, {"chars": units(project.text), "parts": len(parts), "omitted": omitted}
 
@@ -379,56 +393,83 @@ def read_ledger(plugin_root):
 def read_project_file(cwd, bound):
     """The root ``CLAUDE.md`` of the git working tree holding ``cwd``, imports expanded.
 
-    None when there is none, or when it is not a regular file inside the working tree.
-    ``bound`` caps the characters read from the file and from its imports.
+    None when there is none, when it is not a regular file inside the working tree, or when
+    reading it fails in any way. ``bound`` caps the characters read from the file and from its
+    imports.
     """
-    root = git_toplevel(cwd)
-    if root is None:
+    try:
+        root = git_toplevel(cwd)
+        if root is None:
+            return None
+        real_root = os.path.realpath(root)
+        text = read_inside(real_root, os.path.join(real_root, PROJECT_FILE_NAME), bound)
+        if text is None:
+            return None
+        expanded = expand_imports(text, real_root, bound)
+        return ProjectFile(expanded, len(expanded) < bound)
+    except Exception:
+        # The project file is an addition beside the kernel: whatever goes wrong reading it (an
+        # undecodable path, a file changing under the read) costs that file, never the kernel.
         return None
-    path = os.path.join(root, PROJECT_FILE_NAME)
-    text = read_inside(root, path, bound)
-    if text is None:
-        return None
-    expanded = expand_imports(text, root, bound)
-    return ProjectFile(path, expanded, len(expanded) < bound)
 
 
-def expand_imports(text, root, bound):
-    """``text`` with each ``@<relative path>`` line replaced by that file's text, once.
+def expand_imports(text, real_root, bound):
+    """``text`` with each import line outside fenced code replaced by that file's text, once.
 
-    Not recursive: an import inside an imported file stays as written. A line that
-    does not name a regular file inside ``root`` stays as written too, and so do
-    the lines after ``bound`` characters have been imported.
+    Not recursive: an import inside an imported file stays as written. A line that does
+    not name a regular file inside ``real_root`` stays as written too, and so does every
+    import line after ``IMPORT_ATTEMPT_LIMIT`` have been tried or ``bound`` characters
+    imported.
     """
-    pieces, cursor, imported_chars = [], 0, 0
-    for found in _IMPORT_LINE.finditer(text):
-        if imported_chars >= bound:
-            break
-        imported = read_import(root, found.group("path"), bound - imported_chars)
-        if imported is not None:
-            pieces += [text[cursor : found.start()], imported]
-            cursor, imported_chars = found.end(), imported_chars + len(imported)
-    pieces.append(text[cursor:])
+    pieces, fence, attempts, imported_chars = [], None, 0, 0
+    for line in _LINE.findall(text):
+        fence = fence_after(fence, line)
+        found = _IMPORT_LINE.match(line) if fence is None else None
+        if found and attempts < IMPORT_ATTEMPT_LIMIT and imported_chars < bound:
+            attempts += 1
+            imported = read_import(real_root, found.group("path"), bound - imported_chars)
+            if imported is not None:
+                imported_chars += len(imported)
+                line = imported + line[found.end() :]
+        pieces.append(line)
     return "".join(pieces)
 
 
-def read_import(root, relative, bound):
+def fence_after(fence, line):
+    """The fenced code block open after ``line`` (its fence), given the one open before it.
+
+    A fence opens at three or more backticks or tildes and closes at a line of the same
+    character, at least as long, with nothing after it. A backtick in an opening line's
+    info string makes it inline code, not a fence.
+    """
+    found = _FENCE.match(line)
+    if found is None:
+        return fence
+    marker, rest = found.group("marker"), found.group("rest")
+    if fence is None:
+        return None if marker[0] == "`" and "`" in rest else marker
+    closes = marker[0] == fence[0] and len(marker) >= len(fence) and not rest.strip()
+    return None if closes else fence
+
+
+def read_import(real_root, relative, bound):
     """An imported file's text less its final line end (the importing line keeps its own)."""
     if os.path.isabs(relative) or relative.startswith("~"):
         return None
-    text = read_inside(root, os.path.join(root, relative), bound)
+    text = read_inside(real_root, os.path.join(real_root, relative), bound)
     return None if text is None else _FINAL_LINE_END.sub("", text, count=1)
 
 
-def read_inside(root, path, bound):
-    """At most ``bound`` characters of the regular file at ``path``, which must resolve inside ``root``.
+def read_inside(real_root, path, bound):
+    """At most ``bound`` characters of the regular file at ``path``, resolving inside ``real_root``.
 
-    Verbatim: the file's own line endings are kept and undecodable bytes are replaced.
-    None for anything else (a directory, a pipe, a link out of the tree, an unreadable file).
+    ``real_root`` is already free of symlinks. Verbatim: the file's own line endings are kept
+    and undecodable bytes are replaced. None for anything else (a directory, a pipe, a link out
+    of the tree, an unreadable file).
     """
     try:
-        real, base = os.path.realpath(path), os.path.realpath(root)
-        if os.path.commonpath([real, base]) != base or not os.path.isfile(real):
+        real = os.path.realpath(path)
+        if os.path.commonpath([real, real_root]) != real_root or not os.path.isfile(real):
             return None
         with open(real, encoding="utf-8", errors="replace", newline="") as handle:
             return handle.read(bound)
@@ -445,12 +486,12 @@ def git_toplevel(cwd):
             ["git", "rev-parse", "--show-toplevel"],
             cwd=cwd,
             capture_output=True,
-            text=True,
             timeout=GIT_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    root = done.stdout.strip()
+    # A path is bytes: decoded as the file system names it, never as the locale's text.
+    root = os.fsdecode(done.stdout).strip()
     return root if done.returncode == 0 and root else None
 
 

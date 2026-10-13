@@ -43,7 +43,9 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.adherence.results import (
     CatalogEntry,
+    KernelDelivery,
     RunResults,
+    kernel_deliveries,
     measured_sessions,
     pairs_of,
     role_verdicts,
@@ -80,6 +82,12 @@ READING_NOTES = (
     " passed; n is the usable pairs after the worst-case recount.",
     "- Withheld and not-applicable checks enter no rate and no verdict, and are not covered by"
     " a flip verdict; each is listed with its reason.",
+    "- A token saving appears only as a startup-probe reading: the median of first-request"
+    " tokens beside each arm. No verdict here claims a saving; a verdict bounds non-regression"
+    " within the declared margin and nothing more.",
+    "- Kernel delivery evidence lists, per role, the marker records of the lean sessions the"
+    " verdict relies on. An adherence sandbox writes no observation row, so the marker in the"
+    " session's stream is the record a flip can cite.",
 )
 
 
@@ -152,6 +160,7 @@ def _role_section(
     lines += [f"{INDENT}Checks:"]
     for entry in entries:
         lines += _check_lines(entry, complete, verdict)
+    lines += _kernel_delivery_lines(kernel_deliveries(results, role))
     lines.append(_earlier_runs_line(results, role))
     return "\n".join(lines)
 
@@ -212,6 +221,16 @@ def _unmeasured_reasons(statuses: Iterable[SessionStatus]) -> list[str]:
         f"{INDENT * 2}{count} x {shorten(reason, REASON_WIDTH)}"
         for reason, count in reasons.items()
     ]
+
+
+def _kernel_delivery_lines(deliveries: Iterable[KernelDelivery]) -> list[str]:
+    lines = [
+        f"{INDENT * 2}{d.task_id}: session {d.session_id or 'not recorded'},"
+        f" kernel {d.kernel_version}, slot {'not recorded' if d.slot is None else d.slot}"
+        for d in deliveries
+    ]
+    heading = f"{INDENT}Kernel delivery evidence (lean sessions the verdict relies on):"
+    return [heading, *lines] if lines else []
 
 
 def _earlier_runs_line(results: RunResults, role: str) -> str:

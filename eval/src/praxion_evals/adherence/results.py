@@ -52,6 +52,7 @@ from praxion_evals.adherence.model import (
 
 SCHEMA_VERSION = "adherence/1"
 RUN_ID_RANDOM_BYTES = 3
+KERNEL_PREFIX_CHARS = 8  # the length of the kernel version a delivery marker carries
 FlipLabel = Literal["clear", "not clear", "underpowered"]
 FLIP_LABELS: tuple[str, ...] = ("clear", "not clear", "underpowered")
 CHECK_KINDS: tuple[str, ...] = ("mechanical", "judged")
@@ -133,6 +134,16 @@ class CatalogEntry:
             self.kind == "mechanical" or bool((self.golden_bad_case or "").strip()),
             f"the judged check {self.name} records its golden bad case",
         )
+
+
+@dataclass(frozen=True)
+class KernelDelivery:
+    """One kernel delivery marker a lean session's stream showed, as a flip record cites it."""
+
+    task_id: str
+    session_id: str | None
+    kernel_version: str  # the first KERNEL_PREFIX_CHARS of the kernel's version
+    slot: int | None
 
 
 @dataclass(frozen=True)
@@ -256,6 +267,25 @@ def role_verdicts(results: RunResults) -> dict[str, RoleVerdict]:
     }
 
 
+def kernel_deliveries(results: RunResults, role: str) -> tuple[KernelDelivery, ...]:
+    """The marker records of the lean sessions ``role``'s verdict relies on: its complete pairs.
+
+    An adherence sandbox writes no observation row, so the marker in the session's stream
+    is the only record a flip can cite that the lean arm received its kernel.
+    """
+    return tuple(
+        KernelDelivery(
+            task_id=pair.task_id,
+            session_id=row.get("session_id"),
+            kernel_version=row["kernel_version"][:KERNEL_PREFIX_CHARS],
+            slot=row.get("slot"),
+        )
+        for pair in pairs_of(results, role)
+        if pair.complete and isinstance(pair.lean, Measured)
+        for row in pair.lean.kernel_rows
+    )
+
+
 def checks_by_kind(entries: Sequence[CatalogEntry]) -> dict[str, CheckKind]:
     return {entry.name: entry.kind for entry in entries}
 
@@ -342,11 +372,30 @@ def to_json(results: RunResults) -> dict[str, Any]:
         },
         "sessions": [_session_to_json(record) for record in results.sessions],
         "verdicts": {role: verdict_to_json(v) for role, v in role_verdicts(results).items()},
+        "kernel_delivery": _kernel_delivery_to_json(results),
         "golden_bad_case_verdicts": (
             None
             if results.golden_bad_case_verdicts is None
             else dict(results.golden_bad_case_verdicts)
         ),
+    }
+
+
+def _kernel_delivery_to_json(results: RunResults) -> dict[str, list[dict[str, Any]]]:
+    """Derived like the verdicts, never read back; a role with no marker has no entry."""
+    by_role = {role: kernel_deliveries(results, role) for role in results.catalog}
+    return {
+        role: [
+            {
+                "task_id": d.task_id,
+                "session_id": d.session_id,
+                "kernel_version": d.kernel_version,
+                "slot": d.slot,
+            }
+            for d in deliveries
+        ]
+        for role, deliveries in by_role.items()
+        if deliveries
     }
 
 

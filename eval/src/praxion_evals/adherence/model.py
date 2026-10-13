@@ -469,15 +469,20 @@ class SessionSetup:
 class Measured:
     """The session ran and was graded: exactly one outcome per check, and the role's
     own return as the grader read it (clipped by the recorder when it ran away), so a
-    failed return check can be read back from the results file."""
+    failed return check can be read back from the results file. ``kernel_rows`` are the
+    session's kernel delivery marker records, which a flip verdict cites as the evidence
+    that the lean arm received its kernel."""
 
     outcomes: Mapping[str, CheckOutcome]
     first_request_tokens: int | None
     setup: SessionSetup | None = None
     role_return: str | None = None
+    kernel_rows: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         _require(bool(self.outcomes), "a measured session holds at least one outcome")
+        for row in self.kernel_rows:
+            _non_empty(row.get("kernel_version", ""), "a kernel marker record's kernel_version")
         _require(
             self.first_request_tokens is None or self.first_request_tokens >= 0,
             "first-request tokens cannot be negative",
@@ -492,12 +497,13 @@ class Measured:
         first_request_tokens: int | None,
         setup: SessionSetup | None = None,
         role_return: str | None = None,
+        kernel_rows: Sequence[Mapping[str, Any]] = (),
     ) -> Measured:
         _require(
             set(outcomes) == set(check_names),
             f"outcomes {sorted(outcomes)} are not exactly the checks {sorted(check_names)}",
         )
-        return cls(outcomes, first_request_tokens, setup, role_return)
+        return cls(outcomes, first_request_tokens, setup, role_return, tuple(kernel_rows))
 
 
 @dataclass(frozen=True)

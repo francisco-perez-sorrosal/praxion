@@ -312,3 +312,48 @@ def test_the_declared_settings_are_stated_with_the_run_that_made_them():
     assert "target 20 complete pairs per role" in text
     assert "Model claude-opus-5-5; Claude Code 9.9.9; the run is complete." in text
     assert "none, so every allowance is zero" in text
+
+
+# ---------------------------------------------------------------------------
+# Kernel delivery evidence and the saving wording
+# ---------------------------------------------------------------------------
+
+DELIVERY_ROWS = (
+    {"session_id": "sess-7", "kernel_version": "0a1b2c3d", "slot": 1},
+    {"session_id": "sess-7", "kernel_version": "0a1b2c3d", "slot": 2},
+)
+
+
+def lean_delivered(rows: Iterable[Mapping[str, object]] = DELIVERY_ROWS) -> Measured:
+    return Measured(dict(ALL_PASS), 1000, kernel_rows=tuple(rows))
+
+
+def test_the_report_lists_the_delivery_markers_of_the_lean_sessions_its_verdict_relies_on():
+    stray = lean_delivered([{"session_id": "sess-stray", "kernel_version": "ffffffff", "slot": 1}])
+    unpaired = (Errored("launch_refused", "the full arm was refused"), stray)
+
+    text = render([(measured(ALL_PASS), lean_delivered()), unpaired])
+
+    assert "Kernel delivery evidence (" in text
+    assert "task-000: session sess-7, kernel 0a1b2c3d, slot 1" in text
+    assert "task-000: session sess-7, kernel 0a1b2c3d, slot 2" in text
+    assert "sess-stray" not in text
+
+
+def test_the_kernel_evidence_never_reads_as_a_gain():
+    text = render([(measured(ALL_PASS), lean_delivered())])
+
+    assert GAIN_WORDS.findall(text) == []
+    assert MET_INTERVAL.findall(text) == []
+
+
+def test_a_role_whose_lean_sessions_show_no_markers_lists_no_kernel_evidence():
+    assert "Kernel delivery evidence (" not in render(same_both_arms(2))
+
+
+def test_a_token_saving_is_stated_only_as_a_startup_probe_reading_within_the_margin():
+    text = render([(measured(ALL_PASS), lean_delivered())])
+
+    assert "startup-probe reading" in text
+    assert "No verdict here claims a saving" in text
+    assert "within the declared margin" in text

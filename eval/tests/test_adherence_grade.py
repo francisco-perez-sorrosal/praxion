@@ -202,6 +202,7 @@ def _stream(
     is_error: bool = False,
     subtype: str = "success",
     hook_outputs: tuple[str, ...] = (),
+    session_id: str | None = "sess-1",
 ) -> str:
     spawn_input = spawn_input or {"subagent_type": f"praxion:{role}", "prompt": "go"}
     events = [
@@ -248,7 +249,8 @@ def _stream(
             }
         )
     events.append(_assistant([{"type": "text", "text": relay}], LATER_USAGE))
-    events.append({"type": "result", "subtype": subtype, "is_error": is_error, "result": relay})
+    final = {"type": "result", "subtype": subtype, "is_error": is_error, "result": relay}
+    events.append(final if session_id is None else {**final, "session_id": session_id})
     return "\n".join(json.dumps(event) for event in events) + "\n"
 
 
@@ -573,6 +575,28 @@ def test_marker_records_handed_in_replace_the_streams_markers(repo, tmp_path):
 
     assert isinstance(grade.grade(given, ["C2"], None, None), Measured)
     assert grade.grade(emptied, ["C2"], None, None).kind == "kernel_missing"
+
+
+def test_a_measured_session_keeps_its_marker_records_with_the_streams_session_id(repo, tmp_path):
+    stream = {"hook_outputs": (MARKED, SECOND_MARKED)}
+    evidence = _evidence(repo, tmp_path, stream, kernel_expected=True)
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Measured)
+    assert [dict(row) for row in status.kernel_rows] == [
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1},
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2},
+    ]
+
+
+def test_a_stream_that_reported_no_session_id_gives_its_markers_no_session_id(repo, tmp_path):
+    stream = {"hook_outputs": (MARKED,), "session_id": None}
+    evidence = _evidence(repo, tmp_path, stream, kernel_expected=True)
+
+    assert [dict(row) for row in evidence.kernel.rows] == [
+        {"kernel_version": "0a1b2c3d", "slot": 1}
+    ]
 
 
 def test_a_session_owed_no_kernel_is_graded_with_no_kernel_evidence(repo, tmp_path):

@@ -354,3 +354,85 @@ def test_flip_labels_follow_the_verdict_type():
     assert results.flip_label(clear) == "clear"
     assert isinstance(short, Underpowered)
     assert results.flip_label(short) == "underpowered"
+
+
+# ---------------------------------------------------------------------------
+# Kernel delivery: the marker records a flip verdict cites
+# ---------------------------------------------------------------------------
+
+DELIVERED = (
+    {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1},
+    {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2},
+)
+
+
+def lean_with_kernel(task: str, rows=DELIVERED) -> SessionRecord:
+    status = Measured({"C1": Passed(), "C3": Passed()}, 1000, kernel_rows=tuple(rows))
+    return session(task, "lean", status)
+
+
+def test_a_sessions_kernel_marker_records_round_trip_through_the_results_file(tmp_path: Path):
+    original = run_results([session("t1", "full"), lean_with_kernel("t1")])
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, original)
+
+    assert results.load(path) == original
+    stored = json.loads(path.read_text())["sessions"][1]["status"]
+    assert stored["kernel_rows"] == [dict(row) for row in DELIVERED]
+
+
+def test_a_session_without_markers_stores_no_kernel_rows(tmp_path: Path):
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, run_results([*pair_of_sessions("t1")]))
+
+    assert "kernel_rows" not in json.loads(path.read_text())["sessions"][0]["status"]
+
+
+def test_a_marker_record_without_its_kernel_version_is_refused_on_load(tmp_path: Path):
+    path = tmp_path / "run.json"
+    results.write_atomic(path, run_results([session("t1", "full"), lean_with_kernel("t1")]))
+    document = json.loads(path.read_text())
+    document["sessions"][1]["status"]["kernel_rows"] = [{"session_id": "sess-1", "slot": 1}]
+    path.write_text(json.dumps(document))
+
+    with pytest.raises(ValueError, match="kernel_version"):
+        results.load(path)
+
+
+def test_the_flip_record_names_the_deliveries_of_the_lean_sessions_the_verdict_relies_on(
+    tmp_path: Path,
+):
+    relied_on = [session("t1", "full"), lean_with_kernel("t1")]
+    unpaired = [lean_with_kernel("t2", [{"session_id": "sess-2", "kernel_version": "ffffffff"}])]
+    path = tmp_path / "run.json"
+    results.write_atomic(path, run_results([*relied_on, *unpaired]))
+
+    record = json.loads(path.read_text())["kernel_delivery"]
+
+    assert record == {
+        "researcher": [
+            {"task_id": "t1", "session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1},
+            {"task_id": "t1", "session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2},
+        ]
+    }
+
+
+def test_a_kernel_version_is_cited_by_its_eight_character_prefix():
+    full = "0a1b2c3d" + "e" * 32
+    pair = [session("t1", "full"), lean_with_kernel("t1", [{"kernel_version": full}])]
+
+    (delivery,) = results.kernel_deliveries(run_results(pair), "researcher")
+
+    assert delivery.kernel_version == "0a1b2c3d"
+    assert (delivery.session_id, delivery.slot) == (None, None)
+
+
+def test_a_role_none_of_whose_lean_sessions_carry_markers_has_no_flip_record_entry(
+    tmp_path: Path,
+):
+    path = tmp_path / "run.json"
+    results.write_atomic(path, run_results([*pair_of_sessions("t1")]))
+
+    assert json.loads(path.read_text())["kernel_delivery"] == {}

@@ -104,7 +104,12 @@ def setup_from_json(data: _Json) -> SessionSetup:
 def status_to_json(status: SessionStatus) -> dict[str, Any]:
     """A status as JSON; an echoed setup rides along under ``setup``."""
     match status:
-        case Measured(outcomes=outcomes, first_request_tokens=tokens, role_return=role_return):
+        case Measured(
+            outcomes=outcomes,
+            first_request_tokens=tokens,
+            role_return=role_return,
+            kernel_rows=kernel_rows,
+        ):
             encoded: dict[str, Any] = {
                 "kind": "measured",
                 "outcomes": {name: outcome_to_json(o) for name, o in outcomes.items()},
@@ -112,6 +117,8 @@ def status_to_json(status: SessionStatus) -> dict[str, Any]:
             }
             if role_return is not None:
                 encoded["role_return"] = role_return
+            if kernel_rows:
+                encoded["kernel_rows"] = [dict(row) for row in kernel_rows]
         case Errored(kind=kind, detail=detail):
             encoded = {"kind": "errored", "error_kind": kind, "detail": detail}
         case NotMeasured(reason=reason):
@@ -133,7 +140,11 @@ def status_from_json(data: _Json) -> SessionStatus:
                 for name, recorded in _field(data, "outcomes", "a measured status").items()
             }
             return Measured(
-                outcomes, data.get("first_request_tokens"), setup, data.get("role_return")
+                outcomes,
+                data.get("first_request_tokens"),
+                setup,
+                data.get("role_return"),
+                tuple(data.get("kernel_rows", ())),
             )
         case "errored":
             return Errored(

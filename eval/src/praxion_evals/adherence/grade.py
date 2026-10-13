@@ -121,9 +121,17 @@ def evidence_from_recording(
 
 
 def kernel_marker_records(envelope: SessionEnvelope) -> tuple[Mapping[str, Any], ...]:
-    """One record per kernel delivery marker in the stream's hook output."""
+    """One record per kernel delivery marker in the stream's hook output, with the session's id.
+
+    The id is the stream's own, so a flip record can name the session a marker was seen in;
+    a stream that never reported a result has none to give.
+    """
+    result = envelope.final_result
+    session = (
+        {} if result is None or result.session_id is None else {"session_id": result.session_id}
+    )
     return tuple(
-        {"kernel_version": found["version"], "slot": int(found["slot"])}
+        {**session, "kernel_version": found["version"], "slot": int(found["slot"])}
         for hook in envelope.hook_outputs
         for found in _KERNEL_MARKER.finditer(hook.output)
     )
@@ -271,6 +279,7 @@ def grade(
         first_request_tokens(evidence),
         setup,
         role_return=_recorded_return(evidence),
+        kernel_rows=() if evidence.kernel is None else evidence.kernel.rows,
     )
 
 

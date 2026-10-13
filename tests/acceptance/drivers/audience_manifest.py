@@ -81,6 +81,9 @@ def _section_bytes(root: Path, source: str, heading: str, part: str | None) -> b
     """The source section's bytes: its heading line to the next heading (levels 2 to 4).
 
     A part runs from the paragraph starting with its prefix to the section's end.
+    Trailing blank lines are not part of the extent: the bytes end at the last
+    non-blank line, with one newline, so appending a section to the file leaves
+    the previous section's pin intact.
     """
     lines = (root / source).read_text(encoding="utf-8").splitlines(keepends=True)
     found: list[str] | None = None
@@ -102,7 +105,10 @@ def _section_bytes(root: Path, source: str, heading: str, part: str | None) -> b
         start = text.find(part)
         assert start >= 0, f"the section {heading!r} has no part starting {part!r}"
         text = text[start:]
-    return text.encode("utf-8")
+    kept = text.split("\n")
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return ("\n".join(kept) + "\n").encode("utf-8")
 
 
 def _pin_value(root: Path, entry: AudienceEntry) -> str | None:

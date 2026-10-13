@@ -86,10 +86,19 @@ def load(name: str) -> dict:
 
 
 def definition_without_blocks(text: str, block_texts: list[str]) -> str:
-    """An agent definition minus the lines carrying a universal block or the omitClaudeMd key."""
-    return "\n".join(
-        line
-        for line in text.splitlines()
-        if not line.lstrip().startswith("omitClaudeMd:")
-        and not any(block in line for block in block_texts)
-    )
+    """An agent definition minus each universal block (a run of one or more whole lines) and the omitClaudeMd key."""
+    lines = text.splitlines()
+    for block in block_texts:
+        span = block.splitlines()
+        if not span:
+            continue
+        kept: list[str] = []
+        index = 0
+        while index < len(lines):
+            if lines[index : index + len(span)] == span:
+                index += len(span)
+            else:
+                kept.append(lines[index])
+                index += 1
+        lines = kept
+    return "\n".join(line for line in lines if not line.lstrip().startswith("omitClaudeMd:"))

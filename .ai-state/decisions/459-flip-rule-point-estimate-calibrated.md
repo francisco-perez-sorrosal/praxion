@@ -10,7 +10,7 @@ tags: [eval, adherence, statistics, flip-rule, lean-spawns, consult, startup-con
 made_by: agent
 agent_type: orchestrator
 branch: worktree-adherence-eval
-pipeline_tier: standard
+pipeline_tier: full
 affected_files:
   - eval/src/praxion_evals/adherence/
   - eval/EVAL_PLAN.md

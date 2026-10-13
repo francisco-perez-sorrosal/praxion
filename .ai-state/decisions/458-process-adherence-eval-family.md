@@ -10,7 +10,7 @@ tags: [eval, adherence, lean-spawns, omitClaudeMd, startup-context-diet, live-ru
 made_by: agent
 agent_type: systems-architect
 branch: worktree-adherence-eval
-pipeline_tier: standard
+pipeline_tier: full
 affected_files:
   - eval/pyproject.toml
   - eval/src/praxion_evals/adherence/
@@ -20,7 +20,7 @@ affected_files:
 affected_reqs: [REQ-01, REQ-02, REQ-05, REQ-07, REQ-08, REQ-09, REQ-17, REQ-18, REQ-19, REQ-21]
 dissent:
   - "Steelmanned runner-up (fold into praxion-evals-live as a variant axis) keeps one run loop and one spend/isolation path; rejected for BA-01 and model mismatch, with a reversal trigger below."
-  - "Statistics method (Tango score, one-sided 0.95) is a behavioral choice pending the applied-statistics consult and user ratification (SQ-1); at the 20-pair default every judged check is underpowered."
+  - "Statistics method (Tango score, one-sided 0.95) was a behavioral choice pending the applied-statistics consult (SQ-1); the consult ran in the same pipeline and dec-459 fixes the rule: the judged gate is the point estimate, the interval is reported and never decides, and the 20-pair default is bounded as stated there."
 ---
 
 ## Context
@@ -47,7 +47,7 @@ Rejected by dec-040 (never hook-driven, never during a pipeline) and by the need
 
 ## Consequences
 
-Positive: every flip gets a reproducible, capped, paired measurement whose checks trace to existing rules; the token saving (first-request tokens) and adherence come from the same runs; a flip record can cite a run id. Negative: two session loops exist (live, adherence); full flip runs are long and paid (40-56 sessions); judged-check power at the 20-pair default is insufficient until the user ratifies a setting (SQ-1).
+Positive: every flip gets a reproducible, capped, paired measurement whose checks trace to existing rules; the token saving (first-request tokens) and adherence come from the same runs; a flip record can cite a run id. Negative: two session loops exist (live, adherence); full flip runs are long and paid (40-56 sessions); judged-check power at the 20-pair default is bounded as dec-459 states (the gate is the point estimate; the interval is reported, never decides).
 
 Activation: no — the honest-uncertainty gate does not fire on the component boundary (the live runner's reuse surface is known); the statistics method, where uncertainty is real, is routed to the applied-statistics consult rather than decided here.
 

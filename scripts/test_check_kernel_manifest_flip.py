@@ -112,7 +112,7 @@ def test_a_flip_resting_on_a_run_that_fails_the_flip_rule_is_reported(repo: Path
 
 
 def test_a_flip_resting_on_a_run_from_another_eval_is_reported_by_role(repo: Path) -> None:
-    flipped(repo, runs=[run_row(eval_entry="praxion-evals-live")])
+    flipped(repo, runs=[run_row(eval_entry="another-eval")])
 
     found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 

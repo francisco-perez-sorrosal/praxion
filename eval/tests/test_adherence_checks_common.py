@@ -190,11 +190,24 @@ def test_surrounding_blank_lines_do_not_count_toward_the_cap():
     assert _c2("implementer", text="\n\n" + _lines(5) + "\n\n") == Passed()
 
 
+def test_blank_lines_between_the_sections_of_a_return_do_not_count_toward_the_cap():
+    spaced = "\n\n".join(_lines(15).splitlines())  # 15 lines of text, 14 blank ones between
+
+    assert _c2(text=spaced) == Passed()
+
+
+def test_the_cap_counts_the_lines_that_carry_text():
+    outcome = _c2(text="\n\n".join(_lines(16).splitlines()))
+
+    assert isinstance(outcome, Failed)
+    assert "16 non-blank lines against a cap of 15" in outcome.detail
+
+
 def test_both_problems_are_reported_together():
     outcome = _c2(text=_lines(20, marker="no marker"))
 
     assert isinstance(outcome, Failed)
-    assert "20 lines" in outcome.detail
+    assert "20 non-blank lines" in outcome.detail
     assert "terminal marker" in outcome.detail
 
 

@@ -369,6 +369,16 @@ def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
     return install
 
 
+class Explodes(Script):
+    """Launches the third session like the others, then raises as a decode failure would."""
+
+    def __call__(self, spec: SessionSpec, env: dict[str, str]) -> SessionRun:
+        run = super().__call__(spec, env)
+        if len(self.specs) == 3:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        return run
+
+
 def _run(tmp_path: Path, *options: str, name: str = "out.json") -> tuple[int, results.RunResults]:
     output = tmp_path / name
     code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN, *options])
@@ -377,6 +387,20 @@ def _run(tmp_path: Path, *options: str, name: str = "out.json") -> tuple[int, re
 
 def _sessions(loaded: results.RunResults) -> list[tuple[str, str]]:
     return [(r.setup.arm, type(r.status).__name__) for r in loaded.sessions]
+
+
+def test_an_exception_after_the_session_was_launched_is_charged_the_full_session_budget(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Explodes())
+
+    loaded = _run(tmp_path, "--max-total-usd", "4")[1]
+
+    assert _sessions(loaded) == [("full", "Errored"), ("lean", "Measured")]
+    exploded = loaded.sessions[0]
+    assert getattr(exploded.status, "kind", None) == "evaluation_exception"
+    assert exploded.cost_usd == 1.0  # the session budget: the process may have run and spent
+    assert loaded.run.extra["spend"]["spent_usd"] == pytest.approx(1.0 + 3 * 0.01)
 
 
 def test_each_arm_is_proven_then_the_task_runs_in_both_arms_in_turn(
@@ -550,6 +574,56 @@ def test_a_calibration_run_that_lacks_a_named_role_is_refused_before_any_launch(
 
     assert cli.main(argv) == cli.EXIT_USAGE
     assert "has no pairs of verifier" in capsys.readouterr().err
+    assert len(script.specs) == launched
+    assert not (tmp_path / "flip.json").exists()
+
+
+def _flip_argv(tmp_path: Path, *options: str) -> list[str]:
+    return [
+        str(REPO_ROOT),
+        "--role",
+        ROLE,
+        "--output",
+        str(tmp_path / "flip.json"),
+        "--calibration-run",
+        str(tmp_path / "calibration.json"),
+        *SMALL_RUN,
+        *options,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("calibration_options", "flip_options", "reason"),
+    [
+        (["--seed", "8"], [], "measured seed 8, not 7"),
+        (
+            ["--required-pairs", "2"],
+            ["--required-pairs", "2", "--max-tasks", "1"],
+            "measured the researcher on 2 tasks, not the 1 planned",
+        ),
+        (
+            ["--required-pairs", "2", "--max-tasks", "1"],
+            [],
+            "declared a pair target of 2, not 1",
+        ),
+    ],
+    ids=["seed", "task list", "pair target"],
+)
+def test_a_calibration_run_on_another_seed_task_list_or_pair_target_is_refused_before_any_launch(
+    paid: Callable[[Script], None],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    calibration_options: list[str],
+    flip_options: list[str],
+    reason: str,
+) -> None:
+    script = Script()
+    paid(script)
+    _run(tmp_path, "--calibration", *calibration_options, name="calibration.json")
+    launched = len(script.specs)
+
+    assert cli.main(_flip_argv(tmp_path, *flip_options)) == cli.EXIT_USAGE
+    assert reason in capsys.readouterr().err
     assert len(script.specs) == launched
     assert not (tmp_path / "flip.json").exists()
 

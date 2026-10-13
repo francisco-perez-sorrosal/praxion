@@ -724,3 +724,21 @@ def test_run_argv_timeout_returns_the_decoded_partial_stdout_and_no_exit_code(tm
     assert isinstance(run.stdout, str)
     assert json.loads(run.stdout.splitlines()[0])["argv"] == ["-p", "x"]
     assert classify(parse_stream(run.stdout), run.exit_code, run.timed_out) == "timeout"
+
+
+def test_run_argv_keeps_a_stream_carrying_an_invalid_byte_instead_of_raising(tmp_path):
+    """A session that already ran and spent must not be lost to one undecodable byte."""
+    from praxion_evals.live.session import run_argv
+
+    script = tmp_path / "raw.py"
+    script.write_text("import sys; sys.stdout.buffer.write(b'ok \\xff end\\n')\n")
+
+    run = run_argv(
+        [sys.executable, str(script)],
+        cwd=tmp_path,
+        env={"PATH": os.environ["PATH"]},
+        timeout_s=30,
+    )
+
+    assert run.exit_code == 0
+    assert run.stdout == "ok \ufffd end\n"

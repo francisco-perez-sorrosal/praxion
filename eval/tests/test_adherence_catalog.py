@@ -260,6 +260,28 @@ def test_the_grader_resolves_a_role_clause_through_the_catalog():
     assert set(status.outcomes) == {RESEARCHER_SOURCES, "C2"}
 
 
+def test_a_measured_session_records_the_roles_return_as_it_was_graded():
+    returned = "Findings: .ai-work/grade-task/RESEARCH_FINDINGS.md\n[COMPLETE]"
+    evidence = _gradable("researcher", slug="grade-task", role_return=returned)
+
+    status = grade.grade(evidence, ["C2"], judge=None, setup=None)
+
+    assert isinstance(status, Measured)
+    assert status.role_return == returned
+
+
+def test_a_runaway_return_is_recorded_clipped_and_says_so():
+    runaway = "x" * (grade.RECORDED_RETURN_CHARS + 50) + "\n[COMPLETE]"
+    evidence = _gradable("researcher", slug="grade-task", role_return=runaway)
+
+    status = grade.grade(evidence, ["C2"], judge=None, setup=None)
+
+    assert isinstance(status, Measured)
+    assert status.role_return is not None
+    assert status.role_return.endswith(grade.CLIPPED_NOTE)
+    assert len(status.role_return) == grade.RECORDED_RETURN_CHARS + len(grade.CLIPPED_NOTE)
+
+
 def test_the_grader_refuses_a_clause_that_is_not_the_roles():
     evidence = _gradable("researcher")
 

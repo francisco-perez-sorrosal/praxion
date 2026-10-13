@@ -16,9 +16,12 @@ from praxion_evals.adherence.model import (
     Assessed,
     DeclaredSettings,
     Errored,
+    Failed,
     Measured,
+    NoRegression,
     NotMeasured,
     Passed,
+    Regression,
     RuleRef,
     SessionRecord,
     SessionSetup,
@@ -284,6 +287,21 @@ def test_only_tasks_that_ran_in_both_arms_pair_and_a_retry_replaces_its_first_re
 
     assert [p.task_id for p in pairs] == ["t1"]
     assert pairs[0].complete
+
+
+def test_role_verdicts_reads_a_roles_own_allowance_through_the_results_file():
+    clean = Measured({"C1": Passed(), "C3": Passed()}, 1000)
+    drifted = Measured({"C1": Failed("late"), "C3": Passed()}, 1000)
+    sessions = [session("t1", "full", clean), session("t1", "lean", drifted)]
+    calibrated = replace(
+        declared(), allowance_source="calibration-1", allowances={"researcher/C1": 1}
+    )
+
+    allowed = results.role_verdicts(run_results(sessions, settings=calibrated))["researcher"]
+    strict = results.role_verdicts(run_results(sessions))["researcher"]
+
+    assert isinstance(allowed.check_verdicts["C1"], NoRegression)
+    assert isinstance(strict.check_verdicts["C1"], Regression)
 
 
 def test_the_stored_verdicts_are_recomputed_from_the_sessions_never_read_back(tmp_path: Path):

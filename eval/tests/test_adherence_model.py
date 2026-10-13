@@ -317,6 +317,7 @@ def test_a_status_cannot_be_mutated_through_the_mapping_it_was_built_from():
 STATUSES = [
     Measured({"C1": Passed(), "C6": Withheld("no page")}, 12345, SETUP),
     Measured({"C1": Failed("x")}, None),
+    Measured({"C2": Passed()}, 10, SETUP, role_return="Findings written.\n[COMPLETE]"),
     Errored("timeout", "900 s", SETUP),
     Errored("launch_refused", "run cap", None),
     NotMeasured("the role was never spawned", SETUP),

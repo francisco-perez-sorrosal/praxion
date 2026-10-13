@@ -87,6 +87,22 @@ def test_the_same_edit_passes_once_the_kernels_are_regenerated(sandbox: Sandbox)
     assert "state your reading upfront" in module_text(sandbox.root, "core")
 
 
+def test_the_committed_agent_definitions_are_what_the_generator_derives(sandbox: Sandbox) -> None:
+    definitions = {
+        name: sandbox.read(kernel_sandbox.agent_path(name))
+        for name in kernel_sandbox.agent_names(sandbox.root)
+    }
+
+    regenerate(sandbox.root)
+
+    changed = [
+        name
+        for name, text in definitions.items()
+        if sandbox.read(kernel_sandbox.agent_path(name)) != text
+    ]
+    assert changed == [], f"the generator rewrote the universal blocks of {changed}"
+
+
 def test_the_generator_refuses_nothing_on_the_committed_sources(sandbox: Sandbox) -> None:
     result = generate_kernels(sandbox.root)
 

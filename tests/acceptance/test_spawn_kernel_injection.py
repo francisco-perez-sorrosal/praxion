@@ -75,6 +75,27 @@ def test_a_role_at_no_adoption_status_receives_nothing_at_spawn(
     assert injection.strings == ()
 
 
+def test_a_plugin_without_an_adoption_ledger_injects_nothing(
+    sandbox: Sandbox, project: Path
+) -> None:
+    sandbox.path(kernel_sandbox.ADOPTION_LEDGER).unlink(missing_ok=True)
+
+    injection = spawn(sandbox.root, project, "praxion:researcher")
+
+    assert injection.strings == ()
+
+
+def test_an_adoption_ledger_found_in_the_project_is_never_read(
+    sandbox: Sandbox, project: Path
+) -> None:
+    sandbox.path(kernel_sandbox.ADOPTION_LEDGER).unlink(missing_ok=True)
+    kernel_adoption.record(project, kernel_adoption.at_trial("researcher"))
+
+    injection = spawn(sandbox.root, project, "praxion:researcher")
+
+    assert injection.strings == ()
+
+
 @pytest.mark.parametrize("agent_type", ["Explore", "Plan", "general-purpose"])
 def test_a_host_native_agent_receives_no_role_kernel(
     sandbox: Sandbox, project: Path, agent_type: str

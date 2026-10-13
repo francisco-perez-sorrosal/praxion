@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-12T12:02:36Z'
+generated_at: '2026-10-13T16:33:52Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -429,7 +429,7 @@ surfaces:
   path: docs/independent-analysis/startup-context-diet-research.md
   type: markdown
   title: "Scoping Every Resident Token \u2014 What Praxion Loads at Session Start, and How to Load Less Without Losing Guidance"
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   diataxis: explanation
   audience: architect / maintainer
   renderer: explanation_shell
@@ -444,7 +444,7 @@ surfaces:
   path: docs/independent-analysis/subagent-alignment-map.md
   type: markdown
   title: "Subagent Alignment Map \u2014 the process guidance each Praxion agent must receive"
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   diataxis: reference
   audience: architect / maintainer
   renderer: reference_shell
@@ -610,7 +610,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3361,7 +3361,7 @@ surfaces:
   path: .ai-state/decisions/454-agents-carry-the-process-core.md
   type: markdown
   title: Every Praxion agent carries the process core inline, and the shared-block gate requires it
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: adr_card
 - id: ai-state-decisions-455-memory-index-gate
   path: .ai-state/decisions/455-memory-index-gate.md
@@ -3397,7 +3397,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-12'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3585,6 +3585,15 @@ surfaces:
   title: Project Metrics Report
   last_modified: '2026-10-05'
   renderer: default_markdown
+- id: ai-state-specs-spec-adherence-eval-2026-10-12
+  path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
+  type: markdown
+  title: 'Spec: adherence-eval (the per-role, paired full/lean process-adherence eval)'
+  last_modified: '2026-10-12'
+  renderer: default_markdown
+  surfaces_referenced:
+  - ai-state-decisions-458-process-adherence-eval-family
+  - ai-state-decisions-459-flip-rule-point-estimate-calibrated
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
@@ -4240,6 +4249,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-12-12-49-16
   - ai-state-sentinel-reports-sentinel-report-2026-09-14-07-59-49
   - ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
+  - ai-state-specs-spec-adherence-eval-2026-10-12
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17

@@ -26,6 +26,7 @@ Focused recipes assuming familiarity. Skim for the step you need.
 - [Cursor compatibility](cursor-compat.md) — set up Praxion for Cursor in addition to Claude Code
 - [Observability](observability.md) — wire up Phoenix telemetry for a managed project
 - [Harvesting Learnings with Skill-Genesis](skill-genesis.md) — run `/skill-genesis` to autonomously harvest patterns, disposition proposals via `/skill-genesis-review`
+- [Switch a role to its kernel](lean-spawn-how-to.md) — regenerate the role kernels, put a role on trial, flip it with its evidence, read a `kernel_injected` row, run the liveness check
 
 ## Reference — information lookup
 
@@ -48,6 +49,7 @@ Authoritative tables and schemas. Look up, don't read sequentially.
 Discursive explanations of design decisions and ideas. Read for understanding, not action.
 
 - [Concepts overview](concepts.md) — pipeline, learning loop, ecosystem-as-philosophy mapping
+- [Lean spawn: role kernels and the adoption ledger](lean-spawn-kernels.md) — what a kernel is, how it is generated from the audience manifest, how a role is switched, what the spawn hook delivers, and why the fallback stays
 - [Decision tracking](decision-tracking.md) — ADR conventions, lifecycle, supersession, finalize protocol
 - [Architecture-as-Code (AaC) and Documentation-as-Code (DaC)](aac-dac.md) — the toolchain and rationale for the LikeC4 + Diátaxis approach
 - [Claude ecosystem learning resources](claude-ecosystem-learning-resources.md) — curated external links for Claude API/SDK/Code

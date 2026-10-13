@@ -66,6 +66,7 @@ Agents are **delegated, not invoked**. Claude decides when to spawn an agent bas
 - Agents cannot spawn other agents
 - Skills listed in the agent's `skills` field are injected into its context (agents do not inherit skills from the parent)
 - Foreground agents block the main conversation; background agents run concurrently
+- Every definition carries three universal blocks inline: the behavioral contract with its self-test, the Praxion-links rule and the return contract with its terminal marker. They are generated output of `scripts/generate_kernels.py`, byte-identical to `claude/kernels/core-blocks.md`; edit the source rules, not the block in a definition, and regenerate. They stay inline as the fallback when no spawn hook delivers a kernel. See [Lean spawn](../docs/lean-spawn-kernels.md)
 
 ## Using Agents
 

@@ -448,7 +448,9 @@ def fence_after(fence, line):
     info string makes it inline code, not a fence. Any indentation opens one, so an
     import line under a fence nested in a list is never expanded. A closing line indented
     past both its opener and ``FENCE_INDENT_LIMIT`` columns is content, since no margin the
-    opener can sit in lets it close there.
+    opener can sit in lets it close there. Containers are not tracked: a fence left open
+    inside a list item stays open here to the end of the file, where CommonMark closes it
+    with the item, so the fences after it read inverted; close every fence.
     """
     found = _FENCE.match(line)
     if found is None:

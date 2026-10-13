@@ -33,7 +33,7 @@ A new section in an always-loaded source needs an entry in `rules/_audience.yaml
    ```
 
    Use the current instant for `since`: spawns before it are not judged. Keep this layout (two-space role, four-space unquoted `status`): the gate refuses a record the hook would read differently (`I10-hook-misread`).
-3. Commit through the gate. From this commit the hook delivers the role's kernel at every spawn, followed by the project's root `CLAUDE.md`, in which only a line that is wholly `@<relative path>` is expanded, one level deep, resolved from the project root and never inside fenced code; an inline `@path` and deeper imports stay as written. The definition is unchanged, so the role also still inherits the project instructions.
+3. Commit through the gate. From this commit the hook delivers the role's kernel at every spawn, followed by the project's root `CLAUDE.md`, in which only a line that is wholly `@<relative path>` is expanded, one level deep, resolved from the project root and never inside fenced code (close every fence: one left open inside a list item stays open here to the end of the file, where the harness closes it with the item); an inline `@path` and deeper imports stay as written. The definition is unchanged, so the role also still inherits the project instructions.
 4. Spawn the role once and confirm its row (below).
 
 ## Record a run

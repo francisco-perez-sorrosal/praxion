@@ -232,7 +232,7 @@ def hook_misreadings(
             f"the spawn hook reads status {read!r} where PyYAML reads {statuses.get(role)!r}: "
             "rewrite the record in the ledger's generated block shape",
         )
-        for role in sorted(roles)
+        for role in sorted(roles, key=str)
         if (read := hook_status(ledger_text, role)) != statuses.get(role)
     )
 

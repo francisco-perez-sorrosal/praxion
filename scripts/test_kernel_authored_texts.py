@@ -150,6 +150,11 @@ def test_a_moved_block_equals_the_constant_it_was_moved_from(slug: str) -> None:
 # -- What the shared-process texts must carry ----------------------------------------
 
 
+PRINCIPLES_DERIVED = (
+    "claude/kernels/principles.md"  # generated verbatim from the template's Principles section
+)
+
+
 def test_the_principles_pointer_leads_to_a_file_holding_all_eight_principles() -> None:
     pointer = TEXTS["principles-pointer"]
     named = re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+?)`", pointer)
@@ -158,9 +163,15 @@ def test_the_principles_pointer_leads_to_a_file_holding_all_eight_principles() -
         :PRINCIPLE_COUNT
     ]
 
-    assert named == [ks.USER_TEMPLATE]
+    assert named == [
+        PRINCIPLES_DERIVED
+    ]  # a committed .md the sandbox can read; the generator derives it
     assert len(principles) == PRINCIPLE_COUNT
     assert [name for name in principles if name not in pointer] == []
+    derived = REPO_ROOT / PRINCIPLES_DERIVED
+    if derived.exists():  # absent until the generator's derived-artifacts step lands
+        text = derived.read_text(encoding="utf-8")
+        assert [name for name in principles if f"### {name}" not in text] == []
 
 
 def test_the_partial_output_text_carries_the_title_and_its_three_lines() -> None:

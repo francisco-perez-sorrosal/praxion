@@ -34,7 +34,7 @@ packages = ["src/praxion_evals"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-ra -q --strict-markers"
+addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
 markers = ["integration: builds a real repo copy on disk, no network"]
 

@@ -506,7 +506,7 @@ def test_a_calibration_run_records_the_full_arm_twice_and_declares_the_allowance
     assert _sessions(calibration) == [("full", "Measured"), ("lean", "Measured")]
     assert {"lean" in s.plugin_dir.name for s in script.specs} == {False}
     source, allowances = cli.calibrated_allowances(
-        tmp_path / "calibration.json", (ROLE,), cli.DEFAULT_CONFIDENCE, _commit(calibration)
+        tmp_path / "calibration.json", _config(), cli.plan_tasks(_config()), _commit(calibration)
     )
     mechanical = {
         allowance_key(c.name, ROLE) for c in check_catalog(ROLE) if c.kind == "mechanical"
@@ -532,7 +532,13 @@ def test_a_results_file_that_is_not_a_calibration_run_gives_no_allowances(
     _run(tmp_path, "--max-total-usd", "0.5", name="ordinary.json")
 
     with pytest.raises(ValueError, match="not a calibration run"):
-        cli.calibrated_allowances(tmp_path / "ordinary.json", (ROLE,), 0.95, COMMIT)
+        cli.calibrated_allowances(
+            tmp_path / "ordinary.json", _config(), cli.plan_tasks(_config()), COMMIT
+        )
+
+
+def _config(*options: str) -> cli.RunConfig:
+    return cli.parse_config([str(REPO_ROOT), "--role", ROLE, *SMALL_RUN, *options])
 
 
 def _commit(loaded: results.RunResults) -> str:
@@ -549,7 +555,9 @@ def test_a_calibration_run_from_another_checkout_is_refused_with_the_reason(
     with pytest.raises(
         ValueError, match=f"measured checkout {_commit(calibration)}, not {elsewhere}"
     ):
-        cli.calibrated_allowances(tmp_path / "calibration.json", (ROLE,), 0.95, elsewhere)
+        cli.calibrated_allowances(
+            tmp_path / "calibration.json", _config(), cli.plan_tasks(_config()), elsewhere
+        )
 
 
 def test_a_calibration_run_that_lacks_a_named_role_is_refused_before_any_launch(

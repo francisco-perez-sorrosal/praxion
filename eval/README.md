@@ -107,7 +107,7 @@ The first positional argument is the plugin checkout under test (default: this r
 | `--max-tasks N` | Cap the tasks generated per role below the target plus slack; the declared target is unchanged, so a run capped under its target is underpowered by construction (a smoke run). `--dry-run` prints the planned count per role |
 | `--margin-pp`, `--confidence` | Judged-check non-inferiority margin in percentage points (default 10) and interval confidence (default 0.95); declared in the results file before the first session |
 | `--calibration` | Run the `full` arm against itself; mutually exclusive with `--calibration-run` |
-| `--calibration-run FILE` | Take each mechanical check's allowance, per role and check, from this calibration file; refused before any launch unless the file measured this checkout and has pairs of every named role. Without it every allowance is zero |
+| `--calibration-run FILE` | Take each mechanical check's allowance, per role and check, from this calibration file; refused before any launch unless the file measured this checkout, seed, pair target and, for every named role, the same task list and has pairs of every named role. Without it every allowance is zero |
 | `--judge-golden` | Judge each judged check's golden good and bad case once and record both verdicts |
 | `--no-judge` | Withhold judged checks |
 | `--model`, `--effort` | Session model and effort (defaults `opus`, `medium`) |

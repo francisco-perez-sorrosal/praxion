@@ -200,6 +200,7 @@ def run_argv(
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
+            errors="replace",  # a session that ran and spent is never lost to one bad byte
             timeout=timeout_s,
             check=False,
         )

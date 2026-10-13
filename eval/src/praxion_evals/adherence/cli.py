@@ -191,41 +191,75 @@ def declared_settings(
 
 
 def calibrated_allowances(
-    path: Path, roles: Sequence[Role], confidence: float, commit: str
+    path: Path, config: RunConfig, planned: Mapping[Role, Sequence[TaskSpec]], commit: str
 ) -> tuple[str, dict[str, int]]:
     """The run id and each role's mechanical-check noise allowances from a calibration run.
 
-    An allowance is an absolute count measured on one checkout and one role, so the file is
-    refused when it measured another checkout or lacks pairs of a named role; a check
-    shared by several roles keeps one allowance per role, never the widest of them.
+    An allowance is an absolute count of discordant pairs measured on one checkout, one
+    seed, one pair target and one task list of one role, so the file is refused when any
+    of those differs from this run's or it lacks pairs of a named role; a check shared by
+    several roles keeps one allowance per role, never the widest of them.
     """
     calibration = results.load(path)
     if not calibration.run.extra.get("calibration"):
         raise ValueError(f"{path} is not a calibration run")
-    measured = (calibration.run.extra.get("checkout") or {}).get("commit")
-    if measured != commit:
-        raise ValueError(
-            f"the calibration run {calibration.run.id} measured checkout {measured}, not "
-            f"{commit}: an allowance does not carry across checkouts"
-        )
+    mismatch = _calibration_mismatch(calibration, config, planned, commit)
+    if mismatch is not None:
+        raise ValueError(f"the calibration run {calibration.run.id} {mismatch}")
     allowances: dict[str, int] = {}
-    for role in roles:
+    for role in config.roles:
         pairs = results.pairs_of(calibration, role)
-        if not pairs:
-            raise ValueError(f"the calibration run {calibration.run.id} has no pairs of {role}")
         mechanical = {e.name for e in calibration.catalog.get(role, ()) if e.kind == "mechanical"}
-        for name, allowance in verdict.allowances_from_calibration(pairs, confidence).items():
+        measured = verdict.allowances_from_calibration(pairs, config.confidence)
+        for name, allowance in measured.items():
             if name in mechanical:
                 allowances[allowance_key(name, role)] = allowance
     return calibration.run.id, allowances
 
 
-def _declare(config: RunConfig, checkout: Checkout) -> DeclaredSettings:
+def _calibration_mismatch(
+    calibration: results.RunResults,
+    config: RunConfig,
+    planned: Mapping[Role, Sequence[TaskSpec]],
+    commit: str,
+) -> str | None:
+    """Why the calibration's allowances do not carry to this run, or ``None`` when they do."""
+    extra = calibration.run.extra
+    measured = (extra.get("checkout") or {}).get("commit")
+    if measured != commit:
+        return f"measured checkout {measured}, not {commit}: an allowance does not carry across checkouts"
+    if extra.get("seed") != config.seed:
+        return f"measured seed {extra.get('seed')}, not {config.seed}: an allowance holds for one task draw"
+    target = calibration.settings.required_pairs
+    if target != config.required_pairs:
+        return (
+            f"declared a pair target of {target}, not {config.required_pairs}: an allowance "
+            "is a count at the calibration's size"
+        )
+    for role in config.roles:
+        if not results.pairs_of(calibration, role):
+            return f"has no pairs of {role}"
+        theirs = list((extra.get("tasks") or {}).get(role, ()))
+        ours = [task.task_id for task in planned.get(role, ())]
+        if theirs != ours:
+            return _task_list_mismatch(role, theirs, ours)
+    return None
+
+
+def _task_list_mismatch(role: Role, theirs: Sequence[str], ours: Sequence[str]) -> str:
+    if len(theirs) != len(ours):
+        return f"measured the {role} on {len(theirs)} tasks, not the {len(ours)} planned"
+    return f"measured the {role} on other tasks than the {len(ours)} planned (another kit or cap)"
+
+
+def _declare(
+    config: RunConfig, checkout: Checkout, planned: Mapping[Role, Sequence[TaskSpec]]
+) -> DeclaredSettings:
     """The settings a paid run declares, with the noise allowances of its calibration run if any."""
     source, allowances = None, {}
     if config.calibration_run is not None:
         source, allowances = calibrated_allowances(
-            config.calibration_run, config.roles, config.confidence, checkout.commit
+            config.calibration_run, config, planned, checkout.commit
         )
     return declared_settings(config, source, allowances)
 

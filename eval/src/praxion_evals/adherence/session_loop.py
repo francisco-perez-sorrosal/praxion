@@ -64,6 +64,7 @@ from praxion_evals.live.session import (
     CLAUDE_BINARY,
     SandboxPaths,
     SessionRun,
+    SessionSpec,
     build_env,
     parse_stream,
     run_session,
@@ -177,14 +178,14 @@ def begin(
     config: RunConfig,
     checkout: Checkout,
     planned: Mapping[Role, list[TaskSpec]],
-    declare: Callable[[RunConfig, Checkout], DeclaredSettings],
+    declare: Callable[[RunConfig, Checkout, Mapping[Role, list[TaskSpec]]], DeclaredSettings],
 ) -> tuple[Context, RunState]:
     """Check the credential, declare the settings, write the provisional results file."""
     if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
         raise ValueError(
             f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
         )
-    settings = declare(config, checkout)
+    settings = declare(config, checkout, planned)
     judge = _open_judge(config)
     version = query_claude_version()
     started = datetime.now(UTC)
@@ -631,8 +632,9 @@ def _attempt[R](
     """Run one session in a fresh sandbox and scratch repository, assess it, and clean up.
 
     The budget is reserved first and a refusal starts nothing. A session that never started
-    settles at nothing. The sandbox outlives the assessment because a check may run a script
-    against the scratch repository.
+    settles at nothing; one whose process may have started and spent settles at the full
+    budget when its outcome is lost. The sandbox outlives the assessment because a check
+    may run a script against the scratch repository.
     """
     budget = context.config.session_budget_usd
     started_at, began = datetime.now(UTC).isoformat(), time.monotonic()
@@ -646,9 +648,13 @@ def _attempt[R](
     root = _new_sandbox_root(context, task)
     try:
         try:
-            run, commit = _launch(context, task, build, populate, page_url, root)
+            spec, commit = _prepare(context, task, build, populate, page_url, root)
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
+        try:
+            run = run_session(spec, build_env(root, os.environ))
+        except Exception as error:  # the process may have run and spent: charge the budget
+            return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = _settle(reserved, budget, run)
         try:
             evidence = _evidence(context, task, build, page_url, root, run, commit)
@@ -670,17 +676,17 @@ def _new_sandbox_root(context: Context, task: TaskSpec) -> Path:
     return Path(tempfile.mkdtemp(prefix="s-", dir=parent))
 
 
-def _launch(
+def _prepare(
     context: Context,
     task: TaskSpec,
     build: ArmBuild,
     populate: Callable[[Path], None],
     page_url: str | None,
     root: Path,
-) -> tuple[SessionRun, str]:
-    """Populate the sandbox, build the scratch repository, start the session and wait for it.
+) -> tuple[SessionSpec, str]:
+    """Populate the sandbox and build the scratch repository; nothing is launched yet.
 
-    Returns the finished run and the fixture commit the scratch repository starts from.
+    Returns the session to launch and the fixture commit the scratch repository starts from.
     """
     config, sandbox = context.config, SandboxPaths(root)
     populate(root)
@@ -693,7 +699,7 @@ def _launch(
         effort=config.effort,
         max_budget_usd=config.session_budget_usd,
     )
-    return run_session(spec, build_env(root, os.environ)), commit
+    return spec, commit
 
 
 def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:

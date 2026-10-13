@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kernel_version": "5f8aeaf21bafeac025f3ab1c2fc31588a0fe79dc",
+  "kernel_version": "84a1f0cf09f162c938f2e855229c44a4b1ae7eca",
   "slots": 9,
   "roles": {
     "agentic-transactions-architect": {

@@ -144,6 +144,12 @@ def _write_agent(root: Path, name: str, block_line: str, skip_universal: str = "
     return path
 
 
+def _insert_after_frontmatter(path: Path, text: str) -> None:
+    """Put `text` as the first paragraph of the body of the fixture definition at `path`."""
+    head, body = path.read_text(encoding="utf-8").split("---\n\n", 1)
+    path.write_text(f"{head}---\n\n{text}\n\n{body}", encoding="utf-8")
+
+
 def _kinds(report: dict[str, Any]) -> list[str]:
     return [finding["kind"] for finding in report["findings"]]
 
@@ -367,16 +373,104 @@ def test_print_canonical_emits_each_universal_block(slug: str) -> None:
 def test_contract_block_self_test_is_the_rules_own() -> None:
     """The agents' self-test question is the behavioral-contract rule's, byte for byte.
 
-    The rule is the sole author of the contract's wording; the agent block may
-    only prefix it, so a rewording of the rule fails here instead of leaving
-    seventeen agents asking an older question.
+    The rule is the sole author of the contract's wording; the generator copies it, so a
+    rewording of the rule fails here instead of leaving seventeen agents asking an older
+    question.
     """
     block = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
-    question = block.canonical.split("Self-test before you return: ", 1)[1]
+    self_test = block.canonical.splitlines()[-1]
     rule = (_REPO_ROOT / "rules" / "swe" / "agent-behavioral-contract.md").read_text(
         encoding="utf-8"
     )
-    assert f"Self-test: {question}" in rule
+    assert self_test.startswith("Self-test: ")
+    assert self_test in rule
+
+
+# --- 18. The universal canonicals are the generator's, several lines for the contract ----
+
+
+def test_universal_blocks_are_read_from_the_generated_file() -> None:
+    """The gate holds no copy of the three texts: each is a paragraph of the generator's file."""
+    generated = _gate().UNIVERSAL_BLOCKS_PATH.read_text(encoding="utf-8")
+
+    absent = [b.slug for b in _universal_blocks() if b.canonical not in generated]
+
+    assert absent == []
+    assert len(_universal_blocks()) == 3
+
+
+def test_the_contract_block_spans_several_lines() -> None:
+    """The control for the next canaries: a one-line contract would make them vacuous."""
+    contract = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+
+    assert len(contract.canonical.splitlines()) >= 5
+
+
+@pytest.mark.parametrize("index", [0, 2, -1], ids=["first", "middle", "self-test"])
+def test_canary_flags_a_reworded_line_of_the_contract_block(tmp_path: Path, index: int) -> None:
+    """Every line of the contract is compared, not only the line its anchor sits on."""
+    contract = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+    lines = contract.canonical.splitlines()
+    lines[index] = lines[index][:-1] + "!"  # the anchor, at the head of line one, stays intact
+    _write_agent(tmp_path, "bad.md", _canonical(), skip_universal=contract.slug)
+    _insert_after_frontmatter(tmp_path / "agents" / "bad.md", "\n".join(lines))
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert [(f["kind"], f["block"]) for f in report["findings"]] == [("drifted", contract.slug)]
+
+
+def test_canary_flags_a_contract_block_cut_short(tmp_path: Path) -> None:
+    """The contract without its self-test line is a drifted copy, not a conforming prefix."""
+    contract = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+    cut = "\n".join(contract.canonical.splitlines()[:-1])
+    _write_agent(tmp_path, "bad.md", _canonical(), skip_universal=contract.slug)
+    agent = tmp_path / "agents" / "bad.md"
+    _insert_after_frontmatter(agent, cut)
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert [(f["kind"], f["block"]) for f in report["findings"]] == [("drifted", contract.slug)]
+
+
+def test_a_sentence_after_the_contract_block_is_free(tmp_path: Path) -> None:
+    """A definition may follow the contract with its own sentence; it is not drift."""
+    contract = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+    _write_agent(tmp_path, "good.md", _canonical(), skip_universal=contract.slug)
+    _insert_after_frontmatter(
+        tmp_path / "agents" / "good.md", f"{contract.canonical}\nYour own sentence follows."
+    )
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert report["findings"] == []
+
+
+def test_a_reworded_contract_head_is_anchor_missing(tmp_path: Path) -> None:
+    """Head drift on the contract is found through its tell, as for every other block."""
+    contract = next(b for b in _universal_blocks() if b.slug == "behavioral-contract")
+    head, *rest = contract.canonical.splitlines()
+    reworded = head.replace(contract.anchor, "- **Surface Assumptions Quickly**")
+    _write_agent(tmp_path, "bad.md", _canonical(), skip_universal=contract.slug)
+    _insert_after_frontmatter(tmp_path / "agents" / "bad.md", "\n".join([reworded, *rest]))
+
+    report = _gate().check_agent_shared_blocks(tmp_path)
+
+    assert ("anchor-missing", contract.slug) in [
+        (f["kind"], f["block"]) for f in report["findings"]
+    ]
+
+
+def test_a_generated_file_that_is_missing_or_malformed_stops_the_gate(tmp_path: Path) -> None:
+    """No file, or not three paragraphs, is an error naming the file: never an empty comparison."""
+    gate = _gate()
+    with pytest.raises(gate.UniversalBlocksError, match="cannot read"):
+        gate._read_universal_blocks(tmp_path / "absent.md")
+    short = tmp_path / "core-blocks.md"
+    short.write_text("**Praxion links.** Only one block.\n", encoding="utf-8")
+
+    with pytest.raises(gate.UniversalBlocksError, match="expected 3"):
+        gate._read_universal_blocks(short)
 
 
 # --- 11. Canary: the CLI exit code the hook reads ----------------------------

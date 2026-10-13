@@ -54,6 +54,7 @@ import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
+from _kernel_preamble import _PREAMBLE
 
 # -- Constants -----------------------------------------------------------------
 
@@ -62,21 +63,12 @@ _INJECT_NATIVE_FLAG = "PRAXION_INJECT_NATIVE_SUBAGENTS"
 _DISABLE_WORKTREE_FLAG = "PRAXION_DISABLE_WORKTREE_PATH_BRIEFING"
 _SUBPROCESS_TIMEOUT_SECONDS = 3
 
-# Preamble content (chars ≤300 incl. separator — enforced by test).
-# Structural keywords required by test contract:
-#   "Surface Assumptions", "Register Objection", "Stay Surgical", "Simplicity First"
-# Plus tier-selector, delegation-back, and return-contract references.
-# ~292 chars / 3.6 ≈ 81 tokens — paid in the subagent prompt, not orchestrator context.
-# The return clause reaches host-native agents (Explore/Plan/general-purpose) that have
-# no `## Output` block and do not load the always-on coordination rule.
-_PREAMBLE = (
-    "[Praxion process active] "
-    "Apply the behavioral contract: "
-    "Surface Assumptions, Register Objection, Stay Surgical, Simplicity First. "
-    "Use the tier selector; carry this contract into every delegation. "
-    "Return a pointer, not a payload: a summary plus your .ai-work/ "
-    "artifact path, not the full report."
-)
+# `_PREAMBLE` (imported above) is generated into `_kernel_preamble.py` from the behavioral
+# contract (`scripts/generate_kernels.py`); edit the contract and regenerate, never this file.
+# Its length as emitted, with the gap before the prompt, is bounded at 296 characters
+# (`test_preamble_length_is_compact`). The return clause reaches host-native agents
+# (Explore/Plan/general-purpose) that have no `## Output` block and do not load the
+# always-on coordination rule.
 
 # Conservative match for an absolute path naming a `.claude/worktrees/<name>`
 # root inside prompt text. Non-greedy prefix keeps the captured group anchored

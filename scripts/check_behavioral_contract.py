@@ -27,7 +27,10 @@ single-sourcing has not silently drifted.
   are byte-identical to the source's in the source's own order, or an
   allowlisted exception. A file that is none of those three and carries three
   or more of the behaviors in definition shape is a new, unregistered wording
-  -- the defect BC05 exists to catch. The scan is totalising: every file under
+  -- the defect BC05 exists to catch. The consumers are the hand-listed registry
+  plus what the kernel generator writes, computed rather than listed: every
+  `agents/*.md` whose frontmatter declares `name:` and the kernel core files. The
+  scan is totalising: every file under
   the repository root is read, minus the declared out-of-scope prefixes, so a
   restatement cannot hide in a file type nobody thought to glob for.
 
@@ -157,19 +160,25 @@ _BC04_TAGS: tuple[str, ...] = (
 _BC04_HEADING = re.compile(r"^###\s*Behavioral Contract Findings\b")
 _HEADING_BOUNDARY = re.compile(r"^#{1,3}\s")
 
-# The files permitted to carry the four definitions in definition shape, byte-identical
-# to the rule's own lines. Every entry is governed identically, so the registry is a flat
-# set of repo-relative POSIX paths rather than a record with fields nothing reads.
+# The hand-listed files permitted to carry the four definitions in definition shape,
+# byte-identical to the rule's own lines. Every entry is governed identically, so the
+# registry is a flat set of repo-relative POSIX paths rather than a record with fields
+# nothing reads. The files the kernel generator writes join it by computation
+# (`_bc05_consumers`), so no roster of them exists to drift.
 _BC05_CONSUMERS: frozenset[str] = frozenset(
     {
         "claude/canonical-blocks/behavioral-contract.md",
-        "claude/kernels/core-blocks.md",
-        "claude/kernels/core.md",
         "skills/onboard-project/references/claude-md-blocks.md",
         "README.md",
         "codex/config/AGENTS.md.tmpl",
         "AGENTS.md",
     }
+)
+
+# The kernel files the generator writes with the contract's four lines (the core, and the
+# blocks every definition carries as its fallback).
+_BC05_KERNEL_CONSUMERS: frozenset[str] = frozenset(
+    {"claude/kernels/core.md", "claude/kernels/core-blocks.md"}
 )
 
 # Permitted to restate the definitions in their own deliberately distinct prose. Both
@@ -248,10 +257,16 @@ def _read_text(path: Path) -> str | None:
 
 
 _PATHS_KEY_RE = re.compile(r'^["\']?paths["\']?\s*:')
+_NAME_KEY_RE = re.compile(r"^name\s*:")
 
 
 def _has_paths_frontmatter(text: str) -> bool:
     """True if `text` opens with a YAML frontmatter block declaring `paths:`."""
+    return _frontmatter_declares(text, _PATHS_KEY_RE)
+
+
+def _frontmatter_declares(text: str, key: re.Pattern[str]) -> bool:
+    """True if `text` opens with a YAML frontmatter block with a top-level line matching `key`."""
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return False
@@ -263,7 +278,7 @@ def _has_paths_frontmatter(text: str) -> bool:
         # so the check agrees with regenerate_rules_manifest.py's yaml.safe_load
         # (light-review F1, W-1). Top-level keys only: an indented `paths:` is a
         # nested value, not the scoping key.
-        if _PATHS_KEY_RE.match(line):
+        if key.match(line):
             return True
     return False
 
@@ -409,21 +424,44 @@ def _check_bc04(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
 # -- BC05: one wording of the four definitions, repo-wide -----------------------
 
 
+def _bc05_definitions(repo_root: Path) -> frozenset[str]:
+    """The agent definitions (`agents/*.md` whose frontmatter declares `name:`), computed."""
+    agents_dir = repo_root / _AGENTS_DIR_REL
+    if not agents_dir.is_dir():
+        return frozenset()
+    return frozenset(
+        f"{_AGENTS_DIR_REL}/{path.name}"
+        for path in agents_dir.glob("*.md")
+        if _frontmatter_declares(_read_text(path) or "", _NAME_KEY_RE)
+    )
+
+
+def _bc05_consumers(repo_root: Path) -> frozenset[str]:
+    """The registry plus what the generator writes: every definition and the kernel core.
+
+    A definition added tomorrow is compared with the rule the moment it exists.
+    """
+    return _BC05_CONSUMERS | _BC05_KERNEL_CONSUMERS | _bc05_definitions(repo_root)
+
+
 def _check_bc05(repo_root: Path) -> tuple[list[dict], dict | None, dict | None]:
     sites, files_scanned = _bc05_scan(repo_root)
+    consumers = _bc05_consumers(repo_root)
     source_pairs = sites.get(_BC_RULE_REL, ())
 
     source_findings = _bc05_source_findings(source_pairs)
     # A source that does not parse into its own four lines cannot bind anything.
     # Saying so once is louder than five consumer findings derived from one cause.
     consumer_findings = (
-        [] if source_findings else _bc05_consumer_findings(repo_root, sites, source_pairs)
+        []
+        if source_findings
+        else _bc05_consumer_findings(repo_root, consumers, sites, source_pairs)
     )
-    findings = source_findings + consumer_findings + _bc05_unregistered_findings(sites)
+    findings = source_findings + consumer_findings + _bc05_unregistered_findings(sites, consumers)
 
     examined = {
         "files_scanned": files_scanned,
-        "consumers": len(_BC05_CONSUMERS),
+        "consumers": len(consumers),
         "definition_sites": sum(len(pairs) for pairs in sites.values()),
         "distinct_wordings": _bc05_distinct_wordings(sites),
     }
@@ -483,11 +521,12 @@ def _bc05_source_findings(source_pairs: tuple[tuple[str, str], ...]) -> list[dic
 
 def _bc05_consumer_findings(
     repo_root: Path,
+    consumers: frozenset[str],
     sites: dict[str, tuple[tuple[str, str], ...]],
     source_pairs: tuple[tuple[str, str], ...],
 ) -> list[dict]:
     findings: list[dict] = []
-    for rel in sorted(_BC05_CONSUMERS):
+    for rel in sorted(consumers):
         if not (repo_root / rel).is_file():
             findings.append(
                 _bc05_finding(
@@ -534,8 +573,10 @@ def _bc05_divergence_findings(
     return findings
 
 
-def _bc05_unregistered_findings(sites: dict[str, tuple[tuple[str, str], ...]]) -> list[dict]:
-    governed = _BC05_CONSUMERS | _BC05_ALLOWLIST | {_BC_RULE_REL}
+def _bc05_unregistered_findings(
+    sites: dict[str, tuple[tuple[str, str], ...]], consumers: frozenset[str]
+) -> list[dict]:
+    governed = consumers | _BC05_ALLOWLIST | {_BC_RULE_REL}
     return [
         _bc05_finding(
             rel,

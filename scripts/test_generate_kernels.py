@@ -191,6 +191,7 @@ def test_the_core_is_the_three_blocks_then_the_rest(repo: Path) -> None:
         texts["core-blocks.md"]
         == "\n\n".join(
             [
+                f"{gk.CONTRACT_LEAD_IN}\n"
                 "- **Alpha** - first behavior.\n- **Beta** - second behavior.\n"
                 "Self-test: did I follow the contract?",
                 LINKS_TEXT,
@@ -638,6 +639,24 @@ def test_the_sentence_after_the_contract_moves_to_its_own_line_and_stays_there(
 
     assert f"{BLOCKS.contract}\n{OWN_SENTENCE}\n" in once
     assert gk.render_definition(once, BLOCKS) == once
+
+
+def test_the_generated_contract_block_opens_with_the_citation_of_the_rule() -> None:
+    assert gk.CONTRACT_LEAD_IN == "**Apply the behavioral contract** (`" + CONTRACT_RULE + "`):"
+
+
+def test_the_lead_in_of_a_generated_contract_is_not_a_second_contract_or_a_tail() -> None:
+    generated = gk.UniversalBlocks(
+        f"{gk.CONTRACT_LEAD_IN}\n{BLOCKS.contract}", LINKS_TEXT, RETURN_TEXT
+    )
+    before = definition(
+        "Intro.", f"{generated.contract}\n{OWN_SENTENCE}", generated.links, generated.returns
+    )
+
+    after = gk.render_definition(before, generated)
+
+    assert after == before
+    assert after.count(gk.CONTRACT_LEAD_IN) == 1
 
 
 def test_a_contract_reworded_since_it_was_generated_is_replaced_not_duplicated() -> None:

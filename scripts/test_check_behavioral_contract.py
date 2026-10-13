@@ -27,9 +27,11 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from check_behavioral_contract import (  # noqa: E402
     _BC05_ALLOWLIST,
     _BC05_CONSUMERS,
+    _BC05_KERNEL_CONSUMERS,
     _BC05_UNREGISTERED_THRESHOLD,
     _BC_RULE_REL,
     CHECK_IDS,
+    _bc05_consumers,
     _bc05_scan,
     _definition_lines,
     classify,
@@ -181,7 +183,7 @@ def _conforming_tree(tmp_path: Path) -> None:
     """The minimal clean substrate: the source rule, plus every registered consumer
     carrying the source's four lines verbatim."""
     _write(tmp_path / _BC_RULE_REL, _BC05_RULE_TEXT)
-    for rel in sorted(_BC05_CONSUMERS):
+    for rel in sorted(_BC05_CONSUMERS | _BC05_KERNEL_CONSUMERS):
         _write(tmp_path / rel, f"# {rel}\n\n" + "\n".join(_BC05_BULLETS) + "\n")
 
 
@@ -192,9 +194,47 @@ def _bc05_findings(tmp_path: Path) -> list[dict]:
 def test_bc05_registry_sets_are_pairwise_disjoint() -> None:
     """Every in-scope path occupies exactly one of source / consumer / allowlisted /
     unregistered -- a `frozenset` cannot self-check, so the disjointness is asserted here."""
-    assert not (_BC05_CONSUMERS & _BC05_ALLOWLIST)
-    assert _BC_RULE_REL not in _BC05_CONSUMERS
+    registry = _BC05_CONSUMERS | _BC05_KERNEL_CONSUMERS
+    assert not (registry & _BC05_ALLOWLIST)
+    assert _BC_RULE_REL not in registry
     assert _BC_RULE_REL not in _BC05_ALLOWLIST
+
+
+def _write_definition(root: Path, name: str, bullets: list[str]) -> str:
+    rel = f"agents/{name}.md"
+    _write(root / rel, f"---\nname: {name}\n---\n\n" + "\n".join(bullets) + "\n")
+    return rel
+
+
+def test_bc05_consumers_are_the_registry_plus_every_definition_with_a_name(
+    tmp_path: Path,
+) -> None:
+    """The computed set: a definition joins the moment it exists; a guide or a stray file does not."""
+    _write_definition(tmp_path, "writer", list(_BC05_BULLETS))
+    _write(tmp_path / "agents/README.md", "# Agents\n")
+    _write(tmp_path / "agents/notes.md", "---\ntitle: notes\n---\n\nNot a definition.\n")
+
+    assert _bc05_consumers(tmp_path) == _BC05_CONSUMERS | _BC05_KERNEL_CONSUMERS | {
+        "agents/writer.md"
+    }
+
+
+def test_bc05_consumers_include_the_kernel_files_the_generator_writes() -> None:
+    assert _BC05_KERNEL_CONSUMERS == {"claude/kernels/core.md", "claude/kernels/core-blocks.md"}
+    assert _BC05_KERNEL_CONSUMERS <= _bc05_consumers(REPO_ROOT)
+
+
+def test_bc05_compares_a_definition_with_the_rule(tmp_path: Path) -> None:
+    _conforming_tree(tmp_path)
+    clean = _write_definition(tmp_path, "writer", list(_BC05_BULLETS))
+    assert _bc05_findings(tmp_path) == []
+
+    stale = list(_BC05_BULLETS)
+    stale[3] = "- **Simplicity First** — a reworded definition."
+    _write_definition(tmp_path, "writer", stale)
+    findings = _bc05_findings(tmp_path)
+
+    assert [(f["entity"], "Simplicity First" in f["message"]) for f in findings] == [(clean, True)]
 
 
 def test_bc05_is_clean_on_a_conforming_tree(tmp_path: Path) -> None:
@@ -368,11 +408,11 @@ def test_bc05_examines_the_live_corpus_above_its_floor() -> None:
     examined = _live_report()["examined"]["BC05"]
     assert examined["definition_sites"] >= 20
     assert examined["files_scanned"] >= 100
-    assert examined["consumers"] == len(_BC05_CONSUMERS)
+    assert examined["consumers"] == len(_bc05_consumers(REPO_ROOT))
 
 
 def test_bc05_registry_paths_all_exist_in_the_live_corpus() -> None:
-    registry = sorted(_BC05_CONSUMERS | _BC05_ALLOWLIST | {_BC_RULE_REL})
+    registry = sorted(_bc05_consumers(REPO_ROOT) | _BC05_ALLOWLIST | {_BC_RULE_REL})
     assert [rel for rel in registry if not (REPO_ROOT / rel).is_file()] == []
 
 
@@ -392,4 +432,4 @@ def test_bc05_registry_totalises_the_live_corpus() -> None:
     matching_allowlist = {
         rel for rel in _BC05_ALLOWLIST if len(sites.get(rel, ())) >= _BC05_UNREGISTERED_THRESHOLD
     }
-    assert carriers == {_BC_RULE_REL} | _BC05_CONSUMERS | matching_allowlist
+    assert carriers == {_BC_RULE_REL} | _bc05_consumers(REPO_ROOT) | matching_allowlist

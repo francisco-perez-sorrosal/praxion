@@ -69,6 +69,9 @@ RETURN_TEXT = "return-contract"
 BLOCK_TEXTS = frozenset({LINKS_TEXT, RETURN_TEXT})
 SELF_TEST_LABEL = "Self-test:"  # opens the contract's last line, in the rule and in the block
 BEHAVIOUR_BULLET = "- **"
+# The block's first line: it cites the rule, a semantic part of the block that the behaviours
+# and the self-test do not carry (the contract check reads the citation in every definition).
+CONTRACT_LEAD_IN = f"**Apply the behavioral contract** (`{CONTRACT_SOURCE}`):"
 
 # The slugs of the shared-block checker's universal blocks, which locate them in a definition.
 CONTRACT_SLUG = "behavioral-contract"
@@ -106,7 +109,7 @@ class KernelPlanError(km.KernelModelError):
 class UniversalBlocks:
     """The three blocks every agent definition carries, each without a trailing newline."""
 
-    contract: str  # the rule's behaviours then its self-test line, as consecutive lines
+    contract: str  # lead-in, the rule's behaviours, then its self-test line: consecutive lines
     links: str
     returns: str
 
@@ -166,7 +169,7 @@ def assemble(
     if bare:
         raise KernelPlanError(f"module {bare!r} has no text: no entry or authored text places any")
     blocks = UniversalBlocks(
-        _contiguous(texts[contract]),
+        f"{CONTRACT_LEAD_IN}\n{_contiguous(texts[contract])}",
         authored_block(authored, LINKS_TEXT),
         authored_block(authored, RETURN_TEXT),
     )
@@ -439,13 +442,17 @@ def _contract_tail(paragraph: str, shared: sb.SharedBlock) -> str | None:
     """The per-agent sentence after the contract in `paragraph`, '' for none; None for no contract.
 
     The contract stands as one line (the wording a definition carries today, which may run on
-    into that sentence) or as the generated lines: behaviours, the self-test, then the sentence.
+    into that sentence) or as the generated lines: the lead-in, behaviours, the self-test, then
+    the sentence.
     """
     if paragraph.startswith(shared.canonical):
         return paragraph[len(shared.canonical) :].strip()
     lines = paragraph.splitlines()
     self_tests = [i for i, line in enumerate(lines) if line.startswith(SELF_TEST_LABEL)]
-    if lines and lines[0].startswith(BEHAVIOUR_BULLET) and self_tests:
+    opens_generated = bool(lines) and (
+        lines[0] == CONTRACT_LEAD_IN or lines[0].startswith(BEHAVIOUR_BULLET)
+    )
+    if opens_generated and self_tests:
         return "\n".join(lines[self_tests[-1] + 1 :]).strip()
     return "" if _carries(paragraph, shared) else None
 

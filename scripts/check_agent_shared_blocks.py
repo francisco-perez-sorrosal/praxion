@@ -56,6 +56,13 @@ gap class the presence-blind gate let through: three agents never cited the
 contract, and twelve never stated a terminal marker, while every copy that did
 exist agreed.
 
+**Their text is not written here.** ``scripts/generate_kernels.py`` cuts the three
+blocks from the rules and writes them to ``claude/kernels/core-blocks.md``, then
+puts them into every definition; this gate reads that file, so the definitions are
+checked against the generator's output and a hand edit of either side is a finding.
+Only how to *recognise* a block (its anchor, its tells) is kept in this file. The
+contract block is several lines, so it is compared as a run of lines from its anchor.
+
 **Plugin-root reads.** Claude Code substitutes ``${CLAUDE_PLUGIN_ROOT}`` in a
 plugin agent's body (probed 2026-10-11), so a link written against it resolves
 in any project, where a relative one does not. That is what the links block
@@ -104,6 +111,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -146,30 +154,55 @@ _TASK_SLUG_SCOPING = (
     "`.ai-work/` paths to `.ai-work/<task-slug>/`. Use this path for all reads and writes."
 )
 
-# The universal blocks: the process core every agent definition carries.
-_BEHAVIORAL_CONTRACT = (
-    "**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`): "
-    "surface assumptions, register objections, stay surgical, simplicity first. "
-    "Self-test before you return: did I state my interpretation and assumptions, flag "
-    "conflicts with reasons, stay inside declared scope, and choose the simplest path?"
-)
+# Where the generator writes the universal blocks. The kernels travel with this script
+# (the repository, or the plugin tree), so the path is relative to the script, not to the
+# tree whose definitions are being checked.
+UNIVERSAL_BLOCKS_PATH = SCRIPT_DIR.parent / "claude" / "kernels" / "core-blocks.md"
 
-_PRAXION_LINKS = (
-    "**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, "
-    "names a Praxion file: read it from your working directory when it exists there (the "
-    "Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the "
-    "parent of the `agents/` directory this definition lives in."
+# How to recognise each universal block, in the order the generator writes them; the text
+# itself is read from the generator's file. A tell sits on the line that carries the block's
+# anchor, so a reworded head is still found.
+_UNIVERSAL_TELLS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("behavioral-contract", ("`rules/swe/agent-behavioral-contract.md`):",)),
+    ("praxion-links", ("names a Praxion file",)),
+    ("return-contract", ("treats a return without a marker as a suspected truncation",)),
 )
+_LEADING_BOLD = re.compile(r"(?:- )?\*\*[^*]+\*\*")  # a block opens with its bold head
+_PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 
-_RETURN_CONTRACT = (
-    "**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines "
-    "(or your definition's tighter cap) naming the outcome, the key points and the artifact "
-    "path, never the artifact's body, tables or code. End it with exactly one terminal "
-    "marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), "
-    "`[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped "
-    "early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return "
-    "without a marker as a suspected truncation."
-)
+
+class UniversalBlocksError(RuntimeError):
+    """The generator's file does not hold the three universal blocks this gate compares to."""
+
+
+def _read_universal_blocks(path: Path) -> tuple[SharedBlock, ...]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise UniversalBlocksError(f"cannot read the generated universal blocks: {exc}") from exc
+    paragraphs = [p.strip("\n") for p in _PARAGRAPH_BREAK.split(text.strip()) if p.strip()]
+    if len(paragraphs) != len(_UNIVERSAL_TELLS):
+        raise UniversalBlocksError(
+            f"{path} holds {len(paragraphs)} paragraph(s), expected {len(_UNIVERSAL_TELLS)} "
+            "universal blocks; regenerate with scripts/generate_kernels.py"
+        )
+    blocks = []
+    for (slug, tells), canonical in zip(_UNIVERSAL_TELLS, paragraphs, strict=True):
+        head = _LEADING_BOLD.match(canonical)
+        if head is None:
+            raise UniversalBlocksError(f"{path}: the {slug} block does not open with a bold head")
+        blocks.append(
+            SharedBlock(
+                slug=slug,
+                canonical=canonical,
+                anchor=head.group(),
+                tells=tells,
+                corroborators=(head.group(),),
+                universal=True,
+            )
+        )
+    return tuple(blocks)
+
 
 SHARED_BLOCKS: tuple[SharedBlock, ...] = (
     SharedBlock(
@@ -185,30 +218,7 @@ SHARED_BLOCKS: tuple[SharedBlock, ...] = (
         tells=("provided in your prompt as",),
         corroborators=("**task slug**", ".ai-work/"),
     ),
-    SharedBlock(
-        slug="behavioral-contract",
-        canonical=_BEHAVIORAL_CONTRACT,
-        anchor="**Apply the behavioral contract**",
-        tells=("`rules/swe/agent-behavioral-contract.md`): surface assumptions",),
-        corroborators=("**Apply the behavioral contract**",),
-        universal=True,
-    ),
-    SharedBlock(
-        slug="praxion-links",
-        canonical=_PRAXION_LINKS,
-        anchor="**Praxion links.**",
-        tells=("names a Praxion file",),
-        corroborators=("**Praxion links.**",),
-        universal=True,
-    ),
-    SharedBlock(
-        slug="return-contract",
-        canonical=_RETURN_CONTRACT,
-        anchor="**Return contract.**",
-        tells=("treats a return without a marker as a suspected truncation",),
-        corroborators=("**Return contract.**",),
-        universal=True,
-    ),
+    *_read_universal_blocks(UNIVERSAL_BLOCKS_PATH),
 )
 
 # The surface the block is replicated across. A glob, not a roster: an agent
@@ -248,8 +258,12 @@ def _first_divergence(observed: str, canonical: str) -> int:
     return min(len(observed), len(canonical)) + 1
 
 
-def _inspect_line(line: str, lineno: int, rel: str, block: SharedBlock) -> Finding | None:
-    """Compare one candidate line's copy of `block` against the canonical text."""
+def _inspect_line(lines: list[str], index: int, rel: str, block: SharedBlock) -> Finding | None:
+    """Compare the copy of `block` that the candidate `lines[index]` opens against the canonical text.
+
+    A block of several lines is read as that many lines from its anchor; what follows is free.
+    """
+    line, lineno = lines[index], index + 1
     start = line.find(block.anchor)
     if start < 0:
         return Finding(
@@ -263,12 +277,17 @@ def _inspect_line(line: str, lineno: int, rel: str, block: SharedBlock) -> Findi
             ),
             diff=list(
                 difflib.unified_diff(
-                    [block.canonical], [line.strip()], "canonical", f"{rel}:{lineno}", lineterm=""
+                    block.canonical.splitlines(),
+                    [line.strip()],
+                    "canonical",
+                    f"{rel}:{lineno}",
+                    lineterm="",
                 )
             ),
         )
 
-    observed = line[start:]
+    span = len(block.canonical.splitlines())
+    observed = "\n".join([line[start:], *lines[index + 1 : index + span]])
     if observed[: len(block.canonical)] == block.canonical:
         return None
 
@@ -281,7 +300,11 @@ def _inspect_line(line: str, lineno: int, rel: str, block: SharedBlock) -> Findi
         detail=f"diverges from the canonical text at column {column} of the sentence",
         diff=list(
             difflib.unified_diff(
-                [block.canonical], [observed], "canonical", f"{rel}:{lineno}", lineterm=""
+                block.canonical.splitlines(),
+                observed.splitlines(),
+                "canonical",
+                f"{rel}:{lineno}",
+                lineterm="",
             )
         ),
     )
@@ -340,12 +363,13 @@ def check_agent_shared_blocks(root: Path) -> dict[str, Any]:
         if _is_definition(text):
             definitions += 1
             findings.extend(_missing_universal(text, rel))
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        lines = text.splitlines()
+        for index, line in enumerate(lines):
             for block in SHARED_BLOCKS:
                 if not _is_candidate(line, block):
                     continue
                 carriers[block.slug].append(rel)
-                finding = _inspect_line(line, lineno, rel, block)
+                finding = _inspect_line(lines, index, rel, block)
                 if finding is not None:
                     findings.append(finding)
 

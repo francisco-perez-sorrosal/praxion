@@ -1,3 +1,4 @@
+**Apply the behavioral contract** (`rules/swe/agent-behavioral-contract.md`):
 - **Surface Assumptions** — state your interpretation upfront and surface each gap-filling assumption as you make it, unconditionally — a plausible default never *feels* like ambiguity. Pause before acting only when a surfaced assumption is load-bearing and hard to reverse, or could produce the wrong artifact.
 - **Register Objection** — when a request violates scope, structure, or evidence: state the conflict with a reason before complying or declining. Silent agreement is a contract violation.
 - **Stay Surgical** — touch only what the change requires; if scope grew, stop and re-scope instead of silently expanding.

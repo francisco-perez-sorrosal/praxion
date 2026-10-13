@@ -81,6 +81,7 @@ def _load_module():
 # ---------------------------------------------------------------------------
 
 PREAMBLE_MARKER = "[Praxion process active]"
+PREAMBLE_BOUND = 296  # characters as emitted: the preamble plus the gap before the prompt
 SESSION_WORKTREE_MARKER = "[Worktree session]"
 BRIEFED_ROOT_MARKER = "[Worktree briefing]"
 _ORIGINAL_PROMPT = "Research X for the current task."
@@ -265,7 +266,7 @@ def test_preamble_contains_return_contract(praxion_project: Path) -> None:
 
 
 def test_preamble_length_is_compact(praxion_project: Path) -> None:
-    """The injected preamble stays within the ~180 char spec limit."""
+    """The preamble as emitted, with the gap before the prompt, stays within 296 characters."""
     payload = _pretooluse_payload(subagent_type="Explore", cwd=str(praxion_project))
     result = _run_hook(payload)
     assert result.returncode == 0
@@ -273,8 +274,8 @@ def test_preamble_length_is_compact(praxion_project: Path) -> None:
     prompt = output["hookSpecificOutput"]["updatedInput"]["prompt"]
     # Extract only the prepended preamble (everything before the original prompt)
     preamble = prompt[: prompt.index(_ORIGINAL_PROMPT)]
-    assert len(preamble) <= 300, (
-        f"Preamble too long ({len(preamble)} chars, spec ~180+separator): {preamble!r}"
+    assert len(preamble) <= PREAMBLE_BOUND, (
+        f"Preamble too long ({len(preamble)} chars, bound {PREAMBLE_BOUND}): {preamble!r}"
     )
 
 

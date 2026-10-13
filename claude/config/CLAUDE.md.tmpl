@@ -79,6 +79,8 @@ This agent operates within Praxion, installed as the `praxion` plugin — its ag
 
 The ecosystem is auto-discovered. Components are never enumerated in always-loaded context — the assistant finds them via filesystem scanning. This is itself a design principle: avoid maintaining two sources of truth.
 
+The process lives in these artifacts and reaches every session and every spawn through them — rules, agent definitions, hooks, gates — never through an agent's memory of it. Memory supplements the process; it cannot stand in for it.
+
 - Consult skills when entering their domain — each skill encapsulates focused expertise; activate the right one for the task at hand
 - Spawn agents for multi-step work — each agent has a distinct specialty; leverage what it's built for rather than using agents generically
 - Let rules enforce conventions automatically

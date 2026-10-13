@@ -344,6 +344,7 @@ Rule delivery moves from symlinks to the hook bus.
 - Deterministic gates stay deterministic.
 - Progressive disclosure inside skills.
 - Graceful degradation: with the hooks absent (Codex, Cursor, a broken install), behaviour falls back to today's, never to nothing.
+- The process is delivered by its artifacts, never substituted by memory (user, 2026-10-12): a session or a spawn receives the contract, the rules and the gates through rules, kernels, hooks and definitions; harness memory, `MEMORY.md` and the model's own recollection supplement them and are never the channel. A lean spawn is therefore lean only if the kernel carries what the dropped file carried.
 
 **Compatibility facts (verified 2026-10-11):**
 - **AGENTS.md.** Claude Code reads `AGENTS.md` only when no `CLAUDE.md` exists in the working directory or above it. Praxion and its managed projects have a `CLAUDE.md`, so the generated `AGENTS.md` is never loaded twice.

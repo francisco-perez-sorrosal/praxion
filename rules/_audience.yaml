@@ -1,0 +1,524 @@
+# Who each always-loaded section serves.
+#
+# Every section (heading level two to four) of every always-loaded source, and every
+# part of a mixed-audience section, has exactly one entry here. The sources are found
+# from the repository (rules without a path scope, the user template, the project file),
+# never listed. A part starts at the one line that begins with its `part` prefix and
+# runs to the next part or the section's end; the first part starts at the section's
+# first text line, so nothing is left unclassified.
+#
+# scope: core (every agent), role (the named agents or groups), orchestrator-only and
+# no-actor (kept resident for the main session, never in a kernel; each gives a reason).
+# form: verbatim (the source bytes) or condensed (an authored text under
+# claude/kernels/src/, pinned to the source it stands for, so a changed source forces
+# a review of the text). No section is removed from its source by being classified.
+#
+# The wire shape is read in one place, scripts/kernel_model.py; scripts/check_kernel_manifest.py
+# holds the manifest to the sources. Regenerate the kernels with scripts/generate_kernels.py.
+version: 1
+
+# Declared groups: adr-author must equal the agents whose definitions create ADR
+# draft fragments, ledger-writer the agents whose definitions append tech-debt rows.
+groups:
+  adr-author: [systems-architect, implementation-planner, interface-designer, agentic-transactions-architect]
+  ledger-writer: [verifier, sentinel, architect-validator]
+
+# Declared modules: the audience of each. A role entry joins the module whose audience
+# equals its own; principles-anchor is declared before local-verifier because both
+# serve the verifier alone and the first declared wins for an entry naming only it.
+modules:
+  adr-author: {audience: [adr-author]}
+  adr-reader: {audience: [researcher, verifier]}
+  ledger-writer: {audience: [ledger-writer]}
+  principles-digest: {audience: [promethean, systems-architect]}
+  principles-anchor: {audience: [verifier]}
+  delegator: {audience: [roadmap-cartographer]}
+  local-context-engineer: {audience: [context-engineer]}
+  local-verifier: {audience: [verifier]}
+
+# Authored texts kept under claude/kernels/src/: every kernel line that no rule section
+# supplies verbatim is one of these. `condenses: null` marks kernel-only text.
+authored:
+  - id: ai-state-persistent-project-intelligence
+    path: claude/kernels/src/ai-state-persistent-project-intelligence.md
+    module: core
+    condenses: "rules/swe/agent-intermediate-documents.md#`.ai-state/` — Persistent Project Intelligence"
+    pinned_sha: "f9b5125052c04497522b48dad063a416b1f3ca43"
+  - id: audit-subject-exemption
+    path: claude/kernels/src/audit-subject-exemption.md
+    module: local-context-engineer
+    condenses: null
+  - id: boundary-discipline
+    path: claude/kernels/src/boundary-discipline.md
+    module: core
+    condenses: "rules/swe/swe-agent-coordination-protocol.md#Parallel Execution & Boundary Discipline"
+    pinned_sha: "94b54d6f439c6407c0a2a112b692073d0e1dbba2"
+  - id: cross-agent-skill-conventions
+    path: claude/kernels/src/cross-agent-skill-conventions.md
+    module: core
+    condenses: "rules/swe/swe-agent-coordination-protocol.md#Cross-Agent Skill Conventions"
+    pinned_sha: "7b35c926bb5bf84b27d728021f155ec58eef4b4f"
+  - id: delegation-depth
+    path: claude/kernels/src/delegation-depth.md
+    module: core
+    condenses: "rules/swe/swe-agent-coordination-protocol.md#Delegation Depth"
+    pinned_sha: "189aae5609b6cde280b2ae70ab24b21be0e72a6e"
+  - id: ledger-writer
+    path: claude/kernels/src/ledger-writer.md
+    module: ledger-writer
+    condenses: "rules/swe/agent-intermediate-documents.md#`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}"
+    pinned_sha: "b0144f88c554843e864b3f993710d6cdb152dd5d"
+  - id: ledger-writer-verifier-overlay
+    path: claude/kernels/src/ledger-writer-verifier-overlay.md
+    module: local-verifier
+    condenses: null
+  - id: parallel-execution-fragment-files
+    path: claude/kernels/src/parallel-execution-fragment-files.md
+    module: core
+    condenses: "rules/swe/agent-intermediate-documents.md#Parallel Execution"
+    pinned_sha: "3851c53bb03e092a6eaf4899bab72b1d73c4a9ab"
+  - id: partial-output
+    path: claude/kernels/src/partial-output.md
+    module: core
+    condenses: null
+  - id: praxion-links
+    path: claude/kernels/src/praxion-links.md
+    module: core
+    condenses: null
+  - id: principles-pointer
+    path: claude/kernels/src/principles-pointer.md
+    module: core
+    condenses: null
+  - id: return-contract
+    path: claude/kernels/src/return-contract.md
+    module: core
+    condenses: "rules/swe/swe-agent-coordination-protocol.md#Coordination Pipeline"
+    pinned_sha: "c8dbf8aa2bced6b7329349bb0869557b7de5e1ba"
+  - id: staging-discipline-no-bare-stash
+    path: claude/kernels/src/staging-discipline-no-bare-stash.md
+    module: core
+    condenses: "rules/swe/vcs/git-conventions.md#Staging Discipline"
+    pinned_sha: "c47a690795932210277a4d11205c78d06401ae47"
+  - id: staging-discipline-no-blind-discard
+    path: claude/kernels/src/staging-discipline-no-blind-discard.md
+    module: core
+    condenses: "rules/swe/vcs/git-conventions.md#Staging Discipline"
+    pinned_sha: "6a3b4b299a36e451e0cc04113313e649e55aeccc"
+  - id: task-slug-scoping
+    path: claude/kernels/src/task-slug-scoping.md
+    module: core
+    condenses: "rules/swe/agent-intermediate-documents.md#Task Slug Convention"
+    pinned_sha: "0c0e8708a9a95d7c00ce3af8c32020bc6b41e7ac"
+  - id: user-file-sentence
+    path: claude/kernels/src/user-file-sentence.md
+    module: core
+    condenses: null
+
+entries:
+  # -- rules/swe/adr-conventions.md
+  - source: rules/swe/adr-conventions.md
+    heading: "ADR Conventions"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "File Format"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Fragment Filename Schema"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Finalized ADRs (post-merge)"
+    scope: orchestrator-only
+    reason: "The finalize script assigns the number at merge; the fragment-authoring sections already tell an author to write a draft."
+  - source: rules/swe/adr-conventions.md
+    heading: "Frontmatter"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "What makes a decision `architectural`"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Relation Protocols"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Finalize Protocol"
+    scope: orchestrator-only
+    reason: "Describes what the post-merge hook and the merge skill do; no spawned role runs it."
+  - source: rules/swe/adr-conventions.md
+    heading: "Who Writes ADRs"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Agent Writing Protocol"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Discovery Protocol"
+    scope: role
+    form: verbatim
+    agents: [researcher, verifier]
+  - source: rules/swe/adr-conventions.md
+    heading: "Linking to ADRs"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Consumption"
+    scope: orchestrator-only
+    reason: "A maintainer index of where each consumer's behaviour lives; the consumers carry their own."
+  - source: rules/swe/adr-conventions.md
+    heading: "Relationship to LEARNINGS.md"
+    scope: role
+    form: verbatim
+    groups: [adr-author]
+  - source: rules/swe/adr-conventions.md
+    heading: "Migration — historical ADRs"
+    scope: no-actor
+    reason: "One sentence about how pre-existing records keep their names; nothing runs on it."
+  # -- rules/swe/agent-behavioral-contract.md
+  - source: rules/swe/agent-behavioral-contract.md
+    heading: "Agent Behavioral Contract"
+    part: "The Methodology defines the flow"
+    scope: orchestrator-only
+    reason: "Framing sentence that points at the user-level Methodology; the four behaviors it introduces are the next part."
+  - source: rules/swe/agent-behavioral-contract.md
+    heading: "Agent Behavioral Contract"
+    part: "- **Surface Assumptions**"
+    scope: core
+    form: verbatim
+  - source: rules/swe/agent-behavioral-contract.md
+    heading: "Agent Behavioral Contract"
+    part: "No AI authorship in commit messages"
+    scope: orchestrator-only
+    reason: "Commit-message authorship, the Direct-tier calibration note that points at the orchestrator's tier table, and the deep-dive link; no spawned role commits or selects a tier."
+  # -- rules/swe/agent-intermediate-documents.md
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "Agent Intermediate Documents"
+    scope: core
+    form: verbatim
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "`.ai-work/` — Ephemeral Pipeline Documents"
+    scope: core
+    form: verbatim
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "Task Slug Convention"
+    scope: core
+    form: condensed
+    text: task-slug-scoping
+    pin: "0c0e8708a9a95d7c00ce3af8c32020bc6b41e7ac"
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "`.ai-state/` — Persistent Project Intelligence"
+    part: "- **Always committed**"
+    scope: core
+    form: condensed
+    text: ai-state-persistent-project-intelligence
+    pin: "f9b5125052c04497522b48dad063a416b1f3ca43"
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "`.ai-state/` — Persistent Project Intelligence"
+    part: "- **Lifecycle states**"
+    scope: orchestrator-only
+    reason: "The lifecycle-state vocabulary decides what an absent artifact means to whoever audits state; no spawned role acts on it."
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}"
+    scope: role
+    form: condensed
+    text: ledger-writer
+    pin: "b0144f88c554843e864b3f993710d6cdb152dd5d"
+    groups: [ledger-writer]
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "Document Lifecycle"
+    scope: orchestrator-only
+    reason: "Cleanup and retention of pipeline documents, done by the main session."
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "Version Control and Cleanup"
+    scope: orchestrator-only
+    reason: "What the main session commits and deletes at the end of a pipeline."
+  - source: rules/swe/agent-intermediate-documents.md
+    heading: "Parallel Execution"
+    scope: core
+    form: condensed
+    text: parallel-execution-fragment-files
+    pin: "3851c53bb03e092a6eaf4899bab72b1d73c4a9ab"
+  # -- rules/swe/agent-model-routing.md
+  - source: rules/swe/agent-model-routing.md
+    heading: "Agent Model Routing"
+    scope: orchestrator-only
+    reason: "Delivered to the main session by a hook; a spawned role never inherits it and its model is set by its own definition."
+  - source: rules/swe/agent-model-routing.md
+    heading: "Tier Table"
+    scope: orchestrator-only
+    reason: "The same data sits in each definition's model field; only the main session chooses a tier."
+  # -- rules/swe/swe-agent-coordination-protocol.md
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "SWE Agent Coordination Protocol"
+    scope: orchestrator-only
+    reason: "Defines the agents as subprocesses of the main session; no spawned role acts on it."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Process Calibration"
+    scope: orchestrator-only
+    reason: "Tier selection decides whether and how to spawn; a role is already spawned. A definition that points here (the retrospective cell convention) names a rule file readable by path."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Pipeline Isolation"
+    scope: orchestrator-only
+    reason: "Entering a worktree before spawning is the main session's call."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Available Agents"
+    scope: orchestrator-only
+    reason: "The roster the main session spawns from."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Delegation Checklists"
+    scope: role
+    form: verbatim
+    agents: [roadmap-cartographer]
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Proactive Agent Usage"
+    part: "Spawn agents without waiting"
+    scope: orchestrator-only
+    reason: "Which agent the main session spawns next and the depth check before it does."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Proactive Agent Usage"
+    part: "**Multiplicity check:**"
+    scope: role
+    form: verbatim
+    agents: [roadmap-cartographer]
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Cross-Agent Skill Conventions"
+    scope: core
+    form: condensed
+    text: cross-agent-skill-conventions
+    pin: "7b35c926bb5bf84b27d728021f155ec58eef4b4f"
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Coordination Pipeline"
+    part: "Agents communicate through shared documents"
+    scope: orchestrator-only
+    reason: "Pointer to the pipeline-flow diagram and the table's header."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Coordination Pipeline"
+    part: "| Return contract |"
+    scope: core
+    form: condensed
+    text: return-contract
+    pin: "c8dbf8aa2bced6b7329349bb0869557b7de5e1ba"
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Coordination Pipeline"
+    part: "| Do not skip stages |"
+    scope: orchestrator-only
+    reason: "Sequencing, shadowing, rework, pre-refactor and review rules the main session runs; a role that needs one carries it in its own definition."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Conversation Checkpoints"
+    scope: orchestrator-only
+    reason: "The seams between spawns where the main session pauses for the user."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Agent Selection Criteria"
+    scope: orchestrator-only
+    reason: "Spawning policy for the main session."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Delegation Depth"
+    scope: core
+    form: condensed
+    text: delegation-depth
+    pin: "189aae5609b6cde280b2ae70ab24b21be0e72a6e"
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Background Agents"
+    scope: orchestrator-only
+    reason: "Spawning policy: when the main session runs agents in the background."
+  - source: rules/swe/swe-agent-coordination-protocol.md
+    heading: "Parallel Execution & Boundary Discipline"
+    scope: core
+    form: condensed
+    text: boundary-discipline
+    pin: "94b54d6f439c6407c0a2a112b692073d0e1dbba2"
+  # -- rules/swe/vcs/git-conventions.md
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Git Conventions"
+    scope: orchestrator-only
+    reason: "Title and a pointer to the pull-request conventions; no spawned role commits."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Commit Scope"
+    scope: orchestrator-only
+    reason: "What one commit holds; no spawned role commits."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Staging Discipline"
+    part: "- Stage specific files by name"
+    scope: orchestrator-only
+    reason: "Staging by name and reviewing the staged diff; no spawned role commits."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Staging Discipline"
+    part: "- **Never a bare `git stash`"
+    scope: core
+    form: condensed
+    text: staging-discipline-no-bare-stash
+    pin: "c47a690795932210277a4d11205c78d06401ae47"
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Staging Discipline"
+    part: "- **Treat any git command that is routine"
+    scope: core
+    form: condensed
+    text: staging-discipline-no-blind-discard
+    pin: "6a3b4b299a36e451e0cc04113313e649e55aeccc"
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Staging Discipline"
+    part: "- **Verify what a commit *contains*"
+    scope: orchestrator-only
+    reason: "Checking what a finished commit contains; no spawned role commits."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Secrets and Sensitive Files"
+    scope: orchestrator-only
+    reason: "What may enter a commit; no spawned role commits, and the one definition that handles secrets (the CI engineer's) states its own checks."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "What Not to Commit"
+    scope: orchestrator-only
+    reason: "Commit hygiene; no spawned role commits. The commented-out-code bullet is restated inline by the implementer's self-review, the test engineer's checklist and the verifier's convention phase; the debug-print bullet is a code-writing convention no pilot definition cites, so it stays inherited until the writer roles are adopted."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Commit Message Format"
+    scope: orchestrator-only
+    reason: "Subject and body conventions; no spawned role commits."
+  - source: rules/swe/vcs/git-conventions.md
+    heading: "Examples"
+    scope: orchestrator-only
+    reason: "Worked commit messages; no spawned role commits."
+  # -- claude/config/CLAUDE.md.tmpl
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Principles"
+    scope: orchestrator-only
+    reason: "Framing sentence of the principles list; the principles themselves follow, each classified."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Pragmatism"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Context Engineering"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Behavior-Driven Development"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Data Structures First"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Incremental Evolution"
+    scope: role
+    form: verbatim
+    agents: [verifier]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Structural Beauty"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Balanced Coupling"
+    scope: role
+    form: verbatim
+    agents: [verifier]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Root Causes Over Workarounds"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Methodology: Understand, Plan, Verify"
+    scope: orchestrator-only
+    reason: "The main session's working method: spawning, delegating, tier and response weight. The test-selection paragraph is an implementer instruction that stays resident until the writer roles are adopted."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "The Behavioral Contract"
+    scope: orchestrator-only
+    reason: "A pointer to the contract rule; a spawn needs the rule's text, which the core carries, not the pointer."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "The Learning Loop"
+    scope: orchestrator-only
+    reason: "Capture-and-recall practice of the main session and the step-executing roles, none in the pilot."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "The Ecosystem as Philosophy's Implementation"
+    part: "This agent operates within Praxion"
+    scope: orchestrator-only
+    reason: "Describes the main session's toolbox: the plugin namespace and the ecosystem's discovery."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "The Ecosystem as Philosophy's Implementation"
+    part: "The process lives in these artifacts"
+    scope: core
+    form: verbatim
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "The Ecosystem as Philosophy's Implementation"
+    part: "- Consult skills when entering"
+    scope: orchestrator-only
+    reason: "Spawning and skill-use bullets for the main session."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Operating Conventions"
+    scope: no-actor
+    reason: "A container heading with no text of its own; its subsections carry the content."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Response Style"
+    scope: core
+    form: verbatim
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Technical Conventions"
+    scope: orchestrator-only
+    reason: "Build-output, temp-file and debug-print conventions for the session that builds code; no pilot definition cites them and the writer roles keep them inherited until their phase."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Code Style"
+    scope: orchestrator-only
+    reason: "A pointer to a path-scoped rule that loads when a code file is read."
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Personal Info"
+    scope: orchestrator-only
+    reason: "The user's identity placeholders; the template is read, never its rendered copy, so no personal data reaches a kernel."
+  # -- CLAUDE.md
+  - source: CLAUDE.md
+    heading: "Agent reading order"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module."
+  - source: CLAUDE.md
+    heading: "Build / test / lint"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module."
+  - source: CLAUDE.md
+    heading: "Frequent operations"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module."
+  - source: CLAUDE.md
+    heading: "Repository layout"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module."
+  - source: CLAUDE.md
+    heading: "Critical conventions"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module."
+  - source: CLAUDE.md
+    heading: "How to verify your work"
+    scope: orchestrator-only
+    reason: "Praxion-specific text for the main session; a spawn receives the working project's own file whole from the hook, never this one as a module. The verifier does not run tests."
+  - source: CLAUDE.md
+    heading: "Claude-Code-specific machinery"
+    scope: orchestrator-only
+    reason: "Compaction guidance and worktree mechanics of the main session."
+  - source: CLAUDE.md
+    heading: "Where to find more"
+    scope: orchestrator-only
+    reason: "Navigation list for the main session."
+  - source: CLAUDE.md
+    heading: "Known Claude Code Limitations"
+    scope: orchestrator-only
+    reason: "A pointer for the main session."
+  - source: CLAUDE.md
+    heading: "Obsidian Integration"
+    scope: orchestrator-only
+    reason: "A pointer for the main session."

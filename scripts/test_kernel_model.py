@@ -255,6 +255,29 @@ def test_a_declared_module_serves_an_audience_of_several_agents() -> None:
     assert parsed.entries[0].scope == km.Role("principles-digest", km.Verbatim())
 
 
+def test_a_condensed_role_entry_is_served_by_the_module_its_authored_text_lives_in() -> None:
+    modules = {"first": {"audience": ["researcher"]}, "second": {"audience": ["researcher"]}}
+    text = {**authored(), "module": "second"}
+
+    parsed = parse(
+        entry(
+            scope="role", agents=["researcher"], form="condensed", text="alpha-short", pin=ALPHA_SHA
+        ),
+        authored=[text],
+        modules=modules,
+    )
+
+    assert parsed.entries[0].scope == km.Role("second", km.Condensed("alpha-short", ALPHA_SHA))
+
+
+def test_a_verbatim_role_entry_takes_the_first_of_several_modules_for_its_audience() -> None:
+    modules = {"first": {"audience": ["researcher"]}, "second": {"audience": ["researcher"]}}
+
+    parsed = parse(entry(scope="role", agents=["researcher"]), modules=modules)
+
+    assert parsed.entries[0].scope == km.Role("first", km.Verbatim())
+
+
 def test_several_agents_without_a_declared_module_are_refused() -> None:
     assert "no declared module serves" in refusal(
         entry(scope="role", agents=["verifier", "researcher"])
@@ -566,6 +589,21 @@ def ledger_wire(**roles: dict) -> dict:
 
 def parse_ledger(**roles: dict) -> km.Ledger:
     return km.parse_ledger(ledger_wire(**roles), AGENTS)
+
+
+def test_a_ledger_held_as_text_parses_like_the_file(tmp_path: Path) -> None:
+    text = "version: 1\neligible: [researcher]\nroles:\n  researcher: {status: trial, since: d}\n"
+    (tmp_path / km.LEDGER_PATH).parent.mkdir(parents=True)
+    (tmp_path / km.LEDGER_PATH).write_text(text)
+
+    from_text = km.parse_ledger_text(text, AGENTS, "the parent commit's ledger")
+
+    assert from_text == km.load_ledger(tmp_path, AGENTS)
+
+
+def test_ledger_text_that_is_not_yaml_is_refused_naming_where_it_came_from() -> None:
+    with pytest.raises(km.KernelModelError, match="the parent commit's ledger: not valid YAML"):
+        km.parse_ledger_text("roles: [unclosed", AGENTS, "the parent commit's ledger")
 
 
 def test_a_trial_record_needs_only_when_it_began_and_its_runs() -> None:

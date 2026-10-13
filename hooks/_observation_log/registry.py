@@ -302,6 +302,12 @@ CONSUMERS = (
         Mode.STANDARD,
     ),
     ConsumerSpec(
+        "scripts/check_kernel_manifest.py",
+        "code",
+        {EventClass.AGENT_START: ("agent_id", "agent_type", "event_type", "timestamp")},
+        Mode.STANDARD,
+    ),
+    ConsumerSpec(
         "scripts/gate_probes/observation.py",
         "code",
         {

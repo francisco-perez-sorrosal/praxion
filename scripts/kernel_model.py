@@ -429,7 +429,8 @@ def _parse_scope(row: Mapping[str, Any], declared: _Declared) -> Scope:
         return Core(_parse_form(row, declared.authored))
     if kind == "role":
         form = _parse_form(row, declared.authored)
-        return Role(_module_serving(audience, declared.modules), form)
+        home = declared.authored[form.text_ref].module if isinstance(form, Condensed) else None
+        return Role(_module_serving(audience, declared.modules, home), form)
     if not kind:
         raise KernelModelError("an empty audience: the entry names no scope")
     raise KernelModelError(f"unknown scope {kind!r} (core, role, orchestrator-only, no-actor)")
@@ -447,10 +448,18 @@ def _known_audience(row: Mapping[str, Any], declared: _Declared) -> tuple[str, .
     return (*agents, *groups)
 
 
-def _module_serving(audience: tuple[str, ...], modules: dict[str, tuple[str, ...]]) -> str:
-    """The declared module for exactly this audience, else the one a single name implies."""
+def _module_serving(
+    audience: tuple[str, ...], modules: dict[str, tuple[str, ...]], home: str | None = None
+) -> str:
+    """The declared module for exactly this audience, else the one a single name implies.
+
+    Of several modules serving one audience, `home` (where the entry's authored text lives)
+    wins when it is one of them, else the first declared.
+    """
     if not audience:
         raise KernelModelError("an empty audience: a role entry names no agent or group")
+    if home in modules and set(modules[home]) == set(audience):
+        return home
     for name, served in modules.items():
         if set(served) == set(audience):
             return name
@@ -738,12 +747,16 @@ def _require_yaml() -> Any:
 
 
 def _read_yaml(path: Path) -> Mapping[str, Any]:
+    return _parse_yaml(path.read_bytes().decode("utf-8"), str(path))
+
+
+def _parse_yaml(text: str, where: str) -> Mapping[str, Any]:
     yaml = _require_yaml()
     try:
-        loaded = yaml.safe_load(path.read_bytes().decode("utf-8"))
+        loaded = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        raise KernelModelError(f"{path}: not valid YAML: {exc}") from exc
-    return _mapping(loaded, str(path))
+        raise KernelModelError(f"{where}: not valid YAML: {exc}") from exc
+    return _mapping(loaded, where)
 
 
 def agent_definitions(root: Path) -> dict[str, str]:
@@ -772,6 +785,11 @@ def load_ledger(root: Path, agents: Collection[str]) -> Ledger:
     if not path.is_file():
         return Ledger((), MappingProxyType({}))
     return parse_ledger(_read_yaml(path), agents)
+
+
+def parse_ledger_text(text: str, agents: Collection[str], where: str) -> Ledger:
+    """The evidence-checked ledger read from YAML text held elsewhere (another commit's copy)."""
+    return parse_ledger(_parse_yaml(text, where), agents)
 
 
 def load_statuses(root: Path) -> Mapping[str, str]:

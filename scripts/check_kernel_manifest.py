@@ -1,52 +1,86 @@
 """The kernel manifest checker: holds the always-loaded guidance, the manifest and the kernels together.
 
 `python3 scripts/check_kernel_manifest.py [--json] [--repo-root DIR]` is the commit gate behind the
-per-role kernels. It reads the repository once, then judges five invariants; a finding's kind
+per-role kernels. It reads the repository once, then judges nine invariants; a finding's kind
 names the invariant it breaks. Exit 0 clean, 1 findings, 2 input error (no manifest, no plugin
 checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its input never passes.
 
-| Kind                  | Holds when                                                                   |
-| --------------------- | ---------------------------------------------------------------------------- |
-| `I1-unclassified`     | every section and part of every always-loaded source has an audience entry   |
-| `I1-orphan`           | every entry names a section or part that exists                              |
-| `I1-duplicate-heading`| no source holds two sections of one heading (an entry could not tell apart)  |
-| `I2-missing-core`     | every detected agent has a kernel core: the index lists it with strings      |
-| `I3-contract-drift`   | the core carries the contract rule's own lines, and the preamble is current  |
-| `I4-over-cap`         | no committed kernel file and no injected string exceeds the harness cap      |
-| `I5-group-mismatch`   | the ADR-author and ledger-writer groups equal the agents that write those    |
+| Kind                         | Holds when                                                              |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `I1-unclassified`            | every section and part of every always-loaded source has an audience entry |
+| `I1-orphan`                  | every entry names a section or part that exists                         |
+| `I1-duplicate-heading`       | no source holds two sections of one heading (an entry could not tell apart) |
+| `I2-missing-core`            | every detected agent has a kernel core: the index lists it with strings |
+| `I3-contract-drift`          | the core carries the contract rule's own lines, and the preamble is current |
+| `I4-over-cap`                | no committed kernel file and no injected string exceeds the harness cap |
+| `I5-group-mismatch`          | the ADR-author and ledger-writer groups equal the agents that write those |
+| `I6-stale-pin`               | every condensed form's pin matches the source it condenses              |
+| `I7-resident-text-in-kernel` | no orchestrator-only or no-actor paragraph is in any kernel or injected string |
+| `I8-stale-kernel`            | the committed kernels, index, definitions' blocks and preamble equal what the generator writes now |
+| `I9-flip-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
+| `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
+| `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval |
+| `I9-ledger-transition`       | a role moves only absent -> trial -> switched since the parent commit's ledger |
 
-The totality and group judgements are `kernel_model`'s; this module gathers the evidence, names
-each finding and renders it. The index is read here as plain JSON, not through `kernel_model`,
-because the model refuses an over-cap string at parse time and I4 must report one, not die on it.
+`--liveness [--since REV] [--plugin-root DIR]` is a second mode, over an observation log instead
+of the kernels: `liveness-no-kernel-row` names each spawn of a role at trial or switched (by the
+plugin's ledger) that left no `kernel_injected` row -- the only sign that the spawn hook did not
+run for it. The log is the one under `--repo-root`; `--since` keeps spawns at or after that
+revision's commit time. A log it cannot find is an input error, never a clean report.
+
+The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
+evidence, names each finding and renders it. The index is read here as plain JSON, not through
+`kernel_model`, because the model refuses an over-cap string at parse time and I4 must report one,
+not die on it.
 
 Detected, never listed: the agents come from `agents/*.md`, the always-loaded sources from the
-tree, so a new agent or rule is covered the day it exists.
+tree, so a new agent or rule is covered the day it exists. No setting or variable turns any of
+this off: the gate that cannot be disabled is the point.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from itertools import zip_longest
 from pathlib import Path
 
 import generate_kernels as gk
 import kernel_model as km
 import kernel_sources as ks
+from _git_runner import run_git
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+# hooks/_observation_log is the one reader of the observation log; it sits beside scripts/.
+sys.path.insert(0, str(SCRIPT_DIR.parent / "hooks"))
+from _observation_log import reader  # noqa: E402 (after sys.path injection)
 
 REPORT_SCHEMA = 1
 KERNEL_FILE_GLOB = "*.md"
 CORE_FILES = ("core.md", "core-1.md")  # a core above the cap is numbered parts; part one leads
 PARAGRAPH_END = "\n\n"
+IDENTIFYING_CHARS = 24  # a paragraph shorter than this names no source
+RESIDENT_SCOPES = (km.OrchestratorOnly, km.NoActor)
+ADHERENCE_ENTRY = "praxion-evals-adherence"  # the eval whose run a flip may rest on
+SWITCHED = "switched"
+AGENT_PREFIX = "praxion:"  # the agent type of this plugin's agents, as the log records it
+SPAWN_ROW = "agent_start"
+KERNEL_ROW = "kernel_injected"
+STATE_DIR = ".ai-state"
+
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
+_OMIT_LINE = re.compile(r"^omitClaudeMd:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+_NOT_OMITTING = ("", "false")  # any other value is read as the flag, so a mistyped one still gates
 
 
-# -- Pure: the five invariants ---------------------------------------------------------
+# -- Pure: the nine invariants ---------------------------------------------------------
 
 
 def totality_findings(
@@ -115,6 +149,176 @@ def group_findings(manifest: km.Manifest, definitions: Mapping[str, str]) -> tup
     )
 
 
+def pin_findings(
+    manifest: km.Manifest, sections: Mapping[str, Sequence[ks.Section]]
+) -> tuple[km.Finding, ...]:
+    """I6: every condensed form's pin matches the source section it condenses."""
+    return tuple(
+        km.Finding(f"I6-{found.kind}", found.subject, found.detail)
+        for found in km.stale_pins(manifest, sections)
+    )
+
+
+def resident_findings(
+    manifest: km.Manifest, sections: Mapping[str, Sequence[ks.Section]], injected: Mapping[str, str]
+) -> tuple[km.Finding, ...]:
+    """I7: no paragraph of an orchestrator-only or no-actor section in any text a spawn receives.
+
+    `injected` maps where each text came from to the text. A paragraph counts when it is long
+    enough to identify its source and is not a bare heading: two rules may share a heading.
+    """
+    resident = {
+        entry: _identifying_paragraphs(text)
+        for entry, text in km.entry_texts(manifest, sections).items()
+        if isinstance(entry.scope, RESIDENT_SCOPES)
+    }
+    return tuple(
+        km.Finding(
+            "I7-resident-text-in-kernel",
+            where,
+            f"holds text of the {_audience(entry)} section {_section_label(entry)}",
+        )
+        for where, text in injected.items()
+        for entry, paragraphs in resident.items()
+        if any(paragraph in text for paragraph in paragraphs)
+    )
+
+
+def stale_findings(regeneration: tuple[str, ...] | km.KernelModelError) -> tuple[km.Finding, ...]:
+    """I8: the paths the generator would change now, or why it cannot say."""
+    if isinstance(regeneration, km.KernelModelError):
+        detail = f"the generator cannot assemble the kernels: {regeneration}"
+        return (km.Finding("I8-stale-kernel", gk.KERNELS_DIR, detail),)
+    return tuple(
+        km.Finding("I8-stale-kernel", path, "differs from what the generator writes: regenerate")
+        for path in regeneration
+    )
+
+
+def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tuple[km.Finding, ...]:
+    """I9: `omitClaudeMd` and a switched adoption record come together, both ways."""
+    unrecorded = tuple(
+        km.Finding(
+            "I9-flip-without-record",
+            f"role {role}",
+            f"omitClaudeMd is set but its adoption record is {statuses.get(role, 'absent')}, "
+            f"not {SWITCHED}",
+        )
+        for role in sorted(omitting)
+        if statuses.get(role) != SWITCHED
+    )
+    unflagged = tuple(
+        km.Finding(
+            "I9-switch-without-flag",
+            f"role {role}",
+            f"its adoption record is {SWITCHED} but the definition does not set omitClaudeMd",
+        )
+        for role, status in sorted(statuses.items())
+        if status == SWITCHED and role not in omitting
+    )
+    return (*unrecorded, *unflagged)
+
+
+def record_findings(ledger: km.Ledger | km.KernelModelError) -> tuple[km.Finding, ...]:
+    """I9: every switched record is eligible, holds all its evidence, rests on the adherence eval.
+
+    The model refuses a record short of evidence (and says which role and piece); the eval a
+    passing run came from is the commit gate's rule, not the model's.
+    """
+    if isinstance(ledger, km.KernelModelError):
+        return (km.Finding("I9-record-incomplete", km.LEDGER_PATH, str(ledger)),)
+    return tuple(
+        km.Finding(
+            "I9-record-incomplete",
+            f"role {role}",
+            f"rests on run {run.id!r} of eval {run.entry!r}, not {ADHERENCE_ENTRY!r}",
+        )
+        for role, record in sorted(ledger.records.items())
+        if isinstance(record, km.Switched)
+        for run in [_passing_run(record)]
+        if run.entry != ADHERENCE_ENTRY
+    )
+
+
+def transition_findings(
+    before: km.Ledger | None, after: km.Ledger | km.KernelModelError
+) -> tuple[km.Finding, ...]:
+    """I9: moves since the parent commit's ledger; none when there is no parent or no ledger."""
+    if before is None or isinstance(after, km.KernelModelError):
+        return ()
+    return tuple(
+        km.Finding(f"I9-{found.kind}", found.subject, found.detail)
+        for found in km.ledger_transitions(before, after)
+    )
+
+
+def omitting_roles(definitions: Mapping[str, str]) -> frozenset[str]:
+    """The agents whose definition sets `omitClaudeMd` to anything but false."""
+    return frozenset(name for name, text in definitions.items() if _omits_claude_md(text))
+
+
+def liveness_findings(
+    statuses: Mapping[str, str],
+    rows: Sequence[Mapping[str, object]],
+    since: datetime | None = None,
+) -> tuple[km.Finding, ...]:
+    """A spawn of a role at trial or switched, at or after `since`, with no `kernel_injected` row.
+
+    A spawn is an agent's first `agent_start`; a later one is a resume and is never judged. Only
+    this plugin's agents (`praxion:<role>`) count; the role is what follows the prefix. Rows are
+    matched by agent id, so one row serves exactly the spawn that wrote it.
+    """
+    delivered = {row.get("agent_id") for row in rows if row.get("event_type") == KERNEL_ROW}
+    spawns: dict[object, Mapping[str, object]] = {}
+    for row in rows:
+        if row.get("event_type") == SPAWN_ROW:
+            spawns.setdefault(row.get("agent_id"), row)
+    return tuple(
+        km.Finding(
+            "liveness-no-kernel-row",
+            f"role {role}",
+            f"agent {agent_id} started at {row.get('timestamp')} and left no {KERNEL_ROW} row",
+        )
+        for agent_id, row in spawns.items()
+        if agent_id not in delivered
+        if (role := _adopted_role(row, statuses)) is not None
+        if since is None or reader.row_time(dict(row)) >= since
+    )
+
+
+def _identifying_paragraphs(text: str) -> tuple[str, ...]:
+    blocks = (block.strip() for block in re.split(r"\n\s*\n", text))
+    return tuple(b for b in blocks if len(b) >= IDENTIFYING_CHARS and not b.startswith("#"))
+
+
+def _audience(entry: km.AudienceEntry) -> str:
+    return "orchestrator-only" if isinstance(entry.scope, km.OrchestratorOnly) else "no-actor"
+
+
+def _section_label(entry: km.AudienceEntry) -> str:
+    target = entry.target
+    label = f"{target.source} '{target.heading}'"
+    return f"{label} (part {target.prefix!r})" if isinstance(target, km.PartTarget) else label
+
+
+def _passing_run(record: km.Switched) -> km.Run:
+    return next(run for run in record.runs if run.id == record.passing_run)  # the model holds it
+
+
+def _omits_claude_md(definition: str) -> bool:
+    block = _FRONTMATTER.match(definition)
+    line = _OMIT_LINE.search(block.group(1)) if block else None
+    return line is not None and line.group(1).strip("'\"").lower() not in _NOT_OMITTING
+
+
+def _adopted_role(row: Mapping[str, object], statuses: Mapping[str, str]) -> str | None:
+    agent_type = row.get("agent_type")
+    if not isinstance(agent_type, str) or not agent_type.startswith(AGENT_PREFIX):
+        return None
+    role = agent_type.removeprefix(AGENT_PREFIX)
+    return role if role in statuses else None
+
+
 def _contract_lines(
     manifest: km.Manifest, sections: Mapping[str, Sequence[ks.Section]]
 ) -> list[str] | None:
@@ -179,6 +383,12 @@ class Evidence:
     kernel_files: Mapping[str, str]  # name -> text, for each `claude/kernels/*.md`
     index_strings: Mapping[str, tuple[str, ...]] | None  # role -> injected strings; None: no index
     preamble: str | None
+    regeneration: (
+        tuple[str, ...] | km.KernelModelError
+    )  # paths the generator would change, or why not
+    statuses: Mapping[str, str]  # role -> trial or switched, whatever else the ledger holds
+    ledger: km.Ledger | km.KernelModelError  # the evidence-checked ledger, or the refusal
+    parent_ledger: km.Ledger | None  # the ledger as of HEAD; None when HEAD has none
 
 
 def gather(root: Path) -> Evidence:
@@ -194,24 +404,48 @@ def gather(root: Path) -> Evidence:
         _kernel_files(root),
         _index_strings(root),
         _read_text(root / gk.PREAMBLE_PATH),
+        _regeneration(root),
+        km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
+        _evidence_checked_ledger(root, definitions),
+        _parent_ledger(root, definitions),
     )
 
 
 def check(root: Path) -> tuple[km.Finding, ...]:
     """Every finding for the checkout at `root`; raises on an input it cannot read."""
     evidence = gather(root)
-    caps = {f"{gk.KERNELS_DIR}/{name}": text for name, text in evidence.kernel_files.items()}
-    for role, strings in (evidence.index_strings or {}).items():
-        caps.update({f"{km.INDEX_PATH} {role} string {n}": s for n, s in enumerate(strings, 1)})
+    injected = injected_texts(evidence)
+    totality = totality_findings(evidence.manifest, evidence.sections, evidence.required)
     return (
-        *totality_findings(evidence.manifest, evidence.sections, evidence.required),
+        *totality,
         *core_findings(evidence.definitions, evidence.index_strings, evidence.kernel_files),
         *contract_findings(
             evidence.manifest, evidence.sections, evidence.kernel_files, evidence.preamble
         ),
-        *cap_findings(caps),
+        *cap_findings(injected),
         *group_findings(evidence.manifest, evidence.definitions),
+        *pin_findings(evidence.manifest, evidence.sections),
+        *resident_findings(evidence.manifest, evidence.sections, injected),
+        # the generator refuses sources that fail I1: that refusal is I1's finding, not a second
+        *(() if totality else stale_findings(evidence.regeneration)),
+        *flip_findings(omitting_roles(evidence.definitions), evidence.statuses),
+        *record_findings(evidence.ledger),
+        *transition_findings(evidence.parent_ledger, evidence.ledger),
     )
+
+
+def injected_texts(evidence: Evidence) -> dict[str, str]:
+    """Where each text a spawn can receive came from, to the text: kernel files, then strings."""
+    texts = {f"{gk.KERNELS_DIR}/{name}": text for name, text in evidence.kernel_files.items()}
+    for role, strings in (evidence.index_strings or {}).items():
+        texts.update({f"{km.INDEX_PATH} {role} string {n}": s for n, s in enumerate(strings, 1)})
+    return texts
+
+
+def check_liveness(root: Path, plugin_root: Path, since: str | None) -> tuple[km.Finding, ...]:
+    """Spawns in the observation log under `root` that left no kernel row, by the plugin's ledger."""
+    statuses = km.load_statuses(plugin_root)
+    return liveness_findings(statuses, _observation_rows(root), _commit_time(root, since))
 
 
 def _read_text(path: Path) -> str | None:
@@ -235,14 +469,54 @@ def _index_strings(root: Path) -> dict[str, tuple[str, ...]] | None:
         raise km.KernelModelError(f"{path}: not an index this checker can read: {exc!r}") from exc
 
 
+def _regeneration(root: Path) -> tuple[str, ...] | km.KernelModelError:
+    try:
+        return tuple(gk.stale_files(root, gk.plan_kernels(root).files))
+    except km.KernelModelError as refusal:
+        return refusal
+
+
+def _evidence_checked_ledger(
+    root: Path, definitions: Collection[str]
+) -> km.Ledger | km.KernelModelError:
+    try:
+        return km.load_ledger(root, definitions)
+    except km.KernelModelError as refusal:
+        return refusal
+
+
+def _parent_ledger(root: Path, definitions: Collection[str]) -> km.Ledger | None:
+    """The ledger as of HEAD, the commit this one builds on; None when HEAD holds none."""
+    shown = run_git(root, "show", f"HEAD:{km.LEDGER_PATH}")
+    if shown.returncode != 0:  # no repository, no commit yet, or no ledger in it
+        return None
+    return km.parse_ledger_text(shown.stdout, definitions, f"{km.LEDGER_PATH} at HEAD")
+
+
+def _observation_rows(root: Path) -> list[dict]:
+    state_dir = root / STATE_DIR
+    if not reader.segments(state_dir, archives=True):
+        raise km.KernelModelError(f"no observation log under {state_dir}: nothing to judge")
+    return reader.read_rows(state_dir, archives=True)
+
+
+def _commit_time(root: Path, revision: str | None) -> datetime | None:
+    if revision is None:
+        return None
+    shown = run_git(root, "log", "-1", "--format=%cI", revision, "--")
+    if shown.returncode != 0 or not shown.stdout.strip():
+        raise km.KernelModelError(f"--since {revision!r} is not a revision of {root}")
+    return datetime.fromisoformat(shown.stdout.strip())
+
+
 # -- Edge: the command line ---------------------------------------------------------------
 
 
-def render_human(findings: Sequence[km.Finding]) -> str:
+def render_human(findings: Sequence[km.Finding], label: str = "kernel manifest") -> str:
     if not findings:
-        return "kernel manifest: clean"
+        return f"{label}: clean"
     lines = [f"{f.kind}: {f.subject}" + (f" -- {f.detail}" if f.detail else "") for f in findings]
-    return "\n".join([*lines, f"kernel manifest: {len(findings)} finding(s)"])
+    return "\n".join([*lines, f"{label}: {len(findings)} finding(s)"])
 
 
 def render_json(findings: Sequence[km.Finding]) -> str:
@@ -259,12 +533,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
     parser.add_argument("--repo-root", help="repository root (defaults to git discovery)")
+    parser.add_argument(
+        "--liveness",
+        action="store_true",
+        help="judge the observation log under --repo-root instead of the kernels: each spawn of "
+        "a role at trial or switched that left no kernel_injected row",
+    )
+    parser.add_argument(
+        "--since", metavar="REV", help="with --liveness: only spawns at or after REV's commit time"
+    )
+    parser.add_argument(
+        "--plugin-root",
+        help="with --liveness: the plugin checkout whose ledger names the adopted roles "
+        "(defaults to the checkout this script is in)",
+    )
     args = parser.parse_args(argv)
+    if (args.since or args.plugin_root) and not args.liveness:
+        parser.error("--since and --plugin-root apply only with --liveness")
     try:
         root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
         if is_plugin_cache_path(root):
             raise ValueError(f"{root} is an installed-plugin cache: check the source checkout")
-        findings = check(root)
+        if args.liveness:
+            plugin_root = Path(args.plugin_root) if args.plugin_root else SCRIPT_DIR.parent
+            findings, label = check_liveness(root, plugin_root, args.since), "kernel liveness"
+        else:
+            findings, label = check(root), "kernel manifest"
     except (
         ValueError,
         km.MissingParserError,
@@ -272,7 +566,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) as exc:  # the model's errors are ValueErrors
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(render_json(findings) if args.json else render_human(findings))
+    print(render_json(findings) if args.json else render_human(findings, label))
     return 1 if findings else 0
 
 

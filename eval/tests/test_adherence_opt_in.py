@@ -29,6 +29,9 @@ _AUTOMATION_SURFACES = (
     "eval/src/praxion_evals/harness",
 )
 _SCANNED_SUFFIXES = {".py", ".sh", ".yml", ".yaml", ".json", ".md", ".toml"}
+# Names the console entry as data and starts nothing: the commit gate compares the `entry`
+# field of a ledger run to it, so a flip rests only on a run of this eval.
+_NAMES_THE_ENTRY_AS_DATA = ("scripts/check_kernel_manifest.py",)
 
 
 def _files_under(surface: str) -> list[Path]:
@@ -74,7 +77,8 @@ def test_automation_surface_never_references_the_adherence_eval(surface: str) ->
     offenders = [
         str(path.relative_to(_REPO_ROOT))
         for path in _files_under(surface)
-        if any(
+        if str(path.relative_to(_REPO_ROOT)) not in _NAMES_THE_ENTRY_AS_DATA
+        and any(
             ref in path.read_text(encoding="utf-8", errors="replace")
             for ref in _ADHERENCE_REFERENCES
         )

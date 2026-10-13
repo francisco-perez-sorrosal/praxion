@@ -1,0 +1,1 @@
+**Praxion links.** A path into `skills/` or `rules/`, with or without a leading `../`, names a Praxion file: read it from your working directory when it exists there (the Praxion checkout itself), otherwise under the Praxion root ${CLAUDE_PLUGIN_ROOT}, the parent of the `agents/` directory this definition lives in.

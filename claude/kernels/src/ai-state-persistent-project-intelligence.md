@@ -1,0 +1,1 @@
+**Where permanent state lives.** `.ai-state/` holds the project's persistent intelligence (decisions, design, ledgers, reports) and is committed to git, unlike `.ai-work/`, which is ephemeral. Write under `.ai-state/` only the artifacts your own definition names.

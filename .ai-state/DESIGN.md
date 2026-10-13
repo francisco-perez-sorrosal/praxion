@@ -290,7 +290,7 @@ Every spawned Praxion agent receives its role's slice of the process from one so
 | Component | Status | Location |
 |---|---|---|
 | Audience manifest | Designed | `rules/_audience.yaml`, `claude/kernels/src/` |
-| Kernel generator and model | Designed | `scripts/generate_kernels.py`, `scripts/kernel_model.py`, `claude/kernels/` |
+| Kernel generator and model | Designed | `scripts/generate_kernels.py`, `scripts/kernel_sources.py`, `scripts/kernel_model.py`, `claude/kernels/` |
 | Kernel manifest checker | Designed | `scripts/check_kernel_manifest.py` |
 | Kernel spawn hook | Designed | `hooks/inject_kernel.py`, `hooks/hooks.json` |
 | Kernel adoption ledger | Designed | `.ai-state/kernel_adoption.yaml` |

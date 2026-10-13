@@ -9,7 +9,7 @@ tags: [agents, kernels, lean-spawns, startup-context-diet, subagent-start, codex
 made_by: agent
 agent_type: systems-architect
 branch: worktree-lean-spawn-pilot
-pipeline_tier: standard
+pipeline_tier: full
 affected_files:
   - rules/_audience.yaml
   - claude/kernels/

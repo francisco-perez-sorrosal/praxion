@@ -216,7 +216,27 @@ def grade(
         return NotMeasured(f"the main session never spawned the {evidence.role}", setup)
     checks = [role_check(evidence.role, name) for name in check_names]
     outcomes = {check.name: _outcome(check, evidence, judge) for check in checks}
-    return Measured.for_checks(check_names, outcomes, first_request_tokens(evidence), setup)
+    return Measured.for_checks(
+        check_names,
+        outcomes,
+        first_request_tokens(evidence),
+        setup,
+        role_return=_recorded_return(evidence),
+    )
+
+
+RECORDED_RETURN_CHARS = (
+    4_000  # a conformant return is a few hundred; this keeps a runaway one legible
+)
+CLIPPED_NOTE = "\n[clipped by the recorder]"
+
+
+def _recorded_return(evidence: SessionEvidence) -> str | None:
+    """The role's return as graded, so a failed return check can be read from the record."""
+    text = evidence.role_return
+    if text is None or len(text) <= RECORDED_RETURN_CHARS:
+        return text
+    return text[:RECORDED_RETURN_CHARS] + CLIPPED_NOTE
 
 
 def _infrastructure_error(

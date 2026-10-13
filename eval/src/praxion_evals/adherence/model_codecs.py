@@ -104,12 +104,14 @@ def setup_from_json(data: _Json) -> SessionSetup:
 def status_to_json(status: SessionStatus) -> dict[str, Any]:
     """A status as JSON; an echoed setup rides along under ``setup``."""
     match status:
-        case Measured(outcomes=outcomes, first_request_tokens=tokens):
+        case Measured(outcomes=outcomes, first_request_tokens=tokens, role_return=role_return):
             encoded: dict[str, Any] = {
                 "kind": "measured",
                 "outcomes": {name: outcome_to_json(o) for name, o in outcomes.items()},
                 "first_request_tokens": tokens,
             }
+            if role_return is not None:
+                encoded["role_return"] = role_return
         case Errored(kind=kind, detail=detail):
             encoded = {"kind": "errored", "error_kind": kind, "detail": detail}
         case NotMeasured(reason=reason):
@@ -130,7 +132,9 @@ def status_from_json(data: _Json) -> SessionStatus:
                 name: outcome_from_json(recorded)
                 for name, recorded in _field(data, "outcomes", "a measured status").items()
             }
-            return Measured(outcomes, data.get("first_request_tokens"), setup)
+            return Measured(
+                outcomes, data.get("first_request_tokens"), setup, data.get("role_return")
+            )
         case "errored":
             return Errored(
                 cast(ErrorKind, _field(data, "error_kind", "an errored status")),

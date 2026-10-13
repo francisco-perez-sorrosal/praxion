@@ -422,11 +422,14 @@ class SessionSetup:
 
 @dataclass(frozen=True)
 class Measured:
-    """The session ran and was graded: exactly one outcome per check, nothing else."""
+    """The session ran and was graded: exactly one outcome per check, and the role's
+    own return as the grader read it (clipped by the recorder when it ran away), so a
+    failed return check can be read back from the results file."""
 
     outcomes: Mapping[str, CheckOutcome]
     first_request_tokens: int | None
     setup: SessionSetup | None = None
+    role_return: str | None = None
 
     def __post_init__(self) -> None:
         _require(bool(self.outcomes), "a measured session holds at least one outcome")
@@ -443,12 +446,13 @@ class Measured:
         outcomes: Mapping[str, CheckOutcome],
         first_request_tokens: int | None,
         setup: SessionSetup | None = None,
+        role_return: str | None = None,
     ) -> Measured:
         _require(
             set(outcomes) == set(check_names),
             f"outcomes {sorted(outcomes)} are not exactly the checks {sorted(check_names)}",
         )
-        return cls(outcomes, first_request_tokens, setup)
+        return cls(outcomes, first_request_tokens, setup, role_return)
 
 
 @dataclass(frozen=True)

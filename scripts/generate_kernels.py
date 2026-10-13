@@ -29,9 +29,9 @@ Verbatim sections are the source bytes; a condensed entry is its authored text. 
 the same sources writes the same bytes. `--check` assembles in memory, writes nothing and exits
 1 when anything on disk differs. Exit 0 written or fresh, 1 stale under `--check`, 2 input error.
 
-Two wordings are role-specific rather than shared: a role whose own definition words the
-partial-output stop line `Failed at` is told `Failed at`, not `Stopped at`, in its strings
-(the module files keep the shared wording).
+Every role's strings carry the shared wording verbatim, the partial-output stop line included:
+the core says that where a definition words the stop line differently, the definition governs,
+so the kernel never contradicts it and the core stays one text.
 
 Stdlib plus PyYAML (read once, in `kernel_model`).
 """
@@ -96,9 +96,6 @@ _PREAMBLE = {literal}
 '''
 _BEHAVIOUR_NAME = re.compile(rf"^{re.escape(BEHAVIOUR_BULLET)}(.+?)\*\*", re.MULTILINE)
 _PARAGRAPH_BREAK = re.compile(r"(\n\s*\n)")  # capturing, so a split rejoins to the same text
-
-SHARED_STOP_LABEL = "Stopped at"
-OWN_STOP_LABEL = "Failed at"
 
 
 class KernelPlanError(km.KernelModelError):
@@ -280,7 +277,7 @@ def compose(
 ) -> KernelPlan:
     files, parts = plan_files(kernel)
     roles = {
-        role: _assemble_role(role, kernel, manifest, parts, definitions[role], statuses.get(role))
+        role: _assemble_role(role, kernel, manifest, parts, statuses.get(role))
         for role in sorted(definitions)
     }
     slots = max(len(r.strings) for r in roles.values()) + PROJECT_FILE_RESERVE if roles else 0
@@ -295,15 +292,10 @@ def _assemble_role(
     kernel: Kernel,
     manifest: km.Manifest,
     parts: Mapping[str, tuple[str, ...]],
-    definition: str,
     status: str | None,
 ) -> RoleAssembly:
     names = ("core", *(m for m in manifest.modules if role in _members(manifest, m)))
-    label = OWN_STOP_LABEL if _words_stop_line_as_failed(definition) else SHARED_STOP_LABEL
-    units = [
-        (module_label, text.replace(f"**{SHARED_STOP_LABEL}**", f"**{label}**").strip())
-        for module_label, text in _units(names, parts, kernel.blocks.text)
-    ]
+    units = [(label, text.strip()) for label, text in _units(names, parts, kernel.blocks.text)]
     return RoleAssembly(role, status, names, _pack(role, units))
 
 
@@ -311,10 +303,6 @@ def _members(manifest: km.Manifest, module: str) -> frozenset[str]:
     return frozenset(
         agent for name in manifest.modules[module] for agent in manifest.groups.get(name, (name,))
     )
-
-
-def _words_stop_line_as_failed(definition: str) -> bool:
-    return OWN_STOP_LABEL in definition and SHARED_STOP_LABEL not in definition
 
 
 def _units(

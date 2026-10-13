@@ -3,7 +3,7 @@
 Behaviors over a synthetic repository (so no test depends on what the rules say today): what
 is rendered and what is withheld, the universal blocks, parts and packing, the index and its
 statuses, determinism, and `--check` writing nothing. Four checks run over the real repository
-(each role's module set, the committed kernels being fresh, the stop-line wording, the cap),
+(each role's module set, the committed kernels being fresh, the shared stop-line wording, the cap),
 paired with the synthetic canaries that prove the same checks bite.
 """
 
@@ -353,16 +353,16 @@ def test_the_blocks_stay_out_of_the_injected_strings(repo: Path) -> None:
     assert "Shared text for every agent." in reader.strings[0].text
 
 
-def test_a_role_whose_definition_says_failed_at_is_never_told_stopped_at(tmp_path: Path) -> None:
+def test_a_role_whose_definition_says_failed_at_is_told_the_shared_wording(tmp_path: Path) -> None:
     rows = manifest_rows()
     rows["authored"].append(authored_row("stop-line"))
     root = build_repo(tmp_path / "plugin", manifest=rows)
     write(root, "claude/kernels/src/stop-line.md", "Write **Stopped at**: Phase N.\n")
     plan = gk.plan_kernels(root)
 
-    assert "**Failed at**: Phase N." in plan.assembled_kernel("failer").strings[0].text
-    assert "Stopped at" in plan.assembled_kernel("reader").strings[0].text
-    assert "Stopped at" in kernel_text_of(plan, "core.md")
+    for role in ("failer", "reader"):
+        assert "**Stopped at**: Phase N." in plan.assembled_kernel(role).strings[0].text
+    assert "Failed at" not in kernel_text_of(plan, "core.md")
 
 
 def kernel_text_of(plan: gk.KernelPlan, name: str) -> str:
@@ -535,13 +535,13 @@ def test_only_the_context_engineer_holds_the_audit_subject_exemption(live: gk.Ke
 
 
 @pytest.mark.parametrize("role", ["context-engineer", "skill-genesis", "discipline-consultant"])
-def test_a_role_that_words_the_stop_line_failed_at_is_not_told_stopped_at(
+def test_a_role_that_words_the_stop_line_failed_at_is_told_the_shared_wording(
     live: gk.KernelPlan, role: str
 ) -> None:
     held = "\n".join(s.text for s in live.assembled_kernel(role).strings)
 
-    assert "Stopped at" not in held
-    assert "**Failed at**" in held
+    assert "**Stopped at**" in held
+    assert "Failed at" not in held
 
 
 def test_every_live_string_and_file_fits_one_injected_string(live: gk.KernelPlan) -> None:

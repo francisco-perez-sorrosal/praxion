@@ -34,7 +34,7 @@ def test_export_agents_writes_required_codex_fields(tmp_path: Path):
     assert "developer_instructions =" in text
     assert str((REPO_ROOT / "agents" / "researcher.md").resolve()).replace("\\", "/") in text
     assert "source file remains authoritative" in text
-    assert "Surface Assumptions" in text
+    assert "Partial output." in text  # the role kernel, embedded from the index
     developer_instructions = text.split("developer_instructions =", maxsplit=1)[1]
     assert "You do not implement." not in developer_instructions
 

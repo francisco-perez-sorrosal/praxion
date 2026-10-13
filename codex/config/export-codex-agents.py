@@ -11,6 +11,11 @@ from pathlib import Path
 
 FRONTMATTER_BOUNDARY = "---"
 SKIP_AGENT_FILES = {"CLAUDE.md", "README.md"}
+KERNEL_INDEX_PATH = Path("claude") / "kernels" / "index.json"
+PLUGIN_ROOT_VARIABLE = "${CLAUDE_PLUGIN_ROOT}"
+# Frontmatter keys that steer only Claude's own loading of a definition; Codex has no
+# use for them, and a definition must export the same with or without them.
+CLAUDE_ONLY_FRONTMATTER_KEYS = ("omitClaudeMd",)
 
 # Keep the agent wrapper on current Codex model families while preserving the
 # canonical Praxion routing table as the source of truth for which agents get
@@ -36,6 +41,24 @@ def load_model_routes(repo_root: Path) -> dict[str, dict[str, object]]:
     spec.loader.exec_module(module)
     routes = module.export_model_routing(repo_root)["agent_routes"]
     return {route["agent"]: route for route in routes}
+
+
+def load_role_kernels(repo_root: Path) -> dict[str, list[str]]:
+    """Each role's kernel strings, with the plugin location written out.
+
+    The kernel text addresses plugin files as `${CLAUDE_PLUGIN_ROOT}/...`; a Codex reader
+    has no substitution, so the checkout this export reads from replaces the variable.
+    """
+
+    index_path = repo_root / KERNEL_INDEX_PATH
+    if not index_path.is_file():
+        raise AgentParseError(f"Kernel index not found: {index_path}")
+    plugin_root = repo_root.resolve().as_posix()
+    roles = json.loads(index_path.read_text(encoding="utf-8"))["roles"]
+    return {
+        role: [string.replace(PLUGIN_ROOT_VARIABLE, plugin_root) for string in body["strings"]]
+        for role, body in roles.items()
+    }
 
 
 def split_frontmatter_agent(path: Path) -> tuple[list[str], dict[str, str], str]:
@@ -121,7 +144,9 @@ def toml_string(value: str) -> str:
 
 
 def render_frontmatter_capsule(frontmatter_lines: list[str]) -> str:
-    frontmatter_block = "\n".join([FRONTMATTER_BOUNDARY, *frontmatter_lines, FRONTMATTER_BOUNDARY])
+    claude_only_prefixes = tuple(f"{key}:" for key in CLAUDE_ONLY_FRONTMATTER_KEYS)
+    kept = [line for line in frontmatter_lines if not line.startswith(claude_only_prefixes)]
+    frontmatter_block = "\n".join([FRONTMATTER_BOUNDARY, *kept, FRONTMATTER_BOUNDARY])
     return "\n".join(
         [
             "Praxion agent contract:",
@@ -141,6 +166,7 @@ def render_developer_instructions(
     name: str,
     source_path: Path,
     frontmatter_lines: list[str],
+    kernel_strings: list[str],
 ) -> str:
     capsule = render_frontmatter_capsule(frontmatter_lines)
     return "\n".join(
@@ -151,7 +177,7 @@ def render_developer_instructions(
             "The top-level TOML `model` settings are translated from Praxion's routing table; the canonical source remains the routing authority.",
             "Do not treat this wrapper as a fork; the source file remains authoritative.",
             "",
-            "Also apply the Praxion behavioral contract: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First.",
+            *kernel_strings,
             "",
             capsule,
             "",
@@ -165,6 +191,7 @@ def render_codex_agent(
     source_path: Path,
     frontmatter_lines: list[str],
     routing: dict[str, object],
+    kernel_strings: list[str],
 ) -> str:
     description = metadata["description"]
     codex_adapter = routing.get("codex_adapter", {})
@@ -175,7 +202,7 @@ def render_codex_agent(
             f"{source_path}: missing Codex model settings for routing tier: {tier}"
         )
     developer_instructions = render_developer_instructions(
-        metadata["name"], source_path, frontmatter_lines
+        metadata["name"], source_path, frontmatter_lines, kernel_strings
     )
 
     return "\n".join(
@@ -197,6 +224,7 @@ def export_agents(repo_root: Path, out_dir: Path) -> list[Path]:
         raise AgentParseError(f"Agents directory not found: {agents_dir}")
 
     routes = load_model_routes(repo_root)
+    kernels = load_role_kernels(repo_root)
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for source_path in sorted(agents_dir.glob("*.md")):
@@ -208,9 +236,16 @@ def export_agents(repo_root: Path, out_dir: Path) -> list[Path]:
             raise AgentParseError(
                 f"{source_path}: missing Codex routing entry for agent: {metadata['name']}"
             )
+        kernel_strings = kernels.get(metadata["name"])
+        if kernel_strings is None:
+            raise AgentParseError(
+                f"{source_path}: missing kernel in {KERNEL_INDEX_PATH} for agent: {metadata['name']}"
+            )
         target_path = out_dir / f"{metadata['name']}.toml"
         target_path.write_text(
-            render_codex_agent(metadata, source_path.resolve(), frontmatter_lines, routing),
+            render_codex_agent(
+                metadata, source_path.resolve(), frontmatter_lines, routing, kernel_strings
+            ),
             encoding="utf-8",
         )
         written.append(target_path)

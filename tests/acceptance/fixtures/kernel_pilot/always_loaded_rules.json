@@ -1,0 +1,8 @@
+[
+ "rules/swe/adr-conventions.md",
+ "rules/swe/agent-behavioral-contract.md",
+ "rules/swe/agent-intermediate-documents.md",
+ "rules/swe/agent-model-routing.md",
+ "rules/swe/swe-agent-coordination-protocol.md",
+ "rules/swe/vcs/git-conventions.md"
+]

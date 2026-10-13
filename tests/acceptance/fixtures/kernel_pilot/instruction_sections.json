@@ -1,0 +1,967 @@
+{
+ "CLAUDE.md": {
+  "# Praxion [1]": [
+   "e55c0515c93aaeb4"
+  ],
+  "## Agent reading order [1]": [
+   "6f6e0baa65425990"
+  ],
+  "## Build / test / lint [1]": [
+   "8513e22b2365111e"
+  ],
+  "## Claude-Code-specific machinery [1]": [
+   "a719070aeb6578aa",
+   "9384c7a861673389",
+   "cbaac3e3935d42f7",
+   "f29e39606bf7823c",
+   "bafd50ca9367f1d4",
+   "6d5b3dc44d4ea480"
+  ],
+  "## Critical conventions [1]": [
+   "9251815c75efb9b8"
+  ],
+  "## Frequent operations [1]": [
+   "1fe997bb01c5f393"
+  ],
+  "## How to verify your work [1]": [
+   "60cc294288279a49"
+  ],
+  "## Known Claude Code Limitations [1]": [
+   "1e7412fe9ca13955"
+  ],
+  "## Obsidian Integration [1]": [
+   "40ae1bed716d044b"
+  ],
+  "## Repository layout [1]": [
+   "b878794eae2fe09f"
+  ],
+  "## Where to find more [1]": [
+   "b1597dd8a0c4dda3"
+  ]
+ },
+ "claude/config/CLAUDE.md.tmpl": {
+  "# Praxion Development Guidelines for Claude [1]": [],
+  "## Methodology: Understand, Plan, Verify [1]": [
+   "084ab651f58ffa1c",
+   "68430d3a8fe3134e",
+   "d2eb803ebe1af529",
+   "94b4a115b30b21d4",
+   "f490eb51859b4404",
+   "0a21f240db506799",
+   "bb6e4788bc141f1b",
+   "f2c97cc6aa4635a2",
+   "34859b64a2883764"
+  ],
+  "## Operating Conventions [1]": [],
+  "## Personal Info [1]": [
+   "ac59634c7b2b224b"
+  ],
+  "## Principles [1]": [
+   "31a72eb621bf9523"
+  ],
+  "## The Behavioral Contract [1]": [
+   "e7e6ffcb7fe2000e"
+  ],
+  "## The Ecosystem as Philosophy's Implementation [1]": [
+   "8fcfcceb16c9ae4e",
+   "4825405d404abf7a",
+   "9492cc97557029b8",
+   "a0d0522af79c75a6",
+   "be32e72d1e98d576"
+  ],
+  "## The Learning Loop [1]": [
+   "e66f267ceef09047"
+  ],
+  "### Balanced Coupling [1]": [
+   "92b705485207b97d"
+  ],
+  "### Behavior-Driven Development [1]": [
+   "d55086727a313a71"
+  ],
+  "### Code Style [1]": [
+   "35198fdccc31d690"
+  ],
+  "### Context Engineering [1]": [
+   "8ace63c591057069",
+   "a700940e3e0139b0",
+   "cc0b9725242ea44e",
+   "c7a45640260d6899"
+  ],
+  "### Data Structures First [1]": [
+   "b404bde57a186a6c"
+  ],
+  "### Incremental Evolution [1]": [
+   "6c862c7ad2f530d9"
+  ],
+  "### Pragmatism [1]": [
+   "dc7c2d6d3019a977"
+  ],
+  "### Response Style [1]": [
+   "56a67199281df1cb"
+  ],
+  "### Root Causes Over Workarounds [1]": [
+   "e9e15b21564baf8c"
+  ],
+  "### Structural Beauty [1]": [
+   "cc6dbd37f7560a73"
+  ],
+  "### Technical Conventions [1]": [
+   "4160a4782797a9e9"
+  ]
+ },
+ "rules/eval/eval-data-governance.md": {
+  "## Eval Data Governance [1]": [
+   "3fe078efabc7a247",
+   "5aafb8b635f57292"
+  ],
+  "### Rules [1]": [
+   "f46253dbf5406e1c",
+   "4c287ad7f727f5c3",
+   "e884bb89aaaf1e4c",
+   "db0e85fa599d70de",
+   "ac27d9b93f0c1e32",
+   "c39eefe62fed023a"
+  ],
+  "### Sentinel Checks [1]": [
+   "6cb0881d6971c071",
+   "b8e2b16464329b83",
+   "948c15d59ba6a67f",
+   "748a60cf3e2aba56"
+  ]
+ },
+ "rules/ml/eval-driven-verification.md": {
+  "## Eval-Driven Verification [1]": [
+   "bbe2a35fb5240da2"
+  ],
+  "### Metric Source Priority [1]": [
+   "696aabf1323df2f4",
+   "cf2339ee1f60d902",
+   "18dd9d2314cb3fc0",
+   "1070bdd05f4cee2c"
+  ],
+  "### PASS/FAIL/WARN Classification [1]": [
+   "94409f770212afdd"
+  ],
+  "### Threshold Syntax (in SYSTEMS_PLAN.md acceptance criteria) [1]": [
+   "d39119f037166423",
+   "8e0bbc2cdfd61dbd"
+  ]
+ },
+ "rules/ml/experiment-commit-conventions.md": {
+  "## Experiment-Branch Commit Conventions [1]": [
+   "59e280775f5f5fa8",
+   "a6e67628ee9efed5",
+   "ca62e0ad3b71aaed",
+   "453172c4d8c78873"
+  ]
+ },
+ "rules/ml/experiment-tracking-conventions.md": {
+  "## Experiment Tracking Conventions [1]": [
+   "13ec91d782070684"
+  ],
+  "### Experiment Directory Convention [1]": [
+   "cdbf6d2ad0c06fae",
+   "cb5f68d43ed7e8da",
+   "e74a8f3edf6d8f68"
+  ],
+  "### Run Logging Requirements [1]": [
+   "e779b64120dcd81f"
+  ],
+  "### Tracker Declaration [1]": [
+   "ac051956766ba3fe",
+   "e790a1c9e312dc14",
+   "fd3fd5f762bc6012",
+   "c10de2f81462461e"
+  ],
+  "### `program.md` Vocabulary [1]": [
+   "7564bf207fce4a33",
+   "8e0d7be9297c60a8",
+   "fe90177ac066dcd3"
+  ],
+  "### `run_tag` Cross-Reference [1]": [
+   "4c8bb6b3dec72085"
+  ]
+ },
+ "rules/ml/gpu-budget-conventions.md": {
+  "## GPU Budget Conventions [1]": [
+   "6c29dd362932caab"
+  ],
+  "### Budget Declaration Locations [1]": [
+   "25baaaa22f6ebca2",
+   "8ce1fe0ce96078e4"
+  ],
+  "### Required Fields [1]": [
+   "083b3f0063943fe6",
+   "c4c1d4f30b55cc49",
+   "67d9ff55a908982b"
+  ],
+  "### Verifier Enforcement [1]": [
+   "ee4bdc6e23228668"
+  ]
+ },
+ "rules/swe/adr-conventions.md": {
+  "## ADR Conventions [1]": [
+   "4c9340596cf5ff31"
+  ],
+  "### Agent Writing Protocol [1]": [
+   "c685a8946438899e"
+  ],
+  "### Consumption [1]": [
+   "e842f802bbfc5f01"
+  ],
+  "### Discovery Protocol [1]": [
+   "0c5078414ed158b9",
+   "2f3af330d5f7a349"
+  ],
+  "### File Format [1]": [
+   "d5eaef91ae36a49c"
+  ],
+  "### Finalize Protocol [1]": [
+   "c2433b7a410b17e7"
+  ],
+  "### Linking to ADRs [1]": [
+   "0108a52c8ee3f5d0"
+  ],
+  "### Migration \u2014 historical ADRs [1]": [
+   "6d080080f723f99f"
+  ],
+  "### Relation Protocols [1]": [
+   "3c33a2f8a155c96c",
+   "c91b72bb194a1517"
+  ],
+  "### Relationship to LEARNINGS.md [1]": [
+   "a1b31f364674e956"
+  ],
+  "### Who Writes ADRs [1]": [
+   "d8e51b5c90f26959",
+   "342554a0c80605ad"
+  ],
+  "#### Finalized ADRs (post-merge) [1]": [
+   "dd2a62bda27c0c86"
+  ],
+  "#### Fragment Filename Schema [1]": [
+   "f24ced0894e2e245"
+  ],
+  "#### Frontmatter [1]": [
+   "c1adc7f14f090ecd",
+   "df5dc942fd8fdbc3"
+  ],
+  "#### What makes a decision `architectural` [1]": [
+   "fe65737d930ba283",
+   "6c2832f6409b858e",
+   "3c8f3e5ac457b825",
+   "7bf190b91638d094",
+   "58f55af3dc071619",
+   "88aeb26be0cf1053",
+   "cbb6ffa558c6a409"
+  ]
+ },
+ "rules/swe/agent-behavioral-contract.md": {
+  "## Agent Behavioral Contract [1]": [
+   "240b0ad45e5ff24d",
+   "a5b8ec2b82defbbf",
+   "a3b57e92b33a5c7a",
+   "6ca8888710040087",
+   "fdcf471455905e20",
+   "72cc166c391c7436"
+  ]
+ },
+ "rules/swe/agent-intermediate-documents.md": {
+  "## Agent Intermediate Documents [1]": [
+   "bd983e148172de77"
+  ],
+  "### Document Lifecycle [1]": [
+   "f5cce5fa2ea4d708"
+  ],
+  "### Parallel Execution [1]": [
+   "ed024d57e94c8fdc",
+   "7f4e5cc94583d8df"
+  ],
+  "### Version Control and Cleanup [1]": [
+   "e5a486348033662b"
+  ],
+  "### `.ai-state/` \u2014 Persistent Project Intelligence [1]": [
+   "6380202b24939230"
+  ],
+  "### `.ai-work/` \u2014 Ephemeral Pipeline Documents [1]": [
+   "ce432342d6f89823"
+  ],
+  "#### Task Slug Convention [1]": [
+   "d5fe761dd95e2ea1"
+  ],
+  "#### `TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` \u2014 living tech-debt ledger pair {#tech_debt_ledger-summary} [1]": [
+   "3bfe7bbf9bb371fd"
+  ]
+ },
+ "rules/swe/agent-model-routing.md": {
+  "## Agent Model Routing [1]": [
+   "026024aabc3b21ec",
+   "522f686c27e78fb9",
+   "0b8b177298a7fcf2",
+   "7c254b261bc796a2"
+  ],
+  "### Tier Table [1]": [
+   "f16e9a66993c4cf8",
+   "d40921c171c2e1a9",
+   "a21e0426295e9fc0"
+  ]
+ },
+ "rules/swe/coding-style.md": {
+  "## Coding Style [1]": [
+   "73ee7fc5deda5352"
+  ],
+  "### Baseline Configuration [1]": [
+   "bdfe12840b3e3341",
+   "4ab7ec5c3166b0f9",
+   "2eb46a3604e41272",
+   "d3c7bae41b08b4e2"
+  ],
+  "### Code Organization [1]": [
+   "0faf7e7d3fa8c3b3"
+  ],
+  "### Code Reuse and DRY [1]": [
+   "144f46e334643869"
+  ],
+  "### Compatibility and Deprecation [1]": [
+   "3ad096771ca105ce",
+   "b42116562b362a3b",
+   "363ecca27bb7ffe8"
+  ],
+  "### Constants Over Magic Values [1]": [
+   "d648212bdfac3fc1"
+  ],
+  "### Core Principles [1]": [
+   "ec06fcda25998e01"
+  ],
+  "### Data Structures and Invariants [1]": [
+   "05ea50baeded0143",
+   "116842a2e6bfe9c8",
+   "9eb0020a5b60b608"
+  ],
+  "### Error Handling [1]": [
+   "249d31f84f7c946e"
+  ],
+  "### Expressive Constructs [1]": [
+   "0ada33934d6da583",
+   "07cff7a84828a841",
+   "4a56ca8d7a7a5659"
+  ],
+  "### File Size [1]": [
+   "4adba5b07e02e120"
+  ],
+  "### Formatting and Linting [1]": [
+   "58c06d9eedade7ab",
+   "6c3d990d2abf388d",
+   "6649e1291df4db8a",
+   "0f62e415cf7b1a00"
+  ],
+  "### Function Size [1]": [
+   "c2055e855f4a62c7"
+  ],
+  "### Immutability [1]": [
+   "1640105d67598ad6",
+   "a1d3deb6f0d09416",
+   "a26f2a1b421caacd"
+  ],
+  "### Input Validation [1]": [
+   "4b86d93ecd905894",
+   "3321b55418215f7a",
+   "e3402774859bb286"
+  ],
+  "### Language-Specific Style [1]": [
+   "be45b27fa319ecba"
+  ],
+  "### Naming [1]": [
+   "dab7b5ad3d513e7a"
+  ],
+  "### Nesting Depth [1]": [
+   "b501382c8d2ed114",
+   "f3b97def9aa4159f",
+   "f7b306c226bdcaca"
+  ],
+  "### Ordered Operations [1]": [
+   "5af8db7145eba1e3",
+   "4ebd6d57b8c6fcea"
+  ],
+  "### Reading Order and Narrative [1]": [
+   "6211126416acaded",
+   "a82876490ae64a68",
+   "7e944a5063124eeb"
+  ],
+  "### Side-Effect Discipline [1]": [
+   "ade2af5ff6b532a1",
+   "921cde379c3a3c2a",
+   "8a17fbef11bbb7f6"
+  ],
+  "### Timestamp Formatting [1]": [
+   "9093c798e4397569",
+   "97e00949fc6e054b",
+   "37f2b62f29babe02",
+   "86bfec59d107db11"
+  ]
+ },
+ "rules/swe/gate-liveness.md": {
+  "## Gate Liveness [1]": [
+   "526f54ed5920481c",
+   "fbd50440bbdf2fad"
+  ],
+  "### Anti-patterns [1]": [
+   "c0847e47b02f3f2c"
+  ],
+  "### Self-test before shipping a gate [1]": [
+   "5e9a65ed630b0977",
+   "ce8028bf10bf040d",
+   "a4f70a8e84a348e0",
+   "d2cf63d59a0fe611"
+  ],
+  "### The seven clauses [1]": [
+   "b62351362cab6dc0",
+   "d0f45e9f4648c06f"
+  ],
+  "### Two gate kinds, two proofs [1]": [
+   "f6683ddb7f08d67d",
+   "c68220b581529f6b"
+  ]
+ },
+ "rules/swe/id-citation-discipline.md": {
+  "## Identifier Citation Discipline [1]": [
+   "7db79848429c601e",
+   "b6eefcfe1376f8b3"
+  ],
+  "### Enforcement [1]": [
+   "534e5f21bbeca651",
+   "363c76f60c81f293",
+   "402c2f5e7ccc8e57",
+   "0af5d05311a972e2",
+   "20359cab60b51647"
+  ],
+  "### Identifier Lifecycle Table [1]": [
+   "98b33298a3bd3662",
+   "b73c64e216d22ec5"
+  ],
+  "### Narrow Exceptions (and their reasons) [1]": [
+   "785cab701333c7f7"
+  ],
+  "### Self-Test Before Committing Code [1]": [
+   "cdaad8e53f79a56a"
+  ],
+  "### What to Do Instead [1]": [
+   "0a2cbb50364eb997",
+   "7bbefa81d1e1fb0b",
+   "b9f10dd177914330",
+   "c3aaa318a5d9939b",
+   "8f2feb9047ff78ba",
+   "87dc48603261da95",
+   "f81b92d084b171da",
+   "5ec9685de41db545",
+   "47b2afe8c011d1cc"
+  ],
+  "### Why This Exists [1]": [
+   "5990beb8fdbffbb5",
+   "b5ab02014dae9d3b"
+  ]
+ },
+ "rules/swe/plugin-install-conventions.md": {
+  "## Plugin Install Conventions [1]": [
+   "565504730265cdfe"
+  ],
+  "### Anti-patterns to avoid [1]": [
+   "64726ec33ec14a44",
+   "8dbc250001b38b96",
+   "9f189b18e0d32eee"
+  ],
+  "### Prefer the upstream-documented install method, in order [1]": [
+   "c4f64261fedcce77",
+   "96d8e1b7cb87dd04",
+   "0154d59dd7d9f388"
+  ],
+  "### Reference [1]": [
+   "98e764036ca8a5cc"
+  ],
+  "### Self-test before shipping any new skill-bundle integration [1]": [
+   "3ce8927d2a99b29b"
+  ]
+ },
+ "rules/swe/shipped-artifact-isolation.md": {
+  "## Shipped Artifact Isolation [1]": [
+   "df16aaa481784e2d",
+   "970a52b73c8486e5"
+  ],
+  "### Praxion-internal files are exempt [1]": [
+   "415536a8c54b4d8c",
+   "098c6bb745e50bd4"
+  ],
+  "### Self-test before committing a shipped artifact [1]": [
+   "61d0485b9625f83a"
+  ],
+  "### What to do instead [1]": [
+   "6a52187e915d78e8"
+  ]
+ },
+ "rules/swe/staleness-policy.md": {
+  "## Staleness Policy [1]": [
+   "8576f238666de059"
+  ],
+  "### Exclusion Semantics [1]": [
+   "c71c74263d8d2a99",
+   "1b85c61ef43340dc",
+   "3e2d0d0e4e020a16"
+  ],
+  "### Extended Form [1]": [
+   "ec785d5341cede04",
+   "7b57c98c9bcbdbde",
+   "ef4cc8924e574bd9"
+  ],
+  "### Frontmatter Schema [1]": [
+   "bf6365bcde131acd",
+   "466f5f4a109678b2",
+   "1670a83f838b03d2"
+  ],
+  "### Marker Syntax [1]": [
+   "d0fbd305c298404d",
+   "0883e0eeb6faecad",
+   "1c120daeba099742",
+   "24c76e5d608752b9"
+  ],
+  "### Missing-Marker Semantics [1]": [
+   "e9c41d92162db9c1",
+   "fb0390f134b7355c"
+  ],
+  "### Refresh Workflow [1]": [
+   "122596f3bfd98131",
+   "abcf76dc4ff4d5eb",
+   "d358f0da5ad04346",
+   "2c5124fe76062067"
+  ],
+  "### Section Location [1]": [
+   "117a9c9538172489",
+   "ddbdc908714c45bd"
+  ],
+  "### Sentinel Check IDs [1]": [
+   "96519e6b0f0a2c26",
+   "f522577be7ee82ef",
+   "2357f6261407bc75"
+  ],
+  "### Threshold Defaults [1]": [
+   "4df19b94e8f5f22d"
+  ]
+ },
+ "rules/swe/swe-agent-coordination-protocol.md": {
+  "## SWE Agent Coordination Protocol [1]": [
+   "5c6f9a48c22224ac"
+  ],
+  "### Agent Selection Criteria [1]": [
+   "9ef6aa807d9516a1",
+   "f0f0f10177d2d032"
+  ],
+  "### Available Agents [1]": [
+   "b5d4e4b57f9593c4",
+   "6fcb18c4e426e9f3"
+  ],
+  "### Background Agents [1]": [
+   "17370ecb05d2834f"
+  ],
+  "### Conversation Checkpoints [1]": [
+   "cb0209024e6b2e7e",
+   "b018e49188c3e83c",
+   "990c533633c117c6",
+   "5ee137fba931c508"
+  ],
+  "### Coordination Pipeline [1]": [
+   "cb083dc64ac51ee1",
+   "901222c396b8ab12",
+   "553eee31093ee779"
+  ],
+  "### Cross-Agent Skill Conventions [1]": [
+   "b9cdd94370383383"
+  ],
+  "### Delegation Checklists [1]": [
+   "f7457b5f697e5e20",
+   "4eb33bba3a15d325",
+   "93049b9c9118a909",
+   "1f4d56c51332f84c"
+  ],
+  "### Delegation Depth [1]": [
+   "622f2e786bd8ab30"
+  ],
+  "### Parallel Execution & Boundary Discipline [1]": [
+   "e5ec7fde3346b13c",
+   "98886767adae4f02"
+  ],
+  "### Pipeline Isolation [1]": [
+   "ed024d57e94c8fdc",
+   "1ae2ac8caa0aa892",
+   "d0b584d500df4f2f",
+   "0911399f70066a22",
+   "f2b23bbb41ed6b23"
+  ],
+  "### Proactive Agent Usage [1]": [
+   "6958d4e309c1f748",
+   "50eb2c9a03f1c773",
+   "2115f8a2ecc46d8f",
+   "b2ee38f2f00b5718",
+   "b1c0b0d9f5c2816b",
+   "56b1250aaeb96fb8"
+  ],
+  "### Process Calibration [1]": [
+   "87ab4db98827a7ac",
+   "a30d31806d9451f3",
+   "9b0e303902289a56",
+   "93d36203c04a4e6b",
+   "3d466a1f0075f110"
+  ]
+ },
+ "rules/swe/testing-conventions.md": {
+  "## Testing Conventions [1]": [
+   "610b74f51da97e33"
+  ],
+  "### Arrange-Act-Assert [1]": [
+   "e91c789d0e61293b",
+   "196cff1df5ed9776"
+  ],
+  "### Assertion Messages [1]": [
+   "e3ab9fea8e3c67f1",
+   "87af08623cf7cd31"
+  ],
+  "### Cleanup [1]": [
+   "aecc9f73744e0f5e",
+   "cbf027fa6a13d414"
+  ],
+  "### Determinism [1]": [
+   "0415373097acd888",
+   "11efbac981352609",
+   "771d25f630d8a858",
+   "b57f16b019375e67",
+   "e583a4ccb3b978a4",
+   "647ef58b13302a2d"
+  ],
+  "### Error Path Testing [1]": [
+   "cb3e0d289e072254",
+   "c2f1b8ed9d026472"
+  ],
+  "### Fixtures Under Gitignored Paths [1]": [
+   "1bbeb139e84688bb",
+   "1b6a3b472a0d9f98"
+  ],
+  "### Isolation [1]": [
+   "c649c46cb0a71e3c",
+   "9429394fd33bfc6c",
+   "7dd66f0490738017"
+  ],
+  "### Markers [1]": [
+   "859182326355b3ba"
+  ],
+  "### Mocking Boundaries [1]": [
+   "b36d4efe3fdb902d",
+   "197094f87511d8d5"
+  ],
+  "### Naming [1]": [
+   "499348843c3196aa",
+   "5b7619b8504e790d",
+   "fea9805c498ce3e3"
+  ],
+  "### No Commented-Out Tests [1]": [
+   "fe4522826413fb19",
+   "c9c6f11c421e5882"
+  ],
+  "### No Hardcoded Paths [1]": [
+   "b7b67a03a6baa9ea",
+   "bc93b3f58e9d5128"
+  ],
+  "### No Logic in Tests [1]": [
+   "3921248a1afd2a85",
+   "728288883276aa1d"
+  ],
+  "### Rust Boundary [1]": [
+   "1904ef7b452ef1a8"
+  ],
+  "### Test Data [1]": [
+   "8c0c7f117faef1af",
+   "8b8fd2a7c21401c7"
+  ],
+  "### Test File Organization [1]": [
+   "8ad167abef3090fc",
+   "8bc9c4358d881676"
+  ]
+ },
+ "rules/swe/vcs/git-conventions.md": {
+  "## Git Conventions [1]": [
+   "584ff583a2e1f6ce"
+  ],
+  "### Commit Message Format [1]": [
+   "bd10eec87bb3ea05",
+   "6a6ad764c9cf8122",
+   "22759eeae8fe2fc4",
+   "ab5e31fee7c3dde7",
+   "e2cec1fa39b50437",
+   "42ad8fe93b20bf5e",
+   "b6312d46e594a514",
+   "5cd0fced53141326"
+  ],
+  "### Commit Scope [1]": [
+   "fac740e4080a0bd3"
+  ],
+  "### Examples [1]": [
+   "90502cff1520a7e8",
+   "ad4360039530d30f",
+   "80c823732c60178d",
+   "a07d572c39c8fd10",
+   "ff411aa16f888a59"
+  ],
+  "### Secrets and Sensitive Files [1]": [
+   "2bde23d79a3e9780"
+  ],
+  "### Staging Discipline [1]": [
+   "fa97b5253a3a0b9a"
+  ],
+  "### What Not to Commit [1]": [
+   "d92c5fbd562f8981"
+  ]
+ },
+ "rules/swe/vcs/pr-conventions.md": {
+  "## PR Conventions [1]": [
+   "380e6febcb42d87a"
+  ],
+  "### Branch Naming [1]": [
+   "d4ee1985c2ffb3af"
+  ],
+  "### Forward Path: Multi-User Team Mode [1]": [
+   "4a73dafb539fd47b",
+   "8ed9afa0cea15ecd"
+  ],
+  "### Merge Policy [1]": [
+   "aeda07b1356bc4d1",
+   "7c5e12afd57c0965",
+   "71340ffe0b14e65c",
+   "56accfe6ba07b2aa",
+   "2f7c24a8bc589981"
+  ],
+  "### Review Expectations for `.ai-state/`-touching PRs [1]": [
+   "db3369d3bb0bb6e7"
+  ],
+  "### Self-Test Before Merging [1]": [
+   "63be3171184bf1d6",
+   "abcb32c56e62a0d3"
+  ],
+  "### Stacked PRs and Multi-PR Feature Work [1]": [
+   "ced46223a6668cab",
+   "6041fc3ca17211b3"
+  ],
+  "### `.ai-state/` Safety Contract at PR Time [1]": [
+   "231d0e673130bbcd",
+   "ee50d033fee6d441",
+   "0f256ee7e4ccfb9d",
+   "c66f795ddeab2e67"
+  ]
+ },
+ "rules/writing/aac-dac-conventions.md": {
+  "## AaC Fence Convention [1]": [
+   "ddbf1441c8ff9b22"
+  ],
+  "## Authoring Workflow [1]": [
+   "c6e665a390b524a4"
+  ],
+  "## Do Not Strip Fences [1]": [
+   "23e562017e65c9c8"
+  ],
+  "## Fence Schema [1]": [
+   "06ecd88b6c31cc62",
+   "7ab931c7490d4e4e",
+   "4511c98d92ff53f2",
+   "7837af34d995d0dd",
+   "a7849c5030d7b435",
+   "74c365c2996a7339",
+   "2b835eac9e8c3af5",
+   "d7bf9f95f8cf7444",
+   "4b938e12c58d0ea3",
+   "b3eb20630124a1a2"
+  ],
+  "## Override Syntax [1]": [
+   "888102bb59d62909",
+   "4e718fda0e450afb",
+   "f4a611dc6390037b",
+   "906da5aed324e2a4",
+   "159e4860a7c74ab2",
+   "a3a1ba2bc127d95c",
+   "ce0d72b3bef06256",
+   "219682893b307501"
+  ],
+  "## Untagged Content Default [1]": [
+   "ff742f11ebd67e7b"
+  ],
+  "## Validator [1]": [
+   "bf79ad295d6d4b05"
+  ]
+ },
+ "rules/writing/diagram-conventions.md": {
+  "## Diagram Conventions [1]": [],
+  "### Clarity First [1]": [
+   "aba6807bd93edfaa"
+  ],
+  "### Diagram Type Selection [1]": [
+   "4642b908a8db1ad5",
+   "9b5c92ac991e8478"
+  ],
+  "### LikeC4 views [1]": [
+   "e61f3392ba3db1ee"
+  ],
+  "### Migration of legacy inline diagrams [1]": [
+   "3dccd0c82291a8ab"
+  ],
+  "### Source / Rendered Separation (mandatory) [1]": [
+   "28a843475911578c",
+   "d41d0ac3f77a66a5",
+   "4ba2a80091274d31",
+   "babe0e770e159441",
+   "fc5da9f9072d9155",
+   "182c581f98baba6d",
+   "605abd68ebbd5967",
+   "27f2681052b1cb92",
+   "abc106870184f57d",
+   "af2b4bd661321e61",
+   "f55414db0a1510bc"
+  ],
+  "### Styling Consistency [1]": [
+   "ee4b0ed03b32ed1e"
+  ],
+  "### Toolchain Selection [1]": [
+   "7e73e6ebfef9d080",
+   "556d1f0d8099df71",
+   "01ce3991efb0a6eb"
+  ],
+  "### When NOT to Diagram [1]": [
+   "978387f18ffc10e2"
+  ]
+ },
+ "rules/writing/html-output-conventions.md": {
+  "## HTML Output Conventions [1]": [
+   "d19efcc98040109e"
+  ],
+  "### Authorship Boundary (Who Writes HTML?) [1]": [
+   "a387413fec27aa01",
+   "8033937e7ca5507b"
+  ],
+  "### Component Library [1]": [
+   "54152e9042f2acc4",
+   "f0059209b448b5ae",
+   "c5130f936112f174",
+   "7fcb170cefda8d64",
+   "f43db40c74df34dd"
+  ],
+  "### Di\u00e1taxis-Typed Shells [1]": [
+   "473a616a3729d123",
+   "859a4622976b755a",
+   "ff33983275a712c3"
+  ],
+  "### Hybrid Render Boundary [1]": [
+   "8fa81855678e6461",
+   "271b02333a34311e",
+   "564e8039c089708d",
+   "51816107a72f78fc"
+  ],
+  "### Integration with `diagram-conventions.md` [1]": [
+   "23f1834846abbdbb"
+  ],
+  "### MD Inlining via the Dashboard Server [1]": [
+   "f3413c38836e0dce",
+   "eb39fb20cbea1893",
+   "77da9170df4dd055",
+   "7b6e4d90598f1959",
+   "4b93b96d77566ddc",
+   "e2e3e6c28cff5a48"
+  ],
+  "### No JavaScript in Committed HTML [1]": [
+   "743d7bbd059db985",
+   "30e5aa229f881f1c",
+   "90aec31b7abe6abd",
+   "3f7819f394e79724"
+  ],
+  "### Runtime Constraints [1]": [
+   "5213b3d1f39477e1",
+   "bc4509e8a2dd1a9f"
+  ],
+  "### SVG and Diagram Rendering [1]": [
+   "52588e8fba0d923b",
+   "fa715566df84435d",
+   "734860f3f9e7a6c7",
+   "48254aa2a5e25f95"
+  ],
+  "### Scope: Canonical Surfaces, Not Ephemeral Output [1]": [
+   "24e7236046d6c918",
+   "e5ebec19e60ff8a3",
+   "0a5b862d706e1f2b",
+   "4929d0c421c0fc96",
+   "70bd63945ce39976"
+  ],
+  "### Self-test Before Committing HTML-Layer Changes [1]": [
+   "2b5adc84cbf4dda2"
+  ],
+  "### Sharability and File Layout [1]": [
+   "b27ac1b704c12cfc",
+   "2e576adcc0b7984b",
+   "0877e35cedcab84c",
+   "6a9facc705d3ab1a"
+  ],
+  "### The Architectural Pattern [1]": [
+   "cd026e2533f4f2b7",
+   "3179b56f29a1bf22",
+   "164da8562af19308"
+  ],
+  "### Visual Style Defers to `web-ui-design` [1]": [
+   "b2e00b6d358234db",
+   "a13bf39d0d92b8a0",
+   "c92b1e00e7d205e6",
+   "2f4d805fda97e4c0"
+  ],
+  "### `doc_manifest.yaml` \u2014 the Entry-Point Spine [1]": [
+   "e6afec6e79c1215a",
+   "244e3ba3ff6255a5"
+  ]
+ },
+ "rules/writing/readme-style.md": {
+  "## README Writing Style [1]": [
+   "848364a5ca05d3f1"
+  ],
+  "### Core Principle [1]": [
+   "6bdf6fbaa1609c87"
+  ],
+  "### Decision Framework [1]": [
+   "cf7efa01fb47006e",
+   "dfcc8becc5aa14d2"
+  ],
+  "### Emojis, Badges, and Color [1]": [
+   "dff022c4a9e64c3d",
+   "5607342d4767235f",
+   "69ebed3909723414"
+  ],
+  "### Mandatory Exclusions [1]": [
+   "050357e72259ed00"
+  ],
+  "### Mandatory Inclusions [1]": [
+   "255d8ef01ea4f13b"
+  ],
+  "### Markdown Enhancement Patterns [1]": [
+   "8ef560eee33332fb",
+   "3c0f91480fb61a28",
+   "8f83db237a464e9f",
+   "e05818cd6d382fd1",
+   "d7bad47821cc8a4f",
+   "63ff486bc7cd5d97"
+  ],
+  "### Scaling Long READMEs [1]": [
+   "893fc0d965f91aff"
+  ],
+  "### Structural Integrity and Naming [1]": [
+   "2274b8f4431f3b12"
+  ],
+  "### Structure Conventions [1]": [
+   "e27d59b53afc904e"
+  ],
+  "### Termination Criteria [1]": [
+   "34305da70444ae59"
+  ],
+  "### Writing Quality [1]": [
+   "f102fe47b5b8b28c"
+  ]
+ }
+}

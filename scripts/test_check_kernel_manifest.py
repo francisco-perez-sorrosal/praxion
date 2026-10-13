@@ -381,6 +381,7 @@ def test_the_hook_runs_for_every_input_the_invariants_read() -> None:
         "claude/kernels/src/return-contract.md",
         "agents/researcher.md",
         "hooks/hooks.json",
+        "hooks/inject_kernel.py",
         "scripts/check_kernel_manifest.py",
         "scripts/kernel_model.py",
         "scripts/kernel_ledger.py",

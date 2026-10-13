@@ -294,6 +294,18 @@ def test_when_the_version_control_tool_prints_an_undecodable_path_the_kernel_arr
     assert strings[1] is None
 
 
+def test_a_project_under_a_non_ascii_path_delivers_its_file_under_the_c_locale(tmp_path):
+    plugin = make_plugin(tmp_path)
+    parent = tmp_path / "proyecto-ñ"
+    parent.mkdir()
+    project = make_project(parent, claude_md="project rules\n")
+
+    strings = spawn(tmp_path, plugin, project, slots=2, LC_ALL="C", PYTHONUTF8="0")
+
+    assert strings[0].endswith("KERNEL ONE\n\n")
+    assert part_bodies(delivered(strings)) == ["project rules\n"]
+
+
 def test_a_project_file_of_characters_outside_the_basic_plane_arrives_in_parts_under_the_cap(
     tmp_path,
 ):
@@ -416,8 +428,15 @@ def test_an_import_line_inside_fenced_code_stays_as_written_and_the_same_line_ou
         "````\n```\n@x.md\n",
         "```\n``` not a close\n@x.md\n",
         "```\n@x.md\n",
+        "```markdown\n    ```\n@x.md\n```\n",
     ],
-    ids=["the other character", "a shorter fence", "text after the fence", "never closed"],
+    ids=[
+        "the other character",
+        "a shorter fence",
+        "text after the fence",
+        "never closed",
+        "a fence line indented four spaces is content",
+    ],
 )
 def test_a_fence_stays_open_until_a_line_that_closes_it(tmp_path, text):
     (tmp_path / "x.md").write_text("imported\n")

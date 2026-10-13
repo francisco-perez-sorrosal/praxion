@@ -334,3 +334,14 @@ def test_a_record_the_parser_reads_and_the_spawn_hook_cannot_is_reported(
     assert [f.subject for f in found] == ["role researcher"]
     assert "status None where PyYAML reads 'trial'" in found[0].detail
     assert "generated block shape" in found[0].detail
+
+
+def test_a_record_the_spawn_hook_reads_and_the_parser_discards_is_reported(repo: Path) -> None:
+    record = "  verifier:\n    status: trial\n    since: '2026-10-12'\n    runs: []\n"
+    (repo / km.LEDGER_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (repo / km.LEDGER_PATH).write_text(LEDGER_HEAD + record + "roles: {}\n", encoding="utf-8")
+
+    found = [f for f in cb.check(repo) if f.kind == "I10-hook-misread"]
+
+    assert [f.subject for f in found] == ["role verifier"]
+    assert "status 'trial' where PyYAML reads None" in found[0].detail

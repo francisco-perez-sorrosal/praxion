@@ -37,6 +37,7 @@ SWITCHED_FIELDS = tuple(
 )
 _BARE_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _LADDER = (None, "trial", "switched")  # a role stays or climbs one rung: no skipping, no descent
+_MAPPING_KEY = re.compile(r"[ \t]*([\w.-]+)[ \t]*:")
 
 
 @dataclass(frozen=True)
@@ -218,18 +219,32 @@ def hook_misreadings(
     """Each role whose status `hook_status` reads from `ledger_text` otherwise than `statuses`.
 
     `statuses` is PyYAML's reading of the same text; `hook_status` is the spawn hook's own
-    reader, which knows only the generated block shape. A record in any other layout (deeper
-    indentation, a quoted or flow-style value) parses here and injects nothing at spawn.
+    reader, which knows only the generated block shape. Both directions are judged: a record
+    in any other layout (deeper indentation, a quoted or flow-style value) parses here and
+    injects nothing at spawn, and a record PyYAML discards (a second top-level `roles:` key,
+    of which it keeps the last) injects at spawn with no record the gate judged.
     """
+    roles = set(statuses) | _mapping_keys(ledger_text)
     return tuple(
         km.Finding(
             "hook-misread",
             f"role {role}",
-            f"the spawn hook reads status {read!r} where PyYAML reads {status!r}: "
+            f"the spawn hook reads status {read!r} where PyYAML reads {statuses.get(role)!r}: "
             "rewrite the record in the ledger's generated block shape",
         )
-        for role, status in sorted(statuses.items())
-        if (read := hook_status(ledger_text, role)) != status
+        for role in sorted(roles)
+        if (read := hook_status(ledger_text, role)) != statuses.get(role)
+    )
+
+
+def _mapping_keys(text: str) -> frozenset[str]:
+    """Every block-mapping key in `text`, at any indentation, line by line as the hook splits it.
+
+    A superset of the roles the spawn hook can answer for: it reads a status only under a key
+    line, and its key pattern is one of these.
+    """
+    return frozenset(
+        found.group(1) for line in text.splitlines() if (found := _MAPPING_KEY.match(line))
     )
 
 

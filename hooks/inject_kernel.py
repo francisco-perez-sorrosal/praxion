@@ -120,6 +120,8 @@ Piece = namedtuple("Piece", ("body", "module", "part"))
 Delivery = namedtuple("Delivery", ("pieces", "project_file"))
 # A piece as injected, marker included.
 Injection = namedtuple("Injection", ("text", "module", "part"))
+# An open fenced code block: the fence that opened it and how deep that fence was indented.
+Fence = namedtuple("Fence", ("marker", "indent"))
 
 _LINE = re.compile(r"[^\n]*\n|[^\n]+")
 # The ledger's generated shape (block style): the `roles:` key at the margin, a role at two
@@ -130,7 +132,10 @@ _LEDGER_STATUS = re.compile(r"    status:[ \t]*([\w-]+)[ \t]*(#.*)?$")
 # A project-file line that is wholly an import: `@path`, then nothing but blanks to the line end.
 _IMPORT_LINE = re.compile(r"@(?P<path>\S+)[ \t]*(?=\r?$)")
 # A fence line of a fenced code block: three or more backticks or tildes after any indentation.
-_FENCE = re.compile(r"[ \t]*(?P<marker>`{3,}|~{3,})(?P<rest>[^\n]*)")
+_FENCE = re.compile(r"(?P<indent>[ \t]*)(?P<marker>`{3,}|~{3,})(?P<rest>[^\n]*)")
+# A closing fence is indented at most this far past its container's margin (CommonMark).
+FENCE_INDENT_LIMIT = 3
+TAB_STOP = 4
 _FINAL_LINE_END = re.compile(r"\r?\n\Z")
 
 
@@ -440,15 +445,24 @@ def fence_after(fence, line):
 
     A fence opens at three or more backticks or tildes and closes at a line of the same
     character, at least as long, with nothing after it. A backtick in an opening line's
-    info string makes it inline code, not a fence.
+    info string makes it inline code, not a fence. Any indentation opens one, so an
+    import line under a fence nested in a list is never expanded. A closing line indented
+    past both its opener and ``FENCE_INDENT_LIMIT`` columns is content, since no margin the
+    opener can sit in lets it close there.
     """
     found = _FENCE.match(line)
     if found is None:
         return fence
     marker, rest = found.group("marker"), found.group("rest")
+    indent = len(found.group("indent").expandtabs(TAB_STOP))
     if fence is None:
-        return None if marker[0] == "`" and "`" in rest else marker
-    closes = marker[0] == fence[0] and len(marker) >= len(fence) and not rest.strip()
+        return None if marker[0] == "`" and "`" in rest else Fence(marker, indent)
+    closes = (
+        marker[0] == fence.marker[0]
+        and len(marker) >= len(fence.marker)
+        and not rest.strip()
+        and indent <= max(fence.indent, FENCE_INDENT_LIMIT)
+    )
     return None if closes else fence
 
 

@@ -164,6 +164,17 @@ def test_a_role_the_hook_reads_otherwise_than_the_parser_is_named_with_both_read
     assert "status None where PyYAML reads 'trial'" in found[0].detail
 
 
+def test_a_role_the_hook_reads_and_the_parser_does_not_is_named_with_both_readings() -> None:
+    found = kl.hook_misreadings(
+        {},
+        "roles:\n  verifier:\n    status: trial\n",
+        lambda _, role: {"verifier": "trial"}.get(role),
+    )
+
+    assert [(f.kind, f.subject) for f in found] == [("hook-misread", "role verifier")]
+    assert "status 'trial' where PyYAML reads None" in found[0].detail
+
+
 # -- The ladder of moves -------------------------------------------------------------
 
 

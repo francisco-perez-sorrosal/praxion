@@ -17,16 +17,20 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I6-stale-pin`               | every condensed form's pin matches the source it condenses              |
 | `I7-resident-text-in-kernel` | no orchestrator-only or no-actor paragraph is in any kernel or injected string |
 | `I8-stale-kernel`            | the committed kernels, index, definitions' blocks and preamble equal what the generator writes now |
-| `I9-flip-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
+| `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval |
+| `I9-eligible-changed`        | the ledger's `eligible` list is the pilot's five roles, no more and no fewer |
 | `I9-ledger-transition`       | a role moves only absent -> trial -> switched since the parent commit's ledger |
+| `I9-ledger-deleted`          | a ledger present at the parent commit is still there                    |
 
 `--liveness [--since REV] [--plugin-root DIR]` is a second mode, over an observation log instead
-of the kernels: `liveness-no-kernel-row` names each spawn of a role at trial or switched (by the
+of the kernels: `liveness-missing-row` names each spawn of a role at trial or switched (by the
 plugin's ledger) that left no `kernel_injected` row -- the only sign that the spawn hook did not
-run for it. The log is the one under `--repo-root`; `--since` keeps spawns at or after that
-revision's commit time. A log it cannot find is an input error, never a clean report.
+run for it. A role's spawns count from its record's `since`; `--since` keeps spawns at or after
+that revision's commit time. The log is the one under `--repo-root`, read strictly: a log it
+cannot find or read whole is an input error, and every report counts the spawns it judged, so a
+clean one never means that nothing was judged.
 
 The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
 evidence, names each finding and renders it. The index is read here as plain JSON, not through
@@ -51,6 +55,7 @@ from itertools import zip_longest
 from pathlib import Path
 
 import generate_kernels as gk
+import kernel_ledger as kl
 import kernel_model as km
 import kernel_sources as ks
 from _git_runner import run_git
@@ -68,16 +73,25 @@ CORE_FILES = ("core.md", "core-1.md")  # a core above the cap is numbered parts;
 PARAGRAPH_END = "\n\n"
 IDENTIFYING_CHARS = 24  # a paragraph shorter than this names no source
 RESIDENT_SCOPES = (km.OrchestratorOnly, km.NoActor)
-ADHERENCE_ENTRY = "praxion-evals-adherence"  # the eval whose run a flip may rest on
+# The eval whose run a flip may rest on. The one line in `scripts/` that names it, as data: the
+# paid-eval guard in the eval project's tests exempts exactly this line, so keep it alone.
+ADHERENCE_ENTRY = "praxion-evals-adherence"
+PILOT_ROLES = (
+    "researcher",
+    "verifier",
+    "discipline-consultant",
+    "skill-genesis",
+    "context-engineer",
+)
 SWITCHED = "switched"
 AGENT_PREFIX = "praxion:"  # the agent type of this plugin's agents, as the log records it
 SPAWN_ROW = "agent_start"
 KERNEL_ROW = "kernel_injected"
 STATE_DIR = ".ai-state"
 
-_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
-_OMIT_LINE = re.compile(r"^omitClaudeMd:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
-_NOT_OMITTING = ("", "false")  # any other value is read as the flag, so a mistyped one still gates
+OMIT_KEY = (
+    "omitClaudeMd"  # any value but false or null is read as the flag: a mistyped one still gates
+)
 
 
 # -- Pure: the nine invariants ---------------------------------------------------------
@@ -165,10 +179,11 @@ def resident_findings(
     """I7: no paragraph of an orchestrator-only or no-actor section in any text a spawn receives.
 
     `injected` maps where each text came from to the text. A paragraph counts when it is long
-    enough to identify its source and is not a bare heading: two rules may share a heading.
+    enough to identify its source and is not a bare heading (two rules may share a heading); so
+    does each such line of a list or table, which a kernel may carry without its neighbours.
     """
     resident = {
-        entry: _identifying_paragraphs(text)
+        entry: _identifying_texts(text)
         for entry, text in km.entry_texts(manifest, sections).items()
         if isinstance(entry.scope, RESIDENT_SCOPES)
     }
@@ -180,7 +195,7 @@ def resident_findings(
         )
         for where, text in injected.items()
         for entry, paragraphs in resident.items()
-        if any(paragraph in text for paragraph in paragraphs)
+        if any(identifying in text for identifying in paragraphs)
     )
 
 
@@ -199,7 +214,7 @@ def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tup
     """I9: `omitClaudeMd` and a switched adoption record come together, both ways."""
     unrecorded = tuple(
         km.Finding(
-            "I9-flip-without-record",
+            "I9-flag-without-record",
             f"role {role}",
             f"omitClaudeMd is set but its adoption record is {statuses.get(role, 'absent')}, "
             f"not {SWITCHED}",
@@ -219,14 +234,28 @@ def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tup
     return (*unrecorded, *unflagged)
 
 
-def record_findings(ledger: km.Ledger | km.KernelModelError) -> tuple[km.Finding, ...]:
+def record_findings(ledger: kl.Ledger | km.KernelModelError | None) -> tuple[km.Finding, ...]:
     """I9: every switched record is eligible, holds all its evidence, rests on the adherence eval.
 
     The model refuses a record short of evidence (and says which role and piece); the eval a
-    passing run came from is the commit gate's rule, not the model's.
+    passing run came from, and the eligible roles themselves, are the commit gate's rule, not
+    the model's: a ledger that could widen its own list would make the list no rule at all.
     """
+    if ledger is None:
+        return ()
     if isinstance(ledger, km.KernelModelError):
         return (km.Finding("I9-record-incomplete", km.LEDGER_PATH, str(ledger)),)
+    return (*_eligible_changed(ledger), *_foreign_eval_runs(ledger))
+
+
+def _eligible_changed(ledger: kl.Ledger) -> tuple[km.Finding, ...]:
+    if sorted(ledger.eligible) == sorted(PILOT_ROLES):
+        return ()
+    detail = f"eligible lists {sorted(ledger.eligible)}, not the pilot's {sorted(PILOT_ROLES)}"
+    return (km.Finding("I9-eligible-changed", km.LEDGER_PATH, detail),)
+
+
+def _foreign_eval_runs(ledger: kl.Ledger) -> tuple[km.Finding, ...]:
     return tuple(
         km.Finding(
             "I9-record-incomplete",
@@ -234,61 +263,108 @@ def record_findings(ledger: km.Ledger | km.KernelModelError) -> tuple[km.Finding
             f"rests on run {run.id!r} of eval {run.entry!r}, not {ADHERENCE_ENTRY!r}",
         )
         for role, record in sorted(ledger.records.items())
-        if isinstance(record, km.Switched)
+        if isinstance(record, kl.Switched)
         for run in [_passing_run(record)]
         if run.entry != ADHERENCE_ENTRY
     )
 
 
 def transition_findings(
-    before: km.Ledger | None, after: km.Ledger | km.KernelModelError
+    parent: Mapping[str, str] | None, statuses: Mapping[str, str]
 ) -> tuple[km.Finding, ...]:
-    """I9: moves since the parent commit's ledger; none when there is no parent or no ledger."""
-    if before is None or isinstance(after, km.KernelModelError):
+    """I9: moves since the parent commit's ledger; none when the parent held no (readable) ledger."""
+    if parent is None:
         return ()
     return tuple(
         km.Finding(f"I9-{found.kind}", found.subject, found.detail)
-        for found in km.ledger_transitions(before, after)
+        for found in kl.ledger_transitions(parent, statuses)
     )
+
+
+def deletion_findings(
+    parent: Mapping[str, str] | None, ledger: kl.Ledger | km.KernelModelError | None
+) -> tuple[km.Finding, ...]:
+    """I9: a ledger the parent commit holds is still there, or its first appearance could repeat."""
+    if parent is None or ledger is not None:
+        return ()
+    detail = "the parent commit holds this ledger and this tree does not: restore it"
+    return (km.Finding("I9-ledger-deleted", km.LEDGER_PATH, detail),)
 
 
 def omitting_roles(definitions: Mapping[str, str]) -> frozenset[str]:
     """The agents whose definition sets `omitClaudeMd` to anything but false."""
-    return frozenset(name for name, text in definitions.items() if _omits_claude_md(text))
+    return frozenset(name for name, text in definitions.items() if _omits_claude_md(name, text))
 
 
-def liveness_findings(
-    statuses: Mapping[str, str],
+@dataclass(frozen=True)
+class LivenessReport:
+    """What the liveness check judged and found: a clean report states how much it judged."""
+
+    judged: int  # spawns of adopted roles at or after their record's start
+    adopted: int  # roles at trial or switched in the ledger read
+    findings: tuple[km.Finding, ...]
+
+
+def liveness_report(
+    adoptions: Mapping[str, kl.Adoption],
     rows: Sequence[Mapping[str, object]],
     since: datetime | None = None,
-) -> tuple[km.Finding, ...]:
-    """A spawn of a role at trial or switched, at or after `since`, with no `kernel_injected` row.
+) -> LivenessReport:
+    """Each spawn of an adopted role, from its record's start and from `since`, judged for its row.
 
     A spawn is an agent's first `agent_start`; a later one is a resume and is never judged. Only
     this plugin's agents (`praxion:<role>`) count; the role is what follows the prefix. Rows are
     matched by agent id, so one row serves exactly the spawn that wrote it.
     """
     delivered = {row.get("agent_id") for row in rows if row.get("event_type") == KERNEL_ROW}
+    judged = _judged_spawns(adoptions, rows, since)
+    findings = tuple(
+        km.Finding(
+            "liveness-missing-row",
+            f"role {role}",
+            f"agent {agent_id} started at {row.get('timestamp')} and left no {KERNEL_ROW} row",
+        )
+        for agent_id, role, row in judged
+        if agent_id not in delivered
+    )
+    return LivenessReport(len(judged), len(adoptions), findings)
+
+
+def _judged_spawns(
+    adoptions: Mapping[str, kl.Adoption],
+    rows: Sequence[Mapping[str, object]],
+    since: datetime | None,
+) -> list[tuple[object, str, Mapping[str, object]]]:
     spawns: dict[object, Mapping[str, object]] = {}
     for row in rows:
         if row.get("event_type") == SPAWN_ROW:
             spawns.setdefault(row.get("agent_id"), row)
-    return tuple(
-        km.Finding(
-            "liveness-no-kernel-row",
-            f"role {role}",
-            f"agent {agent_id} started at {row.get('timestamp')} and left no {KERNEL_ROW} row",
-        )
-        for agent_id, row in spawns.items()
-        if agent_id not in delivered
-        if (role := _adopted_role(row, statuses)) is not None
-        if since is None or reader.row_time(dict(row)) >= since
-    )
+    judged = []
+    for agent_id, row in spawns.items():
+        role = _adopted_role(row, adoptions)
+        if role is not None and reader.row_time(dict(row)) >= _judged_from(adoptions[role], since):
+            judged.append((agent_id, role, row))
+    return judged
 
 
-def _identifying_paragraphs(text: str) -> tuple[str, ...]:
-    blocks = (block.strip() for block in re.split(r"\n\s*\n", text))
-    return tuple(b for b in blocks if len(b) >= IDENTIFYING_CHARS and not b.startswith("#"))
+def _judged_from(adoption: kl.Adoption, since: datetime | None) -> datetime:
+    return adoption.since if since is None else max(adoption.since, since)
+
+
+def _identifying_texts(text: str) -> tuple[str, ...]:
+    texts: list[str] = []
+    for block in (b.strip() for b in re.split(r"\n\s*\n", text)):
+        if len(block) >= IDENTIFYING_CHARS and not block.startswith("#"):
+            texts.append(block)
+        lines = [line.strip() for line in block.splitlines()]
+        if len(lines) > 1:
+            texts += [line for line in lines if _names_its_source(line)]
+    return tuple(texts)
+
+
+def _names_its_source(line: str) -> bool:
+    """A line long enough in letters and digits to be this source's: rules of dashes name none."""
+    return not line.startswith("#") and sum(c.isalnum() for c in line) >= IDENTIFYING_CHARS
 
 
 def _audience(entry: km.AudienceEntry) -> str:
@@ -301,22 +377,21 @@ def _section_label(entry: km.AudienceEntry) -> str:
     return f"{label} (part {target.prefix!r})" if isinstance(target, km.PartTarget) else label
 
 
-def _passing_run(record: km.Switched) -> km.Run:
+def _passing_run(record: kl.Switched) -> kl.Run:
     return next(run for run in record.runs if run.id == record.passing_run)  # the model holds it
 
 
-def _omits_claude_md(definition: str) -> bool:
-    block = _FRONTMATTER.match(definition)
-    line = _OMIT_LINE.search(block.group(1)) if block else None
-    return line is not None and line.group(1).strip("'\"").lower() not in _NOT_OMITTING
+def _omits_claude_md(name: str, definition: str) -> bool:
+    flag = km.frontmatter(definition, f"agents/{name}.md").get(OMIT_KEY)
+    return flag is not None and flag is not False
 
 
-def _adopted_role(row: Mapping[str, object], statuses: Mapping[str, str]) -> str | None:
+def _adopted_role(row: Mapping[str, object], adoptions: Collection[str]) -> str | None:
     agent_type = row.get("agent_type")
     if not isinstance(agent_type, str) or not agent_type.startswith(AGENT_PREFIX):
         return None
     role = agent_type.removeprefix(AGENT_PREFIX)
-    return role if role in statuses else None
+    return role if role in adoptions else None
 
 
 def _contract_lines(
@@ -387,8 +462,8 @@ class Evidence:
         tuple[str, ...] | km.KernelModelError
     )  # paths the generator would change, or why not
     statuses: Mapping[str, str]  # role -> trial or switched, whatever else the ledger holds
-    ledger: km.Ledger | km.KernelModelError  # the evidence-checked ledger, or the refusal
-    parent_ledger: km.Ledger | None  # the ledger as of HEAD; None when HEAD has none
+    ledger: kl.Ledger | km.KernelModelError | None  # evidence-checked, the refusal, or no file
+    parent_statuses: Mapping[str, str] | None  # the ledger's statuses at HEAD; None: no ledger
 
 
 def gather(root: Path) -> Evidence:
@@ -407,7 +482,7 @@ def gather(root: Path) -> Evidence:
         _regeneration(root),
         km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
         _evidence_checked_ledger(root, definitions),
-        _parent_ledger(root, definitions),
+        _parent_statuses(root),
     )
 
 
@@ -430,7 +505,8 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *(() if totality else stale_findings(evidence.regeneration)),
         *flip_findings(omitting_roles(evidence.definitions), evidence.statuses),
         *record_findings(evidence.ledger),
-        *transition_findings(evidence.parent_ledger, evidence.ledger),
+        *transition_findings(evidence.parent_statuses, evidence.statuses),
+        *deletion_findings(evidence.parent_statuses, evidence.ledger),
     )
 
 
@@ -442,10 +518,10 @@ def injected_texts(evidence: Evidence) -> dict[str, str]:
     return texts
 
 
-def check_liveness(root: Path, plugin_root: Path, since: str | None) -> tuple[km.Finding, ...]:
+def check_liveness(root: Path, plugin_root: Path, since: str | None) -> LivenessReport:
     """Spawns in the observation log under `root` that left no kernel row, by the plugin's ledger."""
-    statuses = km.load_statuses(plugin_root)
-    return liveness_findings(statuses, _observation_rows(root), _commit_time(root, since))
+    adoptions = kl.load_adoptions(plugin_root)
+    return liveness_report(adoptions, _observation_rows(root), _commit_time(root, since))
 
 
 def _read_text(path: Path) -> str | None:
@@ -478,26 +554,52 @@ def _regeneration(root: Path) -> tuple[str, ...] | km.KernelModelError:
 
 def _evidence_checked_ledger(
     root: Path, definitions: Collection[str]
-) -> km.Ledger | km.KernelModelError:
+) -> kl.Ledger | km.KernelModelError | None:
+    if not (root / km.LEDGER_PATH).is_file():
+        return None
     try:
-        return km.load_ledger(root, definitions)
+        return kl.load_ledger(root, definitions)
     except km.KernelModelError as refusal:
         return refusal
 
 
-def _parent_ledger(root: Path, definitions: Collection[str]) -> km.Ledger | None:
-    """The ledger as of HEAD, the commit this one builds on; None when HEAD holds none."""
+def _parent_statuses(root: Path) -> Mapping[str, str] | None:
+    """The ledger's statuses as of HEAD, the commit this one builds on; None when HEAD has none.
+
+    Only statuses matter to the ladder, so the parent is read as leniently as the generator
+    reads the working copy: a commit that repairs a ledger the model now refuses must not be
+    blocked by the old one. A parent too broken even for that is told, then judged as none.
+    """
     shown = run_git(root, "show", f"HEAD:{km.LEDGER_PATH}")
     if shown.returncode != 0:  # no repository, no commit yet, or no ledger in it
         return None
-    return km.parse_ledger_text(shown.stdout, definitions, f"{km.LEDGER_PATH} at HEAD")
+    try:
+        return km.parse_statuses(km.parse_yaml(shown.stdout, f"{km.LEDGER_PATH} at HEAD"))
+    except km.KernelModelError as unreadable:
+        print(f"note: {unreadable}: its moves are not judged", file=sys.stderr)
+        return None
 
 
 def _observation_rows(root: Path) -> list[dict]:
+    """Every row of the log under `root`, read strictly: a lost row could hide a violation."""
     state_dir = root / STATE_DIR
-    if not reader.segments(state_dir, archives=True):
+    listing = reader.segment_listing(state_dir, archives=True)
+    if listing.error:
+        raise km.KernelModelError(
+            f"{state_dir}: the observation log cannot be listed: {listing.error}"
+        )
+    if not listing.segments:
         raise km.KernelModelError(f"no observation log under {state_dir}: nothing to judge")
-    return reader.read_rows(state_dir, archives=True)
+    rows: list[dict] = []
+    for path in listing.segments:
+        segment = reader.read_segment(path)
+        if segment.error or segment.malformed_lines:
+            problem = segment.error or f"unparseable lines {list(segment.malformed_lines)}"
+            raise km.KernelModelError(
+                f"{path}: the observation log is not readable whole: {problem}"
+            )
+        rows.extend(segment.rows)
+    return rows
 
 
 def _commit_time(root: Path, revision: str | None) -> datetime | None:
@@ -512,19 +614,31 @@ def _commit_time(root: Path, revision: str | None) -> datetime | None:
 # -- Edge: the command line ---------------------------------------------------------------
 
 
-def render_human(findings: Sequence[km.Finding], label: str = "kernel manifest") -> str:
+def render_human(
+    findings: Sequence[km.Finding], label: str = "kernel manifest", scope: str = ""
+) -> str:
+    """The report as text; `scope` says how much was judged, shown after the verdict."""
+    tail = f" ({scope})" if scope else ""
     if not findings:
-        return f"{label}: clean"
+        return f"{label}: clean{tail}"
     lines = [f"{f.kind}: {f.subject}" + (f" -- {f.detail}" if f.detail else "") for f in findings]
-    return "\n".join([*lines, f"{label}: {len(findings)} finding(s)"])
+    return "\n".join([*lines, f"{label}: {len(findings)} finding(s){tail}"])
 
 
-def render_json(findings: Sequence[km.Finding]) -> str:
+def render_json(findings: Sequence[km.Finding], **extra: object) -> str:
     report = {
         "schema": REPORT_SCHEMA,
         "findings": [{"kind": f.kind, "subject": f.subject, "detail": f.detail} for f in findings],
+        **extra,
     }
     return json.dumps(report, indent=2, ensure_ascii=False)
+
+
+def render_liveness(report: LivenessReport, as_json: bool) -> str:
+    if as_json:
+        return render_json(report.findings, judged=report.judged, adopted=report.adopted)
+    scope = f"{report.judged} spawn(s) of {report.adopted} adopted role(s) judged"
+    return render_human(report.findings, "kernel liveness", scope)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -556,9 +670,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ValueError(f"{root} is an installed-plugin cache: check the source checkout")
         if args.liveness:
             plugin_root = Path(args.plugin_root) if args.plugin_root else SCRIPT_DIR.parent
-            findings, label = check_liveness(root, plugin_root, args.since), "kernel liveness"
+            report = check_liveness(root, plugin_root, args.since)
+            output, findings = render_liveness(report, args.json), report.findings
         else:
-            findings, label = check(root), "kernel manifest"
+            findings = check(root)
+            output = render_json(findings) if args.json else render_human(findings)
     except (
         ValueError,
         km.MissingParserError,
@@ -566,7 +682,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) as exc:  # the model's errors are ValueErrors
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(render_json(findings) if args.json else render_human(findings, label))
+    print(output)
     return 1 if findings else 0
 
 

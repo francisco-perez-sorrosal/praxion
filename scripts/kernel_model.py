@@ -14,10 +14,8 @@ Where each invariant is enforced:
 | no empty audience, unknown agent or group, empty group                 | `Role`, `Group`, `_known_audience`    |
 | orchestrator-only / no-actor give a reason and name no agent           | `_Reasoned`, `_parse_scope`           |
 | one entry per section; parts of a section have distinct prefixes       | `_refuse_second_entry`                |
-| an unknown `version` / `schema` is refused until taught                | `_check_version`                      |
+| an unknown `version` / `schema` is refused until taught                | `check_version`                       |
 | an injected string never exceeds the harness cap                       | `KernelString`, `RoleKernel`          |
-| a switched record holds every piece of flip evidence                   | `Switched.__post_init__`              |
-| ledger moves only absent -> trial -> switched                          | `ledger_transitions`                  |
 | every section and part classified; no orphaned entry                   | `check_totality`                      |
 | a condensed form's pin matches its source                              | `stale_pins`                          |
 | the two writer groups equal what the definitions say                   | `group_coherence`                     |
@@ -25,9 +23,10 @@ Where each invariant is enforced:
 The pure functions take plain values; the `load_*` functions are the edge. PyYAML is
 imported lazily, so a bare `python3` without it fails naming the interpreter.
 
-The ledger has two readers: `load_ledger` builds the evidence-checked record (the commit
-gate); `load_statuses` reads only who is at trial or switched (the generator and the
-liveness check, which must survive a record the gate is about to refuse).
+The adoption ledger's evidence (a switched record's pieces, the ladder of moves, the
+liveness bound) is `kernel_ledger`'s, built on the readers here; `parse_statuses` /
+`load_statuses` stay here: they read only who is at trial or switched, which the generator
+needs and which must survive a record the commit gate is about to refuse.
 """
 
 from __future__ import annotations
@@ -46,7 +45,6 @@ import kernel_sources as ks
 SUPPORTED_VERSION = 1
 SUPPORTED_INDEX_SCHEMA = 1
 MAX_STRING_CHARS = 10_000  # the harness replaces a longer injected string with a file path
-REQUIRED_PAIRS = 20  # a flip rests on a run of at least this many complete pairs
 
 CORE = "core"
 ADR_AUTHOR = "adr-author"
@@ -57,9 +55,6 @@ MANIFEST_PATH = "rules/_audience.yaml"
 LEDGER_PATH = ".ai-state/kernel_adoption.yaml"
 INDEX_PATH = "claude/kernels/index.json"
 
-_SWITCHED_FIELDS = tuple(
-    "passing_run probe_before_tokens probe_after_tokens flip_rule_ratified flip_ratified".split()
-)
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
 _APPENDS_ROWS = re.compile(r"append\b[^\n]*?\brows?\b", re.IGNORECASE)
 _NAME_LINE = re.compile(r"^name:\s*(\S+)\s*$", re.MULTILINE)
@@ -195,7 +190,7 @@ class Manifest:
     entries: tuple[AudienceEntry, ...]
 
 
-# -- Kernel strings, the index, the adoption record ---------------------------------
+# -- Kernel strings and the index ---------------------------------
 
 
 def _require_fits(text: str, where: str) -> None:
@@ -234,70 +229,10 @@ class KernelIndex:
     roles: Mapping[str, RoleKernel]
 
 
-@dataclass(frozen=True)
-class Run:
-    id: str
-    complete_pairs: int
-    passes_flip_rule: bool
-    entry: str
-
-
-@dataclass(frozen=True)
-class Trial:
-    role: str
-    since: str
-    runs: tuple[Run, ...]
-
-
-@dataclass(frozen=True)
-class Switched:
-    role: str
-    since: str
-    runs: tuple[Run, ...]
-    passing_run: str
-    probe_before_tokens: int
-    probe_after_tokens: int
-    flip_rule_ratified: bool
-    flip_ratified: bool
-
-    def __post_init__(self) -> None:
-        passing = next((run for run in self.runs if run.id == self.passing_run), None)
-        gaps = (
-            _run_gaps(passing) if passing else [f"cites {self.passing_run!r}, not among its runs"]
-        )
-        probes = ((n, getattr(self, n)) for n in _SWITCHED_FIELDS[1:3])
-        gaps += [f"has no positive {n}" for n, v in probes if type(v) is not int or v <= 0]
-        gaps += [
-            f"lacks the user's {n}" for n in _SWITCHED_FIELDS[3:] if getattr(self, n) is not True
-        ]
-        if gaps:
-            raise KernelModelError(f"role {self.role}: a switched record " + "; ".join(gaps))
-
-
-def _run_gaps(run: Run) -> list[str]:
-    gaps = []
-    if run.complete_pairs < REQUIRED_PAIRS:
-        gaps.append(
-            f"rests on run {run.id!r} of {run.complete_pairs} pairs (needs {REQUIRED_PAIRS})"
-        )
-    if not run.passes_flip_rule:
-        gaps.append(f"rests on run {run.id!r}, which does not pass the flip rule")
-    return gaps
-
-
-AdoptionRecord = Trial | Switched
-
-
-@dataclass(frozen=True)
-class Ledger:
-    eligible: tuple[str, ...]
-    records: Mapping[str, AdoptionRecord]
-
-
 # -- Boundary: wire shapes to values ----------------------------------------------
 
 
-def _check_version(raw: Mapping[str, Any], key: str, expected: int) -> None:
+def check_version(raw: Mapping[str, Any], key: str, expected: int) -> None:
     value = raw.get(key)
     if type(value) is not int or value != expected:
         raise KernelModelError(
@@ -306,13 +241,13 @@ def _check_version(raw: Mapping[str, Any], key: str, expected: int) -> None:
         )
 
 
-def _mapping(value: Any, what: str) -> Mapping[str, Any]:
+def as_mapping(value: Any, what: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise KernelModelError(f"{what} must be a mapping, got {type(value).__name__}")
     return value
 
 
-def _sequence(value: Any, what: str) -> Sequence[Any]:
+def as_sequence(value: Any, what: str) -> Sequence[Any]:
     if value is None:
         return ()
     if isinstance(value, str) or not isinstance(value, Sequence):
@@ -320,7 +255,7 @@ def _sequence(value: Any, what: str) -> Sequence[Any]:
     return value
 
 
-def _text(value: Any, what: str) -> str:
+def as_text(value: Any, what: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise KernelModelError(f"{what} must be non-empty text, got {value!r}")
     return value
@@ -338,8 +273,8 @@ class _Declared:
 
 def parse_manifest(raw: Mapping[str, Any], agents: Collection[str]) -> Manifest:
     """The manifest as values; every illegal entry shape is refused naming the entry."""
-    raw = _mapping(raw, "the manifest")
-    _check_version(raw, "version", SUPPORTED_VERSION)
+    raw = as_mapping(raw, "the manifest")
+    check_version(raw, "version", SUPPORTED_VERSION)
     known = frozenset(agents)
     groups = _parse_groups(raw.get("groups"), known)
     declared = _Declared(
@@ -348,16 +283,16 @@ def parse_manifest(raw: Mapping[str, Any], agents: Collection[str]) -> Manifest:
         _parse_modules(raw.get("modules"), known, groups),
         {t.id: t for t in _parse_authored(raw.get("authored"))},
     )
-    entries = _parse_entries(_sequence(raw.get("entries"), "entries"), declared)
+    entries = _parse_entries(as_sequence(raw.get("entries"), "entries"), declared)
     return Manifest(groups, declared.modules, tuple(declared.authored.values()), entries)
 
 
 def _parse_groups(raw: Any, agents: frozenset[str]) -> dict[str, tuple[str, ...]]:
     groups = {}
-    for name, members in _mapping(raw or {}, "groups").items():
+    for name, members in as_mapping(raw or {}, "groups").items():
         if name in agents:
             raise KernelModelError(f"group {name!r} shares its name with an agent")
-        if not (listed := tuple(_sequence(members, f"group {name!r}"))):
+        if not (listed := tuple(as_sequence(members, f"group {name!r}"))):
             raise KernelModelError(f"group {name!r} has no members")
         unknown = [m for m in listed if m not in agents]
         if unknown:
@@ -370,8 +305,8 @@ def _parse_modules(
     raw: Any, agents: frozenset[str], groups: Mapping[str, tuple[str, ...]]
 ) -> dict[str, tuple[str, ...]]:
     modules = {}
-    for name, body in _mapping(raw or {}, "modules").items():
-        audience = tuple(_sequence(_mapping(body, f"module {name!r}").get("audience"), name))
+    for name, body in as_mapping(raw or {}, "modules").items():
+        audience = tuple(as_sequence(as_mapping(body, f"module {name!r}").get("audience"), name))
         if name == CORE or not audience:
             raise KernelModelError(f"module {name!r}: core is implicit and an audience is named")
         for member in audience:
@@ -383,10 +318,10 @@ def _parse_modules(
 
 def _parse_authored(raw: Any) -> list[AuthoredText]:
     texts = []
-    for row in _sequence(raw, "authored"):
-        row = _mapping(row, "an authored text")
+    for row in as_sequence(raw, "authored"):
+        row = as_mapping(row, "an authored text")
         for key in ("id", "path", "module"):
-            _text(row.get(key), f"authored text {key}")
+            as_text(row.get(key), f"authored text {key}")
         texts.append(
             AuthoredText(
                 row["id"], row["path"], row["module"], row.get("condenses"), row.get("pinned_sha")
@@ -398,7 +333,7 @@ def _parse_authored(raw: Any) -> list[AuthoredText]:
 def _parse_entries(rows: Sequence[Any], declared: _Declared) -> tuple[AudienceEntry, ...]:
     entries: list[AudienceEntry] = []
     for position, row in enumerate(rows, start=1):
-        row = _mapping(row, f"entry {position}")
+        row = as_mapping(row, f"entry {position}")
         label = f"entry {position} ({row.get('source')} '{row.get('heading')}')"
         try:
             entry = AudienceEntry(_parse_target(row), _parse_scope(row, declared))
@@ -410,8 +345,8 @@ def _parse_entries(rows: Sequence[Any], declared: _Declared) -> tuple[AudienceEn
 
 
 def _parse_target(row: Mapping[str, Any]) -> Target:
-    source = _text(row.get("source"), "source")
-    heading = _text(row.get("heading"), "heading")
+    source = as_text(row.get("source"), "source")
+    heading = as_text(row.get("heading"), "heading")
     prefix = row.get("part")
     return SectionTarget(source, heading) if prefix is None else PartTarget(source, heading, prefix)
 
@@ -437,8 +372,8 @@ def _parse_scope(row: Mapping[str, Any], declared: _Declared) -> Scope:
 
 
 def _known_audience(row: Mapping[str, Any], declared: _Declared) -> tuple[str, ...]:
-    agents = tuple(_sequence(row.get("agents"), "agents"))
-    groups = tuple(_sequence(row.get("groups"), "groups"))
+    agents = tuple(as_sequence(row.get("agents"), "agents"))
+    groups = tuple(as_sequence(row.get("groups"), "groups"))
     for agent in agents:
         if agent not in declared.agents:
             raise KernelModelError(f"unknown agent {agent!r}")
@@ -500,72 +435,37 @@ def _refuse_second_entry(entries: Sequence[AudienceEntry], entry: AudienceEntry)
 
 
 def parse_index(raw: Mapping[str, Any]) -> KernelIndex:
-    raw = _mapping(raw, "the index")
-    _check_version(raw, "schema", SUPPORTED_INDEX_SCHEMA)
+    raw = as_mapping(raw, "the index")
+    check_version(raw, "schema", SUPPORTED_INDEX_SCHEMA)
     slots = raw.get("slots")
     if type(slots) is not int or slots < 1:
         raise KernelModelError(f"slots must be a positive integer, got {slots!r}")
     roles = {}
-    for name, body in _mapping(raw.get("roles"), "roles").items():
-        body = _mapping(body, f"role {name!r}")
-        strings = tuple(_sequence(body.get("strings"), f"role {name!r} strings"))
+    for name, body in as_mapping(raw.get("roles"), "roles").items():
+        body = as_mapping(body, f"role {name!r}")
+        strings = tuple(as_sequence(body.get("strings"), f"role {name!r} strings"))
         try:
             roles[name] = RoleKernel(body.get("status"), strings)
         except KernelModelError as exc:
             raise KernelModelError(f"role {name!r}: {exc}") from exc
-    version = _text(raw.get("kernel_version"), "kernel_version")
+    version = as_text(raw.get("kernel_version"), "kernel_version")
     return KernelIndex(version, slots, MappingProxyType(roles))
 
 
 def parse_statuses(raw: Mapping[str, Any]) -> Mapping[str, str]:
     """Which roles are at trial or switched, trusting nothing else in the record."""
-    raw = _mapping(raw, "the ledger")
-    _check_version(raw, "version", SUPPORTED_VERSION)
+    raw = as_mapping(raw, "the ledger")
+    check_version(raw, "version", SUPPORTED_VERSION)
     statuses = {}
-    for role, row in _mapping(raw.get("roles") or {}, "roles").items():
-        status = _mapping(row, f"role {role!r}").get("status")
+    for role, row in as_mapping(raw.get("roles") or {}, "roles").items():
+        status = as_mapping(row, f"role {role!r}").get("status")
         if status not in STATUSES:
             raise KernelModelError(f"role {role}: status {status!r} is neither trial nor switched")
         statuses[role] = status
     return MappingProxyType(statuses)
 
 
-def parse_ledger(raw: Mapping[str, Any], agents: Collection[str]) -> Ledger:
-    """The ledger with its evidence: a switched role missing any piece is refused by name."""
-    statuses = parse_statuses(raw)
-    eligible = tuple(_sequence(raw.get("eligible"), "eligible"))
-    records = {}
-    for role, status in statuses.items():
-        if role not in agents:
-            raise KernelModelError(f"role {role}: no such agent")
-        records[role] = _parse_record(role, status, raw["roles"][role], role in eligible)
-    return Ledger(eligible, MappingProxyType(records))
-
-
-def _parse_record(role: str, status: str, row: Mapping[str, Any], eligible: bool) -> AdoptionRecord:
-    since = _text(row.get("since"), f"role {role}: since")
-    runs = tuple(_parse_run(role, run) for run in _sequence(row.get("runs"), "runs"))
-    if status == "trial":
-        return Trial(role, since, runs)
-    if not eligible:
-        raise KernelModelError(f"role {role}: is not eligible to be switched")
-    missing = [key for key in _SWITCHED_FIELDS if row.get(key) is None]
-    if missing:
-        raise KernelModelError(f"role {role}: a switched record lacks {', '.join(missing)}")
-    return Switched(role, since, runs, *(row[key] for key in _SWITCHED_FIELDS))
-
-
-def _parse_run(role: str, row: Any) -> Run:
-    row = _mapping(row, f"role {role}: a run")
-    return Run(
-        id=_text(row.get("id"), f"role {role}: run id"),
-        complete_pairs=row.get("complete_pairs") or 0,
-        passes_flip_rule=row.get("passes_flip_rule") is True,
-        entry=row.get("entry") or "",
-    )
-
-
-# -- Pure: totality, pins, groups, transitions --------------------------------------
+# -- Pure: totality, pins, groups --------------------------------------
 
 
 def _by_section(manifest: Manifest) -> dict[tuple[str, str], list[AudienceEntry]]:
@@ -711,25 +611,6 @@ def group_coherence(
     return tuple(findings)
 
 
-_LADDER = (None, "trial", "switched")  # a role stays or climbs one rung: no skipping, no descent
-
-
-def ledger_transitions(before: Ledger | None, after: Ledger) -> tuple[Finding, ...]:
-    """Moves from the parent commit's ledger that go anywhere but forward one status."""
-    earlier = before.records if before is not None else {}
-    findings = []
-    for role in sorted(set(earlier) | set(after.records)):
-        was, now = _status(earlier.get(role)), _status(after.records.get(role))
-        if _LADDER.index(now) - _LADDER.index(was) not in (0, 1):
-            move = f"{was or 'absent'} -> {now or 'absent'}"
-            findings.append(Finding("ledger-transition", f"role {role}", move))
-    return tuple(findings)
-
-
-def _status(record: AdoptionRecord | None) -> str | None:
-    return None if record is None else type(record).__name__.lower()
-
-
 # -- Edge: files ------------------------------------------------------------------
 
 
@@ -746,17 +627,18 @@ def _require_yaml() -> Any:
     return yaml
 
 
-def _read_yaml(path: Path) -> Mapping[str, Any]:
-    return _parse_yaml(path.read_bytes().decode("utf-8"), str(path))
+def read_yaml(path: Path) -> Mapping[str, Any]:
+    return parse_yaml(path.read_bytes().decode("utf-8"), str(path))
 
 
-def _parse_yaml(text: str, where: str) -> Mapping[str, Any]:
+def parse_yaml(text: str, where: str) -> Mapping[str, Any]:
+    """The mapping in YAML `text`; `where` names its source in a refusal."""
     yaml = _require_yaml()
     try:
         loaded = yaml.safe_load(text)
     except yaml.YAMLError as exc:
         raise KernelModelError(f"{where}: not valid YAML: {exc}") from exc
-    return _mapping(loaded, where)
+    return as_mapping(loaded, where)
 
 
 def agent_definitions(root: Path) -> dict[str, str]:
@@ -770,31 +652,24 @@ def agent_definitions(root: Path) -> dict[str, str]:
     return found
 
 
+def frontmatter(definition: str, where: str) -> Mapping[str, Any]:
+    """The YAML frontmatter of a markdown definition; empty when it declares none."""
+    block = _FRONTMATTER.match(definition)
+    return parse_yaml(block.group(1), where) if block else MappingProxyType({})
+
+
 def load_manifest(root: Path, agents: Collection[str]) -> Manifest:
     path = root / MANIFEST_PATH
     if not path.is_file():
         raise KernelModelError(
             f"{path} does not exist: a gate over no manifest passes over nothing"
         )
-    return parse_manifest(_read_yaml(path), agents)
-
-
-def load_ledger(root: Path, agents: Collection[str]) -> Ledger:
-    """The evidence-checked ledger; no ledger file is an empty ledger."""
-    path = root / LEDGER_PATH
-    if not path.is_file():
-        return Ledger((), MappingProxyType({}))
-    return parse_ledger(_read_yaml(path), agents)
-
-
-def parse_ledger_text(text: str, agents: Collection[str], where: str) -> Ledger:
-    """The evidence-checked ledger read from YAML text held elsewhere (another commit's copy)."""
-    return parse_ledger(_parse_yaml(text, where), agents)
+    return parse_manifest(read_yaml(path), agents)
 
 
 def load_statuses(root: Path) -> Mapping[str, str]:
     path = root / LEDGER_PATH
-    return parse_statuses(_read_yaml(path)) if path.is_file() else MappingProxyType({})
+    return parse_statuses(read_yaml(path)) if path.is_file() else MappingProxyType({})
 
 
 def load_index(root: Path) -> KernelIndex | None:

@@ -10,6 +10,7 @@ executable, like the live runner's.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -30,8 +31,13 @@ _AUTOMATION_SURFACES = (
 )
 _SCANNED_SUFFIXES = {".py", ".sh", ".yml", ".yaml", ".json", ".md", ".toml"}
 # Names the console entry as data and starts nothing: the commit gate compares the `entry`
-# field of a ledger run to it, so a flip rests only on a run of this eval.
-_NAMES_THE_ENTRY_AS_DATA = ("scripts/check_kernel_manifest.py",)
+# field of a ledger run to it, so a flip rests only on a run of this eval. The exemption is the
+# one constant line, not the file: every other line of it is scanned like any script's.
+_NAMES_THE_ENTRY_AS_DATA = {
+    "scripts/check_kernel_manifest.py": re.compile(
+        r'^ADHERENCE_ENTRY = "praxion-evals-adherence"$', re.MULTILINE
+    ),
+}
 
 
 def _files_under(surface: str) -> list[Path]:
@@ -43,6 +49,13 @@ def _files_under(surface: str) -> list[Path]:
         for path in root.rglob("*")
         if path.is_file() and path.suffix in _SCANNED_SUFFIXES and "__pycache__" not in path.parts
     )
+
+
+def _reaches_the_eval(relative: str, text: str) -> bool:
+    """Whether `text` of the file at `relative` names the eval, bar its one exempt data line."""
+    exempt = _NAMES_THE_ENTRY_AS_DATA.get(relative)
+    scanned = exempt.sub("", text) if exempt else text
+    return any(ref in scanned for ref in _ADHERENCE_REFERENCES)
 
 
 def _source_files() -> list[Path]:
@@ -77,10 +90,8 @@ def test_automation_surface_never_references_the_adherence_eval(surface: str) ->
     offenders = [
         str(path.relative_to(_REPO_ROOT))
         for path in _files_under(surface)
-        if str(path.relative_to(_REPO_ROOT)) not in _NAMES_THE_ENTRY_AS_DATA
-        and any(
-            ref in path.read_text(encoding="utf-8", errors="replace")
-            for ref in _ADHERENCE_REFERENCES
+        if _reaches_the_eval(
+            str(path.relative_to(_REPO_ROOT)), path.read_text(encoding="utf-8", errors="replace")
         )
     ]
 
@@ -118,3 +129,24 @@ def test_the_import_scan_sees_a_relative_import_of_the_console_entry() -> None:
     seen = _imports_of("from . import cli\nfrom .cli import main\n", ("praxion_evals", "adherence"))
 
     assert "praxion_evals.adherence.cli" in seen
+
+
+@pytest.mark.parametrize("relative", sorted(_NAMES_THE_ENTRY_AS_DATA))
+def test_an_exempt_file_names_the_eval_once_as_a_string_assignment(relative: str) -> None:
+    text = (_REPO_ROOT / relative).read_text(encoding="utf-8")
+
+    named = sum(text.count(ref) for ref in _ADHERENCE_REFERENCES)
+
+    assert (named, len(_NAMES_THE_ENTRY_AS_DATA[relative].findall(text))) == (1, 1)
+
+
+def test_the_exemption_does_not_hide_a_second_mention_in_the_same_file() -> None:
+    exempt = next(iter(_NAMES_THE_ENTRY_AS_DATA))
+    constant = 'ADHERENCE_ENTRY = "praxion-evals-adherence"\n'
+
+    assert not _reaches_the_eval(exempt, constant)
+    assert _reaches_the_eval(exempt, constant + "launch('praxion-evals-adherence')\n")
+    assert _reaches_the_eval(exempt, constant + "import praxion_evals.adherence\n")
+    assert _reaches_the_eval(
+        exempt, constant + 'ADHERENCE_ENTRY = "praxion-evals-adherence"  # x\n'
+    )

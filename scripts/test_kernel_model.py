@@ -42,13 +42,6 @@ SOURCE = "rules/a.md"
 SOURCE_TEXT = "## Alpha\n\nAlpha body.\n\n## Beta\n\nBeta body.\n"
 SECTIONS = {SOURCE: ks.split_sections(SOURCE, SOURCE_TEXT)}
 ALPHA_SHA = SECTIONS[SOURCE][0].sha
-PILOT_ROLES = [
-    "researcher",
-    "verifier",
-    "discipline-consultant",
-    "skill-genesis",
-    "context-engineer",
-]
 
 
 # -- Builders: the wire shapes ---------------------------------------------------
@@ -562,179 +555,6 @@ def test_agent_definitions_are_files_whose_frontmatter_declares_a_name(tmp_path:
     }
 
 
-# -- The adoption ledger -------------------------------------------------------------
-
-
-def run(run_id: str, pairs: int = 24, passes: bool = True, eval_entry: str = "an-eval"):
-    return {"id": run_id, "complete_pairs": pairs, "passes_flip_rule": passes, "entry": eval_entry}
-
-
-def switched_row(**fields: object) -> dict:
-    row = {
-        "status": "switched",
-        "since": "2026-10-12",
-        "runs": [run("r1", 12, False), run("r2")],
-        "passing_run": "r2",
-        "probe_before_tokens": 31_000,
-        "probe_after_tokens": 22_000,
-        "flip_rule_ratified": True,
-        "flip_ratified": True,
-    }
-    return {**row, **fields}
-
-
-def ledger_wire(**roles: dict) -> dict:
-    return {"version": 1, "eligible": PILOT_ROLES, "roles": roles}
-
-
-def parse_ledger(**roles: dict) -> km.Ledger:
-    return km.parse_ledger(ledger_wire(**roles), AGENTS)
-
-
-def test_a_ledger_held_as_text_parses_like_the_file(tmp_path: Path) -> None:
-    text = "version: 1\neligible: [researcher]\nroles:\n  researcher: {status: trial, since: d}\n"
-    (tmp_path / km.LEDGER_PATH).parent.mkdir(parents=True)
-    (tmp_path / km.LEDGER_PATH).write_text(text)
-
-    from_text = km.parse_ledger_text(text, AGENTS, "the parent commit's ledger")
-
-    assert from_text == km.load_ledger(tmp_path, AGENTS)
-
-
-def test_ledger_text_that_is_not_yaml_is_refused_naming_where_it_came_from() -> None:
-    with pytest.raises(km.KernelModelError, match="the parent commit's ledger: not valid YAML"):
-        km.parse_ledger_text("roles: [unclosed", AGENTS, "the parent commit's ledger")
-
-
-def test_a_trial_record_needs_only_when_it_began_and_its_runs() -> None:
-    ledger = parse_ledger(
-        researcher={"status": "trial", "since": "2026-10-12", "runs": [run("r1")]}
-    )
-
-    assert ledger.records["researcher"] == km.Trial(
-        "researcher", "2026-10-12", (km.Run("r1", 24, True, "an-eval"),)
-    )
-
-
-def test_a_switched_record_holds_every_piece_of_its_evidence() -> None:
-    record = parse_ledger(verifier=switched_row()).records["verifier"]
-
-    assert isinstance(record, km.Switched)
-    assert (record.passing_run, record.probe_before_tokens, record.probe_after_tokens) == (
-        "r2",
-        31_000,
-        22_000,
-    )
-
-
-@pytest.mark.parametrize("field", km._SWITCHED_FIELDS)
-def test_a_switched_record_missing_a_field_is_refused_naming_role_and_field(field: str) -> None:
-    row = switched_row()
-    del row[field]
-
-    with pytest.raises(km.KernelModelError, match=rf"role verifier: .* lacks {field}"):
-        parse_ledger(verifier=row)
-
-
-@pytest.mark.parametrize(
-    ("fields", "reason"),
-    [
-        ({"runs": [run("r2", 19)]}, "19 pairs"),
-        ({"runs": [run("r2", 24, False)]}, "does not pass the flip rule"),
-        ({"passing_run": "r9"}, "not among its runs"),
-        ({"flip_ratified": False}, "lacks the user's flip_ratified"),
-        ({"flip_rule_ratified": False}, "lacks the user's flip_rule_ratified"),
-        ({"probe_after_tokens": 0}, "no positive probe_after_tokens"),
-    ],
-    ids=[
-        "under twenty pairs",
-        "not passing",
-        "unknown run",
-        "flip unratified",
-        "rule unratified",
-        "no reading",
-    ],
-)
-def test_a_switched_record_without_sound_evidence_cannot_be_built(
-    fields: dict, reason: str
-) -> None:
-    with pytest.raises(km.KernelModelError, match=reason):
-        parse_ledger(verifier=switched_row(**fields))
-
-
-def test_a_role_that_is_not_eligible_cannot_be_switched() -> None:
-    with pytest.raises(km.KernelModelError, match="role implementer: is not eligible"):
-        parse_ledger(implementer=switched_row())
-
-
-def test_a_role_that_is_not_eligible_may_still_be_at_trial() -> None:
-    ledger = parse_ledger(implementer={"status": "trial", "since": "d", "runs": []})
-
-    assert isinstance(ledger.records["implementer"], km.Trial)
-
-
-def test_a_record_for_an_unknown_agent_or_status_is_refused() -> None:
-    with pytest.raises(km.KernelModelError, match="role ghost: no such agent"):
-        parse_ledger(ghost={"status": "trial", "since": "d", "runs": []})
-    with pytest.raises(km.KernelModelError, match="role researcher: status 'done'"):
-        parse_ledger(researcher={"status": "done"})
-
-
-def test_the_status_reader_survives_a_record_the_gate_would_refuse() -> None:
-    bare = {"since": "d", "runs": []}
-    wire = ledger_wire(
-        researcher={"status": "switched", **bare}, verifier={"status": "trial", **bare}
-    )
-
-    assert dict(km.parse_statuses(wire)) == {"researcher": "switched", "verifier": "trial"}
-    with pytest.raises(km.KernelModelError, match="researcher: a switched record lacks"):
-        km.parse_ledger(wire, AGENTS)
-
-
-def records(**status: str) -> km.Ledger:
-    built = {}
-    for role, kind in status.items():
-        if kind == "trial":
-            built[role] = km.Trial(role, "d", ())
-        else:
-            built[role] = parse_ledger(**{role: switched_row()}).records[role]
-    return km.Ledger(tuple(PILOT_ROLES), built)
-
-
-@pytest.mark.parametrize(
-    ("before", "after"),
-    [
-        (None, records()),
-        (None, records(researcher="trial")),
-        (records(researcher="trial"), records(researcher="trial")),
-        (records(researcher="trial"), records(researcher="switched")),
-        (records(researcher="switched"), records(researcher="switched")),
-        (records(), records(researcher="trial", verifier="trial")),
-    ],
-    ids=["no ledger", "first trial", "trial stays", "trial to switched", "switched stays", "added"],
-)
-def test_a_ledger_moves_forward_from_absent_to_trial_to_switched(before, after) -> None:
-    assert km.ledger_transitions(before, after) == ()
-
-
-@pytest.mark.parametrize(
-    ("before", "after", "move"),
-    [
-        (None, records(researcher="switched"), "absent -> switched"),
-        (records(researcher="switched"), records(researcher="trial"), "switched -> trial"),
-        (records(researcher="trial"), records(), "trial -> absent"),
-        (records(researcher="switched"), records(), "switched -> absent"),
-    ],
-    ids=["skips trial", "demoted", "trial dropped", "switched dropped"],
-)
-def test_a_ledger_that_skips_or_reverses_a_status_is_reported(before, after, move: str) -> None:
-    found = km.ledger_transitions(before, after)
-
-    assert [(f.kind, f.subject, f.detail) for f in found] == [
-        ("ledger-transition", "role researcher", move)
-    ]
-
-
 # -- The edge: files and the parser ---------------------------------------------------
 
 
@@ -757,15 +577,13 @@ def test_the_loaders_read_the_three_files_of_a_checkout(tmp_path: Path) -> None:
     write(tmp_path, km.INDEX_PATH, '{"schema": 1, "kernel_version": "k", "slots": 2, "roles": {}}')
 
     assert km.load_manifest(tmp_path, AGENTS).entries[0].scope == km.NoActor("r")
-    assert km.load_ledger(tmp_path, AGENTS).records["researcher"] == km.Trial("researcher", "d", ())
     assert dict(km.load_statuses(tmp_path)) == {"researcher": "trial"}
     index = km.load_index(tmp_path)
     assert index is not None
     assert index.slots == 2
 
 
-def test_no_ledger_is_an_empty_ledger_and_no_index_means_no_kernel(tmp_path: Path) -> None:
-    assert km.load_ledger(tmp_path, AGENTS).records == {}
+def test_no_ledger_adopts_nobody_and_no_index_means_no_kernel(tmp_path: Path) -> None:
     assert km.load_statuses(tmp_path) == {}
     assert km.load_index(tmp_path) is None
 
@@ -779,7 +597,7 @@ def test_a_missing_manifest_is_refused_rather_than_read_as_empty(tmp_path: Path)
     ("path", "text", "load"),
     [
         (km.MANIFEST_PATH, "version: [1\n", lambda r: km.load_manifest(r, AGENTS)),
-        (km.LEDGER_PATH, "- a list\n", lambda r: km.load_ledger(r, AGENTS)),
+        (km.LEDGER_PATH, "- a list\n", km.load_statuses),
         (km.INDEX_PATH, "{not json", km.load_index),
     ],
     ids=["bad yaml", "not a mapping", "bad json"],
@@ -819,3 +637,27 @@ def test_the_module_imports_and_parses_without_a_yaml_parser() -> None:
 
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "()"
+
+
+def test_yaml_text_that_is_not_yaml_is_refused_naming_where_it_came_from() -> None:
+    with pytest.raises(km.KernelModelError, match="the old ledger: not valid YAML"):
+        km.parse_yaml("roles: [unclosed", "the old ledger")
+
+
+def test_the_frontmatter_of_a_definition_is_read_as_yaml() -> None:
+    definition = "---\nname: scout\n'quoted' : [a, b]\nflag : true\n---\nBody\n"
+
+    assert km.frontmatter(definition, "agents/scout.md") == {
+        "name": "scout",
+        "quoted": ["a", "b"],
+        "flag": True,
+    }
+
+
+def test_a_definition_without_frontmatter_declares_nothing() -> None:
+    assert km.frontmatter("Body only\n", "agents/scout.md") == {}
+
+
+def test_frontmatter_that_is_not_yaml_is_refused_naming_the_definition() -> None:
+    with pytest.raises(km.KernelModelError, match="agents/scout.md: not valid YAML"):
+        km.frontmatter("---\nname: [unclosed\n---\n", "agents/scout.md")

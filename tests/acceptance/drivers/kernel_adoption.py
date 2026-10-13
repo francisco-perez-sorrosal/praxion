@@ -13,12 +13,13 @@ scenarios provisionally write the running plugin's own ledger.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
 
-from tests.acceptance.drivers.kernel_sandbox import ADOPTION_LEDGER, PILOT_ROLES
+from tests.acceptance.drivers.kernel_sandbox import ADOPTION_LEDGER, PILOT_ROLES, commit_paths
 
 ADHERENCE_ENTRY = "praxion-evals-adherence"
 REQUIRED_PAIRS = 20
@@ -151,7 +152,21 @@ def _load(root: Path) -> dict:
 
 
 def record(root: Path, *records: AdoptionRecord) -> None:
-    """Write each role's record into the ledger, replacing that role's earlier one."""
+    """Write each role's record into the ledger, replacing that role's earlier one.
+
+    A role climbs one rung per commit (absent -> trial -> switched). A switched record
+    is therefore reached the way the rule prescribes: the role's trial row is committed
+    first, on its own, so the switched record the scenario leaves uncommitted is one
+    rung above the parent commit's ledger.
+    """
+    switched = [each for each in records if each.status == "switched"]
+    if switched:
+        _write(root, [at_trial(each.role) for each in switched])
+        commit_paths(root, "ledger: place the roles at trial", ADOPTION_LEDGER)
+    _write(root, records)
+
+
+def _write(root: Path, records: Sequence[AdoptionRecord]) -> None:
     ledger = _load(root)
     for each in records:
         ledger["roles"][each.role] = _record_row(each)

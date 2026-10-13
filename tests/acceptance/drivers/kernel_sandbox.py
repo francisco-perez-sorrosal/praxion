@@ -300,6 +300,20 @@ def commit_gate(root: Path, scripts: tuple[str, ...] = KERNEL_GATE_SCRIPTS) -> G
     return GateVerdict(refused, "\n".join(output), tuple(ran))
 
 
+def commit_paths(root: Path, message: str, *paths: str) -> bool:
+    """Commit only `paths` (no hooks), the way an earlier maintainer commit leaves them at HEAD.
+
+    The commit gate judges each move against the parent commit, so a scenario that
+    needs a move to be one rung long puts the earlier rung in a commit of its own.
+    Returns whether anything was committed.
+    """
+    if not _git(root, "status", "--porcelain", "--", *paths).strip():
+        return False
+    _git(root, "add", "--", *paths)
+    _git(root, "commit", "-q", "--no-verify", "-m", message, "--", *paths)
+    return True
+
+
 def shared_blocks_gate(root: Path) -> GateVerdict:
     return commit_gate(root, (SHARED_BLOCKS_GATE,))
 

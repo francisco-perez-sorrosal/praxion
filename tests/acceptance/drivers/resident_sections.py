@@ -85,8 +85,22 @@ def load(name: str) -> dict:
     return json.loads((FIXTURES / name).read_text())
 
 
+def _span_at(lines: list[str], index: int, span: list[str]) -> bool:
+    """Whether `span` starts at `lines[index]`: whole lines, except the last one, matched by prefix.
+
+    The last line of a block may carry a role's own sentence after the block's text (the
+    discipline-consultant's self-test line does), so it is recognised by its prefix.
+    """
+    window = lines[index : index + len(span)]
+    return len(window) == len(span) and window[:-1] == span[:-1] and window[-1].startswith(span[-1])
+
+
 def definition_without_blocks(text: str, block_texts: list[str]) -> str:
-    """An agent definition minus each universal block (a run of one or more whole lines) and the omitClaudeMd key."""
+    """An agent definition minus each universal block (a run of one or more lines) and the omitClaudeMd key.
+
+    A block's last line is taken out by prefix, so a role sentence that follows the
+    block's text on that line goes with it, as it did in the layout the fixtures froze.
+    """
     lines = text.splitlines()
     for block in block_texts:
         span = block.splitlines()
@@ -95,7 +109,7 @@ def definition_without_blocks(text: str, block_texts: list[str]) -> str:
         kept: list[str] = []
         index = 0
         while index < len(lines):
-            if lines[index : index + len(span)] == span:
+            if _span_at(lines, index, span):
                 index += len(span)
             else:
                 kept.append(lines[index])

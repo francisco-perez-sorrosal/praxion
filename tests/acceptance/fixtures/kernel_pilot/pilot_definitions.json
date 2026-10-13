@@ -1,7 +1,16 @@
 {
- "context-engineer": "7aad4e5d253651ed",
- "discipline-consultant": "daa2697aad296f58",
+ "_refrozen": {
+  "reason": "The context-engineer, discipline-consultant and skill-genesis entries were re-taken, with the same stripping (universal blocks and the omitClaudeMd line set aside), after a wording alignment of their partial stop line from 'Failed at' to the canonical 'Stopped at'. That alignment predates and is independent of any omitClaudeMd flip; the researcher and verifier entries are untouched.",
+  "roles": [
+   "context-engineer",
+   "discipline-consultant",
+   "skill-genesis"
+  ],
+  "sha": "95b6d86f"
+ },
+ "context-engineer": "bd308eb83e7cd5e7",
+ "discipline-consultant": "3491d39e2b2ced19",
  "researcher": "7434c46623ab0a41",
- "skill-genesis": "e002caf29e3dd0a5",
+ "skill-genesis": "17a92d12f06d7701",
  "verifier": "7843d9e9df6245cc"
 }

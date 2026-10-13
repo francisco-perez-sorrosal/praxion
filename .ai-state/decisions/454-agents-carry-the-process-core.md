@@ -38,6 +38,7 @@ affected_files:
   - skills/agent-crafting/SKILL.md
 affected_reqs: []
 supersedes: null
+superseded_in_part_by: [dec-draft-c967bd84]
 superseded_by: null
 re_affirms: null
 re_affirmed_by: null

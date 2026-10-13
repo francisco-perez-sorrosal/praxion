@@ -229,6 +229,32 @@ def test_the_command_does_not_judge_spawns_from_before_the_record_began(
     assert (result.returncode, "0 spawn(s)" in result.stdout) == (0, True)
 
 
+def test_a_record_placed_at_trial_mid_day_does_not_judge_that_days_earlier_spawns(
+    repo: Path, tmp_path: Path
+) -> None:
+    write_ledger(repo, researcher={**trial_row(), "since": "2026-10-12T15:30:00+00:00"})
+    project = tmp_path / "project"
+    write_log(
+        project,
+        started("a1", at="2026-10-12T09:00:00+00:00"),
+        started("a2", at="2026-10-12T16:00:00+00:00"),
+    )
+
+    found = json.loads(liveness(repo, project, "--json").stdout)
+
+    assert (found["judged"], [f["detail"].split()[1] for f in found["findings"]]) == (1, ["a2"])
+
+
+def test_a_record_dated_by_a_bare_date_judges_nothing_of_that_day(
+    repo: Path, tmp_path: Path
+) -> None:
+    write_ledger(repo, researcher=trial_row())  # since: 2026-10-12, a bare date
+    project = tmp_path / "project"
+    write_log(project, started("a1", at="2026-10-12T22:00:00+00:00"))
+
+    assert json.loads(liveness(repo, project, "--json").stdout)["judged"] == 0
+
+
 def test_the_liveness_command_reads_only_spawns_since_a_revision(
     repo: Path, tmp_path: Path
 ) -> None:

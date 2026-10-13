@@ -19,6 +19,7 @@ import kernel_ledger as kl  # noqa: E402
 import kernel_model as km  # noqa: E402
 
 AGENTS = frozenset({"researcher", "verifier", "discipline-consultant", "implementer", "sentinel"})
+END_OF_DAY = datetime(2026, 10, 12, 23, 59, 59, 999999, tzinfo=timezone.utc)
 PILOT_ROLES = [
     "researcher",
     "verifier",
@@ -71,7 +72,7 @@ def test_a_trial_record_needs_only_when_it_began_and_its_runs() -> None:
     )
 
     assert ledger.records["researcher"] == kl.Trial(
-        "researcher", "2026-10-12", (kl.Run("r1", 24, True, "an-eval"),)
+        "researcher", END_OF_DAY, (kl.Run("r1", 24, True, "an-eval"),)
     )
 
 
@@ -127,20 +128,20 @@ def test_a_role_that_is_not_eligible_cannot_be_switched() -> None:
 
 
 def test_a_role_that_is_not_eligible_may_still_be_at_trial() -> None:
-    ledger = parse_ledger(implementer={"status": "trial", "since": "d", "runs": []})
+    ledger = parse_ledger(implementer={"status": "trial", "since": "2026-10-12", "runs": []})
 
     assert isinstance(ledger.records["implementer"], kl.Trial)
 
 
 def test_a_record_for_an_unknown_agent_or_status_is_refused() -> None:
     with pytest.raises(km.KernelModelError, match="role ghost: no such agent"):
-        parse_ledger(ghost={"status": "trial", "since": "d", "runs": []})
+        parse_ledger(ghost={"status": "trial", "since": "2026-10-12", "runs": []})
     with pytest.raises(km.KernelModelError, match="role researcher: status 'done'"):
         parse_ledger(researcher={"status": "done"})
 
 
 def test_the_status_reader_survives_a_record_the_gate_would_refuse() -> None:
-    bare = {"since": "d", "runs": []}
+    bare = {"since": "2026-10-12", "runs": []}
     wire = ledger_wire(
         researcher={"status": "switched", **bare}, verifier={"status": "trial", **bare}
     )
@@ -190,20 +191,18 @@ def test_a_ledger_that_skips_or_reverses_a_status_is_reported(before, after, mov
 # -- Who is adopted, and since when -----------------------------------------------------
 
 
-def test_a_record_begins_at_midnight_utc_of_its_date() -> None:
+def test_a_record_dated_by_a_bare_date_begins_at_the_end_of_that_day() -> None:
     adopted = kl.parse_adoptions(ledger_wire(researcher={"status": "trial", "since": "2026-10-12"}))
 
-    assert adopted["researcher"] == kl.Adoption(
-        "trial", datetime(2026, 10, 12, tzinfo=timezone.utc)
-    )
+    assert adopted["researcher"] == kl.Adoption("trial", END_OF_DAY)
 
 
 @pytest.mark.parametrize(
     "since",
-    ["2026-10-12", "2026-10-12T00:00:00", "2026-10-12T00:00:00Z", "2026-10-12T02:00:00+02:00"],
+    ["2026-10-12T09:30:00", "2026-10-12T09:30:00Z", "2026-10-12T11:30:00+02:00"],
 )
-def test_a_date_or_a_moment_in_any_iso_form_reads_as_the_same_aware_instant(since: str) -> None:
-    assert kl.since_time(since, "researcher") == datetime(2026, 10, 12, tzinfo=timezone.utc)
+def test_a_moment_in_any_iso_form_reads_as_the_same_aware_instant(since: str) -> None:
+    assert kl.since_time(since, "researcher") == datetime(2026, 10, 12, 9, 30, tzinfo=timezone.utc)
 
 
 def test_a_date_the_yaml_parser_already_read_is_accepted() -> None:
@@ -211,7 +210,19 @@ def test_a_date_the_yaml_parser_already_read_is_accepted() -> None:
 
     adopted = kl.parse_adoptions(km.parse_yaml(written, "the ledger"))
 
-    assert adopted["researcher"].since == datetime(2026, 10, 12, tzinfo=timezone.utc)
+    assert adopted["researcher"].since == END_OF_DAY
+
+
+def test_a_date_written_plain_reads_the_same_in_both_readers(tmp_path: Path) -> None:
+    write(
+        tmp_path,
+        "version: 1\neligible: [researcher]\n"
+        "roles:\n  researcher:\n    status: trial\n    since: 2026-10-12\n    runs: []\n",
+    )
+
+    checked = kl.load_ledger(tmp_path, AGENTS).records["researcher"]
+
+    assert checked.since == kl.load_adoptions(tmp_path)["researcher"].since == END_OF_DAY
 
 
 @pytest.mark.parametrize("since", [None, "", "yesterday", 20261012, ["2026-10-12"]])
@@ -231,7 +242,7 @@ def test_the_loaders_read_the_ledger_of_a_checkout(tmp_path: Path) -> None:
     )
 
     assert kl.load_ledger(tmp_path, AGENTS).records["researcher"] == kl.Trial(
-        "researcher", "2026-10-12", ()
+        "researcher", END_OF_DAY, ()
     )
     assert kl.load_adoptions(tmp_path)["researcher"].status == "trial"
 

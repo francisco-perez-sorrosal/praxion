@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from collections.abc import Callable
@@ -15,6 +16,7 @@ import _kernel_checker_testkit as kit  # noqa: E402
 import check_kernel_manifest as cb  # noqa: E402
 import generate_kernels as gk  # noqa: E402
 import kernel_model as km  # noqa: E402
+import kernel_sources as ks  # noqa: E402
 from _kernel_checker_testkit import (  # noqa: E402
     PROBE_SECTION,
     UNIFIED_RULE,
@@ -127,6 +129,24 @@ def test_an_index_edited_by_hand_is_stale(repo: Path) -> None:
     assert subjects(repo, "I8-stale-kernel") == [km.INDEX_PATH]
 
 
+def test_a_status_recorded_after_regeneration_leaves_the_kernels_fresh(repo: Path) -> None:
+    kit.write_ledger(repo, sentinel=kit.trial_row())
+
+    assert subjects(repo, "I8-stale-kernel") == []
+
+
+def test_a_principle_edited_in_the_template_leaves_the_principles_file_stale(repo: Path) -> None:
+    path = repo / ks.USER_TEMPLATE
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            "### Pragmatism\n\n", "### Pragmatism\n\nAmended. ", 1
+        ),
+        encoding="utf-8",
+    )
+
+    assert f"{gk.KERNELS_DIR}/{gk.PRINCIPLES_FILE}" in subjects(repo, "I8-stale-kernel")
+
+
 def test_a_definition_whose_block_was_edited_by_hand_is_stale(repo: Path) -> None:
     path = repo / "agents/researcher.md"
     path.write_text(
@@ -200,3 +220,84 @@ def test_one_line_of_a_resident_block_in_an_injected_string_is_reported_with_its
 
 def test_a_rule_of_dashes_or_pipes_names_no_source() -> None:
     assert not cb._names_its_source("| ---------------------- | ---------------------- |")
+
+
+# -- I8: the spawn hook is registered once per slot ------------------------------------------------
+
+
+def edit_hooks(root: Path, change: Callable[[list[dict]], object]) -> None:
+    """Change the plugin's own spawn-hook registrations (the hooks under its matcher) in place."""
+    path = root / cb.HOOKS_PATH
+    config = json.loads(path.read_text(encoding="utf-8"))
+    group = next(g for g in config["hooks"][cb.SLOT_EVENT] if g["matcher"] == cb.SLOT_MATCHER)
+    change(group["hooks"])
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+
+def slot_hook(number: int, **fields: object) -> dict:
+    command = f"python3 ${{CLAUDE_PLUGIN_ROOT}}/hooks/inject_kernel.py --slot {number}"
+    return {"type": "command", "command": command, "timeout": 5, "async": False, **fields}
+
+
+def slot_details(root: Path) -> list[str]:
+    return [f.detail for f in cb.check(root) if f.kind == "I8-slot-registration"]
+
+
+def test_the_registered_slots_of_the_checkout_are_the_indexs_slots(repo: Path) -> None:
+    assert (cb.gather(repo).index_slots, "I8-slot-registration" in kinds(repo)) == (9, False)
+
+
+def test_a_slot_the_index_asks_for_but_the_hooks_do_not_register_is_reported(repo: Path) -> None:
+    edit_hooks(repo, lambda hooks: hooks.pop())
+
+    assert subjects(repo, "I8-slot-registration") == [cb.HOOKS_PATH]
+    assert "need [1, 2, 3, 4, 5, 6, 7, 8, 9]" in slot_details(repo)[0]
+
+
+def test_a_slot_registered_beyond_the_indexs_count_is_reported(repo: Path) -> None:
+    edit_hooks(repo, lambda hooks: hooks.append(slot_hook(10)))
+
+    assert subjects(repo, "I8-slot-registration") == [cb.HOOKS_PATH]
+
+
+def test_a_slot_registered_twice_is_reported(repo: Path) -> None:
+    edit_hooks(repo, lambda hooks: hooks.__setitem__(8, slot_hook(1)))
+
+    assert subjects(repo, "I8-slot-registration") == [cb.HOOKS_PATH]
+
+
+def test_a_slot_the_harness_would_not_wait_for_is_reported(repo: Path) -> None:
+    edit_hooks(repo, lambda hooks: hooks.__setitem__(2, slot_hook(3, **{"async": True})))
+
+    assert subjects(repo, "I8-slot-registration") == ["slot 3"]
+    assert "never reach the role" in slot_details(repo)[0]
+
+
+def test_slots_under_another_matcher_are_reported(repo: Path) -> None:
+    path = repo / cb.HOOKS_PATH
+    path.write_text(path.read_text(encoding="utf-8").replace(cb.SLOT_MATCHER, "^other:"), "utf-8")
+
+    assert subjects(repo, "I8-slot-registration") == [f"slot {n}" for n in range(1, 10)]
+
+
+def test_an_index_asking_for_more_slots_than_the_hooks_register_is_reported(repo: Path) -> None:
+    edit_index(repo, lambda index: index.update(slots=10))
+
+    assert subjects(repo, "I8-slot-registration") == [cb.HOOKS_PATH]
+
+
+def test_a_checkout_without_a_hook_registry_is_reported_not_passed(repo: Path) -> None:
+    (repo / cb.HOOKS_PATH).unlink()
+
+    assert subjects(repo, "I8-slot-registration") == [cb.HOOKS_PATH]
+
+
+def test_a_hook_registry_that_is_not_json_is_an_input_error(repo: Path) -> None:
+    (repo / cb.HOOKS_PATH).write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(km.KernelModelError, match="hook registry"):
+        cb.check(repo)
+
+
+def test_a_checkout_without_an_index_has_no_slot_count_to_hold_the_hooks_to() -> None:
+    assert cb.slot_findings(None, None) == ()

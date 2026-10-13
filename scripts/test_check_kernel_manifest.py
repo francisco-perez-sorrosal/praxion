@@ -247,9 +247,10 @@ def test_a_committed_kernel_file_over_the_cap_is_reported(repo: Path) -> None:
 def test_an_injected_string_over_the_cap_is_reported_without_refusing_the_index(
     repo: Path,
 ) -> None:
+    held = len(json.loads((repo / km.INDEX_PATH).read_text())["roles"]["sentinel"]["strings"])
     edit_index(repo, lambda index: index["roles"]["sentinel"]["strings"].append("x" * (CAP + 1)))
 
-    assert subjects(repo, "I4-over-cap") == [f"{km.INDEX_PATH} sentinel string 2"]
+    assert subjects(repo, "I4-over-cap") == [f"{km.INDEX_PATH} sentinel string {held + 1}"]
 
 
 # -- I5: the writer groups equal what the definitions write -----------------------------------

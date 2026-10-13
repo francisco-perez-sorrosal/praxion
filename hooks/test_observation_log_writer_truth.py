@@ -309,10 +309,13 @@ def _build_project(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 def _build_plugin(tmp_path: Path) -> Path:
-    """A plugin root whose kernel index puts the scenario's researcher at trial."""
+    """A plugin root whose adoption ledger puts the scenario's researcher at trial."""
     index = tmp_path / "plugin" / "claude" / "kernels" / "index.json"
     index.parent.mkdir(parents=True)
-    role = {"status": "trial", "modules": ["core"], "strings": ["the researcher's kernel"]}
+    ledger = tmp_path / "plugin" / ".ai-state" / "kernel_adoption.yaml"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text("version: 1\nroles:\n  researcher:\n    status: trial\n", encoding="utf-8")
+    role = {"status": None, "modules": ["core"], "strings": ["the researcher's kernel"]}
     index.write_text(
         json.dumps(
             {"schema": 1, "kernel_version": "v1", "slots": 7, "roles": {"researcher": role}}

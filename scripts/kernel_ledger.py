@@ -8,7 +8,7 @@ what the ledger adds to them, as values whose illegal states cannot be built.
 | a switched record holds every piece of flip evidence             | `Switched.__post_init__`         |
 | only an eligible role is switched                                | `_parse_record`                  |
 | a role moves only absent -> trial -> switched                    | `ledger_transitions`             |
-| a record names when it began, readably, to bound what it judges  | `since_time`, `parse_adoptions`  |
+| a record names when it began, readably, to bound what it judges  | `since_time`, both readers       |
 
 The ledger has three readers, each for a caller that trusts different things: `load_ledger`
 builds the evidence-checked record (the commit gate); `load_adoptions` reads only each
@@ -18,9 +18,10 @@ status (the generator). The two lenient readers survive a record the gate is abo
 
 from __future__ import annotations
 
+import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -31,6 +32,7 @@ REQUIRED_PAIRS = 20  # a flip rests on a run of at least this many complete pair
 SWITCHED_FIELDS = tuple(
     "passing_run probe_before_tokens probe_after_tokens flip_rule_ratified flip_ratified".split()
 )
+_BARE_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _LADDER = (None, "trial", "switched")  # a role stays or climbs one rung: no skipping, no descent
 
 
@@ -45,14 +47,14 @@ class Run:
 @dataclass(frozen=True)
 class Trial:
     role: str
-    since: str
+    since: datetime
     runs: tuple[Run, ...]
 
 
 @dataclass(frozen=True)
 class Switched:
     role: str
-    since: str
+    since: datetime
     runs: tuple[Run, ...]
     passing_run: str
     probe_before_tokens: int
@@ -118,7 +120,7 @@ def parse_ledger(raw: Mapping[str, Any], agents: Collection[str]) -> Ledger:
 
 
 def _parse_record(role: str, status: str, row: Mapping[str, Any], eligible: bool) -> AdoptionRecord:
-    since = km.as_text(row.get("since"), f"role {role}: since")
+    since = since_time(row.get("since"), role)
     runs = tuple(_parse_run(role, run) for run in km.as_sequence(row.get("runs"), "runs"))
     if status == "trial":
         return Trial(role, since, runs)
@@ -156,21 +158,28 @@ def parse_adoptions(raw: Mapping[str, Any]) -> Mapping[str, Adoption]:
 
 
 def since_time(value: Any, role: str) -> datetime:
-    """When a record began, as an aware datetime: a date reads as midnight UTC."""
+    """When a record began, as an aware datetime; the one reader of a record's `since`.
+
+    A moment is itself (a naive one reads as UTC). A bare date is the end of that day in UTC, so
+    a role placed at trial mid-day is not judged on that day's earlier spawns; the ledger writer
+    records a moment, and a date YAML already parsed reads the same way as one still text.
+    """
     if isinstance(value, str):
         value = _iso(value, role)
-    elif isinstance(value, date) and not isinstance(value, datetime):
-        value = datetime(value.year, value.month, value.day)
-    if not isinstance(value, datetime):
-        raise km.KernelModelError(f"role {role}: since {value!r} is not a date or a moment")
-    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, date):
+        return datetime.combine(value, time.max, tzinfo=timezone.utc)
+    raise km.KernelModelError(f"role {role}: since {value!r} is not a date or a moment")
 
 
-def _iso(text: str, role: str) -> datetime:
+def _iso(text: str, role: str) -> date | datetime:
     stamp = text.strip()
     if stamp.endswith("Z"):
         stamp = stamp[:-1] + "+00:00"  # `fromisoformat` takes "Z" only from Python 3.11
     try:
+        if _BARE_DATE.fullmatch(stamp):
+            return date.fromisoformat(stamp)
         return datetime.fromisoformat(stamp)
     except ValueError as exc:
         raise km.KernelModelError(

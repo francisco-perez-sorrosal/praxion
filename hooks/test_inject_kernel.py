@@ -33,6 +33,7 @@ from _observation_log import reader  # noqa: E402
 ROLE = "researcher"
 AGENT_TYPE = f"praxion:{ROLE}"
 VERSION = "kernel-version-1"
+MARKER_VERSION = VERSION[: inject_kernel.MARKER_VERSION_CHARS]
 PLUGIN_VARIABLE = "${CLAUDE_PLUGIN_ROOT}"
 CAP = inject_kernel.INJECTION_CAP
 
@@ -40,11 +41,30 @@ CAP = inject_kernel.INJECTION_CAP
 # -- Scratch plugin, project and spawn ------------------------------------------------
 
 
+def ledger_text(status: str | None, role: str = ROLE) -> str:
+    """The adoption ledger as its writers emit it (block style), the role at `status` if any."""
+    roles = f"  {role}:\n    status: {status}\n    since: '2026-10-12'\n    runs: []\n"
+    return (
+        "version: 1\neligible:\n- researcher\n- verifier\n"
+        f"roles:{' {}' if status is None else chr(10) + roles}"
+    )
+
+
 def make_plugin(
-    tmp_path: Path, strings=("KERNEL ONE",), status: str | None = "trial", slots=9, **index
+    tmp_path: Path,
+    strings=("KERNEL ONE",),
+    status: str | None = "trial",
+    slots=9,
+    ledger: str | None = "",
+    index_status: str | None = None,
+    **index,
 ) -> Path:
-    """A plugin root whose index records `ROLE` with `strings` at `status`."""
-    entry = {"status": status, "strings": list(strings)}
+    """A plugin root whose ledger puts `ROLE` at `status` and whose index holds `strings`.
+
+    `ledger` replaces the ledger's text; None writes no ledger. The index carries no status
+    unless `index_status` says so: the ledger alone decides who receives a kernel.
+    """
+    entry = {"status": index_status, "strings": list(strings)}
     document = {
         "schema": 1,
         "kernel_version": VERSION,
@@ -52,10 +72,14 @@ def make_plugin(
         "roles": {ROLE: entry},
         **index,
     }
-    path = tmp_path / "plugin" / "claude" / "kernels" / "index.json"
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(document), encoding="utf-8")
-    return tmp_path / "plugin"
+    root = tmp_path / "plugin"
+    (root / "claude" / "kernels").mkdir(parents=True)
+    (root / "claude" / "kernels" / "index.json").write_text(json.dumps(document), encoding="utf-8")
+    if ledger is not None:
+        (root / ".ai-state").mkdir()
+        text = ledger or ledger_text(status)
+        (root / ".ai-state" / "kernel_adoption.yaml").write_text(text, encoding="utf-8")
+    return root
 
 
 def make_project(tmp_path: Path, claude_md: str | None = None, managed: bool = True) -> Path:
@@ -137,7 +161,7 @@ def project_text(lines: int) -> str:
 
 def part_bodies(strings: list) -> list:
     """The project-file text of each delivered part: the string minus marker and header."""
-    return [s.split("\n", 2)[2] for s in strings if "[project CLAUDE.md, part" in s]
+    return [s.split("\n", 3)[3] for s in strings if "[project CLAUDE.md, part" in s]
 
 
 # -- Who receives a kernel -------------------------------------------------------------
@@ -153,7 +177,7 @@ def test_a_role_at_trial_or_switched_receives_its_kernel_marked_with_version_and
     done = run_hook(tmp_path, plugin, payload(project))
 
     assert done.returncode == 0
-    assert injected(done) == f"[praxion kernel version={VERSION} slot=1]\nKERNEL ONE"
+    assert injected(done) == f"[praxion {MARKER_VERSION} #1]\n\nKERNEL ONE\n\n"
 
 
 def test_each_slot_prints_the_string_of_that_ordinal(tmp_path):
@@ -163,10 +187,27 @@ def test_each_slot_prints_the_string_of_that_ordinal(tmp_path):
     strings = spawn(tmp_path, plugin, project, slots=3)
 
     assert strings == [
-        f"[praxion kernel version={VERSION} slot=1]\nFIRST",
-        f"[praxion kernel version={VERSION} slot=2]\nSECOND",
+        f"[praxion {MARKER_VERSION} #1]\n\nFIRST\n\n",
+        f"[praxion {MARKER_VERSION} #2]\n\nSECOND\n\n",
         None,
     ]
+
+
+def test_strings_joined_end_to_end_keep_the_marker_a_short_paragraph_of_its_own(tmp_path):
+    plugin = make_plugin(tmp_path, strings=("FIRST\n\nand more", "SECOND"))
+    project = make_project(tmp_path)
+
+    joined = "".join(delivered(spawn(tmp_path, plugin, project)))
+
+    assert joined.split("\n\n") == [
+        f"[praxion {MARKER_VERSION} #1]",
+        "FIRST",
+        "and more",
+        f"[praxion {MARKER_VERSION} #2]",
+        "SECOND",
+        "",
+    ]
+    assert len(f"[praxion {MARKER_VERSION} #12]") < 24
 
 
 @pytest.mark.parametrize("status", [None, "retired"])
@@ -331,7 +372,7 @@ def test_a_small_project_file_arrives_whole_in_a_numbered_part_after_the_kernel(
     strings = delivered(spawn(tmp_path, plugin, project))
 
     assert part_bodies(strings) == [text]
-    assert strings[1].splitlines()[1] == "[project CLAUDE.md, part 1 of 1]"
+    assert strings[1].splitlines()[2] == "[project CLAUDE.md, part 1 of 1]"
 
 
 def test_a_project_without_an_instruction_file_receives_only_the_kernel(tmp_path):
@@ -363,7 +404,7 @@ def test_a_project_file_is_delivered_with_its_own_line_endings(tmp_path):
 
 
 def test_a_project_file_beyond_the_reserved_slots_says_what_was_left_out(tmp_path):
-    text = project_text(1000)
+    text = project_text(400)
     plugin = make_plugin(tmp_path, slots=3)
     project = make_project(tmp_path, claude_md=text)
 
@@ -529,6 +570,345 @@ def test_the_role_of_an_agent_is_read_from_this_plugins_namespace_only():
     ]
 
     assert roles == [ROLE, None, None, None, None]
+
+
+# -- The adoption ledger decides who receives a kernel ----------------------------------
+
+ONE_OF_SEVERAL = (
+    "version: 1\neligible:\n- researcher\n- verifier\nroles:\n"
+    "  verifier:\n    status: switched\n    since: '2026-10-12'\n    runs:\n"
+    "    - id: r1\n      status: trial\n      complete_pairs: 24\n"
+    f"  {ROLE}:\n    status: trial\n    since: '2026-10-13T09:00:00+00:00'\n    runs: []\n"
+)
+
+
+@pytest.mark.parametrize(
+    "ledger",
+    [
+        "",
+        "version: 1\nroles: {}\n",
+        "version: 1\nroles:\n  verifier:\n    status: trial\n",
+        "version: 1\nroles:\n  researcher:\n    status: retired\n",
+        "roles: [\n  researcher: {status: trial\n",
+        "\x00\x01 not a ledger at all \xff",
+        "# roles:\n#   researcher:\n#     status: trial\n",
+        "eligible:\n- researcher\nstatus: trial\n",
+        f"version: 1\nroles:\n  {ROLE}:\n    runs:\n    - status: trial\n",
+    ],
+    ids=[
+        "empty",
+        "no roles",
+        "another role only",
+        "a status that is neither",
+        "unbalanced flow syntax",
+        "binary text",
+        "all comments",
+        "status outside the roles block",
+        "a status nested under the role's runs",
+    ],
+)
+def test_a_ledger_that_puts_the_role_at_no_status_injects_nothing_whatever_the_index_says(
+    tmp_path, ledger
+):
+    plugin = make_plugin(tmp_path, ledger=ledger or "\n", index_status="switched")
+    project = make_project(tmp_path)
+
+    assert delivered(spawn(tmp_path, plugin, project)) == []
+    assert rows(project) == []
+
+
+def test_a_plugin_without_an_adoption_ledger_injects_nothing_even_if_the_index_says_trial(
+    tmp_path,
+):
+    plugin = make_plugin(tmp_path, ledger=None, index_status="trial")
+    project = make_project(tmp_path)
+
+    assert delivered(spawn(tmp_path, plugin, project)) == []
+
+
+def test_a_role_at_trial_among_other_roles_in_the_ledgers_own_shape_receives_its_kernel(tmp_path):
+    plugin = make_plugin(tmp_path, ledger=ONE_OF_SEVERAL)
+    project = make_project(tmp_path)
+
+    assert len(delivered(spawn(tmp_path, plugin, project))) == 1
+
+
+def test_an_unreadable_ledger_injects_nothing_and_exits_zero(tmp_path):
+    plugin = make_plugin(tmp_path, ledger=None)
+    (plugin / ".ai-state" / "kernel_adoption.yaml").mkdir(parents=True)
+    project = make_project(tmp_path)
+
+    done = run_hook(tmp_path, plugin, payload(project))
+
+    assert (done.returncode, done.stdout) == (0, "")
+
+
+@pytest.mark.parametrize(
+    ("text", "status"),
+    [
+        (ledger_text("trial"), "trial"),
+        (ledger_text("switched"), "switched"),
+        (ledger_text(None), None),
+        (ONE_OF_SEVERAL, "trial"),
+        ("roles:\n  researcher:\n    status: 'trial'\n", None),
+        (
+            "roles:   # who is adopted\n  researcher:  # this one\n    status: trial  # yes\n",
+            "trial",
+        ),
+    ],
+    ids=["trial", "switched", "no roles", "among others", "a quoted value", "trailing comments"],
+)
+def test_the_status_is_read_from_the_ledgers_roles_block_for_the_role_alone(text, status):
+    assert inject_kernel.adoption_status(text, ROLE) == status
+
+
+# -- The project file is read as the harness would load it, within bounds ----------------
+
+
+def kernel_only(strings: list) -> bool:
+    received = delivered(strings)
+    return len(received) == 1 and not part_bodies(received)
+
+
+def test_a_project_file_that_links_outside_the_working_tree_is_not_delivered(tmp_path):
+    secret = tmp_path / "secret.md"
+    secret.write_text("OUTSIDE SECRET\n")
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+    (project / "CLAUDE.md").symlink_to(secret)
+
+    strings = spawn(tmp_path, plugin, project)
+
+    assert kernel_only(strings)
+    assert "OUTSIDE SECRET" not in "".join(delivered(strings))
+    assert rows(project)[0]["project_file"] is None
+
+
+def test_a_project_file_that_links_to_another_file_inside_the_working_tree_is_delivered(tmp_path):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+    (project / "AGENTS.md").write_text("shared conventions\n")
+    (project / "CLAUDE.md").symlink_to("AGENTS.md")
+
+    assert part_bodies(delivered(spawn(tmp_path, plugin, project))) == ["shared conventions\n"]
+
+
+def test_a_project_file_that_is_a_directory_is_not_delivered(tmp_path):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+    (project / "CLAUDE.md").mkdir()
+
+    assert kernel_only(spawn(tmp_path, plugin, project))
+
+
+def test_a_project_file_that_is_a_pipe_is_not_waited_for(tmp_path):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+    os.mkfifo(project / "CLAUDE.md")
+
+    assert kernel_only(spawn(tmp_path, plugin, project))
+
+
+def test_a_project_file_past_the_read_bound_is_cut_at_it_and_the_notice_says_at_least(tmp_path):
+    plugin = make_plugin(tmp_path, slots=3)
+    project = make_project(tmp_path, claude_md=project_text(5000))
+
+    strings = delivered(spawn(tmp_path, plugin, project, slots=3))
+
+    assert rows(project)[0]["project_file"]["chars"] <= 3 * CAP
+    assert "at least " in strings[-1]
+    assert "further part(s) were not delivered" in strings[-1]
+
+
+def test_undecodable_bytes_in_the_project_file_arrive_as_replacement_characters(tmp_path):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+    (project / "CLAUDE.md").write_bytes(b"before \xff\xfe after\n")
+
+    assert part_bodies(delivered(spawn(tmp_path, plugin, project))) == ["before �� after\n"]
+
+
+@pytest.mark.parametrize(
+    "where",
+    ["outside any repository", "missing"],
+)
+def test_a_working_directory_with_no_repository_or_no_existence_gives_the_kernel_alone(
+    tmp_path, where
+):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path, claude_md=project_text(3))
+    elsewhere = tmp_path / "plain" if where == "outside any repository" else tmp_path / "gone"
+    elsewhere.mkdir(exist_ok=where != "missing")
+    stdin = payload(project, cwd=str(elsewhere))
+
+    strings = [injected(run_hook(tmp_path, plugin, stdin, str(n))) for n in (1, 2)]
+
+    assert strings[0].endswith("KERNEL ONE\n\n")
+    assert strings[1:] == [None]
+    assert rows(project) == []
+
+
+def test_when_the_version_control_tool_fails_the_kernel_still_arrives_without_the_project_file(
+    tmp_path,
+):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path, claude_md=project_text(3))
+
+    done = run_hook(tmp_path, plugin, payload(project), PATH=str(tmp_path / "no-tools"))
+
+    assert injected(done).endswith("KERNEL ONE\n\n")
+    assert (
+        run_hook(tmp_path, plugin, payload(project), "2", PATH=str(tmp_path / "no-tools")).stdout
+        == ""
+    )
+
+
+def test_an_index_modules_list_of_the_wrong_length_is_named_by_position(tmp_path):
+    plugin = make_plugin(tmp_path, strings=("FIRST", "SECOND"))
+    path = plugin / "claude" / "kernels" / "index.json"
+    document = json.loads(path.read_text())
+    document["roles"][ROLE]["modules"] = ["only-one"]
+    path.write_text(json.dumps(document))
+    project = make_project(tmp_path)
+
+    spawn(tmp_path, plugin, project)
+
+    assert [entry["module"] for entry in rows(project)[0]["strings"]] == ["kernel-1", "kernel-2"]
+
+
+# -- The cap counts what the harness counts ------------------------------------------------
+
+ASTRAL = "\U0001f600"  # one character, two UTF-16 units
+
+
+def test_a_project_file_of_characters_outside_the_basic_plane_arrives_in_parts_under_the_cap(
+    tmp_path,
+):
+    text = "".join(ASTRAL * 1000 + "\n" for _ in range(20))
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path, claude_md=text)
+
+    strings = delivered(spawn(tmp_path, plugin, project))
+
+    assert [s for s in strings if inject_kernel.units(s) > CAP] == []
+    assert "".join(part_bodies(strings)) == text
+    assert any(len(s) < inject_kernel.units(s) for s in strings[1:])
+
+
+def test_a_kernel_string_under_the_cap_in_characters_and_over_it_in_units_is_refused_whole(
+    tmp_path,
+):
+    plugin = make_plugin(tmp_path, strings=(ASTRAL * (CAP // 2 + 100),))
+    project = make_project(tmp_path)
+
+    assert delivered(spawn(tmp_path, plugin, project)) == []
+    assert rows(project) == []
+
+
+def test_a_long_line_of_wide_characters_is_cut_between_characters_and_under_the_limit():
+    line = ASTRAL * 100
+
+    pieces = inject_kernel.cut_long_line(line, 60)
+
+    assert [p for p in pieces if inject_kernel.units(p) > 60] == []
+    assert "".join(pieces).replace(inject_kernel.LINE_CONTINUED, "") == line
+
+
+# -- Every slot decides the refusal alike --------------------------------------------------
+
+
+def run_slots(slots, monkeypatch, capsys, project_file):
+    monkeypatch.setattr(inject_kernel, "read_project_file", lambda cwd, bound: project_file)
+    monkeypatch.setattr(inject_kernel, "record_delivery", lambda *args: None)
+    printed = []
+    for slot in range(1, slots + 1):
+        environ = {"CLAUDE_PLUGIN_ROOT": str(PLUGIN_UNDER_TEST[0])}
+        inject_kernel.run(slot, {"agent_type": AGENT_TYPE, "cwd": "."}, environ)
+        printed.append(capsys.readouterr().out)
+    return printed
+
+
+PLUGIN_UNDER_TEST: list = []
+
+
+@pytest.fixture
+def plugin_under_test(tmp_path):
+    PLUGIN_UNDER_TEST[:] = [make_plugin(tmp_path, strings=("FIRST", "SECOND"), slots=4)]
+    yield PLUGIN_UNDER_TEST[0]
+    PLUGIN_UNDER_TEST.clear()
+
+
+def test_a_project_part_past_the_cap_makes_every_slot_print_nothing_not_just_its_own(
+    plugin_under_test, monkeypatch, capsys
+):
+    overflowing = inject_kernel.ProjectFile(
+        "/" + "d" * 1500 + "/CLAUDE.md", project_text(1000), True
+    )
+
+    assert run_slots(4, monkeypatch, capsys, overflowing) == [""] * 4
+
+
+def test_the_same_delivery_without_the_oversized_notice_prints_in_every_slot(
+    plugin_under_test, monkeypatch, capsys
+):
+    fitting = inject_kernel.ProjectFile("/p/CLAUDE.md", project_text(1000), True)
+
+    assert [bool(out) for out in run_slots(4, monkeypatch, capsys, fitting)] == [True] * 4
+
+
+# -- A line `@<path>` imports a file once, as the harness loads it -----------------------
+
+
+def delivered_text(tmp_path, project):
+    plugin = make_plugin(tmp_path)
+    return "".join(part_bodies(delivered(spawn(tmp_path, plugin, project))))
+
+
+def test_an_import_line_is_replaced_by_the_file_it_names(tmp_path):
+    project = make_project(tmp_path, claude_md="top\n@AGENTS.md\nbottom\n")
+    (project / "AGENTS.md").write_text("shared one\nshared two\n")
+
+    assert delivered_text(tmp_path, project) == "top\nshared one\nshared two\nbottom\n"
+
+
+def test_an_import_inside_an_imported_file_is_left_as_written(tmp_path):
+    project = make_project(tmp_path, claude_md="@a.md\n")
+    (project / "a.md").write_text("from a\n@b.md\n")
+    (project / "b.md").write_text("from b\n")
+
+    assert delivered_text(tmp_path, project) == "from a\n@b.md\n"
+
+
+def test_an_import_of_a_file_beside_the_project_file_in_a_subdirectory_resolves_from_the_root(
+    tmp_path,
+):
+    project = make_project(tmp_path, claude_md="@docs/rules.md\n")
+    (project / "docs").mkdir()
+    (project / "docs" / "rules.md").write_text("doc rules")
+
+    assert delivered_text(tmp_path, project) == "doc rules\n"
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["@missing.md", "@docs", "@../outside.md", "@/etc/hosts", "@~/notes.md", "see @AGENTS.md here"],
+    ids=["missing", "directory", "outside", "absolute", "home", "mid-line"],
+)
+def test_an_import_that_is_not_a_regular_file_inside_the_project_stays_as_written(tmp_path, line):
+    project = make_project(tmp_path, claude_md=f"{line}\n")
+    (project / "docs").mkdir()
+    (project / "AGENTS.md").write_text("never shown\n")
+    (tmp_path / "outside.md").write_text("never shown\n")
+
+    assert delivered_text(tmp_path, project) == f"{line}\n"
+
+
+def test_an_import_that_links_out_of_the_project_stays_as_written(tmp_path):
+    project = make_project(tmp_path, claude_md="@escape.md\n")
+    (tmp_path / "outside.md").write_text("never shown\n")
+    (project / "escape.md").symlink_to(tmp_path / "outside.md")
+
+    assert delivered_text(tmp_path, project) == "@escape.md\n"
 
 
 # -- The script's own constraints --------------------------------------------------------

@@ -177,8 +177,19 @@ def test_the_principles_pointer_leads_to_a_file_holding_all_eight_principles() -
 def test_the_partial_output_text_carries_the_title_and_its_three_lines() -> None:
     form = TEXTS["partial-output"]
 
-    for item in ("[PARTIAL]", "Completed phases", "Stopped at", "Usable sections"):
+    for item in (
+        "[PARTIAL]",
+        "Completed phases",
+        "Usable sections",
+        "your own definition words it",
+    ):
         assert item in form, f"the partial-output text lacks {item!r}"
+
+
+def test_the_partial_output_text_names_no_stop_line_label() -> None:
+    form = TEXTS["partial-output"]
+
+    assert [label for label in ("Stopped at", "Failed at") if label in form] == []
 
 
 def test_the_ledger_writer_text_names_the_four_writers_and_every_row_field() -> None:

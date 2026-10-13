@@ -1,0 +1,14 @@
+# Which roles receive their injected kernel, and the evidence for each step up.
+# A role absent from `roles` is at no status: it receives nothing at spawn and its
+# definition keeps the inherited project instructions. A role climbs one rung at a
+# time, absent -> trial -> switched; `since` is the moment its record began (an ISO
+# instant, so a spawn earlier that day is not judged). Only the listed roles may be
+# switched. The commit gate (scripts/check_kernel_manifest.py) holds every move.
+version: 1
+eligible:
+  - researcher
+  - verifier
+  - discipline-consultant
+  - skill-genesis
+  - context-engineer
+roles: {}

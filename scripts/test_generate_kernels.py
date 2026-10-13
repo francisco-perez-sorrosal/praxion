@@ -2,7 +2,7 @@
 
 Behaviors over a synthetic repository (so no test depends on what the rules say today): what
 is rendered and what is withheld, the universal blocks, parts and packing, the index and its
-statuses, determinism, and `--check` writing nothing. Four checks run over the real repository
+principles file, determinism, and `--check` writing nothing. Four checks run over the real repository
 (each role's module set, the committed kernels being fresh, the shared stop-line wording, the cap),
 paired with the synthetic canaries that prove the same checks bite.
 """
@@ -34,6 +34,26 @@ LONG_SOURCE = "## Condensed\n\nThe long source that a short form stands for.\n"
 LINKS_TEXT = "**Praxion links.** Read a Praxion file from the plugin root."
 RETURN_TEXT = "**Return contract.** End with one terminal marker."
 USER_SENTENCE = "The user-level instruction file is not loaded for you."
+TEMPLATE_TEXT = """## Template
+
+User-level text.
+
+## Principles
+
+Framing sentence kept in the orchestrator's session.
+
+### Wisdom
+
+Wisdom text, as the template words it.
+
+### Craft
+
+Craft text, as the template words it.
+
+## Closing
+
+Text after the principles.
+"""
 CONTRACT_SOURCE_TEXT = """## Agent Behavioral Contract
 
 Intro that points at the methodology.
@@ -98,6 +118,10 @@ def manifest_rows() -> dict:
             entry(SHARED_RULE, "Duty", "role", form="verbatim", agents=["writer"]),
             core(CONDENSED_RULE, "Condensed", form="condensed", text="short-form", pin=short_pin),
             entry(TEMPLATE, "Template", "no-actor"),
+            entry(TEMPLATE, "Principles", "orchestrator-only"),
+            entry(TEMPLATE, "Wisdom", "no-actor"),
+            entry(TEMPLATE, "Craft", "no-actor"),
+            entry(TEMPLATE, "Closing", "no-actor"),
         ],
     }
 
@@ -120,7 +144,7 @@ def build_repo(root: Path, *, manifest: Mapping | None = None) -> Path:
     write(root, CONTRACT_RULE, CONTRACT_SOURCE_TEXT)
     write(root, SHARED_RULE, SHARED_SOURCE_TEXT)
     write(root, CONDENSED_RULE, LONG_SOURCE)
-    write(root, TEMPLATE, "## Template\n\nUser-level text.\n")
+    write(root, TEMPLATE, TEMPLATE_TEXT)
     for name, body in AGENTS.items():
         write(root, f"agents/{name}.md", f"---\nname: {name}\n---\n\n{body}")
     for text_id, text in AUTHORED_TEXTS.items():
@@ -346,11 +370,20 @@ def test_a_role_holds_the_core_and_exactly_the_modules_that_name_it(repo: Path) 
     assert "Duty text for the writer." not in plan.assembled_kernel("reader").strings[0].text
 
 
-def test_the_blocks_stay_out_of_the_injected_strings(repo: Path) -> None:
+def test_the_first_injected_string_opens_with_the_blocks_then_the_rest_of_the_core(
+    repo: Path,
+) -> None:
     reader = gk.plan_kernels(repo).assembled_kernel("reader")
+    blocks = kernel_texts(repo_with_kernels(repo))["core-blocks.md"].strip()
 
-    assert LINKS_TEXT not in reader.strings[0].text
+    assert reader.strings[0].text.startswith(blocks)
+    assert reader.strings[0].text.count(LINKS_TEXT) == 1
     assert "Shared text for every agent." in reader.strings[0].text
+
+
+def repo_with_kernels(root: Path) -> Path:
+    run(root)
+    return root
 
 
 def test_a_role_whose_definition_says_failed_at_is_told_the_shared_wording(tmp_path: Path) -> None:
@@ -377,7 +410,7 @@ def test_an_unknown_role_is_refused_by_name(repo: Path) -> None:
 # -- The index ----------------------------------------------------------------------------
 
 
-def test_the_index_projects_statuses_from_the_ledger(repo: Path) -> None:
+def test_the_index_holds_no_adoption_status_whatever_the_ledger_says(repo: Path) -> None:
     write(
         repo,
         km.LEDGER_PATH,
@@ -388,11 +421,20 @@ def test_the_index_projects_statuses_from_the_ledger(repo: Path) -> None:
     index = km.load_index(repo)
 
     assert index is not None
-    assert {name: kernel.status for name, kernel in index.roles.items()} == {
-        "writer": "trial",
-        "reader": None,
-        "failer": None,
-    }
+    assert {kernel.status for kernel in index.roles.values()} == {None}
+
+
+def test_the_index_is_the_same_before_and_after_a_status_is_recorded(repo: Path) -> None:
+    run(repo)
+    before = (repo / km.INDEX_PATH).read_bytes()
+    write(
+        repo,
+        km.LEDGER_PATH,
+        "version: 1\neligible: [writer]\nroles:\n  writer:\n    status: trial\n    since: today\n",
+    )
+
+    assert run(repo, "--check") == 0
+    assert (repo / km.INDEX_PATH).read_bytes() == before
 
 
 def test_the_slots_are_the_most_strings_any_role_has_plus_the_project_file_reserve(
@@ -407,13 +449,22 @@ def test_the_slots_are_the_most_strings_any_role_has_plus_the_project_file_reser
     assert index.slots == most + gk.PROJECT_FILE_RESERVE
 
 
-def test_a_ledger_naming_no_agent_is_refused(repo: Path, capsys) -> None:
-    write(
-        repo, km.LEDGER_PATH, "version: 1\nroles:\n  ghost:\n    status: trial\n    since: today\n"
+def test_the_principles_file_is_the_templates_principles_verbatim_without_the_framing(
+    repo: Path,
+) -> None:
+    run(repo)
+
+    assert kernel_texts(repo)["principles.md"] == (
+        "### Wisdom\n\nWisdom text, as the template words it.\n\n"
+        "### Craft\n\nCraft text, as the template words it.\n"
     )
 
-    assert run(repo) == 2
-    assert "ghost" in capsys.readouterr().err
+
+def test_a_template_without_a_principles_section_is_refused() -> None:
+    template = ks.split_sections(TEMPLATE, "## Template\n\nUser-level text.\n")
+
+    with pytest.raises(gk.KernelPlanError, match="no 'Principles' section"):
+        gk.principles_section({TEMPLATE: template})
 
 
 def test_the_kernel_version_changes_when_a_kernel_byte_does(repo: Path) -> None:
@@ -535,12 +586,12 @@ def test_only_the_context_engineer_holds_the_audit_subject_exemption(live: gk.Ke
 
 
 @pytest.mark.parametrize("role", ["context-engineer", "skill-genesis", "discipline-consultant"])
-def test_a_role_that_words_the_stop_line_failed_at_is_told_the_shared_wording(
+def test_a_kernel_names_no_stop_line_label_so_none_contradicts_its_definition(
     live: gk.KernelPlan, role: str
 ) -> None:
     held = "\n".join(s.text for s in live.assembled_kernel(role).strings)
 
-    assert "**Stopped at**" in held
+    assert "Stopped at" not in held
     assert "Failed at" not in held
 
 

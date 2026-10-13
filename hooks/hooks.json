@@ -139,6 +139,65 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "^praxion:.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 1",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 2",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 3",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 4",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 5",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 6",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 7",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 8",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_kernel.py --slot 9",
+            "timeout": 5,
+            "async": false
+          }
+        ]
       }
     ],
     "SubagentStop": [

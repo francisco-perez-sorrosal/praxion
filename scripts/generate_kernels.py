@@ -9,11 +9,15 @@
   `<module>-<n>.md` parts cut at paragraph ends, whose concatenation is the module (the first
   part of the core carries the contract, because the blocks come first);
 - `core-blocks.md`: the three universal blocks, the part of the core every agent definition
-  carries as its fallback (a hook-delivered kernel never repeats them);
-- `index.json`: per role its status (projected from the adoption ledger), the modules in each
-  of its injected strings, and the strings themselves, packed into the fewest strings under
-  the cap with modules in order and none split; `slots` is the most strings any role has plus
-  a reserve for the working project's own `CLAUDE.md`.
+  carries as its fallback;
+- `principles.md`: the principles of the template's `## Principles` section, each subsection
+  verbatim (the section's own heading and framing sentence are orchestrator-only text, so they
+  stay behind), the file the principles pointer names;
+- `index.json`: per role the modules in each of its injected strings and the strings
+  themselves, packed into the fewest strings under the cap with modules in order and none
+  split (the first string opens with the core, blocks included); `slots` is the most strings
+  any role has plus a reserve for the working project's own `CLAUDE.md`. The index holds no
+  adoption status: the hook reads the plugin's own ledger.
 
 Two more artifacts derive from the same blocks, so nothing written by hand can drift from them:
 
@@ -29,9 +33,9 @@ Verbatim sections are the source bytes; a condensed entry is its authored text. 
 the same sources writes the same bytes. `--check` assembles in memory, writes nothing and exits
 1 when anything on disk differs. Exit 0 written or fresh, 1 stale under `--check`, 2 input error.
 
-Every role's strings carry the shared wording verbatim, the partial-output stop line included:
-the core says that where a definition words the stop line differently, the definition governs,
-so the kernel never contradicts it and the core stays one text.
+Every role's strings carry the shared wording verbatim. The core names no stop-line label (the
+partial-output text says the stop line is worded as the role's own definition words it), so a
+kernel never carries a label its definition does not and the core stays one text.
 
 Stdlib plus PyYAML (read once, in `kernel_model`).
 """
@@ -57,6 +61,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 KERNELS_DIR = "claude/kernels"
 BLOCKS_FILE = "core-blocks.md"
+PRINCIPLES_FILE = "principles.md"
+PRINCIPLES_HEADING = "Principles"
+PRINCIPLES_LEVEL = 2
 INDEX_SCHEMA = 1
 PROJECT_FILE_RESERVE = 6  # slots kept for the working project's CLAUDE.md, ~10,000 characters each
 PARAGRAPH_GAP = "\n\n"
@@ -121,12 +128,12 @@ class Kernel:
 
     blocks: UniversalBlocks
     modules: Mapping[str, str]  # "core" (blocks first), then each declared module; newline-ended
+    principles: str  # the template's Principles section, verbatim
 
 
 @dataclass(frozen=True)
 class RoleAssembly:
     role: str
-    status: str | None
     modules: tuple[str, ...]  # the modules the role holds, core first
     strings: tuple[km.KernelString, ...]  # as injected, in order
 
@@ -174,7 +181,35 @@ def assemble(
         name: PARAGRAPH_GAP.join(t.rstrip("\n") for t in pieces) for name, pieces in placed.items()
     }
     modules["core"] = blocks.text + PARAGRAPH_GAP + modules["core"]
-    return Kernel(blocks, {name: text + "\n" for name, text in modules.items()})
+    return Kernel(
+        blocks,
+        {name: text + "\n" for name, text in modules.items()},
+        principles_section(sections),
+    )
+
+
+def principles_section(sections: Mapping[str, Sequence[ks.Section]]) -> str:
+    """The subsections of the user template's `## Principles` section, byte for byte.
+
+    The section's own heading and framing sentence are classified orchestrator-only, so the
+    file opens at the first principle.
+    """
+    template = sections.get(ks.USER_TEMPLATE, ())
+    start = next(
+        (
+            i
+            for i, section in enumerate(template)
+            if (section.level, section.heading) == (PRINCIPLES_LEVEL, PRINCIPLES_HEADING)
+        ),
+        None,
+    )
+    if start is None:
+        raise KernelPlanError(f"{ks.USER_TEMPLATE} has no '{PRINCIPLES_HEADING}' section")
+    end = next(
+        (i for i in range(start + 1, len(template)) if template[i].level <= PRINCIPLES_LEVEL),
+        len(template),
+    )
+    return ks.pin_extent("".join(section.text for section in template[start + 1 : end]))
 
 
 def _contract_entry(manifest: km.Manifest) -> km.AudienceEntry:
@@ -260,7 +295,7 @@ def split_parts(text: str, cap: int = km.MAX_STRING_CHARS) -> tuple[str, ...]:
 
 def plan_files(kernel: Kernel) -> tuple[dict[str, str], dict[str, tuple[str, ...]]]:
     """The kernel files by name, and each module's parts."""
-    files = {BLOCKS_FILE: kernel.blocks.text + "\n"}
+    files = {BLOCKS_FILE: kernel.blocks.text + "\n", PRINCIPLES_FILE: kernel.principles}
     parts = {name: split_parts(text) for name, text in kernel.modules.items()}
     for name, pieces in parts.items():
         numbered = len(pieces) > 1
@@ -273,13 +308,9 @@ def compose(
     kernel: Kernel,
     manifest: km.Manifest,
     definitions: Mapping[str, str],
-    statuses: Mapping[str, str],
 ) -> KernelPlan:
     files, parts = plan_files(kernel)
-    roles = {
-        role: _assemble_role(role, kernel, manifest, parts, statuses.get(role))
-        for role in sorted(definitions)
-    }
+    roles = {role: _assemble_role(role, manifest, parts) for role in sorted(definitions)}
     slots = max(len(r.strings) for r in roles.values()) + PROJECT_FILE_RESERVE if roles else 0
     index = _render_index(files, roles, slots)
     encoded = {f"{KERNELS_DIR}/{name}": text.encode("utf-8") for name, text in files.items()}
@@ -288,15 +319,11 @@ def compose(
 
 
 def _assemble_role(
-    role: str,
-    kernel: Kernel,
-    manifest: km.Manifest,
-    parts: Mapping[str, tuple[str, ...]],
-    status: str | None,
+    role: str, manifest: km.Manifest, parts: Mapping[str, tuple[str, ...]]
 ) -> RoleAssembly:
     names = ("core", *(m for m in manifest.modules if role in _members(manifest, m)))
-    units = [(label, text.strip()) for label, text in _units(names, parts, kernel.blocks.text)]
-    return RoleAssembly(role, status, names, _pack(role, units))
+    units = [(label, text.strip()) for label, text in _units(names, parts)]
+    return RoleAssembly(role, names, _pack(role, units))
 
 
 def _members(manifest: km.Manifest, module: str) -> frozenset[str]:
@@ -305,15 +332,11 @@ def _members(manifest: km.Manifest, module: str) -> frozenset[str]:
     )
 
 
-def _units(
-    names: Sequence[str], parts: Mapping[str, tuple[str, ...]], blocks: str
-) -> Iterator[tuple[str, str]]:
-    """(label, text) per module part a role holds; the blocks stay in the definition."""
+def _units(names: Sequence[str], parts: Mapping[str, tuple[str, ...]]) -> Iterator[tuple[str, str]]:
+    """(label, text) per module part a role holds, the core's first part (blocks first) first."""
     for name in names:
         for number, part in enumerate(parts[name], start=1):
-            text = part.removeprefix(blocks) if name == "core" and number == 1 else part
-            if text.strip():
-                yield (name if len(parts[name]) == 1 else f"{name}-{number}"), text
+            yield (name if len(parts[name]) == 1 else f"{name}-{number}"), part
 
 
 def _pack(role: str, units: Sequence[tuple[str, str]]) -> tuple[km.KernelString, ...]:
@@ -338,7 +361,6 @@ def _render_index(files: Mapping[str, str], roles: Mapping[str, RoleAssembly], s
         "slots": slots,
         "roles": {
             name: {
-                "status": role.status,
                 "modules": [s.module for s in role.strings],
                 "strings": [s.text for s in role.strings],
             }
@@ -473,7 +495,7 @@ def plan_kernels(root: Path) -> KernelPlan:
     sections = _load_sections(root, manifest)
     _refuse(km.check_totality(manifest, sections, ks.always_loaded_sources(root)))
     kernel = assemble(manifest, sections, _read_authored(root, manifest))
-    plan = compose(kernel, manifest, definitions, _statuses(root, definitions))
+    plan = compose(kernel, manifest, definitions)
     return KernelPlan({**plan.files, **derived_files(kernel, definitions)}, plan.roles)
 
 
@@ -504,14 +526,6 @@ def _read_authored(root: Path, manifest: km.Manifest) -> dict[str, str]:
             raise KernelPlanError(f"authored text {text.id!r}: {text.path} does not exist")
         texts[text.id] = path.read_bytes().decode("utf-8").removesuffix("\n")
     return texts
-
-
-def _statuses(root: Path, definitions: Mapping[str, str]) -> Mapping[str, str]:
-    statuses = km.load_statuses(root)
-    unknown = sorted(set(statuses) - set(definitions))
-    if unknown:
-        raise KernelPlanError(f"the adoption ledger names {unknown[0]!r}, which is no agent")
-    return statuses
 
 
 def stale_files(root: Path, files: Mapping[str, bytes]) -> list[str]:

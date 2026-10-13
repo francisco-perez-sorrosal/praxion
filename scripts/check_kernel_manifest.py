@@ -17,6 +17,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I6-stale-pin`               | every condensed form's pin matches the source it condenses              |
 | `I7-resident-text-in-kernel` | no orchestrator-only or no-actor paragraph is in any kernel or injected string |
 | `I8-stale-kernel`            | the committed kernels, index, definitions' blocks and preamble equal what the generator writes now |
+| `I8-slot-registration`       | `hooks/hooks.json` registers exactly the index's K synchronous spawn-hook slots, under the plugin's own matcher |
 | `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval |
@@ -88,6 +89,11 @@ AGENT_PREFIX = "praxion:"  # the agent type of this plugin's agents, as the log 
 SPAWN_ROW = "agent_start"
 KERNEL_ROW = "kernel_injected"
 STATE_DIR = ".ai-state"
+
+HOOKS_PATH = "hooks/hooks.json"
+SLOT_EVENT = "SubagentStart"
+SLOT_COMMAND = re.compile(r"hooks/inject_kernel\.py --slot (\d+)$")
+SLOT_MATCHER = "^praxion:.*"  # whole agent types; a full-match driver still fires
 
 OMIT_KEY = (
     "omitClaudeMd"  # any value but false or null is read as the flag: a mistyped one still gates
@@ -208,6 +214,42 @@ def stale_findings(regeneration: tuple[str, ...] | km.KernelModelError) -> tuple
         km.Finding("I8-stale-kernel", path, "differs from what the generator writes: regenerate")
         for path in regeneration
     )
+
+
+@dataclass(frozen=True)
+class SlotEntry:
+    """One registration of the spawn hook in `hooks/hooks.json`, as the harness would run it."""
+
+    slot: int
+    matcher: str
+    synchronous: bool
+
+
+def slot_findings(slots: int | None, entries: Sequence[SlotEntry] | None) -> tuple[km.Finding, ...]:
+    """I8: the spawn hook is registered once per slot of the index, synchronously, for this plugin.
+
+    A slot that is missing, doubled, asynchronous (its output never reaches the role) or under
+    another matcher (it fires for nobody, or for everybody) delivers a partial kernel or none.
+    `slots` None is no index: I2 reports that, and there is no K to hold registrations to.
+    """
+    if slots is None:
+        return ()
+    if entries is None:
+        return (km.Finding("I8-slot-registration", HOOKS_PATH, "no spawn-hook registration found"),)
+    registered = sorted(entry.slot for entry in entries)
+    expected = list(range(1, slots + 1))
+    findings = []
+    if registered != expected:
+        detail = f"registers slots {registered}; the index's {slots} slots need {expected}"
+        findings.append(km.Finding("I8-slot-registration", HOOKS_PATH, detail))
+    for entry in sorted(entries, key=lambda each: each.slot):
+        if not entry.synchronous:
+            detail = "is asynchronous: its string would never reach the role"
+            findings.append(km.Finding("I8-slot-registration", f"slot {entry.slot}", detail))
+        if entry.matcher != SLOT_MATCHER:
+            detail = f"has matcher {entry.matcher!r}, not {SLOT_MATCHER!r}"
+            findings.append(km.Finding("I8-slot-registration", f"slot {entry.slot}", detail))
+    return tuple(findings)
 
 
 def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tuple[km.Finding, ...]:
@@ -457,6 +499,8 @@ class Evidence:
     required: tuple[str, ...]
     kernel_files: Mapping[str, str]  # name -> text, for each `claude/kernels/*.md`
     index_strings: Mapping[str, tuple[str, ...]] | None  # role -> injected strings; None: no index
+    index_slots: int | None  # how many spawn-hook slots the index asks for; None: no index
+    slot_entries: tuple[SlotEntry, ...] | None  # the spawn hook as registered; None: none found
     preamble: str | None
     regeneration: (
         tuple[str, ...] | km.KernelModelError
@@ -478,6 +522,8 @@ def gather(root: Path) -> Evidence:
         required,
         _kernel_files(root),
         _index_strings(root),
+        _index_slots(root),
+        _slot_entries(root),
         _read_text(root / gk.PREAMBLE_PATH),
         _regeneration(root),
         km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
@@ -503,6 +549,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *resident_findings(evidence.manifest, evidence.sections, injected),
         # the generator refuses sources that fail I1: that refusal is I1's finding, not a second
         *(() if totality else stale_findings(evidence.regeneration)),
+        *slot_findings(evidence.index_slots, evidence.slot_entries),
         *flip_findings(omitting_roles(evidence.definitions), evidence.statuses),
         *record_findings(evidence.ledger),
         *transition_findings(evidence.parent_statuses, evidence.statuses),
@@ -534,15 +581,58 @@ def _kernel_files(root: Path) -> dict[str, str]:
     return {path.name: path.read_bytes().decode("utf-8") for path in paths}
 
 
-def _index_strings(root: Path) -> dict[str, tuple[str, ...]] | None:
+def _read_index(root: Path) -> dict | None:
     path = root / km.INDEX_PATH
     if not path.is_file():
         return None
     try:
-        roles = json.loads(path.read_bytes().decode("utf-8"))["roles"]
-        return {role: tuple(body["strings"]) for role, body in roles.items()}
-    except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as exc:
+        index = json.loads(path.read_bytes().decode("utf-8"))
+        if not isinstance(index["roles"], dict):
+            raise TypeError("roles is not a mapping")
+        return index
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise km.KernelModelError(f"{path}: not an index this checker can read: {exc!r}") from exc
+
+
+def _index_strings(root: Path) -> dict[str, tuple[str, ...]] | None:
+    index = _read_index(root)
+    if index is None:
+        return None
+    try:
+        return {role: tuple(body["strings"]) for role, body in index["roles"].items()}
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise km.KernelModelError(
+            f"{root / km.INDEX_PATH}: not an index this checker can read: {exc!r}"
+        ) from exc
+
+
+def _index_slots(root: Path) -> int | None:
+    index = _read_index(root)
+    slots = None if index is None else index.get("slots")
+    if index is not None and (type(slots) is not int or slots < 1):
+        raise km.KernelModelError(
+            f"{root / km.INDEX_PATH}: slots {slots!r} is not a positive integer"
+        )
+    return slots
+
+
+def _slot_entries(root: Path) -> tuple[SlotEntry, ...] | None:
+    """The spawn hook's registrations under `SubagentStart`; None when the file is absent."""
+    path = root / HOOKS_PATH
+    if not path.is_file():
+        return None
+    try:
+        groups = json.loads(path.read_bytes().decode("utf-8"))["hooks"].get(SLOT_EVENT, [])
+        return tuple(
+            SlotEntry(int(found.group(1)), group.get("matcher", ""), hook.get("async") is not True)
+            for group in groups
+            for hook in group["hooks"]
+            if (found := SLOT_COMMAND.search(hook["command"]))
+        )
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as exc:
+        raise km.KernelModelError(
+            f"{path}: not a hook registry this checker can read: {exc!r}"
+        ) from exc
 
 
 def _regeneration(root: Path) -> tuple[str, ...] | km.KernelModelError:

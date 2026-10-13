@@ -9,21 +9,34 @@ kernel strings from ``claude/kernels/index.json`` and then the project root
 ``hookSpecificOutput`` JSON; the exit code is always 0, so a failing hook can
 never block a spawn.
 
-Who receives anything: an agent of this plugin (``praxion:<role>``) whose index
-status is ``trial`` or ``switched``. A host-native agent, another plugin's agent
-of the same role name, a role at no status, a plugin with no index, and an
-unknown index schema all receive nothing. There is no disable variable: a
-switched role must never be silenced.
+Who receives anything: an agent of this plugin (``praxion:<role>``) whose adoption
+status in the running plugin's ledger (``.ai-state/kernel_adoption.yaml``) is
+``trial`` or ``switched``. A host-native agent, another plugin's agent of the same
+role name, a role at no status, a plugin with no ledger or no index, and an unknown
+index schema all receive nothing. There is no disable variable: a switched role
+must never be silenced.
 
 Where things are found, never from this script's own location: the plugin root
-from ``CLAUDE_PLUGIN_ROOT`` (the kernel is the running plugin's, never a copy
-in the project) and the project from the payload ``cwd`` through git. The hook
-reads one file of the plugin, a JSON index, so it needs only the standard
-library and any ``python3`` from 3.9. The ledger is projected into the index by
-the generator; a stale index is the manifest checker's finding.
+from ``CLAUDE_PLUGIN_ROOT`` (the kernel and the ledger are the running plugin's,
+never a copy in the project) and the project from the payload ``cwd`` through git.
+The hook reads two files of the plugin, so it needs only the standard library and
+any ``python3`` from 3.9: the ledger is scanned line by line for the shape the
+ledger's writers emit (``roles:`` then ``  <role>:`` then ``    status: <status>``,
+no YAML parser), the index is JSON. A status copied into the index is informative
+only; a stale index is the manifest checker's finding.
+
+The project file is delivered as the harness would load it, minus what the role
+does not inherit: a line of the form ``@<relative path>`` is replaced, once and
+not recursively, by that file's text when it is a regular file inside the project;
+the file itself is read only when it is a regular file inside the project after
+symlinks are resolved, and never beyond the bytes the reserved slots can carry.
+
+Every slot computes the whole delivery from the same inputs and prints its own
+part: a delivery any of whose strings passes the cap is refused by every slot
+alike, so a role never receives part of a kernel.
 
 Delivery evidence has two channels. Every injected string begins with a one-line
-marker carrying the kernel version and its slot number: the adherence eval
+marker (its own paragraph) carrying the kernel version and its slot number: the adherence eval
 cannot read a sandbox's observation log, so the marker in the transcript is the
 only evidence it can read. Slot 1 also appends the single ``kernel_injected``
 row to the project's observation log (none for a spawn that receives nothing).
@@ -47,6 +60,7 @@ PLUGIN_NAMESPACE = "praxion"
 ACTIVE_STATUSES = frozenset({"trial", "switched"})
 INDEX_SCHEMA = 1
 INDEX_PATH = ("claude", "kernels", "index.json")
+LEDGER_PATH = (".ai-state", "kernel_adoption.yaml")
 PLUGIN_ROOT_VARIABLE = "${CLAUDE_PLUGIN_ROOT}"
 PROJECT_FILE_NAME = "CLAUDE.md"
 PROJECT_MODULE = "project-claude-md"
@@ -56,22 +70,37 @@ GIT_TIMEOUT_SECONDS = 3
 # One injected string may not exceed the harness's inline limit; beyond it the
 # harness saves the text to a file and shows a preview, which is not delivery.
 INJECTION_CAP = 10_000
+# The harness counts the cap in UTF-16 code units (as JavaScript strings do), so a
+# character outside the Basic Multilingual Plane weighs two.
+BMP_LIMIT = 0xFFFF
 # Room a project-file part leaves for the slot marker, the part header and an
 # overflow notice, so a part of this much file text always fits the cap.
 FRAMING_RESERVE = 1_000
 PART_TEXT_LIMIT = INJECTION_CAP - FRAMING_RESERVE
 LINE_CONTINUED = "\n[line continued]\n"
 
-MARKER = "[praxion kernel version={version} slot={slot}]"
+# The marker is framing, not kernel prose: it stands as its own paragraph and stays under 24
+# characters (the length below which a paragraph is too short to identify its source), so a
+# comparison of what a role received against the committed kernel text sets it aside. Eight
+# hexadecimal characters of the kernel version identify it; the row carries the whole version.
+MARKER = "[praxion {version} #{slot}]"
+MARKER_VERSION_CHARS = 8
+MARKER_GAP = "\n\n"
+# A kernel string ends its last paragraph, so strings that reach a reader joined end to end
+# (their order and joining are the harness's) never fuse one string's last paragraph into the
+# next string's marker.
+STRING_END = "\n\n"
 PART_HEADER = "[project CLAUDE.md, part {number} of {total}]"
-OMITTED_NOTICE = "\n[project CLAUDE.md: {omitted} further part(s) were not delivered; read {path} for the rest]\n"
+OMITTED_NOTICE = "\n[project CLAUDE.md: {qualifier}{omitted} further part(s) were not delivered; read {path} for the rest]\n"
+AT_LEAST = "at least "
 
 # A kernel the hook may deliver, parsed once from the index: its version, how many
 # slots are registered, and its strings (each with the modules it packs).
 Kernel = namedtuple("Kernel", ("version", "slots", "strings"))
 KernelString = namedtuple("KernelString", ("text", "modules"))
-# The project's root instruction file as read: where, and what it says.
-ProjectFile = namedtuple("ProjectFile", ("path", "text"))
+# The project's root instruction file as read: where, what it says, and whether that is all of
+# it (a file past the read bound is held only as far as the bound).
+ProjectFile = namedtuple("ProjectFile", ("path", "text", "complete"))
 # One string to inject (before its marker), and which module or part it carries.
 Piece = namedtuple("Piece", ("body", "module", "part"))
 # What a spawn receives: the pieces in slot order and, when a project file was
@@ -81,6 +110,14 @@ Delivery = namedtuple("Delivery", ("pieces", "project_file"))
 Injection = namedtuple("Injection", ("text", "module", "part"))
 
 _LINE = re.compile(r"[^\n]*\n|[^\n]+")
+# The ledger's generated shape (block style): the `roles:` key at the margin, a role at two
+# spaces, its `status:` at four. Anything else is not read.
+_LEDGER_ROLES = re.compile(r"roles:[ \t]*(#.*)?$")
+_LEDGER_ROLE = re.compile(r"  ([\w.-]+):[ \t]*(#.*)?$")
+_LEDGER_STATUS = re.compile(r"    status:[ \t]*([\w-]+)[ \t]*(#.*)?$")
+# A project-file line that imports another file, as the harness reads it: `@path` at line start.
+_IMPORT_LINE = re.compile(r"^@(?P<path>\S+)[ \t]*(?=\r?$)", re.MULTILINE)
+_FINAL_LINE_END = re.compile(r"\r?\n\Z")
 
 
 def main(argv=None):
@@ -101,13 +138,14 @@ def run(slot, payload, environ):
     plugin_root = environ.get("CLAUDE_PLUGIN_ROOT")
     if role is None or not plugin_root:
         return
+    if adoption_status(read_ledger(plugin_root), role) not in ACTIVE_STATUSES:
+        return
     kernel = parse_kernel(load_index(plugin_root), role)
     if kernel is None or slot > kernel.slots:
         return
-    # Kernel strings need no project: only slot 1 (the row) and the slots past
-    # the kernel strings pay for the git call and the file read.
-    needs_project = slot == 1 or slot > len(kernel.strings)
-    project = read_project_file(payload.get("cwd")) if needs_project else None
+    # Every slot reads the project and plans the whole delivery: whether it is refused for
+    # passing the cap must come out the same in each, or a role would get part of a kernel.
+    project = read_project_file(payload.get("cwd"), kernel.slots * INJECTION_CAP)
     delivery = plan_delivery(kernel, plugin_root, project)
     injections = render(kernel.version, delivery)
     if slot > len(injections):
@@ -144,13 +182,35 @@ def role_of(agent_type):
     return role if separator and namespace == PLUGIN_NAMESPACE and role else None
 
 
+def adoption_status(ledger_text, role):
+    """The role's status in the ledger's text, or None; a ledger that does not read gives None.
+
+    Only the ledger's own generated shape is read (see ``_LEDGER_*``): the first ``status:``
+    under the role's key inside the top-level ``roles:`` block.
+    """
+    in_roles, current = False, None
+    for line in ledger_text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" "):
+            in_roles, current = bool(_LEDGER_ROLES.match(line)), None
+        elif in_roles and (named := _LEDGER_ROLE.match(line)):
+            current = named.group(1)
+        elif in_roles and current == role and (found := _LEDGER_STATUS.match(line)):
+            return found.group(1)
+    return None
+
+
 def parse_kernel(index, role):
-    """The kernel a role at trial or switched receives; None for everything else."""
+    """The kernel the index holds for a role; None when there is none or the index is unreadable.
+
+    Whether the role is to receive it is the ledger's decision, not the index's.
+    """
     if not isinstance(index, dict) or index.get("schema") != INDEX_SCHEMA:
         return None
     version, slots, roles = index.get("kernel_version"), index.get("slots"), index.get("roles")
     entry = roles.get(role) if isinstance(roles, dict) else None
-    if not isinstance(entry, dict) or entry.get("status") not in ACTIVE_STATUSES:
+    if not isinstance(entry, dict):
         return None
     strings = entry.get("strings")
     if not (isinstance(version, str) and isinstance(slots, int) and isinstance(strings, list)):
@@ -172,7 +232,11 @@ def module_labels(labels, count):
 def plan_delivery(kernel, plugin_root, project):
     """The kernel strings with the plugin location written out, then the project file's parts."""
     pieces = [
-        Piece(string.text.replace(PLUGIN_ROOT_VARIABLE, plugin_root), string.modules, None)
+        Piece(
+            string.text.replace(PLUGIN_ROOT_VARIABLE, plugin_root) + STRING_END,
+            string.modules,
+            None,
+        )
         for string in kernel.strings
     ]
     if project is None or not project.text.strip():
@@ -200,41 +264,57 @@ def project_parts(project, room):
         for number, chunk in enumerate(delivered, 1)
     ]
     if omitted and parts:
-        notice = OMITTED_NOTICE.format(omitted=omitted, path=project.path)
+        qualifier = "" if project.complete else AT_LEAST
+        notice = OMITTED_NOTICE.format(qualifier=qualifier, omitted=omitted, path=project.path)
         parts[-1] = parts[-1]._replace(body=parts[-1].body + notice)
-    return parts, {"chars": len(project.text), "parts": len(parts), "omitted": omitted}
+    return parts, {"chars": units(project.text), "parts": len(parts), "omitted": omitted}
 
 
 def split_chunks(text, limit):
-    """``text`` as chunks of at most ``limit`` characters that concatenate back to it.
+    """``text`` as chunks of at most ``limit`` UTF-16 units that concatenate back to it.
 
     Cuts fall at line ends. The one exception is a single line longer than
     ``limit``, which is cut inside the line and marked at each cut.
     """
-    chunks, current = [], ""
+    chunks, current, size = [], "", 0
     for line in _LINE.findall(text):
-        if len(line) > limit:
+        width = units(line)
+        if width > limit:
             if current:
                 chunks.append(current)
             *cut, current = cut_long_line(line, limit)
             chunks.extend(cut)
-        elif current and len(current) + len(line) > limit:
+            size = units(current)
+        elif current and size + width > limit:
             chunks.append(current)
-            current = line
+            current, size = line, width
         else:
-            current += line
+            current, size = current + line, size + width
     if current:
         chunks.append(current)
     return chunks
 
 
 def cut_long_line(line, limit):
-    """A line longer than ``limit`` as pieces; every piece but the last ends in the marker."""
-    step = limit - len(LINE_CONTINUED)
-    starts = range(0, len(line), step)
-    pieces = [line[start : start + step] + LINE_CONTINUED for start in starts]
-    pieces[-1] = pieces[-1][: -len(LINE_CONTINUED)]
+    """A line longer than ``limit`` units as pieces; every piece but the last ends in the marker.
+
+    A cut never falls inside a character, so a piece may fall one unit short of the limit.
+    """
+    room = limit - units(LINE_CONTINUED)
+    pieces, start, used = [], 0, 0
+    for index, char in enumerate(line):
+        width = units(char)
+        if used + width > room:
+            pieces.append(line[start:index] + LINE_CONTINUED)
+            start, used = index, 0
+        used += width
+    pieces.append(line[start:])
     return pieces
+
+
+def units(text):
+    """The length of ``text`` in UTF-16 code units, which is how the harness counts its cap."""
+    return len(text) + sum(1 for char in text if ord(char) > BMP_LIMIT)
 
 
 def render(version, delivery):
@@ -246,13 +326,15 @@ def render(version, delivery):
     """
     injections = tuple(
         Injection(
-            MARKER.format(version=version, slot=slot) + "\n" + piece.body,
+            MARKER.format(version=version[:MARKER_VERSION_CHARS], slot=slot)
+            + MARKER_GAP
+            + piece.body,
             piece.module,
             piece.part,
         )
         for slot, piece in enumerate(delivery.pieces, 1)
     )
-    return () if any(len(each.text) > INJECTION_CAP for each in injections) else injections
+    return () if any(units(each.text) > INJECTION_CAP for each in injections) else injections
 
 
 def kernel_row(payload, role, version, injections, project_file, timestamp):
@@ -266,7 +348,7 @@ def kernel_row(payload, role, version, injections, project_file, timestamp):
         "role": role,
         "kernel_version": version,
         "strings": [
-            {"module": each.module, "part": each.part, "chars": len(each.text)}
+            {"module": each.module, "part": each.part, "chars": units(each.text)}
             for each in injections
         ],
         "project_file": project_file,
@@ -285,17 +367,72 @@ def load_index(plugin_root):
         return None
 
 
-def read_project_file(cwd):
-    """The root ``CLAUDE.md`` of the git working tree holding ``cwd``; None when there is none."""
+def read_ledger(plugin_root):
+    """The running plugin's adoption ledger as text; empty when absent or unreadable."""
+    try:
+        with open(os.path.join(plugin_root, *LEDGER_PATH), encoding="utf-8") as handle:
+            return handle.read()
+    except (OSError, ValueError):
+        return ""
+
+
+def read_project_file(cwd, bound):
+    """The root ``CLAUDE.md`` of the git working tree holding ``cwd``, imports expanded.
+
+    None when there is none, or when it is not a regular file inside the working tree.
+    ``bound`` caps the characters read from the file and from its imports.
+    """
     root = git_toplevel(cwd)
     if root is None:
         return None
     path = os.path.join(root, PROJECT_FILE_NAME)
+    text = read_inside(root, path, bound)
+    if text is None:
+        return None
+    expanded = expand_imports(text, root, bound)
+    return ProjectFile(path, expanded, len(expanded) < bound)
+
+
+def expand_imports(text, root, bound):
+    """``text`` with each ``@<relative path>`` line replaced by that file's text, once.
+
+    Not recursive: an import inside an imported file stays as written. A line that
+    does not name a regular file inside ``root`` stays as written too, and so do
+    the lines after ``bound`` characters have been imported.
+    """
+    pieces, cursor, imported_chars = [], 0, 0
+    for found in _IMPORT_LINE.finditer(text):
+        if imported_chars >= bound:
+            break
+        imported = read_import(root, found.group("path"), bound - imported_chars)
+        if imported is not None:
+            pieces += [text[cursor : found.start()], imported]
+            cursor, imported_chars = found.end(), imported_chars + len(imported)
+    pieces.append(text[cursor:])
+    return "".join(pieces)
+
+
+def read_import(root, relative, bound):
+    """An imported file's text less its final line end (the importing line keeps its own)."""
+    if os.path.isabs(relative) or relative.startswith("~"):
+        return None
+    text = read_inside(root, os.path.join(root, relative), bound)
+    return None if text is None else _FINAL_LINE_END.sub("", text, count=1)
+
+
+def read_inside(root, path, bound):
+    """At most ``bound`` characters of the regular file at ``path``, which must resolve inside ``root``.
+
+    Verbatim: the file's own line endings are kept and undecodable bytes are replaced.
+    None for anything else (a directory, a pipe, a link out of the tree, an unreadable file).
+    """
     try:
-        # newline="" keeps the file's own line endings: it arrives verbatim.
-        with open(path, encoding="utf-8", errors="replace", newline="") as handle:
-            return ProjectFile(path, handle.read())
-    except OSError:
+        real, base = os.path.realpath(path), os.path.realpath(root)
+        if os.path.commonpath([real, base]) != base or not os.path.isfile(real):
+            return None
+        with open(real, encoding="utf-8", errors="replace", newline="") as handle:
+            return handle.read(bound)
+    except (OSError, ValueError):
         return None
 
 

@@ -36,6 +36,7 @@ COPIED = (
     "claude/config/CLAUDE.md.tmpl",
     "CLAUDE.md",
     gk.PREAMBLE_PATH,
+    cb.HOOKS_PATH,
 )
 UNIFIED_RULE = "rules/swe/agent-intermediate-documents.md"
 PROBE_HEADING = "Resident Probe Section"

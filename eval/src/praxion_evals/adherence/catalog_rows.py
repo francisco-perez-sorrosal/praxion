@@ -31,20 +31,24 @@ from praxion_evals.adherence.checks_documents import (
 from praxion_evals.adherence.checks_process import Mode, in_mode, return_form
 from praxion_evals.adherence.checks_roles import (
     Section,
+    binds_unless_stopped_early,
     count_limit,
     documents_produced,
+    files_carry_wording,
     path_scope,
     required_sections,
     script_exits_zero,
     title_marker_first_unmarked_last,
 )
 from praxion_evals.adherence.model import (
+    CONVENTION_MARKER,
     Binding,
     CheckDef,
     DoesNotBind,
     Role,
     RuleRef,
     TaskFacts,
+    convention_check_name,
 )
 from praxion_evals.adherence.output_forms import (
     DRAFT_ADRS,
@@ -65,6 +69,26 @@ MALFORMED_LEDGER = (
     f"| {_LEDGER_COLUMNS} |\n|{'---|' * 15}\n| td-001 | suggested |\n"
 )
 _LEDGER_SCHEMA_ARGUMENTS = ("--check", "--repo-root", "{repo}")
+
+# ---------------------------------------------------------------------------
+# The pilot roles: the convention a project states only in its own instruction file
+# ---------------------------------------------------------------------------
+
+
+def convention_check(role: Role) -> CheckDef:
+    """The pilot role's check that it followed the convention its fixture's instruction file states.
+
+    No rule section states the obligation to follow the working project's own instruction
+    file, so the closest is cited: the contract every role works under.
+    """
+    return files_carry_wording(
+        convention_check_name(role),
+        RuleRef("rules/swe/agent-behavioral-contract.md", "Agent Behavioral Contract"),
+        role,
+        wording=CONVENTION_MARKER,
+        binds=binds_unless_stopped_early,
+    )
+
 
 # ---------------------------------------------------------------------------
 # The interface-designer and the agentic-transactions-architect
@@ -259,6 +283,7 @@ CONTEXT_ENGINEER_ROW: tuple[CheckDef, ...] = (
         ),
         SHADOWING_MODE,
     ),
+    convention_check("context-engineer"),
 )
 
 CICD_ENGINEER_ROW: tuple[CheckDef, ...] = (
@@ -311,6 +336,7 @@ DISCIPLINE_CONSULTANT_ROW: tuple[CheckDef, ...] = (
         ),
         UNRESOLVABLE_DIRECTIVE,
     ),
+    convention_check("discipline-consultant"),
 )
 
 # ---------------------------------------------------------------------------
@@ -469,6 +495,7 @@ SKILL_GENESIS_ROW: tuple[CheckDef, ...] = (
         "skill-genesis",
         forbidden=ARTIFACT_PLACES,
     ),
+    convention_check("skill-genesis"),
 )
 
 # ---------------------------------------------------------------------------

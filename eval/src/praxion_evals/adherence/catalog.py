@@ -20,6 +20,7 @@ from praxion_evals.adherence.catalog_rows import (
     PARTIAL_MARKER,
     SUPPORT_ROLE_ROWS,
     TECH_DEBT_LEDGER,
+    convention_check,
 )
 from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS
@@ -140,6 +141,7 @@ RESEARCHER_ROW: tuple[CheckDef, ...] = (
         facts=_RESEARCHER_CANARY_FACTS,
         binds=_binds_on_api_question,
     ),
+    convention_check("researcher"),
 )
 
 # ---------------------------------------------------------------------------
@@ -190,6 +192,7 @@ VERIFIER_ROW: tuple[CheckDef, ...] = (
         planted={TECH_DEBT_LEDGER: MALFORMED_LEDGER},
         watched=(TECH_DEBT_LEDGER,),
     ),
+    convention_check("verifier"),
 )
 
 # ---------------------------------------------------------------------------

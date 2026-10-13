@@ -17,8 +17,10 @@ from praxion_evals.adherence.checks_common import synthetic_evidence
 from praxion_evals.adherence.checks_roles import (
     CHECKOUT_ROOT,
     Section,
+    binds_unless_stopped_early,
     closed_tag_set,
     count_limit,
+    files_carry_wording,
     first_line,
     has_content,
     path_scope,
@@ -30,7 +32,9 @@ from praxion_evals.adherence.checks_roles import (
     with_cwd,
 )
 from praxion_evals.adherence.model import (
+    Binds,
     CheckErrored,
+    DoesNotBind,
     Failed,
     NotApplicable,
     Passed,
@@ -601,3 +605,51 @@ def test_a_script_run_in_the_session_home_reads_the_transcripts_planted_there(tm
 
     assert isinstance(outcome, CheckErrored)  # no workflow run is planted: the script refuses
     assert "exited 2" in outcome.reason
+
+
+# ---------------------------------------------------------------------------
+# files_carry_wording
+# ---------------------------------------------------------------------------
+
+WORDING = "Filed under the house rules."
+
+
+def _wording_check():
+    return files_carry_wording("wording", RULE, "researcher", wording=WORDING)
+
+
+def test_a_file_holding_the_wording_passes_beside_one_that_does_not():
+    written = {DOC_PATH: f"# Report\n\n{WORDING}\n", "notes.md": "no wording here"}
+
+    outcome = _wording_check().evaluate(synthetic_evidence("researcher", files=written))
+
+    assert outcome == Passed()
+
+
+def test_files_without_the_wording_fail_and_the_count_is_named():
+    written = {DOC_PATH: "# Report\n", "notes.md": "x"}
+
+    outcome = _wording_check().evaluate(synthetic_evidence("researcher", files=written))
+
+    assert isinstance(outcome, Failed)
+    assert "2 files" in outcome.detail
+
+
+def test_a_session_that_wrote_no_file_fails_the_wording_check():
+    outcome = _wording_check().evaluate(synthetic_evidence("researcher"))
+
+    assert isinstance(outcome, Failed)
+    assert "no file" in outcome.detail
+
+
+def test_the_wording_checks_own_canary_is_failed():
+    check = _wording_check()
+
+    assert isinstance(check.evaluate(check.violation()), Failed)
+
+
+@pytest.mark.parametrize(("forced_stop", "binding"), [(True, DoesNotBind), (False, Binds)])
+def test_a_check_bound_unless_stopped_early_does_not_bind_a_forced_stop(forced_stop, binding):
+    facts = TaskFacts(forced_stop, False, False, None, None, None)
+
+    assert isinstance(binds_unless_stopped_early("researcher", facts), binding)

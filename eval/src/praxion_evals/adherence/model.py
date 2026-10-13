@@ -206,6 +206,35 @@ class EarlyStop:
 
 TaskVariant = Standard | EarlyStop
 
+# The roles the lean-spawn pilot covers: each owes a project convention in its fixture.
+PILOT_ROLES: tuple[str, ...] = (
+    "researcher",
+    "verifier",
+    "discipline-consultant",
+    "skill-genesis",
+    "context-engineer",
+)
+# The wording a pilot task's convention asks every document to carry: the one thing the
+# convention check looks for, and the thing only the fixture's own instruction file states.
+CONVENTION_MARKER = "Filed under the project house rules."
+
+
+def convention_check_name(role: str) -> str:
+    """The name of the role check that reads whether ``role`` followed its task's convention."""
+    return f"{role}: it follows the convention its project's instruction file states"
+
+
+@dataclass(frozen=True)
+class ProjectConvention:
+    """A convention written only in the fixture's own instruction file, and the check that reads it."""
+
+    text: str
+    check: str  # the name of a role check in the catalog
+
+    def __post_init__(self) -> None:
+        _non_empty(self.text, "a project convention's text")
+        _non_empty(self.check, "a project convention's check")
+
 
 @dataclass(frozen=True)
 class TaskSpec:
@@ -219,6 +248,7 @@ class TaskSpec:
     slug: str
     main_prompt: str
     seed: int
+    project_convention: ProjectConvention | None = None  # set for a pilot role's task
 
     def __post_init__(self) -> None:
         for name in ("task_id", "template_id", "fixture_id", "slug", "main_prompt"):

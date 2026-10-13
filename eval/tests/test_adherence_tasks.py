@@ -16,6 +16,8 @@ from praxion_evals.adherence import tasks
 from praxion_evals.adherence.catalog_rows import DIFF_MODE, ON_DEMAND_MODE, SHADOWING_MODE
 from praxion_evals.adherence.checks_process import ACCEPTANCE_DESIGN_MODE, PARALLEL_MODE
 from praxion_evals.adherence.model import (
+    CONVENTION_MARKER,
+    PILOT_ROLES,
     ROLES,
     WEBFETCH_ROLES,
     Ambiguity,
@@ -25,6 +27,7 @@ from praxion_evals.adherence.model import (
     ScopeConflict,
     Standard,
     TaskSpec,
+    convention_check_name,
 )
 from praxion_evals.live.session import SandboxPaths
 
@@ -719,3 +722,83 @@ def test_the_implementer_is_given_a_step_acceptance_tests_to_leave_alone_and_a_s
     assert list((dest / "tests" / "acceptance").glob("test_*.py"))
     assert list((dest / "tests").glob("test_*.py"))
     assert (dest / "README.md").is_file()
+
+
+# ---------------------------------------------------------------------------
+# The project convention a pilot role's fixture states
+# ---------------------------------------------------------------------------
+
+NON_PILOT_ROLES = [role for role in ROLES if role not in PILOT_ROLES]
+
+
+def _convention_files(dest: Path, wording: str) -> list[str]:
+    return sorted(
+        path.relative_to(dest).as_posix()
+        for path in dest.rglob("*")
+        if path.is_file() and ".git" not in path.parts and wording in path.read_text()
+    )
+
+
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_every_task_of_a_pilot_role_names_a_convention_and_the_check_that_reads_it(role):
+    pool = _pool(role)
+
+    assert {task.project_convention for task in pool} == {tasks.PILOT_CONVENTIONS[role]}
+    assert tasks.PILOT_CONVENTIONS[role].check == convention_check_name(role)
+
+
+@pytest.mark.parametrize("role", NON_PILOT_ROLES)
+def test_no_task_of_another_role_names_a_convention(role):
+    assert {task.project_convention for task in _pool(role)} == {None}
+
+
+@pytest.mark.parametrize("fixture", ["ledger-cli", "notes-service"])
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_the_convention_is_written_only_in_the_fixtures_instruction_file(role, fixture, tmp_path):
+    task = next(t for t in _pool(role) if t.fixture_id == fixture)
+    dest = tmp_path / "scratch"
+
+    tasks.build_scratch_repo(task, dest)
+
+    wording = task.project_convention.text
+    assert _convention_files(dest, wording) == [tasks.INSTRUCTIONS_FILE]
+    assert not UNFILLED_TOKEN.search((dest / tasks.INSTRUCTIONS_FILE).read_text())
+    assert not (dest / tasks.INSTRUCTIONS_TEMPLATE).exists()
+
+
+@pytest.mark.parametrize("role", NON_PILOT_ROLES)
+def test_a_task_with_no_convention_states_none_and_leaves_no_template_behind(role, tmp_path):
+    dest = tmp_path / "scratch"
+
+    tasks.build_scratch_repo(tasks.generate(role, SEED, 1)[0], dest)
+
+    assert _convention_files(dest, CONVENTION_MARKER) == []
+    assert not (dest / tasks.INSTRUCTIONS_TEMPLATE).exists()
+
+
+@pytest.mark.parametrize("role", ["context-engineer", "skill-genesis"])
+def test_a_convention_joins_the_conventions_an_overlay_already_states(role, tmp_path):
+    overlay = (tasks.OVERLAYS_DIR / "ecosystem" / "CLAUDE.md.tmpl").read_text()
+    dest = tmp_path / "scratch"
+
+    tasks.build_scratch_repo(tasks.generate(role, SEED, 1)[0], dest)
+
+    stated = (dest / tasks.INSTRUCTIONS_FILE).read_text()
+    assert stated.startswith(overlay.rstrip("\n"))
+    assert stated.rstrip("\n").endswith(tasks.PILOT_CONVENTIONS[role].text)
+
+
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_a_pilot_fixture_without_its_instruction_template_refuses_the_kit(role, fixtures_clone):
+    (fixtures_clone / "repos" / FIXTURE / tasks.INSTRUCTIONS_TEMPLATE).unlink()
+
+    with pytest.raises(ValueError, match=f"{FIXTURE}.*lacks {tasks.INSTRUCTIONS_TEMPLATE}"):
+        tasks.kit_for(role)
+
+
+def test_an_instruction_template_without_the_convention_token_refuses_the_kit(fixtures_clone):
+    template = fixtures_clone / "repos" / FIXTURE / tasks.INSTRUCTIONS_TEMPLATE
+    template.write_text("# A project\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="lacks the convention"):
+        tasks.kit_for("researcher")

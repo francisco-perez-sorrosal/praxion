@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+import yaml
 
 from praxion_evals.adherence import grade
 from praxion_evals.adherence.catalog import (
@@ -30,6 +31,8 @@ from praxion_evals.adherence.catalog_rows import (
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT, section_body
 from praxion_evals.adherence.model import (
+    CONVENTION_MARKER,
+    PILOT_ROLES,
     ROLES,
     Binds,
     CheckErrored,
@@ -39,6 +42,7 @@ from praxion_evals.adherence.model import (
     NotApplicable,
     Passed,
     TaskFacts,
+    convention_check_name,
 )
 from praxion_evals.live.session import InitInfo, ResultInfo, ToolUse
 
@@ -79,8 +83,8 @@ def test_only_the_common_checks_are_marked_common(role):
     assert common == list(COMMON_CHECKS)
 
 
-@pytest.mark.parametrize(("role", "clauses"), [("researcher", 3), ("verifier", 3)])
-def test_the_researcher_and_the_verifier_each_carry_their_three_clauses(role, clauses):
+@pytest.mark.parametrize(("role", "clauses"), [("researcher", 4), ("verifier", 4)])
+def test_the_researcher_and_the_verifier_each_carry_their_four_clauses(role, clauses):
     row = ROLE_ROWS[role]
 
     assert len(row) == clauses
@@ -116,12 +120,12 @@ def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     [
         ("sentinel", 4),
         ("architect-validator", 3),
-        ("context-engineer", 2),
+        ("context-engineer", 3),
         ("cicd-engineer", 1),
-        ("discipline-consultant", 3),
+        ("discipline-consultant", 4),
         ("promethean", 3),
         ("roadmap-cartographer", 4),
-        ("skill-genesis", 3),
+        ("skill-genesis", 4),
     ],
 )
 def test_each_remaining_role_carries_one_check_per_clause_of_its_row(role, clauses):
@@ -353,3 +357,49 @@ def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, 
 
     assert isinstance(status, Measured)
     assert isinstance(status.outcomes[name], NotApplicable)
+
+
+# ---------------------------------------------------------------------------
+# The convention a pilot role's project states only in its own instruction file
+# ---------------------------------------------------------------------------
+
+KERNEL_LEDGER = CHECKOUT_ROOT / ".ai-state" / "kernel_adoption.yaml"
+
+
+def test_the_pilot_roles_are_the_roles_the_adoption_ledger_makes_eligible():
+    ledger = yaml.safe_load(KERNEL_LEDGER.read_text(encoding="utf-8"))
+
+    assert set(PILOT_ROLES) == set(ledger["eligible"])
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_a_role_carries_the_convention_check_exactly_when_it_is_a_pilot_role(role):
+    names = [check.name for check in check_catalog(role)]
+
+    assert (convention_check_name(role) in names) == (role in PILOT_ROLES)
+
+
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_the_convention_check_fails_a_session_that_never_wrote_the_conventions_wording(role):
+    check = role_check(role, convention_check_name(role))
+
+    outcome = check.evaluate(synthetic_evidence(role, files={"notes.md": "Nothing special."}))
+
+    assert isinstance(outcome, Failed)
+
+
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_the_convention_check_passes_a_session_that_wrote_the_conventions_wording(role):
+    check = role_check(role, convention_check_name(role))
+
+    outcome = check.evaluate(synthetic_evidence(role, files={"notes.md": CONVENTION_MARKER}))
+
+    assert outcome == Passed()
+
+
+@pytest.mark.parametrize("role", PILOT_ROLES)
+def test_the_convention_check_is_not_applicable_to_a_task_that_stopped_the_role_early(role):
+    stopped = TaskFacts(True, False, False, None, None, None)
+    check = role_check(role, convention_check_name(role))
+
+    assert isinstance(check.binds(role, stopped), DoesNotBind)

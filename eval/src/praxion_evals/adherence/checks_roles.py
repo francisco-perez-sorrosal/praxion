@@ -37,9 +37,12 @@ from praxion_evals.adherence.checks_common import (
     written_paths,
 )
 from praxion_evals.adherence.model import (
+    Binding,
+    Binds,
     BindsFor,
     CheckErrored,
     CheckOutcome,
+    DoesNotBind,
     Failed,
     MechanicalCheck,
     NotApplicable,
@@ -663,5 +666,41 @@ def text_excludes(
 
     def violation() -> SessionEvidence:
         return synthetic_evidence(role, slug=CANARY_SLUG, files={sample_path: sample_text})
+
+    return clause(name, rule, binds, evaluate, violation)
+
+
+# ---------------------------------------------------------------------------
+# A file the session wrote carries the wording a project convention asks for
+# ---------------------------------------------------------------------------
+
+
+def binds_unless_stopped_early(role: Role, facts: TaskFacts) -> Binding:
+    """A role the task stopped early has not had the turns to write its documents in full."""
+    del role
+    return DoesNotBind("the task stopped the role early") if facts.forced_stop else Binds()
+
+
+def files_carry_wording(
+    name: str,
+    rule: RuleRef,
+    role: Role,
+    *,
+    wording: str,
+    binds: BindsFor | None = None,
+) -> MechanicalCheck:
+    """At least one file the session added or changed holds ``wording``."""
+
+    def evaluate(evidence: SessionEvidence) -> CheckOutcome:
+        written = evidence.repo.files
+        if not written:
+            return Failed("the session wrote no file")
+        if any(wording in text for text in written.values()):
+            return Passed()
+        return Failed(f"none of the {len(written)} files written holds {wording!r}")
+
+    def violation() -> SessionEvidence:
+        report = "# Report\n\nNothing special.\n"
+        return synthetic_evidence(role, slug=CANARY_SLUG, files={canary_path("REPORT.md"): report})
 
     return clause(name, rule, binds, evaluate, violation)

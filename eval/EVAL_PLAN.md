@@ -195,7 +195,7 @@ Verify: `adherence/verdict.py` (pure arithmetic), `eval/tests/test_adherence_ver
 - The researcher received a flip verdict of "not clear" because two complete pairs met the smoke target of two; the verifier was underpowered (one complete pair). Neither reading supports a flip.
 - Calibration: no discordant pair on any check at four pairs, so every allowance stays zero.
 - Golden cases: the judge failed the bad case and passed the good case (observed judge error 0 of 2).
-- C2: every authored return exceeded 15 lines (20 to 32) in both arms; the rule reads "about 15", the check enforces 15. An open fidelity question, not a finding about the arms.
+- C2: every authored return exceeded 15 lines (20 to 32) in both arms, counted with the blank lines between sections; the rule reads "about 15". Settled 2026-10-12: the check counts the lines that carry text against 15, and each measured session now records the role's return so a failing one can be read from the results file. No agent's return template is trimmed on this count alone; a trim, where one is ever warranted, moves content into the artifact and never deletes it.
 - C6 withheld everywhere (the fixture page lives on an unpushed branch). Permission denials are not recorded in v1.
 
 **Smoke size.** That run declared a target of two pairs, which the researcher reached, so it received a verdict; a smoke run should not. Declare the real target and cap the tasks: `--max-tasks 2 --required-pairs 20` plans two tasks per role per arm and leaves every role underpowered by construction, reporting counts and no flip verdict.

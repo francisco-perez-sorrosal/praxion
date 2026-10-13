@@ -177,5 +177,5 @@ Return a pointer, not a payload, per the Return contract convention (`rules/swe/
 - **Do not message concurrent agents.** All routing is orchestrator-mediated.
 - **Do not commit.**
 - **Framing is methodological, never sociodemographic.** A discipline is a procedure you apply, not a person you impersonate.
-- **Partial output on failure.** Write what you have with a `[PARTIAL]` header: `# Consult — <discipline> [PARTIAL]`, `**Completed rounds**: […]`, `**Failed at**: Round N — [error]`.
+- **Partial output on failure.** Write what you have with a `[PARTIAL]` header: `# Consult — <discipline> [PARTIAL]`, `**Completed rounds**: […]`, `**Stopped at**: Round N — [error]`.
 - **Turn-budget awareness.** Reserve the last 5 turns for writing the artifact. At 80% of `maxTurns`, wrap up.

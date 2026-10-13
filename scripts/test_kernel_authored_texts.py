@@ -181,15 +181,16 @@ def test_the_partial_output_text_carries_the_title_and_its_three_lines() -> None
         "[PARTIAL]",
         "Completed phases",
         "Usable sections",
-        "your own definition words it",
+        "**Stopped at**: Phase N -- [reason]",
     ):
         assert item in form, f"the partial-output text lacks {item!r}"
 
 
-def test_the_partial_output_text_names_no_stop_line_label() -> None:
+def test_the_partial_output_text_names_the_canonical_stop_line_only() -> None:
     form = TEXTS["partial-output"]
 
-    assert [label for label in ("Stopped at", "Failed at") if label in form] == []
+    assert "Failed at" not in form
+    assert "follow your definition" not in form
 
 
 def test_the_ledger_writer_text_names_the_four_writers_and_every_row_field() -> None:

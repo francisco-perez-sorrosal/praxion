@@ -586,13 +586,15 @@ def test_only_the_context_engineer_holds_the_audit_subject_exemption(live: gk.Ke
 
 
 @pytest.mark.parametrize("role", ["context-engineer", "skill-genesis", "discipline-consultant"])
-def test_a_kernel_names_no_stop_line_label_so_none_contradicts_its_definition(
+def test_a_kernel_words_the_stop_line_as_its_definition_does(
     live: gk.KernelPlan, role: str
 ) -> None:
     held = "\n".join(s.text for s in live.assembled_kernel(role).strings)
+    definition = (REPO_ROOT / "agents" / f"{role}.md").read_text(encoding="utf-8")
 
-    assert "Stopped at" not in held
-    assert "Failed at" not in held
+    for text in (held, definition):
+        assert "Stopped at" in text
+        assert "Failed at" not in text
 
 
 def test_every_live_string_and_file_fits_one_injected_string(live: gk.KernelPlan) -> None:

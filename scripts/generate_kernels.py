@@ -33,9 +33,9 @@ Verbatim sections are the source bytes; a condensed entry is its authored text. 
 the same sources writes the same bytes. `--check` assembles in memory, writes nothing and exits
 1 when anything on disk differs. Exit 0 written or fresh, 1 stale under `--check`, 2 input error.
 
-Every role's strings carry the shared wording verbatim. The core names no stop-line label (the
-partial-output text says the stop line is worded as the role's own definition words it), so a
-kernel never carries a label its definition does not and the core stays one text.
+Every role's strings carry the shared wording verbatim, the partial-output form's `Stopped at`
+included; a definition that words its own stop line differently is aligned to it, so a kernel
+never carries a label its definition does not.
 
 Stdlib plus PyYAML (read once, in `kernel_model`).
 """

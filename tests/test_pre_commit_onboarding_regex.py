@@ -13,7 +13,7 @@ never transcribed here. A copy would pass because someone typed it correctly
 once and then drift silently the moment the live regex changes -- exactly the
 failure this canary exists to prevent. The consumer sets they must cover are
 likewise imported from their owning registries (`sync_canonical_blocks.COMMAND_FILES`,
-`check_behavioral_contract._BC05_CONSUMERS`) rather than hand-listed, so a
+`check_behavioral_contract._bc05_consumers`) rather than hand-listed, so a
 registry that gains a path the regex doesn't cover reddens the test instead of
 shipping ungated.
 """
@@ -120,14 +120,14 @@ def test_canonical_block_sync_covers_every_registered_consumer() -> None:
 
 
 def test_behavioral_contract_covers_every_bc05_consumer() -> None:
-    """Every BC05 registry path must fire the `behavioral-contract` gate.
+    """Every BC05 consumer -- registered, kernel file or definition -- must fire the gate.
 
-    `_BC05_CONSUMERS` is the binding registry between the rule's four bullet
-    lines and the files that restate them -- a path added there without
-    widening this pattern would let a consumer drift edit land silently.
+    `_bc05_consumers` is the binding set between the rule's four bullet lines and
+    the files that restate them -- a path added to it without widening this pattern
+    would let a consumer drift edit land silently.
     """
     pattern = _behavioral_contract_files_regex()
-    for relative_path in check_behavioral_contract._BC05_CONSUMERS:
+    for relative_path in sorted(check_behavioral_contract._bc05_consumers(REPO_ROOT)):
         assert re.match(pattern, relative_path), (
             f"{BEHAVIORAL_CONTRACT_HOOK_ID}'s files regex {pattern!r} does not match "
             f"BC05 consumer {relative_path!r} -- an edit to it would never trigger the "

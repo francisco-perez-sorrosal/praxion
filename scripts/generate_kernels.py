@@ -431,7 +431,7 @@ def _rewrite_paragraph(paragraph: str, shared: sb.SharedBlock, block: str) -> st
     tail = _contract_tail(paragraph, shared)
     if tail is None:
         return None
-    return f"{block}\n{tail}" if tail else block
+    return f"{block} {tail}" if tail else block
 
 
 def _carries(paragraph: str, shared: sb.SharedBlock) -> bool:
@@ -442,8 +442,9 @@ def _contract_tail(paragraph: str, shared: sb.SharedBlock) -> str | None:
     """The per-agent sentence after the contract in `paragraph`, '' for none; None for no contract.
 
     The contract stands as one line (the wording a definition carries today, which may run on
-    into that sentence) or as the generated lines: the lead-in, behaviours, the self-test, then
-    the sentence.
+    into that sentence) or as the generated lines: the lead-in, behaviours and the self-test,
+    which is a question, so what follows its question mark (on that line, or on lines of their
+    own) is the sentence.
     """
     if paragraph.startswith(shared.canonical):
         return paragraph[len(shared.canonical) :].strip()
@@ -453,7 +454,9 @@ def _contract_tail(paragraph: str, shared: sb.SharedBlock) -> str | None:
         lines[0] == CONTRACT_LEAD_IN or lines[0].startswith(BEHAVIOUR_BULLET)
     )
     if opens_generated and self_tests:
-        return "\n".join(lines[self_tests[-1] + 1 :]).strip()
+        _, _, after_question = lines[self_tests[-1]].partition("?")
+        trailing = [after_question, *lines[self_tests[-1] + 1 :]]
+        return " ".join(part.strip() for part in trailing if part.strip())
     return "" if _carries(paragraph, shared) else None
 
 

@@ -630,15 +630,25 @@ def test_a_paragraph_that_carries_a_tell_but_lost_its_anchor_is_still_the_block(
     assert BLOCKS.links in after
 
 
-def test_the_sentence_after_the_contract_moves_to_its_own_line_and_stays_there(
+def test_the_sentence_after_the_contract_ends_the_self_test_line_and_stays_there(
     old_wording: None,
 ) -> None:
     before = definition("Intro.", f"{OLD_CONTRACT} {OWN_SENTENCE}")
 
     once = gk.render_definition(before, BLOCKS)
 
-    assert f"{BLOCKS.contract}\n{OWN_SENTENCE}\n" in once
+    assert f"{BLOCKS.contract} {OWN_SENTENCE}\n" in once
     assert gk.render_definition(once, BLOCKS) == once
+
+
+def test_a_sentence_generated_on_a_line_of_its_own_moves_up_to_the_self_test_line(
+    old_wording: None,
+) -> None:
+    own_line = definition("Intro.", f"{BLOCKS.contract}\n{OWN_SENTENCE}")
+
+    after = gk.render_definition(own_line, BLOCKS)
+
+    assert f"{BLOCKS.contract} {OWN_SENTENCE}\n" in after
 
 
 def test_the_generated_contract_block_opens_with_the_citation_of_the_rule() -> None:
@@ -650,7 +660,7 @@ def test_the_lead_in_of_a_generated_contract_is_not_a_second_contract_or_a_tail(
         f"{gk.CONTRACT_LEAD_IN}\n{BLOCKS.contract}", LINKS_TEXT, RETURN_TEXT
     )
     before = definition(
-        "Intro.", f"{generated.contract}\n{OWN_SENTENCE}", generated.links, generated.returns
+        "Intro.", f"{generated.contract} {OWN_SENTENCE}", generated.links, generated.returns
     )
 
     after = gk.render_definition(before, generated)
@@ -660,7 +670,7 @@ def test_the_lead_in_of_a_generated_contract_is_not_a_second_contract_or_a_tail(
 
 
 def test_a_contract_reworded_since_it_was_generated_is_replaced_not_duplicated() -> None:
-    generated = definition("Intro.", f"{BLOCKS.contract}\n{OWN_SENTENCE}")
+    generated = definition("Intro.", f"{BLOCKS.contract} {OWN_SENTENCE}")
     reworded = gk.UniversalBlocks(
         BLOCKS.contract.replace("Alpha", "Gamma"), BLOCKS.links, BLOCKS.returns
     )
@@ -669,7 +679,7 @@ def test_a_contract_reworded_since_it_was_generated_is_replaced_not_duplicated()
 
     assert after.count(gk.SELF_TEST_LABEL) == 1
     assert "Alpha" not in after
-    assert f"{reworded.contract}\n{OWN_SENTENCE}\n" in after
+    assert f"{reworded.contract} {OWN_SENTENCE}\n" in after
 
 
 def test_a_block_a_definition_lacks_is_appended_and_then_stays_where_it_is() -> None:

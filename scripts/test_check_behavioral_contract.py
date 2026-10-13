@@ -286,6 +286,17 @@ def test_bc05_flags_a_consumer_missing_one_definition_line(tmp_path: Path) -> No
     assert "carries 3 definition-shape behavior lines" in findings[0]["message"]
 
 
+def test_bc05_flags_a_kernel_core_missing_a_contract_name(tmp_path: Path) -> None:
+    _conforming_tree(tmp_path)
+    without_objection = [b for b in _BC05_BULLETS if "Register Objection" not in b]
+    _write(tmp_path / "claude/kernels/core.md", "# core\n\n" + "\n".join(without_objection) + "\n")
+    findings = _bc05_findings(tmp_path)
+    assert len(findings) == 1, findings
+    assert findings[0]["entity"] == "claude/kernels/core.md"
+    assert findings[0]["severity"] == "fail"
+    assert "carries 3 definition-shape behavior lines" in findings[0]["message"]
+
+
 def test_bc05_flags_a_registered_consumer_missing_from_disk(tmp_path: Path) -> None:
     """A broken registry contract is louder than a silent skip."""
     _conforming_tree(tmp_path)

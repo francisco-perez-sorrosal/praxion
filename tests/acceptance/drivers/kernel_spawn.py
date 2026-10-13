@@ -14,9 +14,10 @@ registered for the `Agent` tool: the preamble is the text a hook's `updatedInput
 puts ahead of the original prompt.
 
 Bound here: the payload shapes, the `event_type` field that names an observation
-row's kind (`kernel_injected` for a delivered kernel) and the project log at
-`<project root>/.ai-state/observations.jsonl`. Not yet bound: the other fields of
-a `kernel_injected` row and the liveness check that expects one.
+row's kind (`kernel_injected` for a delivered kernel), the project log read through
+the observation harness's own reader (never by file name), the fields of a
+`kernel_injected` row, and the liveness check that expects one per spawn of a role
+at trial or switched.
 """
 
 from __future__ import annotations
@@ -24,10 +25,11 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError, isolated_env
+from tests.acceptance.drivers.kernel_sandbox import isolated_env
 from tests.acceptance.drivers.observation_harness import log_rows
 
 KERNEL_ROW = "kernel_injected"
@@ -209,15 +211,41 @@ class KernelRow:
 
 def describe_kernel_row(row: dict) -> KernelRow:
     """Read a kernel_injected row's role, parts, character counts and kernel identity."""
-    raise UnboundDriverError(
-        "the fields of a kernel_injected row (role, parts delivered, character count of "
-        "each injected string, kernel identity) are not designed yet"
+    strings = row["strings"]
+    parts = tuple(
+        entry["module"] if entry.get("part") is None else f"{entry['module']}-{entry['part']}"
+        for entry in strings
     )
+    return KernelRow(
+        role=row["role"],
+        parts=parts,
+        char_counts=tuple(entry["chars"] for entry in strings),
+        kernel_identity=row["kernel_version"],
+    )
+
+
+LIVENESS_CHECKER = "scripts/check_kernel_manifest.py"
 
 
 def kernel_liveness_findings(project: Path, plugin_root: Path) -> str:
-    """The liveness check's report on spawns of a trial or switched role without a kernel row."""
-    raise UnboundDriverError(
-        "the liveness check that expects a kernel_injected row for every spawn of a role "
-        "at trial or switched is not designed yet"
+    """The liveness check's report on spawns of a trial or switched role without a kernel row.
+
+    The checker runs from the plugin root (its own index and ledger) over `project`'s
+    observation log; exit 0 means no findings, 1 findings, anything else a refused input.
+    """
+    assert (plugin_root / LIVENESS_CHECKER).is_file(), (
+        f"there is no kernel manifest checker at {LIVENESS_CHECKER}"
     )
+    scratch = project.parent / f".liveness-{project.name}"
+    proc = subprocess.run(
+        [sys.executable, LIVENESS_CHECKER, "--liveness", "--repo-root", str(project), "--json"],
+        cwd=plugin_root,
+        env=isolated_env(scratch),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode in (0, 1), (
+        f"the liveness check refused its input (exit {proc.returncode}):\n{proc.stdout}{proc.stderr}"
+    )
+    return proc.stdout + proc.stderr

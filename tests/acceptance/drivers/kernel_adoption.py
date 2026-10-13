@@ -1,10 +1,11 @@
-"""Driver for the per-role adoption ledger (`.ai-state/kernel_adoption.yaml`), not yet bound.
+"""Driver for the per-role adoption ledger (`.ai-state/kernel_adoption.yaml`).
 
 Scenarios describe a role's record in the specification's terms: its status
 (trial or switched), the adherence runs of that role in order, the startup probe's
 readings of its first request before and after, and the user's ratification of the
-flip rule and of the flip. The file's shape is designed later; the hooks raise
-until a binding step writes it.
+flip rule and of the flip. The hooks read and write the ledger's wire shape (the implementation
+plan's "Wire shapes": `version: 1`, `eligible`, `roles`); a missing ledger reads as
+empty.
 
 Which ledger a spawn outside the Praxion checkout reads is an open question; the
 scenarios provisionally write the running plugin's own ledger.
@@ -15,10 +16,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
+import yaml
+
+from tests.acceptance.drivers.kernel_sandbox import ADOPTION_LEDGER, PILOT_ROLES
 
 ADHERENCE_ENTRY = "praxion-evals-adherence"
 REQUIRED_PAIRS = 20
+TRIAL_SINCE = "2026-10-12"
 
 
 @dataclass(frozen=True)
@@ -101,12 +105,61 @@ MISSING_ELEMENTS = (
 )
 
 
+def _run_row(run: AdherenceRun) -> dict:
+    return {
+        "id": run.run_id,
+        "complete_pairs": run.complete_pairs,
+        "passes_flip_rule": run.passes_flip_rule,
+        "entry": run.entry,
+    }
+
+
+def _passing_run_id(runs: tuple[AdherenceRun, ...]) -> str | None:
+    """The run a flip rests on: the last run that passes the rule, else the last run."""
+    passing = [r for r in runs if r.passes_flip_rule]
+    chosen = passing or list(runs)
+    return chosen[-1].run_id if chosen else None
+
+
+def _record_row(record: AdoptionRecord) -> dict:
+    row: dict = {
+        "status": record.status,
+        "since": TRIAL_SINCE,
+        "runs": [_run_row(r) for r in record.runs],
+    }
+    if record.status == "switched":
+        passing = _passing_run_id(record.runs)
+        extras = {
+            "passing_run": passing,
+            "probe_before_tokens": record.probe_before_tokens,
+            "probe_after_tokens": record.probe_after_tokens,
+        }
+        row.update({k: v for k, v in extras.items() if v is not None})
+        row["flip_rule_ratified"] = record.flip_rule_ratified
+        row["flip_ratified"] = record.flip_ratified
+    return row
+
+
+def _load(root: Path) -> dict:
+    path = root / ADOPTION_LEDGER
+    ledger = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
+    ledger = ledger or {}
+    ledger.setdefault("version", 1)
+    ledger.setdefault("eligible", list(PILOT_ROLES))
+    ledger.setdefault("roles", {})
+    return ledger
+
+
 def record(root: Path, *records: AdoptionRecord) -> None:
-    raise UnboundDriverError(
-        "writing a role's adoption record (status, adherence runs in order, startup "
-        "readings before and after, ratifications) into the adoption ledger is not designed yet"
-    )
+    """Write each role's record into the ledger, replacing that role's earlier one."""
+    ledger = _load(root)
+    for each in records:
+        ledger["roles"][each.role] = _record_row(each)
+    path = root / ADOPTION_LEDGER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(ledger, sort_keys=False), encoding="utf-8")
 
 
 def switched_roles(root: Path) -> set[str]:
-    raise UnboundDriverError("reading which roles the adoption ledger records as switched")
+    roles = _load(root)["roles"] or {}
+    return {role for role, row in roles.items() if (row or {}).get("status") == "switched"}

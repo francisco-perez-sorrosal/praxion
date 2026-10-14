@@ -11,4 +11,24 @@ eligible:
   - discipline-consultant
   - skill-genesis
   - context-engineer
-roles: {}
+roles:
+  researcher:
+    status: trial
+    since: 2026-10-14T02:32:49Z
+    runs: []
+  verifier:
+    status: trial
+    since: 2026-10-14T02:32:49Z
+    runs: []
+  context-engineer:
+    status: trial
+    since: 2026-10-14T02:32:49Z
+    runs: []
+  discipline-consultant:
+    status: trial
+    since: 2026-10-14T02:32:49Z
+    runs: []
+  skill-genesis:
+    status: trial
+    since: 2026-10-14T02:32:49Z
+    runs: []

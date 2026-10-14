@@ -32,6 +32,10 @@ roles:
         complete_pairs: 13
         passes_flip_rule: false
         entry: ".ai-state/eval_ledger/adherence/20261014T045733Z-7050ca.json (full run, 24 tasks, golden cases judged, observed judge error 0.00; 13 complete pairs of 24, then the API key's credit balance ran out and the remaining 21 sessions of both arms failed at zero cost (result_error, Credit balance is too low); underpowered, no verdict; spend USD 15.34)"
+      - id: 20261014T152926Z-723e7a
+        complete_pairs: 24
+        passes_flip_rule: true
+        entry: ".ai-state/eval_ledger/adherence/20261014T152926Z-723e7a.json (full run, fresh draw after the credit top-up, 24 tasks, 48 sessions, 0 errored; flip verdict clear: no regression on any scored mechanical check, C3 non-inferior 18 of 18 in both arms; observed judge error on the golden cases 0.5; C6 withheld (no fixture page), C5 0 of 6 in both arms; lean first-request median 24,182 vs full 42,762; spend USD 26.65)"
   verifier:
     status: trial
     since: 2026-10-14T02:32:49Z

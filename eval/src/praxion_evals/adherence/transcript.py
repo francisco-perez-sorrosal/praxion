@@ -18,8 +18,10 @@ from typing import Any
 
 # The harness trailer of an Agent tool result, synchronous or a background launch stub.
 _AGENT_ID = re.compile(r"^agentId:\s*(?P<id>[\w-]+)", re.MULTILINE)
-# Claude Code names a project's transcript directory after its cwd, every `/` and `.` a `-`.
-_PROJECT_DIR_CHARS = re.compile(r"[/.]")
+# Claude Code names a project's transcript directory after its cwd, every character that is
+# not a letter or a digit a `-` (observed for `/`, `.` and `_`: a macOS TMPDIR such as
+# `/var/folders/x5/pt_h187.../T` becomes `-private-var-folders-x5-pt-h187...-T`).
+_PROJECT_DIR_CHARS = re.compile(r"[^A-Za-z0-9]")
 
 
 @dataclass(frozen=True)

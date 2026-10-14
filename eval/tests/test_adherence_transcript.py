@@ -67,6 +67,18 @@ def test_a_transcript_that_does_not_exist_is_reported_with_its_path(tmp_path):
     assert found == TranscriptUnread(f"the role's transcript at {expected} was not found")
 
 
+def test_the_project_directory_turns_every_non_alphanumeric_character_into_a_dash():
+    # A macOS TMPDIR holds underscores; the harness names the directory with dashes for them too.
+    cwd = "/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-60q9z5xi/s-1/repo"
+
+    path = transcript_path(Path("/cfg"), cwd, SESSION, AGENT)
+
+    assert (
+        path.parts[3]
+        == "-private-var-folders-x5-pt-h187j3px6-b1dh6fc74kr0000gn-T-praxion-evals-adherence-60q9z5xi-s-1-repo"
+    )
+
+
 def test_a_transcript_path_that_cannot_be_read_is_reported_as_unreadable(tmp_path):
     transcript_path(tmp_path, CWD, SESSION, AGENT).mkdir(parents=True)
 

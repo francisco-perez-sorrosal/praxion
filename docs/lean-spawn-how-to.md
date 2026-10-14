@@ -86,9 +86,11 @@ grep '"event_type":"kernel_injected"' .ai-state/observations.jsonl | tail -n 3
 
 A spawn that received nothing leaves no row.
 
-## Read the in-stream marker
+## Read the transcript marker
 
 The first line of every injected string is `[praxion <8 hex> #<slot>]`. The hex is the first eight characters of `kernel_version`; the slot is the string's place. A role owed N strings shows markers `#1` to `#N` in its context, each once, in any order. Use the marker where no observation log exists, as in a sandboxed eval session.
+
+The marker is recorded in the role's own transcript, `<config dir>/projects/<cwd, every / and . as ->/<session id>/subagents/agent-<agent id>.jsonl`, never in the parent session's `stream-json`. Look for the `attachment` record of type `hook_additional_context` with `hookEvent` `SubagentStart`: its `content` lists every delivered string. Each hook command also leaves a `hook_success` record whose `stdout` holds that hook's JSON output.
 
 ## Run the liveness check
 

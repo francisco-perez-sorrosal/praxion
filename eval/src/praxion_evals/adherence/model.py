@@ -300,7 +300,8 @@ class KernelEvidence:
     """Whether a session was owed an injected kernel, and the delivery markers it shows."""
 
     expected: bool
-    rows: tuple[Mapping[str, Any], ...]  # one record per marker line found in the stream
+    rows: tuple[Mapping[str, Any], ...]  # one record per delivered string's marker line
+    unread: str | None = None  # why the role's transcript was not read; None: read or not sought
 
     @property
     def missing(self) -> bool:

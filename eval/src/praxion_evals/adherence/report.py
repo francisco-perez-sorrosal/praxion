@@ -87,7 +87,7 @@ READING_NOTES = (
     " within the declared margin and nothing more.",
     "- Kernel delivery evidence lists, per role, the marker records of the lean sessions the"
     " verdict relies on. An adherence sandbox writes no observation row, so the marker in the"
-    " session's stream is the record a flip can cite.",
+    " spawned role's transcript is the record a flip can cite.",
 )
 
 

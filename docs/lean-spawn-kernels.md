@@ -86,7 +86,7 @@ The order in which strings arrive is the harness's, not the hook's; the marker n
 
 Two channels record that a kernel arrived:
 
-- **The in-stream marker**, in the role's context and readable in a transcript. The adherence eval reads it because its sandbox holds no observation log.
+- **The marker**, in the role's context and recorded in the role's own transcript; the parent session's stream never carries a subagent's hook output. The adherence eval reads it from that transcript because its sandbox holds no observation log.
 - **The `kernel_injected` row**, in the project's log: timestamp, session, `agent_type`, `agent_id`, `role`, the full `kernel_version`, the `strings` delivered (module, part and character count each) and a `project_file` summary (characters, parts, parts omitted). The how-to shows [how to read one](lean-spawn-how-to.md#read-a-kernel_injected-row).
 
 A spawn of an adopted role with no row means the hook did not run for it. `check_kernel_manifest.py --liveness` reports exactly that.

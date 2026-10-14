@@ -1,4 +1,5 @@
-"""Grading a finished session: evidence is read from the stream and the repository, once.
+"""Grading a finished session: evidence is read from the stream, the role's transcript and the
+repository, once.
 
 The reads of the scratch repository are checked against a real ``git`` repository
 with a planted fact for each (a stash entry, an extra commit, a stray file, a
@@ -13,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import checks_common, grade, session_loop
+from praxion_evals.adherence import checks_common, grade, session_loop, transcript
 from praxion_evals.adherence.model import (
     Binds,
     CheckErrored,
@@ -585,8 +586,8 @@ def test_a_measured_session_keeps_its_marker_records_with_the_streams_session_id
 
     assert isinstance(status, Measured)
     assert [dict(row) for row in status.kernel_rows] == [
-        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1},
-        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2},
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1, "source": "stream"},
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2, "source": "stream"},
     ]
 
 
@@ -595,8 +596,103 @@ def test_a_stream_that_reported_no_session_id_gives_its_markers_no_session_id(re
     evidence = _evidence(repo, tmp_path, stream, kernel_expected=True)
 
     assert [dict(row) for row in evidence.kernel.rows] == [
-        {"kernel_version": "0a1b2c3d", "slot": 1}
+        {"kernel_version": "0a1b2c3d", "slot": 1, "source": "stream"}
     ]
+
+
+# --- the role's own transcript: where the spawn's hook output is recorded ---
+
+AGENT = "a2450d924b822afe6"
+SPAWNED = f"{GOOD_RETURN}\nagentId: {AGENT} (use SendMessage to resume)"
+FIRST = "[praxion 0a1b2c3d #1]\n\nThe kernel."
+SECOND = "[praxion 0a1b2c3d #2]\n\nMore of it."
+
+
+def _hook_log(text: str) -> dict:
+    output = {"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": text}}
+    return {"type": "hook_success", "hookEvent": "SubagentStart", "stdout": json.dumps(output)}
+
+
+def _aggregate(*texts: str, event: str = "SubagentStart") -> dict:
+    return {"type": "hook_additional_context", "hookEvent": event, "content": list(texts)}
+
+
+def _transcript_evidence(repo, tmp_path, attachments, stream_kwargs=None):
+    """A lean session whose role transcript, under the sandbox's config dir, holds ``attachments``."""
+    config_dir = tmp_path / "config"
+    path = transcript.transcript_path(config_dir, str(repo[0]), "sess-1", AGENT)
+    path.parent.mkdir(parents=True)
+    records = [{"type": "user"}, *({"type": "attachment", "attachment": a} for a in attachments)]
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+    stream = {"spawn_result": SPAWNED, **(stream_kwargs or {})}
+    return _evidence(repo, tmp_path, stream, kernel_expected=True, config_dir=config_dir)
+
+
+def test_the_aggregate_record_gives_one_marker_record_per_delivered_string(repo, tmp_path):
+    evidence = _transcript_evidence(repo, tmp_path, [_aggregate(SECOND, FIRST)])
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Measured)
+    assert [dict(row) for row in status.kernel_rows] == [
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 2, "source": "transcript"},
+        {"session_id": "sess-1", "kernel_version": "0a1b2c3d", "slot": 1, "source": "transcript"},
+    ]
+
+
+def test_the_per_hook_logs_give_one_record_per_hook_when_no_aggregate_was_recorded(repo, tmp_path):
+    evidence = _transcript_evidence(repo, tmp_path, [_hook_log(FIRST), _hook_log(SECOND)])
+
+    assert [row["slot"] for row in evidence.kernel.rows] == [1, 2]
+
+
+def test_a_string_in_both_the_aggregate_and_its_hook_log_is_counted_once(repo, tmp_path):
+    attachments = [_hook_log(FIRST), _hook_log(SECOND), _aggregate(FIRST, SECOND)]
+    evidence = _transcript_evidence(repo, tmp_path, attachments)
+
+    assert [row["slot"] for row in evidence.kernel.rows] == [1, 2]
+
+
+def test_a_marker_in_both_the_transcript_and_the_stream_is_counted_once(repo, tmp_path):
+    evidence = _transcript_evidence(
+        repo, tmp_path, [_aggregate(FIRST)], {"hook_outputs": (MARKED, SECOND_MARKED)}
+    )
+
+    assert [(row["slot"], row["source"]) for row in evidence.kernel.rows] == [
+        (1, "transcript"),
+        (2, "stream"),
+    ]
+
+
+def test_an_additional_context_record_of_another_hook_event_is_no_delivery(repo, tmp_path):
+    evidence = _transcript_evidence(repo, tmp_path, [_aggregate(FIRST, event="SessionStart")])
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert status.kind == "kernel_missing"
+    assert status.detail.endswith("and its transcript holds no delivery marker")
+
+
+def test_a_transcript_not_found_is_named_by_its_path_never_read_as_a_hook_failure(repo, tmp_path):
+    config_dir = tmp_path / "config"
+    stream = {"spawn_result": SPAWNED}
+    evidence = _evidence(repo, tmp_path, stream, kernel_expected=True, config_dir=config_dir)
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    expected = transcript.transcript_path(config_dir, str(repo[0]), "sess-1", AGENT)
+    assert status.kind == "kernel_missing"
+    assert status.detail.endswith(f"and the role's transcript at {expected} was not found")
+
+
+def test_a_spawn_whose_result_names_no_agent_id_says_so_in_the_missing_kernel_detail(
+    repo, tmp_path
+):
+    evidence = _evidence(repo, tmp_path, kernel_expected=True, config_dir=tmp_path / "config")
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert status.detail.endswith("the stream reports no agent id for the role's spawn")
 
 
 def test_a_session_owed_no_kernel_is_graded_with_no_kernel_evidence(repo, tmp_path):

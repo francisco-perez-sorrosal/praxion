@@ -1,7 +1,8 @@
 """Grade one finished session: read its evidence once, then score each named check.
 
 :func:`evidence_from_recording` is the one impure step: it parses the recorded
-stream and asks ``git`` what the session changed in the scratch repository.
+stream, reads the spawned role's transcript and asks ``git`` what the session changed
+in the scratch repository.
 :func:`grade` is then a function of that evidence alone and returns exactly one
 status: ``Errored`` when infrastructure failed (a lean session whose kernel never
 arrived included), ``NotMeasured`` when the main session never spawned the role,
@@ -10,6 +11,7 @@ otherwise ``Measured`` with one outcome per check.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -40,6 +42,13 @@ from praxion_evals.adherence.model import (
     SessionStatus,
     TaskFacts,
 )
+from praxion_evals.adherence.transcript import (
+    RoleTranscript,
+    TranscriptRead,
+    TranscriptUnread,
+    read_role_transcript,
+    spawned_agent_id,
+)
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.scenarios import _is_authored  # drops hook and toolchain byproducts
 from praxion_evals.live.session import (
@@ -57,9 +66,14 @@ _AGENT_TRAILER = re.compile(r"^agentId:", re.MULTILINE)
 LAUNCH_STUB_PREFIX = "Async agent launched"
 
 # The delivering hook heads every injected string with `[praxion <version> #<slot>]`. A
-# sandbox keeps no observation log, so that marker, read from the stream's hook output, is
-# the eval's only delivery evidence. The shape is the hook's contract: change both together.
+# sandbox keeps no observation log, so that marker, read from the role's transcript, is the
+# eval's only delivery evidence. The shape is the hook's contract: change both together.
 _KERNEL_MARKER = re.compile(r"\[praxion (?P<version>[^\s\]]+) #(?P<slot>\d+)\]")
+# The transcript's attachment records of a spawn's hooks: one aggregate of every delivered
+# string (what the harness renders into the role's context), and one log per hook command.
+SPAWN_HOOK_EVENT = "SubagentStart"
+AGGREGATE_ATTACHMENT = "hook_additional_context"
+PER_HOOK_ATTACHMENT = "hook_success"
 KERNEL_ACTIVE_STATUSES = frozenset({"trial", "switched"})  # the adoption statuses that deliver
 KERNEL_LEDGER = Path(".ai-state") / "kernel_adoption.yaml"  # under the running plugin's root
 
@@ -87,15 +101,23 @@ def evidence_from_recording(
     external_api_docs: str | None = None,
     kernel_expected: bool = False,
     kernel_rows: Sequence[Mapping[str, Any]] | None = None,
+    config_dir: Path | None = None,
 ) -> SessionEvidence:
-    """Everything a grader may look at, from the stream text and the scratch repository.
+    """Everything a grader may look at, from the stream, the role's transcript and the repository.
 
     ``kernel_expected`` says the session was owed an injected kernel. Its delivery evidence is
-    ``kernel_rows`` when given, otherwise the markers found in the stream's hook output.
+    ``kernel_rows`` when given, otherwise the markers in the role's transcript, kept under
+    ``config_dir`` (the session's ``CLAUDE_CONFIG_DIR``), and in the stream's hook output.
     """
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
-    rows = kernel_marker_records(parsed) if kernel_rows is None else tuple(kernel_rows)
+    if kernel_rows is not None:
+        rows, unread = tuple(kernel_rows), None
+    else:
+        found = _role_transcript(parsed, spawn_id, config_dir, repo_root)
+        attachments = found.attachments if isinstance(found, TranscriptRead) else ()
+        rows = kernel_marker_records(parsed, attachments)
+        unread = found.reason if isinstance(found, TranscriptUnread) else None
     return SessionEvidence(
         role=role,
         slug=slug,
@@ -116,25 +138,91 @@ def evidence_from_recording(
             planted_effect=planted_effect,
             external_api_docs=external_api_docs,
         ),
-        kernel=KernelEvidence(kernel_expected, rows) if kernel_expected or rows else None,
+        kernel=KernelEvidence(kernel_expected, rows, unread) if kernel_expected or rows else None,
     )
 
 
-def kernel_marker_records(envelope: SessionEnvelope) -> tuple[Mapping[str, Any], ...]:
-    """One record per kernel delivery marker in the stream's hook output, with the session's id.
+def _role_transcript(
+    envelope: SessionEnvelope, spawn_id: str | None, config_dir: Path | None, repo_root: Path
+) -> RoleTranscript | None:
+    """The spawned role's transcript; None when no role was spawned or no config dir was given."""
+    if spawn_id is None or config_dir is None:
+        return None
+    init_cwd = None if envelope.init is None else envelope.init.cwd
+    result = envelope.final_result
+    return read_role_transcript(
+        config_dir,
+        init_cwd or str(repo_root.resolve()),
+        None if result is None else result.session_id,
+        spawned_agent_id(envelope.tool_results.get(spawn_id)),
+    )
 
-    The id is the stream's own, so a flip record can name the session a marker was seen in;
-    a stream that never reported a result has none to give.
+
+def kernel_marker_records(
+    envelope: SessionEnvelope, attachments: Sequence[Mapping[str, Any]] = ()
+) -> tuple[Mapping[str, Any], ...]:
+    """One record per kernel delivery marker, from the role's transcript, then the stream.
+
+    ``attachments`` are the transcript's attachment records. A marker seen again (same version
+    and slot) is not counted twice, so a stream that one day carries the spawn's hook output
+    too adds nothing the transcript already showed. The id is the stream's own, so a flip
+    record can name the session a marker was seen in; a stream that never reported a result
+    has none to give.
     """
     result = envelope.final_result
     session = (
         {} if result is None or result.session_id is None else {"session_id": result.session_id}
     )
-    return tuple(
-        {**session, "kernel_version": found["version"], "slot": int(found["slot"])}
-        for hook in envelope.hook_outputs
-        for found in _KERNEL_MARKER.finditer(hook.output)
+    found = [
+        *((marker, "transcript") for marker in _transcript_markers(attachments)),
+        *(
+            (marker, "stream")
+            for hook in envelope.hook_outputs
+            for marker in _KERNEL_MARKER.finditer(hook.output)
+        ),
+    ]
+    records: dict[tuple[str, int], Mapping[str, Any]] = {}
+    for marker, source in found:
+        version, slot = marker["version"], int(marker["slot"])
+        records.setdefault(
+            (version, slot), {**session, "kernel_version": version, "slot": slot, "source": source}
+        )
+    return tuple(records.values())
+
+
+def _transcript_markers(attachments: Sequence[Mapping[str, Any]]) -> list[re.Match[str]]:
+    """The marker heading each string the spawn's hooks delivered.
+
+    The aggregate record lists every delivered string; the per-hook logs repeat them, so they
+    are read only when no aggregate was recorded.
+    """
+    spawn_hooks = [record for record in attachments if record.get("hookEvent") == SPAWN_HOOK_EVENT]
+    aggregate = [record for record in spawn_hooks if record.get("type") == AGGREGATE_ATTACHMENT]
+    texts = (
+        [text for record in aggregate for text in _strings(record.get("content"))]
+        if aggregate
+        else [
+            _additional_context(record.get("stdout"))
+            for record in spawn_hooks
+            if record.get("type") == PER_HOOK_ATTACHMENT
+        ]
     )
+    return [marker for text in texts if (marker := _KERNEL_MARKER.match(text))]
+
+
+def _strings(content: object) -> list[str]:
+    return [item for item in content if isinstance(item, str)] if isinstance(content, list) else []
+
+
+def _additional_context(stdout: object) -> str:
+    """The string a hook's JSON output asked the harness to add; empty when it asked for none."""
+    try:
+        output = json.loads(stdout) if isinstance(stdout, str) else None
+    except json.JSONDecodeError:
+        return ""
+    specific = output.get("hookSpecificOutput") if isinstance(output, dict) else None
+    context = specific.get("additionalContext") if isinstance(specific, dict) else None
+    return context if isinstance(context, str) else ""
 
 
 def kernel_adopted(plugin_copy: Path, role: str) -> bool:
@@ -266,9 +354,10 @@ def grade(
     if evidence.spawn_id is None:
         return NotMeasured(f"the main session never spawned the {evidence.role}", setup)
     if evidence.kernel is not None and evidence.kernel.missing:
+        reason = evidence.kernel.unread or "its transcript holds no delivery marker"
         return Errored(
             kind="kernel_missing",
-            detail=f"the {evidence.role} was owed an injected kernel and its stream shows no delivery marker",
+            detail=f"the {evidence.role} was owed an injected kernel and {reason}",
             setup=setup,
         )
     checks = [role_check(evidence.role, name) for name in check_names]

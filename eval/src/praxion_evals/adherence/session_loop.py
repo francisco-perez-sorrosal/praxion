@@ -729,9 +729,11 @@ def _evidence(
         exit_code=run.exit_code,
         timed_out=run.timed_out,
         judging=context.judge is not None,
-        # The lean arm of an adopted role is owed its kernel; its delivery markers are read
-        # from the stream, since a sandbox's observation log is never written.
+        # The lean arm of an adopted role is owed its kernel; its delivery markers are read from
+        # the role's transcript under the sandbox's config dir, since a sandbox's observation log
+        # is never written and the parent stream never carries a subagent's hook output.
         kernel_expected=build.arm == "lean" and grade.kernel_adopted(build.copy_root, task.role),
+        config_dir=SandboxPaths(root).config_dir,
         **_task_facts(task, page_url is not None),
     )
 

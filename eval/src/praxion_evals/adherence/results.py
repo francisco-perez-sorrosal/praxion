@@ -138,7 +138,7 @@ class CatalogEntry:
 
 @dataclass(frozen=True)
 class KernelDelivery:
-    """One kernel delivery marker a lean session's stream showed, as a flip record cites it."""
+    """One kernel delivery marker a lean session's role transcript showed, as a flip cites it."""
 
     task_id: str
     session_id: str | None
@@ -270,7 +270,7 @@ def role_verdicts(results: RunResults) -> dict[str, RoleVerdict]:
 def kernel_deliveries(results: RunResults, role: str) -> tuple[KernelDelivery, ...]:
     """The marker records of the lean sessions ``role``'s verdict relies on: its complete pairs.
 
-    An adherence sandbox writes no observation row, so the marker in the session's stream
+    An adherence sandbox writes no observation row, so the marker in the role's transcript
     is the only record a flip can cite that the lean arm received its kernel.
     """
     return tuple(

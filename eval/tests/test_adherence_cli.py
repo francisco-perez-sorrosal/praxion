@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import cli, results, session_loop, tasks
+from praxion_evals.adherence import cli, results, session_loop, tasks, transcript
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
@@ -42,6 +42,13 @@ SMALL_RUN = [
 ]
 FULL_TOKENS, LEAN_TOKENS = 5000, 1000
 COMMIT = "f" * 40
+SESSION_ID, AGENT_ID = "scripted-session", "a0123456789abcdef"
+DELIVERED = {
+    "type": "hook_additional_context",
+    "hookEvent": "SubagentStart",
+    "content": ["[praxion 0a1b2c3d #1]\n\nThe kernel."],
+}
+KERNEL_TRANSCRIPT = json.dumps({"type": "attachment", "attachment": DELIVERED}) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +292,8 @@ class _ScriptedJudge(JudgeClient):
 class Script:
     """Answers each launch like a session would, and records what was launched."""
 
+    delivers_kernel = True  # a lean spawn records its kernel in the role's own transcript
+
     def __init__(
         self, *, cost: float | None = 0.01, fail_launch: Callable[[int], bool] | None = None
     ):
@@ -302,6 +311,12 @@ class Script:
         role = re.search(r"praxion:([a-z-]+)", spec.prompt).group(1)  # type: ignore[union-attr]
         lean = "lean" in spec.plugin_dir.name
         answer = self._answer(spec, env, lean)
+        if lean and self.delivers_kernel:
+            config_dir = Path(env["CLAUDE_CONFIG_DIR"])
+            path = transcript.transcript_path(config_dir, str(spec.cwd), SESSION_ID, AGENT_ID)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(KERNEL_TRANSCRIPT)
+        spawned = f"{answer}\nagentId: {AGENT_ID} (to resume)"
         tokens = LEAN_TOKENS if lean else FULL_TOKENS
         usage = {
             "input_tokens": 2,
@@ -310,6 +325,7 @@ class Script:
         }
         plugin = {"name": "praxion", "source": "praxion@inline", "path": str(spec.plugin_dir)}
         result = {"type": "result", "subtype": "success", "is_error": False, "result": answer}
+        result["session_id"] = SESSION_ID
         if self.cost is not None:
             result["total_cost_usd"] = self.cost
         events = [
@@ -341,7 +357,7 @@ class Script:
             {
                 "type": "user",
                 "message": {
-                    "content": [{"type": "tool_result", "tool_use_id": "t1", "content": answer}]
+                    "content": [{"type": "tool_result", "tool_use_id": "t1", "content": spawned}]
                 },
             },
             result,
@@ -422,6 +438,19 @@ def test_each_arm_is_proven_then_the_task_runs_in_both_arms_in_turn(
     assert loaded.arms[ROLE]["lean"]["proof"]["cross_checked"] is True
     assert loaded.run.claude_code_version == "9.9.9-test"
     assert loaded.run.extra["retries"] == []
+
+
+def test_a_lean_session_whose_transcript_is_absent_names_the_path_it_looked_at(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    script = Script()
+    script.delivers_kernel = False
+    paid(script)
+
+    lean = _run(tmp_path)[1].sessions[1].status
+
+    assert getattr(lean, "kind", None) == "kernel_missing"
+    assert f"/subagents/agent-{AGENT_ID}.jsonl was not found" in lean.detail
 
 
 def test_a_transient_infrastructure_error_is_retried_once_and_the_retry_replaces_it(

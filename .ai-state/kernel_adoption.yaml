@@ -28,6 +28,10 @@ roles:
         complete_pairs: 2
         passes_flip_rule: false
         entry: ".ai-state/eval_ledger/adherence/20261014T033052Z-4f6604.json (smoke, 2 tasks, both arms measured, every delivery marker once per lean session; underpowered by design, no verdict; golden cases not judged in this run)"
+      - id: 20261014T045733Z-7050ca
+        complete_pairs: 13
+        passes_flip_rule: false
+        entry: ".ai-state/eval_ledger/adherence/20261014T045733Z-7050ca.json (full run, 24 tasks, golden cases judged, observed judge error 0.00; 13 complete pairs of 24, then the API key's credit balance ran out and the remaining 21 sessions of both arms failed at zero cost (result_error, Credit balance is too low); underpowered, no verdict; spend USD 15.34)"
   verifier:
     status: trial
     since: 2026-10-14T02:32:49Z

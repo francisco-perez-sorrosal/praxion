@@ -15,7 +15,19 @@ roles:
   researcher:
     status: trial
     since: 2026-10-14T02:32:49Z
-    runs: []
+    runs:
+      - id: 20261014T023850Z-809185
+        complete_pairs: 0
+        passes_flip_rule: false
+        entry: ".ai-state/eval_ledger/adherence/20261014T023850Z-809185.json (smoke, 2 tasks; channel failure: the runner read the parent stream for a marker the harness writes to the role's transcript; both lean sessions kernel_missing)"
+      - id: 20261014T031818Z-d71d91
+        complete_pairs: 0
+        passes_flip_rule: false
+        entry: ".ai-state/eval_ledger/adherence/20261014T031818Z-d71d91.json (smoke, 2 tasks; channel failure: the transcript directory name mapped only / and . to dashes, the harness maps every non-alphanumeric; both lean sessions kernel_missing)"
+      - id: 20261014T033052Z-4f6604
+        complete_pairs: 2
+        passes_flip_rule: false
+        entry: ".ai-state/eval_ledger/adherence/20261014T033052Z-4f6604.json (smoke, 2 tasks, both arms measured, every delivery marker once per lean session; underpowered by design, no verdict; golden cases not judged in this run)"
   verifier:
     status: trial
     since: 2026-10-14T02:32:49Z

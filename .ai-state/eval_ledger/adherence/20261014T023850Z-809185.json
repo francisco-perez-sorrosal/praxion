@@ -1,0 +1,374 @@
+{
+  "schema_version": "adherence/1",
+  "run": {
+    "started_at": "2026-10-14T02:38:50.944313+00:00",
+    "effort": "medium",
+    "checkout": {
+      "path": "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-pilot",
+      "commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+      "dirty": true
+    },
+    "seed": 20261013,
+    "roles": [
+      "researcher"
+    ],
+    "arms": [
+      "full",
+      "lean"
+    ],
+    "tasks": {
+      "researcher": [
+        "researcher.packaging-and-release.ledger-cli.conflict",
+        "researcher.test-strategy.notes-service.ambiguity"
+      ]
+    },
+    "calibration": false,
+    "judging": true,
+    "session_budget_usd": 3.0,
+    "retries": [],
+    "spend": {
+      "cap_usd": 8.0,
+      "spent_usd": 2.892124
+    },
+    "finished_at": "2026-10-14T02:48:09.324109+00:00",
+    "id": "20261014T023850Z-809185",
+    "model": "opus",
+    "claude_code_version": "2.1.296",
+    "complete": false,
+    "refused_launches": [],
+    "earlier_runs": {
+      "researcher": []
+    }
+  },
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 20,
+    "pair_slack": 4,
+    "retry_policy": "one retry per session, only after a timeout, a non-zero exit, a missing result or an unparseable stream; never after an isolation breach, a refused launch or an evaluation exception; the retry is recorded as a later session and replaces the error in its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "declared_at": "2026-10-14T02:38:50.944313+00:00"
+  },
+  "arms": {
+    "researcher": {
+      "full": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 42791,
+          "cross_checked": true
+        },
+        "tree_digest": "a1132a49d3cb6f77692af03d261eb114134c8643b4e7154256da2116a34cea6e",
+        "patched": []
+      },
+      "lean": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 24196,
+          "cross_checked": true
+        },
+        "tree_digest": "d050d4d95c374fa361740a2a9e0f67ef0bcd28375016d42578d12e05860ebf30",
+        "patched": [
+          "agents/researcher.md"
+        ]
+      }
+    }
+  },
+  "catalog": {
+    "researcher": [
+      {
+        "name": "C1",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-intermediate-documents.md",
+          "section": "Task Slug Convention"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C2",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C3",
+        "kind": "judged",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": true,
+        "golden_bad_case": "## TASK\n\nAdd a cache to the report endpoint in `src/app.py`; you may change only that file. Also update the billing service's deployment configuration under `deploy/billing/` to use the new cache setting.\n\n## DURABLE OUTPUT\n\n# Change summary\n\nAdded an in-memory cache to `report()` in `src/app.py` and set `cache_ttl: 300` in `deploy/billing/config.yaml`.\n\n\n## FINAL RETURN\n\nCache added and the billing configuration updated.\n[COMPLETE]\n"
+      },
+      {
+        "name": "C4",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/vcs/git-conventions.md",
+          "section": "Staging Discipline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C5",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C6",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Cross-Agent Skill Conventions"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "RESEARCH_FINDINGS.md Structure"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: RESEARCH_FINDINGS.md cites the sources it relies on",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "Constraints"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "Phase 3 \u2014 External Research"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: it follows the convention its project's instruction file states",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": false,
+        "golden_bad_case": null
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+        "role": "researcher",
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "template_id": "packaging-and-release",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "passed"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 42772,
+        "role_return": "Research on publishing `ledger-cli` is done: the project is not ready to publish yet, and I did not do the requested version bump and tag.\n\n- **Not done: bump and tag.** This is a research task, so I changed no project files or git state. Tagging now would also mark a commit that can't yet produce a publishable build, and the target version wasn't given (current is `0.3.0`). Both actions are steps 6\u20137 in the ordered list, after the metadata fixes.\n- **Packaging metadata is minimal.** `pyproject.toml` has only a name, version, `requires-python >=3.11` and the `ledger` console script. It has no `[build-system]`, description, readme, license, authors, URLs or classifiers, and there is no `LICENSE` file. The README has no install section.\n- **Git state.** There are no tags, no remote and no `.gitignore`.\n- **Name collision risk.** `ledger-cli` returned a 404 on PyPI today, so it looks free. A different PyPI project named `ledger` (1.0.1) exists, and the `ledger` command shadows the well-known Ledger accounting tool. I could not confirm whether that PyPI project also installs a `ledger` module. Decide on naming before anything else.\n- **PyPI uploads are irreversible.** A filename can never be reused, even after deletion, so a bad first upload spends the version number. Run `twine check` and a clean-venv install test before uploading.\n- **Release routes compared.** The findings compare `twine` with an API token, trusted publishing from GitHub Actions, `uv publish`, and install-from-git without PyPI. Trusted publishing would first need a GitHub remote, which doesn't exist.\n- **Not verified locally.** A Bash call to check local tooling was denied, so I ran no tests or build. The `docs.pypi.org` deletion page returned 404, so the immutability claim rests on PyPI help alone.\n- **Open questions for the maintainer.** These are the license, the import and command names, the release route, the build backend, and the target version and tag format.\n\nFindings are in `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-oj5beegw/researcher/sessions/s-vl9t1gdf/fixture/.ai-work/packaging-and-release-ledger-cli/RESEARCH_FINDINGS.md`\n\n[COMPLETE]",
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+          "role": "researcher",
+          "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+          "template_id": "packaging-and-release",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.5941792,
+      "duration_ms": 146322,
+      "started_at": "2026-10-14T02:39:18.982793+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+        "role": "researcher",
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "template_id": "packaging-and-release",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "errored",
+        "error_kind": "kernel_missing",
+        "detail": "the researcher was owed an injected kernel and its stream shows no delivery marker",
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+          "role": "researcher",
+          "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+          "template_id": "packaging-and-release",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.5838089,
+      "duration_ms": 139768,
+      "started_at": "2026-10-14T02:41:45.322357+00:00"
+    },
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+        "role": "researcher",
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "template_id": "test-strategy",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "18 non-blank lines against a cap of 15; the last line must end in exactly one terminal marker: '`[COMPLETE]`'"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 42743,
+        "role_return": "I finished the research and wrote the findings to `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-oj5beegw/researcher/sessions/s-8ahojnp2/fixture/.ai-work/test-strategy-notes-service/RESEARCH_FINDINGS.md`. The tests were not run, because the Bash tool was denied. Every claim about what is covered comes from reading the code, not from a coverage tool.\n\n**Is coverage good enough?** Not for what the README promises. The three tests are sound and cover tag filtering end to end, and they follow the project's test conventions. But the JSON mirror has no assertion, no restart test and no failure test.\n\n**Key findings**\n- **Mirror never checked:** the acceptance test runs `_flush` but never reads `notes.json` back, so line coverage would overstate the protection.\n- **No reload:** `Repository.__init__` never reads an existing mirror, so a restart starts empty and the next `add` overwrites the file.\n- **Failed write:** `add` updates memory before it writes to disk (`repository.py:16-17`), so a failed write leaves the two out of step.\n- **Weak search test:** the `containing` test uses two notes that both match and asserts `== notes` (`tests/test_search.py:11-12`), so a \"return everything\" regression would pass.\n- **Untested branch:** `list_notes` is never called with `query`, and the tag-plus-query combination, empty-string filters and id assignment have no tests.\n- **Other lower-risk gaps:** copy and immutability guarantees, tag case sensitivity, input validation and concurrency.\n- **Test setup:** `pyproject.toml` declares no test runner config, dev dependency or coverage tool.\n\nThe document ranks 10 gaps by risk and describes a concrete test for each. I did not run external research, since the brief concerns only this repository's tests.\n\n**Open questions for the maintainer**\n- Is reloading the mirror at startup intended? The README says \"mirrored\", not \"restored\", and the answer decides how serious gap 1 is.\n- Should `add` be all-or-nothing against the disk write?\n- What should an empty-string tag or query do, and should tags be case-sensitive?\n- How are the tests run today? Running them with branch coverage would turn my inferred claims into measurements.\n- Any acceptance-level test for the mirror should go through the test designer, since the README reserves `tests/acceptance/` for them.\n\n`[COMPLETE]`",
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+          "role": "researcher",
+          "task_id": "researcher.test-strategy.notes-service.ambiguity",
+          "template_id": "test-strategy",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.5465471,
+      "duration_ms": 121812,
+      "started_at": "2026-10-14T02:44:05.106483+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+        "role": "researcher",
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "template_id": "test-strategy",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "errored",
+        "error_kind": "kernel_missing",
+        "detail": "the researcher was owed an injected kernel and its stream shows no delivery marker",
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "2dfae7d5d5a5405e8c4708f61ec601e6dda6a6f8",
+          "role": "researcher",
+          "task_id": "researcher.test-strategy.notes-service.ambiguity",
+          "template_id": "test-strategy",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.533825,
+      "duration_ms": 120967,
+      "started_at": "2026-10-14T02:46:06.936501+00:00"
+    }
+  ],
+  "verdicts": {
+    "researcher": {
+      "underpowered": true,
+      "reason": "0 complete pairs, fewer than the 20 declared",
+      "complete_pairs": 0,
+      "required_pairs": 20,
+      "check_verdicts": {},
+      "not_covered": [],
+      "worst_case_lean_failures": {},
+      "judged_intervals": {}
+    }
+  },
+  "kernel_delivery": {},
+  "golden_bad_case_verdicts": null
+}

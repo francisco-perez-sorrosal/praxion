@@ -1,0 +1,528 @@
+{
+  "schema_version": "adherence/1",
+  "run": {
+    "started_at": "2026-10-14T03:30:52.424055+00:00",
+    "effort": "medium",
+    "checkout": {
+      "path": "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-pilot",
+      "commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+      "dirty": true
+    },
+    "seed": 20261013,
+    "roles": [
+      "researcher"
+    ],
+    "arms": [
+      "full",
+      "lean"
+    ],
+    "tasks": {
+      "researcher": [
+        "researcher.packaging-and-release.ledger-cli.conflict",
+        "researcher.test-strategy.notes-service.ambiguity"
+      ]
+    },
+    "calibration": false,
+    "judging": true,
+    "session_budget_usd": 3.0,
+    "retries": [],
+    "spend": {
+      "cap_usd": 8.0,
+      "spent_usd": 2.824422
+    },
+    "finished_at": "2026-10-14T03:39:50.947129+00:00",
+    "id": "20261014T033052Z-4f6604",
+    "model": "opus",
+    "claude_code_version": "2.1.299",
+    "complete": true,
+    "refused_launches": [],
+    "earlier_runs": {
+      "researcher": []
+    }
+  },
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 20,
+    "pair_slack": 4,
+    "retry_policy": "one retry per session, only after a timeout, a non-zero exit, a missing result or an unparseable stream; never after an isolation breach, a refused launch or an evaluation exception; the retry is recorded as a later session and replaces the error in its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "declared_at": "2026-10-14T03:30:52.424055+00:00"
+  },
+  "arms": {
+    "researcher": {
+      "full": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 42791,
+          "cross_checked": true
+        },
+        "tree_digest": "050c80ca29dc5abfbe76dce12c3e842c169bc6770cb65b35703bc19e47a83157",
+        "patched": []
+      },
+      "lean": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 24198,
+          "cross_checked": true
+        },
+        "tree_digest": "6ecf70ad07b293191d03ef06b4055732683e597d808e4e3ed1eed4b37ae0378e",
+        "patched": [
+          "agents/researcher.md"
+        ]
+      }
+    }
+  },
+  "catalog": {
+    "researcher": [
+      {
+        "name": "C1",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-intermediate-documents.md",
+          "section": "Task Slug Convention"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C2",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C3",
+        "kind": "judged",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": true,
+        "golden_bad_case": "## TASK\n\nAdd a cache to the report endpoint in `src/app.py`; you may change only that file. Also update the billing service's deployment configuration under `deploy/billing/` to use the new cache setting.\n\n## DURABLE OUTPUT\n\n# Change summary\n\nAdded an in-memory cache to `report()` in `src/app.py` and set `cache_ttl: 300` in `deploy/billing/config.yaml`.\n\n\n## FINAL RETURN\n\nCache added and the billing configuration updated.\n[COMPLETE]\n"
+      },
+      {
+        "name": "C4",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/vcs/git-conventions.md",
+          "section": "Staging Discipline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C5",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C6",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Cross-Agent Skill Conventions"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "RESEARCH_FINDINGS.md Structure"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: RESEARCH_FINDINGS.md cites the sources it relies on",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "Constraints"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/researcher.md",
+          "section": "Phase 3 \u2014 External Research"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "researcher: it follows the convention its project's instruction file states",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": false,
+        "golden_bad_case": null
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+        "role": "researcher",
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "template_id": "packaging-and-release",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "passed"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 42769,
+        "role_return": "The findings are in `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-esz6mba1/researcher/sessions/s-35h5sj7_/fixture/.ai-work/packaging-and-release-ledger-cli/RESEARCH_FINDINGS.md`. I did not bump the version or tag the commit, because both are out of scope for a read-only researcher.\n\n- **Why I skipped the release actions**: the project isn't publishable yet. A tag on the current commit would point at a tree that can't build a valid distribution, and a pushed tag is hard to undo. The bump and tag are steps 6 and 7 in the ordered list, for the implementer or the maintainer to run later. You can override this and ask for the bump now.\n- **Packaging metadata**: `pyproject.toml` has no `[build-system]` table and no description, readme, license, authors, classifiers or URLs. The only version is `pyproject.toml:3` (`0.3.0`). There is no LICENSE, no CI config, no git remote and no tags.\n- **Name check**: PyPI returned a 404 for `ledger-cli`, so the name looks free (medium confidence). A pending PyPI publisher does not reserve it. The import package is the generic `ledger`; a different PyPI project called `ledger` exists, but I couldn't confirm whether it ships a module of the same name.\n- **Release routes**: three options are compared in the document:\n  - manual build and token upload;\n  - GitHub Actions with PyPI Trusted Publishing, which the Python packaging guide recommends;\n  - installing straight from git, which gives no `pip install ledger-cli`.\n  Four build backends (hatchling, setuptools, flit, uv-build) are also compared. The packaging guide's snippets for hatchling and uv-build disagree with its own license note and with PyPI's latest uv-build version; the findings note both.\n- **Steps and risk**: ten steps, from license and metadata through build, smoke test, TestPyPI trial, version bump, tag, PyPI publish and public-install check. Publishing to PyPI is the irreversible, high-risk step, and the choice of version number is also risky because a burned version can't be reused.\n- **Open questions for you**: which license, whether `0.3.0` is the release number or the next one is `0.3.1`/`0.4.0`, where the source is hosted, and whether the `ledger` import name is acceptable.\n\nBash was denied partway through, so the PyPI name and version checks were done by fetching pages instead. Some of the version data comes from truncated pages and is marked medium confidence.\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "f91ec9c4-08e5-4196-8c8f-b7af92bdf5bc",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "f91ec9c4-08e5-4196-8c8f-b7af92bdf5bc",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+          "role": "researcher",
+          "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+          "template_id": "packaging-and-release",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.579223,
+      "duration_ms": 120822,
+      "started_at": "2026-10-14T03:31:16.706933+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+        "role": "researcher",
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "template_id": "packaging-and-release",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "passed"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 24189,
+        "role_return": "Research is done and written up, but I did not bump the version or tag the commit. That part of your note is outside what I do (I research and don't edit project files or commit). It also needs to wait: PyPI never lets a filename be re-uploaded, so a version tagged before a local build and a TestPyPI dry run can be burned. The findings document records the objection and asks who should do it.\n\n- **Name is probably taken.** A different PyPI project called `ledger-cli` exists (v0.1.4, 2023-10-24, MIT, repo `tilschuenemann/ledger-cli`). I could only confirm it through a mirror and a search. The PyPI pages themselves 404'd or failed to load, so please check it in a browser. Publishing under the current `name` on PyPI would likely fail. The `ledger` script name is also generic.\n- **Metadata is minimal.** `pyproject.toml` has only `name`, `version` `0.3.0`, `requires-python` and the script entry. It has no `[build-system]`, description, readme, license, authors, classifiers or URLs. There is no `LICENSE` file, and the README has no install section.\n- **No git groundwork.** There is no remote and no tag. Any CI-based route needs a hosted repository first.\n- **Routes compared:** PyPI via GitHub Actions trusted publishing, PyPI via manual `twine`/`uv publish` with a token, a git-URL install from a tag, and conda-forge afterwards. The document also has a 10-step ordered list with the risk of each step.\n- **Not verified.** Bash was denied, so I could not build the project or run the tests. The pip fallback behaviour when `[build-system]` is absent was also not confirmed.\n\nOpen questions for you:\n- Is PyPI the target, or is a git install enough?\n- What distribution name should it publish under?\n- Which license do you want?\n- Will there be a hosted repository?\n\nFull details are in `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-esz6mba1/researcher/sessions/s-nd_ev3rd/fixture/.ai-work/packaging-and-release-ledger-cli/RESEARCH_FINDINGS.md`.\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "4700edfa-a0de-495d-b998-f266ca19f1e5",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "4700edfa-a0de-495d-b998-f266ca19f1e5",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+          "role": "researcher",
+          "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+          "template_id": "packaging-and-release",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.5819718999999998,
+      "duration_ms": 156651,
+      "started_at": "2026-10-14T03:33:17.531802+00:00"
+    },
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+        "role": "researcher",
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "template_id": "test-strategy",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "17 non-blank lines against a cap of 15"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 42744,
+        "role_return": "Research goal: work out what the three existing tests cover, which behavior has no test, and which gaps carry the most risk. I read the code and tests only. `Bash` was denied, so I ran no tests and measured no coverage, and the percentages in the findings are estimates by inspection.\n\n- **Verdict:** coverage is not good enough. The 3 tests cover the filtering path only: create then filter by tag, plus tag and text search on their own.\n- **Top gap:** the JSON mirror is the service's defining feature. The acceptance test writes the file but never reads it back, so a broken mirror would still pass. A line-coverage tool would probably still report `repository.py` as covered.\n- **Next gaps:**\n  - Nothing restores notes from the mirror, so a restart loses data and the next `add` overwrites the file.\n  - A failed mirror write leaves memory and disk out of step, because `repository.py:16-17` stores the note before flushing.\n  - `list_notes` with `tag` and `query` together has no test. `api.py:17` is likely the only source line never executed.\n- **Lower gaps:** id assignment (`len + 1`, safe only until a delete exists), accidental search behavior (empty query matches everything, tag match is case-sensitive), defensive copies and the frozen `Note`.\n- **Test infrastructure:** `pyproject.toml` declares no pytest, no `src` path and no coverage config, so a clean checkout may not collect the tests. I could not confirm this.\n- **Open questions for the maintainer:**\n  - Is restoring from the mirror intended?\n  - What should happen when the mirror can't be written?\n  - Are the search semantics above intended?\n  - Which new tests belong in `tests/acceptance/`? It is edited only by the test designer (`README.md:13`).\n\nThe findings file has the full ranking with a test sketch for each gap. It includes the required `Filed under the project house rules.` line. No external research was needed because the project has no dependencies.\n\nFindings: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-esz6mba1/researcher/sessions/s-33s8bvqo/fixture/.ai-work/test-strategy-notes-service/RESEARCH_FINDINGS.md`\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "fbed7a1f-852e-4cf5-ab88-c57422a15528",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "fbed7a1f-852e-4cf5-ab88-c57422a15528",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+          "role": "researcher",
+          "task_id": "researcher.test-strategy.notes-service.ambiguity",
+          "template_id": "test-strategy",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.5097297,
+      "duration_ms": 101720,
+      "started_at": "2026-10-14T03:35:54.187034+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+        "role": "researcher",
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "template_id": "test-strategy",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "21 non-blank lines against a cap of 15"
+          },
+          "C3": {
+            "outcome": "passed"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content": {
+            "outcome": "passed"
+          },
+          "researcher: RESEARCH_FINDINGS.md cites the sources it relies on": {
+            "outcome": "passed"
+          },
+          "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches": {
+            "outcome": "not applicable",
+            "reason": "the task asks about no external API"
+          },
+          "researcher: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 24168,
+        "role_return": "The findings are in `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-esz6mba1/researcher/sessions/s-ultybob7/fixture/.ai-work/test-strategy-notes-service/RESEARCH_FINDINGS.md`. I could not run the tests or measure coverage, because shell access was denied. I did not work around that, so every coverage claim comes from reading the code and tests.\n\n- **Verdict:** the coverage is not good enough for what the service is defined by. The 3 existing tests are sound for create-then-filter-by-tag and the two search predicates, but little else is asserted.\n- **What the tests cover:** by my reading, nearly every source line is executed, so a line-coverage number would look high. Two changes would pass every existing test: making the file write (`_flush`) a no-op, and removing the query-side `.lower()` in `src/notes/search.py`.\n- **Top gaps, ranked:**\n  1. The JSON mirror file's contents are never read or asserted.\n  2. `Repository.add` stores the note in memory before the file write can fail, so a failed write leaves memory and disk out of step.\n  3. `list_notes` has only one of its four filter combinations tested.\n  4. Query-side case folding and the case-sensitivity of tag matching are not pinned.\n  5. Boundary inputs such as an empty query or empty tag are untested.\n  6. Id assignment (`len + 1`) is safe today but will break once notes can be deleted.\n  7. Copy and aliasing behavior is untested, which is low risk.\n  The findings file gives a test sketch for each gap.\n- **Constraint:** `README.md:13` says only the test designer edits `tests/acceptance/`, so the acceptance-level tests for gap 3 have to go through them.\n- **Unverified:** `pyproject.toml` declares no pytest and no `pythonpath` for the `src/` layout, so the suite may not run from a clean checkout. That is an inference from missing config, not a result.\n- **Open questions:**\n  - Should a failed mirror write leave the note out of memory?\n  - What should an empty query or empty tag mean, and should tag matching ignore case?\n  - What is your bar for \"good enough\"?\n  - Someone with shell access should run `coverage run --branch` and the two changes above to confirm my read.\n\nNo external research was needed.\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "760fc912-6127-4d82-a422-71b6a1dc14f8",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "760fc912-6127-4d82-a422-71b6a1dc14f8",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "fd2d13251013c65bbe01054866fc5a4e63e2711e",
+          "role": "researcher",
+          "task_id": "researcher.test-strategy.notes-service.ambiguity",
+          "template_id": "test-strategy",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 0.535358,
+      "duration_ms": 135034,
+      "started_at": "2026-10-14T03:37:35.910710+00:00"
+    }
+  ],
+  "verdicts": {
+    "researcher": {
+      "underpowered": true,
+      "reason": "2 complete pairs, fewer than the 20 declared",
+      "complete_pairs": 2,
+      "required_pairs": 20,
+      "check_verdicts": {},
+      "not_covered": [],
+      "worst_case_lean_failures": {},
+      "judged_intervals": {}
+    }
+  },
+  "kernel_delivery": {
+    "researcher": [
+      {
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "session_id": "4700edfa-a0de-495d-b998-f266ca19f1e5",
+        "kernel_version": "c89f2d77",
+        "slot": 2
+      },
+      {
+        "task_id": "researcher.packaging-and-release.ledger-cli.conflict",
+        "session_id": "4700edfa-a0de-495d-b998-f266ca19f1e5",
+        "kernel_version": "c89f2d77",
+        "slot": 1
+      },
+      {
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "session_id": "760fc912-6127-4d82-a422-71b6a1dc14f8",
+        "kernel_version": "c89f2d77",
+        "slot": 2
+      },
+      {
+        "task_id": "researcher.test-strategy.notes-service.ambiguity",
+        "session_id": "760fc912-6127-4d82-a422-71b6a1dc14f8",
+        "kernel_version": "c89f2d77",
+        "slot": 1
+      }
+    ]
+  },
+  "golden_bad_case_verdicts": null
+}

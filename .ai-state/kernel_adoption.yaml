@@ -13,29 +13,39 @@ eligible:
   - context-engineer
 roles:
   researcher:
-    status: trial
+    status: switched
     since: 2026-10-14T02:32:49Z
     runs:
       - id: 20261014T023850Z-809185
         complete_pairs: 0
         passes_flip_rule: false
-        entry: ".ai-state/eval_ledger/adherence/20261014T023850Z-809185.json (smoke, 2 tasks; channel failure: the runner read the parent stream for a marker the harness writes to the role's transcript; both lean sessions kernel_missing)"
+        # .ai-state/eval_ledger/adherence/20261014T023850Z-809185.json: smoke, 2 tasks; channel failure: the runner read the parent stream for a marker the harness writes to the role's transcript; both lean sessions kernel_missing
+        entry: praxion-evals-adherence
       - id: 20261014T031818Z-d71d91
         complete_pairs: 0
         passes_flip_rule: false
-        entry: ".ai-state/eval_ledger/adherence/20261014T031818Z-d71d91.json (smoke, 2 tasks; channel failure: the transcript directory name mapped only / and . to dashes, the harness maps every non-alphanumeric; both lean sessions kernel_missing)"
+        # .ai-state/eval_ledger/adherence/20261014T031818Z-d71d91.json: smoke, 2 tasks; channel failure: the transcript directory name mapped only / and . to dashes, the harness maps every non-alphanumeric; both lean sessions kernel_missing
+        entry: praxion-evals-adherence
       - id: 20261014T033052Z-4f6604
         complete_pairs: 2
         passes_flip_rule: false
-        entry: ".ai-state/eval_ledger/adherence/20261014T033052Z-4f6604.json (smoke, 2 tasks, both arms measured, every delivery marker once per lean session; underpowered by design, no verdict; golden cases not judged in this run)"
+        # .ai-state/eval_ledger/adherence/20261014T033052Z-4f6604.json: smoke, 2 tasks, both arms measured, every delivery marker once per lean session; underpowered by design, no verdict; golden cases not judged in this run
+        entry: praxion-evals-adherence
       - id: 20261014T045733Z-7050ca
         complete_pairs: 13
         passes_flip_rule: false
-        entry: ".ai-state/eval_ledger/adherence/20261014T045733Z-7050ca.json (full run, 24 tasks, golden cases judged, observed judge error 0.00; 13 complete pairs of 24, then the API key's credit balance ran out and the remaining 21 sessions of both arms failed at zero cost (result_error, Credit balance is too low); underpowered, no verdict; spend USD 15.34)"
+        # .ai-state/eval_ledger/adherence/20261014T045733Z-7050ca.json: full run, 24 tasks, golden cases judged, observed judge error 0.00; 13 complete pairs of 24, then the API key's credit balance ran out and the remaining 21 sessions of both arms failed at zero cost (result_error, Credit balance is too low); underpowered, no verdict; spend USD 15.34
+        entry: praxion-evals-adherence
       - id: 20261014T152926Z-723e7a
         complete_pairs: 24
         passes_flip_rule: true
-        entry: ".ai-state/eval_ledger/adherence/20261014T152926Z-723e7a.json (full run, fresh draw after the credit top-up, 24 tasks, 48 sessions, 0 errored; flip verdict clear: no regression on any scored mechanical check, C3 non-inferior 18 of 18 in both arms; observed judge error on the golden cases 0.5; C6 withheld (no fixture page), C5 0 of 6 in both arms; lean first-request median 24,182 vs full 42,762; spend USD 26.65)"
+        # .ai-state/eval_ledger/adherence/20261014T152926Z-723e7a.json: full run, fresh draw after the credit top-up, 24 tasks, 48 sessions, 0 errored; flip verdict clear: no regression on any scored mechanical check, C3 non-inferior 18 of 18 in both arms; observed judge error on the golden cases 0.5; C6 withheld (no fixture page), C5 0 of 6 in both arms; lean first-request median 24,182 vs full 42,762; spend USD 26.65
+        entry: praxion-evals-adherence
+    passing_run: 20261014T152926Z-723e7a
+    probe_before_tokens: 54801
+    probe_after_tokens: 27029
+    flip_rule_ratified: true
+    flip_ratified: true
   verifier:
     status: trial
     since: 2026-10-14T02:32:49Z

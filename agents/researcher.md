@@ -10,6 +10,7 @@ skills: [claude-ecosystem]
 background: true
 model: sonnet
 effort: high
+omitClaudeMd: true
 maxTurns: 80
 ---
 

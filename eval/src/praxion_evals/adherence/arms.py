@@ -96,7 +96,16 @@ def _patch_and_seal(
     settings = _settings_for(arm, turn_cap)
     if settings:
         path = dest / definition
-        patched_text = _with_settings(path.read_bytes().decode("utf-8"), settings)
+        text = path.read_bytes().decode("utf-8")
+        if arm == "lean" and _carries_flag(text):
+            # A switched role's full arm would carry the flag too: the two arms would be the
+            # same configuration, and a run would compare nothing. Say so, rather than report
+            # the copy "unchanged where it should differ".
+            raise ArmCopyError(
+                f"{definition} already sets {OMIT_CLAUDE_MD_KEY}: the role is switched in this "
+                "checkout, so it has no full arm to compare against"
+            )
+        patched_text = _with_settings(text, settings)
         path.write_bytes(patched_text.encode("utf-8"))
     after = tree_entries(dest)
     patched = _diff_entries(
@@ -127,6 +136,20 @@ def _settings_for(arm: Arm, turn_cap: int | None) -> dict[str, str]:
     if turn_cap is not None:
         settings[MAX_TURNS_KEY] = str(turn_cap)
     return settings
+
+
+def _carries_flag(definition: str) -> bool:
+    """Whether the definition's frontmatter already sets ``omitClaudeMd`` to true."""
+    lines = definition.splitlines()
+    try:
+        closing = frontmatter_closing(lines)
+    except ValueError:
+        return False
+    return any(
+        line.startswith(f"{OMIT_CLAUDE_MD_KEY}:")
+        and line.split(":", 1)[1].strip().lower() == "true"
+        for line in lines[1:closing]
+    )
 
 
 def _with_settings(definition: str, settings: Mapping[str, str]) -> str:

@@ -27,6 +27,34 @@ from pathlib import Path
 
 import pytest
 
+from praxion_evals.live.materialize import (
+    Materialization,
+    make_read_only,
+    make_writable,
+    tree_digest,
+)
+
+OMIT_CLAUDE_MD_LINE = "omitClaudeMd:"
+
+
+def unswitched(materialization: Materialization, role: str = "researcher") -> Materialization:
+    """The materialized checkout as if ``role`` were not switched: its ``omitClaudeMd`` line removed.
+
+    The paid-path and arm tests were written against a checkout with no switched role; once a
+    role flips for real, its lean arm can no longer be built from the live tree (the full arm
+    would carry the flag too). Stripping the line restores the shape those tests exercise.
+    """
+    from dataclasses import replace
+
+    definition = materialization.root / "agents" / f"{role}.md"
+    make_writable(materialization.root)
+    lines = definition.read_text(encoding="utf-8").splitlines(keepends=True)
+    kept = [line for line in lines if not line.startswith(OMIT_CLAUDE_MD_LINE)]
+    definition.write_text("".join(kept), encoding="utf-8")
+    make_read_only(materialization.root)
+    return replace(materialization, tree_digest=tree_digest(materialization.root))
+
+
 # ---------------------------------------------------------------------------
 # The fake `claude` process
 # ---------------------------------------------------------------------------

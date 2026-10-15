@@ -28,6 +28,7 @@ from praxion_evals.adherence.model import (
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.harness.schemas import JudgeVerdict
 from praxion_evals.live.session import SessionRun, SessionSpec
+from tests.conftest import unswitched
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROLE = "researcher"
@@ -139,6 +140,17 @@ def test_the_report_option_needs_no_role() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every run here sees the checkout with the role not yet switched (see conftest.unswitched)."""
+    materialize = session_loop.materialize_path
+
+    def materialize_unswitched(source: Path, dest: Path, *args, **kwargs):
+        return unswitched(materialize(source, dest, *args, **kwargs), ROLE)
+
+    monkeypatch.setattr(session_loop, "materialize_path", materialize_unswitched)
+
+
 @pytest.fixture
 def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(spec: SessionSpec, env: object) -> SessionRun:
@@ -186,7 +198,7 @@ def test_a_capped_dry_run_plans_that_many_tasks_per_role_per_arm_and_keeps_the_t
     lines = [json.loads(line) for line in captured.out.splitlines()]
     assert len(lines) == 2 * 2
     assert len({line["task_id"] for line in lines}) == 2
-    assert "researcher: 2 tasks (target 20)" in captured.err
+    assert f"{ROLE}: 2 tasks (target 20)" in captured.err
 
 
 def test_a_cap_above_the_target_plus_slack_changes_nothing() -> None:
@@ -636,7 +648,7 @@ def _flip_argv(tmp_path: Path, *options: str) -> list[str]:
         (
             ["--required-pairs", "2"],
             ["--required-pairs", "2", "--max-tasks", "1"],
-            "measured the researcher on 2 tasks, not the 1 planned",
+            f"measured the {ROLE} on 2 tasks, not the 1 planned",
         ),
         (
             ["--required-pairs", "2", "--max-tasks", "1"],

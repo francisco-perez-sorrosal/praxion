@@ -37,6 +37,7 @@ from praxion_evals.live.materialize import (
     tree_entries,
 )
 from praxion_evals.live.session import SandboxPaths
+from tests.conftest import unswitched
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROLE = "researcher"
@@ -56,7 +57,10 @@ def _read(root: Path, relpath: str) -> str:
 
 @pytest.fixture(scope="module")
 def original(tmp_path_factory: pytest.TempPathFactory) -> Materialization:
-    return materialize_path(REPO_ROOT, tmp_path_factory.mktemp("original") / "checkout")
+    # The checkout as the tests were written against it: the role not yet switched.
+    return unswitched(
+        materialize_path(REPO_ROOT, tmp_path_factory.mktemp("original") / "checkout"), ROLE
+    )
 
 
 @pytest.fixture(scope="module")
@@ -218,6 +222,20 @@ def test_a_definition_with_crlf_line_endings_keeps_them_outside_the_patched_line
     assert (build.copy_root / DEFINITION).read_bytes() == (
         b"---\r\nname: x\r\nomitClaudeMd: true\n---\r\nBody\r\n"
     )
+
+
+def test_a_switched_role_has_no_lean_arm_to_build(original, tmp_path):
+    # Its full arm would carry the flag too, so the run would compare nothing; say so.
+    checkout = _fake_checkout(
+        original,
+        tmp_path / "checkout",
+        {DEFINITION: "---\nname: x\nomitClaudeMd: true\n---\nBody\n"},
+    )
+
+    with pytest.raises(ArmCopyError, match="switched in this checkout"):
+        build_arm(checkout, tmp_path / "copy", ROLE, "lean")
+
+    assert not (tmp_path / "copy").exists()
 
 
 # ---------------------------------------------------------------------------

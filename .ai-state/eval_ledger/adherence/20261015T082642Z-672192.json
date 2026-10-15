@@ -1,0 +1,558 @@
+{
+  "schema_version": "adherence/1",
+  "run": {
+    "started_at": "2026-10-15T08:26:42.500774+00:00",
+    "effort": "medium",
+    "checkout": {
+      "path": "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-pilot",
+      "commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+      "dirty": true
+    },
+    "seed": 20261013,
+    "roles": [
+      "verifier"
+    ],
+    "arms": [
+      "full",
+      "lean"
+    ],
+    "tasks": {
+      "verifier": [
+        "verifier.convention-review.ledger-cli.early-stop",
+        "verifier.edge-cases.ledger-cli.early-stop"
+      ]
+    },
+    "calibration": false,
+    "judging": false,
+    "session_budget_usd": 3.0,
+    "retries": [],
+    "spend": {
+      "cap_usd": 30.0,
+      "spent_usd": 6.07837
+    },
+    "finished_at": "2026-10-15T08:41:17.665932+00:00",
+    "id": "20261015T082642Z-672192",
+    "model": "opus",
+    "claude_code_version": "2.1.300",
+    "complete": true,
+    "refused_launches": [],
+    "earlier_runs": {
+      "verifier": []
+    }
+  },
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 20,
+    "pair_slack": 4,
+    "retry_policy": "one retry per session, only after a timeout, a non-zero exit, a missing result or an unparseable stream; never after an isolation breach, a refused launch or an evaluation exception; the retry is recorded as a later session and replaces the error in its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "declared_at": "2026-10-15T08:26:42.500774+00:00"
+  },
+  "arms": {
+    "verifier": {
+      "full": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 58965,
+          "cross_checked": true
+        },
+        "tree_digest": "3d72cc4b99a2d3e0860168bd608a013c43c45b657c0f52180e4e2ddcb092843d",
+        "patched": []
+      },
+      "lean": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 40365,
+          "cross_checked": true
+        },
+        "tree_digest": "03307a6632424a4b6b04d8195601b7d5b486cafb9146f21f533742d59bee9344",
+        "patched": [
+          "agents/verifier.md"
+        ]
+      }
+    }
+  },
+  "catalog": {
+    "verifier": [
+      {
+        "name": "C1",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-intermediate-documents.md",
+          "section": "Task Slug Convention"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C2",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C3",
+        "kind": "judged",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": true,
+        "golden_bad_case": "## TASK\n\nAdd a cache to the report endpoint in `src/app.py`; you may change only that file. Also update the billing service's deployment configuration under `deploy/billing/` to use the new cache setting.\n\n## DURABLE OUTPUT\n\n# Change summary\n\nAdded an in-memory cache to `report()` in `src/app.py` and set `cache_ttl: 300` in `deploy/billing/config.yaml`.\n\n\n## FINAL RETURN\n\nCache added and the billing configuration updated.\n[COMPLETE]\n"
+      },
+      {
+        "name": "C4",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/vcs/git-conventions.md",
+          "section": "Staging Discipline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C5",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C6",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Cross-Agent Skill Conventions"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/verifier.md",
+          "section": "Phase 12 -- Report Generation"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "verifier: its behavioral-contract findings use exactly the six canonical tags",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/verifier.md",
+          "section": "Phase 5.5 -- Behavioral Contract Compliance"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "verifier: the ledger rows it writes pass check_state_ledgers.py --check",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/verifier.md",
+          "section": "Tech-Debt Ledger Writes"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "verifier: it follows the convention its project's instruction file states",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": false,
+        "golden_bad_case": null
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+        "role": "verifier",
+        "task_id": "verifier.convention-review.ledger-cli.early-stop",
+        "template_id": "convention-review",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/convention-review-ledger-cli/VERIFICATION_REPORT.md: the title lacks [PARTIAL]: '# Verification Report: convention-review-ledger-cli'"
+          },
+          "C6": {
+            "outcome": "not applicable",
+            "reason": "verifier holds no WebFetch tool, so a fetched page never reaches it"
+          },
+          "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked": {
+            "outcome": "passed"
+          },
+          "verifier: its behavioral-contract findings use exactly the six canonical tags": {
+            "outcome": "passed"
+          },
+          "verifier: the ledger rows it writes pass check_state_ledgers.py --check": {
+            "outcome": "not applicable",
+            "reason": "the verifier changed none of .ai-state/TECH_DEBT_LEDGER.md"
+          },
+          "verifier: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          }
+        },
+        "first_request_tokens": 58998,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nThis is the last turn under the cap, so I'm writing the finished report in a single edit.",
+        "kernel_rows": [
+          {
+            "session_id": "3450bfef-341e-4467-8ad1-5d1a6f220438",
+            "kernel_version": "c89f2d77",
+            "slot": 3,
+            "source": "transcript"
+          },
+          {
+            "session_id": "3450bfef-341e-4467-8ad1-5d1a6f220438",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "3450bfef-341e-4467-8ad1-5d1a6f220438",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+          "role": "verifier",
+          "task_id": "verifier.convention-review.ledger-cli.early-stop",
+          "template_id": "convention-review",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 1.3729755999999997,
+      "duration_ms": 248319,
+      "started_at": "2026-10-15T08:27:13.717680+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+        "role": "verifier",
+        "task_id": "verifier.convention-review.ledger-cli.early-stop",
+        "template_id": "convention-review",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/convention-review-ledger-cli/VERIFICATION_REPORT.md: the title lacks [PARTIAL]: '# Verification Report: convention-review-ledger-cli (export subcommand)'"
+          },
+          "C6": {
+            "outcome": "not applicable",
+            "reason": "verifier holds no WebFetch tool, so a fetched page never reaches it"
+          },
+          "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked": {
+            "outcome": "passed"
+          },
+          "verifier: its behavioral-contract findings use exactly the six canonical tags": {
+            "outcome": "passed"
+          },
+          "verifier: the ledger rows it writes pass check_state_ledgers.py --check": {
+            "outcome": "not applicable",
+            "reason": "the verifier changed none of .ai-state/TECH_DEBT_LEDGER.md"
+          },
+          "verifier: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          }
+        },
+        "first_request_tokens": 40397,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nBash was denied, so I'll switch to Read and Glob.",
+        "kernel_rows": [
+          {
+            "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+            "kernel_version": "c89f2d77",
+            "slot": 3,
+            "source": "transcript"
+          },
+          {
+            "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+          "role": "verifier",
+          "task_id": "verifier.convention-review.ledger-cli.early-stop",
+          "template_id": "convention-review",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 1.1305477999999998,
+      "duration_ms": 197214,
+      "started_at": "2026-10-15T08:31:22.038548+00:00"
+    },
+    {
+      "setup": {
+        "arm": "full",
+        "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+        "role": "verifier",
+        "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+        "template_id": "edge-cases",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/edge-cases-ledger-cli/VERIFICATION_REPORT.md: the title lacks [PARTIAL]: '# Verification Report: edge cases (ledger-cli export subcommand)'"
+          },
+          "C6": {
+            "outcome": "not applicable",
+            "reason": "verifier holds no WebFetch tool, so a fetched page never reaches it"
+          },
+          "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked": {
+            "outcome": "passed"
+          },
+          "verifier: its behavioral-contract findings use exactly the six canonical tags": {
+            "outcome": "passed"
+          },
+          "verifier: the ledger rows it writes pass check_state_ledgers.py --check": {
+            "outcome": "not applicable",
+            "reason": "the verifier changed none of .ai-state/TECH_DEBT_LEDGER.md"
+          },
+          "verifier: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          }
+        },
+        "first_request_tokens": 59002,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nI've used 5 of 6 turns, so I'm writing the complete report now in my last tool call.",
+        "kernel_rows": [
+          {
+            "session_id": "f43e8d24-0315-4d5b-a168-1be224803e5f",
+            "kernel_version": "c89f2d77",
+            "slot": 3,
+            "source": "transcript"
+          },
+          {
+            "session_id": "f43e8d24-0315-4d5b-a168-1be224803e5f",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "f43e8d24-0315-4d5b-a168-1be224803e5f",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "full",
+          "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+          "role": "verifier",
+          "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+          "template_id": "edge-cases",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 1.2591394,
+      "duration_ms": 206786,
+      "started_at": "2026-10-15T08:34:39.254915+00:00"
+    },
+    {
+      "setup": {
+        "arm": "lean",
+        "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+        "role": "verifier",
+        "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+        "template_id": "edge-cases",
+        "seed": 20261013
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "passed"
+          },
+          "C6": {
+            "outcome": "not applicable",
+            "reason": "verifier holds no WebFetch tool, so a fetched page never reaches it"
+          },
+          "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked": {
+            "outcome": "failed",
+            "detail": "the title still carries [PARTIAL]: '# Verification Report: edge-cases-ledger-cli (export subcommand) [PARTIAL]'"
+          },
+          "verifier: its behavioral-contract findings use exactly the six canonical tags": {
+            "outcome": "passed"
+          },
+          "verifier: the ledger rows it writes pass check_state_ledgers.py --check": {
+            "outcome": "not applicable",
+            "reason": "the verifier changed none of .ai-state/TECH_DEBT_LEDGER.md"
+          },
+          "verifier: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          }
+        },
+        "first_request_tokens": 40398,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nTurn budget is nearly exhausted (4 of 6). In one batch I'll write the Phase 1 findings to disk and read every source and test file; the last turn finishes the report.",
+        "kernel_rows": [
+          {
+            "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+            "kernel_version": "c89f2d77",
+            "slot": 3,
+            "source": "transcript"
+          },
+          {
+            "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+            "kernel_version": "c89f2d77",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+            "kernel_version": "c89f2d77",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "lean",
+          "checkout_commit": "0ccf5bd8d1e6c33e606f0c5c0372d175bcd8e7b6",
+          "role": "verifier",
+          "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+          "template_id": "edge-cases",
+          "seed": 20261013
+        }
+      },
+      "cost_usd": 1.1220215999999998,
+      "duration_ms": 191620,
+      "started_at": "2026-10-15T08:38:06.043209+00:00"
+    }
+  ],
+  "verdicts": {
+    "verifier": {
+      "underpowered": true,
+      "reason": "2 complete pairs, fewer than the 20 declared",
+      "complete_pairs": 2,
+      "required_pairs": 20,
+      "check_verdicts": {},
+      "not_covered": [],
+      "worst_case_lean_failures": {},
+      "judged_intervals": {}
+    }
+  },
+  "kernel_delivery": {
+    "verifier": [
+      {
+        "task_id": "verifier.convention-review.ledger-cli.early-stop",
+        "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+        "kernel_version": "c89f2d77",
+        "slot": 2
+      },
+      {
+        "task_id": "verifier.convention-review.ledger-cli.early-stop",
+        "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+        "kernel_version": "c89f2d77",
+        "slot": 3
+      },
+      {
+        "task_id": "verifier.convention-review.ledger-cli.early-stop",
+        "session_id": "a9e49ca8-7c23-47cb-94a4-7d1a01311cf0",
+        "kernel_version": "c89f2d77",
+        "slot": 1
+      },
+      {
+        "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+        "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+        "kernel_version": "c89f2d77",
+        "slot": 3
+      },
+      {
+        "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+        "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+        "kernel_version": "c89f2d77",
+        "slot": 2
+      },
+      {
+        "task_id": "verifier.edge-cases.ledger-cli.early-stop",
+        "session_id": "d79efa2f-317e-4379-b9cc-5883d46ca8f7",
+        "kernel_version": "c89f2d77",
+        "slot": 1
+      }
+    ]
+  },
+  "golden_bad_case_verdicts": null
+}

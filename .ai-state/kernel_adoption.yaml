@@ -55,6 +55,11 @@ roles:
         complete_pairs: 24
         passes_flip_rule: false
         entry: praxion-evals-adherence
+      - id: 20261015T082642Z-672192
+        # .ai-state/eval_ledger/adherence/20261015T082642Z-672192.json: diagnostic draw, the first two tasks (both forced-stop), no judge, sandbox kept; C5 full 0 of 2, lean 1 of 2. Transcripts: both arms write the [PARTIAL] skeleton at their third call; at the last turn either arm may judge its report finished and drop [PARTIAL]. No kernel content found missing.
+        complete_pairs: 2
+        passes_flip_rule: false
+        entry: praxion-evals-adherence
   context-engineer:
     status: trial
     since: 2026-10-14T02:32:49Z

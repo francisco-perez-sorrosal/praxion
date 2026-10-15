@@ -232,6 +232,8 @@ def test_with_session_token_replaces_every_api_key_with_the_token():
 
 
 def test_with_session_token_refuses_an_empty_token():
+    import pytest
+
     from praxion_evals.live.session import with_session_token
 
     with pytest.raises(ValueError, match="empty"):

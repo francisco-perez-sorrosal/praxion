@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -29,8 +30,15 @@ from _kernel_checker_testkit import (  # noqa: E402
 )
 
 # pytest finds a fixture by name in the module that uses it
-repo = kit.repo
 template = kit.template
+
+
+@pytest.fixture
+def repo(template: Path, tmp_path: Path) -> Path:
+    """The live inputs as they stood before any flip: each canary plants its own flag and record."""
+    shutil.copytree(template, tmp_path / "checkout")
+    kit.unswitched(tmp_path / "checkout")
+    return tmp_path / "checkout"
 
 
 def test_a_role_flipped_with_its_full_record_passes(repo: Path) -> None:

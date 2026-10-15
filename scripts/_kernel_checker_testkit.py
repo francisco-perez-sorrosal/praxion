@@ -37,6 +37,7 @@ COPIED = (
     "CLAUDE.md",
     gk.PREAMBLE_PATH,
     cb.HOOKS_PATH,
+    km.LEDGER_PATH,  # live flags arrive with their records: a legitimate switch is a clean baseline
 )
 UNIFIED_RULE = "rules/swe/agent-intermediate-documents.md"
 PROBE_HEADING = "Resident Probe Section"
@@ -60,6 +61,17 @@ def template(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def repo(template: Path, tmp_path: Path) -> Path:
     shutil.copytree(template, tmp_path / "checkout")
     return tmp_path / "checkout"
+
+
+def unswitched(root: Path) -> None:
+    """Back to a checkout where no role is switched: no ledger, no flag in any definition."""
+    (root / km.LEDGER_PATH).unlink()
+    for definition in (root / "agents").glob("*.md"):
+        text = definition.read_text(encoding="utf-8")
+        definition.write_text(
+            "".join(ln for ln in text.splitlines(True) if not ln.startswith("omitClaudeMd:")),
+            encoding="utf-8",
+        )
 
 
 def kinds(root: Path) -> set[str]:

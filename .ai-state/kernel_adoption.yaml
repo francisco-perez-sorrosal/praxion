@@ -49,7 +49,12 @@ roles:
   verifier:
     status: trial
     since: 2026-10-14T02:32:49Z
-    runs: []
+    runs:
+      - id: 20261015T035717Z-03a785
+        # .ai-state/eval_ledger/adherence/20261015T035717Z-03a785.json: full run on the subscription token, 24 tasks, 48 sessions, 0 errored, golden judge error 0.00; flip verdict NOT clear: C5 (forced-stop partial title) full 6 of 9, lean 0 of 9 (b 6, c 0); C1 23 vs 24 (b 1); write-early title check 12 vs 13 (b 8, c 7); C3 non-inferior 6 of 14 both arms; lean first-request median 40,392 vs full 58,986; estimated session cost 79.85 (subscription, not charged)
+        complete_pairs: 24
+        passes_flip_rule: false
+        entry: praxion-evals-adherence
   context-engineer:
     status: trial
     since: 2026-10-14T02:32:49Z

@@ -184,6 +184,21 @@ def build_env(
     }
 
 
+SESSION_API_KEYS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+def with_session_token(env: Mapping[str, str], token: str) -> dict[str, str]:
+    """``env`` for a session that authenticates with ``token`` (a `claude setup-token`) alone.
+
+    The API keys leave the session's environment so the session bills the token's
+    subscription, never the key; the runner's own process keeps the key for the judge.
+    """
+    if not token.strip():
+        raise ValueError("the session token is empty")
+    kept = {key: value for key, value in env.items() if key not in SESSION_API_KEYS}
+    return {**kept, "CLAUDE_CODE_OAUTH_TOKEN": token.strip()}
+
+
 def run_session(spec: SessionSpec, env: Mapping[str, str]) -> SessionRun:
     return run_argv(build_argv(spec), cwd=spec.cwd, env=env, timeout_s=spec.timeout_s)
 

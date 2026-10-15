@@ -178,6 +178,32 @@ def test_a_dry_run_lists_every_task_of_every_named_arm(
 
 
 @pytest.mark.usefixtures("no_launch")
+@pytest.mark.usefixtures("no_launch")
+def test_a_token_file_puts_the_token_in_every_session_and_takes_the_api_key_out(
+    capsys, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-key-for-the-judge")
+    token_file = tmp_path / "session-token"
+    token_file.write_text("sk-ant-oat01-example\n")
+
+    lines = _dry_run(
+        capsys,
+        tmp_path,
+        "--role",
+        ROLE,
+        "--max-tasks",
+        "1",
+        "--session-oauth-token-file",
+        str(token_file),
+    )
+
+    assert lines, "the dry run plans sessions"
+    for line in lines:
+        assert "CLAUDE_CODE_OAUTH_TOKEN" in line["env_names"]
+        assert "ANTHROPIC_API_KEY" not in line["env_names"]
+    assert "sk-ant-oat01" not in capsys.readouterr().out  # names only, never the token
+
+
 def test_a_dry_run_of_a_calibration_lists_the_full_arm_only(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:

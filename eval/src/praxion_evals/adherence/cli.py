@@ -43,8 +43,9 @@ from praxion_evals.adherence.session_loop import (
     Checkout,
     RunConfig,
     resolve_checkout,
+    session_env,
 )
-from praxion_evals.live.session import SandboxPaths, SessionSpec, build_argv, build_env
+from praxion_evals.live.session import SandboxPaths, SessionSpec, build_argv
 from praxion_evals.live.spend import RUNNER_SPEND_CAP_USD
 
 PROG = "praxion-evals-adherence"
@@ -143,6 +144,11 @@ def _parser() -> argparse.ArgumentParser:
     add("--model", default=DEFAULT_MODEL)
     add("--effort", default=DEFAULT_EFFORT)
     add("--keep-sandbox", action="store_true")
+    add(
+        "--session-oauth-token-file",
+        type=Path,
+        help="a `claude setup-token` file: sessions bill its subscription, the judge keeps the API key",
+    )
     add("--dry-run", action="store_true")
     add("--overwrite", action="store_true")
     noise = parser.add_mutually_exclusive_group()
@@ -294,7 +300,7 @@ def _print_dry_run(
             for arm in config.arms:
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
                 spec = _planned_spec(config, checkout, run_root, task, arm, sandbox)
-                env_names = sorted(build_env(sandbox.root, os.environ))
+                env_names = sorted(session_env(config, sandbox.root, os.environ))
                 line = {"role": role, "arm": arm, "task_id": task.task_id}
                 print(json.dumps({**line, "argv": build_argv(spec), "env_names": env_names}))
     return EXIT_COMPLETE

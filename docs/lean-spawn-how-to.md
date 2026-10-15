@@ -36,6 +36,17 @@ A new section in an always-loaded source needs an entry in `rules/_audience.yaml
 3. Commit through the gate. From this commit the hook delivers the role's kernel at every spawn, followed by the project's root `CLAUDE.md`, in which only a line that is wholly `@<relative path>` is expanded, one level deep, resolved from the project root and never inside fenced code (close every fence: one left open inside a list item stays open here to the end of the file, where the harness closes it with the item); an inline `@path` and deeper imports stay as written. The definition is unchanged, so the role also still inherits the project instructions.
 4. Spawn the role once and confirm its row (below).
 
+## Run the sessions on a subscription
+
+A paired run launches dozens of headless sessions, and each bills whatever credential it finds. To bill a Claude subscription instead of API credits, make a long-lived token in your own terminal with `claude setup-token`, save it to a file only you can read (for example `~/.claude/praxion-session-token`, mode 600) and name that file on the run:
+
+```bash
+praxion-evals-adherence --role verifier --arm full --arm lean --required-pairs 20 --judge-golden \
+  --session-oauth-token-file ~/.claude/praxion-session-token --max-total-usd 200
+```
+
+Every session then carries the token as `CLAUDE_CODE_OAUTH_TOKEN` and no API key; the runner's own process keeps the key for the judge, which runs on the Messages API and costs cents. A dry run shows the effect in each session's `env_names`. The cost figures a subscription session reports are Claude Code's estimates, not charges, so the run cap bounds an estimate; note that in the run's ledger comment. A subscription has usage windows: if a run is throttled mid-way its remaining sessions error out and the run is listed like any other, so run one role at a time and leave headroom.
+
 ## Record a run
 
 After each adherence run, append it to the role's `runs` with its `id`, `complete_pairs`, `passes_flip_rule` and `entry`. A run that does not pass stays recorded and the role stays at `trial`.

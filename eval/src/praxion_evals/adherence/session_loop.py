@@ -69,6 +69,7 @@ from praxion_evals.live.session import (
     parse_stream,
     run_session,
     session_error,
+    with_session_token,
 )
 from praxion_evals.live.spend import SpendLedger
 
@@ -119,6 +120,9 @@ class RunConfig:
     report: Path | None
     fixture_pages_base_url: str | None
     max_tasks: int | None = None  # a cap on the tasks per role, below the target plus slack
+    # A `claude setup-token` file: sessions authenticate with it and never see the API key,
+    # which the runner's own process keeps for the judge. None: sessions inherit the key.
+    session_oauth_token_file: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +176,16 @@ class RunState:
     results: results.RunResults
     ledger: SpendLedger
     page_fetchable: bool | None = None  # None: not probed yet
+
+
+def session_env(config: RunConfig, root: Path, ambient: Mapping[str, str]) -> dict[str, str]:
+    """A session's environment: the sandbox allowlist, and the token file's token in place of
+    the API key when the run names one (the runner's own process keeps the key for the judge)."""
+    env = build_env(root, ambient)
+    if config.session_oauth_token_file is None:
+        return env
+    token = config.session_oauth_token_file.read_text(encoding="utf-8")
+    return with_session_token(env, token)
 
 
 def begin(
@@ -652,7 +666,7 @@ def _attempt[R](
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
         try:
-            run = run_session(spec, build_env(root, os.environ))
+            run = run_session(spec, session_env(context.config, root, os.environ))
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = _settle(reserved, budget, run)

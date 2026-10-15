@@ -215,6 +215,29 @@ def test_build_env_drops_unlisted_ambient_keys():
     assert "SOME_UNRELATED_TOOL_VAR" not in env
 
 
+def test_with_session_token_replaces_every_api_key_with_the_token():
+    from praxion_evals.live.session import with_session_token
+
+    env = {
+        "ANTHROPIC_API_KEY": "sk-key",
+        "ANTHROPIC_AUTH_TOKEN": "bearer",
+        "CLAUDE_CODE_OAUTH_TOKEN": "",
+        "HOME": "/sandbox/home",
+    }
+
+    tokened = with_session_token(env, "sk-ant-oat01-example\n")
+
+    assert tokened == {"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-example", "HOME": "/sandbox/home"}
+    assert env["ANTHROPIC_API_KEY"] == "sk-key"  # the caller's mapping is untouched
+
+
+def test_with_session_token_refuses_an_empty_token():
+    from praxion_evals.live.session import with_session_token
+
+    with pytest.raises(ValueError, match="empty"):
+        with_session_token({"HOME": "/sandbox/home"}, " \n")
+
+
 def test_build_env_passes_through_the_allowlisted_credential_and_locale_keys():
     """Auth and locale/terminal keys are the documented pass-through set."""
     from praxion_evals.live.session import build_env

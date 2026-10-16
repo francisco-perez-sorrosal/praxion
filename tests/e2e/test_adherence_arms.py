@@ -10,7 +10,7 @@ fails scores no session of that role and spends only the proof.
 from __future__ import annotations
 
 from tests.acceptance.drivers.adherence_eval import SEED, split_definition, task_ids
-from tests.e2e.drivers.adherence_journey import flagged_roles, run_journey
+from tests.e2e.drivers.adherence_journey import flagged_roles, run_journey, switched_in_checkout
 
 
 def test_a_run_naming_one_role_and_the_lean_arm_launches_only_that_roles_lean_copy(tmp_path):
@@ -19,9 +19,11 @@ def test_a_run_naming_one_role_and_the_lean_arm_launches_only_that_roles_lean_co
     launches = journey.launches
 
     assert launches, f"the run launched no session; {journey.describe()}"
-    assert [flagged_roles(launch) for launch in launches] == [{"verifier"}] * len(launches), (
-        "a launch ran another role's or another arm's copy"
-    )
+    already_switched = switched_in_checkout(journey.request.checkout)
+    assert "verifier" not in already_switched, "the measured role must start unswitched"
+    assert [flagged_roles(launch) for launch in launches] == [
+        already_switched | {"verifier"}
+    ] * len(launches), "a launch ran another role's or another arm's copy"
 
 
 def test_the_lean_copy_differs_from_the_checkout_only_by_the_one_setting(tmp_path):
@@ -74,16 +76,16 @@ def test_a_run_of_both_arms_leaves_the_checkout_under_test_unchanged(tmp_path):
 
 
 def test_an_arm_whose_proof_fails_scores_nothing_and_spends_only_the_proof(tmp_path):
-    journey = run_journey(tmp_path, roles=("researcher",), arms=("full", "lean"))
-    tasks = len(task_ids("researcher", SEED))
+    journey = run_journey(tmp_path, roles=("verifier",), arms=("full", "lean"))
+    tasks = len(task_ids("verifier", SEED))
 
     results = journey.results
 
     for arm in ("full", "lean"):
-        assert results.arm_built("researcher", arm) is False, (
+        assert results.arm_built("verifier", arm) is False, (
             f"the {arm} arm passed a proof it cannot pass"
         )
-        assert results.scored_sessions("researcher", arm) == 0
+        assert results.scored_sessions("verifier", arm) == 0
     assert 0 < len(journey.launches) < tasks, (
         f"{len(journey.launches)} launches for a role with {tasks} tasks: more than the proof was spent"
     )

@@ -112,3 +112,14 @@ def flagged_roles(launch: Launch) -> set[str]:
         for name, text in launch.agent_texts.items()
         if text.startswith("---\n") and omits_claude_md(text)
     }
+
+
+def switched_in_checkout(checkout: Path) -> set[str]:
+    """The roles whose definition in the checkout under test already carries `omitClaudeMd: true`."""
+    texts = {
+        definition.stem: definition.read_text(encoding="utf-8")
+        for definition in (checkout / "agents").glob("*.md")
+    }
+    return {
+        name for name, text in texts.items() if text.startswith("---\n") and omits_claude_md(text)
+    }

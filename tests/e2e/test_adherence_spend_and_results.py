@@ -26,7 +26,7 @@ EARLIER_RUN = json.dumps({"earlier": "run", "sessions": [1, 2, 3]})
 
 def test_a_cap_below_one_sessions_budget_launches_nothing_and_records_the_refusal(tmp_path):
     journey = run_journey(
-        tmp_path, roles=("researcher",), arms=("lean",), run_cap_usd=BELOW_ONE_SESSION
+        tmp_path, roles=("verifier",), arms=("lean",), run_cap_usd=BELOW_ONE_SESSION
     )
 
     results = journey.results
@@ -42,7 +42,7 @@ def test_a_cap_below_one_sessions_budget_launches_nothing_and_records_the_refusa
 def test_a_session_reporting_no_cost_is_counted_at_its_full_budget(tmp_path):
     journey = run_journey(
         tmp_path,
-        roles=("researcher", "verifier"),
+        roles=("verifier", "implementer"),
         arms=("lean",),
         run_cap_usd=1.5,
         session_budget_usd=1.0,

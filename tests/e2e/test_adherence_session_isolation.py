@@ -15,7 +15,7 @@ PROBES = {"PRAXION_ADHERENCE_LEAK_PROBE": "leaked", "CLAUDE_PLUGIN_ROOT": "/oper
 
 
 def test_every_session_runs_in_its_own_sandbox_with_only_the_checkout_copy(tmp_path):
-    journey = run_journey(tmp_path, roles=("researcher",), arms=("lean",), extra_env=PROBES)
+    journey = run_journey(tmp_path, roles=("verifier",), arms=("lean",), extra_env=PROBES)
     operator_home = Path.home()
 
     launches = journey.launches

@@ -1,3 +1,9 @@
+## v0.52.1 (2026-10-16)
+
+### Fix
+
+- Find a non-ASCII project path under a C locale
+
 ## v0.52.0 (2026-10-16)
 
 ### Feat

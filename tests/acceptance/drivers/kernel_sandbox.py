@@ -192,6 +192,10 @@ def build_template(dest: Path) -> Path:
         else:
             shutil.copy2(source, target)
     _git(dest, "init", "-q")
+    # Committing this many files trips `gc --auto`, which detaches and deletes loose
+    # objects while the first scenario is still copying the template; the copies
+    # inherit the setting, so no scenario's repository repacks under a copy either.
+    _git(dest, "config", "gc.auto", "0")
     _git(dest, "add", "-A")
     _git(dest, "commit", "-q", "--no-verify", "-m", "plugin checkout under test")
     return dest

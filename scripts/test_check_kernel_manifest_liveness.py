@@ -188,7 +188,8 @@ def test_the_liveness_command_is_clean_when_every_spawn_left_its_row(
 
     assert (result.returncode, result.stdout.strip()) == (
         0,
-        "kernel liveness: clean (1 spawn(s) of 1 adopted role(s) judged)",
+        "kernel liveness: clean (1 spawn(s) of 1 adopted role(s) judged; "
+        "no ledger history to place a re-opening of researcher)",
     )
 
 

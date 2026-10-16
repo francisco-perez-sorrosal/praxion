@@ -8,7 +8,7 @@ lenient readers (statuses, entries, adoptions) survive a record the gate refuses
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -191,6 +191,7 @@ def test_a_role_key_the_parser_reads_as_a_number_is_named_not_crashed_on() -> No
 PARENT_AT = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 BEFORE_PARENT = datetime(2026, 10, 14, 2, 32, tzinfo=timezone.utc)
 AFTER_PARENT = datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc)
+BUILT_AT = datetime(2026, 10, 16, 10, 0, tzinfo=timezone.utc)  # the re-opening commit
 
 
 def entry(status: str, since: datetime | None = BEFORE_PARENT, runs: tuple = ()) -> kl.Entry:
@@ -198,7 +199,7 @@ def entry(status: str, since: datetime | None = BEFORE_PARENT, runs: tuple = ())
 
 
 def parent(**entries: kl.Entry) -> kl.ParentLedger:
-    return kl.ParentLedger(entries, PARENT_AT)
+    return kl.ParentLedger(entries, PARENT_AT, BUILT_AT)
 
 
 def moves(before: kl.ParentLedger | None, **after: kl.Entry) -> list[tuple[str, str, str]]:
@@ -272,15 +273,67 @@ def test_a_move_off_the_legal_moves_is_reported(before, after, move: str) -> Non
 
 
 @pytest.mark.parametrize(
-    "since", [BEFORE_PARENT, PARENT_AT, None], ids=["before", "at the parent", "unreadable"]
+    ("since", "kind"),
+    [
+        (None, "ledger-reopen-no-since"),
+        (BEFORE_PARENT, "ledger-reopen-before-parent"),
+        (PARENT_AT, "ledger-reopen-before-parent"),
+        (BUILT_AT + timedelta(seconds=1), "ledger-reopen-after-commit"),
+    ],
+    ids=["no since", "the held record's since kept", "at the parent", "in the future"],
 )
-def test_a_held_role_reopened_with_a_stale_since_is_reported(since: datetime | None) -> None:
+def test_a_held_role_reopened_with_a_since_outside_its_bounds_is_reported(
+    since: datetime | None, kind: str
+) -> None:
     found = moves(parent(verifier=entry("held")), verifier=entry("trial", since=since))
 
-    assert [(kind, subject) for kind, subject, _ in found] == [
-        ("ledger-reopen-since", "role verifier")
-    ]
-    assert "while held would be judged" in found[0][2]
+    assert [(k, subject) for k, subject, _ in found] == [(kind, "role verifier")]
+
+
+def test_a_reopening_dated_at_its_own_commit_passes() -> None:
+    assert moves(parent(verifier=entry("held")), verifier=entry("trial", since=BUILT_AT)) == []
+
+
+# -- The liveness bound of a re-opened trial ---------------------------------------------
+
+HOLD_AT = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+REOPEN_AT = datetime(2026, 10, 16, 12, 0, tzinfo=timezone.utc)
+
+
+def version(at: datetime | None, status: str | None) -> kl.LedgerVersion:
+    return kl.LedgerVersion(at, {"verifier": status} if status else {})
+
+
+def judged_from(*history: kl.LedgerVersion, since: datetime = BEFORE_PARENT) -> datetime:
+    adoptions = {"verifier": kl.Adoption("trial", since)}
+    return kl.judged_adoptions(adoptions, history)["verifier"].since
+
+
+def test_a_reopened_trial_is_judged_from_its_reopening_commit_whatever_since_it_records() -> None:
+    history = (version(None, "trial"), version(REOPEN_AT, "trial"), version(HOLD_AT, "held"))
+
+    assert judged_from(*history) == REOPEN_AT
+
+
+def test_a_reopened_trial_whose_since_is_later_than_its_commit_keeps_its_since() -> None:
+    later = REOPEN_AT + timedelta(hours=1)
+    history = (version(None, "trial"), version(REOPEN_AT, "trial"), version(HOLD_AT, "held"))
+
+    assert judged_from(*history, since=later) == later
+
+
+def test_a_reopening_not_yet_committed_judges_no_spawn() -> None:
+    assert judged_from(version(None, "trial"), version(HOLD_AT, "held")) == kl.NEVER
+
+
+@pytest.mark.parametrize(
+    "before", [None, "absent"], ids=["history ends at the trial", "absent before the trial"]
+)
+def test_a_first_trial_keeps_its_recorded_since(before: str | None) -> None:
+    history = [version(None, "trial"), version(REOPEN_AT, "trial")]
+    history += [version(HOLD_AT, None)] if before else []
+
+    assert judged_from(*history) == BEFORE_PARENT
 
 
 @pytest.mark.parametrize(

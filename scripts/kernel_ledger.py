@@ -9,6 +9,7 @@ what the ledger adds to them, as values whose illegal states cannot be built.
 | a held record (a trial closed without a flip) states its reason  | `Held.__post_init__`             |
 | only an eligible role is switched                                | `_parse_record`                  |
 | a role moves only along `_MOVES`; a re-opened trial starts anew  | `ledger_transitions`             |
+| a re-opened trial is judged from its re-opening commit           | `judged_adoptions`               |
 | a recorded run is never dropped, reordered or added while held   | `ledger_transitions`             |
 | a record names when it began, readably, to bound what it judges  | `since_time`, both readers       |
 | the spawn hook reads every role's status as PyYAML does          | `hook_misreadings`               |
@@ -26,7 +27,7 @@ line, without a YAML parser, so `hook_misreadings` holds its reading to PyYAML's
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from pathlib import Path
@@ -138,10 +139,26 @@ class Entry:
 
 @dataclass(frozen=True)
 class ParentLedger:
-    """The ledger at the parent commit, and when that commit was made."""
+    """The ledger a move starts from, when its commit was made, and when the judged one was.
+
+    `built_at` is the judged commit's time, or, for a commit still being built, the gate's
+    clock, which that commit's time can only follow.
+    """
 
     entries: Mapping[str, Entry]
     committed_at: datetime
+    built_at: datetime
+
+
+@dataclass(frozen=True)
+class LedgerVersion:
+    """The ledger's statuses at one commit (`committed_at` None: the tree, newer than any)."""
+
+    committed_at: datetime | None
+    statuses: Mapping[str, str]
+
+
+NEVER = datetime.max.replace(tzinfo=timezone.utc)  # the start of a re-opening not yet committed
 
 
 # -- Boundary: the evidence-checked ledger ------------------------------------------
@@ -277,18 +294,18 @@ def ledger_transitions(
 
     `parent` None is no ledger at all: every role in `after` then starts from absent.
     """
-    earlier, committed_at = (parent.entries, parent.committed_at) if parent else ({}, None)
+    earlier = parent.entries if parent else {}
     findings: list[km.Finding] = []
     for role in sorted(set(earlier) | set(after)):
         was, now = earlier.get(role), after.get(role)
-        findings += _move_findings(role, was, now, committed_at)
+        findings += _move_findings(role, was, now, parent)
         if was is not None and now is not None:
             findings += _run_findings(role, was, now)
     return tuple(findings)
 
 
 def _move_findings(
-    role: str, was: Entry | None, now: Entry | None, committed_at: datetime | None
+    role: str, was: Entry | None, now: Entry | None, parent: ParentLedger | None
 ) -> list[km.Finding]:
     move = (was.status if was else None, now.status if now else None)
     if move[0] == move[1]:
@@ -296,17 +313,54 @@ def _move_findings(
     if move not in _MOVES:
         detail = f"{move[0] or 'absent'} -> {move[1] or 'absent'}"
         return [km.Finding("ledger-transition", f"role {role}", detail)]
-    if move == ("held", "trial") and now and not _later(now.since, committed_at):
-        detail = (
-            f"re-opened with since {now.since}, not after the parent commit "
-            f"({committed_at}): its spawns made while held would be judged"
-        )
-        return [km.Finding("ledger-reopen-since", f"role {role}", detail)]
+    if move == ("held", "trial") and now and parent:
+        return _reopen_findings(f"role {role}", now.since, parent)
     return []
 
 
-def _later(since: datetime | None, committed_at: datetime | None) -> bool:
-    return since is not None and committed_at is not None and since > committed_at
+def _reopen_findings(
+    subject: str, since: datetime | None, parent: ParentLedger
+) -> list[km.Finding]:
+    """A re-opened trial records the instant it re-opened: after the commit it follows, not after
+    its own re-opening, so its start neither reaches into the held period nor into the future."""
+    if since is None:
+        detail = "re-opened as a trial with no readable since: record the instant it re-opened"
+        return [km.Finding("ledger-reopen-no-since", subject, detail)]
+    if since <= parent.committed_at:
+        detail = (
+            f"re-opened with since {since}, not after the commit it follows ({parent.committed_at})"
+        )
+        return [km.Finding("ledger-reopen-before-parent", subject, detail)]
+    if since > parent.built_at:
+        detail = f"re-opened with since {since}, after its own re-opening ({parent.built_at})"
+        return [km.Finding("ledger-reopen-after-commit", subject, detail)]
+    return []
+
+
+def judged_adoptions(
+    adoptions: Mapping[str, Adoption], history: Sequence[LedgerVersion]
+) -> Mapping[str, Adoption]:
+    """Each adoption judged from the later of its start and the commit that re-opened it from held.
+
+    `history` runs newest first, the tree before every commit. A first trial keeps its start.
+    """
+    return MappingProxyType(
+        {
+            role: Adoption(adoption.status, max(adoption.since, _reopened_at(role, history)))
+            for role, adoption in adoptions.items()
+        }
+    )
+
+
+def _reopened_at(role: str, history: Sequence[LedgerVersion]) -> datetime:
+    earliest = NEVER  # only the tree re-opened it: no spawn so far is after the re-opening commit
+    for version in history:
+        status = version.statuses.get(role)
+        if status not in DELIVERING:
+            return earliest if status == "held" else datetime.min.replace(tzinfo=timezone.utc)
+        if version.committed_at is not None:
+            earliest = version.committed_at
+    return datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _run_findings(role: str, was: Entry, now: Entry) -> list[km.Finding]:

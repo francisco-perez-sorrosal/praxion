@@ -208,17 +208,46 @@ def test_a_trial_closed_without_a_flip_moves_to_held(repo: Path) -> None:
 def test_a_held_role_reopened_with_a_since_after_the_parent_commit_moves_back_to_trial(
     repo: Path,
 ) -> None:
-    reopened = {**trial_row(), "since": REOPENED_AFTER_PARENT}
+    reopened = {**trial_row(), "since": REOPENED_AFTER_PARENT}  # before the gate's clock
 
     assert moved(repo, held_row(), reopened) == []
 
 
-def test_a_held_role_reopened_with_its_old_since_is_reported(repo: Path) -> None:
-    found = moved(repo, held_row(), trial_row())
+@pytest.mark.parametrize(
+    ("since", "kind"),
+    [
+        (None, "I9-ledger-reopen-no-since"),
+        ("2026-10-12", "I9-ledger-reopen-before-parent"),
+        ("2999-01-01T00:00:00Z", "I9-ledger-reopen-after-commit"),
+    ],
+    ids=["no since", "the held record's since kept", "in the future"],
+)
+def test_a_held_role_reopened_with_a_since_outside_its_bounds_is_reported(
+    repo: Path, since: str | None, kind: str
+) -> None:
+    found = moved(repo, held_row(), {**trial_row(), "since": since})
 
-    assert [(kind, subject) for kind, subject, _ in found] == [
-        ("I9-ledger-reopen-since", "role researcher")
+    assert [(k, subject) for k, subject, _ in found if k.startswith("I9-ledger")] == [
+        (kind, "role researcher")
     ]
+
+
+@pytest.mark.parametrize(
+    ("since", "refused"),
+    [("2026-10-14T06:00:00Z", False), ("2026-10-14T18:00:00Z", True)],
+    ids=["before the re-opening commit", "after the re-opening commit"],
+)
+def test_a_committed_reopening_is_judged_against_its_own_commit_time(
+    repo: Path, since: str, refused: bool
+) -> None:
+    write_ledger(repo, researcher=held_row())
+    commit_all(repo)
+    write_ledger(repo, researcher={**trial_row(), "since": since})
+    commit_all(repo, at="2026-10-14T12:00:00+00:00")
+
+    found = [f.kind for f in cb.check(repo) if f.kind.startswith("I9-ledger")]
+
+    assert found == (["I9-ledger-reopen-after-commit"] if refused else [])
 
 
 @pytest.mark.parametrize(

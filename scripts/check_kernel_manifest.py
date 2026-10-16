@@ -23,7 +23,9 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
 | `I9-eligible-changed`        | the ledger's `eligible` list is the pilot's five roles, no more and no fewer |
 | `I9-ledger-transition`       | since the parent commit's ledger a role stays or moves absent -> trial, trial -> switched or held, held -> trial |
-| `I9-ledger-reopen-since`     | a held role re-opened as a trial has a `since` later than the parent commit |
+| `I9-ledger-reopen-no-since`  | a held role re-opened as a trial records its own `since`                |
+| `I9-ledger-reopen-before-parent` | that `since` is later than the commit the re-opening follows        |
+| `I9-ledger-reopen-after-commit` | ...and no later than the re-opening commit (the gate's clock while it is built) |
 | `I9-ledger-runs-rewritten`   | a role's runs at the parent commit open its runs now: none dropped, reordered or rewritten |
 | `I9-ledger-held-run-added`   | a role that stays held keeps its runs unchanged                         |
 | `I9-ledger-deleted`          | a ledger present at the parent commit is still there                    |
@@ -50,6 +52,7 @@ this off: the gate that cannot be disabled is the point.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import re
 import sys
@@ -61,9 +64,9 @@ from pathlib import Path
 
 import generate_kernels as gk
 import kernel_ledger as kl
+import kernel_ledger_history as kh
 import kernel_model as km
 import kernel_sources as ks
-from _git_runner import run_git
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -358,6 +361,7 @@ class LivenessReport:
     judged: int  # spawns of adopted roles at or after their record's start
     adopted: int  # roles at trial or switched in the ledger read
     findings: tuple[km.Finding, ...]
+    unplaced: tuple[str, ...] = ()  # roles a plugin root without history cannot place
 
 
 def liveness_report(
@@ -545,7 +549,7 @@ def gather(root: Path) -> Evidence:
         kl.load_entries(root),
         _read_text(root / km.LEDGER_PATH),
         _evidence_checked_ledger(root, definitions),
-        _parent_ledger(root),
+        kh.parent_ledger(root),
     )
 
 
@@ -585,9 +589,10 @@ def injected_texts(evidence: Evidence) -> dict[str, str]:
 
 def check_liveness(root: Path, plugin_root: Path, since: str | None) -> LivenessReport:
     """Spawns in the observation log under `root` that left no kernel row, by the plugin's ledger."""
-    adoptions = kl.load_adoptions(plugin_root)
-    bound = None if since is None else _commit_time(root, since)
-    return liveness_report(adoptions, _observation_rows(root), bound)
+    placed = kh.placed_adoptions(plugin_root)
+    bound = None if since is None else kh.commit_time(root, since)
+    report = liveness_report(placed.adoptions, _observation_rows(root), bound)
+    return dataclasses.replace(report, unplaced=placed.unplaced)
 
 
 def _read_text(path: Path) -> str | None:
@@ -672,25 +677,6 @@ def _evidence_checked_ledger(
         return refusal
 
 
-def _parent_ledger(root: Path) -> kl.ParentLedger | None:
-    """The ledger as of HEAD, the commit this one builds on, and its time; None when HEAD has none.
-
-    Read as leniently as the moves allow (status, start, run ids): a commit that repairs a
-    ledger the model now refuses must not be blocked by the old one. A parent too broken
-    even for that is told, then judged as none.
-    """
-    shown = run_git(root, "show", f"HEAD:{km.LEDGER_PATH}")
-    if shown.returncode != 0:  # no repository, no commit yet, or no ledger in it
-        return None
-    committed_at = _commit_time(root, "HEAD")
-    try:
-        raw = km.parse_yaml(shown.stdout, f"{km.LEDGER_PATH} at HEAD")
-        return kl.ParentLedger(kl.parse_entries(raw), committed_at)
-    except km.KernelModelError as unreadable:
-        print(f"note: {unreadable}: its moves are not judged", file=sys.stderr)
-        return None
-
-
 def _observation_rows(root: Path) -> list[dict]:
     """Every row of the log under `root`, read strictly: a lost row could hide a violation."""
     state_dir = root / STATE_DIR
@@ -711,13 +697,6 @@ def _observation_rows(root: Path) -> list[dict]:
             )
         rows.extend(segment.rows)
     return rows
-
-
-def _commit_time(root: Path, revision: str) -> datetime:
-    shown = run_git(root, "log", "-1", "--format=%cI", revision, "--")
-    if shown.returncode != 0 or not shown.stdout.strip():
-        raise km.KernelModelError(f"--since {revision!r} is not a revision of {root}")
-    return datetime.fromisoformat(shown.stdout.strip())
 
 
 # -- Edge: the command line ---------------------------------------------------------------
@@ -745,8 +724,11 @@ def render_json(findings: Sequence[km.Finding], **extra: object) -> str:
 
 def render_liveness(report: LivenessReport, as_json: bool) -> str:
     if as_json:
-        return render_json(report.findings, judged=report.judged, adopted=report.adopted)
+        extra = {"unplaced": list(report.unplaced)} if report.unplaced else {}
+        return render_json(report.findings, judged=report.judged, adopted=report.adopted, **extra)
     scope = f"{report.judged} spawn(s) of {report.adopted} adopted role(s) judged"
+    if report.unplaced:
+        scope += f"; no ledger history to place a re-opening of {', '.join(report.unplaced)}"
     return render_human(report.findings, "kernel liveness", scope)
 
 

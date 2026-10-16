@@ -1,7 +1,8 @@
 ---
-id: dec-draft-c967bd84
+id: dec-460
+draft_id: dec-draft-c967bd84
 title: Role kernels are generated from one manifest and delivered by definition, spawn hook and Codex wrapper
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-12
 summary: "A hand-authored audience manifest classifies every resident section; a generator emits committed kernel modules, a JSON index, the three universal blocks in every agent definition and the host-native preamble; a checker gates nine invariants; a synchronous SubagentStart hook injects the kernel rest and the project's CLAUDE.md for roles the adoption ledger marks trial or switched; the Codex wrapper embeds the same strings. Blocks stay in every definition as generated fallback; omitClaudeMd lands on a pilot role only with its adoption record."

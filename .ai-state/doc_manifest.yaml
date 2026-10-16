@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-13T16:33:52Z'
+generated_at: '2026-10-16T06:39:40Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -61,7 +61,7 @@ surfaces:
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-13'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -85,6 +85,8 @@ surfaces:
   - docs-independent-analysis-process-economy-roadmap
   - docs-independent-analysis-startup-context-diet-research
   - docs-independent-analysis-subagent-alignment-map
+  - docs-lean-spawn-how-to
+  - docs-lean-spawn-kernels
   - docs-metrics-readme
   - docs-ml-training-onramp
   - docs-multi-session
@@ -130,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-13'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -463,6 +465,26 @@ surfaces:
   title: "Wave 4\u20135 External Audit (Adversarial)"
   last_modified: '2026-06-29'
   renderer: default_markdown
+- id: docs-lean-spawn-how-to
+  path: docs/lean-spawn-how-to.md
+  type: markdown
+  title: Switch a role to its kernel
+  last_modified: '2026-10-15'
+  diataxis: how-to
+  audience: developer
+  renderer: how_to_shell
+  surfaces_referenced:
+  - docs-lean-spawn-kernels
+- id: docs-lean-spawn-kernels
+  path: docs/lean-spawn-kernels.md
+  type: markdown
+  title: 'Lean spawn: role kernels and the adoption ledger'
+  last_modified: '2026-10-15'
+  diataxis: explanation
+  audience: developer
+  renderer: explanation_shell
+  surfaces_referenced:
+  - docs-lean-spawn-how-to
 - id: docs-metrics-readme
   path: docs/metrics/README.md
   type: markdown
@@ -571,7 +593,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-15'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -602,7 +624,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-15'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -616,7 +638,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-15'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3393,6 +3415,12 @@ surfaces:
   title: The lean-spawn flip rule gates on paired point estimates with a calibrated noise allowance, lists every run, and recounts lean-only errors as failures
   last_modified: '2026-10-12'
   renderer: adr_card
+- id: ai-state-decisions-460-role-kernels-generated-and-injected
+  path: .ai-state/decisions/460-role-kernels-generated-and-injected.md
+  type: markdown
+  title: Role kernels are generated from one manifest and delivered by definition, spawn hook and Codex wrapper
+  last_modified: '2026-10-15'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3465,12 +3493,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-10-02'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-31_03-16-10.json
-  type: json
-  title: METRICS_REPORT_2026-08-31_03-16-10.json
-  last_modified: '2026-08-30'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.json
   type: json
@@ -3525,12 +3547,12 @@ surfaces:
   title: METRICS_REPORT_2026-10-05_13-41-51.json
   last_modified: '2026-10-05'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-08-31_03-16-10.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-08-30'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-12_14-30-52.json
+  type: json
+  title: METRICS_REPORT_2026-10-12_14-30-52.json
+  last_modified: '2026-10-12'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.md
   type: markdown
@@ -3585,6 +3607,12 @@ surfaces:
   title: Project Metrics Report
   last_modified: '2026-10-05'
   renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-12_14-30-52.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-10-12'
+  renderer: default_markdown
 - id: ai-state-specs-spec-adherence-eval-2026-10-12
   path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
   type: markdown
@@ -3621,6 +3649,17 @@ surfaces:
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
   last_modified: '2026-08-13'
   renderer: default_markdown
+- id: ai-state-specs-spec-lean-spawn-pilot-2026-10-15
+  path: .ai-state/specs/SPEC_lean-spawn-pilot_2026-10-15.md
+  type: markdown
+  title: 'Spec: lean-spawn-pilot (per-role kernels, the spawn hook and `omitClaudeMd` for the pilot roles)'
+  last_modified: '2026-10-15'
+  renderer: default_markdown
+  surfaces_referenced:
+  - ai-state-decisions-454-agents-carry-the-process-core
+  - ai-state-decisions-457-startup-and-routing-instruments
+  - ai-state-decisions-458-process-adherence-eval-family
+  - ai-state-decisions-459-flip-rule-point-estimate-calibrated
 - id: ai-state-specs-spec-merge-triggers-2026-10-03
   path: .ai-state/specs/SPEC_merge-triggers_2026-10-03.md
   type: markdown
@@ -3717,6 +3756,7 @@ groups:
   label: How-to guides
   surface_ids:
   - docs-cursor-compat
+  - docs-lean-spawn-how-to
   - docs-observability
   - docs-onboarding
   - docs-skill-genesis
@@ -3750,6 +3790,7 @@ groups:
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
   - docs-independent-analysis-startup-context-diet-research
+  - docs-lean-spawn-kernels
   - docs-multidisciplinary-identities-evidence
 - id: other
   label: Other
@@ -4215,12 +4256,11 @@ groups:
   - ai-state-decisions-457-startup-and-routing-instruments
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+  - ai-state-decisions-460-role-kernels-generated-and-injected
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
-  - ai-state-metrics-reports-metrics-report-2026-08-31-03-16-10
   - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
@@ -4239,6 +4279,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-09-28-13-00-11
   - ai-state-metrics-reports-metrics-report-2026-10-05-13-41-51
   - ai-state-metrics-reports-metrics-report-2026-10-05-13-41-51
+  - ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
+  - ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
@@ -4254,6 +4296,7 @@ groups:
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
+  - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30

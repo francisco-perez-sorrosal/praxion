@@ -23,10 +23,10 @@ Where each invariant is enforced:
 The pure functions take plain values; the `load_*` functions are the edge. PyYAML is
 imported lazily, so a bare `python3` without it fails naming the interpreter.
 
-The adoption ledger's evidence (a switched record's pieces, the ladder of moves, the
+The adoption ledger's evidence (a switched or held record's pieces, the legal moves, the
 liveness bound) is `kernel_ledger`'s, built on the readers here; `parse_statuses` /
-`load_statuses` stay here: they read only who is at trial or switched, which the generator
-needs and which must survive a record the commit gate is about to refuse.
+`load_statuses` stay here: they read only each role's status (trial, switched or held),
+which the generator needs and which must survive a record the commit gate is about to refuse.
 """
 
 from __future__ import annotations
@@ -49,7 +49,8 @@ MAX_STRING_CHARS = 10_000  # the harness replaces a longer injected string with 
 CORE = "core"
 ADR_AUTHOR = "adr-author"
 LEDGER_WRITER = "ledger-writer"
-STATUSES = ("trial", "switched")
+STATUSES = ("trial", "switched", "held")  # held: a trial closed without a flip
+_STATUS_CHOICE = ", ".join(STATUSES[:-1]) + f" or {STATUSES[-1]}"
 
 MANIFEST_PATH = "rules/_audience.yaml"
 LEDGER_PATH = ".ai-state/kernel_adoption.yaml"
@@ -212,12 +213,12 @@ class KernelString:
 
 @dataclass(frozen=True)
 class RoleKernel:
-    status: str | None  # "trial" | "switched" | None
+    status: str | None  # one of STATUSES, or None
     strings: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if self.status is not None and self.status not in STATUSES:
-            raise KernelModelError(f"status {self.status!r} is neither trial nor switched")
+            raise KernelModelError(f"status {self.status!r} is not {_STATUS_CHOICE}")
         for number, text in enumerate(self.strings, start=1):
             _require_fits(text, f"injected string {number}")
 
@@ -453,14 +454,14 @@ def parse_index(raw: Mapping[str, Any]) -> KernelIndex:
 
 
 def parse_statuses(raw: Mapping[str, Any]) -> Mapping[str, str]:
-    """Which roles are at trial or switched, trusting nothing else in the record."""
+    """Each role's status (trial, switched or held), trusting nothing else in the record."""
     raw = as_mapping(raw, "the ledger")
     check_version(raw, "version", SUPPORTED_VERSION)
     statuses = {}
     for role, row in as_mapping(raw.get("roles") or {}, "roles").items():
         status = as_mapping(row, f"role {role!r}").get("status")
         if status not in STATUSES:
-            raise KernelModelError(f"role {role}: status {status!r} is neither trial nor switched")
+            raise KernelModelError(f"role {role}: status {status!r} is not {_STATUS_CHOICE}")
         statuses[role] = status
     return MappingProxyType(statuses)
 

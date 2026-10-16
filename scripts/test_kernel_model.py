@@ -329,7 +329,7 @@ def test_an_index_parses_into_role_kernels() -> None:
     ("wire", "reason"),
     [
         (index_wire(strings=["x" * 10_001]), "exceed the 10000 cap"),
-        (index_wire(status="adopted"), "neither trial nor switched"),
+        (index_wire(status="adopted"), "is not trial, switched or held"),
         ({**index_wire(), "slots": 0}, "slots must be"),
         ({**index_wire(), "kernel_version": ""}, "kernel_version"),
     ],

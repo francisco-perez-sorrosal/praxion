@@ -127,6 +127,17 @@ def trial_row() -> dict:
     return {"status": "trial", "since": "2026-10-12", "runs": []}
 
 
+def held_row(**fields: object) -> dict:
+    """A trial closed without a flip; `fields` alter it (`runs`, `since`, `reason`)."""
+    row = {
+        "status": "held",
+        "since": "2026-10-12",
+        "runs": [],
+        "reason": "the flip rule did not pass",
+    }
+    return {**row, **fields}
+
+
 def write_ledger(root: Path, eligible: list[str] | None = None, **roles: dict) -> None:
     path = root / km.LEDGER_PATH
     path.parent.mkdir(parents=True, exist_ok=True)

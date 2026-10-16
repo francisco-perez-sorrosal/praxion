@@ -403,6 +403,23 @@ def test_a_role_at_trial_among_other_roles_in_the_ledgers_own_shape_receives_its
     assert len(delivered(spawn(tmp_path, plugin, project))) == 1
 
 
+HELD = (
+    "version: 1\neligible:\n- researcher\n- verifier\nroles:\n"
+    f"  {ROLE}:\n    status: held\n    since: '2026-10-12'\n    runs:\n"
+    "    - id: r1\n      complete_pairs: 24\n      passes_flip_rule: false\n"
+    "    reason: the flip rule did not pass\n"
+)
+
+
+def test_a_role_recorded_held_receives_nothing_and_leaves_no_row(tmp_path):
+    plugin = make_plugin(tmp_path, ledger=HELD, index_status="trial")
+    project = make_project(tmp_path)
+
+    assert inject_kernel.adoption_status(HELD, ROLE) == "held"
+    assert delivered(spawn(tmp_path, plugin, project)) == []
+    assert rows(project) == []
+
+
 def test_an_unreadable_ledger_injects_nothing_and_exits_zero(tmp_path):
     plugin = make_plugin(tmp_path, ledger=None)
     (plugin / ".ai-state" / "kernel_adoption.yaml").mkdir(parents=True)

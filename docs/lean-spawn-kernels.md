@@ -49,23 +49,25 @@ Agents, rules and sources are detected from the tree, not listed, so a new agent
 
 ## How a role is switched
 
-A role climbs one rung at a time, recorded in `.ai-state/kernel_adoption.yaml`:
+A role's status is recorded in `.ai-state/kernel_adoption.yaml`:
 
 | Status | What the spawn hook does | What the definition does |
 |---|---|---|
 | (absent) | Delivers nothing. | Keeps inheriting the project instructions. |
 | `trial` | Delivers the kernel. | Unchanged: the role still inherits the project instructions, so a trial role receives both. |
 | `switched` | Delivers the kernel. | Carries `omitClaudeMd: true`. |
+| `held` | Delivers nothing: a trial closed without a flip. | Keeps inheriting the project instructions. |
 
-The ledger lists the `eligible` roles (the pilot's five) and, per adopted role, a record: `since` (the ISO moment the record began, so earlier spawns are not judged) and its `runs`. A `switched` record also holds the flip evidence: the passing run (at least 20 complete pairs from the adherence eval, passing the flip rule), the startup probe's before and after readings, and two booleans for the user's ratification of the flip rule and of this flip.
+The ledger lists the `eligible` roles (the pilot's five) and, per adopted role, a record: `since` (the ISO moment the record began, so earlier spawns are not judged) and its `runs`. A `switched` record also holds the flip evidence: the passing run (at least 20 complete pairs from the adherence eval, passing the flip rule), the startup probe's before and after readings, and two booleans for the user's ratification of the flip rule and of this flip. A `held` record keeps the closed trial's `since` and every run, and states a `reason`.
 
 The commit gate holds each move:
 
-- a role moves only absent, then `trial`, then `switched`, and a ledger present at the parent commit is never deleted;
+- a role moves only from absent to `trial`, from `trial` to `switched` or `held`, or from `held` back to `trial` with a `since` later than the parent commit (a new trial, judged from its own start); nothing leaves `switched`, no record is removed, and a ledger present at the parent commit is never deleted;
+- a recorded run is never dropped, reordered or rewritten, and none is added while a role stays `held`;
 - `omitClaudeMd` is set on an agent only while its record is `switched`, and a `switched` record requires the flag;
-- a `switched` record missing any piece of evidence, or for a role that is not eligible, is refused by name.
+- a `switched` record missing any piece of evidence, or for a role that is not eligible, and a `held` record with no reason, are refused by name.
 
-The ledger is where the user's ratification is recorded, so a flag cannot reach a commit without it. The adherence eval (`praxion-evals-adherence`, which the gate names as data and never runs) supplies the run a flip rests on. A role that does not pass stays at `trial` with its runs recorded.
+The ledger is where the user's ratification is recorded, so a flag cannot reach a commit without it. The adherence eval (`praxion-evals-adherence`, which the gate names as data and never runs) supplies the run a flip rests on. A role that does not pass stays at `trial` with its runs recorded, or, once its trial closes, is `held`; `--liveness` judges only `trial` and `switched` roles.
 
 ## What the spawn hook does
 
@@ -73,7 +75,7 @@ The ledger is where the user's ratification is recorded, so a flag cannot reach 
 
 Every slot computes the same whole delivery and prints its part:
 
-1. **Who receives anything.** Only an agent of this plugin (`praxion:<role>`) whose status in the running plugin's ledger is `trial` or `switched`. A host-native agent, another plugin's agent of the same role name, a role at no status, a plugin without a ledger or an index, and an unknown index schema receive nothing. There is no disable variable: a switched role must never be silenced.
+1. **Who receives anything.** Only an agent of this plugin (`praxion:<role>`) whose status in the running plugin's ledger is `trial` or `switched`. A host-native agent, another plugin's agent of the same role name, a role at no status or `held`, a plugin without a ledger or an index, and an unknown index schema receive nothing. There is no disable variable: a switched role must never be silenced.
 2. **Where things are found.** The plugin root comes from `CLAUDE_PLUGIN_ROOT`, never from the script's own location; the kernel and ledger are the running plugin's. The project comes from the payload's `cwd` through git. The hook needs only the standard library: it scans the ledger line by line for its generated shape and reads the index as JSON.
 3. **The strings, in order.** The role's kernel strings first (with `${CLAUDE_PLUGIN_ROOT}` written out as the real path), then the project's root `CLAUDE.md` as numbered parts headed `[project CLAUDE.md, part N of M]`, cut at line ends. A line that is wholly `@<relative path>` is replaced by that file's text when it is a regular file inside the project after symlinks resolve. The expansion is narrower than the harness's own: one level deep, resolved from the project root, never inside a fenced code block (fences are tracked without their containers, so one left open inside a list item stays open to the end of the file), and at most 64 such lines tried; an inline `@path`, an import inside an imported file and anything past the limit stay as written. The read is bounded by what the reserved slots can carry, and a failure reading the file costs the file, never the kernel. If the parts exceed the free slots, the last delivered part says how many were left out and tells the role to read `CLAUDE.md` in the project root.
 4. **Whole or nothing.** If any string would pass the cap, every slot refuses the whole delivery alike; a role never receives part of a kernel.

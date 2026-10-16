@@ -20,9 +20,12 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I8-slot-registration`       | `hooks/hooks.json` registers exactly the index's K synchronous spawn-hook slots, under the plugin's own matcher |
 | `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
-| `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval |
+| `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
 | `I9-eligible-changed`        | the ledger's `eligible` list is the pilot's five roles, no more and no fewer |
-| `I9-ledger-transition`       | a role moves only absent -> trial -> switched since the parent commit's ledger |
+| `I9-ledger-transition`       | since the parent commit's ledger a role stays or moves absent -> trial, trial -> switched or held, held -> trial |
+| `I9-ledger-reopen-since`     | a held role re-opened as a trial has a `since` later than the parent commit |
+| `I9-ledger-runs-rewritten`   | a role's runs at the parent commit open its runs now: none dropped, reordered or rewritten |
+| `I9-ledger-held-run-added`   | a role that stays held keeps its runs unchanged                         |
 | `I9-ledger-deleted`          | a ledger present at the parent commit is still there                    |
 | `I10-hook-misread`           | the spawn hook reads every role's ledger status as PyYAML does          |
 
@@ -314,19 +317,19 @@ def _foreign_eval_runs(ledger: kl.Ledger) -> tuple[km.Finding, ...]:
 
 
 def transition_findings(
-    parent: Mapping[str, str] | None, statuses: Mapping[str, str]
+    parent: kl.ParentLedger | None, entries: Mapping[str, kl.Entry]
 ) -> tuple[km.Finding, ...]:
     """I9: moves since the parent commit's ledger; none when the parent held no (readable) ledger."""
     if parent is None:
         return ()
     return tuple(
         km.Finding(f"I9-{found.kind}", found.subject, found.detail)
-        for found in kl.ledger_transitions(parent, statuses)
+        for found in kl.ledger_transitions(parent, entries)
     )
 
 
 def deletion_findings(
-    parent: Mapping[str, str] | None, ledger: kl.Ledger | km.KernelModelError | None
+    parent: kl.ParentLedger | None, ledger: kl.Ledger | km.KernelModelError | None
 ) -> tuple[km.Finding, ...]:
     """I9: a ledger the parent commit holds is still there, or its first appearance could repeat."""
     if parent is None or ledger is not None:
@@ -515,10 +518,11 @@ class Evidence:
     regeneration: (
         tuple[str, ...] | km.KernelModelError
     )  # paths the generator would change, or why not
-    statuses: Mapping[str, str]  # role -> trial or switched, whatever else the ledger holds
+    statuses: Mapping[str, str]  # role -> trial, switched or held, whatever else it holds
+    entries: Mapping[str, kl.Entry]  # role -> status, start and run ids, for the moves
     ledger_text: str | None  # the ledger as the spawn hook reads it; None: no ledger
     ledger: kl.Ledger | km.KernelModelError | None  # evidence-checked, the refusal, or no file
-    parent_statuses: Mapping[str, str] | None  # the ledger's statuses at HEAD; None: no ledger
+    parent: kl.ParentLedger | None  # the ledger at HEAD as the moves read it; None: no ledger
 
 
 def gather(root: Path) -> Evidence:
@@ -538,9 +542,10 @@ def gather(root: Path) -> Evidence:
         _read_text(root / gk.PREAMBLE_PATH),
         _regeneration(root),
         km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
+        kl.load_entries(root),
         _read_text(root / km.LEDGER_PATH),
         _evidence_checked_ledger(root, definitions),
-        _parent_statuses(root),
+        _parent_ledger(root),
     )
 
 
@@ -564,8 +569,8 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *slot_findings(evidence.index_slots, evidence.slot_entries),
         *flip_findings(omitting_roles(evidence.definitions), evidence.statuses),
         *record_findings(evidence.ledger),
-        *transition_findings(evidence.parent_statuses, evidence.statuses),
-        *deletion_findings(evidence.parent_statuses, evidence.ledger),
+        *transition_findings(evidence.parent, evidence.entries),
+        *deletion_findings(evidence.parent, evidence.ledger),
         *misreading_findings(evidence.statuses, evidence.ledger_text),
     )
 
@@ -581,7 +586,8 @@ def injected_texts(evidence: Evidence) -> dict[str, str]:
 def check_liveness(root: Path, plugin_root: Path, since: str | None) -> LivenessReport:
     """Spawns in the observation log under `root` that left no kernel row, by the plugin's ledger."""
     adoptions = kl.load_adoptions(plugin_root)
-    return liveness_report(adoptions, _observation_rows(root), _commit_time(root, since))
+    bound = None if since is None else _commit_time(root, since)
+    return liveness_report(adoptions, _observation_rows(root), bound)
 
 
 def _read_text(path: Path) -> str | None:
@@ -666,18 +672,20 @@ def _evidence_checked_ledger(
         return refusal
 
 
-def _parent_statuses(root: Path) -> Mapping[str, str] | None:
-    """The ledger's statuses as of HEAD, the commit this one builds on; None when HEAD has none.
+def _parent_ledger(root: Path) -> kl.ParentLedger | None:
+    """The ledger as of HEAD, the commit this one builds on, and its time; None when HEAD has none.
 
-    Only statuses matter to the ladder, so the parent is read as leniently as the generator
-    reads the working copy: a commit that repairs a ledger the model now refuses must not be
-    blocked by the old one. A parent too broken even for that is told, then judged as none.
+    Read as leniently as the moves allow (status, start, run ids): a commit that repairs a
+    ledger the model now refuses must not be blocked by the old one. A parent too broken
+    even for that is told, then judged as none.
     """
     shown = run_git(root, "show", f"HEAD:{km.LEDGER_PATH}")
     if shown.returncode != 0:  # no repository, no commit yet, or no ledger in it
         return None
+    committed_at = _commit_time(root, "HEAD")
     try:
-        return km.parse_statuses(km.parse_yaml(shown.stdout, f"{km.LEDGER_PATH} at HEAD"))
+        raw = km.parse_yaml(shown.stdout, f"{km.LEDGER_PATH} at HEAD")
+        return kl.ParentLedger(kl.parse_entries(raw), committed_at)
     except km.KernelModelError as unreadable:
         print(f"note: {unreadable}: its moves are not judged", file=sys.stderr)
         return None
@@ -705,9 +713,7 @@ def _observation_rows(root: Path) -> list[dict]:
     return rows
 
 
-def _commit_time(root: Path, revision: str | None) -> datetime | None:
-    if revision is None:
-        return None
+def _commit_time(root: Path, revision: str) -> datetime:
     shown = run_git(root, "log", "-1", "--format=%cI", revision, "--")
     if shown.returncode != 0 or not shown.stdout.strip():
         raise km.KernelModelError(f"--since {revision!r} is not a revision of {root}")

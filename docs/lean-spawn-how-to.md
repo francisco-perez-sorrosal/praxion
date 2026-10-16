@@ -5,7 +5,7 @@ audience: developer
 
 # Switch a role to its kernel
 
-Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on trial, flip it, read a `kernel_injected` row and run the liveness check. For what each part is and why, see [Lean spawn: role kernels and the adoption ledger](lean-spawn-kernels.md).
+Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on trial, flip it or hold it, read a `kernel_injected` row and run the liveness check. For what each part is and why, see [Lean spawn: role kernels and the adoption ledger](lean-spawn-kernels.md).
 
 Run commands from the repository root.
 
@@ -49,7 +49,7 @@ Every session then carries the token as `CLAUDE_CODE_OAUTH_TOKEN` and no API key
 
 ## Record a run
 
-After each adherence run, append it to the role's `runs` with its `id`, `complete_pairs`, `passes_flip_rule` and `entry`. A run that does not pass stays recorded and the role stays at `trial`.
+After each adherence run, append it to the role's `runs` with its `id`, `complete_pairs`, `passes_flip_rule` and `entry`. A run that does not pass stays recorded and the role stays at `trial`. The list only grows: the gate refuses a commit that drops, reorders or rewrites a recorded run (`I9-ledger-runs-rewritten`).
 
 ## Flip a role to `switched`
 
@@ -76,9 +76,32 @@ Flip only on a run of at least 20 complete pairs that passes the flip rule, with
    ```
 
    The definition: add `omitClaudeMd: true` to the frontmatter of `agents/researcher.md` and change nothing else.
-3. The gate refuses the commit when the flag has no `switched` record, when a `switched` record has no flag, when an evidence field is missing or a ratification is not `true`, or when the move skips a rung. Fix the reported finding; no switch turns the gate off.
+3. The gate refuses the commit when the flag has no `switched` record, when a `switched` record has no flag, when an evidence field is missing or a ratification is not `true`, or when the move is not one the ledger allows (`switched` is reached only from `trial`). Fix the reported finding; no switch turns the gate off.
 
 State a reading with its profile (model, setting sources, MCP mode, plugin directory). Readings compare only within one profile.
+
+## Hold a role
+
+Hold a role when its trial closes without a flip: its run failed the flip rule, or no run can reach 20 complete pairs. A held role receives nothing at spawn, keeps inheriting the project instructions and is not judged by `--liveness`, so it costs what it cost before the trial.
+
+1. In one commit, change only the record's `status` and add a `reason` naming why the trial closed. Keep `since` (the closed trial's start) and every run, in order:
+
+   ```yaml
+   verifier:
+     status: held
+     since: 2026-10-14T02:32:49Z
+     runs:
+       - id: <run id>
+         complete_pairs: 24
+         passes_flip_rule: false
+         entry: praxion-evals-adherence
+     reason: the flip rule did not pass on the forced-stop check
+   ```
+
+   A role with no run may be held with `runs: []`. Quote a reason that contains `: `, or YAML cannot read the ledger and the gate stops with an input error. The definition is unchanged: a held role never carries `omitClaudeMd`.
+2. The gate refuses a held record with no `reason` (`I9-record-incomplete`), a run added while the role stays held (`I9-ledger-held-run-added`), a move to `held` from anything but `trial`, and any move from `held` but back to `trial` (`I9-ledger-transition`).
+
+To re-open a held role, set `status: trial` and a fresh `since` (the current instant, later than the commit you build on), keep every run and drop the `reason`. The re-opened trial is judged from its own start: a `since` at or before the parent commit is refused (`I9-ledger-reopen-since`), because its spawns made while held received no kernel and would read as missing rows. Record the next run only after the re-open commit.
 
 ## Read a `kernel_injected` row
 

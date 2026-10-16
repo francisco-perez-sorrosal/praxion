@@ -6,15 +6,19 @@ what the ledger adds to them, as values whose illegal states cannot be built.
 | Invariant                                                        | Enforced by                      |
 | ---------------------------------------------------------------- | -------------------------------- |
 | a switched record holds every piece of flip evidence             | `Switched.__post_init__`         |
+| a held record (a trial closed without a flip) states its reason  | `Held.__post_init__`             |
 | only an eligible role is switched                                | `_parse_record`                  |
-| a role moves only absent -> trial -> switched                    | `ledger_transitions`             |
+| a role moves only along `_MOVES`; a re-opened trial starts anew  | `ledger_transitions`             |
+| a recorded run is never dropped, reordered or added while held   | `ledger_transitions`             |
 | a record names when it began, readably, to bound what it judges  | `since_time`, both readers       |
 | the spawn hook reads every role's status as PyYAML does          | `hook_misreadings`               |
 
-The ledger has three readers, each for a caller that trusts different things: `load_ledger`
-builds the evidence-checked record (the commit gate); `load_adoptions` reads only each
-role's status and start (the liveness check); `kernel_model.load_statuses` reads only the
-status (the generator). The two lenient readers survive a record the gate is about to refuse.
+The ledger has four readers, each for a caller that trusts different things: `load_ledger`
+builds the evidence-checked record (the commit gate); `parse_entries` reads each role's
+status, start and run ids (the move check, at this commit and its parent); `load_adoptions`
+reads the status and start of each role that receives a kernel (the liveness check);
+`kernel_model.load_statuses` reads only the status (the generator). The three lenient readers
+survive a record the gate is about to refuse.
 A fourth reader lives outside this module: the spawn hook scans the ledger's text line by
 line, without a YAML parser, so `hook_misreadings` holds its reading to PyYAML's.
 """
@@ -36,7 +40,9 @@ SWITCHED_FIELDS = tuple(
     "passing_run probe_before_tokens probe_after_tokens flip_rule_ratified flip_ratified".split()
 )
 _BARE_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
-_LADDER = (None, "trial", "switched")  # a role stays or climbs one rung: no skipping, no descent
+# Besides staying put. Nothing leaves switched, nothing is removed, and a flip rests on a trial.
+_MOVES = frozenset({(None, "trial"), ("trial", "switched"), ("trial", "held"), ("held", "trial")})
+DELIVERING = ("trial", "switched")  # the statuses that receive a kernel at spawn
 _MAPPING_KEY = re.compile(r"[ \t]*([\w.-]+)[ \t]*:")
 
 
@@ -91,7 +97,20 @@ def _run_gaps(run: Run) -> list[str]:
     return gaps
 
 
-AdoptionRecord = Trial | Switched
+@dataclass(frozen=True)
+class Held:
+    """A trial closed without a flip: it keeps its start and every run that decided it."""
+
+    role: str
+    since: datetime
+    runs: tuple[Run, ...]
+    reason: str
+
+    def __post_init__(self) -> None:
+        km.as_text(self.reason, f"role {self.role}: a held record's reason")
+
+
+AdoptionRecord = Trial | Held | Switched
 
 
 @dataclass(frozen=True)
@@ -102,10 +121,27 @@ class Ledger:
 
 @dataclass(frozen=True)
 class Adoption:
-    """A role at trial or switched, and the moment its record began: no spawn before it is judged."""
+    """A role that receives a kernel, and when its record began: no spawn before it is judged."""
 
     status: str
     since: datetime
+
+
+@dataclass(frozen=True)
+class Entry:
+    """A role's record as the move check reads it, trusting nothing past its status."""
+
+    status: str
+    since: datetime | None  # None: absent or unreadable, which the evidence-checked reader names
+    runs: tuple[object, ...]  # each run's id, in the recorded order
+
+
+@dataclass(frozen=True)
+class ParentLedger:
+    """The ledger at the parent commit, and when that commit was made."""
+
+    entries: Mapping[str, Entry]
+    committed_at: datetime
 
 
 # -- Boundary: the evidence-checked ledger ------------------------------------------
@@ -128,6 +164,8 @@ def _parse_record(role: str, status: str, row: Mapping[str, Any], eligible: bool
     runs = tuple(_parse_run(role, run) for run in km.as_sequence(row.get("runs"), "runs"))
     if status == "trial":
         return Trial(role, since, runs)
+    if status == "held":
+        return Held(role, since, runs, row.get("reason", ""))
     if not eligible:
         raise km.KernelModelError(f"role {role}: is not eligible to be switched")
     missing = [key for key in SWITCHED_FIELDS if row.get(key) is None]
@@ -150,15 +188,52 @@ def _parse_run(role: str, row: Any) -> Run:
 
 
 def parse_adoptions(raw: Mapping[str, Any]) -> Mapping[str, Adoption]:
-    """Each role at trial or switched with the moment its record began; nothing else is judged."""
+    """Each role at trial or switched with the moment its record began; nothing else is judged.
+
+    A held role receives nothing at spawn, so none of its spawns, then or later, is judged.
+    """
     statuses = km.parse_statuses(raw)
     rows = km.as_mapping(raw.get("roles") or {}, "roles")
     return MappingProxyType(
         {
             role: Adoption(status, since_time(rows[role].get("since"), role))
             for role, status in statuses.items()
+            if status in DELIVERING
         }
     )
+
+
+def parse_entries(raw: Mapping[str, Any]) -> Mapping[str, Entry]:
+    """Each role's status, start and run ids, as the move check compares them.
+
+    Lenient past the status: a start that does not read is None and a run is its `id` (or
+    itself, when it is no mapping), so a commit is judged on its moves even while the
+    evidence-checked reader refuses one of its records by name.
+    """
+    statuses = km.parse_statuses(raw)
+    rows = km.as_mapping(raw.get("roles") or {}, "roles")
+    return MappingProxyType(
+        {
+            role: Entry(
+                status, _readable_since(rows[role].get("since"), role), _run_ids(rows[role])
+            )
+            for role, status in statuses.items()
+        }
+    )
+
+
+def _readable_since(value: Any, role: str) -> datetime | None:
+    try:
+        return since_time(value, role)
+    except km.KernelModelError:
+        return None
+
+
+def _run_ids(row: Mapping[str, Any]) -> tuple[object, ...]:
+    runs = row.get("runs")
+    if not isinstance(runs, list):
+        return ()
+    return tuple(run.get("id") if isinstance(run, Mapping) else run for run in runs)
 
 
 def since_time(value: Any, role: str) -> datetime:
@@ -191,24 +266,58 @@ def _iso(text: str, role: str) -> date | datetime:
         ) from exc
 
 
-# -- Pure: the ladder of moves -------------------------------------------------------
+# -- Pure: the legal moves --------------------------------------------------------------
 
 
 def ledger_transitions(
-    before: Mapping[str, str] | None, after: Mapping[str, str]
+    parent: ParentLedger | None, after: Mapping[str, Entry]
 ) -> tuple[km.Finding, ...]:
-    """Moves between two ledgers' statuses (role -> status) that go anywhere but forward one rung.
+    """Each way the ledger `after` breaks from the parent commit's: a move off `_MOVES`, a
+    re-opened trial dated before that commit, a run dropped, reordered or added while held.
 
-    `before` None is no ledger at all: every role in `after` then starts from absent.
+    `parent` None is no ledger at all: every role in `after` then starts from absent.
     """
-    earlier = before or {}
-    findings = []
+    earlier, committed_at = (parent.entries, parent.committed_at) if parent else ({}, None)
+    findings: list[km.Finding] = []
     for role in sorted(set(earlier) | set(after)):
         was, now = earlier.get(role), after.get(role)
-        if _LADDER.index(now) - _LADDER.index(was) not in (0, 1):
-            move = f"{was or 'absent'} -> {now or 'absent'}"
-            findings.append(km.Finding("ledger-transition", f"role {role}", move))
+        findings += _move_findings(role, was, now, committed_at)
+        if was is not None and now is not None:
+            findings += _run_findings(role, was, now)
     return tuple(findings)
+
+
+def _move_findings(
+    role: str, was: Entry | None, now: Entry | None, committed_at: datetime | None
+) -> list[km.Finding]:
+    move = (was.status if was else None, now.status if now else None)
+    if move[0] == move[1]:
+        return []
+    if move not in _MOVES:
+        detail = f"{move[0] or 'absent'} -> {move[1] or 'absent'}"
+        return [km.Finding("ledger-transition", f"role {role}", detail)]
+    if move == ("held", "trial") and now and not _later(now.since, committed_at):
+        detail = (
+            f"re-opened with since {now.since}, not after the parent commit "
+            f"({committed_at}): its spawns made while held would be judged"
+        )
+        return [km.Finding("ledger-reopen-since", f"role {role}", detail)]
+    return []
+
+
+def _later(since: datetime | None, committed_at: datetime | None) -> bool:
+    return since is not None and committed_at is not None and since > committed_at
+
+
+def _run_findings(role: str, was: Entry, now: Entry) -> list[km.Finding]:
+    if now.runs[: len(was.runs)] != was.runs:
+        detail = f"runs {list(was.runs)} at the parent commit do not open {list(now.runs)}"
+        return [km.Finding("ledger-runs-rewritten", f"role {role}", detail)]
+    if was.status == now.status == "held" and now.runs != was.runs:
+        added = list(now.runs[len(was.runs) :])
+        detail = f"runs {added} added to a held record: re-open it as a trial first"
+        return [km.Finding("ledger-held-run-added", f"role {role}", detail)]
+    return []
 
 
 def hook_misreadings(
@@ -257,6 +366,12 @@ def load_ledger(root: Path, agents: Collection[str]) -> Ledger:
     if not path.is_file():
         return Ledger((), MappingProxyType({}))
     return parse_ledger(km.read_yaml(path), agents)
+
+
+def load_entries(root: Path) -> Mapping[str, Entry]:
+    """Each role's record under `root` as the move check reads it; no ledger file has none."""
+    path = root / km.LEDGER_PATH
+    return parse_entries(km.read_yaml(path)) if path.is_file() else MappingProxyType({})
 
 
 def load_adoptions(root: Path) -> Mapping[str, Adoption]:

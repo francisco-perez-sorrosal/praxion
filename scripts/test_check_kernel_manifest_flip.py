@@ -1,4 +1,4 @@
-"""Canaries for I9 and I10: a role flips only with its record, a record the hook can read."""
+"""Canaries for I9 and I10: a role flips or is held only with its record, which the hook can read."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from _kernel_checker_testkit import (  # noqa: E402
     commit_all,
     flipped,
     frontmatter_line,
+    held_row,
     omit_claude_md,
     regenerate,
     run_checker,
@@ -187,6 +188,110 @@ def test_a_ledger_that_first_appears_in_this_commit_has_no_parent_to_climb_from(
     assert cb.check(repo) == ()
 
 
+# -- A trial closes as held, and a held role re-opens as a new trial ------------------------------
+
+REOPENED_AFTER_PARENT = "2026-10-14T09:00:00Z"  # commit_all commits at 2026-10-13T12:00Z
+
+
+def moved(repo: Path, before: dict, after: dict) -> list[tuple[str, str, str]]:
+    """The I9 move findings for a commit taking the researcher's record from `before` to `after`."""
+    write_ledger(repo, researcher=before)
+    commit_all(repo)
+    write_ledger(repo, researcher=after)
+    return [(f.kind, f.subject, f.detail) for f in cb.check(repo) if f.kind.startswith("I9-")]
+
+
+def test_a_trial_closed_without_a_flip_moves_to_held(repo: Path) -> None:
+    assert moved(repo, trial_row(), held_row(runs=[run_row(passes=False)])) == []
+
+
+def test_a_held_role_reopened_with_a_since_after_the_parent_commit_moves_back_to_trial(
+    repo: Path,
+) -> None:
+    reopened = {**trial_row(), "since": REOPENED_AFTER_PARENT}
+
+    assert moved(repo, held_row(), reopened) == []
+
+
+def test_a_held_role_reopened_with_its_old_since_is_reported(repo: Path) -> None:
+    found = moved(repo, held_row(), trial_row())
+
+    assert [(kind, subject) for kind, subject, _ in found] == [
+        ("I9-ledger-reopen-since", "role researcher")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "move"),
+    [
+        ({}, {"researcher": held_row()}, "absent -> held"),
+        ({"researcher": held_row()}, {"researcher": kit.switched_row()}, "held -> switched"),
+        (
+            {"researcher": kit.switched_row()},
+            {"researcher": held_row(runs=[run_row()])},
+            "switched -> held",
+        ),
+        ({"researcher": held_row()}, {}, "held -> absent"),
+    ],
+    ids=["held from nothing", "flipped from held", "switched held", "held removed"],
+)
+def test_a_move_the_ledger_does_not_allow_is_reported(
+    repo: Path, before: dict, after: dict, move: str
+) -> None:
+    write_ledger(repo, **before)
+    commit_all(repo)
+    write_ledger(repo, **after)
+
+    found = [f for f in cb.check(repo) if f.kind == "I9-ledger-transition"]
+    assert [(f.subject, f.detail) for f in found] == [("role researcher", move)]
+
+
+def test_a_held_record_that_states_no_reason_is_reported_by_role(repo: Path) -> None:
+    write_ledger(repo, researcher=held_row(reason=""))
+
+    found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
+
+    assert len(found) == 1
+    assert "role researcher: a held record's reason" in found[0].detail
+
+
+@pytest.mark.parametrize(
+    "runs",
+    [[run_row()], [{**run_row(), "id": "r2"}, run_row()], [run_row(), {**run_row(), "id": "r9"}]],
+    ids=["dropped", "reordered", "rewritten"],
+)
+def test_a_run_list_that_does_not_open_with_the_parents_is_reported(repo: Path, runs: list) -> None:
+    recorded = [run_row(), {**run_row(), "id": "r2"}]
+
+    found = moved(repo, {**trial_row(), "runs": recorded}, {**trial_row(), "runs": runs})
+
+    assert [(kind, subject) for kind, subject, _ in found] == [
+        ("I9-ledger-runs-rewritten", "role researcher")
+    ]
+
+
+def test_a_run_added_to_a_record_that_stays_held_is_reported(repo: Path) -> None:
+    found = moved(repo, held_row(), held_row(runs=[run_row(passes=False)]))
+
+    assert found == [
+        (
+            "I9-ledger-held-run-added",
+            "role researcher",
+            "runs ['r1'] added to a held record: re-open it as a trial first",
+        )
+    ]
+
+
+def test_the_flag_on_a_held_role_is_reported(repo: Path) -> None:
+    write_ledger(repo, researcher=held_row())
+    omit_claude_md(repo, "researcher")
+
+    found = [f for f in cb.check(repo) if f.kind == "I9-flag-without-record"]
+
+    assert [f.subject for f in found] == ["role researcher"]
+    assert "is held" in found[0].detail
+
+
 # -- Only the pilot's five roles can ever be flipped -----------------------------------------------
 
 
@@ -314,6 +419,13 @@ def test_a_checkout_that_never_had_a_ledger_has_none_to_lose(repo: Path) -> None
 
 # -- I10: the spawn hook reads the ledger as the gate does ---------------------------------------
 
+
+def inject_kernel_status(repo: Path, role: str) -> str | None:
+    return cb.inject_kernel.adoption_status(
+        (repo / km.LEDGER_PATH).read_text(encoding="utf-8"), role
+    )
+
+
 LEDGER_HEAD = "version: 1\neligible:\n" + "".join(f"- {role}\n" for role in kit.PILOT) + "roles:\n"
 
 
@@ -321,6 +433,13 @@ def test_a_ledger_in_its_generated_block_shape_is_read_alike_by_the_hook(repo: P
     write_ledger(repo, researcher=trial_row(), verifier=trial_row())
 
     assert subjects(repo, "I10-hook-misread") == []
+
+
+def test_a_held_record_in_its_generated_block_shape_is_read_alike_by_the_hook(repo: Path) -> None:
+    write_ledger(repo, researcher=held_row(runs=[run_row(passes=False)]), verifier=trial_row())
+
+    assert subjects(repo, "I10-hook-misread") == []
+    assert inject_kernel_status(repo, "researcher") == "held"
 
 
 @pytest.mark.parametrize(

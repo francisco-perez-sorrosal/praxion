@@ -1,8 +1,8 @@
 """Tests for kernel_ledger.py -- the adoption ledger as legal values.
 
-A switched record is built only with every piece of its evidence; a status moves only one
-rung up the ladder; the lenient readers (statuses, adoptions) survive a record the gate
-refuses. Every case builds its own wire shape, so none depends on the repository's ledger.
+A switched record is built only with every piece of its evidence and a held one only with
+its reason; a status moves only along the legal moves, and a recorded run is never lost; the
+lenient readers (statuses, entries, adoptions) survive a record the gate refuses. Every case builds its own wire shape, so none depends on the repository's ledger.
 """
 
 from __future__ import annotations
@@ -186,41 +186,180 @@ def test_a_role_key_the_parser_reads_as_a_number_is_named_not_crashed_on() -> No
     assert "status None where PyYAML reads 'trial'" in found[0].detail
 
 
-# -- The ladder of moves -------------------------------------------------------------
+# -- The legal moves -------------------------------------------------------------------
+
+PARENT_AT = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+BEFORE_PARENT = datetime(2026, 10, 14, 2, 32, tzinfo=timezone.utc)
+AFTER_PARENT = datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc)
+
+
+def entry(status: str, since: datetime | None = BEFORE_PARENT, runs: tuple = ()) -> kl.Entry:
+    return kl.Entry(status, since, runs)
+
+
+def parent(**entries: kl.Entry) -> kl.ParentLedger:
+    return kl.ParentLedger(entries, PARENT_AT)
+
+
+def moves(before: kl.ParentLedger | None, **after: kl.Entry) -> list[tuple[str, str, str]]:
+    return [(f.kind, f.subject, f.detail) for f in kl.ledger_transitions(before, after)]
 
 
 @pytest.mark.parametrize(
     ("before", "after"),
     [
         (None, {}),
-        (None, {"researcher": "trial"}),
-        ({"researcher": "trial"}, {"researcher": "trial"}),
-        ({"researcher": "trial"}, {"researcher": "switched"}),
-        ({"researcher": "switched"}, {"researcher": "switched"}),
-        ({}, {"researcher": "trial", "verifier": "trial"}),
+        (None, {"researcher": entry("trial")}),
+        (parent(researcher=entry("trial")), {"researcher": entry("trial")}),
+        (parent(researcher=entry("trial")), {"researcher": entry("switched")}),
+        (parent(researcher=entry("switched")), {"researcher": entry("switched")}),
+        (parent(), {"researcher": entry("trial"), "verifier": entry("trial")}),
+        (parent(verifier=entry("held")), {"verifier": entry("held")}),
     ],
-    ids=["no ledger", "first trial", "trial stays", "trial to switched", "switched stays", "added"],
+    ids=[
+        "no ledger",
+        "first trial",
+        "trial stays",
+        "trial to switched",
+        "switched stays",
+        "added",
+        "held stays",
+    ],
 )
-def test_a_ledger_moves_forward_from_absent_to_trial_to_switched(before, after) -> None:
+def test_a_ledger_that_stays_or_moves_forward_passes(before, after) -> None:
     assert kl.ledger_transitions(before, after) == ()
+
+
+def test_a_trial_closed_without_a_flip_moves_to_held() -> None:
+    assert moves(parent(verifier=entry("trial")), verifier=entry("held")) == []
+
+
+def test_a_held_role_reopened_after_the_parent_commit_moves_back_to_trial() -> None:
+    reopened = entry("trial", since=AFTER_PARENT)
+
+    assert moves(parent(verifier=entry("held")), verifier=reopened) == []
 
 
 @pytest.mark.parametrize(
     ("before", "after", "move"),
     [
-        (None, {"researcher": "switched"}, "absent -> switched"),
-        ({"researcher": "switched"}, {"researcher": "trial"}, "switched -> trial"),
-        ({"researcher": "trial"}, {}, "trial -> absent"),
-        ({"researcher": "switched"}, {}, "switched -> absent"),
+        (None, {"researcher": entry("switched")}, "absent -> switched"),
+        (parent(researcher=entry("switched")), {"researcher": entry("trial")}, "switched -> trial"),
+        (parent(researcher=entry("trial")), {}, "trial -> absent"),
+        (parent(researcher=entry("switched")), {}, "switched -> absent"),
+        (parent(), {"researcher": entry("held")}, "absent -> held"),
+        (parent(researcher=entry("held")), {"researcher": entry("switched")}, "held -> switched"),
+        (parent(researcher=entry("switched")), {"researcher": entry("held")}, "switched -> held"),
+        (parent(researcher=entry("held")), {}, "held -> absent"),
     ],
-    ids=["skips trial", "demoted", "trial dropped", "switched dropped"],
+    ids=[
+        "skips trial",
+        "demoted",
+        "trial dropped",
+        "switched dropped",
+        "held from nothing",
+        "flipped from held",
+        "switched held",
+        "held dropped",
+    ],
 )
-def test_a_ledger_that_skips_or_reverses_a_status_is_reported(before, after, move: str) -> None:
+def test_a_move_off_the_legal_moves_is_reported(before, after, move: str) -> None:
     found = kl.ledger_transitions(before, after)
 
     assert [(f.kind, f.subject, f.detail) for f in found] == [
         ("ledger-transition", "role researcher", move)
     ]
+
+
+@pytest.mark.parametrize(
+    "since", [BEFORE_PARENT, PARENT_AT, None], ids=["before", "at the parent", "unreadable"]
+)
+def test_a_held_role_reopened_with_a_stale_since_is_reported(since: datetime | None) -> None:
+    found = moves(parent(verifier=entry("held")), verifier=entry("trial", since=since))
+
+    assert [(kind, subject) for kind, subject, _ in found] == [
+        ("ledger-reopen-since", "role verifier")
+    ]
+    assert "while held would be judged" in found[0][2]
+
+
+@pytest.mark.parametrize(
+    ("was", "now"),
+    [(("r1", "r2"), ("r1",)), (("r1", "r2"), ("r2", "r1")), (("r1", "r2"), ("r1", "r9"))],
+    ids=["dropped", "reordered", "rewritten"],
+)
+@pytest.mark.parametrize("status", ["trial", "held", "switched"])
+def test_a_run_list_that_does_not_open_with_the_parents_is_reported(
+    was: tuple, now: tuple, status: str
+) -> None:
+    found = moves(parent(verifier=entry(status, runs=was)), verifier=entry(status, runs=now))
+
+    assert [(kind, subject) for kind, subject, _ in found] == [
+        ("ledger-runs-rewritten", "role verifier")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("was", "now"),
+    [("trial", "trial"), ("trial", "held"), ("held", "trial"), ("trial", "switched")],
+    ids=["at trial", "closing the trial", "reopening", "flipping"],
+)
+def test_a_run_appended_outside_a_held_record_passes(was: str, now: str) -> None:
+    before = parent(verifier=entry(was, runs=("r1",)))
+
+    assert moves(before, verifier=entry(now, since=AFTER_PARENT, runs=("r1", "r2"))) == []
+
+
+def test_a_run_added_to_a_record_that_stays_held_is_reported() -> None:
+    found = moves(
+        parent(verifier=entry("held", runs=("r1",))), verifier=entry("held", runs=("r1", "r2"))
+    )
+
+    assert found == [
+        (
+            "ledger-held-run-added",
+            "role verifier",
+            "runs ['r2'] added to a held record: re-open it as a trial first",
+        )
+    ]
+
+
+# -- A held record --------------------------------------------------------------------
+
+HELD = {"status": "held", "since": "2026-10-12", "runs": [], "reason": "no kit reaches 20 pairs"}
+
+
+def test_a_held_record_keeps_its_start_runs_and_reason() -> None:
+    record = parse_ledger(verifier={**HELD, "runs": [run("r1", 24, False)]}).records["verifier"]
+
+    assert record == kl.Held(
+        "verifier", END_OF_DAY, (kl.Run("r1", 24, False, "an-eval"),), "no kit reaches 20 pairs"
+    )
+
+
+def test_a_held_record_may_close_a_trial_that_has_no_run() -> None:
+    assert parse_ledger(verifier=HELD).records["verifier"].runs == ()
+
+
+@pytest.mark.parametrize(
+    "reason", [None, "", "   ", 7], ids=["absent", "empty", "blank", "no text"]
+)
+def test_a_held_record_that_states_no_reason_is_refused_naming_the_role(reason: object) -> None:
+    with pytest.raises(km.KernelModelError, match="role verifier: a held record's reason"):
+        parse_ledger(verifier={**HELD, "reason": reason})
+
+
+def test_every_reader_reads_a_held_status() -> None:
+    wire = ledger_wire(verifier=HELD, researcher={"status": "trial", "since": "2026-10-12"})
+
+    assert dict(km.parse_statuses(wire)) == {"verifier": "held", "researcher": "trial"}
+    assert kl.parse_entries(wire)["verifier"] == kl.Entry("held", END_OF_DAY, ())
+
+
+def test_the_move_reader_survives_a_record_the_gate_would_refuse() -> None:
+    wire = ledger_wire(verifier={"status": "held", "since": "someday", "runs": [run("r1"), "r2"]})
+
+    assert kl.parse_entries(wire)["verifier"] == kl.Entry("held", None, ("r1", "r2"))
 
 
 # -- Who is adopted, and since when -----------------------------------------------------
@@ -230,6 +369,17 @@ def test_a_record_dated_by_a_bare_date_begins_at_the_end_of_that_day() -> None:
     adopted = kl.parse_adoptions(ledger_wire(researcher={"status": "trial", "since": "2026-10-12"}))
 
     assert adopted["researcher"] == kl.Adoption("trial", END_OF_DAY)
+
+
+def test_a_held_role_is_not_adopted_so_none_of_its_spawns_is_judged() -> None:
+    adopted = kl.parse_adoptions(
+        ledger_wire(
+            verifier={"status": "held", "since": "2026-10-12", "reason": "closed"},
+            researcher={"status": "switched", "since": "2026-10-12"},
+        )
+    )
+
+    assert list(adopted) == ["researcher"]
 
 
 @pytest.mark.parametrize(

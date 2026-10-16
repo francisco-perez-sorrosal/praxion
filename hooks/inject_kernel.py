@@ -403,7 +403,7 @@ def read_project_file(cwd, bound):
     imports.
     """
     try:
-        root = git_toplevel(cwd)
+        root = git_toplevel(native_path(cwd))
         if root is None:
             return None
         real_root = os.path.realpath(root)
@@ -509,6 +509,19 @@ def git_toplevel(cwd):
     # A path is bytes: decoded as the file system names it, never as the locale's text.
     root = os.fsdecode(done.stdout).strip()
     return root if done.returncode == 0 and root else None
+
+
+def native_path(text):
+    """``text``, a path from the JSON payload, spelled as the file system names it.
+
+    The payload carries the path's UTF-8 text. Under a file system encoding other than
+    UTF-8 (a C locale with UTF-8 mode off, on Linux) no os call can find a non-ASCII path
+    until its bytes are re-read in that encoding. Already escaped bytes, which stdin decoding
+    leaves under such a locale, pass through unchanged; under UTF-8 this returns ``text``.
+    """
+    if not isinstance(text, str):
+        return None
+    return os.fsdecode(text.encode("utf-8", "surrogateescape"))
 
 
 def emit(text):

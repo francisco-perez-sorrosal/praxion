@@ -47,7 +47,7 @@ roles:
     flip_rule_ratified: true
     flip_ratified: true
   verifier:
-    status: trial
+    status: held
     since: 2026-10-14T02:32:49Z
     runs:
       - id: 20261015T035717Z-03a785
@@ -60,8 +60,9 @@ roles:
         complete_pairs: 2
         passes_flip_rule: false
         entry: praxion-evals-adherence
+    reason: "the flip rule did not pass on run 20261015T035717Z-03a785 (the forced-stop partial-title check fell from 6 to 0 of 9, and two single-pair differences count under the zero allowance); a diagnostic draw found no kernel text missing; a same-arm calibration run comes before any new trial"
   context-engineer:
-    status: trial
+    status: held
     since: 2026-10-14T02:32:49Z
     runs:
       - id: 20261016T024750Z-62073e
@@ -69,11 +70,14 @@ roles:
         complete_pairs: 3
         passes_flip_rule: false
         entry: praxion-evals-adherence
+    reason: "not decidable: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; its 3 pairs scored equal on every check; a full kit comes before any new trial"
   discipline-consultant:
-    status: trial
+    status: held
     since: 2026-10-14T02:32:49Z
     runs: []
+    reason: "not measured: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; a full kit comes before any new trial"
   skill-genesis:
-    status: trial
+    status: held
     since: 2026-10-14T02:32:49Z
     runs: []
+    reason: "not measured: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; a full kit comes before any new trial"

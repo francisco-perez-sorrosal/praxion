@@ -1,3 +1,48 @@
+## v0.52.0 (2026-10-16)
+
+### Feat
+
+- Let a trial close as held
+- Let adherence sessions bill a subscription token
+- Switch the researcher to its kernel
+- The flip record cites the kernel deliveries a verdict relies on
+- A project convention in the pilot fixtures and the role check that reads it
+- The adherence eval's kernel_missing error kind and kernel evidence
+- Register the kernel hook slots and create the adoption ledger
+- The kernel spawn hook, unregistered
+- Embed each role's kernel in its Codex wrapper
+- Manifest checker invariants I6 to I9 and the kernel liveness check
+- Manifest checker invariants I1 to I5 and the kernel-manifest commit gate
+- First generated commit: regenerate the 17 definitions from the kernel generator
+- Commit the first generated kernels and register the core as a BC05 consumer
+- Author the kernel texts under claude/kernels/src
+- Record the role's return with each measured session
+- Move the role rows, document checks and output forms into their own modules (step 14)
+- Split the ADR and process check constructors into their own modules (step 13)
+- Check agent routing before any description change
+- Count the always-loaded budget on the current-generation tokenizer
+- Measure the real-token startup payload per session and agent
+
+### Fix
+
+- Never report a spawn made while a role was held
+- Name a role's transcript directory as the harness does
+- Read kernel delivery from the spawned role's transcript
+- Name a numeric ledger key and state the fence-container limit
+- Close the spawn hook re-review warnings
+- Harden the spawn hook's project-file delivery
+- One canonical stop line across the core and every pilot definition
+- Revise the manifest checker after its light review
+- Charge a lost session its budget; match the calibration file fully
+- C2 counts the lines that carry text; C4 catches more verbs and wrappers
+- Ship the cartographer's roadmap overlay as a template
+- Pass the role through to the per-role allowance lookup (step 17)
+- Narrow every Bash grant and template the ecosystem overlay (step 15 revision)
+
+### Refactor
+
+- Expose the tree-digest helpers of materialize for the arm build (step 8)
+
 ## v0.51.0 (2026-10-12)
 
 ### Feat

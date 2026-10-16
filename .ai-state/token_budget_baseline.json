@@ -10,24 +10,6 @@
   },
   "samples": [
     {
-      "date": "2026-09-07",
-      "governed_tokens": 17321,
-      "governed_bytes": 67031,
-      "basis": "tokenizer"
-    },
-    {
-      "date": "2026-09-08",
-      "governed_tokens": 16730,
-      "governed_bytes": 65505,
-      "basis": "tokenizer"
-    },
-    {
-      "date": "2026-09-09",
-      "governed_tokens": 16730,
-      "governed_bytes": 65505,
-      "basis": "tokenizer"
-    },
-    {
       "date": "2026-09-10",
       "governed_tokens": 16730,
       "governed_bytes": 65505,
@@ -192,6 +174,27 @@
     },
     {
       "date": "2026-10-12",
+      "governed_tokens": 24799,
+      "governed_bytes": 66710,
+      "basis": "tokenizer",
+      "ruler": "claude-sonnet-5-5"
+    },
+    {
+      "date": "2026-10-13",
+      "governed_tokens": 18531,
+      "governed_bytes": 66710,
+      "basis": "estimate",
+      "ruler": null
+    },
+    {
+      "date": "2026-10-14",
+      "governed_tokens": 24799,
+      "governed_bytes": 66710,
+      "basis": "tokenizer",
+      "ruler": "claude-sonnet-5-5"
+    },
+    {
+      "date": "2026-10-15",
       "governed_tokens": 24799,
       "governed_bytes": 66710,
       "basis": "tokenizer",

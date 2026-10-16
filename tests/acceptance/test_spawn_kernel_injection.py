@@ -6,7 +6,7 @@ Every scenario runs the registered hooks as separate processes on a synthetic
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -252,32 +252,53 @@ def test_a_switched_role_spawned_without_the_hook_is_reported_by_the_liveness_ch
     assert "researcher" in kernel_spawn.kernel_liveness_findings(project, sandbox.root)
 
 
+def reopened_verifier(
+    runs: tuple[kernel_adoption.AdherenceRun, ...], since: str
+) -> kernel_adoption.AdoptionRecord:
+    return kernel_adoption.AdoptionRecord("verifier", "trial", runs=runs, since=since)
+
+
 def test_spawns_made_while_a_role_was_held_are_not_reported_after_its_trial_reopens(
     sandbox: Sandbox, project: Path
 ) -> None:
     runs = kernel_adoption.runs_of("verifier", 1)
-    kernel_adoption.commit_records(sandbox.root, kernel_adoption.held("verifier", runs=runs))
+    kernel_adoption.commit_hold(sandbox.root, kernel_adoption.held("verifier", runs=runs))
     spawn(sandbox.root, project, "praxion:verifier")
-    reopened_at = kernel_adoption.reopened_since(timedelta(seconds=2))
-    kernel_adoption.commit_records(
-        sandbox.root,
-        kernel_adoption.AdoptionRecord("verifier", "trial", runs=runs, since=reopened_at),
-    )
+    reopening = kernel_adoption.reopened_after(datetime.now(UTC))
+    kernel_adoption.commit_records(sandbox.root, reopened_verifier(runs, reopening))
 
     findings = kernel_spawn.kernel_liveness_findings(project, sandbox.root)
 
     assert "verifier" not in findings, findings
 
 
+@pytest.mark.parametrize("start", kernel_adoption.STARTS_BEFORE_THE_REOPENING)
+def test_a_reopening_that_records_an_earlier_start_never_gets_held_spawns_reported(
+    sandbox: Sandbox, project: Path, start: str
+) -> None:
+    runs = kernel_adoption.runs_of("verifier", 1)
+    hold = kernel_adoption.commit_hold(sandbox.root, kernel_adoption.held("verifier", runs=runs))
+    spawn(sandbox.root, project, "praxion:verifier")
+    reopened = reopened_verifier(runs, kernel_adoption.start_before_the_reopening(start, hold))
+    kernel_adoption.rewrite(sandbox.root, reopened)
+    verdict = kernel_sandbox.commit_gate(sandbox.root)
+    kernel_adoption.commit_records(sandbox.root, reopened)
+
+    findings = kernel_spawn.kernel_liveness_findings(project, sandbox.root)
+
+    assert verdict.refused or "verifier" not in findings, (
+        f"the gate let a re-opening with {start} through, and the liveness check then "
+        f"reported a spawn made while the role was held:\n{findings}"
+    )
+
+
 def test_a_reopened_trial_spawned_without_the_hook_is_reported_by_the_liveness_check(
     sandbox: Sandbox, project: Path
 ) -> None:
     runs = kernel_adoption.runs_of("verifier", 1)
-    kernel_adoption.commit_records(sandbox.root, kernel_adoption.held("verifier", runs=runs))
-    reopened_at = kernel_adoption.reopened_since(-timedelta(minutes=1))
+    kernel_adoption.commit_hold(sandbox.root, kernel_adoption.held("verifier", runs=runs))
     kernel_adoption.commit_records(
-        sandbox.root,
-        kernel_adoption.AdoptionRecord("verifier", "trial", runs=runs, since=reopened_at),
+        sandbox.root, reopened_verifier(runs, kernel_adoption.reopened_now())
     )
     kernel_spawn.unregister_kernel_hooks(sandbox.root)
 

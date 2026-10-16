@@ -41,6 +41,7 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -142,11 +143,11 @@ def _run(argv: list[str], cwd: Path, env: dict[str, str], timeout: int = 300) ->
     return RunResult(proc.returncode, proc.stdout + proc.stderr)
 
 
-def _git(root: Path, *args: str) -> str:
+def _git(root: Path, *args: str, **env: str) -> str:
     proc = subprocess.run(
         ["git", *_IDENTITY, *args],
         cwd=root,
-        env=isolated_env(root.parent / f".{root.name}-git"),
+        env=isolated_env(root.parent / f".{root.name}-git", **env),
         capture_output=True,
         text=True,
         timeout=120,
@@ -300,17 +301,20 @@ def commit_gate(root: Path, scripts: tuple[str, ...] = KERNEL_GATE_SCRIPTS) -> G
     return GateVerdict(refused, "\n".join(output), tuple(ran))
 
 
-def commit_paths(root: Path, message: str, *paths: str) -> bool:
+def commit_paths(root: Path, message: str, *paths: str, at: datetime | None = None) -> bool:
     """Commit only `paths` (no hooks), the way an earlier maintainer commit leaves them at HEAD.
 
     The commit gate judges each move against the parent commit, so a scenario that
     needs a move to be one rung long puts the earlier rung in a commit of its own.
+    `at` dates the commit (author and committer) at that moment instead of now.
     Returns whether anything was committed.
     """
     if not _git(root, "status", "--porcelain", "--", *paths).strip():
         return False
+    dates = ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE")
+    dated = {} if at is None else dict.fromkeys(dates, at.isoformat())
     _git(root, "add", "--", *paths)
-    _git(root, "commit", "-q", "--no-verify", "-m", message, "--", *paths)
+    _git(root, "commit", "-q", "--no-verify", "-m", message, "--", *paths, **dated)
     return True
 
 

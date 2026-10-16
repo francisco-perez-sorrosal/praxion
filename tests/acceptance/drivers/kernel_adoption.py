@@ -4,7 +4,11 @@ Scenarios describe a role's record in the specification's terms: its status
 (trial, switched or held), the moment the record began, the adherence runs of that
 role in order, the startup probe's readings of its first request before and after,
 the user's ratification of the flip rule and of the flip, and, for a held role, the
-reason its trial closed without a flip. The hooks read and write the ledger's wire
+reason its trial closed without a flip. A held role re-opened is a new trial: its
+record starts at the re-opening, and the spawns made while it was held come before
+that start. Scenarios date the hold an hour back, so the hold, the spawns made while
+held and the re-opening are distinct instants at the ledger's whole-second resolution.
+The hooks read and write the ledger's wire
 shape (the implementation plan's "Wire shapes": `version: 1`, `eligible`, `roles`; a
 held row carries `reason`); a missing ledger reads as empty.
 
@@ -27,6 +31,7 @@ ADHERENCE_ENTRY = "praxion-evals-adherence"
 REQUIRED_PAIRS = 20
 TRIAL_SINCE = "2026-10-12"
 HELD_REASON = "the flip rule did not pass on the role's last run; a calibration run comes first"
+HELD_FOR = timedelta(hours=1)  # how long before its re-opening a scenario's role was held
 
 
 @dataclass(frozen=True)
@@ -47,7 +52,9 @@ class AdoptionRecord:
     flip_rule_ratified: bool = False
     flip_ratified: bool = False
     reason: str | None = None  # why a held trial closed without a flip; None writes no reason
-    since: str = TRIAL_SINCE  # the moment the record (a trial, or a re-opened one) began
+    since: str | None = (
+        TRIAL_SINCE  # when the record (a trial, or a re-opened one) began; None writes none
+    )
 
 
 def at_trial(role: str) -> AdoptionRecord:
@@ -61,13 +68,60 @@ def held(
     return AdoptionRecord(role, "held", runs=runs, reason=reason)
 
 
-def reopened_since(offset: timedelta = timedelta(minutes=1)) -> str:
-    """The start of a re-opened trial: an ISO instant `offset` from now.
+def ledger_instant(moment: datetime) -> str:
+    """`moment` as the ledger writes an instant: ISO 8601 in UTC, whole seconds."""
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    A re-opened trial is a new trial, so it begins after the commit that held the role;
-    a negative offset places it before spawns about to be made.
+
+def commit_hold(root: Path, record: AdoptionRecord, held_for: timedelta = HELD_FOR) -> datetime:
+    """Commit `record`, a held one, as a hold made `held_for` ago; return the hold's moment."""
+    hold = datetime.now(UTC) - held_for
+    _write(root, [record])
+    commit_paths(root, "ledger: the role held", ADOPTION_LEDGER, at=hold)
+    return hold
+
+
+def reopened_now() -> str:
+    """The start of a trial re-opened at this moment: the re-opening itself.
+
+    Truncated to the ledger's whole seconds, so every spawn made after the re-opening
+    falls at or after the start.
     """
-    return (datetime.now(UTC) + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return ledger_instant(datetime.now(UTC))
+
+
+def reopened_after(moment: datetime) -> str:
+    """The start of a trial re-opened right after `moment`: the first whole second past it.
+
+    Whatever happened by `moment` (a spawn made while the role was held) then comes
+    before the start, at any resolution a reader compares instants at.
+    """
+    return ledger_instant(moment.replace(microsecond=0) + timedelta(seconds=1))
+
+
+def start_before_the_reopening(kind: str, hold: datetime) -> str:
+    """A start a re-opened trial records that falls before its re-opening."""
+    starts = {
+        "the first trial's start kept": TRIAL_SINCE,
+        "a start inside the held period": ledger_instant(hold + HELD_FOR / 2),
+    }
+    return starts[kind]
+
+
+STARTS_BEFORE_THE_REOPENING = ("the first trial's start kept", "a start inside the held period")
+
+
+def start_out_of_bounds(kind: str) -> str | None:
+    """A start a re-opened trial may not record: none, one not after the hold, or a future one."""
+    starts = {
+        "no start": None,
+        "the first trial's start kept": TRIAL_SINCE,
+        "a start after the re-opening": ledger_instant(datetime.now(UTC) + HELD_FOR),
+    }
+    return starts[kind]
+
+
+STARTS_OUT_OF_BOUNDS = ("no start", "the first trial's start kept", "a start after the re-opening")
 
 
 def runs_of(role: str, count: int) -> tuple[AdherenceRun, ...]:
@@ -149,11 +203,10 @@ def _passing_run_id(runs: tuple[AdherenceRun, ...]) -> str | None:
 
 
 def _record_row(record: AdoptionRecord) -> dict:
-    row: dict = {
-        "status": record.status,
-        "since": record.since,
-        "runs": [_run_row(r) for r in record.runs],
-    }
+    row: dict = {"status": record.status}
+    if record.since is not None:
+        row["since"] = record.since
+    row["runs"] = [_run_row(r) for r in record.runs]
     if record.reason is not None:
         row["reason"] = record.reason
     if record.status == "switched":

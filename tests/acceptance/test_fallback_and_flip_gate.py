@@ -184,13 +184,45 @@ def test_a_trial_closed_as_held_with_a_reason_passes(sandbox: Sandbox, runs: Run
 
 
 def test_a_held_role_reopened_as_a_new_trial_passes(sandbox: Sandbox) -> None:
-    kernel_adoption.move(
-        sandbox.root, ROLE, held(), at_trial(since=kernel_adoption.reopened_since())
-    )
+    kernel_adoption.commit_hold(sandbox.root, held())
+    kernel_adoption.rewrite(sandbox.root, at_trial(since=kernel_adoption.reopened_now()))
 
     verdict = commit_gate(sandbox.root)
 
     assert not verdict.refused, verdict.output
+
+
+REOPENED_WITHOUT_EVERY_RUN = {"a run dropped": (SECOND,), "runs reordered": (SECOND, FIRST)}
+
+
+@pytest.mark.parametrize(
+    "runs", REOPENED_WITHOUT_EVERY_RUN.values(), ids=REOPENED_WITHOUT_EVERY_RUN.keys()
+)
+def test_a_held_role_reopened_without_every_run_in_order_is_refused(
+    sandbox: Sandbox, runs: Runs
+) -> None:
+    kernel_adoption.commit_hold(sandbox.root, held())
+    kernel_adoption.rewrite(sandbox.root, at_trial(runs=runs, since=kernel_adoption.reopened_now()))
+
+    verdict = commit_gate(sandbox.root)
+
+    assert verdict.refused, "a re-opened trial lost or reordered the runs its hold kept"
+    assert ROLE in verdict.output, verdict.output
+
+
+@pytest.mark.parametrize("start", kernel_adoption.STARTS_OUT_OF_BOUNDS)
+def test_a_held_role_reopened_with_its_start_out_of_bounds_is_refused(
+    sandbox: Sandbox, start: str
+) -> None:
+    kernel_adoption.commit_hold(sandbox.root, held())
+    kernel_adoption.rewrite(
+        sandbox.root, at_trial(since=kernel_adoption.start_out_of_bounds(start))
+    )
+
+    verdict = commit_gate(sandbox.root)
+
+    assert verdict.refused, f"a re-opened trial with {start} was let through"
+    assert ROLE in verdict.output, verdict.output
 
 
 def test_a_held_role_flipped_straight_to_switched_is_refused(sandbox: Sandbox) -> None:

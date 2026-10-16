@@ -1,11 +1,12 @@
 """Driver for the per-role adoption ledger (`.ai-state/kernel_adoption.yaml`).
 
 Scenarios describe a role's record in the specification's terms: its status
-(trial or switched), the adherence runs of that role in order, the startup probe's
-readings of its first request before and after, and the user's ratification of the
-flip rule and of the flip. The hooks read and write the ledger's wire shape (the implementation
-plan's "Wire shapes": `version: 1`, `eligible`, `roles`); a missing ledger reads as
-empty.
+(trial, switched or held), the moment the record began, the adherence runs of that
+role in order, the startup probe's readings of its first request before and after,
+the user's ratification of the flip rule and of the flip, and, for a held role, the
+reason its trial closed without a flip. The hooks read and write the ledger's wire
+shape (the implementation plan's "Wire shapes": `version: 1`, `eligible`, `roles`; a
+held row carries `reason`); a missing ledger reads as empty.
 
 Which ledger a spawn outside the Praxion checkout reads is an open question; the
 scenarios provisionally write the running plugin's own ledger.
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -24,6 +26,7 @@ from tests.acceptance.drivers.kernel_sandbox import ADOPTION_LEDGER, PILOT_ROLES
 ADHERENCE_ENTRY = "praxion-evals-adherence"
 REQUIRED_PAIRS = 20
 TRIAL_SINCE = "2026-10-12"
+HELD_REASON = "the flip rule did not pass on the role's last run; a calibration run comes first"
 
 
 @dataclass(frozen=True)
@@ -37,16 +40,39 @@ class AdherenceRun:
 @dataclass(frozen=True)
 class AdoptionRecord:
     role: str
-    status: str  # "trial" | "switched"
+    status: str  # "trial" | "switched" | "held"
     runs: tuple[AdherenceRun, ...] = ()  # every adherence run of the role, in order
     probe_before_tokens: int | None = None
     probe_after_tokens: int | None = None
     flip_rule_ratified: bool = False
     flip_ratified: bool = False
+    reason: str | None = None  # why a held trial closed without a flip; None writes no reason
+    since: str = TRIAL_SINCE  # the moment the record (a trial, or a re-opened one) began
 
 
 def at_trial(role: str) -> AdoptionRecord:
     return AdoptionRecord(role, "trial")
+
+
+def held(
+    role: str, runs: tuple[AdherenceRun, ...] = (), reason: str | None = HELD_REASON
+) -> AdoptionRecord:
+    """A trial closed without a flip: its runs kept in order, and (by default) its reason."""
+    return AdoptionRecord(role, "held", runs=runs, reason=reason)
+
+
+def reopened_since(offset: timedelta = timedelta(minutes=1)) -> str:
+    """The start of a re-opened trial: an ISO instant `offset` from now.
+
+    A re-opened trial is a new trial, so it begins after the commit that held the role;
+    a negative offset places it before spawns about to be made.
+    """
+    return (datetime.now(UTC) + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def runs_of(role: str, count: int) -> tuple[AdherenceRun, ...]:
+    """`count` recorded runs of `role`, none of which passes the flip rule."""
+    return tuple(AdherenceRun(f"{role}-run-{n}", 12, False) for n in range(1, count + 1))
 
 
 def full_switch_record(role: str) -> AdoptionRecord:
@@ -125,9 +151,11 @@ def _passing_run_id(runs: tuple[AdherenceRun, ...]) -> str | None:
 def _record_row(record: AdoptionRecord) -> dict:
     row: dict = {
         "status": record.status,
-        "since": TRIAL_SINCE,
+        "since": record.since,
         "runs": [_run_row(r) for r in record.runs],
     }
+    if record.reason is not None:
+        row["reason"] = record.reason
     if record.status == "switched":
         passing = _passing_run_id(record.runs)
         extras = {
@@ -154,20 +182,47 @@ def _load(root: Path) -> dict:
 def record(root: Path, *records: AdoptionRecord) -> None:
     """Write each role's record into the ledger, replacing that role's earlier one.
 
-    A role climbs one rung per commit (absent -> trial -> switched). A switched record
-    is therefore reached the way the rule prescribes: the role's trial row is committed
-    first, on its own, so the switched record the scenario leaves uncommitted is one
-    rung above the parent commit's ledger.
+    A role's status moves one step per commit, and only along absent -> trial, then
+    trial -> switched, trial -> held, or held -> trial (a re-opened trial). A switched
+    or held record is therefore reached the way the rule prescribes: the role's trial
+    row (a held role's with the runs it keeps) is committed first, on its own, so the
+    record the scenario leaves uncommitted is one step from the parent commit's ledger.
     """
-    switched = [each for each in records if each.status == "switched"]
-    if switched:
-        _write(root, [at_trial(each.role) for each in switched])
-        commit_paths(root, "ledger: place the roles at trial", ADOPTION_LEDGER)
+    switched = [at_trial(each.role) for each in records if each.status == "switched"]
+    closed = [
+        replace(each, status="trial", reason=None) for each in records if each.status == "held"
+    ]
+    if switched or closed:
+        commit_records(root, *switched, *closed)
     _write(root, records)
 
 
-def _write(root: Path, records: Sequence[AdoptionRecord]) -> None:
+def commit_records(root: Path, *records: AdoptionRecord) -> None:
+    """Write `records` and commit the ledger without the gate: the parent of the move under test."""
+    _write(root, records)
+    commit_paths(root, "ledger: the records before the move", ADOPTION_LEDGER)
+
+
+def rewrite(root: Path, *records: AdoptionRecord) -> None:
+    """Write `records` exactly as given, uncommitted: the move the commit gate judges."""
+    _write(root, records)
+
+
+def move(
+    root: Path, role: str, before: AdoptionRecord | None, after: AdoptionRecord | None
+) -> None:
+    """Commit `before` as `role`'s record, then leave `after` uncommitted for the gate.
+
+    None stands for no record: absent at the parent commit, or removed by the move.
+    """
+    _write(root, [before] if before else [], drop=role)
+    commit_paths(root, "ledger: the record before the move", ADOPTION_LEDGER)
+    _write(root, [after] if after else [], drop=role)
+
+
+def _write(root: Path, records: Sequence[AdoptionRecord], drop: str | None = None) -> None:
     ledger = _load(root)
+    ledger["roles"].pop(drop, None)
     for each in records:
         ledger["roles"][each.role] = _record_row(each)
     path = root / ADOPTION_LEDGER

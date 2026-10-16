@@ -16,6 +16,7 @@ from tests.acceptance.drivers import (
     kernel_spawn,
     resident_sections,
 )
+from tests.acceptance.drivers.kernel_adoption import AdoptionRecord
 from tests.acceptance.drivers.kernel_sandbox import (
     PILOT_ROLES,
     REPO_ROOT,
@@ -155,3 +156,76 @@ def test_omit_claude_md_on_a_pilot_role_with_its_full_record_passes(
     verdict = commit_gate(sandbox.root)
 
     assert not verdict.refused, verdict.output
+
+
+# -- The ledger's moves --------------------------------------------------------------------
+
+ROLE = "verifier"
+TWO_RUNS = kernel_adoption.runs_of(ROLE, 2)
+FIRST, SECOND = TWO_RUNS
+Runs = tuple[kernel_adoption.AdherenceRun, ...]
+
+
+def at_trial(runs: Runs = TWO_RUNS, since: str = kernel_adoption.TRIAL_SINCE) -> AdoptionRecord:
+    return AdoptionRecord(ROLE, "trial", runs=runs, since=since)
+
+
+def held(runs: Runs = TWO_RUNS, reason: str | None = kernel_adoption.HELD_REASON) -> AdoptionRecord:
+    return kernel_adoption.held(ROLE, runs=runs, reason=reason)
+
+
+@pytest.mark.parametrize("runs", [(), TWO_RUNS], ids=["no runs", "two runs"])
+def test_a_trial_closed_as_held_with_a_reason_passes(sandbox: Sandbox, runs: Runs) -> None:
+    kernel_adoption.move(sandbox.root, ROLE, at_trial(runs), held(runs))
+
+    verdict = commit_gate(sandbox.root)
+
+    assert not verdict.refused, verdict.output
+
+
+def test_a_held_role_reopened_as_a_new_trial_passes(sandbox: Sandbox) -> None:
+    kernel_adoption.move(
+        sandbox.root, ROLE, held(), at_trial(since=kernel_adoption.reopened_since())
+    )
+
+    verdict = commit_gate(sandbox.root)
+
+    assert not verdict.refused, verdict.output
+
+
+def test_a_held_role_flipped_straight_to_switched_is_refused(sandbox: Sandbox) -> None:
+    switch = kernel_adoption.full_switch_record(ROLE)
+    kernel_adoption.move(sandbox.root, ROLE, held(runs=switch.runs), switch)
+    kernel_sandbox.set_frontmatter_key(sandbox, ROLE, OMIT)
+    regenerate(sandbox.root)
+
+    verdict = commit_gate(sandbox.root)
+
+    assert verdict.refused, "a held role was switched without a new trial"
+    assert ROLE in verdict.output, verdict.output
+
+
+# Each move: the role's record at the parent commit, then the record the commit under
+# test leaves; None is no record (absent before, removed after).
+REFUSED_MOVES = {
+    "held with no reason": (at_trial(), held(reason=None)),
+    "held with an empty reason": (at_trial(), held(reason="")),
+    "a run dropped from a trial": (at_trial(), at_trial(runs=(FIRST,))),
+    "a run dropped from a held record": (held(), held(runs=(SECOND,))),
+    "runs reordered": (at_trial(), at_trial(runs=(SECOND, FIRST))),
+    "a run added to a held record": (held(runs=(FIRST,)), held()),
+    "the record removed": (at_trial(), None),
+    "no status straight to held": (None, held()),
+}
+
+
+@pytest.mark.parametrize(("before", "after"), REFUSED_MOVES.values(), ids=REFUSED_MOVES.keys())
+def test_a_ledger_move_outside_the_rule_is_refused_naming_the_role(
+    sandbox: Sandbox, before: AdoptionRecord | None, after: AdoptionRecord | None
+) -> None:
+    kernel_adoption.move(sandbox.root, ROLE, before, after)
+
+    verdict = commit_gate(sandbox.root)
+
+    assert verdict.refused, "the gate let the move through"
+    assert ROLE in verdict.output, verdict.output

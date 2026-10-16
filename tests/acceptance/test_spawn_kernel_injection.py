@@ -6,6 +6,7 @@ Every scenario runs the registered hooks as separate processes on a synthetic
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,21 @@ def test_a_role_at_trial_or_switched_receives_only_committed_kernel_text(
 
     assert injection.strings, "the role received no kernel"
     assert [p for p in paragraphs(received) if p not in committed] == []
+
+
+@pytest.mark.parametrize("runs", [0, 2], ids=["no runs", "two runs"])
+@pytest.mark.parametrize("role", kernel_sandbox.PILOT_ROLES)
+def test_a_role_recorded_held_receives_nothing_at_spawn_and_leaves_no_row(
+    sandbox: Sandbox, project: Path, role: str, runs: int
+) -> None:
+    kernel_adoption.record(
+        sandbox.root, kernel_adoption.held(role, runs=kernel_adoption.runs_of(role, runs))
+    )
+
+    injection = spawn(sandbox.root, project, f"praxion:{role}")
+
+    assert injection.strings == (), f"held {role} still received a kernel"
+    assert kernel_rows(project) == [], f"held {role} left a kernel_injected row"
 
 
 @pytest.mark.parametrize("role", ["implementer", "systems-architect", "test-engineer"])
@@ -234,6 +250,40 @@ def test_a_switched_role_spawned_without_the_hook_is_reported_by_the_liveness_ch
 
     assert kernel_rows(project) == []
     assert "researcher" in kernel_spawn.kernel_liveness_findings(project, sandbox.root)
+
+
+def test_spawns_made_while_a_role_was_held_are_not_reported_after_its_trial_reopens(
+    sandbox: Sandbox, project: Path
+) -> None:
+    runs = kernel_adoption.runs_of("verifier", 1)
+    kernel_adoption.commit_records(sandbox.root, kernel_adoption.held("verifier", runs=runs))
+    spawn(sandbox.root, project, "praxion:verifier")
+    reopened_at = kernel_adoption.reopened_since(timedelta(seconds=2))
+    kernel_adoption.commit_records(
+        sandbox.root,
+        kernel_adoption.AdoptionRecord("verifier", "trial", runs=runs, since=reopened_at),
+    )
+
+    findings = kernel_spawn.kernel_liveness_findings(project, sandbox.root)
+
+    assert "verifier" not in findings, findings
+
+
+def test_a_reopened_trial_spawned_without_the_hook_is_reported_by_the_liveness_check(
+    sandbox: Sandbox, project: Path
+) -> None:
+    runs = kernel_adoption.runs_of("verifier", 1)
+    kernel_adoption.commit_records(sandbox.root, kernel_adoption.held("verifier", runs=runs))
+    reopened_at = kernel_adoption.reopened_since(-timedelta(minutes=1))
+    kernel_adoption.commit_records(
+        sandbox.root,
+        kernel_adoption.AdoptionRecord("verifier", "trial", runs=runs, since=reopened_at),
+    )
+    kernel_spawn.unregister_kernel_hooks(sandbox.root)
+
+    spawn(sandbox.root, project, "praxion:verifier")
+
+    assert "verifier" in kernel_spawn.kernel_liveness_findings(project, sandbox.root)
 
 
 # -- The project's own instruction file --------------------------------------------------

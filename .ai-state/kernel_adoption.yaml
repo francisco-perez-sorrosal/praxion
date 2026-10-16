@@ -63,7 +63,12 @@ roles:
   context-engineer:
     status: trial
     since: 2026-10-14T02:32:49Z
-    runs: []
+    runs:
+      - id: 20261016T024750Z-62073e
+        # .ai-state/eval_ledger/adherence/20261016T024750Z-62073e.json: subscription token, golden judge error 0.00; the runner planned 3 tasks, not 24: the context-engineer has a smoke kit (4 templates; only researcher, verifier and implementer have full sets), so no run can reach 20 pairs; 3 complete pairs, every scored check equal in both arms; lean first request 38,509 vs full 57,143
+        complete_pairs: 3
+        passes_flip_rule: false
+        entry: praxion-evals-adherence
   discipline-consultant:
     status: trial
     since: 2026-10-14T02:32:49Z

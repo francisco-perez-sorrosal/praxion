@@ -16,7 +16,10 @@ A role's two arms ran the same tasks, so each task yields one pair. The rule:
   decides;
 - a role with fewer complete pairs than declared is underpowered and gets no
   flip verdict; otherwise the flip is clear only when every scored check
-  clears, and withheld or not-applicable checks are listed as not covered.
+  clears, and withheld or not-applicable checks are listed as not covered;
+- under the own-discordance method, a mechanical check whose allowance is wider than the
+  margin times its usable pairs cannot state non-regression within the margin, so it is
+  listed as not covered too; a regression is never withheld that way.
 
 Pure: no I/O, no clock, no randomness.
 """
@@ -54,6 +57,7 @@ from praxion_evals.adherence.model import (
 
 BISECTION_STEPS = 80
 PERCENT = 100
+OVER_MARGIN = "the allowance exceeds the margin times the usable pairs"
 PARAMETER_FLOOR = -1.0  # the paired difference of two proportions lies in [-1, 1]
 PARAMETER_CEILING = 1.0
 
@@ -86,6 +90,8 @@ def role_verdict(
             continue
         lean_failures[name] = counts.lean_failures
         verdicts[name] = _decide(name, kind, counts, settings, role)
+        if _allowance_exceeds_margin(verdicts[name], settings):
+            not_covered[name] = OVER_MARGIN
     return Assessed(complete, verdicts, not_covered, lean_failures)
 
 
@@ -160,6 +166,19 @@ def _decide(
             assert_never(kind)
 
 
+def _allowance_exceeds_margin(check_verdict: CheckVerdict, settings: DeclaredSettings) -> bool:
+    """Whether a clearing mechanical verdict rests on noise wider than the margin it would claim.
+
+    Only the own-discordance method is held to this; a file that declares none keeps the
+    verdict it showed.
+    """
+    return (
+        settings.allowance_method == OWN_DISCORDANCE_EXACT
+        and isinstance(check_verdict, NoRegression)
+        and PERCENT * check_verdict.allowance > settings.margin_pp * check_verdict.counts.n
+    )
+
+
 def _mechanical_allowance(
     name: str, counts: Counts, settings: DeclaredSettings, role: str | None
 ) -> int:
@@ -170,7 +189,7 @@ def _mechanical_allowance(
     allowances it declared.
     """
     if settings.allowance_method == OWN_DISCORDANCE_EXACT:
-        return _exact_quantile(counts.b + counts.c, settings.confidence)
+        return _exact_quantile(counts.discordant, settings.confidence)
     return settings.allowance(name, role)
 
 
@@ -230,8 +249,7 @@ def allowances_from_calibration(pairs: Sequence[Pair], confidence: float) -> dic
     names = sorted({name for pair in pairs for name in _measured_names(pair)})
     discordant = {name: tally(name, [p for p in pairs if p.complete]) for name in names}
     return {
-        name: _exact_quantile(counts.b + counts.c, confidence)
-        for name, counts in discordant.items()
+        name: _exact_quantile(counts.discordant, confidence) for name, counts in discordant.items()
     }
 
 

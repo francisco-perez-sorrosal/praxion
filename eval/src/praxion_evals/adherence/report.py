@@ -32,10 +32,12 @@ from praxion_evals.adherence.lineage import (
 )
 from praxion_evals.adherence.model import (
     ARMS,
+    OWN_DISCORDANCE_EXACT,
     Assessed,
     CheckErrored,
     CheckOutcome,
     CheckVerdict,
+    DeclaredSettings,
     Errored,
     Failed,
     Inferior,
@@ -52,6 +54,7 @@ from praxion_evals.adherence.model import (
     Underpowered,
     Withheld,
 )
+from praxion_evals.adherence.model_verdict import NotCovered
 from praxion_evals.adherence.results import (
     CatalogEntry,
     KernelDelivery,
@@ -199,7 +202,7 @@ def _role_section(
     lines += _session_lines(results, role)
     lines += [f"{INDENT}Checks:"]
     for entry in entries:
-        lines += _check_lines(entry, complete, verdict)
+        lines += _check_lines(entry, complete, verdict, results.settings)
     lines += _kernel_delivery_lines(kernel_deliveries(results, role))
     lines.append(_earlier_runs_line(results, role))
     return "\n".join(lines)
@@ -306,15 +309,37 @@ def _earlier_runs_line(results: RunResults, role: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _check_lines(entry: CatalogEntry, complete: list[Pair], verdict: RoleVerdict) -> list[str]:
+def _check_lines(
+    entry: CatalogEntry, complete: list[Pair], verdict: RoleVerdict, settings: DeclaredSettings
+) -> list[str]:
     lines = [
         f"{INDENT * 2}{entry.name} ({entry.kind}) enforces {entry.rule.file}, section"
         f" '{entry.rule.section}'"
     ]
     for arm in ARMS:
         lines += _arm_outcome_lines(entry.name, arm, [getattr(pair, arm) for pair in complete])
+    lines += _allowance_lines(entry.name, verdict, settings)
     lines.append(f"{INDENT * 3}verdict: {_check_verdict(entry.name, verdict)}")
     return lines
+
+
+def _allowance_lines(check: str, verdict: RoleVerdict, settings: DeclaredSettings) -> list[str]:
+    """A mechanical check's discordance and allowance beside the margin; none for a file whose
+    allowances were declared rather than sized by the run's own discordance."""
+    if settings.allowance_method != OWN_DISCORDANCE_EXACT or not isinstance(verdict, Assessed):
+        return []
+    match verdict.check_verdicts.get(check):
+        case (
+            NoRegression(counts=counts, allowance=allowance)
+            | Regression(counts=counts, allowance=allowance)
+        ):
+            return [
+                f"{INDENT * 3}allowance: {allowance} pairs ({PERCENT * allowance / counts.n:.1f} pp)"
+                f" at {counts.discordant} discordant pairs; declared margin"
+                f" {settings.margin_pp:g} pp"
+            ]
+        case _:
+            return []
 
 
 def _arm_outcome_lines(check: str, arm: str, statuses: Iterable[SessionStatus]) -> list[str]:
@@ -342,10 +367,13 @@ def _check_verdict(check: str, verdict: RoleVerdict) -> str:
     match verdict:
         case Underpowered():
             return "none (the role is underpowered)"
-        case Assessed(check_verdicts=scored, not_covered=not_covered):
+        case Assessed(check_verdicts=scored):
+            coverage = verdict.coverage(check)
+            if isinstance(coverage, NotCovered):
+                return f"not covered by the flip verdict ({coverage.reason})"
             if check in scored:
                 return _scored_verdict(scored[check])
-            return f"not covered by the flip verdict ({not_covered.get(check, 'not scored')})"
+            return "not covered by the flip verdict (not scored)"
         case _:
             assert_never(verdict)
 

@@ -33,6 +33,7 @@ from praxion_evals.live.session import SessionRun
 from praxion_evals.live.spend import SpendLedger
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
+OWN = "own-discordance-exact"
 RULE = RuleRef("rules/swe/agent-behavioral-contract.md", "Agent Behavioral Contract")
 CHECKS = (
     CatalogEntry("C1", "mechanical", RULE, True, None),
@@ -56,7 +57,7 @@ def measured(outcomes: Mapping[str, CheckOutcome], tokens: int | None = 1000) ->
     return Measured(dict(outcomes), tokens)
 
 
-def declared(required_pairs: int = 1) -> DeclaredSettings:
+def declared(required_pairs: int = 1, allowance_method: str | None = None) -> DeclaredSettings:
     return DeclaredSettings(
         margin_pp=10.0,
         method="tango-score",
@@ -67,6 +68,7 @@ def declared(required_pairs: int = 1) -> DeclaredSettings:
         retry_policy="one retry per session, for infrastructure errors only",
         allowance_source=None,
         allowances={},
+        allowance_method=allowance_method,  # type: ignore[arg-type]
     )
 
 
@@ -87,6 +89,7 @@ def results_of(
     required_pairs: int = 1,
     earlier_runs: tuple[EarlierRun, ...] = (),
     observed_error: float | None = None,
+    allowance_method: str | None = None,
 ) -> RunResults:
     return RunResults(
         run=RunInfo(
@@ -98,7 +101,7 @@ def results_of(
             earlier_runs={"researcher": earlier_runs},
             extra={},
         ),
-        settings=declared(required_pairs),
+        settings=declared(required_pairs, allowance_method),
         declared_at="2026-10-12T08:59:00Z",
         catalog={"researcher": CHECKS},
         arms={"researcher": {"full": {"built": True}, "lean": {"built": True}}},
@@ -263,6 +266,67 @@ def test_a_check_no_pair_scored_is_listed_as_not_covered_with_its_reason():
 
     assert "not covered by the flip verdict (no page to fetch)" in text
     assert "flip verdict clear" in text
+
+
+C1_DOWN = {**ALL_PASS, "C1": FAIL}
+
+
+def own_discordance_run(discordant: int, net: int) -> list[tuple[Measured, Measured]]:
+    """Twenty-four pairs of which ``discordant`` differ on C1, ``net`` more against the lean arm."""
+    lean_failed = (discordant + net) // 2
+    return (
+        [(measured(ALL_PASS), measured(C1_DOWN))] * lean_failed
+        + [(measured(C1_DOWN), measured(ALL_PASS))] * (discordant - lean_failed)
+        + same_both_arms(24 - discordant)
+    )
+
+
+def c1_block(text: str) -> list[str]:
+    """The header line of C1's block and every deeper line after it."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip().startswith("C1 ("))
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    block = [lines[start]]
+    for line in lines[start + 1 :]:
+        if len(line) - len(line.lstrip()) <= indent:
+            break
+        block.append(line)
+    return block
+
+
+def test_a_mechanical_check_states_its_discordance_and_allowance_beside_the_margin():
+    text = render(own_discordance_run(2, 2), required_pairs=24, allowance_method=OWN)
+
+    block = c1_block(text)
+    assert "allowance: 2 pairs (8.3 pp) at 2 discordant pairs; declared margin 10 pp" in block[-2]
+    assert block[-1].strip().startswith("verdict: no regression (b 2, c 0, n 24")
+
+
+def test_a_check_whose_allowance_exceeds_the_margin_ends_its_block_with_the_not_covered_verdict():
+    text = render(own_discordance_run(15, 7), required_pairs=24, allowance_method=OWN)
+
+    block = c1_block(text)
+    assert "allowance: 7 pairs (29.2 pp) at 15 discordant pairs; declared margin 10 pp" in block[-2]
+    assert block[-1].strip() == (
+        "verdict: not covered by the flip verdict"
+        " (the allowance exceeds the margin times the usable pairs)"
+    )
+
+
+def test_a_regression_under_a_wide_allowance_is_reported_as_a_regression_beside_its_allowance():
+    text = render(own_discordance_run(15, 9), required_pairs=24, allowance_method=OWN)
+
+    block = c1_block(text)
+    assert "allowance: 7 pairs (29.2 pp) at 15 discordant pairs" in block[-2]
+    assert block[-1].strip().startswith("verdict: regression (b 12, c 3, n 24")
+    assert "flip verdict not clear" in text
+
+
+def test_a_results_file_without_the_allowance_method_renders_no_allowance_line():
+    text = render(own_discordance_run(15, 7), required_pairs=24)
+
+    assert "allowance:" not in text.replace("noise allowance", "")
+    assert c1_block(text)[-1].strip().startswith("verdict: regression (b 11, c 4, n 24")
 
 
 def test_the_stored_verdict_is_ignored_and_the_report_follows_the_sessions(tmp_path: Path):

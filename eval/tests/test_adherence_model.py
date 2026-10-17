@@ -230,9 +230,9 @@ REFUSED = [
         lambda: Underpowered("not short", 20, 20), "short", id="an underpowered role at target"
     ),
     pytest.param(
-        lambda: _assessed({"C1": CLEAR[0]}, {"C1": "withheld"}),
-        "scored or not covered",
-        id="a check both scored and not covered",
+        lambda: _assessed({"C1": BLOCKING[0]}, {"C1": "withheld"}),
+        "never withheld",
+        id="a failing verdict withheld from the flip claim",
     ),
 ]
 

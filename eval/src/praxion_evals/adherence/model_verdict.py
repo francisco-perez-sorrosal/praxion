@@ -45,6 +45,10 @@ class Counts:
         return self.lean_passed_only
 
     @property
+    def discordant(self) -> int:
+        return self.b + self.c
+
+    @property
     def n(self) -> int:
         return self.both_passed + self.b + self.c + self.both_failed
 
@@ -90,6 +94,24 @@ CLEARING_VERDICTS = (NoRegression, NonInferior)
 
 
 @dataclass(frozen=True)
+class Covered:
+    """The flip claim speaks for this check."""
+
+
+@dataclass(frozen=True)
+class NotCovered:
+    """The flip claim is silent on this check, and the report says why."""
+
+    reason: str
+
+    def __post_init__(self) -> None:
+        _non_empty(self.reason, "a not-covered reason")
+
+
+Coverage = Covered | NotCovered
+
+
+@dataclass(frozen=True)
 class Underpowered:
     """Fewer complete pairs than declared: counts only, and no flip verdict by construction."""
 
@@ -106,25 +128,36 @@ class Underpowered:
 class Assessed:
     complete_pairs: int
     check_verdicts: Mapping[str, CheckVerdict]
-    not_covered: Mapping[str, str]  # check -> why it is covered by no verdict
+    not_covered: Mapping[str, str]  # check -> why the flip claim is silent on it
     worst_case_lean_failures: Mapping[str, int]
 
     def __post_init__(self) -> None:
+        # A check keeps its arithmetic when only its claim is withheld (an allowance wider than
+        # the margin); a failing verdict is evidence the claim cannot withhold.
         _require(
-            not set(self.check_verdicts) & set(self.not_covered),
-            "a check is either scored or not covered",
+            all(
+                isinstance(self.check_verdicts[name], CLEARING_VERDICTS)
+                for name in self.not_covered
+                if name in self.check_verdicts
+            ),
+            "a failing verdict is never withheld from the flip claim",
         )
         _frozen(self, "check_verdicts", self.check_verdicts)
         _frozen(self, "not_covered", self.not_covered)
         _frozen(self, "worst_case_lean_failures", self.worst_case_lean_failures)
 
+    def coverage(self, check: str) -> Coverage:
+        reason = self.not_covered.get(check)
+        return Covered() if reason is None else NotCovered(reason)
+
     @property
     def flip(self) -> Literal["clear", "not clear"]:
-        """Clear only when at least one check is scored and every scored check clears."""
+        """Clear only when at least one covered check is scored and every scored check clears."""
         verdicts = self.check_verdicts.values()
+        covered = [name for name in self.check_verdicts if name not in self.not_covered]
         return (
             "clear"
-            if verdicts and all(isinstance(v, CLEARING_VERDICTS) for v in verdicts)
+            if covered and all(isinstance(v, CLEARING_VERDICTS) for v in verdicts)
             else "not clear"
         )
 

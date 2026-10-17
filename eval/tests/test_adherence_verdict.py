@@ -27,6 +27,7 @@ from praxion_evals.adherence.model import (
     Underpowered,
     Withheld,
 )
+from praxion_evals.adherence.model_verdict import Covered, NotCovered
 
 PASS, FAIL = Passed(), Failed("the check failed")
 WITHHELD = Withheld("no page to fetch")
@@ -273,6 +274,74 @@ def test_a_settings_without_the_method_and_without_allowances_reads_zero():
 
     assert isinstance(result.check_verdicts["C1"], Regression)
     assert result.check_verdicts["C1"].allowance == 0
+
+
+# ---------------------------------------------------------------------------
+# A check whose allowance is wider than the margin is not covered
+# ---------------------------------------------------------------------------
+
+
+def test_fifteen_discordant_pairs_of_twenty_four_are_not_covered_at_the_margin():
+    result = own_discordance_verdict(discordant_run("C1", 15, 7))
+
+    assert result.not_covered == {"C1": verdict.OVER_MARGIN}
+    assert result.coverage("C1") == NotCovered(verdict.OVER_MARGIN)
+    assert result.flip == "not clear"
+
+
+def test_two_discordant_pairs_of_twenty_four_are_covered():
+    result = own_discordance_verdict(discordant_run("C1", 2, 2))
+
+    assert result.not_covered == {}
+    assert result.coverage("C1") == Covered()
+    assert result.flip == "clear"
+
+
+@pytest.mark.parametrize(
+    ("margin_pp", "covered"),
+    [pytest.param(12.5, True, id="allowance equals margin times pairs"), (12.4, False)],
+)
+def test_an_allowance_equal_to_the_margin_times_the_usable_pairs_is_still_covered(
+    margin_pp, covered
+):
+    # three discordant pairs of 24 give an allowance of 3, which is 12.5 points of 24
+    result = own_discordance_verdict(discordant_run("C1", 3, 3), margin_pp=margin_pp)
+
+    assert (result.coverage("C1") == Covered()) is covered
+
+
+def test_a_covered_check_clears_beside_one_the_flip_claim_is_silent_on():
+    ok, c1_down = measured(C1=PASS, C2=PASS), measured(C1=FAIL, C2=PASS)
+    run = pairs(11, ok, c1_down) + pairs(4, c1_down, ok) + pairs(9, ok, ok)  # C1: 15 discordant
+
+    result = own_discordance_verdict(run, {"C1": "mechanical", "C2": "mechanical"})
+
+    assert (result.flip, list(result.not_covered)) == ("clear", ["C1"])
+
+
+def test_a_regression_beyond_a_wide_allowance_is_never_withheld():
+    result = own_discordance_verdict(discordant_run("C1", 15, 9))
+
+    assert isinstance(result.check_verdicts["C1"], Regression)
+    assert (result.not_covered, result.flip) == ({}, "not clear")
+
+
+def test_a_judged_check_is_never_held_to_the_allowance_rule():
+    ok = measured(C3=PASS)
+
+    result = own_discordance_verdict(pairs(RUN_PAIRS, ok, ok), JUDGED)
+
+    assert result.not_covered == {}
+
+
+def test_a_settings_without_the_method_keeps_a_wide_declared_allowance_covered():
+    result = verdict.role_verdict(
+        MECHANICAL,
+        discordant_run("C1", 15, 7),
+        settings(required_pairs=RUN_PAIRS, allowances={"C1": 8}),
+    )
+
+    assert (result.not_covered, result.flip) == ({}, "clear")
 
 
 def test_an_allowance_method_nobody_defined_is_refused():

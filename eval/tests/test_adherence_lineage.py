@@ -1,14 +1,14 @@
 """How a run ended: the ending's wire form round-trips, only a both-arms stop or a spend refusal
 is continuable, a file without an ending is legacy, and the runner records the ending it had.
-What it was measured on: the tree digest counts what a role runs on and nothing else, a legacy
-file's roles are derived from its commit, `diff` names every difference, and the runner records
-the identity it began with."""
+A run's lineage is parsed from its results directory, a continuation relaunches only the tasks
+nobody finished, and is refused with every reason, while a stopped run left neither continued nor
+closed is found by its role and closing one records why. What a run was measured on is tested in
+`test_adherence_run_identity.py`."""
 
 from __future__ import annotations
 
-import hashlib
-import subprocess
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,38 +16,35 @@ import pytest
 
 import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import report, results
-from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, StopReason, StopRule
+from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, StopReason
 from praxion_evals.adherence.lineage import (
+    CONTINUATION_OPTIONS,
     Closed,
     Finished,
     InfraStopped,
     Interrupted,
     Legacy,
     Lineage,
-    MeasuredIdentity,
     PartRef,
-    RoleIdentity,
+    ReadTip,
     RunEnding,
     SpendRefused,
-    UnknownIdentity,
-    at_commit,
+    UnreadableTip,
+    close,
     continuable,
-    current_identity,
-    diff,
+    continuation_refusals,
     ending_from_json,
     ending_of,
     ending_to_json,
-    measured_identity,
     never_launched,
+    pending_stop,
     relaunch_tasks,
-    role_identity,
-    tree_digest,
-    working_tree,
 )
 from praxion_evals.adherence.model import Errored
+from praxion_evals.adherence.run_identity import MeasuredIdentity
 from praxion_evals.live.session import SessionRun, SessionSpec
 from tests.test_adherence_report import results_of
-from tests.test_adherence_results import pair_of_sessions, run_results, session
+from tests.test_adherence_results import declared, pair_of_sessions, run_results, session
 
 # The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
 # role unswitched, shared with the paid-loop tests of the command line.
@@ -301,458 +298,16 @@ def test_the_results_loader_keeps_the_ending_it_was_given(tmp_path: Path) -> Non
 
 
 # ---------------------------------------------------------------------------
-# What the run was measured on: the tree digest
-# ---------------------------------------------------------------------------
-
-DEFINITION = "---\nname: researcher\n---\nthe definition, version one\n"
-ADOPTION = ".ai-state/kernel_adoption.yaml"
-RESULTS_FILE = ".ai-state/eval_ledger/adherence/run-a.json"
-KERNEL_INDEX = "claude/kernels/index.json"
-KERNEL_VERSION = "c89f2d7799c59943f33f4d160d4764a74e1cc491"
-NON_ASCII_PATH = "naïve/résumé.txt"
-
-
-def _git(repo: Path, *args: str) -> str:
-    done = subprocess.run(
-        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.org", *args],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return done.stdout.strip()
-
-
-def _put(repo: Path, path: str, text: str) -> None:
-    target = repo / path
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text, encoding="utf-8")
-
-
-def _checkout_at(root: Path) -> Path:
-    """A committed repository holding a role definition, an adoption ledger, a results file and
-    a file with a non-ASCII path, with `scratch/` ignored."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "main")
-    _put(root, "agents/researcher.md", DEFINITION)
-    _put(root, ADOPTION, "version: 1\nroles: {}\n")
-    _put(root, RESULTS_FILE, "{}")
-    _put(root, NON_ASCII_PATH, "a path outside ASCII\n")
-    _put(root, ".gitignore", "scratch/\n")
-    _git(root, "add", ".")
-    _git(root, "commit", "-q", "-m", "base")
-    return root
-
-
-@pytest.fixture
-def checkout(tmp_path: Path) -> Path:
-    return _checkout_at(tmp_path / "checkout")
-
-
-def test_a_change_inside_the_results_directory_leaves_the_tree_digest(checkout: Path) -> None:
-    before = tree_digest(checkout)
-
-    _put(checkout, RESULTS_FILE, '{"a": "recorded run"}')
-    _put(checkout, ".ai-state/eval_ledger/adherence/index.json", "{}")
-
-    assert tree_digest(checkout) == before
-
-
-@pytest.mark.parametrize(
-    "path",
-    ["agents/researcher.md", ADOPTION, NON_ASCII_PATH],
-    ids=["definition", "adoption ledger", "non-ASCII path"],
-)
-def test_a_change_to_a_tracked_file_anywhere_else_changes_the_tree_digest(
-    checkout: Path, path: str
-) -> None:
-    before = tree_digest(checkout)
-
-    _put(checkout, path, "changed\n")
-
-    assert tree_digest(checkout) != before
-
-
-def test_a_new_file_nothing_ignores_changes_the_tree_digest_before_it_is_committed(
-    checkout: Path,
-) -> None:
-    before = tree_digest(checkout)
-
-    _put(checkout, "notes.md", "not committed yet\n")
-
-    assert tree_digest(checkout) != before
-
-
-def test_a_tracked_file_deleted_from_the_tree_changes_the_tree_digest(checkout: Path) -> None:
-    before = tree_digest(checkout)
-
-    (checkout / NON_ASCII_PATH).unlink()
-
-    assert tree_digest(checkout) != before
-
-
-def test_an_ignored_file_is_outside_the_identity(checkout: Path) -> None:
-    before = tree_digest(checkout)
-
-    _put(checkout, "scratch/output.log", "build output\n")
-
-    assert tree_digest(checkout) == before
-
-
-def test_committing_what_the_tree_already_holds_leaves_the_tree_digest(checkout: Path) -> None:
-    _put(checkout, "notes.md", "to be committed\n")
-    before = tree_digest(checkout)
-
-    _git(checkout, "add", "notes.md")
-    _git(checkout, "commit", "-q", "-m", "notes")
-
-    assert tree_digest(checkout) == before
-
-
-def test_the_tree_digest_is_the_same_wherever_the_same_files_are_checked_out(
-    checkout: Path, tmp_path: Path
-) -> None:
-    elsewhere = _checkout_at(tmp_path / "elsewhere")
-
-    assert tree_digest(elsewhere) == tree_digest(checkout)
-
-
-def test_measuring_a_directory_that_is_not_a_repository_is_refused(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="failed in"):
-        tree_digest(tmp_path)
-
-
-# ---------------------------------------------------------------------------
-# What a role ran with
-# ---------------------------------------------------------------------------
-
-
-def _adopt(repo: Path, status: str = "switched", index: str | None = None) -> None:
-    _put(repo, ADOPTION, f"version: 1\nroles:\n  researcher:\n    status: {status}\n")
-    index = f'{{"schema": 1, "kernel_version": "{KERNEL_VERSION}"}}' if index is None else index
-    _put(repo, KERNEL_INDEX, index)
-
-
-def test_a_role_not_adopted_at_the_checkout_has_no_kernel(checkout: Path) -> None:
-    assert role_identity(working_tree(checkout), "researcher") == RoleIdentity(
-        hashlib.sha256(DEFINITION.encode()).hexdigest(), None
-    )
-
-
-def test_an_adopted_role_carries_the_kernel_version_it_receives(checkout: Path) -> None:
-    _adopt(checkout)
-
-    identity = role_identity(working_tree(checkout), "researcher")
-
-    assert identity == RoleIdentity(hashlib.sha256(DEFINITION.encode()).hexdigest(), KERNEL_VERSION)
-
-
-def test_a_role_that_is_held_receives_no_kernel(checkout: Path) -> None:
-    _adopt(checkout, status="held")
-
-    identity = role_identity(working_tree(checkout), "researcher")
-
-    assert identity == RoleIdentity(hashlib.sha256(DEFINITION.encode()).hexdigest(), None)
-
-
-def test_an_adopted_role_whose_kernel_index_cannot_be_read_is_unknown(checkout: Path) -> None:
-    _adopt(checkout, index="not json")
-
-    identity = role_identity(working_tree(checkout), "researcher")
-
-    assert identity == UnknownIdentity(
-        "researcher receives a kernel but claude/kernels/index.json cannot be read"
-    )
-
-
-def test_a_role_without_a_definition_is_unknown(checkout: Path) -> None:
-    assert role_identity(working_tree(checkout), "verifier") == UnknownIdentity(
-        "agents/verifier.md cannot be read"
-    )
-
-
-# ---------------------------------------------------------------------------
-# A file written before identity was recorded
-# ---------------------------------------------------------------------------
-
-
-def _recorded(extra: dict[str, Any]) -> results.RunResults:
-    loaded = results_of([])
-    return replace(loaded, run=replace(loaded.run, extra=extra))
-
-
-def _legacy_extra(commit: str) -> dict[str, Any]:
-    return {
-        "checkout": {"path": "/gone", "commit": commit, "dirty": False},
-        "roles": ["researcher"],
-        "seed": 7,
-        "tasks": {"researcher": ["task-000"]},
-    }
-
-
-def test_a_legacy_files_roles_are_derived_from_the_commit_it_recorded(checkout: Path) -> None:
-    commit = _git(checkout, "rev-parse", "HEAD")
-    _put(checkout, "agents/researcher.md", "edited since\n")  # the working tree has moved on
-
-    derived = measured_identity(_recorded(_legacy_extra(commit)), checkout)
-
-    expected = RoleIdentity(hashlib.sha256(DEFINITION.encode()).hexdigest(), None)
-    assert derived.roles == {"researcher": expected}
-    assert (derived.tree, derived.model) == (None, None)
-
-
-def test_a_legacy_files_role_is_unknown_when_its_commit_cannot_be_reached(checkout: Path) -> None:
-    derived = measured_identity(_recorded(_legacy_extra("0" * 40)), checkout)
-
-    assert derived.roles == {"researcher": UnknownIdentity("agents/researcher.md cannot be read")}
-
-
-def test_a_commit_is_read_back_exactly_as_it_was_committed(checkout: Path) -> None:
-    commit = _git(checkout, "rev-parse", "HEAD")
-
-    assert at_commit(checkout, commit)("agents/researcher.md") == DEFINITION.encode()
-    assert at_commit(checkout, commit)("agents/missing.md") is None
-
-
-# ---------------------------------------------------------------------------
-# What differs
-# ---------------------------------------------------------------------------
-
-RECORDED_ROLE = RoleIdentity("a" * 64, KERNEL_VERSION)
-STOP_RULE = StopRule.parse(3, ["result_error"], 2000)
-
-
-def _identity() -> MeasuredIdentity:
-    base = measured_identity(
-        _recorded(
-            {
-                **_legacy_extra("0" * 40),
-                "launch_order": {"researcher": {"task-000": ["full", "lean"]}},
-                "identity": {
-                    "tree": "b" * 64,
-                    "model": "claude-opus-5-5",
-                    "roles": {"researcher": {"definition_sha": "a" * 64, "kernel": KERNEL_VERSION}},
-                },
-            }
-        ),
-        Path("/not-read"),
-    )
-    return replace(base, declared=replace(base.declared, stop_rule=STOP_RULE))
-
-
-def _changed(**changes: Any) -> MeasuredIdentity:
-    return replace(_identity(), **changes)
-
-
-def _declared(**changes: Any) -> MeasuredIdentity:
-    return _changed(declared=replace(_identity().declared, **changes))
-
-
-def test_the_identity_a_file_recorded_is_read_back_whole() -> None:
-    identity = _identity()
-
-    assert (identity.tree, identity.model, identity.seed) == ("b" * 64, "claude-opus-5-5", 7)
-    assert identity.roles == {"researcher": RECORDED_ROLE}
-    assert identity.tasks == {"researcher": ("task-000",)}
-    assert identity.launch_orders == {"researcher": {"task-000": ("full", "lean")}}
-
-
-def test_identities_that_are_the_same_differ_in_nothing() -> None:
-    assert diff(_identity(), _identity()) == ()
-
-
-@pytest.mark.parametrize(
-    ("other", "named"),
-    [
-        (_changed(model="claude-sonnet-5-5"), "model: claude-opus-5-5 -> claude-sonnet-5-5"),
-        (_changed(seed=8), "seed: 7 -> 8"),
-        (
-            _changed(tasks={"researcher": ("task-000", "task-001")}),
-            "tasks.researcher: [task-000] -> [task-000, task-001]",
-        ),
-        (_declared(margin_pp=12.0), "declared.margin_pp: 10.0 -> 12.0"),
-        (_declared(stop_rule=replace(STOP_RULE, count=4)), "declared.stop_rule.count: 3 -> 4"),
-        (
-            _changed(launch_orders={"researcher": {"task-000": ("lean", "full")}}),
-            "launch_orders.researcher.task-000: [full, lean] -> [lean, full]",
-        ),
-        (_changed(tree="c" * 64), "tree: bbbbbbbbbbbb -> cccccccccccc"),
-        (
-            _changed(roles={"researcher": RoleIdentity("d" * 64, KERNEL_VERSION)}),
-            "roles.researcher.definition: aaaaaaaaaaaa -> dddddddddddd",
-        ),
-        (
-            _changed(roles={"researcher": RoleIdentity("a" * 64, None)}),
-            f"roles.researcher.kernel: {KERNEL_VERSION} -> None",
-        ),
-    ],
-    ids=[
-        "model",
-        "seed",
-        "task list",
-        "margin",
-        "stop count",
-        "launch order",
-        "tree",
-        "role definition",
-        "role kernel",
-    ],
-)
-def test_diff_names_each_way_two_identities_differ(other: MeasuredIdentity, named: str) -> None:
-    assert diff(_identity(), other) == (named,)
-
-
-def test_diff_names_every_difference_not_only_the_first() -> None:
-    other = replace(_declared(margin_pp=12.0), seed=8, model="claude-sonnet-5-5")
-
-    assert len(diff(_identity(), other)) == 3
-
-
-def test_a_model_not_yet_reported_is_not_a_difference() -> None:
-    assert diff(_identity(), _changed(model=None)) == ()
-
-
-def test_launch_orders_only_one_run_recorded_are_not_a_difference() -> None:
-    later = _changed(
-        launch_orders={"researcher": {"task-000": ("full", "lean"), "task-001": ("lean", "full")}}
-    )
-
-    assert diff(_identity(), later) == ()
-
-
-def test_a_role_whose_identity_is_unknown_is_always_a_difference() -> None:
-    unknown = _changed(roles={"researcher": UnknownIdentity("the commit is gone")})
-
-    assert diff(unknown, unknown) == ("roles.researcher: identity unknown (the commit is gone)",)
-
-
-# ---------------------------------------------------------------------------
-# What the runner records
-# ---------------------------------------------------------------------------
-
-REPORTED = "claude-opus-5-5"
-
-
-class Reports(cli_tests.Script):
-    """Answers like the stand-in, with an init event that reports a model: the Nth launch
-    reports `model-N` unless one name is fixed."""
-
-    def __init__(self, model: str | None = None) -> None:
-        super().__init__()
-        self.model = model
-
-    def __call__(self, spec: SessionSpec, env: dict[str, str]) -> SessionRun:
-        run = super().__call__(spec, env)
-        model = self.model or f"model-{len(self.specs)}"
-        init = '"subtype": "init"'
-        return replace(run, stdout=run.stdout.replace(init, f'{init}, "model": "{model}"', 1))
-
-
-def test_a_new_run_records_what_it_was_measured_on_when_it_begins(
-    paid: Any, tmp_path: Path
-) -> None:
-    paid(cli_tests.Script())
-
-    loaded = cli_tests._run(tmp_path)[1]
-
-    recorded = loaded.run.extra["identity"]
-    definition = (cli_tests.REPO_ROOT / "agents" / f"{cli_tests.ROLE}.md").read_bytes()
-    assert set(recorded) == {"tree", "model", "roles"}
-    assert len(recorded["tree"]) == len(hashlib.sha256().hexdigest())
-    assert (
-        recorded["roles"][cli_tests.ROLE]["definition_sha"]
-        == hashlib.sha256(definition).hexdigest()
-    )
-
-
-def test_a_run_whose_sessions_report_no_model_records_none(paid: Any, tmp_path: Path) -> None:
-    paid(cli_tests.Script())
-
-    assert cli_tests._run(tmp_path)[1].run.extra["identity"]["model"] is None
-
-
-def test_a_run_records_the_model_its_first_session_reported_and_keeps_it(
-    paid: Any, tmp_path: Path
-) -> None:
-    paid(Reports())
-
-    loaded = cli_tests._run(tmp_path)[1]
-
-    assert loaded.run.extra["identity"]["model"] == "model-1"
-
-
-def test_the_identity_a_run_wrote_reads_back_as_the_one_it_began_with(
-    paid: Any, tmp_path: Path
-) -> None:
-    paid(Reports(REPORTED))
-
-    loaded = cli_tests._run(tmp_path)[1]
-
-    identity = measured_identity(loaded, cli_tests.REPO_ROOT)
-    assert (identity.model, identity.seed) == (REPORTED, loaded.run.extra["seed"])
-    assert identity.roles == {
-        cli_tests.ROLE: role_identity(working_tree(cli_tests.REPO_ROOT), cli_tests.ROLE)
-    }
-
-
-def test_the_record_a_run_begins_with_names_the_tree_of_the_checkout(checkout: Path) -> None:
-    record = current_identity(checkout, ["researcher"])
-
-    assert record == {
-        "tree": tree_digest(checkout),
-        "model": None,
-        "roles": {
-            "researcher": {
-                "definition_sha": hashlib.sha256(DEFINITION.encode()).hexdigest(),
-                "kernel": None,
-            }
-        },
-    }
-
-
-# ---------------------------------------------------------------------------
-# Hook-written telemetry is not part of what a run was measured on
-# ---------------------------------------------------------------------------
-
-TELEMETRY_SUMMARY = ".ai-state/observations_summary.jsonl"
-TELEMETRY_SEGMENT = ".ai-state/observations-2026-10.jsonl"
-
-
-def test_a_change_confined_to_hook_written_telemetry_leaves_the_tree_digest(
-    checkout: Path,
-) -> None:
-    _put(checkout, TELEMETRY_SUMMARY, '{"sessions": 1}\n')
-    _git(checkout, "add", ".")
-    _git(checkout, "commit", "-q", "-m", "telemetry")
-    before = tree_digest(checkout)
-
-    _put(checkout, TELEMETRY_SUMMARY, '{"sessions": 2}\n')
-    _put(checkout, TELEMETRY_SEGMENT, '{"event": "spawn"}\n')
-
-    assert tree_digest(checkout) == before
-
-
-@pytest.mark.parametrize(
-    "path",
-    [ADOPTION, ".ai-state/observations.md", ".ai-state/notes/observations.jsonl"],
-    ids=["adoption ledger", "observations in another format", "a telemetry name below a folder"],
-)
-def test_a_change_beside_the_telemetry_still_changes_the_tree_digest(
-    checkout: Path, path: str
-) -> None:
-    before = tree_digest(checkout)
-
-    _put(checkout, path, "changed\n")
-
-    assert tree_digest(checkout) != before
-
-
-# ---------------------------------------------------------------------------
 # A run's lineage: the parts of one declared run
 # ---------------------------------------------------------------------------
 
 
-def _write_part(directory: Path, run_id: str, continues: str | None = None) -> None:
-    extra = {} if continues is None else {"continues": continues}
+def _write_part(
+    directory: Path, run_id: str, continues: str | None = None, ending: RunEnding | None = None
+) -> None:
+    extra: dict[str, Any] = {} if continues is None else {"continues": continues}
+    if ending is not None:
+        extra["ending"] = ending_to_json(ending)
     results.write_atomic(directory / f"{run_id}.json", run_results([], run_id=run_id, extra=extra))
 
 
@@ -1089,3 +644,262 @@ def test_a_run_that_planned_no_tasks_for_the_role_is_refused() -> None:
 
     with pytest.raises(ValueError, match=r"a run's planned tasks lacks 'researcher'"):
         relaunch_tasks(run, "researcher")
+
+
+# ---------------------------------------------------------------------------
+# Whether a stopped run may be continued
+# ---------------------------------------------------------------------------
+
+SEED = 7
+
+
+def _identity(tree: str = "tree-a", **changes: Any) -> MeasuredIdentity:
+    held: dict[str, Any] = {
+        "tree": tree,
+        "model": "claude-opus-5-5",
+        "seed": SEED,
+        "tasks": {"researcher": ("task-0", "task-1")},
+        "launch_orders": {},
+        "declared": declared(),
+        "roles": {},
+    }
+    return MeasuredIdentity(**{**held, **changes})
+
+
+def _tip(ending: RunEnding | None = None, continued_by: str | None = None) -> ReadTip:
+    extra = {} if ending is None else {"ending": ending_to_json(ending)}
+    return ReadTip(run_results([], run_id="run-a", extra=extra), _identity(), continued_by)
+
+
+def _refusals(
+    tip: ReadTip, now: MeasuredIdentity | None = None, options: Any = ()
+) -> tuple[str, ...]:
+    return continuation_refusals(tip, now or _identity(), options)
+
+
+@pytest.mark.parametrize(
+    "ending",
+    [_stop("both-arms"), SpendRefused(("task-1",))],
+    ids=["both-arms stop", "spend refusal"],
+)
+def test_a_run_that_stopped_continuably_and_still_measures_the_same_is_not_refused(
+    ending: RunEnding,
+) -> None:
+    assert _refusals(_tip(ending)) == ()
+
+
+def test_a_results_file_that_cannot_be_read_is_refused_naming_it() -> None:
+    unreadable = UnreadableTip(Path("out/20261020T000000Z-0badf1.json"), "it is not JSON")
+
+    refused = continuation_refusals(unreadable, _identity(), ())
+
+    assert refused == (
+        "20261020T000000Z-0badf1.json cannot be read as a results file: it is not JSON",
+    )
+
+
+@pytest.mark.parametrize(
+    ("ending", "said"),
+    [
+        (Finished(), "finished its plan"),
+        (_stop("one-arm"), "lean arm alone"),
+        (Interrupted(), "interrupted"),
+        (_closed(), "was closed on 2026-10-17T09:00:00Z: no credit left"),
+        (Legacy(), "before runs recorded how they ended"),
+    ],
+    ids=["complete run", "one-arm stop", "interrupt or crash", "closed run", "recorded before"],
+)
+def test_a_run_that_did_not_stop_continuably_is_refused_with_the_reason_and_its_name(
+    ending: RunEnding, said: str
+) -> None:
+    (refused,) = _refusals(_tip(None if isinstance(ending, Legacy) else ending))
+
+    assert refused.startswith("run run-a ")
+    assert said in refused
+
+
+def test_a_run_that_already_has_a_continuation_is_refused_naming_it() -> None:
+    (refused,) = _refusals(_tip(_stop(), continued_by="run-b"))
+
+    assert "already has a continuation, run-b" in refused
+
+
+@pytest.mark.parametrize("option", sorted(CONTINUATION_OPTIONS))
+def test_an_option_that_only_bounds_spend_or_output_may_accompany_a_continuation(
+    option: str,
+) -> None:
+    assert _refusals(_tip(_stop()), options=[option]) == ()
+
+
+@pytest.mark.parametrize("option", ["--margin-pp", "--seed", "--role"])
+def test_an_option_that_could_change_what_is_measured_is_refused_naming_it(option: str) -> None:
+    (refused,) = _refusals(_tip(_stop()), options=["--output", option])
+
+    assert refused.startswith(f"{option} would change what the run measures")
+
+
+@pytest.mark.parametrize(
+    ("now", "named"),
+    [
+        (_identity(tree="tree-b"), "tree"),
+        (_identity(model="claude-opus-5-6"), "model"),
+        (_identity(seed=8), "seed"),
+        (_identity(tasks={"researcher": ("task-1",)}), "tasks.researcher"),
+        (_identity(declared=replace(declared(), margin_pp=12.0)), "declared.margin_pp"),
+    ],
+    ids=["tree", "model", "seed", "tasks", "a declared setting"],
+)
+def test_a_difference_in_what_is_measured_is_refused_naming_it(
+    now: MeasuredIdentity, named: str
+) -> None:
+    (refused,) = _refusals(_tip(_stop()), now)
+
+    assert refused.startswith(f"changed since the stop: {named}")
+
+
+def test_every_reason_is_named_not_only_the_first() -> None:
+    refused = _refusals(_tip(Interrupted(), continued_by="run-b"), _identity(seed=9), ["--seed"])
+
+    assert [line.split(" ")[0] for line in refused] == ["run", "run", "--seed", "changed"]
+
+
+def test_how_well_the_run_did_never_decides_whether_it_is_continued() -> None:
+    errored = Errored("result_error", "boom")
+    outcomes = {
+        "none": [],
+        "all passed": [*pair_of_sessions("task-0")],
+        "lean errored": [session("task-0", "full"), session("task-0", "lean", errored)],
+    }
+    ending = {"ending": ending_to_json(_stop())}
+
+    refusals = {
+        name: continuation_refusals(
+            ReadTip(run_results(sessions, extra=ending), _identity()), _identity(), ()
+        )
+        for name, sessions in outcomes.items()
+    }
+
+    assert refusals == dict.fromkeys(outcomes, ())
+
+
+# ---------------------------------------------------------------------------
+# A stopped run left neither continued nor closed
+# ---------------------------------------------------------------------------
+
+
+def test_the_stopped_run_of_a_role_that_nothing_resolved_is_pending(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a", ending=Finished())
+    _write_part(tmp_path, "run-b", ending=_stop())
+
+    pending = pending_stop(tmp_path, "researcher")
+
+    assert pending == PartRef("run-b", tmp_path / "run-b.json", None)
+
+
+def test_a_stop_of_another_role_is_not_pending_for_this_one(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a", ending=_stop())
+
+    assert pending_stop(tmp_path, "verifier") is None
+
+
+def test_nothing_is_pending_in_a_directory_with_no_stopped_run(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a", ending=Finished())
+    (tmp_path / "notes.json").write_text("{}", encoding="utf-8")
+
+    assert pending_stop(tmp_path, "researcher") is None
+
+
+@pytest.mark.parametrize(
+    "ending",
+    [_stop("one-arm"), Interrupted(), _closed(), None],
+    ids=["one-arm stop", "interrupt", "closed", "recorded before endings"],
+)
+def test_a_run_that_was_not_continuable_when_it_stopped_blocks_nothing(
+    tmp_path: Path, ending: RunEnding | None
+) -> None:
+    _write_part(tmp_path, "run-a", ending=ending)
+
+    assert pending_stop(tmp_path, "researcher") is None
+
+
+def test_a_stop_that_was_continued_is_resolved_and_a_continuation_that_stopped_is_pending(
+    tmp_path: Path,
+) -> None:
+    _write_part(tmp_path, "run-a", ending=_stop())
+    _write_part(tmp_path, "run-b", continues="run-a", ending=SpendRefused(("task-1",)))
+
+    assert pending_stop(tmp_path, "researcher") == PartRef(
+        "run-b", tmp_path / "run-b.json", "run-a"
+    )
+
+    _write_part(tmp_path, "run-c", continues="run-b", ending=Finished())
+
+    assert pending_stop(tmp_path, "researcher") is None
+
+
+# ---------------------------------------------------------------------------
+# Closing a stopped run
+# ---------------------------------------------------------------------------
+
+CLOSED_AT = datetime(2026, 10, 17, 9, 0, tzinfo=UTC)
+
+
+def test_closing_a_stopped_run_records_the_reason_the_time_and_the_ending_it_closes() -> None:
+    stopped = _stop()
+
+    closed = close(_tip(stopped), "the credential is gone for good", CLOSED_AT)
+
+    assert (closed.reason, closed.at, closed.stopped) == (
+        "the credential is gone for good",
+        "2026-10-17T09:00:00+00:00",
+        stopped,
+    )
+    assert not continuable(closed)
+
+
+@pytest.mark.parametrize("reason", ["", "   "])
+def test_a_close_without_a_reason_is_refused(reason: str) -> None:
+    with pytest.raises(ValueError, match="closing a run needs a reason"):
+        close(_tip(_stop()), reason, CLOSED_AT)
+
+
+def test_a_close_at_a_time_that_names_no_offset_is_refused() -> None:
+    with pytest.raises(ValueError, match="must carry a UTC offset"):
+        close(_tip(_stop()), "gone", datetime(2026, 10, 17, 9, 0))
+
+
+@pytest.mark.parametrize(
+    "ending", [Finished(), _closed(), None], ids=["finished", "closed", "recorded before"]
+)
+def test_a_run_that_did_not_stop_cannot_be_closed(ending: RunEnding | None) -> None:
+    with pytest.raises(ValueError, match="did not stop"):
+        close(_tip(ending), "gone", CLOSED_AT)
+
+
+def test_only_the_latest_part_of_a_lineage_can_be_closed() -> None:
+    with pytest.raises(ValueError, match="continued by run-b"):
+        close(_tip(_stop(), continued_by="run-b"), "gone", CLOSED_AT)
+
+
+def test_the_closed_ending_carries_the_per_check_result_the_run_had_reached() -> None:
+    pairs = [s for task in ("task-0", "task-1") for s in pair_of_sessions(task)]
+    ending = {"ending": ending_to_json(_stop())}
+    tip = ReadTip(results_of(pairs, required_pairs=2, extra=ending), _identity())
+
+    interim = close(tip, "gone", CLOSED_AT).interim
+
+    assert interim == {"researcher.C1": "clear", "researcher.C3": "clear"}
+
+
+def test_a_role_short_of_pairs_is_carried_as_underpowered() -> None:
+    ending = {"ending": ending_to_json(_stop())}
+    tip = ReadTip(results_of([], required_pairs=2, extra=ending), _identity())
+
+    assert close(tip, "gone", CLOSED_AT).interim == {"researcher": "underpowered"}
+
+
+def test_a_closed_ending_survives_the_results_file(tmp_path: Path) -> None:
+    closed = close(_tip(_stop()), "gone", CLOSED_AT)
+    _write_part(tmp_path, "run-a", ending=closed)
+
+    assert ending_of(results.load(tmp_path / "run-a.json")) == closed

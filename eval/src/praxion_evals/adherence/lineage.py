@@ -17,45 +17,43 @@ is now a value of its own, ``RunEnding``, written to the file by the runner:
 Whether an ending can be continued is derived by ``continuable``, never stored, so it cannot
 disagree with the ending it summarises.
 
-What a run was measured on is a value of its own too, ``MeasuredIdentity``: the checkout's tree,
-the model a session reported, the seed, the planned tasks, the launch orders, the declared
-settings and, per role, the definition and kernel the role ran with. ``diff`` names every way two
-of them differ, so a continuation can be refused for a stated reason and an earlier run can be
-set apart from another by how it differs.
+What a run was measured on lives in ``run_identity``; the names other modules use are re-exported
+here. A continued run is a lineage of parts, each part's results file naming the one it continues
+(``Lineage``); a continuation launches again only the tasks nobody finished (``relaunch_tasks``)
+and is refused, naming every reason, unless the stopped run was continuable and still measures
+the same thing (``continuation_refusals``). A stopped run left neither continued nor closed
+blocks a fresh run of its role (``pending_stop``); ``close`` is how the operator resolves it.
 
-A continued run is a lineage of parts, each part's results file naming the one it continues
-(``Lineage``); a continuation launches again only the tasks nobody finished (``relaunch_tasks``).
-
-The ending and relaunch halves are pure: nothing in them touches a process, a file or a clock.
-``Lineage.parse`` reads a results directory. The identity half reads a checkout (or one commit of
-it) to measure it; ``diff`` is pure again.
+The ending, refusal and relaunch halves are pure: nothing in them touches a process, a file or a
+clock, and none reads a graded outcome to decide whether a run continues. ``Lineage.parse`` and
+``pending_stop`` read a results directory.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-import os
-import subprocess
-from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, fields, is_dataclass
-from fnmatch import fnmatchcase
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, assert_never, get_args
 
-import yaml
-
-from praxion_evals.adherence.grade import KERNEL_ACTIVE_STATUSES, KERNEL_LEDGER
 from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, Scope, StopReason
 from praxion_evals.adherence.model import (
     ARMS,
+    CLEARING_VERDICTS,
     ROLES,
-    DeclaredSettings,
+    Assessed,
     Errored,
     Measured,
     SessionStatus,
 )
-from praxion_evals.adherence.results import RunResults, load
+from praxion_evals.adherence.results import RunResults, flip_label, instant, load, role_verdicts
+from praxion_evals.adherence.run_identity import (  # noqa: F401  (re-exported for session_loop)
+    MeasuredIdentity,
+    current_identity,
+    diff,
+    measured_identity,
+)
 
 # ---------------------------------------------------------------------------
 # The ending
@@ -291,7 +289,7 @@ class Lineage:
         (a gap) or itself, and a run that two parts continue (a fork, even on a branch the
         named run is not on).
         """
-        parts = _parts_in(results_dir)
+        parts = {held: ref for held, (ref, _) in _runs_in(results_dir).items()}
         if run_id not in parts:
             raise ValueError(f"no results file in {results_dir} holds run {run_id}")
         chain = [_root_of(parts, run_id, results_dir)]
@@ -303,17 +301,19 @@ class Lineage:
         return cls(tuple(chain))
 
 
-def _parts_in(results_dir: Path) -> dict[str, PartRef]:
-    parts: dict[str, PartRef] = {}
+def _runs_in(results_dir: Path) -> dict[str, tuple[PartRef, RunResults]]:
+    """Every readable results file of ``results_dir`` by the run it holds, oldest file first."""
+    runs: dict[str, tuple[PartRef, RunResults]] = {}
     for path in sorted(results_dir.glob("*.json")):
         try:
-            run = load(path).run
+            results = load(path)
         except (OSError, ValueError, KeyError, TypeError):
             continue  # not a results file: the run's listing names it, and no lineage runs through it
-        if run.id in parts:
-            raise ValueError(f"{parts[run.id].path.name} and {path.name} both hold run {run.id}")
-        parts[run.id] = PartRef(run.id, path, run.extra.get("continues"))
-    return parts
+        run = results.run
+        if run.id in runs:
+            raise ValueError(f"{runs[run.id][0].path.name} and {path.name} both hold run {run.id}")
+        runs[run.id] = (PartRef(run.id, path, run.extra.get("continues")), results)
+    return runs
 
 
 def _root_of(parts: Mapping[str, PartRef], run_id: str, results_dir: Path) -> PartRef:
@@ -407,282 +407,163 @@ def _fails_as(status: SessionStatus, stop: StopReason) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# What the run was measured on
+# Whether a stopped run may be continued, and closing one
 # ---------------------------------------------------------------------------
 
-# Paths (fnmatch patterns over repository-relative paths) the tree digest leaves out. Results
-# files and the run index: committing one never changes what a later run was measured on.
-# Hook-written telemetry: rewritten on every session and tracked, and no session reads it as
-# guidance. Every other path counts, the adoption ledger included.
-RESULTS_DIR = ".ai-state/eval_ledger/adherence/"
-UNCOUNTED_PATHS: tuple[str, ...] = (RESULTS_DIR + "*", ".ai-state/observations*.jsonl")
-KERNEL_INDEX = "claude/kernels/index.json"
-DIGEST_SHOWN = 12  # characters of a digest a difference names
-
-# A repository-relative path's bytes, or None when the source has nothing there.
-Reader = Callable[[str], bytes | None]
-
-
-@dataclass(frozen=True)
-class RoleIdentity:
-    """What a role ran with: its definition's digest and the kernel version it received, or
-    ``None`` when the role was not adopted (delivered nothing) at the checkout."""
-
-    definition_sha: str
-    kernel: str | None
+# The options a continuation may be given beside the run it continues: they bound what it spends
+# or where it writes, never what it measures.
+CONTINUATION_OPTIONS = frozenset(
+    {
+        "--max-total-usd",
+        "--session-budget-usd",
+        "--keep-sandbox",
+        "--session-oauth-token-file",
+        "--output",
+    }
+)
 
 
 @dataclass(frozen=True)
-class UnknownIdentity:
-    """A role whose identity could not be read: a commit that is not reachable, a definition
-    that is gone. It matches nothing, itself included."""
+class ReadTip:
+    """The latest part of a lineage, read: its results, the identity it was measured on, and the
+    run that continues it (``None`` when none does, which is what a tip is)."""
 
+    results: RunResults
+    identity: MeasuredIdentity
+    continued_by: str | None = None
+
+
+@dataclass(frozen=True)
+class UnreadableTip:
+    """A results file named for continuation that is missing or does not read as one."""
+
+    path: Path
     reason: str
 
 
-RoleIdentityOrUnknown = RoleIdentity | UnknownIdentity
+Tip = ReadTip | UnreadableTip
 
 
-@dataclass(frozen=True)
-class MeasuredIdentity:
-    """Everything a run was measured on that a continuation must reproduce.
+def continuation_refusals(
+    tip: Tip, identity_now: MeasuredIdentity, supplied_options: Collection[str]
+) -> tuple[str, ...]:
+    """Every reason ``tip`` cannot be continued now, one line each; empty when it can.
 
-    ``tree`` is ``None`` for a file written before identity was recorded; ``model`` is ``None``
-    until a session reports one (the alias a run asked for is not a resolved model).
+    Refused: a results file that cannot be read; a run that did not stop continuably (it
+    finished, stopped in one arm alone, was interrupted or crashed, was closed, or predates
+    endings); a run something already continues; an option beyond ``CONTINUATION_OPTIONS``; and
+    any way ``identity_now`` differs from what the run was measured on. Only the ending and the
+    identity decide: how well the run did is never read.
     """
+    match tip:
+        case UnreadableTip(path=path, reason=reason):
+            return (f"{path.name} cannot be read as a results file: {reason}",)
+        case ReadTip():
+            return (
+                *_ending_refusals(tip),
+                *_continued_refusals(tip),
+                *_option_refusals(supplied_options),
+                *(f"changed since the stop: {line}" for line in diff(tip.identity, identity_now)),
+            )
+        case _:
+            assert_never(tip)
 
-    tree: str | None
-    model: str | None
-    seed: int
-    tasks: Mapping[str, tuple[str, ...]]  # the planned task ids, by role
-    launch_orders: Mapping[str, Mapping[str, tuple[str, ...]]]  # by role, then task id
-    declared: DeclaredSettings
-    roles: Mapping[str, RoleIdentityOrUnknown]
+
+def _ending_refusals(tip: ReadTip) -> tuple[str, ...]:
+    ending, run = ending_of(tip.results), tip.results.run.id
+    if continuable(ending):
+        return ()
+    match ending:
+        case Finished():
+            return (f"run {run} finished its plan; a complete run has nothing left to continue",)
+        case InfraStopped(reason=reason):
+            return (
+                f"run {run} stopped in the {reason.arm} arm alone; a stop confined to one arm is a"
+                " failure to count against the lean arm, not an outage to continue",
+            )
+        case Interrupted():
+            return (
+                f"run {run} was interrupted, not stopped; only an infrastructure stop in both arms"
+                " or a spend refusal is continued",
+            )
+        case Closed(reason=reason, at=at):
+            return (f"run {run} was closed on {at}: {reason}",)
+        case Legacy():
+            return (f"run {run} was recorded before runs recorded how they ended",)
+        case SpendRefused():
+            raise AssertionError("a spend refusal is continuable")
+        case _:
+            assert_never(ending)
 
 
-def measured_identity(recorded: RunResults, repo: Path) -> MeasuredIdentity:
-    """The identity a results file recorded. A file written before identity was recorded has
-    none, so each role's identity is derived from the commit it ran at, looked up in ``repo``."""
-    extra = recorded.run.extra
-    identity = extra.get("identity")
-    if identity is None:
-        commit = _field(_field(extra, "checkout", "a run"), "commit", "a checkout")
-        read = at_commit(repo, commit)
-        roles = {role: role_identity(read, role) for role in _field(extra, "roles", "a run")}
-        tree = model = None
-    else:
-        what = "a run identity"
-        roles = {role: _role_from_json(e) for role, e in _field(identity, "roles", what).items()}
-        tree, model = _field(identity, "tree", what), _field(identity, "model", what)
-    return MeasuredIdentity(
-        tree=tree,
-        model=model,
-        seed=_field(extra, "seed", "a run"),
-        tasks={role: tuple(ids) for role, ids in _field(extra, "tasks", "a run").items()},
-        launch_orders={
-            role: {task: tuple(order) for task, order in per_task.items()}
-            for role, per_task in extra.get("launch_order", {}).items()
-        },
-        declared=recorded.settings,
-        roles=roles,
+def _continued_refusals(tip: ReadTip) -> tuple[str, ...]:
+    if tip.continued_by is None:
+        return ()
+    return (
+        f"run {tip.results.run.id} already has a continuation, {tip.continued_by}; only the"
+        " latest part of a lineage is continued",
     )
 
 
-def diff(a: MeasuredIdentity, b: MeasuredIdentity) -> tuple[str, ...]:
-    """Every way ``a`` and ``b`` differ, one line each; empty when nothing differs.
+def _option_refusals(supplied: Collection[str]) -> tuple[str, ...]:
+    allowed = ", ".join(sorted(CONTINUATION_OPTIONS))
+    return tuple(
+        f"{option} would change what the run measures; a continuation takes only {allowed}"
+        for option in sorted(set(supplied) - CONTINUATION_OPTIONS)
+    )
 
-    A model that either run has not reported yet is not a difference: it is compared once both
-    are known. Neither is a launch order or a role only one of them recorded, since a run that
-    has not reached a task has drawn nothing for it. A role whose identity is unknown is
-    always reported.
+
+def pending_stop(results_dir: Path, role: str) -> PartRef | None:
+    """The oldest stopped run of ``role`` that was continuable when it stopped and has been
+    neither continued nor closed, or ``None``.
+
+    Keyed on the role alone, not on what the tree holds now: a commit elsewhere makes a stopped
+    run no longer continuable, and would otherwise release the operator from choosing between
+    continuing and closing. Closing is always possible, so this cannot deadlock a role.
     """
-    found = list(_differences("tree", _abbreviated(a.tree), _abbreviated(b.tree)))
-    if a.model is not None and b.model is not None:
-        found += _differences("model", a.model, b.model)
-    found += _differences("seed", a.seed, b.seed)
-    found += _differences("tasks", a.tasks, b.tasks)
-    found += _launch_order_differences(a.launch_orders, b.launch_orders)
-    found += _differences("declared", a.declared, b.declared)
-    for role in sorted(a.roles.keys() & b.roles.keys()):
-        found += _role_differences(role, a.roles[role], b.roles[role])
-    return tuple(found)
+    runs = _runs_in(results_dir).values()
+    continued = {ref.continues for ref, _ in runs}
+    for ref, results in runs:
+        stopped = continuable(ending_of(results)) and ref.run_id not in continued
+        if stopped and role in results.catalog:
+            return ref
+    return None
 
 
-def _launch_order_differences(
-    a: Mapping[str, Mapping[str, tuple[str, ...]]], b: Mapping[str, Mapping[str, tuple[str, ...]]]
-) -> Iterator[str]:
-    for role in sorted(a.keys() & b.keys()):
-        shared = a[role].keys() & b[role].keys()
-        yield from _differences(
-            f"launch_orders.{role}",
-            {task: a[role][task] for task in shared},
-            {task: b[role][task] for task in shared},
+def close(tip: ReadTip, reason: str, now: datetime) -> Closed:
+    """The ending that closes a stopped run, carrying the per-check result it had reached.
+
+    Refused: an empty reason; a run that is not at the end of its lineage; a run that did not
+    stop (a finished, closed or pre-ending run has nothing to give up on).
+    """
+    ending, run = ending_of(tip.results), tip.results.run.id
+    if tip.continued_by is not None:
+        raise ValueError(
+            f"run {run} is continued by {tip.continued_by}; only the latest part is closed"
         )
+    if not isinstance(ending, InfraStopped | SpendRefused | Interrupted):
+        raise ValueError(
+            f"run {run} did not stop ({type(ending).__name__}), so there is nothing to close"
+        )
+    return Closed(
+        reason,
+        instant(now.isoformat(), "the closing time").isoformat(),
+        _interim(tip.results),
+        ending,
+    )
 
 
-def _role_differences(role: str, a: RoleIdentityOrUnknown, b: RoleIdentityOrUnknown) -> list[str]:
-    if isinstance(a, UnknownIdentity):
-        return [f"roles.{role}: identity unknown ({a.reason})"]
-    if isinstance(b, UnknownIdentity):
-        return [f"roles.{role}: identity unknown ({b.reason})"]
-    return [
-        *_differences(
-            f"roles.{role}.definition",
-            _abbreviated(a.definition_sha),
-            _abbreviated(b.definition_sha),
-        ),
-        *_differences(f"roles.{role}.kernel", a.kernel, b.kernel),
-    ]
-
-
-def _abbreviated(digest: str | None) -> str | None:
-    return None if digest is None else digest[:DIGEST_SHOWN]
-
-
-def _differences(label: str, a: Any, b: Any) -> Iterator[str]:
-    """One line per leaf that differs, named by its path (``declared.stop_rule.count``)."""
-    if is_dataclass(a) and type(a) is type(b):
-        for each in fields(a):
-            yield from _differences(
-                f"{label}.{each.name}", getattr(a, each.name), getattr(b, each.name)
-            )
-    elif isinstance(a, Mapping) and isinstance(b, Mapping):
-        for key in sorted(a.keys() | b.keys()):
-            yield from _differences(f"{label}.{key}", a.get(key), b.get(key))
-    elif a != b:
-        yield f"{label}: {_shown(a)} -> {_shown(b)}"
-
-
-def _shown(value: Any) -> str:
-    if isinstance(value, set | frozenset):
-        value = sorted(value)
-    if isinstance(value, list | tuple):
-        return "[" + ", ".join(str(item) for item in value) + "]"
-    return str(value)
-
-
-# --- measuring a checkout, or one commit of it ---
-
-
-def current_identity(checkout: Path, roles: Sequence[str]) -> dict[str, Any]:
-    """The identity record a run writes when it begins: the checkout's tree and each role's
-    identity there. The model is ``None`` until the first session reports one."""
-    read = working_tree(checkout)
-    return {
-        "tree": tree_digest(checkout),
-        "model": None,
-        "roles": {role: _role_to_json(role_identity(read, role)) for role in roles},
-    }
-
-
-def tree_digest(checkout: Path) -> str:
-    """sha256 over the sorted ``(path, blob id)`` of every file git tracks, or would add because
-    it is not ignored, outside ``UNCOUNTED_PATHS``, with the contents the working tree holds now.
-
-    An ignored file is not part of the identity: scratch space and build output are not what
-    the roles run on. The blob id is git's (sha1 of ``blob <size>`` NUL and the content),
-    computed here so the digest does not depend on git's line-ending filters or the platform.
-    """
-    listed = _git(checkout, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-    digest = hashlib.sha256()
-    for path in sorted(set(listed.split(b"\0")) - {b""}):
-        name = os.fsdecode(path)
-        if any(fnmatchcase(name, pattern) for pattern in UNCOUNTED_PATHS):
+def _interim(results: RunResults) -> dict[str, str]:
+    """Each role's per-check outcome as the flip would label it, keyed ``role.check``; a role
+    short of pairs has no checks to label and stands as itself."""
+    interim: dict[str, str] = {}
+    for role, role_verdict in role_verdicts(results).items():
+        if not isinstance(role_verdict, Assessed):
+            interim[role] = flip_label(role_verdict)
             continue
-        blob = _blob_id(checkout / name)
-        if blob is not None:  # a tracked file deleted from the tree, or a submodule, has none
-            digest.update(blob.encode() + b"\t" + path + b"\0")
-    return digest.hexdigest()
-
-
-def _blob_id(path: Path) -> str | None:
-    if path.is_symlink():
-        content = os.fsencode(os.readlink(path))
-    elif path.is_file():
-        content = path.read_bytes()
-    else:
-        return None
-    return hashlib.sha1(b"blob %d\0" % len(content) + content, usedforsecurity=False).hexdigest()
-
-
-def working_tree(checkout: Path) -> Reader:
-    def read(path: str) -> bytes | None:
-        try:
-            return (checkout / path).read_bytes()
-        except OSError:
-            return None
-
-    return read
-
-
-def at_commit(repo: Path, commit: str) -> Reader:
-    def read(path: str) -> bytes | None:
-        try:
-            return _git(repo, "show", f"{commit}:{path}")
-        except ValueError:  # the commit is not reachable in this repository, or lacks the path
-            return None
-
-    return read
-
-
-def role_identity(read: Reader, role: str) -> RoleIdentityOrUnknown:
-    path = f"agents/{role}.md"
-    definition = read(path)
-    if definition is None:
-        return UnknownIdentity(f"{path} cannot be read")
-    kernel = None
-    if _receives_kernel(read, role):
-        kernel = _kernel_version(read)
-        if kernel is None:
-            return UnknownIdentity(f"{role} receives a kernel but {KERNEL_INDEX} cannot be read")
-    return RoleIdentity(hashlib.sha256(definition).hexdigest(), kernel)
-
-
-def _receives_kernel(read: Reader, role: str) -> bool:
-    """Whether the adoption ledger has the role receiving a kernel at spawn. Mirrors the
-    delivering hook: a ledger that is absent or does not read, or a role at no delivering
-    status, hands over nothing."""
-    ledger = read(str(KERNEL_LEDGER))
-    try:
-        roles = (yaml.safe_load(ledger) or {}).get("roles") if ledger is not None else None
-    except (yaml.YAMLError, AttributeError):
-        return False
-    entry = roles.get(role) if isinstance(roles, dict) else None
-    return isinstance(entry, dict) and entry.get("status") in KERNEL_ACTIVE_STATUSES
-
-
-def _kernel_version(read: Reader) -> str | None:
-    index = read(KERNEL_INDEX)
-    try:
-        version = json.loads(index).get("kernel_version") if index is not None else None
-    except (ValueError, AttributeError):
-        return None
-    return version if isinstance(version, str) else None
-
-
-def _git(repo: Path, *args: str) -> bytes:
-    try:
-        done = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=True)
-    except subprocess.CalledProcessError as error:
-        raise ValueError(f"`git {' '.join(args)}` failed in {repo}") from error
-    return done.stdout
-
-
-# --- the wire form: ``run.identity`` in the results file ---
-
-
-def _role_to_json(identity: RoleIdentityOrUnknown) -> dict[str, Any]:
-    match identity:
-        case RoleIdentity(definition_sha=sha, kernel=kernel):
-            return {"definition_sha": sha, "kernel": kernel}
-        case UnknownIdentity(reason=reason):
-            return {"unknown": reason}
-        case _:
-            assert_never(identity)
-
-
-def _role_from_json(data: _Json) -> RoleIdentityOrUnknown:
-    if "unknown" in data:
-        return UnknownIdentity(data["unknown"])
-    what = "a role identity"
-    return RoleIdentity(_field(data, "definition_sha", what), _field(data, "kernel", what))
+        for check, verdict in role_verdict.check_verdicts.items():
+            clears = (
+                isinstance(verdict, CLEARING_VERDICTS) and check not in role_verdict.not_covered
+            )
+            interim[f"{role}.{check}"] = "clear" if clears else "not clear"
+    return interim

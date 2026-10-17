@@ -16,14 +16,16 @@ import pytest
 
 import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import report, results
-from praxion_evals.adherence.infra_stop import Launched, StopReason, StopRule
+from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, StopReason, StopRule
 from praxion_evals.adherence.lineage import (
     Closed,
     Finished,
     InfraStopped,
     Interrupted,
     Legacy,
+    Lineage,
     MeasuredIdentity,
+    PartRef,
     RoleIdentity,
     RunEnding,
     SpendRefused,
@@ -36,12 +38,16 @@ from praxion_evals.adherence.lineage import (
     ending_of,
     ending_to_json,
     measured_identity,
+    never_launched,
+    relaunch_tasks,
     role_identity,
     tree_digest,
     working_tree,
 )
+from praxion_evals.adherence.model import Errored
 from praxion_evals.live.session import SessionRun, SessionSpec
 from tests.test_adherence_report import results_of
+from tests.test_adherence_results import pair_of_sessions, run_results, session
 
 # The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
 # role unswitched, shared with the paid-loop tests of the command line.
@@ -701,3 +707,385 @@ def test_the_record_a_run_begins_with_names_the_tree_of_the_checkout(checkout: P
             }
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Hook-written telemetry is not part of what a run was measured on
+# ---------------------------------------------------------------------------
+
+TELEMETRY_SUMMARY = ".ai-state/observations_summary.jsonl"
+TELEMETRY_SEGMENT = ".ai-state/observations-2026-10.jsonl"
+
+
+def test_a_change_confined_to_hook_written_telemetry_leaves_the_tree_digest(
+    checkout: Path,
+) -> None:
+    _put(checkout, TELEMETRY_SUMMARY, '{"sessions": 1}\n')
+    _git(checkout, "add", ".")
+    _git(checkout, "commit", "-q", "-m", "telemetry")
+    before = tree_digest(checkout)
+
+    _put(checkout, TELEMETRY_SUMMARY, '{"sessions": 2}\n')
+    _put(checkout, TELEMETRY_SEGMENT, '{"event": "spawn"}\n')
+
+    assert tree_digest(checkout) == before
+
+
+@pytest.mark.parametrize(
+    "path",
+    [ADOPTION, ".ai-state/observations.md", ".ai-state/notes/observations.jsonl"],
+    ids=["adoption ledger", "observations in another format", "a telemetry name below a folder"],
+)
+def test_a_change_beside_the_telemetry_still_changes_the_tree_digest(
+    checkout: Path, path: str
+) -> None:
+    before = tree_digest(checkout)
+
+    _put(checkout, path, "changed\n")
+
+    assert tree_digest(checkout) != before
+
+
+# ---------------------------------------------------------------------------
+# A run's lineage: the parts of one declared run
+# ---------------------------------------------------------------------------
+
+
+def _write_part(directory: Path, run_id: str, continues: str | None = None) -> None:
+    extra = {} if continues is None else {"continues": continues}
+    results.write_atomic(directory / f"{run_id}.json", run_results([], run_id=run_id, extra=extra))
+
+
+def _ids(chain: Lineage) -> list[str]:
+    return [part.run_id for part in chain.parts]
+
+
+def test_a_run_nothing_continues_is_a_lineage_of_one_part(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+
+    chain = Lineage.parse(tmp_path, "run-a")
+
+    assert (_ids(chain), chain.tip.run_id) == (["run-a"], "run-a")
+
+
+@pytest.mark.parametrize("named", ["run-a", "run-b", "run-c"])
+def test_any_part_names_the_whole_lineage_oldest_first(tmp_path: Path, named: str) -> None:
+    _write_part(tmp_path, "run-c", continues="run-b")
+    _write_part(tmp_path, "run-a")
+    _write_part(tmp_path, "run-b", continues="run-a")
+
+    assert _ids(Lineage.parse(tmp_path, named)) == ["run-a", "run-b", "run-c"]
+
+
+def test_only_the_latest_part_is_the_tip(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+    _write_part(tmp_path, "run-b", continues="run-a")
+
+    assert Lineage.parse(tmp_path, "run-a").tip.run_id == "run-b"
+
+
+def test_a_part_remembers_its_file_and_the_run_it_continues(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+    _write_part(tmp_path, "run-b", continues="run-a")
+
+    first, second = Lineage.parse(tmp_path, "run-b").parts
+
+    assert (first, second) == (
+        PartRef("run-a", tmp_path / "run-a.json", None),
+        PartRef("run-b", tmp_path / "run-b.json", "run-a"),
+    )
+
+
+def test_runs_that_are_not_in_the_lineage_are_left_out(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+    _write_part(tmp_path, "run-b", continues="run-a")
+    _write_part(tmp_path, "run-elsewhere")
+
+    assert _ids(Lineage.parse(tmp_path, "run-a")) == ["run-a", "run-b"]
+
+
+def test_a_json_file_that_is_not_a_results_file_does_not_break_a_lineage(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+    (tmp_path / "stray.json").write_text("[1, 2]", encoding="utf-8")
+
+    assert _ids(Lineage.parse(tmp_path, "run-a")) == ["run-a"]
+
+
+@pytest.mark.parametrize("named", ["run-a", "run-b", "run-c"])
+def test_a_lineage_where_two_parts_continue_one_is_refused_whichever_part_is_named(
+    tmp_path: Path, named: str
+) -> None:
+    _write_part(tmp_path, "run-a")
+    _write_part(tmp_path, "run-b", continues="run-a")
+    _write_part(tmp_path, "run-c", continues="run-a")
+
+    with pytest.raises(ValueError, match=r"forks: run-b, run-c all continue run-a"):
+        Lineage.parse(tmp_path, named)
+
+
+def test_a_part_continuing_a_run_no_file_holds_is_a_gap(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-b", continues="run-lost")
+
+    with pytest.raises(ValueError, match=r"gap: run run-b continues run-lost"):
+        Lineage.parse(tmp_path, "run-b")
+
+
+def test_a_predecessor_that_cannot_be_read_is_a_gap(tmp_path: Path) -> None:
+    (tmp_path / "run-a.json").write_text("{not json", encoding="utf-8")
+    _write_part(tmp_path, "run-b", continues="run-a")
+
+    with pytest.raises(ValueError, match=r"gap: run run-b continues run-a"):
+        Lineage.parse(tmp_path, "run-b")
+
+
+def test_parts_that_continue_each_other_are_refused_as_a_loop(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a", continues="run-b")
+    _write_part(tmp_path, "run-b", continues="run-a")
+
+    with pytest.raises(ValueError, match=r"loops"):
+        Lineage.parse(tmp_path, "run-a")
+
+
+def test_a_run_no_file_holds_has_no_lineage(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+
+    with pytest.raises(ValueError, match=r"holds run run-missing"):
+        Lineage.parse(tmp_path, "run-missing")
+
+
+def test_two_files_holding_one_run_are_refused(tmp_path: Path) -> None:
+    _write_part(tmp_path, "run-a")
+    (tmp_path / "copy.json").write_text((tmp_path / "run-a.json").read_text(), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"copy.json and run-a.json both hold run run-a"):
+        Lineage.parse(tmp_path, "run-a")
+
+
+def test_a_lineage_has_a_part() -> None:
+    with pytest.raises(ValueError, match=r"at least one part"):
+        Lineage(())
+
+
+def test_a_lineage_built_out_of_order_is_refused() -> None:
+    first = PartRef("run-a", Path("run-a.json"), None)
+    second = PartRef("run-b", Path("run-b.json"), "run-a")
+
+    with pytest.raises(ValueError, match=r"run run-b continues 'run-a', not its predecessor None"):
+        Lineage((second, first))
+
+
+# ---------------------------------------------------------------------------
+# What a continuation launches again
+# ---------------------------------------------------------------------------
+
+STOPPING_TAIL = "fatal: the session channel closed unexpectedly"
+STOPPING_KIND = "exit_nonzero"
+COMPLETE_PAIR, LEAN_BEFORE_STREAK, LEAN_ONLY, FULL_ONLY = "task-1", "task-2", "task-3", "task-4"
+LEAN_IN_STREAK, BOTH_IN_STREAK, REFUSED, NOT_REACHED = "task-5", "task-6", "task-7", "task-8"
+PLANNED = (
+    COMPLETE_PAIR,
+    LEAN_BEFORE_STREAK,
+    LEAN_ONLY,
+    FULL_ONLY,
+    LEAN_IN_STREAK,
+    BOTH_IN_STREAK,
+    REFUSED,
+    NOT_REACHED,
+)
+EIGHT_SHAPES = {
+    "a complete pair": COMPLETE_PAIR,
+    "a lean session of the stopping kind and tail before the streak": LEAN_BEFORE_STREAK,
+    "a lean-only error of another kind": LEAN_ONLY,
+    "a full-only error of another kind": FULL_ONLY,
+    "a full session complete and its lean session inside the streak": LEAN_IN_STREAK,
+    "both sessions inside the streak": BOTH_IN_STREAK,
+    "a launch the spend cap refused": REFUSED,
+    "a task never launched": NOT_REACHED,
+}
+LAUNCHED_AGAIN = {LEAN_IN_STREAK, BOTH_IN_STREAK, REFUSED, NOT_REACHED}
+
+
+def failed(task: str, arm: str, kind: str = STOPPING_KIND, tail: str = STOPPING_TAIL):
+    status = Errored(kind, "the session failed", tails=EvidenceTail(tail, ""))  # type: ignore[arg-type]
+    return session(task, arm, status)
+
+
+def stopped_at(*streak: tuple[str, int], arm: str = "lean", tail: str = STOPPING_TAIL):
+    sessions = tuple(Launched(task, arm, attempt) for task, attempt in streak)  # type: ignore[arg-type]
+    masked = EvidenceTail(tail, "").masked()
+    return InfraStopped(
+        StopReason(STOPPING_KIND, masked, "researcher", arm, sessions, "both-arms")  # type: ignore[arg-type]
+    )
+
+
+def stopped_run(sessions, ending: RunEnding, planned=PLANNED) -> results.RunResults:
+    extra = {"tasks": {"researcher": list(planned)}, "ending": ending_to_json(ending)}
+    return run_results(sessions, extra=extra)
+
+
+def eight_shapes_run() -> results.RunResults:
+    """The streak is the last three lean sessions: the lean retry pair of one task, then one
+    more; the full arm of the last streak task failed the same way inside the window."""
+    sessions = [
+        *pair_of_sessions(COMPLETE_PAIR),
+        session(LEAN_BEFORE_STREAK, "full"),
+        *[failed(LEAN_BEFORE_STREAK, "lean")] * 2,
+        session(LEAN_ONLY, "full"),
+        *[failed(LEAN_ONLY, "lean", "no_result_event", "")] * 2,
+        *[failed(FULL_ONLY, "full", "envelope_unparseable", "")] * 2,
+        session(FULL_ONLY, "lean"),
+        failed(REFUSED, "full", "launch_refused", ""),
+        failed(REFUSED, "lean", "launch_refused", ""),
+        session(LEAN_IN_STREAK, "full"),
+        *[failed(LEAN_IN_STREAK, "lean")] * 2,
+        *[failed(BOTH_IN_STREAK, "full")] * 2,
+        failed(BOTH_IN_STREAK, "lean"),
+    ]
+    streak = ((LEAN_IN_STREAK, 1), (LEAN_IN_STREAK, 2), (BOTH_IN_STREAK, 1))
+    return stopped_run(sessions, stopped_at(*streak))
+
+
+@pytest.mark.parametrize("task", EIGHT_SHAPES.values(), ids=EIGHT_SHAPES.keys())
+def test_a_task_is_launched_again_only_when_nothing_finished_it(task: str) -> None:
+    relaunched = relaunch_tasks(eight_shapes_run(), "researcher")
+
+    assert (task in relaunched) == (task in LAUNCHED_AGAIN)
+
+
+def test_the_tasks_launched_again_keep_the_order_the_run_planned_them_in() -> None:
+    assert relaunch_tasks(eight_shapes_run(), "researcher") == (
+        LEAN_IN_STREAK,
+        BOTH_IN_STREAK,
+        REFUSED,
+        NOT_REACHED,
+    )
+
+
+def test_the_sessions_never_launched_are_the_refused_ones_and_those_in_the_streak() -> None:
+    run = eight_shapes_run()
+
+    ignored = [
+        (r.setup.task_id, r.setup.arm)
+        for i, r in enumerate(run.sessions)
+        if i in never_launched(run)
+    ]
+
+    assert ignored == [
+        (REFUSED, "full"),
+        (REFUSED, "lean"),
+        (LEAN_IN_STREAK, "lean"),
+        (LEAN_IN_STREAK, "lean"),
+        (BOTH_IN_STREAK, "full"),
+        (BOTH_IN_STREAK, "full"),
+        (BOTH_IN_STREAK, "lean"),
+    ]
+
+
+def test_a_full_session_of_the_stopping_kind_and_tail_before_the_streak_keeps_its_outcome() -> None:
+    sessions = [
+        *[failed("early", "full")] * 2,
+        session("early", "lean"),
+        session("late", "full"),
+        *[failed("late", "lean")] * 3,
+    ]
+    streak = (("late", 1), ("late", 2), ("late", 3))
+    run = stopped_run(sessions, stopped_at(*streak), ("early", "late"))
+
+    assert relaunch_tasks(run, "researcher") == ("late",)
+
+
+def test_a_full_session_of_another_tail_inside_the_streaks_window_keeps_its_outcome() -> None:
+    other = "fatal: another channel failed"
+    sessions = [
+        session("b", "lean"),
+        session("a", "full"),
+        failed("a", "lean"),
+        *[failed("b", "full", tail=other)] * 2,
+        session("c", "full"),
+        *[failed("c", "lean")] * 2,
+    ]
+    run = stopped_run(sessions, stopped_at(("a", 1), ("c", 1), ("c", 2)), ("a", "b", "c"))
+
+    assert relaunch_tasks(run, "researcher") == ("a", "c")
+
+
+def test_a_full_session_of_another_kind_inside_the_streaks_window_keeps_its_outcome() -> None:
+    sessions = [
+        session("b", "lean"),
+        session("a", "full"),
+        failed("a", "lean"),
+        *[failed("b", "full", "no_result_event", STOPPING_TAIL)] * 2,
+        session("c", "full"),
+        *[failed("c", "lean")] * 2,
+    ]
+    run = stopped_run(sessions, stopped_at(("a", 1), ("c", 1), ("c", 2)), ("a", "b", "c"))
+
+    assert relaunch_tasks(run, "researcher") == ("a", "c")
+
+
+def test_a_lean_session_that_retried_into_a_measured_one_with_a_full_session_is_a_pair() -> None:
+    sessions = [
+        session("a", "full"),
+        failed("a", "lean", "no_result_event", ""),
+        session("a", "lean"),
+    ]
+    run = stopped_run(sessions, Interrupted(), ("a",))
+
+    assert relaunch_tasks(run, "researcher") == ()
+
+
+def test_an_interrupted_run_launches_again_the_tasks_it_never_finished() -> None:
+    sessions = [*pair_of_sessions("a"), session("b", "full")]
+    run = stopped_run(sessions, Interrupted(), ("a", "b", "c"))
+
+    assert relaunch_tasks(run, "researcher") == ("b", "c")
+
+
+def test_a_spend_refusal_launches_again_the_refused_tasks_and_the_unreached_ones() -> None:
+    sessions = [
+        *pair_of_sessions("a"),
+        failed("b", "full", "launch_refused", ""),
+        failed("b", "lean", "launch_refused", ""),
+    ]
+    run = stopped_run(sessions, SpendRefused(("b",)), ("a", "b", "c"))
+
+    assert relaunch_tasks(run, "researcher") == ("b", "c")
+
+
+def test_a_run_that_recorded_no_session_launches_every_planned_task() -> None:
+    assert relaunch_tasks(stopped_run([], Interrupted(), ("a", "b")), "researcher") == ("a", "b")
+
+
+def test_a_session_recorded_before_tails_were_kept_counts_as_one_with_an_empty_tail() -> None:
+    old = session("b", "full", Errored(STOPPING_KIND, "the session failed"))  # type: ignore[arg-type]
+    sessions = [
+        session("b", "lean"),
+        failed("a", "lean", tail=""),
+        old,
+        failed("c", "lean", tail=""),
+    ]
+    run = stopped_run(sessions, stopped_at(("a", 1), ("c", 1), tail=""), ("a", "b", "c"))
+
+    assert relaunch_tasks(run, "researcher") == ("a", "b", "c")
+
+
+def test_a_stop_naming_sessions_the_arm_did_not_end_on_is_refused() -> None:
+    sessions = [failed("a", "lean"), session("b", "lean")]
+    run = stopped_run(sessions, stopped_at(("a", 1)), ("a", "b"))
+
+    with pytest.raises(ValueError, match=r"the stop names sessions that the researcher lean arm"):
+        relaunch_tasks(run, "researcher")
+
+
+def test_a_stop_naming_no_session_is_refused() -> None:
+    run = stopped_run([failed("a", "lean")], stopped_at(), ("a",))
+
+    with pytest.raises(ValueError, match=r"the stop names sessions"):
+        relaunch_tasks(run, "researcher")
+
+
+def test_a_run_that_planned_no_tasks_for_the_role_is_refused() -> None:
+    run = run_results([], extra={"tasks": {}, "ending": ending_to_json(Interrupted())})
+
+    with pytest.raises(ValueError, match=r"a run's planned tasks lacks 'researcher'"):
+        relaunch_tasks(run, "researcher")

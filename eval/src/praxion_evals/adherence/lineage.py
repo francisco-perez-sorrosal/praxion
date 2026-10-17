@@ -23,8 +23,12 @@ settings and, per role, the definition and kernel the role ran with. ``diff`` na
 of them differ, so a continuation can be refused for a stated reason and an earlier run can be
 set apart from another by how it differs.
 
-The ending half is pure: nothing in it touches a process, a file or a clock. The identity half
-reads a checkout (or one commit of it) to measure it; ``diff`` is pure again.
+A continued run is a lineage of parts, each part's results file naming the one it continues
+(``Lineage``); a continuation launches again only the tasks nobody finished (``relaunch_tasks``).
+
+The ending and relaunch halves are pure: nothing in them touches a process, a file or a clock.
+``Lineage.parse`` reads a results directory. The identity half reads a checkout (or one commit of
+it) to measure it; ``diff`` is pure again.
 """
 
 from __future__ import annotations
@@ -35,15 +39,23 @@ import os
 import subprocess
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields, is_dataclass
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, assert_never, get_args
 
 import yaml
 
 from praxion_evals.adherence.grade import KERNEL_ACTIVE_STATUSES, KERNEL_LEDGER
-from praxion_evals.adherence.infra_stop import Launched, Scope, StopReason
-from praxion_evals.adherence.model import ARMS, ROLES, DeclaredSettings
-from praxion_evals.adherence.results import RunResults
+from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, Scope, StopReason
+from praxion_evals.adherence.model import (
+    ARMS,
+    ROLES,
+    DeclaredSettings,
+    Errored,
+    Measured,
+    SessionStatus,
+)
+from praxion_evals.adherence.results import RunResults, load
 
 # ---------------------------------------------------------------------------
 # The ending
@@ -232,13 +244,178 @@ def _choice(value: Any, choices: tuple[str, ...], name: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# A run's lineage: the parts of one declared run
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PartRef:
+    """One results file of a lineage: the run it holds and the run it continues."""
+
+    run_id: str
+    path: Path
+    continues: str | None
+
+
+@dataclass(frozen=True)
+class Lineage:
+    """The parts of one declared run, oldest first: the first continues nothing, every later
+    part names its predecessor. Only the tip may be continued or closed.
+
+    The chain is checked here, at construction; ``parse`` is how a results directory becomes one.
+    """
+
+    parts: tuple[PartRef, ...]
+
+    def __post_init__(self) -> None:
+        if not self.parts:
+            raise ValueError("a lineage has at least one part")
+        predecessor = None
+        for part in self.parts:
+            if part.continues != predecessor:
+                raise ValueError(
+                    f"run {part.run_id} continues {part.continues!r}, not its predecessor"
+                    f" {predecessor!r}"
+                )
+            predecessor = part.run_id
+
+    @property
+    def tip(self) -> PartRef:
+        return self.parts[-1]
+
+    @classmethod
+    def parse(cls, results_dir: Path, run_id: str) -> Lineage:
+        """The whole lineage ``run_id`` belongs to, whichever of its parts that is.
+
+        Refused: a run no readable results file holds, a part continuing a run that is missing
+        (a gap) or itself, and a run that two parts continue (a fork, even on a branch the
+        named run is not on).
+        """
+        parts = _parts_in(results_dir)
+        if run_id not in parts:
+            raise ValueError(f"no results file in {results_dir} holds run {run_id}")
+        chain = [_root_of(parts, run_id, results_dir)]
+        while later := [p for p in parts.values() if p.continues == chain[-1].run_id]:
+            if len(later) > 1:
+                names = ", ".join(sorted(p.run_id for p in later))
+                raise ValueError(f"the lineage forks: {names} all continue {chain[-1].run_id}")
+            chain.append(later[0])
+        return cls(tuple(chain))
+
+
+def _parts_in(results_dir: Path) -> dict[str, PartRef]:
+    parts: dict[str, PartRef] = {}
+    for path in sorted(results_dir.glob("*.json")):
+        try:
+            run = load(path).run
+        except (OSError, ValueError, KeyError, TypeError):
+            continue  # not a results file: the run's listing names it, and no lineage runs through it
+        if run.id in parts:
+            raise ValueError(f"{parts[run.id].path.name} and {path.name} both hold run {run.id}")
+        parts[run.id] = PartRef(run.id, path, run.extra.get("continues"))
+    return parts
+
+
+def _root_of(parts: Mapping[str, PartRef], run_id: str, results_dir: Path) -> PartRef:
+    part, walked = parts[run_id], {run_id}
+    while part.continues is not None:
+        earlier = parts.get(part.continues)
+        if earlier is None:
+            raise ValueError(
+                f"the lineage has a gap: run {part.run_id} continues {part.continues}, which no"
+                f" readable results file in {results_dir} holds"
+            )
+        if earlier.run_id in walked:
+            raise ValueError(f"the lineage loops: run {earlier.run_id} continues itself")
+        walked.add(earlier.run_id)
+        part = earlier
+    return part
+
+
+# ---------------------------------------------------------------------------
+# What a continuation launches again
+# ---------------------------------------------------------------------------
+
+LAUNCH_REFUSED = "launch_refused"  # the error kind of a session the spend cap refused
+
+
+def relaunch_tasks(results: RunResults, role: str) -> tuple[str, ...]:
+    """The role's planned tasks a continuation launches again, whole in every arm, in planned
+    order: those with no complete pair and no session that ended otherwise.
+
+    A session ``never_launched`` does not count either way. Every other session keeps its
+    outcome, so a task whose lean side alone errored is not launched again and stays a lean
+    failure in the worst-case recount.
+    """
+    ignored = never_launched(results)
+    latest: dict[str, dict[str, SessionStatus]] = {}
+    for position, record in enumerate(results.sessions):
+        if record.setup.role == role and position not in ignored:
+            latest.setdefault(record.setup.task_id, {})[record.setup.arm] = record.status
+    planned = _field(_field(results.run.extra, "tasks", "a run"), role, "a run's planned tasks")
+    return tuple(task for task in planned if _unfinished(latest.get(task, {})))
+
+
+def _unfinished(latest: Mapping[str, SessionStatus]) -> bool:
+    """``latest`` is a task's last status per arm: unfinished when every one was measured and
+    they do not make a pair."""
+    measured = all(isinstance(status, Measured) for status in latest.values())
+    return measured and set(latest) != set(ARMS)
+
+
+def never_launched(results: RunResults) -> frozenset[int]:
+    """Positions in ``results.sessions`` a continuation treats as never launched: the sessions
+    the spend cap refused, the stopping streak, and the other arm's errors of the streak's kind
+    and masked tail inside the streak's window. A session of that kind and tail before the
+    streak is not among them: the failure stands."""
+    refused = {
+        position
+        for position, record in enumerate(results.sessions)
+        if isinstance(record.status, Errored) and record.status.kind == LAUNCH_REFUSED
+    }
+    return frozenset(refused | _inside_the_stop(results))
+
+
+def _inside_the_stop(results: RunResults) -> set[int]:
+    ending = ending_of(results)
+    if not isinstance(ending, InfraStopped):
+        return set()
+    stop, sessions = ending.reason, results.sessions
+    of_arm = [
+        i for i, r in enumerate(sessions) if (r.setup.role, r.setup.arm) == (stop.role, stop.arm)
+    ]
+    streak = of_arm[len(of_arm) - len(stop.sessions) :]
+    named = [(sessions[i].setup.task_id, sessions[i].setup.arm) for i in streak]
+    if not streak or named != [(s.task_id, s.arm) for s in stop.sessions]:
+        raise ValueError(
+            f"the stop names sessions that the {stop.role} {stop.arm} arm did not end on"
+        )
+    alike = {
+        i
+        for i in range(streak[0], streak[-1] + 1)
+        if sessions[i].setup.role == stop.role
+        and sessions[i].setup.arm != stop.arm
+        and _fails_as(sessions[i].status, stop)
+    }
+    return {*streak, *alike}
+
+
+def _fails_as(status: SessionStatus, stop: StopReason) -> bool:
+    if not isinstance(status, Errored) or status.kind != stop.kind:
+        return False
+    return (status.tails or EvidenceTail("", "")).masked() == stop.masked_tail
+
+
+# ---------------------------------------------------------------------------
 # What the run was measured on
 # ---------------------------------------------------------------------------
 
-# Where results files and the run index live. Committing one never changes what a later run was
-# measured on, so the tree digest leaves this directory out; everything else counts, the
-# adoption ledger included.
+# Paths (fnmatch patterns over repository-relative paths) the tree digest leaves out. Results
+# files and the run index: committing one never changes what a later run was measured on.
+# Hook-written telemetry: rewritten on every session and tracked, and no session reads it as
+# guidance. Every other path counts, the adoption ledger included.
 RESULTS_DIR = ".ai-state/eval_ledger/adherence/"
+UNCOUNTED_PATHS: tuple[str, ...] = (RESULTS_DIR + "*", ".ai-state/observations*.jsonl")
 KERNEL_INDEX = "claude/kernels/index.json"
 DIGEST_SHOWN = 12  # characters of a digest a difference names
 
@@ -400,7 +577,7 @@ def current_identity(checkout: Path, roles: Sequence[str]) -> dict[str, Any]:
 
 def tree_digest(checkout: Path) -> str:
     """sha256 over the sorted ``(path, blob id)`` of every file git tracks, or would add because
-    it is not ignored, outside ``RESULTS_DIR``, with the contents the working tree holds now.
+    it is not ignored, outside ``UNCOUNTED_PATHS``, with the contents the working tree holds now.
 
     An ignored file is not part of the identity: scratch space and build output are not what
     the roles run on. The blob id is git's (sha1 of ``blob <size>`` NUL and the content),
@@ -409,9 +586,10 @@ def tree_digest(checkout: Path) -> str:
     listed = _git(checkout, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
     digest = hashlib.sha256()
     for path in sorted(set(listed.split(b"\0")) - {b""}):
-        if path.startswith(RESULTS_DIR.encode()):
+        name = os.fsdecode(path)
+        if any(fnmatchcase(name, pattern) for pattern in UNCOUNTED_PATHS):
             continue
-        blob = _blob_id(checkout / os.fsdecode(path))
+        blob = _blob_id(checkout / name)
         if blob is not None:  # a tracked file deleted from the tree, or a submodule, has none
             digest.update(blob.encode() + b"\t" + path + b"\0")
     return digest.hexdigest()

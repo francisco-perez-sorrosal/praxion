@@ -53,6 +53,7 @@ from praxion_evals.adherence.lineage import (
     Interrupted,
     RunEnding,
     SpendRefused,
+    current_identity,
     ending_to_json,
 )
 from praxion_evals.adherence.model import (
@@ -342,6 +343,7 @@ def _provisional(
         "judging": config.judging,
         "session_budget_usd": config.session_budget_usd,
         "retries": [],
+        "identity": current_identity(checkout.path, config.roles),
     }
     run = results.RunInfo(run_id, config.model, version, False, (), earlier, extra)
     catalog = {
@@ -625,7 +627,7 @@ def _prove(
         ledger, done = attempt(
             _launch_of(context), state.ledger, proof_task, build, copy_home, None, _observe
         )
-        state = replace(state, ledger=ledger)
+        state = _note_resolved_model(replace(state, ledger=ledger), done.model)
         match done.result:
             case Errored(kind="launch_refused", detail=detail):
                 state = _add_refusal(state, f"{role} {arm} arm proof: {detail}")
@@ -682,7 +684,7 @@ def _session_with_retry(
 def _task_session(
     context: Context, state: RunState, task: TaskSpec, slot: Arm, build: ArmBuild
 ) -> RunState:
-    ledger, record = task_session(
+    ledger, record, model = task_session(
         _launch_of(context), state.ledger, task, slot, build, state.page_fetchable
     )
     status = record.status
@@ -693,7 +695,15 @@ def _task_session(
         ledger=ledger,
         results=replace(state.results, sessions=(*state.results.sessions, record)),
     )
-    return _checkpoint(context, _fold_stop(state, record))
+    return _checkpoint(context, _fold_stop(_note_resolved_model(state, model), record))
+
+
+def _note_resolved_model(state: RunState, model: str | None) -> RunState:
+    """Record the model a session's init event reported, once: the first session to report one."""
+    identity = state.results.run.extra["identity"]
+    if model is None or identity["model"] is not None:
+        return state
+    return _update_extra(state, identity={**identity, "model": model})
 
 
 def _fold_stop(state: RunState, record: SessionRecord) -> RunState:

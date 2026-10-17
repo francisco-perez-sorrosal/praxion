@@ -10,9 +10,14 @@ the first launch is a ``ValueError`` the console entry reports.
 
 One session's launch (sandbox, ``claude``, settlement, grading) lives in ``session_launch``.
 
+After every task session (a retry is the arm's next session) the run folds the record into
+the infrastructure stop (``infra_stop.step``); once it answers ``Stop`` nothing more is
+launched, no session, retry or proof, and the run ends ``InfraStopped`` with every session it
+recorded. The stop reads only an errored session's kind and evidence, never a graded outcome.
+
 Exit codes of a run: 0 it is complete; 1 it is incomplete (a refused launch, an arm that
-could not be built or proven, a session that ended in error, an operator interrupt; the
-results are written). The results file records how the run ended (``lineage.RunEnding``).
+could not be built or proven, a session that ended in error, a stop, an operator interrupt;
+the results are written). The results file records how the run ended (``lineage.RunEnding``).
 Judge calls are metered by the judge's own account, not by the ledger, which covers the
 ``claude`` sessions only.
 """
@@ -28,14 +33,22 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, assert_never
 
 from praxion_evals.adherence import arms, grade, report, results, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
-from praxion_evals.adherence.infra_stop import DEFAULT_STOP_COUNT
+from praxion_evals.adherence.infra_stop import (
+    DEFAULT_STOP_COUNT,
+    Continue,
+    FoldState,
+    Stop,
+    StopReason,
+    step,
+)
 from praxion_evals.adherence.lineage import (
     Finished,
+    InfraStopped,
     Interrupted,
     RunEnding,
     SpendRefused,
@@ -52,11 +65,13 @@ from praxion_evals.adherence.model import (
     Passed,
     Role,
     SessionEvidence,
+    SessionRecord,
     Standard,
     TaskSpec,
     outcome_to_json,
 )
 from praxion_evals.adherence.session_launch import (
+    DEFAULT_TAIL_CHARS,
     REAL_HOME,
     Launch,
     attempt,
@@ -86,7 +101,6 @@ OUTPUT_DIR = Path(".ai-state/eval_ledger/adherence")
 SANDBOX_PREFIX = "praxion-evals-adherence-"
 PROBE_TIMEOUT_S = 15
 HTTP_OK = 200
-DEFAULT_TAIL_CHARS = 2000  # what an errored session keeps of each output stream
 
 # Infrastructure errors a second try may not repeat. Never an isolation breach (the sandbox
 # leaked), a refused launch (the cap is spent) or an evaluation exception (the grader failed,
@@ -181,11 +195,14 @@ class Context:
 
 @dataclass(frozen=True)
 class RunState:
-    """What each step replaces: the results so far, the spend and the C6 page probe."""
+    """What each step replaces: the results so far, the spend, the C6 page probe and the
+    infrastructure stop's fold over the task sessions."""
 
     results: results.RunResults
     ledger: SpendLedger
     page_fetchable: bool | None = None  # None: not probed yet
+    fold: FoldState = FoldState()
+    stop: StopReason | None = None  # set once by the fold; nothing is launched after it
 
 
 def session_env(config: RunConfig, root: Path, ambient: Mapping[str, str]) -> dict[str, str]:
@@ -211,6 +228,7 @@ def _launch_of(context: Context) -> Launch:
         session_budget_usd=config.session_budget_usd,
         keep_sandbox=config.keep_sandbox,
         env_for=lambda root: session_env(config, root, os.environ),
+        tail_chars=config.tail_chars,
     )
 
 
@@ -345,6 +363,8 @@ def conduct(context: Context, state: RunState) -> int:
         if context.config.judge_golden:
             state = _judge_golden(context, state)
         for role, role_tasks in context.planned.items():
+            if state.stop is not None:
+                break
             state = _measure_role(context, state, role, role_tasks)
     except KeyboardInterrupt:
         interrupted, state = True, _as_checkpointed(context)
@@ -376,7 +396,7 @@ def _clean_up(context: Context) -> None:
 
 def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:
     """Complete means: no refused launch, every arm built and proven, no session left in error,
-    and not interrupted."""
+    not stopped and not interrupted."""
     latest = {
         (r.setup.role, r.setup.arm, r.setup.task_id): r.status for r in state.results.sessions
     }
@@ -388,8 +408,9 @@ def _finalize(context: Context, state: RunState, interrupted: bool) -> results.R
         and not state.results.run.refused_launches
         and not unbuilt
         and not any(isinstance(status, Errored) for status in latest.values())
+        and state.stop is None
     )
-    ending = _ending(state.results, interrupted)
+    ending = _ending(state, interrupted)
     state = _update_run(state, complete=complete)
     state = _update_extra(
         state,
@@ -399,11 +420,13 @@ def _finalize(context: Context, state: RunState, interrupted: bool) -> results.R
     return _checkpoint(context, state).results
 
 
-def _ending(recorded: results.RunResults, interrupted: bool) -> RunEnding:
+def _ending(state: RunState, interrupted: bool) -> RunEnding:
     if interrupted:
         return Interrupted()
-    if recorded.run.refused_launches:
-        return SpendRefused(_refused_tasks(recorded))
+    if state.stop is not None:
+        return InfraStopped(state.stop)
+    if state.results.run.refused_launches:
+        return SpendRefused(_refused_tasks(state.results))
     return Finished()
 
 
@@ -487,6 +510,8 @@ def _measure_role(
     state = _probe_page(context, state, runnable)
     for task in role_tasks:
         for slot, copy_arm in _slots(config, runnable):
+            if state.stop is not None:
+                return state
             build = builds[(copy_arm, tasks.turn_cap_of(task))]
             state = _session_with_retry(context, state, task, slot, build)
     return state
@@ -604,13 +629,15 @@ def _probe_page(context: Context, state: RunState, runnable: Sequence[Arm]) -> R
     return replace(state, page_fetchable=fetchable)
 
 
-# --- one session, with its one retry ---
+# --- one session, with its one retry, each folded into the stop ---
 
 
 def _session_with_retry(
     context: Context, state: RunState, task: TaskSpec, slot: Arm, build: ArmBuild
 ) -> RunState:
     state = _task_session(context, state, task, slot, build)
+    if state.stop is not None:  # the run stopped on this session: no retry either
+        return state
     last = state.results.sessions[-1].status
     if not (isinstance(last, Errored) and last.kind in RETRYABLE_ERRORS):
         return state
@@ -633,7 +660,21 @@ def _task_session(
         ledger=ledger,
         results=replace(state.results, sessions=(*state.results.sessions, record)),
     )
-    return _checkpoint(context, state)
+    return _checkpoint(context, _fold_stop(state, record))
+
+
+def _fold_stop(state: RunState, record: SessionRecord) -> RunState:
+    """Fold one recorded task session into the infrastructure stop under the declared rule."""
+    rule = state.results.settings.stop_rule
+    assert rule is not None  # a run declares its stop rule before its first launch
+    fold, decision = step(rule, state.fold, record)
+    match decision:
+        case Stop(reason=reason):
+            return replace(state, fold=fold, stop=reason)
+        case Continue():
+            return replace(state, fold=fold)
+        case _:
+            assert_never(decision)
 
 
 # --- state updates: each returns a new state; a checkpoint writes the file whole ---

@@ -48,8 +48,8 @@ from praxion_evals.live.spend import SpendLedger
 
 MS_PER_S = 1000
 REAL_HOME = Path.home()  # read once, here: the isolation scan takes it in as an input
-# What an errored session keeps of each output stream when the run declares no other bound.
-# Checklist: the run's declared bound is `RunConfig.tail_chars`; wire it into `Launch.tail_chars`.
+# What an errored session keeps of each output stream when the run declares no other bound
+# (the run's declared bound, `RunConfig.tail_chars`, reaches `Launch.tail_chars`).
 DEFAULT_TAIL_CHARS = 2000
 # A session that never started, or whose output is lost, has no output to keep.
 NO_OUTPUT = EvidenceTail("", "")

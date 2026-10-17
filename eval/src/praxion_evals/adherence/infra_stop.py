@@ -235,7 +235,8 @@ def step(
     record: SessionRecord,
     tails: EvidenceTail | None = None,
 ) -> tuple[FoldState, Decision]:
-    """Fold ``record`` into ``state``; ``tails`` is the errored session's captured evidence.
+    """Fold ``record`` into ``state``. An errored record's evidence is its own ``tails``;
+    ``tails`` given here stands in for them.
 
     A counting failure extends its arm's streak when it matches the streak's kind and masked
     tail and starts a new one otherwise; any other record of the arm (one that ran, one that
@@ -270,7 +271,8 @@ def _failure(rule: StopRule, record: SessionRecord, tails: EvidenceTail | None) 
     status = record.status
     if not (isinstance(status, Errored) and status.kind in rule.kinds):
         return None
-    return Failure(status.kind, (tails or EvidenceTail("", "")).masked())
+    # A record written before tails were kept has none: its kind alone makes it the same.
+    return Failure(status.kind, (tails or status.tails or EvidenceTail("", "")).masked())
 
 
 def _streak(

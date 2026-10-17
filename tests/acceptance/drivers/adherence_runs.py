@@ -24,12 +24,13 @@ test (a committed copy of this repository), committing a file in it, and the sta
 launcher itself (`stand_in_claude`): it passes each arm's proof, ends each session as the
 script says, and reports every launch with its arm, task and attempt.
 
-Unbound until a binding step names the designed surface (each raises with the
-assumption it stands for): continuing and closing a run, a stopped run constructed in the
-runner's own format, the dry run's per-task launch order, and every reading of what this
-change adds to a results file (the error tails, the stop, the declared stop settings, the
-allowance method, the lineage, the worst-case lean failures and the earlier-runs
-listing). Where the results directory sits is bound: a run writes into
+Also bound: continuing and closing a run (`--continue RUN`, `--close RUN --reason TEXT`, RUN
+the id of a results file of the checkout), a stopped run constructed in the runner's own
+format (`plant_stopped_run`), the dry run's per-task launch order, the names of transcript
+directories, and every reading of what this change adds to a results file (the pins of
+`adherence_results_wire`: error tails, the stop, the declared stop settings, the allowance
+method, the lineage, the worst-case lean failures and the earlier-runs listing). A reading
+of a field the runner does not write yet fails on the missing field, named. Where the results directory sits is bound: a run writes into
 `<checkout>/.ai-state/eval_ledger/adherence/`, beside every earlier run of the checkout.
 
 A run is started from inside the checkout (the console entry names its default results
@@ -40,14 +41,17 @@ scenario stays offline and deterministic.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from tests.acceptance.drivers import adherence_eval, stand_in_claude
+from tests.acceptance.drivers import adherence_eval, adherence_results_wire, stand_in_claude
 from tests.acceptance.drivers.adherence_eval import (
     DUMMY_CREDENTIAL,
     EVAL_PROJECT,
@@ -63,8 +67,40 @@ from tests.acceptance.drivers.adherence_eval import (
     install_fake_claude,
     planned_sessions,
     run_adherence_eval,
+    run_in_eval,
 )
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
+from tests.acceptance.drivers.adherence_results_wire import (  # the readings a scenario calls
+    LaunchedSession,
+    StopVariant,
+    TaskShape,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    allowance_taken_from_calibration as allowance_taken_from_calibration,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    declared_allowance_method as declared_allowance_method,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    declared_stop_settings as declared_stop_settings,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    declared_tail_bound as declared_tail_bound,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    earlier_runs as earlier_runs,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    error_tails as error_tails,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    lean_failure_tasks as lean_failure_tasks,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    lineage as lineage,
+)
+from tests.acceptance.drivers.adherence_results_wire import (
+    stop_reason as stop_reason,
+)
 
 RESULTS_SUBDIR = Path(".ai-state") / "eval_ledger" / "adherence"
 ROLE = "researcher"  # a role with a full kit: 24 planned tasks by default
@@ -183,13 +219,6 @@ class Plan:
 
 
 @dataclass(frozen=True)
-class LaunchedSession:
-    arm: str
-    task_id: str
-    attempt: int  # 1 for a task's first session in that arm, 2 for its retry
-
-
-@dataclass(frozen=True)
 class StandInRun:
     exit_code: int
     stdout: str
@@ -268,17 +297,31 @@ def _run_console(
 ) -> StandInRun:
     """One console invocation with a fresh stand-in `claude`; the other runs share it."""
     root = _fresh_directory(workspace, "stand-in")
+    tasks = _planned_places(root, checkout, plan)
+    args = [*_run_options(plan, checkout), *extra_args]
+    return _invoke(root, checkout, plan.role, tasks, script, args)
+
+
+def _invoke(
+    root: Path,
+    checkout: Path,
+    role: str,
+    tasks: Mapping[str, stand_in_claude.TaskPlace],
+    script: Script,
+    args: Sequence[str],
+) -> StandInRun:
+    """The console entry started inside `checkout` with `args`, every session a stand-in."""
     stand_in = stand_in_claude.install(
         root / "claude",
         version=FAKE_CLAUDE_VERSION,
-        role=plan.role,
-        tasks=_planned_places(root, checkout, plan),
+        role=role,
+        tasks=tasks,
         by_arm=script.by_arm,
         by_task=script.by_task,
         default=script.default,
     )
     before = set(results_dir(checkout).glob("*.json")) if results_dir(checkout).is_dir() else set()
-    done = _console(checkout, stand_in.bin_dir, [*_run_options(plan, checkout), *extra_args])
+    done = _console(checkout, stand_in.bin_dir, args)
     launched = stand_in.launches()
     return StandInRun(
         exit_code=done.returncode,
@@ -334,17 +377,31 @@ def _run_options(plan: Plan, checkout: Path) -> list[str]:
     return args
 
 
+def _planning_dry_run(root: Path, checkout: Path, plan: Plan) -> str:
+    """The printed sessions of a plan's dry run, which launches nothing and writes nothing.
+
+    Its results location is `root`, not the checkout's, so no guard on the checkout's results
+    directory can refuse it.
+    """
+    tripwire = adherence_eval.install_tripwire(root)
+    output = ["--output", str(root / "dry" / "adherence.json")]
+    done = _console(
+        checkout, tripwire.bin_dir, [*_plan_options(plan, checkout), "--dry-run", *output]
+    )
+    assert done.returncode == 0, f"the dry run of the plan failed: {done.stderr[-2000:]}"
+    assert not tripwire.starts(), "a dry run started a session"
+    return done.stdout
+
+
 def _planned_places(root: Path, checkout: Path, plan: Plan) -> dict[str, stand_in_claude.TaskPlace]:
     """Each planned task's place in the planned order, by the fingerprint of its scratch repository.
 
     The dry run says how many tasks a run plans; the task generator then builds the same tasks'
     repositories, because a prompt does not tell tasks apart (a template's variants share one).
     """
-    tripwire = adherence_eval.install_tripwire(root)
-    done = _console(checkout, tripwire.bin_dir, [*_plan_options(plan, checkout), "--dry-run"])
-    assert done.returncode == 0, f"the dry run of the plan failed: {done.stderr[-2000:]}"
-    assert not tripwire.starts(), "a dry run started a session"
-    planned = list(dict.fromkeys(s.task_id for s in planned_sessions(done.stdout)))
+    planned = list(
+        dict.fromkeys(s.task_id for s in planned_sessions(_planning_dry_run(root, checkout, plan)))
+    )
     request = {"role": plan.role, "seed": plan.seed, "count": len(planned)}
     built = adherence_eval.run_in_eval(
         _BUILD_PLANNED_REPOS, {**request, "into": str(root / "scratch")}
@@ -407,18 +464,16 @@ def _results_path(checkout: Path, before: set[Path], stdout: str) -> Path:
 def continue_run(
     workspace: Path, checkout: Path, stopped: Path, plan: Plan, script: Script | None = None
 ) -> StandInRun:
-    """Ask the console entry to continue the run whose results file is `stopped`."""
-    raise UnboundDriverError(
-        "the console entry continues a stopped run named by its results file, through the"
-        " stand-in launcher"
-    )
+    """Ask the console entry to continue the run whose results file is `stopped`, as `plan` says."""
+    return _run_console(workspace, checkout, plan, script or Script(), ("--continue", stopped.stem))
 
 
 def close_run(workspace: Path, checkout: Path, stopped: Path, reason: str | None) -> StandInRun:
     """Ask the console entry to close a stopped run, with `reason` (None: no reason given)."""
-    raise UnboundDriverError(
-        "the console entry closes a stopped run named by its results file, recording the"
-        " operator's reason"
+    root = _fresh_directory(workspace, "stand-in")
+    given = [] if reason is None else ["--reason", reason]
+    return _invoke(
+        root, checkout, ROLE, {}, Script(), [str(checkout), "--close", stopped.stem, *given]
     )
 
 
@@ -427,18 +482,7 @@ def stop_count_refusal(workspace: Path, checkout: Path, stop_count: int) -> Stan
     return run_with_stand_in(workspace, checkout, Plan(stop_count=stop_count), Script())
 
 
-# -- A stopped run, constructed: unbound -------------------------------------------------------
-
-TaskShape = Literal[
-    "complete pair",
-    "both sessions inside the streak",
-    "full complete and lean inside the streak",
-    "lean of the stopping kind and tail before the streak",
-    "lean-only error of another kind",
-    "full-only error of another kind",
-    "refused launch",
-    "never launched",
-]
+# -- A stopped run, constructed -----------------------------------------------------------------
 
 EIGHT_SHAPES: tuple[TaskShape, ...] = (
     "complete pair",
@@ -462,14 +506,6 @@ KEPT_LEAN_FAILURE_SHAPES = frozenset(
     {"lean of the stopping kind and tail before the streak", "lean-only error of another kind"}
 )
 
-StopVariant = Literal[
-    "both arms in the streak",
-    "confined to one arm",
-    "operator interrupt",
-    "complete",
-    "already continued",
-]
-
 
 @dataclass(frozen=True)
 class PlantedRun:
@@ -492,116 +528,59 @@ def plant_stopped_run(
 
     Its planned tasks take `shapes` in planned order; it stopped as `variant` says (a
     streak of one error kind and masked tail; `recorded_launch_order_swapped` records a
-    per-task launch order other than the one the run's seed gives).
+    per-task launch order other than the one the run's seed gives). The file is built from
+    the one the runner writes for the same plan through the stand-in, which is kept outside
+    the checkout's results so that the stopped run is the only new file there.
     """
-    raise UnboundDriverError(
-        "a stopped run constructed in the runner's own results format: its declarations,"
-        " its tree, its planned tasks and launch order, its sessions and its stop"
+    root = _fresh_directory(workspace, "planted")
+    orders = launch_orders(_planning_dry_run(_fresh_directory(root, "orders"), checkout, plan))
+    elsewhere = ("--output", str(root / "template" / "adherence.json"))
+    template = _run_console(root, checkout, plan, Script(), elsewhere)
+    assert template.results_path.is_file(), (
+        f"the template run wrote nothing: {template.stderr[-2000:]}"
     )
-
-
-# -- Readings of a results file: unbound -------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ErrorTails:
-    task_id: str
-    arm: str
-    error_output: str
-    result_text: str
-
-
-def error_tails(results_path: Path) -> list[ErrorTails]:
-    raise UnboundDriverError(
-        "an errored session's record keeps the tail of its error output and of its result text"
+    document = adherence_results_wire.stopped_run_document(
+        adherence_results_wire.read_document(template.results_path),
+        shapes=shapes,
+        variant=variant,
+        launch_orders=orders,
+        swap_first_launch_order=recorded_launch_order_swapped,
     )
+    path = _write_results(checkout, document)
+    if variant == "already continued":
+        part_id = _a_second_later(document["run"]["id"])
+        _write_results(checkout, adherence_results_wire.continuation_document(document, part_id))
+    tasks = tuple(document["run"]["tasks"][plan.role])
+    return PlantedRun(path, document["run"]["id"], tasks, dict(zip(tasks, shapes, strict=True)))
 
 
-def declared_tail_bound(results_path: Path) -> int:
-    raise UnboundDriverError("the results file declares the tail bound before the first launch")
+_DERIVED_BLOCKS = """
+import json, sys
+from praxion_evals.adherence import results
+
+written = results.to_json(results.from_json(json.load(sys.stdin)))
+print(json.dumps({key: written[key] for key in ("verdicts", "kernel_delivery")}))
+"""
+RUN_ID_TIME = "%Y%m%dT%H%M%SZ"
 
 
-@dataclass(frozen=True)
-class StopReason:
-    error_kind: str
-    masked_tail: str
-    streak: tuple[LaunchedSession, ...]
-    other_arm_same: bool  # the other arm ended in the same kind and tail inside the window
+def _write_results(checkout: Path, document: Mapping[str, Any]) -> Path:
+    """Write `document` as a results file of the checkout.
+
+    The runner's own loader reads it once (it refuses a file it cannot read) and gives the
+    derived blocks, which a results file holds for its readers and never reads back.
+    """
+    complete = {**document, **run_in_eval(_DERIVED_BLOCKS, document)}
+    path = results_dir(checkout) / f"{document['run']['id']}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(complete, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
-def stop_reason(results_path: Path) -> StopReason | None:
-    raise UnboundDriverError("the results file records the stop and its reason; None: no stop")
-
-
-@dataclass(frozen=True)
-class StopSettings:
-    stop_count: int
-    counting_kinds: frozenset[str]
-    masking_rule: str
-    declared_before_first_launch: bool
-
-
-def declared_stop_settings(results_path: Path) -> StopSettings:
-    raise UnboundDriverError(
-        "the results file declares the stop count, its counting kinds and the masking rule"
-        " among its settings, before the first launch"
-    )
-
-
-def declared_allowance_method(results_path: Path) -> str:
-    raise UnboundDriverError(
-        "the results file declares the allowance method among its settings before the first launch"
-    )
-
-
-def allowance_taken_from_calibration(results_path: Path) -> bool:
-    raise UnboundDriverError(
-        "the results file shows whether any allowance came from a calibration run"
-    )
-
-
-@dataclass(frozen=True)
-class LineagePart:
-    run_id: str
-    stop: str | None  # the stop that ended this part; None for the part that finished
-
-
-def lineage(results_path: Path) -> list[LineagePart]:
-    raise UnboundDriverError("a continued run's results name every part of its lineage in order")
-
-
-def lean_failure_tasks(results_path: Path, role: str) -> set[str]:
-    raise UnboundDriverError(
-        "the tasks a continued run counts as lean failures under the worst-case recount"
-    )
-
-
-@dataclass(frozen=True)
-class EarlierRun:
-    run_ids: tuple[str, ...]  # one id, or every part of a continued lineage
-    flip: str  # "clear", "not clear" or "underpowered"
-    interim: bool = False  # a closed run, carrying its interim per-check result
-
-
-@dataclass(frozen=True)
-class EarlierRunsListing:
-    draws: tuple[EarlierRun, ...]  # same role definition and kernel identity, in order
-    apart: Mapping[str, str]  # run id -> how its identity differs ("identity unknown" included)
-    calibration: tuple[str, ...]
-    skipped_files: tuple[str, ...]  # names of JSON files beside it that are not results files
-
-
-def earlier_runs(results_path: Path, role: str) -> EarlierRunsListing:
-    raise UnboundDriverError(
-        "a run's results list its role's earlier runs by measured identity, with calibration"
-        " runs and identity differences apart, and name every skipped JSON file"
-    )
-
-
-def earlier_runs_in_report(report: str, role: str) -> EarlierRunsListing:
-    raise UnboundDriverError(
-        "a report lists its role's earlier runs by measured identity, as the results do"
-    )
+def _a_second_later(run_id: str) -> str:
+    stamp, _, _ = run_id.partition("-")
+    later = datetime.strptime(stamp, RUN_ID_TIME) + timedelta(seconds=1)
+    return f"{later:{RUN_ID_TIME}}-c0d1ed"
 
 
 # -- The dry run's launch order ------------------------------------------------------------------
@@ -626,23 +605,47 @@ def dry_run(workspace: Path, checkout: Path, *, seed: int = adherence_eval.SEED)
 
 def launch_orders(dry_run_stdout: str) -> dict[str, tuple[str, str]]:
     """Each planned task's arm order, as the dry run prints it: (first arm, second arm)."""
-    raise UnboundDriverError("the dry run prints each task's arm launch order")
+    arms_by_task: dict[str, list[str]] = {}
+    for session in planned_sessions(dry_run_stdout):
+        arms_by_task.setdefault(session.task_id, []).append(session.arm)
+    orders = {}
+    for task, arms in arms_by_task.items():
+        assert len(arms) == 2, (
+            f"the dry run prints {len(arms)} sessions for {task}, not one per arm"
+        )
+        orders[task] = (arms[0], arms[1])
+    return orders
 
 
 # -- Transcript directories: the runner's and the catalog's naming --------------------------------
 
+_RUNNER_DIR_NAME = """
+import json, sys
+from praxion_evals.adherence.transcript import transcript_dir_name
+
+print(json.dumps(transcript_dir_name(json.load(sys.stdin)["cwd"])))
+"""
+# The one catalog row that locates a transcript lays out a session home for its repository.
+_CATALOG_DIR_NAMES = """
+import json, sys
+from pathlib import Path
+from praxion_evals.adherence import catalog_rows
+
+PROJECTS = ".claude/projects/"
+files = catalog_rows._lens_run_files(Path(json.load(sys.stdin)["cwd"]))
+named = {path.removeprefix(PROJECTS).split("/")[0] for path in files}
+print(json.dumps({catalog_rows.CARTOGRAPHER_ISOLATION: named.pop()}))
+"""
+
 
 def runner_transcript_dir_name(cwd: str) -> str:
-    raise UnboundDriverError(
-        "the name the runner gives the transcript directory of a session started in `cwd`"
-    )
+    """The name the runner gives the transcript directory of a session started in `cwd`."""
+    return run_in_eval(_RUNNER_DIR_NAME, {"cwd": cwd})
 
 
 def catalog_transcript_dir_names(cwd: str) -> dict[str, str]:
-    raise UnboundDriverError(
-        "the name each catalog row that locates a transcript gives the directory of a session"
-        " started in `cwd`, by row"
-    )
+    """The name each catalog row that locates a transcript gives it for a session in `cwd`."""
+    return run_in_eval(_CATALOG_DIR_NAMES, {"cwd": cwd})
 
 
 # Two transcript directories Claude Code 2.1.302 itself named: working directory -> name.
@@ -657,10 +660,12 @@ RECORDED_TRANSCRIPT_DIRS = {
 
 
 def lineage_complete_pairs(results_path: Path, role: str) -> int:
-    """The complete pairs a continued run's results count for `role` over its whole lineage."""
-    raise UnboundDriverError(
-        "a continued run's results state the complete pairs of its whole lineage for a role"
-    )
+    """The complete pairs a continued run's results state for `role` over its whole lineage."""
+    from tests.acceptance.drivers.adherence_scoring import role_section
+
+    with tempfile.TemporaryDirectory(prefix="lineage-report-") as workspace:
+        report = run_report(Path(workspace), results_path)
+    return adherence_results_wire.complete_pairs_in_report(role_section(report, role))
 
 
 def run_report(workspace: Path, results_path: Path) -> str:

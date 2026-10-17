@@ -43,7 +43,7 @@ The architecture is organized around three core concerns: **knowledge delivery**
 
 ## 3. Components
 
-<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-08-04 by orchestrator (split into 3a structural components / 3b capabilities; 3a is model-backed and reconcilable, 3b is a prose-owned feature log) -->
+<!-- OWNER: systems-architect (skeleton), implementer (as-built) | LAST UPDATED: 2026-10-17 by implementer (adherence stop machinery `infra_stop.py` Built). Previously 2026-08-04 by orchestrator (split into 3a structural components / 3b capabilities; 3a is model-backed and reconcilable, 3b is a prose-owned feature log) -->
 <!-- L1 diagram: major building blocks and their relationships.
      Status values: Designed (interface defined, not yet implemented), Built (code exists on disk),
      Planned (roadmap item, no interface yet), Deprecated (scheduled for removal). -->
@@ -303,7 +303,8 @@ Every spawned Praxion agent receives its role's slice of the process from one so
 | Adherence-eval kernel evidence (`kernel_missing`) | Built | `eval/src/praxion_evals/adherence/model.py`, `eval/src/praxion_evals/adherence/grade.py` |
 | Eligible roles (gate-owned pin: the five pilot roles plus the implementer, read at the parent commit; replaces the ledger's `eligible` list) | Planned (dec-draft-42f62347) | `scripts/kernel_eligibility.py` |
 | Adherence run index (digest-checked per-run summary the gate resolves cited runs through) | Planned (dec-draft-42f62347) | `eval/src/praxion_evals/adherence/run_index.py`, `.ai-state/eval_ledger/adherence/index.json` |
-| Adherence infrastructure stop, continuation and pre-commitment; allowances from the run's own discordance with coverage statements; C5 bound to running out of turns | Planned (dec-draft-c9d81997, awaiting the user's ratification) | `eval/src/praxion_evals/adherence/infra_stop.py`, `lineage.py`, `verdict.py`, `session_launch.py`, `model_verdict.py` |
+| Adherence stop machinery (pure: evidence tails with redaction, the masking rule, the stop rule, the streak fold; not yet wired into the session loop) | Built (dec-draft-c9d81997) | `eval/src/praxion_evals/adherence/infra_stop.py` |
+| Adherence infrastructure stop wiring, continuation and pre-commitment; allowances from the run's own discordance with coverage statements; C5 bound to running out of turns | Planned (dec-draft-c9d81997, awaiting the user's ratification) | `eval/src/praxion_evals/adherence/lineage.py`, `verdict.py`, `session_launch.py`, `model_verdict.py` |
 
 ## 4. Interfaces
 

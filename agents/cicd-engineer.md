@@ -168,5 +168,5 @@ Return a concise summary:
 - **Explain trade-offs.** When making design choices (caching strategy, runner selection, deployment pattern), explain why.
 - **Incremental changes.** For existing pipelines, propose targeted improvements rather than complete rewrites.
 - **No git commits.** Write files but never commit. The user handles version control.
-- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Failed at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
+- **Partial output on failure.** If you encounter an error that prevents completing your full output, write what you have to `.ai-work/<task-slug>/` with a `[PARTIAL]` header: `# [Document Title] [PARTIAL]` followed by `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [error]`, and `**Usable sections**: [list]`. Then continue with whatever content is reliable.
 - **Turn budget awareness.** You have a hard turn limit (`maxTurns` in frontmatter). Track your tool call count — reserve the last 5 turns for writing workflow files + config. At 80% budget consumed, wrap up and write output with what you have.

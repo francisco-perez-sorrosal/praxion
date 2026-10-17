@@ -303,7 +303,7 @@ Every spawned Praxion agent receives its role's slice of the process from one so
 | Adherence-eval kernel evidence (`kernel_missing`) | Built | `eval/src/praxion_evals/adherence/model.py`, `eval/src/praxion_evals/adherence/grade.py` |
 | Eligible roles (gate-owned pin: the five pilot roles plus the implementer, read at the parent commit; replaces the ledger's `eligible` list) | Planned (dec-draft-42f62347) | `scripts/kernel_eligibility.py` |
 | Adherence run index (digest-checked per-run summary the gate resolves cited runs through) | Planned (dec-draft-42f62347) | `eval/src/praxion_evals/adherence/run_index.py`, `.ai-state/eval_ledger/adherence/index.json` |
-| Adherence infrastructure stop, continuation and pre-commitment; allowances from the run's own discordance with coverage statements; C5 bound to running out of turns | Planned (dec-draft-c9d81997, awaiting the user's ratification) | `eval/src/praxion_evals/adherence/infra_stop.py`, `lineage.py`, `verdict.py`, `session_launch.py` |
+| Adherence infrastructure stop, continuation and pre-commitment; allowances from the run's own discordance with coverage statements; C5 bound to running out of turns | Planned (dec-draft-c9d81997, awaiting the user's ratification) | `eval/src/praxion_evals/adherence/infra_stop.py`, `lineage.py`, `verdict.py`, `session_launch.py`, `model_verdict.py` |
 
 ## 4. Interfaces
 

@@ -1,11 +1,11 @@
-"""The adherence eval's closed types and their JSON codecs.
+"""The adherence eval's closed types; their JSON codecs and verdict types are served from siblings.
 
 Every sum is a closed set of frozen dataclasses and every invariant is
 enforced where the value is built, so the interior never re-validates: a
 ``Measured`` status holds the outcomes of its checks and nothing else, an
 ``Underpowered`` role has no flip by construction, an ``ArmBuild`` cannot
 patch a file it should not. Raw strings are parsed once, at the
-codecs at the bottom of this module.
+codecs in ``model_codecs``; the flip rule's verdict types live in ``model_verdict``.
 
 Pure: nothing here touches a process, a file or a clock.
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args
@@ -604,7 +605,7 @@ def allowance_key(check: str, role: str | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Pairs and verdicts
+# Pairs
 # ---------------------------------------------------------------------------
 
 
@@ -626,126 +627,11 @@ class Pair:
         return isinstance(self.full, Measured) and isinstance(self.lean, Measured)
 
 
-@dataclass(frozen=True)
-class Interval:
-    """The one-sided interval on the paired difference ``lean - full``, reported, never deciding."""
-
-    lower: float
-    upper: float
-
-
-@dataclass(frozen=True)
-class Counts:
-    """A check's usable pairs after the worst-case recount, by what each arm did."""
-
-    both_passed: int
-    lean_failed_only: int  # b: full passed, lean failed
-    lean_passed_only: int  # c: full failed, lean passed
-    both_failed: int
-
-    def __post_init__(self) -> None:
-        _require(min(self.both_passed, self.b, self.c, self.both_failed) >= 0, "counts are >= 0")
-
-    @property
-    def b(self) -> int:
-        return self.lean_failed_only
-
-    @property
-    def c(self) -> int:
-        return self.lean_passed_only
-
-    @property
-    def n(self) -> int:
-        return self.both_passed + self.b + self.c + self.both_failed
-
-    @property
-    def passes_full(self) -> int:
-        return self.both_passed + self.b
-
-    @property
-    def passes_lean(self) -> int:
-        return self.both_passed + self.c
-
-    @property
-    def lean_failures(self) -> int:
-        return self.b + self.both_failed
-
-
-@dataclass(frozen=True)
-class NoRegression:
-    counts: Counts
-    allowance: int
-
-
-@dataclass(frozen=True)
-class Regression:
-    counts: Counts
-    allowance: int
-
-
-@dataclass(frozen=True)
-class NonInferior:
-    counts: Counts
-    interval: Interval
-
-
-@dataclass(frozen=True)
-class Inferior:
-    counts: Counts
-    interval: Interval
-
-
-CheckVerdict = NoRegression | Regression | NonInferior | Inferior
-CLEARING_VERDICTS = (NoRegression, NonInferior)
-
-
-@dataclass(frozen=True)
-class Underpowered:
-    """Fewer complete pairs than declared: counts only, and no flip verdict by construction."""
-
-    reason: str
-    complete_pairs: int
-    required_pairs: int
-
-    def __post_init__(self) -> None:
-        _non_empty(self.reason, "an underpowered reason")
-        _require(self.complete_pairs < self.required_pairs, "an underpowered role is short")
-
-
-@dataclass(frozen=True)
-class Assessed:
-    complete_pairs: int
-    check_verdicts: Mapping[str, CheckVerdict]
-    not_covered: Mapping[str, str]  # check -> why it is covered by no verdict
-    worst_case_lean_failures: Mapping[str, int]
-
-    def __post_init__(self) -> None:
-        _require(
-            not set(self.check_verdicts) & set(self.not_covered),
-            "a check is either scored or not covered",
-        )
-        _frozen(self, "check_verdicts", self.check_verdicts)
-        _frozen(self, "not_covered", self.not_covered)
-        _frozen(self, "worst_case_lean_failures", self.worst_case_lean_failures)
-
-    @property
-    def flip(self) -> Literal["clear", "not clear"]:
-        """Clear only when at least one check is scored and every scored check clears."""
-        verdicts = self.check_verdicts.values()
-        return (
-            "clear"
-            if verdicts and all(isinstance(v, CLEARING_VERDICTS) for v in verdicts)
-            else "not clear"
-        )
-
-
-RoleVerdict = Underpowered | Assessed
-
-
 # ---------------------------------------------------------------------------
-# JSON codecs live in model_codecs and need the types above, so they are served
-# lazily (PEP 562): `model.status_to_json` and friends stay the import path, and
-# either module can be imported first without a cycle.
+# The verdict types (model_verdict) and the JSON codecs (model_codecs) need the
+# types above, so they are served lazily (PEP 562): `model.Assessed`,
+# `model.status_to_json` and friends stay the import path, and any of the three
+# modules can be imported first without a cycle.
 # ---------------------------------------------------------------------------
 
 if TYPE_CHECKING:  # the names `__getattr__` serves, declared for type checkers
@@ -761,26 +647,38 @@ if TYPE_CHECKING:  # the names `__getattr__` serves, declared for type checkers
         verdict_label,
         verdict_to_json,
     )
+    from praxion_evals.adherence.model_verdict import (  # noqa: F401
+        CLEARING_VERDICTS,
+        Assessed,
+        CheckVerdict,
+        Counts,
+        Inferior,
+        Interval,
+        NonInferior,
+        NoRegression,
+        Regression,
+        RoleVerdict,
+        Underpowered,
+    )
 
-CODEC_NAMES = frozenset(
+_CODEC_NAMES = (
+    "outcome_from_json outcome_to_json settings_from_json settings_to_json setup_from_json "
+    "setup_to_json status_from_json status_to_json verdict_label verdict_to_json"
+)
+_VERDICT_NAMES = (
+    "CLEARING_VERDICTS Assessed CheckVerdict Counts Inferior Interval NonInferior NoRegression "
+    "Regression RoleVerdict Underpowered"
+)
+_SERVED_BY: Mapping[str, str] = MappingProxyType(
     {
-        "outcome_from_json",
-        "outcome_to_json",
-        "settings_from_json",
-        "settings_to_json",
-        "setup_from_json",
-        "setup_to_json",
-        "status_from_json",
-        "status_to_json",
-        "verdict_label",
-        "verdict_to_json",
+        **dict.fromkeys(_CODEC_NAMES.split(), "model_codecs"),
+        **dict.fromkeys(_VERDICT_NAMES.split(), "model_verdict"),
     }
 )
 
 
 def __getattr__(name: str) -> object:
-    if name in CODEC_NAMES:
-        from praxion_evals.adherence import model_codecs
-
-        return getattr(model_codecs, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = _SERVED_BY.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(import_module(f"praxion_evals.adherence.{module}"), name)

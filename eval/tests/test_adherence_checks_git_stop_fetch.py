@@ -29,6 +29,7 @@ from praxion_evals.adherence.model import (
     TaskFacts,
     Withheld,
 )
+from praxion_evals.adherence.transcript import StoppedAtCap
 from praxion_evals.live.session import ToolUse
 
 SLUG = "canary-task"
@@ -230,6 +231,7 @@ PARTIAL_FINDINGS = (
 
 
 def _c5(role="researcher", files=None, **kwargs):
+    kwargs.setdefault("role_ending", StoppedAtCap(6, 6))
     evidence = synthetic_evidence(role, files=files, forced_stop=True, **kwargs)
     return COMMON_CHECKS["C5"].evaluate(evidence)
 

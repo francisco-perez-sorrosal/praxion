@@ -16,11 +16,15 @@ from praxion_evals.adherence.model import (
     Passed,
     Withheld,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 from praxion_evals.live.session import ToolUse
 
 SLUG = "canary-task"
 FINDINGS = f".ai-work/{SLUG}/RESEARCH_FINDINGS.md"
 REPORT = f".ai-work/{SLUG}/VERIFICATION_REPORT.md"
+CAP = 6
+RAN_OUT = StoppedAtCap(CAP, CAP)
+ENDED_EARLY = EndedOnItsOwn(3)
 
 
 def _use(name: str, **tool_input: str) -> ToolUse:
@@ -220,16 +224,50 @@ def test_a_missing_return_is_not_elicited_and_fails():
     assert "not elicited" in outcome.detail
 
 
-def test_a_forced_stop_leaves_no_return_to_judge():
-    outcome = _c2(text="", forced_stop=True)
+def test_a_role_stopped_at_its_cap_leaves_no_return_to_judge():
+    outcome = _c2(text="", forced_stop=True, role_ending=RAN_OUT)
 
     assert isinstance(outcome, NotApplicable)
 
 
-def test_a_forced_stop_with_no_recorded_return_is_not_applicable_either():
-    evidence = synthetic_evidence("researcher", role_return=None, forced_stop=True)
+def test_a_role_stopped_at_its_cap_with_no_recorded_return_is_not_applicable_either():
+    evidence = synthetic_evidence(
+        "researcher", role_return=None, forced_stop=True, role_ending=RAN_OUT
+    )
 
     assert isinstance(COMMON_CHECKS["C2"].evaluate(evidence), NotApplicable)
+
+
+def test_a_forced_stop_role_that_ended_before_its_cap_is_held_to_its_return():
+    conforming = _c2(text="Report written.\n[COMPLETE]", forced_stop=True, role_ending=ENDED_EARLY)
+    unmarked = _c2(text="Report written.", forced_stop=True, role_ending=ENDED_EARLY)
+
+    assert conforming == Passed()
+    assert isinstance(unmarked, Failed)
+    assert "terminal marker" in unmarked.detail
+
+
+def test_a_forced_stop_role_that_wrote_no_return_before_its_cap_fails_as_on_any_task():
+    evidence = synthetic_evidence(
+        "researcher", role_return=None, forced_stop=True, role_ending=ENDED_EARLY
+    )
+
+    outcome = COMMON_CHECKS["C2"].evaluate(evidence)
+
+    assert isinstance(outcome, Failed)
+    assert "not elicited" in outcome.detail
+
+
+def test_a_forced_stop_whose_ending_is_unknown_is_withheld_on_c2_with_the_reason():
+    ending = Unknown("the role's transcript holds no request of the role's own")
+
+    outcome = _c2(text="", forced_stop=True, role_ending=ending)
+
+    assert outcome == Withheld(ending.reason)
+
+
+def test_a_forced_stop_with_no_recorded_ending_is_withheld_on_c2():
+    assert isinstance(_c2(text="", forced_stop=True), Withheld)
 
 
 # ---------------------------------------------------------------------------
@@ -290,8 +328,9 @@ REPORT_DIR = ".ai-state/sentinel_reports"
 GENESIS_DIR = ".ai-state/skill_genesis_reports"
 
 
-def _c5_for(role, **kwargs):
-    return COMMON_CHECKS["C5"].evaluate(synthetic_evidence(role, forced_stop=True, **kwargs))
+def _c5_for(role, role_ending=RAN_OUT, **kwargs):
+    evidence = synthetic_evidence(role, forced_stop=True, role_ending=role_ending, **kwargs)
+    return COMMON_CHECKS["C5"].evaluate(evidence)
 
 
 @pytest.mark.parametrize(
@@ -341,3 +380,23 @@ def test_a_forced_stop_leaves_the_partial_form_the_definition_states(role, path,
 
     assert _c5_for(role, files={path: marked}) == Passed()
     assert isinstance(_c5_for(role, files={path: "# Report\n"}), Failed)
+
+
+def test_a_role_that_ended_before_its_cap_is_not_applicable_on_c5_and_says_why():
+    outcome = _c5_for("researcher", ENDED_EARLY, files={FINDINGS: "# Findings\n"})
+
+    assert isinstance(outcome, NotApplicable)
+    assert "before its turn cap" in outcome.reason
+
+
+def test_a_role_whose_ending_is_unknown_is_withheld_on_c5_with_the_reason():
+    ending = Unknown("the transcript holds 12 requests, more than the 6-turn cap")
+
+    assert _c5_for("researcher", ending) == Withheld(ending.reason)
+
+
+def test_a_forced_stop_with_no_recorded_ending_is_withheld_on_c5_not_scored():
+    outcome = _c5_for("researcher", None, files={FINDINGS: "# Findings\n"})
+
+    assert isinstance(outcome, Withheld)
+    assert "ending" in outcome.reason

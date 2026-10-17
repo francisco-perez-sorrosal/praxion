@@ -43,8 +43,10 @@ from praxion_evals.adherence.model import (
     TaskFacts,
 )
 from praxion_evals.adherence.transcript import (
+    EndedOnItsOwn,
     RoleEnding,
     RoleTranscript,
+    StoppedAtCap,
     TranscriptRead,
     TranscriptUnread,
     Unknown,
@@ -67,6 +69,8 @@ GIT_TIMEOUT_S = 60
 # A synchronous spawn's result ends with a harness trailer after the role's own text.
 _AGENT_TRAILER = re.compile(r"^agentId:", re.MULTILINE)
 LAUNCH_STUB_PREFIX = "Async agent launched"
+# The harness's note ahead of the partial return of a role it stopped at its `maxTurns`.
+_TURN_LIMIT_NOTE = re.compile(r"stopped at its (?P<cap>\d+)-turn limit")
 
 # The delivering hook heads every injected string with `[praxion <version> #<slot>]`. A
 # sandbox keeps no observation log, so that marker, read from the role's transcript, is the
@@ -118,6 +122,7 @@ def evidence_from_recording(
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
     found = _role_transcript(parsed, spawn_id, config_dir, repo_root)
+    role_tool_uses, returned = _role_tool_uses(parsed, spawn_id), _role_return(parsed, spawn_id)
     if kernel_rows is not None:
         rows, unread = tuple(kernel_rows), None
     else:
@@ -133,8 +138,8 @@ def evidence_from_recording(
         sandbox=sandbox,
         plugin_copy=plugin_copy,
         spawn_id=spawn_id,
-        role_tool_uses=_role_tool_uses(parsed, spawn_id),
-        role_return=_role_return(parsed, spawn_id),
+        role_tool_uses=role_tool_uses,
+        role_return=returned,
         repo=read_repo(repo_root, fixture_commit, slug),
         facts=TaskFacts(
             forced_stop=forced_stop,
@@ -145,15 +150,39 @@ def evidence_from_recording(
             external_api_docs=external_api_docs,
         ),
         kernel=KernelEvidence(kernel_expected, rows, unread) if kernel_expected or rows else None,
-        role_ending=_ending_of(found, turn_cap) if forced_stop else None,
+        role_ending=(
+            _ending_of(found, turn_cap, returned, len(role_tool_uses)) if forced_stop else None
+        ),
     )
 
 
-def _ending_of(found: RoleTranscript | None, turn_cap: int | None) -> RoleEnding:
-    """How a forced-stop role ended; a transcript never sought is an ending nobody can read."""
-    if found is None:
-        return Unknown("the role's transcript was not sought: no spawn or no config dir was given")
+def _ending_of(
+    found: RoleTranscript | None, turn_cap: int | None, returned: str | None, tool_calls: int
+) -> RoleEnding:
+    """How a forced-stop role ended: its transcript when one was read, else the stream's record."""
+    if found is None or isinstance(found, TranscriptUnread):
+        return _ending_from_stream(returned, tool_calls)
     return role_ending(found, turn_cap)
+
+
+def _ending_from_stream(returned: str | None, tool_calls: int) -> RoleEnding:
+    """The ending the spawn's result alone records, for a role whose transcript is not at hand.
+
+    The harness heads the return of a role it stopped with a note naming the limit, so that
+    note is the recorded stop, and a role stopped at N turns held N requests. A return
+    without the note is a role that ended on its own; with neither, nothing says how it ended.
+    """
+    if returned is None or not returned.strip():
+        return Unknown(
+            "the role's transcript was not read and the stream holds no return from the role"
+        )
+    heading = returned.lstrip().partition("\n")[0]  # a body that quotes the note is not the note
+    limit = _TURN_LIMIT_NOTE.search(heading)
+    if limit is not None:
+        cap = int(limit["cap"])
+        return StoppedAtCap(cap, cap)
+    # One request per tool call, plus the closing text request: the stream names no other count.
+    return EndedOnItsOwn(tool_calls + 1)
 
 
 def _role_transcript(

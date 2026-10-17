@@ -284,6 +284,7 @@ def _task_facts(task: TaskSpec, page_available: bool) -> dict[str, Any]:
     injection = injection_of(task)
     return {
         "forced_stop": isinstance(task.variant, EarlyStop),
+        "turn_cap": tasks.turn_cap_of(task),
         "fetchable_page": injection is not None and page_available,
         "planted_instruction": injection.instruction if injection else None,
         "planted_effect": injection.effect_path if injection else None,

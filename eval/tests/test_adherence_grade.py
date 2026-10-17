@@ -29,7 +29,7 @@ from praxion_evals.adherence.model import (
     RuleRef,
     SessionSetup,
 )
-from praxion_evals.adherence.transcript import StoppedAtCap, Unknown
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 
 SLUG = "grade-task"
 SPAWN = "toolu_spawn"
@@ -706,13 +706,13 @@ TURN_PROBE = (
 FORCED_STOP_CAP = 10
 
 
-def _forced_stop_evidence(repo, tmp_path, *, turn_cap, **kwargs):
+def _forced_stop_evidence(repo, tmp_path, *, turn_cap, spawn_result=SPAWNED, **kwargs):
     """A forced-stop session whose role transcript, under the config dir, is the recorded probe."""
     config_dir = tmp_path / "config"
     path = transcript.transcript_path(config_dir, str(repo[0]), "sess-1", AGENT)
     path.parent.mkdir(parents=True)
     path.write_text(TURN_PROBE.read_text())
-    stream = {"spawn_result": SPAWNED}
+    stream = {"spawn_result": spawn_result}
     return _evidence(
         repo, tmp_path, stream, forced_stop=True, turn_cap=turn_cap, config_dir=config_dir, **kwargs
     )
@@ -737,11 +737,59 @@ def test_a_forced_stop_task_with_no_known_cap_is_an_unknown_ending_not_a_guess(r
     assert "no turn cap" in evidence.role_ending.reason
 
 
-def test_a_forced_stop_task_whose_transcript_was_never_sought_says_so(repo, tmp_path):
-    evidence = _evidence(repo, tmp_path, forced_stop=True, turn_cap=FORCED_STOP_CAP)
+TURN_LIMIT_NOTE = (
+    "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is"
+    " PARTIAL output; treat it as incomplete.\n\n"
+)
+READ = ("Read", {"file_path": "README.md"})
+
+
+def test_without_a_transcript_the_harness_note_in_the_return_is_the_recorded_stop(repo, tmp_path):
+    stream = {
+        "spawn_result": TURN_LIMIT_NOTE + "Writing the report now.",
+        "child_tools": (READ,) * 5,
+    }
+
+    evidence = _evidence(repo, tmp_path, stream, forced_stop=True)
+
+    assert evidence.role_ending == StoppedAtCap(6, 6)
+
+
+def test_without_a_transcript_a_return_with_no_note_is_a_role_that_ended_on_its_own(repo, tmp_path):
+    stream = {"child_tools": (READ,) * 2}
+
+    evidence = _evidence(repo, tmp_path, stream, forced_stop=True)
+
+    assert evidence.role_ending == EndedOnItsOwn(3)
+
+
+def test_a_note_quoted_in_the_body_of_a_return_is_not_the_harness_note(repo, tmp_path):
+    quoted = "The report is written.\nA log said the agent stopped at its 6-turn limit.\n[COMPLETE]"
+
+    evidence = _evidence(repo, tmp_path, {"spawn_result": quoted}, forced_stop=True)
+
+    assert isinstance(evidence.role_ending, EndedOnItsOwn)
+
+
+def test_without_a_transcript_or_a_return_the_ending_is_unknown_with_the_reason(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path, {"spawn_result": None}, forced_stop=True)
 
     assert isinstance(evidence.role_ending, Unknown)
-    assert "not sought" in evidence.role_ending.reason
+    assert "no return" in evidence.role_ending.reason
+
+
+def test_a_blank_return_is_no_return_so_the_ending_is_unknown(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path, {"spawn_result": " \n"}, forced_stop=True)
+
+    assert isinstance(evidence.role_ending, Unknown)
+
+
+def test_a_transcript_that_was_read_decides_over_the_note_in_the_stream(repo, tmp_path):
+    evidence = _forced_stop_evidence(
+        repo, tmp_path, turn_cap=FORCED_STOP_CAP + 5, spawn_result=TURN_LIMIT_NOTE + SPAWNED
+    )
+
+    assert isinstance(evidence.role_ending, Unknown)
 
 
 def test_a_task_that_did_not_stop_the_role_early_has_no_ending(repo, tmp_path):

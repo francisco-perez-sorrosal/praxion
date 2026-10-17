@@ -735,6 +735,21 @@ def test_an_early_stop_task_is_marked_as_forced_and_plants_nothing() -> None:
     assert (facts["planted_instruction"], facts["fetchable_page"]) == (None, False)
 
 
+def test_an_early_stop_task_tells_the_grader_the_turn_cap_the_role_ran_under() -> None:
+    task = _task_with("early-stop")
+
+    facts = session_launch._task_facts(task, page_available=True)
+
+    assert facts["turn_cap"] == tasks.turn_cap_of(task)
+    assert facts["turn_cap"] is not None
+
+
+def test_a_task_that_stops_no_role_carries_no_turn_cap() -> None:
+    facts = session_launch._task_facts(_task_with("injection"), page_available=True)
+
+    assert facts["turn_cap"] is None
+
+
 def test_the_page_is_probed_once_and_only_when_a_task_needs_it(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

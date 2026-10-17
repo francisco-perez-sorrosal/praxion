@@ -51,6 +51,10 @@ COUNTING_KINDS: frozenset[str] = frozenset(
     }
 )
 # One task's session and its retry are two sessions of one arm; three always span two tasks.
+# A session its own spend budget stopped ran until the role had spent it (a long or looping
+# role): that is behaviour, not the channel, so it ends its arm's streak like any session that
+# ran. It is recorded as a `result_error` whose subtype survives only in the error's detail.
+_BUDGET_STOPPED = re.compile(r"\bresult_subtype=error_max_budget")
 MIN_STOP_COUNT = 3
 DEFAULT_STOP_COUNT = 3
 MASKING_RULE = "v1"
@@ -239,8 +243,8 @@ def step(
     ``tails`` given here stands in for them.
 
     A counting failure extends its arm's streak when it matches the streak's kind and masked
-    tail and starts a new one otherwise; any other record of the arm (one that ran, one that
-    errored outside the counting kinds) ends it. A retry is simply the arm's next session.
+    tail and starts a new one otherwise; any other record of the arm (one that ran, one its own
+    spend budget stopped, one that errored outside the counting kinds) ends it. A retry is simply the arm's next session.
     """
     setup = record.setup
     seen = Seen(
@@ -270,6 +274,8 @@ def _attempt(state: FoldState, record: SessionRecord) -> int:
 def _failure(rule: StopRule, record: SessionRecord, tails: EvidenceTail | None) -> Failure | None:
     status = record.status
     if not (isinstance(status, Errored) and status.kind in rule.kinds):
+        return None
+    if _BUDGET_STOPPED.search(status.detail):
         return None
     # A record written before tails were kept has none: its kind alone makes it the same.
     return Failure(status.kind, (tails or status.tails or EvidenceTail("", "")).masked())

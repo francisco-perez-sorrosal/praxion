@@ -15,8 +15,11 @@ A fresh run of a role is refused, before anything launches, while a run of that 
 and was neither continued nor closed; ``--close RUN --reason TEXT`` is how an operator who
 will not continue it says so. ``--continue RUN`` starts a later part of the stopped run: it
 declares what the run declared and launches again only the tasks no part finished, and it is
-refused before anything launches, naming every reason, unless the run stopped continuably and
-every option given beside it restates what the run declared.
+refused before anything launches, naming every reason, unless the run stopped continuably, every
+option given beside it restates what the run declared, it measures the same thing now (a path of
+the tree changed since the run's commit is named; a committed results file changes nothing) and
+it would replace no results file of the run's lineage. A spend limit it does not name is the one
+the stopped run recorded.
 """
 
 from __future__ import annotations
@@ -25,11 +28,13 @@ import argparse
 import json
 import math
 import os
+import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 from praxion_evals.adherence import arms, report, results, session_loop, tasks
@@ -63,6 +68,7 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.adherence.run_ending import Continuation
 from praxion_evals.adherence.run_identity import (
+    UNCOUNTED_PATHS,
     MeasuredIdentity,
     role_identity,
     tree_digest,
@@ -182,11 +188,14 @@ def _parser() -> argparse.ArgumentParser:
         dest="run_cap_usd",
         type=_number(float, 0.0, above=True),
         default=RUNNER_SPEND_CAP_USD,
+        help="what the run may spend; a continuation's cap bounds its own part, and defaults "
+        "to the one the stopped run recorded",
     )
     add(
         "--session-budget-usd",
         type=_number(float, 0.0, above=True),
         default=DEFAULT_SESSION_BUDGET_USD,
+        help="what one session may spend; a continuation defaults to the stopped run's",
     )
     add("--margin-pp", type=float, default=DEFAULT_MARGIN_PP)
     add("--required-pairs", type=_number(int, 1), default=tasks.DEFAULT_TARGET)
@@ -325,7 +334,8 @@ def _refuse_beside_stopped_run(config: RunConfig) -> None:
 
 def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) -> int:
     """Write the closed ending into the stopped run's own results file."""
-    tip, path, _ = _read_part(session_loop.results_dir(config), run_id, checkout.path)
+    tip, files, _ = _read_part(session_loop.results_dir(config), run_id, checkout.path)
+    path = files[-1]
     ending = close(tip, reason, datetime.now(UTC))
     recorded = tip.results
     extra = {**recorded.run.extra, "ending": ending_to_json(ending)}
@@ -336,16 +346,18 @@ def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) 
 
 def _read_part(
     directory: Path, run_id: str, repo: Path
-) -> tuple[ReadTip, Path, tuple[results.RunResults, ...]]:
-    """The run ``run_id`` as the part of its lineage it is: read, its file, and the parts of the
-    lineage up to it, oldest first. A missing run, a fork and a gap are refused."""
+) -> tuple[ReadTip, tuple[Path, ...], tuple[results.RunResults, ...]]:
+    """The run ``run_id`` as the part of its lineage it is: read, the files of the lineage up to
+    it and the parts they hold, oldest first (the run's own file is the last). A missing run, a
+    fork and a gap are refused."""
     lineage = Lineage.parse(directory, run_id)
     ids = [part.run_id for part in lineage.parts]
     at = ids.index(run_id)
-    parts = tuple(results.load(part.path) for part in lineage.parts[: at + 1])
+    files = tuple(part.path for part in lineage.parts[: at + 1])
+    parts = tuple(results.load(path) for path in files)
     continued_by = ids[at + 1] if at + 1 < len(ids) else None
     tip = ReadTip(parts[-1], measured_identity(parts[-1], repo), continued_by)
-    return tip, lineage.parts[at].path, parts
+    return tip, files, parts
 
 
 # --- --continue RUN: a later part of a stopped run ---
@@ -362,13 +374,22 @@ def _begin_continuation(
     """
     run_id, repo = config.continue_run, checkout.path
     assert run_id is not None  # main hands over only a config that names the run to continue
-    tip, parts = _read_tip(session_loop.results_dir(config), run_id, repo)
+    tip, files, parts = _read_tip(session_loop.results_dir(config), run_id, repo)
     if isinstance(tip, UnreadableTip):
         raise _refused(run_id, continuation_refusals(tip, identity_now(config, {}, repo), ()))
-    declared = recorded_config(config, parts[0])
+    declared = _with_recorded_limits(recorded_config(config, parts[0]), given, tip.results)
     planned = _replanned(declared, parts[0])
-    changed = _changed_options(given, config, declared, parts[0])
-    if refusals := continuation_refusals(tip, identity_now(declared, planned, repo), changed):
+    now = identity_now(declared, planned, repo)
+    refusals = (
+        *continuation_refusals(
+            tip,
+            now,
+            _changed_options(given, config, declared, parts[0]),
+            _changed_paths(tip, now, repo),
+        ),
+        *_output_refusals(config, files),
+    )
+    if refusals:
         raise _refused(run_id, refusals)
     again = {role: relaunch_tasks(tip.results, role, parts[:-1]) for role in planned}
     launched: dict[Role, list[TaskSpec]] = {
@@ -391,17 +412,16 @@ def _refused(run_id: str, refusals: Sequence[str]) -> ValueError:
 
 def _read_tip(
     directory: Path, run_id: str, repo: Path
-) -> tuple[Tip, tuple[results.RunResults, ...]]:
-    """The run to continue and the parts of its lineage up to it; no parts when its results file
-    cannot be read."""
+) -> tuple[Tip, tuple[Path, ...], tuple[results.RunResults, ...]]:
+    """The run to continue, the files of its lineage and the parts they hold, up to it; neither
+    when its results file cannot be read."""
     named = directory / f"{run_id}.json"
     try:
         if named.exists():
             results.load(named)
     except (OSError, ValueError, KeyError, TypeError) as error:
-        return UnreadableTip(named, f"{type(error).__name__}: {error}"), ()
-    tip, _, parts = _read_part(directory, run_id, repo)
-    return tip, parts
+        return UnreadableTip(named, f"{type(error).__name__}: {error}"), (), ()
+    return _read_part(directory, run_id, repo)
 
 
 def recorded_config(config: RunConfig, first: results.RunResults) -> RunConfig:
@@ -431,10 +451,34 @@ def recorded_config(config: RunConfig, first: results.RunResults) -> RunConfig:
         raise ValueError(f"run {first.run.id} does not record {missing}") from missing
 
 
+def _planned_ids(first: results.RunResults) -> Mapping[str, Sequence[str]]:
+    recorded = first.run.extra.get("tasks")
+    if recorded is None:
+        raise ValueError(f"run {first.run.id} does not record its planned tasks")
+    return recorded
+
+
+def _with_recorded_limits(
+    declared: RunConfig, given: Mapping[str, str], stopped: results.RunResults
+) -> RunConfig:
+    """``declared`` with the session budget and the spend cap the stopped run recorded, for each
+    the continuation does not name: a part runs under the limits its run began with. The cap
+    bounds the part's own spend; each part starts its ledger afresh."""
+    extra = stopped.run.extra
+    recorded = {
+        "session_budget_usd": extra.get("session_budget_usd"),
+        "run_cap_usd": extra.get("spend", {}).get("cap_usd"),
+    }
+    return replace(
+        declared,
+        **{dest: v for dest, v in recorded.items() if v is not None and dest not in given},
+    )
+
+
 def _replanned(declared: RunConfig, first: results.RunResults) -> dict[Role, list[TaskSpec]]:
     """The run's planned tasks as the generator builds them now from the recorded seed and
     count; the identity check compares their ids with the recorded ones."""
-    recorded = first.run.extra["tasks"]
+    recorded = _planned_ids(first)
     return {
         role: tasks.generate(role, declared.seed, len(recorded.get(role, ())))
         for role in declared.roles
@@ -459,10 +503,60 @@ def _changed_options(
     if "max_tasks" in given:
         capped = plan_tasks(replace(declared, max_tasks=config.max_tasks))
         if {role: [t.task_id for t in specs] for role, specs in capped.items()} != dict(
-            first.run.extra["tasks"]
+            _planned_ids(first)
         ):
             changed.append(given["max_tasks"])
     return tuple(changed)
+
+
+def _changed_paths(tip: ReadTip, now: MeasuredIdentity, repo: Path) -> tuple[str, ...]:
+    """The paths of the tree that differ from the commit the stopped run launched at, named only
+    when the tree differs at all (a run may have launched on edits since committed)."""
+    commit = tip.results.run.extra.get("checkout", {}).get("commit")
+    if commit is None or tip.identity.tree == now.tree:
+        return ()
+    return paths_changed_since(repo, commit)
+
+
+def paths_changed_since(repo: Path, commit: str) -> tuple[str, ...]:
+    """The paths the tree counts whose content differs from ``commit``: tracked files edited,
+    added or deleted since, and files nothing ignores that are not tracked yet. Empty when
+    ``commit`` is not reachable in ``repo``, which leaves the tree's digest as the only evidence."""
+    try:
+        tracked = _paths_listed(repo, "diff", "--name-only", "-z", commit, "--")
+        untracked = _paths_listed(repo, "ls-files", "-z", "--others", "--exclude-standard")
+    except subprocess.CalledProcessError:
+        return ()
+    counted = (path for path in {*tracked, *untracked} if not _uncounted(path))
+    return tuple(sorted(counted))
+
+
+def _uncounted(path: str) -> bool:
+    return any(fnmatchcase(path, pattern) for pattern in UNCOUNTED_PATHS)
+
+
+def _paths_listed(repo: Path, *args: str) -> list[str]:
+    done = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=True)
+    return [os.fsdecode(path) for path in done.stdout.split(b"\0") if path]
+
+
+def _output_refusals(config: RunConfig, lineage_files: Sequence[Path]) -> tuple[str, ...]:
+    """A continuation adds a results file and replaces none: every file of its lineage holds
+    sessions that were paid for."""
+    refusals = []
+    if config.overwrite:
+        refusals.append(
+            "--overwrite could replace a results file holding paid sessions;"
+            " a continuation only adds a file"
+        )
+    if config.output is not None and config.output.resolve() in {
+        f.resolve() for f in lineage_files
+    }:
+        refusals.append(
+            f"--output {config.output} is a results file of the run's own lineage;"
+            " a continuation never replaces one"
+        )
+    return tuple(refusals)
 
 
 def identity_now(

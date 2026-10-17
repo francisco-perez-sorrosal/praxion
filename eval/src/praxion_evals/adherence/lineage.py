@@ -37,7 +37,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, assert_never, get_args
 
-from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, Scope, StopReason
+from praxion_evals.adherence.infra_stop import (
+    Failure,
+    FoldState,
+    Launched,
+    Scope,
+    StopReason,
+    StopRule,
+    step,
+)
 from praxion_evals.adherence.model import (
     ARMS,
     CLEARING_VERDICTS,
@@ -45,6 +53,7 @@ from praxion_evals.adherence.model import (
     Assessed,
     Errored,
     Measured,
+    SessionRecord,
     SessionStatus,
 )
 from praxion_evals.adherence.results import RunResults, flip_label, instant, load, role_verdicts
@@ -385,7 +394,9 @@ def _inside_the_stop(results: RunResults) -> set[int]:
     ending = ending_of(results)
     if not isinstance(ending, InfraStopped):
         return set()
-    stop, sessions = ending.reason, results.sessions
+    stop, sessions, rule = ending.reason, results.sessions, results.settings.stop_rule
+    if rule is None:
+        raise ValueError(f"run {results.run.id} stopped but declares no stop rule")
     of_arm = [
         i for i, r in enumerate(sessions) if (r.setup.role, r.setup.arm) == (stop.role, stop.arm)
     ]
@@ -395,27 +406,28 @@ def _inside_the_stop(results: RunResults) -> set[int]:
         raise ValueError(
             f"the stop names sessions that the {stop.role} {stop.arm} arm did not end on"
         )
-    last = sessions[streak[-1]].status
+    last = sessions[streak[-1]]
     alike = {
         i
         for i in range(streak[0], streak[-1] + 1)
         if sessions[i].setup.role == stop.role
         and sessions[i].setup.arm != stop.arm
-        and _fails_alike(sessions[i].status, last)
+        and _fails_alike(rule, sessions[i], last)
     }
     return {*streak, *alike}
 
 
-def _fails_alike(status: SessionStatus, streak_session: SessionStatus) -> bool:
-    """Whether ``status`` failed as a session of the streak did: the same kind and the same
-    masked evidence, compared tail to tail as the stop compared them."""
-    if not (isinstance(status, Errored) and isinstance(streak_session, Errored)):
-        return False
-    return status.kind == streak_session.kind and _masked(status) == _masked(streak_session)
+def _fails_alike(rule: StopRule, record: SessionRecord, streak_session: SessionRecord) -> bool:
+    """Whether ``record`` failed as ``streak_session`` did, by the stop's own reading: the same
+    kind and masked evidence, and only a session that counted as a failure at all. A session its
+    own spend budget stopped ran, so it is never a failure of the stop."""
+    failure = _failure_of(rule, record)
+    return failure is not None and failure == _failure_of(rule, streak_session)
 
 
-def _masked(status: Errored) -> str:
-    return (status.tails or EvidenceTail("", "")).masked()
+def _failure_of(rule: StopRule, record: SessionRecord) -> Failure | None:
+    folded, _ = step(rule, FoldState(), record)
+    return folded.seen[0].failure
 
 
 # ---------------------------------------------------------------------------
@@ -457,15 +469,19 @@ Tip = ReadTip | UnreadableTip
 
 
 def continuation_refusals(
-    tip: Tip, identity_now: MeasuredIdentity, supplied_options: Collection[str]
+    tip: Tip,
+    identity_now: MeasuredIdentity,
+    supplied_options: Collection[str],
+    changed_paths: Collection[str] = (),
 ) -> tuple[str, ...]:
     """Every reason ``tip`` cannot be continued now, one line each; empty when it can.
 
     Refused: a results file that cannot be read; a run that did not stop continuably (it
     finished, stopped in one arm alone, was interrupted or crashed, was closed, or predates
     endings); a run something already continues; an option beyond ``CONTINUATION_OPTIONS``; and
-    any way ``identity_now`` differs from what the run was measured on. Only the ending and the
-    identity decide: how well the run did is never read.
+    any way ``identity_now`` differs from what the run was measured on, each path of the tree in
+    ``changed_paths`` named beside the tree's own difference. Only the ending and the identity
+    decide: how well the run did is never read.
     """
     match tip:
         case UnreadableTip(path=path, reason=reason):
@@ -476,6 +492,10 @@ def continuation_refusals(
                 *_continued_refusals(tip),
                 *_option_refusals(supplied_options),
                 *(f"changed since the stop: {line}" for line in diff(tip.identity, identity_now)),
+                *(
+                    f"changed since the stop: tree: {path} differs from the run's commit"
+                    for path in changed_paths
+                ),
             )
         case _:
             assert_never(tip)

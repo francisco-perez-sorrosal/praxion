@@ -16,7 +16,14 @@ import pytest
 
 import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import report, results
-from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, StopReason
+from praxion_evals.adherence.infra_stop import (
+    COUNTING_KINDS,
+    DEFAULT_STOP_COUNT,
+    EvidenceTail,
+    Launched,
+    StopReason,
+    StopRule,
+)
 from praxion_evals.adherence.lineage import (
     CONTINUATION_OPTIONS,
     Closed,
@@ -475,7 +482,10 @@ def stopped_at(*streak: tuple[str, int], arm: str = "lean", tail: str = STOPPING
 
 def stopped_run(sessions, ending: RunEnding, planned=PLANNED) -> results.RunResults:
     extra = {"tasks": {"researcher": list(planned)}, "ending": ending_to_json(ending)}
-    return run_results(sessions, extra=extra)
+    settings = replace(
+        declared(), stop_rule=StopRule.parse(DEFAULT_STOP_COUNT, COUNTING_KINDS, 2000)
+    )
+    return run_results(sessions, settings=settings, extra=extra)
 
 
 def eight_shapes_run() -> results.RunResults:

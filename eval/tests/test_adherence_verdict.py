@@ -616,68 +616,6 @@ def test_a_role_where_the_lean_arm_loses_every_pair_has_the_floor_as_its_bound()
     assert lower_bound(5, 0, 5) == -1.0
 
 
-# ---------------------------------------------------------------------------
-# Calibration: the allowance a same-arm run earns each check
-# ---------------------------------------------------------------------------
-
-
-def calibration(discordant_against_second: int, discordant_for_second: int) -> list[Pair]:
-    ok, bad = measured(C1=PASS), measured(C1=FAIL)
-    return (
-        pairs(10, ok, ok)
-        + pairs(discordant_against_second, ok, bad)
-        + pairs(discordant_for_second, bad, ok)
-    )
-
-
-@pytest.mark.parametrize(
-    ("b", "c", "expected"),
-    [
-        pytest.param(0, 0, 0, id="no discordance, no noise"),
-        pytest.param(1, 0, 1, id="one discordant pair needs one pair of slack"),
-        pytest.param(2, 2, 4, id="four discordant pairs"),
-        pytest.param(5, 5, 6, id="ten discordant pairs"),
-    ],
-)
-def test_the_allowance_is_the_smallest_noise_the_same_arm_run_stays_under(b, c, expected):
-    allowances = verdict.allowances_from_calibration(calibration(b, c), 0.95)
-
-    assert allowances == {"C1": expected}
-
-
-def test_a_higher_confidence_never_earns_a_smaller_allowance():
-    pairs_ = calibration(4, 3)
-
-    low = verdict.allowances_from_calibration(pairs_, 0.80)["C1"]
-    high = verdict.allowances_from_calibration(pairs_, 0.99)["C1"]
-
-    assert low <= high
-
-
-def test_the_allowance_is_the_exact_binomial_quantile_of_the_net_discordance():
-    # Six discordant pairs: b - c = 2 * Bin(6, 1/2) - 6, and Bin(6, 1/2) <= 4 holds with
-    # probability 57/64 = 0.89 while <= 5 holds with 63/64, so 0.95 first holds at k = 4.
-    assert verdict.allowances_from_calibration(calibration(3, 3), 0.95) == {"C1": 4}
-    assert verdict.allowances_from_calibration(calibration(3, 3), 0.85) == {"C1": 2}
-
-
-def test_a_pair_with_an_errored_side_adds_no_noise_to_the_allowance():
-    pairs_ = calibration(0, 0) + both_errored(4) + lean_errored(3, measured(C1=PASS))
-
-    assert verdict.allowances_from_calibration(pairs_, 0.95) == {"C1": 0}
-
-
-def test_every_check_the_run_scored_gets_its_own_allowance():
-    ok = measured(C1=PASS, C2=PASS)
-    drifted = measured(C1=PASS, C2=FAIL)
-
-    allowances = verdict.allowances_from_calibration(
-        pairs(10, ok, ok) + pairs(1, ok, drifted), 0.95
-    )
-
-    assert allowances == {"C1": 0, "C2": 1}
-
-
 def test_the_verdict_codec_carries_what_the_core_computes():
     ok, bad = measured(C1=PASS, C3=PASS), measured(C1=FAIL, C3=PASS)
 

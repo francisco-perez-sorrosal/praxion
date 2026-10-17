@@ -232,34 +232,8 @@ def _score_statistic(b: int, c: int, n: int, delta: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Noise allowances from a same-arm calibration run
+# The exact one-sided quantile of a check's own discordant count
 # ---------------------------------------------------------------------------
-
-
-def allowances_from_calibration(pairs: Sequence[Pair], confidence: float) -> dict[str, int]:
-    """Each check's allowance: the smallest ``k >= 0`` that same-arm noise stays under.
-
-    ``pairs`` are one arm run twice on the same tasks (the second run in the
-    ``lean`` slot). For a check with ``d`` discordant pairs, ``b - c`` is
-    ``2 * Binomial(d, 1/2) - d`` when the two runs are exchangeable, and the
-    allowance is the smallest ``k`` with ``P(b - c <= k) >= confidence``. A
-    check with no discordance gets zero. Only mechanical checks use it; the
-    caller keeps those.
-    """
-    names = sorted({name for pair in pairs for name in _measured_names(pair)})
-    discordant = {name: tally(name, [p for p in pairs if p.complete]) for name in names}
-    return {
-        name: _exact_quantile(counts.discordant, confidence) for name, counts in discordant.items()
-    }
-
-
-def _measured_names(pair: Pair) -> set[str]:
-    return {
-        name
-        for status in (pair.full, pair.lean)
-        if isinstance(status, Measured)
-        for name in status.outcomes
-    }
 
 
 def _exact_quantile(discordant: int, confidence: float) -> int:

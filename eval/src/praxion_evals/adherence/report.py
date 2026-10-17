@@ -64,6 +64,7 @@ from praxion_evals.adherence.results import (
     pairs_of,
     role_verdicts,
 )
+from praxion_evals.adherence.verdict import tally
 
 PERCENT = 100
 REASON_WIDTH = 160
@@ -126,12 +127,7 @@ def _run_section(results: RunResults) -> str:
     state = (
         "complete" if run.complete else f"incomplete ({len(run.refused_launches)} refused launches)"
     )
-    allowances = (
-        f"from {settings.allowance_source}: "
-        + ", ".join(f"{name} {pairs}" for name, pairs in sorted(settings.allowances.items()))
-        if settings.allowance_source
-        else "none, so every allowance is zero"
-    )
+    allowances = _allowances_declared(settings)
     return "\n".join(
         [
             f"Adherence report for run {run.id}",
@@ -147,6 +143,15 @@ def _run_section(results: RunResults) -> str:
             _judge_error_line(results),
         ]
     )
+
+
+def _allowances_declared(settings: DeclaredSettings) -> str:
+    if settings.allowance_method == OWN_DISCORDANCE_EXACT:
+        return "none declared; each check's is the exact one-sided quantile of its own discordant count"
+    if settings.allowance_source:
+        pairs = ", ".join(f"{name} {n}" for name, n in sorted(settings.allowances.items()))
+        return f"from {settings.allowance_source}: {pairs}"
+    return "none, so every allowance is zero"
 
 
 def _ending_lines(ending: RunEnding) -> list[str]:
@@ -201,8 +206,9 @@ def _role_section(
     )
     lines += _session_lines(results, role)
     lines += [f"{INDENT}Checks:"]
+    calibration = bool(results.run.extra.get("calibration"))
     for entry in entries:
-        lines += _check_lines(entry, complete, verdict, results.settings)
+        lines += _check_lines(entry, complete, verdict, results.settings, calibration)
     lines += _kernel_delivery_lines(kernel_deliveries(results, role))
     lines.append(_earlier_runs_line(results, role))
     return "\n".join(lines)
@@ -310,7 +316,11 @@ def _earlier_runs_line(results: RunResults, role: str) -> str:
 
 
 def _check_lines(
-    entry: CatalogEntry, complete: list[Pair], verdict: RoleVerdict, settings: DeclaredSettings
+    entry: CatalogEntry,
+    complete: list[Pair],
+    verdict: RoleVerdict,
+    settings: DeclaredSettings,
+    calibration: bool,
 ) -> list[str]:
     lines = [
         f"{INDENT * 2}{entry.name} ({entry.kind}) enforces {entry.rule.file}, section"
@@ -318,9 +328,21 @@ def _check_lines(
     ]
     for arm in ARMS:
         lines += _arm_outcome_lines(entry.name, arm, [getattr(pair, arm) for pair in complete])
+    if calibration:
+        return [*lines, _slot_order_line(entry.name, complete)]
     lines += _allowance_lines(entry.name, verdict, settings)
     lines.append(f"{INDENT * 3}verdict: {_check_verdict(entry.name, verdict)}")
     return lines
+
+
+def _slot_order_line(check: str, complete: list[Pair]) -> str:
+    """A same-arm run's net discordance on a check: how far the second run's slot moved the
+    result. A diagnostic only; it sizes no allowance and decides no verdict."""
+    counts = tally(check, complete)
+    return (
+        f"{INDENT * 3}slot-order check: b - c = {counts.b - counts.c}"
+        f" (b {counts.b}, c {counts.c}, n {counts.n}); no allowance"
+    )
 
 
 def _allowance_lines(check: str, verdict: RoleVerdict, settings: DeclaredSettings) -> list[str]:

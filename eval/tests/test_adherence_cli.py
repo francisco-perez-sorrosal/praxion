@@ -31,7 +31,6 @@ from praxion_evals.adherence.model import (
     Failed,
     Measured,
     Passed,
-    allowance_key,
 )
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.harness.schemas import JudgeVerdict
@@ -104,6 +103,14 @@ def test_the_default_slack_is_a_fifth_of_the_target_and_at_least_four(
 
 def test_a_declared_slack_overrides_the_default() -> None:
     assert cli.parse_config(["--role", ROLE, "--pair-slack", "0"]).pair_slack == 0
+
+
+def test_every_new_run_declares_the_own_discordance_method_and_no_allowance() -> None:
+    settings = cli.declared_settings(cli.parse_config(["--role", ROLE]))
+
+    assert settings.allowance_method == model.OWN_DISCORDANCE_EXACT
+    assert settings.allowance_source is None
+    assert dict(settings.allowances) == {}
 
 
 def test_a_calibration_run_measures_the_full_arm_only() -> None:
@@ -636,17 +643,6 @@ def test_a_stop_rule_naming_another_masking_rule_is_refused() -> None:
 
     with pytest.raises(ValueError, match="masking"):
         model.settings_from_json(wire)
-
-
-def test_an_allowance_is_declared_per_role_and_check_and_read_by_that_role_only() -> None:
-    settings = cli.declared_settings(
-        cli.parse_config(["--role", ROLE, "--role", "verifier"]),
-        "calibration-1",
-        {allowance_key("C1", ROLE): 3},
-    )
-
-    assert settings.allowance("C1", ROLE) == 3
-    assert settings.allowance("C1", "verifier") == 0
 
 
 def test_golden_cases_are_judged_once_and_recorded_before_any_session(

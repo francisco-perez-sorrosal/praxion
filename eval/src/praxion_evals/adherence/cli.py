@@ -24,7 +24,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
-from praxion_evals.adherence import arms, report, results, session_loop, tasks, verdict
+from praxion_evals.adherence import arms, report, results, session_loop, tasks
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
     DEFAULT_STOP_COUNT,
@@ -33,13 +33,13 @@ from praxion_evals.adherence.infra_stop import (
 )
 from praxion_evals.adherence.model import (
     ARMS,
+    OWN_DISCORDANCE_EXACT,
     ROLES,
     Arm,
     ArmBuild,
     DeclaredSettings,
     Role,
     TaskSpec,
-    allowance_key,
 )
 from praxion_evals.adherence.session_loop import (
     DEFAULT_TAIL_CHARS,
@@ -64,10 +64,15 @@ DEFAULT_CONFIDENCE = 0.95
 DEFAULT_SESSION_BUDGET_USD = 3.0
 DEFAULT_MODEL = "opus"  # the live runner's defaults
 DEFAULT_EFFORT = "medium"
+CALIBRATION_RUN_NOTE = (
+    "a calibration file sets no allowance (each run sizes its own from its discordant pairs)"
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     config = parse_config(argv)
+    if config.calibration_run is not None:
+        print(f"{PROG}: --calibration-run: {CALIBRATION_RUN_NOTE}", file=sys.stderr)
     try:
         if config.report is not None:
             print(report.render(results.load(config.report)), end="")
@@ -173,8 +178,16 @@ def _parser() -> argparse.ArgumentParser:
     add("--dry-run", action="store_true")
     add("--overwrite", action="store_true")
     noise = parser.add_mutually_exclusive_group()
-    noise.add_argument("--calibration", action="store_true", help="run the full arm against itself")
-    noise.add_argument("--calibration-run", type=Path, help="a calibration file: allowance source")
+    noise.add_argument(
+        "--calibration",
+        action="store_true",
+        help="run the full arm against itself, a diagnostic of the slot order",
+    )
+    noise.add_argument(
+        "--calibration-run",
+        type=Path,
+        help=f"accepted for old command lines; {CALIBRATION_RUN_NOTE}",
+    )
     add("--judge-golden", action="store_true")
     add("--report", type=Path, help="render a results file; launch nothing")
     add("--fixture-pages-base-url", help="the directory URL that serves the fixture page")
@@ -199,11 +212,9 @@ def _number[N: (int, float)](
 # --- what the run declares and plans, before anything launches ---
 
 
-def declared_settings(
-    config: RunConfig,
-    allowance_source: str | None = None,
-    allowances: Mapping[str, int] | None = None,
-) -> DeclaredSettings:
+def declared_settings(config: RunConfig) -> DeclaredSettings:
+    """The settings every new run declares: its own discordant count sizes each mechanical
+    allowance, so no allowance is declared and no calibration file supplies one."""
     return DeclaredSettings(
         margin_pp=config.margin_pp,
         method="tango-score",
@@ -212,84 +223,18 @@ def declared_settings(
         required_pairs=config.required_pairs,
         pair_slack=config.pair_slack,
         retry_policy=RETRY_POLICY,
-        allowance_source=allowance_source,
-        allowances=allowances or {},
+        allowance_source=None,
+        allowances={},
+        allowance_method=OWN_DISCORDANCE_EXACT,
         stop_rule=StopRule.parse(config.stop_count, COUNTING_KINDS, config.tail_chars),
     )
-
-
-def calibrated_allowances(
-    path: Path, config: RunConfig, planned: Mapping[Role, Sequence[TaskSpec]], commit: str
-) -> tuple[str, dict[str, int]]:
-    """The run id and each role's mechanical-check noise allowances from a calibration run.
-
-    An allowance is an absolute count of discordant pairs measured on one checkout, one
-    seed, one pair target and one task list of one role, so the file is refused when any
-    of those differs from this run's or it lacks pairs of a named role; a check shared by
-    several roles keeps one allowance per role, never the widest of them.
-    """
-    calibration = results.load(path)
-    if not calibration.run.extra.get("calibration"):
-        raise ValueError(f"{path} is not a calibration run")
-    mismatch = _calibration_mismatch(calibration, config, planned, commit)
-    if mismatch is not None:
-        raise ValueError(f"the calibration run {calibration.run.id} {mismatch}")
-    allowances: dict[str, int] = {}
-    for role in config.roles:
-        pairs = results.pairs_of(calibration, role)
-        mechanical = {e.name for e in calibration.catalog.get(role, ()) if e.kind == "mechanical"}
-        measured = verdict.allowances_from_calibration(pairs, config.confidence)
-        for name, allowance in measured.items():
-            if name in mechanical:
-                allowances[allowance_key(name, role)] = allowance
-    return calibration.run.id, allowances
-
-
-def _calibration_mismatch(
-    calibration: results.RunResults,
-    config: RunConfig,
-    planned: Mapping[Role, Sequence[TaskSpec]],
-    commit: str,
-) -> str | None:
-    """Why the calibration's allowances do not carry to this run, or ``None`` when they do."""
-    extra = calibration.run.extra
-    measured = (extra.get("checkout") or {}).get("commit")
-    if measured != commit:
-        return f"measured checkout {measured}, not {commit}: an allowance does not carry across checkouts"
-    if extra.get("seed") != config.seed:
-        return f"measured seed {extra.get('seed')}, not {config.seed}: an allowance holds for one task draw"
-    target = calibration.settings.required_pairs
-    if target != config.required_pairs:
-        return (
-            f"declared a pair target of {target}, not {config.required_pairs}: an allowance "
-            "is a count at the calibration's size"
-        )
-    for role in config.roles:
-        if not results.pairs_of(calibration, role):
-            return f"has no pairs of {role}"
-        theirs = list((extra.get("tasks") or {}).get(role, ()))
-        ours = [task.task_id for task in planned.get(role, ())]
-        if theirs != ours:
-            return _task_list_mismatch(role, theirs, ours)
-    return None
-
-
-def _task_list_mismatch(role: Role, theirs: Sequence[str], ours: Sequence[str]) -> str:
-    if len(theirs) != len(ours):
-        return f"measured the {role} on {len(theirs)} tasks, not the {len(ours)} planned"
-    return f"measured the {role} on other tasks than the {len(ours)} planned (another kit or cap)"
 
 
 def _declare(
     config: RunConfig, checkout: Checkout, planned: Mapping[Role, Sequence[TaskSpec]]
 ) -> DeclaredSettings:
-    """The settings a paid run declares, with the noise allowances of its calibration run if any."""
-    source, allowances = None, {}
-    if config.calibration_run is not None:
-        source, allowances = calibrated_allowances(
-            config.calibration_run, config, planned, checkout.commit
-        )
-    return declared_settings(config, source, allowances)
+    """The settings a paid run declares; the session loop hands every run's context to its declarer."""
+    return declared_settings(config)
 
 
 def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:

@@ -54,12 +54,14 @@ ALLOWLIST = frozenset(
 )
 
 # Importer -> the declared consumer it belongs under. The cost collector's
-# read pass was split out of its entry module for size (td-237); the registry
-# declares the component under the entry module.
+# read pass (td-237) and the kernel checker's liveness mode were split out of
+# their entry modules for size; the registry declares each component under the
+# entry module.
 _COMPANION_MODULES = {
     "scripts/project_metrics/collectors/cost_collector_read.py": (
         "scripts/project_metrics/collectors/cost_collector.py"
     ),
+    "scripts/kernel_liveness.py": "scripts/check_kernel_manifest.py",
 }
 
 # Test modules and pytest conftest files are test support, not consumers.

@@ -34,7 +34,7 @@ _SCANNED_SUFFIXES = {".py", ".sh", ".yml", ".yaml", ".json", ".md", ".toml"}
 # field of a ledger run to it, so a flip rests only on a run of this eval. The exemption is the
 # one constant line, not the file: every other line of it is scanned like any script's.
 _NAMES_THE_ENTRY_AS_DATA = {
-    "scripts/check_kernel_manifest.py": re.compile(
+    "scripts/kernel_ledger_checks.py": re.compile(
         r'^ADHERENCE_ENTRY = "praxion-evals-adherence"$', re.MULTILINE
     ),
 }

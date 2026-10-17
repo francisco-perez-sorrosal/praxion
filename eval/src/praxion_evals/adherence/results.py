@@ -56,6 +56,9 @@ KERNEL_PREFIX_CHARS = 8  # the length of the kernel version a delivery marker ca
 FlipLabel = Literal["clear", "not clear", "underpowered"]
 FLIP_LABELS: tuple[str, ...] = ("clear", "not clear", "underpowered")
 CHECK_KINDS: tuple[str, ...] = ("mechanical", "judged")
+# The wire kind of a run's ending once closed on request; ``lineage`` writes it, and the listing
+# (which cannot import ``lineage``) reads it.
+CLOSED_ENDING_KIND = "closed"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -388,8 +391,16 @@ def _earlier_for(role: str, runs: Sequence[RunResults], differences: Differences
         elif differing := differences(earlier, role):
             apart[earlier.run.id] = "; ".join(differing)
         else:
-            draws.append(Draw((earlier.run.id,), flip_label(role_verdicts(earlier)[role])))
+            draws.append(_draw_of(earlier, role))
     return EarlierRuns(tuple(draws), apart, tuple(calibration))
+
+
+def _draw_of(earlier: RunResults, role: str) -> Draw:
+    """A run closed on request gave up before its plan ran out: it reached no flip verdict, so it
+    is a not-clear draw however its sessions would read, and what it had reached is interim."""
+    if (earlier.run.extra.get("ending") or {}).get("kind") == CLOSED_ENDING_KIND:
+        return Draw((earlier.run.id,), "not clear", interim=True)
+    return Draw((earlier.run.id,), flip_label(role_verdicts(earlier)[role]))
 
 
 def earlier_to_json(listing: EarlierListing) -> dict[str, Any]:

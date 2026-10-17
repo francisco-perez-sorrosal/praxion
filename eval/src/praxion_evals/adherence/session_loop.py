@@ -155,6 +155,9 @@ class RunConfig:
     # The infrastructure stop, declared with the other settings (see `infra_stop.StopRule`).
     stop_count: int = DEFAULT_STOP_COUNT
     tail_chars: int = DEFAULT_TAIL_CHARS
+    # Close the stopped run with this id, saying why; a close launches nothing.
+    close: str | None = None
+    reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -306,8 +309,16 @@ def _open_judge(config: RunConfig) -> JudgeClient | None:
 
 
 def _default_output(run_id: str) -> Path:
-    repo = Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    return repo / OUTPUT_DIR / f"{run_id}.json"
+    return _default_results_dir() / f"{run_id}.json"
+
+
+def _default_results_dir() -> Path:
+    return Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip()) / OUTPUT_DIR
+
+
+def results_dir(config: RunConfig) -> Path:
+    """The directory holding the runs a run is listed beside: where its results file goes."""
+    return config.output.parent if config.output else _default_results_dir()
 
 
 def _provisional(

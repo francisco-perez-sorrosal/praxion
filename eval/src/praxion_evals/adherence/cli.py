@@ -10,6 +10,10 @@ path) and writes nothing, and a paid run is handed to
 Exit codes: 0 the run is complete; 1 it is incomplete (a refused launch, an arm that
 could not be built or proven, a session that ended in error; the results are
 written); 2 usage.
+
+A fresh run of a role is refused, before anything launches, while a run of that role stopped
+and was neither continued nor closed; ``--close RUN --reason TEXT`` is how an operator who
+will not continue it says so.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 from praxion_evals.adherence import arms, report, results, session_loop, tasks
@@ -30,6 +35,14 @@ from praxion_evals.adherence.infra_stop import (
     DEFAULT_STOP_COUNT,
     MIN_STOP_COUNT,
     StopRule,
+)
+from praxion_evals.adherence.lineage import (
+    Lineage,
+    ReadTip,
+    close,
+    ending_to_json,
+    measured_identity,
+    pending_stop,
 )
 from praxion_evals.adherence.model import (
     ARMS,
@@ -78,11 +91,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(report.render(results.load(config.report)), end="")
             return EXIT_COMPLETE
         checkout = resolve_checkout(config)
+        if config.close is not None:
+            return _close_run(config, checkout, config.close, config.reason or "")
         if config.output is not None:
             results.refuse_existing(config.output, config.overwrite)
         planned = plan_tasks(config)
         if config.dry_run:
             return _print_dry_run(config, checkout, planned)
+        _refuse_beside_stopped_run(config)
         context, state = session_loop.begin(config, checkout, planned, _declare)
     except (ValueError, OSError) as error:  # everything before the first launch is a usage error
         print(f"{PROG}: {error}", file=sys.stderr)
@@ -99,8 +115,12 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
     if args["calibration"] and set(args["arms"] or ["full"]) != {"full"}:
         parser.error("a calibration run measures the full arm against itself; use --arm full")
     named = {"full"} if args["calibration"] else set(args["arms"] or ARMS)
-    if args["report"] is None and not args["roles"]:
-        parser.error("name at least one --role, or --report FILE")
+    if args["report"] is None and args["close"] is None and not args["roles"]:
+        parser.error("name at least one --role, --report FILE or --close RUN")
+    if (args["close"] is None) != (args["reason"] is None):
+        parser.error(
+            "--close RUN and --reason TEXT go together: a stopped run is closed with a reason"
+        )
     if args["judge_golden"] and not args["judging"]:
         parser.error("--judge-golden needs a judge; drop --no-judge")
     args["roles"] = tuple(dict.fromkeys(args["roles"] or ()))
@@ -190,6 +210,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     add("--judge-golden", action="store_true")
     add("--report", type=Path, help="render a results file; launch nothing")
+    add("--close", metavar="RUN", help="give up on the stopped run RUN, saying why; launch nothing")
+    add("--reason", help="why --close gives up on the run")
     add("--fixture-pages-base-url", help="the directory URL that serves the fixture page")
     return parser
 
@@ -252,6 +274,38 @@ def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:
         count = min(wanted, tasks.producible_task_count(role, config.seed))
         plan[role] = tasks.generate(role, config.seed, count)
     return plan
+
+
+# --- a stopped run is continued or closed, never left beside a fresh one ---
+
+
+def _refuse_beside_stopped_run(config: RunConfig) -> None:
+    """A fresh run of a role cannot start while a run of it stopped and was neither continued
+    nor closed: a new draw beside it would leave the stopped run to be forgotten."""
+    directory = session_loop.results_dir(config)
+    for role in config.roles:
+        if (stopped := pending_stop(directory, role)) is not None:
+            raise ValueError(
+                f"run {stopped.run_id} of {role} stopped and was neither continued nor closed;"
+                f" continue it (--continue {stopped.run_id}) or close it"
+                f" (--close {stopped.run_id} --reason TEXT) before starting a fresh run"
+            )
+
+
+def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) -> int:
+    """Write the closed ending into the stopped run's own results file."""
+    lineage = Lineage.parse(session_loop.results_dir(config), run_id)
+    ids = [part.run_id for part in lineage.parts]
+    at = ids.index(run_id)
+    recorded = results.load(lineage.parts[at].path)
+    continued_by = ids[at + 1] if at + 1 < len(ids) else None
+    tip = ReadTip(recorded, measured_identity(recorded, checkout.path), continued_by)
+    ending = close(tip, reason, datetime.now(UTC))
+    extra = {**recorded.run.extra, "ending": ending_to_json(ending)}
+    closed = replace(recorded, run=replace(recorded.run, extra=extra))
+    results.write_atomic(lineage.parts[at].path, closed)
+    print(f"closed run {run_id}: {reason}")
+    return EXIT_COMPLETE
 
 
 # --- --dry-run: the sessions a paid run would launch ---

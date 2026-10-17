@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,16 @@ from praxion_evals.adherence import (
 )
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
-from praxion_evals.adherence.infra_stop import COUNTING_KINDS
+from praxion_evals.adherence.infra_stop import COUNTING_KINDS, Launched, StopReason
+from praxion_evals.adherence.lineage import (
+    Closed,
+    Finished,
+    InfraStopped,
+    RunEnding,
+    SpendRefused,
+    ending_of,
+    ending_to_json,
+)
 from praxion_evals.adherence.model import (
     CheckErrored,
     Errored,
@@ -704,6 +714,163 @@ def test_the_report_option_renders_a_results_file_and_launches_nothing(
     assert code == 0
     assert loaded.run.id in capsys.readouterr().out
     assert len(script.specs) == launched
+
+
+# ---------------------------------------------------------------------------
+# A stopped run is continued or closed, never left beside a fresh one
+# ---------------------------------------------------------------------------
+
+REASON = "the credit was cut off for an unrelated audit"
+STOPPED_BOTH_ARMS = SpendRefused(("task-001",))
+STOPPED_ONE_ARM = InfraStopped(
+    StopReason(
+        "result_error",
+        "credit",
+        ROLE,
+        "lean",
+        tuple(Launched("task-001", "lean", 1) for _ in range(3)),
+        "one-arm",
+    )
+)
+
+
+def _ended_as(tmp_path: Path, ending: RunEnding, name: str = "stopped.json") -> results.RunResults:
+    """A small run of ROLE in ``tmp_path``, its results rewritten to say it ended as ``ending``."""
+    loaded = _run(tmp_path, name=name)[1]
+    extra = {**loaded.run.extra, "ending": ending_to_json(ending)}
+    rewritten = replace(loaded, run=replace(loaded.run, extra=extra))
+    results.write_atomic(tmp_path / name, rewritten)
+    return rewritten
+
+
+def _close(tmp_path: Path, run_id: str, *options: str) -> int:
+    where = ["--output", str(tmp_path / "closing.json")]  # its directory is where the runs are
+    return cli.main([str(REPO_ROOT), "--close", run_id, *options, *where])
+
+
+def _fresh_run(tmp_path: Path) -> int:
+    output = tmp_path / "fresh.json"
+    return cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN])
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_stopped_run_is_closed_with_a_reason_written_into_its_own_results_file(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+
+    code = _close(tmp_path, stopped.run.id, "--reason", REASON)
+
+    ending = ending_of(results.load(tmp_path / "stopped.json"))
+    assert code == 0
+    assert isinstance(ending, Closed)
+    assert (ending.reason, ending.stopped) == (REASON, STOPPED_BOTH_ARMS)
+    assert ending.interim, "the closed run carries the per-check result it had reached"
+
+
+@pytest.mark.parametrize("argv", [["--close", "20261020T000000Z-0badf1"], ["--reason", REASON]])
+def test_a_close_and_its_reason_go_together(argv: list[str]) -> None:
+    with pytest.raises(SystemExit) as raised:
+        cli.parse_config([*argv, "--role", ROLE])
+
+    assert raised.value.code == 2
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_blank_reason_closes_nothing(paid: Callable[[Script], None], tmp_path: Path) -> None:
+    paid(Script())
+    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+
+    code = _close(tmp_path, stopped.run.id, "--reason", "  ")
+
+    assert code == 2
+    assert ending_of(results.load(tmp_path / "stopped.json")) == STOPPED_BOTH_ARMS
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_run_that_did_not_stop_is_not_closed(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    finished = _ended_as(tmp_path, Finished())
+
+    code = _close(tmp_path, finished.run.id, "--reason", REASON)
+
+    assert code == 2
+    assert ending_of(results.load(tmp_path / "stopped.json")) == Finished()
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_fresh_run_beside_a_continuable_stopped_run_is_refused_naming_it(
+    paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    script = Script()
+    paid(script)
+    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+    launched = len(script.specs)
+    capsys.readouterr()
+
+    code = _fresh_run(tmp_path)
+
+    assert code == 2
+    assert stopped.run.id in capsys.readouterr().err
+    assert len(script.specs) == launched
+    assert not (tmp_path / "fresh.json").exists()
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_fresh_run_starts_once_the_stopped_run_was_closed(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+    _close(tmp_path, stopped.run.id, "--reason", REASON)
+
+    code = _fresh_run(tmp_path)
+
+    assert code == 0
+    assert (tmp_path / "fresh.json").exists()
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_stop_confined_to_one_arm_does_not_block_a_fresh_run(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    _ended_as(tmp_path, STOPPED_ONE_ARM)
+
+    code = _fresh_run(tmp_path)
+
+    assert code == 0
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_dry_run_beside_a_stopped_run_is_not_refused(
+    paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    paid(Script())
+    _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+    capsys.readouterr()
+
+    lines = _dry_run(capsys, tmp_path, "--role", ROLE)
+
+    assert lines, "the dry run still plans its sessions"
+
+
+@pytest.mark.usefixtures("full_first")
+def test_a_closed_run_is_listed_by_the_next_run_as_a_not_clear_interim_draw(
+    paid: Callable[[Script], None], tmp_path: Path
+) -> None:
+    paid(Script())
+    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
+    _close(tmp_path, stopped.run.id, "--reason", REASON)
+
+    _fresh_run(tmp_path)
+
+    listed = results.earlier_listed(results.load(tmp_path / "fresh.json").run, ROLE)
+    assert listed is not None
+    assert listed.draws == (results.Draw((stopped.run.id,), "not clear", interim=True),)
 
 
 # ---------------------------------------------------------------------------

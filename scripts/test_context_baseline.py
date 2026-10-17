@@ -690,6 +690,15 @@ def test_transcripts_dir_names_the_directory_read_and_is_echoed_as_source_root(
     assert (exit_code, report["source_root"], report["subagents"]) == (0, str(transcripts), 1)
 
 
+def test_the_derived_directory_is_named_as_the_harness_named_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(ctx.Path, "home", lambda: tmp_path)
+    cwd = "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn_continuation"
+
+    derived = ctx._transcripts_dir(Path(cwd))
+
+    assert derived.name == "-Users-fperez-dev-praxion--claude-worktrees-lean-spawn-continuation"
+
+
 def test_without_transcripts_dir_the_directory_derived_from_the_project_root_is_read(
     tmp_path, monkeypatch, capsys
 ):

@@ -327,6 +327,18 @@ def test_the_cartographers_lens_canary_reads_the_real_script_output():
     assert "exited 1" in outcome.detail  # the script found the quoted sibling fragment
 
 
+def test_the_lens_canary_lays_out_the_session_home_under_the_directory_the_harness_names(tmp_path):
+    from praxion_evals.adherence import catalog_rows
+    from praxion_evals.adherence.transcript import transcript_dir_name
+
+    repo = tmp_path / "my_repo+1"
+    repo.mkdir()
+
+    homes = {path.split("/")[2] for path in catalog_rows._lens_run_files(repo)}
+
+    assert homes == {transcript_dir_name(str(repo.resolve()))}
+
+
 @pytest.mark.parametrize("role", ["interface-designer", "agentic-transactions-architect"])
 def test_the_self_test_clause_is_reported_not_applicable_with_its_reason(role):
     evidence = _gradable(role, slug="grade-task")

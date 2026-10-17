@@ -49,6 +49,7 @@ def _load():
 
 
 cli = _load()
+transcripts_dir = importlib.import_module("_workflow_run").transcripts_dir
 
 
 # --------------------------------------------------------------------------- #
@@ -114,8 +115,7 @@ def _project(tmp_path, monkeypatch):
 
 
 def _project_transcripts_dir(home, project_root):
-    mangled = str(project_root).replace("/", "-")
-    return home / ".claude" / "projects" / mangled
+    return home / ".claude" / "projects" / transcripts_dir(project_root).name
 
 
 def _run_dir(home, project_root, session, wf_id):

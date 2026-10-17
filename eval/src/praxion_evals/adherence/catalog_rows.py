@@ -55,6 +55,7 @@ from praxion_evals.adherence.output_forms import (
     SENTINEL_REPORTS,
     SKILL_GENESIS_REPORTS,
 )
+from praxion_evals.adherence.transcript import transcript_dir_name
 from praxion_evals.live.session import ToolUse
 
 PARTIAL_MARKER = "[PARTIAL]"
@@ -401,7 +402,7 @@ def _lens_run_files(repo: Path) -> Mapping[str, str]:
 
     Laid out as Claude Code keeps them under the session's home, for the project at ``repo``.
     """
-    mangled = str(repo.resolve()).replace("/", "-").replace(".", "-")
+    mangled = transcript_dir_name(str(repo.resolve()))
     run = f".claude/projects/{mangled}/canary-session/subagents/workflows/wf_canary"
     lenses = {"economy": "agent-econ", "portability": "agent-port"}
     fragment = lambda lens: f".ai-work/canary-task/RESEARCH_{lens}.md"  # noqa: E731

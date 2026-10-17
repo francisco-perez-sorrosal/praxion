@@ -39,6 +39,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
@@ -49,6 +51,7 @@ def _load():
 
 
 wfc = _load()
+transcripts_dir = importlib.import_module("_workflow_run").transcripts_dir
 
 
 # --------------------------------------------------------------------------- #
@@ -110,10 +113,7 @@ def _project(tmp_path, monkeypatch):
 
 
 def _project_transcripts_dir(home, project_root):
-    # The harness mangles both "/" and "." to "-" (a worktree under
-    # `.claude/worktrees/` lands in `...-praxion--claude-worktrees-...`).
-    mangled = str(project_root).replace("/", "-").replace(".", "-")
-    return home / ".claude" / "projects" / mangled
+    return home / ".claude" / "projects" / transcripts_dir(project_root).name
 
 
 def _run_dir(home, project_root, session, wf_id):
@@ -677,6 +677,29 @@ def test_project_root_with_dotted_segments_resolves_the_harness_directory(
 
     assert exit_code == 0
     assert {run["wf_id"] for run in json.loads(captured.out)} == {"wf_dotted001"}
+
+
+# Names the harness gave the transcript directory of a session started in `cwd`, recorded
+# from live sessions; the eval package pins the same pairs for its own copy of the rule.
+_RECORDED_DIRECTORY_NAMES = [
+    (
+        "/private/tmp/claude-501/-Users-fperez-dev-praxion/ad40a83d/scratchpad/naming probe_a+b \u00f1",
+        "-private-tmp-claude-501--Users-fperez-dev-praxion-ad40a83d-scratchpad-naming-probe-a-b--",
+    ),
+    (
+        "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-continuation",
+        "-Users-fperez-dev-praxion--claude-worktrees-lean-spawn-continuation",
+    ),
+]
+
+
+@pytest.mark.parametrize(("cwd", "named"), _RECORDED_DIRECTORY_NAMES)
+def test_the_transcript_directory_is_named_as_the_harness_named_it(
+    cwd, named, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(wfc.Path, "home", lambda: tmp_path)
+
+    assert transcripts_dir(Path(cwd)) == tmp_path / ".claude" / "projects" / named
 
 
 def test_table_output_names_the_run_in_human_readable_form(tmp_path, monkeypatch, capsys):

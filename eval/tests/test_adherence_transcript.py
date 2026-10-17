@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from praxion_evals.adherence.transcript import (
     TranscriptRead,
     TranscriptUnread,
     read_role_transcript,
     spawned_agent_id,
+    transcript_dir_name,
     transcript_path,
 )
 
@@ -77,6 +80,28 @@ def test_the_project_directory_turns_every_non_alphanumeric_character_into_a_das
         path.parts[3]
         == "-private-var-folders-x5-pt-h187j3px6-b1dh6fc74kr0000gn-T-praxion-evals-adherence-60q9z5xi-s-1-repo"
     )
+
+
+@pytest.mark.parametrize(
+    ("cwd", "named"),
+    [
+        (
+            "/private/tmp/claude-501/-Users-fperez-dev-praxion/ad40a83d/scratchpad/naming probe_a+b \u00f1",
+            "-private-tmp-claude-501--Users-fperez-dev-praxion-ad40a83d-scratchpad-naming-probe-a-b--",
+        ),
+        (
+            "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-continuation",
+            "-Users-fperez-dev-praxion--claude-worktrees-lean-spawn-continuation",
+        ),
+        ("/Users/me/repo2", "-Users-me-repo2"),
+        ("/srv//repo", "-srv--repo"),
+    ],
+    ids=["recorded: odd characters", "recorded: dots", "all ASCII", "empty segment"],
+)
+def test_the_directory_name_has_one_dash_for_each_character_that_is_not_a_letter_or_digit(
+    cwd, named
+):
+    assert transcript_dir_name(cwd) == named
 
 
 def test_a_transcript_path_that_cannot_be_read_is_reported_as_unreadable(tmp_path):

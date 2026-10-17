@@ -83,6 +83,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from _repo_root import git_toplevel_from_cwd
+from _workflow_run import transcripts_dir as _transcripts_dir
 
 # hooks/_observation_log is a sibling package to this file's own scripts/
 # directory -- both live one level under the repo root.
@@ -156,13 +157,6 @@ class _WalUnreadableError(Exception):
 # --------------------------------------------------------------------------- #
 # I/O layer (the only impure functions)
 # --------------------------------------------------------------------------- #
-def _transcripts_dir(project_root: Path) -> Path:
-    """Claude Code's per-project transcript directory: the project's absolute
-    path with every "/" replaced by "-", under `~/.claude/projects/`."""
-    mangled = str(project_root).replace("/", "-")
-    return Path.home() / ".claude" / "projects" / mangled
-
-
 # Where a session files its subagent transcripts, relative to the project's
 # transcript directory: Agent-tool spawns as siblings under `subagents/`,
 # Workflow-tool spawns one level deeper under the run's own directory

@@ -25,6 +25,7 @@ duplicating a three-line pure function is cheaper than coupling this module to
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -45,13 +46,18 @@ class WorkflowRunError(Exception):
 # --------------------------------------------------------------------------- #
 # project <-> run-directory resolution
 # --------------------------------------------------------------------------- #
+# The harness names a project's transcript directory after its cwd, one dash for each
+# character that is not an ASCII letter or digit. The eval package keeps the same rule in its
+# `transcript_dir_name`; this stdlib-only module cannot import it, so each copy is pinned to
+# the same recorded harness names by its tests.
+_NOT_ALPHANUMERIC = re.compile(r"[^A-Za-z0-9]")
+
+
 def transcripts_dir(project_root: Path) -> Path:
-    """Claude Code's per-project transcript directory: the project's absolute
-    path with every "/" and "." replaced by "-", under `~/.claude/projects/`.
-    The "." rule matters for worktrees under `.claude/worktrees/`, whose
-    harness directory reads `...-praxion--claude-worktrees-...`."""
-    mangled = str(project_root).replace("/", "-").replace(".", "-")
-    return Path.home() / ".claude" / "projects" / mangled
+    """Claude Code's per-project transcript directory under `~/.claude/projects/`.
+    A worktree under `.claude/worktrees/` reads `...-praxion--claude-worktrees-...`,
+    a `_`, a space or a non-ASCII letter in the path is one dash too."""
+    return Path.home() / ".claude" / "projects" / _NOT_ALPHANUMERIC.sub("-", str(project_root))
 
 
 def session_from_run_dir(run_dir: Path) -> str:

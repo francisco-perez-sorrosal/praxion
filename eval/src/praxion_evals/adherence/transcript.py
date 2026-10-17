@@ -19,8 +19,9 @@ from typing import Any
 # The harness trailer of an Agent tool result, synchronous or a background launch stub.
 _AGENT_ID = re.compile(r"^agentId:\s*(?P<id>[\w-]+)", re.MULTILINE)
 # Claude Code names a project's transcript directory after its cwd, every character that is
-# not a letter or a digit a `-` (observed for `/`, `.` and `_`: a macOS TMPDIR such as
-# `/var/folders/x5/pt_h187.../T` becomes `-private-var-folders-x5-pt-h187...-T`).
+# not an ASCII letter or digit a `-`, one per character (recorded for `/`, `.`, `_`, a space,
+# `+` and a non-ASCII letter: a macOS TMPDIR such as `/var/folders/x5/pt_h187.../T` becomes
+# `-private-var-folders-x5-pt-h187...-T`).
 _PROJECT_DIR_CHARS = re.compile(r"[^A-Za-z0-9]")
 
 
@@ -44,9 +45,14 @@ def spawned_agent_id(spawn_result: str | None) -> str | None:
     return None if found is None else found["id"]
 
 
+def transcript_dir_name(cwd: str) -> str:
+    """The name Claude Code gives the transcript directory of a session started in ``cwd``."""
+    return _PROJECT_DIR_CHARS.sub("-", cwd)
+
+
 def transcript_path(config_dir: Path, cwd: str, session_id: str, agent_id: str) -> Path:
     """Where Claude Code keeps the transcript of agent ``agent_id`` spawned in ``session_id``."""
-    project = _PROJECT_DIR_CHARS.sub("-", cwd)
+    project = transcript_dir_name(cwd)
     return config_dir / "projects" / project / session_id / "subagents" / f"agent-{agent_id}.jsonl"
 
 

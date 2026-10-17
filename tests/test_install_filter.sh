@@ -518,6 +518,82 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Test 12: link_rules links exactly the manifest's install:symlink set
+# -----------------------------------------------------------------------------
+# The sweep keeps only the manifest's symlink set; link_rules used to link every
+# rule file except README.md and hook-deliver rules, so a file the manifest
+# leaves out on purpose — the rules tree's directory guide, CLAUDE.md — was swept
+# and then linked straight back on every install, loading in every session and
+# every spawn of every project. Linking and sweeping must agree by construction.
+start_test "test_link_rules_links_only_the_manifest_symlink_set"
+
+LINK_SRC="${TMPDIR}/link_src"
+LINK_TGT="${TMPDIR}/link_tgt"
+mkdir -p "${LINK_SRC}/swe/references" "${LINK_SRC}/writing"
+printf '# guide\n'   > "${LINK_SRC}/CLAUDE.md"
+printf '# catalog\n' > "${LINK_SRC}/README.md"
+printf '# style\n'   > "${LINK_SRC}/swe/coding-style.md"
+printf '# ref\n'     > "${LINK_SRC}/swe/references/detail.md"
+printf '# hooked\n'  > "${LINK_SRC}/swe/hook-delivered.md"
+printf '# docs\n'    > "${LINK_SRC}/writing/docs.md"
+cat > "${LINK_SRC}/_manifest.yaml" <<'YAMLEOF'
+version: 1
+rules:
+  - id: swe/coding-style
+    path: rules/swe/coding-style.md
+    install: symlink
+    core: true
+  - id: swe/hook-delivered
+    path: rules/swe/hook-delivered.md
+    install: hook-deliver
+    core: false
+  - id: writing/docs
+    path: rules/writing/docs.md
+    install: symlink
+    core: false
+YAMLEOF
+# A link left by an install that predates the directory-guide exclusion.
+mkdir -p "$LINK_TGT"
+ln -sf "${LINK_SRC}/CLAUDE.md" "${LINK_TGT}/CLAUDE.md"
+
+link_rules "$LINK_SRC" "$LINK_TGT"
+
+LINKED="$(cd "$LINK_TGT" && find . -type l | sed 's|^\./||' | sort | tr '\n' ' ')"
+if [ "$LINKED" = "swe/coding-style.md writing/docs.md " ]; then
+    pass "only the manifest's install:symlink rules are linked (${LINKED})"
+else
+    fail "linked set differs from the manifest's symlink set: '${LINKED}'"
+fi
+
+if [ "$LINK_RULES_COUNT" -eq 2 ]; then
+    pass "LINK_RULES_COUNT reports the two linked rules"
+else
+    fail "LINK_RULES_COUNT=${LINK_RULES_COUNT}, expected 2"
+fi
+
+# -----------------------------------------------------------------------------
+# Test 13: without a manifest, link_rules still skips non-rule files
+# -----------------------------------------------------------------------------
+start_test "test_link_rules_without_manifest_skips_guides_and_references"
+
+FALLBACK_SRC="${TMPDIR}/fallback_src"
+FALLBACK_TGT="${TMPDIR}/fallback_tgt"
+mkdir -p "${FALLBACK_SRC}/swe/references"
+printf '# guide\n'   > "${FALLBACK_SRC}/CLAUDE.md"
+printf '# catalog\n' > "${FALLBACK_SRC}/README.md"
+printf '# style\n'   > "${FALLBACK_SRC}/swe/coding-style.md"
+printf '# ref\n'     > "${FALLBACK_SRC}/swe/references/detail.md"
+
+link_rules "$FALLBACK_SRC" "$FALLBACK_TGT"
+
+FALLBACK_LINKED="$(cd "$FALLBACK_TGT" && find . -type l | sed 's|^\./||' | sort | tr '\n' ' ')"
+if [ "$FALLBACK_LINKED" = "swe/coding-style.md " ]; then
+    pass "no manifest → every rule file linked, guides and references skipped"
+else
+    fail "no manifest → unexpected linked set: '${FALLBACK_LINKED}'"
+fi
+
+# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 printf "\n---\n"

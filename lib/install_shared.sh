@@ -75,7 +75,7 @@ manifest_rule_paths() {
 # Symlink rule files from the repo's rules/ directory into a target rules directory.
 #
 # Both Claude Code and Cursor use the same rules source with the same filtering
-# (skip README.md, skip references/), but link into different destinations:
+# (the manifest's install:symlink set), but link into different destinations:
 #   - Claude Code: ~/.claude/rules/
 #   - Cursor:      ~/.cursor/rules/ or <project>/.cursor/rules/
 #
@@ -109,19 +109,20 @@ link_rules() {
     # be parsed, so a transient parse error never deletes live links.
     sweep_stale_rule_symlinks "$rules_source_dir" "$rules_target_dir"
 
-    # Build the set of rule paths to skip during symlinking.
-    # Rules with install: hook-deliver are NOT symlinked — they are injected
-    # at session start by hooks/inject_rules.py, which reads the same manifest
-    # and emits them as additionalContext. Symlinking them in addition would
-    # load them unconditionally and defeat the per-project blacklist mechanism.
-    local hook_deliver_paths=""
+    # The manifest's install:symlink set is what gets linked — the same set
+    # sweep_stale_rule_symlinks keeps, so a file the manifest leaves out (a
+    # hook-deliver rule, or a directory guide such as rules/CLAUDE.md) is never
+    # swept above and re-linked here. Hook-deliver rules are injected at session
+    # start by hooks/inject_rules.py; symlinking them too would load them
+    # unconditionally and defeat the per-project blacklist mechanism.
+    local symlink_paths=""
     local manifest_file="${rules_source_dir}/_manifest.yaml"
-    # `|| hook_deliver_paths=""` bypasses `set -e` when the manifest is absent —
-    # falling back to "link all rules" is the documented safe default; without
-    # it the script terminates silently because `var=$(cmd)` propagates the
-    # failure under set -e.
-    hook_deliver_paths=$(manifest_rule_paths "$manifest_file" hook-deliver) \
-        || hook_deliver_paths=""
+    # `|| symlink_paths=""` bypasses `set -e` when the manifest is absent or
+    # unreadable — falling back to "link every rule file" is the documented safe
+    # default; without it the script terminates silently because `var=$(cmd)`
+    # propagates the failure under set -e.
+    symlink_paths=$(manifest_rule_paths "$manifest_file" symlink) \
+        || symlink_paths=""
 
     LINK_RULES_COUNT=0
     while IFS= read -r rule_file; do
@@ -129,14 +130,15 @@ link_rules() {
         local rel_dir
         rel_dir="$(dirname "$rel_path")"
 
-        # Skip non-rule files that live alongside rules
-        [[ "$(basename "$rule_file")" == "README.md" ]] && continue
-        # Reference files are skill/rule support material, not rules themselves
-        [[ "$rel_path" == */references/* ]] && continue
-        # Skip hook-deliver rules — delivered by inject_rules.py at session start
-        if [ -n "$hook_deliver_paths" ] && \
-           echo "$hook_deliver_paths" | grep -qxF "$rel_path"; then
-            continue
+        if [ -n "$symlink_paths" ]; then
+            echo "$symlink_paths" | grep -qxF "$rel_path" || continue
+        else
+            # Fallback without a readable manifest: skip the files that live
+            # alongside rules without being rules — catalog READMEs, directory
+            # guides (CLAUDE.md, loaded on demand as a nested CLAUDE.md) and
+            # reference material.
+            case "$(basename "$rule_file")" in README.md|CLAUDE.md) continue ;; esac
+            [[ "$rel_path" == */references/* ]] && continue
         fi
 
         [ "$rel_dir" != "." ] && mkdir -p "${rules_target_dir}/${rel_dir}"

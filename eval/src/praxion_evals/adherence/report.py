@@ -19,6 +19,17 @@ from statistics import median
 from textwrap import shorten
 from typing import assert_never
 
+from praxion_evals.adherence.lineage import (
+    Closed,
+    Finished,
+    InfraStopped,
+    Interrupted,
+    Legacy,
+    RunEnding,
+    SpendRefused,
+    continuable,
+    ending_of,
+)
 from praxion_evals.adherence.model import (
     ARMS,
     Assessed,
@@ -109,7 +120,7 @@ def render(results: RunResults) -> str:
 
 def _run_section(results: RunResults) -> str:
     run, settings = results.run, results.settings
-    ending = (
+    state = (
         "complete" if run.complete else f"incomplete ({len(run.refused_launches)} refused launches)"
     )
     allowances = (
@@ -121,7 +132,8 @@ def _run_section(results: RunResults) -> str:
     return "\n".join(
         [
             f"Adherence report for run {run.id}",
-            f"Model {run.model}; Claude Code {run.claude_code_version}; the run is {ending}.",
+            f"Model {run.model}; Claude Code {run.claude_code_version}; the run is {state}.",
+            *_ending_lines(ending_of(results)),
             f"Declared at {results.declared_at}, before the first session:",
             f"{INDENT}non-inferiority margin {settings.margin_pp:g} pp for judged checks;"
             f" method {settings.method}, {settings.sidedness},"
@@ -132,6 +144,33 @@ def _run_section(results: RunResults) -> str:
             _judge_error_line(results),
         ]
     )
+
+
+def _ending_lines(ending: RunEnding) -> list[str]:
+    """How a run that did not finish ended; nothing for one that ran to the end of its plan or
+    was recorded before endings existed."""
+    match ending:
+        case Finished() | Legacy():
+            return []
+        case InfraStopped(reason=reason):
+            return [
+                f"The run stopped itself: {len(reason.sessions)} {reason.arm} sessions in a row"
+                f" ended in {reason.kind} with the same evidence {_one_line(reason.masked_tail)};"
+                f" {_continuability(ending)}."
+            ]
+        case SpendRefused(tasks=tasks):
+            refused = f" (tasks {', '.join(tasks)})" if tasks else ""
+            return [f"The spend cap refused launches{refused}; {_continuability(ending)}."]
+        case Interrupted():
+            return [f"The operator interrupted the run; {_continuability(ending)}."]
+        case Closed(reason=reason, at=at):
+            return [f"The run was closed on {at} without being continued: {reason}."]
+        case _:
+            assert_never(ending)
+
+
+def _continuability(ending: RunEnding) -> str:
+    return "continuable" if continuable(ending) else "not continuable"
 
 
 def _judge_error_line(results: RunResults) -> str:

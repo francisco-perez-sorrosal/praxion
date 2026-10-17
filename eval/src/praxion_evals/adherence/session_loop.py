@@ -11,7 +11,8 @@ the first launch is a ``ValueError`` the console entry reports.
 One session's launch (sandbox, ``claude``, settlement, grading) lives in ``session_launch``.
 
 Exit codes of a run: 0 it is complete; 1 it is incomplete (a refused launch, an arm that
-could not be built or proven, a session that ended in error; the results are written).
+could not be built or proven, a session that ended in error, an operator interrupt; the
+results are written). The results file records how the run ended (``lineage.RunEnding``).
 Judge calls are metered by the judge's own account, not by the ledger, which covers the
 ``claude`` sessions only.
 """
@@ -33,6 +34,13 @@ from praxion_evals.adherence import arms, grade, report, results, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import DEFAULT_STOP_COUNT
+from praxion_evals.adherence.lineage import (
+    Finished,
+    Interrupted,
+    RunEnding,
+    SpendRefused,
+    ending_to_json,
+)
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -332,17 +340,30 @@ def _loaded_run_id(path: Path) -> str | None:
 
 
 def conduct(context: Context, state: RunState) -> int:
+    interrupted = False
     try:
         if context.config.judge_golden:
             state = _judge_golden(context, state)
         for role, role_tasks in context.planned.items():
             state = _measure_role(context, state, role, role_tasks)
+    except KeyboardInterrupt:
+        interrupted, state = True, _as_checkpointed(context)
     finally:
         _clean_up(context)
-    final = _finalize(context, state)
+    final = _finalize(context, state, interrupted)
     print(f"wrote {context.output}")
     print(report.render(final), end="")
     return EXIT_COMPLETE if final.run.complete else EXIT_INCOMPLETE
+
+
+def _as_checkpointed(context: Context) -> RunState:
+    """The run as its last checkpoint recorded it. An interrupt unwinds through the steps that
+    hold the newer state, but every session is checkpointed as it ends, so the file is the
+    truth; the spend is the last settled one (a session in flight is not charged)."""
+    on_disk = results.load(context.output)
+    spent = on_disk.run.extra.get("spend", {}).get("spent_usd", 0.0)
+    ledger = SpendLedger(cap_usd=context.config.run_cap_usd, spent_usd=spent)
+    return RunState(on_disk, ledger)
 
 
 def _clean_up(context: Context) -> None:
@@ -353,8 +374,9 @@ def _clean_up(context: Context) -> None:
     shutil.rmtree(context.run_root, ignore_errors=True)
 
 
-def _finalize(context: Context, state: RunState) -> results.RunResults:
-    """Complete means: no refused launch, every arm built and proven, no session left in error."""
+def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:
+    """Complete means: no refused launch, every arm built and proven, no session left in error,
+    and not interrupted."""
     latest = {
         (r.setup.role, r.setup.arm, r.setup.task_id): r.status for r in state.results.sessions
     }
@@ -362,14 +384,37 @@ def _finalize(context: Context, state: RunState) -> results.RunResults:
         not a["built"] for per_arm in state.results.arms.values() for a in per_arm.values()
     )
     complete = (
-        not state.results.run.refused_launches
+        not interrupted
+        and not state.results.run.refused_launches
         and not unbuilt
         and not any(isinstance(status, Errored) for status in latest.values())
     )
+    ending = _ending(state.results, interrupted)
     state = _update_run(state, complete=complete)
-    return _checkpoint(
-        context, _update_extra(state, finished_at=datetime.now(UTC).isoformat())
-    ).results
+    state = _update_extra(
+        state,
+        ending=ending_to_json(ending),
+        finished_at=datetime.now(UTC).isoformat(),
+    )
+    return _checkpoint(context, state).results
+
+
+def _ending(recorded: results.RunResults, interrupted: bool) -> RunEnding:
+    if interrupted:
+        return Interrupted()
+    if recorded.run.refused_launches:
+        return SpendRefused(_refused_tasks(recorded))
+    return Finished()
+
+
+def _refused_tasks(recorded: results.RunResults) -> tuple[str, ...]:
+    """The tasks whose session the cap refused, in order, each once."""
+    refused = (
+        r.setup.task_id
+        for r in recorded.sessions
+        if isinstance(r.status, Errored) and r.status.kind == "launch_refused"
+    )
+    return tuple(dict.fromkeys(refused))
 
 
 def _judge_golden(context: Context, state: RunState) -> RunState:

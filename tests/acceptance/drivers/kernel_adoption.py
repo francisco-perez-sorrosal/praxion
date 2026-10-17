@@ -9,7 +9,7 @@ record starts at the re-opening, and the spawns made while it was held come befo
 that start. Scenarios date the hold an hour back, so the hold, the spawns made while
 held and the re-opening are distinct instants at the ledger's whole-second resolution.
 The hooks read and write the ledger's wire
-shape (the implementation plan's "Wire shapes": `version: 1`, `eligible`, `roles`; a
+shape (`version: 1`, `roles`, and `eligible` while the roles are not pinned apart; a
 held row carries `reason`); a missing ledger reads as empty.
 
 Which ledger a spawn outside the Praxion checkout reads is an open question; the
@@ -26,6 +26,8 @@ from pathlib import Path
 import yaml
 
 from tests.acceptance.drivers.kernel_sandbox import ADOPTION_LEDGER, PILOT_ROLES, commit_paths
+
+ELIGIBILITY_PIN = "scripts/kernel_eligibility.py"  # where the eligible roles live once pinned
 
 ADHERENCE_ENTRY = "praxion-evals-adherence"
 REQUIRED_PAIRS = 20
@@ -227,7 +229,8 @@ def _load(root: Path) -> dict:
     ledger = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
     ledger = ledger or {}
     ledger.setdefault("version", 1)
-    ledger.setdefault("eligible", list(PILOT_ROLES))
+    if not (root / ELIGIBILITY_PIN).is_file():
+        ledger.setdefault("eligible", list(PILOT_ROLES))  # until the roles are pinned apart
     ledger.setdefault("roles", {})
     return ledger
 

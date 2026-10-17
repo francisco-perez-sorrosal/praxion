@@ -19,24 +19,31 @@ Bound here, because the specification or the base commit fixes them:
   `underpowered`; and a check's block of that role's section, which opens with the
   check's name and holds its `verdict:` line;
 - the flip verdicts the committed results files showed before this change, frozen in
-  `fixtures/recorded_adherence_verdicts.json`.
+  `fixtures/recorded_adherence_verdicts.json`;
+- a recorded forced-stop session, as the stream holds it: a role the harness stopped at
+  its turn cap carries the harness's note (`NOTE: this agent stopped at its N-turn
+  limit`, read from a recorded results file) ahead of its partial return in the spawn's
+  tool result; a role that ended before its cap wrote a return and carries no note; a
+  stream with neither a note, nor the role's requests, nor a return cannot tell;
+- a results file of forced-stop sessions, each carrying the `role_ending` of the Seam
+  Contract's pin W8; only a forced-stop session carries one, so the report finds them by
+  it;
+- the report lines of the Seam Contract: per role and arm
+  `forced-stop sessions, <arm> arm: <n> ran out of turns, <m> ended before their cap`
+  and `differential run-out rate (lean minus full): <x.x> pp`, and inside a mechanical
+  check's block `allowance: <k> pairs (<pp> pp) at <d> discordant pairs; declared margin
+  <M> pp`.
 
-Unbound until a binding step names the designed surface (each raises with the
-assumption it stands for):
-
-- a recorded forced-stop session in which the harness stopped the role at its turn
-  cap, one in which the role ended before its cap, and one whose record cannot tell;
-- a results file whose forced-stop pairs carry the turns each role took, the cap it
-  ran under and whether the harness stopped it there;
-- the report's per-role, per-arm count of forced-stop sessions that ran out of turns
-  and that ended before their cap, and its differential run-out rate;
-- the report's statement of a mechanical check's discordant count and allowance, in
-  pairs and in percentage points beside the margin.
+Pins the Seam Contract leaves open: the turn count and the stop reason of a role come
+from the stream alone (the note, the role's own requests and its return); the cap is
+not handed to the grader. A production step that finds one wrong stops with a plan
+amendment; it never edits this driver.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from math import comb
@@ -47,9 +54,11 @@ from tests.acceptance.drivers.adherence_eval import (
     DUMMY_CREDENTIAL,
     EVAL_PROJECT,
     EVAL_PYTHON,
+    OWN_DISCORDANCE_EXACT,
     CheckSpec,
     FlipSettings,
     Pair,
+    RoleMeasurement,
     RoleVerdict,
     SessionEvidence,
     _guarded_path,
@@ -57,8 +66,10 @@ from tests.acceptance.drivers.adherence_eval import (
     adherence_console_entry,
     eval_env,
     install_tripwire,
+    scratch_repo,
+    session_envelope,
+    session_places,
 )
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 RESULTS_DIR = adherence_eval.REPO_ROOT / ".ai-state" / "eval_ledger" / "adherence"
@@ -117,7 +128,9 @@ def mechanical_verdict(
         )
         for i in range(USABLE_PAIRS)
     ]
-    settings = FlipSettings(allowances=dict(calibrated_allowances or {}))
+    settings = FlipSettings(
+        allowances=dict(calibrated_allowances or {}), allowance_method=OWN_DISCORDANCE_EXACT
+    )
     return adherence_eval.role_verdict(checks, pairs, settings)
 
 
@@ -163,13 +176,18 @@ def flip_verdict_class(report: str, role: str) -> str:
     raise AssertionError(f"the report's line for {role} states no verdict: {line}")
 
 
-def check_block(report: str, role: str, check: str) -> str:
-    """The lines of `check`'s block inside `role`'s section of a report."""
+def role_section(report: str, role: str) -> str:
+    """The text of `role`'s section of a report, from its `Role <role>:` line to the next role's."""
     lines = report.splitlines()
     start = next(i for i, ln in enumerate(lines) if ln.startswith(f"Role {role}:"))
     section = lines[start + 1 :]
     end = next((i for i, ln in enumerate(section) if ln.startswith("Role ")), len(section))
-    section = section[:end]
+    return "\n".join(section[:end])
+
+
+def check_block(report: str, role: str, check: str) -> str:
+    """The lines of `check`'s block inside `role`'s section of a report."""
+    section = role_section(report, role).splitlines()
     opening = next((i for i, ln in enumerate(section) if ln.strip().startswith(f"{check} (")), None)
     assert opening is not None, f"the report shows no block for {check} under {role}"
     indent = len(section[opening]) - len(section[opening].lstrip())
@@ -190,20 +208,51 @@ def recorded_results_file(run_id: str) -> Path:
     return RESULTS_DIR / f"{run_id}.json"
 
 
-# -- Forced stops: unbound ---------------------------------------------------------------
+# -- Forced stops ---------------------------------------------------------------------------
+
+FORCED_STOP_CAP = 6
+EARLY_ENDING_TURNS = 3
+# The harness's own note, ahead of the role's partial return in the spawn's tool result.
+TURN_LIMIT_NOTE = (
+    f"NOTE: this agent stopped at its {FORCED_STOP_CAP}-turn limit before finishing. The text"
+    " below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage)"
+    " to let it continue from where it stopped.\n\n"
+)
+RAN_OUT = {"C2": "not applicable", "C5": "passed"}
+ENDED_BEFORE_CAP = {"C2": "passed", "C5": "not applicable"}
+NOT_A_FORCED_STOP = {"C2": "passed", "C5": "not applicable"}
+FORCED_STOP_CHECKS = (CheckSpec("C2", "mechanical"), CheckSpec("C5", "mechanical"))
+FIRST_REQUEST_TOKENS = {"full": 40_000, "lean": 30_000}
 
 
 def forced_stop_evidence(workspace: Path, role: str, ran_out: bool | None) -> SessionEvidence:
     """A forced-stop session's recorded evidence.
 
-    `ran_out=True`: the harness stopped the role at its lowered turn cap; `False`: the
-    role ended on its own before the cap and wrote its return; `None`: the record does
-    not establish whether the cap was reached.
+    `ran_out=True`: the harness stopped the role at its lowered turn cap, as its note in
+    the spawn's tool result says; `False`: the role ended on its own before the cap and
+    wrote its return; `None`: the stream holds neither a note, nor the role's requests,
+    nor a return, so it cannot establish whether the cap was reached.
     """
-    raise UnboundDriverError(
-        "a recorded forced-stop session carrying the turns the role took, the cap it ran"
-        " under and whether the harness stopped it at that cap"
-    )
+    repo = scratch_repo(workspace)
+    places = session_places(workspace)
+    reads = [adherence_eval.read(repo.path("README.md"))]
+    common = {"role": role, "cwd": repo.root, "plugin_copy": places.plugin_copy}
+    if ran_out is True:
+        envelope = session_envelope(
+            **common,
+            actions=reads * (FORCED_STOP_CAP - 1),
+            return_text="This is my last turn. I am writing the final report now.",
+            spawn_result_note=TURN_LIMIT_NOTE,
+        )
+    elif ran_out is False:
+        envelope = session_envelope(
+            **common,
+            actions=reads * (EARLY_ENDING_TURNS - 1),
+            return_text="The report is written.\n[COMPLETE]",
+        )
+    else:
+        envelope = session_envelope(**common, return_text=None)
+    return SessionEvidence(role, repo, envelope, places, forced_stop=True)
 
 
 def forced_stop_results(
@@ -215,11 +264,59 @@ def forced_stop_results(
 ) -> Path:
     """A results file of 24 pairs, `both_ran_out_pairs` of them forced stops that ran out of
     turns in both arms, plus `ended_before_cap[arm]` forced-stop sessions of that arm that
-    ended before their cap; every other pair is a clean measured pair."""
-    raise UnboundDriverError(
-        "a results file whose forced-stop sessions record the turns the role took, its cap"
-        " and whether the harness stopped it at the cap"
-    )
+    ended before their cap; every other pair is a clean measured pair.
+
+    The sessions that ended before their cap stand alone, one task each with no session of
+    the other arm, so they complete no pair and leave every pair's outcomes as they were.
+    """
+    ended = ended_before_cap or {}
+    assert 0 <= both_ran_out_pairs <= USABLE_PAIRS, both_ran_out_pairs
+    assert set(ended) <= set(adherence_eval.ARMS), ended
+    ran_out_ending = {"kind": "stopped_at_cap", "turns": FORCED_STOP_CAP, "cap": FORCED_STOP_CAP}
+    early_ending = {
+        "kind": "ended_on_its_own",
+        "turns": EARLY_ENDING_TURNS,
+        "cap": FORCED_STOP_CAP,
+    }
+
+    def session(arm: str, task_id: str, outcomes: dict, ending: dict | None) -> dict:
+        status = adherence_eval._side_json(outcomes, False, FIRST_REQUEST_TOKENS[arm])
+        if ending is not None:
+            status = {**status, "role_ending": ending}
+        return adherence_eval._session_record(role, arm, task_id, status)
+
+    sessions = []
+    for i in range(USABLE_PAIRS):
+        forced = i < both_ran_out_pairs
+        task_id = (
+            f"{role}.forced-stop.ran-out-{i:02d}.early-stop" if forced else f"{role}.clean-{i:02d}"
+        )
+        sessions += [
+            session(
+                arm,
+                task_id,
+                RAN_OUT if forced else NOT_A_FORCED_STOP,
+                ran_out_ending if forced else None,
+            )
+            for arm in adherence_eval.ARMS
+        ]
+    for arm, count in ended.items():
+        sessions += [
+            session(
+                arm,
+                f"{role}.forced-stop.ended-{arm}-{j:02d}.early-stop",
+                ENDED_BEFORE_CAP,
+                early_ending,
+            )
+            for j in range(count)
+        ]
+    measurement = RoleMeasurement(FORCED_STOP_CHECKS, (), FIRST_REQUEST_TOKENS)
+    document = adherence_eval._results_document({role: measurement}, FlipSettings(), None)
+    document["sessions"] = sessions
+    path = workspace / "forced-stop-results.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
 
 
 @dataclass(frozen=True)
@@ -230,20 +327,28 @@ class RunOutCounts:
 
 def forced_stop_counts(report: str, role: str, arm: str) -> RunOutCounts:
     """The report's count, for one role and arm, of forced-stop sessions by how they ended."""
-    raise UnboundDriverError(
-        "the report states, per role and arm, how many forced-stop sessions ran out of"
-        " turns and how many ended before their cap"
+    line = re.compile(
+        rf"^\s*forced-stop sessions, {arm} arm: (\d+) ran out of turns,"
+        r" (\d+) ended before their cap\s*$",
+        re.MULTILINE,
     )
+    found = line.search(role_section(report, role))
+    assert found, f"the report states no forced-stop counts for the {arm} arm of {role}"
+    return RunOutCounts(int(found[1]), int(found[2]))
 
 
 def differential_run_out_rate(report: str, role: str) -> float:
     """The report's differential run-out rate between the arms, in percentage points."""
-    raise UnboundDriverError(
-        "the report states the differential run-out rate between the arms of a role"
+    line = re.compile(
+        r"^\s*differential run-out rate \(lean minus full\): (-?\d+(?:\.\d+)?) pp\s*$",
+        re.MULTILINE,
     )
+    found = line.search(role_section(report, role))
+    assert found, f"the report states no differential run-out rate for {role}"
+    return float(found[1])
 
 
-# -- Allowance statements: unbound ---------------------------------------------------------
+# -- Allowance statements ------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -256,7 +361,11 @@ class AllowanceStatement:
 
 def allowance_statement(report: str, role: str, check: str) -> AllowanceStatement:
     """What the report states beside a mechanical check: discordance, allowance, margin."""
-    raise UnboundDriverError(
-        "the report states, per mechanical check, its discordant count and its allowance"
-        " in pairs and in percentage points beside the declared margin"
+    line = re.compile(
+        r"^\s*allowance: (\d+) pairs \((-?\d+(?:\.\d+)?) pp\) at (\d+) discordant pairs;"
+        r" declared margin (\d+(?:\.\d+)?) pp\s*$",
+        re.MULTILINE,
     )
+    found = line.search(check_block(report, role, check))
+    assert found, f"the report states no allowance for {check} under {role}"
+    return AllowanceStatement(int(found[3]), int(found[1]), float(found[2]), float(found[4]))

@@ -20,33 +20,48 @@ the run's planned task order; every other session `ran()`.
 Bound here, because the specification or the base commit fixes them: the console
 entry and its existing options (`adherence_eval`), `--max-tasks`, `--model`,
 `--calibration` and `--calibration-run`, the dry run's JSON lines, a checkout under
-test (a committed copy of this repository), and committing a file in it.
+test (a committed copy of this repository), committing a file in it, and the stand-in
+launcher itself (`stand_in_claude`): it passes each arm's proof, ends each session as the
+script says, and reports every launch with its arm, task and attempt.
 
 Unbound until a binding step names the designed surface (each raises with the
-assumption it stands for): the stand-in launcher itself (it must pass each arm's proof
-and report every launch with its arm, task and attempt), the option that declares the
-stop count, continuing and closing a run, a stopped run constructed in the runner's own
-format, the dry run's per-task launch order, and every reading of what this change adds
-to a results file (the error tails, the stop, the declared stop settings, the allowance
-method, the lineage, the worst-case lean failures and the earlier-runs listing). Where
-the results directory sits is bound: a run writes into `<checkout>/.ai-state/eval_ledger/
-adherence/`, beside every earlier run of the checkout.
+assumption it stands for): continuing and closing a run, a stopped run constructed in the
+runner's own format, the dry run's per-task launch order, and every reading of what this
+change adds to a results file (the error tails, the stop, the declared stop settings, the
+allowance method, the lineage, the worst-case lean failures and the earlier-runs
+listing). Where the results directory sits is bound: a run writes into
+`<checkout>/.ai-state/eval_ledger/adherence/`, beside every earlier run of the checkout.
+
+A run is started from inside the checkout (the console entry names its default results
+directory after the repository it is started in), with no judge, no spend cap in the way
+of a stand-in that reports no cost, and a fixture-page address nothing answers, so a
+scenario stays offline and deterministic.
 """
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from tests.acceptance.drivers import adherence_eval
+from tests.acceptance.drivers import adherence_eval, stand_in_claude
 from tests.acceptance.drivers.adherence_eval import (
+    DUMMY_CREDENTIAL,
+    EVAL_PROJECT,
+    EVAL_PYTHON,
+    FAKE_CLAUDE_VERSION,
     RunRequest,
     _git,
+    _guarded_path,
+    _uv,
+    adherence_console_entry,
     checkout_under_test,
+    eval_env,
     install_fake_claude,
+    planned_sessions,
     run_adherence_eval,
 )
 from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
@@ -55,6 +70,11 @@ RESULTS_SUBDIR = Path(".ai-state") / "eval_ledger" / "adherence"
 ROLE = "researcher"  # a role with a full kit: 24 planned tasks by default
 DEFAULT_STOP_COUNT = 3
 PLANTED_SECRET = "sk-ant-oat01-acceptance-planted-session-secret-7f3a9c"
+RUN_TIMEOUT_S = 1800  # 24 tasks in two arms, each session a process of its own
+NO_SPEND_CAP_USD = (
+    1_000_000  # a stand-in spends nothing; a session that reports no cost is charged its budget
+)
+UNREACHABLE_PAGES = "http://127.0.0.1:9/"  # nothing answers: the fetched-page probe fails at once
 
 EndingKind = Literal[
     "ran", "graded failure", "isolation breach", "crashed", "error result", "unparseable"
@@ -175,7 +195,8 @@ class StandInRun:
     stdout: str
     stderr: str
     results_path: Path
-    launches: tuple[LaunchedSession, ...]
+    launches: tuple[LaunchedSession, ...]  # the task sessions, in launch order
+    proofs: tuple[LaunchedSession, ...] = ()  # the arm proofs, which are not task sessions
 
     def launches_in(self, arm: str) -> list[LaunchedSession]:
         return [launch for launch in self.launches if launch.arm == arm]
@@ -191,9 +212,30 @@ def results_dir(checkout: Path) -> Path:
     return checkout / RESULTS_SUBDIR
 
 
+OMIT_FLAG_LINE = re.compile(r"^omitClaudeMd: true\n", re.MULTILINE)
+
+
 def new_checkout(workspace: Path) -> Path:
-    """A clean, committed copy of this repository for a run to measure."""
-    return checkout_under_test(workspace)
+    """A clean, committed copy of this repository for a run to measure.
+
+    A role is measured while it is on trial: its definition does not yet omit the inherited
+    instructions, so the full arm is the role as it is and the lean arm adds the switch. A
+    role this repository has already switched has no full arm to compare against, and its lean
+    arm cannot be built, so the copy puts every such role back on trial in a commit of its own.
+    """
+    checkout = checkout_under_test(workspace)
+    switched = [
+        definition
+        for definition in sorted((checkout / "agents").glob("*.md"))
+        if OMIT_FLAG_LINE.search(definition.read_text(encoding="utf-8"))
+    ]
+    for definition in switched:
+        text = definition.read_text(encoding="utf-8")
+        definition.write_text(OMIT_FLAG_LINE.sub("", text, count=1), encoding="utf-8")
+    if switched:
+        _git(checkout, "add", "--", *(str(d.relative_to(checkout)) for d in switched))
+        _git(checkout, "commit", "-q", "-m", "put the switched roles back on trial")
+    return checkout
 
 
 def commit_in_checkout(checkout: Path, relpath: str, message: str) -> None:
@@ -208,21 +250,158 @@ def change_in_checkout(checkout: Path, relpath: str) -> None:
     commit_in_checkout(checkout, relpath, f"change {relpath}")
 
 
-# -- Runs with the stand-in launcher: unbound ------------------------------------------------
+# -- Runs with the stand-in launcher --------------------------------------------------------------
 
 
-def run_with_stand_in(
-    workspace: Path, checkout: Path, plan: Plan, script: Script, *, run_id_hint: str = ""
-) -> StandInRun:
+def run_with_stand_in(workspace: Path, checkout: Path, plan: Plan, script: Script) -> StandInRun:
     """Run the adherence eval on `checkout` through its console entry, every session a stand-in.
 
-    The results file goes into the checkout's results directory.
+    The results file goes into the checkout's results directory. The arm of a session is the
+    arm of the plugin copy it was handed, so a calibration run's second session of the full
+    copy reads as a full session.
     """
-    raise UnboundDriverError(
-        "a stand-in session launcher the console entry runs instead of a paying `claude`:"
-        " it passes each arm's proof, ends each session as the scenario scripts it, and"
-        " reports every launch with its arm, its task and its attempt"
+    return _run_console(workspace, checkout, plan, script, extra_args=())
+
+
+def _run_console(
+    workspace: Path, checkout: Path, plan: Plan, script: Script, extra_args: Sequence[str]
+) -> StandInRun:
+    """One console invocation with a fresh stand-in `claude`; the other runs share it."""
+    root = _fresh_directory(workspace, "stand-in")
+    stand_in = stand_in_claude.install(
+        root / "claude",
+        version=FAKE_CLAUDE_VERSION,
+        role=plan.role,
+        tasks=_planned_places(root, checkout, plan),
+        by_arm=script.by_arm,
+        by_task=script.by_task,
+        default=script.default,
     )
+    before = set(results_dir(checkout).glob("*.json")) if results_dir(checkout).is_dir() else set()
+    done = _console(checkout, stand_in.bin_dir, [*_run_options(plan, checkout), *extra_args])
+    launched = stand_in.launches()
+    return StandInRun(
+        exit_code=done.returncode,
+        stdout=done.stdout,
+        stderr=done.stderr,
+        results_path=_results_path(checkout, before, done.stdout),
+        launches=tuple(_launched(r) for r in launched if not r.proof),
+        proofs=tuple(_launched(r) for r in launched if r.proof),
+    )
+
+
+def _launched(record: stand_in_claude.LaunchRecord) -> LaunchedSession:
+    return LaunchedSession(record.arm, record.task_id, record.attempt)
+
+
+def _fresh_directory(workspace: Path, stem: str) -> Path:
+    """An unused directory name under `workspace`: one workspace may hold several runs."""
+    taken = {p.name for p in workspace.iterdir()} if workspace.is_dir() else set()
+    name = next(n for n in (f"{stem}-{i}" for i in range(1_000)) if n not in taken)
+    root = workspace / name
+    root.mkdir(parents=True)
+    return root
+
+
+def _plan_options(plan: Plan, checkout: Path) -> list[str]:
+    """The options that fix which sessions a run plans; the dry run takes exactly these."""
+    args = [str(checkout), "--role", plan.role, "--seed", str(plan.seed)]
+    args += ["--max-tasks", str(plan.max_tasks), "--no-judge"]
+    for arm in plan.arms:
+        args += ["--arm", arm]
+    if plan.calibration:
+        args.append("--calibration")
+    return args
+
+
+def _run_options(plan: Plan, checkout: Path) -> list[str]:
+    args = _plan_options(plan, checkout)
+    args += [
+        "--max-total-usd",
+        str(NO_SPEND_CAP_USD),
+        "--fixture-pages-base-url",
+        UNREACHABLE_PAGES,
+    ]
+    optional = (
+        ("--model", plan.model),
+        ("--margin-pp", plan.margin_pp),
+        ("--calibration-run", plan.calibration_run),
+        ("--stop-count", plan.stop_count),
+    )
+    for flag, value in optional:
+        if value is not None:
+            args += [flag, str(value)]
+    return args
+
+
+def _planned_places(root: Path, checkout: Path, plan: Plan) -> dict[str, stand_in_claude.TaskPlace]:
+    """Each planned task's place in the planned order, by the fingerprint of its scratch repository.
+
+    The dry run says how many tasks a run plans; the task generator then builds the same tasks'
+    repositories, because a prompt does not tell tasks apart (a template's variants share one).
+    """
+    tripwire = adherence_eval.install_tripwire(root)
+    done = _console(checkout, tripwire.bin_dir, [*_plan_options(plan, checkout), "--dry-run"])
+    assert done.returncode == 0, f"the dry run of the plan failed: {done.stderr[-2000:]}"
+    assert not tripwire.starts(), "a dry run started a session"
+    planned = list(dict.fromkeys(s.task_id for s in planned_sessions(done.stdout)))
+    request = {"role": plan.role, "seed": plan.seed, "count": len(planned)}
+    built = adherence_eval.run_in_eval(
+        _BUILD_PLANNED_REPOS, {**request, "into": str(root / "scratch")}
+    )
+    assert [b["task_id"] for b in built] == planned, (
+        "the generator and the dry run plan different tasks"
+    )
+    return {
+        stand_in_claude.fingerprint(Path(b["dir"])): stand_in_claude.TaskPlace(b["task_id"], i)
+        for i, b in enumerate(built)
+    }
+
+
+_BUILD_PLANNED_REPOS = """
+import json, sys
+from pathlib import Path
+from praxion_evals.adherence import tasks
+
+request = json.load(sys.stdin)
+built = []
+for i, spec in enumerate(tasks.generate(request["role"], request["seed"], request["count"])):
+    dest = Path(request["into"]) / f"{i:03d}"
+    tasks.build_scratch_repo(spec, dest, None)
+    built.append({"task_id": spec.task_id, "dir": str(dest)})
+print(json.dumps(built))
+"""
+
+
+def _console(
+    checkout: Path, claude_bin: Path, args: Sequence[str]
+) -> subprocess.CompletedProcess[str]:
+    """The console entry, started inside `checkout` (its default results directory) as an operator would."""
+    entry = adherence_console_entry()
+    env = eval_env({"PATH": _guarded_path(claude_bin), "ANTHROPIC_API_KEY": DUMMY_CREDENTIAL})
+    command = [_uv(), "run", "--quiet", "--python", EVAL_PYTHON, "--project", str(EVAL_PROJECT)]
+    return subprocess.run(
+        [*command, entry.name, *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=checkout,
+        timeout=RUN_TIMEOUT_S,
+        check=False,
+    )
+
+
+WROTE_LINE = re.compile(r"^wrote (?P<path>.+)$", re.MULTILINE)
+NO_RESULTS_FILE = "(no results file was written).json"
+
+
+def _results_path(checkout: Path, before: set[Path], stdout: str) -> Path:
+    """The results file the run wrote, or a path that holds none when it wrote nothing."""
+    wrote = WROTE_LINE.search(stdout)
+    if wrote:
+        return Path(wrote["path"])
+    appeared = sorted(set(results_dir(checkout).glob("*.json")) - before)
+    return appeared[-1] if appeared else results_dir(checkout) / NO_RESULTS_FILE
 
 
 def continue_run(

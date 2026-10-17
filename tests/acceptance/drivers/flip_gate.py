@@ -21,12 +21,15 @@ Bound here, because the specification or the base commit fixes them:
   (`log_segments.archive_position_path`), a segment's span closing at its last
   modification.
 
-Unbound until a binding step names the designed surface: where the eligible roles are
-pinned, how a commit changes them, and every path that holds them.
+- the eligible roles, pinned apart from the adoption records and the definitions as the
+  literal tuple `ELIGIBLE_ROLES` in `scripts/kernel_eligibility.py`, which is the only path
+  that holds them. A commit changes them by rewriting that tuple. Until the pin exists a
+  checkout has no eligible roles to read, and the scenarios that need them fail on that.
 """
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -42,7 +45,6 @@ from tests.acceptance.drivers.kernel_sandbox import (
     ADOPTION_LEDGER,
     REPO_ROOT,
     Sandbox,
-    UnboundDriverError,
     agent_path,
     commit_paths,
     isolated_env,
@@ -53,6 +55,8 @@ CLEAR_24 = ("20261014T152926Z-723e7a", "researcher", 24)
 NOT_CLEAR_24 = ("20261015T035717Z-03a785", "verifier", 24)
 UNDERPOWERED_13 = ("20261014T045733Z-7050ca", "researcher", 13)
 OMIT = "omitClaudeMd: true"
+ELIGIBILITY_PIN = "scripts/kernel_eligibility.py"
+ELIGIBLE_ROLES_NAME = "ELIGIBLE_ROLES"
 
 
 # -- Results files a record cites ----------------------------------------------------------
@@ -138,22 +142,45 @@ def commit_without_ledger(sandbox: Sandbox) -> None:
     commit_paths(sandbox.root, "no ledger", ADOPTION_LEDGER, agent_path("researcher"))
 
 
-# -- The eligible roles: unbound ------------------------------------------------------------------
+# -- The eligible roles ---------------------------------------------------------------------------
 
 
 def eligible_roles(root: Path) -> set[str]:
-    raise UnboundDriverError(
-        "the roles eligible to be switched, read from where they are pinned apart from the"
-        " adoption records and the agent definitions"
-    )
+    """The roles eligible to be switched, as the pin's literal tuple records them."""
+    _, node = _pinned_tuple(root)
+    return set(ast.literal_eval(node))
 
 
 def set_eligible_roles(root: Path, roles: set[str]) -> None:
-    raise UnboundDriverError("a commit's change to the pinned eligible roles")
+    """Rewrite the pin's tuple to `roles`: the current order kept, additions sorted after it."""
+    source, node = _pinned_tuple(root)
+    current = list(ast.literal_eval(node))
+    rewritten = (*[r for r in current if r in roles], *sorted(roles - set(current)))
+    lines = source.splitlines(keepends=True)
+    before = "".join(lines[: node.lineno - 1]) + lines[node.lineno - 1][: node.col_offset]
+    after = lines[node.end_lineno - 1][node.end_col_offset :] + "".join(lines[node.end_lineno :])
+    (root / ELIGIBILITY_PIN).write_text(before + repr(rewritten) + after, encoding="utf-8")
 
 
 def paths_holding_eligible_roles(root: Path) -> set[str]:
-    raise UnboundDriverError("every repository path that holds the eligible roles")
+    """Every repository path that holds the eligible roles: the pin alone, once it exists."""
+    return {ELIGIBILITY_PIN} if (root / ELIGIBILITY_PIN).is_file() else set()
+
+
+def _pinned_tuple(root: Path) -> tuple[str, ast.expr]:
+    """The pin's source and the expression bound to `ELIGIBLE_ROLES` in it."""
+    path = root / ELIGIBILITY_PIN
+    assert path.is_file(), f"the eligible roles are pinned nowhere: {ELIGIBILITY_PIN} is missing"
+    source = path.read_text(encoding="utf-8")
+    for statement in ast.parse(source).body:
+        targets = (
+            statement.targets
+            if isinstance(statement, ast.Assign)
+            else [getattr(statement, "target", None)]
+        )
+        if any(isinstance(t, ast.Name) and t.id == ELIGIBLE_ROLES_NAME for t in targets):
+            return source, statement.value
+    raise AssertionError(f"{ELIGIBILITY_PIN} binds no {ELIGIBLE_ROLES_NAME}")
 
 
 # -- The liveness check ---------------------------------------------------------------------------

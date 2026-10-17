@@ -75,6 +75,10 @@ this driver.
   "regression", "non-inferior" or "inferior", whose `flip` is absent or null for
   an underpowered role, and which always carries `complete_pairs`.
 - Report: `report.render(results.load(path))`, text.
+- Allowance method: `settings.allowance_method` is `"own-discordance-exact"` (Seam Contract
+  pin W1). `FlipSettings` declares it unless the scenario hands the settings a table of
+  allowances without asking for it, which keeps the declared-allowance reading of a file
+  written before the method existed.
 """
 
 from __future__ import annotations
@@ -790,12 +794,15 @@ def session_envelope(
     extra_plugins: Sequence[Mapping[str, str]] = (),
     model: str = "claude-opus-5-5",
     cost_usd: float = 0.42,
+    spawn_result_note: str = "",
 ) -> str:
     """A `claude -p --output-format stream-json --verbose` envelope of one session.
 
     The main session spawns `role` once (unless `spawned` is False); the role makes
     `actions` in order and returns `return_text` (None: it returned nothing); the
-    main session then relays `relay_text` as its own final result.
+    main session then relays `relay_text` as its own final result. `spawn_result_note`
+    is text the harness puts ahead of the role's return in the spawn's tool result
+    alone, as it does when it stops a role at its turn cap.
     """
     session = "acceptance-session"
     events: list[dict[str, Any]] = [
@@ -926,7 +933,7 @@ def session_envelope(
         if return_text is not None:
             usage = ROLE_FIRST_REQUEST if role_requests == 0 else LATER_REQUEST
             events.append(assistant([{"type": "text", "text": return_text}], usage, SPAWN_ID))
-        events.append(tool_result(SPAWN_ID, return_text or "", None))
+        events.append(tool_result(SPAWN_ID, spawn_result_note + (return_text or ""), None))
         events.append(
             assistant(
                 [{"type": "text", "text": relay_text or "The agent finished."}],
@@ -1290,6 +1297,9 @@ def lean_errored_pairs(count: int, full: Mapping[str, OutcomeKind]) -> list[Pair
     return [Pair(dict(full), {}, frozenset({"lean"})) for _ in range(count)]
 
 
+OWN_DISCORDANCE_EXACT = "own-discordance-exact"
+
+
 @dataclass(frozen=True)
 class FlipSettings:
     margin_pp: float = DEFAULT_MARGIN_PP
@@ -1297,6 +1307,16 @@ class FlipSettings:
     allowances: Mapping[str, int] = field(
         default_factory=dict
     )  # mechanical check -> pairs; absent: 0
+    # How a mechanical check's allowance is decided. None: the settings declare the exact
+    # own-discordance method, unless they hand the verdict a table of allowances, which is
+    # then the declared reading that a file written before the method existed carries.
+    allowance_method: str | None = None
+
+    @property
+    def declared_allowance_method(self) -> str | None:
+        if self.allowance_method is not None:
+            return self.allowance_method
+        return None if self.allowances else OWN_DISCORDANCE_EXACT
 
 
 @dataclass(frozen=True)
@@ -1342,7 +1362,7 @@ CALIBRATION_RUN_ID = "acceptance-calibration"
 
 
 def _settings_json(settings: FlipSettings) -> dict[str, Any]:
-    return {
+    declared: dict[str, Any] = {
         "margin_pp": settings.margin_pp,
         "method": "tango-score",
         "confidence": 0.95,
@@ -1353,6 +1373,9 @@ def _settings_json(settings: FlipSettings) -> dict[str, Any]:
         "allowance_source": CALIBRATION_RUN_ID if settings.allowances else None,
         "allowances": dict(settings.allowances),
     }
+    if settings.declared_allowance_method is not None:
+        declared["allowance_method"] = settings.declared_allowance_method
+    return declared
 
 
 def _check_outcome_json(kind: OutcomeKind) -> dict[str, str]:

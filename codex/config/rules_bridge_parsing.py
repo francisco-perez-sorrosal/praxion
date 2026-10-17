@@ -130,6 +130,10 @@ def parse_rule_frontmatter(lines: list[str], path: Path) -> dict[str, object]:
             raise RuleParseError(f"{path}: unsupported frontmatter line: {line!r}")
 
         key, raw_value = match.group(1), (match.group(2) or "").strip()
+        if key == "paths" and raw_value:
+            metadata["paths"] = parse_flow_sequence(raw_value, path)
+            index += 1
+            continue
         if key == "paths":
             paths: list[str] = []
             index += 1
@@ -176,6 +180,34 @@ def parse_rule_frontmatter(lines: list[str], path: Path) -> dict[str, object]:
         index += 1
 
     return metadata
+
+
+def parse_flow_sequence(raw_value: str, path: Path) -> list[str]:
+    """The items of a one-line YAML flow sequence such as ``["a/**", 'b.md']``.
+
+    Rules may write ``paths:`` either as a block list or in this inline form; read
+    as a block list, the inline form yields no globs and the rule is mistaken for
+    an always-on one. Commas inside quoted items are kept.
+    """
+    if not (raw_value.startswith("[") and raw_value.endswith("]")):
+        raise RuleParseError(f"{path}: unsupported paths value: {raw_value!r}")
+    items: list[str] = []
+    current: list[str] = []
+    quote = ""
+    for char in raw_value[1:-1]:
+        if quote:
+            current.append(char)
+            quote = "" if char == quote else quote
+        elif char in "\"'":
+            current.append(char)
+            quote = char
+        elif char == ",":
+            items.append("".join(current).strip())
+            current = []
+        else:
+            current.append(char)
+    items.append("".join(current).strip())
+    return [strip_yaml_string(item) for item in items if item]
 
 
 def strip_yaml_string(value: str) -> str:

@@ -19,7 +19,9 @@ A role's two arms ran the same tasks, so each task yields one pair. The rule:
   clears, and withheld or not-applicable checks are listed as not covered;
 - under the own-discordance method, a mechanical check whose allowance is wider than the
   margin times its usable pairs cannot state non-regression within the margin, so it is
-  listed as not covered too; a regression is never withheld that way.
+  listed as not covered too; a regression is never withheld that way;
+- under the same method, the forced-stop check C5 clears only on enough evidence it could have
+  failed: fewer than five pairs that ran out of turns on both sides list it as not covered.
 
 Pure: no I/O, no clock, no randomness.
 """
@@ -54,10 +56,13 @@ from praxion_evals.adherence.model import (
     Withheld,
     scored,
 )
+from praxion_evals.adherence.transcript import StoppedAtCap
 
 BISECTION_STEPS = 80
 PERCENT = 100
 OVER_MARGIN = "the allowance exceeds the margin times the usable pairs"
+FORCED_STOP_CHECK = "C5"
+MIN_RUN_OUT_PAIRS = 5  # the statistician's floor: below it C5 has had too few chances to fail
 PARAMETER_FLOOR = -1.0  # the paired difference of two proportions lies in [-1, 1]
 PARAMETER_CEILING = 1.0
 
@@ -80,6 +85,7 @@ def role_verdict(
             settings.required_pairs,
         )
     recounted = [pair for pair in pairs if _countable(pair)]
+    ran_out = ran_out_on_both_sides(pairs)
     verdicts: dict[str, CheckVerdict] = {}
     not_covered: dict[str, str] = {}
     lean_failures: dict[str, int] = {}
@@ -90,9 +96,19 @@ def role_verdict(
             continue
         lean_failures[name] = counts.lean_failures
         verdicts[name] = _decide(name, kind, counts, settings, role)
-        if _allowance_exceeds_margin(verdicts[name], settings):
-            not_covered[name] = OVER_MARGIN
+        silent_because = _why_claim_is_silent(name, verdicts[name], ran_out, settings)
+        if silent_because is not None:
+            not_covered[name] = silent_because
     return Assessed(complete, verdicts, not_covered, lean_failures)
+
+
+def ran_out_on_both_sides(pairs: Sequence[Pair]) -> int:
+    """Pairs whose two sessions both ended by the harness stopping the role at its turn cap."""
+    return sum(_ran_out(pair.full) and _ran_out(pair.lean) for pair in pairs)
+
+
+def _ran_out(status: SessionStatus) -> bool:
+    return isinstance(status, Measured) and isinstance(status.role_ending, StoppedAtCap)
 
 
 def tally(check: str, pairs: Sequence[Pair]) -> Counts:
@@ -166,17 +182,28 @@ def _decide(
             assert_never(kind)
 
 
-def _allowance_exceeds_margin(check_verdict: CheckVerdict, settings: DeclaredSettings) -> bool:
-    """Whether a clearing mechanical verdict rests on noise wider than the margin it would claim.
+def _why_claim_is_silent(
+    name: str, check_verdict: CheckVerdict, ran_out: int, settings: DeclaredSettings
+) -> str | None:
+    """Why the flip claim says nothing for a scored mechanical check that would clear, if it does.
 
-    Only the own-discordance method is held to this; a file that declares none keeps the
-    verdict it showed.
+    A clearing verdict is withheld when it rests on noise wider than the margin it would claim,
+    or, for the forced-stop check, on fewer than ``MIN_RUN_OUT_PAIRS`` pairs that ran out of
+    turns on both sides. A failing verdict is never withheld. Only the own-discordance method
+    is held to either; a file that declares none keeps the verdict it showed.
     """
-    return (
-        settings.allowance_method == OWN_DISCORDANCE_EXACT
-        and isinstance(check_verdict, NoRegression)
-        and PERCENT * check_verdict.allowance > settings.margin_pp * check_verdict.counts.n
-    )
+    if settings.allowance_method != OWN_DISCORDANCE_EXACT or not isinstance(
+        check_verdict, NoRegression
+    ):
+        return None
+    if PERCENT * check_verdict.allowance > settings.margin_pp * check_verdict.counts.n:
+        return OVER_MARGIN
+    if name == FORCED_STOP_CHECK and ran_out < MIN_RUN_OUT_PAIRS:
+        return (
+            f"{ran_out} pairs ran out of turns on both sides, fewer than the"
+            f" {MIN_RUN_OUT_PAIRS} it needs to be scored"
+        )
+    return None
 
 
 def _mechanical_allowance(

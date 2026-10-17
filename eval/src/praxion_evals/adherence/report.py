@@ -64,6 +64,7 @@ from praxion_evals.adherence.results import (
     pairs_of,
     role_verdicts,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap
 from praxion_evals.adherence.verdict import tally
 
 PERCENT = 100
@@ -205,6 +206,7 @@ def _role_section(
         f" lean failures: {_lean_errored(pairs)}."
     )
     lines += _session_lines(results, role)
+    lines += _run_out_lines(results, role)
     lines += [f"{INDENT}Checks:"]
     calibration = bool(results.run.extra.get("calibration"))
     for entry in entries:
@@ -248,6 +250,44 @@ def _session_lines(results: RunResults, role: str) -> list[str]:
         )
         lines += _unmeasured_reasons(statuses)
     return lines + _errored_tail_lines(results, role)
+
+
+def _run_out_lines(results: RunResults, role: str) -> list[str]:
+    """How the role's forced-stop sessions ended, per arm, and the gap between the arms.
+
+    Counted over every measured session that recorded an ending, paired or not; a session whose
+    record could not tell is in neither count. Reported and never decisive: nothing here enters
+    a verdict. None for a run with no forced-stop session, or one recorded before endings were.
+    """
+    counts = {arm: _run_out_counts(measured_sessions(results, role, arm)) for arm in ARMS}
+    if not any(any(arm_counts) for arm_counts in counts.values()):
+        return []
+    lines = [
+        f"{INDENT}forced-stop sessions, {arm} arm: {ran_out} ran out of turns,"
+        f" {ended_early} ended before their cap"
+        for arm, (ran_out, ended_early) in counts.items()
+    ]
+    lines.append(
+        f"{INDENT}differential run-out rate (lean minus full): {_differential_run_out(counts)}"
+    )
+    return lines
+
+
+def _run_out_counts(sessions: Iterable[Measured]) -> tuple[int, int]:
+    endings = Counter(type(session.role_ending) for session in sessions)
+    return endings[StoppedAtCap], endings[EndedOnItsOwn]
+
+
+def _differential_run_out(counts: dict[str, tuple[int, int]]) -> str:
+    """Lean's share of forced-stop sessions that ran out of turns, minus full's, in points."""
+    shares = {
+        arm: ran_out / (ran_out + ended_early)
+        for arm, (ran_out, ended_early) in counts.items()
+        if ran_out + ended_early
+    }
+    if len(shares) < len(ARMS):
+        return "not defined, an arm has no forced-stop session that ended in a known way"
+    return f"{PERCENT * (shares['lean'] - shares['full']):.1f} pp"
 
 
 def _errored_tail_lines(results: RunResults, role: str) -> list[str]:

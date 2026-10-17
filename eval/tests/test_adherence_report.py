@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections.abc import Iterable, Mapping
@@ -29,6 +30,7 @@ from praxion_evals.adherence.model import (
     Withheld,
 )
 from praxion_evals.adherence.results import CatalogEntry, EarlierRun, RunInfo, RunResults
+from praxion_evals.adherence.transcript import EndedOnItsOwn, RoleEnding, StoppedAtCap, Unknown
 from praxion_evals.live.session import SessionRun
 from praxion_evals.live.spend import SpendLedger
 
@@ -545,3 +547,95 @@ def test_the_report_shows_each_errored_sessions_tails_and_none_for_an_old_record
     assert "error tail: boom at line 3" in text
     assert "result tail: (empty)" in text
     assert text.count("error tail:") == 1
+
+
+# ---------------------------------------------------------------------------
+# Forced-stop sessions: how they ended, and the coverage floor of the forced-stop check
+# ---------------------------------------------------------------------------
+
+CAP = 6
+C5_ENTRY = CatalogEntry("C5", "mechanical", RULE, False, None)
+RAN_OUT = {"C5": PASS}
+ENDED_EARLY = {"C5": NotApplicable("the role ended before its cap")}
+NOT_FORCED = {"C5": NotApplicable("the task did not stop the role early")}
+
+
+def forced(outcomes: Mapping[str, CheckOutcome], ending: RoleEnding | None) -> Measured:
+    return Measured(dict(outcomes), 1000, role_ending=ending)
+
+
+STOPPED = forced(RAN_OUT, StoppedAtCap(CAP, CAP))
+ENDED = forced(ENDED_EARLY, EndedOnItsOwn(CAP - 3))
+UNTOLD = forced(ENDED_EARLY, Unknown("the transcript could not be read"))
+CLEAN = forced(NOT_FORCED, None)
+
+
+def lone(arm: str, index: int, status: Measured) -> SessionRecord:
+    """A session whose task ran in no other arm: it completes no pair."""
+    setup = SessionSetup(arm, COMMIT, "researcher", f"lone-{arm}-{index:03d}", "template", 7)  # type: ignore[arg-type]
+    return SessionRecord(setup, status, 0.01, 1000, "2026-10-12T09:00:00Z")
+
+
+def forced_stop_report(both_ran_out: int, lone_sessions: Iterable[SessionRecord] = ()) -> str:
+    pairs = [(STOPPED, STOPPED)] * both_ran_out + [(CLEAN, CLEAN)] * (24 - both_ran_out)
+    sessions = sessions_of("researcher", pairs) + list(lone_sessions)
+    run = results_of(sessions, required_pairs=24, allowance_method=OWN)
+    return report.render(dataclasses.replace(run, catalog={"researcher": (C5_ENTRY,)}))
+
+
+def line_of(text: str, start: str) -> str:
+    return next(ln.strip() for ln in text.splitlines() if ln.strip().startswith(start))
+
+
+def test_the_report_counts_forced_stop_sessions_by_how_they_ended_per_arm():
+    lone_sessions = [lone("full", 0, ENDED)] + [lone("lean", i, ENDED) for i in range(3)]
+
+    text = forced_stop_report(5, [*lone_sessions, lone("lean", 9, UNTOLD)])
+
+    assert line_of(text, "forced-stop sessions, full") == (
+        "forced-stop sessions, full arm: 5 ran out of turns, 1 ended before their cap"
+    )
+    assert line_of(text, "forced-stop sessions, lean") == (
+        "forced-stop sessions, lean arm: 5 ran out of turns, 3 ended before their cap"
+    )
+
+
+def test_the_differential_run_out_rate_is_lean_minus_full_in_points():
+    lone_sessions = [lone("full", 0, ENDED)] + [lone("lean", i, ENDED) for i in range(3)]
+
+    text = forced_stop_report(5, lone_sessions)  # lean 5 of 8 ran out, full 5 of 6
+
+    assert line_of(text, "differential run-out rate") == (
+        "differential run-out rate (lean minus full): -20.8 pp"
+    )
+
+
+def test_the_differential_run_out_rate_is_not_defined_when_an_arm_has_no_known_ending():
+    text = forced_stop_report(0, [lone("full", 0, STOPPED)])
+
+    assert "(lean minus full): not defined" in line_of(text, "differential run-out rate")
+
+
+def test_a_run_recorded_before_endings_were_kept_states_no_run_out_lines():
+    text = render(same_both_arms(3))
+
+    assert "forced-stop sessions" not in text
+    assert "run-out rate" not in text
+
+
+def test_the_run_out_counts_never_move_the_flip_verdict():
+    plain = forced_stop_report(5)
+    skewed = forced_stop_report(5, [lone("lean", i, ENDED) for i in range(4)])
+
+    assert line_of(plain, "Role researcher:") == line_of(skewed, "Role researcher:")
+
+
+@pytest.mark.parametrize(("both_ran_out", "covered"), [(4, False), (5, True)])
+def test_the_report_lists_the_forced_stop_check_as_not_covered_under_five_pairs(
+    both_ran_out, covered
+):
+    text = forced_stop_report(both_ran_out)
+
+    verdict_line = line_of(text, "verdict:")
+    assert ("not covered by the flip verdict" not in verdict_line) is covered, verdict_line
+    assert (f"{both_ran_out} pairs ran out of turns on both sides" in verdict_line) is not covered

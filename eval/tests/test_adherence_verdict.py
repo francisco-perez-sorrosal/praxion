@@ -28,6 +28,7 @@ from praxion_evals.adherence.model import (
     Withheld,
 )
 from praxion_evals.adherence.model_verdict import Covered, NotCovered
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap
 
 PASS, FAIL = Passed(), Failed("the check failed")
 WITHHELD = Withheld("no page to fetch")
@@ -332,6 +333,88 @@ def test_a_judged_check_is_never_held_to_the_allowance_rule():
     result = own_discordance_verdict(pairs(RUN_PAIRS, ok, ok), JUDGED)
 
     assert result.not_covered == {}
+
+
+# ---------------------------------------------------------------------------
+# The forced-stop check needs five pairs that ran out of turns on both sides
+# ---------------------------------------------------------------------------
+
+FORCED_STOP = {"C5": "mechanical"}
+CAP = 6
+NOT_RUN_OUT = NotApplicable("the role ended before its cap")
+
+
+def ran_out() -> Measured:
+    return Measured({"C5": PASS}, None, role_ending=StoppedAtCap(CAP, CAP))
+
+
+def ended_before_cap() -> Measured:
+    return Measured({"C5": NOT_RUN_OUT}, None, role_ending=EndedOnItsOwn(CAP - 3))
+
+
+def clean() -> Measured:
+    return Measured({"C5": NotApplicable("the task did not stop the role early")}, None)
+
+
+def forced_stop_run(both_ran_out: int, ended_early: int = 0) -> list[Pair]:
+    """24 pairs: `both_ran_out` stopped at the cap in both arms, `ended_early` stopped in the full
+    arm only, the rest not forced-stop tasks."""
+    idle = RUN_PAIRS - both_ran_out - ended_early
+    return (
+        pairs(both_ran_out, ran_out(), ran_out())
+        + pairs(ended_early, ran_out(), ended_before_cap())
+        + pairs(idle, clean(), clean())
+    )
+
+
+@pytest.mark.parametrize(("both_ran_out", "covered"), [(4, False), (5, True)])
+def test_the_forced_stop_check_is_covered_from_five_pairs_that_ran_out_on_both_sides(
+    both_ran_out, covered
+):
+    result = own_discordance_verdict(forced_stop_run(both_ran_out), FORCED_STOP)
+
+    assert (result.coverage("C5") == Covered()) is covered
+
+
+def test_the_reason_the_forced_stop_check_is_not_covered_counts_the_pairs_that_ran_out():
+    result = own_discordance_verdict(forced_stop_run(4), FORCED_STOP)
+
+    assert result.not_covered == {
+        "C5": "4 pairs ran out of turns on both sides, fewer than the 5 it needs to be scored"
+    }
+    assert result.flip == "not clear"
+
+
+def test_a_pair_that_ran_out_on_one_side_only_is_not_counted():
+    assert verdict.ran_out_on_both_sides(forced_stop_run(4, ended_early=3)) == 4
+
+
+def test_the_floor_binds_the_forced_stop_check_alone():
+    both = {"C1": "mechanical", "C5": "mechanical"}
+    ok_and_ran_out = Measured({"C1": PASS, "C5": PASS}, None, role_ending=StoppedAtCap(CAP, CAP))
+    idle = Measured({"C1": PASS, "C5": NotApplicable("not a forced stop")}, None)
+    run = pairs(4, ok_and_ran_out, ok_and_ran_out) + pairs(RUN_PAIRS - 4, idle, idle)
+
+    result = own_discordance_verdict(run, both)
+
+    assert list(result.not_covered) == ["C5"]
+
+
+def test_a_settings_without_the_method_keeps_the_forced_stop_verdict_it_showed():
+    result = verdict.role_verdict(
+        FORCED_STOP, forced_stop_run(4), settings(required_pairs=RUN_PAIRS)
+    )
+
+    assert (result.not_covered, result.flip) == ({}, "clear")
+
+
+def test_a_forced_stop_regression_is_never_withheld_for_want_of_pairs():
+    lean_crashed = lean_errored(8, ran_out())  # counted as lean failures on the full side's check
+
+    result = own_discordance_verdict(forced_stop_run(3) + lean_crashed, FORCED_STOP)
+
+    assert isinstance(result.check_verdicts["C5"], Regression)
+    assert (result.not_covered, result.flip) == ({}, "not clear")
 
 
 def test_a_settings_without_the_method_keeps_a_wide_declared_allowance_covered():

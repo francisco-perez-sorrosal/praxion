@@ -36,7 +36,9 @@ JUDGED = {"C3": "judged"}
 BOTH = {"C1": "mechanical", "C3": "judged"}
 
 
-def settings(required_pairs=20, margin_pp=10.0, allowances=None, confidence=0.95):
+def settings(
+    required_pairs=20, margin_pp=10.0, allowances=None, confidence=0.95, allowance_method=None
+):
     allowances = allowances or {}
     return DeclaredSettings(
         margin_pp=margin_pp,
@@ -48,6 +50,7 @@ def settings(required_pairs=20, margin_pp=10.0, allowances=None, confidence=0.95
         retry_policy="one retry for infrastructure errors",
         allowance_source="calibration-run" if allowances else None,
         allowances=allowances,
+        allowance_method=allowance_method,
     )
 
 
@@ -143,6 +146,151 @@ def test_a_check_with_no_allowance_declared_gets_zero():
 
     assert isinstance(result.check_verdicts["C1"], NoRegression)
     assert isinstance(result.check_verdicts["C2"], Regression)
+
+
+# ---------------------------------------------------------------------------
+# Mechanical checks sized by the run's own discordant count
+# ---------------------------------------------------------------------------
+
+OWN = "own-discordance-exact"
+RUN_PAIRS = 24
+# discordant pairs -> the allowance: the smallest net discordance whose exact one-sided
+# tail at 95 percent covers it (the consult's oracle table)
+EXACT_ALLOWANCE = {0: 0, 4: 4, 5: 3, 10: 6, 15: 7, 20: 8, 24: 8}
+
+
+def discordant_run(check, discordant, net, total=RUN_PAIRS) -> list[Pair]:
+    """``total`` pairs of which ``discordant`` split ``net`` more lean failures than lean passes."""
+    lean_failed = (discordant + net) // 2
+    ok, bad = measured(**{check: PASS}), measured(**{check: FAIL})
+    return (
+        pairs(lean_failed, ok, bad)
+        + pairs(discordant - lean_failed, bad, ok)
+        + pairs(total - discordant, ok, ok)
+    )
+
+
+def own_discordance_verdict(
+    pairs_, checks=MECHANICAL, role: str | None = "researcher", **settings_kwargs
+):
+    declared = settings(required_pairs=RUN_PAIRS, allowance_method=OWN, **settings_kwargs)
+    return verdict.role_verdict(checks, pairs_, declared, role)
+
+
+@pytest.mark.parametrize(("discordant", "allowance"), EXACT_ALLOWANCE.items())
+def test_a_net_discordance_at_the_exact_quantile_of_its_own_count_is_no_regression(
+    discordant, allowance
+):
+    result = own_discordance_verdict(discordant_run("C1", discordant, allowance))
+
+    check = result.check_verdicts["C1"]
+    assert isinstance(check, NoRegression)
+    assert check.allowance == allowance
+
+
+@pytest.mark.parametrize("discordant", [5, 10, 15, 20, 24])
+def test_a_net_discordance_one_step_past_the_exact_quantile_is_a_regression(discordant):
+    past = EXACT_ALLOWANCE[discordant] + 2  # net discordance keeps the parity of the count
+
+    result = own_discordance_verdict(discordant_run("C1", discordant, past))
+
+    assert isinstance(result.check_verdicts["C1"], Regression)
+    assert result.flip == "not clear"
+
+
+def test_each_check_takes_the_allowance_of_its_own_discordant_count():
+    c1_noise = pairs(5, measured(C1=PASS, C2=PASS), measured(C1=FAIL, C2=PASS))
+    c2_noise = pairs(4, measured(C1=PASS, C2=PASS), measured(C1=PASS, C2=FAIL))
+    quiet = pairs(15, measured(C1=PASS, C2=PASS), measured(C1=PASS, C2=PASS))
+    both_checks = {"C1": "mechanical", "C2": "mechanical"}
+
+    result = own_discordance_verdict(c1_noise + c2_noise + quiet, both_checks)
+
+    assert result.check_verdicts["C1"].allowance == EXACT_ALLOWANCE[5]
+    assert isinstance(result.check_verdicts["C1"], Regression)
+    assert result.check_verdicts["C2"].allowance == EXACT_ALLOWANCE[4]
+    assert isinstance(result.check_verdicts["C2"], NoRegression)
+
+
+def test_a_lean_errored_pair_counts_in_the_discordant_count_the_allowance_is_sized_by():
+    ok = measured(C1=PASS)
+
+    result = own_discordance_verdict(pairs(RUN_PAIRS, ok, ok) + lean_errored(5, ok))
+
+    assert result.check_verdicts["C1"].counts.b == 5
+    assert result.check_verdicts["C1"].allowance == EXACT_ALLOWANCE[5]
+
+
+def test_the_allowance_follows_the_declared_confidence():
+    run = discordant_run("C1", 10, 6)
+
+    strict = own_discordance_verdict(run, confidence=0.99)
+    lenient = own_discordance_verdict(run, confidence=0.80)
+
+    assert lenient.check_verdicts["C1"].allowance < strict.check_verdicts["C1"].allowance
+
+
+@pytest.mark.parametrize("calibrated", [0, 3, 12])
+def test_an_allowance_a_calibration_run_declared_is_never_taken_under_the_own_method(calibrated):
+    run = discordant_run("C1", 10, 8)  # past the exact quantile of 6
+
+    result = own_discordance_verdict(
+        run, allowances={"researcher/C1": calibrated, "C1": calibrated}
+    )
+
+    assert isinstance(result.check_verdicts["C1"], Regression)
+    assert result.check_verdicts["C1"].allowance == EXACT_ALLOWANCE[10]
+
+
+def test_the_allowance_is_the_same_whatever_role_asks_for_it():
+    run = discordant_run("C1", 10, 6)
+
+    as_researcher = own_discordance_verdict(run, role="researcher")
+    as_verifier = own_discordance_verdict(run, role="verifier")
+    bare = own_discordance_verdict(run, role=None)
+
+    assert as_researcher.check_verdicts == as_verifier.check_verdicts == bare.check_verdicts
+
+
+def test_a_settings_without_the_method_keeps_reading_the_declared_allowance():
+    run = discordant_run("C1", 10, 8)
+
+    narrow = verdict.role_verdict(
+        MECHANICAL, run, settings(required_pairs=RUN_PAIRS, allowances={"C1": 7})
+    )
+    wide = verdict.role_verdict(
+        MECHANICAL, run, settings(required_pairs=RUN_PAIRS, allowances={"C1": 8})
+    )
+
+    assert isinstance(narrow.check_verdicts["C1"], Regression)
+    assert isinstance(wide.check_verdicts["C1"], NoRegression)
+
+
+def test_a_settings_without_the_method_and_without_allowances_reads_zero():
+    result = verdict.role_verdict(
+        MECHANICAL, discordant_run("C1", 10, 2), settings(required_pairs=RUN_PAIRS)
+    )
+
+    assert isinstance(result.check_verdicts["C1"], Regression)
+    assert result.check_verdicts["C1"].allowance == 0
+
+
+def test_an_allowance_method_nobody_defined_is_refused():
+    with pytest.raises(ValueError, match="allowance method"):
+        settings(allowance_method="widest-calibration")
+
+
+def test_the_allowance_method_round_trips_through_the_settings_codec():
+    declared = settings(allowance_method=OWN)
+
+    assert model.settings_from_json(model.settings_to_json(declared)) == declared
+
+
+def test_a_settings_record_without_the_method_loads_as_none_and_writes_none_back():
+    written = model.settings_to_json(settings())
+
+    assert "allowance_method" not in written
+    assert model.settings_from_json(written).allowance_method is None
 
 
 # ---------------------------------------------------------------------------

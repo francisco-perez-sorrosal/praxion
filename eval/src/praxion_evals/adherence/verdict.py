@@ -7,7 +7,9 @@ A role's two arms ran the same tasks, so each task yields one pair. The rule:
   error caused by the lean arm cannot hide a regression; an error on the
   ``full`` side or on both leaves the pair incomplete;
 - a mechanical check regresses when ``lean`` fails it on more pairs than
-  ``full`` does, beyond that check's declared noise allowance (zero when none);
+  ``full`` does, beyond its noise allowance: the exact one-sided quantile of its own
+  discordant count when the settings declare that method, else the declared allowance
+  (zero when none);
 - a judged check is non-inferior when the ``lean`` pass rate is no more than the
   declared margin below the ``full`` one, a point-estimate rule; the one-sided
   Tango score interval on the paired difference is reported beside it and never
@@ -27,6 +29,7 @@ from statistics import NormalDist
 from typing import assert_never
 
 from praxion_evals.adherence.model import (
+    OWN_DISCORDANCE_EXACT,
     Assessed,
     CheckErrored,
     CheckKind,
@@ -143,7 +146,7 @@ def _decide(
 ) -> CheckVerdict:
     match kind:
         case "mechanical":
-            allowance = settings.allowance(name, role)
+            allowance = _mechanical_allowance(name, counts, settings, role)
             if counts.b - counts.c > allowance:
                 return Regression(counts, allowance)
             return NoRegression(counts, allowance)
@@ -155,6 +158,20 @@ def _decide(
             return Inferior(counts, interval)
         case _:
             assert_never(kind)
+
+
+def _mechanical_allowance(
+    name: str, counts: Counts, settings: DeclaredSettings, role: str | None
+) -> int:
+    """Net discordance a mechanical check may show without regressing.
+
+    Under the own-discordance method the run's own discordant count sizes it, so no
+    calibration run's allowance is ever read; a file that declares no method keeps the
+    allowances it declared.
+    """
+    if settings.allowance_method == OWN_DISCORDANCE_EXACT:
+        return _exact_quantile(counts.b + counts.c, settings.confidence)
+    return settings.allowance(name, role)
 
 
 # ---------------------------------------------------------------------------

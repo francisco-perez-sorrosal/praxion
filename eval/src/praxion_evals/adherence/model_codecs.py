@@ -185,6 +185,11 @@ def settings_to_json(settings: DeclaredSettings) -> dict[str, Any]:
             if settings.stop_rule is None
             else {"stop_rule": _stop_rule_to_json(settings.stop_rule)}
         ),
+        **(
+            {}
+            if settings.allowance_method is None
+            else {"allowance_method": settings.allowance_method}
+        ),
     }
 
 
@@ -224,6 +229,7 @@ def settings_from_json(data: _Json) -> DeclaredSettings:
         allowance_source=data.get("allowance_source"),
         allowances={name: int(k) for name, k in (data.get("allowances") or {}).items()},
         stop_rule=_stop_rule_from_json(data["stop_rule"]) if "stop_rule" in data else None,
+        allowance_method=data.get("allowance_method"),
     )
 
 

@@ -560,6 +560,10 @@ class SessionRecord:
 # ---------------------------------------------------------------------------
 
 
+AllowanceMethod = Literal["own-discordance-exact"]
+OWN_DISCORDANCE_EXACT: AllowanceMethod = "own-discordance-exact"
+
+
 @dataclass(frozen=True)
 class DeclaredSettings:
     """Fixed and written to the results file before the first session launches."""
@@ -575,12 +579,17 @@ class DeclaredSettings:
     allowances: Mapping[str, int]  # by `allowance_key(check, role)`
     # The infrastructure stop's declared rule; None only in a file written before it existed.
     stop_rule: StopRule | None = None
+    # How a mechanical check's allowance is decided. None: read ``allowances`` as declared, the
+    # reading of every file written before the method existed, so each renders the verdict it showed.
+    allowance_method: AllowanceMethod | None = None
 
     def __post_init__(self) -> None:
         _require(0 < self.margin_pp < 100, "the margin is a percentage between 0 and 100")
         _require(0.5 < self.confidence < 1, "the confidence is between 0.5 and 1")
         _one_of(self.method, get_args(Literal["tango-score"]), "the method")
         _one_of(self.sidedness, get_args(Literal["one-sided"]), "the sidedness")
+        if self.allowance_method is not None:
+            _one_of(self.allowance_method, get_args(AllowanceMethod), "the allowance method")
         _require(self.required_pairs >= 1, "at least one pair is required")
         _require(self.pair_slack >= 0, "the pair slack is not negative")
         _non_empty(self.retry_policy, "the retry policy")

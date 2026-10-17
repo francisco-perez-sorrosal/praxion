@@ -13,10 +13,19 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import cli, results, session_launch, session_loop, tasks, transcript
+from praxion_evals.adherence import (
+    cli,
+    model,
+    results,
+    session_launch,
+    session_loop,
+    tasks,
+    transcript,
+)
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
+from praxion_evals.adherence.infra_stop import COUNTING_KINDS
 from praxion_evals.adherence.model import (
     CheckErrored,
     Errored,
@@ -701,6 +710,66 @@ def test_a_calibration_run_on_another_seed_task_list_or_pair_target_is_refused_b
     assert reason in capsys.readouterr().err
     assert len(script.specs) == launched
     assert not (tmp_path / "flip.json").exists()
+
+
+def test_the_stop_rule_defaults_to_three_failures_and_two_thousand_characters() -> None:
+    rule = cli.declared_settings(cli.parse_config(["--role", ROLE])).stop_rule
+
+    assert rule is not None
+    assert (rule.count, rule.tail_chars, rule.masking) == (3, 2000, "v1")
+    assert rule.kinds == COUNTING_KINDS
+
+
+def test_a_declared_stop_count_and_tail_bound_reach_the_rule() -> None:
+    config = cli.parse_config(["--role", ROLE, "--stop-count", "5", "--tail-chars", "300"])
+
+    rule = cli.declared_settings(config).stop_rule
+
+    assert rule is not None
+    assert (rule.count, rule.tail_chars) == (5, 300)
+
+
+@pytest.mark.parametrize("stop_count", ["0", "1", "2", "-3"])
+def test_a_stop_count_below_three_is_a_usage_error_naming_the_stop(
+    stop_count: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as raised:
+        cli.parse_config(["--role", ROLE, "--stop-count", stop_count])
+
+    assert raised.value.code == 2
+    assert "stop count must be at least 3" in capsys.readouterr().err
+
+
+def test_a_tail_bound_of_zero_is_a_usage_error() -> None:
+    with pytest.raises(SystemExit) as raised:
+        cli.parse_config(["--role", ROLE, "--tail-chars", "0"])
+
+    assert raised.value.code == 2
+
+
+def test_the_stop_rule_survives_the_settings_json_round_trip() -> None:
+    settings = cli.declared_settings(cli.parse_config(["--role", ROLE, "--stop-count", "4"]))
+
+    wire = model.settings_to_json(settings)
+
+    assert wire["stop_rule"]["count"] == 4
+    assert model.settings_from_json(wire) == settings
+
+
+def test_settings_written_before_the_stop_rule_load_without_one() -> None:
+    wire = model.settings_to_json(cli.declared_settings(cli.parse_config(["--role", ROLE])))
+    del wire["stop_rule"]
+
+    assert model.settings_from_json(wire).stop_rule is None
+    assert "stop_rule" not in model.settings_to_json(model.settings_from_json(wire))
+
+
+def test_a_stop_rule_naming_another_masking_rule_is_refused() -> None:
+    wire = model.settings_to_json(cli.declared_settings(cli.parse_config(["--role", ROLE])))
+    wire["stop_rule"]["masking"] = "v2"
+
+    with pytest.raises(ValueError, match="masking"):
+        model.settings_from_json(wire)
 
 
 def test_an_allowance_is_declared_per_role_and_check_and_read_by_that_role_only() -> None:

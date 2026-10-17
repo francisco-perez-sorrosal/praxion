@@ -570,6 +570,8 @@ class DeclaredSettings:
     retry_policy: str
     allowance_source: str | None  # a same-arm calibration run id; None: every allowance is zero
     allowances: Mapping[str, int]  # by `allowance_key(check, role)`
+    # The infrastructure stop's declared rule; None only in a file written before it existed.
+    stop_rule: StopRule | None = None
 
     def __post_init__(self) -> None:
         _require(0 < self.margin_pp < 100, "the margin is a percentage between 0 and 100")
@@ -635,6 +637,7 @@ class Pair:
 # ---------------------------------------------------------------------------
 
 if TYPE_CHECKING:  # the names `__getattr__` serves, declared for type checkers
+    from praxion_evals.adherence.infra_stop import StopRule  # imports this module at run time
     from praxion_evals.adherence.model_codecs import (  # noqa: F401
         outcome_from_json,
         outcome_to_json,

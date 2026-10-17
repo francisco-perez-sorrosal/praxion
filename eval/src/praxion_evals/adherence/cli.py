@@ -25,6 +25,12 @@ from dataclasses import replace
 from pathlib import Path
 
 from praxion_evals.adherence import arms, report, results, session_loop, tasks, verdict
+from praxion_evals.adherence.infra_stop import (
+    COUNTING_KINDS,
+    DEFAULT_STOP_COUNT,
+    MIN_STOP_COUNT,
+    StopRule,
+)
 from praxion_evals.adherence.model import (
     ARMS,
     ROLES,
@@ -36,6 +42,7 @@ from praxion_evals.adherence.model import (
     allowance_key,
 )
 from praxion_evals.adherence.session_loop import (
+    DEFAULT_TAIL_CHARS,
     EXIT_COMPLETE,
     OUTPUT_DIR,
     RETRY_POLICY,
@@ -149,6 +156,19 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="a `claude setup-token` file: sessions bill its subscription, the judge keeps the API key",
     )
+    add(
+        "--stop-count",
+        type=int,
+        default=DEFAULT_STOP_COUNT,
+        help="stop the run after this many identical infrastructure failures of one arm in a "
+        f"row; at least {MIN_STOP_COUNT}, so one task's session and its retry cannot stop it",
+    )
+    add(
+        "--tail-chars",
+        type=_number(int, 1),
+        default=DEFAULT_TAIL_CHARS,
+        help="the end of an errored session's output kept as its evidence, per stream",
+    )
     add("--dry-run", action="store_true")
     add("--overwrite", action="store_true")
     noise = parser.add_mutually_exclusive_group()
@@ -193,6 +213,7 @@ def declared_settings(
         retry_policy=RETRY_POLICY,
         allowance_source=allowance_source,
         allowances=allowances or {},
+        stop_rule=StopRule.parse(config.stop_count, COUNTING_KINDS, config.tail_chars),
     )
 
 

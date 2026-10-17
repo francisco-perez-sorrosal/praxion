@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, assert_never, cast
 
+from praxion_evals.adherence.infra_stop import StopRule
 from praxion_evals.adherence.model import (
     Assessed,
     CheckErrored,
@@ -169,7 +170,34 @@ def settings_to_json(settings: DeclaredSettings) -> dict[str, Any]:
         "retry_policy": settings.retry_policy,
         "allowance_source": settings.allowance_source,
         "allowances": dict(settings.allowances),
+        **(
+            {}
+            if settings.stop_rule is None
+            else {"stop_rule": _stop_rule_to_json(settings.stop_rule)}
+        ),
     }
+
+
+def _stop_rule_to_json(rule: StopRule) -> dict[str, Any]:
+    return {
+        "count": rule.count,
+        "kinds": sorted(rule.kinds),
+        "masking": rule.masking,
+        "tail_chars": rule.tail_chars,
+    }
+
+
+def _stop_rule_from_json(data: _Json) -> StopRule:
+    what = "the declared stop rule"
+    masking = _field(data, "masking", what)
+    rule = StopRule.parse(
+        int(_field(data, "count", what)),
+        _field(data, "kinds", what),
+        int(_field(data, "tail_chars", what)),
+    )
+    if rule.masking != masking:
+        raise ValueError(f"{what} names the masking rule {masking!r}, not {rule.masking!r}")
+    return rule
 
 
 def settings_from_json(data: _Json) -> DeclaredSettings:
@@ -185,6 +213,7 @@ def settings_from_json(data: _Json) -> DeclaredSettings:
         retry_policy=_field(data, "retry_policy", what),
         allowance_source=data.get("allowance_source"),
         allowances={name: int(k) for name, k in (data.get("allowances") or {}).items()},
+        stop_rule=_stop_rule_from_json(data["stop_rule"]) if "stop_rule" in data else None,
     )
 
 

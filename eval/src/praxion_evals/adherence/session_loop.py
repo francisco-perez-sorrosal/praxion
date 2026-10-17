@@ -32,6 +32,7 @@ from typing import Any
 from praxion_evals.adherence import arms, grade, report, results, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
+from praxion_evals.adherence.infra_stop import DEFAULT_STOP_COUNT
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -77,6 +78,7 @@ OUTPUT_DIR = Path(".ai-state/eval_ledger/adherence")
 SANDBOX_PREFIX = "praxion-evals-adherence-"
 PROBE_TIMEOUT_S = 15
 HTTP_OK = 200
+DEFAULT_TAIL_CHARS = 2000  # what an errored session keeps of each output stream
 
 # Infrastructure errors a second try may not repeat. Never an isolation breach (the sandbox
 # leaked), a refused launch (the cap is spent) or an evaluation exception (the grader failed,
@@ -120,6 +122,9 @@ class RunConfig:
     # A `claude setup-token` file: sessions authenticate with it and never see the API key,
     # which the runner's own process keeps for the judge. None: sessions inherit the key.
     session_oauth_token_file: Path | None = None
+    # The infrastructure stop, declared with the other settings (see `infra_stop.StopRule`).
+    stop_count: int = DEFAULT_STOP_COUNT
+    tail_chars: int = DEFAULT_TAIL_CHARS
 
 
 @dataclass(frozen=True)

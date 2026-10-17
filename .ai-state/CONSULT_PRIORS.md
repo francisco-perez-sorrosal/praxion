@@ -131,6 +131,12 @@ the first.
 | 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-04 | novel |  | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
 | 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-05 | novel |  | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
 | 2026-10-12T04:21:29Z | adherence-eval | statistician | architecture | CH-06 | matched | P-06 | 7ecda507b60ea416e72125da8e29b6b914e20365 | 0 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-01 | matched | P-04 | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-02 | novel |  | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-03 | novel |  | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-04 | novel |  | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-05 | matched | P-02 | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
+| 2026-10-17T05:10:40Z | lean-spawn-continuation | statistician | architecture | CH-06 | novel |  | 60debb088e26c7433d73ce5fc3be7ecd78c2007c | 4 |
 
 ## Column Definitions
 

@@ -1,0 +1,11 @@
+{
+  "_about": "The flip verdict each committed adherence results file showed when rendered with `praxion-evals-adherence --report` before the forced-stop and allowance rules changed: per run id, per role, one of clear, not clear or underpowered. Frozen from the rendering, never read from git history.",
+  "20261014T023850Z-809185": {"researcher": "underpowered"},
+  "20261014T031818Z-d71d91": {"researcher": "underpowered"},
+  "20261014T033052Z-4f6604": {"researcher": "underpowered"},
+  "20261014T045733Z-7050ca": {"researcher": "underpowered"},
+  "20261014T152926Z-723e7a": {"researcher": "clear"},
+  "20261015T035717Z-03a785": {"verifier": "not clear"},
+  "20261015T082642Z-672192": {"verifier": "underpowered"},
+  "20261016T024750Z-62073e": {"context-engineer": "underpowered"}
+}

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from tests.acceptance.drivers import (
+    flip_gate,
     kernel_adoption,
     kernel_sandbox,
     kernel_spawn,
@@ -122,13 +123,15 @@ def test_a_switched_definition_differs_from_before_only_by_the_flag_and_its_bloc
 
 
 def test_omit_claude_md_on_a_role_outside_the_pilot_is_refused(sandbox: Sandbox) -> None:
-    kernel_adoption.record(sandbox.root, kernel_adoption.full_switch_record("implementer"))
-    kernel_sandbox.set_frontmatter_key(sandbox, "implementer", OMIT)
+    kernel_adoption.record(
+        sandbox.root, flip_gate.cited_switch_record(sandbox.root, "systems-architect")
+    )
+    kernel_sandbox.set_frontmatter_key(sandbox, "systems-architect", OMIT)
 
     verdict = commit_gate(sandbox.root)
 
-    assert verdict.refused, "a non-pilot role was switched"
-    assert "implementer" in verdict.output, verdict.output
+    assert verdict.refused, "a role outside the eligible ones was switched"
+    assert "systems-architect" in verdict.output, verdict.output
 
 
 @pytest.mark.parametrize("element", kernel_adoption.MISSING_ELEMENTS)
@@ -149,8 +152,7 @@ def test_omit_claude_md_on_a_pilot_role_without_its_full_record_is_refused(
 def test_omit_claude_md_on_a_pilot_role_with_its_full_record_passes(
     sandbox: Sandbox, role: str
 ) -> None:
-    kernel_adoption.record(sandbox.root, kernel_adoption.full_switch_record(role))
-    kernel_sandbox.set_frontmatter_key(sandbox, role, OMIT)
+    flip_gate.switch_with_flag(sandbox, flip_gate.cited_switch_record(sandbox.root, role))
     regenerate(sandbox.root)
 
     verdict = commit_gate(sandbox.root)

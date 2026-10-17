@@ -8,6 +8,8 @@ the run-level spend ledger, grades each session and rewrites the results file af
 every one. Nothing in this module reads argv or prints a usage error: a refusal before
 the first launch is a ``ValueError`` the console entry reports.
 
+One session's launch (sandbox, ``claude``, settlement, grading) lives in ``session_launch``.
+
 Exit codes of a run: 0 it is complete; 1 it is incomplete (a refused launch, an arm that
 could not be built or proven, a session that ended in error; the results are written).
 Judge calls are metered by the judge's own account, not by the ledger, which covers the
@@ -19,9 +21,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
-import time
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -37,19 +37,22 @@ from praxion_evals.adherence.model import (
     ArmBuild,
     CheckErrored,
     DeclaredSettings,
-    EarlyStop,
     Errored,
     Failed,
     NotBuilt,
     Passed,
     Role,
     SessionEvidence,
-    SessionRecord,
-    SessionSetup,
-    SessionStatus,
     Standard,
     TaskSpec,
     outcome_to_json,
+)
+from praxion_evals.adherence.session_launch import (
+    REAL_HOME,
+    Launch,
+    attempt,
+    injection_of,
+    task_session,
 )
 from praxion_evals.harness.judge_client import JudgeClient, select_judge_client
 from praxion_evals.live.materialize import (
@@ -59,15 +62,11 @@ from praxion_evals.live.materialize import (
     materialize_path,
 )
 from praxion_evals.live.report import CREDENTIAL_KEYS
-from praxion_evals.live.results import Errored as LiveErrored
 from praxion_evals.live.session import (
     CLAUDE_BINARY,
     SandboxPaths,
     SessionRun,
-    SessionSpec,
     build_env,
-    parse_stream,
-    run_session,
     session_error,
     with_session_token,
 )
@@ -78,8 +77,6 @@ OUTPUT_DIR = Path(".ai-state/eval_ledger/adherence")
 SANDBOX_PREFIX = "praxion-evals-adherence-"
 PROBE_TIMEOUT_S = 15
 HTTP_OK = 200
-MS_PER_S = 1000
-REAL_HOME = Path.home()  # read once, here: the isolation scan takes it in as an input
 
 # Infrastructure errors a second try may not repeat. Never an isolation breach (the sandbox
 # leaked), a refused launch (the cap is spent) or an evaluation exception (the grader failed,
@@ -188,6 +185,22 @@ def session_env(config: RunConfig, root: Path, ambient: Mapping[str, str]) -> di
     return with_session_token(env, token)
 
 
+def _launch_of(context: Context) -> Launch:
+    config = context.config
+    return Launch(
+        run_root=context.run_root,
+        checkout_commit=context.checkout.commit,
+        page_url=context.page_url,
+        judge=context.judge,
+        seed=config.seed,
+        model=config.model,
+        effort=config.effort,
+        session_budget_usd=config.session_budget_usd,
+        keep_sandbox=config.keep_sandbox,
+        env_for=lambda root: session_env(config, root, os.environ),
+    )
+
+
 def begin(
     config: RunConfig,
     checkout: Checkout,
@@ -221,7 +234,7 @@ def begin(
         page_url=tasks.fixture_page_url(checkout.commit)
         if base is None
         else f"{base.rstrip('/')}/{PurePosixPath(tasks.PAGE_PATH).name}",
-        needs_page=any(_injection_of(t) for role_tasks in planned.values() for t in role_tasks),
+        needs_page=any(injection_of(t) for role_tasks in planned.values() for t in role_tasks),
     )
     return context, RunState(provisional, SpendLedger(cap_usd=config.run_cap_usd))
 
@@ -501,11 +514,11 @@ def _prove(
     observed: dict[Arm, arms.ProofObservation | None] = {}
     verdicts: dict[Arm, arms.ArmVerdict] = {}
     for (arm, _), build in builds.items():
-        ledger, attempt = _attempt(
-            context, state.ledger, proof_task, build, copy_home, None, _observe
+        ledger, done = attempt(
+            _launch_of(context), state.ledger, proof_task, build, copy_home, None, _observe
         )
         state = replace(state, ledger=ledger)
-        match attempt.result:
+        match done.result:
             case Errored(kind="launch_refused", detail=detail):
                 state = _add_refusal(state, f"{role} {arm} arm proof: {detail}")
                 verdicts[arm] = NotBuilt(f"the proof launch was refused: {detail}")
@@ -559,208 +572,18 @@ def _session_with_retry(
 def _task_session(
     context: Context, state: RunState, task: TaskSpec, slot: Arm, build: ArmBuild
 ) -> RunState:
-    config = context.config
-    setup = SessionSetup(
-        arm=slot,
-        checkout_commit=context.checkout.commit,
-        role=task.role,
-        task_id=task.task_id,
-        template_id=task.template_id,
-        seed=config.seed,
+    ledger, record = task_session(
+        _launch_of(context), state.ledger, task, slot, build, state.page_fetchable
     )
-    page_url = context.page_url if _injection_of(task) and state.page_fetchable else None
-
-    def populate(root: Path) -> None:
-        install_user_scope(build.copy_root, root)
-
-    ledger, attempt = _attempt(
-        context,
-        state.ledger,
-        task,
-        build,
-        populate,
-        page_url,
-        lambda evidence: _grade(context, evidence, task, setup),
-    )
-    status: SessionStatus = attempt.result
-    if isinstance(status, Errored):
-        status = replace(status, setup=setup)
-        if status.kind == "launch_refused":
-            state = _add_refusal(state, f"{task.role} {slot} {task.task_id}: {status.detail}")
-    record = SessionRecord(
-        setup, status, attempt.charged_usd, attempt.duration_ms, attempt.started_at
-    )
-    print(
-        f"{task.role} {slot} {task.task_id}: {type(status).__name__}", file=sys.stderr, flush=True
-    )
+    status = record.status
+    if isinstance(status, Errored) and status.kind == "launch_refused":
+        state = _add_refusal(state, f"{task.role} {slot} {task.task_id}: {status.detail}")
     state = replace(
         state,
         ledger=ledger,
         results=replace(state.results, sessions=(*state.results.sessions, record)),
     )
     return _checkpoint(context, state)
-
-
-def _grade(
-    context: Context, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
-) -> SessionStatus:
-    """C3 is named only for a task that planted a gap or a conflict: without one it passes vacuously."""
-    names = [
-        check.name
-        for check in check_catalog(task.role)
-        if not (check.name == "C3" and isinstance(task.variant, EarlyStop))
-    ]
-    return grade.grade(evidence, names, context.judge, setup, real_home=REAL_HOME)
-
-
-def _injection_of(task: TaskSpec) -> tasks.Injection | None:
-    return task.variant.injection if isinstance(task.variant, Standard) else None
-
-
-# --- one launch: reserve, sandbox, start, settle, read, assess ---
-
-
-@dataclass(frozen=True)
-class Attempt[R]:
-    """One session's assessment, or the error that kept it from having one.
-
-    ``charged_usd`` is what the ledger took: the reported cost, or the full budget when the
-    session reported none.
-    """
-
-    result: R | Errored
-    charged_usd: float
-    duration_ms: int
-    started_at: str
-
-
-def _attempt[R](
-    context: Context,
-    ledger: SpendLedger,
-    task: TaskSpec,
-    build: ArmBuild,
-    populate: Callable[[Path], None],
-    page_url: str | None,
-    assess: Callable[[SessionEvidence], R],
-) -> tuple[SpendLedger, Attempt[R]]:
-    """Run one session in a fresh sandbox and scratch repository, assess it, and clean up.
-
-    The budget is reserved first and a refusal starts nothing. A session that never started
-    settles at nothing; one whose process may have started and spent settles at the full
-    budget when its outcome is lost. The sandbox outlives the assessment because a check
-    may run a script against the scratch repository.
-    """
-    budget = context.config.session_budget_usd
-    started_at, began = datetime.now(UTC).isoformat(), time.monotonic()
-
-    def finish(result: R | Errored, charged: float) -> Attempt[R]:
-        return Attempt(result, charged, int((time.monotonic() - began) * MS_PER_S), started_at)
-
-    reserved = ledger.reserve(budget)
-    if isinstance(reserved, LiveErrored):
-        return ledger, finish(Errored("launch_refused", reserved.detail), 0.0)
-    root = _new_sandbox_root(context, task)
-    try:
-        try:
-            spec, commit = _prepare(context, task, build, populate, page_url, root)
-        except Exception as error:  # nothing was started, so nothing was spent
-            return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
-        try:
-            run = run_session(spec, session_env(context.config, root, os.environ))
-        except Exception as error:  # the process may have run and spent: charge the budget
-            return reserved.settle(budget, None), finish(_crash(error), budget)
-        settled, charged = _settle(reserved, budget, run)
-        try:
-            evidence = _evidence(context, task, build, page_url, root, run, commit)
-            return settled, finish(assess(evidence), charged)
-        except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged)
-    finally:
-        if not context.config.keep_sandbox:
-            shutil.rmtree(root, ignore_errors=True)
-
-
-def _crash(error: Exception) -> Errored:
-    return Errored("evaluation_exception", f"{type(error).__name__}: {error}")
-
-
-def _new_sandbox_root(context: Context, task: TaskSpec) -> Path:
-    parent = context.run_root / task.role / "sessions"
-    parent.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix="s-", dir=parent))
-
-
-def _prepare(
-    context: Context,
-    task: TaskSpec,
-    build: ArmBuild,
-    populate: Callable[[Path], None],
-    page_url: str | None,
-    root: Path,
-) -> tuple[SessionSpec, str]:
-    """Populate the sandbox and build the scratch repository; nothing is launched yet.
-
-    Returns the session to launch and the fixture commit the scratch repository starts from.
-    """
-    config, sandbox = context.config, SandboxPaths(root)
-    populate(root)
-    commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
-    spec = tasks.session_spec(
-        task,
-        build,
-        sandbox,
-        model=config.model,
-        effort=config.effort,
-        max_budget_usd=config.session_budget_usd,
-    )
-    return spec, commit
-
-
-def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:
-    """Settle the reservation at the reported cost, or at the full budget when none was reported."""
-    final = parse_stream(run.stdout).final_result
-    cost = None if final is None else final.total_cost_usd
-    return ledger.settle(budget, cost), budget if cost is None else cost
-
-
-def _evidence(
-    context: Context,
-    task: TaskSpec,
-    build: ArmBuild,
-    page_url: str | None,
-    root: Path,
-    run: SessionRun,
-    commit: str,
-) -> SessionEvidence:
-    return grade.evidence_from_recording(
-        role=task.role,
-        envelope=run.stdout,
-        repo_root=tasks.scratch_dir(SandboxPaths(root)),
-        fixture_commit=commit,
-        sandbox=root,
-        plugin_copy=build.copy_root,
-        slug=task.slug,
-        exit_code=run.exit_code,
-        timed_out=run.timed_out,
-        judging=context.judge is not None,
-        # The lean arm of an adopted role is owed its kernel; its delivery markers are read from
-        # the role's transcript under the sandbox's config dir, since a sandbox's observation log
-        # is never written and the parent stream never carries a subagent's hook output.
-        kernel_expected=build.arm == "lean" and grade.kernel_adopted(build.copy_root, task.role),
-        config_dir=SandboxPaths(root).config_dir,
-        **_task_facts(task, page_url is not None),
-    )
-
-
-def _task_facts(task: TaskSpec, page_available: bool) -> dict[str, Any]:
-    """The task's own flags for the grader; ``page_available`` is the C6 probe's answer."""
-    injection = _injection_of(task)
-    return {
-        "forced_stop": isinstance(task.variant, EarlyStop),
-        "fetchable_page": injection is not None and page_available,
-        "planted_instruction": injection.instruction if injection else None,
-        "planted_effect": injection.effect_path if injection else None,
-    }
 
 
 # --- state updates: each returns a new state; a checkpoint writes the file whole ---

@@ -1,7 +1,7 @@
 """The adherence console entry: argument parsing, the dry run, the report option, and the paid loop.
 
 The paid loop runs over a real copy of this repository with a scripted stand-in for the
-one function that starts ``claude`` (``session_loop.run_session``); no process is ever started.
+one function that starts ``claude`` (``session_launch.run_session``); no process is ever started.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import cli, results, session_loop, tasks, transcript
+from praxion_evals.adherence import cli, results, session_launch, session_loop, tasks, transcript
 from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
@@ -156,7 +156,7 @@ def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(spec: SessionSpec, env: object) -> SessionRun:
         raise AssertionError("a session was started")
 
-    monkeypatch.setattr(session_loop, "run_session", refuse)
+    monkeypatch.setattr(session_launch, "run_session", refuse)
 
 
 def _dry_run(capsys: pytest.CaptureFixture[str], tmp_path: Path, *options: str) -> list[dict]:
@@ -418,7 +418,7 @@ def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
     monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
 
     def install(script: Script) -> None:
-        monkeypatch.setattr(session_loop, "run_session", script)
+        monkeypatch.setattr(session_launch, "run_session", script)
 
     return install
 
@@ -790,15 +790,15 @@ def test_an_injection_task_tells_the_grader_what_was_planted_and_whether_the_pag
 ):
     task = _task_with("injection")
 
-    reachable = session_loop._task_facts(task, page_available=True)
-    unreachable = session_loop._task_facts(task, page_available=False)
+    reachable = session_launch._task_facts(task, page_available=True)
+    unreachable = session_launch._task_facts(task, page_available=False)
 
     assert reachable["planted_effect"] == tasks.PLANTED_INJECTION.effect_path
     assert (reachable["fetchable_page"], unreachable["fetchable_page"]) == (True, False)
 
 
 def test_an_early_stop_task_is_marked_as_forced_and_plants_nothing() -> None:
-    facts = session_loop._task_facts(_task_with("early-stop"), page_available=True)
+    facts = session_launch._task_facts(_task_with("early-stop"), page_available=True)
 
     assert facts["forced_stop"] is True
     assert (facts["planted_instruction"], facts["fetchable_page"]) == (None, False)

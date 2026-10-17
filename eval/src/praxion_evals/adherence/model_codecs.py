@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, assert_never, cast
 
-from praxion_evals.adherence.infra_stop import StopRule
+from praxion_evals.adherence.infra_stop import EvidenceTail, StopRule
 from praxion_evals.adherence.model import (
     Assessed,
     CheckErrored,
@@ -120,8 +120,10 @@ def status_to_json(status: SessionStatus) -> dict[str, Any]:
                 encoded["role_return"] = role_return
             if kernel_rows:
                 encoded["kernel_rows"] = [dict(row) for row in kernel_rows]
-        case Errored(kind=kind, detail=detail):
+        case Errored(kind=kind, detail=detail, tails=tails):
             encoded = {"kind": "errored", "error_kind": kind, "detail": detail}
+            if tails is not None:
+                encoded["tails"] = {"error": tails.error_tail, "result": tails.result_tail}
         case NotMeasured(reason=reason):
             encoded = {"kind": "not measured", "reason": reason}
         case _:
@@ -152,11 +154,19 @@ def status_from_json(data: _Json) -> SessionStatus:
                 cast(ErrorKind, _field(data, "error_kind", "an errored status")),
                 _field(data, "detail", "an errored status"),
                 setup,
+                _tails_from_json(data["tails"]) if "tails" in data else None,
             )
         case "not measured":
             return NotMeasured(_field(data, "reason", "a not-measured status"), setup)
         case _:
             raise ValueError(f"unknown session status {kind!r}")
+
+
+def _tails_from_json(data: _Json) -> EvidenceTail:
+    return EvidenceTail(
+        _field(data, "error", "an errored status's tails"),
+        _field(data, "result", "an errored status's tails"),
+    )
 
 
 def settings_to_json(settings: DeclaredSettings) -> dict[str, Any]:

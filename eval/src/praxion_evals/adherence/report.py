@@ -54,6 +54,7 @@ from praxion_evals.adherence.results import (
 PERCENT = 100
 REASON_WIDTH = 160
 INDENT = "  "
+EMPTY_TAIL = "(empty)"
 
 OUTCOME_LABELS: dict[type, str] = {
     Passed: "passed",
@@ -198,7 +199,27 @@ def _session_lines(results: RunResults, role: str) -> list[str]:
             f" first-request tokens, median {_token_median(results, role, arm)}."
         )
         lines += _unmeasured_reasons(statuses)
+    return lines + _errored_tail_lines(results, role)
+
+
+def _errored_tail_lines(results: RunResults, role: str) -> list[str]:
+    """Each errored session's recorded tails, under its arm and task; none for a record
+    written before the tails existed."""
+    lines = []
+    for record in results.sessions:
+        status = record.status
+        if record.setup.role != role or not isinstance(status, Errored) or status.tails is None:
+            continue
+        lines += [
+            f"{INDENT * 2}{record.setup.arm} {record.setup.task_id} ({status.kind}):",
+            f"{INDENT * 3}error tail: {_one_line(status.tails.error_tail)}",
+            f"{INDENT * 3}result tail: {_one_line(status.tails.result_tail)}",
+        ]
     return lines
+
+
+def _one_line(tail: str) -> str:
+    return " ".join(tail.split()) or EMPTY_TAIL
 
 
 def _token_median(results: RunResults, role: str, arm: str) -> str:

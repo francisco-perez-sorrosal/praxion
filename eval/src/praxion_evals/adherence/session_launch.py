@@ -20,6 +20,7 @@ from typing import Any
 
 from praxion_evals.adherence import grade, tasks
 from praxion_evals.adherence.catalog import check_catalog
+from praxion_evals.adherence.infra_stop import EvidenceTail
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -34,6 +35,7 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.materialize import install_user_scope
+from praxion_evals.live.report import CREDENTIAL_KEYS
 from praxion_evals.live.results import Errored as LiveErrored
 from praxion_evals.live.session import (
     SandboxPaths,
@@ -46,6 +48,11 @@ from praxion_evals.live.spend import SpendLedger
 
 MS_PER_S = 1000
 REAL_HOME = Path.home()  # read once, here: the isolation scan takes it in as an input
+# What an errored session keeps of each output stream when the run declares no other bound.
+# Checklist: the run's declared bound is `RunConfig.tail_chars`; wire it into `Launch.tail_chars`.
+DEFAULT_TAIL_CHARS = 2000
+# A session that never started, or whose output is lost, has no output to keep.
+NO_OUTPUT = EvidenceTail("", "")
 
 
 @dataclass(frozen=True)
@@ -62,6 +69,7 @@ class Launch:
     session_budget_usd: float
     keep_sandbox: bool
     env_for: Callable[[Path], Mapping[str, str]]  # a session's environment, given its sandbox root
+    tail_chars: int = DEFAULT_TAIL_CHARS  # what an errored session keeps of each output stream
 
 
 # --- one task session ---
@@ -131,7 +139,7 @@ class Attempt[R]:
     """One session's assessment, or the error that kept it from having one.
 
     ``charged_usd`` is what the ledger took: the reported cost, or the full budget when the
-    session reported none.
+    session reported none. An errored result carries the tails of the session's output.
     """
 
     result: R | Errored
@@ -159,7 +167,9 @@ def attempt[R](
     budget = launch.session_budget_usd
     started_at, began = datetime.now(UTC).isoformat(), time.monotonic()
 
-    def finish(result: R | Errored, charged: float) -> Attempt[R]:
+    def finish(result: R | Errored, charged: float, tails: EvidenceTail = NO_OUTPUT) -> Attempt[R]:
+        if isinstance(result, Errored):
+            result = replace(result, tails=tails)
         return Attempt(result, charged, int((time.monotonic() - began) * MS_PER_S), started_at)
 
     reserved = ledger.reserve(budget)
@@ -172,15 +182,17 @@ def attempt[R](
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
         try:
-            run = run_session(spec, launch.env_for(root))
+            env = launch.env_for(root)
+            run = run_session(spec, env)
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = _settle(reserved, budget, run)
+        tails = _tails_of(run, env, launch.tail_chars)
         try:
             evidence = _evidence(launch, task, build, page_url, root, run, commit)
-            return settled, finish(assess(evidence), charged)
+            return settled, finish(assess(evidence), charged, tails)
         except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged)
+            return settled, finish(_crash(error), charged, tails)
     finally:
         if not launch.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
@@ -227,6 +239,15 @@ def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendL
     final = parse_stream(run.stdout).final_result
     cost = None if final is None else final.total_cost_usd
     return ledger.settle(budget, cost), budget if cost is None else cost
+
+
+def _tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTail:
+    """The end of the session's error output and of its result text, with the credentials
+    the session was given (and any API key shape) redacted before the bound clips them."""
+    final = parse_stream(run.stdout).final_result
+    result_text = final.result_text if final and final.result_text else ""
+    secrets = [env[key] for key in CREDENTIAL_KEYS if key in env]
+    return EvidenceTail.capture(run.stderr, result_text, bound, secrets)
 
 
 def _evidence(

@@ -515,6 +515,9 @@ class Errored:
     kind: ErrorKind
     detail: str
     setup: SessionSetup | None = None
+    # The redacted, bounded end of the session's output; None only in a record written before
+    # the tails existed.
+    tails: EvidenceTail | None = None
 
     def __post_init__(self) -> None:
         _one_of(self.kind, ERROR_KINDS, "an errored session's kind")
@@ -637,7 +640,10 @@ class Pair:
 # ---------------------------------------------------------------------------
 
 if TYPE_CHECKING:  # the names `__getattr__` serves, declared for type checkers
-    from praxion_evals.adherence.infra_stop import StopRule  # imports this module at run time
+    from praxion_evals.adherence.infra_stop import (
+        EvidenceTail,
+        StopRule,
+    )  # imports this module at run time
     from praxion_evals.adherence.model_codecs import (  # noqa: F401
         outcome_from_json,
         outcome_to_json,

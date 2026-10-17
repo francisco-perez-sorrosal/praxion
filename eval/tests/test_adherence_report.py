@@ -6,10 +6,12 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from praxion_evals.adherence import report, results
+from praxion_evals.adherence import model, report, results, session_launch
+from praxion_evals.adherence.infra_stop import EvidenceTail
 from praxion_evals.adherence.model import (
     CheckErrored,
     CheckOutcome,
@@ -27,6 +29,8 @@ from praxion_evals.adherence.model import (
     Withheld,
 )
 from praxion_evals.adherence.results import CatalogEntry, EarlierRun, RunInfo, RunResults
+from praxion_evals.live.session import SessionRun
+from praxion_evals.live.spend import SpendLedger
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 RULE = RuleRef("rules/swe/agent-behavioral-contract.md", "Agent Behavioral Contract")
@@ -357,3 +361,123 @@ def test_a_token_saving_is_stated_only_as_a_startup_probe_reading_within_the_mar
     assert "startup-probe reading" in text
     assert "No verdict here claims a saving" in text
     assert "within the declared margin" in text
+
+
+# ---------------------------------------------------------------------------
+# An errored session keeps, redacts and shows the end of its output
+# ---------------------------------------------------------------------------
+
+TOKEN = "subscription-token-0123456789"
+TAIL_BOUND = 40
+
+
+def result_stream(text: str) -> str:
+    event = {"type": "result", "subtype": "error_during_execution", "is_error": True}
+    return json.dumps({**event, "result": text, "total_cost_usd": 0.1})
+
+
+def attempt_ending(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    ended: SessionRun,
+    error: Errored,
+    *,
+    cap_usd: float = 10.0,
+) -> Errored:
+    """The Errored one launch yields when the session ended as `ended` and grading says `error`."""
+    monkeypatch.setattr(session_launch, "_prepare", lambda *args: (None, "commit"))
+    monkeypatch.setattr(session_launch, "run_session", lambda spec, env: ended)
+    monkeypatch.setattr(session_launch, "_evidence", lambda *args: None)
+    launch = session_launch.Launch(
+        run_root=tmp_path,
+        checkout_commit=COMMIT,
+        page_url="",
+        judge=None,
+        seed=7,
+        model="m",
+        effort="low",
+        session_budget_usd=1.0,
+        keep_sandbox=False,
+        env_for=lambda root: {"CLAUDE_CODE_OAUTH_TOKEN": TOKEN},
+        tail_chars=TAIL_BOUND,
+    )
+    task = SimpleNamespace(role="researcher")
+    _, done = session_launch.attempt(
+        launch,
+        SpendLedger(cap_usd=cap_usd),
+        task,  # type: ignore[arg-type]
+        None,  # type: ignore[arg-type]
+        lambda root: None,
+        None,
+        lambda evidence: error,
+    )
+    assert isinstance(done.result, Errored)
+    return done.result
+
+
+@pytest.mark.parametrize("kind", ["timeout", "exit_nonzero", "result_error", "kernel_missing"])
+def test_each_kind_of_errored_session_keeps_the_end_of_both_streams(
+    kind, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    ended = SessionRun(result_stream("r" * 100 + "result end"), "e" * 100 + "stderr end", 1)
+
+    errored = attempt_ending(monkeypatch, tmp_path, ended, Errored(kind, "why"))
+
+    assert errored.tails == EvidenceTail(
+        ("e" * 100 + "stderr end")[-TAIL_BOUND:], ("r" * 100 + "result end")[-TAIL_BOUND:]
+    )
+
+
+def test_a_stream_the_session_never_wrote_is_recorded_as_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    errored = attempt_ending(
+        monkeypatch, tmp_path, SessionRun("", "", 1), Errored("no_result_event", "none")
+    )
+
+    assert errored.tails == EvidenceTail("", "")
+
+
+def test_a_launch_that_started_no_session_still_carries_empty_tails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    errored = attempt_ending(
+        monkeypatch, tmp_path, SessionRun("", "", 0), Errored("timeout", "unused"), cap_usd=0.5
+    )
+
+    assert (errored.kind, errored.tails) == ("launch_refused", EvidenceTail("", ""))
+
+
+def test_the_session_credential_never_reaches_a_tail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    leak = f"auth failed for {TOKEN}"
+    ended = SessionRun(result_stream(leak), leak, 1)
+
+    errored = attempt_ending(monkeypatch, tmp_path, ended, Errored("result_error", "why"))
+
+    assert errored.tails == EvidenceTail("auth failed for [REDACTED]", "auth failed for [REDACTED]")
+
+
+def test_a_tail_written_to_the_results_file_loads_back_and_an_old_record_has_none():
+    kept = Errored("timeout", "no answer", None, EvidenceTail("stderr end", ""))
+
+    wire = model.status_to_json(kept)
+
+    assert wire["tails"] == {"error": "stderr end", "result": ""}
+    assert model.status_from_json(wire) == kept
+    assert "tails" not in model.status_to_json(Errored("timeout", "no answer"))
+    old = {"kind": "errored", "error_kind": "timeout", "detail": "d"}
+    assert model.status_from_json(old) == Errored("timeout", "d")
+
+
+def test_the_report_shows_each_errored_sessions_tails_and_none_for_an_old_record():
+    kept = Errored("timeout", "no answer", None, EvidenceTail("boom\n  at line 3", ""))
+    old = Errored("timeout", "no answer")
+
+    text = render([(measured(ALL_PASS), kept), (measured(ALL_PASS), old)])
+
+    assert "lean task-000 (timeout):" in text
+    assert "error tail: boom at line 3" in text
+    assert "result tail: (empty)" in text
+    assert text.count("error tail:") == 1

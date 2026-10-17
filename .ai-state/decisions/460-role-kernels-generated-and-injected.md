@@ -33,7 +33,7 @@ re_affirms: null
 re_affirmed_by: null
 retired_by: null
 supersedes_in_part: dec-454
-superseded_in_part_by: null
+superseded_in_part_by: [dec-draft-42f62347]
 dissent: null
 ---
 

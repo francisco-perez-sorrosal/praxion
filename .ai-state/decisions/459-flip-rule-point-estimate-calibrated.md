@@ -21,6 +21,7 @@ superseded_by: null
 re_affirms: null
 re_affirmed_by: null
 retired_by: null
+superseded_in_part_by: [dec-draft-c9d81997]
 ---
 
 ## Context

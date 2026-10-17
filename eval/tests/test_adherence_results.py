@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import results
+from praxion_evals.adherence import lineage, results, session_loop
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import (
     Assessed,
@@ -89,6 +89,7 @@ def run_results(
     declared_at: str = DECLARED_AT,
     roles=("researcher",),
     observed_error=None,
+    extra=None,
 ) -> RunResults:
     return RunResults(
         run=RunInfo(
@@ -98,7 +99,7 @@ def run_results(
             complete=True,
             refused_launches=(),
             earlier_runs={"researcher": (EarlierRun("run-0", "not clear"),)},
-            extra={"seed": 7, "effort": "high"},
+            extra={"seed": 7, "effort": "high", **(extra or {})},
         ),
         settings=settings or declared(),
         declared_at=declared_at,
@@ -320,30 +321,158 @@ def test_the_stored_verdicts_are_recomputed_from_the_sessions_never_read_back(tm
     assert "flip" not in json.loads(path.read_text())["verdicts"]["researcher"]
 
 
-def test_earlier_runs_lists_the_same_role_on_the_same_checkout_with_its_verdict(tmp_path: Path):
-    def write(name: str, run_id: str, sessions, role: str = "researcher") -> None:
-        results.write_atomic(tmp_path / name, run_results(sessions, run_id=run_id, roles=(role,)))
+# ---------------------------------------------------------------------------
+# Earlier runs: listed by what they measured
+# ---------------------------------------------------------------------------
 
-    write("a.json", "run-a", [*pair_of_sessions("t1")])  # clear: one pair, target 1
-    write("b.json", "run-b", [*pair_of_sessions("t1", commit="f" * 40)])  # another checkout
-    write(
-        "c.json", "run-c", [*pair_of_sessions("t1", role="verifier")], role="verifier"
-    )  # another role
+
+def the_same(earlier: RunResults, role: str) -> tuple[str, ...]:
+    return ()
+
+
+def write_run(directory: Path, run_id: str, sessions, **kwargs) -> None:
+    roles = kwargs.pop("roles", ("researcher",))
+    results.write_atomic(
+        directory / f"{run_id}.json", run_results(sessions, run_id=run_id, roles=roles, **kwargs)
+    )
+
+
+def listed(directory: Path, differences=the_same, replaced=None) -> results.EarlierListing:
+    return results.earlier_runs(directory, ("researcher",), differences, replaced)
+
+
+def test_runs_of_the_same_identity_on_other_commits_are_all_draws_in_order_with_their_verdicts(
+    tmp_path: Path,
+):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])  # clear: one pair, target 1
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t1", commit="f" * 40)], settings=declared(5))
+
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert earlier.draws == (
+        results.Draw(("run-a",), "clear"),
+        results.Draw(("run-b",), "underpowered"),
+    )
+    assert (earlier.apart, earlier.calibration) == ({}, ())
+
+
+def test_a_run_that_never_measured_the_role_is_not_listed_for_it(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1", role="verifier")], roles=("verifier",))
+
+    assert listed(tmp_path).by_role["researcher"] == results.EarlierRuns((), {}, ())
+
+
+def test_a_run_of_another_identity_is_named_apart_with_how_it_differs(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t1")])
+
+    def differs(earlier: RunResults, role: str) -> tuple[str, ...]:
+        return ("roles.researcher.definition: 1a2b -> 3c4d",) if earlier.run.id == "run-a" else ()
+
+    earlier = listed(tmp_path, differs).by_role["researcher"]
+
+    assert [d.run_ids for d in earlier.draws] == [("run-b",)]
+    assert earlier.apart == {"run-a": "roles.researcher.definition: 1a2b -> 3c4d"}
+
+
+def test_a_calibration_run_is_listed_apart_never_as_a_draw(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")], extra={"calibration": True})
+
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert (earlier.draws, earlier.calibration) == ((), ("run-a",))
+
+
+def test_a_json_file_that_is_not_a_results_file_is_skipped_and_named(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
     (tmp_path / "notes.json").write_text('{"not": "a results file"}')
     (tmp_path / "broken.json").write_text("{")
+    (tmp_path / "list.json").write_text("[1, 2]")
+    (tmp_path / "shaped.json").write_text('{"schema_version": "adherence/1", "run": []}')
 
-    found = results.earlier_runs(tmp_path, "researcher", COMMIT)
+    found = listed(tmp_path)
 
-    assert found == (EarlierRun("run-a", "clear"),)
+    assert found.skipped_files == ("broken.json", "list.json", "notes.json", "shaped.json")
+    assert [d.run_ids for d in found.by_role["researcher"].draws] == [("run-a",)]
 
 
-def test_an_earlier_run_that_was_underpowered_says_so(tmp_path: Path):
-    path = tmp_path / "a.json"
-    results.write_atomic(path, run_results([*pair_of_sessions("t1")], settings=declared(5)))
+def test_the_run_a_listing_run_overwrites_is_no_longer_evidence(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t1")])
 
-    assert results.earlier_runs(tmp_path, "researcher", COMMIT) == (
-        EarlierRun("run-a", "underpowered"),
+    earlier = listed(tmp_path, replaced="run-a").by_role["researcher"]
+
+    assert [d.run_ids for d in earlier.draws] == [("run-b",)]
+
+
+def test_a_listing_is_recorded_under_the_run_and_read_back_for_each_role(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t1")], extra={"calibration": True})
+    (tmp_path / "notes.json").write_text("{}")
+    listing = listed(tmp_path)
+
+    run = run_results(extra=results.earlier_to_json(listing)).run
+    reloaded = json.loads(json.dumps(run.extra))
+
+    assert (
+        results.earlier_listed(replace(run, extra=reloaded), "researcher")
+        == (listing.by_role["researcher"])
     )
+    assert results.skipped_files(run) == ("notes.json",)
+
+
+def test_older_readers_keep_the_first_run_id_of_each_draw(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+
+    assert listed(tmp_path).for_older_readers() == {"researcher": (EarlierRun("run-a", "clear"),)}
+
+
+def test_a_file_written_before_listings_has_no_listing_and_no_skipped_names():
+    run = run_results().run
+
+    assert results.earlier_listed(run, "researcher") is None
+    assert results.skipped_files(run) == ()
+
+
+def test_a_draw_names_the_run_it_took():
+    with pytest.raises(ValueError, match="names the run"):
+        results.Draw((), "clear")
+
+
+# -- Which identity counts as the same: the runner's comparison ------------------------------------
+
+
+def identity_of(definition: str, recorded: bool = True) -> RunResults:
+    roles = {"researcher": {"definition_sha": definition * 64, "kernel": None}}
+    extra = {
+        "checkout": {"path": "/gone", "commit": "0" * 40, "dirty": False},
+        "roles": ["researcher"],
+        "tasks": {"researcher": []},
+    }
+    if recorded:
+        extra["identity"] = {"tree": "t" * 64, "model": None, "roles": roles}
+    return run_results(extra=extra)
+
+
+def test_the_runner_compares_only_the_role_definition_and_kernel(tmp_path: Path):
+    this = lineage.measured_identity(identity_of("a"), tmp_path)
+    differences = session_loop._identity_differences(this, tmp_path)
+
+    assert differences(identity_of("a"), "researcher") == ()
+    assert differences(identity_of("b"), "researcher") == (
+        "roles.researcher.definition: bbbbbbbbbbbb -> aaaaaaaaaaaa",
+    )
+
+
+def test_a_run_recording_no_identity_is_listed_apart_saying_what_its_checkout_held(tmp_path: Path):
+    this = lineage.measured_identity(identity_of("a"), tmp_path)
+
+    (how,) = session_loop._identity_differences(this, tmp_path)(
+        identity_of("a", recorded=False), "researcher"
+    )
+
+    assert how.startswith("recorded no identity; its commit held ")
+    assert "identity unknown" in how  # the commit is not reachable from an empty directory
 
 
 def test_flip_labels_follow_the_verdict_type():

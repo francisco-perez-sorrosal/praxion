@@ -92,6 +92,7 @@ def results_of(
     earlier_runs: tuple[EarlierRun, ...] = (),
     observed_error: float | None = None,
     allowance_method: str | None = None,
+    extra: Mapping[str, object] | None = None,
 ) -> RunResults:
     return RunResults(
         run=RunInfo(
@@ -101,7 +102,7 @@ def results_of(
             complete=True,
             refused_launches=(),
             earlier_runs={"researcher": earlier_runs},
-            extra={},
+            extra=dict(extra or {}),
         ),
         settings=declared(required_pairs, allowance_method),
         declared_at="2026-10-12T08:59:00Z",
@@ -365,6 +366,48 @@ def test_every_earlier_run_of_the_role_is_listed_with_its_verdict():
 
     assert "run-0: flip not clear; run-00: flip underpowered" in text
     assert "Earlier runs of this role on this checkout: none." in render(same_both_arms(1))
+
+
+def listing(**by_kind) -> dict[str, object]:
+    return {"earlier": {"researcher": {"draws": [], "apart": {}, "calibration": [], **by_kind}}}
+
+
+def test_a_listed_draw_is_shown_with_its_verdict_and_an_empty_listing_says_none():
+    draws = [
+        {"run_ids": ["run-0"], "flip": "not clear", "interim": False},
+        {"run_ids": ["run-1"], "flip": "clear", "interim": False},
+    ]
+
+    text = render(same_both_arms(1), extra=listing(draws=draws))
+
+    assert (
+        "Earlier runs of this role on the same definition and kernel:"
+        " run-0: flip not clear; run-1: flip clear."
+    ) in text
+    assert "same definition and kernel: none." in render(same_both_arms(1), extra=listing())
+
+
+def test_a_run_of_another_identity_is_shown_apart_with_how_it_differs():
+    apart = {"run-2": "roles.researcher.definition: 1a2b -> 3c4d"}
+
+    text = render(same_both_arms(1), extra=listing(apart=apart))
+
+    assert "set apart, with how they differ:" in text
+    assert "run-2: roles.researcher.definition: 1a2b -> 3c4d" in text
+
+
+def test_a_calibration_run_is_shown_apart_and_never_among_the_draws():
+    text = render(same_both_arms(1), extra=listing(calibration=["run-3", "run-4"]))
+
+    assert "Calibration runs of this role, never a draw: run-3, run-4." in text
+    assert "same definition and kernel: none." in text
+
+
+def test_the_json_files_that_were_skipped_are_named_in_the_run_section():
+    text = render(same_both_arms(1), extra={**listing(), "skipped_files": ["notes.json"]})
+
+    assert "Skipped, not adherence results files, beside this run's: notes.json." in text
+    assert "Skipped" not in render(same_both_arms(1), extra=listing())
 
 
 def test_the_judges_observed_golden_case_error_is_given_when_recorded():

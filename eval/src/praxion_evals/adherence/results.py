@@ -21,7 +21,7 @@ import json
 import os
 import secrets
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -94,6 +94,49 @@ class EarlierRun:
     def __post_init__(self) -> None:
         _require(bool(self.run_id.strip()), "an earlier run names its run identifier")
         _require(self.flip in FLIP_LABELS, f"an earlier run's flip is one of {FLIP_LABELS}")
+
+
+@dataclass(frozen=True)
+class Draw:
+    """One draw of a role's flip verdict: the run or runs it took, in order, and what they reached."""
+
+    run_ids: tuple[str, ...]
+    flip: FlipLabel
+    interim: bool = False
+
+    def __post_init__(self) -> None:
+        _require(bool(self.run_ids), "a draw names the run it took")
+        _require(self.flip in FLIP_LABELS, f"a draw's flip is one of {FLIP_LABELS}")
+
+
+@dataclass(frozen=True)
+class EarlierRuns:
+    """A role's earlier runs grouped by what they measured.
+
+    ``draws`` measured the same role definition and kernel as the run that lists them, whatever
+    their checkout commit; ``apart`` maps every other run to how its identity differs; a
+    calibration run is never a draw and is listed in ``calibration``.
+    """
+
+    draws: tuple[Draw, ...]
+    apart: Mapping[str, str]
+    calibration: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EarlierListing:
+    """What the results directory held when a run began: every role's earlier runs, and the
+    names of the JSON files in it that are not results files."""
+
+    by_role: Mapping[str, EarlierRuns]
+    skipped_files: tuple[str, ...]
+
+    def for_older_readers(self) -> dict[str, tuple[EarlierRun, ...]]:
+        """``run.earlier_runs`` as it was before runs were grouped: the draws' first ids."""
+        return {
+            role: tuple(EarlierRun(draw.run_ids[0], draw.flip) for draw in earlier.draws)
+            for role, earlier in self.by_role.items()
+        }
 
 
 @dataclass(frozen=True)
@@ -300,24 +343,92 @@ def flip_label(role_verdict: RoleVerdict) -> FlipLabel:
             assert_never(role_verdict)
 
 
-def earlier_runs(directory: Path, role: str, checkout_commit: str) -> tuple[EarlierRun, ...]:
-    """Every results file in ``directory`` that measured ``role`` on this checkout, oldest first.
+# How an earlier run's identity for a role differs from the listing run's, one line each; empty
+# when it measured the same definition and kernel. The caller supplies it because reading an
+# identity needs the checkout, which this module does not know.
+Differences = Callable[["RunResults", str], tuple[str, ...]]
 
-    A ``.json`` file that is not an ``adherence/1`` results file is not a run and is passed over.
+
+def earlier_runs(
+    directory: Path, roles: Sequence[str], differences: Differences, replaced: str | None = None
+) -> EarlierListing:
+    """Every results file in ``directory``, oldest first, listed by what it measured for each role.
+
+    A ``.json`` file that is not an ``adherence/1`` results file is not a run: it is passed over
+    and its name returned. ``replaced`` is the id of a run the listing run overwrites, which is
+    no longer evidence.
     """
-    found: list[EarlierRun] = []
+    runs, skipped = _read_directory(directory)
+    runs = [earlier for earlier in runs if earlier.run.id != replaced]
+    return EarlierListing(
+        {role: _earlier_for(role, runs, differences) for role in roles}, tuple(skipped)
+    )
+
+
+def _read_directory(directory: Path) -> tuple[list[RunResults], list[str]]:
+    runs: list[RunResults] = []
+    skipped: list[str] = []
     for path in sorted(directory.glob("*.json")):
         try:
-            earlier = load(path)
-        except ValueError:
+            runs.append(load(path))
+        except (OSError, ValueError, KeyError, TypeError):  # whatever its shape, it is named
+            skipped.append(path.name)
+    return runs, skipped
+
+
+def _earlier_for(role: str, runs: Sequence[RunResults], differences: Differences) -> EarlierRuns:
+    draws: list[Draw] = []
+    apart: dict[str, str] = {}
+    calibration: list[str] = []
+    for earlier in runs:
+        if not any(record.setup.role == role for record in earlier.sessions):
             continue
-        measured_here = any(
-            record.setup.role == role and record.setup.checkout_commit == checkout_commit
-            for record in earlier.sessions
-        )
-        if measured_here:
-            found.append(EarlierRun(earlier.run.id, flip_label(role_verdicts(earlier)[role])))
-    return tuple(found)
+        if earlier.run.extra.get("calibration"):
+            calibration.append(earlier.run.id)
+        elif differing := differences(earlier, role):
+            apart[earlier.run.id] = "; ".join(differing)
+        else:
+            draws.append(Draw((earlier.run.id,), flip_label(role_verdicts(earlier)[role])))
+    return EarlierRuns(tuple(draws), apart, tuple(calibration))
+
+
+def earlier_to_json(listing: EarlierListing) -> dict[str, Any]:
+    """The run keys a listing adds to ``run`` (pin ``earlier`` and ``skipped_files``)."""
+    return {
+        "earlier": {
+            role: {
+                "draws": [
+                    {"run_ids": list(d.run_ids), "flip": d.flip, "interim": d.interim}
+                    for d in earlier.draws
+                ],
+                "apart": dict(earlier.apart),
+                "calibration": list(earlier.calibration),
+            }
+            for role, earlier in listing.by_role.items()
+        },
+        "skipped_files": list(listing.skipped_files),
+    }
+
+
+def earlier_listed(run: RunInfo, role: str) -> EarlierRuns | None:
+    """The listing a run recorded for ``role``; ``None`` for a file written before listings."""
+    recorded = run.extra.get("earlier")
+    if recorded is None:
+        return None
+    entry = recorded.get(role, {})
+    return EarlierRuns(
+        draws=tuple(
+            Draw(tuple(d["run_ids"]), d["flip"], bool(d.get("interim", False)))
+            for d in entry.get("draws", ())
+        ),
+        apart=dict(entry.get("apart", {})),
+        calibration=tuple(entry.get("calibration", ())),
+    )
+
+
+def skipped_files(run: RunInfo) -> tuple[str, ...]:
+    """The JSON files beside this run's that were not results files, as the run named them."""
+    return tuple(run.extra.get("skipped_files") or ())
 
 
 def catalog_entry(check: CheckDef) -> CatalogEntry:
@@ -420,6 +531,7 @@ def _session_to_json(record: SessionRecord) -> dict[str, Any]:
 
 
 def from_json(data: Mapping[str, Any]) -> RunResults:
+    _require(isinstance(data, Mapping), "a results file is a JSON object")
     version = data.get("schema_version")
     _require(
         version == SCHEMA_VERSION,

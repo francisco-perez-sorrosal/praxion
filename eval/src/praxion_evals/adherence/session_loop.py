@@ -51,10 +51,13 @@ from praxion_evals.adherence.lineage import (
     Finished,
     InfraStopped,
     Interrupted,
+    MeasuredIdentity,
     RunEnding,
     SpendRefused,
     current_identity,
+    diff,
     ending_to_json,
+    measured_identity,
 )
 from praxion_evals.adherence.model import (
     Arm,
@@ -318,15 +321,6 @@ def _provisional(
     output: Path,
 ) -> results.RunResults:
     """The results file as first written: every setting declared, no session yet."""
-    replaced = _loaded_run_id(output)  # a file this run overwrites is no longer evidence
-    earlier = {
-        role: tuple(
-            e
-            for e in results.earlier_runs(output.parent, role, checkout.commit)
-            if e.run_id != replaced
-        )
-        for role in config.roles
-    }
     extra = {
         "started_at": started.isoformat(),
         "effort": config.effort,
@@ -345,12 +339,55 @@ def _provisional(
         "retries": [],
         "identity": current_identity(checkout.path, config.roles),
     }
-    run = results.RunInfo(run_id, config.model, version, False, (), earlier, extra)
+    run = results.RunInfo(run_id, config.model, version, False, (), {}, extra)
     catalog = {
         role: tuple(results.catalog_entry(check) for check in check_catalog(role))
         for role in config.roles
     }
-    return results.RunResults(run, settings, started.isoformat(), catalog, {}, (), None)
+    provisional = results.RunResults(run, settings, started.isoformat(), catalog, {}, (), None)
+    return _with_earlier_runs(provisional, output, checkout.path)
+
+
+def _with_earlier_runs(
+    provisional: results.RunResults, output: Path, repo: Path
+) -> results.RunResults:
+    """The provisional file with the runs beside it listed by what they measured."""
+    this = measured_identity(provisional, repo)
+    listing = results.earlier_runs(
+        output.parent,
+        tuple(provisional.catalog),
+        _identity_differences(this, repo),
+        replaced=_loaded_run_id(output),  # a file this run overwrites is no longer evidence
+    )
+    run = replace(
+        provisional.run,
+        earlier_runs=listing.for_older_readers(),
+        extra={**provisional.run.extra, **results.earlier_to_json(listing)},
+    )
+    return replace(provisional, run=run)
+
+
+def _identity_differences(this: MeasuredIdentity, repo: Path) -> results.Differences:
+    """How an earlier run's role identity (its definition and kernel) differs from this run's.
+
+    An identity that cannot be derived is a difference, so that run is listed apart, not lost.
+    A run that recorded none has only the identity its commit held, which is an inference (the
+    commit may not be what ran), so it is never a draw: it is listed apart, saying what its
+    commit held.
+    """
+
+    def differences(earlier: results.RunResults, role: str) -> tuple[str, ...]:
+        try:
+            theirs = measured_identity(earlier, repo).roles[role]
+        except (ValueError, KeyError) as error:
+            return (f"identity cannot be derived ({error})",)
+        found = diff(replace(this, roles={**this.roles, role: theirs}), this)
+        if "identity" in earlier.run.extra:
+            return found
+        held = "; ".join(found) or "the same definition and kernel as this run"
+        return (f"recorded no identity; its commit held {held}",)
+
+    return differences
 
 
 def _loaded_run_id(path: Path) -> str | None:

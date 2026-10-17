@@ -59,10 +59,12 @@ from praxion_evals.adherence.results import (
     CatalogEntry,
     KernelDelivery,
     RunResults,
+    earlier_listed,
     kernel_deliveries,
     measured_sessions,
     pairs_of,
     role_verdicts,
+    skipped_files,
 )
 from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap
 from praxion_evals.adherence.verdict import tally
@@ -134,6 +136,7 @@ def _run_section(results: RunResults) -> str:
             f"Adherence report for run {run.id}",
             f"Model {run.model}; Claude Code {run.claude_code_version}; the run is {state}.",
             *_ending_lines(ending_of(results)),
+            *_skipped_lines(results),
             f"Declared at {results.declared_at}, before the first session:",
             f"{INDENT}non-inferiority margin {settings.margin_pp:g} pp for judged checks;"
             f" method {settings.method}, {settings.sidedness},"
@@ -144,6 +147,13 @@ def _run_section(results: RunResults) -> str:
             _judge_error_line(results),
         ]
     )
+
+
+def _skipped_lines(results: RunResults) -> list[str]:
+    skipped = skipped_files(results.run)
+    if not skipped:
+        return []
+    return [f"Skipped, not adherence results files, beside this run's: {', '.join(skipped)}."]
 
 
 def _allowances_declared(settings: DeclaredSettings) -> str:
@@ -212,7 +222,7 @@ def _role_section(
     for entry in entries:
         lines += _check_lines(entry, complete, verdict, results.settings, calibration)
     lines += _kernel_delivery_lines(kernel_deliveries(results, role))
-    lines.append(_earlier_runs_line(results, role))
+    lines += _earlier_runs_lines(results, role)
     return "\n".join(lines)
 
 
@@ -342,12 +352,21 @@ def _kernel_delivery_lines(deliveries: Iterable[KernelDelivery]) -> list[str]:
     return [heading, *lines] if lines else []
 
 
-def _earlier_runs_line(results: RunResults, role: str) -> str:
-    earlier = results.run.earlier_runs.get(role, ())
-    if not earlier:
-        return f"{INDENT}Earlier runs of this role on this checkout: none."
-    listed = "; ".join(f"{run.run_id}: flip {run.flip}" for run in earlier)
-    return f"{INDENT}Earlier runs of this role on this checkout: {listed}."
+def _earlier_runs_lines(results: RunResults, role: str) -> list[str]:
+    listed = earlier_listed(results.run, role)
+    if listed is None:  # a file written before runs were listed by what they measured
+        earlier = results.run.earlier_runs.get(role, ())
+        runs = "; ".join(f"{run.run_id}: flip {run.flip}" for run in earlier) or "none"
+        return [f"{INDENT}Earlier runs of this role on this checkout: {runs}."]
+    draws = "; ".join(f"{' + '.join(d.run_ids)}: flip {d.flip}" for d in listed.draws) or "none"
+    lines = [f"{INDENT}Earlier runs of this role on the same definition and kernel: {draws}."]
+    if listed.apart:
+        lines.append(f"{INDENT}Earlier runs of this role set apart, with how they differ:")
+        lines += [f"{INDENT * 2}{run_id}: {how}" for run_id, how in listed.apart.items()]
+    if listed.calibration:
+        calibration = ", ".join(listed.calibration)
+        lines.append(f"{INDENT}Calibration runs of this role, never a draw: {calibration}.")
+    return lines
 
 
 # ---------------------------------------------------------------------------

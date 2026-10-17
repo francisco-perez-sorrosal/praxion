@@ -1,9 +1,9 @@
 """The three largest files of this change, and every file split from them, stay under 800 lines.
 
 The run loop and the common checks of the adherence eval, and the kernel and adoption
-gate, are split by cohesion before this change grows them. Files split from the two eval
-modules stay in the adherence package; files split from the gate are the gate's own
-`scripts/` modules (named for the kernel or the gate), test modules aside.
+gate, are split by cohesion before this change grows them. Every module of the adherence
+package and every non-test module of the scripts directory whose name holds kernel or
+manifest stays under the ceiling, the three and every file split from them among them.
 """
 
 from __future__ import annotations

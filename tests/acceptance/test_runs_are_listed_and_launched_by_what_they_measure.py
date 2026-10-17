@@ -139,23 +139,18 @@ def test_a_planned_list_of_twenty_four_tasks_holds_both_launch_orders(tmp_path: 
 
 # -- Transcript directories ---------------------------------------------------------------------
 
-WORKING_DIRECTORIES = {
-    "an underscore": "/tmp/adherence_sandbox/scratch",
-    "a space": "/tmp/adherence sandbox/scratch",
-    "a plus": "/tmp/adherence+sandbox/scratch",
-    "a non-ASCII letter": "/tmp/adhérence/scratch",
-}
 
-
-@pytest.mark.parametrize("cwd", WORKING_DIRECTORIES.values(), ids=WORKING_DIRECTORIES.keys())
-def test_the_runner_and_every_catalog_row_name_the_transcript_directory_as_the_harness_does(
-    cwd: str,
+@pytest.mark.parametrize(
+    ("cwd", "recorded"),
+    runs.RECORDED_TRANSCRIPT_DIRS.items(),
+    ids=["underscore, space, plus and non-ASCII letter", "dots and slashes"],
+)
+def test_the_runner_and_every_catalog_row_name_the_transcript_directory_as_the_harness_did(
+    cwd: str, recorded: str
 ) -> None:
-    harness = runs.harness_transcript_dir_name(cwd)
-
     named = {
         "runner": runs.runner_transcript_dir_name(cwd),
         **runs.catalog_transcript_dir_names(cwd),
     }
 
-    assert named == dict.fromkeys(named, harness)
+    assert named == dict.fromkeys(named, recorded)

@@ -466,14 +466,22 @@ def catalog_transcript_dir_names(cwd: str) -> dict[str, str]:
     )
 
 
-def harness_transcript_dir_name(cwd: str) -> str:
-    """The name Claude Code gives the transcript directory of a session started in `cwd`.
+# Two transcript directories Claude Code 2.1.302 itself named: working directory -> name.
+RECORDED_TRANSCRIPT_DIRS = {
+    "/private/tmp/claude-501/-Users-fperez-dev-praxion/ad40a83d-c5f0-4541-948c-3fbc6073e3e7"
+    "/scratchpad/naming probe_a+b \u00f1": "-private-tmp-claude-501--Users-fperez-dev-praxion"
+    "-ad40a83d-c5f0-4541-948c-3fbc6073e3e7-scratchpad-naming-probe-a-b--",
+    "/Users/fperez/dev/praxion/.claude/worktrees/lean-spawn-continuation": (
+        "-Users-fperez-dev-praxion--claude-worktrees-lean-spawn-continuation"
+    ),
+}
 
-    Provisional oracle, until a transcript directory the harness wrote for such a working
-    directory is recorded: every character other than an ASCII letter or digit becomes a
-    dash, as the harness was seen to map slashes, dots and every other non-alphanumeric.
-    """
-    return "".join(ch if ch.isascii() and ch.isalnum() else "-" for ch in cwd)
+
+def lineage_complete_pairs(results_path: Path, role: str) -> int:
+    """The complete pairs a continued run's results count for `role` over its whole lineage."""
+    raise UnboundDriverError(
+        "a continued run's results state the complete pairs of its whole lineage for a role"
+    )
 
 
 def run_report(workspace: Path, results_path: Path) -> str:

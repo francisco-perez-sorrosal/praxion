@@ -29,6 +29,7 @@ from praxion_evals.adherence.model import (
     RuleRef,
     SessionSetup,
 )
+from praxion_evals.adherence.transcript import StoppedAtCap, Unknown
 
 SLUG = "grade-task"
 SPAWN = "toolu_spawn"
@@ -693,6 +694,69 @@ def test_a_spawn_whose_result_names_no_agent_id_says_so_in_the_missing_kernel_de
     status = grade.grade(evidence, ["C2"], None, None)
 
     assert status.detail.endswith("the stream reports no agent id for the role's spawn")
+
+
+# ---------------------------------------------------------------------------
+# How a forced-stop role ended
+# ---------------------------------------------------------------------------
+
+TURN_PROBE = (
+    Path(__file__).parent / "fixtures" / "role_transcripts" / "turn_probe_stopped_at_cap.jsonl"
+)
+FORCED_STOP_CAP = 10
+
+
+def _forced_stop_evidence(repo, tmp_path, *, turn_cap, **kwargs):
+    """A forced-stop session whose role transcript, under the config dir, is the recorded probe."""
+    config_dir = tmp_path / "config"
+    path = transcript.transcript_path(config_dir, str(repo[0]), "sess-1", AGENT)
+    path.parent.mkdir(parents=True)
+    path.write_text(TURN_PROBE.read_text())
+    stream = {"spawn_result": SPAWNED}
+    return _evidence(
+        repo, tmp_path, stream, forced_stop=True, turn_cap=turn_cap, config_dir=config_dir, **kwargs
+    )
+
+
+def test_a_forced_stop_task_carries_the_ending_of_the_role_against_its_cap(repo, tmp_path):
+    evidence = _forced_stop_evidence(repo, tmp_path, turn_cap=FORCED_STOP_CAP)
+
+    assert evidence.role_ending == StoppedAtCap(FORCED_STOP_CAP, FORCED_STOP_CAP)
+
+
+def test_a_role_that_stopped_short_of_a_higher_cap_is_not_read_as_having_hit_it(repo, tmp_path):
+    evidence = _forced_stop_evidence(repo, tmp_path, turn_cap=FORCED_STOP_CAP + 5)
+
+    assert isinstance(evidence.role_ending, Unknown)
+
+
+def test_a_forced_stop_task_with_no_known_cap_is_an_unknown_ending_not_a_guess(repo, tmp_path):
+    evidence = _forced_stop_evidence(repo, tmp_path, turn_cap=None)
+
+    assert isinstance(evidence.role_ending, Unknown)
+    assert "no turn cap" in evidence.role_ending.reason
+
+
+def test_a_forced_stop_task_whose_transcript_was_never_sought_says_so(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path, forced_stop=True, turn_cap=FORCED_STOP_CAP)
+
+    assert isinstance(evidence.role_ending, Unknown)
+    assert "not sought" in evidence.role_ending.reason
+
+
+def test_a_task_that_did_not_stop_the_role_early_has_no_ending(repo, tmp_path):
+    evidence = _evidence(repo, tmp_path)
+
+    assert evidence.role_ending is None
+
+
+def test_the_recorded_status_carries_the_ending_the_evidence_read(repo, tmp_path):
+    evidence = _forced_stop_evidence(repo, tmp_path, turn_cap=FORCED_STOP_CAP)
+
+    status = grade.grade(evidence, ["C2"], None, None)
+
+    assert isinstance(status, Measured)
+    assert status.role_ending == StoppedAtCap(FORCED_STOP_CAP, FORCED_STOP_CAP)
 
 
 def test_a_session_owed_no_kernel_is_graded_with_no_kernel_evidence(repo, tmp_path):

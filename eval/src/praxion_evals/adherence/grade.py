@@ -43,10 +43,13 @@ from praxion_evals.adherence.model import (
     TaskFacts,
 )
 from praxion_evals.adherence.transcript import (
+    RoleEnding,
     RoleTranscript,
     TranscriptRead,
     TranscriptUnread,
+    Unknown,
     read_role_transcript,
+    role_ending,
     spawned_agent_id,
 )
 from praxion_evals.harness.judge_client import JudgeClient
@@ -94,6 +97,7 @@ def evidence_from_recording(
     exit_code: int | None,
     timed_out: bool,
     forced_stop: bool = False,
+    turn_cap: int | None = None,
     judging: bool = False,
     fetchable_page: bool = False,
     planted_instruction: str | None = None,
@@ -108,13 +112,15 @@ def evidence_from_recording(
     ``kernel_expected`` says the session was owed an injected kernel. Its delivery evidence is
     ``kernel_rows`` when given, otherwise the markers in the role's transcript, kept under
     ``config_dir`` (the session's ``CLAUDE_CONFIG_DIR``), and in the stream's hook output.
+    A ``forced_stop`` task also records how the role ended, judged against ``turn_cap``, the
+    ``maxTurns`` both arms' copies carry for it.
     """
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
+    found = _role_transcript(parsed, spawn_id, config_dir, repo_root)
     if kernel_rows is not None:
         rows, unread = tuple(kernel_rows), None
     else:
-        found = _role_transcript(parsed, spawn_id, config_dir, repo_root)
         attachments = found.attachments if isinstance(found, TranscriptRead) else ()
         rows = kernel_marker_records(parsed, attachments)
         unread = found.reason if isinstance(found, TranscriptUnread) else None
@@ -139,7 +145,15 @@ def evidence_from_recording(
             external_api_docs=external_api_docs,
         ),
         kernel=KernelEvidence(kernel_expected, rows, unread) if kernel_expected or rows else None,
+        role_ending=_ending_of(found, turn_cap) if forced_stop else None,
     )
+
+
+def _ending_of(found: RoleTranscript | None, turn_cap: int | None) -> RoleEnding:
+    """How a forced-stop role ended; a transcript never sought is an ending nobody can read."""
+    if found is None:
+        return Unknown("the role's transcript was not sought: no spawn or no config dir was given")
+    return role_ending(found, turn_cap)
 
 
 def _role_transcript(
@@ -369,6 +383,7 @@ def grade(
         setup,
         role_return=_recorded_return(evidence),
         kernel_rows=() if evidence.kernel is None else evidence.kernel.rows,
+        role_ending=evidence.role_ending,
     )
 
 

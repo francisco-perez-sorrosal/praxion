@@ -34,6 +34,7 @@ from praxion_evals.adherence.results import (
     RunInfo,
     RunResults,
 )
+from praxion_evals.adherence.transcript import StoppedAtCap
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 DECLARED_AT = "2026-10-12T08:59:00Z"
@@ -380,6 +381,18 @@ def test_a_sessions_kernel_marker_records_round_trip_through_the_results_file(tm
     assert results.load(path) == original
     stored = json.loads(path.read_text())["sessions"][1]["status"]
     assert stored["kernel_rows"] == [dict(row) for row in DELIVERED]
+
+
+def test_a_forced_stop_sessions_role_ending_round_trips_through_the_results_file(tmp_path: Path):
+    status = Measured({"C1": Passed(), "C3": Passed()}, 7, role_ending=StoppedAtCap(5, 5))
+    ended = session("t1", "full", status)
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, run_results([ended]))
+
+    assert results.load(path).sessions[0].status.role_ending == StoppedAtCap(5, 5)
+    stored = json.loads(path.read_text())["sessions"][0]["status"]
+    assert stored["role_ending"]["kind"] == "stopped_at_cap"
 
 
 def test_a_session_without_markers_stores_no_kernel_rows(tmp_path: Path):

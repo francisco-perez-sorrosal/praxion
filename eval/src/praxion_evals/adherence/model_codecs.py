@@ -37,6 +37,7 @@ from praxion_evals.adherence.model import (
     Underpowered,
     Withheld,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, RoleEnding, StoppedAtCap, Unknown
 
 _Json = Mapping[str, Any]
 
@@ -110,6 +111,7 @@ def status_to_json(status: SessionStatus) -> dict[str, Any]:
             first_request_tokens=tokens,
             role_return=role_return,
             kernel_rows=kernel_rows,
+            role_ending=role_ending,
         ):
             encoded: dict[str, Any] = {
                 "kind": "measured",
@@ -120,6 +122,8 @@ def status_to_json(status: SessionStatus) -> dict[str, Any]:
                 encoded["role_return"] = role_return
             if kernel_rows:
                 encoded["kernel_rows"] = [dict(row) for row in kernel_rows]
+            if role_ending is not None:
+                encoded["role_ending"] = role_ending_to_json(role_ending)
         case Errored(kind=kind, detail=detail, tails=tails):
             encoded = {"kind": "errored", "error_kind": kind, "detail": detail}
             if tails is not None:
@@ -148,6 +152,7 @@ def status_from_json(data: _Json) -> SessionStatus:
                 setup,
                 data.get("role_return"),
                 tuple(data.get("kernel_rows", ())),
+                role_ending_from_json(data["role_ending"]) if "role_ending" in data else None,
             )
         case "errored":
             return Errored(
@@ -160,6 +165,33 @@ def status_from_json(data: _Json) -> SessionStatus:
             return NotMeasured(_field(data, "reason", "a not-measured status"), setup)
         case _:
             raise ValueError(f"unknown session status {kind!r}")
+
+
+def role_ending_to_json(ending: RoleEnding) -> dict[str, Any]:
+    match ending:
+        case StoppedAtCap(turns=turns, cap=cap):
+            return {"kind": "stopped_at_cap", "turns": turns, "cap": cap}
+        case EndedOnItsOwn(turns=turns):
+            # The ending holds no cap, so the record keeps none; the wire shape allows null.
+            return {"kind": "ended_on_its_own", "turns": turns, "cap": None}
+        case Unknown(reason=reason):
+            return {"kind": "unknown", "reason": reason}
+        case _:
+            assert_never(ending)
+
+
+def role_ending_from_json(data: _Json) -> RoleEnding:
+    what = "a role ending"
+    kind = _field(data, "kind", what)
+    match kind:
+        case "stopped_at_cap":
+            return StoppedAtCap(int(_field(data, "turns", what)), int(_field(data, "cap", what)))
+        case "ended_on_its_own":
+            return EndedOnItsOwn(int(_field(data, "turns", what)))
+        case "unknown":
+            return Unknown(_field(data, "reason", what))
+        case _:
+            raise ValueError(f"unknown role ending {kind!r}")
 
 
 def _tails_from_json(data: _Json) -> EvidenceTail:

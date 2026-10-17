@@ -19,6 +19,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args
 
+from praxion_evals.adherence.transcript import RoleEnding
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
 from praxion_evals.live.session import SessionEnvelope, ToolUse
 
@@ -324,6 +325,7 @@ class SessionEvidence:
     repo: RepoFacts
     facts: TaskFacts
     kernel: KernelEvidence | None = None  # None: no kernel was in play for this session
+    role_ending: RoleEnding | None = None  # None: the task did not stop the role early
 
     def __post_init__(self) -> None:
         _one_of(self.role, ROLES, "evidence role")
@@ -473,13 +475,15 @@ class Measured:
     own return as the grader read it (clipped by the recorder when it ran away), so a
     failed return check can be read back from the results file. ``kernel_rows`` are the
     session's kernel delivery marker records, which a flip verdict cites as the evidence
-    that the lean arm received its kernel."""
+    that the lean arm received its kernel. ``role_ending`` is how a forced-stop role ended:
+    None for any other task, and in a record written before it was kept."""
 
     outcomes: Mapping[str, CheckOutcome]
     first_request_tokens: int | None
     setup: SessionSetup | None = None
     role_return: str | None = None
     kernel_rows: tuple[Mapping[str, Any], ...] = ()
+    role_ending: RoleEnding | None = None
 
     def __post_init__(self) -> None:
         _require(bool(self.outcomes), "a measured session holds at least one outcome")
@@ -500,12 +504,15 @@ class Measured:
         setup: SessionSetup | None = None,
         role_return: str | None = None,
         kernel_rows: Sequence[Mapping[str, Any]] = (),
+        role_ending: RoleEnding | None = None,
     ) -> Measured:
         _require(
             set(outcomes) == set(check_names),
             f"outcomes {sorted(outcomes)} are not exactly the checks {sorted(check_names)}",
         )
-        return cls(outcomes, first_request_tokens, setup, role_return, tuple(kernel_rows))
+        return cls(
+            outcomes, first_request_tokens, setup, role_return, tuple(kernel_rows), role_ending
+        )
 
 
 @dataclass(frozen=True)

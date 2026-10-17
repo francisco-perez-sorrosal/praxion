@@ -45,6 +45,7 @@ from praxion_evals.adherence.model import (
     Underpowered,
     Withheld,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -319,6 +320,9 @@ STATUSES = [
     Measured({"C1": Passed(), "C6": Withheld("no page")}, 12345, SETUP),
     Measured({"C1": Failed("x")}, None),
     Measured({"C2": Passed()}, 10, SETUP, role_return="Findings written.\n[COMPLETE]"),
+    Measured({"C5": Passed()}, 10, SETUP, role_ending=StoppedAtCap(10, 10)),
+    Measured({"C2": Passed()}, 10, SETUP, role_ending=EndedOnItsOwn(4)),
+    Measured({"C5": Withheld("no cap")}, None, role_ending=Unknown("no turn cap is known")),
     Errored("timeout", "900 s", SETUP),
     Errored("launch_refused", "run cap", None),
     NotMeasured("the role was never spawned", SETUP),
@@ -328,6 +332,45 @@ STATUSES = [
 @pytest.mark.parametrize("status", STATUSES)
 def test_a_status_survives_its_json_round_trip_with_its_setup(status):
     assert model.status_from_json(model.status_to_json(status)) == status
+
+
+def test_a_role_ending_is_recorded_in_the_pinned_wire_shape():
+    ending = model.status_to_json(Measured({"C5": Passed()}, 10, role_ending=StoppedAtCap(10, 10)))
+
+    assert ending["role_ending"] == {"kind": "stopped_at_cap", "turns": 10, "cap": 10}
+
+
+def test_a_record_written_before_role_endings_loads_with_none():
+    legacy = {"kind": "measured", "outcomes": {"C2": {"outcome": "passed"}}}
+
+    status = model.status_from_json(legacy)
+
+    assert isinstance(status, Measured)
+    assert status.role_ending is None
+
+
+def test_a_status_without_a_role_ending_records_none():
+    assert "role_ending" not in model.status_to_json(Measured({"C2": Passed()}, 10))
+
+
+def test_an_ending_that_ended_on_its_own_loads_whatever_cap_the_record_names():
+    recorded = {"kind": "ended_on_its_own", "turns": 4, "cap": 10}
+    status = {"kind": "measured", "outcomes": {"C2": {"outcome": "passed"}}}
+
+    loaded = model.status_from_json({**status, "role_ending": recorded})
+
+    assert loaded.role_ending == EndedOnItsOwn(4)
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    [{"kind": "mystery"}, {"kind": "stopped_at_cap", "turns": 3}, {"kind": "unknown"}],
+)
+def test_a_malformed_role_ending_is_refused_at_the_boundary(malformed):
+    status = {"kind": "measured", "outcomes": {"C2": {"outcome": "passed"}}}
+
+    with pytest.raises(ValueError, match="lacks|unknown"):
+        model.status_from_json({**status, "role_ending": malformed})
 
 
 def test_a_status_echoes_its_setup_only_when_it_has_one():

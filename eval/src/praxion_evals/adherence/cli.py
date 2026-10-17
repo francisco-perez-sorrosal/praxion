@@ -13,7 +13,10 @@ written); 2 usage.
 
 A fresh run of a role is refused, before anything launches, while a run of that role stopped
 and was neither continued nor closed; ``--close RUN --reason TEXT`` is how an operator who
-will not continue it says so.
+will not continue it says so. ``--continue RUN`` starts a later part of the stopped run: it
+declares what the run declared and launches again only the tasks no part finished, and it is
+refused before anything launches, naming every reason, unless the run stopped continuably and
+every option given beside it restates what the run declared.
 """
 
 from __future__ import annotations
@@ -39,10 +42,14 @@ from praxion_evals.adherence.infra_stop import (
 from praxion_evals.adherence.lineage import (
     Lineage,
     ReadTip,
+    Tip,
+    UnreadableTip,
     close,
+    continuation_refusals,
     ending_to_json,
     measured_identity,
     pending_stop,
+    relaunch_tasks,
 )
 from praxion_evals.adherence.model import (
     ARMS,
@@ -54,6 +61,13 @@ from praxion_evals.adherence.model import (
     Role,
     TaskSpec,
 )
+from praxion_evals.adherence.run_ending import Continuation
+from praxion_evals.adherence.run_identity import (
+    MeasuredIdentity,
+    role_identity,
+    tree_digest,
+    working_tree,
+)
 from praxion_evals.adherence.session_loop import (
     DEFAULT_TAIL_CHARS,
     EXIT_COMPLETE,
@@ -61,8 +75,11 @@ from praxion_evals.adherence.session_loop import (
     RETRY_POLICY,
     SANDBOX_PREFIX,
     Checkout,
+    Context,
     RunConfig,
+    RunState,
     ordered_arms,
+    planned_order,
     resolve_checkout,
     session_env,
 )
@@ -95,11 +112,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _close_run(config, checkout, config.close, config.reason or "")
         if config.output is not None:
             results.refuse_existing(config.output, config.overwrite)
-        planned = plan_tasks(config)
-        if config.dry_run:
-            return _print_dry_run(config, checkout, planned)
-        _refuse_beside_stopped_run(config)
-        context, state = session_loop.begin(config, checkout, planned, _declare)
+        if config.continue_run is not None:
+            context, state = _begin_continuation(config, checkout, given_options(argv))
+        else:
+            planned = plan_tasks(config)
+            if config.dry_run:
+                return _print_dry_run(config, checkout, planned)
+            _refuse_beside_stopped_run(config)
+            context, state = session_loop.begin(config, checkout, planned, _declare)
     except (ValueError, OSError) as error:  # everything before the first launch is a usage error
         print(f"{PROG}: {error}", file=sys.stderr)
         return EXIT_USAGE
@@ -115,8 +135,13 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
     if args["calibration"] and set(args["arms"] or ["full"]) != {"full"}:
         parser.error("a calibration run measures the full arm against itself; use --arm full")
     named = {"full"} if args["calibration"] else set(args["arms"] or ARMS)
-    if args["report"] is None and args["close"] is None and not args["roles"]:
-        parser.error("name at least one --role, --report FILE or --close RUN")
+    if not (args["roles"] or args["report"] or args["close"] or args["continue_run"]):
+        parser.error("name at least one --role, --report FILE, --close RUN or --continue RUN")
+    if args["continue_run"] and (args["report"] or args["close"] or args["dry_run"]):
+        parser.error(
+            "--continue RUN launches the stopped run's unfinished tasks;"
+            " it takes no --report, --close or --dry-run"
+        )
     if (args["close"] is None) != (args["reason"] is None):
         parser.error(
             "--close RUN and --reason TEXT go together: a stopped run is closed with a reason"
@@ -212,6 +237,12 @@ def _parser() -> argparse.ArgumentParser:
     add("--report", type=Path, help="render a results file; launch nothing")
     add("--close", metavar="RUN", help="give up on the stopped run RUN, saying why; launch nothing")
     add("--reason", help="why --close gives up on the run")
+    add(
+        "--continue",
+        dest="continue_run",
+        metavar="RUN",
+        help="launch again the unfinished tasks of the stopped run RUN, as it declared them",
+    )
     add("--fixture-pages-base-url", help="the directory URL that serves the fixture page")
     return parser
 
@@ -294,18 +325,176 @@ def _refuse_beside_stopped_run(config: RunConfig) -> None:
 
 def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) -> int:
     """Write the closed ending into the stopped run's own results file."""
-    lineage = Lineage.parse(session_loop.results_dir(config), run_id)
-    ids = [part.run_id for part in lineage.parts]
-    at = ids.index(run_id)
-    recorded = results.load(lineage.parts[at].path)
-    continued_by = ids[at + 1] if at + 1 < len(ids) else None
-    tip = ReadTip(recorded, measured_identity(recorded, checkout.path), continued_by)
+    tip, path, _ = _read_part(session_loop.results_dir(config), run_id, checkout.path)
     ending = close(tip, reason, datetime.now(UTC))
+    recorded = tip.results
     extra = {**recorded.run.extra, "ending": ending_to_json(ending)}
-    closed = replace(recorded, run=replace(recorded.run, extra=extra))
-    results.write_atomic(lineage.parts[at].path, closed)
+    results.write_atomic(path, replace(recorded, run=replace(recorded.run, extra=extra)))
     print(f"closed run {run_id}: {reason}")
     return EXIT_COMPLETE
+
+
+def _read_part(
+    directory: Path, run_id: str, repo: Path
+) -> tuple[ReadTip, Path, tuple[results.RunResults, ...]]:
+    """The run ``run_id`` as the part of its lineage it is: read, its file, and the parts of the
+    lineage up to it, oldest first. A missing run, a fork and a gap are refused."""
+    lineage = Lineage.parse(directory, run_id)
+    ids = [part.run_id for part in lineage.parts]
+    at = ids.index(run_id)
+    parts = tuple(results.load(part.path) for part in lineage.parts[: at + 1])
+    continued_by = ids[at + 1] if at + 1 < len(ids) else None
+    tip = ReadTip(parts[-1], measured_identity(parts[-1], repo), continued_by)
+    return tip, lineage.parts[at].path, parts
+
+
+# --- --continue RUN: a later part of a stopped run ---
+
+
+def _begin_continuation(
+    config: RunConfig, checkout: Checkout, given: Mapping[str, str]
+) -> tuple[Context, RunState]:
+    """Start a later part of the stopped run ``config.continue_run``, or refuse naming why.
+
+    The part declares what the run's first part declared and launches again, whole in every arm
+    and in the seed's order, only the tasks no part finished; it builds and proves its arms like
+    any run. Nothing launches before every refusal is ruled out.
+    """
+    run_id, repo = config.continue_run, checkout.path
+    assert run_id is not None  # main hands over only a config that names the run to continue
+    tip, parts = _read_tip(session_loop.results_dir(config), run_id, repo)
+    if isinstance(tip, UnreadableTip):
+        raise _refused(run_id, continuation_refusals(tip, identity_now(config, {}, repo), ()))
+    declared = recorded_config(config, parts[0])
+    planned = _replanned(declared, parts[0])
+    changed = _changed_options(given, config, declared, parts[0])
+    if refusals := continuation_refusals(tip, identity_now(declared, planned, repo), changed):
+        raise _refused(run_id, refusals)
+    again = {role: relaunch_tasks(tip.results, role, parts[:-1]) for role in planned}
+    launched: dict[Role, list[TaskSpec]] = {
+        role: [task for task in specs if task.task_id in again[role]]
+        for role, specs in planned.items()
+        if again[role]
+    }
+    settings = parts[0].settings
+
+    def first_part_settings(*_: object) -> DeclaredSettings:
+        return settings
+
+    continuation = Continuation.of(parts)
+    return session_loop.begin(declared, checkout, launched, first_part_settings, continuation)
+
+
+def _refused(run_id: str, refusals: Sequence[str]) -> ValueError:
+    return ValueError(f"run {run_id} cannot be continued:" + "".join(f"\n  {r}" for r in refusals))
+
+
+def _read_tip(
+    directory: Path, run_id: str, repo: Path
+) -> tuple[Tip, tuple[results.RunResults, ...]]:
+    """The run to continue and the parts of its lineage up to it; no parts when its results file
+    cannot be read."""
+    named = directory / f"{run_id}.json"
+    try:
+        if named.exists():
+            results.load(named)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return UnreadableTip(named, f"{type(error).__name__}: {error}"), ()
+    tip, _, parts = _read_part(directory, run_id, repo)
+    return tip, parts
+
+
+def recorded_config(config: RunConfig, first: results.RunResults) -> RunConfig:
+    """``config`` with every declaration the run's first part recorded in place of its own."""
+    extra, settings = first.run.extra, first.settings
+    rule = settings.stop_rule
+    stop = {} if rule is None else {"stop_count": rule.count, "tail_chars": rule.tail_chars}
+    try:
+        return replace(
+            config,
+            roles=tuple(extra["roles"]),
+            arms=tuple(extra["arms"]),
+            seed=extra["seed"],
+            margin_pp=settings.margin_pp,
+            required_pairs=settings.required_pairs,
+            pair_slack=settings.pair_slack,
+            confidence=settings.confidence,
+            judging=extra["judging"],
+            model=first.run.model,
+            effort=extra["effort"],
+            calibration=extra["calibration"],
+            judge_golden=first.golden_bad_case_verdicts is not None,
+            max_tasks=None,  # the planned tasks are recorded; the cap that chose them is not
+            **stop,
+        )
+    except KeyError as missing:
+        raise ValueError(f"run {first.run.id} does not record {missing}") from missing
+
+
+def _replanned(declared: RunConfig, first: results.RunResults) -> dict[Role, list[TaskSpec]]:
+    """The run's planned tasks as the generator builds them now from the recorded seed and
+    count; the identity check compares their ids with the recorded ones."""
+    recorded = first.run.extra["tasks"]
+    return {
+        role: tasks.generate(role, declared.seed, len(recorded.get(role, ())))
+        for role in declared.roles
+    }
+
+
+def _changed_options(
+    given: Mapping[str, str], config: RunConfig, declared: RunConfig, first: results.RunResults
+) -> tuple[str, ...]:
+    """The options named beside ``--continue`` that would change what the run declared.
+
+    An option that restates a recorded declaration, or sets what a run does not declare (the
+    spend cap, the session budget, where the results go), changes nothing. No run records its
+    ``--max-tasks`` cap, only the tasks it planned, so the cap changes the run when it would plan
+    other tasks.
+    """
+    changed = [
+        option
+        for dest, option in given.items()
+        if dest != "max_tasks" and getattr(config, dest) != getattr(declared, dest)
+    ]
+    if "max_tasks" in given:
+        capped = plan_tasks(replace(declared, max_tasks=config.max_tasks))
+        if {role: [t.task_id for t in specs] for role, specs in capped.items()} != dict(
+            first.run.extra["tasks"]
+        ):
+            changed.append(given["max_tasks"])
+    return tuple(changed)
+
+
+def identity_now(
+    config: RunConfig, planned: Mapping[Role, Sequence[TaskSpec]], repo: Path
+) -> MeasuredIdentity:
+    """What a run of ``config`` planning ``planned`` would be measured on in ``repo`` now. The
+    resolved model is unknown until a session reports one."""
+    read = working_tree(repo)
+    return MeasuredIdentity(
+        tree=tree_digest(repo),
+        model=None,
+        seed=config.seed,
+        tasks={role: tuple(task.task_id for task in specs) for role, specs in planned.items()},
+        launch_orders={
+            role: {task.task_id: planned_order(config, task.task_id) for task in specs}
+            for role, specs in planned.items()
+        },
+        declared=declared_settings(config),
+        roles={role: role_identity(read, role) for role in config.roles},
+    )
+
+
+def given_options(argv: Sequence[str] | None) -> dict[str, str]:
+    """Each option ``argv`` names, by the run setting it sets, and how it is spelled; an option
+    left at its default is not among them."""
+    parser = _parser()
+    actions = parser._actions  # argparse lists its actions only privately
+    for action in actions:
+        action.default = argparse.SUPPRESS  # an option argv does not name is left out
+    named = vars(parser.parse_args(argv))
+    spelling = {action.dest: (action.option_strings or [action.dest])[0] for action in actions}
+    return {dest: spelling[dest] for dest in named}
 
 
 # --- --dry-run: the sessions a paid run would launch ---

@@ -17,7 +17,8 @@ recorded. The stop reads only an errored session's kind and evidence, never a gr
 
 Exit codes of a run: 0 it is complete; 1 it is incomplete (a refused launch, an arm that
 could not be built or proven, a session that ended in error, a stop, an operator interrupt;
-the results are written). The results file records how the run ended (``lineage.RunEnding``).
+the results are written). The results file records how the run ended (``run_ending.finalized``);
+a later part of a stopped run starts from its ``run_ending.Continuation``.
 Judge calls are metered by the judge's own account, not by the ledger, which covers the
 ``claude`` sessions only.
 """
@@ -48,15 +49,9 @@ from praxion_evals.adherence.infra_stop import (
     step,
 )
 from praxion_evals.adherence.lineage import (
-    Finished,
-    InfraStopped,
-    Interrupted,
     MeasuredIdentity,
-    RunEnding,
-    SpendRefused,
     current_identity,
     diff,
-    ending_to_json,
     measured_identity,
 )
 from praxion_evals.adherence.model import (
@@ -75,6 +70,7 @@ from praxion_evals.adherence.model import (
     TaskSpec,
     outcome_to_json,
 )
+from praxion_evals.adherence.run_ending import Continuation, finalized
 from praxion_evals.adherence.session_launch import (
     DEFAULT_TAIL_CHARS,
     REAL_HOME,
@@ -158,6 +154,8 @@ class RunConfig:
     # Close the stopped run with this id, saying why; a close launches nothing.
     close: str | None = None
     reason: str | None = None
+    # Continue the stopped run with this id: a later part of it, launching its unfinished tasks.
+    continue_run: str | None = None
 
 
 @dataclass(frozen=True)
@@ -248,8 +246,13 @@ def begin(
     checkout: Checkout,
     planned: Mapping[Role, list[TaskSpec]],
     declare: Callable[[RunConfig, Checkout, Mapping[Role, list[TaskSpec]]], DeclaredSettings],
+    continuation: Continuation | None = None,
 ) -> tuple[Context, RunState]:
-    """Check the credential, declare the settings, write the provisional results file."""
+    """Check the credential, declare the settings, write the provisional results file.
+
+    ``planned`` is what this run launches; a ``continuation`` is a later part of a stopped run,
+    which launches again only the tasks no earlier part finished and records the whole plan.
+    """
     if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
         raise ValueError(
             f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
@@ -262,7 +265,7 @@ def begin(
     output = config.output or _default_output(run_id)
     results.refuse_existing(output, config.overwrite)
     provisional = _provisional(
-        config, checkout, planned, settings, run_id, version, started, output
+        config, checkout, planned, settings, run_id, version, started, output, continuation
     )
     results.write_atomic(output, provisional)
     base = config.fixture_pages_base_url
@@ -330,6 +333,7 @@ def _provisional(
     version: str,
     started: datetime,
     output: Path,
+    continuation: Continuation | None = None,
 ) -> results.RunResults:
     """The results file as first written: every setting declared, no session yet."""
     extra = {
@@ -349,6 +353,7 @@ def _provisional(
         "session_budget_usd": config.session_budget_usd,
         "retries": [],
         "identity": current_identity(checkout.path, config.roles),
+        **(continuation.extra(run_id) if continuation else {}),
     }
     run = results.RunInfo(run_id, config.model, version, False, (), {}, extra)
     catalog = {
@@ -449,49 +454,8 @@ def _clean_up(context: Context) -> None:
 
 
 def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:
-    """Complete means: no refused launch, every arm built and proven, no session left in error,
-    not stopped and not interrupted."""
-    latest = {
-        (r.setup.role, r.setup.arm, r.setup.task_id): r.status for r in state.results.sessions
-    }
-    unbuilt = any(
-        not a["built"] for per_arm in state.results.arms.values() for a in per_arm.values()
-    )
-    complete = (
-        not interrupted
-        and not state.results.run.refused_launches
-        and not unbuilt
-        and not any(isinstance(status, Errored) for status in latest.values())
-        and state.stop is None
-    )
-    ending = _ending(state, interrupted)
-    state = _update_run(state, complete=complete)
-    state = _update_extra(
-        state,
-        ending=ending_to_json(ending),
-        finished_at=datetime.now(UTC).isoformat(),
-    )
-    return _checkpoint(context, state).results
-
-
-def _ending(state: RunState, interrupted: bool) -> RunEnding:
-    if interrupted:
-        return Interrupted()
-    if state.stop is not None:
-        return InfraStopped(state.stop)
-    if state.results.run.refused_launches:
-        return SpendRefused(_refused_tasks(state.results))
-    return Finished()
-
-
-def _refused_tasks(recorded: results.RunResults) -> tuple[str, ...]:
-    """The tasks whose session the cap refused, in order, each once."""
-    refused = (
-        r.setup.task_id
-        for r in recorded.sessions
-        if isinstance(r.status, Errored) and r.status.kind == "launch_refused"
-    )
-    return tuple(dict.fromkeys(refused))
+    ended = finalized(state.results, state.stop, interrupted, datetime.now(UTC))
+    return _checkpoint(context, replace(state, results=ended)).results
 
 
 def _judge_golden(context: Context, state: RunState) -> RunState:
@@ -592,12 +556,16 @@ def ordered_arms(arms_named: Sequence[Arm], seed: int, task_id: str) -> list[Arm
 def _record_launch_order(context: Context, state: RunState, role: Role, task: TaskSpec) -> RunState:
     """Write the task's launch order into the results before its first session starts, so a
     continuation reads the order the stopped run used rather than drawing it again."""
-    config = context.config
-    order = CALIBRATION_ORDER if config.calibration else launch_order(config.seed, task.task_id)
+    order = planned_order(context.config, task.task_id)
     recorded = state.results.run.extra.get("launch_order", {})
     per_role = {**recorded.get(role, {}), task.task_id: list(order)}
     state = _update_extra(state, launch_order={**recorded, role: per_role})
     return _checkpoint(context, state)
+
+
+def planned_order(config: RunConfig, task_id: str) -> tuple[Arm, Arm]:
+    """The order a task's slots run in: the calibration's fixed one, else the seed's draw."""
+    return CALIBRATION_ORDER if config.calibration else launch_order(config.seed, task_id)
 
 
 def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[tuple[Arm, Arm]]:

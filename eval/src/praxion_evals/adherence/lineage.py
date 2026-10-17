@@ -31,7 +31,7 @@ clock, and none reads a graded outcome to decide whether a run continues. ``Line
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -339,19 +339,24 @@ def _root_of(parts: Mapping[str, PartRef], run_id: str, results_dir: Path) -> Pa
 LAUNCH_REFUSED = "launch_refused"  # the error kind of a session the spend cap refused
 
 
-def relaunch_tasks(results: RunResults, role: str) -> tuple[str, ...]:
+def relaunch_tasks(
+    results: RunResults, role: str, earlier: Sequence[RunResults] = ()
+) -> tuple[str, ...]:
     """The role's planned tasks a continuation launches again, whole in every arm, in planned
     order: those with no complete pair and no session that ended otherwise.
 
-    A session ``never_launched`` does not count either way. Every other session keeps its
-    outcome, so a task whose lean side alone errored is not launched again and stays a lean
+    ``results`` is the part being continued and ``earlier`` the parts before it, oldest first: each
+    part holds only the sessions it launched, so a task an earlier part finished stays finished. A
+    session ``never_launched`` in its own part does not count either way. Every other session keeps
+    its outcome, so a task whose lean side alone errored is not launched again and stays a lean
     failure in the worst-case recount.
     """
-    ignored = never_launched(results)
     latest: dict[str, dict[str, SessionStatus]] = {}
-    for position, record in enumerate(results.sessions):
-        if record.setup.role == role and position not in ignored:
-            latest.setdefault(record.setup.task_id, {})[record.setup.arm] = record.status
+    for part in (*earlier, results):
+        ignored = never_launched(part)
+        for position, record in enumerate(part.sessions):
+            if record.setup.role == role and position not in ignored:
+                latest.setdefault(record.setup.task_id, {})[record.setup.arm] = record.status
     planned = _field(_field(results.run.extra, "tasks", "a run"), role, "a run's planned tasks")
     return tuple(task for task in planned if _unfinished(latest.get(task, {})))
 
@@ -390,20 +395,27 @@ def _inside_the_stop(results: RunResults) -> set[int]:
         raise ValueError(
             f"the stop names sessions that the {stop.role} {stop.arm} arm did not end on"
         )
+    last = sessions[streak[-1]].status
     alike = {
         i
         for i in range(streak[0], streak[-1] + 1)
         if sessions[i].setup.role == stop.role
         and sessions[i].setup.arm != stop.arm
-        and _fails_as(sessions[i].status, stop)
+        and _fails_alike(sessions[i].status, last)
     }
     return {*streak, *alike}
 
 
-def _fails_as(status: SessionStatus, stop: StopReason) -> bool:
-    if not isinstance(status, Errored) or status.kind != stop.kind:
+def _fails_alike(status: SessionStatus, streak_session: SessionStatus) -> bool:
+    """Whether ``status`` failed as a session of the streak did: the same kind and the same
+    masked evidence, compared tail to tail as the stop compared them."""
+    if not (isinstance(status, Errored) and isinstance(streak_session, Errored)):
         return False
-    return (status.tails or EvidenceTail("", "")).masked() == stop.masked_tail
+    return status.kind == streak_session.kind and _masked(status) == _masked(streak_session)
+
+
+def _masked(status: Errored) -> str:
+    return (status.tails or EvidenceTail("", "")).masked()
 
 
 # ---------------------------------------------------------------------------

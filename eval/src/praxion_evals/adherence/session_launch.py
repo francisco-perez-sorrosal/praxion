@@ -82,7 +82,8 @@ def task_session(
     slot: Arm,
     build: ArmBuild,
     page_fetchable: bool | None,
-) -> tuple[SpendLedger, SessionRecord]:
+) -> tuple[SpendLedger, SessionRecord, str | None]:
+    """The session's ledger and record, and the model its init event reported (None if none)."""
     setup = SessionSetup(
         arm=slot,
         checkout_commit=launch.checkout_commit,
@@ -112,7 +113,7 @@ def task_session(
     print(
         f"{task.role} {slot} {task.task_id}: {type(status).__name__}", file=sys.stderr, flush=True
     )
-    return ledger, record
+    return ledger, record, done.model
 
 
 def _grade(
@@ -140,12 +141,15 @@ class Attempt[R]:
 
     ``charged_usd`` is what the ledger took: the reported cost, or the full budget when the
     session reported none. An errored result carries the tails of the session's output.
+    ``model`` is the model the session's init event reported; None when it started no process
+    or the stream carried none.
     """
 
     result: R | Errored
     charged_usd: float
     duration_ms: int
     started_at: str
+    model: str | None = None
 
 
 def attempt[R](
@@ -167,10 +171,16 @@ def attempt[R](
     budget = launch.session_budget_usd
     started_at, began = datetime.now(UTC).isoformat(), time.monotonic()
 
-    def finish(result: R | Errored, charged: float, tails: EvidenceTail = NO_OUTPUT) -> Attempt[R]:
+    def finish(
+        result: R | Errored,
+        charged: float,
+        tails: EvidenceTail = NO_OUTPUT,
+        model: str | None = None,
+    ) -> Attempt[R]:
         if isinstance(result, Errored):
             result = replace(result, tails=tails)
-        return Attempt(result, charged, int((time.monotonic() - began) * MS_PER_S), started_at)
+        duration_ms = int((time.monotonic() - began) * MS_PER_S)
+        return Attempt(result, charged, duration_ms, started_at, model)
 
     reserved = ledger.reserve(budget)
     if isinstance(reserved, LiveErrored):
@@ -187,12 +197,12 @@ def attempt[R](
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = _settle(reserved, budget, run)
-        tails = _tails_of(run, env, launch.tail_chars)
+        tails, model = _tails_of(run, env, launch.tail_chars), _resolved_model(run)
         try:
             evidence = _evidence(launch, task, build, page_url, root, run, commit)
-            return settled, finish(assess(evidence), charged, tails)
+            return settled, finish(assess(evidence), charged, tails, model)
         except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged, tails)
+            return settled, finish(_crash(error), charged, tails, model)
     finally:
         if not launch.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
@@ -239,6 +249,11 @@ def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendL
     final = parse_stream(run.stdout).final_result
     cost = None if final is None else final.total_cost_usd
     return ledger.settle(budget, cost), budget if cost is None else cost
+
+
+def _resolved_model(run: SessionRun) -> str | None:
+    init = parse_stream(run.stdout).init
+    return None if init is None else init.model
 
 
 def _tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTail:

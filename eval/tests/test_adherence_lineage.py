@@ -31,7 +31,10 @@ from tests.test_adherence_report import results_of
 # The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
 # role unswitched, shared with the paid-loop tests of the command line.
 paid = cli_tests.paid
+full_first = cli_tests.full_first  # every task launches full first, as these runs end mid-task
 unswitched_checkout = cli_tests.unswitched_checkout
+
+pytestmark = pytest.mark.usefixtures("full_first")
 
 CREDIT_TAIL = "\nCredit balance is too low"
 

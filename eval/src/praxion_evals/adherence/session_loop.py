@@ -25,6 +25,7 @@ Judge calls are metered by the judge's own account, not by the ledger, which cov
 from __future__ import annotations
 
 import os
+import random
 import shutil
 import subprocess
 import tempfile
@@ -101,6 +102,9 @@ OUTPUT_DIR = Path(".ai-state/eval_ledger/adherence")
 SANDBOX_PREFIX = "praxion-evals-adherence-"
 PROBE_TIMEOUT_S = 15
 HTTP_OK = 200
+
+LAUNCH_ARMS: tuple[Arm, Arm] = ("full", "lean")
+CALIBRATION_ORDER: tuple[Arm, Arm] = ("full", "lean")  # its slots, in the order they run
 
 # Infrastructure errors a second try may not repeat. Never an isolation breach (the sandbox
 # leaked), a refused launch (the cap is spent) or an evaluation exception (the grader failed,
@@ -509,7 +513,10 @@ def _measure_role(
     runnable: list[Arm] = [a for a in config.arms if isinstance(verdicts.get(a), arms.ArmProven)]
     state = _probe_page(context, state, runnable)
     for task in role_tasks:
-        for slot, copy_arm in _slots(config, runnable):
+        if state.stop is not None:
+            return state
+        state = _record_launch_order(context, state, role, task)
+        for slot, copy_arm in _slots(config, runnable, task):
             if state.stop is not None:
                 return state
             build = builds[(copy_arm, tasks.turn_cap_of(task))]
@@ -517,15 +524,41 @@ def _measure_role(
     return state
 
 
-def _slots(config: RunConfig, runnable: Sequence[Arm]) -> list[tuple[Arm, Arm]]:
+def launch_order(seed: int, task_id: str) -> tuple[Arm, Arm]:
+    """Which arm a task launches first, drawn from the run's seed and the task alone.
+
+    Drawing per task spreads both orders over the list, so a drift in the account over the run
+    falls on both arms alike; the seed and task fix it, so a rerun or a continuation repeats it.
+    """
+    first, second = random.Random(f"{seed}:{task_id}").sample(LAUNCH_ARMS, 2)
+    return first, second
+
+
+def ordered_arms(arms_named: Sequence[Arm], seed: int, task_id: str) -> list[Arm]:
+    """The named arms in the task's launch order."""
+    return [arm for arm in launch_order(seed, task_id) if arm in arms_named]
+
+
+def _record_launch_order(context: Context, state: RunState, role: Role, task: TaskSpec) -> RunState:
+    """Write the task's launch order into the results before its first session starts, so a
+    continuation reads the order the stopped run used rather than drawing it again."""
+    config = context.config
+    order = CALIBRATION_ORDER if config.calibration else launch_order(config.seed, task.task_id)
+    recorded = state.results.run.extra.get("launch_order", {})
+    per_role = {**recorded.get(role, {}), task.task_id: list(order)}
+    state = _update_extra(state, launch_order={**recorded, role: per_role})
+    return _checkpoint(context, state)
+
+
+def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[tuple[Arm, Arm]]:
     """(the arm a session is recorded under, the arm whose copy it runs), in launch order.
 
     A calibration run records its second run of the full copy in the lean slot, so the
-    ordinary pairing and verdict code reads it as a pair.
+    ordinary pairing and verdict code reads it as a pair; it keeps that fixed order.
     """
     if config.calibration:
         return [("full", "full"), ("lean", "full")] if "full" in runnable else []
-    return [(arm, arm) for arm in runnable]
+    return [(arm, arm) for arm in ordered_arms(runnable, config.seed, task.task_id)]
 
 
 def _build_copy(

@@ -49,6 +49,7 @@ from praxion_evals.adherence.session_loop import (
     SANDBOX_PREFIX,
     Checkout,
     RunConfig,
+    ordered_arms,
     resolve_checkout,
     session_env,
 )
@@ -318,7 +319,7 @@ def _print_dry_run(
     for role, role_tasks in planned.items():
         print(f"{role}: {len(role_tasks)} tasks (target {config.required_pairs})", file=sys.stderr)
         for index, task in enumerate(role_tasks):
-            for arm in config.arms:
+            for arm in ordered_arms(config.arms, config.seed, task.task_id):
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
                 spec = _planned_spec(config, checkout, run_root, task, arm, sandbox)
                 env_names = sorted(session_env(config, sandbox.root, os.environ))

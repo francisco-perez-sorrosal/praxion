@@ -430,6 +430,12 @@ def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
     return install
 
 
+@pytest.fixture
+def full_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every task launches the full arm first, so a scripted run's expectations read in arm order."""
+    monkeypatch.setattr(session_loop, "launch_order", lambda seed, task_id: ("full", "lean"))
+
+
 class Explodes(Script):
     """Launches the third session like the others, then raises as a decode failure would."""
 
@@ -450,6 +456,7 @@ def _sessions(loaded: results.RunResults) -> list[tuple[str, str]]:
     return [(r.setup.arm, type(r.status).__name__) for r in loaded.sessions]
 
 
+@pytest.mark.usefixtures("full_first")
 def test_an_exception_after_the_session_was_launched_is_charged_the_full_session_budget(
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:
@@ -464,6 +471,7 @@ def test_an_exception_after_the_session_was_launched_is_charged_the_full_session
     assert loaded.run.extra["spend"]["spent_usd"] == pytest.approx(1.0 + 3 * 0.01)
 
 
+@pytest.mark.usefixtures("full_first")
 def test_each_arm_is_proven_then_the_task_runs_in_both_arms_in_turn(
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:
@@ -485,6 +493,7 @@ def test_each_arm_is_proven_then_the_task_runs_in_both_arms_in_turn(
     assert loaded.run.extra["retries"] == []
 
 
+@pytest.mark.usefixtures("full_first")
 def test_a_lean_session_whose_transcript_is_absent_names_the_path_it_looked_at(
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:
@@ -498,6 +507,7 @@ def test_a_lean_session_whose_transcript_is_absent_names_the_path_it_looked_at(
     assert f"/subagents/agent-{AGENT_ID}.jsonl was not found" in lean.detail
 
 
+@pytest.mark.usefixtures("full_first")
 def test_a_transient_infrastructure_error_is_retried_once_and_the_retry_replaces_it(
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:
@@ -533,6 +543,7 @@ def test_an_error_that_keeps_failing_is_retried_once_only_and_leaves_the_run_inc
     assert not loaded.run.complete
 
 
+@pytest.mark.usefixtures("full_first")
 def test_a_session_that_reports_no_cost_is_charged_its_budget_and_the_cap_refuses_the_rest(
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:

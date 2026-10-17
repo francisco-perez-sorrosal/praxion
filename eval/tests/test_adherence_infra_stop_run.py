@@ -21,8 +21,11 @@ from praxion_evals.live.session import SessionRun, SessionSpec
 # The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
 # role unswitched, shared with the paid-loop tests of the command line.
 paid = cli_tests.paid
+full_first = cli_tests.full_first  # every task launches full first, as these runs count sessions
 unswitched_checkout = cli_tests.unswitched_checkout
 Script = cli_tests.Script
+
+pytestmark = pytest.mark.usefixtures("full_first")
 
 Ending = Callable[[Script, SessionSpec, dict[str, str]], SessionRun]
 STOP_RUN = ["--required-pairs", "5"]  # five tasks per arm: room for a streak and what follows

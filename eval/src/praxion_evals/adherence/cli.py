@@ -20,6 +20,9 @@ option given beside it restates what the run declared, it measures the same thin
 the tree changed since the run's commit is named; a committed results file changes nothing) and
 it would replace no results file of the run's lineage. A spend limit it does not name is the one
 the stopped run recorded.
+
+Every results directory carries a run index beside its files (``run_index``): a finished run and a
+close rewrite it, and ``<checkout> --reindex`` rebuilds it from the files alone.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ from datetime import UTC, datetime
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from praxion_evals.adherence import arms, report, results, session_loop, tasks
+from praxion_evals.adherence import arms, report, results, run_index, session_loop, tasks
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
     DEFAULT_STOP_COUNT,
@@ -115,6 +118,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             tip = results.load(config.report)
             print(report.render(tip, parts_before(tip, config.report.parent)), end="")
             return EXIT_COMPLETE
+        if config.reindex:
+            return _reindex(config)
         checkout = resolve_checkout(config)
         if config.close is not None:
             return _close_run(config, checkout, config.close, config.reason or "")
@@ -143,8 +148,17 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
     if args["calibration"] and set(args["arms"] or ["full"]) != {"full"}:
         parser.error("a calibration run measures the full arm against itself; use --arm full")
     named = {"full"} if args["calibration"] else set(args["arms"] or ARMS)
-    if not (args["roles"] or args["report"] or args["close"] or args["continue_run"]):
-        parser.error("name at least one --role, --report FILE, --close RUN or --continue RUN")
+    names_work = args["roles"] or args["report"] or args["close"] or args["continue_run"]
+    if args["reindex"]:
+        if names_work or args["output"]:
+            parser.error(
+                "--reindex rebuilds the checkout's run index and takes no --role, --report,"
+                " --close, --continue or --output"
+            )
+    elif not names_work:
+        parser.error(
+            "name at least one --role, --report FILE, --close RUN, --continue RUN or --reindex"
+        )
     if args["continue_run"] and (args["report"] or args["close"] or args["dry_run"]):
         parser.error(
             "--continue RUN launches the stopped run's unfinished tasks;"
@@ -254,6 +268,11 @@ def _parser() -> argparse.ArgumentParser:
         metavar="RUN",
         help="launch again the unfinished tasks of the stopped run RUN, as it declared them",
     )
+    add(
+        "--reindex",
+        action="store_true",
+        help="rebuild the run index of the checkout's results directory; launch nothing",
+    )
     add("--fixture-pages-base-url", help="the directory URL that serves the fixture page")
     return parser
 
@@ -342,7 +361,18 @@ def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) 
     recorded = tip.results
     extra = {**recorded.run.extra, "ending": ending_to_json(ending)}
     results.write_atomic(path, replace(recorded, run=replace(recorded.run, extra=extra)))
+    run_index.write_index(path.parent)
     print(f"closed run {run_id}: {reason}")
+    return EXIT_COMPLETE
+
+
+def _reindex(config: RunConfig) -> int:
+    """Rebuild the run index beside the results files of the checkout named, or of this one."""
+    directory = (
+        config.checkout / OUTPUT_DIR if config.checkout else session_loop.results_dir(config)
+    )
+    index = run_index.write_index(directory)
+    print(f"indexed {directory}: {index.name}")
     return EXIT_COMPLETE
 
 

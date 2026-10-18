@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "runs": {
+    "20261014T023850Z-809185": {
+      "file": "20261014T023850Z-809185.json",
+      "sha256": "9e87848febe4e4761d489b1c995c05dffe3594dda92eec5083f64600af1fbaca",
+      "lineage_root": "20261014T023850Z-809185",
+      "ending": "legacy",
+      "roles": {
+        "researcher": {
+          "complete_pairs": 0,
+          "flip": "underpowered"
+        }
+      }
+    },
+    "20261014T031818Z-d71d91": {
+      "file": "20261014T031818Z-d71d91.json",
+      "sha256": "b00a37cb158a29076d26cddf620658c854d9a220f09af08322086ca862591685",
+      "lineage_root": "20261014T031818Z-d71d91",
+      "ending": "legacy",
+      "roles": {
+        "researcher": {
+          "complete_pairs": 0,
+          "flip": "underpowered"
+        }
+      }
+    },
+    "20261014T033052Z-4f6604": {
+      "file": "20261014T033052Z-4f6604.json",
+      "sha256": "582d86125d3880f5ba7f87713a2be0357398dee32b7057cc08328d19b1076828",
+      "lineage_root": "20261014T033052Z-4f6604",
+      "ending": "legacy",
+      "roles": {
+        "researcher": {
+          "complete_pairs": 2,
+          "flip": "underpowered"
+        }
+      }
+    },
+    "20261014T045733Z-7050ca": {
+      "file": "20261014T045733Z-7050ca.json",
+      "sha256": "1f3a23814f946ddd78122475f8bc018c799a9496af9e51430a53f15297e72408",
+      "lineage_root": "20261014T045733Z-7050ca",
+      "ending": "legacy",
+      "roles": {
+        "researcher": {
+          "complete_pairs": 13,
+          "flip": "underpowered"
+        }
+      }
+    },
+    "20261014T152926Z-723e7a": {
+      "file": "20261014T152926Z-723e7a.json",
+      "sha256": "da4d59abf2e026bfa60c078f159df87d9ec18b49e1d74604bd2f0888e418294b",
+      "lineage_root": "20261014T152926Z-723e7a",
+      "ending": "legacy",
+      "roles": {
+        "researcher": {
+          "complete_pairs": 24,
+          "flip": "clear"
+        }
+      }
+    },
+    "20261015T035717Z-03a785": {
+      "file": "20261015T035717Z-03a785.json",
+      "sha256": "a3291d43e073a556e3c9e548238fd7f0c0fe026dee2de7271f8fae76d525e86e",
+      "lineage_root": "20261015T035717Z-03a785",
+      "ending": "legacy",
+      "roles": {
+        "verifier": {
+          "complete_pairs": 24,
+          "flip": "not clear"
+        }
+      }
+    },
+    "20261015T082642Z-672192": {
+      "file": "20261015T082642Z-672192.json",
+      "sha256": "07de17da7d3cd9f0b709460caf59ba766d665c6cff642ed1d1431f8c93463817",
+      "lineage_root": "20261015T082642Z-672192",
+      "ending": "legacy",
+      "roles": {
+        "verifier": {
+          "complete_pairs": 2,
+          "flip": "underpowered"
+        }
+      }
+    },
+    "20261016T024750Z-62073e": {
+      "file": "20261016T024750Z-62073e.json",
+      "sha256": "b1c4d71de810776f9ffe89db28115acfce20d713591f627899c99eb07153d4b9",
+      "lineage_root": "20261016T024750Z-62073e",
+      "ending": "legacy",
+      "roles": {
+        "context-engineer": {
+          "complete_pairs": 3,
+          "flip": "underpowered"
+        }
+      }
+    }
+  },
+  "skipped": []
+}

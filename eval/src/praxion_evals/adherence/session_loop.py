@@ -37,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, assert_never
 
-from praxion_evals.adherence import arms, grade, report, results, tasks
+from praxion_evals.adherence import arms, grade, report, results, run_index, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import (
@@ -156,6 +156,8 @@ class RunConfig:
     reason: str | None = None
     # Continue the stopped run with this id: a later part of it, launching its unfinished tasks.
     continue_run: str | None = None
+    # Rebuild the run index of the results directory; launches nothing.
+    reindex: bool = False
 
 
 @dataclass(frozen=True)
@@ -455,7 +457,9 @@ def _clean_up(context: Context) -> None:
 
 def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:
     ended = finalized(state.results, state.stop, interrupted, datetime.now(UTC))
-    return _checkpoint(context, replace(state, results=ended)).results
+    final = _checkpoint(context, replace(state, results=ended)).results
+    run_index.write_index(context.output.parent)  # the file the index names is final now
+    return final
 
 
 def _judge_golden(context: Context, state: RunState) -> RunState:

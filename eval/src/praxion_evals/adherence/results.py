@@ -59,6 +59,9 @@ CHECK_KINDS: tuple[str, ...] = ("mechanical", "judged")
 # The wire kind of a run's ending once closed on request; ``lineage`` writes it, and the listing
 # (which cannot import ``lineage``) reads it.
 CLOSED_ENDING_KIND = "closed"
+# The run index sits beside the results files and is not one: ``run_index`` writes it, and a
+# listing must not name it as a stray JSON file.
+RUN_INDEX_NAME = "index.json"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -245,7 +248,11 @@ def refuse_existing(path: Path, overwrite: bool) -> None:
 def write_atomic(path: Path, results: RunResults) -> None:
     """Replace ``path`` with ``results`` whole: a crash leaves the previous file or the new one."""
     _refuse_changed_settings(path, results)
-    text = json.dumps(to_json(results), indent=2) + "\n"
+    write_text_atomic(path, json.dumps(to_json(results), indent=2) + "\n")
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Replace ``path`` with ``text`` whole: a temporary file beside it, synced, then renamed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(
         dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
@@ -390,6 +397,8 @@ def _read_directory(directory: Path) -> tuple[list[RunResults], list[str]]:
     runs: list[RunResults] = []
     skipped: list[str] = []
     for path in sorted(directory.glob("*.json")):
+        if path.name == RUN_INDEX_NAME:
+            continue
         try:
             runs.append(load(path))
         except (OSError, ValueError, KeyError, TypeError):  # whatever its shape, it is named
@@ -401,7 +410,7 @@ def _earlier_for(role: str, runs: Sequence[RunResults], differences: Differences
     draws: list[Draw] = []
     apart: dict[str, str] = {}
     calibration: list[str] = []
-    for lineage in _lineages(runs):
+    for lineage in lineages(runs):
         whole = merged(lineage)
         if not any(record.setup.role == role for record in whole.sessions):
             continue
@@ -412,11 +421,11 @@ def _earlier_for(role: str, runs: Sequence[RunResults], differences: Differences
         elif differing := differences(whole, role):
             apart[label] = "; ".join(differing)
         else:
-            draws.append(_draw_of(whole, ids, role))
+            draws.append(draw_of(whole, ids, role))
     return EarlierRuns(tuple(draws), apart, tuple(calibration))
 
 
-def _lineages(runs: Sequence[RunResults]) -> list[list[RunResults]]:
+def lineages(runs: Sequence[RunResults]) -> list[list[RunResults]]:
     """The runs grouped into the lineages they form, each oldest part first, in the order the
     directory first met them. A part continuing a run the directory lacks starts a lineage of its
     own: a listing names what it finds and never refuses a directory."""
@@ -444,7 +453,7 @@ def _predecessor(run: RunResults, held: Mapping[str, RunResults]) -> RunResults 
     return None if continues is None else held.get(continues)
 
 
-def _draw_of(whole: RunResults, ids: tuple[str, ...], role: str) -> Draw:
+def draw_of(whole: RunResults, ids: tuple[str, ...], role: str) -> Draw:
     """A lineage closed on request gave up before its plan ran out: it reached no flip verdict, so
     it is a not-clear draw however its sessions would read, and what it had reached is interim."""
     if (whole.run.extra.get("ending") or {}).get("kind") == CLOSED_ENDING_KIND:

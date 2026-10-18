@@ -4,6 +4,7 @@
 per-role kernels. It reads the repository once, then judges ten invariants; a finding's kind
 names the invariant it breaks. Exit 0 clean, 1 findings, 2 input error (no manifest, no plugin
 checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its input never passes.
+(`--liveness` also exits 2 when its log is unknown, below.)
 
 | Kind                         | Holds when                                                              |
 | ---------------------------- | ----------------------------------------------------------------------- |
@@ -36,9 +37,13 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 of the kernels: `liveness-missing-row` names each spawn of a role at trial or switched (by the
 plugin's ledger) that left no `kernel_injected` row -- the only sign that the spawn hook did not
 run for it. A role's spawns count from its record's `since`; `--since` keeps spawns at or after
-that revision's commit time. The log is the one under `--repo-root`, read strictly: a log it
-cannot find or read whole is an input error, and every report counts the spawns it judged, so a
-clean one never means that nothing was judged.
+that revision's commit time. The log is the one under `--repo-root`: a log it cannot find is an
+input error, and a segment inside the judged window (from the earliest instant any adopted role is
+judged from) that is missing from the archive positions, unreadable or holding a line that does
+not parse makes the result unknown: each such segment is named, the findings from the rest are
+still listed, and the exit status is 2, never 0. A segment wholly before the window changes
+nothing. Every report counts the spawns it judged, so a clean one never means that nothing was
+judged.
 
 The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
 evidence, names the findings of I1 to I8 and renders every report. The ledger's findings (I9, I10)
@@ -519,8 +524,14 @@ def render_human(
     tail = f" ({scope})" if scope else ""
     if not findings:
         return f"{label}: clean{tail}"
-    lines = [f"{f.kind}: {f.subject}" + (f" -- {f.detail}" if f.detail else "") for f in findings]
+    lines = [finding_line(f) for f in findings]
     return "\n".join([*lines, f"{label}: {len(findings)} finding(s){tail}"])
+
+
+def finding_line(finding: km.Finding) -> str:
+    return f"{finding.kind}: {finding.subject}" + (
+        f" -- {finding.detail}" if finding.detail else ""
+    )
 
 
 def render_json(findings: Sequence[km.Finding], **extra: object) -> str:
@@ -534,12 +545,27 @@ def render_json(findings: Sequence[km.Finding], **extra: object) -> str:
 
 def render_liveness(report: LivenessReport, as_json: bool) -> str:
     if as_json:
-        extra = {"unplaced": list(report.unplaced)} if report.unplaced else {}
+        extra: dict[str, object] = {"unplaced": list(report.unplaced)} if report.unplaced else {}
+        if report.lost:
+            extra["unknown"] = [{"segment": str(s.path), "reason": s.reason} for s in report.lost]
         return render_json(report.findings, judged=report.judged, adopted=report.adopted, **extra)
     scope = f"{report.judged} spawn(s) of {report.adopted} adopted role(s) judged"
     if report.unplaced:
         scope += f"; no ledger history to place a re-opening of {', '.join(report.unplaced)}"
-    return render_human(report.findings, "kernel liveness", scope)
+    if not report.lost:
+        return render_human(report.findings, "kernel liveness", scope)
+    lines = [finding_line(f) for f in report.findings]
+    lines += [f"liveness-unknown-segment: {s.path} -- {s.reason}" for s in report.lost]
+    unknown = (
+        f"{len(report.lost)} segment(s) not read whole; "
+        f"{len(report.findings)} finding(s) from the rest; {scope}"
+    )
+    return "\n".join([*lines, f"kernel liveness: unknown ({unknown})"])
+
+
+def liveness_status(report: LivenessReport) -> int:
+    """Unknown is 2, as for any input the gate cannot judge; findings 1; clean 0."""
+    return 2 if report.lost else 1 if report.findings else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -572,15 +598,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.liveness:
             plugin_root = Path(args.plugin_root) if args.plugin_root else SCRIPT_DIR.parent
             report = check_liveness(root, plugin_root, args.since)
-            output, findings = render_liveness(report, args.json), report.findings
+            output, status = render_liveness(report, args.json), liveness_status(report)
         else:
             findings = check(root)
             output = render_json(findings) if args.json else render_human(findings)
+            status = 1 if findings else 0
     except (ValueError, km.MissingParserError, OSError) as exc:  # model errors are ValueErrors
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(output)
-    return 1 if findings else 0
+    return status
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _kernel_checker_testkit as kit  # noqa: E402
 import check_kernel_manifest as cb  # noqa: E402
 import kernel_ledger as kl  # noqa: E402
+import kernel_liveness as kv  # noqa: E402
 from _kernel_checker_testkit import (  # noqa: E402
     AT,
     NOON,
@@ -298,9 +300,200 @@ def test_a_project_with_no_observation_log_is_an_input_error_not_a_pass(
 # -- A log that cannot be read whole is never a clean report ----------------------------------------
 
 
-def test_a_log_with_an_unparseable_line_is_an_input_error_not_a_pass(
+def archive(project: Path, position: int, when: datetime) -> Path:
+    """An archive at `position` holding one padding row, last appended to at `when`."""
+    state = project / ".ai-state"
+    state.mkdir(parents=True, exist_ok=True)
+    path = cb.reader.retention.archive_path(cb.reader.log_path(state), position)
+    path.write_text(json.dumps({"timestamp": when.isoformat(), "event_type": "padding"}) + "\n")
+    os.utime(path, (when.timestamp(), when.timestamp()))
+    return path
+
+
+needs_a_mode_to_bite = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0, reason="root reads a file whatever its mode"
+)
+
+
+def unreadable(path: Path) -> Path:
+    path.chmod(0o000)
+    return path
+
+
+def lost_by(project: Path, repo: Path, *args: str) -> dict:
+    """The JSON report of one liveness run."""
+    return json.loads(liveness(repo, project, "--json", *args).stdout)
+
+
+def fact(name: str, when: datetime | None, problem: str | None = None) -> kv.SegmentFact:
+    return kv.SegmentFact(Path(name), when, problem)
+
+
+JUDGED_FROM = datetime(2026, 10, 12, tzinfo=timezone.utc)
+BEFORE = datetime(2026, 9, 1, tzinfo=timezone.utc)
+INSIDE = datetime(2026, 10, 14, tzinfo=timezone.utc)
+
+
+def lost_names(*segments: kv.SegmentFact) -> list[str]:
+    judged = cb.liveness_report(adopted(researcher="trial"), [], None, segments)
+    return [lost.path.name for lost in judged.lost]
+
+
+def test_a_segment_not_read_whole_inside_the_window_is_lost() -> None:
+    assert lost_names(fact("log.1", INSIDE, "unreadable: denied")) == ["log.1"]
+
+
+def test_a_segment_not_read_whole_wholly_before_the_window_is_not_lost() -> None:
+    assert lost_names(fact("log.1", BEFORE, "unreadable: denied")) == []
+
+
+def test_a_segment_last_appended_at_the_moment_the_window_opens_is_inside_it() -> None:
+    assert lost_names(fact("log.1", JUDGED_FROM, "missing")) == ["log.1"]
+
+
+def test_a_lost_segment_carries_the_reason_it_was_not_read_whole() -> None:
+    judged = cb.liveness_report(
+        adopted(researcher="trial"), [], None, [fact("log.1", INSIDE, "unreadable: denied")]
+    )
+
+    assert [(lost.path.name, lost.reason) for lost in judged.lost] == [
+        ("log.1", "unreadable: denied")
+    ]
+
+
+def test_a_segment_read_whole_is_never_lost() -> None:
+    assert lost_names(fact("log.1", INSIDE)) == []
+
+
+def test_a_gap_between_segments_newer_than_the_window_start_is_lost() -> None:
+    gap = fact("log.2", None, "missing")
+
+    assert lost_names(fact("log.3", BEFORE), gap, fact("log.1", INSIDE), fact("log", INSIDE)) == [
+        "log.2"
+    ]
+
+
+def test_a_gap_beneath_only_segments_older_than_the_window_is_not_lost() -> None:
+    gap = fact("log.2", None, "missing")
+
+    assert lost_names(fact("log.3", BEFORE), gap, fact("log.1", BEFORE)) == []
+
+
+def test_a_gap_with_no_dated_segment_above_it_may_reach_into_the_window() -> None:
+    assert lost_names(fact("log.2", None, "missing"), fact("log.1", None)) == ["log.2"]
+
+
+def test_a_segment_whose_time_is_unknown_is_dated_by_the_next_newer_one() -> None:
+    undated = fact("log.2", None, "unreadable: denied")
+
+    assert lost_names(undated, fact("log.1", BEFORE)) == []
+
+
+def test_no_adopted_role_opens_no_window() -> None:
+    judged = cb.liveness_report({}, [], None, [fact("log.1", INSIDE, "missing")])
+
+    assert judged.lost == ()
+
+
+def test_the_window_opens_at_the_earliest_instant_any_role_is_judged_from() -> None:
+    adoptions = {
+        "researcher": kl.Adoption("trial", datetime(2026, 10, 14, tzinfo=timezone.utc)),
+        "verifier": kl.Adoption("trial", datetime(2026, 10, 1, tzinfo=timezone.utc)),
+    }
+    segment = fact("log.1", datetime(2026, 10, 5, tzinfo=timezone.utc), "missing")
+
+    assert [s.path.name for s in cb.liveness_report(adoptions, [], None, [segment]).lost] == [
+        "log.1"
+    ]
+
+
+def test_since_moves_the_window_for_every_role() -> None:
+    segment = fact("log.1", datetime(2026, 10, 13, tzinfo=timezone.utc), "missing")
+    later = datetime(2026, 10, 14, tzinfo=timezone.utc)
+
+    judged = cb.liveness_report(adopted(researcher="trial"), [], later, [segment])
+
+    assert judged.lost == ()
+
+
+@needs_a_mode_to_bite
+def test_an_unreadable_segment_inside_the_window_is_named_and_the_findings_are_kept(
     repo: Path, tmp_path: Path
 ) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"))
+    gone = archive(project, 1, INSIDE)
+    unreadable(gone)
+
+    try:
+        result = liveness(repo, project)
+    finally:
+        gone.chmod(0o600)
+
+    assert (result.returncode, "unknown" in result.stdout, gone.name in result.stdout) == (
+        2,
+        True,
+        True,
+    )
+    assert "liveness-missing-row: role researcher" in result.stdout
+
+
+def test_a_missing_archive_inside_the_window_makes_liveness_unknown(
+    repo: Path, tmp_path: Path
+) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"), delivered("a1"))
+    archive(project, 3, BEFORE)
+    archive(project, 1, INSIDE)
+
+    result = liveness(repo, project)
+
+    assert (result.returncode, "observations.jsonl.2 -- missing" in result.stdout) == (2, True)
+
+
+@needs_a_mode_to_bite
+def test_an_unreadable_segment_wholly_before_the_window_leaves_the_result_clean(
+    repo: Path, tmp_path: Path
+) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"), delivered("a1"))
+    old = unreadable(archive(project, 1, BEFORE))
+
+    try:
+        result = liveness(repo, project)
+    finally:
+        old.chmod(0o600)
+
+    assert (result.returncode, "unknown" in result.stdout) == (0, False)
+
+
+def test_the_json_report_names_each_segment_it_could_not_read_whole(
+    repo: Path, tmp_path: Path
+) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"), delivered("a1"))
+    archive(project, 2, INSIDE)
+
+    found = lost_by(project, repo)
+
+    assert [(Path(u["segment"]).name, u["reason"]) for u in found["unknown"]] == [
+        ("observations.jsonl.1", "missing")
+    ]
+
+
+def test_a_clean_json_report_has_no_unknown_key(repo: Path, tmp_path: Path) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"), delivered("a1"))
+
+    assert "unknown" not in lost_by(project, repo)
+
+
+def test_a_log_with_an_unparseable_line_is_unknown_not_a_pass(repo: Path, tmp_path: Path) -> None:
     write_ledger(repo, researcher=trial_row())
     project = tmp_path / "project"
     write_log(project, started("a1"), delivered("a1"))
@@ -309,25 +502,44 @@ def test_a_log_with_an_unparseable_line_is_an_input_error_not_a_pass(
 
     result = liveness(repo, project)
 
-    assert result.returncode == 2
-    assert "not readable whole" in result.stderr
+    assert (result.returncode, "unknown" in result.stdout, "unparseable" in result.stdout) == (
+        2,
+        True,
+        True,
+    )
 
 
-def test_a_log_segment_that_cannot_be_read_is_an_input_error_not_a_pass(
+@needs_a_mode_to_bite
+def test_a_state_directory_that_cannot_be_listed_is_an_input_error(
     repo: Path, tmp_path: Path
 ) -> None:
     write_ledger(repo, researcher=trial_row())
     project = tmp_path / "project"
     write_log(project, started("a1"))
-    log = cb.reader.log_path(project / ".ai-state")
-    log.chmod(0o000)
+    state = project / ".ai-state"
+    state.chmod(0o000)
+
+    try:
+        result = liveness(repo, project)
+    finally:
+        state.chmod(0o755)
+
+    assert (result.returncode, "cannot be listed" in result.stderr) == (2, True)
+
+
+@needs_a_mode_to_bite
+def test_every_segment_unreadable_is_unknown_not_a_pass(repo: Path, tmp_path: Path) -> None:
+    write_ledger(repo, researcher=trial_row())
+    project = tmp_path / "project"
+    write_log(project, started("a1"))
+    log = unreadable(cb.reader.log_path(project / ".ai-state"))
 
     try:
         result = liveness(repo, project)
     finally:
         log.chmod(0o600)
 
-    assert result.returncode == 2
+    assert (result.returncode, "unknown" in result.stdout) == (2, True)
 
 
 def test_a_ledger_whose_record_does_not_say_when_it_began_is_an_input_error(

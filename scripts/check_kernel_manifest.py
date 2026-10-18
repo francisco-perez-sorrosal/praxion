@@ -18,6 +18,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I7-resident-text-in-kernel` | no orchestrator-only or no-actor paragraph is in any kernel or injected string |
 | `I8-stale-kernel`            | the committed kernels, index, definitions' blocks and preamble equal what the generator writes now |
 | `I8-slot-registration`       | `hooks/hooks.json` registers exactly the index's K synchronous spawn-hook slots, under the plugin's own matcher |
+| `I9-flag-not-literal-true`   | `omitClaudeMd` is written as the literal `true`: false, yes, no, on, off, a quoted true, 1, null and empty are refused |
 | `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
@@ -77,7 +78,7 @@ from kernel_ledger_checks import (
     flip_findings,
     inject_kernel,  # noqa: F401
     misreading_findings,
-    omitting_roles,
+    omit_flags,
     record_findings,
     transition_findings,
 )
@@ -399,7 +400,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         # the generator refuses sources that fail I1: that refusal is I1's finding, not a second
         *(() if totality else stale_findings(evidence.regeneration)),
         *slot_findings(evidence.index_slots, evidence.slot_entries),
-        *flip_findings(omitting_roles(evidence.definitions), evidence.statuses),
+        *flip_findings(omit_flags(evidence.definitions), evidence.statuses),
         *record_findings(evidence.ledger),
         *transition_findings(evidence.parent, evidence.entries),
         *deletion_findings(evidence.parent, evidence.ledger),

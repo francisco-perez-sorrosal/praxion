@@ -9,8 +9,9 @@ function takes what it judges as an argument and reads nothing.
 
 from __future__ import annotations
 
+import re
 import sys
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 
 import kernel_ledger as kl
@@ -32,13 +33,29 @@ PILOT_ROLES = (
 )
 SWITCHED = "switched"
 
-OMIT_KEY = (
-    "omitClaudeMd"  # any value but false or null is read as the flag: a mistyped one still gates
-)
+OMIT_KEY = "omitClaudeMd"
+OMIT_SET = "true"  # the only text that sets the flag: YAML's other spellings are refused, not read
+
+# The frontmatter block of a definition, as the model reads it.
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
 
 
-def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tuple[km.Finding, ...]:
-    """I9: `omitClaudeMd` and a switched adoption record come together, both ways."""
+def flip_findings(flags: Mapping[str, str], statuses: Mapping[str, str]) -> tuple[km.Finding, ...]:
+    """I9: `omitClaudeMd` is a literal true, and it and a switched adoption record come together.
+
+    `flags` maps each agent whose definition carries the key to the value as written.
+    """
+    omitting = {role for role, value in flags.items() if value == OMIT_SET}
+    misspelled = tuple(
+        km.Finding(
+            "I9-flag-not-literal-true",
+            f"role {role}",
+            f"omitClaudeMd is {value!r}, not the literal {OMIT_SET}: no other spelling "
+            "sets the flag, so the key is removed or written as the literal",
+        )
+        for role, value in sorted(flags.items())
+        if value != OMIT_SET
+    )
     unrecorded = tuple(
         km.Finding(
             "I9-flag-without-record",
@@ -58,7 +75,7 @@ def flip_findings(omitting: Collection[str], statuses: Mapping[str, str]) -> tup
         for role, status in sorted(statuses.items())
         if status == SWITCHED and role not in omitting
     )
-    return (*unrecorded, *unflagged)
+    return (*misspelled, *unrecorded, *unflagged)
 
 
 def record_findings(ledger: kl.Ledger | km.KernelModelError | None) -> tuple[km.Finding, ...]:
@@ -130,11 +147,29 @@ def misreading_findings(
     return tuple(km.Finding(f"I10-{found.kind}", found.subject, found.detail) for found in misread)
 
 
-def omitting_roles(definitions: Mapping[str, str]) -> frozenset[str]:
-    """The agents whose definition sets `omitClaudeMd` to anything but false."""
-    return frozenset(name for name, text in definitions.items() if _omits_claude_md(name, text))
+def omit_flags(definitions: Mapping[str, str]) -> Mapping[str, str]:
+    """Each agent whose definition carries `omitClaudeMd`, to the value as written.
+
+    As written, because YAML reads `yes`, `on` and a quoted `true` its own ways and the gate
+    admits none of them: the value is the source text of the scalar, quotes included.
+    """
+    found = {}
+    for name, text in definitions.items():
+        # the model refuses frontmatter that is not YAML (and a missing PyYAML) before it is composed
+        km.frontmatter(text, f"agents/{name}.md")
+        if (block := _FRONTMATTER.match(text)) and (value := _written_flag(block.group(1))):
+            found[name] = value[0]
+    return found
 
 
-def _omits_claude_md(name: str, definition: str) -> bool:
-    flag = km.frontmatter(definition, f"agents/{name}.md").get(OMIT_KEY)
-    return flag is not None and flag is not False
+def _written_flag(block: str) -> tuple[str] | None:
+    """The key's value as written in the YAML `block`, in a tuple so an empty one is not absent."""
+    import yaml  # present: km.frontmatter has just parsed this block with it
+
+    root = yaml.compose(block)
+    written = [
+        block[value.start_mark.index : value.end_mark.index].strip()
+        for key, value in getattr(root, "value", ())
+        if isinstance(key, yaml.ScalarNode) and key.value == OMIT_KEY
+    ]
+    return (written[-1],) if written else None  # the last duplicate wins, as in YAML

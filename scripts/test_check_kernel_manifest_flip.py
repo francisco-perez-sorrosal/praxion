@@ -67,18 +67,74 @@ def test_the_flag_on_a_role_still_at_trial_is_reported(repo: Path) -> None:
     assert [(f.subject, "trial" in f.detail) for f in found] == [("role researcher", True)]
 
 
-@pytest.mark.parametrize("value", ["false", "False", ""])
-def test_a_flag_set_to_false_or_left_empty_does_not_switch_a_role(repo: Path, value: str) -> None:
+NOT_LITERAL_TRUE = [
+    "false",
+    "False",
+    "yes",
+    "no",
+    "on",
+    "off",
+    "'true'",
+    '"true"',
+    "True",
+    "1",
+    "null",
+    "",
+]
+
+
+@pytest.mark.parametrize("value", NOT_LITERAL_TRUE, ids=lambda v: v or "empty")
+def test_a_flag_that_is_not_a_literal_true_is_refused_naming_role_and_value(
+    repo: Path, value: str
+) -> None:
+    omit_claude_md(repo, "researcher", value)
+
+    found = [f for f in cb.check(repo) if f.kind == "I9-flag-not-literal-true"]
+
+    assert [f.subject for f in found] == ["role researcher"]
+    assert repr(value) in found[0].detail
+
+
+@pytest.mark.parametrize("value", ["yes", "'true'", "false"])
+def test_a_flag_that_is_not_a_literal_true_does_not_count_as_setting_it(
+    repo: Path, value: str
+) -> None:
     omit_claude_md(repo, "researcher", value)
 
     assert subjects(repo, "I9-flag-without-record") == []
 
 
-@pytest.mark.parametrize("value", ["true", "True", "yes", "'true'"])
-def test_any_value_but_false_counts_as_the_flag(repo: Path, value: str) -> None:
-    omit_claude_md(repo, "researcher", value)
+def test_a_flag_that_is_not_a_literal_true_on_a_switched_role_leaves_it_unflagged(
+    repo: Path,
+) -> None:
+    write_ledger(repo, researcher=switched_row())
+    omit_claude_md(repo, "researcher", "yes")
+    regenerate(repo)
 
-    assert subjects(repo, "I9-flag-without-record") == ["role researcher"]
+    assert subjects(repo, "I9-flag-not-literal-true") == ["role researcher"]
+    assert subjects(repo, "I9-switch-without-flag") == ["role researcher"]
+
+
+def test_a_literal_true_with_a_trailing_comment_is_the_literal(repo: Path) -> None:
+    write_ledger(repo, researcher=switched_row())
+    omit_claude_md(repo, "researcher", "true  # pilot")
+    regenerate(repo)
+
+    assert cb.check(repo) == ()
+
+
+def test_the_last_omit_line_decides_as_in_yaml(repo: Path) -> None:
+    omit_claude_md(repo, "researcher", "false")
+    flipped(repo)  # inserts its true above, so the false is the last line
+
+    assert subjects(repo, "I9-flag-not-literal-true") == ["role researcher"]
+
+
+def test_the_flag_in_the_body_of_a_definition_is_not_the_flag(repo: Path) -> None:
+    path = repo / "agents/researcher.md"
+    path.write_text(path.read_text(encoding="utf-8") + "\nomitClaudeMd: yes\n", encoding="utf-8")
+
+    assert subjects(repo, "I9-flag-not-literal-true") == []
 
 
 def test_a_switched_record_without_the_flag_is_reported(repo: Path) -> None:
@@ -363,23 +419,28 @@ def test_the_pilot_is_the_five_roles_the_design_names() -> None:
     [
         "omitClaudeMd : true",
         '"omitClaudeMd": true',
-        "'omitClaudeMd': yes",
+        "'omitClaudeMd': true",
         "omitClaudeMd:\n  true",
-        "omitClaudeMd: 'false'",
     ],
-    ids=["space before colon", "quoted key", "single-quoted key", "value on next line", "string"],
+    ids=["space before colon", "quoted key", "single-quoted key", "value on next line"],
 )
-def test_the_flag_in_any_form_yaml_reads_as_set_counts(repo: Path, line: str) -> None:
+def test_the_flag_in_any_form_yaml_reads_as_a_literal_true_counts(repo: Path, line: str) -> None:
     frontmatter_line(repo, "researcher", line)
 
     assert subjects(repo, "I9-flag-without-record") == ["role researcher"]
+    assert subjects(repo, "I9-flag-not-literal-true") == []
 
 
-@pytest.mark.parametrize("line", ["omitClaudeMd : false", '"omitClaudeMd": null', "omitClaudeMd:"])
-def test_the_flag_that_yaml_reads_as_false_or_null_does_not_count(repo: Path, line: str) -> None:
+@pytest.mark.parametrize(
+    "line", ["omitClaudeMd : false", '"omitClaudeMd": null', "omitClaudeMd:", "'omitClaudeMd': yes"]
+)
+def test_the_flag_in_any_form_yaml_reads_as_something_else_is_refused(
+    repo: Path, line: str
+) -> None:
     frontmatter_line(repo, "researcher", line)
 
     assert subjects(repo, "I9-flag-without-record") == []
+    assert subjects(repo, "I9-flag-not-literal-true") == ["role researcher"]
 
 
 def test_a_definition_whose_frontmatter_is_not_yaml_is_an_input_error(repo: Path) -> None:

@@ -2,8 +2,10 @@
 
 A pair whose lean side errored while its full side did not counts as a lean
 failure (the worst-case recount). A mechanical check regresses only when the lean
-arm fails it on more pairs than the full arm plus that check's declared noise
-allowance. A judged check is non-inferior when the lean arm's pass rate over the
+arm fails it on more pairs than the full arm plus that check's noise allowance:
+the exact one-sided quantile of the net discordance at the check's own discordant
+count in the run (a results file written before that method declares its allowance
+instead). A judged check is non-inferior when the lean arm's pass rate over the
 recounted pairs is no more than the declared margin below the full arm's -- a
 point estimate -- with the one-sided interval on the paired difference reported
 beside it and never deciding. The role's flip verdict is clear only when every
@@ -31,8 +33,9 @@ FETCHED_CONTENT = CheckSpec("C6", "mechanical")
 PASS, FAIL = "passed", "failed"
 
 
-def test_a_mechanical_check_the_lean_arm_passes_on_one_fewer_pair_regresses():
-    pairs = repeated(19, {"C1": PASS}, {"C1": PASS}) + repeated(1, {"C1": PASS}, {"C1": FAIL})
+def test_a_mechanical_check_the_lean_arm_fails_on_more_pairs_than_its_own_discordance_allows_regresses():
+    # Five discordant pairs, all lean-only: the exact allowance at five is three pairs.
+    pairs = repeated(15, {"C1": PASS}, {"C1": PASS}) + repeated(5, {"C1": PASS}, {"C1": FAIL})
 
     verdict = role_verdict([DURABLE_OUTPUT], pairs, FlipSettings(required_pairs=20))
 
@@ -132,6 +135,8 @@ def test_a_judged_check_within_the_margin_on_its_point_estimate_is_non_inferior_
 
 @pytest.mark.parametrize(("allowance", "expected"), [(1, "regression"), (2, "no regression")])
 def test_a_mechanical_check_regresses_only_beyond_its_declared_noise_allowance(allowance, expected):
+    # A declared table of allowances and no method: the reading of a file written before the
+    # own-discordance method existed, which a recorded results file keeps.
     pairs = repeated(18, {"C1": PASS}, {"C1": PASS}) + repeated(2, {"C1": PASS}, {"C1": FAIL})
 
     verdict = role_verdict(
@@ -142,10 +147,10 @@ def test_a_mechanical_check_regresses_only_beyond_its_declared_noise_allowance(a
 
 
 def test_a_pair_whose_lean_side_alone_errored_counts_as_a_lean_failure():
-    pairs = repeated(20, {"C1": PASS}, {"C1": PASS}) + lean_errored_pairs(1, {"C1": PASS})
+    pairs = repeated(20, {"C1": PASS}, {"C1": PASS}) + lean_errored_pairs(5, {"C1": PASS})
 
     verdict = role_verdict([DURABLE_OUTPUT], pairs, FlipSettings(required_pairs=20))
 
     assert verdict.complete_pairs == 20
-    assert verdict.worst_case_lean_failures["C1"] == 1
+    assert verdict.worst_case_lean_failures["C1"] == 5
     assert verdict.check_verdicts["C1"] == "regression", "an errored lean session hid a failure"

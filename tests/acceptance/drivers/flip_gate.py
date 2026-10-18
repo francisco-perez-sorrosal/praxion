@@ -14,6 +14,10 @@ Bound here, because the specification or the base commit fixes them:
   `20261015T035717Z-03a785`), and an underpowered run of 13 (the researcher's
   `20261014T045733Z-7050ca`). A copy measures another role when every mention of the
   original role in it is rewritten to that role;
+- the run index beside the results files (`index.json`), which the gate reads beside them:
+  a sandbox's index is rebuilt from its results files by `<sandbox> --reindex` through the
+  real console entry whenever a record is cited or a switch is written, so it matches the
+  results the scenario planted, removed or overwrote;
 - a parent commit's ledger the gate cannot read is a ledger file that is not YAML;
 - the liveness check, `scripts/check_kernel_manifest.py --liveness --repo-root PROJECT
   --json`, run from the plugin root; exit 0 is a clean report;
@@ -35,11 +39,22 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from tests.acceptance.drivers import kernel_adoption
+from tests.acceptance.drivers.adherence_eval import (
+    DUMMY_CREDENTIAL,
+    EVAL_PROJECT,
+    EVAL_PYTHON,
+    _guarded_path,
+    _uv,
+    adherence_console_entry,
+    eval_env,
+    install_tripwire,
+)
 from tests.acceptance.drivers.kernel_adoption import AdherenceRun, AdoptionRecord
 from tests.acceptance.drivers.kernel_sandbox import (
     ADOPTION_LEDGER,
@@ -77,6 +92,28 @@ def plant_results(root: Path, run_id: str, source: tuple[str, str, int], role: s
     return pairs
 
 
+def reindex(root: Path) -> None:
+    """Rebuild `root`'s run index from its results files, through the real console entry."""
+    with tempfile.TemporaryDirectory(prefix="flip-gate-tripwire-") as scratch:
+        tripwire = install_tripwire(Path(scratch))
+        env = eval_env(
+            {"PATH": _guarded_path(tripwire.bin_dir), "ANTHROPIC_API_KEY": DUMMY_CREDENTIAL}
+        )
+        proc = subprocess.run(
+            [_uv(), "run", "--quiet", "--python", EVAL_PYTHON, "--project", str(EVAL_PROJECT)]
+            + [adherence_console_entry().name, str(root), "--reindex"],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=EVAL_PROJECT,
+            timeout=300,
+        )
+        assert not tripwire.starts(), "reindexing a sandbox started claude"
+    assert proc.returncode == 0, (
+        f"--reindex of {root} failed: {(proc.stdout + proc.stderr)[-2000:]}"
+    )
+
+
 def _suffix(role: str, salt: str) -> str:
     return hashlib.sha1(f"{salt}:{role}".encode()).hexdigest()[:6]
 
@@ -95,6 +132,7 @@ def cited_switch_record(root: Path, role: str) -> AdoptionRecord:
     early = plant_results(root, earlier_id(role), UNDERPOWERED_13, role)
     passing = plant_results(root, passing_id(role), CLEAR_24, role)
     full = kernel_adoption.full_switch_record(role)
+    reindex(root)
     return AdoptionRecord(
         role,
         "switched",
@@ -110,7 +148,11 @@ def cited_switch_record(root: Path, role: str) -> AdoptionRecord:
 
 
 def switch_with_flag(sandbox: Sandbox, record: AdoptionRecord) -> None:
-    """Record `record` (its trial committed first) and set the role's flag, as a flip does."""
+    """Record `record` (its trial committed first) and set the role's flag, as a flip does.
+
+    The run index is rebuilt first: scenarios plant, remove or overwrite results files after
+    citing them, and a flip commits an index that matches the results it rests on."""
+    reindex(sandbox.root)
     kernel_adoption.record(sandbox.root, record)
     text = sandbox.read(agent_path(record.role))
     if OMIT not in text:

@@ -476,17 +476,56 @@ def test_a_commit_that_removes_the_agent_of_an_adopted_role_is_not_blocked_by_th
     assert [(f.subject, f.detail) for f in found] == [("role ghost", "trial -> absent")]
 
 
-def test_a_parent_ledger_too_broken_to_read_is_told_and_judged_as_none(
-    repo: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+BROKEN_LEDGER = "roles: [unclosed"
+
+
+def commit_broken_ledger(repo: Path) -> None:
     (repo / km.LEDGER_PATH).parent.mkdir(parents=True, exist_ok=True)
-    (repo / km.LEDGER_PATH).write_text("roles: [unclosed", encoding="utf-8")
+    (repo / km.LEDGER_PATH).write_text(BROKEN_LEDGER, encoding="utf-8")
     commit_all(repo)
 
+
+def test_a_parent_ledger_too_broken_to_read_is_an_input_error_naming_it(repo: Path) -> None:
+    commit_broken_ledger(repo)
+
     flipped(repo)
+    ran = run_checker(repo)
+
+    assert ran.returncode == 2
+    assert "parent commit's ledger cannot be read" in ran.stderr
+    assert "kernel_adoption.yaml at HEAD" in ran.stderr
+
+
+def test_a_parent_ledger_too_broken_to_read_is_refused_when_the_tree_is_committed_too(
+    repo: Path,
+) -> None:
+    commit_broken_ledger(repo)
+    flipped(repo)
+    commit_all(repo)
+
+    ran = run_checker(repo)
+
+    assert ran.returncode == 2
+    assert "kernel_adoption.yaml at HEAD^" in ran.stderr
+
+
+def test_deleting_the_ledger_cannot_pass_as_a_first_appearance_over_an_unreadable_parent(
+    repo: Path,
+) -> None:
+    commit_broken_ledger(repo)
+
+    (repo / km.LEDGER_PATH).unlink()
+
+    assert run_checker(repo).returncode == 2
+
+
+def test_a_parent_commit_holding_no_ledger_is_read_as_none(repo: Path) -> None:
+    commit_all(repo)
+
+    write_ledger(repo, researcher=trial_row())
 
     assert cb.check(repo) == ()
-    assert "its moves are not judged" in capsys.readouterr().err
+    assert run_checker(repo).returncode == 0
 
 
 # -- The first appearance of a ledger cannot be repeated -------------------------------------------------

@@ -7,6 +7,8 @@ lenient readers (statuses, entries, adoptions) survive a record the gate refuses
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,6 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import kernel_ledger as kl  # noqa: E402
+import kernel_ledger_history as kh  # noqa: E402
 import kernel_model as km  # noqa: E402
 
 AGENTS = frozenset({"researcher", "verifier", "discipline-consultant", "implementer", "sentinel"})
@@ -495,3 +498,132 @@ def test_a_ledger_that_is_not_a_mapping_is_refused_naming_it(tmp_path: Path) -> 
 
     with pytest.raises(km.KernelModelError, match="kernel_adoption.yaml"):
         kl.load_ledger(tmp_path, AGENTS)
+
+
+# -- The parent ledger, as the history reads it ---------------------------------------
+
+
+COMMITTED = "2026-10-13T12:00:00+00:00"
+
+
+def commit_all(root: Path, at: str = COMMITTED) -> None:
+    """Commit everything under `root`, a repository of its own, at the moment `at`.
+
+    Not the checker testkit's: that imports the checker, which reads the repository's own files
+    and so cannot run where the mutation sensor relocates this file.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_AUTHOR_DATE=at, GIT_COMMITTER_DATE=at)
+    identity = ["-c", "user.name=Probe", "-c", "user.email=probe@example.invalid"]
+    steps = (["init", "-q"], ["add", "-A"], [*identity, "commit", "-q", "--no-verify", "-m", "x"])
+    for step in steps:
+        subprocess.run(
+            ["git", *step], cwd=root, env=env, check=True, capture_output=True, timeout=60
+        )
+
+
+def commit_ledger(root: Path, text: str, at: str = COMMITTED) -> None:
+    write(root, text)
+    commit_all(root, at)
+
+
+def test_a_parent_commit_holding_a_readable_ledger_is_present(tmp_path: Path) -> None:
+    commit_ledger(tmp_path, "version: 1\nroles:\n  researcher: {status: trial, runs: []}\n")
+    write(tmp_path, "version: 1\nroles: {}\n")
+
+    read = kh.parent_ledger(tmp_path)
+
+    assert isinstance(read, kh.Present)
+    assert set(read.ledger.entries) == {"researcher"}
+
+
+def test_a_parent_commit_holding_no_ledger_is_absent(tmp_path: Path) -> None:
+    (tmp_path / "unrelated.txt").write_text("x", encoding="utf-8")
+    commit_all(tmp_path)
+
+    assert kh.parent_ledger(tmp_path) == kh.Absent()
+
+
+def test_a_directory_with_no_repository_is_absent(tmp_path: Path) -> None:
+    assert kh.parent_ledger(tmp_path) == kh.Absent()
+
+
+def test_a_parent_commit_holding_a_ledger_that_is_not_yaml_is_unreadable_not_absent(
+    tmp_path: Path,
+) -> None:
+    commit_ledger(tmp_path, "roles: [unclosed")
+    write(tmp_path, "version: 1\nroles: {}\n")
+
+    read = kh.parent_ledger(tmp_path)
+
+    assert isinstance(read, kh.Unreadable)
+    assert read.detail.startswith(f"{km.LEDGER_PATH} at HEAD: not valid YAML")
+
+
+def test_a_first_parent_holding_a_ledger_that_is_not_yaml_is_unreadable_naming_its_revision(
+    tmp_path: Path,
+) -> None:
+    commit_ledger(tmp_path, "roles: [unclosed")
+    commit_ledger(tmp_path, EMPTY_LEDGER)
+
+    read = kh.parent_ledger(tmp_path)
+
+    assert isinstance(read, kh.Unreadable)
+    assert read.detail.startswith(f"{km.LEDGER_PATH} at HEAD^: not valid YAML")
+
+
+TRIAL_LEDGER = "version: 1\nroles:\n  researcher: {status: trial, runs: []}\n"
+EMPTY_LEDGER = "version: 1\nroles: {}\n"
+
+
+def test_a_commit_being_built_is_judged_at_the_gates_clock_from_the_parent_commit(
+    tmp_path: Path,
+) -> None:
+    commit_ledger(tmp_path, EMPTY_LEDGER)
+    write(tmp_path, TRIAL_LEDGER)
+    now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
+
+    read = kh.parent_ledger(tmp_path, clock=lambda: now)
+
+    assert isinstance(read, kh.Present)
+    assert (read.ledger.committed_at, read.ledger.built_at) == (
+        datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc),
+        now,
+    )
+
+
+def test_a_commit_being_built_is_judged_at_the_present_moment_by_default(tmp_path: Path) -> None:
+    commit_ledger(tmp_path, EMPTY_LEDGER)
+    write(tmp_path, TRIAL_LEDGER)
+    before = datetime.now(timezone.utc)
+
+    read = kh.parent_ledger(tmp_path)
+
+    assert isinstance(read, kh.Present)
+    assert before <= read.ledger.built_at <= datetime.now(timezone.utc)
+
+
+def test_a_commit_already_made_is_judged_from_its_first_parent_at_its_own_time(
+    tmp_path: Path,
+) -> None:
+    commit_ledger(tmp_path, TRIAL_LEDGER)
+    commit_ledger(tmp_path, EMPTY_LEDGER, at="2026-10-14T08:00:00+00:00")
+
+    read = kh.parent_ledger(tmp_path)
+
+    assert isinstance(read, kh.Present)
+    assert set(read.ledger.entries) == {"researcher"}
+    assert (read.ledger.committed_at, read.ledger.built_at) == (
+        datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc),
+        datetime(2026, 10, 14, 8, 0, tzinfo=timezone.utc),
+    )
+
+
+def test_a_commit_already_made_over_a_parent_without_a_ledger_has_none_to_move_from(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "unrelated.txt").write_text("x", encoding="utf-8")
+    commit_all(tmp_path)
+    commit_ledger(tmp_path, EMPTY_LEDGER)
+
+    assert kh.parent_ledger(tmp_path) == kh.Absent()

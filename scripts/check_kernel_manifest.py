@@ -378,7 +378,7 @@ def gather(root: Path) -> Evidence:
         kl.load_entries(root),
         _read_text(root / km.LEDGER_PATH),
         _evidence_checked_ledger(root, definitions),
-        kh.parent_ledger(root),
+        _parent_ledger(root),
     )
 
 
@@ -478,6 +478,17 @@ def _slot_entries(root: Path) -> tuple[SlotEntry, ...] | None:
         raise km.KernelModelError(
             f"{path}: not a hook registry this checker can read: {exc!r}"
         ) from exc
+
+
+def _parent_ledger(root: Path) -> kl.ParentLedger | None:
+    """The parent commit's ledger; None when it holds none. One it cannot read is an input error."""
+    match kh.parent_ledger(root):
+        case kh.Present(ledger):
+            return ledger
+        case kh.Absent():
+            return None
+        case kh.Unreadable(detail):
+            raise km.KernelModelError(f"the parent commit's ledger cannot be read: {detail}")
 
 
 def _regeneration(root: Path) -> tuple[str, ...] | km.KernelModelError:

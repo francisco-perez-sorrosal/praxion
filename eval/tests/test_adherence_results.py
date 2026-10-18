@@ -578,3 +578,135 @@ def test_a_role_none_of_whose_lean_sessions_carry_markers_has_no_flip_record_ent
     results.write_atomic(path, run_results([*pair_of_sessions("t1")]))
 
     assert json.loads(path.read_text())["kernel_delivery"] == {}
+
+
+# ---------------------------------------------------------------------------
+# A continued run is one run: one verdict, listed once
+# ---------------------------------------------------------------------------
+
+LEAN_FAILS = Measured({"C1": Failed("no"), "C3": Passed()}, 1000)
+STOPPED = Errored("exit_nonzero", "credit exhausted", None)
+
+
+def stopped_then_continued() -> tuple[RunResults, RunResults, RunResults]:
+    """A run of three tasks as one run, and the same sessions as the two parts of a lineage:
+    the first stopped inside task t2, the second launched t2 again and then t3."""
+    t1, t2, t3 = pair_of_sessions("t1"), pair_of_sessions("t2"), pair_of_sessions("t3")
+    t3 = (t3[0], session("t3", "lean", LEAN_FAILS))
+    stopped = (session("t2", "full", STOPPED), session("t2", "lean", STOPPED))
+    whole = run_results([*t1, *t2, *t3], settings=declared(3))
+    first = run_results([*t1, *stopped], run_id="run-a", settings=declared(3))
+    second = run_results(
+        [*t2, *t3], run_id="run-b", settings=declared(5), extra={"continues": "run-a"}
+    )
+    return whole, first, second
+
+
+def test_the_verdict_over_a_lineage_equals_the_verdict_over_the_same_pairs_as_one_run():
+    whole, first, second = stopped_then_continued()
+
+    lineage_run = results.merged([first, second])
+
+    assert results.pairs_of(lineage_run, "researcher") == results.pairs_of(whole, "researcher")
+    assert results.role_verdicts(lineage_run) == results.role_verdicts(whole)
+
+
+def test_a_task_launched_again_replaces_the_session_the_stop_cut_short():
+    _, first, second = stopped_then_continued()
+
+    pairs = results.pairs_of(results.merged([first, second]), "researcher")
+
+    assert [(p.task_id, type(p.full), type(p.lean)) for p in pairs] == [
+        ("t1", Measured, Measured),
+        ("t2", Measured, Measured),
+        ("t3", Measured, Measured),
+    ]
+
+
+def test_a_lineage_is_judged_under_what_its_first_part_declared():
+    _, first, second = stopped_then_continued()
+
+    lineage_run = results.merged([first, second])
+
+    assert (lineage_run.settings, lineage_run.declared_at) == (first.settings, first.declared_at)
+    assert lineage_run.run.id == second.run.id
+
+
+def test_a_run_that_continues_nothing_merges_to_itself():
+    only = run_results([*pair_of_sessions("t1")])
+
+    assert results.merged([only]) == only
+
+
+def test_a_lineage_is_listed_once_naming_every_part(tmp_path: Path):
+    _, first, second = stopped_then_continued()
+    write_run(tmp_path, "run-a", first.sessions, settings=first.settings)
+    write_run(
+        tmp_path, "run-b", second.sessions, settings=second.settings, extra={"continues": "run-a"}
+    )
+
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert [d.run_ids for d in earlier.draws] == [("run-a", "run-b")]
+
+
+def test_a_lineage_is_listed_with_the_verdict_over_all_its_parts(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")], settings=declared(2))
+    write_run(
+        tmp_path,
+        "run-b",
+        [*pair_of_sessions("t2")],
+        settings=declared(2),
+        extra={"continues": "run-a"},
+    )
+
+    first_alone = results.role_verdicts(results.load(tmp_path / "run-a.json"))["researcher"]
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert isinstance(first_alone, Underpowered)
+    assert earlier.draws == (results.Draw(("run-a", "run-b"), "clear"),)
+
+
+def test_a_lineage_whose_tip_was_closed_is_a_not_clear_interim_draw(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(
+        tmp_path,
+        "run-b",
+        [*pair_of_sessions("t2")],
+        extra={"continues": "run-a", "ending": {"kind": results.CLOSED_ENDING_KIND}},
+    )
+
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert earlier.draws == (results.Draw(("run-a", "run-b"), "not clear", interim=True),)
+
+
+def test_a_part_whose_predecessor_is_missing_is_listed_on_its_own(tmp_path: Path):
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t2")], extra={"continues": "run-a"})
+
+    earlier = listed(tmp_path).by_role["researcher"]
+
+    assert [d.run_ids for d in earlier.draws] == [("run-b",)]
+
+
+def test_the_parts_before_a_run_are_read_oldest_first_and_a_run_continuing_nothing_has_none(
+    tmp_path: Path,
+):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t2")], extra={"continues": "run-a"})
+    write_run(tmp_path, "run-c", [*pair_of_sessions("t3")], extra={"continues": "run-b"})
+
+    before = lineage.parts_before(results.load(tmp_path / "run-c.json"), tmp_path)
+
+    assert [part.run.id for part in before] == ["run-a", "run-b"]
+    assert lineage.parts_before(results.load(tmp_path / "run-a.json"), tmp_path) == ()
+
+
+def test_a_lineage_of_another_identity_is_set_apart_once(tmp_path: Path):
+    write_run(tmp_path, "run-a", [*pair_of_sessions("t1")])
+    write_run(tmp_path, "run-b", [*pair_of_sessions("t2")], extra={"continues": "run-a"})
+
+    earlier = listed(tmp_path, lambda earlier, role: ("the kernel changed",))
+
+    assert earlier.by_role["researcher"].draws == ()
+    assert earlier.by_role["researcher"].apart == {"run-a + run-b": "the kernel changed"}

@@ -53,6 +53,7 @@ from praxion_evals.adherence.lineage import (
     continuation_refusals,
     ending_to_json,
     measured_identity,
+    parts_before,
     pending_stop,
     relaunch_tasks,
 )
@@ -111,7 +112,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{PROG}: --calibration-run: {CALIBRATION_RUN_NOTE}", file=sys.stderr)
     try:
         if config.report is not None:
-            print(report.render(results.load(config.report)), end="")
+            tip = results.load(config.report)
+            print(report.render(tip, parts_before(tip, config.report.parent)), end="")
             return EXIT_COMPLETE
         checkout = resolve_checkout(config)
         if config.close is not None:

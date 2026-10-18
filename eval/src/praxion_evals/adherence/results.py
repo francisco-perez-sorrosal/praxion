@@ -22,7 +22,7 @@ import os
 import secrets
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, assert_never
@@ -301,6 +301,24 @@ def pairs_of(results: RunResults, role: str) -> list[Pair]:
     ]
 
 
+def merged(parts: Sequence[RunResults]) -> RunResults:
+    """The parts of one lineage, oldest first, read as the one run they are.
+
+    Every part holds only the sessions it launched, and a later record of a task and arm replaces
+    an earlier, so the verdict over the concatenated sessions is the one over the same pairs taken
+    as one run. The run is judged under what its first part declared before its first launch; the
+    latest part supplies the rest (its identity, its ending, its arms).
+    """
+    first, latest = parts[0], parts[-1]
+    return replace(
+        latest,
+        settings=first.settings,
+        declared_at=first.declared_at,
+        catalog=first.catalog,
+        sessions=tuple(record for part in parts for record in part.sessions),
+    )
+
+
 def role_verdicts(results: RunResults) -> dict[str, RoleVerdict]:
     return {
         role: verdict.role_verdict(
@@ -383,24 +401,55 @@ def _earlier_for(role: str, runs: Sequence[RunResults], differences: Differences
     draws: list[Draw] = []
     apart: dict[str, str] = {}
     calibration: list[str] = []
-    for earlier in runs:
-        if not any(record.setup.role == role for record in earlier.sessions):
+    for lineage in _lineages(runs):
+        whole = merged(lineage)
+        if not any(record.setup.role == role for record in whole.sessions):
             continue
-        if earlier.run.extra.get("calibration"):
-            calibration.append(earlier.run.id)
-        elif differing := differences(earlier, role):
-            apart[earlier.run.id] = "; ".join(differing)
+        ids = tuple(part.run.id for part in lineage)
+        label = " + ".join(ids)  # a lineage is one run: listed once, named by every part
+        if whole.run.extra.get("calibration"):
+            calibration.append(label)
+        elif differing := differences(whole, role):
+            apart[label] = "; ".join(differing)
         else:
-            draws.append(_draw_of(earlier, role))
+            draws.append(_draw_of(whole, ids, role))
     return EarlierRuns(tuple(draws), apart, tuple(calibration))
 
 
-def _draw_of(earlier: RunResults, role: str) -> Draw:
-    """A run closed on request gave up before its plan ran out: it reached no flip verdict, so it
-    is a not-clear draw however its sessions would read, and what it had reached is interim."""
-    if (earlier.run.extra.get("ending") or {}).get("kind") == CLOSED_ENDING_KIND:
-        return Draw((earlier.run.id,), "not clear", interim=True)
-    return Draw((earlier.run.id,), flip_label(role_verdicts(earlier)[role]))
+def _lineages(runs: Sequence[RunResults]) -> list[list[RunResults]]:
+    """The runs grouped into the lineages they form, each oldest part first, in the order the
+    directory first met them. A part continuing a run the directory lacks starts a lineage of its
+    own: a listing names what it finds and never refuses a directory."""
+    held = {earlier.run.id: earlier for earlier in runs}
+    lineages: dict[str, list[tuple[int, RunResults]]] = {}
+    for run in runs:
+        chain = _chain_to(run, held)
+        lineages.setdefault(chain[0].run.id, []).append((len(chain), run))
+    return [
+        [run for _, run in sorted(members, key=lambda m: m[0])] for members in lineages.values()
+    ]
+
+
+def _chain_to(run: RunResults, held: Mapping[str, RunResults]) -> list[RunResults]:
+    """``run`` preceded by every run it continues that ``held`` holds, oldest first."""
+    chain, seen = [run], {run.run.id}
+    while (before := _predecessor(chain[0], held)) is not None and before.run.id not in seen:
+        seen.add(before.run.id)  # an id met twice is a loop: stop where it closes
+        chain.insert(0, before)
+    return chain
+
+
+def _predecessor(run: RunResults, held: Mapping[str, RunResults]) -> RunResults | None:
+    continues: str | None = run.run.extra.get("continues")
+    return None if continues is None else held.get(continues)
+
+
+def _draw_of(whole: RunResults, ids: tuple[str, ...], role: str) -> Draw:
+    """A lineage closed on request gave up before its plan ran out: it reached no flip verdict, so
+    it is a not-clear draw however its sessions would read, and what it had reached is interim."""
+    if (whole.run.extra.get("ending") or {}).get("kind") == CLOSED_ENDING_KIND:
+        return Draw(ids, "not clear", interim=True)
+    return Draw(ids, flip_label(role_verdicts(whole)[role]))
 
 
 def earlier_to_json(listing: EarlierListing) -> dict[str, Any]:

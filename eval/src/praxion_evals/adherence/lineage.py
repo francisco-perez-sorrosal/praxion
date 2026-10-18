@@ -22,7 +22,8 @@ here. A continued run is a lineage of parts, each part's results file naming the
 (``Lineage``); a continuation launches again only the tasks nobody finished (``relaunch_tasks``)
 and is refused, naming every reason, unless the stopped run was continuable and still measures
 the same thing (``continuation_refusals``). A stopped run left neither continued nor closed
-blocks a fresh run of its role (``pending_stop``); ``close`` is how the operator resolves it.
+blocks a fresh run of its role (``pending_stop``); ``close`` is how the operator resolves it. A
+lineage is read as one run by ``results.merged``; ``parts_before`` finds the parts a report needs.
 
 The ending, refusal and relaunch halves are pure: nothing in them touches a process, a file or a
 clock, and none reads a graded outcome to decide whether a run continues. ``Lineage.parse`` and
@@ -308,6 +309,19 @@ class Lineage:
                 raise ValueError(f"the lineage forks: {names} all continue {chain[-1].run_id}")
             chain.append(later[0])
         return cls(tuple(chain))
+
+
+def parts_before(results: RunResults, results_dir: Path) -> tuple[RunResults, ...]:
+    """The parts of ``results``' lineage that came before it, oldest first, read from
+    ``results_dir``: none for a run that continues nothing, which is then read as it always was.
+
+    Refused, as ``Lineage.parse`` refuses: a gap, a fork, or a run no readable file holds.
+    """
+    if results.run.extra.get("continues") is None:
+        return ()
+    lineage = Lineage.parse(results_dir, results.run.id)
+    earlier = lineage.parts[: [part.run_id for part in lineage.parts].index(results.run.id)]
+    return tuple(load(part.path) for part in earlier)
 
 
 def _runs_in(results_dir: Path) -> dict[str, tuple[PartRef, RunResults]]:

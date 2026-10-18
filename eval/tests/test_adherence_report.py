@@ -12,7 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 from praxion_evals.adherence import model, report, results, session_launch
-from praxion_evals.adherence.infra_stop import EvidenceTail
+from praxion_evals.adherence.infra_stop import EvidenceTail, Launched, StopReason
+from praxion_evals.adherence.lineage import LAUNCH_REFUSED, Finished, InfraStopped, ending_to_json
 from praxion_evals.adherence.model import (
     CheckErrored,
     CheckOutcome,
@@ -682,3 +683,96 @@ def test_the_report_lists_the_forced_stop_check_as_not_covered_under_five_pairs(
     verdict_line = line_of(text, "verdict:")
     assert ("not covered by the flip verdict" not in verdict_line) is covered, verdict_line
     assert (f"{both_ran_out} pairs ran out of turns on both sides" in verdict_line) is not covered
+
+
+# ---------------------------------------------------------------------------
+# A continued run reads as one run, naming its parts
+# ---------------------------------------------------------------------------
+
+TWO_PAIRS = sessions_of("researcher", same_both_arms(2))  # task-000 then task-001, full then lean
+
+
+def part_of(
+    run_id: str,
+    sessions: Iterable[SessionRecord],
+    *,
+    started_at: str,
+    version: str,
+    extra: Mapping[str, object],
+) -> RunResults:
+    whole = results_of(list(sessions), extra={"started_at": started_at, **extra})
+    return dataclasses.replace(
+        whole, run=dataclasses.replace(whole.run, id=run_id, claude_code_version=version)
+    )
+
+
+def stopped_part(sessions: Iterable[SessionRecord] = TWO_PAIRS[:2]) -> RunResults:
+    streak = tuple(Launched(f"task-{i:03d}", "full", 1) for i in range(3))
+    stop = StopReason("credit_exhausted", "no credit", "researcher", "full", streak, "both-arms")
+    return part_of(
+        "run-a",
+        sessions,
+        started_at="2026-10-12T09:00:00+00:00",
+        version="9.9.8",
+        extra={"ending": ending_to_json(InfraStopped(stop))},
+    )
+
+
+def continuing_part(
+    sessions: Iterable[SessionRecord] = TWO_PAIRS[2:], **extra: object
+) -> RunResults:
+    return part_of(
+        "run-b",
+        sessions,
+        started_at="2026-10-13T09:00:00+00:00",
+        version="9.9.9",
+        extra={"continues": "run-a", "ending": ending_to_json(Finished()), **extra},
+    )
+
+
+def test_a_continued_runs_report_says_so_and_names_every_part_with_what_it_cost():
+    text = report.render(continuing_part(), [stopped_part()])
+
+    assert "Continued run: part 2 of 2" in text
+    assert line_of(text, "part 1:") == (
+        "part 1: run-a (started 2026-10-12T09:00:00+00:00; Claude Code 9.9.8; 2 sessions launched;"
+        " $0.02 spent; 3 full sessions in a row ended in credit_exhausted with the same evidence)"
+    )
+    assert line_of(text, "part 2:") == (
+        "part 2: run-b (started 2026-10-13T09:00:00+00:00; Claude Code 9.9.9; 2 sessions launched;"
+        " $0.02 spent; it finished its plan)"
+    )
+
+
+def test_a_continued_runs_role_section_counts_the_pairs_of_every_part():
+    text = report.render(continuing_part(), [stopped_part()])
+
+    assert "2 complete pairs of 2 paired tasks;" in text
+
+
+def test_a_refused_launch_is_not_a_session_the_part_launched():
+    refusal = Errored(LAUNCH_REFUSED, "the spend cap refused it")
+    refused = dataclasses.replace(TWO_PAIRS[0], status=refusal)
+
+    text = report.render(continuing_part(), [stopped_part([*TWO_PAIRS[:2], refused])])
+
+    assert "2 sessions launched" in line_of(text, "part 1:")
+
+
+def test_a_run_that_continues_nothing_names_no_parts():
+    text = report.render(continuing_part())
+
+    assert "Continued run" not in text
+    assert "part 1:" not in text
+
+
+def test_a_continued_runs_report_does_not_list_its_own_parts_as_earlier_runs():
+    draws = [
+        {"run_ids": ["run-a"], "flip": "underpowered", "interim": False},
+        {"run_ids": ["run-0"], "flip": "clear", "interim": False},
+    ]
+    lineage = [{"run_id": "run-a", "stop": "x"}, {"run_id": "run-b", "stop": None}]
+
+    text = report.render(continuing_part(lineage=lineage, **listing(draws=draws)), [stopped_part()])
+
+    assert "same definition and kernel: run-0: flip clear." in text

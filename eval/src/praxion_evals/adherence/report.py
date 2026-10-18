@@ -8,18 +8,22 @@ margin on a judged one; it says that judge error attenuates differences and that
 a reported interval did not decide; it gives an underpowered role its counts and
 no flip verdict. No sentence ranks one arm over the other.
 
-Pure: a results value in, a string out.
+A continued run is one run: ``render`` takes the latest part and the parts before it and states
+one verdict over the sessions of all of them, under what the first part declared, naming each part.
+
+Pure: results values in, a string out.
 """
 
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from statistics import median
 from textwrap import shorten
-from typing import assert_never
+from typing import Any, assert_never
 
 from praxion_evals.adherence.lineage import (
+    LAUNCH_REFUSED,
     Closed,
     Finished,
     InfraStopped,
@@ -50,6 +54,7 @@ from praxion_evals.adherence.model import (
     Passed,
     Regression,
     RoleVerdict,
+    SessionRecord,
     SessionStatus,
     Underpowered,
     Withheld,
@@ -58,14 +63,17 @@ from praxion_evals.adherence.model_verdict import NotCovered
 from praxion_evals.adherence.results import (
     CatalogEntry,
     KernelDelivery,
+    RunInfo,
     RunResults,
     earlier_listed,
     kernel_deliveries,
     measured_sessions,
+    merged,
     pairs_of,
     role_verdicts,
     skipped_files,
 )
+from praxion_evals.adherence.run_ending import stop_summary
 from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap
 from praxion_evals.adherence.verdict import tally
 
@@ -110,12 +118,16 @@ READING_NOTES = (
 )
 
 
-def render(results: RunResults) -> str:
-    verdicts = role_verdicts(results)
-    sections = [_run_section(results), "\n".join(READING_NOTES)]
+def render(results: RunResults, continued_from: Sequence[RunResults] = ()) -> str:
+    """The report of ``results``; ``continued_from`` is the parts of its lineage before it, oldest
+    first, so the report reads the whole run and not just the part that happened to end it."""
+    parts = [*continued_from, results]
+    whole = merged(parts)
+    verdicts = role_verdicts(whole)
+    sections = [_run_section(whole, parts), "\n".join(READING_NOTES)]
     sections += [
-        _role_section(results, role, entries, verdicts[role])
-        for role, entries in results.catalog.items()
+        _role_section(whole, role, entries, verdicts[role])
+        for role, entries in whole.catalog.items()
     ]
     return "\n\n".join(sections) + "\n"
 
@@ -125,7 +137,7 @@ def render(results: RunResults) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _run_section(results: RunResults) -> str:
+def _run_section(results: RunResults, parts: Sequence[RunResults]) -> str:
     run, settings = results.run, results.settings
     state = (
         "complete" if run.complete else f"incomplete ({len(run.refused_launches)} refused launches)"
@@ -135,6 +147,7 @@ def _run_section(results: RunResults) -> str:
         [
             f"Adherence report for run {run.id}",
             f"Model {run.model}; Claude Code {run.claude_code_version}; the run is {state}.",
+            *_continued_lines(parts),
             *_ending_lines(ending_of(results)),
             *_skipped_lines(results),
             f"Declared at {results.declared_at}, before the first session:",
@@ -147,6 +160,31 @@ def _run_section(results: RunResults) -> str:
             _judge_error_line(results),
         ]
     )
+
+
+def _continued_lines(parts: Sequence[RunResults]) -> list[str]:
+    """A continued run says so and names every part, oldest first, with what it cost and how it
+    ended; nothing for a run that continues no other."""
+    if len(parts) < 2:
+        return []
+    lines = [
+        f"Continued run: part {len(parts)} of {len(parts)}; one verdict over the sessions of every"
+        " part, judged under what part 1 declared."
+    ]
+    for number, part in enumerate(parts, start=1):
+        launched = sum(not _refused(record) for record in part.sessions)
+        spent = sum(record.cost_usd for record in part.sessions)
+        started = part.run.extra.get("started_at", "not recorded")
+        lines.append(
+            f"{INDENT}part {number}: {part.run.id} (started {started};"
+            f" Claude Code {part.run.claude_code_version}; {launched} sessions launched;"
+            f" ${spent:.2f} spent; {stop_summary(ending_of(part))})"
+        )
+    return lines
+
+
+def _refused(record: SessionRecord) -> bool:
+    return isinstance(record.status, Errored) and record.status.kind == LAUNCH_REFUSED
 
 
 def _skipped_lines(results: RunResults) -> list[str]:
@@ -358,7 +396,9 @@ def _earlier_runs_lines(results: RunResults, role: str) -> list[str]:
         earlier = results.run.earlier_runs.get(role, ())
         runs = "; ".join(f"{run.run_id}: flip {run.flip}" for run in earlier) or "none"
         return [f"{INDENT}Earlier runs of this role on this checkout: {runs}."]
-    draws = "; ".join(f"{' + '.join(d.run_ids)}: flip {d.flip}" for d in listed.draws) or "none"
+    own = _own_run_ids(results.run)  # the parts a run continues were listed beside it, not before
+    shown = [d for d in listed.draws if own.isdisjoint(d.run_ids)]
+    draws = "; ".join(f"{' + '.join(d.run_ids)}: flip {d.flip}" for d in shown) or "none"
     lines = [f"{INDENT}Earlier runs of this role on the same definition and kernel: {draws}."]
     if listed.apart:
         lines.append(f"{INDENT}Earlier runs of this role set apart, with how they differ:")
@@ -367,6 +407,11 @@ def _earlier_runs_lines(results: RunResults, role: str) -> list[str]:
         calibration = ", ".join(listed.calibration)
         lines.append(f"{INDENT}Calibration runs of this role, never a draw: {calibration}.")
     return lines
+
+
+def _own_run_ids(run: RunInfo) -> frozenset[str]:
+    lineage: Sequence[dict[str, Any]] = run.extra.get("lineage") or ()
+    return frozenset({run.id, *(part["run_id"] for part in lineage)})
 
 
 # ---------------------------------------------------------------------------

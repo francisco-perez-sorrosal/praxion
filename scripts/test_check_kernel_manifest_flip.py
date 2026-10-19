@@ -190,12 +190,12 @@ def test_a_flip_resting_on_a_run_from_another_eval_is_reported_by_role(repo: Pat
 
 
 def test_a_role_outside_the_eligible_list_cannot_be_flipped(repo: Path) -> None:
-    flipped(repo, role="implementer")
+    flipped(repo, role="sentinel")
 
     found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 
     assert len(found) == 1
-    assert "implementer" in found[0].detail
+    assert "sentinel" in found[0].detail
 
 
 def test_a_ledger_that_is_not_yaml_is_an_input_error_not_a_finding(repo: Path) -> None:
@@ -385,17 +385,17 @@ def test_the_flag_on_a_held_role_is_reported(repo: Path) -> None:
 
 
 def test_a_switched_role_outside_the_pin_is_refused_by_name(repo: Path) -> None:
-    write_ledger(repo, implementer=switched_row())
-    omit_claude_md(repo, "implementer")
+    write_ledger(repo, sentinel=switched_row())
+    omit_claude_md(repo, "sentinel")
     regenerate(repo)
 
     found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 
     assert [f.subject for f in found] == [km.LEDGER_PATH]
-    assert "role implementer: is not eligible" in found[0].detail
+    assert "role sentinel: is not eligible" in found[0].detail
 
 
-@pytest.mark.parametrize("listed", [[*ELIGIBLE_ROLES, "implementer"], list(ELIGIBLE_ROLES), []])
+@pytest.mark.parametrize("listed", [[*ELIGIBLE_ROLES, "sentinel"], list(ELIGIBLE_ROLES), []])
 def test_a_ledger_that_lists_eligible_roles_of_its_own_is_refused(
     repo: Path, listed: list[str]
 ) -> None:

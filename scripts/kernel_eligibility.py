@@ -15,4 +15,5 @@ ELIGIBLE_ROLES = (
     "discipline-consultant",
     "skill-genesis",
     "context-engineer",
+    "implementer",
 )

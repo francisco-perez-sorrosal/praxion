@@ -23,7 +23,7 @@ import kernel_ledger_history as kh  # noqa: E402
 import kernel_model as km  # noqa: E402
 from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
 
-AGENTS = frozenset({*ELIGIBLE_ROLES, "implementer", "sentinel"})
+AGENTS = frozenset({*ELIGIBLE_ROLES, "sentinel"})
 END_OF_DAY = datetime(2026, 10, 12, 23, 59, 59, 999999, tzinfo=timezone.utc)
 
 
@@ -121,8 +121,8 @@ def test_a_switched_record_without_sound_evidence_cannot_be_built(
 
 
 def test_a_role_that_is_not_eligible_cannot_be_switched() -> None:
-    with pytest.raises(km.KernelModelError, match="role implementer: is not eligible"):
-        parse_ledger(implementer=switched_row())
+    with pytest.raises(km.KernelModelError, match="role sentinel: is not eligible"):
+        parse_ledger(sentinel=switched_row())
 
 
 @pytest.mark.parametrize("role", ELIGIBLE_ROLES)
@@ -140,9 +140,16 @@ def test_eligibility_is_judged_against_the_pin_not_the_ledger(monkeypatch) -> No
     assert isinstance(parse_ledger(verifier=switched_row()).records["verifier"], kl.Switched)
 
 
-def test_the_pin_lists_the_five_pilot_roles() -> None:
+def test_the_pin_lists_the_five_pilot_roles_and_the_implementer() -> None:
     assert sorted(ELIGIBLE_ROLES) == sorted(
-        ["researcher", "verifier", "discipline-consultant", "skill-genesis", "context-engineer"]
+        [
+            "researcher",
+            "verifier",
+            "discipline-consultant",
+            "skill-genesis",
+            "context-engineer",
+            "implementer",
+        ]
     )
 
 
@@ -177,9 +184,9 @@ def test_the_lenient_readers_ignore_an_eligible_key_the_gate_refuses() -> None:
 
 
 def test_a_role_that_is_not_eligible_may_still_be_at_trial() -> None:
-    ledger = parse_ledger(implementer={"status": "trial", "since": "2026-10-12", "runs": []})
+    ledger = parse_ledger(sentinel={"status": "trial", "since": "2026-10-12", "runs": []})
 
-    assert isinstance(ledger.records["implementer"], kl.Trial)
+    assert isinstance(ledger.records["sentinel"], kl.Trial)
 
 
 def test_a_record_for_an_unknown_agent_or_status_is_refused() -> None:

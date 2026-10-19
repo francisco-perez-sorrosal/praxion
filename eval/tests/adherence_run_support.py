@@ -9,8 +9,13 @@ untouched).
 
 from __future__ import annotations
 
+import atexit
+import functools
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -26,10 +31,51 @@ from praxion_evals.adherence.lineage import (
     SpendRefused,
     ending_to_json,
 )
+from praxion_evals.adherence.model import ROLES
 from praxion_evals.live.session import SessionRun, SessionSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROLE = "researcher"
+
+# What a scripted run reads of the checkout it measures: each role's definition and kernel
+# adoption (the arm copies and the run identity), the install primitives every proof and task
+# sandbox runs (the renderer, its template and the rule linker) and the rules they link.
+# Anything else in the real checkout is copied once per arm and digested for no reader.
+_CHECKOUT_FILES = (
+    ".ai-state/kernel_adoption.yaml",
+    "claude/kernels/index.json",
+    "claude/config/CLAUDE.md.tmpl",
+    "scripts/render_claude_md.py",
+    "lib/install_shared.sh",
+    *(f"agents/{role}.md" for role in ROLES),
+)
+_CHECKOUT_TREES = ("rules",)
+
+
+@functools.cache
+def scripted_checkout() -> Path:
+    """A small git checkout the scripted runs measure: the files they read, copied once.
+
+    Every run still materializes its own copy of it per role and arm, and digests it, as it
+    does the real checkout; the copy is just 40 files rather than 3000. Built once per test
+    process and never written by a run, so every test shares it.
+    """
+    root = Path(tempfile.mkdtemp(prefix="adherence-checkout-")).resolve()
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    for relpath in _CHECKOUT_FILES:
+        (root / relpath).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    for tree in _CHECKOUT_TREES:
+        shutil.copytree(REPO_ROOT / tree, root / tree, symlinks=True)
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.org"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run(
+        [*git, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "checkout"], check=True
+    )
+    return root
+
+
 SMALL_RUN = [
     "--required-pairs",
     "1",
@@ -139,7 +185,9 @@ def run_small(
 ) -> tuple[int, results.RunResults]:
     """One small run of ROLE into ``tmp_path / name``: its exit code and the results it wrote."""
     output = tmp_path / name
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN, *options])
+    code = cli.main(
+        [str(scripted_checkout()), "--role", ROLE, "--output", str(output), *SMALL_RUN, *options]
+    )
     return code, results.load(output)
 
 
@@ -148,7 +196,7 @@ def sessions_of(loaded: results.RunResults) -> list[tuple[str, str]]:
 
 
 def dry_run(capsys: pytest.CaptureFixture[str], tmp_path: Path, *options: str) -> list[dict]:
-    argv = [str(REPO_ROOT), "--output", str(tmp_path / "out.json"), "--dry-run", *options]
+    argv = [str(scripted_checkout()), "--output", str(tmp_path / "out.json"), "--dry-run", *options]
     assert cli.main(argv) == 0
     assert not (tmp_path / "out.json").exists()
     return [json.loads(line) for line in capsys.readouterr().out.splitlines()]
@@ -179,4 +227,4 @@ def ended_as(tmp_path: Path, ending: RunEnding, name: str = "stopped.json") -> r
 
 def close_run(tmp_path: Path, run_id: str, *options: str) -> int:
     where = ["--output", str(tmp_path / "closing.json")]  # its directory is where the runs are
-    return cli.main([str(REPO_ROOT), "--close", run_id, *options, *where])
+    return cli.main([str(scripted_checkout()), "--close", run_id, *options, *where])

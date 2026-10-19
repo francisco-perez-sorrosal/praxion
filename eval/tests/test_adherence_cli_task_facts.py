@@ -13,8 +13,8 @@ from praxion_evals.adherence import (
     tasks,
 )
 from tests.adherence_run_support import (
-    REPO_ROOT,
     ROLE,
+    scripted_checkout,
 )
 
 pytestmark = pytest.mark.usefixtures("unswitched_checkout")
@@ -70,7 +70,7 @@ def test_the_page_is_probed_once_and_only_when_a_task_needs_it(
     probes: list[str] = []
     monkeypatch.setattr(session_loop, "page_is_fetchable", lambda url: probes.append(url) or False)
     config = cli.parse_config(["--role", ROLE, "--output", str(tmp_path / "o.json")])
-    checkout = session_loop.Checkout(REPO_ROOT, "0" * 40, False)
+    checkout = session_loop.Checkout(scripted_checkout(), "0" * 40, False)
     planned = {ROLE: [_task_with("injection")]}
     output = tmp_path / "o.json"
     settings = cli.declared_settings(config)

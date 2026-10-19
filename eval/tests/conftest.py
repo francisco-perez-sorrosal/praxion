@@ -18,6 +18,7 @@ closures cannot cross that boundary.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
@@ -263,18 +264,23 @@ def fake_claude(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeClaude:
     return FakeClaude(control_path=control_path, log_path=log_path)
 
 
-@pytest.fixture
-def unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every run here sees the checkout with the role not yet switched (see ``unswitched``).
-
-    Not autouse: a module that drives ``cli.main`` applies it through ``pytestmark``.
-    """
+def use_unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every run sees the checkout with the role not yet switched (see ``unswitched``)."""
     materialize = session_loop.materialize_path
 
     def materialize_unswitched(source: Path, dest: Path, *args, **kwargs):
         return unswitched(materialize(source, dest, *args, **kwargs), ROLE)
 
     monkeypatch.setattr(session_loop, "materialize_path", materialize_unswitched)
+
+
+@pytest.fixture
+def unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every run here sees the checkout with the role not yet switched (see ``unswitched``).
+
+    Not autouse: a module that drives ``cli.main`` applies it through ``pytestmark``.
+    """
+    use_unswitched_checkout(monkeypatch)
 
 
 @pytest.fixture
@@ -285,22 +291,27 @@ def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(session_launch, "run_session", refuse)
 
 
+def use_paid_script(monkeypatch: pytest.MonkeyPatch, script: Script) -> None:
+    """Installs ``script`` as the one function that starts ``claude``, with a dummy credential."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
+    monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
+    monkeypatch.setattr(session_launch, "run_session", script)
+
+
 @pytest.fixture
 def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
     """Installs a ``Script`` as the one function that starts ``claude``, with a dummy credential."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
-    monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
+    return functools.partial(use_paid_script, monkeypatch)
 
-    def install(script: Script) -> None:
-        monkeypatch.setattr(session_launch, "run_session", script)
 
-    return install
+def use_full_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(session_loop, "launch_order", lambda seed, task_id: ("full", "lean"))
 
 
 @pytest.fixture
 def full_first(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every task launches the full arm first, so a scripted run's expectations read in arm order."""
-    monkeypatch.setattr(session_loop, "launch_order", lambda seed, task_id: ("full", "lean"))
+    use_full_first(monkeypatch)
 
 
 @pytest.fixture

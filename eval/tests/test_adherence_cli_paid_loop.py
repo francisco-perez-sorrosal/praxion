@@ -31,10 +31,10 @@ from praxion_evals.harness.schemas import JudgeVerdict
 from praxion_evals.live.session import SessionRun, SessionSpec
 from tests.adherence_run_support import (
     AGENT_ID,
-    REPO_ROOT,
     ROLE,
     Script,
     run_small,
+    scripted_checkout,
     sessions_of,
 )
 
@@ -223,7 +223,7 @@ def test_golden_cases_are_judged_once_and_recorded_before_any_session(
 
     code = cli.main(
         [
-            str(REPO_ROOT),
+            str(scripted_checkout()),
             "--role",
             ROLE,
             "--output",
@@ -253,7 +253,9 @@ def test_judging_that_is_unavailable_is_a_usage_error_before_anything_is_written
 
     monkeypatch.setattr(session_loop, "select_judge_client", unavailable)
 
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(tmp_path / "o.json")])
+    code = cli.main(
+        [str(scripted_checkout()), "--role", ROLE, "--output", str(tmp_path / "o.json")]
+    )
 
     assert code == 2
     assert not (tmp_path / "o.json").exists()

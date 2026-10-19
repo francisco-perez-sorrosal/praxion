@@ -19,7 +19,6 @@ from praxion_evals.adherence.lineage import (
 )
 from tests.adherence_run_support import (
     REASON,
-    REPO_ROOT,
     ROLE,
     SMALL_RUN,
     STOPPED_BOTH_ARMS,
@@ -28,6 +27,7 @@ from tests.adherence_run_support import (
     close_run,
     dry_run,
     ended_as,
+    scripted_checkout,
 )
 
 pytestmark = pytest.mark.usefixtures("unswitched_checkout")
@@ -40,7 +40,7 @@ pytestmark = pytest.mark.usefixtures("unswitched_checkout")
 
 def _fresh_run(tmp_path: Path) -> int:
     output = tmp_path / "fresh.json"
-    return cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN])
+    return cli.main([str(scripted_checkout()), "--role", ROLE, "--output", str(output), *SMALL_RUN])
 
 
 @pytest.mark.usefixtures("full_first")

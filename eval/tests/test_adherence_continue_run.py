@@ -7,6 +7,7 @@ anything launches."""
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import replace
@@ -29,7 +30,6 @@ from praxion_evals.adherence.lineage import (
     Finished,
     InfraStopped,
     ReadTip,
-    RunEnding,
     SpendRefused,
     _fails_alike,
     continuation_refusals,
@@ -42,10 +42,25 @@ from praxion_evals.adherence.model import Errored, Measured, SessionRecord
 from praxion_evals.adherence.run_identity import MeasuredIdentity, tree_digest
 from praxion_evals.live.session import SessionSpec
 from tests.adherence_run_support import (
-    REPO_ROOT,
     ROLE,
     Script,
     run_small,
+    scripted_checkout,
+)
+from tests.stopped_run_support import (
+    BOTH_IN_STREAK,
+    LAUNCHED_AGAIN,
+    LEAN_BEFORE_STREAK,
+    LEAN_IN_STREAK,
+    LEAN_ONLY,
+    NEVER_LAUNCHED,
+    REFUSED,
+    STOPPED,
+    STOPPING_KIND,
+    STOPPING_TAIL,
+    build_stopped,
+    rewritten,
+    stopped_in_eight_shapes,
 )
 from tests.test_adherence_results import declared, run_results, session
 
@@ -54,72 +69,10 @@ SEEDED_LAUNCH_ORDER = session_loop.launch_order  # as imported, before `full_fir
 # Every task launches full first, as the shapes below read.
 pytestmark = pytest.mark.usefixtures("full_first", "unswitched_checkout")
 
-EIGHT_TASKS = ["--required-pairs", "8"]  # with the small run's zero slack: eight planned tasks
-STOPPING_KIND, STOPPING_TAIL = "exit_nonzero", "fatal: the session channel closed unexpectedly"
-STOPPED = "stopped.json"
-# The planned position of each task shape, as the planner reads them.
-(COMPLETE, LEAN_BEFORE_STREAK, LEAN_ONLY, FULL_ONLY) = (0, 1, 2, 3)
-(LEAN_IN_STREAK, BOTH_IN_STREAK, REFUSED, NEVER_LAUNCHED) = (4, 5, 6, 7)
-LAUNCHED_AGAIN = (LEAN_IN_STREAK, BOTH_IN_STREAK, REFUSED, NEVER_LAUNCHED)
-
-
-# ---------------------------------------------------------------------------
-# A stopped run in eight shapes, and its continuation
-# ---------------------------------------------------------------------------
-
-
-def _failed(record: SessionRecord, kind: str = STOPPING_KIND, tail: str = STOPPING_TAIL):
-    status = Errored(kind, "the session failed", tails=EvidenceTail(tail, ""))  # type: ignore[arg-type]
-    return replace(record, status=status)
-
-
-def _shaped(ran: dict[tuple[int, str], SessionRecord]) -> list[SessionRecord]:
-    """The eight task shapes in planned order; ``ran`` is each (position, arm)'s measured record."""
-    return [
-        ran[(COMPLETE, "full")],
-        ran[(COMPLETE, "lean")],
-        ran[(LEAN_BEFORE_STREAK, "full")],
-        *[_failed(ran[(LEAN_BEFORE_STREAK, "lean")])] * 2,
-        ran[(LEAN_ONLY, "full")],
-        *[_failed(ran[(LEAN_ONLY, "lean")], "no_result_event", "")] * 2,
-        *[_failed(ran[(FULL_ONLY, "full")], "envelope_unparseable", "")] * 2,
-        ran[(FULL_ONLY, "lean")],
-        _failed(ran[(REFUSED, "full")], "launch_refused", ""),
-        _failed(ran[(REFUSED, "lean")], "launch_refused", ""),
-        ran[(LEAN_IN_STREAK, "full")],
-        *[_failed(ran[(LEAN_IN_STREAK, "lean")])] * 2,
-        *[_failed(ran[(BOTH_IN_STREAK, "full")])] * 2,
-        _failed(ran[(BOTH_IN_STREAK, "lean")]),
-    ]
-
-
-def _rewritten(tmp_path: Path, run: results.RunResults, ending: RunEnding, sessions=None):
-    extra = {**run.run.extra, "ending": ending_to_json(ending)}
-    rewritten = replace(run, run=replace(run.run, extra=extra), sessions=sessions or run.sessions)
-    results.write_atomic(tmp_path / STOPPED, rewritten)
-    return rewritten
-
-
-def _stopped_in_eight_shapes(tmp_path: Path, *options: str) -> results.RunResults:
-    """A run of eight tasks that stopped on three lean failures in a row, seen in both arms."""
-    run = run_small(tmp_path, *EIGHT_TASKS, *options, name=STOPPED)[1]
-    planned = run.run.extra["tasks"][ROLE]
-    ran = {(planned.index(r.setup.task_id), r.setup.arm): r for r in run.sessions}
-    streak = [(LEAN_IN_STREAK, 1), (LEAN_IN_STREAK, 2), (BOTH_IN_STREAK, 1)]
-    stop = StopReason(
-        STOPPING_KIND,
-        EvidenceTail(STOPPING_TAIL, "").masked(),
-        ROLE,
-        "lean",
-        tuple(Launched(planned[at], "lean", attempt) for at, attempt in streak),
-        "both-arms",
-    )
-    return _rewritten(tmp_path, run, InfraStopped(stop), _shaped(ran))
-
 
 def _continue(tmp_path: Path, run_id: str, *options: str, name: str = "part.json") -> int:
     where = ["--output", str(tmp_path / name)]  # its directory is where the stopped run is
-    return cli.main([str(REPO_ROOT), "--continue", run_id, *where, *options])
+    return cli.main([str(scripted_checkout()), "--continue", run_id, *where, *options])
 
 
 def _task_sessions(script: Script) -> list[SessionSpec]:
@@ -127,10 +80,28 @@ def _task_sessions(script: Script) -> list[SessionSpec]:
     return [spec for spec in script.specs if PROOF_LABEL not in spec.prompt]
 
 
+@pytest.fixture(scope="module")
+def stopped_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The directory of a stopped run launched full arm first, built once for every test."""
+    return build_stopped(tmp_path_factory, seeded_order=False)
+
+
+@pytest.fixture(scope="module")
+def stopped_dir_seeded(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The directory of a stopped run launched in the seed's order, built once."""
+    return build_stopped(tmp_path_factory, seeded_order=True)
+
+
 @pytest.fixture
-def stopped(paid: Callable[[Script], None], tmp_path: Path) -> results.RunResults:
+def stopped(
+    request: pytest.FixtureRequest, paid: Callable[[Script], None], tmp_path: Path
+) -> results.RunResults:
+    """A stopped run in ``tmp_path``: a copy of the one built for the module, in the order the test asks."""
+    seeded = "seeded_launch_order" in request.fixturenames
+    source = request.getfixturevalue("stopped_dir_seeded" if seeded else "stopped_dir")
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True)
     paid(Script())
-    return _stopped_in_eight_shapes(tmp_path)
+    return results.load(tmp_path / STOPPED)
 
 
 def _planned(run: results.RunResults, *positions: int) -> list[str]:
@@ -296,7 +267,7 @@ def test_a_continuation_of_a_run_that_finished_its_plan_is_refused_before_any_la
 ) -> None:
     paid(Script())
     run = run_small(tmp_path, name=STOPPED)[1]
-    finished = _rewritten(tmp_path, run, Finished())
+    finished = rewritten(tmp_path, run, Finished())
     script = Script()
     paid(script)
     capsys.readouterr()
@@ -403,7 +374,7 @@ def test_a_continuation_names_no_budget_so_it_runs_under_the_limits_the_run_reco
     paid: Callable[[Script], None], tmp_path: Path
 ) -> None:
     paid(Script())
-    run = _stopped_in_eight_shapes(tmp_path, "--session-budget-usd", "2", "--max-total-usd", "7")
+    run = stopped_in_eight_shapes(tmp_path, "--session-budget-usd", "2", "--max-total-usd", "7")
 
     _continue(tmp_path, run.run.id)
 

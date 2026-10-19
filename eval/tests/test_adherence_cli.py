@@ -23,12 +23,12 @@ from praxion_evals.adherence import (
 )
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
 from tests.adherence_run_support import (
-    REPO_ROOT,
     ROLE,
     SMALL_RUN,
     Script,
     dry_run,
     run_small,
+    scripted_checkout,
 )
 
 pytestmark = pytest.mark.usefixtures("unswitched_checkout")
@@ -180,7 +180,14 @@ def test_a_dry_run_of_a_calibration_lists_the_full_arm_only(
 def test_a_capped_dry_run_plans_that_many_tasks_per_role_per_arm_and_keeps_the_target(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    argv = [str(REPO_ROOT), "--output", str(tmp_path / "out.json"), "--dry-run", "--role", ROLE]
+    argv = [
+        str(scripted_checkout()),
+        "--output",
+        str(tmp_path / "out.json"),
+        "--dry-run",
+        "--role",
+        ROLE,
+    ]
 
     assert cli.main([*argv, "--max-tasks", "2", "--required-pairs", "20"]) == 0
 
@@ -214,7 +221,7 @@ def test_an_existing_output_is_refused_before_anything_else(
     output = tmp_path / "out.json"
     output.write_text("earlier", encoding="utf-8")
 
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output)])
+    code = cli.main([str(scripted_checkout()), "--role", ROLE, "--output", str(output)])
 
     assert code == 2
     assert "--overwrite" in capsys.readouterr().err
@@ -229,7 +236,7 @@ def test_a_role_with_no_task_kit_is_a_usage_error(
     tasks.kit_for.cache_clear()
     try:
         code = cli.main(
-            [str(REPO_ROOT), "--role", "sentinel", "--output", str(tmp_path / "o.json")]
+            [str(scripted_checkout()), "--role", "sentinel", "--output", str(tmp_path / "o.json")]
         )
     finally:
         tasks.kit_for.cache_clear()  # the empty table's refusals must not outlive the patch
@@ -244,7 +251,9 @@ def test_a_paid_run_without_a_credential_is_a_usage_error(
     for key in session_loop.CREDENTIAL_KEYS:
         monkeypatch.delenv(key, raising=False)
 
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(tmp_path / "o.json")])
+    code = cli.main(
+        [str(scripted_checkout()), "--role", ROLE, "--output", str(tmp_path / "o.json")]
+    )
 
     assert code == 2
     assert not (tmp_path / "o.json").exists()

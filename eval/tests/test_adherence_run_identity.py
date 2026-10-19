@@ -28,10 +28,10 @@ from praxion_evals.adherence.run_identity import (
 )
 from praxion_evals.live.session import SessionRun, SessionSpec
 from tests.adherence_run_support import (
-    REPO_ROOT,
     ROLE,
     Script,
     run_small,
+    scripted_checkout,
 )
 from tests.test_adherence_report import results_of
 
@@ -392,7 +392,7 @@ def test_a_new_run_records_what_it_was_measured_on_when_it_begins(
     loaded = run_small(tmp_path)[1]
 
     recorded = loaded.run.extra["identity"]
-    definition = (REPO_ROOT / "agents" / f"{ROLE}.md").read_bytes()
+    definition = (scripted_checkout() / "agents" / f"{ROLE}.md").read_bytes()
     assert set(recorded) == {"tree", "model", "roles"}
     assert len(recorded["tree"]) == len(hashlib.sha256().hexdigest())
     assert recorded["roles"][ROLE]["definition_sha"] == hashlib.sha256(definition).hexdigest()
@@ -421,9 +421,9 @@ def test_the_identity_a_run_wrote_reads_back_as_the_one_it_began_with(
 
     loaded = run_small(tmp_path)[1]
 
-    identity = measured_identity(loaded, REPO_ROOT)
+    identity = measured_identity(loaded, scripted_checkout())
     assert (identity.model, identity.seed) == (REPORTED, loaded.run.extra["seed"])
-    assert identity.roles == {ROLE: role_identity(working_tree(REPO_ROOT), ROLE)}
+    assert identity.roles == {ROLE: role_identity(working_tree(scripted_checkout()), ROLE)}
 
 
 def test_the_record_a_run_begins_with_names_the_tree_of_the_checkout(checkout: Path) -> None:

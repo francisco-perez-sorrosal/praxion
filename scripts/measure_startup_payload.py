@@ -43,6 +43,14 @@ Exit codes: 0 read (and, with ``--fail-on-regression``, no regression) /
 1 a regression past the tolerance under ``--fail-on-regression`` / 2 usage
 error, a target that could not be read, or a plugin-cache root.
 
+``--session-oauth-token-file FILE`` bills every probe session to a subscription:
+the file's ``claude setup-token`` token is each session's only credential
+(``CLAUDE_CODE_OAUTH_TOKEN``; no API key reaches it), and the reading's profile
+names ``credential: subscription``, so it compares only with a reading taken the
+same way. The token is read once, refused before any session when the file is
+missing, unreadable or blank, and never printed, recorded or put in an error
+message: it is redacted from every session's error output before anything keeps it.
+
 Stdlib-only and 3.9-safe, because the ambient ``python3`` runs it.
 """
 
@@ -57,7 +65,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
@@ -79,6 +87,13 @@ DEFAULT_TOLERANCE_PERCENT = 2.0
 # and double every listing, so a plugin-dir run disables it for the session
 # (the same overlay `scripts/praxion-claude-dev` applies).
 MARKETPLACE_PLUGIN_KEY = "praxion@bit-agora"
+
+OAUTH_VARIABLE = "CLAUDE_CODE_OAUTH_TOKEN"
+# What a session billed to a subscription must not hold beside its token.
+API_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+SUBSCRIPTION_CREDENTIAL = "subscription"
+REDACTED = "[redacted]"
+STDERR_TAIL_CHARS = 600
 
 MAIN_PROMPT = "Reply with the single word ok."
 AGENT_PROMPT = (
@@ -103,13 +118,20 @@ class Profile:
     setting_sources: str | None = None
     strict_mcp_config: bool = False
     plugin_dir: str | None = None
+    credential: str | None = None  # SUBSCRIPTION_CREDENTIAL, or None for the ambient route
 
     @property
     def key(self) -> str:
         sources = "default" if self.setting_sources is None else f"sources={self.setting_sources}"
         mcp = "no-mcp" if self.strict_mcp_config else "mcp"
         plugin = "plugin-dir" if self.plugin_dir else "installed"
-        return "|".join([self.cwd_kind, self.model, sources, mcp, plugin])
+        route = [self.credential] if self.credential else []
+        return "|".join([self.cwd_kind, self.model, sources, mcp, plugin, *route])
+
+    def to_json(self) -> dict:
+        """The profile as a reading records it; a reading on the ambient route names no credential."""
+        named = {k: v for k, v in asdict(self).items() if k != "credential" or v is not None}
+        return {**named, "key": self.key}
 
 
 @dataclass(frozen=True)
@@ -297,6 +319,45 @@ def build_invocation(target: str, profile: Profile, namespace: str, max_turns: i
     return argv
 
 
+class TokenFileError(Exception):
+    """The session token file cannot be used; the message never carries its content."""
+
+
+def read_session_token(path: Path) -> str:
+    """The token in a `claude setup-token` file, or a TokenFileError naming the file and why not."""
+    try:
+        text = path.read_bytes().decode()
+    except FileNotFoundError:
+        raise TokenFileError(f"{path}: the token file does not exist") from None
+    except OSError as error:
+        raise TokenFileError(f"{path}: the token file cannot be read ({error.strerror})") from None
+    except UnicodeDecodeError:  # its message quotes the bytes it could not decode
+        raise TokenFileError(f"{path}: the token file is not text") from None
+    token = text.strip()
+    if not token:
+        raise TokenFileError(f"{path}: the token file is blank")
+    return token
+
+
+def session_environment(inherited: Mapping[str, str], token: str | None) -> dict:
+    """The environment a probe session starts with.
+
+    With a token it is the session's only credential. Without one the environment is
+    inherited as is, except an empty oauth variable, which the CLI would read as a token.
+    """
+    if token is None:
+        return {k: v for k, v in inherited.items() if k != OAUTH_VARIABLE or v}
+    held_elsewhere = (OAUTH_VARIABLE, *API_CREDENTIAL_VARIABLES)
+    return {
+        **{k: v for k, v in inherited.items() if k not in held_elsewhere},
+        OAUTH_VARIABLE: token,
+    }
+
+
+def redact(text: str, token: str | None) -> str:
+    return text if token is None else text.replace(token, REDACTED)
+
+
 def agent_names(repo_root: Path) -> list:
     """Every agent the repository defines: `agents/*.md` whose frontmatter declares `name:`."""
     names = []
@@ -347,10 +408,20 @@ def write_baseline(path: Path, baseline: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_target(target: str, profile: Profile, cwd: Path, namespace: str, timeout: int) -> tuple:
-    """Run one session, stop it once the target's first request is seen; returns (observation, stderr tail)."""
+def run_target(
+    target: str,
+    profile: Profile,
+    cwd: Path,
+    namespace: str,
+    timeout: int,
+    token: str | None = None,
+) -> tuple:
+    """Run one session, stop it once the target's first request is seen; returns (observation, stderr tail).
+
+    The stderr tail has the session's token redacted before it is cut, so no part of it survives.
+    """
     argv = build_invocation(target, profile, namespace)
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_OAUTH_TOKEN" or v}
+    env = session_environment(os.environ, token)
     process = subprocess.Popen(
         argv,
         cwd=str(cwd),
@@ -375,7 +446,7 @@ def run_target(target: str, profile: Profile, cwd: Path, namespace: str, timeout
     stderr_tail = ""
     if process.stderr is not None:
         try:
-            stderr_tail = process.stderr.read()[-600:]
+            stderr_tail = redact(process.stderr.read(), token)[-STDERR_TAIL_CHARS:]
         except (OSError, ValueError):
             stderr_tail = ""
     return seen, stderr_tail
@@ -393,7 +464,13 @@ def _stop(process: subprocess.Popen) -> None:
 
 
 def measure(
-    targets: list, profile: Profile, cwd: Path, namespace: str, timeout: int, today: date
+    targets: list,
+    profile: Profile,
+    cwd: Path,
+    namespace: str,
+    timeout: int,
+    today: date,
+    token: str | None = None,
 ) -> dict:
     """A reading over `targets`: one session each, `main` folded in from any agent run."""
     collected = {}
@@ -401,7 +478,7 @@ def measure(
     stderr_by_target = {}
     mcp_by_target = {}
     for target in targets:
-        seen, stderr_tail = run_target(target, profile, cwd, namespace, timeout)
+        seen, stderr_tail = run_target(target, profile, cwd, namespace, timeout, token)
         version = version or seen.claude_code_version
         mcp_by_target[target] = seen.mcp_servers
         for name, reading in readings_for(seen, target, namespace, timeout).items():
@@ -415,7 +492,7 @@ def measure(
         "date": today.isoformat(),
         "claude_code_version": version,
         "cwd": str(cwd),
-        "profile": {**asdict(profile), "key": profile.key},
+        "profile": profile.to_json(),
         "targets": {name: reading.to_json() for name, reading in collected.items()},
         "mcp_servers": mcp_by_target,
         "stderr": stderr_by_target,
@@ -450,6 +527,11 @@ def _parse_args(argv: list | None) -> argparse.Namespace:
     parser.add_argument("--strict-mcp-config", action="store_true", help="passed through to claude")
     parser.add_argument(
         "--plugin-dir", help="measure this plugin checkout; the marketplace copy is disabled"
+    )
+    parser.add_argument(
+        "--session-oauth-token-file",
+        type=Path,
+        help="a `claude setup-token` file: every session bills its subscription, with no API key",
     )
     parser.add_argument(
         "--namespace", default=DEFAULT_NAMESPACE, help="agent namespace (default praxion)"
@@ -488,6 +570,14 @@ def main(argv: list | None = None) -> int:
         print("measure_startup_payload: the `claude` CLI is not on PATH", file=sys.stderr)
         return 2
 
+    token = None
+    if args.session_oauth_token_file is not None:
+        try:
+            token = read_session_token(args.session_oauth_token_file)
+        except TokenFileError as error:
+            print(f"measure_startup_payload: {error}", file=sys.stderr)
+            return 2
+
     targets = list(args.targets) or ([] if args.all_agents else [MAIN_TARGET])
     if args.all_agents:
         targets += [AGENT_TARGET_PREFIX + name for name in agent_names(repo_root)]
@@ -508,9 +598,10 @@ def main(argv: list | None = None) -> int:
         setting_sources=args.setting_sources,
         strict_mcp_config=args.strict_mcp_config,
         plugin_dir=str(Path(args.plugin_dir).resolve()) if args.plugin_dir else None,
+        credential=SUBSCRIPTION_CREDENTIAL if token else None,
     )
     try:
-        reading = measure(targets, profile, cwd, args.namespace, args.timeout, date.today())
+        reading = measure(targets, profile, cwd, args.namespace, args.timeout, date.today(), token)
     finally:
         if scratch:
             shutil.rmtree(scratch, ignore_errors=True)

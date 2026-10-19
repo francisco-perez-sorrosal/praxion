@@ -6,6 +6,9 @@ it is exercised by hand (`--json`) rather than under pytest."""
 from __future__ import annotations
 
 import json
+import os
+import stat
+import sys
 from pathlib import Path
 
 import measure_startup_payload as msp
@@ -316,3 +319,189 @@ def test_mcp_server_statuses_are_read_off_the_init_event():
     seen = msp.parse_stream([init])
 
     assert seen.mcp_servers == {"likec4": "connected", "ide": "failed"}
+
+
+# -- the subscription token -----------------------------------------------------------
+
+TOKEN = "sk-ant-oat01-unit-test-token-0042"
+
+
+def _token_file(tmp_path: Path, content: str | bytes | None = TOKEN + "\n") -> Path:
+    path = tmp_path / "session-token"
+    if isinstance(content, str):
+        path.write_text(content, encoding="utf-8")
+    elif content is not None:
+        path.write_bytes(content)
+    return path
+
+
+def test_the_token_is_the_files_text_without_its_surrounding_whitespace(tmp_path: Path):
+    assert msp.read_session_token(_token_file(tmp_path, f"\n  {TOKEN}  \n")) == TOKEN
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (None, "does not exist"),
+        ("", "is blank"),
+        (" \n\t\n", "is blank"),
+        (b"\xff\xfe" + TOKEN.encode(), "is not text"),
+    ],
+    ids=["missing", "empty", "whitespace", "binary"],
+)
+def test_an_unusable_token_file_is_refused_naming_the_file_and_never_its_content(
+    tmp_path: Path, content: str | bytes | None, reason: str
+):
+    path = _token_file(tmp_path, content)
+
+    with pytest.raises(msp.TokenFileError) as refused:
+        msp.read_session_token(path)
+
+    assert str(refused.value) == f"{path}: the token file {reason}"
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "geteuid") or os.geteuid() == 0, reason="root reads a file whatever its mode"
+)
+def test_an_unreadable_token_file_is_refused_with_the_systems_reason(tmp_path: Path):
+    path = _token_file(tmp_path)
+    path.chmod(0)
+
+    with pytest.raises(msp.TokenFileError) as refused:
+        msp.read_session_token(path)
+
+    assert str(refused.value) == f"{path}: the token file cannot be read (Permission denied)"
+    assert TOKEN not in str(refused.value)
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+
+def test_a_session_with_a_token_holds_it_as_its_only_credential():
+    inherited = {
+        "ANTHROPIC_API_KEY": "key",
+        "ANTHROPIC_AUTH_TOKEN": "auth",
+        msp.OAUTH_VARIABLE: "someone-elses",
+        "PATH": "/bin",
+    }
+
+    env = msp.session_environment(inherited, TOKEN)
+
+    assert env == {msp.OAUTH_VARIABLE: TOKEN, "PATH": "/bin"}
+    assert inherited["ANTHROPIC_API_KEY"] == "key", "the inherited environment is left alone"
+
+
+def test_a_session_without_a_token_inherits_its_environment_but_an_empty_oauth_variable():
+    inherited = {"ANTHROPIC_API_KEY": "key", msp.OAUTH_VARIABLE: "", "PATH": "/bin"}
+
+    assert msp.session_environment(inherited, None) == {"ANTHROPIC_API_KEY": "key", "PATH": "/bin"}
+    kept = {msp.OAUTH_VARIABLE: "ambient"}
+    assert msp.session_environment(kept, None) == kept
+
+
+def test_redaction_removes_every_occurrence_and_leaves_text_alone_without_a_token():
+    text = f"a {TOKEN} b {TOKEN}"
+
+    assert msp.redact(text, TOKEN) == f"a {msp.REDACTED} b {msp.REDACTED}"
+    assert msp.redact(text, None) == text
+
+
+def test_the_subscription_route_is_a_profile_axis_and_absent_otherwise():
+    ambient = msp.Profile("managed", "sonnet")
+    subscription = msp.Profile("managed", "sonnet", credential=msp.SUBSCRIPTION_CREDENTIAL)
+
+    assert subscription.key == ambient.key + "|subscription"
+    assert subscription.to_json()["credential"] == "subscription"
+    assert "credential" not in ambient.to_json()
+    assert ambient.to_json()["key"] == ambient.key
+
+
+_STAND_IN = """#!{python}
+import os, sys
+token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "")
+sys.stderr.write("x" * {pad} + token + "\\n")
+"""
+
+
+def _stand_in_claude(tmp_path: Path, monkeypatch, pad: int) -> None:
+    script = tmp_path / "bin" / "claude"
+    script.parent.mkdir()
+    script.write_text(_STAND_IN.format(python=sys.executable, pad=pad))
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{script.parent}{os.pathsep}{os.environ['PATH']}")
+
+
+@pytest.mark.parametrize("pad", [0, msp.STDERR_TAIL_CHARS - len(TOKEN) // 2, 2000])
+def test_a_token_a_session_echoes_is_in_no_part_of_the_stderr_tail(
+    tmp_path: Path, monkeypatch, pad: int
+):
+    _stand_in_claude(tmp_path, monkeypatch, pad)
+
+    _, tail = msp.run_target(
+        msp.MAIN_TARGET, msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 30, TOKEN
+    )
+
+    assert tail.count(msp.REDACTED) == 1
+    assert not any(TOKEN[:n] in tail for n in (8, 14, len(TOKEN)))
+
+
+def test_the_session_receives_the_token_in_its_environment(tmp_path: Path, monkeypatch):
+    _stand_in_claude(tmp_path, monkeypatch, 0)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "operator-key")
+
+    _, tail = msp.run_target(
+        msp.MAIN_TARGET, msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 30, TOKEN
+    )
+
+    assert tail.strip() == msp.REDACTED, "the stand-in saw no token in its environment"
+
+
+def _run_main(tmp_path: Path, monkeypatch, capsys, *extra: str):
+    seen = {}
+
+    def fake_measure(targets, profile, cwd, namespace, timeout, today, token=None):
+        seen.update(profile=profile, token=token, call=(targets, namespace, timeout, today))
+        return {"targets": {}, "claude_code_version": None, "date": "d", "profile": {}}
+
+    monkeypatch.setattr(msp, "measure", fake_measure)
+    monkeypatch.setattr(msp.shutil, "which", lambda name: "/stand-in/claude")
+    code = msp.main(["main", "--empty-dir", "--json", "--repo-root", str(tmp_path), *extra])
+    return code, seen, capsys.readouterr()
+
+
+def test_the_token_file_sets_the_token_and_the_profile_route_of_the_run(
+    tmp_path: Path, monkeypatch, capsys
+):
+    path = _token_file(tmp_path)
+
+    code, seen, output = _run_main(
+        tmp_path, monkeypatch, capsys, "--session-oauth-token-file", str(path)
+    )
+
+    assert code == 0
+    assert seen["token"] == TOKEN
+    targets, namespace, timeout, today = seen["call"]
+    assert (targets, namespace, timeout) == (["main"], "praxion", msp.DEFAULT_TIMEOUT_SECONDS)
+    assert today == msp.date.today()
+    assert seen["profile"].credential == msp.SUBSCRIPTION_CREDENTIAL
+    assert TOKEN not in output.out + output.err
+
+
+def test_a_run_without_the_option_has_no_token_and_the_ambient_route(
+    tmp_path: Path, monkeypatch, capsys
+):
+    code, seen, _ = _run_main(tmp_path, monkeypatch, capsys)
+
+    assert code == 0
+    assert seen["token"] is None
+    assert seen["profile"].credential is None
+
+
+def test_a_refused_token_file_stops_the_run_before_any_session(tmp_path: Path, monkeypatch, capsys):
+    path = _token_file(tmp_path, "")
+
+    code, seen, output = _run_main(
+        tmp_path, monkeypatch, capsys, "--session-oauth-token-file", str(path)
+    )
+
+    assert code == 2
+    assert seen == {}, "a session was measured"
+    assert output.err.strip() == f"measure_startup_payload: {path}: the token file is blank"

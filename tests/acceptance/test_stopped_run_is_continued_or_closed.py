@@ -47,11 +47,12 @@ CRASH = "Traceback (most recent call last)"
 
 
 def assert_refused_before_launch(result: runs.StandInRun, *named: str, reason: str = "") -> None:
-    """The run's own refusal, before any launch, naming ``named`` and saying ``reason``.
+    """The run's own refusal, before any launch, naming ``named`` and matching ``reason``.
 
-    argparse rejecting the command line also exits non-zero with nothing launched, and its
-    usage echo prints every option name, so the refusal must carry no usage line; a crash's
-    traceback can print any name, so it must carry none either.
+    ``reason`` is a regular expression searched in the printed output. argparse rejecting
+    the command line also exits non-zero with nothing launched, and its usage echo prints
+    every option name, so the refusal must carry no usage line; a crash's traceback can
+    print any name, so it must carry none either.
     """
     printed = result.stdout + result.stderr
     assert result.exit_code != 0, "the continuation was accepted"
@@ -59,7 +60,7 @@ def assert_refused_before_launch(result: runs.StandInRun, *named: str, reason: s
     assert not USAGE_LINE.search(printed), f"argparse rejected the command, not the run: {printed}"
     assert CRASH not in printed, f"the run crashed instead of refusing: {printed}"
     assert all(word in printed for word in named), f"the refusal does not name {named}: {printed}"
-    assert reason in printed, f"the refusal does not say {reason!r}: {printed}"
+    assert re.search(reason, printed), f"the refusal does not say {reason!r}: {printed}"
 
 
 def test_a_continuation_launches_exactly_the_unfinished_tasks_whole_in_every_arm(
@@ -153,8 +154,12 @@ def test_a_continuation_of_a_run_whose_recorded_launch_order_differs_from_its_se
     assert_refused_before_launch(result, "order")
 
 
+# "complete" as a run's state: the whole word, so "incomplete" never says it, and never the
+# other sense the spec gives the word, a complete pair.
+COMPLETE_RUN = r"\bcomplete\b(?!\s+pairs?\b)"
+
 NOT_CONTINUABLE = {
-    "complete": "complete",
+    "complete": COMPLETE_RUN,
     "confined to one arm": "confined to one arm",
     "operator interrupt": "interrupt",
     "already continued": "already has a continuation",
@@ -172,6 +177,10 @@ def test_a_run_that_did_not_stop_continuably_is_refused_a_continuation(
     assert_refused_before_launch(result, planted.run_id, reason=said)
 
 
+# The spec's word for this refusal, as the word or as the verb it abbreviates.
+UNREADABLE = r"\bunreadable\b|\b(?:cannot|can't|could not|couldn't) be read\b"
+
+
 def test_a_continuation_of_an_unreadable_results_file_is_refused(
     tmp_path: Path, checkout: Path
 ) -> None:
@@ -181,7 +190,7 @@ def test_a_continuation_of_an_unreadable_results_file_is_refused(
 
     result = runs.continue_run(tmp_path, checkout, broken, PLAN)
 
-    assert_refused_before_launch(result, broken.name, reason="cannot be read as a results file")
+    assert_refused_before_launch(result, broken.name, reason=UNREADABLE)
 
 
 def test_a_continuation_of_a_run_recorded_before_this_change_is_refused(

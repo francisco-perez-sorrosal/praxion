@@ -10,6 +10,7 @@ count. The stop count is declared before the first launch, at least 3.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -154,9 +155,13 @@ def test_a_stop_count_below_three_is_refused_before_any_launch(
     assert result.exit_code != 0, "a stop count below 3 was accepted"
     assert result.launches == ()
     printed = result.stdout + result.stderr
-    assert "stop count must be at least 3" in printed, (
-        f"the refusal does not name the floor: {printed}"
+    # The refusal may come through the command line's own error path, which prints the usage
+    # line and every option name; only the floor the declaration missed, in the spec's words,
+    # tells it apart from the command line rejecting an option it does not know.
+    assert re.search(r"stop[ _-]count", printed, re.IGNORECASE), (
+        f"the refusal does not name the stop count: {printed}"
     )
+    assert re.search(r"\bat least 3\b", printed), f"the refusal does not state the floor: {printed}"
 
 
 def test_the_stop_settings_are_declared_before_the_first_launch(tmp_path: Path) -> None:

@@ -5,7 +5,8 @@
 # flip: a reason, its runs kept, nothing injected; held -> trial re-opens it with a
 # later `since`). `since` is the moment its record began (an ISO
 # instant, so a spawn earlier that day is not judged). Only the roles pinned in
-# scripts/kernel_eligibility.py may be switched; this file lists none. The commit
+# scripts/kernel_eligibility.py (ELIGIBLE_ROLES, the pin's home, changed only in a
+# commit of its own) may be switched; this file lists none. The commit
 # gate (scripts/check_kernel_manifest.py) holds every move.
 version: 1
 roles:

@@ -69,6 +69,9 @@ See `eval/EVAL_PLAN.md` for the full design narrative, deferred families, and op
 > [!WARNING]
 > Every run spends API money. Start with `--dry-run`, which prints the sessions a run would launch and starts none. The run cap defaults to $50 and each session to $3.
 
+> [!WARNING]
+> While a paid run writes into this checkout, every gated commit is refused with `I9-run-index-stale`. The runner checkpoints its results file into `.ai-state/eval_ledger/adherence/` after every session and writes the run index only when the run ends. Run with `--output` outside the checkout, or commit nothing until the run ends, and never `--reindex` an in-flight file.
+
 **Scope today.** Every role has its check rows and a task kit: the `researcher`, the `verifier` and the `implementer` have full kits (24 producible tasks each); the other fourteen have smoke kits (three runnable tasks by default, 24 producible). The main-session conditional-adherence eval is deferred (`EVAL_PLAN.md`).
 
 ```sh
@@ -82,15 +85,19 @@ uv run praxion-evals-adherence .. --role researcher --role verifier \
   --required-pairs 2 --pair-slack 0 --judge-golden \
   --max-total-usd 30 --session-budget-usd 3 --output ../tmp/smoke-run.json
 
-# 3. Calibration: the full arm against itself, the source of mechanical allowances.
+# 3. Diagnostic: the full arm against itself, a check of the slot order. It sizes no allowance.
 uv run praxion-evals-adherence .. --role researcher --calibration \
   --required-pairs 4 --pair-slack 0 --max-total-usd 15 --output ../tmp/calibration-run.json
 
-# 4. A paired run that uses the calibration's allowances.
-uv run praxion-evals-adherence .. --role researcher --calibration-run ../tmp/calibration-run.json
-
-# 5. Render a results file; launches nothing.
+# 4. Render a results file; launches nothing.
 uv run praxion-evals-adherence --report ../tmp/smoke-run.json
+
+# 5. A run stopped itself or was cut short: continue it or close it (never start a fresh one beside it).
+uv run praxion-evals-adherence .. --continue <run id>
+uv run praxion-evals-adherence .. --close <run id> --reason "<why>"
+
+# 6. Rebuild the run index the commit gate reads; launches nothing.
+uv run praxion-evals-adherence .. --reindex
 ```
 
 The first positional argument is the plugin checkout under test (default: this repository's root). Inside a Claude Code session, export `CLAUDE_CODE_OAUTH_TOKEN=""` first so the judge client does not reuse the session's token.
@@ -106,8 +113,13 @@ The first positional argument is the plugin checkout under test (default: this r
 | `--required-pairs N`, `--pair-slack N` | Target complete pairs per role (default 20) and slack above it (default a fifth of the target, at least four) |
 | `--max-tasks N` | Cap the tasks generated per role below the target plus slack; the declared target is unchanged, so a run capped under its target is underpowered by construction (a smoke run). `--dry-run` prints the planned count per role |
 | `--margin-pp`, `--confidence` | Judged-check non-inferiority margin in percentage points (default 10) and interval confidence (default 0.95); declared in the results file before the first session |
-| `--calibration` | Run the `full` arm against itself; mutually exclusive with `--calibration-run` |
-| `--calibration-run FILE` | Take each mechanical check's allowance, per role and check, from this calibration file; refused before any launch unless the file measured this checkout, seed, pair target and, for every named role, the same task list and has pairs of every named role. Without it every allowance is zero |
+| `--stop-count N`, `--tail-chars N` | Stop the run after `N` identical infrastructure failures of one arm in a row (default 3, at least 3), and keep the last `N` characters of an errored session's output per stream as its evidence (default 2000). Declared in the results file before the first launch |
+| `--continue RUN` | Launch again the unfinished tasks of a stopped run, as it declared them. Only `--max-total-usd`, `--session-budget-usd`, `--keep-sandbox`, `--session-oauth-token-file` and `--output` may accompany it; refused before any launch, naming every reason, when the run is not continuable or the tree, model, seed, tasks or a declaration differ |
+| `--close RUN`, `--reason TEXT` | Give up on a stopped run, saying why (a reason is required). The run stays listed as a not-clear draw |
+| `--reindex` | Rebuild `.ai-state/eval_ledger/adherence/index.json` from the results files; launches nothing |
+| `--session-oauth-token-file FILE` | Bill the sessions to the subscription behind a `claude setup-token` file; the judge keeps the API key |
+| `--calibration` | Run the `full` arm against itself, a diagnostic of the slot order. It sets no allowance; mutually exclusive with `--calibration-run` |
+| `--calibration-run FILE` | Accepted for old command lines. It sets no allowance and writes one stderr line saying so: each run sizes its mechanical allowances from its own discordant pairs |
 | `--judge-golden` | Judge each judged check's golden good and bad case once and record both verdicts |
 | `--no-judge` | Withhold judged checks |
 | `--model`, `--effort` | Session model and effort (defaults `opus`, `medium`) |
@@ -117,6 +129,8 @@ The first positional argument is the plugin checkout under test (default: this r
 | `--dry-run` | Print the planned sessions; start none |
 
 Exit codes: 0 the run completed; 1 it is incomplete (a refused launch, an arm that could not be built or proven, an errored session; the results are still written); 2 usage error.
+
+Mechanical allowances: every new run declares `own-discordance-exact`, so each mechanical check's allowance is the exact one-sided quantile at that check's own count of discordant pairs, one per role and check. The two arms of each task launch in a seeded order. The report prints each allowance beside the margin, lists a check whose allowance exceeds the margin as not covered, and lists the forced-stop check as not covered when fewer than five pairs ran out of turns on both sides. Earlier runs of a role are listed by role definition and kernel identity, not by commit. Recipes for stopping, continuing, closing, indexing and the eligibility pin: [`docs/lean-spawn-how-to.md`](../docs/lean-spawn-how-to.md).
 
 The report states counts and bounds. A role with fewer complete pairs than the target is reported underpowered with no flip verdict, and no wording claims improvement. The user's ratification of the flip rule is owed before any verdict gates a lean-spawn flip.
 

@@ -15,6 +15,7 @@ The mechanism makes no claim that a role does its work better or cheaper. It cha
 - [What a kernel is](#what-a-kernel-is)
 - [How a kernel is assembled](#how-a-kernel-is-assembled)
 - [How a role is switched](#how-a-role-is-switched)
+- [What the evidence for a flip rests on](#what-the-evidence-for-a-flip-rests-on)
 - [What the spawn hook does](#what-the-spawn-hook-does)
 - [Delivery evidence](#delivery-evidence)
 - [Why the fallback is always present](#why-the-fallback-is-always-present)
@@ -58,16 +59,36 @@ A role's status is recorded in `.ai-state/kernel_adoption.yaml`:
 | `switched` | Delivers the kernel. | Carries `omitClaudeMd: true`. |
 | `held` | Delivers nothing: a trial closed without a flip. | Keeps inheriting the project instructions. |
 
-The ledger lists the `eligible` roles (the pilot's five) and, per adopted role, a record: `since` (the ISO moment the record began, so earlier spawns are not judged) and its `runs`. A `switched` record also holds the flip evidence: the passing run (at least 20 complete pairs from the adherence eval, passing the flip rule), the startup probe's before and after readings, and two booleans for the user's ratification of the flip rule and of this flip. A `held` record keeps the closed trial's `since` and every run, and states a `reason`.
+The ledger lists no eligible roles; the roles that may be switched are pinned in `scripts/kernel_eligibility.py` (the pilot's five and the `implementer`; see [Why the pin lives outside the ledger](#why-the-pin-lives-outside-the-ledger)). Per adopted role the ledger holds a record: `since` (the ISO moment the record began, so earlier spawns are not judged) and its `runs`. A `switched` record also holds the flip evidence: the passing run (at least 20 complete pairs from the adherence eval, passing the flip rule), the startup probe's before and after readings, and two booleans for the user's ratification of the flip rule and of this flip. A `held` record keeps the closed trial's `since` and every run, and states a `reason`.
 
 The commit gate holds each move:
 
 - a role moves only from absent to `trial`, from `trial` to `switched` or `held`, or from `held` back to `trial` with a `since` later than the parent commit (a new trial, judged from its own start); nothing leaves `switched`, no record is removed, and a ledger present at the parent commit is never deleted;
 - a recorded run is never dropped, reordered or rewritten, and none is added while a role stays `held`;
 - `omitClaudeMd` is set on an agent only while its record is `switched`, and a `switched` record requires the flag;
-- a `switched` record missing any piece of evidence, or for a role that is not eligible, and a `held` record with no reason, are refused by name.
+- a `switched` record missing any piece of evidence, or for a role the pin did not list at the parent commit, and a `held` record with no reason, are refused by name;
+- every run a `switched` record cites must resolve to a results file of that role, with the complete pairs and pass flag the record claims, through the run index (next section);
+- `omitClaudeMd` counts only as the literal `true`, and a parent commit whose ledger cannot be read refuses the commit rather than reading as no ledger.
 
 The ledger is where the user's ratification is recorded, so a flag cannot reach a commit without it. The adherence eval (`praxion-evals-adherence`, which the gate names as data and never runs) supplies the run a flip rests on. A role that does not pass stays at `trial` with its runs recorded, or, once its trial closes, is `held`; `--liveness` judges only `trial` and `switched` roles.
+
+## What the evidence for a flip rests on
+
+The adherence instrument (`praxion-evals-adherence`, opt-in and metered; the gate names it as data and never runs it) produces the run a flip cites. Each design choice below exists so that the run is a fair draw that cannot be quietly re-rolled. The page describes behaviour; none of it claims that a lean spawn does better work, and the amended rule awaits the user's ratification before the next flip (draft decision `dec-draft-c9d81997`, which partly supersedes [`dec-459`](../.ai-state/decisions/459-flip-rule-point-estimate-calibrated.md)).
+
+- **A run can stop itself, and that stop is outcome-independent.** After `N` (at least 3) identical infrastructure failures in one arm, with volatile tokens masked out of the evidence, the run launches nothing more and keeps its evidence. Only channel errors count; a graded failure never does, so the stop cannot be steered by how a role behaved.
+- **A stopped run is continued or closed, never abandoned.** An operator free to restart after seeing interim counts could raise the rate of clear verdicts. So a fresh run of a role is refused while a continuable stop of that role is unresolved (the pre-commitment is keyed on the role), a continuation must measure the identical tree, model, seed, tasks, launch orders and declarations, and the continued lineage is one run with one verdict. Closing needs a recorded reason and the run stays listed as a not-clear draw.
+- **Allowances come from the run itself.** A mechanical check's allowance is the exact one-sided quantile at that check's own count of discordant pairs. A statistician consult found that an allowance taken from a separate calibration run gives an unchanged role a high rate of false regressions, while the same quantile at the trial's own count stays under nominal; so no calibration file sets an allowance. The price is stated rather than hidden: a check whose allowance exceeds the margin is listed as not covered. The seeded per-task launch order is what keeps the two arms exchangeable.
+- **C5 judges only a role that ran out of turns.** The role's own transcript says whether the harness stopped it at its cap; a role that ended earlier is judged on its return instead. With fewer than five pairs that ran out of turns on both sides, C5 is listed as not covered.
+- **Earlier runs are listed by what was measured**: the role definition and kernel identity, not the commit, so a later commit that changed nothing the role runs on does not hide a prior draw.
+- **The gate reads an index, not the eval.** `.ai-state/eval_ledger/adherence/index.json` has one writer (the runner) and a digest per results file, so the stdlib-only gate can resolve a cited run to its role, complete pairs and verdict without importing the eval package. The cost is an operational limit: the runner writes the index only when a run ends, so a paid run writing into the checkout leaves every gated commit refused with `I9-run-index-stale` until it ends. Run the eval with `--output` outside the checkout.
+- **The startup probe can bill a subscription** through the same token-file route as the runner (`--session-oauth-token-file`), and its profile records that it did, so readings compare only like with like.
+
+Verification paths for each item are in the how-to: [stop](lean-spawn-how-to.md#let-a-run-stop-itself-on-an-infrastructure-failure), [continue or close](lean-spawn-how-to.md#continue-or-close-a-stopped-run), [allowances and coverage](lean-spawn-how-to.md#read-a-runs-allowances-and-coverage), [earlier runs](lean-spawn-how-to.md#list-the-earlier-runs-of-a-role) and [the index](lean-spawn-how-to.md#index-the-results-and-let-the-gate-resolve-a-cited-run).
+
+### Why the pin lives outside the ledger
+
+A ledger that listed its own eligible roles could widen the list in the commit that switches a role, and the list would be no rule at all. The pin is therefore one literal in `scripts/kernel_eligibility.py`, read by the gate at the parent commit. A commit that changes the pin may change no adoption record and no flag, and a move to `switched` is judged against the pin as it stood before the commit. Making the `implementer` eligible was such a commit of its own; its trial record lands later, with its run, in the run-preparation commit after the merge (draft decision `dec-draft-42f62347`, which amends [`dec-460`](../.ai-state/decisions/460-role-kernels-generated-and-injected.md)'s clause that only the five pilot roles may be switched). Eligibility is permission to start a trial, not evidence.
 
 ## What the spawn hook does
 
@@ -111,5 +132,8 @@ Switching depends on the hook, so every other channel keeps its own copy of what
 | Generator | `scripts/generate_kernels.py` |
 | Commit gate and liveness check | `scripts/check_kernel_manifest.py` |
 | Adoption ledger | `.ai-state/kernel_adoption.yaml` |
+| Eligibility pin | `scripts/kernel_eligibility.py` |
+| Run index reader (gate side) | `scripts/kernel_run_index.py`, `.ai-state/eval_ledger/adherence/index.json` |
+| Adherence instrument | `eval/src/praxion_evals/adherence/` (`infra_stop.py`, `lineage.py`, `run_identity.py`, `run_index.py`, `verdict.py`), `eval/EVAL_PLAN.md` |
 | Spawn hook and its registration | `hooks/inject_kernel.py`, `hooks/hooks.json` |
 | Codex wrappers | `codex/config/export-codex-agents.py` |

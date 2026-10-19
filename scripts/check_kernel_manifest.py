@@ -24,6 +24,8 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
 | `I9-eligible-in-ledger`      | the ledger carries no `eligible` key: the eligible roles are pinned in `scripts/kernel_eligibility.py` |
+| `I9-eligible-with-move`      | a commit that changes the eligible roles carries no adoption record and no `omitClaudeMd` flag |
+| `I9-eligible-not-yet`        | a role moves to switched only if the parent commit already listed it as eligible |
 | `I9-ledger-transition`       | since the parent commit's ledger a role stays or moves absent -> trial, trial -> switched or held, held -> trial |
 | `I9-ledger-reopen-no-since`  | a held role re-opened as a trial records its own `since`                |
 | `I9-ledger-reopen-before-parent` | that `since` is later than the commit the re-opening follows        |
@@ -73,13 +75,14 @@ import kernel_ledger_history as kh
 import kernel_model as km
 import kernel_sources as ks
 from _repo_root import is_plugin_cache_path, resolve_repo_root
-from kernel_eligibility import ELIGIBLE_ROLES  # noqa: F401
+from kernel_eligibility import ELIGIBLE_ROLES
 
 # The ledger's invariants (I9, I10) and the liveness mode are judged in their own modules. The
 # names marked below are re-exported: the tests and their testkit reach them through this one.
 from kernel_ledger_checks import (
     ADHERENCE_ENTRY,  # noqa: F401
     deletion_findings,
+    eligibility_findings,
     flip_findings,
     inject_kernel,  # noqa: F401
     misreading_findings,
@@ -361,6 +364,8 @@ class Evidence:
     ledger_text: str | None  # the ledger as the spawn hook reads it; None: no ledger
     ledger: kl.Ledger | km.KernelModelError | None  # evidence-checked, the refusal, or no file
     parent: kl.ParentLedger | None  # the ledger at HEAD as the moves read it; None: no ledger
+    records: Mapping[str, object]  # role -> adoption record as written; empty: no ledger
+    parent_flip: kh.ParentFlip | None  # eligible roles, records and definitions at the parent
 
 
 def gather(root: Path) -> Evidence:
@@ -368,6 +373,7 @@ def gather(root: Path) -> Evidence:
     manifest = km.load_manifest(root, definitions)
     required = ks.always_loaded_sources(root)
     sources = {*required, *(entry.target.source for entry in manifest.entries)}
+    ledger_text = _read_text(root / km.LEDGER_PATH)
     return Evidence(
         definitions,
         manifest,
@@ -381,9 +387,11 @@ def gather(root: Path) -> Evidence:
         _regeneration(root),
         km.load_statuses(root),  # first: a ledger it cannot read is an input error, not a finding
         kl.load_entries(root),
-        _read_text(root / km.LEDGER_PATH),
+        ledger_text,
         _evidence_checked_ledger(root, definitions),
         _parent_ledger(root),
+        kh.written_records(kh.ledger_mapping(ledger_text, km.LEDGER_PATH)),
+        kh.parent_flip(root, definitions),
     )
 
 
@@ -392,6 +400,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
     evidence = gather(root)
     injected = injected_texts(evidence)
     totality = totality_findings(evidence.manifest, evidence.sections, evidence.required)
+    flags = omit_flags(evidence.definitions)
     return (
         *totality,
         *core_findings(evidence.definitions, evidence.index_strings, evidence.kernel_files),
@@ -405,9 +414,10 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         # the generator refuses sources that fail I1: that refusal is I1's finding, not a second
         *(() if totality else stale_findings(evidence.regeneration)),
         *slot_findings(evidence.index_slots, evidence.slot_entries),
-        *flip_findings(omit_flags(evidence.definitions), evidence.statuses),
+        *flip_findings(flags, evidence.statuses),
         *record_findings(evidence.ledger),
         *transition_findings(evidence.parent, evidence.entries),
+        *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),
         *misreading_findings(evidence.statuses, evidence.ledger_text),
     )

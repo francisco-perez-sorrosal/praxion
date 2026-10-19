@@ -2,19 +2,21 @@
 
 `check_kernel_manifest` gathers the evidence and renders the findings; this module names each
 finding the ledger's rules can raise: the `omitClaudeMd` flag against a `switched` record, a
-switched record's evidence, an eligible list the ledger must not carry, the moves since the
-parent commit, a deleted ledger, and the spawn hook reading every record as PyYAML does. No
-command line; every function takes what it judges as an argument and reads nothing.
+switched record's evidence, an eligible list the ledger must not carry, the eligible roles held
+to the parent commit's list, the moves since the parent commit, a deleted ledger, and the spawn
+hook reading every record as PyYAML does. No command line; every function takes what it judges
+as an argument and reads nothing.
 """
 
 from __future__ import annotations
 
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 
 import kernel_ledger as kl
+import kernel_ledger_history as kh
 import kernel_model as km
 
 # hooks/ sits beside scripts/; the spawn hook's own ledger reader is what I10 holds to PyYAML's.
@@ -116,6 +118,82 @@ def transition_findings(
         km.Finding(f"I9-{found.kind}", found.subject, found.detail)
         for found in kl.ledger_transitions(parent, entries)
     )
+
+
+def eligibility_findings(
+    pinned: Collection[str],
+    parent: kh.ParentFlip | None,
+    records: Mapping[str, object],
+    flags: Mapping[str, str],
+) -> tuple[km.Finding, ...]:
+    """I9: the eligible roles are held to the parent commit's list, not to the one this commit sets.
+
+    A role moves to switched only if the parent commit already listed it, and the commit that
+    changes the list carries no adoption record and no `omitClaudeMd` flag. Nothing is judged
+    without an earlier list to hold the commit to (no parent, or one that predates the pin).
+    """
+    if parent is None or isinstance(parent.eligible, kh.NotYetPinned):
+        return ()
+    then = parent.eligible
+    return (
+        *_eligible_only_from_here(pinned, then, parent.records, records),
+        *_changed_beside_the_list(pinned, then, parent, records, flags),
+    )
+
+
+def _eligible_only_from_here(
+    pinned: Collection[str],
+    then: Collection[str],
+    was: Mapping[str, object],
+    records: Mapping[str, object],
+) -> tuple[km.Finding, ...]:
+    return tuple(
+        km.Finding(
+            "I9-eligible-not-yet",
+            f"role {role}",
+            f"moves to {SWITCHED} but is eligible only from this commit: the parent commit "
+            f"lists {', '.join(then) or 'no roles'}",
+        )
+        for role in sorted(set(pinned) - set(then))
+        if _status(records.get(role)) == SWITCHED and _status(was.get(role)) != SWITCHED
+    )
+
+
+def _changed_beside_the_list(
+    pinned: Collection[str],
+    then: Collection[str],
+    parent: kh.ParentFlip,
+    records: Mapping[str, object],
+    flags: Mapping[str, str],
+) -> tuple[km.Finding, ...]:
+    added, dropped = sorted(set(pinned) - set(then)), sorted(set(then) - set(pinned))
+    if not (added or dropped):
+        return ()
+    change = ", ".join([*(f"+{role}" for role in added), *(f"-{role}" for role in dropped)])
+    recorded = _differing(records, parent.records)
+    flagged = _differing(flags, omit_flags(parent.definitions))
+    return tuple(
+        km.Finding(
+            "I9-eligible-with-move",
+            f"role {role}",
+            f"the eligible roles change in this commit ({change}) and so does its "
+            + " and ".join(
+                what
+                for what, roles in (("adoption record", recorded), (f"{OMIT_KEY} flag", flagged))
+                if role in roles
+            ),
+        )
+        for role in sorted(recorded | flagged)
+    )
+
+
+def _differing(now: Mapping[str, object], was: Mapping[str, object]) -> set[str]:
+    """The roles `now` and `was` do not hold alike, absence counting as a difference."""
+    return {role for role in {*now, *was} if now.get(role) != was.get(role)}
+
+
+def _status(record: object) -> object:
+    return record.get("status") if isinstance(record, Mapping) else None
 
 
 def deletion_findings(

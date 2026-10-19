@@ -352,7 +352,7 @@ repos:
         entry: python scripts/check_kernel_manifest.py --repo-root .
         language: python
         additional_dependencies: ['pyyaml']
-        files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|hooks/hooks\.json|hooks/_kernel_preamble\.py|hooks/inject_kernel\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_ledger|kernel_ledger_checks|kernel_model|kernel_sources|check_agent_shared_blocks|_markdown_tables|_repo_root)\.py)$'
+        files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|hooks/hooks\.json|hooks/_kernel_preamble\.py|hooks/inject_kernel\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_eligibility|kernel_ledger|kernel_ledger_checks|kernel_ledger_history|kernel_liveness|kernel_model|kernel_sources|check_agent_shared_blocks|_markdown_tables|_repo_root)\.py)$'
         pass_filenames: false
 
       # Block G — ADR frontmatter promotion (td-103). Self-scans the staged

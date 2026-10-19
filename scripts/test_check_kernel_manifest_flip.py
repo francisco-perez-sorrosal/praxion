@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -413,8 +415,163 @@ def test_a_ledger_without_an_eligible_key_raises_no_eligibility_finding(repo: Pa
     assert subjects(repo, "I9-eligible-in-ledger") == []
 
 
-def test_the_checker_reaches_the_pin_the_ledger_is_judged_against() -> None:
-    assert cb.ELIGIBLE_ROLES is kl.ELIGIBLE_ROLES
+# -- The eligible roles are held to the parent commit's list ----------------------------------------
+
+PIN_PATH = "scripts/kernel_eligibility.py"
+NEWLY_ELIGIBLE = ELIGIBLE_ROLES[-1]  # the parent commit's list lacks it, this tree's pin has it
+LISTED_AT_PARENT = ELIGIBLE_ROLES[:-1]
+
+
+def write_pin(repo: Path, roles: tuple[str, ...]) -> None:
+    (repo / PIN_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (repo / PIN_PATH).write_text(f"ELIGIBLE_ROLES = {roles!r}\n", encoding="utf-8")
+
+
+def committed_pin(repo: Path, roles: tuple[str, ...]) -> None:
+    """A parent commit pinning `roles` and holding no ledger and no flag."""
+    write_pin(repo, roles)
+    commit_all(repo)
+
+
+def test_a_record_beside_a_change_of_the_eligible_roles_is_refused_naming_the_role(
+    repo: Path,
+) -> None:
+    committed_pin(repo, LISTED_AT_PARENT)
+
+    write_ledger(repo, researcher=trial_row())
+    found = [f for f in cb.check(repo) if f.kind == "I9-eligible-with-move"]
+
+    assert [f.subject for f in found] == ["role researcher"]
+    assert f"+{NEWLY_ELIGIBLE}" in found[0].detail
+    assert "adoption record" in found[0].detail
+
+
+def test_a_record_beside_an_unchanged_list_of_eligible_roles_passes(repo: Path) -> None:
+    committed_pin(repo, ELIGIBLE_ROLES)
+
+    write_ledger(repo, researcher=trial_row())
+
+    assert subjects(repo, "I9-eligible-with-move") == []
+
+
+def test_a_flag_beside_a_change_of_the_eligible_roles_is_refused_naming_the_role(
+    repo: Path,
+) -> None:
+    committed_pin(repo, LISTED_AT_PARENT)
+
+    omit_claude_md(repo, "researcher")
+    found = [f for f in cb.check(repo) if f.kind == "I9-eligible-with-move"]
+
+    assert [f.subject for f in found] == ["role researcher"]
+    assert "omitClaudeMd flag" in found[0].detail
+
+
+def test_a_flag_beside_an_unchanged_list_of_eligible_roles_passes(repo: Path) -> None:
+    committed_pin(repo, ELIGIBLE_ROLES)
+
+    omit_claude_md(repo, "researcher")
+
+    assert subjects(repo, "I9-eligible-with-move") == []
+
+
+def test_a_change_of_the_eligible_roles_beside_neither_a_record_nor_a_flag_passes(
+    repo: Path,
+) -> None:
+    committed_pin(repo, LISTED_AT_PARENT)
+
+    (repo / "README.probe").write_text("nothing else changes\n", encoding="utf-8")
+
+    assert subjects(repo, "I9-eligible-with-move") == []
+
+
+def test_a_committed_change_of_the_eligible_roles_beside_a_record_is_judged_from_its_parent(
+    repo: Path,
+) -> None:
+    committed_pin(repo, LISTED_AT_PARENT)
+    write_ledger(repo, researcher=trial_row())
+    commit_all(repo)
+
+    assert subjects(repo, "I9-eligible-with-move") == ["role researcher"]
+
+
+def test_a_move_to_switched_of_a_role_the_parent_commit_did_not_list_is_refused(
+    repo: Path,
+) -> None:
+    write_ledger(repo, **{NEWLY_ELIGIBLE: trial_row()})
+    write_pin(repo, LISTED_AT_PARENT)
+    commit_all(repo)
+
+    flipped(repo, role=NEWLY_ELIGIBLE)
+    found = [f for f in cb.check(repo) if f.kind == "I9-eligible-not-yet"]
+
+    assert [f.subject for f in found] == [f"role {NEWLY_ELIGIBLE}"]
+    assert ", ".join(LISTED_AT_PARENT) in found[0].detail
+
+
+def test_a_move_to_switched_of_a_role_the_parent_commit_listed_passes(repo: Path) -> None:
+    write_ledger(repo, researcher=trial_row())
+    write_pin(repo, LISTED_AT_PARENT)
+    commit_all(repo)
+
+    flipped(repo)
+
+    assert subjects(repo, "I9-eligible-not-yet") == []
+
+
+def test_a_role_already_switched_at_the_parent_commit_is_not_a_move(repo: Path) -> None:
+    flipped(repo, role=NEWLY_ELIGIBLE)
+    write_pin(repo, LISTED_AT_PARENT)
+    commit_all(repo)
+
+    write_ledger(repo, **{NEWLY_ELIGIBLE: switched_row(probe_after_tokens=21_000)})
+
+    assert subjects(repo, "I9-eligible-not-yet") == []
+
+
+def test_a_parent_commit_before_the_pin_is_held_to_the_list_its_ledger_carried(
+    repo: Path,
+) -> None:
+    write_ledger(repo, **{NEWLY_ELIGIBLE: trial_row()})
+    ledger = repo / km.LEDGER_PATH
+    ledger.write_text(
+        ledger.read_text(encoding="utf-8") + yaml.safe_dump({"eligible": list(LISTED_AT_PARENT)}),
+        encoding="utf-8",
+    )
+    commit_all(repo)
+
+    flipped(repo, role=NEWLY_ELIGIBLE)
+
+    assert subjects(repo, "I9-eligible-not-yet") == [f"role {NEWLY_ELIGIBLE}"]
+
+
+def test_a_parent_commit_that_pins_no_eligible_roles_anywhere_holds_the_move_to_none(
+    repo: Path,
+) -> None:
+    write_ledger(repo, researcher=trial_row())
+    commit_all(repo)
+
+    flipped(repo)
+
+    assert cb.check(repo) == ()
+
+
+def test_a_shallow_clone_without_the_parent_commit_judges_no_eligibility(
+    repo: Path, tmp_path: Path
+) -> None:
+    committed_pin(repo, LISTED_AT_PARENT)
+    write_ledger(repo, researcher=trial_row())
+    commit_all(repo)
+    clone = tmp_path / "shallow"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", f"file://{repo}", str(clone)],
+        check=True,
+        capture_output=True,
+        env=env,
+        timeout=60,
+    )
+
+    assert [f for f in cb.check(clone) if f.kind.startswith("I9-eligible")] == []
 
 
 # -- The flag is read from the frontmatter as YAML reads it ------------------------------------------

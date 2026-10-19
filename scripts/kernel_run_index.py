@@ -115,11 +115,17 @@ def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
 
 
 def _refuse_split_lineages(entries: Mapping[str, Entry]) -> None:
-    """Every part names a listed root and carries its roles, so any part judges like the whole."""
+    """Every part names a listed root that is its own root and carries its roles, so any part
+    judges like the whole and a refusal never names a root outside the parts."""
     for run_id, entry in entries.items():
         root = entries.get(entry.lineage_root)
         if root is None:
             raise ValueError(f"run {run_id}'s lineage root {entry.lineage_root} is not listed")
+        if root.lineage_root != entry.lineage_root:
+            raise ValueError(
+                f"run {run_id}'s lineage root {entry.lineage_root} is not its own root"
+                f" (it names {root.lineage_root})"
+            )
         if entry.roles != root.roles:
             raise ValueError(f"run {run_id} and its lineage root {entry.lineage_root} differ")
 

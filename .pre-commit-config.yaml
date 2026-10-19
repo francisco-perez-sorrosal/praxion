@@ -344,15 +344,18 @@ repos:
       # and ledger-writer groups equal the agents that write those targets (I5).
       # A whole-checkout scan, like agent-shared-blocks: the defect lives between
       # a rule edit and a kernel nobody regenerated, so no single staged file
-      # shows it. `files:` lists every input the invariants read; a rule is any
-      # rules/ markdown file because the always-loaded set is the unscoped ones
-      # and a new unscoped rule must trigger the scan the day it is written.
+      # shows it. `always_run`: pre-commit drops deleted paths before it matches
+      # `files:`, so a commit that only deletes a cited results file would skip
+      # the gate; it takes under a second. `files:` stays as the recorded read set
+      # (a test pins it against the inputs the invariants read); a rule is any
+      # rules/ markdown file because the always-loaded set is the unscoped ones.
       - id: kernel-manifest
         name: Kernel manifest agreement
         entry: python scripts/check_kernel_manifest.py --repo-root .
         language: python
         additional_dependencies: ['pyyaml']
         files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|\.ai-state/eval_ledger/adherence/[^/]+\.json|hooks/hooks\.json|hooks/_kernel_preamble\.py|hooks/inject_kernel\.py|hooks/_observation_log/[^/]+\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_eligibility|kernel_ledger|kernel_ledger_checks|kernel_ledger_history|kernel_liveness|kernel_model|kernel_run_index|kernel_sources|check_agent_shared_blocks|_git_runner|_markdown_tables|_repo_root)\.py)$'
+        always_run: true
         pass_filenames: false
 
       # Block G — ADR frontmatter promotion (td-103). Self-scans the staged

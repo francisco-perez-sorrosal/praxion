@@ -316,6 +316,13 @@ def test_an_index_of_any_other_shape_is_an_input_error_naming_it(text: str) -> N
         kri.parse_index(text.encode("utf-8"))
 
 
+def test_a_lineage_root_that_is_not_its_own_root_is_refused_naming_the_chain() -> None:
+    runs = {"a": listed_part(root="b"), "b": listed_part(root="c"), "c": listed_part(root="c")}
+
+    with pytest.raises(km.KernelModelError, match=r"lineage root b.*is not its own root"):
+        kri.parse_index(index_text(runs).encode("utf-8"))
+
+
 def test_an_index_that_is_not_utf8_is_an_input_error_naming_it(tmp_path: Path) -> None:
     directory = plant(tmp_path, indexed(PASSING))
     (directory / kri.INDEX_NAME).write_bytes(b"\xff{}")

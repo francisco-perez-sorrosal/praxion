@@ -406,7 +406,13 @@ def test_the_gate_code_is_read_from_the_imports_it_makes() -> None:
     assert {"scripts/check_kernel_manifest.py", "scripts/kernel_run_index.py"} <= set(_gate_code())
 
 
-def test_the_hook_runs_for_every_input_the_invariants_read() -> None:
+def test_the_hook_runs_on_every_commit_so_a_deletion_reaches_it() -> None:
+    # pre-commit matches `files:` only against staged paths that were not deleted, so a
+    # commit that only removes a cited results file reaches the gate through always_run alone.
+    assert _kernel_hook()["always_run"] is True
+
+
+def test_the_recorded_read_set_names_every_input_the_invariants_read() -> None:
     pattern = re.compile(_kernel_hook()["files"])
     inputs = [
         *ks.always_loaded_sources(REPO_ROOT),

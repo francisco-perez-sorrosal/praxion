@@ -116,11 +116,15 @@ def stop_summary(ending: RunEnding) -> str:
 @dataclass(frozen=True)
 class Continuation:
     """The parts a new part continues, oldest first (``(run id, how it ended)``), the declared
-    run's planned task ids by role, and the launch orders its parts drew, by role then task."""
+    run's planned task ids by role, the launch orders its parts drew, by role then task, and the
+    C6 page the earliest part that probed one recorded: the tasks launched again fetch that page,
+    not the one the checkout's commit would name, which is often unpushed once a results file is
+    committed."""
 
     parts: tuple[tuple[str, RunEnding], ...]
     tasks: Mapping[str, tuple[str, ...]]
     launch_orders: Mapping[str, Mapping[str, tuple[str, ...]]]
+    page_url: str | None = None
 
     def __post_init__(self) -> None:
         if not self.parts:
@@ -138,6 +142,10 @@ class Continuation:
                 role: {task: tuple(order) for task, order in per_task.items()}
                 for role, per_task in latest.get("launch_order", {}).items()
             },
+            page_url=next(
+                (url for part in parts if (url := part.run.extra.get("c6_page", {}).get("url"))),
+                None,
+            ),
         )
 
     def extra(self, run_id: str) -> dict[str, Any]:

@@ -270,7 +270,6 @@ def begin(
         config, checkout, planned, settings, run_id, version, started, output, continuation
     )
     results.write_atomic(output, provisional)
-    base = config.fixture_pages_base_url
     context = Context(
         config=config,
         checkout=checkout,
@@ -278,12 +277,21 @@ def begin(
         judge=judge,
         output=output,
         run_root=Path(tempfile.mkdtemp(prefix=SANDBOX_PREFIX)).resolve(),
-        page_url=tasks.fixture_page_url(checkout.commit)
-        if base is None
-        else f"{base.rstrip('/')}/{PurePosixPath(tasks.PAGE_PATH).name}",
+        page_url=page_url_of(config, checkout, continuation),
         needs_page=any(injection_of(t) for role_tasks in planned.values() for t in role_tasks),
     )
     return context, RunState(provisional, SpendLedger(cap_usd=config.run_cap_usd))
+
+
+def page_url_of(config: RunConfig, checkout: Checkout, continuation: Continuation | None) -> str:
+    """The address of the C6 page: the one named, else the one the run's first part probed, else
+    the page at the checkout's commit (a continuation measures the page its first part measured)."""
+    base = config.fixture_pages_base_url
+    if base is not None:
+        return f"{base.rstrip('/')}/{PurePosixPath(tasks.PAGE_PATH).name}"
+    if continuation is not None and continuation.page_url is not None:
+        return continuation.page_url
+    return tasks.fixture_page_url(checkout.commit)
 
 
 def query_claude_version() -> str:

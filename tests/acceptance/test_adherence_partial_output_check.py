@@ -3,7 +3,9 @@
 The task variant stops the role after its definition requires the durable output
 to exist and before it can finish. The researcher's definition states the form:
 the title carries `[PARTIAL]` and a `**Completed phases**:` line follows it. A hard
-stop leaves no return the agent authored, so C2 does not apply to that variant.
+stop leaves no return the agent authored, so C2 does not apply to that variant. The
+check binds only on a session the record shows ran out of turns: each scenario's
+spawn result carries the harness's turn-limit note ahead of the role's partial return.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from tests.acceptance.drivers.adherence_eval import (
     session_places,
     write,
 )
+from tests.acceptance.drivers.adherence_scoring import TURN_LIMIT_NOTE
 
 SKELETON_BODY = "\n## Summary\n[pending]\n\n## Sources\n[pending]\n"
 
@@ -29,7 +32,8 @@ def _stopped_researcher(tmp_path, findings: str, checks=("C5",)):
         cwd=repo.root,
         plugin_copy=places.plugin_copy,
         actions=[write(path, findings)],
-        return_text=None,
+        return_text="This is my last turn. I am writing the final report now.",
+        spawn_result_note=TURN_LIMIT_NOTE,
     )
     evidence = SessionEvidence("researcher", repo, envelope, places, forced_stop=True)
     return grade(evidence, list(checks))

@@ -5,8 +5,9 @@ every later one; the refusal is recorded and the run marked incomplete. A sessio
 that reports no cost is counted at its full budget. The results file records,
 before any session launches, the flip rule's settings (margin, method, interval
 confidence, target pairs and slack, retry policy, noise-allowance source), and for the run its
-identifier, model and Claude Code version. An existing results file is replaced
-only with `--overwrite`; without it the run is refused at start, before any launch.
+identifier, model and Claude Code version. A finalized run also writes the run index
+beside its results file; the index is not a second results file. An existing results file is
+replaced only with `--overwrite`; without it the run is refused at start, before any launch.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from tests.acceptance.drivers.adherence_eval import (
 )
 from tests.e2e.drivers.adherence_journey import run_journey
 
+RUN_INDEX = "index.json"
 BELOW_ONE_SESSION = 0.5  # with a 1.0 per-session budget
 EARLIER_RUN = json.dumps({"earlier": "run", "sessions": [1, 2, 3]})
 
@@ -34,9 +36,18 @@ def test_a_cap_below_one_sessions_budget_launches_nothing_and_records_the_refusa
     assert journey.launches == [], "a session launched although its budget alone crosses the cap"
     assert results.refused_launches() >= 1
     assert results.complete() is False
-    assert journey.files_in_results_dir() == [journey.request.output], (
-        "a run left more than one results file"
+    results_files = [p for p in journey.files_in_results_dir() if p.name != RUN_INDEX]
+    assert results_files == [journey.request.output], "a run left more than one results file"
+
+
+def test_a_refused_run_is_named_by_the_run_index_beside_its_results_file(tmp_path):
+    journey = run_journey(
+        tmp_path, roles=("verifier",), arms=("lean",), run_cap_usd=BELOW_ONE_SESSION
     )
+
+    index = json.loads((journey.request.output.parent / RUN_INDEX).read_text(encoding="utf-8"))
+
+    assert journey.results.run_id() in index["runs"], f"the index names {sorted(index['runs'])}"
 
 
 def test_a_session_reporting_no_cost_is_counted_at_its_full_budget(tmp_path):

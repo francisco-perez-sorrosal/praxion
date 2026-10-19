@@ -23,6 +23,12 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
+| `I9-run-index-stale`         | the run index lists every results file beside it, each with the sha256 of its bytes now |
+| `I9-run-missing`             | every run a switched record cites (new, changed or unchanged) has a readable results file in the index |
+| `I9-run-wrong-role`          | ...whose results measured that role                                     |
+| `I9-run-pairs-differ`        | ...whose lineage's complete pairs are the record's                      |
+| `I9-run-flag-disagrees`      | ...whose lineage's flip verdict agrees with the record's pass flag      |
+| `I9-run-passing-short`       | ...and the passing run's lineage is clear on at least 20 complete pairs |
 | `I9-eligible-in-ledger`      | the ledger carries no `eligible` key: the eligible roles are pinned in `scripts/kernel_eligibility.py` |
 | `I9-eligible-with-move`      | a commit that changes the eligible roles carries no adoption record and no `omitClaudeMd` flag |
 | `I9-eligible-not-yet`        | a role moves to switched only if the parent commit already listed it as eligible |
@@ -49,7 +55,7 @@ judged.
 
 The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
 evidence, names the findings of I1 to I8 and renders every report. The ledger's findings (I9, I10)
-are `kernel_ledger_checks`'; the liveness judgement and its log reading are `kernel_liveness`'. The index is read here as plain JSON, not through
+are `kernel_ledger_checks`', over the run index `kernel_run_index` reads; the liveness judgement and its log reading are `kernel_liveness`'. The index is read here as plain JSON, not through
 `kernel_model`, because the model refuses an over-cap string at parse time and I4 must report one,
 not die on it.
 
@@ -73,6 +79,7 @@ import generate_kernels as gk
 import kernel_ledger as kl
 import kernel_ledger_history as kh
 import kernel_model as km
+import kernel_run_index as kri
 import kernel_sources as ks
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from kernel_eligibility import ELIGIBLE_ROLES
@@ -81,6 +88,7 @@ from kernel_eligibility import ELIGIBLE_ROLES
 # names marked below are re-exported: the tests and their testkit reach them through this one.
 from kernel_ledger_checks import (
     ADHERENCE_ENTRY,  # noqa: F401
+    cited_run_findings,
     deletion_findings,
     eligibility_findings,
     flip_findings,
@@ -88,6 +96,7 @@ from kernel_ledger_checks import (
     misreading_findings,
     omit_flags,
     record_findings,
+    run_index_findings,
     transition_findings,
 )
 from kernel_liveness import (
@@ -366,6 +375,7 @@ class Evidence:
     parent: kl.ParentLedger | None  # the ledger at HEAD as the moves read it; None: no ledger
     records: Mapping[str, object]  # role -> adoption record as written; empty: no ledger
     parent_flip: kh.ParentFlip | None  # eligible roles, records and definitions at the parent
+    adherence: kri.Adherence  # the run index and the digests of the results files beside it
 
 
 def gather(root: Path) -> Evidence:
@@ -392,6 +402,7 @@ def gather(root: Path) -> Evidence:
         _parent_ledger(root),
         kh.written_records(kh.ledger_mapping(ledger_text, km.LEDGER_PATH)),
         kh.parent_flip(root, definitions),
+        kri.read_adherence(root),
     )
 
 
@@ -416,6 +427,8 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *slot_findings(evidence.index_slots, evidence.slot_entries),
         *flip_findings(flags, evidence.statuses),
         *record_findings(evidence.ledger),
+        *run_index_findings(evidence.adherence),
+        *cited_run_findings(evidence.ledger, evidence.adherence),
         *transition_findings(evidence.parent, evidence.entries),
         *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),

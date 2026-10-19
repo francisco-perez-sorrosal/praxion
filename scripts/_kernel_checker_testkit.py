@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_kernel_manifest as cb  # noqa: E402
 import generate_kernels as gk  # noqa: E402
 import kernel_model as km  # noqa: E402
+import kernel_run_index as kri  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "check_kernel_manifest.py"
@@ -38,6 +39,7 @@ COPIED = (
     gk.PREAMBLE_PATH,
     cb.HOOKS_PATH,
     km.LEDGER_PATH,  # live flags arrive with their records: a legitimate switch is a clean baseline
+    kri.RESULTS_DIR,  # ...and the records with the results files and index their runs resolve to
 )
 UNIFIED_RULE = "rules/swe/agent-intermediate-documents.md"
 PROBE_HEADING = "Resident Probe Section"
@@ -102,10 +104,18 @@ def append(root: Path, rel: str, text: str) -> None:
 
 
 ADHERENCE = cb.ADHERENCE_ENTRY
+# A researcher run the copied index lists as clear on 24 complete pairs: a record citing it with
+# the defaults below resolves to its results, so a flip built from them is a clean baseline.
+CLEAR_RUN = "20261014T152926Z-723e7a"
 
 
 def run_row(pairs: int = 24, passes: bool = True, eval_entry: str = ADHERENCE) -> dict:
-    return {"id": "r1", "complete_pairs": pairs, "passes_flip_rule": passes, "entry": eval_entry}
+    return {
+        "id": CLEAR_RUN,
+        "complete_pairs": pairs,
+        "passes_flip_rule": passes,
+        "entry": eval_entry,
+    }
 
 
 def switched_row(**fields: object) -> dict:
@@ -113,7 +123,7 @@ def switched_row(**fields: object) -> dict:
         "status": "switched",
         "since": "2026-10-12",
         "runs": [run_row()],
-        "passing_run": "r1",
+        "passing_run": CLEAR_RUN,
         "probe_before_tokens": 31_000,
         "probe_after_tokens": 22_000,
         "flip_rule_ratified": True,

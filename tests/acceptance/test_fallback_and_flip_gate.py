@@ -134,7 +134,11 @@ def test_omit_claude_md_on_a_role_outside_the_pilot_is_refused(sandbox: Sandbox)
     assert "systems-architect" in verdict.output, verdict.output
 
 
-@pytest.mark.parametrize("element", kernel_adoption.MISSING_ELEMENTS)
+FOREIGN_EVAL = "a passing run from another eval"
+OTHER_MISSING_ELEMENTS = [e for e in kernel_adoption.MISSING_ELEMENTS if e != FOREIGN_EVAL]
+
+
+@pytest.mark.parametrize("element", OTHER_MISSING_ELEMENTS)
 def test_omit_claude_md_on_a_pilot_role_without_its_full_record_is_refused(
     sandbox: Sandbox, element: str
 ) -> None:
@@ -146,6 +150,20 @@ def test_omit_claude_md_on_a_pilot_role_without_its_full_record_is_refused(
 
     assert verdict.refused, f"researcher was switched with {element}"
     assert "researcher" in verdict.output, verdict.output
+
+
+def test_omit_claude_md_on_a_role_resting_on_a_run_from_another_eval_is_refused(
+    sandbox: Sandbox,
+) -> None:
+    cited = flip_gate.cited_switch_record(sandbox.root, "researcher")
+    kernel_adoption.record(sandbox.root, kernel_adoption.lacking(cited, FOREIGN_EVAL))
+    kernel_sandbox.set_frontmatter_key(sandbox, "researcher", OMIT)
+
+    verdict = commit_gate(sandbox.root)
+
+    assert verdict.refused, "researcher was switched resting on a run from another eval"
+    assert "I9-record-incomplete: role researcher" in verdict.output, verdict.output
+    assert "praxion-evals-live" in verdict.output, verdict.output
 
 
 @pytest.mark.parametrize("role", PILOT_ROLES)
@@ -228,7 +246,7 @@ def test_a_held_role_reopened_with_its_start_out_of_bounds_is_refused(
 
 
 def test_a_held_role_flipped_straight_to_switched_is_refused(sandbox: Sandbox) -> None:
-    switch = kernel_adoption.full_switch_record(ROLE)
+    switch = flip_gate.cited_switch_record(sandbox.root, ROLE)
     kernel_adoption.move(sandbox.root, ROLE, held(runs=switch.runs), switch)
     kernel_sandbox.set_frontmatter_key(sandbox, ROLE, OMIT)
     regenerate(sandbox.root)
@@ -236,7 +254,9 @@ def test_a_held_role_flipped_straight_to_switched_is_refused(sandbox: Sandbox) -
     verdict = commit_gate(sandbox.root)
 
     assert verdict.refused, "a held role was switched without a new trial"
-    assert ROLE in verdict.output, verdict.output
+    assert "I9-ledger-transition: role verifier -- held -> switched" in verdict.output, (
+        verdict.output
+    )
 
 
 # Each move: the role's record at the parent commit, then the record the commit under

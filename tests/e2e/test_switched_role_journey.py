@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.acceptance.drivers import kernel_adoption, kernel_sandbox, kernel_spawn
+from tests.acceptance.drivers import flip_gate, kernel_adoption, kernel_sandbox, kernel_spawn
 from tests.acceptance.drivers.kernel_sandbox import (
     PLUGIN_ROOT_VARIABLE,
     module_text,
@@ -27,7 +27,7 @@ def test_a_switched_researcher_receives_its_kernel_and_the_project_file_and_is_r
     plugin = kernel_sandbox.new_sandbox(
         kernel_sandbox.build_template(tmp_path / "template"), tmp_path / "plugin"
     )
-    kernel_adoption.record(plugin.root, kernel_adoption.full_switch_record("researcher"))
+    kernel_adoption.record(plugin.root, flip_gate.cited_switch_record(plugin.root, "researcher"))
     kernel_sandbox.set_frontmatter_key(plugin, "researcher", "omitClaudeMd: true")
     kernel_sandbox.regenerate(plugin.root)
     verdict = kernel_sandbox.commit_gate(plugin.root)

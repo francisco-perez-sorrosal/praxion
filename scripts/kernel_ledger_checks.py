@@ -2,10 +2,11 @@
 
 `check_kernel_manifest` gathers the evidence and renders the findings; this module names each
 finding the ledger's rules can raise: the `omitClaudeMd` flag against a `switched` record, a
-switched record's evidence, an eligible list the ledger must not carry, the eligible roles held
-to the parent commit's list, the moves since the parent commit, a deleted ledger, and the spawn
-hook reading every record as PyYAML does. No command line; every function takes what it judges
-as an argument and reads nothing.
+switched record's evidence, the run index against the results files it describes, every run a
+switched record cites resolved through that index, an eligible list the ledger must not carry,
+the eligible roles held to the parent commit's list, the moves since the parent commit, a deleted
+ledger, and the spawn hook reading every record as PyYAML does. No command line; every function
+takes what it judges as an argument and reads nothing.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pathlib import Path
 import kernel_ledger as kl
 import kernel_ledger_history as kh
 import kernel_model as km
+import kernel_run_index as kri
 
 # hooks/ sits beside scripts/; the spawn hook's own ledger reader is what I10 holds to PyYAML's.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
@@ -106,6 +108,96 @@ def _foreign_eval_runs(ledger: kl.Ledger) -> tuple[km.Finding, ...]:
 
 def _passing_run(record: kl.Switched) -> kl.Run:
     return next(run for run in record.runs if run.id == record.passing_run)  # the model holds it
+
+
+def run_index_findings(adherence: kri.Adherence) -> tuple[km.Finding, ...]:
+    """I9: the run index still describes every results file beside it: none gone, changed or new."""
+    listed = {entry.file: entry.sha256 for entry in adherence.entries.values()}
+    drifted = [
+        (name, "is listed but gone" if name not in adherence.files else "changed since indexed")
+        for name, digest in sorted(listed.items())
+        if adherence.files.get(name) != digest
+    ]
+    unlisted = [
+        (name, "is not in the index")
+        for name in sorted(adherence.files)
+        if name not in listed and name not in adherence.skipped
+    ]
+    return tuple(
+        km.Finding(
+            "I9-run-index-stale",
+            f"{kri.RESULTS_DIR}/{name}",
+            f"{what}: rebuild {kri.INDEX_NAME} with `{ADHERENCE_ENTRY} --reindex`",
+        )
+        for name, what in (*drifted, *unlisted)
+    )
+
+
+def cited_run_findings(
+    ledger: kl.Ledger | km.KernelModelError | None, adherence: kri.Adherence
+) -> tuple[km.Finding, ...]:
+    """I9: every run a switched record cites resolves, through the run index, to its lineage.
+
+    New, changed or unchanged, a switched record is judged whole: each run it cites, the passing
+    run included, must have results that measured the role, the record's complete pairs and pass
+    flag must be what its lineage reached, and the passing run's lineage must be clear on at least
+    `kl.REQUIRED_PAIRS` pairs. Two parts of one lineage resolve to the same values, so they are
+    one run; a closed lineage reads "not clear" in the index, a draw that refuses nothing alone.
+    """
+    if not isinstance(ledger, kl.Ledger):
+        return ()  # no ledger, or one the model refused: `record_findings` reports that
+    return tuple(
+        finding
+        for role, record in sorted(ledger.records.items())
+        if isinstance(record, kl.Switched)
+        for run in record.runs
+        for finding in _citation_findings(
+            role, run, run.id == record.passing_run, adherence.lineage_of(run.id)
+        )
+    )
+
+
+def _citation_findings(
+    role: str, run: kl.Run, passing: bool, lineage: kri.Lineage | None
+) -> tuple[km.Finding, ...]:
+    subject = f"role {role}"
+    if lineage is None:
+        detail = f"cites run {run.id!r}, which has no readable results file in {kri.RESULTS_DIR}"
+        return (km.Finding("I9-run-missing", subject, detail),)
+    reached = lineage.roles.get(role)
+    if reached is None:
+        measured = ", ".join(sorted(lineage.roles)) or "no role"
+        detail = f"cites run {run.id!r}, whose results measured {measured}, not {role}"
+        return (km.Finding("I9-run-wrong-role", subject, detail),)
+    clear = reached.flip == kri.CLEAR
+    whole = f"{_named(lineage)} reached {reached.complete_pairs} complete pairs, {reached.flip}"
+    judged = (
+        (
+            "I9-run-pairs-differ",
+            run.complete_pairs != reached.complete_pairs,
+            f"cites run {run.id!r} with {run.complete_pairs} complete pairs",
+        ),
+        (
+            "I9-run-flag-disagrees",
+            run.passes_flip_rule != clear,
+            f"cites run {run.id!r} with passes_flip_rule {str(run.passes_flip_rule).lower()}",
+        ),
+        (
+            "I9-run-passing-short",
+            passing and not (clear and reached.complete_pairs >= kl.REQUIRED_PAIRS),
+            f"rests on run {run.id!r}, which needs {kl.REQUIRED_PAIRS} complete pairs, clear",
+        ),
+    )
+    return tuple(
+        km.Finding(kind, subject, f"{claim}; {whole}") for kind, broken, claim in judged if broken
+    )
+
+
+def _named(lineage: kri.Lineage) -> str:
+    """The run as one: its own id, or its lineage's root and every part when it was continued."""
+    if lineage.parts == (lineage.root,):
+        return f"run {lineage.root!r}"
+    return f"the lineage of {lineage.root!r} (parts {', '.join(lineage.parts)})"
 
 
 def transition_findings(

@@ -366,7 +366,7 @@ def test_a_run_added_to_a_record_that_stays_held_is_reported(repo: Path) -> None
         (
             "I9-ledger-held-run-added",
             "role researcher",
-            "runs ['r1'] added to a held record: re-open it as a trial first",
+            f"runs [{kit.CLEAR_RUN!r}] added to a held record: re-open it as a trial first",
         )
     ]
 

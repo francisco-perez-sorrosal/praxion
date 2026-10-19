@@ -13,22 +13,22 @@ from typing import Any
 
 import pytest
 
-import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import cli, report, results, run_index
 from praxion_evals.adherence.lineage import parts_before
 from praxion_evals.adherence.model import Errored
 from praxion_evals.adherence.session_loop import OUTPUT_DIR
+from tests.adherence_run_support import (
+    REASON,
+    ROLE,
+    STOPPED_BOTH_ARMS,
+    Script,
+    close_run,
+    ended_as,
+    run_small,
+)
 from tests.test_adherence_results import declared, pair_of_sessions, session, write_run
 
-# The fixtures that stand a scripted `claude` in for the paid sessions, shared with the paid-loop
-# tests of the command line.
-paid = cli_tests.paid
-full_first = cli_tests.full_first
-unswitched_checkout = cli_tests.unswitched_checkout
-Script = cli_tests.Script
-ROLE = cli_tests.ROLE
-
-pytestmark = pytest.mark.usefixtures("full_first")
+pytestmark = pytest.mark.usefixtures("full_first", "unswitched_checkout")
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 RECORDED = REPOSITORY / OUTPUT_DIR
@@ -301,7 +301,7 @@ def test_a_finished_run_writes_the_index_beside_its_results_file(
 ):
     paid(Script())
 
-    run = cli_tests._run(tmp_path)[1]
+    run = run_small(tmp_path)[1]
 
     entry = json.loads((tmp_path / INDEX).read_text())["runs"][run.run.id]
     assert entry["file"] == "out.json"
@@ -313,9 +313,9 @@ def test_closing_a_run_rewrites_the_index_with_the_closed_ending(
     paid: Callable[[Script], None], tmp_path: Path
 ):
     paid(Script())
-    stopped = cli_tests._ended_as(tmp_path, cli_tests.STOPPED_BOTH_ARMS)
+    stopped = ended_as(tmp_path, STOPPED_BOTH_ARMS)
 
-    cli_tests._close(tmp_path, stopped.run.id, "--reason", cli_tests.REASON)
+    close_run(tmp_path, stopped.run.id, "--reason", REASON)
 
     entry = json.loads((tmp_path / INDEX).read_text())["runs"][stopped.run.id]
     assert entry["ending"] == "closed"

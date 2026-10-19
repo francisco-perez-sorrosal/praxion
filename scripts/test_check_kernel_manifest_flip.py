@@ -19,6 +19,7 @@ import kernel_ledger as kl  # noqa: E402
 import kernel_model as km  # noqa: E402
 from _kernel_checker_testkit import (  # noqa: E402
     ADHERENCE,
+    OUTSIDE_THE_PIN,
     commit_all,
     flipped,
     frontmatter_line,
@@ -190,12 +191,12 @@ def test_a_flip_resting_on_a_run_from_another_eval_is_reported_by_role(repo: Pat
 
 
 def test_a_role_outside_the_eligible_list_cannot_be_flipped(repo: Path) -> None:
-    flipped(repo, role="sentinel")
+    flipped(repo, role=OUTSIDE_THE_PIN)
 
     found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 
     assert len(found) == 1
-    assert "sentinel" in found[0].detail
+    assert OUTSIDE_THE_PIN in found[0].detail
 
 
 def test_a_ledger_that_is_not_yaml_is_an_input_error_not_a_finding(repo: Path) -> None:
@@ -385,17 +386,17 @@ def test_the_flag_on_a_held_role_is_reported(repo: Path) -> None:
 
 
 def test_a_switched_role_outside_the_pin_is_refused_by_name(repo: Path) -> None:
-    write_ledger(repo, sentinel=switched_row())
-    omit_claude_md(repo, "sentinel")
+    write_ledger(repo, **{OUTSIDE_THE_PIN: switched_row()})
+    omit_claude_md(repo, OUTSIDE_THE_PIN)
     regenerate(repo)
 
     found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 
     assert [f.subject for f in found] == [km.LEDGER_PATH]
-    assert "role sentinel: is not eligible" in found[0].detail
+    assert f"role {OUTSIDE_THE_PIN}: is not eligible" in found[0].detail
 
 
-@pytest.mark.parametrize("listed", [[*ELIGIBLE_ROLES, "sentinel"], list(ELIGIBLE_ROLES), []])
+@pytest.mark.parametrize("listed", [[*ELIGIBLE_ROLES, OUTSIDE_THE_PIN], list(ELIGIBLE_ROLES), []])
 def test_a_ledger_that_lists_eligible_roles_of_its_own_is_refused(
     repo: Path, listed: list[str]
 ) -> None:

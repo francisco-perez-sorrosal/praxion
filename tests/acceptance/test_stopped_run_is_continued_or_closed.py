@@ -41,11 +41,13 @@ def tasks_of(planted: runs.PlantedRun, shapes: frozenset[str]) -> set[str]:
     return {task for task, shape in planted.shapes.items() if shape in shapes}
 
 
-def assert_refused_before_launch(result: runs.StandInRun, *named: str) -> None:
+def assert_refused_before_launch(result: runs.StandInRun, *named: str, reason: str = "") -> None:
+    """``named`` words and the refusal's own ``reason`` text must be in the output: a usage echo has the former."""
     printed = result.stdout + result.stderr
     assert result.exit_code != 0, "the continuation was accepted"
     assert result.launches == (), "a session launched before the refusal"
     assert all(word in printed for word in named), f"the refusal does not name {named}: {printed}"
+    assert reason in printed, f"the refusal does not say {reason!r}: {printed}"
 
 
 def test_a_continuation_launches_exactly_the_unfinished_tasks_whole_in_every_arm(
@@ -69,6 +71,7 @@ def test_a_continuation_launches_its_tasks_in_the_order_its_seed_gave_them(
     result = runs.continue_run(tmp_path, checkout, stopped.path, PLAN)
     task_order = [t for t in stopped.task_ids if t in result.launched_tasks()]
 
+    assert result.launches, "nothing launched, so there is no order to compare"
     assert [s.task_id for s in result.launches if s.attempt == 1][::2] == task_order
     assert {
         s.task_id: tuple(x.arm for x in result.launches if x.task_id == s.task_id)
@@ -104,7 +107,9 @@ def test_a_change_to_the_adoption_ledger_since_the_stop_refuses_the_continuation
 
     result = runs.continue_run(tmp_path, checkout, stopped.path, PLAN)
 
-    assert_refused_before_launch(result, "kernel_adoption.yaml")
+    assert_refused_before_launch(
+        result, "kernel_adoption.yaml", reason="changed since the stop: tree"
+    )
 
 
 DIFFERENT_DECLARATIONS = {
@@ -124,7 +129,7 @@ def test_a_continuation_differing_in_a_declaration_is_refused_naming_it(
 ) -> None:
     result = runs.continue_run(tmp_path, checkout, stopped.path, plan)
 
-    assert_refused_before_launch(result, named)
+    assert_refused_before_launch(result, named, reason="would change what the run measures")
 
 
 def test_a_continuation_of_a_run_whose_recorded_launch_order_differs_from_its_seed_is_refused(
@@ -137,18 +142,23 @@ def test_a_continuation_of_a_run_whose_recorded_launch_order_differs_from_its_se
     assert_refused_before_launch(result, "order")
 
 
-NOT_CONTINUABLE = ("complete", "confined to one arm", "operator interrupt", "already continued")
+NOT_CONTINUABLE = {
+    "complete": "finished its plan",
+    "confined to one arm": "lean arm alone",
+    "operator interrupt": "was interrupted, not stopped",
+    "already continued": "already has a continuation",
+}
 
 
-@pytest.mark.parametrize("variant", NOT_CONTINUABLE)
+@pytest.mark.parametrize(("variant", "said"), NOT_CONTINUABLE.items(), ids=NOT_CONTINUABLE.keys())
 def test_a_run_that_did_not_stop_continuably_is_refused_a_continuation(
-    tmp_path: Path, checkout: Path, variant: runs.StopVariant
+    tmp_path: Path, checkout: Path, variant: runs.StopVariant, said: str
 ) -> None:
     planted = runs.plant_stopped_run(tmp_path, checkout, PLAN, variant=variant)
 
     result = runs.continue_run(tmp_path, checkout, planted.path, PLAN)
 
-    assert_refused_before_launch(result, planted.run_id)
+    assert_refused_before_launch(result, planted.run_id, reason=said)
 
 
 def test_a_continuation_of_an_unreadable_results_file_is_refused(
@@ -160,7 +170,7 @@ def test_a_continuation_of_an_unreadable_results_file_is_refused(
 
     result = runs.continue_run(tmp_path, checkout, broken, PLAN)
 
-    assert_refused_before_launch(result, broken.name)
+    assert_refused_before_launch(result, broken.name, reason="cannot be read as a results file")
 
 
 def test_a_continuation_of_a_run_recorded_before_this_change_is_refused(
@@ -170,7 +180,9 @@ def test_a_continuation_of_a_run_recorded_before_this_change_is_refused(
 
     result = runs.continue_run(tmp_path, checkout, recorded, Plan())
 
-    assert_refused_before_launch(result, "20261014T045733Z-7050ca")
+    assert_refused_before_launch(
+        result, "20261014T045733Z-7050ca", reason="before runs recorded how they ended"
+    )
 
 
 def test_a_fresh_run_beside_an_unresolved_continuable_stopped_run_is_refused_naming_it(

@@ -11,21 +11,19 @@ from pathlib import Path
 
 import pytest
 
-import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import lineage, model, results, session_loop
 from praxion_evals.adherence.arms import PROOF_LABEL
 from praxion_evals.adherence.infra_stop import StopReason
 from praxion_evals.adherence.model import Errored, Failed, Measured
 from praxion_evals.live.session import SessionRun, SessionSpec
+from tests.adherence_run_support import (
+    ROLE,
+    Script,
+    run_small,
+)
 
-# The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
-# role unswitched, shared with the paid-loop tests of the command line.
-paid = cli_tests.paid
-full_first = cli_tests.full_first  # every task launches full first, as these runs count sessions
-unswitched_checkout = cli_tests.unswitched_checkout
-Script = cli_tests.Script
-
-pytestmark = pytest.mark.usefixtures("full_first")
+# Every task launches full first, as these runs count sessions.
+pytestmark = pytest.mark.usefixtures("full_first", "unswitched_checkout")
 
 Ending = Callable[[Script, SessionSpec, dict[str, str]], SessionRun]
 STOP_RUN = ["--required-pairs", "5"]  # five tasks per arm: room for a streak and what follows
@@ -101,7 +99,7 @@ def _stop_run(
     paid: Callable[[Script], None], tmp_path: Path, script: Endings, *options: str
 ) -> results.RunResults:
     paid(script)
-    return cli_tests._run(tmp_path, *STOP_RUN, *options)[1]
+    return run_small(tmp_path, *STOP_RUN, *options)[1]
 
 
 def _stop_of(loaded: results.RunResults) -> StopReason:
@@ -120,7 +118,7 @@ def test_n_identical_errors_of_one_arm_stop_the_run_after_exactly_n_sessions_of_
     script = Endings(lean=[_credit()] * 5)
     paid(script)
 
-    code, loaded = cli_tests._run(tmp_path, *STOP_RUN)
+    code, loaded = run_small(tmp_path, *STOP_RUN)
 
     stop = _stop_of(loaded)
     assert code == session_loop.EXIT_INCOMPLETE
@@ -269,9 +267,9 @@ def test_a_stop_in_one_role_proves_and_launches_nothing_for_the_roles_after_it(
 
     loaded = _stop_run(paid, tmp_path, script, "--role", "verifier")
 
-    assert _stop_of(loaded).role == cli_tests.ROLE
-    assert _proven_roles(script) == {cli_tests.ROLE}, "a later role's arms were proven"
-    assert {r.setup.role for r in loaded.sessions} == {cli_tests.ROLE}
+    assert _stop_of(loaded).role == ROLE
+    assert _proven_roles(script) == {ROLE}, "a later role's arms were proven"
+    assert {r.setup.role for r in loaded.sessions} == {ROLE}
 
 
 def _budget_stopped(script: Script, spec: SessionSpec, env: dict[str, str]) -> SessionRun:

@@ -8,16 +8,16 @@ from pathlib import Path
 
 import pytest
 
-import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import cli, session_loop
+from tests.adherence_run_support import (
+    ROLE,
+    Script,
+    dry_run,
+    run_small,
+)
 
-# The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
-# role unswitched, shared with the paid-loop tests of the command line.
-paid = cli_tests.paid
-no_launch = cli_tests.no_launch
-unswitched_checkout = cli_tests.unswitched_checkout
-Script = cli_tests.Script
-ROLE = cli_tests.ROLE
+pytestmark = pytest.mark.usefixtures("unswitched_checkout")
+
 
 TWENTY_FOUR_TASKS = [f"task-{number}" for number in range(24)]
 
@@ -51,7 +51,7 @@ def test_a_run_records_each_task_order_and_launches_in_it(
 ) -> None:
     paid(Script())
 
-    _, loaded = cli_tests._run(tmp_path)
+    _, loaded = run_small(tmp_path)
 
     (task_id,) = {r.setup.task_id for r in loaded.sessions}
     order = session_loop.launch_order(cli.DEFAULT_SEED, task_id)
@@ -64,7 +64,7 @@ def test_a_calibration_run_records_its_fixed_slot_order(
 ) -> None:
     paid(Script())
 
-    _, loaded = cli_tests._run(tmp_path, "--calibration")
+    _, loaded = run_small(tmp_path, "--calibration")
 
     (task_id,) = {r.setup.task_id for r in loaded.sessions}
     assert loaded.run.extra["launch_order"] == {ROLE: {task_id: ["full", "lean"]}}
@@ -75,7 +75,7 @@ def test_a_calibration_run_records_its_fixed_slot_order(
 def test_a_dry_run_prints_each_task_arms_in_its_launch_order(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    lines = cli_tests._dry_run(capsys, tmp_path, "--role", ROLE)
+    lines = dry_run(capsys, tmp_path, "--role", ROLE)
 
     printed: dict[str, list[str]] = {}
     for line in lines:

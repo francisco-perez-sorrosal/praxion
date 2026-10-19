@@ -103,6 +103,7 @@ def append(root: Path, rel: str, text: str) -> None:
     path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
 
 
+OUTSIDE_THE_PIN = "sentinel"  # a real agent that is not in the eligible pin
 ADHERENCE = cb.ADHERENCE_ENTRY
 # A researcher run the copied index lists as clear on 24 complete pairs: a record citing it with
 # the defaults below resolves to its results, so a flip built from them is a clean baseline.

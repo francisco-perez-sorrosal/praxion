@@ -156,8 +156,10 @@ def test_a_check_with_no_allowance_declared_gets_zero():
 
 OWN = "own-discordance-exact"
 RUN_PAIRS = 24
-# discordant pairs -> the allowance: the smallest net discordance whose exact one-sided
-# tail at 95 percent covers it (the consult's oracle table)
+# discordant pairs d -> the allowance. With no true difference the d discordant pairs split as a
+# fair coin, so the net discordance b - c = 2 * Binomial(d, 1/2) - d. The allowance is the
+# smallest k with P(b <= (d + k) // 2) >= 0.95: d = 4 gives 15/16 at k = 2 (short of 0.95) and
+# 16/16 at k = 4; d = 5 gives 26/32 at k = 1 and 31/32 at k = 3.
 EXACT_ALLOWANCE = {0: 0, 4: 4, 5: 3, 10: 6, 15: 7, 20: 8, 24: 8}
 
 

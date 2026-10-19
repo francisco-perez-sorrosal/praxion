@@ -254,7 +254,7 @@ def test_a_held_role_flipped_straight_to_switched_is_refused(sandbox: Sandbox) -
     verdict = commit_gate(sandbox.root)
 
     assert verdict.refused, "a held role was switched without a new trial"
-    assert "I9-ledger-transition: role verifier -- held -> switched" in verdict.output, (
+    assert f"I9-ledger-transition: role {ROLE} -- held -> switched" in verdict.output, (
         verdict.output
     )
 

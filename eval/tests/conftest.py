@@ -22,17 +22,21 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
+from praxion_evals.adherence import session_launch, session_loop
 from praxion_evals.live.materialize import (
     Materialization,
     make_read_only,
     make_writable,
     tree_digest,
 )
+from praxion_evals.live.session import SessionRun, SessionSpec
+from tests.adherence_run_support import ROLE, Script
 
 OMIT_CLAUDE_MD_LINE = "omitClaudeMd:"
 
@@ -257,6 +261,46 @@ def fake_claude(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeClaude:
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     return FakeClaude(control_path=control_path, log_path=log_path)
+
+
+@pytest.fixture
+def unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every run here sees the checkout with the role not yet switched (see ``unswitched``).
+
+    Not autouse: a module that drives ``cli.main`` applies it through ``pytestmark``.
+    """
+    materialize = session_loop.materialize_path
+
+    def materialize_unswitched(source: Path, dest: Path, *args, **kwargs):
+        return unswitched(materialize(source, dest, *args, **kwargs), ROLE)
+
+    monkeypatch.setattr(session_loop, "materialize_path", materialize_unswitched)
+
+
+@pytest.fixture
+def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(spec: SessionSpec, env: object) -> SessionRun:
+        raise AssertionError("a session was started")
+
+    monkeypatch.setattr(session_launch, "run_session", refuse)
+
+
+@pytest.fixture
+def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
+    """Installs a ``Script`` as the one function that starts ``claude``, with a dummy credential."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
+    monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
+
+    def install(script: Script) -> None:
+        monkeypatch.setattr(session_launch, "run_session", script)
+
+    return install
+
+
+@pytest.fixture
+def full_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every task launches the full arm first, so a scripted run's expectations read in arm order."""
+    monkeypatch.setattr(session_loop, "launch_order", lambda seed, task_id: ("full", "lean"))
 
 
 @pytest.fixture

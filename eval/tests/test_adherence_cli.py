@@ -1,15 +1,16 @@
-"""The adherence console entry: argument parsing, the dry run, the report option, and the paid loop.
+"""The adherence console entry: argument parsing, the declared settings and stop rule, the dry
+run and the start-of-run refusals, and the report option.
 
-The paid loop runs over a real copy of this repository with a scripted stand-in for the
-one function that starts ``claude`` (``session_launch.run_session``); no process is ever started.
+The paid loop itself is in `test_adherence_cli_paid_loop.py`, closing and continuing a stopped run
+in `test_adherence_cli_close.py`, and what a task tells the grader in
+`test_adherence_cli_task_facts.py`. None of them starts a process: the one function that starts
+``claude`` (``session_launch.run_session``) is a scripted stand-in.
 """
 
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,55 +18,20 @@ import pytest
 from praxion_evals.adherence import (
     cli,
     model,
-    results,
-    session_launch,
     session_loop,
     tasks,
-    transcript,
 )
-from praxion_evals.adherence.arms import NO_MARKER_REPLY, PROOF_LABEL
-from praxion_evals.adherence.checks_common import C3, GoldenVerdicts
-from praxion_evals.adherence.infra_stop import COUNTING_KINDS, Launched, StopReason
-from praxion_evals.adherence.lineage import (
-    Closed,
-    Finished,
-    InfraStopped,
-    RunEnding,
-    SpendRefused,
-    ending_of,
-    ending_to_json,
+from praxion_evals.adherence.infra_stop import COUNTING_KINDS
+from tests.adherence_run_support import (
+    REPO_ROOT,
+    ROLE,
+    SMALL_RUN,
+    Script,
+    dry_run,
+    run_small,
 )
-from praxion_evals.adherence.model import (
-    CheckErrored,
-    Errored,
-    Failed,
-    Measured,
-    Passed,
-)
-from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.harness.schemas import JudgeVerdict
-from praxion_evals.live.session import SessionRun, SessionSpec
-from tests.conftest import unswitched
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ROLE = "researcher"
-SMALL_RUN = [
-    "--required-pairs",
-    "1",
-    "--pair-slack",
-    "0",
-    "--no-judge",
-    "--session-budget-usd",
-    "1",
-]
-FULL_TOKENS, LEAN_TOKENS = 5000, 1000
-SESSION_ID, AGENT_ID = "scripted-session", "a0123456789abcdef"
-DELIVERED = {
-    "type": "hook_additional_context",
-    "hookEvent": "SubagentStart",
-    "content": ["[praxion 0a1b2c3d #1]\n\nThe kernel."],
-}
-KERNEL_TRANSCRIPT = json.dumps({"type": "attachment", "attachment": DELIVERED}) + "\n"
+pytestmark = pytest.mark.usefixtures("unswitched_checkout")
 
 
 # ---------------------------------------------------------------------------
@@ -164,37 +130,11 @@ def test_the_report_option_needs_no_role() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(autouse=True)
-def unswitched_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every run here sees the checkout with the role not yet switched (see conftest.unswitched)."""
-    materialize = session_loop.materialize_path
-
-    def materialize_unswitched(source: Path, dest: Path, *args, **kwargs):
-        return unswitched(materialize(source, dest, *args, **kwargs), ROLE)
-
-    monkeypatch.setattr(session_loop, "materialize_path", materialize_unswitched)
-
-
-@pytest.fixture
-def no_launch(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(spec: SessionSpec, env: object) -> SessionRun:
-        raise AssertionError("a session was started")
-
-    monkeypatch.setattr(session_launch, "run_session", refuse)
-
-
-def _dry_run(capsys: pytest.CaptureFixture[str], tmp_path: Path, *options: str) -> list[dict]:
-    argv = [str(REPO_ROOT), "--output", str(tmp_path / "out.json"), "--dry-run", *options]
-    assert cli.main(argv) == 0
-    assert not (tmp_path / "out.json").exists()
-    return [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-
-
 @pytest.mark.usefixtures("no_launch")
 def test_a_dry_run_lists_every_task_of_every_named_arm(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    lines = _dry_run(capsys, tmp_path, "--role", ROLE)
+    lines = dry_run(capsys, tmp_path, "--role", ROLE)
 
     assert sorted((line["task_id"], line["arm"]) for line in lines) == sorted(
         (task, arm) for task in tasks.task_ids(ROLE, cli.DEFAULT_SEED) for arm in ("full", "lean")
@@ -210,7 +150,7 @@ def test_a_token_file_puts_the_token_in_every_session_and_takes_the_api_key_out(
     token_file = tmp_path / "session-token"
     token_file.write_text("sk-ant-oat01-example\n")
 
-    lines = _dry_run(
+    lines = dry_run(
         capsys,
         tmp_path,
         "--role",
@@ -231,7 +171,7 @@ def test_a_token_file_puts_the_token_in_every_session_and_takes_the_api_key_out(
 def test_a_dry_run_of_a_calibration_lists_the_full_arm_only(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    lines = _dry_run(capsys, tmp_path, "--role", ROLE, "--calibration")
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--calibration")
 
     assert {line["arm"] for line in lines} == {"full"}
 
@@ -262,7 +202,7 @@ def test_a_cap_above_the_target_plus_slack_changes_nothing() -> None:
 def test_a_dry_run_uses_the_declared_slack_for_the_task_count(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    lines = _dry_run(capsys, tmp_path, "--role", ROLE, "--arm", "full", *SMALL_RUN)
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--arm", "full", *SMALL_RUN)
 
     assert len(lines) == 1
 
@@ -308,291 +248,6 @@ def test_a_paid_run_without_a_credential_is_a_usage_error(
 
     assert code == 2
     assert not (tmp_path / "o.json").exists()
-
-
-# ---------------------------------------------------------------------------
-# The golden-case record
-# ---------------------------------------------------------------------------
-
-
-def test_the_golden_record_counts_the_cases_the_judge_got_wrong() -> None:
-    right = GoldenVerdicts(bad=Failed("missed"), good=Passed())
-    wrong = GoldenVerdicts(bad=Passed(), good=Passed())
-
-    record = session_loop.golden_record({"C3": right, "C9": wrong})
-
-    assert record["observed_error"] == 0.25
-    assert record["cases"]["C3"]["separates"] is True
-    assert record["cases"]["C9"]["bad"] == {"outcome": "passed"}
-
-
-def test_an_errored_golden_case_is_recorded_but_neither_right_nor_wrong() -> None:
-    errored = GoldenVerdicts(bad=CheckErrored("judge down"), good=Passed())
-
-    assert session_loop.golden_record({"C3": errored})["observed_error"] == 0.0
-    assert (
-        session_loop.golden_record({"C3": GoldenVerdicts(CheckErrored("x"), CheckErrored("y"))})[
-            "observed_error"
-        ]
-        is None
-    )
-
-
-class _ScriptedJudge(JudgeClient):
-    """Fails the golden bad case and passes everything else, as a faithful judge would."""
-
-    def judge(self, rubric: str, artifact: str, schema: dict) -> JudgeVerdict:  # type: ignore[type-arg]
-        verdict = "FAIL" if artifact == C3.golden_bad_case else "PASS"  # type: ignore[union-attr]
-        return JudgeVerdict(verdict=verdict, findings=(), score=0, raw={})  # type: ignore[arg-type]
-
-
-# ---------------------------------------------------------------------------
-# The paid loop, over a scripted `claude`
-# ---------------------------------------------------------------------------
-
-
-class Script:
-    """Answers each launch like a session would, and records what was launched."""
-
-    delivers_kernel = True  # a lean spawn records its kernel in the role's own transcript
-
-    def __init__(
-        self, *, cost: float | None = 0.01, fail_launch: Callable[[int], bool] | None = None
-    ):
-        self.cost = cost
-        self.fail_launch = fail_launch or (lambda number: False)
-        self.specs: list[SessionSpec] = []
-
-    def __call__(self, spec: SessionSpec, env: dict[str, str]) -> SessionRun:
-        self.specs.append(spec)
-        if self.fail_launch(len(self.specs)):
-            return SessionRun("", "scripted failure", 3)
-        return SessionRun(self._stream(spec, env), "", 0)
-
-    def _stream(self, spec: SessionSpec, env: dict[str, str]) -> str:
-        role = re.search(r"praxion:([a-z-]+)", spec.prompt).group(1)  # type: ignore[union-attr]
-        lean = "lean" in spec.plugin_dir.name
-        answer = self._answer(spec, env, lean)
-        if lean and self.delivers_kernel:
-            config_dir = Path(env["CLAUDE_CONFIG_DIR"])
-            path = transcript.transcript_path(config_dir, str(spec.cwd), SESSION_ID, AGENT_ID)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(KERNEL_TRANSCRIPT)
-        spawned = f"{answer}\nagentId: {AGENT_ID} (to resume)"
-        tokens = LEAN_TOKENS if lean else FULL_TOKENS
-        usage = {
-            "input_tokens": 2,
-            "cache_creation_input_tokens": tokens,
-            "cache_read_input_tokens": 0,
-        }
-        plugin = {"name": "praxion", "source": "praxion@inline", "path": str(spec.plugin_dir)}
-        result = {"type": "result", "subtype": "success", "is_error": False, "result": answer}
-        result["session_id"] = SESSION_ID
-        if self.cost is not None:
-            result["total_cost_usd"] = self.cost
-        events = [
-            {
-                "type": "system",
-                "subtype": "init",
-                "plugins": [plugin],
-                "mcp_servers": [],
-                "cwd": str(spec.cwd),
-            },
-            {
-                "type": "assistant",
-                "message": {
-                    "content": [
-                        {
-                            "type": "tool_use",
-                            "id": "t1",
-                            "name": "Agent",
-                            "input": {"subagent_type": f"praxion:{role}", "prompt": "do it"},
-                        }
-                    ]
-                },
-            },
-            {
-                "type": "assistant",
-                "parent_tool_use_id": "t1",
-                "message": {"content": [{"type": "text", "text": answer}], "usage": usage},
-            },
-            {
-                "type": "user",
-                "message": {
-                    "content": [{"type": "tool_result", "tool_use_id": "t1", "content": spawned}]
-                },
-            },
-            result,
-        ]
-        return "\n".join(json.dumps(event) for event in events)
-
-    @staticmethod
-    def _answer(spec: SessionSpec, env: dict[str, str], lean: bool) -> str:
-        if PROOF_LABEL not in spec.prompt:
-            return "Findings are in the report.\n[COMPLETE]"
-        if lean:
-            return NO_MARKER_REPLY
-        planted = (Path(env["CLAUDE_CONFIG_DIR"]) / "CLAUDE.md").read_text(encoding="utf-8")
-        return re.findall(rf"{PROOF_LABEL}-[0-9a-f]+", planted)[-1]
-
-
-@pytest.fixture
-def paid(monkeypatch: pytest.MonkeyPatch) -> Callable[[Script], None]:
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
-    monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
-
-    def install(script: Script) -> None:
-        monkeypatch.setattr(session_launch, "run_session", script)
-
-    return install
-
-
-@pytest.fixture
-def full_first(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every task launches the full arm first, so a scripted run's expectations read in arm order."""
-    monkeypatch.setattr(session_loop, "launch_order", lambda seed, task_id: ("full", "lean"))
-
-
-class Explodes(Script):
-    """Launches the third session like the others, then raises as a decode failure would."""
-
-    def __call__(self, spec: SessionSpec, env: dict[str, str]) -> SessionRun:
-        run = super().__call__(spec, env)
-        if len(self.specs) == 3:
-            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
-        return run
-
-
-def _run(tmp_path: Path, *options: str, name: str = "out.json") -> tuple[int, results.RunResults]:
-    output = tmp_path / name
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN, *options])
-    return code, results.load(output)
-
-
-def _sessions(loaded: results.RunResults) -> list[tuple[str, str]]:
-    return [(r.setup.arm, type(r.status).__name__) for r in loaded.sessions]
-
-
-@pytest.mark.usefixtures("full_first")
-def test_an_exception_after_the_session_was_launched_is_charged_the_full_session_budget(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Explodes())
-
-    loaded = _run(tmp_path, "--max-total-usd", "4")[1]
-
-    assert _sessions(loaded) == [("full", "Errored"), ("lean", "Measured")]
-    exploded = loaded.sessions[0]
-    assert getattr(exploded.status, "kind", None) == "evaluation_exception"
-    assert exploded.cost_usd == 1.0  # the session budget: the process may have run and spent
-    assert loaded.run.extra["spend"]["spent_usd"] == pytest.approx(1.0 + 3 * 0.01)
-
-
-@pytest.mark.usefixtures("full_first")
-def test_each_arm_is_proven_then_the_task_runs_in_both_arms_in_turn(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script()
-    paid(script)
-
-    code, loaded = _run(tmp_path)
-
-    assert code == 0
-    assert loaded.run.complete
-    assert [("lean" in s.plugin_dir.name) for s in script.specs] == [False, True, False, True]
-    assert _sessions(loaded) == [("full", "Measured"), ("lean", "Measured")]
-    assert {arm: loaded.arms[ROLE][arm]["built"] for arm in ("full", "lean")} == {
-        "full": True,
-        "lean": True,
-    }
-    assert loaded.arms[ROLE]["lean"]["proof"]["cross_checked"] is True
-    assert loaded.run.claude_code_version == "9.9.9-test"
-    assert loaded.run.extra["retries"] == []
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_lean_session_whose_transcript_is_absent_names_the_path_it_looked_at(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script()
-    script.delivers_kernel = False
-    paid(script)
-
-    lean = _run(tmp_path)[1].sessions[1].status
-
-    assert getattr(lean, "kind", None) == "kernel_missing"
-    assert f"/subagents/agent-{AGENT_ID}.jsonl was not found" in lean.detail
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_transient_infrastructure_error_is_retried_once_and_the_retry_replaces_it(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script(fail_launch=lambda number: number == 4)  # the lean task session
-    paid(script)
-
-    code, loaded = _run(tmp_path)
-
-    assert code == 0
-    assert _sessions(loaded) == [("full", "Measured"), ("lean", "Errored"), ("lean", "Measured")]
-    assert loaded.run.extra["retries"] == [
-        {
-            "role": ROLE,
-            "arm": "lean",
-            "task_id": loaded.sessions[0].setup.task_id,
-            "after": "exit_nonzero",
-        }
-    ]
-    assert isinstance(results.pairs_of(loaded, ROLE)[0].lean, Measured)
-
-
-def test_an_error_that_keeps_failing_is_retried_once_only_and_leaves_the_run_incomplete(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script(fail_launch=lambda number: number >= 2)  # every launch after the proof
-    paid(script)
-
-    code, loaded = _run(tmp_path, "--arm", "lean")
-
-    assert code == 1
-    assert len(script.specs) == 3  # the proof, the lean session and its one retry
-    assert _sessions(loaded) == [("lean", "Errored"), ("lean", "Errored")]
-    assert not loaded.run.complete
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_session_that_reports_no_cost_is_charged_its_budget_and_the_cap_refuses_the_rest(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script(cost=None)
-    paid(script)
-
-    code, loaded = _run(tmp_path, "--max-total-usd", "2")
-
-    assert code == 1
-    assert len(script.specs) == 2  # the two proofs fill the cap
-    assert [
-        (r.setup.arm, r.status.kind) for r in loaded.sessions if isinstance(r.status, Errored)
-    ] == [
-        ("full", "launch_refused"),
-        ("lean", "launch_refused"),
-    ]
-    assert len(loaded.run.refused_launches) == 2
-    assert loaded.run.extra["spend"] == {"cap_usd": 2.0, "spent_usd": 2.0}
-
-
-def test_an_arm_whose_proof_fails_runs_no_task(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    script = Script(fail_launch=lambda number: number == 1)  # the full arm's proof
-    paid(script)
-
-    code, loaded = _run(tmp_path)
-
-    assert code == 1
-    assert loaded.arms[ROLE]["full"]["built"] is False
-    assert loaded.arms[ROLE]["lean"]["built"] is True
-    assert _sessions(loaded) == [("lean", "Measured")]
 
 
 def test_the_stop_rule_defaults_to_three_failures_and_two_thousand_characters() -> None:
@@ -655,57 +310,12 @@ def test_a_stop_rule_naming_another_masking_rule_is_refused() -> None:
         model.settings_from_json(wire)
 
 
-def test_golden_cases_are_judged_once_and_recorded_before_any_session(
-    paid: Callable[[Script], None], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    paid(Script())
-    monkeypatch.setattr(session_loop, "select_judge_client", _ScriptedJudge)
-    output = tmp_path / "golden.json"
-
-    code = cli.main(
-        [
-            str(REPO_ROOT),
-            "--role",
-            ROLE,
-            "--output",
-            str(output),
-            "--judge-golden",
-            "--max-total-usd",
-            "0.5",
-            "--session-budget-usd",
-            "1",
-        ]
-    )
-
-    recorded = results.load(output).golden_bad_case_verdicts
-    assert code == 1  # the cap refused the proofs
-    assert recorded is not None
-    assert recorded["observed_error"] == 0.0
-    assert recorded["cases"]["C3"]["separates"] is True
-
-
-def test_judging_that_is_unavailable_is_a_usage_error_before_anything_is_written(
-    paid: Callable[[Script], None], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    paid(Script())
-
-    def unavailable() -> JudgeClient:
-        raise RuntimeError("no judge credentials")
-
-    monkeypatch.setattr(session_loop, "select_judge_client", unavailable)
-
-    code = cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(tmp_path / "o.json")])
-
-    assert code == 2
-    assert not (tmp_path / "o.json").exists()
-
-
 def test_the_report_option_renders_a_results_file_and_launches_nothing(
     paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     script = Script()
     paid(script)
-    _, loaded = _run(tmp_path)
+    _, loaded = run_small(tmp_path)
     launched = len(script.specs)
     capsys.readouterr()
 
@@ -714,232 +324,3 @@ def test_the_report_option_renders_a_results_file_and_launches_nothing(
     assert code == 0
     assert loaded.run.id in capsys.readouterr().out
     assert len(script.specs) == launched
-
-
-# ---------------------------------------------------------------------------
-# A stopped run is continued or closed, never left beside a fresh one
-# ---------------------------------------------------------------------------
-
-REASON = "the credit was cut off for an unrelated audit"
-STOPPED_BOTH_ARMS = SpendRefused(("task-001",))
-STOPPED_ONE_ARM = InfraStopped(
-    StopReason(
-        "result_error",
-        "credit",
-        ROLE,
-        "lean",
-        tuple(Launched("task-001", "lean", 1) for _ in range(3)),
-        "one-arm",
-    )
-)
-
-
-def _ended_as(tmp_path: Path, ending: RunEnding, name: str = "stopped.json") -> results.RunResults:
-    """A small run of ROLE in ``tmp_path``, its results rewritten to say it ended as ``ending``."""
-    loaded = _run(tmp_path, name=name)[1]
-    extra = {**loaded.run.extra, "ending": ending_to_json(ending)}
-    rewritten = replace(loaded, run=replace(loaded.run, extra=extra))
-    results.write_atomic(tmp_path / name, rewritten)
-    return rewritten
-
-
-def _close(tmp_path: Path, run_id: str, *options: str) -> int:
-    where = ["--output", str(tmp_path / "closing.json")]  # its directory is where the runs are
-    return cli.main([str(REPO_ROOT), "--close", run_id, *options, *where])
-
-
-def _fresh_run(tmp_path: Path) -> int:
-    output = tmp_path / "fresh.json"
-    return cli.main([str(REPO_ROOT), "--role", ROLE, "--output", str(output), *SMALL_RUN])
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_stopped_run_is_closed_with_a_reason_written_into_its_own_results_file(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Script())
-    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-
-    code = _close(tmp_path, stopped.run.id, "--reason", REASON)
-
-    ending = ending_of(results.load(tmp_path / "stopped.json"))
-    assert code == 0
-    assert isinstance(ending, Closed)
-    assert (ending.reason, ending.stopped) == (REASON, STOPPED_BOTH_ARMS)
-    assert ending.interim, "the closed run carries the per-check result it had reached"
-
-
-@pytest.mark.parametrize("argv", [["--close", "20261020T000000Z-0badf1"], ["--reason", REASON]])
-def test_a_close_and_its_reason_go_together(argv: list[str]) -> None:
-    with pytest.raises(SystemExit) as raised:
-        cli.parse_config([*argv, "--role", ROLE])
-
-    assert raised.value.code == 2
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_blank_reason_closes_nothing(paid: Callable[[Script], None], tmp_path: Path) -> None:
-    paid(Script())
-    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-
-    code = _close(tmp_path, stopped.run.id, "--reason", "  ")
-
-    assert code == 2
-    assert ending_of(results.load(tmp_path / "stopped.json")) == STOPPED_BOTH_ARMS
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_run_that_did_not_stop_is_not_closed(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Script())
-    finished = _ended_as(tmp_path, Finished())
-
-    code = _close(tmp_path, finished.run.id, "--reason", REASON)
-
-    assert code == 2
-    assert ending_of(results.load(tmp_path / "stopped.json")) == Finished()
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_fresh_run_beside_a_continuable_stopped_run_is_refused_naming_it(
-    paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    script = Script()
-    paid(script)
-    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-    launched = len(script.specs)
-    capsys.readouterr()
-
-    code = _fresh_run(tmp_path)
-
-    assert code == 2
-    assert stopped.run.id in capsys.readouterr().err
-    assert len(script.specs) == launched
-    assert not (tmp_path / "fresh.json").exists()
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_fresh_run_starts_once_the_stopped_run_was_closed(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Script())
-    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-    _close(tmp_path, stopped.run.id, "--reason", REASON)
-
-    code = _fresh_run(tmp_path)
-
-    assert code == 0
-    assert (tmp_path / "fresh.json").exists()
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_stop_confined_to_one_arm_does_not_block_a_fresh_run(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Script())
-    _ended_as(tmp_path, STOPPED_ONE_ARM)
-
-    code = _fresh_run(tmp_path)
-
-    assert code == 0
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_dry_run_beside_a_stopped_run_is_not_refused(
-    paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    paid(Script())
-    _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-    capsys.readouterr()
-
-    lines = _dry_run(capsys, tmp_path, "--role", ROLE)
-
-    assert lines, "the dry run still plans its sessions"
-
-
-@pytest.mark.usefixtures("full_first")
-def test_a_closed_run_is_listed_by_the_next_run_as_a_not_clear_interim_draw(
-    paid: Callable[[Script], None], tmp_path: Path
-) -> None:
-    paid(Script())
-    stopped = _ended_as(tmp_path, STOPPED_BOTH_ARMS)
-    _close(tmp_path, stopped.run.id, "--reason", REASON)
-
-    _fresh_run(tmp_path)
-
-    listed = results.earlier_listed(results.load(tmp_path / "fresh.json").run, ROLE)
-    assert listed is not None
-    assert listed.draws == (results.Draw((stopped.run.id,), "not clear", interim=True),)
-
-
-# ---------------------------------------------------------------------------
-# What a task tells the grader, and the one C6 page probe
-# ---------------------------------------------------------------------------
-
-
-def _task_with(variant_label: str) -> tasks.TaskSpec:
-    every_task = tasks.generate(ROLE, cli.DEFAULT_SEED, tasks.producible_task_count(ROLE, 7))
-    return next(t for t in every_task if t.task_id.endswith(f".{variant_label}"))
-
-
-def test_an_injection_task_tells_the_grader_what_was_planted_and_whether_the_page_was_reachable() -> (
-    None
-):
-    task = _task_with("injection")
-
-    reachable = session_launch._task_facts(task, page_available=True)
-    unreachable = session_launch._task_facts(task, page_available=False)
-
-    assert reachable["planted_effect"] == tasks.PLANTED_INJECTION.effect_path
-    assert (reachable["fetchable_page"], unreachable["fetchable_page"]) == (True, False)
-
-
-def test_an_early_stop_task_is_marked_as_forced_and_plants_nothing() -> None:
-    facts = session_launch._task_facts(_task_with("early-stop"), page_available=True)
-
-    assert facts["forced_stop"] is True
-    assert (facts["planted_instruction"], facts["fetchable_page"]) == (None, False)
-
-
-def test_an_early_stop_task_tells_the_grader_the_turn_cap_the_role_ran_under() -> None:
-    task = _task_with("early-stop")
-
-    facts = session_launch._task_facts(task, page_available=True)
-
-    assert facts["turn_cap"] == tasks.turn_cap_of(task)
-    assert facts["turn_cap"] is not None
-
-
-def test_a_task_that_stops_no_role_carries_no_turn_cap() -> None:
-    facts = session_launch._task_facts(_task_with("injection"), page_available=True)
-
-    assert facts["turn_cap"] is None
-
-
-def test_the_page_is_probed_once_and_only_when_a_task_needs_it(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    probes: list[str] = []
-    monkeypatch.setattr(session_loop, "page_is_fetchable", lambda url: probes.append(url) or False)
-    config = cli.parse_config(["--role", ROLE, "--output", str(tmp_path / "o.json")])
-    checkout = session_loop.Checkout(REPO_ROOT, "0" * 40, False)
-    planned = {ROLE: [_task_with("injection")]}
-    output = tmp_path / "o.json"
-    settings = cli.declared_settings(config)
-    started = session_loop.datetime.now(session_loop.UTC)
-    provisional = session_loop._provisional(
-        config, checkout, planned, settings, "run", "1", started, output
-    )
-    context = session_loop.Context(
-        config, checkout, planned, None, output, tmp_path, "https://page", True
-    )
-    state = session_loop.RunState(provisional, session_loop.SpendLedger(cap_usd=1.0))
-
-    unproven = session_loop._probe_page(context, state, [])
-    first = session_loop._probe_page(context, unproven, ["full"])
-    again = session_loop._probe_page(context, first, ["full", "lean"])
-
-    assert unproven.page_fetchable is None
-    assert (first.page_fetchable, again.page_fetchable, probes) == (False, False, ["https://page"])
-    assert first.results.run.extra["c6_page"] == {"url": "https://page", "fetchable": False}

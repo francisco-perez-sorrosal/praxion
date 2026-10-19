@@ -12,7 +12,6 @@ from typing import Any
 
 import pytest
 
-import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import results
 from praxion_evals.adherence.infra_stop import StopRule
 from praxion_evals.adherence.run_identity import (
@@ -28,13 +27,15 @@ from praxion_evals.adherence.run_identity import (
     working_tree,
 )
 from praxion_evals.live.session import SessionRun, SessionSpec
+from tests.adherence_run_support import (
+    REPO_ROOT,
+    ROLE,
+    Script,
+    run_small,
+)
 from tests.test_adherence_report import results_of
 
-paid = cli_tests.paid
-full_first = cli_tests.full_first
-unswitched_checkout = cli_tests.unswitched_checkout
-
-pytestmark = pytest.mark.usefixtures("full_first")
+pytestmark = pytest.mark.usefixtures("full_first", "unswitched_checkout")
 
 # ---------------------------------------------------------------------------
 # What the run was measured on: the tree digest
@@ -368,7 +369,7 @@ def test_a_role_whose_identity_is_unknown_is_always_a_difference() -> None:
 REPORTED = "claude-opus-5-5"
 
 
-class Reports(cli_tests.Script):
+class Reports(Script):
     """Answers like the stand-in, with an init event that reports a model: the Nth launch
     reports `model-N` unless one name is fixed."""
 
@@ -386,24 +387,21 @@ class Reports(cli_tests.Script):
 def test_a_new_run_records_what_it_was_measured_on_when_it_begins(
     paid: Any, tmp_path: Path
 ) -> None:
-    paid(cli_tests.Script())
+    paid(Script())
 
-    loaded = cli_tests._run(tmp_path)[1]
+    loaded = run_small(tmp_path)[1]
 
     recorded = loaded.run.extra["identity"]
-    definition = (cli_tests.REPO_ROOT / "agents" / f"{cli_tests.ROLE}.md").read_bytes()
+    definition = (REPO_ROOT / "agents" / f"{ROLE}.md").read_bytes()
     assert set(recorded) == {"tree", "model", "roles"}
     assert len(recorded["tree"]) == len(hashlib.sha256().hexdigest())
-    assert (
-        recorded["roles"][cli_tests.ROLE]["definition_sha"]
-        == hashlib.sha256(definition).hexdigest()
-    )
+    assert recorded["roles"][ROLE]["definition_sha"] == hashlib.sha256(definition).hexdigest()
 
 
 def test_a_run_whose_sessions_report_no_model_records_none(paid: Any, tmp_path: Path) -> None:
-    paid(cli_tests.Script())
+    paid(Script())
 
-    assert cli_tests._run(tmp_path)[1].run.extra["identity"]["model"] is None
+    assert run_small(tmp_path)[1].run.extra["identity"]["model"] is None
 
 
 def test_a_run_records_the_model_its_first_session_reported_and_keeps_it(
@@ -411,7 +409,7 @@ def test_a_run_records_the_model_its_first_session_reported_and_keeps_it(
 ) -> None:
     paid(Reports())
 
-    loaded = cli_tests._run(tmp_path)[1]
+    loaded = run_small(tmp_path)[1]
 
     assert loaded.run.extra["identity"]["model"] == "model-1"
 
@@ -421,13 +419,11 @@ def test_the_identity_a_run_wrote_reads_back_as_the_one_it_began_with(
 ) -> None:
     paid(Reports(REPORTED))
 
-    loaded = cli_tests._run(tmp_path)[1]
+    loaded = run_small(tmp_path)[1]
 
-    identity = measured_identity(loaded, cli_tests.REPO_ROOT)
+    identity = measured_identity(loaded, REPO_ROOT)
     assert (identity.model, identity.seed) == (REPORTED, loaded.run.extra["seed"])
-    assert identity.roles == {
-        cli_tests.ROLE: role_identity(working_tree(cli_tests.REPO_ROOT), cli_tests.ROLE)
-    }
+    assert identity.roles == {ROLE: role_identity(working_tree(REPO_ROOT), ROLE)}
 
 
 def test_the_record_a_run_begins_with_names_the_tree_of_the_checkout(checkout: Path) -> None:

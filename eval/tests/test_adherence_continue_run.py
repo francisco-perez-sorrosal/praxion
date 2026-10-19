@@ -15,7 +15,6 @@ from typing import Any
 
 import pytest
 
-import tests.test_adherence_cli as cli_tests
 from praxion_evals.adherence import cli, results, session_loop
 from praxion_evals.adherence.arms import PROOF_LABEL
 from praxion_evals.adherence.infra_stop import (
@@ -42,17 +41,18 @@ from praxion_evals.adherence.lineage import (
 from praxion_evals.adherence.model import Errored, Measured, SessionRecord
 from praxion_evals.adherence.run_identity import MeasuredIdentity, tree_digest
 from praxion_evals.live.session import SessionSpec
+from tests.adherence_run_support import (
+    REPO_ROOT,
+    ROLE,
+    Script,
+    run_small,
+)
 from tests.test_adherence_results import declared, run_results, session
 
-# The fixtures that stand a scripted `claude` in for the paid sessions and keep the live checkout's
-# role unswitched, shared with the paid-loop tests of the command line.
-paid = cli_tests.paid
-full_first = cli_tests.full_first  # every task launches full first, as the shapes below read
-unswitched_checkout = cli_tests.unswitched_checkout
-Script = cli_tests.Script
-ROLE = cli_tests.ROLE
+SEEDED_LAUNCH_ORDER = session_loop.launch_order  # as imported, before `full_first` fixes it
 
-pytestmark = pytest.mark.usefixtures("full_first")
+# Every task launches full first, as the shapes below read.
+pytestmark = pytest.mark.usefixtures("full_first", "unswitched_checkout")
 
 EIGHT_TASKS = ["--required-pairs", "8"]  # with the small run's zero slack: eight planned tasks
 STOPPING_KIND, STOPPING_TAIL = "exit_nonzero", "fatal: the session channel closed unexpectedly"
@@ -102,7 +102,7 @@ def _rewritten(tmp_path: Path, run: results.RunResults, ending: RunEnding, sessi
 
 def _stopped_in_eight_shapes(tmp_path: Path, *options: str) -> results.RunResults:
     """A run of eight tasks that stopped on three lean failures in a row, seen in both arms."""
-    run = cli_tests._run(tmp_path, *EIGHT_TASKS, *options, name=STOPPED)[1]
+    run = run_small(tmp_path, *EIGHT_TASKS, *options, name=STOPPED)[1]
     planned = run.run.extra["tasks"][ROLE]
     ran = {(planned.index(r.setup.task_id), r.setup.arm): r for r in run.sessions}
     streak = [(LEAN_IN_STREAK, 1), (LEAN_IN_STREAK, 2), (BOTH_IN_STREAK, 1)]
@@ -119,7 +119,7 @@ def _stopped_in_eight_shapes(tmp_path: Path, *options: str) -> results.RunResult
 
 def _continue(tmp_path: Path, run_id: str, *options: str, name: str = "part.json") -> int:
     where = ["--output", str(tmp_path / name)]  # its directory is where the stopped run is
-    return cli.main([str(cli_tests.REPO_ROOT), "--continue", run_id, *where, *options])
+    return cli.main([str(REPO_ROOT), "--continue", run_id, *where, *options])
 
 
 def _task_sessions(script: Script) -> list[SessionSpec]:
@@ -160,16 +160,27 @@ def test_a_continuation_launches_again_exactly_the_tasks_no_part_finished_in_bot
     assert len(_relaunched(part)) == 2 * len(LAUNCHED_AGAIN)
 
 
+@pytest.fixture
+def seeded_launch_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The order the seed gives each task, for a test that reads it: undoes ``full_first``."""
+    monkeypatch.setattr(session_loop, "launch_order", SEEDED_LAUNCH_ORDER)
+
+
 def test_the_tasks_launched_again_run_in_their_planned_and_seeded_order(
-    paid: Callable[[Script], None], stopped: results.RunResults, tmp_path: Path
+    paid: Callable[[Script], None],
+    seeded_launch_order: None,
+    stopped: results.RunResults,
+    tmp_path: Path,
 ) -> None:
     paid(Script())
 
     _continue(tmp_path, stopped.run.id)
 
-    expected = [
-        (task, arm) for task in _planned(stopped, *LAUNCHED_AGAIN) for arm in ("full", "lean")
-    ]
+    seed = stopped.run.extra["seed"]
+    again = _planned(stopped, *LAUNCHED_AGAIN)
+    expected = [(task, arm) for task in again for arm in SEEDED_LAUNCH_ORDER(seed, task)]
+    full_first_order = [(task, arm) for task in again for arm in ("full", "lean")]
+    assert expected != full_first_order, "the seed draws an order a fixed one would not give"
     assert _relaunched(results.load(tmp_path / "part.json")) == expected
 
 
@@ -284,7 +295,7 @@ def test_a_continuation_of_a_run_that_finished_its_plan_is_refused_before_any_la
     paid: Callable[[Script], None], capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     paid(Script())
-    run = cli_tests._run(tmp_path, name=STOPPED)[1]
+    run = run_small(tmp_path, name=STOPPED)[1]
     finished = _rewritten(tmp_path, run, Finished())
     script = Script()
     paid(script)

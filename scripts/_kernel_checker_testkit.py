@@ -102,7 +102,6 @@ def append(root: Path, rel: str, text: str) -> None:
 
 
 ADHERENCE = cb.ADHERENCE_ENTRY
-PILOT = ["researcher", "verifier", "discipline-consultant", "skill-genesis", "context-engineer"]
 
 
 def run_row(pairs: int = 24, passes: bool = True, eval_entry: str = ADHERENCE) -> dict:
@@ -138,10 +137,10 @@ def held_row(**fields: object) -> dict:
     return {**row, **fields}
 
 
-def write_ledger(root: Path, eligible: list[str] | None = None, **roles: dict) -> None:
+def write_ledger(root: Path, **roles: dict) -> None:
     path = root / km.LEDGER_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    ledger = {"version": 1, "eligible": PILOT if eligible is None else eligible, "roles": roles}
+    ledger = {"version": 1, "roles": roles}
     path.write_text(yaml.safe_dump(ledger, sort_keys=False), encoding="utf-8")
 
 

@@ -414,7 +414,7 @@ def test_the_index_holds_no_adoption_status_whatever_the_ledger_says(repo: Path)
     write(
         repo,
         km.LEDGER_PATH,
-        "version: 1\neligible: [writer]\nroles:\n  writer:\n    status: trial\n    since: today\n",
+        "version: 1\nroles:\n  writer:\n    status: trial\n    since: today\n",
     )
     run(repo)
 
@@ -430,7 +430,7 @@ def test_the_index_is_the_same_before_and_after_a_status_is_recorded(repo: Path)
     write(
         repo,
         km.LEDGER_PATH,
-        "version: 1\neligible: [writer]\nroles:\n  writer:\n    status: trial\n    since: today\n",
+        "version: 1\nroles:\n  writer:\n    status: trial\n    since: today\n",
     )
 
     assert run(repo, "--check") == 0

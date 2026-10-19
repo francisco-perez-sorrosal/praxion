@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -29,6 +30,7 @@ from _kernel_checker_testkit import (  # noqa: E402
     trial_row,
     write_ledger,
 )
+from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
 
 # pytest finds a fixture by name in the module that uses it
 template = kit.template
@@ -377,38 +379,42 @@ def test_the_flag_on_a_held_role_is_reported(repo: Path) -> None:
     assert "is held" in found[0].detail
 
 
-# -- Only the pilot's five roles can ever be flipped -----------------------------------------------
+# -- Only the pinned roles can ever be flipped, and the ledger names none of its own ---------------
 
 
-def test_a_ledger_that_widens_its_own_eligible_list_cannot_flip_a_role_outside_the_pilot(
-    repo: Path,
-) -> None:
-    write_ledger(repo, eligible=[*kit.PILOT, "implementer"], implementer=switched_row())
+def test_a_switched_role_outside_the_pin_is_refused_by_name(repo: Path) -> None:
+    write_ledger(repo, implementer=switched_row())
     omit_claude_md(repo, "implementer")
     regenerate(repo)
 
-    found = [f for f in cb.check(repo) if f.kind == "I9-eligible-changed"]
+    found = [f for f in cb.check(repo) if f.kind == "I9-record-incomplete"]
 
     assert [f.subject for f in found] == [km.LEDGER_PATH]
-    assert "implementer" in found[0].detail
+    assert "role implementer: is not eligible" in found[0].detail
 
 
-def test_a_ledger_that_drops_a_pilot_role_from_its_eligible_list_is_reported(repo: Path) -> None:
-    write_ledger(repo, eligible=kit.PILOT[1:])
+@pytest.mark.parametrize("listed", [[*ELIGIBLE_ROLES, "implementer"], list(ELIGIBLE_ROLES), []])
+def test_a_ledger_that_lists_eligible_roles_of_its_own_is_refused(
+    repo: Path, listed: list[str]
+) -> None:
+    write_ledger(repo, researcher=trial_row())
+    path = repo / km.LEDGER_PATH
+    path.write_text(path.read_text(encoding="utf-8") + yaml.safe_dump({"eligible": listed}))
 
-    assert subjects(repo, "I9-eligible-changed") == [km.LEDGER_PATH]
+    found = [f for f in cb.check(repo) if f.kind == "I9-eligible-in-ledger"]
+
+    assert [f.subject for f in found] == [km.LEDGER_PATH]
+    assert "kernel_eligibility" in found[0].detail
 
 
-def test_the_eligible_list_is_the_pilots_whatever_its_order(repo: Path) -> None:
-    write_ledger(repo, eligible=list(reversed(kit.PILOT)))
+def test_a_ledger_without_an_eligible_key_raises_no_eligibility_finding(repo: Path) -> None:
+    write_ledger(repo, researcher=trial_row())
 
-    assert subjects(repo, "I9-eligible-changed") == []
+    assert subjects(repo, "I9-eligible-in-ledger") == []
 
 
-def test_the_pilot_is_the_five_roles_the_design_names() -> None:
-    assert sorted(cb.PILOT_ROLES) == sorted(
-        ["researcher", "verifier", "discipline-consultant", "skill-genesis", "context-engineer"]
-    )
+def test_the_checker_reaches_the_pin_the_ledger_is_judged_against() -> None:
+    assert cb.ELIGIBLE_ROLES is kl.ELIGIBLE_ROLES
 
 
 # -- The flag is read from the frontmatter as YAML reads it ------------------------------------------
@@ -555,7 +561,7 @@ def inject_kernel_status(repo: Path, role: str) -> str | None:
     )
 
 
-LEDGER_HEAD = "version: 1\neligible:\n" + "".join(f"- {role}\n" for role in kit.PILOT) + "roles:\n"
+LEDGER_HEAD = "version: 1\nroles:\n"
 
 
 def test_a_ledger_in_its_generated_block_shape_is_read_alike_by_the_hook(repo: Path) -> None:

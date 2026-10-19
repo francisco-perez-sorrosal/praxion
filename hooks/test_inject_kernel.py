@@ -345,7 +345,7 @@ def test_the_role_of_an_agent_is_read_from_this_plugins_namespace_only():
 # -- The adoption ledger decides who receives a kernel ----------------------------------
 
 ONE_OF_SEVERAL = (
-    "version: 1\neligible:\n- researcher\n- verifier\nroles:\n"
+    "version: 1\nroles:\n"
     "  verifier:\n    status: switched\n    since: '2026-10-12'\n    runs:\n"
     "    - id: r1\n      status: trial\n      complete_pairs: 24\n"
     f"  {ROLE}:\n    status: trial\n    since: '2026-10-13T09:00:00+00:00'\n    runs: []\n"
@@ -362,7 +362,7 @@ ONE_OF_SEVERAL = (
         "roles: [\n  researcher: {status: trial\n",
         "\x00\x01 not a ledger at all \xff",
         "# roles:\n#   researcher:\n#     status: trial\n",
-        "eligible:\n- researcher\nstatus: trial\n",
+        "version: 1\nstatus: trial\n",
         f"version: 1\nroles:\n  {ROLE}:\n    runs:\n    - status: trial\n",
     ],
     ids=[
@@ -404,11 +404,20 @@ def test_a_role_at_trial_among_other_roles_in_the_ledgers_own_shape_receives_its
 
 
 HELD = (
-    "version: 1\neligible:\n- researcher\n- verifier\nroles:\n"
+    "version: 1\nroles:\n"
     f"  {ROLE}:\n    status: held\n    since: '2026-10-12'\n    runs:\n"
     "    - id: r1\n      complete_pairs: 24\n      passes_flip_rule: false\n"
     "    reason: the flip rule did not pass\n"
 )
+
+
+def test_a_ledger_that_still_lists_eligible_roles_delivers_by_status_alone(tmp_path):
+    ledger = "version: 1\neligible:\n- verifier\n" + ledger_text("trial").split("\n", 1)[1]
+    plugin = make_plugin(tmp_path, ledger=ledger)
+    project = make_project(tmp_path)
+
+    assert inject_kernel.adoption_status(ledger, ROLE) == "trial"
+    assert len(delivered(spawn(tmp_path, plugin, project))) == 1
 
 
 def test_a_role_recorded_held_receives_nothing_and_leaves_no_row(tmp_path):

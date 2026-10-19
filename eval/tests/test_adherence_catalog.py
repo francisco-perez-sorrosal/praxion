@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 
 import pytest
-import yaml
 
 from praxion_evals.adherence import grade
 from praxion_evals.adherence.catalog import (
@@ -375,13 +375,22 @@ def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, 
 # The convention a pilot role's project states only in its own instruction file
 # ---------------------------------------------------------------------------
 
-KERNEL_LEDGER = CHECKOUT_ROOT / ".ai-state" / "kernel_adoption.yaml"
+KERNEL_ELIGIBILITY_PIN = CHECKOUT_ROOT / "scripts" / "kernel_eligibility.py"
 
 
-def test_the_pilot_roles_are_the_roles_the_adoption_ledger_makes_eligible():
-    ledger = yaml.safe_load(KERNEL_LEDGER.read_text(encoding="utf-8"))
+def _eligible_roles() -> set[str]:
+    """The roles the commit gate's pin makes eligible, read by syntax: this project is its own."""
+    for statement in ast.parse(KERNEL_ELIGIBILITY_PIN.read_text(encoding="utf-8")).body:
+        if isinstance(statement, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "ELIGIBLE_ROLES"
+            for target in statement.targets
+        ):
+            return set(ast.literal_eval(statement.value))
+    raise AssertionError(f"{KERNEL_ELIGIBILITY_PIN} binds no ELIGIBLE_ROLES")
 
-    assert set(PILOT_ROLES) == set(ledger["eligible"])
+
+def test_every_pilot_role_is_a_role_the_commit_gate_makes_eligible():
+    assert set(PILOT_ROLES) <= _eligible_roles()
 
 
 @pytest.mark.parametrize("role", ROLES)

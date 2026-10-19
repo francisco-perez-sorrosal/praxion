@@ -7,6 +7,7 @@ lenient readers (statuses, entries, adoptions) survive a record the gate refuses
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -20,16 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kernel_ledger as kl  # noqa: E402
 import kernel_ledger_history as kh  # noqa: E402
 import kernel_model as km  # noqa: E402
+from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
 
-AGENTS = frozenset({"researcher", "verifier", "discipline-consultant", "implementer", "sentinel"})
+AGENTS = frozenset({*ELIGIBLE_ROLES, "implementer", "sentinel"})
 END_OF_DAY = datetime(2026, 10, 12, 23, 59, 59, 999999, tzinfo=timezone.utc)
-PILOT_ROLES = [
-    "researcher",
-    "verifier",
-    "discipline-consultant",
-    "skill-genesis",
-    "context-engineer",
-]
 
 
 # -- Builders: the wire shapes ---------------------------------------------------
@@ -54,7 +49,7 @@ def switched_row(**fields: object) -> dict:
 
 
 def ledger_wire(**roles: dict) -> dict:
-    return {"version": 1, "eligible": PILOT_ROLES, "roles": roles}
+    return {"version": 1, "roles": roles}
 
 
 def parse_ledger(**roles: dict) -> kl.Ledger:
@@ -128,6 +123,57 @@ def test_a_switched_record_without_sound_evidence_cannot_be_built(
 def test_a_role_that_is_not_eligible_cannot_be_switched() -> None:
     with pytest.raises(km.KernelModelError, match="role implementer: is not eligible"):
         parse_ledger(implementer=switched_row())
+
+
+@pytest.mark.parametrize("role", ELIGIBLE_ROLES)
+def test_every_role_the_pin_lists_may_be_switched(role: str) -> None:
+    record = parse_ledger(**{role: switched_row()}).records[role]
+
+    assert isinstance(record, kl.Switched)
+
+
+def test_eligibility_is_judged_against_the_pin_not_the_ledger(monkeypatch) -> None:
+    monkeypatch.setattr(kl, "ELIGIBLE_ROLES", ("verifier",))
+
+    with pytest.raises(km.KernelModelError, match="role researcher: is not eligible"):
+        parse_ledger(researcher=switched_row())
+    assert isinstance(parse_ledger(verifier=switched_row()).records["verifier"], kl.Switched)
+
+
+def test_the_pin_lists_the_five_pilot_roles() -> None:
+    assert sorted(ELIGIBLE_ROLES) == sorted(
+        ["researcher", "verifier", "discipline-consultant", "skill-genesis", "context-engineer"]
+    )
+
+
+def test_the_pin_is_a_plain_tuple_literal_a_driver_can_rewrite_by_its_syntax() -> None:
+    source = (Path(kl.__file__).parent / "kernel_eligibility.py").read_text(encoding="utf-8")
+    bound = [
+        node.value
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign) and node.targets[0].id == "ELIGIBLE_ROLES"
+    ]
+
+    assert [ast.literal_eval(value) for value in bound] == [ELIGIBLE_ROLES]
+
+
+@pytest.mark.parametrize("listed", [["researcher"], list(ELIGIBLE_ROLES), []])
+def test_a_ledger_that_lists_eligible_roles_is_refused_whatever_it_lists(listed: list) -> None:
+    wire = {**ledger_wire(), "eligible": listed}
+
+    with pytest.raises(kl.EligibleInLedger, match="pinned in scripts/kernel_eligibility.py"):
+        kl.parse_ledger(wire, AGENTS)
+
+
+def test_the_lenient_readers_ignore_an_eligible_key_the_gate_refuses() -> None:
+    wire = {
+        **ledger_wire(researcher={"status": "trial", "since": "2026-10-12", "runs": []}),
+        "eligible": ["researcher"],
+    }
+
+    assert dict(km.parse_statuses(wire)) == {"researcher": "trial"}
+    assert kl.parse_adoptions(wire)["researcher"].status == "trial"
+    assert "researcher" in kl.parse_entries(wire)
 
 
 def test_a_role_that_is_not_eligible_may_still_be_at_trial() -> None:
@@ -457,7 +503,7 @@ def test_a_date_the_yaml_parser_already_read_is_accepted() -> None:
 def test_a_date_written_plain_reads_the_same_in_both_readers(tmp_path: Path) -> None:
     write(
         tmp_path,
-        "version: 1\neligible: [researcher]\n"
+        "version: 1\n"
         "roles:\n  researcher:\n    status: trial\n    since: 2026-10-12\n    runs: []\n",
     )
 
@@ -478,8 +524,7 @@ def test_a_record_that_does_not_say_when_it_began_cannot_bound_a_judgement(since
 def test_the_loaders_read_the_ledger_of_a_checkout(tmp_path: Path) -> None:
     write(
         tmp_path,
-        "version: 1\neligible: [researcher]\n"
-        "roles:\n  researcher: {status: trial, since: '2026-10-12', runs: []}\n",
+        "version: 1\nroles:\n  researcher: {status: trial, since: '2026-10-12', runs: []}\n",
     )
 
     assert kl.load_ledger(tmp_path, AGENTS).records["researcher"] == kl.Trial(

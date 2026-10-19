@@ -2,9 +2,9 @@
 
 `check_kernel_manifest` gathers the evidence and renders the findings; this module names each
 finding the ledger's rules can raise: the `omitClaudeMd` flag against a `switched` record, a
-switched record's evidence, the eligible list, the moves since the parent commit, a deleted
-ledger, and the spawn hook reading every record as PyYAML does. No command line; every
-function takes what it judges as an argument and reads nothing.
+switched record's evidence, an eligible list the ledger must not carry, the moves since the
+parent commit, a deleted ledger, and the spawn hook reading every record as PyYAML does. No
+command line; every function takes what it judges as an argument and reads nothing.
 """
 
 from __future__ import annotations
@@ -24,13 +24,6 @@ import inject_kernel  # noqa: E402 (the spawn hook, after sys.path injection)
 # The eval whose run a flip may rest on. The one line in `scripts/` that names it, as data: the
 # paid-eval guard in the eval project's tests exempts exactly this line, so keep it alone.
 ADHERENCE_ENTRY = "praxion-evals-adherence"
-PILOT_ROLES = (
-    "researcher",
-    "verifier",
-    "discipline-consultant",
-    "skill-genesis",
-    "context-engineer",
-)
 SWITCHED = "switched"
 
 OMIT_KEY = "omitClaudeMd"
@@ -81,22 +74,18 @@ def flip_findings(flags: Mapping[str, str], statuses: Mapping[str, str]) -> tupl
 def record_findings(ledger: kl.Ledger | km.KernelModelError | None) -> tuple[km.Finding, ...]:
     """I9: every switched record is eligible, holds all its evidence, rests on the adherence eval.
 
-    The model refuses a record short of evidence (and says which role and piece); the eval a
-    passing run came from, and the eligible roles themselves, are the commit gate's rule, not
-    the model's: a ledger that could widen its own list would make the list no rule at all.
+    The model refuses a record short of evidence (and says which role and piece), and a switched
+    role the pin does not list; the eval a passing run came from is the commit gate's rule, not
+    the model's. A ledger that lists eligible roles is refused outright: the list lives in
+    `kernel_eligibility`, where a record cannot widen it.
     """
     if ledger is None:
         return ()
+    if isinstance(ledger, kl.EligibleInLedger):
+        return (km.Finding("I9-eligible-in-ledger", km.LEDGER_PATH, str(ledger)),)
     if isinstance(ledger, km.KernelModelError):
         return (km.Finding("I9-record-incomplete", km.LEDGER_PATH, str(ledger)),)
-    return (*_eligible_changed(ledger), *_foreign_eval_runs(ledger))
-
-
-def _eligible_changed(ledger: kl.Ledger) -> tuple[km.Finding, ...]:
-    if sorted(ledger.eligible) == sorted(PILOT_ROLES):
-        return ()
-    detail = f"eligible lists {sorted(ledger.eligible)}, not the pilot's {sorted(PILOT_ROLES)}"
-    return (km.Finding("I9-eligible-changed", km.LEDGER_PATH, detail),)
+    return _foreign_eval_runs(ledger)
 
 
 def _foreign_eval_runs(ledger: kl.Ledger) -> tuple[km.Finding, ...]:

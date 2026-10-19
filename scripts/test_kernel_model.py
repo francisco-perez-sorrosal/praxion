@@ -572,7 +572,7 @@ def test_the_loaders_read_the_three_files_of_a_checkout(tmp_path: Path) -> None:
     write(
         tmp_path,
         km.LEDGER_PATH,
-        "version: 1\neligible: [researcher]\nroles:\n  researcher: {status: trial, since: d, runs: []}\n",
+        "version: 1\nroles:\n  researcher: {status: trial, since: d, runs: []}\n",
     )
     write(tmp_path, km.INDEX_PATH, '{"schema": 1, "kernel_version": "k", "slots": 2, "roles": {}}')
 

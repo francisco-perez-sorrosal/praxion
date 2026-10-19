@@ -7,7 +7,8 @@ what the ledger adds to them, as values whose illegal states cannot be built.
 | ---------------------------------------------------------------- | -------------------------------- |
 | a switched record holds every piece of flip evidence             | `Switched.__post_init__`         |
 | a held record (a trial closed without a flip) states its reason  | `Held.__post_init__`             |
-| only an eligible role is switched                                | `_parse_record`                  |
+| only an eligible role (`kernel_eligibility`) is switched         | `_parse_record`                  |
+| the ledger lists no eligible roles of its own                    | `parse_ledger`                   |
 | a role moves only along `_MOVES`; a re-opened trial starts anew  | `ledger_transitions`             |
 | a re-opened trial is judged from its re-opening commit           | `judged_adoptions`               |
 | a recorded run is never dropped, reordered or added while held   | `ledger_transitions`             |
@@ -35,11 +36,13 @@ from types import MappingProxyType
 from typing import Any
 
 import kernel_model as km
+from kernel_eligibility import ELIGIBLE_ROLES
 
 REQUIRED_PAIRS = 20  # a flip rests on a run of at least this many complete pairs
 SWITCHED_FIELDS = tuple(
     "passing_run probe_before_tokens probe_after_tokens flip_rule_ratified flip_ratified".split()
 )
+ELIGIBLE_KEY = "eligible"  # a key the ledger once held, now refused
 _BARE_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Besides staying put. Nothing leaves switched, nothing is removed, and a flip rests on a trial.
 _MOVES = frozenset({(None, "trial"), ("trial", "switched"), ("trial", "held"), ("held", "trial")})
@@ -116,7 +119,6 @@ AdoptionRecord = Trial | Held | Switched
 
 @dataclass(frozen=True)
 class Ledger:
-    eligible: tuple[str, ...]
     records: Mapping[str, AdoptionRecord]
 
 
@@ -161,29 +163,37 @@ class LedgerVersion:
 NEVER = datetime.max.replace(tzinfo=timezone.utc)  # the start of a re-opening not yet committed
 
 
+class EligibleInLedger(km.KernelModelError):
+    """The ledger carries an `eligible` key: the roles are pinned in `kernel_eligibility`."""
+
+
 # -- Boundary: the evidence-checked ledger ------------------------------------------
 
 
 def parse_ledger(raw: Mapping[str, Any], agents: Collection[str]) -> Ledger:
     """The ledger with its evidence: a switched role missing any piece is refused by name."""
+    if ELIGIBLE_KEY in raw:
+        raise EligibleInLedger(
+            "the ledger lists eligible roles: they are pinned in scripts/kernel_eligibility.py, "
+            f"so the {ELIGIBLE_KEY!r} key is removed"
+        )
     statuses = km.parse_statuses(raw)
-    eligible = tuple(km.as_sequence(raw.get("eligible"), "eligible"))
     records = {}
     for role, status in statuses.items():
         if role not in agents:
             raise km.KernelModelError(f"role {role}: no such agent")
-        records[role] = _parse_record(role, status, raw["roles"][role], role in eligible)
-    return Ledger(eligible, MappingProxyType(records))
+        records[role] = _parse_record(role, status, raw["roles"][role])
+    return Ledger(MappingProxyType(records))
 
 
-def _parse_record(role: str, status: str, row: Mapping[str, Any], eligible: bool) -> AdoptionRecord:
+def _parse_record(role: str, status: str, row: Mapping[str, Any]) -> AdoptionRecord:
     since = since_time(row.get("since"), role)
     runs = tuple(_parse_run(role, run) for run in km.as_sequence(row.get("runs"), "runs"))
     if status == "trial":
         return Trial(role, since, runs)
     if status == "held":
         return Held(role, since, runs, row.get("reason", ""))
-    if not eligible:
+    if role not in ELIGIBLE_ROLES:
         raise km.KernelModelError(f"role {role}: is not eligible to be switched")
     missing = [key for key in SWITCHED_FIELDS if row.get(key) is None]
     if missing:
@@ -418,7 +428,7 @@ def load_ledger(root: Path, agents: Collection[str]) -> Ledger:
     """The evidence-checked ledger; no ledger file is an empty ledger."""
     path = root / km.LEDGER_PATH
     if not path.is_file():
-        return Ledger((), MappingProxyType({}))
+        return Ledger(MappingProxyType({}))
     return parse_ledger(km.read_yaml(path), agents)
 
 

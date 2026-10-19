@@ -23,7 +23,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-flag-without-record`     | `omitClaudeMd` is set on an agent only while its adoption record is switched |
 | `I9-switch-without-flag`     | an agent whose record is switched carries `omitClaudeMd`                |
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
-| `I9-eligible-changed`        | the ledger's `eligible` list is the pilot's five roles, no more and no fewer |
+| `I9-eligible-in-ledger`      | the ledger carries no `eligible` key: the eligible roles are pinned in `scripts/kernel_eligibility.py` |
 | `I9-ledger-transition`       | since the parent commit's ledger a role stays or moves absent -> trial, trial -> switched or held, held -> trial |
 | `I9-ledger-reopen-no-since`  | a held role re-opened as a trial records its own `since`                |
 | `I9-ledger-reopen-before-parent` | that `since` is later than the commit the re-opening follows        |
@@ -73,12 +73,12 @@ import kernel_ledger_history as kh
 import kernel_model as km
 import kernel_sources as ks
 from _repo_root import is_plugin_cache_path, resolve_repo_root
+from kernel_eligibility import ELIGIBLE_ROLES  # noqa: F401
 
 # The ledger's invariants (I9, I10) and the liveness mode are judged in their own modules. The
 # names marked below are re-exported: the tests and their testkit reach them through this one.
 from kernel_ledger_checks import (
     ADHERENCE_ENTRY,  # noqa: F401
-    PILOT_ROLES,  # noqa: F401
     deletion_findings,
     flip_findings,
     inject_kernel,  # noqa: F401

@@ -37,10 +37,7 @@ ASTRAL = "\U0001f600"  # one character, two UTF-16 units
 def ledger_text(status: str | None, role: str = ROLE) -> str:
     """The adoption ledger as its writers emit it (block style), the role at `status` if any."""
     roles = f"  {role}:\n    status: {status}\n    since: '2026-10-12'\n    runs: []\n"
-    return (
-        "version: 1\neligible:\n- researcher\n- verifier\n"
-        f"roles:{' {}' if status is None else chr(10) + roles}"
-    )
+    return f"version: 1\nroles:{' {}' if status is None else chr(10) + roles}"
 
 
 def make_plugin(

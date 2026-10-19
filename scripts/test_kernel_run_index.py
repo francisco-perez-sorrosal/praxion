@@ -269,6 +269,18 @@ def test_a_checkout_with_no_results_directory_has_nothing_to_hold(tmp_path: Path
     assert adherence.lineage_of(PASSING) is None
 
 
+# -- An index the gate cannot read --------------------------------------------------------
+
+
+def listed_part(root: str, flip: str = "clear") -> dict:
+    roles = {ROLE: {"complete_pairs": 24, "flip": flip}}
+    return {"file": "r.json", "sha256": "0", "lineage_root": root, "roles": roles}
+
+
+def index_text(runs: dict) -> str:
+    return json.dumps({"schema": kri.INDEX_SCHEMA, "runs": runs, "skipped": []})
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -295,11 +307,21 @@ def test_a_checkout_with_no_results_directory_has_nothing_to_hold(tmp_path: Path
                 },
             }
         ),
+        index_text({"r": listed_part(root="gone")}),
+        index_text({"a": listed_part(root="a"), "b": listed_part(root="a", flip="not clear")}),
     ],
 )
 def test_an_index_of_any_other_shape_is_an_input_error_naming_it(text: str) -> None:
     with pytest.raises(km.KernelModelError, match="index.json"):
-        kri.parse_index(text)
+        kri.parse_index(text.encode("utf-8"))
+
+
+def test_an_index_that_is_not_utf8_is_an_input_error_naming_it(tmp_path: Path) -> None:
+    directory = plant(tmp_path, indexed(PASSING))
+    (directory / kri.INDEX_NAME).write_bytes(b"\xff{}")
+
+    with pytest.raises(km.KernelModelError, match="index.json"):
+        kri.read_adherence(tmp_path)
 
 
 # -- The repository as committed ----------------------------------------------------------

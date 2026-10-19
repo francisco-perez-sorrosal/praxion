@@ -3,8 +3,9 @@
 `.ai-state/eval_ledger/adherence/index.json` has one writer, the adherence eval (every run as it
 finalizes, and its `--reindex`). It names each results file with the sha256 of its bytes, the root
 of the lineage the run belongs to, and per role the complete pairs and the flip label the whole
-lineage reached; every part of a continued run carries its lineage's values. The gate trusts the
-index only as far as it can check it, so `read_adherence` returns the index together with the
+lineage reached; every part of a continued run carries its lineage's values, and an index whose
+parts disagree or whose root is not listed is refused. The gate trusts the index only as far as it
+can check it, so `read_adherence` returns the index together with the
 digest of every JSON file beside it, and `Adherence.lineage_of` resolves a run only while its
 file is still there. A run resolves through the lineage the index names, never through a results
 file's own `earlier` listing, which on a continued run's tip holds its own predecessor parts.
@@ -18,7 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal, get_args
 
 import kernel_model as km
 
@@ -26,8 +27,9 @@ RESULTS_DIR = ".ai-state/eval_ledger/adherence"
 INDEX_NAME = "index.json"
 INDEX_PATH = f"{RESULTS_DIR}/{INDEX_NAME}"
 INDEX_SCHEMA = 1
-CLEAR = "clear"
-FLIP_LABELS = (CLEAR, "not clear", "underpowered")  # a closed lineage already reads "not clear"
+Flip = Literal["clear", "not clear", "underpowered"]  # a closed lineage already reads "not clear"
+FLIP_LABELS: tuple[Flip, ...] = get_args(Flip)
+CLEAR: Flip = "clear"
 RESULTS_GLOB = "*.json"
 
 
@@ -36,7 +38,7 @@ class Standing:
     """What a lineage reached for one role it measured."""
 
     complete_pairs: int
-    flip: str  # one of FLIP_LABELS
+    flip: Flip
 
 
 @dataclass(frozen=True)
@@ -92,23 +94,34 @@ def read_adherence(root: Path) -> Adherence:
     index = directory / INDEX_NAME
     if not index.is_file():
         return Adherence(MappingProxyType({}), frozenset(), MappingProxyType(files))
-    entries, skipped = parse_index(index.read_bytes().decode("utf-8"))
+    entries, skipped = parse_index(index.read_bytes())
     return Adherence(entries, skipped, MappingProxyType(files))
 
 
-def parse_index(text: str) -> tuple[Mapping[str, Entry], frozenset[str]]:
+def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
     """The index's entries by run id and its skipped names; raises on any other shape."""
     try:
-        raw = json.loads(text)
+        raw = json.loads(data.decode("utf-8"))
         if raw["schema"] != INDEX_SCHEMA:
             raise ValueError(f"schema {raw['schema']!r}, not {INDEX_SCHEMA}")
         entries = {_text(run_id): _entry(row) for run_id, row in _mapping(raw["runs"]).items()}
+        _refuse_split_lineages(entries)
         skipped = frozenset(_text(name) for name in _list(raw["skipped"]))
-    except (ValueError, KeyError, TypeError) as exc:  # a JSONDecodeError is a ValueError
+    except (ValueError, KeyError, TypeError) as exc:  # JSON and UTF-8 decode errors are ValueErrors
         raise km.KernelModelError(
             f"{INDEX_PATH}: not a run index this gate can read: {exc}"
         ) from exc
     return MappingProxyType(entries), skipped
+
+
+def _refuse_split_lineages(entries: Mapping[str, Entry]) -> None:
+    """Every part names a listed root and carries its roles, so any part judges like the whole."""
+    for run_id, entry in entries.items():
+        root = entries.get(entry.lineage_root)
+        if root is None:
+            raise ValueError(f"run {run_id}'s lineage root {entry.lineage_root} is not listed")
+        if entry.roles != root.roles:
+            raise ValueError(f"run {run_id} and its lineage root {entry.lineage_root} differ")
 
 
 def _entry(row: Any) -> Entry:

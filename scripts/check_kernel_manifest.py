@@ -55,9 +55,10 @@ judged.
 
 The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
 evidence, names the findings of I1 to I8 and renders every report. The ledger's findings (I9, I10)
-are `kernel_ledger_checks`', over the run index `kernel_run_index` reads; the liveness judgement and its log reading are `kernel_liveness`'. The index is read here as plain JSON, not through
-`kernel_model`, because the model refuses an over-cap string at parse time and I4 must report one,
-not die on it.
+are `kernel_ledger_checks`', over the run index `kernel_run_index` reads; the liveness judgement
+and its log reading are `kernel_liveness`'. The kernel index `claude/kernels/index.json` is read
+here as plain JSON, not through `kernel_model`, because the model refuses an over-cap string at
+parse time and I4 must report one, not die on it.
 
 Detected, never listed: the agents come from `agents/*.md`, the always-loaded sources from the
 tree, so a new agent or rule is covered the day it exists. No setting or variable turns any of

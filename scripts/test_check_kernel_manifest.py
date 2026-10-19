@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,6 +24,7 @@ import _kernel_checker_testkit as kit  # noqa: E402
 import check_kernel_manifest as cb  # noqa: E402
 import generate_kernels as gk  # noqa: E402
 import kernel_model as km  # noqa: E402
+import kernel_run_index as kri  # noqa: E402
 import kernel_sources as ks  # noqa: E402
 from _kernel_checker_testkit import (  # noqa: E402
     CAP,
@@ -370,23 +372,54 @@ def test_the_commit_gate_runs_the_checker_with_pyyaml_over_the_whole_checkout() 
     assert hook["pass_filenames"] is False
 
 
+# A fresh interpreter, so a module some other test imported is never counted as the gate's.
+GATE_IMPORTS = (
+    "import sys; sys.path.insert(0, 'scripts'); import check_kernel_manifest; "
+    "print(*(getattr(m, '__file__', None) for m in list(sys.modules.values())), sep='\\n')"
+)
+CODE_DIRS = ("scripts", "hooks")
+
+
+def _gate_code() -> list[str]:
+    """Every file of this checkout's scripts and hooks that the gate imports."""
+    done = subprocess.run(
+        [sys.executable, "-c", GATE_IMPORTS],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    files = [Path(line).resolve() for line in done.stdout.splitlines() if line != "None"]
+    return sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in files
+        if any(path.is_relative_to(REPO_ROOT / name) for name in CODE_DIRS)
+    )
+
+
+def _results_files() -> list[str]:
+    directory = REPO_ROOT / kri.RESULTS_DIR
+    return [f"{kri.RESULTS_DIR}/{path.name}" for path in sorted(directory.glob(kri.RESULTS_GLOB))]
+
+
+def test_the_gate_code_is_read_from_the_imports_it_makes() -> None:
+    assert {"scripts/check_kernel_manifest.py", "scripts/kernel_run_index.py"} <= set(_gate_code())
+
+
 def test_the_hook_runs_for_every_input_the_invariants_read() -> None:
     pattern = re.compile(_kernel_hook()["files"])
     inputs = [
         *ks.always_loaded_sources(REPO_ROOT),
+        *_gate_code(),
+        *_results_files(),
         km.MANIFEST_PATH,
         km.LEDGER_PATH,
         km.INDEX_PATH,
+        kri.INDEX_PATH,
         gk.PREAMBLE_PATH,
         "claude/kernels/src/return-contract.md",
         "agents/researcher.md",
         "hooks/hooks.json",
-        "hooks/inject_kernel.py",
-        "scripts/check_kernel_manifest.py",
-        "scripts/kernel_model.py",
-        "scripts/kernel_ledger.py",
-        "scripts/kernel_sources.py",
-        "scripts/generate_kernels.py",
     ]
 
     assert [path for path in inputs if not pattern.search(path)] == []

@@ -153,7 +153,10 @@ def test_a_stop_count_below_three_is_refused_before_any_launch(
 
     assert result.exit_code != 0, "a stop count below 3 was accepted"
     assert result.launches == ()
-    assert "stop count must be at least 3" in (result.stdout + result.stderr)
+    printed = result.stdout + result.stderr
+    assert "stop count must be at least 3" in printed, (
+        f"the refusal does not name the floor: {printed}"
+    )
 
 
 def test_the_stop_settings_are_declared_before_the_first_launch(tmp_path: Path) -> None:

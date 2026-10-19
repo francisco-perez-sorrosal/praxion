@@ -10,6 +10,7 @@ is refused until that run is continued or closed with a reason.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -41,11 +42,22 @@ def tasks_of(planted: runs.PlantedRun, shapes: frozenset[str]) -> set[str]:
     return {task for task, shape in planted.shapes.items() if shape in shapes}
 
 
+USAGE_LINE = re.compile(r"^usage: ", re.MULTILINE)
+CRASH = "Traceback (most recent call last)"
+
+
 def assert_refused_before_launch(result: runs.StandInRun, *named: str, reason: str = "") -> None:
-    """``named`` words and the refusal's own ``reason`` text must be in the output: a usage echo has the former."""
+    """The run's own refusal, before any launch, naming ``named`` and saying ``reason``.
+
+    argparse rejecting the command line also exits non-zero with nothing launched, and its
+    usage echo prints every option name, so the refusal must carry no usage line; a crash's
+    traceback can print any name, so it must carry none either.
+    """
     printed = result.stdout + result.stderr
     assert result.exit_code != 0, "the continuation was accepted"
     assert result.launches == (), "a session launched before the refusal"
+    assert not USAGE_LINE.search(printed), f"argparse rejected the command, not the run: {printed}"
+    assert CRASH not in printed, f"the run crashed instead of refusing: {printed}"
     assert all(word in printed for word in named), f"the refusal does not name {named}: {printed}"
     assert reason in printed, f"the refusal does not say {reason!r}: {printed}"
 
@@ -107,17 +119,16 @@ def test_a_change_to_the_adoption_ledger_since_the_stop_refuses_the_continuation
 
     result = runs.continue_run(tmp_path, checkout, stopped.path, PLAN)
 
-    assert_refused_before_launch(
-        result, "kernel_adoption.yaml", reason="changed since the stop: tree"
-    )
+    assert_refused_before_launch(result, "kernel_adoption.yaml")
 
 
+# Each difference is named by the option that declares it.
 DIFFERENT_DECLARATIONS = {
-    "model": (Plan(max_tasks=len(EIGHT_SHAPES), model="sonnet"), "model"),
-    "seed": (Plan(max_tasks=len(EIGHT_SHAPES), seed=99), "seed"),
-    "task list": (Plan(max_tasks=len(EIGHT_SHAPES) - 1), "task"),
-    "margin": (Plan(max_tasks=len(EIGHT_SHAPES), margin_pp=5), "margin"),
-    "stop count": (Plan(max_tasks=len(EIGHT_SHAPES), stop_count=5), "stop"),
+    "model": (Plan(max_tasks=len(EIGHT_SHAPES), model="sonnet"), "--model"),
+    "seed": (Plan(max_tasks=len(EIGHT_SHAPES), seed=99), "--seed"),
+    "task list": (Plan(max_tasks=len(EIGHT_SHAPES) - 1), "--max-tasks"),
+    "margin": (Plan(max_tasks=len(EIGHT_SHAPES), margin_pp=5), "--margin-pp"),
+    "stop count": (Plan(max_tasks=len(EIGHT_SHAPES), stop_count=5), "--stop-count"),
 }
 
 
@@ -129,7 +140,7 @@ def test_a_continuation_differing_in_a_declaration_is_refused_naming_it(
 ) -> None:
     result = runs.continue_run(tmp_path, checkout, stopped.path, plan)
 
-    assert_refused_before_launch(result, named, reason="would change what the run measures")
+    assert_refused_before_launch(result, named)
 
 
 def test_a_continuation_of_a_run_whose_recorded_launch_order_differs_from_its_seed_is_refused(
@@ -143,9 +154,9 @@ def test_a_continuation_of_a_run_whose_recorded_launch_order_differs_from_its_se
 
 
 NOT_CONTINUABLE = {
-    "complete": "finished its plan",
-    "confined to one arm": "lean arm alone",
-    "operator interrupt": "was interrupted, not stopped",
+    "complete": "complete",
+    "confined to one arm": "confined to one arm",
+    "operator interrupt": "interrupt",
     "already continued": "already has a continuation",
 }
 
@@ -180,9 +191,7 @@ def test_a_continuation_of_a_run_recorded_before_this_change_is_refused(
 
     result = runs.continue_run(tmp_path, checkout, recorded, Plan())
 
-    assert_refused_before_launch(
-        result, "20261014T045733Z-7050ca", reason="before runs recorded how they ended"
-    )
+    assert_refused_before_launch(result, "20261014T045733Z-7050ca", reason="recorded before")
 
 
 def test_a_fresh_run_beside_an_unresolved_continuable_stopped_run_is_refused_naming_it(

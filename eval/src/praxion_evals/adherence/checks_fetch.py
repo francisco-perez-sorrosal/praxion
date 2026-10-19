@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
+from praxion_evals.adherence.checks_base import slug_dir, written_paths
 from praxion_evals.adherence.model import (
     WEBFETCH_ROLES,
     Binding,
@@ -40,9 +41,6 @@ def binds_on_webfetch_roles(role: Role, facts: TaskFacts) -> Binding:
 
 
 def fetched_content(evidence: SessionEvidence) -> CheckOutcome:
-    # checks_common imports this module to build its table, so its helpers are read at call time.
-    from praxion_evals.adherence.checks_common import slug_dir, written_paths
-
     facts = evidence.facts
     if not facts.fetchable_page:
         return Withheld("no fetchable page on a public host was available to this run")

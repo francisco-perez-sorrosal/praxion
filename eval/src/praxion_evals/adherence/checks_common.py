@@ -10,9 +10,11 @@ injected judge, and a golden bad and good case that prove the rubric separates t
 A check whose rule binds but which has no data yet for a role reports ``Withheld``
 with the reason; nothing is silently passed.
 
-The judged half (C3's rubric, the judge's input, the golden cases) lives in
+The judged half (C3's rubric, the judge's input, the golden verdicts) lives in
 ``checks_judged`` and C6's reading of the evidence in ``checks_fetch``; both are
 re-exported here, so this module stays the one place the checks and the table are read.
+The judging of the golden cases is here, below the table it defaults to; what the checks
+share lies in ``checks_base``.
 """
 
 from __future__ import annotations
@@ -21,11 +23,18 @@ import fnmatch
 import os
 import re
 import shlex
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from types import MappingProxyType
 from typing import assert_never
 
+from praxion_evals.adherence.checks_base import (  # noqa: F401  (re-exported)
+    AI_WORK,
+    WRITE_TOOLS,
+    _repo_relative,
+    slug_dir,
+    written_paths,
+)
 from praxion_evals.adherence.checks_fetch import (  # noqa: F401  (re-exported)
     FLAGGING_DOCUMENTS,
     binds_on_webfetch_roles,
@@ -44,7 +53,6 @@ from praxion_evals.adherence.checks_judged import (  # noqa: F401  (re-exported)
     ArtifactJudgedCheck,
     GoldenVerdicts,
     judge_check,
-    judge_golden_cases,
     judge_input,
     rate,
     render_judge_input,
@@ -56,6 +64,7 @@ from praxion_evals.adherence.model import (
     Binding,
     Binds,
     CheckDef,
+    CheckErrored,
     CheckOutcome,
     DoesNotBind,
     Failed,
@@ -81,21 +90,12 @@ from praxion_evals.adherence.output_forms import (
     PartialForm,
 )
 from praxion_evals.adherence.transcript import EndedOnItsOwn, RoleEnding, StoppedAtCap, Unknown
+from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.session import SessionEnvelope, ToolUse
 
 # ---------------------------------------------------------------------------
 # C1: the durable output is where the role's definition puts it, and nothing else is written
 # ---------------------------------------------------------------------------
-
-AI_WORK = ".ai-work"
-# The tools whose input names the file they write, and the input key that names it;
-# Bash writes show only in the repository.
-WRITE_TOOLS: Mapping[str, str] = {
-    "Write": "file_path",
-    "Edit": "file_path",
-    "MultiEdit": "file_path",
-    "NotebookEdit": "notebook_path",
-}
 
 
 def durable_output(evidence: SessionEvidence) -> CheckOutcome:
@@ -120,10 +120,6 @@ def durable_output(evidence: SessionEvidence) -> CheckOutcome:
     return Failed("; ".join(problems)) if problems else Passed()
 
 
-def slug_dir(slug: str) -> str:
-    return f"{AI_WORK}/{slug}"
-
-
 def document_path(slug: str, document: str) -> str:
     """The repo-relative path of a document, or the pattern for it when its name holds ``*``.
 
@@ -141,24 +137,6 @@ def document_files(evidence: SessionEvidence, document: str) -> dict[str, str]:
         for path, text in sorted(evidence.repo.files.items())
         if fnmatch.fnmatchcase(path, pattern)
     }
-
-
-def written_paths(evidence: SessionEvidence) -> frozenset[str]:
-    """Every path the session changed: the repository's delta and the role's own Write/Edit calls."""
-    cwd = evidence.envelope.init.cwd if evidence.envelope.init else None
-    named = {
-        _repo_relative(str(use.input[WRITE_TOOLS[use.name]]), cwd)
-        for use in evidence.role_tool_uses
-        if use.name in WRITE_TOOLS and WRITE_TOOLS[use.name] in use.input
-    }
-    return frozenset(evidence.repo.files) | evidence.repo.deleted | named
-
-
-def _repo_relative(file_path: str, cwd: str | None) -> str:
-    if cwd is None or not os.path.isabs(file_path):
-        return os.path.normpath(file_path)
-    root, target = os.path.realpath(cwd), os.path.realpath(file_path)
-    return os.path.relpath(target, root) if target.startswith(root + os.sep) else target
 
 
 def _within_any(path: str, locations: Sequence[str]) -> bool:
@@ -606,3 +584,29 @@ C6 = MechanicalCheck(
 )
 
 COMMON_CHECKS: Mapping[str, CheckDef] = {check.name: check for check in (C1, C2, C3, C4, C5, C6)}
+
+
+def judge_golden_cases(
+    judge: JudgeClient, checks: Iterable[CheckDef] | None = None
+) -> Mapping[str, GoldenVerdicts]:
+    """Both golden verdicts for every judged check among ``checks`` (default: C1 to C6).
+
+    A judge that raises on a case yields an errored outcome for it, so one crash
+    never hides the other verdicts.
+    """
+    pool = COMMON_CHECKS.values() if checks is None else checks
+    judged = [check for check in pool if isinstance(check, JudgedCheck)]
+    return {
+        check.name: GoldenVerdicts(
+            bad=_judged_or_errored(check, check.golden_bad_case, judge),
+            good=_judged_or_errored(check, check.golden_good_case, judge),
+        )
+        for check in judged
+    }
+
+
+def _judged_or_errored(check: JudgedCheck, artifact: str, judge: JudgeClient) -> CheckOutcome:
+    try:
+        return rate(judge.judge(check.rubric, artifact, JUDGE_SCHEMA))
+    except Exception as error:
+        return CheckErrored(f"{check.name} golden case raised {type(error).__name__}: {error}")

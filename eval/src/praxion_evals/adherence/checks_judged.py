@@ -2,20 +2,20 @@
 
 A :class:`~praxion_evals.adherence.model.JudgedCheck` is a rubric, an injected judge and a
 golden bad and good case that prove the rubric separates them. This module holds the rubric,
-the layout the judge reads, the judging of one session and the judging of the golden cases;
-``checks_common`` re-exports every public name here and holds the check itself in its table.
+the layout the judge reads, the judging of one session and the shape of the golden verdicts;
+``checks_common`` re-exports every public name here, holds the check itself in its table and
+judges the golden cases over that table.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from praxion_evals.adherence.checks_base import slug_dir
 from praxion_evals.adherence.model import (
-    CheckDef,
-    CheckErrored,
     CheckOutcome,
     Failed,
     JudgedCheck,
@@ -170,9 +170,6 @@ def spawn_prompt(evidence: SessionEvidence) -> str:
 
 def _task_directory_text(evidence: SessionEvidence) -> str:
     """The text the role left in its slug directory, and the ADR fragments it drafted."""
-    # checks_common imports this module to build its table, so its helpers are read at call time.
-    from praxion_evals.adherence.checks_common import slug_dir
-
     prefixes = (slug_dir(evidence.slug) + "/", DRAFT_ADRS + "/")
     return "\n\n".join(
         f"### {path}\n\n{text.strip()}"
@@ -211,31 +208,3 @@ class GoldenVerdicts:
     def separates(self) -> bool:
         """True only when the bad case failed and the good case passed."""
         return isinstance(self.bad, Failed) and isinstance(self.good, Passed)
-
-
-def judge_golden_cases(
-    judge: JudgeClient, checks: Iterable[CheckDef] | None = None
-) -> Mapping[str, GoldenVerdicts]:
-    """Both golden verdicts for every judged check among ``checks`` (default: C1 to C6).
-
-    A judge that raises on a case yields an errored outcome for it, so one crash
-    never hides the other verdicts.
-    """
-    from praxion_evals.adherence.checks_common import COMMON_CHECKS  # see _task_directory_text
-
-    pool = COMMON_CHECKS.values() if checks is None else checks
-    judged = [check for check in pool if isinstance(check, JudgedCheck)]
-    return {
-        check.name: GoldenVerdicts(
-            bad=_judged_or_errored(check, check.golden_bad_case, judge),
-            good=_judged_or_errored(check, check.golden_good_case, judge),
-        )
-        for check in judged
-    }
-
-
-def _judged_or_errored(check: JudgedCheck, artifact: str, judge: JudgeClient) -> CheckOutcome:
-    try:
-        return rate(judge.judge(check.rubric, artifact, JUDGE_SCHEMA))
-    except Exception as error:
-        return CheckErrored(f"{check.name} golden case raised {type(error).__name__}: {error}")

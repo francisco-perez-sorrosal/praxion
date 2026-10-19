@@ -215,9 +215,16 @@ def _mechanical_allowance(
     calibration run's allowance is ever read; a file that declares no method keeps the
     allowances it declared.
     """
-    if settings.allowance_method == OWN_DISCORDANCE_EXACT:
-        return _exact_quantile(counts.discordant, settings.confidence)
-    return settings.allowance(name, role)
+    # Exhaustive on purpose: a second method fails type-checking here instead of taking the
+    # legacy branch. The case spells OWN_DISCORDANCE_EXACT out because a case cannot take a name.
+    method = settings.allowance_method
+    match method:
+        case "own-discordance-exact":
+            return _exact_quantile(counts.discordant, settings.confidence)
+        case None:
+            return settings.allowance(name, role)
+        case _:
+            assert_never(method)
 
 
 # ---------------------------------------------------------------------------
@@ -259,11 +266,20 @@ def _score_statistic(b: int, c: int, n: int, delta: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# The exact one-sided quantile of a check's own discordant count
+# The noise allowance: the exact one-sided quantile of a check's own discordant count
 # ---------------------------------------------------------------------------
 
 
 def _exact_quantile(discordant: int, confidence: float) -> int:
+    """The smallest net discordance ``b - c`` the exact one-sided test cannot call a regression.
+
+    Of the ``d = b + c`` pairs on which the arms disagree, a lean arm no worse than the full
+    arm loses ``b`` of them as a fair coin would, so ``b - c = 2 * Binomial(d, 1/2) - d``.
+    Net discordance ``k`` therefore needs ``b <= (d + k) // 2``, and this returns the first
+    ``k`` for which that tail holds at least ``confidence`` of the ``2**d`` outcomes. It is the
+    allowance itself, sized by the check's own ``d`` at the declared confidence; no calibration
+    run's allowance enters.
+    """
     for allowance in range(discordant + 1):
         at_most = (discordant + allowance) // 2
         mass = sum(comb(discordant, i) for i in range(at_most + 1))

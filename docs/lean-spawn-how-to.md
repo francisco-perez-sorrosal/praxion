@@ -10,7 +10,7 @@ Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on tria
 Run commands from the repository root.
 
 > [!IMPORTANT]
-> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; draft decision `dec-462`) was ratified by the user on 2026-10-19. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
+> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; decision `dec-462`) was ratified by the user on 2026-10-19. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
 
 ## Regenerate the kernels after a rule or agent change
 
@@ -113,11 +113,43 @@ The commit gate does not import the eval. It reads `.ai-state/eval_ledger/adhere
 cd eval && uv run praxion-evals-adherence .. --reindex   # rebuild from the results files alone; launches nothing
 ```
 
-Each entry holds a results file's name and sha256, its lineage root and ending, and per role the complete pairs and flip label (lineage-level for a continued run, `not clear` for a closed one). JSON files that are not results files are named apart. Commit the regenerated `index.json` with the results files it lists; `--reindex` over a clean tree leaves it byte-identical.
+The index is schema 2. Each entry holds a results file's name and sha256, its lineage root and ending, and per role the complete pairs, the flip label (lineage-level for a continued run, `not clear` for a closed one) and `scored_checks`, the checks that verdict scored. The gate reads it as a locator and a list of digests, not as evidence (see [What the gate derives, cross-checks and trusts](#what-the-gate-derives-cross-checks-and-trusts)). JSON files that are not results files are named apart. A gate that meets an index of another schema refuses it with a `--reindex` hint. Rebuild with `--reindex` and commit the regenerated `index.json` in the same commit as any change to its writer (`eval/src/praxion_evals/adherence/run_index.py`) and with the results files it lists; `--reindex` over a clean tree leaves it byte-identical.
 
-For every `switched` record, new or unchanged, the gate resolves each run the record cites, `passing_run` included, through the index to its lineage and refuses, naming the role and run: `I9-run-missing` (no readable results file), `I9-run-wrong-role`, `I9-run-pairs-differ` (complete pairs differ from the record), `I9-run-flag-disagrees` (the record's pass flag disagrees with the verdict) and `I9-run-passing-short` (the passing run has fewer than 20 complete pairs or a verdict other than clear). Citing any part of a lineage resolves to the whole lineage; citing two parts counts one run. `I9-run-index-stale` is a digest that no longer matches, a listed file that is gone, or a results file the index does not list. An unreadable index is an input error (exit 2). The `kernel-manifest` pre-commit hook runs for the index, the results files and `scripts/kernel_run_index.py`.
+Each finalized or closed run also records, in its own results file, a top-level `standing` key: per role, the lineage root, its parts, the complete pairs, the flip label and the checks scored (a closed run records `not clear`). The part that ends a lineage writes it; a one-part file written before the key existed is read from the verdict it records, and a file that is part of a continued run and records no standing gives the gate nothing to rest on.
 
-Verify: `python3 -m pytest scripts/test_kernel_run_index.py -q`; `cd eval && uv run pytest tests/test_adherence_run_index.py -q`; `uv run pytest tests/acceptance/test_switched_records_rest_on_their_results.py -q`; `python3 scripts/check_kernel_manifest.py` over the committed ledger.
+For every `switched` record, new or unchanged, the gate resolves each run the record cites, `passing_run` included, through the index to a results file, then judges the run from the results files beside it, and refuses, naming the role and run:
+
+| Finding | Meaning |
+|---|---|
+| `I9-run-missing` | no readable results file, or the results files give no one lineage for the run (a missing file, a gap, a fork or a loop in the `continues` links) |
+| `I9-run-wrong-role` | the lineage's results did not measure the record's role |
+| `I9-run-lineage-differs` | the index lists a different lineage than the files chain |
+| `I9-run-pairs-differ`, `I9-run-index-pairs-differ`, `I9-run-recorded-pairs-differ` | the record's, the index's or the results file's own count of complete pairs differs from the count the gate derived |
+| `I9-run-flag-disagrees`, `I9-run-index-flip-differs` | the record's pass flag, or the index's flip label, disagrees with the standing the results files record |
+| `I9-run-passing-short` | the passing run has fewer than 20 derived complete pairs, or a standing other than clear |
+| `I9-run-standing-unrecorded` | no results file records a whole-lineage standing for the role |
+| `I9-run-convention-unscored` | the passing run's verdict did not score the role's project-convention check |
+
+Citing any part of a lineage resolves to the whole lineage; citing two parts counts one run. `I9-run-index-stale` is a digest that no longer matches, a listed file that is gone, or a results file the index does not list. An unreadable index is an input error (exit 2). The `kernel-manifest` pre-commit hook runs for the index, the results files and `scripts/kernel_run_index.py`, `scripts/kernel_run_evidence.py` and `scripts/kernel_ledger_checks.py`.
+
+### What the gate derives, cross-checks and trusts
+
+The gate uses the standard library only and does not import the eval. Three sets, in decreasing order of what it proves itself:
+
+- **Derived by the gate** from the results files: a run's lineage (the chain of their `continues` links), the role's complete pairs (per task, the latest session of each arm across the parts, counted when both were measured) and a closed ending (the tip file's recorded ending).
+- **Cross-checked** against the fields the files record: the flip standing and the scored checks of the whole lineage, and the figures the index and the record claim for it (lineage, pairs, flip label, pass flag). Any disagreement, a count that disagrees with the file's own sessions, a passing run not clear on 20 derived pairs, a passing run whose scored checks lack the role's convention check, and a run with no recorded whole-lineage standing are each a refusal of their own kind.
+- **Trusted without checking:** the per-check verdicts, allowances, intervals and flip label the eval computed; which checks a verdict covers; and the contents of a results file as such. A results file rewritten together with its digest in the index passes the gate unseen.
+
+The backstop for that trust is the two human ratifications every switched record carries, `flip_rule_ratified: true` and `flip_ratified: true`, together with review of the commit that adds a results file.
+
+On a refusal:
+
+- **`I9-run-standing-unrecorded`.** The cited run (or the lineage's last part) records no standing for the role. Cite a run whose lineage ended in a finalize or close that recorded it, or run the role again and cite the new run. Do not hand-write a `standing` key: the eval writes it, and `--reindex` does not create one.
+- **`I9-run-convention-unscored`.** The passing run's verdict did not score `<role>: it follows the convention its project's instruction file states`, so a lean role's project instructions are not shown to reach it. Cite a passing run that scored it, or run the role again; the finding names the checks the run did score. The implementer's fixtures state the project convention and its catalog lists that check, so a new implementer run scores it.
+
+Verify: `python3 -m pytest scripts/test_kernel_run_evidence.py scripts/test_kernel_run_evidence_parity.py scripts/test_kernel_ledger_checks_evidence.py scripts/test_kernel_ledger_checks_scored.py -q`; `uv run pytest tests/acceptance/test_flip_gate_takes_standing_from_results.py tests/acceptance/test_implementer_scores_the_project_convention.py -q`; `cd eval && uv run pytest tests/test_adherence_standing.py -q`.
+
+Index verify: `python3 -m pytest scripts/test_kernel_run_index.py -q`; `cd eval && uv run pytest tests/test_adherence_run_index.py -q`; `uv run pytest tests/acceptance/test_switched_records_rest_on_their_results.py -q`; `python3 scripts/check_kernel_manifest.py` over the committed ledger.
 
 ## Move the eligibility pin
 
@@ -125,7 +157,7 @@ The roles that may be switched are the literal `ELIGIBLE_ROLES` in `scripts/kern
 
 1. Edit only the tuple, in a commit of its own.
 2. The gate refuses a commit that changes the pin together with any adoption record or any definition's `omitClaudeMd` (`I9-eligible-with-move`, naming both). It judges a move to `switched` against the pin as it stood at the parent commit, so a role becomes switchable from the commit after (`I9-eligible-not-yet`). A ledger that carries an `eligible` key is refused (`I9-eligible-in-ledger`).
-3. The `implementer` is eligible and has no record in `.ai-state/kernel_adoption.yaml`: it receives nothing at spawn and still inherits the project instructions. Its trial record, and the one spawn that shows a `kernel_injected` row judged clean by `--liveness`, land with its run in the run-preparation commit after the merge, with the user's go. The eval holds no project-convention fixture for the implementer yet, and the run index keeps pairs and a flip label, not which checks were scored (tracked as `td-468`); read an implementer run's report for the checks it scored before citing it.
+3. The `implementer` is eligible and has no record in `.ai-state/kernel_adoption.yaml`: it receives nothing at spawn and still inherits the project instructions. Its trial record, and the one spawn that shows a `kernel_injected` row judged clean by `--liveness`, land with its run in the run-preparation commit after the merge, with the user's go. The implementer's fixtures state the project convention and the run index lists the checks each run scored, so the gate refuses an implementer run that did not score it (`I9-run-convention-unscored`).
 
 Verify: `uv run pytest tests/acceptance/test_flag_eligibility_and_liveness_gates.py -q`; `python3 -c "import sys; sys.path.insert(0, 'scripts'); import kernel_eligibility as k; print(k.ELIGIBLE_ROLES)"`.
 

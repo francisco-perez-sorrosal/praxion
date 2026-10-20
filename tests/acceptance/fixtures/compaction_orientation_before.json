@@ -1,0 +1,5 @@
+{
+  "a pipeline outside a step loop": "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"# Pipeline orientation (post-compaction)\\n\\nTask slug: plain-feature\\nCurrent step: Step 2 of 3: Wire up the retry queue\\nRead first: .ai-work/plain-feature/HANDOFF.md\\nThen on demand: .ai-work/plain-feature/IMPLEMENTATION_PLAN.md, .ai-work/plain-feature/WIP.md\\nNext action (recorded): Finish the retry queue tests.\"}}\n",
+  "the newest pipeline outside a loop, an older one under the driver": "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"# Pipeline orientation (post-compaction)\\n\\nTask slug: plain-feature\\nCurrent step: Step 2 of 3: Wire up the retry queue\\nRead first: .ai-work/plain-feature/HANDOFF.md\\nThen on demand: .ai-work/plain-feature/IMPLEMENTATION_PLAN.md, .ai-work/plain-feature/WIP.md\\nNext action (recorded): Finish the retry queue tests.\\nOther pipelines in .ai-work/: driven-feature\"}}\n",
+  "no task with a step record": ""
+}

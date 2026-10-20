@@ -34,6 +34,11 @@ SCORED = ["C1", kre.convention_check_name(ROLE)]  # the checks a planted run's v
 # -- Builders: results files, their index, a switched record citing them ---------------
 
 
+def scored_by(run: dict) -> list[str]:
+    """The checks a planted run's verdict scored: none for an underpowered one, as the eval writes it."""
+    return [] if run["flip"] == "underpowered" else SCORED
+
+
 def indexed(
     run_id: str, pairs: int = 24, flip: str = "clear", role: str = ROLE, root: str | None = None
 ) -> dict:
@@ -57,7 +62,7 @@ def results_file(run: dict, group: list[dict]) -> dict:
         "parts": parts,
         "complete_pairs": run["pairs"],
         "flip": run["flip"],
-        "scored_checks": SCORED,
+        "scored_checks": scored_by(run),
     }
     return {
         "schema_version": "adherence/1",
@@ -85,7 +90,7 @@ def plant(directory_root: Path, *runs: dict, skipped: tuple[str, ...] = ()) -> P
                 run["role"]: {
                     "complete_pairs": run["pairs"],
                     "flip": run["flip"],
-                    "scored_checks": SCORED,
+                    "scored_checks": scored_by(run),
                 }
             },
         }

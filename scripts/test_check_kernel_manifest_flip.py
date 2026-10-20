@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _kernel_checker_testkit as kit  # noqa: E402
 import check_kernel_manifest as cb  # noqa: E402
 import kernel_ledger as kl  # noqa: E402
+import kernel_ledger_checks as lc  # noqa: E402
 import kernel_model as km  # noqa: E402
 from _kernel_checker_testkit import (  # noqa: E402
     ADHERENCE,
@@ -714,9 +715,9 @@ def test_a_checkout_that_never_had_a_ledger_has_none_to_lose(repo: Path) -> None
 
 
 def inject_kernel_status(repo: Path, role: str) -> str | None:
-    return cb.inject_kernel.adoption_status(
-        (repo / km.LEDGER_PATH).read_text(encoding="utf-8"), role
-    )
+    hook = cb.inject_kernel
+    assert hook is not None, "hooks/inject_kernel.py is beside scripts/ in this checkout"
+    return hook.adoption_status((repo / km.LEDGER_PATH).read_text(encoding="utf-8"), role)
 
 
 LEDGER_HEAD = "version: 1\nroles:\n"
@@ -765,3 +766,38 @@ def test_a_record_the_spawn_hook_reads_and_the_parser_discards_is_reported(repo:
 
     assert [f.subject for f in found] == ["role verifier"]
     assert "status 'trial' where PyYAML reads None" in found[0].detail
+
+
+def test_without_the_spawn_hook_the_misreading_check_refuses_rather_than_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lc, "inject_kernel", None)
+
+    with pytest.raises(km.KernelModelError, match="hooks/inject_kernel.py is not beside scripts/"):
+        lc.misreading_findings({}, "")
+
+
+def test_with_the_spawn_hook_the_misreading_check_judges_instead_of_refusing() -> None:
+    assert lc.inject_kernel is not None
+    assert lc.misreading_findings({}, "") == ()
+
+
+def test_without_the_spawn_hook_the_checker_exits_2_naming_why(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(lc, "inject_kernel", None)
+
+    status = cb.main(["--repo-root", str(repo)])
+
+    assert status == 2
+    assert "hooks/inject_kernel.py is not beside scripts/: I10 cannot be judged" in (
+        capsys.readouterr().err
+    )
+
+
+def test_with_the_spawn_hook_the_checker_reads_a_clean_checkout_as_clean(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    status = cb.main(["--repo-root", str(repo)])
+
+    assert (status, capsys.readouterr().err) == (0, "")

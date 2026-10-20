@@ -197,11 +197,11 @@ def _citation_findings(
     if role not in measured:
         detail = f"cites run {run.id!r}, whose results measured {', '.join(measured) or 'no role'}"
         return (km.Finding("I9-run-wrong-role", subject, f"{detail}, not {role}"),)
-    named = _named(derived.parts)
     reached = indexed.roles.get(role)
     broken = (
-        *_lineage_claims(run, indexed, reached, derived, named),
-        *_standing_claims(run, passing, reached, derived, named, files, role),
+        *_lineage_claims(run, indexed, reached, derived),
+        *_standing_claims(run, passing, reached, derived, files, role),
+        *_recorded_pairs_claims(run, derived, files, role),
         *_convention_claims(run, passing, files, role),
     )
     return tuple(km.Finding(kind, subject, detail) for kind, detail in broken)
@@ -216,10 +216,9 @@ def _lineage_claims(
     indexed: kri.Lineage,
     reached: kri.Standing | None,
     derived: kre.Derived,
-    named: str,
 ) -> list[tuple[str, str]]:
     """Where the index and the record disagree with the results files on lineage and pairs."""
-    pairs = derived.complete_pairs
+    pairs, named = derived.complete_pairs, _named(derived.parts)
     listed = "no standing" if reached is None else f"{reached.complete_pairs} complete pairs"
     claims = [
         (
@@ -248,7 +247,6 @@ def _standing_claims(
     passing: bool,
     reached: kri.Standing | None,
     derived: kre.Derived,
-    named: str,
     files: Sequence[kre.RunFile],
     role: str,
 ) -> list[tuple[str, str]]:
@@ -258,9 +256,7 @@ def _standing_claims(
     except kre.RunEvidenceError as exc:
         unrecorded = f"cites run {run.id!r}, whose lineage records no standing for {role}: {exc}"
         return [("I9-run-standing-unrecorded", unrecorded)]
-    clear = judged == kri.CLEAR
-    pairs = derived.complete_pairs
-    recorded = _recorded_pairs(files, run.id, role)
+    clear, pairs, named = judged == kri.CLEAR, derived.complete_pairs, _named(derived.parts)
     labelled = reached.flip if reached else None
     claims = [
         (
@@ -280,14 +276,26 @@ def _standing_claims(
             f"rests on run {run.id!r}, which needs {kl.REQUIRED_PAIRS} complete pairs, clear; "
             f"{named} reached {pairs} complete pairs, {judged}",
         ),
-        (
-            "I9-run-recorded-pairs-differ",
-            recorded not in (None, pairs),
-            f"the results file records {recorded} complete pairs "
-            f"for run {run.id!r}'s lineage; {named} reached {pairs} complete pairs",
-        ),
     ]
     return [(kind, detail) for kind, broken, detail in claims if broken]
+
+
+def _recorded_pairs_claims(
+    run: kl.Run, derived: kre.Derived, files: Sequence[kre.RunFile], role: str
+) -> list[tuple[str, str]]:
+    """Where the lineage's last results file records other complete pairs than its sessions give.
+
+    A file that records no standing claims nothing here: `_standing_claims` reports it, or the
+    lineage was closed on request and is judged not clear whatever it records.
+    """
+    recorded, pairs = _recorded_pairs(files, run.id, role), derived.complete_pairs
+    if recorded in (None, pairs):
+        return []
+    detail = (
+        f"the results file records {recorded} complete pairs for run {run.id!r}'s lineage; "
+        f"{_named(derived.parts)} reached {pairs} complete pairs"
+    )
+    return [("I9-run-recorded-pairs-differ", detail)]
 
 
 def _convention_claims(

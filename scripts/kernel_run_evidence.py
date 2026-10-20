@@ -231,6 +231,8 @@ def _figures(pairs: Any, flip: Any, scored: Any) -> Standing:
     checks = tuple(_text(name) for name in _list(scored))
     if list(checks) != sorted(set(checks)):
         raise ValueError(f"scored_checks {list(checks)!r} are not sorted and unique")
+    if flip == UNDERPOWERED and checks:
+        raise ValueError(f"an underpowered standing scored no check, yet lists {list(checks)!r}")
     return Standing(pairs, flip, checks)
 
 

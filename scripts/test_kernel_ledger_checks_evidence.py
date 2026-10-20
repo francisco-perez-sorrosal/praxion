@@ -57,7 +57,7 @@ def standing(parts: list[str], pairs: int = 24, flip: str = "clear", role: str =
         "parts": parts,
         "complete_pairs": pairs,
         "flip": flip,
-        "scored_checks": SCORED,
+        "scored_checks": [] if flip == "underpowered" else SCORED,  # as the eval writes it
     }
     return {role: entry}
 
@@ -249,6 +249,70 @@ def test_a_closed_lineage_stands_not_clear_whatever_its_file_records(tmp_path: P
         "I9-run-index-flip-differs",
         "I9-run-flag-disagrees",
         "I9-run-passing-short",
+    ]
+
+
+def test_a_flag_and_a_sufficiency_claim_a_not_clear_standing_refutes_are_refused_with_figures(
+    tmp_path: Path,
+) -> None:
+    plant(tmp_path, whole(PASSING, 24, "not clear"))
+
+    assert findings(tmp_path, PASSING_ALONE) == [
+        (
+            "I9-run-flag-disagrees",
+            f"role {ROLE} -- cites run {PASSING!r} with passes_flip_rule true; "
+            f"run {PASSING!r} stands not clear",
+        ),
+        (
+            "I9-run-passing-short",
+            f"role {ROLE} -- rests on run {PASSING!r}, which needs {kl.REQUIRED_PAIRS} complete "
+            f"pairs, clear; run {PASSING!r} reached 24 complete pairs, not clear",
+        ),
+    ]
+
+
+def test_a_clear_run_short_of_the_floor_is_refused_naming_the_pairs_it_reached(
+    tmp_path: Path,
+) -> None:
+    short = kl.REQUIRED_PAIRS - 1
+    plant(tmp_path, whole(PASSING, short))
+
+    found = findings(tmp_path, switched(cited(PASSING, 24)))
+
+    assert [kind for kind, _ in found] == ["I9-run-pairs-differ", "I9-run-passing-short"]
+    assert found[1][1] == (
+        f"role {ROLE} -- rests on run {PASSING!r}, which needs {kl.REQUIRED_PAIRS} complete "
+        f"pairs, clear; run {PASSING!r} reached {short} complete pairs, clear"
+    )
+
+
+def test_a_closed_lineage_whose_tip_records_no_standing_is_judged_not_clear_and_no_more(
+    tmp_path: Path,
+) -> None:
+    closed = results(PASSING, pairs_of(24), None, ending={"kind": "closed"})
+    plant(tmp_path, closed)
+
+    # the recorded-pairs and unrecorded findings are for a file that records a figure or is open
+    assert kinds(tmp_path, PASSING_ALONE) == [
+        "I9-run-index-flip-differs",
+        "I9-run-flag-disagrees",
+        "I9-run-passing-short",
+    ]
+
+
+def test_an_open_lineage_whose_tip_records_no_standing_is_refused_naming_why(
+    tmp_path: Path,
+) -> None:
+    first = results(PART_ONE, pairs_of(24), None)
+    tip = results(PART_TWO, pairs_of(24), None, continues=PART_ONE)
+    plant(tmp_path, first, tip)
+
+    assert findings(tmp_path, switched(cited(PART_TWO), passing=PART_TWO)) == [
+        (
+            "I9-run-standing-unrecorded",
+            f"role {ROLE} -- cites run {PART_TWO!r}, whose lineage records no standing for "
+            f"{ROLE}: run {PART_TWO} is part of a continued run and records no standing",
+        )
     ]
 
 

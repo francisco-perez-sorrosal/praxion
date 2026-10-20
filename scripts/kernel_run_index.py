@@ -48,7 +48,9 @@ class Standing:
 
 @dataclass(frozen=True)
 class Lineage:
-    """A run as one declared run: its first part, every part in order, what it reached per role."""
+    """A run as the index groups it: its first part, every part in order, and the standing the
+    asked-for part's own entry lists per role (not a lineage-wide figure; the gate compares that
+    entry with the results files)."""
 
     root: str
     parts: tuple[str, ...]

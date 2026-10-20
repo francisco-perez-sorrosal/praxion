@@ -301,6 +301,25 @@ def test_a_malformed_standing_is_refused_naming_the_run_and_what_is_wrong(
     assert reason in str(refusal.value)
 
 
+def test_an_underpowered_standing_listing_scored_checks_is_unrecorded_as_the_eval_refuses_it(
+    tmp_path,
+):
+    listing = standing_entry([FIRST], pairs=2, flip="underpowered", scored=("C1",))
+    files = read(tmp_path, results(FIRST, both_arms("t1"), standing={ROLE: listing}))
+
+    assert isinstance(files[0].recorded, kre.Unrecorded)
+    with pytest.raises(kre.RunEvidenceError, match="underpowered standing scored no check") as why:
+        kre.judged_standing(files, FIRST, ROLE)
+    assert f"run {FIRST} records" in str(why.value)
+
+
+def test_an_underpowered_standing_listing_no_scored_check_is_read(tmp_path):
+    empty = standing_entry([FIRST], pairs=2, flip="underpowered", scored=())
+    files = read(tmp_path, results(FIRST, both_arms("t1"), standing={ROLE: empty}))
+
+    assert kre.recorded_standing(files, FIRST, ROLE) == kre.Standing(2, "underpowered", ())
+
+
 def test_a_standing_that_omits_the_role_is_refused_and_one_that_names_it_is_read(tmp_path):
     files = read(
         tmp_path, results(FIRST, both_arms("t1"), standing={ROLE: standing_entry([FIRST])})

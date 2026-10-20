@@ -1,5 +1,6 @@
 ---
-id: dec-draft-42f62347
+id: dec-461
+draft_id: dec-draft-42f62347
 title: The flip gate holds the eligible roles in its own module and reads run evidence from a digest-checked run index; the implementer becomes eligible
 status: accepted
 category: architectural

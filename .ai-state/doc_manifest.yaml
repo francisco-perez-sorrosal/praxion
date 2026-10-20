@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-16T06:39:40Z'
+generated_at: '2026-10-20T02:47:10Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-16'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-13'
+  last_modified: '2026-10-19'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -469,7 +469,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -479,11 +479,13 @@ surfaces:
   path: docs/lean-spawn-kernels.md
   type: markdown
   title: 'Lean spawn: role kernels and the adoption ledger'
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
   surfaces_referenced:
+  - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+  - ai-state-decisions-460-role-kernels-generated-and-injected
   - docs-lean-spawn-how-to
 - id: docs-metrics-readme
   path: docs/metrics/README.md
@@ -593,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -624,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -632,13 +634,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-16'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3383,7 +3385,7 @@ surfaces:
   path: .ai-state/decisions/454-agents-carry-the-process-core.md
   type: markdown
   title: Every Praxion agent carries the process core inline, and the shared-block gate requires it
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-15'
   renderer: adr_card
 - id: ai-state-decisions-455-memory-index-gate
   path: .ai-state/decisions/455-memory-index-gate.md
@@ -3413,19 +3415,31 @@ surfaces:
   path: .ai-state/decisions/459-flip-rule-point-estimate-calibrated.md
   type: markdown
   title: The lean-spawn flip rule gates on paired point estimates with a calibrated noise allowance, lists every run, and recounts lean-only errors as failures
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-16'
   renderer: adr_card
 - id: ai-state-decisions-460-role-kernels-generated-and-injected
   path: .ai-state/decisions/460-role-kernels-generated-and-injected.md
   type: markdown
   title: Role kernels are generated from one manifest and delivered by definition, spawn hook and Codex wrapper
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-16'
+  renderer: adr_card
+- id: ai-state-decisions-461-eligibility-pin-in-gate-implementer-eligible
+  path: .ai-state/decisions/461-eligibility-pin-in-gate-implementer-eligible.md
+  type: markdown
+  title: The flip gate holds the eligible roles in its own module and reads run evidence from a digest-checked run index; the implementer becomes eligible
+  last_modified: '2026-10-19'
+  renderer: adr_card
+- id: ai-state-decisions-462-flip-rule-amendment-own-discordance-continuation
+  path: .ai-state/decisions/462-flip-rule-amendment-own-discordance-continuation.md
+  type: markdown
+  title: The flip rule sizes mechanical allowances by the run's own discordance, seeds launch order, states coverage, and makes a stopped run one declared run that is continued or closed
+  last_modified: '2026-10-19'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-12'
+  last_modified: '2026-10-15'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4257,6 +4271,8 @@ groups:
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
   - ai-state-decisions-460-role-kernels-generated-and-injected
+  - ai-state-decisions-461-eligibility-pin-in-gate-implementer-eligible
+  - ai-state-decisions-462-flip-rule-amendment-own-discordance-continuation
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

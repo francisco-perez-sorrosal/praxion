@@ -10,7 +10,7 @@ Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on tria
 Run commands from the repository root.
 
 > [!IMPORTANT]
-> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; draft decision `dec-draft-c9d81997`) was ratified by the user on 2026-10-19. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
+> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; draft decision `dec-462`) was ratified by the user on 2026-10-19. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
 
 ## Regenerate the kernels after a rule or agent change
 

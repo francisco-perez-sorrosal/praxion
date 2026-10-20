@@ -1,5 +1,6 @@
 ---
-id: dec-draft-c9d81997
+id: dec-462
+draft_id: dec-draft-c9d81997
 title: The flip rule sizes mechanical allowances by the run's own discordance, seeds launch order, states coverage, and makes a stopped run one declared run that is continued or closed
 status: accepted
 category: behavioral

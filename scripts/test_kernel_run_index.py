@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kernel_ledger as kl  # noqa: E402
 import kernel_ledger_checks as lc  # noqa: E402
 import kernel_model as km  # noqa: E402
+import kernel_run_evidence as kre  # noqa: E402
 import kernel_run_index as kri  # noqa: E402
 from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
 
@@ -27,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ROLE = "researcher"
 EARLY, PASSING = "20261101T000000Z-early0", "20261102T000000Z-pass00"
 FIRST_PART, LATER_PART = "20261103T000000Z-part01", "20261104T000000Z-part02"
-SCORED = ["C1", "C3"]  # the checks a planted run's verdict scored, as the eval lists them
+SCORED = ["C1", kre.convention_check_name(ROLE)]  # the checks a planted run's verdict scored
 
 
 # -- Builders: results files, their index, a switched record citing them ---------------

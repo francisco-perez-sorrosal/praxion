@@ -158,7 +158,8 @@ def cited_run_findings(
     run included, is resolved through the index (a locator and a digest) and then derived from
     the results files beside it: its lineage, its complete pairs, its flip standing. The record
     and the index are held to those figures, and the passing run must stand clear on at least
-    `kl.REQUIRED_PAIRS` pairs the gate counted itself. Two parts of one lineage derive the same
+    `kl.REQUIRED_PAIRS` pairs the gate counted itself and must have scored the role's convention
+    check (the other cited runs need not). Two parts of one lineage derive the same
     values, so they are one run; a closed lineage stands "not clear", a draw that refuses nothing
     alone.
     """
@@ -201,6 +202,7 @@ def _citation_findings(
     broken = (
         *_lineage_claims(run, indexed, reached, derived, named),
         *_standing_claims(run, passing, reached, derived, named, files, role),
+        *_convention_claims(run, passing, files, role),
     )
     return tuple(km.Finding(kind, subject, detail) for kind, detail in broken)
 
@@ -288,10 +290,33 @@ def _standing_claims(
     return [(kind, detail) for kind, broken, detail in claims if broken]
 
 
+def _convention_claims(
+    run: kl.Run, passing: bool, files: Sequence[kre.RunFile], role: str
+) -> list[tuple[str, str]]:
+    """Where the passing run's verdict did not score the role's convention check.
+
+    Only the passing run is judged: the record's other cited runs need not have scored it. A run
+    that records no standing is reported by `_standing_claims`, not here.
+    """
+    recorded = _recorded(files, run.id, role)
+    check = kre.convention_check_name(role)
+    if not passing or recorded is None or check in recorded.scored_checks:
+        return []
+    scored = ", ".join(recorded.scored_checks) or "no check"
+    detail = f"rests on run {run.id!r}, whose verdict did not score {check!r}: it scored {scored}"
+    return [("I9-run-convention-unscored", detail)]
+
+
 def _recorded_pairs(files: Sequence[kre.RunFile], run_id: str, role: str) -> int | None:
     """The complete pairs the lineage's last results file records; None when it records none."""
+    recorded = _recorded(files, run_id, role)
+    return None if recorded is None else recorded.complete_pairs
+
+
+def _recorded(files: Sequence[kre.RunFile], run_id: str, role: str) -> kre.Standing | None:
+    """What the lineage's last results file records for the role; None when it records none."""
     try:
-        return kre.recorded_standing(files, run_id, role).complete_pairs
+        return kre.recorded_standing(files, run_id, role)
     except kre.RunEvidenceError:
         return None
 

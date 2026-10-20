@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import kernel_ledger as kl  # noqa: E402
 import kernel_ledger_checks as lc  # noqa: E402
+import kernel_run_evidence as kre  # noqa: E402
 import kernel_run_index as kri  # noqa: E402
 from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
 
@@ -31,7 +32,7 @@ PART_ONE, PART_TWO, PART_THREE = (
     "20261104T000000Z-part02",
     "20261105T000000Z-part03",
 )
-SCORED = ["C1", "C3"]
+SCORED = ["C1", kre.convention_check_name(ROLE)]
 Index = dict[str, Any]
 
 

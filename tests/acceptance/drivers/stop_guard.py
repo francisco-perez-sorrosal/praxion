@@ -104,12 +104,20 @@ def guard_registration() -> Registration:
 def main_transcript(task: LoopTask, session: str = SANDBOX_SESSION) -> Path:
     """The main session's own transcript, beside its `<session>/subagents/` directory."""
     assert task.sandbox_home is not None
-    path = task.sandbox_home / ".claude" / "projects" / SANDBOX_PROJECT_DIR / f"{session}.jsonl"
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        line = {"type": "user", "message": {"role": "user", "content": "Relay the step loop."}}
-        path.write_text(json.dumps(line) + "\n", encoding="utf-8")
-    return path
+    return task.sandbox_home / ".claude" / "projects" / SANDBOX_PROJECT_DIR / f"{session}.jsonl"
+
+
+def start_session(task: LoopTask) -> None:
+    """The main session exists, its transcript on disk, before any stop is fired.
+
+    Created at setup, never while a stop is measured: a scenario's snapshot then holds
+    the transcript, so a guard that writes to it is caught, and nothing the driver
+    writes is mistaken for the guard's.
+    """
+    path = main_transcript(task)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = {"type": "user", "message": {"role": "user", "content": "Relay the step loop."}}
+    path.write_text(json.dumps(line) + "\n", encoding="utf-8")
 
 
 def stop_input(task: LoopTask, *, stop_hook_active: bool = False) -> dict[str, Any]:
@@ -233,7 +241,10 @@ def fire_stop(
 
 
 def loop(workspace: Path, *steps: Step, done: tuple[str, ...] = ()) -> LoopTask:
-    return step_loop.build_loop(workspace, *steps, done=done)
+    """A step loop in a session that has started: its main transcript is already there."""
+    task = step_loop.build_loop(workspace, *steps, done=done)
+    start_session(task)
+    return task
 
 
 def second_task(task: LoopTask, slug: str, *steps: Step) -> LoopTask:

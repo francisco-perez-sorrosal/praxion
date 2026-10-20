@@ -108,7 +108,7 @@ def test_the_only_judged_role_checks_are_the_adr_categories():
 
 @pytest.mark.parametrize(
     ("role", "clauses"),
-    [("implementer", 7), ("test-engineer", 4), ("doc-engineer", 3), ("systems-architect", 6)],
+    [("implementer", 8), ("test-engineer", 4), ("doc-engineer", 3), ("systems-architect", 6)],
 )
 def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     assert len(ROLE_ROWS[role]) == clauses

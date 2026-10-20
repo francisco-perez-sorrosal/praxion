@@ -215,6 +215,7 @@ PILOT_ROLES: tuple[str, ...] = (
     "discipline-consultant",
     "skill-genesis",
     "context-engineer",
+    "implementer",
 )
 # The wording a pilot task's convention asks every document to carry: the one thing the
 # convention check looks for, and the thing only the fixture's own instruction file states.

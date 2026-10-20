@@ -277,6 +277,7 @@ IMPLEMENTER_ROW: tuple[CheckDef, ...] = (
     sibling_read_before_create(
         IMPLEMENTER_SIBLING, RuleRef("agents/implementer.md", "Constraints"), "implementer"
     ),
+    convention_check("implementer"),
 )
 
 # ---------------------------------------------------------------------------

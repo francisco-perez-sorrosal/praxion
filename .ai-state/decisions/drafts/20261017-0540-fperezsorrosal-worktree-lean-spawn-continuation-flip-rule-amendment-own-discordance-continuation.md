@@ -1,10 +1,10 @@
 ---
 id: dec-draft-c9d81997
 title: The flip rule sizes mechanical allowances by the run's own discordance, seeds launch order, states coverage, and makes a stopped run one declared run that is continued or closed
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-17
-summary: "Amends dec-459 clauses 2 and 5 after the statistician consult (CH-01 to CH-06, all switch-now), awaiting the user's ratification before the next flip. Each mechanical allowance is the exact one-sided quantile at the run's own discordant count for that check; no calibration run sets an allowance; the two arms' launch order is seeded per task. The report states each allowance in points beside the margin and lists a check as not covered when it exceeds the margin, and C5 as not covered under five both-ran-out pairs. A run stops after N >= 3 identical (masked-tail) infrastructure errors in one arm. A two-armed stop or a spend refusal is continuable under an identical tree outside the results directory, and a continuation is one run with its lineage. A fresh run of a role is refused while a continuable stopped run is neither continued nor closed. C5 binds only on a role the harness stopped at its cap. Earlier runs are grouped by role definition and kernel identity, every other run of the role listed apart."
+summary: "Amends dec-459 clauses 2 and 5 after the statistician consult (CH-01 to CH-06, all switch-now), ratified by the user on 2026-10-19. Each mechanical allowance is the exact one-sided quantile at the run's own discordant count for that check; no calibration run sets an allowance; the two arms' launch order is seeded per task. The report states each allowance in points beside the margin and lists a check as not covered when it exceeds the margin, and C5 as not covered under five both-ran-out pairs. A run stops after N >= 3 identical (masked-tail) infrastructure errors in one arm. A two-armed stop or a spend refusal is continuable under an identical tree outside the results directory, and a continuation is one run with its lineage. A fresh run of a role is refused while a continuable stopped run is neither continued nor closed. C5 binds only on a role the harness stopped at its cap. Earlier runs are grouped by role definition and kernel identity, every other run of the role listed apart."
 tags: [eval, adherence, statistics, flip-rule, lean-spawns, consult, continuation, startup-context-diet]
 made_by: agent
 agent_type: systems-architect

@@ -1,7 +1,7 @@
 ---
 id: dec-draft-42f62347
 title: The flip gate holds the eligible roles in its own module and reads run evidence from a digest-checked run index; the implementer becomes eligible
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-17
 summary: "Moves the eligible-roles pin out of the adoption ledger, which a flip commit writes, into a gate-owned module, scripts/kernel_eligibility.py, read at the parent commit. A commit that changes eligibility may change no adoption record and no flag. Adds the implementer to the five pilot roles (its trial record lands later, with its run). Adds a run index beside the adherence results, written by the runner and digest-checked by the gate, through which the gate resolves every run a switched record cites. Amends dec-460's clause 5 ('switched only for the five eligible pilot roles')."

@@ -10,7 +10,7 @@ Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on tria
 Run commands from the repository root.
 
 > [!IMPORTANT]
-> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; draft decision `dec-draft-c9d81997`) awaits the user's ratification before the next flip. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
+> The amended flip rule (allowances sized by each run's own discordance, the coverage statement, the C5 binding, continuation and the earlier-runs scope; draft decision `dec-draft-c9d81997`) was ratified by the user on 2026-10-19. No paid run, push or release belongs to the pipeline that built it: each paid run needs the user's go and stated caps. Nothing here claims that a lean spawn does better work; every recipe describes behaviour and the command or file that shows it.
 
 ## Regenerate the kernels after a rule or agent change
 
@@ -135,7 +135,7 @@ After each adherence run, append it to the role's `runs` with its `id`, `complet
 
 ## Flip a role to `switched`
 
-Flip only on a run of at least 20 complete pairs that passes the flip rule, with the startup probe read before and after for the role's first request, and with the user's ratification in hand. The amended flip rule awaits that ratification before the next flip; a report states the rule it was scored under. A flip is also a commit of its own: it may not change the eligibility pin.
+Flip only on a run of at least 20 complete pairs that passes the flip rule, with the startup probe read before and after for the role's first request, and with the user's ratification in hand. The amended flip rule was ratified on 2026-10-19; a report states the rule it was scored under. A flip is also a commit of its own: it may not change the eligibility pin.
 
 1. Take both readings with the same profile:
 

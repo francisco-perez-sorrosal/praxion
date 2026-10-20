@@ -19,9 +19,12 @@ a role's convention check named `<role>: it follows the convention its project's
 instruction file states`, as the pilot roles' results files name it; a run's scored
 checks, read from a legacy verdict, are its per-check verdicts not listed as not covered.
 
-Unbound: where this change records a run's scored checks, in the results file and in the
-index entry (`recorded_standing`, `index_scored_checks`), which raise until a binding step
-names the fields.
+Also bound: where this change records a run's scored checks. A results file records, for each
+role it measured, the standing of its whole lineage under the top-level `standing.<role>`
+(`complete_pairs`, `flip`, `scored_checks`), and the index entry lists the same checks under
+`runs.<id>.roles.<role>.scored_checks`. `recorded_standing` and `index_scored_checks` read those
+fields; a file or entry that lacks one fails the call with an assertion naming the file, the run
+and the role.
 """
 
 from __future__ import annotations
@@ -37,10 +40,6 @@ from tests.acceptance.drivers.flip_gate import RESULTS_SUBDIR
 
 INDEX = "index.json"
 CONVENTION_SUFFIX = "it follows the convention its project's instruction file states"
-
-
-class UnboundReadingError(NotImplementedError):
-    """A reading of a field this change adds, which no binding step has named yet."""
 
 
 def convention_check(role: str) -> str:
@@ -186,17 +185,26 @@ class Standing:
 
 def recorded_standing(path: Path, role: str) -> Standing:
     """The lineage standing a results file records for `role` (pairs, flip, scored checks)."""
-    raise UnboundReadingError(
-        "unbound: where a finalized or closed results file records, for a role it measured, "
-        "the standing of its whole lineage (complete pairs, flip label and the checks it "
-        f"scored) is not named yet; asked of {path.name} for {role}"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    standing = document.get("standing") or {}
+    assert role in standing, (
+        f"{path.name} records no standing for {role}: its top-level `standing` "
+        f"{'lists ' + str(sorted(standing)) if standing else 'is absent'}"
+    )
+    recorded = standing[role]
+    missing = [k for k in ("complete_pairs", "flip", "scored_checks") if k not in recorded]
+    assert not missing, f"{path.name} standing for {role} lacks {missing}"
+    return Standing(
+        complete_pairs=recorded["complete_pairs"],
+        flip=recorded["flip"],
+        scored_checks=tuple(recorded["scored_checks"]),
     )
 
 
 def index_scored_checks(root: Path, run_id: str, role: str) -> list[str]:
     """The checks the run index lists as scored for `role` in run `run_id`'s entry."""
-    raise UnboundReadingError(
-        "unbound: the run index entry's list of the checks a run scored for a role, kept "
-        f"beside its complete pairs and flip label, is not named yet; asked of {run_id} "
-        f"for {role}"
+    entry = read_index(root)["runs"][run_id].get("roles", {}).get(role, {})
+    assert "scored_checks" in entry, (
+        f"the run index entry for {run_id} lists no scored_checks for {role}"
     )
+    return list(entry["scored_checks"])

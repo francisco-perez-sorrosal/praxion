@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-20T02:47:10Z'
+generated_at: '2026-10-20T02:49:42Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -634,7 +634,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-16'
+  last_modified: '2026-10-19'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3415,13 +3415,13 @@ surfaces:
   path: .ai-state/decisions/459-flip-rule-point-estimate-calibrated.md
   type: markdown
   title: The lean-spawn flip rule gates on paired point estimates with a calibrated noise allowance, lists every run, and recounts lean-only errors as failures
-  last_modified: '2026-10-16'
+  last_modified: '2026-10-19'
   renderer: adr_card
 - id: ai-state-decisions-460-role-kernels-generated-and-injected
   path: .ai-state/decisions/460-role-kernels-generated-and-injected.md
   type: markdown
   title: Role kernels are generated from one manifest and delivered by definition, spawn hook and Codex wrapper
-  last_modified: '2026-10-16'
+  last_modified: '2026-10-19'
   renderer: adr_card
 - id: ai-state-decisions-461-eligibility-pin-in-gate-implementer-eligible
   path: .ai-state/decisions/461-eligibility-pin-in-gate-implementer-eligible.md
@@ -3439,7 +3439,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-15'
+  last_modified: '2026-10-19'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3507,12 +3507,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-10-02'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.json
-  type: json
-  title: METRICS_REPORT_2026-09-05_06-08-20.json
-  last_modified: '2026-09-05'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.json
   type: json
@@ -3567,12 +3561,12 @@ surfaces:
   title: METRICS_REPORT_2026-10-12_14-30-52.json
   last_modified: '2026-10-12'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-05_06-08-20.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-09-05'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-19_12-13-43.json
+  type: json
+  title: METRICS_REPORT_2026-10-19_12-13-43.json
+  last_modified: '2026-10-19'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.md
   type: markdown
@@ -3626,6 +3620,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-10-12'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-19_12-13-43.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-10-19'
   renderer: default_markdown
 - id: ai-state-specs-spec-adherence-eval-2026-10-12
   path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
@@ -4277,8 +4277,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
-  - ai-state-metrics-reports-metrics-report-2026-09-05-06-08-20
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
@@ -4297,6 +4295,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-10-05-13-41-51
   - ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
   - ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
+  - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
+  - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49

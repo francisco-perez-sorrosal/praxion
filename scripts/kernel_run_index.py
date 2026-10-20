@@ -2,13 +2,14 @@
 
 `.ai-state/eval_ledger/adherence/index.json` has one writer, the adherence eval (every run as it
 finalizes, and its `--reindex`). It names each results file with the sha256 of its bytes, the root
-of the lineage the run belongs to, and per role the complete pairs and the flip label the whole
-lineage reached; every part of a continued run carries its lineage's values, and an index whose
-parts disagree or whose root is not listed is refused. The gate trusts the index only as far as it
-can check it, so `read_adherence` returns the index together with the
-digest of every JSON file beside it, and `Adherence.lineage_of` resolves a run only while its
-file is still there. A run resolves through the lineage the index names, never through a results
-file's own `earlier` listing, which on a continued run's tip holds its own predecessor parts.
+of the lineage the run belongs to, and per role the complete pairs, the flip label the whole
+lineage reached and the checks its verdict scored; every part of a continued run carries its
+lineage's values, and an index whose parts disagree or whose root is not listed is refused, as is
+an index of another schema. The gate trusts the index only as far as it can check it, so
+`read_adherence` returns the index together with the digest of every JSON file beside it, and
+`Adherence.lineage_of` resolves a run only while its file is still there. A run resolves through
+the lineage the index names, never through a results file's own `earlier` listing, which on a
+continued run's tip holds its own predecessor parts.
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ import kernel_model as km
 RESULTS_DIR = ".ai-state/eval_ledger/adherence"
 INDEX_NAME = "index.json"
 INDEX_PATH = f"{RESULTS_DIR}/{INDEX_NAME}"
-INDEX_SCHEMA = 1
+INDEX_SCHEMA = 2
+REINDEX_HINT = "rebuild it with the adherence eval's --reindex"
 Flip = Literal["clear", "not clear", "underpowered"]  # a closed lineage already reads "not clear"
 FLIP_LABELS: tuple[Flip, ...] = get_args(Flip)
 CLEAR: Flip = "clear"
@@ -35,10 +37,12 @@ RESULTS_GLOB = "*.json"
 
 @dataclass(frozen=True)
 class Standing:
-    """What a lineage reached for one role it measured."""
+    """What a lineage reached for one role it measured, and the checks its verdict scored (sorted,
+    unique)."""
 
     complete_pairs: int
     flip: Flip
+    scored_checks: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -103,7 +107,7 @@ def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
     try:
         raw = json.loads(data.decode("utf-8"))
         if raw["schema"] != INDEX_SCHEMA:
-            raise ValueError(f"schema {raw['schema']!r}, not {INDEX_SCHEMA}")
+            raise ValueError(f"schema {raw['schema']!r}, not {INDEX_SCHEMA}; {REINDEX_HINT}")
         entries = {_text(run_id): _entry(row) for run_id, row in _mapping(raw["runs"]).items()}
         _refuse_split_lineages(entries)
         skipped = frozenset(_text(name) for name in _list(raw["skipped"]))
@@ -148,7 +152,14 @@ def _standing(value: Any) -> Standing:
         raise ValueError(f"complete_pairs {pairs!r} is not a count")
     if flip not in FLIP_LABELS:
         raise ValueError(f"flip {flip!r} is none of {', '.join(FLIP_LABELS)}")
-    return Standing(pairs, flip)
+    return Standing(pairs, flip, _scored_checks(value["scored_checks"]))
+
+
+def _scored_checks(value: Any) -> tuple[str, ...]:
+    checks = tuple(_text(name) for name in _list(value))
+    if list(checks) != sorted(set(checks)):
+        raise ValueError(f"scored_checks {list(checks)!r} are not sorted and unique")
+    return checks
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

@@ -1,9 +1,10 @@
 """The run index: what every results file in a directory says, with a digest to check it by.
 
 ``index.json`` sits beside the results files and names each one: its file, the sha256 of its
-bytes, the root of its lineage, how it ended, and per role the complete pairs and the flip label
-the lineage reached. A reader with no eval code (the adoption gate) trusts a file only while its
-digest still matches and cites runs through the index instead of re-deriving verdicts.
+bytes, the root of its lineage, how it ended, and per role the complete pairs, the flip label the
+lineage reached and the checks its verdict scored (sorted; none without per-check verdicts). A
+reader with no eval code (the adoption gate) trusts a file only while its digest still matches and
+cites runs through the index instead of re-deriving verdicts.
 
 The index is derived and has one writer, :func:`write_index`: the runner calls it when a run
 finalizes, ``--close`` calls it, and ``--reindex`` rebuilds it from the files alone. Nothing reads
@@ -29,7 +30,7 @@ from praxion_evals.adherence import results
 from praxion_evals.adherence.model import Assessed, RoleVerdict
 from praxion_evals.adherence.results import RoleStanding, RunResults
 
-INDEX_SCHEMA = 1
+INDEX_SCHEMA = 2
 LEGACY_ENDING = "legacy"  # a file written before runs recorded how they ended
 
 
@@ -101,7 +102,12 @@ def _entry_of(
         "lineage_root": lineage_root,
         "ending": _ending_kind(file.results),
         "roles": {
-            role: {"complete_pairs": s.complete_pairs, "flip": s.flip} for role, s in roles.items()
+            role: {
+                "complete_pairs": s.complete_pairs,
+                "flip": s.flip,
+                "scored_checks": list(s.scored_checks),
+            }
+            for role, s in roles.items()
         },
     }
 

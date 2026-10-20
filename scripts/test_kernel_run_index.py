@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ROLE = "researcher"
 EARLY, PASSING = "20261101T000000Z-early0", "20261102T000000Z-pass00"
 FIRST_PART, LATER_PART = "20261103T000000Z-part01", "20261104T000000Z-part02"
+SCORED = ["C1", "C3"]  # the checks a planted run's verdict scored, as the eval lists them
 
 
 # -- Builders: results files, their index, a switched record citing them ---------------
@@ -51,7 +52,13 @@ def plant(directory_root: Path, *runs: dict, skipped: tuple[str, ...] = ()) -> P
             "sha256": hashlib.sha256(raw).hexdigest(),
             "lineage_root": run["root"],
             "ending": "finished",
-            "roles": {run["role"]: {"complete_pairs": run["pairs"], "flip": run["flip"]}},
+            "roles": {
+                run["role"]: {
+                    "complete_pairs": run["pairs"],
+                    "flip": run["flip"],
+                    "scored_checks": SCORED,
+                }
+            },
         }
     index = {"schema": kri.INDEX_SCHEMA, "runs": entries, "skipped": list(skipped)}
     (directory / kri.INDEX_NAME).write_text(json.dumps(index), encoding="utf-8")
@@ -272,48 +279,65 @@ def test_a_checkout_with_no_results_directory_has_nothing_to_hold(tmp_path: Path
 # -- An index the gate cannot read --------------------------------------------------------
 
 
-def listed_part(root: str, flip: str = "clear") -> dict:
-    roles = {ROLE: {"complete_pairs": 24, "flip": flip}}
+def listed_part(root: str, flip: str = "clear", **standing: object) -> dict:
+    roles = {ROLE: {"complete_pairs": 24, "flip": flip, "scored_checks": SCORED, **standing}}
     return {"file": "r.json", "sha256": "0", "lineage_root": root, "roles": roles}
 
 
-def index_text(runs: dict) -> str:
-    return json.dumps({"schema": kri.INDEX_SCHEMA, "runs": runs, "skipped": []})
+def index_text(runs: dict, schema: int = kri.INDEX_SCHEMA) -> str:
+    return json.dumps({"schema": schema, "runs": runs, "skipped": []})
+
+
+def without_scored_checks() -> dict:
+    part = listed_part(root="r")
+    del part["roles"][ROLE]["scored_checks"]
+    return part
 
 
 @pytest.mark.parametrize(
     "text",
     [
         "{not json",
-        json.dumps({"schema": 2, "runs": {}, "skipped": []}),
-        json.dumps({"schema": 1, "runs": [], "skipped": []}),
-        json.dumps(
-            {
-                "schema": 1,
-                "runs": {"r": {"file": "r.json", "sha256": "0", "lineage_root": "r", "roles": {}}},
-            }
-        ),
-        json.dumps(
-            {
-                "schema": 1,
-                "skipped": [],
-                "runs": {
-                    "r": {
-                        "file": "r.json",
-                        "sha256": "0",
-                        "lineage_root": "r",
-                        "roles": {ROLE: {"complete_pairs": 24, "flip": "passed"}},
-                    }
-                },
-            }
-        ),
+        json.dumps({"schema": 3, "runs": {}, "skipped": []}),
+        json.dumps({"schema": kri.INDEX_SCHEMA, "runs": [], "skipped": []}),
+        json.dumps({"schema": kri.INDEX_SCHEMA, "runs": {"r": listed_part(root="r")}}),
+        index_text({"r": listed_part(root="r", flip="passed")}),
         index_text({"r": listed_part(root="gone")}),
         index_text({"a": listed_part(root="a"), "b": listed_part(root="a", flip="not clear")}),
+        index_text({"a": listed_part(root="a"), "b": listed_part(root="a", scored_checks=[])}),
+        index_text({"r": without_scored_checks()}),
+        index_text({"r": listed_part(root="r", scored_checks="C1")}),
+        index_text({"r": listed_part(root="r", scored_checks=["C1", 3])}),
+        index_text({"r": listed_part(root="r", scored_checks=["C3", "C1"])}),
+        index_text({"r": listed_part(root="r", scored_checks=["C1", "C1"])}),
     ],
 )
 def test_an_index_of_any_other_shape_is_an_input_error_naming_it(text: str) -> None:
     with pytest.raises(km.KernelModelError, match="index.json"):
         kri.parse_index(text.encode("utf-8"))
+
+
+def test_a_schema_one_index_is_unreadable_and_names_reindex() -> None:
+    schema_one = index_text({"r": listed_part(root="r")}, schema=1)
+
+    with pytest.raises(km.KernelModelError, match=r"schema 1, not 2.*--reindex"):
+        kri.parse_index(schema_one.encode("utf-8"))
+
+
+def test_each_role_carries_the_checks_its_verdict_scored() -> None:
+    text = index_text({"r": listed_part(root="r", scored_checks=["C1", "C3"])})
+
+    entries, _ = kri.parse_index(text.encode("utf-8"))
+
+    assert entries["r"].roles[ROLE].scored_checks == ("C1", "C3")
+
+
+def test_a_role_that_scored_no_check_carries_none() -> None:
+    text = index_text({"r": listed_part(root="r", flip="underpowered", scored_checks=[])})
+
+    entries, _ = kri.parse_index(text.encode("utf-8"))
+
+    assert entries["r"].roles[ROLE].scored_checks == ()
 
 
 def test_a_lineage_root_that_is_not_its_own_root_is_refused_naming_the_chain() -> None:

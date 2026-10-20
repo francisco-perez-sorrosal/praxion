@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "runs": {
     "20261014T023850Z-809185": {
       "file": "20261014T023850Z-809185.json",
@@ -9,7 +9,8 @@
       "roles": {
         "researcher": {
           "complete_pairs": 0,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     },
@@ -21,7 +22,8 @@
       "roles": {
         "researcher": {
           "complete_pairs": 0,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     },
@@ -33,7 +35,8 @@
       "roles": {
         "researcher": {
           "complete_pairs": 2,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     },
@@ -45,7 +48,8 @@
       "roles": {
         "researcher": {
           "complete_pairs": 13,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     },
@@ -57,7 +61,17 @@
       "roles": {
         "researcher": {
           "complete_pairs": 24,
-          "flip": "clear"
+          "flip": "clear",
+          "scored_checks": [
+            "C1",
+            "C2",
+            "C3",
+            "C4",
+            "C5",
+            "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content",
+            "researcher: RESEARCH_FINDINGS.md cites the sources it relies on",
+            "researcher: it follows the convention its project's instruction file states"
+          ]
         }
       }
     },
@@ -69,7 +83,17 @@
       "roles": {
         "verifier": {
           "complete_pairs": 24,
-          "flip": "not clear"
+          "flip": "not clear",
+          "scored_checks": [
+            "C1",
+            "C2",
+            "C3",
+            "C4",
+            "C5",
+            "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked",
+            "verifier: it follows the convention its project's instruction file states",
+            "verifier: its behavioral-contract findings use exactly the six canonical tags"
+          ]
         }
       }
     },
@@ -81,7 +105,8 @@
       "roles": {
         "verifier": {
           "complete_pairs": 2,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     },
@@ -93,7 +118,8 @@
       "roles": {
         "context-engineer": {
           "complete_pairs": 3,
-          "flip": "underpowered"
+          "flip": "underpowered",
+          "scored_checks": []
         }
       }
     }

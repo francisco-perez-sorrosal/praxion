@@ -15,7 +15,7 @@ import pytest
 
 from praxion_evals.adherence import cli, report, results, run_index
 from praxion_evals.adherence.lineage import parts_before
-from praxion_evals.adherence.model import Errored
+from praxion_evals.adherence.model import Errored, Measured, Passed
 from praxion_evals.adherence.session_loop import OUTPUT_DIR
 from tests.adherence_run_support import (
     REASON,
@@ -100,8 +100,8 @@ def test_each_role_carries_its_complete_pairs_and_flip_label(tmp_path: Path):
     roles = indexed(tmp_path)["runs"]["run-a"]["roles"]
 
     assert roles == {
-        "researcher": {"complete_pairs": 1, "flip": "clear"},
-        "verifier": {"complete_pairs": 1, "flip": "clear"},
+        "researcher": {"complete_pairs": 1, "flip": "clear", "scored_checks": ["C1", "C3"]},
+        "verifier": {"complete_pairs": 1, "flip": "clear", "scored_checks": ["C1", "C3"]},
     }
 
 
@@ -110,7 +110,19 @@ def test_a_role_short_of_its_declared_pairs_is_underpowered_with_the_pairs_it_ha
 
     roles = indexed(tmp_path)["runs"]["run-a"]["roles"]
 
-    assert roles == {"researcher": {"complete_pairs": 1, "flip": "underpowered"}}
+    assert roles == {
+        "researcher": {"complete_pairs": 1, "flip": "underpowered", "scored_checks": []}
+    }
+
+
+def test_a_check_the_verdict_does_not_cover_is_not_listed_as_scored(tmp_path: Path):
+    only_c1 = Measured({"C1": Passed()}, 1000)
+    sessions = [session("t1", "full", only_c1), session("t1", "lean", only_c1)]
+    write_run(tmp_path, "run-a", sessions)
+
+    roles = indexed(tmp_path)["runs"]["run-a"]["roles"]
+
+    assert roles["researcher"]["scored_checks"] == ["C1"]
 
 
 def test_a_pair_with_an_errored_side_is_not_a_complete_pair(tmp_path: Path):
@@ -135,7 +147,7 @@ def test_every_part_of_a_continued_run_carries_the_pairs_and_label_of_the_whole_
 
     entries = indexed(tmp_path)["runs"]
 
-    whole = {"researcher": {"complete_pairs": 2, "flip": "clear"}}
+    whole = {"researcher": {"complete_pairs": 2, "flip": "clear", "scored_checks": ["C1", "C3"]}}
     assert (entries["part-1"]["roles"], entries["part-2"]["roles"]) == (whole, whole)
 
 
@@ -168,7 +180,9 @@ def test_a_closed_run_is_not_clear_however_its_pairs_read(tmp_path: Path):
     entry = indexed(tmp_path)["runs"]["run-a"]
 
     assert entry["ending"] == "closed"
-    assert entry["roles"] == {"researcher": {"complete_pairs": 1, "flip": "not clear"}}
+    assert entry["roles"] == {
+        "researcher": {"complete_pairs": 1, "flip": "not clear", "scored_checks": ["C1", "C3"]}
+    }
 
 
 def test_a_continued_run_whose_tip_was_closed_is_not_clear_in_every_part(tmp_path: Path):
@@ -225,7 +239,7 @@ def test_two_files_holding_one_run_are_refused(tmp_path: Path):
 
 
 def test_an_empty_directory_has_an_index_of_nothing(tmp_path: Path):
-    assert indexed(tmp_path) == {"schema": 1, "runs": {}, "skipped": []}
+    assert indexed(tmp_path) == {"schema": 2, "runs": {}, "skipped": []}
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +380,11 @@ def test_the_recorded_runs_are_indexed_with_the_pairs_and_labels_the_report_show
 
     for path in recorded_files():
         entry = document["runs"][results.load(path).run.id]
-        assert entry["roles"] == reported_standing(path), path.name
+        figures = {
+            role: {"complete_pairs": s["complete_pairs"], "flip": s["flip"]}
+            for role, s in entry["roles"].items()
+        }
+        assert figures == reported_standing(path), path.name
 
 
 def test_the_researcher_runs_were_indexed_with_zero_zero_two_thirteen_and_twenty_four_pairs():

@@ -14,7 +14,14 @@ import re
 import pytest
 
 from tests.acceptance.drivers import stop_guard
-from tests.acceptance.drivers.step_loop import Step, Work, attempt, record
+from tests.acceptance.drivers.step_loop import (
+    Step,
+    Work,
+    attempt,
+    leave_agent_transcript,
+    new_agent_id,
+    record,
+)
 from tests.acceptance.drivers.stop_guard import (
     END_SHAPES,
     MESSAGE_CAP_BYTES,
@@ -77,20 +84,40 @@ def test_a_held_stop_writes_nothing(tmp_path):
     assert stop_guard.files_and_bytes(task) == before
 
 
-def test_two_qualifying_requests_are_named_one_per_stop(tmp_path):
+def _two_ended_unrecorded(tmp_path):
+    """Two tasks, each with an ended, unrecorded request; the first task's issued first."""
     first = loop(tmp_path, Step("1"))
     second = stop_guard.second_task(first, "loop-task-b", Step("8"))
-    requests = {first.slug: (first, issue(first)), second.slug: (second, issue(second))}
-    ended = {slug: leave_ended_agent(t, r, END_SHAPES[0]) for slug, (t, r) in requests.items()}
+    pairs = [(task, issue(task)) for task in (first, second)]
+    return [
+        (task, request, leave_ended_agent(task, request, END_SHAPES[0])) for task, request in pairs
+    ]
 
-    named_first = fire_stop(first).message
-    (slug_a,) = [s for s, (_, r) in requests.items() if r["id"] in named_first and s in named_first]
-    task_a, request_a = requests[slug_a]
-    stop_guard.record_return(task_a, request_a, ended[slug_a])
-    named_second = fire_stop(first).message
-    (slug_b,) = set(requests) - {slug_a}
 
-    assert stop_guard.record_command(*requests[slug_b], ended[slug_b]) in named_second
+def test_of_two_qualifying_requests_the_oldest_is_named_first_and_the_other_once_it_is_recorded(
+    tmp_path,
+):
+    (older, older_request, older_end), (newer, newer_request, newer_end) = _two_ended_unrecorded(
+        tmp_path
+    )
+
+    named_first = fire_stop(older).message
+    stop_guard.record_return(older, older_request, older_end)
+    named_next = fire_stop(older).message
+
+    assert stop_guard.record_command(older, older_request, older_end) in named_first, named_first
+    assert stop_guard.record_command(newer, newer_request, newer_end) in named_next, named_next
+
+
+def test_a_request_still_unrecorded_is_named_again_on_the_next_stop(tmp_path):
+    (older, older_request, older_end), _ = _two_ended_unrecorded(tmp_path)
+    expected = stop_guard.record_command(older, older_request, older_end)
+
+    first = fire_stop(older).message
+    again = fire_stop(older).message
+
+    assert expected in first, first
+    assert expected in again, again
 
 
 # -- Letting a stop through -------------------------------------------------------------------
@@ -165,6 +192,25 @@ def test_an_input_the_guard_cannot_read_lets_the_stop_through_silently(tmp_path,
     outcome = fire_stop(task, stdin=stdin)
 
     assert outcome.let_through_silently, f"{case}: {outcome.describe()}"
+
+
+def test_an_ended_transcript_holding_an_unparseable_line_lets_the_stop_through(tmp_path):
+    task = loop(tmp_path, Step("1"))
+    request = issue(task)
+    agent_id = new_agent_id()
+    leave_agent_transcript(
+        task,
+        request,
+        agent_id,
+        requests=9,
+        final_text="Done.\n[COMPLETE]",
+        ended=True,
+        readable=False,
+    )
+
+    outcome = fire_stop(task)
+
+    assert outcome.let_through_silently, outcome.describe()
 
 
 def test_an_unreadable_agent_transcript_lets_the_stop_through_silently(tmp_path):

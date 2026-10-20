@@ -27,12 +27,19 @@ DRIVER = r"step_loop\.py"
 REMINDER = r"remind_turn_budget\.py"
 LOOP_TOPIC = r"step[_ -]loop|turn[_ -]budget|_agent_transcript"
 NAMED_PATH = re.compile(r"`([\w./-]+/[\w.-]+\.(?:py|md|json|sh|jsonl))`")
+# The metadata table's dated history of what past checks found on disk: a record of
+# earlier dates, not a description of the loop, so a path it names may since be gone.
+PROVENANCE_ROW = re.compile(r"^\|\s*\*\*Last verified against code\*\*\s*\|")
+
+
+def _lines_describing_the_loop(text: str) -> list[str]:
+    return [line for line in lines_containing(text, LOOP_TOPIC) if not PROVENANCE_ROW.match(line)]
 
 
 def _paths_named_for_the_loop_that_do_not_exist(relative: str) -> list[str]:
     named = {
         path
-        for line in lines_containing(read(relative), LOOP_TOPIC)
+        for line in _lines_describing_the_loop(read(relative))
         for path in NAMED_PATH.findall(line)
     }
     return sorted(path for path in named if not path_of(path).exists())

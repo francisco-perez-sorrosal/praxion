@@ -34,9 +34,9 @@ Activation: fired — honest uncertainty (the brief rates detection 6/10) on a o
 
 ## Decision
 
-1. A new synchronous `Stop` hook, `hooks/guard_step_loop_stop.py`, registered once in `hooks/hooks.json` (`async: false`, timeout 10 s). It is a thin shell: parse stdin; return at once when `stop_hook_active` is true; walk to `.ai-work/`; read each task's `WIP.md` and `ITERATION_LEDGER.jsonl`; when no driver-issued request is outstanding, return with no transcript read and no process started.
+1. A new synchronous `Stop` hook, `hooks/guard_step_loop_stop.py`, registered once in `hooks/hooks.json` (`async: false`, timeout 10 s). It is a thin shell: parse stdin; return at once when `stop_hook_active` is true; find `.ai-work/` at the checkout root, the first ancestor holding a `.git` entry, which is the root `record` derives (going past it would read an outer checkout's loop and print a command `record` rejects); read each task's `WIP.md` and `ITERATION_LEDGER.jsonl` as text; when no request id on a task's `Attempts:` lines is missing from that task's ledger text, return with no transcript read, no import and no process started.
 2. Only past that test it imports a new driver-side module, `scripts/_step_loop_outstanding.py`, which composes the driver's existing readers (`Attempts:` parsing, the ledger reader, the shared transcript reader, `names_request`, `end_evidence`, `end_source`, the observation-log stop row, the declared turn cap) and the driver's record-command composer. There is one definition of "ended" and one of the command: the driver's.
-3. It judges only transcripts under this session's own `subagents/` directory. A transcript with any unparseable line counts as unreadable and passes. It holds only when `end_source` names an end, exactly when `record` would accept the agent.
+3. It judges only transcripts under this session's own `subagents/` directory, and refuses a session id that is not one plain path segment. Before reading, it keeps only files named by an agent id and modified no earlier than the oldest outstanding request's prompt file. A task directory whose name is not a slug yields no request. A transcript ties to a request only when `names_request` names it and its prompt also carries the request's own `Task slug:` line, because request ids restart in every task. A transcript with any unparseable line counts as unreadable and passes. When several transcripts of the session tie to one request and any of them is running, the request is not held. It holds only when `end_source` names an end, so the set it holds is a strict subset of what `record` accepts: it never holds an agent `record` would refuse, and it passes some that `record` would accept (a transcript `record` salvages, an ended agent with a running sibling).
 4. It holds with exit 0 and `{"decision":"block","reason":...}`: one message of at most 600 bytes naming the request, the agent, how it ended and the fully filled record command, for the first held request ordered by issue time (the prompt file's mtime) then slug. It keeps no state.
 5. Any failure (unreadable input, exception, a missing plugin `scripts/` tree) exits 0 with no output: today's behaviour. The step-loop skill's `## Rules` bullet on `record` states the same rule for the orchestrator (a marker is final under an "interim" note; `record` is always safe).
 
@@ -60,7 +60,7 @@ Pros: softer transcript label. Cons: the spec and the acceptance contract define
 
 ## Consequences
 
-- Positive: an ended, unrecorded agent cannot leave the orchestrator idle past one stop; the guard cannot disagree with `record` about whether an agent ended.
+- Positive: an ended, unrecorded agent cannot leave the orchestrator idle past one stop; the guard never holds an agent `record` would refuse as running.
 - Negative: one more synchronous hook on every Stop in every managed project (bounded to two small file reads per task directory outside a loop); a cross-tree import inside the plugin.
 - The hook has no Codex bridge entry, following `remind_calibration` and the orientation hook; the Cursor export carries no hooks.
 

@@ -6,11 +6,12 @@ terminal marker plus the step record is final even under an "interim" notice, so
 held once with the exact `record` call to run.
 
 Fail-open and read-only by construction. Empty, unparseable or non-object input, an input
-that says a stop hook already held this stop, no `.ai-work/`, no issued request, every request
-recorded, an agent still running, any exception: exit 0 with nothing printed. The body writes
-no file and starts no process. The probe (`scripts/_step_loop_outstanding.py`) is imported only
-once a text test of the step records finds an issued request, so a project with no step loop
-pays one directory walk.
+that says a stop hook already held this stop, a session id that is not one plain path segment,
+no checkout or no `.ai-work/` in it, no issued request, every request recorded, an agent still
+running, any exception: exit 0 with nothing printed. The body writes no file and starts no
+process. The probe (`scripts/_step_loop_outstanding.py`) is imported only once a text test finds
+an issued request its task's iteration ledger does not name, so a project with no step loop
+pays one directory walk and a loop whose requests are all recorded imports nothing.
 
 Synchronous (`async: false`, a held stop needs the verdict before the turn ends), registered
 once under `Stop` in `hooks/hooks.json`.
@@ -26,7 +27,10 @@ import sys
 from pathlib import Path
 
 MESSAGE_PREFIX = "[step-loop-guard]"
-MAX_MESSAGE_BYTES = 600  # the cap of the held message; the one command in it is not trimmed
+# The cap of the held message. The one command in it is never trimmed, so the bound holds only
+# for a slug of at most 64 characters (the probe skips longer task names) and the request and
+# agent ids the driver and the harness issue.
+MAX_MESSAGE_BYTES = 600
 RULE = (
     'A terminal marker plus the step record is final even under an "interim" notice, '
     "and `record` refuses a running agent, so run it now rather than wait."
@@ -35,7 +39,10 @@ RULE = (
 WORK_DIR = ".ai-work"
 WIP_DOC = "WIP.md"
 # A step the driver issued: its `Attempts:` line names the request (`_loop_fields` owns the grammar).
-ISSUED_REQUEST_LINE = re.compile(r"Attempts\W*:.*\brequest=")
+ISSUED_REQUEST = re.compile(r"Attempts\W*:.*?\brequest=([A-Za-z0-9_-]+)")
+LEDGER_FILE = "ITERATION_LEDGER.jsonl"
+GIT_ENTRY = ".git"  # a directory in a checkout, a file in a linked worktree
+SESSION_ID = re.compile(r"[A-Za-z0-9_-]+")
 
 # Cross-file obligation: the form the driver prints for its own commands
 # (`SCRIPT` and `SELF_HOST_INVOCATION` in `scripts/_step_loop_cli.py`, pinned equal by this
@@ -81,28 +88,48 @@ def _parse_stop(raw: str) -> dict | None:
 
 
 def _find_work_root() -> Path | None:
-    """`.ai-work/` found by walking up from the working directory (as the orientation hook does)."""
+    """The `.ai-work/` of the checkout the working directory is in, else None.
+
+    A walk-up of its own, not the orientation hook's: that one stops at the nearest `.ai-work/`,
+    this one at the first ancestor holding a `.git` entry, the checkout `record` derives its root
+    from. Crossing that boundary would read an outer checkout's loop and print a command `record`
+    rejects from here.
+    """
     here = Path.cwd()
-    return next(
-        (parent / WORK_DIR for parent in (here, *here.parents) if (parent / WORK_DIR).is_dir()),
-        None,
-    )
+    checkout = next((p for p in (here, *here.parents) if (p / GIT_ENTRY).exists()), None)
+    if checkout is None or not (checkout / WORK_DIR).is_dir():
+        return None
+    return checkout / WORK_DIR
 
 
 def _any_request_issued(work_root: Path) -> bool:
-    """True when some task's step record has an `Attempts:` line naming a request."""
+    """True when some task issued a request its iteration ledger does not name (a text test)."""
     try:
-        records = [task / WIP_DOC for task in work_root.iterdir() if task.is_dir()]
+        tasks = [task for task in work_root.iterdir() if task.is_dir()]
     except OSError:
         return False
-    return any(_names_a_request(record) for record in records)
+    return any(_has_unrecorded_request(task) for task in tasks)
 
 
-def _names_a_request(record: Path) -> bool:
+def _has_unrecorded_request(task: Path) -> bool:
+    """A request id on the task's `Attempts:` lines that its ledger's text does not contain; a
+    missing or unreadable ledger contains none. A plain substring test, no JSON parse."""
     try:
-        return ISSUED_REQUEST_LINE.search(record.read_text(encoding="utf-8")) is not None
+        record = (task / WIP_DOC).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
+    issued = ISSUED_REQUEST.findall(record)
+    if not issued:
+        return False
+    ledger = _ledger_text(task)
+    return any(request not in ledger for request in issued)
+
+
+def _ledger_text(task: Path) -> str:
+    try:
+        return (task / LEDGER_FILE).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
 
 
 # --- Has its agent ended? -------------------------------------------------------------------
@@ -111,9 +138,9 @@ def _names_a_request(record: Path) -> bool:
 def _subagents_dir(stop: dict) -> Path | None:
     """Where the harness leaves this session's agent transcripts, beside the main transcript."""
     transcript, session = stop.get("transcript_path"), stop.get("session_id")
-    if not (isinstance(transcript, str) and transcript and isinstance(session, str) and session):
+    if not (isinstance(transcript, str) and transcript and isinstance(session, str)):
         return None
-    if Path(session).name != session:  # an id is one path segment
+    if not SESSION_ID.fullmatch(session):  # one plain path segment: never "", ".", ".." or a path
         return None
     return Path(transcript).parent / session / "subagents"
 

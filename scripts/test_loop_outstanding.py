@@ -31,7 +31,13 @@ REQUEST, SLUG, STEP = "s2-a1-implement", "demo", "2"
 SESSION, AGENT = "sess-1", "a1b2c3"
 MAX_TURNS = 3
 INVOCATION = Invocation("step-loop")
-SPAWN_PROMPT = f"Task slug: {SLUG}\nSpawn request: {REQUEST}\nRead PROMPT_{REQUEST}.md first."
+
+
+def prompt_of(slug: str) -> str:
+    return f"Task slug: {slug}\nSpawn request: {REQUEST}\nRead PROMPT_{REQUEST}.md first."
+
+
+SPAWN_PROMPT = prompt_of(SLUG)
 
 
 def user(text: str) -> dict:
@@ -58,6 +64,17 @@ MARKED = [
 UNMARKED = [user(SPAWN_PROMPT), assistant("r1", call("Edit")), assistant("r2", say("all done"))]
 CAPPED = [user(SPAWN_PROMPT), *(assistant(f"r{n}", call("Edit")) for n in range(MAX_TURNS))]
 RUNNING = [user(SPAWN_PROMPT), assistant("r1", say("working"), call("Bash"))]
+
+
+def ended_of(slug: str) -> list[dict]:
+    """The transcript of an agent of task `slug` that ended with a marker."""
+    return [user(prompt_of(slug)), *MARKED[1:]]
+
+
+def running_of(slug: str) -> list[dict]:
+    return [user(prompt_of(slug)), *RUNNING[1:]]
+
+
 HELD_FIXTURES = {"marker": MARKED, "final-text": UNMARKED, "turn-cap": CAPPED}
 
 
@@ -70,6 +87,7 @@ class World:
         self.subagents = root / "config" / "projects" / "p" / SESSION / "subagents"
         self.subagents.mkdir(parents=True)
         self.stopped: set[str] = set()
+        self.wal_roots: list[Path] = []
 
     def issue(
         self, request: str = REQUEST, *, slug: str = SLUG, step: str = STEP, at: float = 100.0
@@ -126,11 +144,14 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     built = World(tmp_path)
     monkeypatch.setattr(record, "AGENTS_DIR", agents)
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "config"))
-    monkeypatch.setattr(
-        files,
-        "session_wal_rows",
-        lambda root: [{"event_type": "agent_stop", "agent_id": a} for a in built.stopped],
-    )
+
+    def wal_rows(root: Path) -> list[dict]:
+        built.wal_roots.append(root)
+        if root != built.root:  # the one log of this world sits at the root of its checkout
+            return []
+        return [{"event_type": "agent_stop", "agent_id": a} for a in built.stopped]
+
+    monkeypatch.setattr(files, "session_wal_rows", wal_rows)
     return built
 
 
@@ -269,7 +290,8 @@ def test_an_absent_work_root_yields_nothing(tmp_path: Path) -> None:
 def test_two_qualifying_requests_come_back_oldest_issued_first(world: World) -> None:
     world.issue(slug="zeta", at=100.0)
     world.issue(slug="alpha", at=200.0)
-    world.put(MARKED)
+    world.put(ended_of("zeta"), agent="a1")
+    world.put(ended_of("alpha"), agent="a2")
 
     assert [h.outstanding.slug for h in world.held()] == ["zeta", "alpha"]
 
@@ -277,9 +299,82 @@ def test_two_qualifying_requests_come_back_oldest_issued_first(world: World) -> 
 def test_requests_issued_together_break_the_tie_by_task_slug(world: World) -> None:
     world.issue(slug="beta", at=100.0)
     world.issue(slug="alpha", at=100.0)
-    world.put(MARKED)
+    world.put(ended_of("beta"), agent="a1")
+    world.put(ended_of("alpha"), agent="a2")
 
     assert [h.outstanding.slug for h in world.held()] == ["alpha", "beta"]
+
+
+# --- Which task, which agent ---------------------------------------------------------------
+
+
+def test_two_tasks_issuing_one_request_id_hold_only_the_task_whose_agent_ended(
+    world: World,
+) -> None:
+    world.issue(slug="alpha", at=100.0)
+    world.issue(slug="beta", at=200.0)
+    world.put(running_of("alpha"), agent="a1")
+    world.put(ended_of("beta"), agent="b2")
+
+    held = world.held()
+
+    assert [(h.outstanding.slug, h.agent_id) for h in held] == [("beta", "b2")]
+
+
+def test_a_request_with_one_agent_ended_and_one_running_is_not_held(world: World) -> None:
+    world.issue()
+    world.put(ended_of(SLUG), agent="a1")
+    world.put(running_of(SLUG), agent="b2")
+
+    assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("running")])
+
+
+def test_a_transcript_that_names_the_request_but_not_the_task_is_not_tied_to_it(
+    world: World,
+) -> None:
+    world.issue()
+    world.put(ended_of("other-task"))
+
+    assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("no-transcript-in-session")])
+
+
+def test_a_task_directory_whose_name_is_not_a_slug_yields_no_request(world: World) -> None:
+    world.issue(slug="x;cmd")
+    world.issue(slug="s" * 65)
+    world.put(ended_of("x;cmd"))
+
+    assert (probe.outstanding_requests(world.work), world.held()) == ((), ())
+
+
+def test_a_transcript_last_modified_before_the_request_was_issued_is_not_read(
+    world: World,
+) -> None:
+    world.issue(at=100.0)
+    path = world.put(MARKED)
+    os.utime(path, (50.0, 50.0))
+
+    assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("no-transcript-in-session")])
+
+
+def test_a_request_whose_prompt_file_is_gone_keeps_every_transcript(world: World) -> None:
+    task = world.issue(at=100.0)
+    (task / f"PROMPT_{REQUEST}.md").unlink()
+    os.utime(world.put(MARKED), (50.0, 50.0))
+
+    assert [h.agent_id for h in world.held()] == [AGENT]
+
+
+# --- The observation log -------------------------------------------------------------------
+
+
+def test_the_observation_log_is_read_at_the_root_that_holds_the_work_root(world: World) -> None:
+    world.issue()
+    world.put(RUNNING)
+    world.stopped.add(AGENT)
+
+    (held,) = world.held()
+
+    assert (held.agent_id, world.wal_roots) == (AGENT, [world.work.parent])
 
 
 # --- The command ---------------------------------------------------------------------------

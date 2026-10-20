@@ -10,12 +10,19 @@ keeping a second reading:
   `WIP.md` or ledger cannot be read yields no request: a guard that cannot look lets the stop
   through.
 * **Held**: an agent transcript of this session (`subagents_dir`) that `names_request` ties to
-  the request and that `end_source` reads as ended: the predicate `record` accepts an agent by.
-  The transcript must be a clean `Read`; a line that does not parse makes it `NotHeld`, where
-  `record` would salvage the lines that do. The command to run is built by the driver's own
-  `Invocation`, never retyped.
+  the request, whose prompt also carries the `Task slug:` line of the request's own task (request
+  ids restart in every task), and that `end_source` reads as ended: the predicate `record` accepts
+  an agent by, tightened. The transcript must be a clean `Read`; a line that does not parse makes
+  it `NotHeld`, where `record` would salvage the lines that do. When several transcripts of the
+  session are tied to one request and any of them is running, the request is `NotHeld`. The
+  command to run is built by the driver's own `Invocation`, never retyped. A task directory whose
+  name is not a slug is skipped, so a `Held` never carries one.
 
-The observation log is read from `work_root`'s parent: `.ai-work/` sits at the repository root.
+The observation log is read from `work_root`'s parent, and that is the root `record` reads: it
+takes `.ai-work/` at the top level of the checkout, which is where the Stop guard looks for
+`work_root` (its walk-up stops at the first ancestor holding a `.git` entry). A caller whose
+`work_root` is not at its checkout's root breaks that equality. Transcripts older than the oldest
+outstanding request's prompt file, and files whose names are not agent ids, are never read.
 Stdlib-only and 3.9-safe at runtime.
 """
 
@@ -52,6 +59,9 @@ from iteration_ledger import read_ledger  # noqa: E402
 WIP_FILE = "WIP.md"
 REVIEWER_AGENT, WORKER_AGENT = "praxion:verifier", "praxion:implementer"
 NEVER_ISSUED = float("-inf")  # a request whose prompt file is gone sorts as the oldest
+# The shape `_goal_scaffold._SLUG_RE` accepts for a task slug, bounded: the Stop guard prints the
+# slug into a command the model runs, so a directory name outside it is no task.
+_SLUG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 # The ids `hooks/_agent_transcript.locate` accepts: any other file is one `record` cannot find.
 _AGENT_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 _TRANSCRIPT_PREFIX, _TRANSCRIPT_GLOBS = "agent-", ("agent-*.jsonl", "workflows/*/agent-*.jsonl")
@@ -89,6 +99,7 @@ class NotHeld:
 
 
 Verdict = Union[Held, NotHeld]  # noqa: UP007 -- runtime value, 3.9 floor
+RUNNING = NotHeld("running")
 
 
 @dataclass(frozen=True)
@@ -116,7 +127,7 @@ def judge_outstanding(
     outstanding = outstanding_requests(work_root)
     if not outstanding:
         return ()
-    transcripts = _load_transcripts(subagents_dir)
+    transcripts = _load_transcripts(subagents_dir, min(o.issued_at for o in outstanding))
     repo_root = work_root.parent
     return tuple((o, _judge(o, transcripts, repo_root, invocation)) for o in outstanding)
 
@@ -125,7 +136,9 @@ def outstanding_requests(work_root: Path) -> tuple[Outstanding, ...]:
     """The requests every task under `work_root` issued and the ledger does not record, oldest
     issued first, ties by task slug."""
     try:
-        tasks = sorted(path for path in work_root.iterdir() if path.is_dir())
+        tasks = sorted(
+            path for path in work_root.iterdir() if _SLUG_RE.fullmatch(path.name) and path.is_dir()
+        )
     except OSError:
         return ()
     found = [request for task in tasks for request in _outstanding_of(task)]
@@ -147,8 +160,12 @@ def _outstanding_of(task: Path) -> Iterator[Outstanding]:
 
 
 def _issued_at(task: Path, request: str) -> float:
+    return _mtime(task / f"{PROMPT_STEM}_{request}{PROMPT_SUFFIX}")
+
+
+def _mtime(path: Path) -> float:
     try:
-        return (task / f"{PROMPT_STEM}_{request}{PROMPT_SUFFIX}").stat().st_mtime
+        return path.stat().st_mtime
     except OSError:
         return NEVER_ISSUED
 
@@ -156,19 +173,25 @@ def _issued_at(task: Path, request: str) -> float:
 # --- The transcripts of the session --------------------------------------------------------
 
 
-def _load_transcripts(subagents_dir: Path) -> tuple[_Transcript, ...]:
+def _load_transcripts(subagents_dir: Path, since: float) -> tuple[_Transcript, ...]:
+    """The session's transcripts written at or after `since` under an agent id, each read once."""
     paths = sorted({path for glob in _TRANSCRIPT_GLOBS for path in subagents_dir.glob(glob)})
-    loaded = (_load(path) for path in paths)
-    return tuple(t for t in loaded if _AGENT_ID_RE.fullmatch(t.agent_id))
+    candidates = [path for path in paths if _AGENT_ID_RE.fullmatch(_agent_id_of(path))]
+    return tuple(_load(path) for path in candidates if _mtime(path) >= since)
+
+
+def _agent_id_of(path: Path) -> str:
+    return path.stem[len(_TRANSCRIPT_PREFIX) :]
 
 
 def _load(path: Path) -> _Transcript:
-    agent_id = path.stem[len(_TRANSCRIPT_PREFIX) :]
+    agent_id = _agent_id_of(path)
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return _Transcript(agent_id, Unreadable(lines_ok=0, last_ok=False), "")
-    return _Transcript(agent_id, parse_transcript(text), text)
+    reading = parse_transcript(text)
+    return _Transcript(agent_id, reading, text if isinstance(reading, Unreadable) else "")
 
 
 # --- The verdict -----------------------------------------------------------------------------
@@ -180,15 +203,16 @@ def _judge(
     repo_root: Path,
     invocation: Invocation,
 ) -> Verdict:
-    """Held when any transcript tied to the request shows its agent ended; else the reason."""
+    """Held when a transcript tied to the request shows its agent ended and no other agent tied
+    to it is running; else the reason."""
     max_turns = declared_max_turns(_agent_type(outstanding.request))
     verdicts = [
         _judge_transcript(outstanding, t, max_turns, repo_root, invocation) for t in transcripts
     ]
     related = [verdict for verdict in verdicts if verdict is not None]
     held = next((verdict for verdict in related if isinstance(verdict, Held)), None)
-    if held is not None:
-        return held
+    if held is not None:  # a reissued request has two agents; one ending says nothing of the other
+        return RUNNING if len(related) > 1 and RUNNING in related else held
     reasons = {verdict.reason for verdict in related if isinstance(verdict, NotHeld)}
     reason = next((r for r in _REASON_PRECEDENCE if r in reasons), "no-transcript-in-session")
     return NotHeld(reason)
@@ -204,8 +228,8 @@ def _judge_transcript(
     """One transcript's verdict on the request, `None` when it is not about it."""
     reading, request = transcript.reading, outstanding.request
     if isinstance(reading, Unreadable):  # it cannot be tied to a request; its bytes can mention one
-        return NotHeld("unreadable") if _mentions(transcript.text, request) else None
-    if not names_request(reading, request):
+        return NotHeld("unreadable") if _mentions(transcript.text, outstanding) else None
+    if not (names_request(reading, request) and _names_task(reading, outstanding.slug)):
         return None
     if not isinstance(reading, Read) or reading.malformed:
         return NotHeld("unreadable")
@@ -213,7 +237,7 @@ def _judge_transcript(
     if end_source(evidence) is None:  # the observation log is read only for an agent still silent
         evidence = end_evidence(reading, max_turns, agent_stopped(repo_root, transcript.agent_id))
     if end_source(evidence) is None:
-        return NotHeld("running")
+        return RUNNING
     marker = parse_marker(evidence.final_text)
     command = invocation.command(
         "record",
@@ -234,5 +258,21 @@ def _agent_type(request: str) -> str:
     return REVIEWER_AGENT if key is not None and key.kind == "review" else WORKER_AGENT
 
 
-def _mentions(text: str, request: str) -> bool:
-    return re.search(rf"Spawn request: {re.escape(request)}(?![a-z0-9-])", text) is not None
+def _names_task(reading: TranscriptReading, slug: str) -> bool:
+    """The agent's first user message carries the `Task slug:` line of the request's own task."""
+    return (
+        isinstance(reading, Read) and _task_line(slug).search(reading.first_user_text) is not None
+    )
+
+
+def _mentions(text: str, outstanding: Outstanding) -> bool:
+    """Raw transcript bytes name the request and its task: all an unparseable file can say."""
+    request = rf"Spawn request: {re.escape(outstanding.request)}(?![a-z0-9-])"
+    return (
+        re.search(request, text) is not None
+        and _task_line(outstanding.slug).search(text) is not None
+    )
+
+
+def _task_line(slug: str) -> re.Pattern[str]:
+    return re.compile(rf"Task slug: {re.escape(slug)}(?![A-Za-z0-9_-])")

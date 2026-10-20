@@ -9,9 +9,11 @@ stop against a real driver-issued loop are the acceptance tests'.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -43,6 +45,55 @@ def _held(slug="loop-task", request="s3-a1-implement", agent_id="a" * 17, marker
         f"--agent-id {agent_id} --marker {marker}"
     )
     return Held(Outstanding(slug, STEP_ID, request, 0.0), agent_id, marker, command)
+
+
+REQUEST = "s3-a1-implement"
+AGENT = "a" * 17
+SESSION = "sess"
+
+
+def _agent_lines(slug: str) -> str:
+    """An ended agent's transcript: the driver's prompt for `slug`, then a marked final text."""
+    prompt = f"Task slug: {slug}\nSpawn request: {REQUEST}\nRead PROMPT_{REQUEST}.md first."
+    final = {"type": "text", "text": "done\n[COMPLETE]"}
+    records = [
+        {"type": "user", "message": {"content": prompt}},
+        {"type": "assistant", "requestId": "r1", "message": {"content": [final]}},
+    ]
+    return "".join(json.dumps(record) + "\n" for record in records)
+
+
+def _issue(checkout: Path, slug: str, issued_at: float, *, recorded: bool = False) -> Path:
+    """A task of the loop under `checkout`: its step record, prompt file and, if asked, ledger."""
+    task = checkout / ".ai-work" / slug
+    task.mkdir(parents=True)
+    (task / "WIP.md").write_text(f"# WIP\n\n{_attempts(REQUEST)}", encoding="utf-8")
+    prompt = task / f"PROMPT_{REQUEST}.md"
+    prompt.write_text("prompt\n", encoding="utf-8")
+    os.utime(prompt, (issued_at, issued_at))
+    if recorded:
+        (task / "ITERATION_LEDGER.jsonl").write_text(f'{{"request": "{REQUEST}"}}\n')
+    return task
+
+
+def _stop(checkout: Path, slug: str | None, session: str = SESSION) -> dict:
+    """The Stop input of a session whose one ended agent worked for task `slug` (None: no agent)."""
+    config = checkout / "cfg"
+    subagents = config / session / "subagents"
+    subagents.mkdir(parents=True, exist_ok=True)
+    if slug is not None:
+        (subagents / f"agent-{AGENT}.jsonl").write_text(_agent_lines(slug), encoding="utf-8")
+    return {"session_id": session, "transcript_path": str(config / f"{SESSION}.jsonl")}
+
+
+def _checkout(path: Path) -> Path:
+    (path / ".git").mkdir(parents=True)
+    return path
+
+
+def _hold_from(stop: dict, cwd: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    monkeypatch.chdir(cwd)
+    return guard._hold_message(json.dumps(stop))
 
 
 def _sentences(message: str) -> list[str]:
@@ -153,9 +204,20 @@ def test_an_unreadable_step_record_marks_no_loop(tmp_path):
         {"transcript_path": "/t/sess.jsonl"},
         {"session_id": "", "transcript_path": "/t/sess.jsonl"},
         {"session_id": "../x", "transcript_path": "/t/sess.jsonl"},
+        {"session_id": ".", "transcript_path": "/t/sess.jsonl"},
+        {"session_id": "..", "transcript_path": "/t/sess.jsonl"},
         {"session_id": 7, "transcript_path": "/t/sess.jsonl"},
     ],
-    ids=["empty", "no transcript", "no session", "empty id", "path-like id", "non-string id"],
+    ids=[
+        "empty",
+        "no transcript",
+        "no session",
+        "empty id",
+        "path-like id",
+        "dot id",
+        "dot-dot id",
+        "non-string id",
+    ],
 )
 def test_a_stop_that_does_not_locate_its_session_has_no_agent_transcripts_to_read(stop):
     assert guard._subagents_dir(stop) is None
@@ -165,6 +227,116 @@ def test_the_session_directory_sits_beside_the_main_transcript():
     stop = {"session_id": "sess", "transcript_path": "/cfg/projects/p/sess.jsonl"}
 
     assert guard._subagents_dir(stop) == Path("/cfg/projects/p/sess/subagents")
+
+
+# -- Holding a stop for the right task, in the right checkout -------------------------------
+
+
+def test_an_ended_agent_of_the_loop_holds_the_stop_with_its_own_task_and_agent(
+    tmp_path, monkeypatch
+):
+    checkout = _checkout(tmp_path)
+    _issue(checkout, "loop-task", 100.0)
+
+    message = _hold_from(_stop(checkout, "loop-task"), checkout, monkeypatch)
+
+    assert f"record loop-task --request {REQUEST} --agent-id {AGENT}" in message
+
+
+def test_a_stale_task_sharing_a_request_id_is_never_held_with_the_current_agent(
+    tmp_path, monkeypatch
+):
+    checkout = _checkout(tmp_path)
+    _issue(checkout, "stale-task", 100.0)
+    _issue(checkout, "current-task", 200.0)
+
+    message = _hold_from(_stop(checkout, "current-task"), checkout, monkeypatch)
+
+    assert f"record current-task --request {REQUEST} --agent-id {AGENT}" in message
+    assert "stale-task" not in message
+
+
+def test_a_nested_checkout_does_not_reach_the_outer_checkouts_loop(tmp_path, monkeypatch):
+    outer = _checkout(tmp_path)
+    _issue(outer, "loop-task", 100.0)
+    stop = _stop(outer, "loop-task")
+    nested = outer / ".claude" / "worktrees" / "w"
+    (nested / "sub").mkdir(parents=True)
+    (nested / ".git").write_text("gitdir: ../../../.git/worktrees/w\n", encoding="utf-8")
+
+    assert _hold_from(stop, outer, monkeypatch)
+    assert _hold_from(stop, nested / "sub", monkeypatch) == ""
+
+
+def test_no_checkout_above_the_working_directory_lets_the_stop_through(tmp_path, monkeypatch):
+    _issue(tmp_path, "loop-task", 100.0)
+    stop = _stop(tmp_path, "loop-task")
+
+    assert _hold_from(stop, tmp_path, monkeypatch) == ""
+
+
+@pytest.mark.parametrize("session", [".", ".."])
+def test_a_session_id_that_is_not_a_plain_segment_lets_the_stop_through(
+    session, tmp_path, monkeypatch
+):
+    checkout = _checkout(tmp_path)
+    _issue(checkout, "loop-task", 100.0)
+
+    clean = _hold_from(_stop(checkout, "loop-task"), checkout, monkeypatch)
+    dotted = _hold_from(_stop(checkout, "loop-task", session), checkout, monkeypatch)
+
+    assert (bool(clean), dotted) == (True, "")
+
+
+def test_a_request_the_ledger_records_marks_no_loop_in_play(tmp_path):
+    _issue(tmp_path, "task", 100.0, recorded=True)
+
+    assert not guard._any_request_issued(tmp_path / ".ai-work")
+
+
+def test_a_request_absent_from_the_ledger_marks_a_loop_in_play(tmp_path):
+    task = _issue(tmp_path, "task", 100.0, recorded=True)
+    (task / "WIP.md").write_text(_attempts("s9-a1-implement"), encoding="utf-8")
+
+    assert guard._any_request_issued(tmp_path / ".ai-work")
+
+
+# The probe is imported only past the text test, so the check needs an interpreter that has
+# not yet imported it: this process's tests import it at the top of the file.
+_PROBE_LOADED = textwrap.dedent(
+    """
+    import json, sys
+    sys.path.insert(0, sys.argv[1])
+    import guard_step_loop_stop as guard
+    guard._hold_message(sys.argv[2])
+    print("_step_loop_outstanding" in sys.modules)
+    """
+)
+
+
+def _probe_loaded_after_a_stop(checkout: Path, stop: dict) -> bool:
+    own_tree = {k: v for k, v in os.environ.items() if k != "CLAUDE_PLUGIN_ROOT"}
+    result = subprocess.run(
+        [sys.executable, "-c", _PROBE_LOADED, str(HOOKS_DIR), json.dumps(stop)],
+        capture_output=True,
+        text=True,
+        env=own_tree,
+        cwd=checkout,
+        timeout=30,
+        check=True,
+    )
+    return result.stdout.strip() == "True"
+
+
+def test_a_loop_whose_requests_are_all_recorded_imports_no_probe(tmp_path):
+    checkout = _checkout(tmp_path / "recorded")
+    _issue(checkout, "loop-task", 100.0, recorded=True)
+    control = _checkout(tmp_path / "unrecorded")
+    _issue(control, "loop-task", 100.0)
+
+    loaded = [_probe_loaded_after_a_stop(c, _stop(c, "loop-task")) for c in (checkout, control)]
+
+    assert loaded == [False, True]
 
 
 # -- Failing open ----------------------------------------------------------------------------
@@ -191,9 +363,7 @@ def test_a_held_stop_prints_one_block_decision(monkeypatch, capsys):
 
 
 def test_the_hook_started_as_the_harness_starts_it_prints_nothing_when_nothing_is_held(tmp_path):
-    task = tmp_path / ".ai-work" / "task"
-    task.mkdir(parents=True)
-    (task / "WIP.md").write_text(_attempts(), encoding="utf-8")
+    _issue(_checkout(tmp_path), "task", 100.0)
     stop = {
         "session_id": "sess",
         "transcript_path": str(tmp_path / "cfg" / "sess.jsonl"),

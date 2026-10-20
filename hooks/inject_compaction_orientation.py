@@ -29,6 +29,17 @@ Behavior contract:
   directive-bearing step title is reduced to its bare identifier. So the same
   text is correct in a main window and in a subagent window.
 
+Loop mode: when the newest task is under the step-loop driver (its `WIP.md` names a
+driver-issued request, or it has an `ITERATION_LEDGER.jsonl`), the step record's
+current-step and next-action lines are stale by construction, so the block reports the
+driver's own position instead, read from its read-only `status --json`. An unreadable
+position is said to be unreadable and names the status command; it never falls back to
+the stale lines. Outside a loop the block is unchanged byte for byte and no process
+starts. Loop mode narrows the role-neutral clause of dec-387: the block now names the
+driver's record command for an outstanding request, attributed to the driver and with its
+placeholders kept. The command is harmless in a subagent window, where `record` refuses a
+running agent.
+
 Synchronous hook (``async: false`` -- an async hook drops ``additionalContext``
 delivery), registered on ``SessionStart`` with ``matcher: "compact"``. Exit 0
 unconditionally: a broken hook must never block or corrupt a post-compaction
@@ -39,7 +50,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 # The `.ai-work/` walk-up is the same one the pre-compaction snapshot performs;
@@ -82,6 +96,19 @@ ORCHESTRATION_VERBS = ("spawn", "proceed to verification", "commit")
 TITLE_SEPARATORS = (":", "—")
 TITLE_WITHHELD_MARKER = "(title withheld: contains a directive)"
 
+# -- Loop mode ----------------------------------------------------------------
+
+ITERATION_LEDGER = "ITERATION_LEDGER.jsonl"
+DRIVER_REQUEST_LINE = re.compile(r"^\s*-\s*Attempts:.*\brequest=", re.MULTILINE)
+
+# The driver's own relative path; the plugin root is `CLAUDE_PLUGIN_ROOT`, else this tree.
+DRIVER_RELATIVE = Path("scripts") / "step_loop.py"
+STATUS_TIMEOUT_SECONDS = 6  # under the hook's registered 10 s
+
+# Mirrors `ATTEMPT_CAP` in scripts/_loop_fields.py (the status object does not carry the
+# cap); a parity test in test_orientation_loop_mode.py keeps the two equal.
+ATTEMPT_CAP = 2
+
 
 # -- Composition ---------------------------------------------------------------
 
@@ -94,6 +121,8 @@ def _compose_orientation(ai_work: Path) -> str:
 
     task_dir = _newest(task_dirs)
     wip_text = (task_dir / WIP_DOC).read_text(encoding="utf-8")
+    if _under_the_driver(task_dir, wip_text):
+        return _compose_loop_orientation(ai_work, task_dirs, task_dir)
     current_step = _current_step(wip_text)
     if not current_step:
         return ""
@@ -110,11 +139,24 @@ def _compose_orientation(ai_work: Path) -> str:
     if next_action_line:
         lines.append(next_action_line)
 
-    others = [other.name for other in task_dirs if other != task_dir]
-    if others:
-        lines.append(f"Other pipelines in .ai-work/: {', '.join(others)}")
+    lines.extend(_other_pipelines_lines(task_dirs, task_dir))
 
     return _truncate("\n".join(lines))
+
+
+def _compose_loop_orientation(ai_work: Path, task_dirs: list[Path], task_dir: Path) -> str:
+    """The block for a task under the driver: its position, never the step record's."""
+    lines = [HEADER, "", f"Task slug: {task_dir.name}"]
+    lines.extend(_pointer_lines(task_dir))
+    lines.extend(_position_lines(task_dir.name, ai_work.parent))
+    lines.extend(_other_pipelines_lines(task_dirs, task_dir))
+    return _truncate("\n".join(lines))
+
+
+def _other_pipelines_lines(task_dirs: list[Path], task_dir: Path) -> list[str]:
+    """The other pipelines, named by slug only."""
+    others = [other.name for other in task_dirs if other != task_dir]
+    return [f"Other pipelines in .ai-work/: {', '.join(others)}"] if others else []
 
 
 def _pointer_lines(task_dir: Path) -> list[str]:
@@ -195,6 +237,112 @@ def _truncate(block: str) -> str:
         return block
     budget = MAX_CONTEXT_BYTES - len(TRUNCATION_MARKER.encode("utf-8"))
     return encoded[:budget].decode("utf-8", errors="ignore") + TRUNCATION_MARKER
+
+
+# -- The driver's position ------------------------------------------------------
+
+
+STOPPED_OUTCOMES = ("needs-human", "budget-exhausted")
+
+
+@dataclass(frozen=True)
+class DriverPosition:
+    """What `status --json` says, parsed once at the boundary; the rest trusts it."""
+
+    outcome: str
+    step: str | None
+    verdict: str
+    attempts: int
+    used: int
+    budget: int
+    cause: str | None
+    request: str | None
+    then: str | None
+
+    @classmethod
+    def parse(cls, doc: object) -> DriverPosition:
+        """Raise on any shape the driver does not print; the caller maps that to unreadable."""
+        if not isinstance(doc, dict):
+            raise TypeError("status --json is not an object")
+        step_id = doc["selected_step"]
+        row = next((r for r in doc["steps"] if r["step"] == step_id), None)
+        stop = doc["stop"]
+        position = cls(
+            outcome=str(doc["outcome"]),
+            step=None if step_id is None else str(step_id),
+            verdict=str(row["verdict"]) if row else "",
+            attempts=int(row["attempts"]) if row else 0,
+            used=int(doc["iterations"]["used"]),
+            budget=int(doc["iterations"]["budget"]),
+            cause=None if stop is None else str(stop["cause"]),
+            request=doc["pending_request"],
+            then=doc["then"],
+        )
+        if position.request is not None and not position.then:
+            raise ValueError("an outstanding request without its record command")
+        return position
+
+    def lines(self) -> list[str]:
+        """At most two lines: the position, then the outstanding request when there is one."""
+        iterations = f"iterations {self.used}/{self.budget}"
+        if self.outcome == "complete":
+            return [f"Driver position: complete, {iterations}"]
+        step = f"step {self.step}" if self.step else "no step"
+        if self.outcome in STOPPED_OUTCOMES:
+            return [f"Driver position: stopped at {step} (cause: {self.cause}), {iterations}"]
+        position = (
+            f"Driver position: {step} {self.verdict}, "
+            f"attempts {self.attempts}/{ATTEMPT_CAP}, {iterations}"
+        )
+        if self.request is None:
+            return [position]
+        return [position, f"Outstanding request {self.request}; driver's command: {self.then}"]
+
+
+def _under_the_driver(task_dir: Path, wip_text: str) -> bool:
+    """A cheap file test, no process: a driver-issued request or an iteration ledger."""
+    return bool(DRIVER_REQUEST_LINE.search(wip_text)) or (task_dir / ITERATION_LEDGER).exists()
+
+
+def _position_lines(slug: str, root: Path) -> list[str]:
+    """The driver's position in at most two lines; each line that would direct is
+    replaced by its location, and an unreadable position says so."""
+    status_command = f"step_loop.py status {slug}"
+    position = _read_position(slug, root)
+    if position is None:
+        return [f"Driver position: could not be read; run {status_command}"]
+    return [
+        f"Driver position: see {status_command}" if _contains_orchestration_verb(line) else line
+        for line in position.lines()
+    ]
+
+
+def _read_position(slug: str, root: Path) -> DriverPosition | None:
+    """Run the driver's read-only status and parse it, whatever its exit code (2 is a
+    stop); None when it is absent, fails, runs past its bound or prints what cannot be parsed."""
+    plugin_root = Path(
+        os.environ.get("CLAUDE_PLUGIN_ROOT") or Path(__file__).resolve().parent.parent
+    )
+    command = [
+        "python3",
+        str(plugin_root / DRIVER_RELATIVE),
+        "status",
+        slug,
+        "--json",
+        "--worktree-root",
+        str(root),
+    ]
+    try:
+        done = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=root,
+            timeout=STATUS_TIMEOUT_SECONDS,
+        )
+        return DriverPosition.parse(json.loads(done.stdout))
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return None
 
 
 # -- Filesystem ----------------------------------------------------------------

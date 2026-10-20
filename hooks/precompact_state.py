@@ -6,6 +6,8 @@ PIPELINE_STATE.md that the agent can re-read after compaction to restore
 orientation. Exits 0 unconditionally -- must never block compaction.
 """
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 

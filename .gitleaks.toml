@@ -20,4 +20,8 @@ description = "Secret-redaction test fixtures intentionally contain secret-shape
 paths = [
   '''scripts/praxion_feedback/tests/test_sanitizer\.py''',
   '''scripts/test_report_praxion_issue\.py''',
+  # A frozen snapshot of the implementer's eval kit: a map of file paths to their
+  # sha256 digests. The generic-api-key rule reads each 64-hex digest as a key;
+  # nothing in it is a secret, and the digests are what the scenario compares.
+  '''tests/acceptance/fixtures/implementer_kit_before\.json''',
 ]

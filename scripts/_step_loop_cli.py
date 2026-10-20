@@ -45,6 +45,7 @@ from _step_loop_state import (
     Running,
     Series,
     Verified,
+    is_done,
     spent,
     step_cap,
 )
@@ -240,10 +241,14 @@ def spawn_envelope(frame: Frame, request: SpawnRequest, invoke: str | Invocation
         "prompt_path": request.prompt_path,
         "reissued": request.reissued,
     }
-    then = Invocation.of(invoke).command(
-        "record", frame.slug, "--request", key.id, RECORD_PLACEHOLDERS
+    return _envelope(frame, "spawn", request=shown, then=record_command(frame.slug, key.id, invoke))
+
+
+def record_command(slug: str, request_id: str, invoke: str | Invocation) -> str:
+    """The `record` call that follows a request, its agent id and marker left as placeholders."""
+    return Invocation.of(invoke).command(
+        "record", slug, "--request", request_id, RECORD_PLACEHOLDERS
     )
-    return _envelope(frame, "spawn", request=shown, then=then)
 
 
 def complete_envelope(frame: Frame) -> dict[str, Any]:
@@ -363,6 +368,7 @@ def status_object(
     states: Mapping[str, Series],
     action: Action,
     stop: Mapping[str, Any] | None,
+    invoke: str | Invocation,
 ) -> dict[str, Any]:
     pending = action.key.id if isinstance(action, Spawn) and action.reissued else None
     used, budget = iterations_of(inputs)
@@ -374,7 +380,21 @@ def status_object(
         "iterations": {"used": used, "budget": budget},
         "steps": [_step_row(step, states[step.id], inputs) for step in inputs.steps],
         "stop": None if stop is None else dict(stop),
+        "selected_step": _selected_step(inputs, states, action),
+        "then": None if pending is None else record_command(slug, pending, invoke),
     }
+
+
+def _selected_step(inputs: LoopInputs, states: Mapping[str, Series], action: Action) -> str | None:
+    """The step the driver's next action concerns: the request's step, else the stop's, else
+    the first step not done; None once the loop is complete."""
+    if isinstance(action, Spawn):
+        return action.step.id
+    if isinstance(action, Complete):
+        return None
+    if action.step is not None:
+        return action.step
+    return next((step.id for step in inputs.steps if not is_done(states[step.id])), None)
 
 
 def _step_row(step: PlanStep, state: Series, inputs: LoopInputs) -> dict[str, Any]:

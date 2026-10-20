@@ -237,6 +237,7 @@ def test_the_attempt_cap_mirrors_the_drivers():
         node.value.value
         for node in tree.body
         if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant)
         and [t.id for t in node.targets if isinstance(t, ast.Name)] == ["ATTEMPT_CAP"]
     ]
     hook = ast.parse((HOOKS_DIR / "inject_compaction_orientation.py").read_text())
@@ -244,6 +245,7 @@ def test_the_attempt_cap_mirrors_the_drivers():
         node.value.value
         for node in hook.body
         if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant)
         and [t.id for t in node.targets if isinstance(t, ast.Name)] == ["ATTEMPT_CAP"]
     ]
 

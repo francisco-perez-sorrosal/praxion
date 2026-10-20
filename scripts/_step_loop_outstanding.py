@@ -213,9 +213,11 @@ def _judge(
     held = next((verdict for verdict in related if isinstance(verdict, Held)), None)
     if held is not None:  # a reissued request has two agents; one ending says nothing of the other
         return RUNNING if len(related) > 1 and RUNNING in related else held
-    reasons = {verdict.reason for verdict in related if isinstance(verdict, NotHeld)}
-    reason = next((r for r in _REASON_PRECEDENCE if r in reasons), "no-transcript-in-session")
-    return NotHeld(reason)
+    reasons: set[NotHeldReason] = {v.reason for v in related if isinstance(v, NotHeld)}
+    for reason in _REASON_PRECEDENCE:
+        if reason in reasons:
+            return NotHeld(reason)
+    return NotHeld("no-transcript-in-session")
 
 
 def _judge_transcript(

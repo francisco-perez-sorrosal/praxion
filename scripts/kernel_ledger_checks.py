@@ -3,27 +3,43 @@
 `check_kernel_manifest` gathers the evidence and renders the findings; this module names each
 finding the ledger's rules can raise: the `omitClaudeMd` flag against a `switched` record, a
 switched record's evidence, the run index against the results files it describes, every run a
-switched record cites resolved through that index, an eligible list the ledger must not carry,
-the eligible roles held to the parent commit's list, the moves since the parent commit, a deleted
-ledger, and the spawn hook reading every record as PyYAML does. No command line; every function
-takes what it judges as an argument and reads nothing.
+switched record cites located by that index and judged from its results files, an eligible list
+the ledger must not carry, the eligible roles held to the parent commit's list, the moves since
+the parent commit, a deleted ledger, and the spawn hook reading every record as PyYAML does. No
+command line; every function takes what it judges as an argument and reads nothing, except
+`cited_run_findings`, which reads the results files of a cited run through `kernel_run_evidence`.
 """
 
 from __future__ import annotations
 
+import importlib
 import re
 import sys
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
+from types import ModuleType
 
 import kernel_ledger as kl
 import kernel_ledger_history as kh
 import kernel_model as km
+import kernel_run_evidence as kre
 import kernel_run_index as kri
 
 # hooks/ sits beside scripts/; the spawn hook's own ledger reader is what I10 holds to PyYAML's.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
-import inject_kernel  # noqa: E402 (the spawn hook, after sys.path injection)
+
+
+def _spawn_hook() -> ModuleType | None:
+    """The spawn hook, or None in a copy of scripts/ apart from its checkout (the mutation sensor)."""
+    try:
+        return importlib.import_module("inject_kernel")
+    except ModuleNotFoundError as exc:
+        if exc.name != "inject_kernel":
+            raise  # the hook is there and one of its own imports is not
+        return None
+
+
+inject_kernel = _spawn_hook()
 
 # The eval whose run a flip may rest on. The one line in `scripts/` that names it, as data: the
 # paid-eval guard in the eval project's tests exempts exactly this line, so keep it alone.
@@ -136,68 +152,155 @@ def run_index_findings(adherence: kri.Adherence) -> tuple[km.Finding, ...]:
 def cited_run_findings(
     ledger: kl.Ledger | km.KernelModelError | None, adherence: kri.Adherence
 ) -> tuple[km.Finding, ...]:
-    """I9: every run a switched record cites resolves, through the run index, to its lineage.
+    """I9: every run a switched record cites is judged from its results files, never the index.
 
     New, changed or unchanged, a switched record is judged whole: each run it cites, the passing
-    run included, must have results that measured the role, the record's complete pairs and pass
-    flag must be what its lineage reached, and the passing run's lineage must be clear on at least
-    `kl.REQUIRED_PAIRS` pairs. Two parts of one lineage resolve to the same values, so they are
-    one run; a closed lineage reads "not clear" in the index, a draw that refuses nothing alone.
+    run included, is resolved through the index (a locator and a digest) and then derived from
+    the results files beside it: its lineage, its complete pairs, its flip standing. The record
+    and the index are held to those figures, and the passing run must stand clear on at least
+    `kl.REQUIRED_PAIRS` pairs the gate counted itself. Two parts of one lineage derive the same
+    values, so they are one run; a closed lineage stands "not clear", a draw that refuses nothing
+    alone.
     """
     if not isinstance(ledger, kl.Ledger):
         return ()  # no ledger, or one the model refused: `record_findings` reports that
+    files = kre.read_run_files(adherence.directory)
     return tuple(
         finding
         for role, record in sorted(ledger.records.items())
         if isinstance(record, kl.Switched)
         for run in record.runs
         for finding in _citation_findings(
-            role, run, run.id == record.passing_run, adherence.lineage_of(run.id)
+            role, run, run.id == record.passing_run, adherence.lineage_of(run.id), files
         )
     )
 
 
 def _citation_findings(
-    role: str, run: kl.Run, passing: bool, lineage: kri.Lineage | None
+    role: str,
+    run: kl.Run,
+    passing: bool,
+    indexed: kri.Lineage | None,
+    files: Sequence[kre.RunFile],
 ) -> tuple[km.Finding, ...]:
     subject = f"role {role}"
-    if lineage is None:
+    if indexed is None:
         detail = f"cites run {run.id!r}, which has no readable results file in {kri.RESULTS_DIR}"
         return (km.Finding("I9-run-missing", subject, detail),)
-    reached = lineage.roles.get(role)
-    if reached is None:
-        measured = ", ".join(sorted(lineage.roles)) or "no role"
-        detail = f"cites run {run.id!r}, whose results measured {measured}, not {role}"
-        return (km.Finding("I9-run-wrong-role", subject, detail),)
-    clear = reached.flip == kri.CLEAR
-    whole = f"{_named(lineage)} reached {reached.complete_pairs} complete pairs, {reached.flip}"
-    judged = (
+    try:
+        derived = kre.derive(files, run.id, role)
+    except kre.RunEvidenceError as exc:
+        detail = f"cites run {run.id!r}, whose results files give no one lineage: {exc}"
+        return (km.Finding("I9-run-missing", subject, detail),)
+    measured = sorted(_measured_roles(files, derived.parts))
+    if role not in measured:
+        detail = f"cites run {run.id!r}, whose results measured {', '.join(measured) or 'no role'}"
+        return (km.Finding("I9-run-wrong-role", subject, f"{detail}, not {role}"),)
+    named = _named(derived.parts)
+    reached = indexed.roles.get(role)
+    broken = (
+        *_lineage_claims(run, indexed, reached, derived, named),
+        *_standing_claims(run, passing, reached, derived, named, files, role),
+    )
+    return tuple(km.Finding(kind, subject, detail) for kind, detail in broken)
+
+
+def _measured_roles(files: Sequence[kre.RunFile], parts: Collection[str]) -> set[str]:
+    return {s.role for file in files if file.run_id in parts for s in file.sessions}
+
+
+def _lineage_claims(
+    run: kl.Run,
+    indexed: kri.Lineage,
+    reached: kri.Standing | None,
+    derived: kre.Derived,
+    named: str,
+) -> list[tuple[str, str]]:
+    """Where the index and the record disagree with the results files on lineage and pairs."""
+    pairs = derived.complete_pairs
+    listed = "no standing" if reached is None else f"{reached.complete_pairs} complete pairs"
+    claims = [
+        (
+            "I9-run-lineage-differs",
+            indexed.parts != derived.parts,
+            f"the index lists the lineage of run {run.id!r} as {', '.join(indexed.parts)}, "
+            f"the results files chain {', '.join(derived.parts)}",
+        ),
+        (
+            "I9-run-index-pairs-differ",
+            reached is None or reached.complete_pairs != pairs,
+            f"the index lists run {run.id!r} with {listed}; {named} reached {pairs} complete pairs",
+        ),
         (
             "I9-run-pairs-differ",
-            run.complete_pairs != reached.complete_pairs,
-            f"cites run {run.id!r} with {run.complete_pairs} complete pairs",
+            run.complete_pairs != pairs,
+            f"cites run {run.id!r} with {run.complete_pairs} complete pairs; "
+            f"{named} reached {pairs} complete pairs",
+        ),
+    ]
+    return [(kind, detail) for kind, broken, detail in claims if broken]
+
+
+def _standing_claims(
+    run: kl.Run,
+    passing: bool,
+    reached: kri.Standing | None,
+    derived: kre.Derived,
+    named: str,
+    files: Sequence[kre.RunFile],
+    role: str,
+) -> list[tuple[str, str]]:
+    """Where the index and the record disagree with the standing the results files give."""
+    try:
+        judged = kre.judged_standing(files, run.id, role)
+    except kre.RunEvidenceError as exc:
+        unrecorded = f"cites run {run.id!r}, whose lineage records no standing for {role}: {exc}"
+        return [("I9-run-standing-unrecorded", unrecorded)]
+    clear = judged == kri.CLEAR
+    pairs = derived.complete_pairs
+    recorded = _recorded_pairs(files, run.id, role)
+    labelled = reached.flip if reached else None
+    claims = [
+        (
+            "I9-run-index-flip-differs",
+            reached is not None and reached.flip != judged,
+            f"the index labels run {run.id!r} {labelled!r}; {named} stands {judged}",
         ),
         (
             "I9-run-flag-disagrees",
             run.passes_flip_rule != clear,
-            f"cites run {run.id!r} with passes_flip_rule {str(run.passes_flip_rule).lower()}",
+            f"cites run {run.id!r} with passes_flip_rule {str(run.passes_flip_rule).lower()}; "
+            f"{named} stands {judged}",
         ),
         (
             "I9-run-passing-short",
-            passing and not (clear and reached.complete_pairs >= kl.REQUIRED_PAIRS),
-            f"rests on run {run.id!r}, which needs {kl.REQUIRED_PAIRS} complete pairs, clear",
+            passing and not (clear and pairs >= kl.REQUIRED_PAIRS),
+            f"rests on run {run.id!r}, which needs {kl.REQUIRED_PAIRS} complete pairs, clear; "
+            f"{named} reached {pairs} complete pairs, {judged}",
         ),
-    )
-    return tuple(
-        km.Finding(kind, subject, f"{claim}; {whole}") for kind, broken, claim in judged if broken
-    )
+        (
+            "I9-run-recorded-pairs-differ",
+            recorded not in (None, pairs),
+            f"the results file records {recorded} complete pairs "
+            f"for run {run.id!r}'s lineage; {named} reached {pairs} complete pairs",
+        ),
+    ]
+    return [(kind, detail) for kind, broken, detail in claims if broken]
 
 
-def _named(lineage: kri.Lineage) -> str:
+def _recorded_pairs(files: Sequence[kre.RunFile], run_id: str, role: str) -> int | None:
+    """The complete pairs the lineage's last results file records; None when it records none."""
+    try:
+        return kre.recorded_standing(files, run_id, role).complete_pairs
+    except kre.RunEvidenceError:
+        return None
+
+
+def _named(parts: Sequence[str]) -> str:
     """The run as one: its own id, or its lineage's root and every part when it was continued."""
-    if lineage.parts == (lineage.root,):
-        return f"run {lineage.root!r}"
-    return f"the lineage of {lineage.root!r} (parts {', '.join(lineage.parts)})"
+    if len(parts) == 1:
+        return f"run {parts[0]!r}"
+    return f"the lineage of {parts[0]!r} (parts {', '.join(parts)})"
 
 
 def transition_findings(
@@ -302,6 +405,10 @@ def misreading_findings(
     statuses: Mapping[str, str], ledger_text: str | None
 ) -> tuple[km.Finding, ...]:
     """I10: the spawn hook reads each role's status from the ledger's text as PyYAML does."""
+    if inject_kernel is None:
+        raise km.KernelModelError(
+            "hooks/inject_kernel.py is not beside scripts/: I10 cannot be judged"
+        )
     misread = kl.hook_misreadings(statuses, ledger_text or "", inject_kernel.adoption_status)
     return tuple(km.Finding(f"I10-{found.kind}", found.subject, found.detail) for found in misread)
 

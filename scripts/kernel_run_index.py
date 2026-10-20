@@ -3,10 +3,11 @@
 `.ai-state/eval_ledger/adherence/index.json` has one writer, the adherence eval (every run as it
 finalizes, and its `--reindex`). It names each results file with the sha256 of its bytes, the root
 of the lineage the run belongs to, and per role the complete pairs, the flip label the whole
-lineage reached and the checks its verdict scored; every part of a continued run carries its
-lineage's values, and an index whose parts disagree or whose root is not listed is refused, as is
-an index of another schema. The gate trusts the index only as far as it can check it, so
-`read_adherence` returns the index together with the digest of every JSON file beside it, and
+lineage reached and the checks its verdict scored; an index whose root is not listed or is not
+its own root is refused, as is an index of another schema. The index is a locator and a digest,
+not evidence: the gate judges a cited run from the results files themselves
+(`kernel_run_evidence`) and holds the index to what they give. `read_adherence` returns the index
+together with the digest of every JSON file beside it and the directory they are in, and
 `Adherence.lineage_of` resolves a run only while its file is still there. A run resolves through
 the lineage the index names, never through a results file's own `earlier` listing, which on a
 continued run's tip holds its own predecessor parts.
@@ -69,12 +70,14 @@ class Adherence:
     """The run index and the directory it describes.
 
     `entries` maps run id to its entry (empty when there is no index), `skipped` the JSON files
-    the index names as no run, `files` every JSON file beside the index to the sha256 of its bytes.
+    the index names as no run, `files` every JSON file beside the index to the sha256 of its bytes,
+    `directory` where those files are, for a reader that judges a run from the files themselves.
     """
 
     entries: Mapping[str, Entry]
     skipped: frozenset[str]
     files: Mapping[str, str]
+    directory: Path
 
     def lineage_of(self, run_id: str) -> Lineage | None:
         """The whole lineage `run_id` is part of; None when the index lists no file still here."""
@@ -97,9 +100,9 @@ def read_adherence(root: Path) -> Adherence:
     }
     index = directory / INDEX_NAME
     if not index.is_file():
-        return Adherence(MappingProxyType({}), frozenset(), MappingProxyType(files))
+        return Adherence(MappingProxyType({}), frozenset(), MappingProxyType(files), directory)
     entries, skipped = parse_index(index.read_bytes())
-    return Adherence(entries, skipped, MappingProxyType(files))
+    return Adherence(entries, skipped, MappingProxyType(files), directory)
 
 
 def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
@@ -119,8 +122,9 @@ def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
 
 
 def _refuse_split_lineages(entries: Mapping[str, Entry]) -> None:
-    """Every part names a listed root that is its own root and carries its roles, so any part
-    judges like the whole and a refusal never names a root outside the parts."""
+    """Every part names a listed root that is its own root, so a refusal never names a root outside
+    the parts. Whether the parts the index groups are the lineage the results files chain is the
+    gate's finding (`I9-run-lineage-differs`) for a run a switched record cites, not a refusal."""
     for run_id, entry in entries.items():
         root = entries.get(entry.lineage_root)
         if root is None:
@@ -130,8 +134,6 @@ def _refuse_split_lineages(entries: Mapping[str, Entry]) -> None:
                 f"run {run_id}'s lineage root {entry.lineage_root} is not its own root"
                 f" (it names {root.lineage_root})"
             )
-        if entry.roles != root.roles:
-            raise ValueError(f"run {run_id} and its lineage root {entry.lineage_root} differ")
 
 
 def _entry(row: Any) -> Entry:

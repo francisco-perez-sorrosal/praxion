@@ -39,13 +39,41 @@ def indexed(
     return {"id": run_id, "role": role, "pairs": pairs, "flip": flip, "root": root or run_id}
 
 
+def results_file(run: dict, group: list[dict]) -> dict:
+    """The results file the eval would write for `run`: `pairs` complete pairs and its standing."""
+    parts = sorted(part["id"] for part in group)
+    position = parts.index(run["id"])
+    sessions = [
+        {
+            "setup": {"arm": arm, "role": run["role"], "task_id": f"t{n}", "template_id": f"x{n}"},
+            "status": {"kind": "measured"},
+        }
+        for n in range(run["pairs"])
+        for arm in ("full", "lean")
+    ]
+    standing = {
+        "lineage_root": parts[0],
+        "parts": parts,
+        "complete_pairs": run["pairs"],
+        "flip": run["flip"],
+        "scored_checks": SCORED,
+    }
+    return {
+        "schema_version": "adherence/1",
+        "run": {"id": run["id"], "continues": parts[position - 1] if position else None},
+        "sessions": sessions,
+        "standing": {run["role"]: standing},
+    }
+
+
 def plant(directory_root: Path, *runs: dict, skipped: tuple[str, ...] = ()) -> Path:
     """Results files for `runs` and the index the eval would write for them; the directory."""
     directory = directory_root / kri.RESULTS_DIR
     directory.mkdir(parents=True, exist_ok=True)
     entries = {}
     for run in runs:
-        raw = json.dumps({"run": {"id": run["id"]}}).encode("utf-8")
+        group = [other for other in runs if other["root"] == run["root"]]
+        raw = json.dumps(results_file(run, group)).encode("utf-8")
         (directory / f"{run['id']}.json").write_bytes(raw)
         entries[run["id"]] = {
             "file": f"{run['id']}.json",
@@ -235,7 +263,8 @@ def test_a_results_file_changed_since_it_was_indexed_makes_the_index_stale(
     tmp_path: Path,
 ) -> None:
     directory = plant(tmp_path, indexed(EARLY, 13, "underpowered"), indexed(PASSING))
-    (directory / f"{EARLY}.json").write_text('{"edited": true}', encoding="utf-8")
+    path = directory / f"{EARLY}.json"
+    path.write_text(json.dumps({**json.loads(path.read_text()), "edited": True}), encoding="utf-8")
 
     found = findings(tmp_path, THE_RECORD)
 
@@ -303,8 +332,6 @@ def without_scored_checks() -> dict:
         json.dumps({"schema": kri.INDEX_SCHEMA, "runs": {"r": listed_part(root="r")}}),
         index_text({"r": listed_part(root="r", flip="passed")}),
         index_text({"r": listed_part(root="gone")}),
-        index_text({"a": listed_part(root="a"), "b": listed_part(root="a", flip="not clear")}),
-        index_text({"a": listed_part(root="a"), "b": listed_part(root="a", scored_checks=[])}),
         index_text({"r": without_scored_checks()}),
         index_text({"r": listed_part(root="r", scored_checks="C1")}),
         index_text({"r": listed_part(root="r", scored_checks=["C1", 3])}),

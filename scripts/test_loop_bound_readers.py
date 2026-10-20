@@ -98,7 +98,7 @@ def inputs(plan, commits, verdict=None):
 def table_row(loop_inputs):
     action = next_action(loop_inputs)
     states = series_states(loop_inputs)
-    status = cli.status_object(SLUG, loop_inputs, states, action, None)
+    status = cli.status_object(SLUG, loop_inputs, states, action, None, "x")
     table = cli.status_table(status, cli.next_line(SLUG, action, "x"), loop_inputs.steps)
     return table.splitlines()[2]
 

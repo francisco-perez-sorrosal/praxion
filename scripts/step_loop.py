@@ -263,7 +263,7 @@ def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
     if isinstance(action, Stop):
         stop = cli.stop_object(task.slug, action, invoke, task.dir / HANDOFF_FILE)
         lines = (stop_stderr(cli.stop_view(action, task.slug, invoke)),)
-    status = cli.status_object(task.slug, inputs, series_states(inputs), action, stop)
+    status = cli.status_object(task.slug, inputs, series_states(inputs), action, stop, invoke)
     if args.json:
         return Reply(status, lines)
     table = cli.status_table(status, cli.next_line(task.slug, action, invoke), inputs.steps)

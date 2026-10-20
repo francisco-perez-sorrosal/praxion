@@ -134,7 +134,7 @@ class Readings:
 def status_of(loop):
     action = issuable_action(loop)
     stop = cli.stop_object(SLUG, action, "x", HANDOFF) if isinstance(action, Stop) else None
-    return cli.status_object(SLUG, loop, series_states(loop), action, stop), action
+    return cli.status_object(SLUG, loop, series_states(loop), action, stop, "x"), action
 
 
 def read_everywhere(tmp_path, plan, commits):

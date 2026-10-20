@@ -360,7 +360,9 @@ def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) 
     ending = close(tip, reason, datetime.now(UTC))
     recorded = tip.results
     extra = {**recorded.run.extra, "ending": ending_to_json(ending)}
-    results.write_atomic(path, replace(recorded, run=replace(recorded.run, extra=extra)))
+    ended = replace(recorded, run=replace(recorded.run, extra=extra))
+    standing = run_index.standing_ending_at(path.parent, ended)
+    results.write_atomic(path, replace(ended, standing=standing))
     run_index.write_index(path.parent)
     print(f"closed run {run_id}: {reason}")
     return EXIT_COMPLETE

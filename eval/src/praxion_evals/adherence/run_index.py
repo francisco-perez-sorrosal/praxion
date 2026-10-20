@@ -9,6 +9,9 @@ The index is derived and has one writer, :func:`write_index`: the runner calls i
 finalizes, ``--close`` calls it, and ``--reindex`` rebuilds it from the files alone. Nothing reads
 it back here, so it cannot drift from the evidence the way a hand-edited copy could.
 
+:func:`standing_of` is the one place a lineage's per-role standing is built; the index entries and
+the standing a finalized or closed run records in its own results file both come from it.
+
 A continued run is one run: every part's entry carries the verdict of its whole lineage, and a
 tip's recorded ``earlier`` listing (which holds its own predecessor parts) is never read.
 """
@@ -23,7 +26,8 @@ from pathlib import Path
 from typing import Any
 
 from praxion_evals.adherence import results
-from praxion_evals.adherence.results import RunResults
+from praxion_evals.adherence.model import Assessed, RoleVerdict
+from praxion_evals.adherence.results import RoleStanding, RunResults
 
 INDEX_SCHEMA = 1
 LEGACY_ENDING = "legacy"  # a file written before runs recorded how they ended
@@ -78,7 +82,7 @@ def _refuse_a_run_held_twice(files: Sequence[ResultsFile]) -> None:
 
 def index_of(files: Sequence[ResultsFile], skipped: Sequence[str]) -> dict[str, Any]:
     """The index document (pin: ``runs`` by run id, ``skipped`` the JSON files that are no run)."""
-    standing = _lineage_standing([file.results for file in files])
+    standing = _standing_by_run([file.results for file in files])
     return {
         "schema": INDEX_SCHEMA,
         "runs": {
@@ -88,32 +92,70 @@ def index_of(files: Sequence[ResultsFile], skipped: Sequence[str]) -> dict[str, 
     }
 
 
-def _entry_of(file: ResultsFile, lineage_root: str, roles: dict[str, Any]) -> dict[str, Any]:
+def _entry_of(
+    file: ResultsFile, lineage_root: str, roles: dict[str, RoleStanding]
+) -> dict[str, Any]:
     return {
         "file": file.name,
         "sha256": file.sha256,
         "lineage_root": lineage_root,
         "ending": _ending_kind(file.results),
-        "roles": roles,
+        "roles": {
+            role: {"complete_pairs": s.complete_pairs, "flip": s.flip} for role, s in roles.items()
+        },
     }
 
 
-def _lineage_standing(runs: Sequence[RunResults]) -> dict[str, tuple[str, dict[str, Any]]]:
-    """Each run id to the root of its lineage and what the lineage reached, read as one run."""
-    standing: dict[str, tuple[str, dict[str, Any]]] = {}
+def _standing_by_run(
+    runs: Sequence[RunResults],
+) -> dict[str, tuple[str, dict[str, RoleStanding]]]:
+    """Each run id to the root of its lineage and what the lineage stands on: one run."""
+    standing: dict[str, tuple[str, dict[str, RoleStanding]]] = {}
     for parts in results.lineages(runs):
-        ids = tuple(part.run.id for part in parts)
-        whole = results.merged(parts)
-        roles = {
-            role: {
-                "complete_pairs": sum(pair.complete for pair in results.pairs_of(whole, role)),
-                "flip": results.draw_of(whole, ids, role).flip,
-            }
-            for role in whole.catalog
-        }
-        for run_id in ids:
-            standing[run_id] = (ids[0], roles)
+        roles = standing_of(parts)
+        for part in parts:
+            standing[part.run.id] = (parts[0].run.id, roles)
     return standing
+
+
+def standing_of(parts: Sequence[RunResults]) -> dict[str, RoleStanding]:
+    """What a lineage stands on for each role of its catalog, its ``parts`` (oldest first) read as
+    one run: the complete pairs over their sessions, the flip they reached (a lineage closed on
+    request reached none) and the checks the verdict scored."""
+    ids = tuple(part.run.id for part in parts)
+    whole = results.merged(parts)
+    closed = _ending_kind(whole) == results.CLOSED_ENDING_KIND
+    verdicts = results.role_verdicts(whole)
+    return {
+        role: RoleStanding.of(
+            ids,
+            sum(pair.complete for pair in results.pairs_of(whole, role)),
+            results.draw_of(whole, ids, role).flip,
+            _scored_checks(verdicts[role]),
+            closed=closed,
+        )
+        for role in whole.catalog
+    }
+
+
+def standing_ending_at(results_dir: Path, written: RunResults) -> dict[str, RoleStanding]:
+    """The standing of the lineage that ``written`` ends: the parts ``results_dir`` holds before it
+    and ``written`` itself, which stands in for any file of the same run already there."""
+    held = [run for run in results.read_directory(results_dir)[0] if run.run.id != written.run.id]
+    lineage = next(
+        parts
+        for parts in results.lineages([*held, written])
+        if any(part.run.id == written.run.id for part in parts)
+    )
+    ids = [part.run.id for part in lineage]
+    return standing_of(lineage[: ids.index(written.run.id) + 1])
+
+
+def _scored_checks(verdict: RoleVerdict) -> tuple[str, ...]:
+    """The checks a verdict gives a per-check verdict and does not list as not covered."""
+    if not isinstance(verdict, Assessed):
+        return ()  # an underpowered role has no per-check verdicts
+    return tuple(sorted(name for name in verdict.check_verdicts if name not in verdict.not_covered))
 
 
 def _ending_kind(run: RunResults) -> str:

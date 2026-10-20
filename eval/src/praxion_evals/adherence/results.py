@@ -196,6 +196,52 @@ class KernelDelivery:
 
 
 @dataclass(frozen=True)
+class RoleStanding:
+    """What a run's whole lineage stands on for one role, as the run that ended it recorded it.
+
+    Written once by the part that finalizes or closes the lineage and never rewritten, so a reader
+    without eval code can see which checks a passing run rests on. ``scored_checks`` are the checks
+    the lineage's verdict gives a per-check verdict and does not list as not covered.
+    """
+
+    lineage_root: str
+    parts: tuple[str, ...]
+    complete_pairs: int
+    flip: FlipLabel
+    scored_checks: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require(bool(self.parts), "a standing names the parts of its lineage")
+        _require(self.lineage_root == self.parts[0], "a standing's lineage root is its first part")
+        _require(self.complete_pairs >= 0, "a standing's complete pairs are not negative")
+        _require(self.flip in FLIP_LABELS, f"a standing's flip is one of {FLIP_LABELS}")
+        _require(
+            list(self.scored_checks) == sorted(set(self.scored_checks)),
+            "a standing's scored checks are sorted and unique",
+        )
+        _require(
+            self.flip != "underpowered" or not self.scored_checks,
+            "an underpowered standing scored no check: it has no per-check verdicts",
+        )
+
+    @classmethod
+    def of(
+        cls,
+        parts: Sequence[str],
+        complete_pairs: int,
+        flip: FlipLabel,
+        scored_checks: Sequence[str],
+        *,
+        closed: bool,
+    ) -> RoleStanding:
+        """The standing of the lineage ``parts`` names; one that ended closed reached no flip verdict."""
+        _require(not closed or flip == "not clear", "a lineage that ended closed stands not clear")
+        return cls(
+            parts[0] if parts else "", tuple(parts), complete_pairs, flip, tuple(scored_checks)
+        )
+
+
+@dataclass(frozen=True)
 class RunResults:
     run: RunInfo
     settings: DeclaredSettings
@@ -204,6 +250,7 @@ class RunResults:
     arms: Mapping[str, Mapping[str, Mapping[str, Any]]]
     sessions: tuple[SessionRecord, ...]
     golden_bad_case_verdicts: Mapping[str, Any] | None
+    standing: Mapping[str, RoleStanding] | None = None  # absent on files written before it
 
     def __post_init__(self) -> None:
         declared = instant(self.declared_at, "the settings' declared_at")
@@ -222,6 +269,8 @@ class RunResults:
             for arm, record in per_arm.items():
                 _require(arm in ARMS, f"{role}'s arms name an unknown arm {arm!r}")
                 _require(isinstance(record.get("built"), bool), f"{role}/{arm} lacks 'built'")
+        for role in self.standing or {}:
+            _require(role in self.catalog, f"the standing names {role}, which has no catalog")
         error = (self.golden_bad_case_verdicts or {}).get("observed_error")
         _require(
             error is None or 0 <= error <= 1,
@@ -386,14 +435,15 @@ def earlier_runs(
     and its name returned. ``replaced`` is the id of a run the listing run overwrites, which is
     no longer evidence.
     """
-    runs, skipped = _read_directory(directory)
+    runs, skipped = read_directory(directory)
     runs = [earlier for earlier in runs if earlier.run.id != replaced]
     return EarlierListing(
         {role: _earlier_for(role, runs, differences) for role in roles}, tuple(skipped)
     )
 
 
-def _read_directory(directory: Path) -> tuple[list[RunResults], list[str]]:
+def read_directory(directory: Path) -> tuple[list[RunResults], list[str]]:
+    """The results files of ``directory`` and the names of the other JSON files; never refuses."""
     runs: list[RunResults] = []
     skipped: list[str] = []
     for path in sorted(directory.glob("*.json")):
@@ -558,6 +608,7 @@ def to_json(results: RunResults) -> dict[str, Any]:
             if results.golden_bad_case_verdicts is None
             else dict(results.golden_bad_case_verdicts)
         ),
+        **({} if results.standing is None else {"standing": _standing_to_json(results.standing)}),
     }
 
 
@@ -576,6 +627,19 @@ def _kernel_delivery_to_json(results: RunResults) -> dict[str, list[dict[str, An
         ]
         for role, deliveries in by_role.items()
         if deliveries
+    }
+
+
+def _standing_to_json(standing: Mapping[str, RoleStanding]) -> dict[str, Any]:
+    return {
+        role: {
+            "lineage_root": s.lineage_root,
+            "parts": list(s.parts),
+            "complete_pairs": s.complete_pairs,
+            "flip": s.flip,
+            "scored_checks": list(s.scored_checks),
+        }
+        for role, s in standing.items()
     }
 
 
@@ -618,6 +682,30 @@ def from_json(data: Mapping[str, Any]) -> RunResults:
         arms=_need(data, "arms", "a results file"),
         sessions=tuple(_session_from_json(r) for r in _need(data, "sessions", "a results file")),
         golden_bad_case_verdicts=data.get("golden_bad_case_verdicts"),
+        standing=_standing_from_json(data["standing"]) if "standing" in data else None,
+    )
+
+
+def _standing_from_json(recorded: Mapping[str, Any]) -> dict[str, RoleStanding]:
+    _require(isinstance(recorded, Mapping), "the recorded standing is a JSON object")
+    return {role: _role_standing_from_json(role, entry) for role, entry in recorded.items()}
+
+
+def _role_standing_from_json(role: str, entry: Mapping[str, Any]) -> RoleStanding:
+    what = f"the standing of {role}"
+    _require(isinstance(entry, Mapping), f"{what} is a JSON object")
+    parts, scored = _need(entry, "parts", what), _need(entry, "scored_checks", what)
+    pairs = _need(entry, "complete_pairs", what)
+    _require(
+        isinstance(parts, list) and isinstance(scored, list), f"{what} lists its parts and checks"
+    )
+    _require(isinstance(pairs, int) and not isinstance(pairs, bool), f"{what} counts whole pairs")
+    return RoleStanding(
+        lineage_root=_need(entry, "lineage_root", what),
+        parts=tuple(parts),
+        complete_pairs=pairs,
+        flip=_need(entry, "flip", what),
+        scored_checks=tuple(scored),
     )
 
 

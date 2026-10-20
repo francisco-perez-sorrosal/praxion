@@ -465,6 +465,7 @@ def _clean_up(context: Context) -> None:
 
 def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:
     ended = finalized(state.results, state.stop, interrupted, datetime.now(UTC))
+    ended = replace(ended, standing=run_index.standing_ending_at(context.output.parent, ended))
     final = _checkpoint(context, replace(state, results=ended)).results
     run_index.write_index(context.output.parent)  # the file the index names is final now
     return final

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-4646100d
+id: dec-465
+draft_id: dec-draft-4646100d
 title: A Stop hook holds the orchestrator's stop once when a step-loop agent of this session has ended unrecorded, judged by the driver's own end evidence
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-20
 summary: "Adds hooks/guard_step_loop_stop.py, a synchronous Stop hook, and scripts/_step_loop_outstanding.py, a driver-side probe it imports lazily. The hook holds a stop (decision block) only when a request the driver issued is absent from the iteration ledger and the transcript of the agent this session started on it ends by the same predicate record accepts; it names the first such request (oldest issued, then slug) with the exact, filled record command. It passes on stop_hook_active, on any unreadable input (a transcript with any unparseable line included), outside a step loop without reading a transcript or starting a process, and writes nothing."

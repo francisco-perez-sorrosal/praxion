@@ -1,7 +1,8 @@
 ---
-id: dec-draft-dc3dfb3d
+id: dec-464
+draft_id: dec-draft-dc3dfb3d
 title: During a step loop the post-compaction orientation reports the driver's position and the outstanding request's record command, read from the driver's status
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-20
 summary: "Narrows dec-387's role-neutral clause. When the newest task is under the step-loop driver, hooks/inject_compaction_orientation.py runs the driver's read-only status --json from its own plugin tree and renders a two-line digest (the selected step, its state and attempts, iterations, a stop's cause, and the outstanding request with its record command, placeholders kept) in place of WIP.md's current-step and next-action lines; on a driver read failure it says the position could not be read and names status. status --json gains two additive keys, selected_step and then. Outside a step loop the block is byte-identical to today's."

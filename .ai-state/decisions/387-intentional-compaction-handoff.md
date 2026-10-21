@@ -33,7 +33,7 @@ affected_files:
   - skills/software-planning/references/artifact-inventory.md
   - .ai-state/DESIGN.md
 affected_reqs: [REQ-01, REQ-02, REQ-02b, REQ-03, REQ-04, REQ-05, REQ-05b, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10]
-superseded_in_part_by: [dec-draft-dc3dfb3d]
+superseded_in_part_by: [dec-464]
 dissent: "With no Praxion-set threshold there is no mechanical backstop: the whole mechanism now depends on a human remembering to run /handoff at a boundary, and an orchestrator that never does behaves exactly as the measured baseline did. The design accepts this deliberately — the alternative moves an irreversible act away from the person who can see the status line — but low uptake, not delivery failure, is the most likely way this decision turns out wrong. Secondarily: the restore's delivery is documented (SessionStart honours additionalContext) yet still unobserved here, since nothing in this repo has ever compacted."
 ---
 

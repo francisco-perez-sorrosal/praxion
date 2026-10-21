@@ -1,7 +1,8 @@
 ---
-id: dec-draft-76021526
+id: dec-463
+draft_id: dec-draft-76021526
 title: The flip gate takes a cited run's standing from its results files, keeps the run index as locator and digest only, and states what it still trusts
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-20
 summary: "Narrows dec-461 clause 2. The gate parses a cited run's results files with the stdlib (new scripts/kernel_run_evidence.py): it derives the lineage from the files' continues links and counts complete pairs itself; it takes flip standing and scored checks from what the files record (a new per-role standing key written at finalize and close, or the legacy one-part verdict), refuses a run with no recorded whole-lineage standing, refuses any index or record figure that disagrees, and refuses a passing run that did not score the role's convention check. The index (schema 2, gaining scored_checks) only locates files and carries digests. The gate does not recompute the eval's statistics and trusts them, and the files' contents, as stated here and in docs/lean-spawn-how-to.md."

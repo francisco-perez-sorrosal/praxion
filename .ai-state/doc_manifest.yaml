@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-20T02:49:42Z'
+generated_at: '2026-10-21T03:23:16Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -469,7 +469,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -640,7 +640,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2981,7 +2981,7 @@ surfaces:
   type: markdown
   title: "The phase-boundary handoff is the mechanism: a Tier-3 HANDOFF.md with verbatim user constraints and a readiness gate, plus a SessionStart(compact) safety net \u2014 Praxion sets no utilisation\
     \ band"
-  last_modified: '2026-09-19'
+  last_modified: '2026-10-19'
   renderer: adr_card
 - id: ai-state-decisions-388-mutation-sensor
   path: .ai-state/decisions/388-mutation-sensor.md
@@ -3435,6 +3435,24 @@ surfaces:
   title: The flip rule sizes mechanical allowances by the run's own discordance, seeds launch order, states coverage, and makes a stopped run one declared run that is continued or closed
   last_modified: '2026-10-19'
   renderer: adr_card
+- id: ai-state-decisions-463-flip-gate-evidence-from-results-files
+  path: .ai-state/decisions/463-flip-gate-evidence-from-results-files.md
+  type: markdown
+  title: The flip gate takes a cited run's standing from its results files, keeps the run index as locator and digest only, and states what it still trusts
+  last_modified: '2026-10-20'
+  renderer: adr_card
+- id: ai-state-decisions-464-orientation-reports-driver-position
+  path: .ai-state/decisions/464-orientation-reports-driver-position.md
+  type: markdown
+  title: During a step loop the post-compaction orientation reports the driver's position and the outstanding request's record command, read from the driver's status
+  last_modified: '2026-10-20'
+  renderer: adr_card
+- id: ai-state-decisions-465-step-loop-stop-guard
+  path: .ai-state/decisions/465-step-loop-stop-guard.md
+  type: markdown
+  title: A Stop hook holds the orchestrator's stop once when a step-loop agent of this session has ended unrecorded, judged by the driver's own end evidence
+  last_modified: '2026-10-20'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3662,6 +3680,12 @@ surfaces:
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-lean-spawn-continuation-2026-10-20
+  path: .ai-state/specs/SPEC_lean-spawn-continuation_2026-10-20.md
+  type: markdown
+  title: 'Spec: lean-spawn-continuation (fix the adherence instrument and close the flip gate''s holes before any new trial)'
+  last_modified: '2026-10-19'
   renderer: default_markdown
 - id: ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   path: .ai-state/specs/SPEC_lean-spawn-pilot_2026-10-15.md
@@ -4273,6 +4297,9 @@ groups:
   - ai-state-decisions-460-role-kernels-generated-and-injected
   - ai-state-decisions-461-eligibility-pin-in-gate-implementer-eligible
   - ai-state-decisions-462-flip-rule-amendment-own-discordance-continuation
+  - ai-state-decisions-463-flip-gate-evidence-from-results-files
+  - ai-state-decisions-464-orientation-reports-driver-position
+  - ai-state-decisions-465-step-loop-stop-guard
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4312,6 +4339,7 @@ groups:
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
+  - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11

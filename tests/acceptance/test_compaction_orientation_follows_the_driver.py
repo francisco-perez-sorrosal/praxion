@@ -53,6 +53,7 @@ def test_the_orientation_names_the_outstanding_request_and_its_record_call(tmp_p
 
     context = orientation.orient(task.root).context
 
+    assert asked.request is not None, asked.doc
     record_call = asked.doc["then"][asked.doc["then"].index("record ") :]
     assert asked.request["id"] in context
     assert record_call in context, context
@@ -62,6 +63,7 @@ def test_the_orientation_names_the_step_the_driver_acts_on_with_its_state_and_at
     task, asked = _driven_loop(tmp_path)
     state = status(task, as_json=True).json()
     step = next(s for s in state["steps"] if s["step"] == "5")
+    assert asked.request is not None, asked.doc
 
     context = orientation.orient(task.root).context
 
@@ -97,7 +99,9 @@ def test_the_orientation_keeps_its_cap_its_pointers_and_its_withheld_words(tmp_p
 
 def test_a_stopped_loop_is_reported_as_stopped_with_its_cause(tmp_path):
     task = build_loop(tmp_path, Step("1"), Step("2"))
-    cap = next_action(task).request["attempt_cap"]
+    first = next_action(task).request
+    assert first is not None
+    cap = first["attempt_cap"]
     for _ in range(cap):
         attempt(task, Work(passes=False))
     stop = status(task, as_json=True).json()["stop"]

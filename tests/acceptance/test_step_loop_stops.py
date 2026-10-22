@@ -53,18 +53,19 @@ def test_a_blocked_or_conflicted_return_stops_for_a_human_naming_the_step(tmp_pa
     assert step_id_of(stopped.stop["step"]) == "1"
 
 
-def test_a_blocked_return_whose_work_verified_is_committed_before_the_stop(tmp_path):
+def test_a_blocked_return_whose_work_verified_commits_nothing_before_the_stop(tmp_path):
     task = build_loop(tmp_path, Step("1"), Step("2"))
 
     stopped = attempt(task, Work(final_marker="blocked"))
 
     assert stopped.exit_code == 2
-    assert stopped.recorded["commit"] is not None
+    assert stopped.recorded["commit"] is None
 
 
 def test_completion_takes_precedence_over_a_human_stop(tmp_path):
-    task = build_loop(tmp_path, Step("1"))
-    attempt(task, Work(final_marker="blocked"))
+    task = build_loop(
+        tmp_path, Step("1"), done=("1",), extra_progress={"1": "  - Attempts: count=1"}
+    )
 
     finished = next_action(task)
 

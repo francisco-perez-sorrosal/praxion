@@ -1,7 +1,8 @@
 ---
-id: dec-draft-60ae24db
+id: dec-473
+draft_id: dec-draft-60ae24db
 title: "The step-loop Stop guard bounds its per-Stop transcript reading by count, bytes and its own deadline, and lets the stop through at a bound"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "The outstanding-request probe examines transcripts newest first, at most 64 files and 16 MiB, before a 5 s deadline; reaching a bound before a hold lets the stop through"

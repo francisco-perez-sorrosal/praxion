@@ -23,7 +23,7 @@ re_affirms: null
 re_affirmed_by: null
 retired_by: null
 supersedes_in_part: null
-superseded_in_part_by: [dec-draft-60ae24db]
+superseded_in_part_by: [dec-473]
 dissent: null
 ---
 

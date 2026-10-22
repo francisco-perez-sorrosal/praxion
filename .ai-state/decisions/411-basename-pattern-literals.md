@@ -16,7 +16,7 @@ affected_files:
   - scripts/_test_inventory.py
   - skills/testing-strategy/references/test-selection.md
 affected_reqs: [REQ-04, REQ-05, REQ-06, REQ-07, REQ-10]
-superseded_in_part_by: [dec-draft-3c42fa4b]
+superseded_in_part_by: [dec-471]
 ---
 
 ## Context

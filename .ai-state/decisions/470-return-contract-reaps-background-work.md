@@ -1,7 +1,8 @@
 ---
-id: dec-draft-1989de75
+id: dec-470
+draft_id: dec-draft-1989de75
 title: "Every agent reaps its background work before its final message, through the universal return-contract block"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "One sentence added to claude/kernels/src/return-contract.md and regenerated into every definition and kernel: stop or await every background job before the final message, bound every watcher, a process-name watcher must exclude shells"

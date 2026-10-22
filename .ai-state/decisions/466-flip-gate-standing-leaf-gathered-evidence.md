@@ -1,7 +1,8 @@
 ---
-id: dec-draft-87eed51f
+id: dec-466
+draft_id: dec-draft-87eed51f
 title: "The flip gate's run readers share one stdlib standing leaf, results files are gathered before judging, and an unreadable earlier part is named"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-22
 summary: "New scripts/kernel_run_standing.py holds the one Standing value and typed-read helpers for both run readers; check_kernel_manifest.gather reads the results files into run evidence the judging takes as an argument; an unreadable part of a continued run's lineage gets I9-run-part-unreadable naming the file"

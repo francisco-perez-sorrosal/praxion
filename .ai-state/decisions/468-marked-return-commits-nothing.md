@@ -1,7 +1,8 @@
 ---
-id: dec-draft-6250d858
+id: dec-468
+draft_id: dec-draft-6250d858
 title: "A [CONFLICT] or [BLOCKED] return commits nothing and stops; status and next read one state"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "record never commits or ticks a step, ordinary or goal, whose return carries [CONFLICT] or [BLOCKED], keeps every edit, records a null commit and stops naming the paths left uncommitted (five names and a count); a marked series is never done, and status reads marked as next does"

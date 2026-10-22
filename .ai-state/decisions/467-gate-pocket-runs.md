@@ -1,7 +1,8 @@
 ---
-id: dec-draft-db4e6884
+id: dec-467
+draft_id: dec-draft-db4e6884
 title: "The step-loop gate runs each pocket detached under the pocket's own declared bound, keeps a cut-off run's evidence and feeds it to the next attempt"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-22
 summary: "Scope runs move into a new pocket-run module: detached, re-attachable across record calls, bounded per pocket (override, declared gate-timeout-seconds, default 540 s); a cut-off run is red, names its pocket and keeps every failure seen; the next attempt's prompt carries that evidence; green blocks summarise the selection"

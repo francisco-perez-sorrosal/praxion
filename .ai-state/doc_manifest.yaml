@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-21T03:23:16Z'
+generated_at: '2026-10-22T20:38:25Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -479,7 +479,7 @@ surfaces:
   path: docs/lean-spawn-kernels.md
   type: markdown
   title: 'Lean spawn: role kernels and the adoption ledger'
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-22'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -634,13 +634,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -2974,14 +2974,14 @@ surfaces:
   path: .ai-state/decisions/386-test-results-fixed-shape.md
   type: markdown
   title: TEST_RESULTS.md has a fixed green-step shape, bounded by a byte ceiling the verifier checks; failures-only is the test-invocation default
-  last_modified: '2026-09-17'
+  last_modified: '2026-10-21'
   renderer: adr_card
 - id: ai-state-decisions-387-intentional-compaction-handoff
   path: .ai-state/decisions/387-intentional-compaction-handoff.md
   type: markdown
   title: "The phase-boundary handoff is the mechanism: a Tier-3 HANDOFF.md with verbatim user constraints and a readiness gate, plus a SessionStart(compact) safety net \u2014 Praxion sets no utilisation\
     \ band"
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: adr_card
 - id: ai-state-decisions-388-mutation-sensor
   path: .ai-state/decisions/388-mutation-sensor.md
@@ -3119,13 +3119,13 @@ surfaces:
   path: .ai-state/decisions/410-outer-loop-provenance-and-reverse-barrier.md
   type: markdown
   title: "Outer-loop reverse barrier and provenance without a hook \u2014 driver layer, owning steps, pending accounting, verifier history checks"
-  last_modified: '2026-09-29'
+  last_modified: '2026-10-21'
   renderer: adr_card
 - id: ai-state-decisions-411-basename-pattern-literals
   path: .ai-state/decisions/411-basename-pattern-literals.md
   type: markdown
   title: Slash-less wildcard literals select only their test holders and account only for data files
-  last_modified: '2026-09-30'
+  last_modified: '2026-10-21'
   renderer: adr_card
 - id: ai-state-decisions-412-raise-spawn-budgets
   path: .ai-state/decisions/412-raise-spawn-budgets.md
@@ -3427,7 +3427,7 @@ surfaces:
   path: .ai-state/decisions/461-eligibility-pin-in-gate-implementer-eligible.md
   type: markdown
   title: The flip gate holds the eligible roles in its own module and reads run evidence from a digest-checked run index; the implementer becomes eligible
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: adr_card
 - id: ai-state-decisions-462-flip-rule-amendment-own-discordance-continuation
   path: .ai-state/decisions/462-flip-rule-amendment-own-discordance-continuation.md
@@ -3445,19 +3445,67 @@ surfaces:
   path: .ai-state/decisions/464-orientation-reports-driver-position.md
   type: markdown
   title: During a step loop the post-compaction orientation reports the driver's position and the outstanding request's record command, read from the driver's status
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-21'
   renderer: adr_card
 - id: ai-state-decisions-465-step-loop-stop-guard
   path: .ai-state/decisions/465-step-loop-stop-guard.md
   type: markdown
   title: A Stop hook holds the orchestrator's stop once when a step-loop agent of this session has ended unrecorded, judged by the driver's own end evidence
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-21'
+  renderer: adr_card
+- id: ai-state-decisions-466-flip-gate-standing-leaf-gathered-evidence
+  path: .ai-state/decisions/466-flip-gate-standing-leaf-gathered-evidence.md
+  type: markdown
+  title: The flip gate's run readers share one stdlib standing leaf, results files are gathered before judging, and an unreadable earlier part is named
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-467-gate-pocket-runs
+  path: .ai-state/decisions/467-gate-pocket-runs.md
+  type: markdown
+  title: The step-loop gate runs each pocket detached under the pocket's own declared bound, keeps a cut-off run's evidence and feeds it to the next attempt
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-468-marked-return-commits-nothing
+  path: .ai-state/decisions/468-marked-return-commits-nothing.md
+  type: markdown
+  title: A [CONFLICT] or [BLOCKED] return commits nothing and stops; status and next read one state
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-469-outer-loop-fixture-allowlist-class
+  path: .ai-state/decisions/469-outer-loop-fixture-allowlist-class.md
+  type: markdown
+  title: A scanner allowlist entry anchored in the outer-loop directories is its own path class and may ride the acceptance-design commit
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-470-return-contract-reaps-background-work
+  path: .ai-state/decisions/470-return-contract-reaps-background-work.md
+  type: markdown
+  title: Every agent reaps its background work before its final message, through the universal return-contract block
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-471-selection-bare-names-pocket-scoped
+  path: .ai-state/decisions/471-selection-bare-names-pocket-scoped.md
+  type: markdown
+  title: A bare file name, a single-segment import stem and a layout pairing connect only within one pocket
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-472-status-emits-attempt-cap
+  path: .ai-state/decisions/472-status-emits-attempt-cap.md
+  type: markdown
+  title: status --json reports each step's attempt cap and the orientation reads it; the mirrored constant is retired
+  last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-473-stop-guard-per-stop-bounds
+  path: .ai-state/decisions/473-stop-guard-per-stop-bounds.md
+  type: markdown
+  title: The step-loop Stop guard bounds its per-Stop transcript reading by count, bytes and its own deadline, and lets the stop through at a bound
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-19'
+  last_modified: '2026-10-20'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3698,6 +3746,12 @@ surfaces:
   - ai-state-decisions-457-startup-and-routing-instruments
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+- id: ai-state-specs-spec-loop-gate-hardening-2026-10-20
+  path: .ai-state/specs/SPEC_loop-gate-hardening_2026-10-20.md
+  type: markdown
+  title: 'Spec: loop-gate-hardening (the session-stall fixes and the flip gate''s evidence)'
+  last_modified: '2026-10-20'
+  renderer: default_markdown
 - id: ai-state-specs-spec-merge-triggers-2026-10-03
   path: .ai-state/specs/SPEC_merge-triggers_2026-10-03.md
   type: markdown
@@ -4300,6 +4354,14 @@ groups:
   - ai-state-decisions-463-flip-gate-evidence-from-results-files
   - ai-state-decisions-464-orientation-reports-driver-position
   - ai-state-decisions-465-step-loop-stop-guard
+  - ai-state-decisions-466-flip-gate-standing-leaf-gathered-evidence
+  - ai-state-decisions-467-gate-pocket-runs
+  - ai-state-decisions-468-marked-return-commits-nothing
+  - ai-state-decisions-469-outer-loop-fixture-allowlist-class
+  - ai-state-decisions-470-return-contract-reaps-background-work
+  - ai-state-decisions-471-selection-bare-names-pocket-scoped
+  - ai-state-decisions-472-status-emits-attempt-cap
+  - ai-state-decisions-473-stop-guard-per-stop-bounds
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4341,6 +4403,7 @@ groups:
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
+  - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30

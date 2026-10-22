@@ -1,7 +1,8 @@
 ---
-id: dec-draft-4502a925
+id: dec-472
+draft_id: dec-draft-4502a925
 title: "status --json reports each step's attempt cap and the orientation reads it; the mirrored constant is retired"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "Each status row gains attempt_cap (2, or a goal step's iteration budget); the post-compaction orientation renders attempts against it and drops its copy of ATTEMPT_CAP and the parity test"

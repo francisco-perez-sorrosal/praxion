@@ -21,7 +21,7 @@ affected_files:
   - scripts/test_check_test_results_shape.py
   - .ai-state/TEST_TOPOLOGY.md
 affected_reqs: []
-superseded_in_part_by: [dec-draft-db4e6884]
+superseded_in_part_by: [dec-467]
 ---
 
 ## Context

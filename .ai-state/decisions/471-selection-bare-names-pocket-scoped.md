@@ -1,7 +1,8 @@
 ---
-id: dec-draft-3c42fa4b
+id: dec-471
+draft_id: dec-draft-3c42fa4b
 title: "A bare file name, a single-segment import stem and a layout pairing connect only within one pocket"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "Bare-basename literals and test_<stem> layout pairs no longer cross pocket boundaries, nor a single-segment flat-stem import unless exactly one file in the repository bears the stem; slash literals, globs, dotted imports and declared deps still do; a path left with no connection widens"

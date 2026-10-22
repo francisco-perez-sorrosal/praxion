@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d47d4f40
+id: dec-469
+draft_id: dec-draft-d47d4f40
 title: "A scanner allowlist entry anchored in the outer-loop directories is its own path class and may ride the acceptance-design commit"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-22
 summary: "New path class between inner-loop test and state/doc: a .gitleaks.toml change whose full diff only adds comments and allowlist paths entries beginning ^tests/acceptance/ or ^tests/e2e/ and removes or changes no non-comment line; any other change to the file is production; verifier and test-engineer follow"

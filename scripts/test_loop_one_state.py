@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -16,8 +17,22 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from _loop_fields import GoalBudget  # noqa: E402
-from _loop_state_testkit import PLAIN_STEP, one, read, rec, verdict, verified  # noqa: E402
-from _step_loop_action import Stop, next_action  # noqa: E402
+from _loop_state_testkit import (  # noqa: E402
+    ACCEPT,
+    FORCED_STEP,
+    PARTIAL,
+    PLAIN_STEP,
+    PLAN,
+    REVISE,
+    one,
+    read,
+    rec,
+    reviewed,
+    revised,
+    verdict,
+    verified,
+)
+from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
 from _step_loop_state import (  # noqa: E402
     DoneOutside,
     Exhausted,
@@ -27,6 +42,8 @@ from _step_loop_state import (  # noqa: E402
     Marked,
     NotDriven,
     Running,
+    Series,
+    StateWord,
     Verified,
     step_series,
     step_state_word,
@@ -68,11 +85,16 @@ def test_a_series_state_reads_as_its_one_word(name):
     assert step_state_word(state) == word
 
 
-def test_every_word_a_state_gives_is_in_the_closed_set():
+def test_the_closed_set_of_words_is_the_one_the_type_declares():
+    assert set(get_args(StateWord)) == CLOSED_SET
+
+
+def test_every_state_kind_has_a_case_and_every_case_gives_a_word_of_the_closed_set():
+    assert {type(state) for state, _ in STATES.values()} == set(get_args(Series))
     assert {word for _, word in STATES.values()} == CLOSED_SET
 
 
-def test_a_stalled_goal_reads_as_exhausted_like_the_reconciler_and_the_stop_say_it_ended():
+def test_a_stalled_goal_reads_as_attempts_exhausted_though_its_stop_names_the_stall():
     goal = one("**Assignee**: implementer", "**Iterations**: 6")
     stalled = Exhausted((rec(goal, 1), rec(goal, 2)), GoalBudget(6))
 
@@ -95,6 +117,55 @@ def test_a_verified_record_reads_as_verified_complete():
     )
 
     assert step_state_word(step_series(STEP_ONE, inputs)) == "verified-complete"
+
+
+SECOND_REVIEW = rec(FORCED_STEP, 1, "review", verdict="verified-complete", round_=2)
+VERIFIED_AND_REVIEWED = [verified(FORCED_STEP), reviewed(FORCED_STEP)]
+
+
+@pytest.mark.parametrize(
+    ("records", "reviews", "word", "acts"),
+    [
+        pytest.param([verified(FORCED_STEP)], {}, "pending", "review", id="review-due"),
+        pytest.param([verified(FORCED_STEP)], {"1": PARTIAL}, "in-flight", "review", id="asked"),
+        pytest.param(VERIFIED_AND_REVIEWED, {"1": REVISE}, "pending", "revise", id="revise-due"),
+        pytest.param(VERIFIED_AND_REVIEWED, {}, "human-verdict", "review-unfinished", id="no-file"),
+        pytest.param(
+            [*VERIFIED_AND_REVIEWED, revised(FORCED_STEP, ok=False)],
+            {"1": REVISE},
+            "human-verdict",
+            "revision-failed",
+            id="revision-failed",
+        ),
+        pytest.param(
+            [*VERIFIED_AND_REVIEWED, revised(FORCED_STEP), SECOND_REVIEW],
+            {"1": REVISE},
+            "human-verdict",
+            "review-revised-twice",
+            id="revised-twice",
+        ),
+    ],
+)
+def test_a_verified_step_whose_review_is_not_satisfied_is_not_shown_complete(
+    records, reviews, word, acts
+):
+    inputs = read(PLAN, records=records, reviews=reviews)
+
+    acted = next_action(inputs)
+
+    assert step_state_word(step_series(FORCED_STEP, inputs)) == word
+    assert isinstance(acted, (Spawn, Stop))
+    assert (acted.key.kind if isinstance(acted, Spawn) else acted.cause) == acts
+
+
+@pytest.mark.parametrize("file", [ACCEPT, None])
+def test_a_verified_step_with_its_review_satisfied_is_shown_complete(file):
+    forced = file is not None
+    step = FORCED_STEP if forced else PLAIN_STEP
+    records = [verified(step), *([reviewed(step)] if forced else [])]
+    inputs = read([step], records=records, reviews={"1": file} if forced else {})
+
+    assert step_state_word(step_series(step, inputs)) == "verified-complete"
 
 
 def test_a_marked_step_stops_the_loop_with_a_cause_that_names_the_marker_status_shows():

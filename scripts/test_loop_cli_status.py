@@ -147,7 +147,7 @@ def test_a_step_done_outside_the_loop_shows_verified_complete(tmp_path):
     assert [row["verdict"] for row in status["steps"]] == ["verified-complete"]
 
 
-def test_a_step_not_yet_run_shows_pending_in_the_table_and_the_json(tmp_path):
+def test_a_step_not_yet_run_shows_pending_in_the_json(tmp_path):
     root = build(tmp_path)
 
     status = call(root, "status", "--json").doc

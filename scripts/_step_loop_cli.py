@@ -50,6 +50,9 @@ from _step_loop_state import (
 )
 from iteration_ledger import IterationRecord
 
+# The envelope shape is unchanged, so SCHEMA stays 1. A status row's `verdict` is now one of the
+# `StateWord` set: the reconciler's own words (`mismatch`, `partial@<point>`, `unknown`,
+# `blocked`) no longer reach it, and no consumer in the repository read them.
 SCHEMA = 1
 SCRIPT = "step_loop.py"
 SELF_HOST_INVOCATION = f"python3 scripts/{SCRIPT}"

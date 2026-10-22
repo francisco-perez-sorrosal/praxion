@@ -33,7 +33,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, Union, assert_never
 
 from _loop_fields import (
     AnyAttempt,
@@ -45,7 +45,20 @@ from _loop_fields import (
     request_cap,
 )
 from _plan_steps import Implementer, PlanStep
-from _step_loop_review import NotRequired, ReviewState, needs_review, review_state, satisfied
+from _step_loop_review import (
+    Accepted,
+    Due,
+    NotRequired,
+    Requested,
+    ReviewState,
+    RevisedTwice,
+    ReviseDue,
+    RevisionFailed,
+    Unfinished,
+    needs_review,
+    review_state,
+    satisfied,
+)
 
 if TYPE_CHECKING:
     from iteration_ledger import IterationRecord
@@ -239,8 +252,9 @@ def is_done(state: Series) -> bool:
 
 
 # The word a series state is shown as. Two states share a word with a sibling because the
-# acceptance tests that pin `status` read them so: a goal step that stalled is exhausted (a
-# person reads the stall off the stop's cause) and a step done outside the loop is verified.
+# acceptance tests that pin `status` read them so: a goal step that stalled is attempts-exhausted
+# (its stop's cause, `stalled`, is the one place a person reads the stall) and a step done
+# outside the loop is verified-complete.
 StateWord = Literal[
     "pending",
     "in-flight",
@@ -250,25 +264,45 @@ StateWord = Literal[
     "attempts-exhausted",
     "human-verdict",
 ]
-_PLAIN_WORDS: dict[type, StateWord] = {
-    Fresh: "pending",
-    NotDriven: "pending",
-    Running: "in-flight",
-    Failed: "failed",
-    Exhausted: "attempts-exhausted",
-    Marked: "marked",
-    Verified: "verified-complete",
-    DoneOutside: "verified-complete",
-}
 
 
 def step_state_word(state: Series) -> StateWord:
-    """The one word `status` shows for a step, agreeing with the cause `next` stops on. The
-    reconciler's own word never reaches it: a marked return whose check passes is
-    `verified-complete` to the reconciler and still `marked` here."""
+    """The one word `status` shows for a step, from the state `next` acts on. The reconciler's
+    own word never reaches it: a marked return whose check passes is `verified-complete` to the
+    reconciler and still `marked` here. Only two states differ from the cause `next` stops on:
+    a spent goal bound (`stalled`) and a verified step whose review stands between it and done."""
+    if isinstance(state, (Fresh, NotDriven)):
+        return "pending"
+    if isinstance(state, Running):
+        return "in-flight"
+    if isinstance(state, Failed):
+        return "failed"
+    if isinstance(state, Exhausted):
+        return "attempts-exhausted"
+    if isinstance(state, Marked):
+        return "marked"
+    if isinstance(state, Verified):
+        return _verified_word(state.review)
+    if isinstance(state, DoneOutside):
+        return "verified-complete"
     if isinstance(state, HumanVerdict):
         return "attempts-exhausted" if state.verdict == EXHAUSTED else "human-verdict"
-    return _PLAIN_WORDS[type(state)]
+    assert_never(state)
+
+
+def _verified_word(review: ReviewState) -> StateWord:
+    """A verified step is complete only once its review is satisfied; until then `next` spawns
+    the review or revision (nothing outstanding: pending; its request out: in-flight) or stops
+    for a person."""
+    if isinstance(review, (NotRequired, Accepted)):
+        return "verified-complete"
+    if isinstance(review, (Due, ReviseDue)):
+        return "pending"
+    if isinstance(review, Requested):
+        return "in-flight"
+    if isinstance(review, (RevisedTwice, Unfinished, RevisionFailed)):
+        return "human-verdict"
+    assert_never(review)
 
 
 def is_driven(step: PlanStep) -> bool:

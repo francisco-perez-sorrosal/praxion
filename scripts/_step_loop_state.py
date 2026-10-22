@@ -273,8 +273,10 @@ def step_state_word(state: Series) -> StateWord:
     on for an exhausted bound and a human verdict. It differs where `next` has no stop of that
     name: a spent goal bound reads `attempts-exhausted` (the stop's cause is `stalled`), a
     marked step reads `marked` (the stop is `blocked-marker` or `conflict-marker`), a step the
-    loop does not drive reads `pending` (the stop is `not-driven`), and a verified step whose
-    review is unsatisfied reads by what `next` does about it."""
+    loop does not drive reads `pending` (the stop is `not-driven`), a marked step that `is_done`
+    reads `verified-complete` while `next` still stops on its marker for as long as another step
+    remains, and a verified step whose review is unsatisfied reads by what `next` does about
+    it."""
     if isinstance(state, (Fresh, NotDriven)):
         return "pending"
     if isinstance(state, Running):

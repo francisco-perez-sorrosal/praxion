@@ -33,6 +33,7 @@ from _loop_state_testkit import (  # noqa: E402
     verdict,
     verified,
 )
+from _loop_state_testkit import SECOND as SECOND_STEP  # noqa: E402
 from _step_loop_action import Complete, Spawn, Stop, next_action  # noqa: E402
 from _step_loop_state import (  # noqa: E402
     DoneOutside,
@@ -188,6 +189,16 @@ def test_a_done_marked_step_that_is_the_last_left_is_shown_complete_as_next_answ
     assert (type(state), is_done(state)) == (Marked, True)
     assert step_state_word(state) == "verified-complete"
     assert isinstance(next_action(inputs), Complete)
+
+
+def test_a_done_marked_step_with_another_step_left_is_shown_complete_while_next_stops_on_its_marker():
+    committed = replace(verified(STEP_ONE), commit="abc1234")
+    inputs = read([STEP_ONE, SECOND_STEP], records=[committed, rec(STEP_ONE, 2, stop="blocked")])
+
+    stopped = next_action(inputs)
+
+    assert step_state_word(step_series(STEP_ONE, inputs)) == "verified-complete"
+    assert (type(stopped), stopped.cause) == (Stop, "blocked-marker")
 
 
 def test_a_marked_step_stops_the_loop_with_a_cause_that_names_the_marker_status_shows():

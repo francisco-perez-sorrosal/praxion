@@ -9,6 +9,8 @@ Bound here, because the specification or the base commit fixes them:
 
 - a gate's block in `TEST_RESULTS.md` opens on a `## Step <id>` heading that names the
   request it gated and runs to the next level-2 heading;
+- a pocket's time bound is set through the environment variable `POCKET_TIMEOUTS_VARIABLE`,
+  `<pocket root>=<seconds>` entries joined by commas, in the task environment `record` sees;
 - the shape checker is `scripts/check_test_results_shape.py FILE`, exit 0 clean;
 - the next attempt's prompt is the file the spawn request's `prompt_path` names;
 - the step `next` acts on is its spawn request's step, or its stop's step;
@@ -16,7 +18,6 @@ Bound here, because the specification or the base commit fixes them:
 
 Not yet bound (each raises until a binding step binds it to the designed interface):
 
-- how a scenario sets the time bound the gate allows one pocket's run;
 - where `status --json` reports the attempt cap of each step.
 """
 
@@ -48,19 +49,23 @@ def pocket_config(name: str) -> str:
     )
 
 
-# -- The gate's time bound for one pocket (not yet bound) ---------------------------------
+# -- The gate's time bound for one pocket --------------------------------------------------
 
-
-class PocketBoundNotBoundError(NotImplementedError):
-    pass
+POCKET_TIMEOUTS_VARIABLE = "PRAXION_STEP_LOOP_POCKET_TIMEOUTS"
 
 
 def bound_pocket_run(task: LoopTask, pocket_root: str, seconds: int) -> None:
-    """Make the gate allow the run of the pocket rooted at `pocket_root` at most `seconds`."""
-    raise PocketBoundNotBoundError(
-        "a scenario cannot yet set the time bound the gate allows one pocket's run: "
-        f"wanted {seconds} s for the pocket at {pocket_root!r} of {task.root}"
-    )
+    """Make the gate allow the run of the pocket rooted at `pocket_root` at most `seconds`.
+
+    Other pockets keep their bounds: the entry names this pocket alone, and an entry already
+    set for another pocket stays beside it.
+    """
+    kept = [
+        entry
+        for entry in task.env.get(POCKET_TIMEOUTS_VARIABLE, "").split(",")
+        if entry and entry.partition("=")[0] != pocket_root
+    ]
+    task.env[POCKET_TIMEOUTS_VARIABLE] = ",".join([*kept, f"{pocket_root}={seconds}"])
 
 
 # -- What the gate wrote ------------------------------------------------------------------

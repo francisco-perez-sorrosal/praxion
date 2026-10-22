@@ -43,6 +43,7 @@ def _return_marked(tmp_path, marker):
     task = build_loop(tmp_path, Step("1"), Step("2"))
     head_before = head(task)
     asked = next_action(task)
+    assert asked.request is not None, asked.doc
     agent_id = work_on(task, asked.request, COMPLETE_WORK_MARKED[marker])
     left = {path: (task.root / path).read_bytes() for path in STEP_FILES}
     returned = record(task, asked.request["id"], agent_id=agent_id, marker=marker)
@@ -53,6 +54,7 @@ def _return_marked(tmp_path, marker):
 def test_a_marked_return_whose_check_passes_commits_nothing(tmp_path, marker):
     task, head_before, _, returned = _return_marked(tmp_path, marker)
 
+    assert returned.recorded is not None, returned.doc
     assert returned.recorded["commit"] is None, returned.doc
     assert head(task) == head_before
 
@@ -83,6 +85,7 @@ def test_a_marked_return_stops_naming_the_step_the_marker_and_each_uncommitted_f
 
     said = returned.text()
     assert returned.outcome == "needs-human", returned.doc
+    assert returned.stop is not None, returned.doc
     assert step_id_of(returned.stop["step"]) == "1"
     assert marker in said.lower(), said
     assert all(path in said for path in STEP_FILES), said
@@ -95,6 +98,9 @@ def test_a_conflicted_step_stops_with_the_same_cause_until_its_block_is_revised(
     once_more = next_action(task)
 
     assert again.outcome == "needs-human", again.doc
+    assert returned.stop is not None, returned.doc
+    assert again.stop is not None, again.doc
+    assert once_more.stop is not None, once_more.doc
     assert again.stop["cause"] == returned.stop["cause"] == once_more.stop["cause"]
     assert step_id_of(again.stop["step"]) == "1"
 
@@ -106,6 +112,7 @@ def test_after_the_revision_the_step_restarts_at_attempt_one_naming_the_kept_edi
     resumed = next_action(task)
 
     assert resumed.outcome == "spawn", resumed.doc
+    assert resumed.request is not None, resumed.doc
     assert step_id_of(resumed.request["step"]) == "1"
     assert resumed.request["attempt"] == 1
     prompt = prompt_of(resumed)
@@ -118,6 +125,8 @@ def test_the_conflicting_attempt_counts_as_one_iteration_of_the_loop(tmp_path):
 
     resumed = next_action(task)
 
+    assert returned.iterations is not None, returned.doc
+    assert resumed.iterations is not None, resumed.doc
     assert returned.iterations["used"] == 1, returned.doc
     assert resumed.iterations["used"] >= 1, resumed.doc
 
@@ -165,7 +174,9 @@ def _failed(tmp_path):
 
 def _exhausted(tmp_path):
     task = build_loop(tmp_path, Step("1"), Step("2"))
-    cap = next_action(task).request["attempt_cap"]
+    asked = next_action(task)
+    assert asked.request is not None, asked.doc
+    cap = asked.request["attempt_cap"]
     for _ in range(cap):
         attempt(task, Work(passes=False))
     return task

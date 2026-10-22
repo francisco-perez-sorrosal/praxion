@@ -53,6 +53,7 @@ def _loop_with_slow_pocket(tmp_path, slow_tests_text):
 
 def _one_gate(task, work):
     asked = next_action(task)
+    assert asked.request is not None, asked.doc
     agent_id = work_on(task, asked.request, work)
     returned = record(task, asked.request["id"], agent_id=agent_id, marker=work.final_marker)
     return asked.request["id"], returned
@@ -68,6 +69,7 @@ def test_a_pocket_run_past_its_bound_is_cut_off_and_the_gate_is_red(tmp_path):
 
     request_id, returned = _one_gate(task, work)
 
+    assert returned.recorded is not None, returned.doc
     assert returned.recorded["gate"]["verdict"] != "verified-complete", returned.doc
     assert returned.recorded["commit"] is None
     assert head(task) == head_before
@@ -151,6 +153,7 @@ def test_a_record_call_cut_off_and_run_again_never_repeats_a_finished_pocket_run
         )
     )
     asked = next_action(task)
+    assert asked.request is not None, asked.doc
     agent_id = work_on(task, asked.request, work)
     call = pocket_gate.start_record(task, asked.request["id"], agent_id)
     finished_first = pocket_gate.wait_for_lines(log, 2, deadline_seconds=300)[0]
@@ -162,6 +165,7 @@ def test_a_record_call_cut_off_and_run_again_never_repeats_a_finished_pocket_run
 
     runs = log.read_text(encoding="utf-8").splitlines()
     assert runs.count(finished_first) == 1, f"the finished {finished_first} run repeated: {runs}"
+    assert returned.recorded is not None, returned.doc
     assert returned.recorded["gate"]["verdict"] == "verified-complete", returned.doc
     assert len(commits_after(task, task.base)) == base_commits + 1
 
@@ -197,6 +201,7 @@ def test_a_green_block_for_a_wide_scope_stays_within_the_section_ceiling(tmp_pat
 
     request_id, returned = _one_gate(task, work)
 
+    assert returned.recorded is not None, returned.doc
     assert returned.recorded["gate"]["verdict"] == "verified-complete", returned.doc
     block = gate_block(task, request_id)
     checked = pocket_gate.shape_check(tmp_path, block)
@@ -223,5 +228,6 @@ def test_a_green_block_says_when_a_pocket_run_was_widened(tmp_path):
 
     request_id, returned = _one_gate(task, Work(other_edits=((unmapped, "[app]\nmode = 1\n"),)))
 
+    assert returned.recorded is not None, returned.doc
     assert returned.recorded["gate"]["verdict"] == "verified-complete", returned.doc
     assert "widened" in gate_block(task, request_id).lower()

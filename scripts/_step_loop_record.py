@@ -476,7 +476,7 @@ def declared_max_turns(subagent_type: str) -> int | None:
 
 def read_return(
     seen: Sighting, relayed: Marker, asked: SpawnRequest, max_turns: int | None
-) -> tuple[Marker, str, Warnings]:
+) -> tuple[Marker, StopReason, Warnings]:
     """(the marker that counts, the stop reason, the warnings the transcript gives)."""
     shown = None if seen.unreadable else parse_marker(seen.final_text)
     marker = resolve_marker(shown, relayed)

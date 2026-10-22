@@ -239,7 +239,14 @@ def test_a_step_waiting_for_its_review_holds_back_the_steps_after_it():
     assert (type(chosen), chosen.step.id) == (Next, "1")
 
 
-# --- A marked series is done only when its review is satisfied -------------------------------
+FIRST_SHA, SECOND_SHA, THIRD_SHA = "a" * 40, "b" * 40, "c" * 40
+
+
+def committed(record, sha):
+    return replace(record, commit=sha)
+
+
+# --- A marked series is done only when its review is satisfied and its work is committed ------
 
 BLOCKED_REVISION = [
     verified(FORCED_STEP),
@@ -272,8 +279,8 @@ def test_a_marked_series_with_committed_work_is_done_exactly_when_its_review_is_
     steps, reviews, done
 ):
     step = steps[0]
-    returned = replace(
-        rec(step, 1, "implement", stop="blocked", verdict="verified-complete"), commit=FIRST_SHA
+    returned = committed(
+        rec(step, 1, "implement", stop="blocked", verdict="verified-complete"), FIRST_SHA
     )
     asked = [reviewed(step)] if step is FORCED_STEP else []
 
@@ -291,6 +298,18 @@ def test_a_marked_series_whose_verified_return_holds_no_commit_is_not_done(stop)
     assert (isinstance(state, Marked), is_done(state)) == (True, False)
 
 
+def test_a_marked_revise_return_over_committed_work_leaves_the_series_open():
+    records = [
+        committed(verified(FORCED_STEP), FIRST_SHA),
+        reviewed(FORCED_STEP),
+        rec(FORCED_STEP, 1, "revise", stop="conflict", verdict="verified-complete"),
+    ]
+
+    state = step_series(FORCED_STEP, read(PLAN, records=records, reviews={"1": REVISE}))
+
+    assert (isinstance(state, Marked), is_done(state)) == (True, False)
+
+
 def test_a_conflicted_only_step_whose_check_passed_does_not_complete_the_loop():
     returned = rec(PLAIN_STEP, 1, "implement", stop="conflict", verdict="verified-complete")
 
@@ -300,12 +319,6 @@ def test_a_conflicted_only_step_whose_check_passed_does_not_complete_the_loop():
 
 
 # --- the range a review reads, and the requests a review leaves outstanding --------------------
-
-FIRST_SHA, SECOND_SHA, THIRD_SHA = "a" * 40, "b" * 40, "c" * 40
-
-
-def committed(record, sha):
-    return replace(record, commit=sha)
 
 
 def ranged(*records, step=FORCED_STEP):

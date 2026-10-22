@@ -351,7 +351,7 @@ def test_a_pid_record_that_names_no_process_of_ours_is_never_signalled(make_spec
 
     run = read_run(spec, now=FakeClock(1000.0 + BOUND))
 
-    assert isinstance(run, CutOff)  # and this very process, in group 0, is still here
+    assert isinstance(run, NotStarted)  # and this very process, in group 0, is still here
 
 
 def test_an_unreadable_start_record_is_not_started(make_spec):
@@ -375,3 +375,63 @@ def test_an_unreadable_exit_record_is_not_started(make_spec):
 
     assert isinstance(run, NotStarted)
     assert "exit record" in run.reason
+
+
+def test_a_stale_pid_record_naming_a_live_unrelated_group_is_never_killed(make_spec):
+    bystander = subprocess.Popen(LONG_RUNNING, start_new_session=True)
+    try:
+        spec = make_spec(LONG_RUNNING, bound_seconds=BOUND)
+        spec.run_dir.mkdir(parents=True)
+        spec.start_path.write_text("1000.0\n", encoding="utf-8")
+        spec.pid_path.write_text(f"{bystander.pid}\n", encoding="utf-8")
+        spec.log_path.write_text("$ sleep 600\n", encoding="utf-8")
+
+        run = read_run(spec, now=FakeClock(1000.0 + BOUND))
+
+        assert isinstance(run, NotStarted)
+        assert "without an exit record" in run.reason
+        assert bystander.poll() is None
+    finally:
+        os.killpg(bystander.pid, signal.SIGKILL)
+        bystander.wait(timeout=GUARD_SECONDS)
+
+
+def test_the_launcher_records_its_own_pid_and_leads_the_runs_group(make_spec):
+    spec = make_spec(LONG_RUNNING)
+    run_detached(spec, give_up_at=0.0)
+
+    wait_until(lambda: has_text(spec.pid_path), "the launcher's pid file")
+
+    pid = int(spec.pid_path.read_text(encoding="utf-8"))
+    assert os.getpgid(pid) == pid
+    assert pocket_runs._launcher_is_ours(spec)
+
+
+def test_a_run_started_for_another_command_is_not_adopted_and_is_stopped(make_spec):
+    first = make_spec(python_run("import time; time.sleep(600)"))
+    run_detached(first, give_up_at=0.0)
+    wait_until(lambda: has_text(first.pid_path), "the launcher's pid file")
+    leader = int(first.pid_path.read_text(encoding="utf-8"))
+    other = make_spec(python_run("print('another')"))
+
+    run = run_detached(other, give_up_at=time.time() + GUARD_SECONDS)
+
+    assert isinstance(run, NotStarted)
+    assert "another command or bound" in run.reason
+    wait_until(lambda: not process_exists(leader), "the old run to be stopped")
+
+
+def test_a_run_started_under_another_bound_is_not_adopted(make_spec):
+    first = make_spec(python_run("print('x')"), bound_seconds=BOUND)
+    assert isinstance(run_detached(first, give_up_at=time.time() + GUARD_SECONDS), Finished)
+    longer = make_spec(python_run("print('x')"), bound_seconds=BOUND * 2)
+
+    assert isinstance(run_detached(longer, give_up_at=0.0), NotStarted)
+
+
+def test_the_same_command_and_bound_attach_to_the_run_on_record(make_spec):
+    first = make_spec(python_run("print('x')"))
+    run_detached(first, give_up_at=time.time() + GUARD_SECONDS)
+    again = make_spec(python_run("print('x')"))
+
+    assert isinstance(run_detached(again, give_up_at=time.time() + GUARD_SECONDS), Finished)

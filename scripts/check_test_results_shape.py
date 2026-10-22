@@ -50,6 +50,7 @@ from _step_schema import (
 )
 
 DEFAULT_CEILING_BYTES = 1024
+_CUT_OFF_PREFIX = "Cut off:"  # the step-loop gate names a cut-off pocket on such a line
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,8 @@ def _classify_block(block: StepBlock) -> tuple[str, str | None]:
     block -- td-214's guard against a step reading green from a stale line
     while a later, red one sits unread.
     """
+    if any(line.startswith(_CUT_OFF_PREFIX) for line in block.text.splitlines()):
+        return "red", None  # a run cut off by its bound is red whatever else the block counts
     counts = [line for _, line in block.results if isinstance(line, Counts)]
     if any(c.status == _RED for c in counts):
         return "red", None

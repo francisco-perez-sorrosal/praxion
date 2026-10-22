@@ -549,3 +549,18 @@ def test_live_corpus_cli_reports_each_advisory_and_exits_one(tmp_path: Path, cap
         24,
         4,
     )
+
+
+def test_a_block_naming_a_cut_off_pocket_is_red_and_exempt_from_the_ceiling(tmp_path: Path) -> None:
+    failed = "".join(f"Failed: eval/tests/test_slow.py::test_failure_{n:03d}\n" for n in range(21))
+    block = (
+        "## Step 1 — step-loop gate, s1-a1-implement\n\n"  # id-citation-discipline:ignore
+        "Cut off: eval after 7s (override)\n"
+        + failed
+        + "Finished: pass=3 fail=0 skip=0 pending=0\n"
+        "Result: none — eval cut off after 7s (override)\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", block)
+
+    assert len(block.encode()) > DEFAULT_CEILING_BYTES
+    assert find_findings(path, DEFAULT_CEILING_BYTES) == []

@@ -26,13 +26,19 @@ every later call, so a `record` call cut off at its ceiling loses nothing. A run
 files under its request's directory (`<n>` is the invocation's number):
 
 * `<n>.log` -- the command on its first line, then both output streams;
-* `<n>.start` -- the start time, written once, before the process starts: its existence is what
-  makes a later call attach instead of start;
+* `<n>.start` -- the start time, the command and the bound, written once, before the process
+  starts: its existence is what makes a later call attach instead of start, and a call that asks
+  for another command or bound never adopts the run on record;
 * `<n>.pid` -- the launcher's process id, which leads the run's process group, written by the
-  starting call as soon as the launcher exists;
-* `<n>.exit` -- `<return code> <finish time>`, written by the launcher when the command exits.
+  launcher itself as its first act, so a live run is never without a reference;
+* `<n>.exit` -- `<return code> <finish time>`, written by the launcher when the command exits;
+* `<n>.cut` -- empty, written when the run was killed for outliving its bound, so a later look
+  reads the same verdict.
 
-A run with no exit file past its bound is killed with its whole group. A run that exited later
+A run with no exit file past its bound is killed with its whole group, once the pid on record is
+confirmed to be a live launcher of this run (its command line holds the run's log path); a run whose
+launcher is gone is read as not started. Nothing enforces the bound between calls: a run outliving a
+killed driver is stopped by the next attach, which measures from the recorded start. A run that exited later
 than its start plus its bound is cut off too, though nothing killed it: the verdict follows the
 recorded times, not the moment somebody looked.
 
@@ -227,6 +233,7 @@ class NotStarted:
 
     pocket: str
     reason: str
+    output: str = ""  # what its log held, when it ended without an exit record
 
 
 PocketRun = Union[Finished, CutOff, NotStarted]  # noqa: UP007 -- runtime value, 3.9 floor
@@ -235,14 +242,21 @@ PocketRun = Union[Finished, CutOff, NotStarted]  # noqa: UP007 -- runtime value,
 # --- One run: start it detached, or attach to it ---
 
 POLL_SECONDS = 0.1
-# $1 the log, $2 the exit file, then the command. The shell leads the run's process group (the
-# run starts in a session of its own); the exit file appears whole or not at all.
+# $1 the log, $2 the exit file, $3 the pid file, then the command. The shell leads the run's
+# process group (the run starts in a session of its own) and records its own pid before anything
+# else, so no live run is ever without a reference; the pid and exit files appear whole or not
+# at all.
 _LAUNCHER = r"""
-log=$1; done=$2; shift 2
+log=$1; done=$2; pidfile=$3; shift 3
+printf '%s\n' "$$" > "$pidfile.tmp" && mv "$pidfile.tmp" "$pidfile"
 "$@" >> "$log" 2>&1
 code=$?
 printf '%s %s\n' "$code" "$(date +%s)" > "$done.tmp" && mv "$done.tmp" "$done"
 """
+_PS_TIMEOUT_SECONDS = 10.0
+_PID_RECORD_WAIT_SECONDS = 2.0
+_PID_RECORD_POLL_SECONDS = 0.01
+_PINNED_LINES = 3  # start time, command, bound
 _FIRST_SIGNALLABLE_PID = 2  # pid 1 and group 0 (our own) are never signalled
 _NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
 _FORCED_COLOUR_VARS = ("FORCE_COLOR", "CLICOLOR_FORCE")
@@ -284,6 +298,10 @@ class RunSpec:
     @property
     def exit_path(self) -> Path:
         return self._file("exit")
+
+    @property
+    def cut_path(self) -> Path:
+        return self._file("cut")
 
     def _file(self, suffix: str) -> Path:
         return self.run_dir / f"{self.number}.{suffix}"
@@ -334,11 +352,15 @@ def read_run(spec: RunSpec, now: Callable[[], float] = time.time) -> Observed:
             return StillRunning(spec.pocket, elapsed, spec.bound)
         finish = _read_exit(spec)  # it may have exited between the two looks
         if finish is None:
-            return NotStarted(spec.pocket, "the run ended without an exit record")
+            return _ended_without_record(spec)
     if isinstance(finish, NotStarted):
         return finish
     if finish is None:
-        _kill_group(spec)
+        if _launcher_is_ours(spec):
+            _kill_group(spec)
+            spec.cut_path.touch()  # the cut stays the verdict once the launcher is gone
+        elif not spec.cut_path.exists():  # a stale or planted pid record is never signalled
+            return _ended_without_record(spec)
         return _cut_off(spec)
     returncode, finished_at = finish
     if finished_at - started > spec.bound.seconds:
@@ -355,23 +377,43 @@ def _start_once(spec: RunSpec, now: Callable[[], float]) -> NotStarted | None:
         spec.run_dir.mkdir(parents=True, exist_ok=True)
         descriptor = os.open(spec.start_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     except FileExistsError:
-        return None
+        return _refuse_another_run(spec)
     except OSError as exc:
         return NotStarted(spec.pocket, f"could not start: {exc}")
     with os.fdopen(descriptor, "w", encoding="utf-8") as stamp:
-        stamp.write(f"{now()!r}\n")
+        stamp.write(f"{now()!r}\n{shlex.join(spec.argv)}\n{_bound_text(spec)}\n")
     try:
         spec.log_path.write_text(f"$ {shlex.join(spec.argv)}\n", encoding="utf-8")
-        _record_pid(spec, _launch(spec))
+        _launch(spec)
     except OSError as exc:
         spec.start_path.unlink(missing_ok=True)  # nothing runs: a later call may try again
         return NotStarted(spec.pocket, f"could not start: {exc}")
     return None
 
 
-def _launch(spec: RunSpec) -> int:
-    """Start the launcher in a session of its own; its pid leads the run's process group."""
-    command = ["sh", "-c", _LAUNCHER, "sh", str(spec.log_path), str(spec.exit_path), *spec.argv]
+def _bound_text(spec: RunSpec) -> str:
+    return repr(float(spec.bound.seconds))
+
+
+def _refuse_another_run(spec: RunSpec) -> NotStarted | None:
+    """On attach, the run on record must be the one this call asks for: the command and the
+    bound are pinned in its start record. A run started for another is never adopted -- it is
+    stopped, and this request's run reads as not started. A record not yet whole (the starting
+    call is still writing it) is adopted."""
+    try:
+        lines = spec.start_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    if len(lines) < _PINNED_LINES or lines[1:3] == [shlex.join(spec.argv), _bound_text(spec)]:
+        return None
+    _kill_group(spec)
+    return NotStarted(spec.pocket, "the run on record was started for another command or bound")
+
+
+def _launch(spec: RunSpec) -> None:
+    """Start the launcher in a session of its own; its pid, which it records, leads the group."""
+    files = (str(spec.log_path), str(spec.exit_path), str(spec.pid_path))
+    command = ["sh", "-c", _LAUNCHER, "sh", *files, *spec.argv]
     process = subprocess.Popen(
         command, cwd=spec.cwd, env=no_colour_environment(os.environ),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -380,9 +422,7 @@ def _launch(spec: RunSpec) -> int:
     with warnings.catch_warnings():
         # Detached on purpose: the run outlives this call and is found again through its files.
         warnings.simplefilter("ignore", ResourceWarning)
-        pid = process.pid
         del process
-    return pid
 
 
 def no_colour_environment(environ: Mapping[str, str]) -> dict[str, str]:
@@ -400,18 +440,12 @@ def with_outcome_reports(argv: tuple[str, ...]) -> tuple[str, ...]:
     return (*argv[:at], *_OUTCOME_REPORTS, *argv[at:])
 
 
-def _record_pid(spec: RunSpec, pid: int) -> None:
-    pending = spec.pid_path.with_name(spec.pid_path.name + ".tmp")
-    pending.write_text(f"{pid}\n", encoding="utf-8")
-    pending.replace(spec.pid_path)
-
-
 def _read_start(spec: RunSpec) -> float | NotStarted:
     try:
-        return float(spec.start_path.read_text(encoding="utf-8"))
+        return float(spec.start_path.read_text(encoding="utf-8").splitlines()[0])
     except FileNotFoundError:
         return NotStarted(spec.pocket, "no run was started")
-    except (OSError, ValueError):
+    except (OSError, ValueError, IndexError):
         return NotStarted(spec.pocket, f"the start record {spec.start_path} cannot be read")
 
 
@@ -433,6 +467,10 @@ def _read_log(spec: RunSpec) -> str | None:
         return None
 
 
+def _ended_without_record(spec: RunSpec) -> NotStarted:
+    return NotStarted(spec.pocket, "the run ended without an exit record", _read_log(spec) or "")
+
+
 def _cut_off(spec: RunSpec) -> CutOff:
     output = _read_log(spec) or ""  # a cut-off run is red whether or not its log can be read
     return CutOff(spec.bound, spec.argv, failed_node_ids(output), output, spec.log_path)
@@ -450,24 +488,40 @@ def _leader_pid(spec: RunSpec) -> int | None:
     return pid if pid >= _FIRST_SIGNALLABLE_PID else None
 
 
-def _group_is_alive(spec: RunSpec) -> bool:
-    """Whether the run's group still has a member. A launcher not recorded yet is starting."""
-    pid = _leader_pid(spec)
+def _await_pid_record(spec: RunSpec) -> int | None:
+    """The recorded pid, waiting a moment for a launcher that has only just started to write it."""
+    give_up = time.monotonic() + _PID_RECORD_WAIT_SECONDS
+    while not spec.pid_path.exists() and time.monotonic() < give_up:
+        time.sleep(_PID_RECORD_POLL_SECONDS)
+    return _leader_pid(spec)
+
+
+def _launcher_is_ours(spec: RunSpec) -> bool:
+    """Whether the recorded pid is a live launcher of this very run: its command line holds the
+    run's log path, which no other process has. The pid file is only a claim; it may be stale
+    (the pid reused after a reboot) or written by someone else."""
+    pid = _await_pid_record(spec)
     if pid is None:
-        return True
+        return False
     _reap(pid)
     try:
-        os.killpg(pid, 0)
-    except ProcessLookupError:
+        done = subprocess.run(
+            ["ps", "-ww", "-o", "command=", "-p", str(pid)],
+            capture_output=True, text=True, timeout=_PS_TIMEOUT_SECONDS, check=False,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
         return False
-    except PermissionError:  # a group exists that is not ours: not the run that ended
-        return True
-    return True
+    return str(spec.log_path) in done.stdout
+
+
+def _group_is_alive(spec: RunSpec) -> bool:
+    """Whether the run's launcher still lives. A launcher not recorded yet is starting."""
+    return _leader_pid(spec) is None or _launcher_is_ours(spec)
 
 
 def _kill_group(spec: RunSpec) -> None:
     pid = _leader_pid(spec)
-    if pid is None:
+    if pid is None or not _launcher_is_ours(spec):
         return
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(pid, signal.SIGKILL)

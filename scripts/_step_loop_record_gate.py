@@ -48,7 +48,14 @@ from _step_loop_io import (
     run_check,
     run_derived_scope,
 )
-from _step_loop_pocket_runs import CutOff, Finished, NotStarted, Observed, files_with_outcomes
+from _step_loop_pocket_runs import (
+    CutOff,
+    Finished,
+    NotStarted,
+    Observed,
+    failed_node_ids,
+    files_with_outcomes,
+)
 from _step_loop_state import VERIFIED, LoopInputs, bare_id, is_done, series_states
 from _step_schema import (
     GREEN,
@@ -148,7 +155,7 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     # own command is the plan's one and stays.
     derived = (derived_from(task.repo, changed),) if scope else ()
     command = (f"Command: `{check.command}`",) if check and check.command else ()
-    kept = tuple(render_result_line(run) for run in (scope.kept if scope else ()))
+    kept = tuple(finished_line(run) for run in (scope.kept if scope else ()))
     summary = (*(scope.scopes if scope else ()), *derived)
     body = (
         *summary,
@@ -160,6 +167,12 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     )
     write_gate_block(results, step.id, request, body)
     return Gate(body, any(run.red for run in runs))
+
+
+def finished_line(run: GateRun) -> str:
+    """The counts of runs that finished beside one that did not, in a form that is no `Result:`
+    line: the block keeps one deciding `Result:` line per run, and a red block stays red."""
+    return render_result_line(run).replace(_RESULT_PREFIX, "Finished:", 1)
 
 
 def derived_from(repo: Path, changed: Sequence[str]) -> str:
@@ -251,6 +264,7 @@ def scope_line(pocket: PocketScope, readings: Sequence[_RunReading]) -> str | No
         return None
     counts = [cast(Counts, cast(GateRun, run).counts) for run in runs]
     tests = sum(c.passed + c.failed + c.skipped + c.errors for c in counts)
+    tests += sum(cast(GateRun, run).pending for run in runs)
     logs = [run.output for run in pocket.runs if isinstance(run, Finished)]
     files = pocket.listed_test_files or sum(files_with_outcomes(log) for log in logs)
     named = f" files={files}" if files else ""
@@ -264,20 +278,32 @@ def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunRea
         command = shlex.join(observed.argv)
         run = classify_run(command, observed.output, rule)
         if isinstance(run.counts, NoRun):
-            return _RunReading(command, reason=f"{pocket}: {run.counts.rationale}")
+            seen = _unanswered(observed.output, rule)
+            return _RunReading(command, reason=f"{pocket}: {run.counts.rationale}", failures=seen)
+        if observed.returncode != 0 and not run.red and not run.pending_ids:
+            # A runner that exits non-zero with no failure to show is not a pass.
+            why = f"{pocket}: exited {observed.returncode} with no failure reported"
+            return _RunReading(command, finished=run, reason=why)
         return _RunReading(command, finished=run, failures=run.failed_ids)
     if isinstance(observed, CutOff):
         bound = observed.bound
         cut = f"{pocket} after {bound.seconds:g}s ({bound.source})"
-        seen = tuple(node for node in observed.failed_seen if not rule.is_pending(node))
+        seen = _unanswered(observed.output, rule, observed.failed_seen)
         return _RunReading(
             shlex.join(observed.argv), reason=f"{pocket} cut off after {bound.seconds:g}s "
             f"({bound.source})", cut_off=cut, failures=seen,
         )  # fmt: skip
     if isinstance(observed, NotStarted):
-        return _RunReading("", reason=f"{pocket} did not run ({observed.reason})")
+        seen = _unanswered(observed.output, rule)
+        return _RunReading("", reason=f"{pocket} did not run ({observed.reason})", failures=seen)
     elapsed, bound = f"{observed.elapsed:.0f}", f"{observed.bound.seconds:g}"
     return _RunReading("", reason=f"{pocket} still running after {elapsed}s (bound {bound}s)")
+
+
+def _unanswered(log: str, rule: PendingRule, known: Sequence[str] = ()) -> tuple[str, ...]:
+    """The failures a log streamed (or `known` already) that no later step owns."""
+    nodes = known or failed_node_ids(log)
+    return tuple(node for node in nodes if not rule.is_pending(node))
 
 
 def failure_lines(failures: Sequence[str], where: str) -> tuple[str, ...]:

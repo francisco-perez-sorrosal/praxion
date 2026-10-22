@@ -399,7 +399,8 @@ def test_a_cut_off_run_ends_the_block_on_a_red_result_line_whatever_the_check_sh
     assert (gate.red, gate.deciding) == (True, "Result: none — eval cut off after 7s (override)")
     assert "Cut off: eval after 7s (override)" in body
     assert "Failed: t.py::test_x" in body
-    assert "Result: pass=2 fail=1 skip=0 pending=0 by=step-loop" in body
+    assert "Finished: pass=2 fail=1 skip=0 pending=0 by=step-loop" in body
+    assert [line for line in gate.body if line.startswith("Result:")][-1] == gate.deciding
 
 
 def test_a_cut_off_block_is_read_back_red(monkeypatch, tmp_path):
@@ -737,3 +738,47 @@ def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkey
     gate = gating.run_gate(task, task.inputs.steps[0], REQUEST)
 
     assert "Derived from: 2 declared files differing from 0123456" in gate.body
+
+
+def test_a_run_that_ended_without_a_summary_keeps_the_failures_it_streamed():
+    log = "t.py::test_a FAILED  [ 50%]\nt.py::test_b PASSED [100%]\n"
+
+    reading = read(("eval", finished("eval", log)))
+
+    assert (reading.deciding.red, reading.notes[-1]) == (True, "Failed: t.py::test_a")
+
+
+def test_a_run_that_ended_without_an_exit_record_keeps_the_failures_its_log_streamed():
+    lost = NotStarted(
+        "eval", "the run ended without an exit record", "t.py::test_a FAILED [ 50%]\n"
+    )
+
+    reading = read(("eval", lost))
+
+    assert reading.notes == ("Failed: t.py::test_a",)
+
+
+def test_a_non_zero_exit_with_no_failure_reported_is_red():
+    run = Finished("eval", ("pytest",), 1, PASSED_OUTPUT, LOGS / "1.log")
+
+    reading = read(("eval", run))
+
+    assert (reading.deciding.counts, reading.kept[0].counts) == (
+        NoRun("eval: exited 1 with no failure reported"),
+        Counts(3, 0, 0, 0),
+    )
+
+
+def test_a_non_zero_exit_whose_only_failures_a_later_step_owns_stays_green():
+    output = "FAILED t.py::test_later - x\n== 1 failed, 2 passed in 0.10s =="
+    run = Finished("eval", ("pytest",), 1, output, LOGS / "1.log")
+
+    assert not read(("eval", run), rule=LATER_PENDING).deciding.red
+
+
+def test_the_test_count_of_a_scope_line_includes_the_failures_a_later_step_owns():
+    output = "FAILED t.py::test_later - x\n== 1 failed, 2 passed in 0.10s =="
+
+    reading = read(("eval", finished("eval", output)), rule=LATER_PENDING)
+
+    assert reading.scopes == ("Scope: eval files=1 tests=3 narrow",)

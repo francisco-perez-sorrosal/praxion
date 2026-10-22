@@ -4,7 +4,7 @@ title: "Every agent reaps its background work before its final message, through 
 status: proposed
 category: behavioral
 date: 2026-10-22
-summary: "One sentence added to claude/kernels/src/return-contract.md and regenerated into every definition and kernel: stop or await every background job before the final message, bound every watcher, a process-name watcher excludes shells"
+summary: "One sentence added to claude/kernels/src/return-contract.md and regenerated into every definition and kernel: stop or await every background job before the final message, bound every watcher, a process-name watcher must exclude shells"
 tags: [agents, kernels, return-contract, background-jobs]
 made_by: agent
 agent_type: systems-architect

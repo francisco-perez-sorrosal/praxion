@@ -4,7 +4,7 @@ title: "A scanner allowlist entry anchored in the outer-loop directories is its 
 status: proposed
 category: behavioral
 date: 2026-10-22
-summary: "New path class between inner-loop test and state/doc: a .gitleaks.toml change whose added lines are only comments and allowlist paths anchored in tests/acceptance/ or tests/e2e/; any other change to the file is production; verifier and test-engineer follow"
+summary: "New path class between inner-loop test and state/doc: a .gitleaks.toml change whose full diff only adds comments and allowlist paths entries beginning ^tests/acceptance/ or ^tests/e2e/ and removes or changes no non-comment line; any other change to the file is production; verifier and test-engineer follow"
 tags: [acceptance-design, path-classes, secret-scanning]
 made_by: agent
 agent_type: systems-architect
@@ -26,7 +26,7 @@ td-486. An outer-loop fixture that trips the secret scanner needs a `.gitleaks.t
 
 ## Decision
 
-Insert the class *outer-loop fixture allowlist* after inner-loop test: `.gitleaks.toml`, only in a commit whose added lines are comments and allowlist `paths` entries each anchored (after an optional `^`) at `tests/acceptance/` or `tests/e2e/` with no alternation; any other change to the file is production. Such a change may ride the acceptance-design commit, a commit tied to an answered Spec Question, or a planned driver-binding step. The class is decided by the path and the commit's added lines (`git diff -U0`). The verifier's commit-order audit cites the class by name with a golden bad and good case; the test-engineer's acceptance-design mode may write the entry and names it in its return.
+Insert the class *outer-loop fixture allowlist* after inner-loop test: `.gitleaks.toml`, only in a commit whose whole change to that file (its full diff, each added line placed in the file as of that commit) removes or changes no line other than a comment and adds only comments and entries of the `[allowlist]` `paths` array, each a regex beginning `^tests/acceptance/` or `^tests/e2e/`, with no alternation and no wildcard reaching beyond them; any other change to the file (a removed or changed line, `useDefault`, a rule, a looser or unanchored entry) is production. The wording is stated once, at the `coordination-details.md` Path Classes anchor; the verifier and the test-engineer cite it by name. Such a change may ride the acceptance-design commit, a commit tied to an answered Spec Question, or a planned driver-binding step. The class is decided by the path and the commit's full diff of that file. The acceptance designer reads `.gitleaks.toml` only to place the entry (input class A3, listed under Sources Read). The verifier's commit-order audit cites the class by name with a golden bad and good case; the test-engineer's acceptance-design mode may write the entry and names it in its return.
 
 ## Considered Options
 

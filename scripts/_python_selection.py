@@ -8,12 +8,12 @@ sources, listed in attribution order:
    test under a `conftest.py`'s directory depends on that `conftest.py`;
 2. **import** -- `ast.Import`/`ast.ImportFrom` (relative too) and
    `importlib.import_module("<literal>")`, resolved sibling-first, then from
-   the pocket root / pytest `pythonpath` / `src`, then by flat stem across the
-   pocket (an ambiguous stem connects to every match);
+   the pocket root / pytest `pythonpath` / `src`, then by flat stem (an
+   ambiguous stem connects to every match; see "Pockets" below);
 3. **path-literal** -- any string constant in any pocket module, in one of
    five classes. With a `/`: a path suffix (of the file or of one of its
    directories), or a glob when it has wildcards. Without a `/`: an exact
-   basename, or a basename pattern (`*.md`) matching the basename of a changed
+   basename (see "Pockets" below), or a basename pattern (`*.md`) matching the basename of a changed
    path at any depth. A wildcard literal with no letter or digit outside its
    wildcards (`*`, `.*`, `*.*`) names no file. Suffixes, globs and exact
    basenames are *named* edges that hold at every hop. A basename pattern
@@ -29,6 +29,16 @@ stopping at the first source to connect drops the tests of modules that
 import the changed one. The order above only decides the `via` attribution:
 the kind of the first hop out of the changed path, along the test's shortest
 path to it.
+
+Pockets: a name shared by files of several pockets says nothing about which one
+a reader means, so three connections hold only inside one pocket (the most
+specific pocket a path belongs to): a bare-basename literal, a layout pairing
+(`test_<stem>.py` with `<stem>.py`), and a single-segment flat-stem import. The
+last falls back across pockets only for a stem exactly one file in the
+repository bears, which no other file can be meant by. What names a file with
+more than its basename still crosses pockets: path literals with a `/`, globs,
+dotted imports and declared dependencies. A path left with no connection reaches
+no test and widens, named.
 
 Data files narrow, code widens: a changed file reached only by a basename
 pattern selects its test readers, but stands in for the full suite only when
@@ -230,6 +240,23 @@ def estimate_tests(root: Path, paths: Iterable[str]) -> int:
 # --- The graph -------------------------------------------------------------------
 
 
+class _Pockets:
+    """Which pocket a path belongs to: the one with the longest matching root."""
+
+    def __init__(self, roots: Sequence[str]) -> None:
+        self.roots = tuple(roots)
+        self._longest_first = tuple(sorted(roots, key=lambda r: 0 if r in ("", ".") else -len(r)))
+
+    def of(self, path: str) -> str:
+        for root in self._longest_first:
+            if under(path, root):
+                return root
+        return "."
+
+
+_ROOT_POCKET_ONLY = _Pockets((".",))
+
+
 class Graph:
     """Reverse edges ("who depends on this node?"), computed on demand per kind."""
 
@@ -242,14 +269,15 @@ class Graph:
         pocket_roots: Sequence[str],
     ) -> None:
         self._deps = deps
+        self._pockets = _Pockets(pocket_roots)
         known = set(files) | set(changed)
         self._known = frozenset(known)
         self._test_files = tuple(sorted(path for path in known if is_any_test_file(path)))
         self._py_tests_by_stem = _tests_by_stem(self._test_files)
         modules = sorted(path for path in known if path.endswith(".py"))
-        resolver = _ImportResolver(root, known, pocket_roots)
+        resolver = _ImportResolver(root, known, self._pockets)
         self._importers: dict[str, set[str]] = {}
-        self._literals = _LiteralIndex()
+        self._literals = _LiteralIndex(self._pockets)
         for module in modules:
             tree = _parse(root / module)
             if tree is None:
@@ -287,7 +315,12 @@ class Graph:
         if not name.endswith(".py") or is_any_test_file(node):
             return set()
         stem = directory.rpartition("/")[2] if name == "__init__.py" else name[: -len(".py")]
-        candidates = self._py_tests_by_stem.get(stem, ())
+        pocket = self._pockets.of(node)
+        candidates = [
+            test
+            for test in self._py_tests_by_stem.get(stem, ())
+            if self._pockets.of(test) == pocket
+        ]
         if not candidates:
             return set()
         scores = {test: _common_dir_suffix(node, test) for test in candidates}
@@ -336,10 +369,10 @@ def _common_dir_suffix(first: str, second: str) -> int:
 class _ImportResolver:
     """Maps a module's import statements to the pocket files they load."""
 
-    def __init__(self, root: Path, known: set[str], pocket_roots: Sequence[str]) -> None:
+    def __init__(self, root: Path, known: set[str], pockets: _Pockets) -> None:
         self._known = known
-        self._pockets = tuple(sorted(pocket_roots, key=lambda r: -1 if r in ("", ".") else len(r)))
-        self._bases = {pocket: _import_bases(root, pocket, known) for pocket in pocket_roots}
+        self._pockets = pockets
+        self._bases = {pocket: _import_bases(root, pocket, known) for pocket in pockets.roots}
         self._by_stem: dict[str, list[str]] = {}
         for path in known:
             if path.endswith(".py"):
@@ -367,7 +400,7 @@ class _ImportResolver:
 
     def _resolve_dotted(self, module: str, dotted: str) -> set[str]:
         sibling_dir = module.rpartition("/")[0]
-        pocket = self._pocket_of(module)
+        pocket = self._pockets.of(module)
         for bases in ((sibling_dir,), self._bases.get(pocket, ())):
             found: set[str] = set()
             for base in bases:
@@ -388,18 +421,15 @@ class _ImportResolver:
     def _flat_stem(self, pocket: str, dotted: str) -> set[str]:
         rel = dotted.replace(".", "/")
         suffixes = (f"{rel}.py", f"{rel}/__init__.py")
-        return {
+        matches = {
             path
             for path in self._by_stem.get(dotted.rpartition(".")[2], ())
-            if under(path, pocket)
-            and (path in suffixes or path.endswith(tuple("/" + s for s in suffixes)))
+            if path in suffixes or path.endswith(tuple("/" + s for s in suffixes))
         }
-
-    def _pocket_of(self, path: str) -> str:
-        for pocket in reversed(self._pockets):
-            if under(path, pocket):
-                return pocket
-        return "."
+        if "." in dotted:
+            return {path for path in matches if under(path, pocket)}
+        own = {path for path in matches if self._pockets.of(path) == pocket}
+        return own or (matches if len(matches) == 1 else set())
 
 
 def _import_bases(root: Path, pocket: str, known: set[str]) -> tuple[str, ...]:
@@ -475,7 +505,8 @@ def _literal_class(literal: str) -> _LiteralClass:
 class _LiteralIndex:
     """String constants, indexed so a node looks up only candidate literals."""
 
-    def __init__(self) -> None:
+    def __init__(self, pockets: _Pockets = _ROOT_POCKET_ONLY) -> None:
+        self._pockets = pockets
         self._by_basename: dict[str, set[str]] = {}
         self._by_last_segment: dict[str, list[tuple[str, str]]] = {}
         self._globs: list[tuple[re.Pattern[str], str]] = []
@@ -496,8 +527,13 @@ class _LiteralIndex:
                 self._by_last_segment.setdefault(last, []).append((normalized, module))
 
     def modules_matching(self, node: str) -> set[str]:
-        """Holders of a *named* literal: exact basename, path suffix or path glob."""
-        found = set(self._by_basename.get(node.rpartition("/")[2], ()))
+        """Holders of a *named* literal: exact basename (same pocket only), path suffix or path glob."""
+        pocket = self._pockets.of(node)
+        found = {
+            module
+            for module in self._by_basename.get(node.rpartition("/")[2], ())
+            if self._pockets.of(module) == pocket
+        }
         segments = node.split("/")
         for end in range(len(segments), 0, -1):  # the file itself, then each ancestor directory
             prefix = "/".join(segments[:end])

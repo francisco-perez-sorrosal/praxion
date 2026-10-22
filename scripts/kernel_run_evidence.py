@@ -1,9 +1,9 @@
 """A cited run's results files as the commit gate reads them: plain JSON, no eval code.
 
 The adoption gate judges a run a switched record cites from the results files themselves, never
-from the run index's own standing (the index is only a locator and a digest). `read_run_files`
-parses the files of a results directory once, at the boundary, into frozen values; everything
-after it works on those values.
+from the run index's own standing (the index is only a locator and a digest). `read_results`
+parses the files of a results directory once, at the boundary, into frozen values, and keeps each
+file it could not read with the reason; everything after it works on those values.
 
 What the gate derives itself: a run's lineage (the chain of `continues` links over the files) and
 its complete pairs, which restate the eval's `pairs_of` rule (the latest session of each arm for a
@@ -26,6 +26,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, get_args
 
 from kernel_run_standing import (
@@ -41,6 +42,7 @@ from kernel_run_standing import (
 
 RESULTS_SCHEMA = "adherence/1"
 RESULTS_GLOB = "*.json"
+RESULTS_SUFFIX = ".json"  # a run's results file is named for its id
 CLOSED_ENDING = "closed"
 LEGACY_ENDING = "legacy"  # a file written before runs recorded how they ended
 _UNRECORDED_PART = "run {} is part of a continued run and records no standing"
@@ -119,6 +121,23 @@ class RunFile:
 
 
 @dataclass(frozen=True)
+class RunReading:
+    """What a results directory gave: the files that parsed, and why each other one did not."""
+
+    files: tuple[RunFile, ...]
+    unreadable: Mapping[str, str]  # file name -> why it could not be read
+
+
+@dataclass(frozen=True)
+class UnreadablePart:
+    """A part of a run's lineage whose results file could not be read."""
+
+    run_id: str
+    file: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class Derived:
     """What the gate counts itself for one role of one run: the lineage's parts, oldest first,
     and its complete pairs."""
@@ -130,19 +149,42 @@ class Derived:
 # -- Reading: the boundary ---------------------------------------------------------------
 
 
-def read_run_files(results_dir: Path) -> tuple[RunFile, ...]:
-    """The results files of `results_dir` in file-name order; JSON that is no results file is
-    passed over."""
-    files = []
+def read_results(results_dir: Path) -> RunReading:
+    """The results files of `results_dir` in file-name order, and the files that could not be read.
+
+    JSON that is no results file (the index among them) is passed over; a file that is not text,
+    not JSON, or a results file of a shape this gate cannot parse is kept by name with why.
+    """
+    files: list[RunFile] = []
+    unreadable: dict[str, str] = {}
     for path in sorted(results_dir.glob(RESULTS_GLOB)):
         try:
             data = json.loads(path.read_bytes())
             if isinstance(data, Mapping) and data.get("schema_version") == RESULTS_SCHEMA:
                 files.append(_parse_file(data))
-        except (OSError, ValueError, KeyError, TypeError):  # whatever its shape, it is no run
-            continue
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            unreadable[path.name] = _why_unreadable(exc)
     continued = {file.continues for file in files if file.continues is not None}
-    return tuple(_unless_continued(file, continued) for file in files)
+    return RunReading(
+        tuple(_unless_continued(file, continued) for file in files),
+        MappingProxyType(unreadable),
+    )
+
+
+def read_run_files(results_dir: Path) -> tuple[RunFile, ...]:
+    """The results files of `results_dir` that parsed; the unreadable ones are `read_results`'."""
+    return read_results(results_dir).files
+
+
+def _why_unreadable(exc: Exception) -> str:
+    """The reason a file was kept apart, in words that name what is wrong with it."""
+    if isinstance(exc, UnicodeDecodeError):
+        return f"not text ({exc})"
+    if isinstance(exc, json.JSONDecodeError):
+        return f"not JSON ({exc})"
+    if isinstance(exc, OSError):
+        return f"cannot be read ({exc.strerror or exc})"
+    return f"not a results file this gate can parse ({type(exc).__name__}: {exc})"
 
 
 def _parse_file(data: Mapping[str, Any]) -> RunFile:
@@ -252,6 +294,28 @@ def judged_standing(files: Sequence[RunFile], run_id: str, role: str) -> Flip:
     if tip.ending == CLOSED_ENDING:
         return NOT_CLEAR
     return recorded_standing(files, run_id, role).flip
+
+
+def unreadable_part(
+    files: Sequence[RunFile], unreadable: Mapping[str, str], run_id: str
+) -> UnreadablePart | None:
+    """The unreadable results file `run_id`'s `continues` chain reaches, `run_id`'s own included.
+
+    The chain is followed back through the parsed files; it ends at the first id no parsed file
+    holds. That id is a part of the lineage the files cannot give when `<id>.json` is in
+    `unreadable`; otherwise the chain simply has no such file (a gap for `derive` to refuse).
+    """
+    held = {file.run_id: file for file in files}
+    seen: set[str] = set()
+    reached: str | None = run_id
+    while reached is not None and reached not in seen:
+        seen.add(reached)
+        if reached in held:
+            reached = held[reached].continues
+            continue
+        name = f"{reached}{RESULTS_SUFFIX}"
+        return UnreadablePart(reached, name, unreadable[name]) if name in unreadable else None
+    return None
 
 
 def _lineage_of(files: Sequence[RunFile], run_id: str) -> tuple[RunFile, ...]:

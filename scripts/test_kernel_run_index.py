@@ -23,6 +23,7 @@ import kernel_model as km  # noqa: E402
 import kernel_run_evidence as kre  # noqa: E402
 import kernel_run_index as kri  # noqa: E402
 from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
+from test_kernel_ledger_checks_evidence import gathered  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ROLE = "researcher"
@@ -119,8 +120,8 @@ def switched(*runs: dict, passing: str = PASSING) -> kl.Ledger:
 
 
 def findings(root: Path, ledger: kl.Ledger) -> list[tuple[str, str]]:
-    adherence = kri.read_adherence(root)
-    found = (*lc.run_index_findings(adherence), *lc.cited_run_findings(ledger, adherence))
+    evidence = gathered(root)
+    found = (*lc.run_index_findings(evidence.index), *lc.cited_run_findings(ledger, evidence))
     return [(finding.kind, f"{finding.subject} -- {finding.detail}") for finding in found]
 
 

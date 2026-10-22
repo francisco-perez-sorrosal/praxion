@@ -21,6 +21,7 @@ import kernel_ledger_checks as lc  # noqa: E402
 import kernel_run_evidence as kre  # noqa: E402
 import kernel_run_index as kri  # noqa: E402
 from kernel_eligibility import ELIGIBLE_ROLES  # noqa: E402
+from test_kernel_ledger_checks_evidence import gathered  # noqa: E402
 
 ROLE = "researcher"
 EARLY, PASSING = "20261101T000000Z-early0", "20261102T000000Z-pass00"
@@ -130,7 +131,7 @@ def switched(*runs: dict, passing: str = PASSING) -> kl.Ledger:
 
 
 def findings(tmp_path: Path, ledger: kl.Ledger) -> list[tuple[str, str]]:
-    found = lc.cited_run_findings(ledger, kri.read_adherence(tmp_path))
+    found = lc.cited_run_findings(ledger, gathered(tmp_path))
     return [(finding.kind, f"{finding.subject} -- {finding.detail}") for finding in found]
 
 

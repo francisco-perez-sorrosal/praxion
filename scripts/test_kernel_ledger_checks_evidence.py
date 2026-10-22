@@ -134,8 +134,15 @@ def switched(*runs: dict, passing: str = PASSING) -> kl.Ledger:
     return kl.parse_ledger({"version": 1, "roles": {ROLE: row}}, frozenset(ELIGIBLE_ROLES))
 
 
+def gathered(root: Path) -> lc.RunEvidence:
+    """What the checker's gather hands the judging: every results file read once, beside the index."""
+    index = kri.read_adherence(root)
+    reading = kre.read_results(index.directory)
+    return lc.RunEvidence(reading.files, reading.unreadable, index)
+
+
 def findings(tmp_path: Path, ledger: kl.Ledger) -> list[tuple[str, str]]:
-    found = lc.cited_run_findings(ledger, kri.read_adherence(tmp_path))
+    found = lc.cited_run_findings(ledger, gathered(tmp_path))
     return [(finding.kind, f"{finding.subject} -- {finding.detail}") for finding in found]
 
 
@@ -482,7 +489,7 @@ def test_a_lineage_whose_last_part_records_no_standing_is_refused_naming_role_an
 def test_a_ledger_that_is_not_switched_judges_no_run(tmp_path: Path) -> None:
     plant(tmp_path, whole(PASSING, 5))
 
-    assert lc.cited_run_findings(None, kri.read_adherence(tmp_path)) == ()
+    assert lc.cited_run_findings(None, gathered(tmp_path)) == ()
 
 
 def test_a_trial_record_cites_runs_that_are_not_judged(tmp_path: Path) -> None:

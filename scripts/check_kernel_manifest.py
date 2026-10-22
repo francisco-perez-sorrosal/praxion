@@ -25,6 +25,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-record-incomplete`       | a switched record is eligible and holds every piece of flip evidence, the passing run from the adherence eval; a held record states its reason |
 | `I9-run-index-stale`         | the run index lists every results file beside it, each with the sha256 of its bytes now |
 | `I9-run-missing`             | every run a switched record cites (new, changed or unchanged) has a readable results file in the index |
+| `I9-run-part-unreadable`     | ...whose lineage's results files all read: one that cannot be read is named, with why |
 | `I9-run-wrong-role`          | ...whose results measured that role                                     |
 | `I9-run-pairs-differ`        | ...whose lineage's complete pairs are the record's                      |
 | `I9-run-flag-disagrees`      | ...whose lineage's flip verdict agrees with the record's pass flag      |
@@ -80,6 +81,7 @@ import generate_kernels as gk
 import kernel_ledger as kl
 import kernel_ledger_history as kh
 import kernel_model as km
+import kernel_run_evidence as kre
 import kernel_run_index as kri
 import kernel_sources as ks
 from _repo_root import is_plugin_cache_path, resolve_repo_root
@@ -89,6 +91,7 @@ from kernel_eligibility import ELIGIBLE_ROLES
 # names marked below are re-exported: the tests and their testkit reach them through this one.
 from kernel_ledger_checks import (
     ADHERENCE_ENTRY,  # noqa: F401
+    RunEvidence,
     cited_run_findings,
     deletion_findings,
     eligibility_findings,
@@ -376,7 +379,7 @@ class Evidence:
     parent: kl.ParentLedger | None  # the ledger at HEAD as the moves read it; None: no ledger
     records: Mapping[str, object]  # role -> adoption record as written; empty: no ledger
     parent_flip: kh.ParentFlip | None  # eligible roles, records and definitions at the parent
-    adherence: kri.Adherence  # the run index and the digests of the results files beside it
+    runs: RunEvidence  # the results files read once, the ones unreadable, and the run index
 
 
 def gather(root: Path) -> Evidence:
@@ -403,7 +406,7 @@ def gather(root: Path) -> Evidence:
         _parent_ledger(root),
         kh.written_records(kh.ledger_mapping(ledger_text, km.LEDGER_PATH)),
         kh.parent_flip(root, definitions),
-        kri.read_adherence(root),
+        _gather_runs(root),
     )
 
 
@@ -428,8 +431,8 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *slot_findings(evidence.index_slots, evidence.slot_entries),
         *flip_findings(flags, evidence.statuses),
         *record_findings(evidence.ledger),
-        *run_index_findings(evidence.adherence),
-        *cited_run_findings(evidence.ledger, evidence.adherence),
+        *run_index_findings(evidence.runs.index),
+        *cited_run_findings(evidence.ledger, evidence.runs),
         *transition_findings(evidence.parent, evidence.entries),
         *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),
@@ -443,6 +446,13 @@ def injected_texts(evidence: Evidence) -> dict[str, str]:
     for role, strings in (evidence.index_strings or {}).items():
         texts.update({f"{km.INDEX_PATH} {role} string {n}": s for n, s in enumerate(strings, 1)})
     return texts
+
+
+def _gather_runs(root: Path) -> RunEvidence:
+    """The run index and, once, every results file beside it: the judging reads no file."""
+    index = kri.read_adherence(root)
+    reading = kre.read_results(index.directory)
+    return RunEvidence(reading.files, reading.unreadable, index)
 
 
 def _read_text(path: Path) -> str | None:

@@ -6,8 +6,8 @@ switched record's evidence, the run index against the results files it describes
 switched record cites located by that index and judged from its results files, an eligible list
 the ledger must not carry, the eligible roles held to the parent commit's list, the moves since
 the parent commit, a deleted ledger, and the spawn hook reading every record as PyYAML does. No
-command line; every function takes what it judges as an argument and reads nothing, except
-`cited_run_findings`, which reads the results files of a cited run through `kernel_run_evidence`.
+command line; every function takes what it judges as an argument and reads nothing: the results
+files a cited run needs are gathered by the checker beforehand (`RunEvidence`).
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import importlib
 import re
 import sys
 from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
@@ -149,8 +150,21 @@ def run_index_findings(adherence: kri.Adherence) -> tuple[km.Finding, ...]:
     )
 
 
+@dataclass(frozen=True)
+class RunEvidence:
+    """Everything the cited-run judging needs, gathered by the checker before judging begins.
+
+    `files` are the results files that parsed, `unreadable` the ones that did not (file name to
+    why), `index` the run index with the digest of every file beside it.
+    """
+
+    files: tuple[kre.RunFile, ...]
+    unreadable: Mapping[str, str]
+    index: kri.Adherence
+
+
 def cited_run_findings(
-    ledger: kl.Ledger | km.KernelModelError | None, adherence: kri.Adherence
+    ledger: kl.Ledger | km.KernelModelError | None, evidence: RunEvidence
 ) -> tuple[km.Finding, ...]:
     """I9: every run a switched record cites is judged from its results files, never the index.
 
@@ -161,30 +175,28 @@ def cited_run_findings(
     `kl.REQUIRED_PAIRS` pairs the gate counted itself and must have scored the role's convention
     check (the other cited runs need not). Two parts of one lineage derive the same
     values, so they are one run; a closed lineage stands "not clear", a draw that refuses nothing
-    alone.
+    alone. A run whose `continues` chain reaches a results file that could not be read (its own
+    included) is refused naming that file and why, and judged no further: the lineage the files
+    give is short of a part, so its figures would only look different.
     """
     if not isinstance(ledger, kl.Ledger):
         return ()  # no ledger, or one the model refused: `record_findings` reports that
-    files = kre.read_run_files(adherence.directory)
     return tuple(
         finding
         for role, record in sorted(ledger.records.items())
         if isinstance(record, kl.Switched)
         for run in record.runs
-        for finding in _citation_findings(
-            role, run, run.id == record.passing_run, adherence.lineage_of(run.id), files
-        )
+        for finding in _citation_findings(role, run, run.id == record.passing_run, evidence)
     )
 
 
 def _citation_findings(
-    role: str,
-    run: kl.Run,
-    passing: bool,
-    indexed: kri.Lineage | None,
-    files: Sequence[kre.RunFile],
+    role: str, run: kl.Run, passing: bool, evidence: RunEvidence
 ) -> tuple[km.Finding, ...]:
-    subject = f"role {role}"
+    subject, files = f"role {role}", evidence.files
+    if part := kre.unreadable_part(files, evidence.unreadable, run.id):
+        return (km.Finding("I9-run-part-unreadable", subject, _unreadable_detail(run, part)),)
+    indexed = evidence.index.lineage_of(run.id)
     if indexed is None:
         detail = f"cites run {run.id!r}, which has no readable results file in {kri.RESULTS_DIR}"
         return (km.Finding("I9-run-missing", subject, detail),)
@@ -205,6 +217,12 @@ def _citation_findings(
         *_convention_claims(run, passing, files, role),
     )
     return tuple(km.Finding(kind, subject, detail) for kind, detail in broken)
+
+
+def _unreadable_detail(run: kl.Run, part: kre.UnreadablePart) -> str:
+    """Which file to repair and why, for a run whose lineage the files cannot give."""
+    reached = "" if part.run_id == run.id else f"whose lineage reaches run {part.run_id!r}, "
+    return f"cites run {run.id!r}, {reached}whose results file {part.file} is unreadable: {part.reason}"
 
 
 def _measured_roles(files: Sequence[kre.RunFile], parts: Collection[str]) -> set[str]:

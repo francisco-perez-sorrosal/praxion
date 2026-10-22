@@ -88,6 +88,8 @@ class LoopInputs:
     reviews: Mapping[str, str] = field(default_factory=dict)  # review file text by step id
     unnamed: tuple[str, ...] = ()  # `Attempts:` lines that name no step
     snapshots: tuple[str, ...] = ()  # request ids with a tree snapshot file beside the task
+    uncommitted: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    # ^ a marked step's declared files that differ from HEAD, by step id; no other step has an entry
 
     @classmethod
     def read(

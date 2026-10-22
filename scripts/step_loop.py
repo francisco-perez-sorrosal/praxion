@@ -93,7 +93,14 @@ from _step_loop_render import (
     stop_next_action,
     stop_stderr,
 )
-from _step_loop_state import LoopInputs, request_kind, review_range, series_states, step_cap
+from _step_loop_state import (
+    LoopInputs,
+    Marked,
+    request_kind,
+    review_range,
+    series_states,
+    step_cap,
+)
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
 
@@ -161,9 +168,22 @@ def read_task(args: argparse.Namespace) -> Task:
     inputs = LoopInputs.read(
         steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed, snapshots
     )
+    inputs = replace(inputs, uncommitted=uncommitted_files(repo, inputs))
     brief = directory / BRIEF_FILE
     brief_text = brief.read_text("utf-8") if brief.is_file() else ""
     return Task(args.slug, repo, work, directory, base_ref, wip_text, brief_text, inputs)
+
+
+def uncommitted_files(repo: Path, inputs: LoopInputs) -> dict[str, tuple[str, ...]]:
+    """What each marked step left behind: its declared files that differ from HEAD. A marked
+    return commits nothing, so the stop names these files for the person who takes them over."""
+    states = series_states(inputs)
+    left = {
+        step.id: paths_differing_from_head(repo, step.files)
+        for step in inputs.steps
+        if isinstance(states[step.id], Marked)
+    }
+    return {step_id: files for step_id, files in left.items() if files}
 
 
 def _required(path: Path) -> str:

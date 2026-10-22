@@ -200,6 +200,8 @@ def _marked_stop(inputs: LoopInputs) -> Stop | None:
         state = states.get(step.id)
         if isinstance(state, Marked):
             evidence = f"the latest return at {STEP_LABEL}{step.id} carried [{state.marker}]"
+            if left := inputs.uncommitted.get(step.id):
+                evidence += f"; uncommitted: {', '.join(left)}"
             return Stop(f"{state.marker.lower()}-marker", step.id, evidence, state.attempts)
     return None
 

@@ -564,3 +564,28 @@ def test_a_block_naming_a_cut_off_pocket_is_red_and_exempt_from_the_ceiling(tmp_
 
     assert len(block.encode()) > DEFAULT_CEILING_BYTES
     assert find_findings(path, DEFAULT_CEILING_BYTES) == []
+
+
+def test_a_driver_gate_block_whose_deciding_result_is_red_is_exempt_from_the_ceiling(
+    tmp_path: Path,
+) -> None:
+    failed = "".join(f"Failed: tests/test_x.py::test_failure_{n:03d}\n" for n in range(30))
+    block = (
+        "## Step 2 — step-loop gate, s2-a1-implement\n\n"  # id-citation-discipline:ignore
+        + failed
+        + "Result: none — the pocket did not run (no run was started)\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", block)
+
+    assert len(block.encode()) > DEFAULT_CEILING_BYTES
+    assert find_findings(path, DEFAULT_CEILING_BYTES) == []
+
+
+def test_a_no_run_block_that_is_not_the_drivers_is_still_bound_by_the_ceiling(
+    tmp_path: Path,
+) -> None:
+    heading = "## Step 2 — a measurement\n\n"  # id-citation-discipline:ignore
+    block = heading + "x" * 1100 + "\nResult: none — measured by hand\n"
+    path = _write(tmp_path, "TEST_RESULTS.md", block)
+
+    assert [f.kind for f in find_findings(path, DEFAULT_CEILING_BYTES)] == ["no-run-over-ceiling"]

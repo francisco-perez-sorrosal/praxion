@@ -45,7 +45,7 @@ from _step_loop_io import (  # noqa: E402
     snapshot_outside,
     split_outer_loop,
 )
-from _step_loop_pocket_runs import CutOff, Finished  # noqa: E402
+from _step_loop_pocket_runs import CutOff, Finished, StillRunning  # noqa: E402
 
 REPO_ROOT = SCRIPT_DIR.parent
 BASE_FILES = {
@@ -1046,3 +1046,27 @@ def test_the_real_resolver_answers_in_the_shape_the_runner_reads() -> None:
     assert plan is not None
     shapes = {frozenset(i) for pocket in plan["pockets"] for i in pocket["invocations"]}
     assert shapes == {frozenset({"cwd", "argv"})}
+
+
+def test_a_run_still_inside_its_bound_when_the_budget_ends_is_reported_and_no_later_run_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    slow = py("import time; time.sleep(60)")
+    later = py("print('later')")
+    monkeypatch.setattr(
+        step_io,
+        "RESOLVER",
+        write_stub_resolver(tmp_path, scope_answer(pocket_answer(".", slow, later))),
+    )
+    run_dir = tmp_path / "gate" / "request"
+
+    result = run_derived_scope(tmp_path, ["a.py"], run_dir, {}, give_up_at=time.time())
+
+    try:
+        assert isinstance(result, ScopeRuns)
+        assert [type(run) for run in result.pockets[0].runs] == [StillRunning]
+        assert not (run_dir / "2.start").exists()
+    finally:
+        run_derived_scope(
+            tmp_path, ["a.py"], run_dir, {"PRAXION_STEP_LOOP_POCKET_TIMEOUTS": ".=0.01"}
+        )  # stops the sleeper

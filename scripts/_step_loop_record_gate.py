@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,7 @@ from _step_loop_pocket_runs import (
     Finished,
     NotStarted,
     Observed,
+    StillRunning,
     failed_node_ids,
     files_with_outcomes,
 )
@@ -75,6 +77,8 @@ NOTHING_SELECTED = "the step declares no check and the test scope selects no tes
 NOTHING_TO_RUN = "nothing-to-run"  # the resolver's decision when no test is needed
 SCOPE_COMMAND = "resolve_test_scope.py"
 GATE_DIRECTORY = "gate"  # under the task directory: one subdirectory of run logs per request
+GATE_WAIT_VARIABLE = "PRAXION_STEP_LOOP_GATE_WAIT_SECONDS"
+DEFAULT_GATE_WAIT_SECONDS = 480.0  # under the skill's 600 s ceiling on one `record` call
 FAILED_LINES_SHOWN = 20
 SHORT_SHA_LENGTH = 7
 _MORE_FAILURES = "…"
@@ -108,6 +112,25 @@ class Gate:
     @property
     def deciding(self) -> str:
         return self.body[-1]
+
+
+class GateStillRunningError(Exception):
+    """The scope has a run still inside its bound after the call's budget. Nothing was written:
+    the same `record` run again attaches to it."""
+
+    def __init__(self, pockets: tuple[str, ...]) -> None:
+        super().__init__(f"still running: {', '.join(pockets)}")
+        self.pockets = pockets
+
+
+def gate_wait_seconds() -> float:
+    """The most one `record` call waits for the scope's runs, from the environment (a value that
+    is not a number: the default)."""
+    raw = os.environ.get(GATE_WAIT_VARIABLE, "").strip()
+    try:
+        return max(float(raw), 0.0) if raw else DEFAULT_GATE_WAIT_SECONDS
+    except ValueError:
+        return DEFAULT_GATE_WAIT_SECONDS
 
 
 @dataclass(frozen=True)
@@ -206,7 +229,9 @@ def scope_run(
 ) -> ScopeReading | None:
     """The derived scope of `changed`, every invocation it lists run and read; None when the
     resolver decides no test is needed (a run that failed is red, a run never asked is not)."""
-    resolved = run_derived_scope(repo, changed, run_dir, os.environ)
+    resolved = run_derived_scope(
+        repo, changed, run_dir, os.environ, time.time() + gate_wait_seconds()
+    )
     if isinstance(resolved, ScopeUnresolved):
         why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
         return ScopeReading(
@@ -216,6 +241,13 @@ def scope_run(
         if resolved.decision == NOTHING_TO_RUN:
             return None
         return ScopeReading(GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test")))
+    running = tuple(
+        pocket.pocket
+        for pocket in resolved.pockets
+        if any(isinstance(run, StillRunning) for run in pocket.runs)
+    )
+    if running:
+        raise GateStillRunningError(running)
     return read_scope(resolved, rule, repo)
 
 

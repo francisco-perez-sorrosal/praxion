@@ -38,7 +38,7 @@ files under its request's directory (`<n>` is the invocation's number):
 A run with no exit file past its bound is killed with its whole group, once the pid on record is
 confirmed to be a live launcher of this run (its command line holds the run's log path); a run whose
 launcher is gone is read as not started. Nothing enforces the bound between calls: a run outliving a
-killed driver is stopped by the next attach, which measures from the recorded start. A run that exited later
+killed driver is stopped by the next attach, which measures from the recorded start. A launcher that cannot record its pid exits before the command runs. A run that exited later
 than its start plus its bound is cut off too, though nothing killed it: the verdict follows the
 recorded times, not the moment somebody looked.
 
@@ -248,7 +248,7 @@ POLL_SECONDS = 0.1
 # at all.
 _LAUNCHER = r"""
 log=$1; done=$2; pidfile=$3; shift 3
-printf '%s\n' "$$" > "$pidfile.tmp" && mv "$pidfile.tmp" "$pidfile"
+printf '%s\n' "$$" > "$pidfile.tmp" && mv "$pidfile.tmp" "$pidfile" || exit 70
 "$@" >> "$log" 2>&1
 code=$?
 printf '%s %s\n' "$code" "$(date +%s)" > "$done.tmp" && mv "$done.tmp" "$done"
@@ -515,8 +515,20 @@ def _launcher_is_ours(spec: RunSpec) -> bool:
 
 
 def _group_is_alive(spec: RunSpec) -> bool:
-    """Whether the run's launcher still lives. A launcher not recorded yet is starting."""
-    return _leader_pid(spec) is None or _launcher_is_ours(spec)
+    """Whether the run's group still has a member. A launcher not recorded yet is starting. The
+    `ps` check of `_launcher_is_ours` only authorises a kill: a missing or slow `ps` must never
+    make a live run read as ended."""
+    pid = _leader_pid(spec)
+    if pid is None:
+        return True
+    _reap(pid)
+    try:
+        os.killpg(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # a group exists that is not ours: not the run that ended
+        return True
+    return True
 
 
 def _kill_group(spec: RunSpec) -> None:

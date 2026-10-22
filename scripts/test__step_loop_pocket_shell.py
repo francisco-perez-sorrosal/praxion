@@ -435,3 +435,29 @@ def test_the_same_command_and_bound_attach_to_the_run_on_record(make_spec):
     again = make_spec(python_run("print('x')"))
 
     assert isinstance(run_detached(again, give_up_at=time.time() + GUARD_SECONDS), Finished)
+
+
+def test_a_missing_ps_never_makes_a_live_run_read_as_ended(make_spec, monkeypatch):
+    spec = make_spec(LONG_RUNNING)
+    run_detached(spec, give_up_at=0.0)
+    wait_until(lambda: has_text(spec.pid_path), "the launcher's pid file")
+
+    def no_ps(*_args, **_kwargs):
+        raise FileNotFoundError("ps")
+
+    monkeypatch.setattr(pocket_runs.subprocess, "run", no_ps)
+
+    assert isinstance(read_run(spec), StillRunning)
+
+
+def test_a_launcher_that_cannot_write_its_pid_runs_nothing(make_spec, tmp_path):
+    clock = FakeClock(1000.0)
+    marker = tmp_path / "ran"
+    spec = make_spec(python_run(f"open({str(marker)!r}, 'w').write('x')"), bound_seconds=BOUND)
+    spec.run_dir.mkdir(parents=True)
+    spec.pid_path.with_name("1.pid.tmp").mkdir()  # the launcher cannot write its pid there
+
+    run = run_detached(spec, give_up_at=1000.0 + BOUND + 1, now=clock, sleep=clock.sleep)
+
+    assert isinstance(run, NotStarted)
+    assert not marker.exists()

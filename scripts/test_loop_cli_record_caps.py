@@ -309,3 +309,31 @@ def test_deleting_the_snapshot_clears_the_disturbed_stop(tmp_path, verb):
     cleared = call(root, verb)
 
     assert (cleared.exit, "commit-disturbed-tree" in cleared.stdout) == (0, False)
+
+
+# --- A gate that is still running when the call's budget ends ----------------------------------
+
+
+def test_a_gate_still_running_is_refused_as_such_and_says_to_run_the_same_record_again():
+    refusal = rec.gate_running_refusal("s1-a1-implement", rec.GateStillRunningError(("eval", ".")))
+
+    assert refusal.code == "gate-running"
+    assert "eval, ." in refusal.message
+    assert "s1-a1-implement stays pending" in refusal.message
+    assert "run the same record again" in refusal.message
+
+
+def test_take_back_turns_a_gate_still_running_into_the_refusal(monkeypatch):
+    def running(*_args, **_kwargs):
+        raise rec.GateStillRunningError(("eval",))
+
+    monkeypatch.setattr(rec, "record_return", running)
+
+    with pytest.raises(rec.RecordRefusedError) as refused:
+        rec.take_back(None, "s1-a1-implement", "agent", "complete")  # type: ignore[arg-type]
+
+    assert refused.value.code == "gate-running"
+
+
+def test_the_gate_error_vocabulary_names_gate_running_beside_agent_running():
+    assert "agent-running, gate-running" in " ".join(step_loop.__doc__.split())

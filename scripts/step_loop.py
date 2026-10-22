@@ -34,7 +34,7 @@ Outcome and exit code: spawn or complete 0; needs-human 2 (a stalled goal among 
 budget-exhausted 3; an error 4, or 1 for the code `internal`. Outcome precedence: complete, then
 needs-human, then budget-exhausted, then spawn. Error codes: usage, missing-artifact,
 request-not-pending, not-started-but-ran, agent-not-found, agent-not-for-request, agent-running,
-worker-not-started (`run`), internal.
+gate-running, worker-not-started (`run`), internal.
 
 Guarantees:
 * A spawn that is new has its attempt written to `WIP.md` (`- Attempts: Step <id> count=<n>

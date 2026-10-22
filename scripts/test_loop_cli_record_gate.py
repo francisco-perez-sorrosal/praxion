@@ -44,6 +44,7 @@ from _step_loop_pocket_runs import (  # noqa: E402
     Finished,
     NotStarted,
     PocketBound,
+    StillRunning,
 )
 from _step_loop_render import RequestKey, spawn_request  # noqa: E402
 from _step_loop_state import LoopInputs  # noqa: E402
@@ -782,3 +783,53 @@ def test_the_test_count_of_a_scope_line_includes_the_failures_a_later_step_owns(
     reading = read(("eval", finished("eval", output)), rule=LATER_PENDING)
 
     assert reading.scopes == ("Scope: eval files=1 tests=3 narrow",)
+
+
+# --- A scope still running when the call's budget ends ---------------------------------------
+
+
+def test_a_scope_with_a_run_still_inside_its_bound_raises_before_anything_is_written(
+    monkeypatch, tmp_path
+):
+    still = StillRunning("eval", 480.0, PocketBound("eval", 1200.0, "declared"))
+    monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py",))
+    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(
+        gating, "run_derived_scope", lambda *_: scope((".", finished(".")), ("eval", still))
+    )
+    task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
+
+    with pytest.raises(gating.GateStillRunningError) as running:
+        gating.run_gate(task, task.inputs.steps[0], REQUEST)
+
+    assert running.value.pockets == ("eval",)
+    assert not (tmp_path / gating.RESULTS_FILE).exists()
+
+
+def test_the_scope_is_run_against_a_deadline_the_call_budget_sets(monkeypatch, tmp_path):
+    asked = []
+    monkeypatch.setenv(gating.GATE_WAIT_VARIABLE, "12")
+    monkeypatch.setattr(gating.time, "time", lambda: 1000.0)
+    monkeypatch.setattr(
+        gating,
+        "run_derived_scope",
+        lambda *args: asked.append(args) or ScopeRuns("nothing-to-run", ()),
+    )
+
+    gating.scope_run(tmp_path, tmp_path / "gate", ["a.py"], NOTHING_PENDING)
+
+    assert asked[0][-1] == 1012.0
+
+
+@pytest.mark.parametrize(
+    ("raw", "seconds"), [(None, 480.0), ("30", 30.0), ("0", 0.0), ("soon", 480.0), ("-5", 0.0)]
+)
+def test_the_call_budget_is_480_seconds_unless_the_environment_says_otherwise(
+    monkeypatch, raw, seconds
+):
+    monkeypatch.delenv(gating.GATE_WAIT_VARIABLE, raising=False)
+    if raw is not None:
+        monkeypatch.setenv(gating.GATE_WAIT_VARIABLE, raw)
+
+    assert gating.gate_wait_seconds() == seconds

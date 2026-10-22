@@ -12,7 +12,7 @@ Relay the step-loop driver's requests for the task slug `$ARGUMENTS`. The driver
 ## Rules
 
 - Pass the spawn request to the Agent tool unchanged.
-- Call `record` when the agent's completion notification arrives. A return that carries a terminal marker, together with the progress the step record shows, is final even when the harness labels the notification possibly interim (the agent left background work running): run the `then` command at once instead of ending the turn to wait for another notification. Answer a return with no marker under such a note the same way, with `--marker none`. Running `record` is always safe: it refuses an agent that has not ended (`agent-running`) and leaves the request pending, and that refusal is the only signal to wait.
+- Call `record` when the agent's completion notification arrives. A return that carries a terminal marker, together with the progress the step record shows, is final even when the harness labels the notification possibly interim (the agent left background work running): run the `then` command at once instead of ending the turn to wait for another notification. Answer a return with no marker under such a note the same way, with `--marker none`. Running `record` is always safe: it refuses an agent that has not ended (`agent-running`) or a gate run still inside its bound (`gate-running`) and leaves the request pending, and that refusal is the only signal to wait.
 - Relay to `record` the request id, the agent id and the marker you saw.
 - Never edit the rendered prompt.
 - Never read the rendered prompt.

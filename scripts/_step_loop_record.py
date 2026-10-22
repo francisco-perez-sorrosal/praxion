@@ -79,7 +79,13 @@ from _step_loop_io import (  # noqa: E402
     OutsideRepoError,
     commit_paths,
 )
-from _step_loop_record_gate import TaskView, add_refusal, read_verdict, run_gate  # noqa: E402
+from _step_loop_record_gate import (  # noqa: E402
+    GateStillRunningError,
+    TaskView,
+    add_refusal,
+    read_verdict,
+    run_gate,
+)
 from _step_loop_render import SpawnRequest, commit_message, spawn_request  # noqa: E402
 from _step_loop_review import file_verdict, review_record  # noqa: E402
 from _step_loop_settle import (  # noqa: E402
@@ -141,7 +147,20 @@ def take_back(
     stands instead of waiting for an end that never comes."""
     if agent_id is None or relayed is None:
         return withdraw_request(task, request)
-    return record_return(task, request, agent_id, relayed, exited=session_exited)
+    try:
+        return record_return(task, request, agent_id, relayed, exited=session_exited)
+    except GateStillRunningError as running:
+        raise gate_running_refusal(request, running) from None
+
+
+def gate_running_refusal(request: str, running: GateStillRunningError) -> RecordRefusedError:
+    """The refusal for a gate whose run is still inside its bound when the call's budget ends."""
+    return RecordRefusedError(
+        "gate-running",
+        f"record failed because the gate's run in {', '.join(running.pockets)} is still inside"
+        f" its bound; {request} stays pending and nothing was written. To fix: run the same"
+        " record again.",
+    )
 
 
 def record_return(

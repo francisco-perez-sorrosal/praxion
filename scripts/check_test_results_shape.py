@@ -50,7 +50,7 @@ from _step_schema import (
 )
 
 DEFAULT_CEILING_BYTES = 1024
-_CUT_OFF_PREFIX = "Cut off:"  # the step-loop gate names a cut-off pocket on such a line
+_DRIVER_GATE_MARK = "step-loop gate,"  # the step-loop driver's block heading
 
 
 @dataclass(frozen=True)
@@ -82,8 +82,8 @@ def _classify_block(block: StepBlock) -> tuple[str, str | None]:
     block -- td-214's guard against a step reading green from a stale line
     while a later, red one sits unread.
     """
-    if any(line.startswith(_CUT_OFF_PREFIX) for line in block.text.splitlines()):
-        return "red", None  # a run cut off by its bound is red whatever else the block counts
+    if _driver_block_decided_red(block):
+        return "red", None  # the driver's own red block: failure detail belongs in it
     counts = [line for _, line in block.results if isinstance(line, Counts)]
     if any(c.status == _RED for c in counts):
         return "red", None
@@ -100,6 +100,15 @@ def _classify_block(block: StepBlock) -> tuple[str, str | None]:
     if _is_heading_only(block):
         return "empty", None
     return "missing-result-line", None
+
+
+def _driver_block_decided_red(block: StepBlock) -> bool:
+    """A block the step-loop driver wrote whose deciding (last) `Result:` line is red or no run:
+    a crashed, never-started or cut-off run, whose `Failed:` lines the ceiling must not bound."""
+    if _DRIVER_GATE_MARK not in block.text.splitlines()[0] or not block.results:
+        return False
+    _, deciding = block.results[-1]
+    return isinstance(deciding, NoRun) or (isinstance(deciding, Counts) and deciding.status == _RED)
 
 
 def _is_heading_only(block: StepBlock) -> bool:

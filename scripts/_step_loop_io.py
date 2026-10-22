@@ -46,6 +46,7 @@ from _git_runner import GIT_TIMEOUT_SECONDS, GitUnavailableError, run_git
 from _step_loop_pocket_runs import (
     Observed,
     RunSpec,
+    StillRunning,
     no_colour_environment,
     pocket_bound,
     run_detached,
@@ -588,11 +589,24 @@ def run_derived_scope(
             for at, i in enumerate(invocations)
         ]  # fmt: skip
         number += len(specs)
-        runs = tuple(run_detached(spec, give_up_at) for spec in specs)
+        runs = _run_in_order(specs, give_up_at)
         pockets.append(
             PocketScope(entry["root"], entry["selection"] == _WIDENED, len(entry["tests"]), runs)
         )
+        if isinstance(runs[-1], StillRunning):
+            break  # the budget is spent: nothing after a run still inside its bound starts
     return ScopeRuns(str(plan["decision"]), tuple(pockets))
+
+
+def _run_in_order(specs: list[RunSpec], give_up_at: float) -> tuple[Observed, ...]:
+    """Each run after the one before; a run still inside its bound when the budget ends is the
+    last one started, for the caller to come back to."""
+    runs: list[Observed] = []
+    for spec in specs:
+        runs.append(run_detached(spec, give_up_at))
+        if isinstance(runs[-1], StillRunning):
+            break
+    return tuple(runs)
 
 
 def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:

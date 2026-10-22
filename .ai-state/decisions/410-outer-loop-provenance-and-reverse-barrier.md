@@ -22,6 +22,7 @@ affected_files:
   - commands/sdd-coverage.md
   - scripts/spec_drift.py
 affected_reqs: [REQ-11, REQ-12, REQ-13, REQ-14, REQ-15, REQ-19]
+superseded_in_part_by: [dec-draft-d47d4f40]
 ---
 
 ## Context

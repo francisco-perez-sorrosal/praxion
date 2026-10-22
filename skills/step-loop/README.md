@@ -13,7 +13,7 @@ After the pre-mortem gate of a Standard or Full pipeline, when the plan is ready
 
 ## Skill Contents
 
-- `SKILL.md` — the relay rules (pass the spawn request unchanged, `record` only after the completion notification, never edit or read the rendered prompt, never commit), the `next` / `record` procedure and its exit-code table, the marker note, the `--not-started` form and the `--session-exited` form for an agent its session's restart killed.
+- `SKILL.md` — the relay rules (pass the spawn request unchanged, `record` only after the completion notification, never edit or read the rendered prompt, never commit), the `next` / `record` procedure and its exit-code table, the marker note, the `--not-started` form and the `--session-exited` form for an agent its session's restart killed. The refusals `agent-running` and `gate-running` leave the request pending; a return marked `[CONFLICT]` or `[BLOCKED]` is recorded without a commit and stops the loop.
 
 ## Related Skills
 

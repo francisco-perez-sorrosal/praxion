@@ -31,7 +31,7 @@ The kernel mechanism pairs the two. A role that omits the inherited surface rece
 
 A kernel is the per-role text the spawn hook delivers. It is split into one or more *strings*, because the harness caps one injected string at 10,000 characters. Each role's kernel has the same shape:
 
-1. the **core**, which opens with the three universal blocks (the behavioral contract with its self-test, the Praxion-links rule, the return contract with its terminal markers) and carries the rest of the guidance every agent needs;
+1. the **core**, which opens with the three universal blocks (the behavioral contract with its self-test, the Praxion-links rule, the return contract with its terminal markers, and its instruction to stop or await every background job before the final message, since a live job marks the return interim) and carries the rest of the guidance every agent needs;
 2. the **modules** whose audience includes the role (for example the ADR-author module for the agents that create decision records, or the ledger-writer module for the agents that append tech-debt rows).
 
 A kernel never contains text meant for the orchestrator alone, or text that no actor reads. Both classes stay resident in their sources and are excluded mechanically (see below).

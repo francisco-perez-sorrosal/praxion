@@ -20,6 +20,7 @@ from _step_loop_gate import GateEvidence, parse_gate_evidence  # noqa: E402
 from _step_loop_record_gate import FAILED_LINES_SHOWN, failure_lines  # noqa: E402
 from _step_loop_render import (  # noqa: E402
     GATE_EVIDENCE_BOUND,
+    Kind,
     PromptInputs,
     RequestKey,
     render_prompt,
@@ -62,7 +63,7 @@ def evidence_body(text):
     return opened.split("\n</gate-evidence>", 1)[0]
 
 
-def prompt_with(evidence, kind="implement"):
+def prompt_with(evidence, kind: Kind = "implement"):
     step = parse_plan_steps(STEP_TEXT)[0]
     round_ = None if kind == "implement" else 1
     request = spawn_request("demo", step, RequestKey(STEP_ID, 2, kind, 1, round_), 2, WORK)

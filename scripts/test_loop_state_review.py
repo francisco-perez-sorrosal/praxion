@@ -41,7 +41,7 @@ from _loop_state_testkit import (  # noqa: E402
     steps_of,
     verified,
 )
-from _step_loop_action import Spawn, issuable_action, next_action  # noqa: E402
+from _step_loop_action import Spawn, Stop, issuable_action, next_action  # noqa: E402
 from _step_loop_render import RequestKey  # noqa: E402
 from _step_loop_review import (  # noqa: E402
     Accepted,
@@ -315,6 +315,7 @@ def test_a_conflicted_only_step_whose_check_passed_does_not_complete_the_loop():
 
     stop = act([PLAIN_STEP], records=[returned])
 
+    assert isinstance(stop, Stop)
     assert (stop.cause, stop.step) == ("conflict-marker", "1")
 
 

@@ -51,6 +51,7 @@ def test_a_marked_stop_with_no_uncommitted_file_names_only_the_step_and_the_mark
 
     stop = next_action(inputs)
 
+    assert isinstance(stop, Stop)
     assert stop.evidence == f"the latest return at {STEP_LABEL}1 carried [CONFLICT]"
 
 

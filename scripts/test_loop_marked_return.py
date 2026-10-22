@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -101,7 +102,7 @@ def returned(monkeypatch, tmp_path):
         )
         monkeypatch.setattr(rec, "settle_replan", lambda wip, inputs, step, request: False)
         monkeypatch.setattr(rec, "edit_warnings", lambda task, step, request: ())
-        taken = rec.record_return(task, REQUEST, "agent-1", relayed or resolved)
+        taken = rec.record_return(cast(rec.TaskView, task), REQUEST, "agent-1", relayed or resolved)
         return effects, taken
 
     return take_back

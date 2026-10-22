@@ -13,6 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -616,9 +617,10 @@ def gate_plan(*lines):
 
 def gate_task(tmp_path, plan):
     inputs = LoopInputs(tuple(parse_plan_steps(plan)), {}, (), {})
-    return SimpleNamespace(
+    stand_in = SimpleNamespace(
         slug=SLUG, repo=tmp_path, work=tmp_path, dir=tmp_path, base_ref="HEAD", inputs=inputs
     )
+    return cast(gating.TaskView, stand_in)
 
 
 def run_the_gate(monkeypatch, tmp_path, plan, *, changed=(), decision=None):

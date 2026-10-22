@@ -336,4 +336,5 @@ def test_take_back_turns_a_gate_still_running_into_the_refusal(monkeypatch):
 
 
 def test_the_gate_error_vocabulary_names_gate_running_beside_agent_running():
+    assert step_loop.__doc__ is not None
     assert "agent-running, gate-running" in " ".join(step_loop.__doc__.split())

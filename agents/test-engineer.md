@@ -186,7 +186,7 @@ Record: testing patterns that worked, gotchas with the test framework, flaky tes
 
 **Spec coverage check**: When a `## Behavioral Specification` section exists in `.ai-work/<task-slug>/SYSTEMS_PLAN.md`, include a quick coverage table in your report. Read `.ai-work/<task-slug>/traceability.yml` (or `traceability_test-engineer.yml` in parallel mode) to enumerate which REQ IDs now have tests. Cross-reference against the REQ IDs in the spec and list any that remain uncovered. This gives the user immediate visibility into spec-to-test gaps without waiting for the verifier. **Never grep test code for REQ IDs** — code is ID-free per [`rules/swe/id-citation-discipline.md`](../rules/swe/id-citation-discipline.md); the YAML is the authoritative source.
 
-**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation.
+**Return contract.** Your final message is a pointer, not a payload: at most ~15 lines (or your definition's tighter cap) naming the outcome, the key points and the artifact path, never the artifact's body, tables or code. End it with exactly one terminal marker: `[COMPLETE]`, `[BLOCKED]` (name the blocker and its evidence path), `[CONFLICT]` (a file outside your declared set is needed) or `[PARTIAL]` (stopped early; the artifact keeps its `[PARTIAL]` title). The orchestrator treats a return without a marker as a suspected truncation. Before your final message, stop or await every background job you started (a live job marks your return interim) and bound every watcher with a timeout or an iteration cap (a watcher that matches processes by name excludes shells).
 
 Stop and report one of:
 - `[COMPLETE]` — step done, tests pass, WIP.md updated, spec coverage table included (if applicable)
@@ -244,7 +244,7 @@ Oracles come from the spec, never from reading an existing implementation: an or
 
 ### Output
 
-Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under `tests/acceptance/`, or `tests/e2e/` for a journey spanning two or more boundaries, each reaching the system only through a driver under a `drivers/` directory inside them.
+Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under `tests/acceptance/`, or `tests/e2e/` for a journey spanning two or more boundaries, each reaching the system only through a driver under a `drivers/` directory inside them. A fixture the secret scanner would flag also gets its `.gitleaks.toml` entry, the *outer-loop fixture allowlist* class: comments and `[allowlist]` `paths` entries anchored at `tests/acceptance/` or `tests/e2e/`, no wildcard or alternation, no removed entry, no rule. Name that entry in your return.
 
 ```markdown
 # Acceptance Tests — <task-slug>
@@ -290,9 +290,9 @@ An empty section reads `_None._`. The skipped form keeps all five sections; `## 
 ### Anti-instructions
 
 - Read nothing outside the allowed set. If a needed fact is not in it, that is a Spec Question, not a reason to open a forbidden file.
-- Write no production code, no `WIP.md`, no `LEARNINGS.md`, no `traceability.yml`; no REQ, BA or SQ id in test names, docstrings or comments.
-- Never commit: the orchestrator commits the RED tests in a test-only commit before any production change.
-- Return `[COMPLETE]` or `[BLOCKED]` with a pointer to `ACCEPTANCE_TESTS.md` and the `red`/`guard` counts.
+- Write no production code (the allowlist entry excepted), no `WIP.md`, no `LEARNINGS.md`, no `traceability.yml`; no REQ, BA or SQ id in test names, docstrings or comments.
+- Never commit: the orchestrator commits the RED tests, and the allowlist entry, in a test-only commit before any production change.
+- Return `[COMPLETE]` or `[BLOCKED]` with a pointer to `ACCEPTANCE_TESTS.md`, the `red`/`guard` counts and any allowlist entry written.
 
 **Driver-binding step (paired mode).** When a planned step binds an unbound driver to the designed interface, its `Files:` are driver files only: you never edit a scenario file, and you confirm the scenarios now fail for the missing behavior, not for the unbound driver.
 

@@ -159,7 +159,7 @@ At Standard and Full tier the outer loop is designed by the test-engineer in `Mo
 1. **Spec phase.** `systems-architect` in `Mode: spec` writes `## Goal`, `## Acceptance Criteria` and `## Behavioral Specification` (with `### Observable Surface`) into `SYSTEMS_PLAN.md`; every other required heading reads `[pending: design phase]`. It runs `extract_spec.py <slug>` until exit 0, which writes `.ai-work/<task-slug>/SPEC_EXTRACT.md`.
 2. **Gate.** The orchestrator runs `extract_spec.py <slug> --check` (exit 0 required) and records `HEAD` as the **Base commit**. Nothing tracked may change before this point: the researcher and the spec-mode architect write only under `.ai-work/`, so no design text exists anywhere the designer could read.
 3. **Acceptance design.** `test-engineer` in `Mode: acceptance-design`, spawned at `opus`, writes `ACCEPTANCE_TESTS.md` and RED tests under `tests/acceptance/` and `tests/e2e/` (drivers under a `drivers/` directory inside them).
-4. **AD commit.** The orchestrator commits the outer-loop files, test-only, by explicit pathspec.
+4. **AD commit.** The orchestrator commits the outer-loop files and any outer-loop fixture allowlist entry the test-engineer wrote, test-only, by explicit pathspec.
 5. **Spec-Question round.** At most one, only when `## Spec Questions` is non-empty ([routing](#spec-question-routing)).
 6. **Design phase.** `systems-architect` resumes in `Mode: feature` (Phases 2–10) and reads `ACCEPTANCE_TESTS.md`: each Boundary Assumption is a consumer-driven contract that the design satisfies or challenges in `## Architecture`. The interface-designer and context-engineer architecture-stage shadows run as usual.
 7. **Planning and execution.** The planner reads `SYSTEMS_PLAN.md` and `ACCEPTANCE_TESTS.md`. Driver-binding steps (test-engineer, driver files only) precede any production step when a Boundary Assumption is unbound. Implementer steps follow, then the verifier.
@@ -193,15 +193,16 @@ Oracles come from the spec, never from reading an existing implementation: an or
 
 ### Path Classes and the First Production Commit
 
-A pure function of the path; the first match wins, so every path lands in exactly one class:
+A function of the path and, for the *outer-loop fixture allowlist* class alone, of the lines a commit adds to it; the first match wins, so every path lands in exactly one class:
 
 1. *outer-loop driver*: under `tests/acceptance/` or `tests/e2e/`, inside a `drivers/` directory
 2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`
-3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file with a `tests/`, `test/`, `spec/` or `__tests__/` directory segment at any depth. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production. In Praxion, `claude/project-baseline/tests/` is shipped product and belongs to class 5, not here
-4. *state/doc*: `.ai-state/**`, `docs/**`
-5. *production*: everything else — in Praxion this includes agent, skill and rule Markdown, because they are the product
+3. *inner-loop test*: test-shaped names only: `test_*.py`, `*_test.*`, `*.test.{ts,js,tsx,jsx}`, `*.spec.{ts,js,tsx,jsx}`, `*_spec.rb`, and any file with a `tests/`, `test/`, `spec/` or `__tests__/` directory segment at any depth. A glob without a slash matches the basename; one with a slash matches the path. These are narrower than the load-time globs of `rules/swe/testing-conventions.md` on purpose: `scripts/extract_spec.py` is production. In Praxion, `claude/project-baseline/tests/` is shipped product and belongs to *production*, not here
+4. *outer-loop fixture allowlist*: `.gitleaks.toml`, only in a commit whose added lines (`git diff -U0`) are comments and `[allowlist]` `paths` entries each anchored, after an optional `^`, at `tests/acceptance/` or `tests/e2e/`, with no wildcard or alternation reaching beyond them, no removed entry and no rule; any other change to that file is *production*. It counts as test-only. A project with another scanner names that scanner's allowlist file here
+5. *state/doc*: `.ai-state/**`, `docs/**`
+6. *production*: everything else — in Praxion this includes agent, skill and rule Markdown, because they are the product
 
-The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a class-5 path. The AD commit must be strictly earlier; afterwards any change to an outer-loop file (scenario or driver) belongs to a commit tied to an answered Spec Question (`Resolved in:` sha) or to a planned driver-binding step, and an outer-loop file that first appears after the first production commit is such a change. The Base commit is the one the orchestrator recorded at the Gate.
+The **first production commit** is the earliest commit in `<Base commit>..HEAD` touching a production path. The AD commit must be strictly earlier; afterwards any change to an outer-loop file (scenario or driver), or an allowlist entry, belongs to a commit tied to an answered Spec Question (`Resolved in:` sha) or to a planned driver-binding step, and an outer-loop file that first appears after the first production commit is such a change. The Base commit is the one the orchestrator recorded at the Gate.
 
 ### Spec-Question Routing
 
@@ -222,7 +223,7 @@ The **first production commit** is the earliest commit in `<Base commit>..HEAD` 
 - **Count, don't credit.** The acceptance designer is a charged spawn under the unchanged budgets ([Spawn Budget](#spawn-budget)). The offset is structural: unit tests moved to the implementer, so a plan no longer spends one test-engineer spawn per behavioral step.
 - **Resumes.** The architect's spec-to-design resume and Spec-Question resumes are free while the resumed context is below the heavy-context threshold, and are reported with their context size. A lost resume that forces a fresh `Mode: feature` spawn is charged.
 - **Routing.** Every acceptance-design spawn, resumes included, passes `model: opus` per spawn ([model routing policy](../../agent-crafting/references/model-routing-policy.md)); the agent's frontmatter tier is only the floor.
-- **Commit ownership.** The agents never commit. The orchestrator commits the outer-loop files by explicit pathspec in a test-only commit whose subject says so. A project whose pre-commit hook runs the test suite must exempt `tests/acceptance/` and `tests/e2e/` from it (their tests are RED by design); bypassing the hook with `--no-verify` is never silent — say so at the next checkpoint.
+- **Commit ownership.** The agents never commit. The orchestrator commits the outer-loop files and any outer-loop fixture allowlist entry by explicit pathspec in a test-only commit whose subject says so. A project whose pre-commit hook runs the test suite must exempt `tests/acceptance/` and `tests/e2e/` from it (their tests are RED by design); bypassing the hook with `--no-verify` is never silent — say so at the next checkpoint.
 
 ## Batched Improvement Execution
 

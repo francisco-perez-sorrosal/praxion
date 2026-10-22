@@ -18,6 +18,7 @@ decides, and a step with no check reads as unverifiable, which is red.
 
 from __future__ import annotations
 
+import math
 import os
 import shlex
 import time
@@ -125,12 +126,13 @@ class GateStillRunningError(Exception):
 
 def gate_wait_seconds() -> float:
     """The most one `record` call waits for the scope's runs, from the environment (a value that
-    is not a number: the default)."""
+    is not a finite number: the default, so no setting can make one call wait without end)."""
     raw = os.environ.get(GATE_WAIT_VARIABLE, "").strip()
     try:
-        return max(float(raw), 0.0) if raw else DEFAULT_GATE_WAIT_SECONDS
+        seconds = float(raw) if raw else DEFAULT_GATE_WAIT_SECONDS
     except ValueError:
         return DEFAULT_GATE_WAIT_SECONDS
+    return max(seconds, 0.0) if math.isfinite(seconds) else DEFAULT_GATE_WAIT_SECONDS
 
 
 @dataclass(frozen=True)

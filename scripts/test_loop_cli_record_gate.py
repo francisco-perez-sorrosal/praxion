@@ -823,7 +823,16 @@ def test_the_scope_is_run_against_a_deadline_the_call_budget_sets(monkeypatch, t
 
 
 @pytest.mark.parametrize(
-    ("raw", "seconds"), [(None, 480.0), ("30", 30.0), ("0", 0.0), ("soon", 480.0), ("-5", 0.0)]
+    ("raw", "seconds"),
+    [
+        (None, 480.0),
+        ("30", 30.0),
+        ("0", 0.0),
+        ("soon", 480.0),
+        ("-5", 0.0),
+        ("nan", 480.0),
+        ("inf", 480.0),
+    ],
 )
 def test_the_call_budget_is_480_seconds_unless_the_environment_says_otherwise(
     monkeypatch, raw, seconds

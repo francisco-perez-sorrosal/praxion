@@ -238,6 +238,39 @@ def is_done(state: Series) -> bool:
     )
 
 
+# The word a series state is shown as. Two states share a word with a sibling because the
+# acceptance tests that pin `status` read them so: a goal step that stalled is exhausted (a
+# person reads the stall off the stop's cause) and a step done outside the loop is verified.
+StateWord = Literal[
+    "pending",
+    "in-flight",
+    "verified-complete",
+    "failed",
+    "marked",
+    "attempts-exhausted",
+    "human-verdict",
+]
+_PLAIN_WORDS: dict[type, StateWord] = {
+    Fresh: "pending",
+    NotDriven: "pending",
+    Running: "in-flight",
+    Failed: "failed",
+    Exhausted: "attempts-exhausted",
+    Marked: "marked",
+    Verified: "verified-complete",
+    DoneOutside: "verified-complete",
+}
+
+
+def step_state_word(state: Series) -> StateWord:
+    """The one word `status` shows for a step, agreeing with the cause `next` stops on. The
+    reconciler's own word never reaches it: a marked return whose check passes is
+    `verified-complete` to the reconciler and still `marked` here."""
+    if isinstance(state, HumanVerdict):
+        return "attempts-exhausted" if state.verdict == EXHAUSTED else "human-verdict"
+    return _PLAIN_WORDS[type(state)]
+
+
 def is_driven(step: PlanStep) -> bool:
     """Whether the loop runs the step (it is the implementer's)."""
     return isinstance(step.assignee, Implementer)

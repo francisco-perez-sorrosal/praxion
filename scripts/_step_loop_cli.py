@@ -36,10 +36,8 @@ from _step_loop_review import (
     Unfinished,
 )
 from _step_loop_state import (
-    EXHAUSTED,
     Exhausted,
     Failed,
-    HumanVerdict,
     LoopInputs,
     Marked,
     Running,
@@ -48,6 +46,7 @@ from _step_loop_state import (
     is_done,
     spent,
     step_cap,
+    step_state_word,
 )
 from iteration_ledger import IterationRecord
 
@@ -57,8 +56,6 @@ SELF_HOST_INVOCATION = f"python3 scripts/{SCRIPT}"
 SUMMARY_PREFIX = "step_loop: "
 DASH = "—"
 SHORT_SHA = 7
-PENDING = "pending"
-IN_FLIGHT = "in-flight"
 VERBS = ("next", "record", "status")
 GOAL_VERB = "goal"
 RUN_VERB = "run"
@@ -403,19 +400,11 @@ def _step_row(step: PlanStep, state: Series, inputs: LoopInputs) -> dict[str, An
     return {
         "step": step.id,
         "assignee": assignee,
-        "verdict": _shown_verdict(state, inputs.verdicts.get(step.id, {}).get("verdict", PENDING)),
+        "verdict": step_state_word(state),
         "attempts": _attempts_of(state),
         "review": _REVIEW_WORDS.get(type(state.review)) if isinstance(state, Verified) else None,
         "commit": commits[-1][:SHORT_SHA] if commits else None,
     }
-
-
-def _shown_verdict(state: Series, word: str) -> str:
-    """In flight while a request is outstanding; never exhausted for a series still open."""
-    if isinstance(state, Running):
-        return IN_FLIGHT
-    held = isinstance(state, (Exhausted, HumanVerdict))
-    return PENDING if word == EXHAUSTED and not held else word
 
 
 def _attempts_of(state: Series) -> int:

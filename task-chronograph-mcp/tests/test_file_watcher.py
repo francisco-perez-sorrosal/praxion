@@ -141,6 +141,27 @@ class TestParseTimestamp:
 # watch_progress_file
 # ---------------------------------------------------------------------------
 
+# A filesystem event reaches the watcher after a platform-dependent delay, and a write made
+# before the watcher is armed raises no event at all, so the test rewrites the same content
+# until the store shows it, within a bound, instead of sleeping fixed times.
+SEEN_DEADLINE_SECONDS = 15.0
+REWRITE_EVERY_SECONDS = 1.0
+POLL_SECONDS = 0.05
+
+
+async def _write_until_seen(path, content: str, store: EventStore) -> None:
+    # Yield once first: the watcher seeds its line counts from the file as it starts, and a
+    # seed taken after the write would count the line as already seen.
+    await asyncio.sleep(POLL_SECONDS)
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + SEEN_DEADLINE_SECONDS
+    next_write = loop.time()
+    while store.get_pipeline_summary()["event_count"] == 0 and loop.time() < deadline:
+        if loop.time() >= next_write:
+            path.write_text(content)
+            next_write = loop.time() + REWRITE_EVERY_SECONDS
+        await asyncio.sleep(POLL_SECONDS)
+
 
 class TestWatchProgressFile:
     async def test_new_lines_added_to_store(self, tmp_path):
@@ -153,16 +174,11 @@ class TestWatchProgressFile:
 
         watcher_task = asyncio.create_task(watch_progress_file(tmp_path, store))
 
-        # Give the watcher time to start
-        await asyncio.sleep(0.3)
-
-        # Write a valid progress line
-        progress_file.write_text(
-            "[2025-01-15T14:30:00] [researcher] Phase 2/5: analysis -- Analyzing auth\n"
+        await _write_until_seen(
+            progress_file,
+            "[2025-01-15T14:30:00] [researcher] Phase 2/5: analysis -- Analyzing auth\n",
+            store,
         )
-
-        # Wait for the watcher to detect the change
-        await asyncio.sleep(0.5)
 
         watcher_task.cancel()
         with pytest.raises(asyncio.CancelledError):

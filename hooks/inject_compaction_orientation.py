@@ -105,10 +105,6 @@ DRIVER_REQUEST_LINE = re.compile(r"^\s*-\s*Attempts:.*\brequest=", re.MULTILINE)
 DRIVER_RELATIVE = Path("scripts") / "step_loop.py"
 STATUS_TIMEOUT_SECONDS = 6  # under the hook's registered 10 s
 
-# Mirrors `ATTEMPT_CAP` in scripts/_loop_fields.py (the status object does not carry the
-# cap); a parity test in test_orientation_loop_mode.py keeps the two equal.
-ATTEMPT_CAP = 2
-
 
 # -- Composition ---------------------------------------------------------------
 
@@ -253,6 +249,7 @@ class DriverPosition:
     step: str | None
     verdict: str
     attempts: int
+    attempt_cap: int | None
     used: int
     budget: int
     cause: str | None
@@ -272,6 +269,7 @@ class DriverPosition:
             step=None if step_id is None else str(step_id),
             verdict=str(row["verdict"]) if row else "",
             attempts=int(row["attempts"]) if row else 0,
+            attempt_cap=int(row["attempt_cap"]) if row and "attempt_cap" in row else None,
             used=int(doc["iterations"]["used"]),
             budget=int(doc["iterations"]["budget"]),
             cause=None if stop is None else str(stop["cause"]),
@@ -290,10 +288,12 @@ class DriverPosition:
         step = f"step {self.step}" if self.step else "no step"
         if self.outcome in STOPPED_OUTCOMES:
             return [f"Driver position: stopped at {step} (cause: {self.cause}), {iterations}"]
-        position = (
-            f"Driver position: {step} {self.verdict}, "
-            f"attempts {self.attempts}/{ATTEMPT_CAP}, {iterations}"
+        attempts = (
+            f"{self.attempts}"
+            if self.attempt_cap is None
+            else f"{self.attempts}/{self.attempt_cap}"
         )
+        position = f"Driver position: {step} {self.verdict}, attempts {attempts}, {iterations}"
         if self.request is None:
             return [position]
         return [position, f"Outstanding request {self.request}; driver's command: {self.then}"]

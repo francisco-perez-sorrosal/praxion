@@ -405,6 +405,7 @@ def _step_row(step: PlanStep, state: Series, inputs: LoopInputs) -> dict[str, An
         "assignee": assignee,
         "verdict": step_state_word(state),
         "attempts": _attempts_of(state),
+        "attempt_cap": step_cap(step),
         "review": _REVIEW_WORDS.get(type(state.review)) if isinstance(state, Verified) else None,
         "commit": commits[-1][:SHORT_SHA] if commits else None,
     }

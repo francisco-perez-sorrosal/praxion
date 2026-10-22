@@ -124,6 +124,15 @@ def test_the_new_keys_leave_the_existing_ones_in_place(tmp_path):
     )
 
 
+def test_every_step_row_reports_the_cap_its_attempts_count_against(tmp_path):
+    root = build(tmp_path)
+    call(root, "next")
+
+    rows = call(root, "status", "--json").doc["steps"]
+
+    assert [row["attempt_cap"] for row in rows] == [2, 2]
+
+
 def test_the_status_table_is_unchanged_for_a_pending_request(tmp_path):
     root = build(tmp_path)
     call(root, "next")

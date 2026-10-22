@@ -28,7 +28,13 @@ THEN = (
     "python3 scripts/step_loop.py record loop-task --request s5-a1-implement "
     "--agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
 )
-ROW = {"step": "5", "assignee": "implementer", "verdict": "in-flight", "attempts": 1}
+ROW = {
+    "step": "5",
+    "assignee": "implementer",
+    "verdict": "in-flight",
+    "attempts": 1,
+    "attempt_cap": 2,
+}
 
 
 def _status(**overrides) -> dict:
@@ -231,25 +237,20 @@ def test_a_task_is_under_the_driver_by_a_request_line_or_an_iteration_ledger(
     assert ("Current step" not in context) is under_the_driver
 
 
-def test_the_attempt_cap_mirrors_the_drivers():
-    tree = ast.parse((HOOKS_DIR.parent / "scripts" / "_loop_fields.py").read_text())
-    (driver_cap,) = [
-        node.value.value
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and [t.id for t in node.targets if isinstance(t, ast.Name)] == ["ATTEMPT_CAP"]
-    ]
-    hook = ast.parse((HOOKS_DIR / "inject_compaction_orientation.py").read_text())
-    (hook_cap,) = [
-        node.value.value
-        for node in hook.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and [t.id for t in node.targets if isinstance(t, ast.Name)] == ["ATTEMPT_CAP"]
-    ]
+def test_a_rows_own_cap_is_what_the_attempts_render_against(tmp_path):
+    goal_row = {**ROW, "attempts": 3, "attempt_cap": 6}
 
-    assert hook_cap == driver_cap
+    context = _driven_context(tmp_path, _printing(_status(steps=[goal_row])))
+
+    assert "attempts 3/6" in context
+
+
+def test_a_row_without_a_cap_renders_the_count_alone(tmp_path):
+    bare_row = {key: value for key, value in ROW.items() if key != "attempt_cap"}
+
+    context = _driven_context(tmp_path, _printing(_status(steps=[bare_row])))
+
+    assert "attempts 1," in context
 
 
 def _system_python_3_9() -> str | None:

@@ -21,7 +21,7 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 from _agent_transcript import (  # noqa: E402 (after sys.path injection)
@@ -37,7 +37,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
 from _handoff_inputs import read_existing  # noqa: E402
 from _handoff_readiness import WAL_AGENT_STOP, session_wal_rows  # noqa: E402
 from _loop_fields import REQUEST_ID_RE, AnyAttempt, render_attempts_line  # noqa: E402
-from _step_loop_gate import EndEvidence  # noqa: E402
+from _step_loop_gate import EndEvidence, GateEvidence, parse_gate_evidence  # noqa: E402
 from _step_loop_render import AgentCall, parse_request_id  # noqa: E402
 from _step_loop_state import SNAPSHOT_STEM, SNAPSHOT_SUFFIX  # noqa: E402
 from _step_schema import Counts, NoRun, checklist_step_id, parse_result_line  # noqa: E402
@@ -180,19 +180,36 @@ def latest_reading(results_path: Path, step_id: str) -> tuple[str, ...]:
     """The step's latest gate block as lines to show: the check's command, then each `Result:`
     line restated. The latest block is the last in the file, so the scaffold's baseline block,
     written first, reads until a gate block follows it; empty when the step has none."""
+    block = _latest_gate_block(results_path, step_id)
+    if block is None:
+        return ()
+    commands = [line for line in block.lines if line.startswith(_COMMAND_PREFIX)]
+    results = [restate_result(line) for line in block.lines if line.startswith(_RESULT_PREFIX)]
+    return (*commands[-1:], *results)  # the check's command is the gate's last
+
+
+def latest_gate_evidence(results_path: Path, step_id: str) -> GateEvidence | None:
+    """What the step's latest gate block showed went wrong; None when it was green or absent."""
+    block = _latest_gate_block(results_path, step_id)
+    return None if block is None else parse_gate_evidence(block.request, block.lines)
+
+
+class _GateBlock(NamedTuple):
+    request: str
+    lines: list[str]
+
+
+def _latest_gate_block(results_path: Path, step_id: str) -> _GateBlock | None:
     lines = results_path.read_text("utf-8").splitlines() if results_path.is_file() else []
     prefix = gate_heading(step_id, "")
     start = next((i for i in reversed(range(len(lines))) if lines[i].startswith(prefix)), None)
     if start is None:
-        return ()
+        return None
     end = next(
         (i for i in range(start + 1, len(lines)) if lines[i].startswith(_BLOCK_HEADING_PREFIX)),
         len(lines),
     )
-    block = lines[start + 1 : end]
-    commands = [line for line in block if line.startswith(_COMMAND_PREFIX)]
-    results = [restate_result(line) for line in block if line.startswith(_RESULT_PREFIX)]
-    return (*commands[-1:], *results)  # the check's command is the gate's last
+    return _GateBlock(lines[start][len(prefix) :], lines[start + 1 : end])
 
 
 def restate_result(line: str) -> str:

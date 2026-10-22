@@ -75,6 +75,7 @@ from _step_loop_action import Complete, Spawn, Stop, issuable_action
 from _step_loop_cli import CallerError
 from _step_loop_files import (
     iteration_patches,
+    latest_gate_evidence,
     latest_reading,
     set_attempts_line,
     snapshot_requests,
@@ -251,6 +252,7 @@ def _prompt_inputs(task: Task, action: Spawn, request: SpawnRequest) -> PromptIn
         wip_text=task.wip_text,
         findings_text=inputs.reviews.get(step.id, ""),
         previous=previous,
+        gate_evidence=latest_gate_evidence(task.dir / RESULTS_FILE, step.id),
         dirty_files=paths_differing_from_head(task.repo, step.files) if previous else (),
         review_range=review_range(inputs, step),
         goal=_goal_state(task, step) if action.key.kind == "implement" else None,

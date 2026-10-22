@@ -46,7 +46,7 @@ either rule.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol, Union
 
@@ -322,6 +322,53 @@ def gate_result_lines(scope: GateRun | None, check: GateRun) -> tuple[str, ...]:
     scope_decides = scope is not None and scope.red and not check.red
     runs = (check, scope) if scope_decides else (scope, check)
     return tuple(render_result_line(run) for run in runs if run is not None)
+
+
+# --- What a red gate block shows the next attempt ---
+#
+# Reads the `Cut off:` and `Failed:` lines `read_scope` and `failure_lines` write into a driver
+# block (`_step_loop_record_gate.py`): change both sides together. A `Failed:` line whose text
+# opens with the omitted mark is the pointer to the failures the block had no room for.
+
+CUT_OFF_PREFIX, FAILED_PREFIX, OMITTED_MARK = "Cut off: ", "Failed: ", "…"
+
+
+@dataclass(frozen=True)
+class GateEvidence:
+    """The request of a gate block, where its runs were cut off and which nodes failed.
+
+    `omitted` is the block's own pointer to the failures it names no node for ("" when none)."""
+
+    request: str
+    cut_offs: tuple[str, ...] = ()
+    failed: tuple[str, ...] = ()
+    omitted: str = ""
+
+    def lines(self) -> tuple[str, ...]:
+        """The block's lines in the order the gate saw them: failures, then the cut."""
+        pointer = [f"{FAILED_PREFIX}{self.omitted}"] if self.omitted else []
+        return (
+            *(f"{FAILED_PREFIX}{node}" for node in self.failed),
+            *pointer,
+            *(f"{CUT_OFF_PREFIX}{cut}" for cut in self.cut_offs),
+        )
+
+
+def parse_gate_evidence(request: str, block: Sequence[str]) -> GateEvidence | None:
+    """The evidence a gate block's lines hold, or None for a block that shows none (green)."""
+    cut_offs = tuple(
+        _after(line, CUT_OFF_PREFIX) for line in block if line.startswith(CUT_OFF_PREFIX)
+    )
+    failures = [_after(line, FAILED_PREFIX) for line in block if line.startswith(FAILED_PREFIX)]
+    failed = tuple(text for text in failures if not text.startswith(OMITTED_MARK))
+    omitted = next((text for text in failures if text.startswith(OMITTED_MARK)), "")
+    if not (cut_offs or failed or omitted):
+        return None
+    return GateEvidence(request, cut_offs, failed, omitted)
+
+
+def _after(line: str, prefix: str) -> str:
+    return line[len(prefix) :].strip()
 
 
 # --- How an attempt ended ---

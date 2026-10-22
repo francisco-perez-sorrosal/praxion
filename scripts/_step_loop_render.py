@@ -22,6 +22,7 @@ from typing import Literal, NamedTuple, cast, get_args
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
 from _plan_steps import PlanStep
+from _step_loop_gate import GateEvidence
 from _step_schema import STEP_ID_RE
 
 PROMPT_CEILING = 16_000
@@ -37,6 +38,7 @@ SLOT_BOUNDS = {  # characters; a slot named here is cut to its bound
     "iteration-patches": 1_000,
 }
 PROGRESS_BOUND = 2_500  # a goal prompt keeps the newest progress lines within this
+GATE_EVIDENCE_BOUND = 1_500  # an implement prompt keeps the newest lines of the last red gate
 
 Kind = Literal["implement", "revise", "review"]
 Model = Literal["opus", "sonnet"]
@@ -173,6 +175,7 @@ class PromptInputs:
     wip_text: str = ""
     findings_text: str = ""
     previous: tuple[PriorAttempt, ...] = ()
+    gate_evidence: GateEvidence | None = None  # what the step's latest red gate block showed
     dirty_files: tuple[str, ...] = ()
     review_range: tuple[str, str] | None = None
     goal: GoalState | None = None  # for a goal step's implement request
@@ -259,6 +262,7 @@ def _slots(inputs: PromptInputs) -> list[_Slot]:
         return [section("key-signals", "TASK_BRIEF.md", "Key Signals"), ("diff", "", diff, "")]
     if inputs.goal is not None and kind == "implement":
         return _goal_slots(inputs, inputs.goal)
+    follow: list[_Slot] = []  # after the lead: what an implement attempt also needs to know
     if kind == "revise":
         file = f"LIGHT_REVIEW_step-{step.id}.md"
         lead = ("review-findings", file, inputs.findings_text.strip(), f"{work}/{file}")
@@ -268,8 +272,10 @@ def _slots(inputs: PromptInputs) -> list[_Slot]:
             edited = ", ".join(inputs.dirty_files)
             lines.append(f"Uncommitted edits to {edited} remain; read them first.")
         lead = ("previous-attempts", "", "\n".join(lines), f"{work}/ITERATION_LEDGER.jsonl")
+        follow.append(_gate_evidence_slot(inputs.gate_evidence, f"{work}/TEST_RESULTS.md"))
     return [
         lead,
+        *follow,
         section("health-guards", "TASK_BRIEF.md", "Health Guards"),
         section("corrections", "WIP.md", "Corrections in force"),
     ]
@@ -290,6 +296,14 @@ def _goal_slots(inputs: PromptInputs, goal: GoalState) -> list[_Slot]:
         ("protected-paths", "", "\n".join(f"- {path}" for path in goal.protected), plan),
         ("iteration-patches", work,"\n".join(goal.patches), work),
     ]  # fmt: skip
+
+
+def _gate_evidence_slot(evidence: GateEvidence | None, results: str) -> _Slot:
+    """The latest red gate's lines, newest first and cut to their bound (empty without any)."""
+    if evidence is None:
+        return ("gate-evidence", "", "", results)
+    text = _newest_first(evidence.lines(), GATE_EVIDENCE_BOUND, results)
+    return ("gate-evidence", f"TEST_RESULTS.md, {evidence.request}", text, results)
 
 
 _LINES_CUT = "[{count} earlier lines cut: full record in {path}]"

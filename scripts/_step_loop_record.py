@@ -14,10 +14,12 @@ derived here, in phases:
    block ending on the deciding line, and the reconciler reads the verdict as if the request
    were recorded. A red run fails the attempt whatever the check's expectations say: the
    check grammar has no error key, so a run red only by errors would otherwise meet it.
-4. **Commit** a verified attempt by explicit path. A commit git refuses, or one that cannot
-   finish or would disturb the tree, adds a `Result: none` line saying why, so every reader
-   sees the attempt unverified; the last two (and a repository whose commands cannot run) also
-   leave a `TREE_SNAPSHOT_<request>.patch`, which keeps the loop stopped for a person until
+4. **Commit** a verified attempt by explicit path, unless it returned [CONFLICT] or [BLOCKED]:
+   that agent called its scope incomplete, so whatever the check shows, nothing is committed or
+   ticked and every edit stays in the working tree for a person. A commit git refuses, or one
+   that cannot finish or would disturb the tree, adds a `Result: none` line saying why, so every
+   reader sees the attempt unverified; the last two (and a repository whose commands cannot run)
+   also leave a `TREE_SNAPSHOT_<request>.patch`, which keeps the loop stopped for a person until
    they delete it.
 5. **Ledger**: exactly one record per return (a light reviewer's skips phases 3 and 4).
 
@@ -96,7 +98,14 @@ from _step_loop_settle import (  # noqa: E402
     tick_step,
     withdraw_line,
 )
-from _step_loop_state import VERIFIED, LoopInputs, bare_id, series_work, step_cap  # noqa: E402
+from _step_loop_state import (  # noqa: E402
+    MARKED_STOPS,
+    VERIFIED,
+    LoopInputs,
+    bare_id,
+    series_work,
+    step_cap,
+)
 from iteration_ledger import IterationRecord  # noqa: E402
 
 END_WAIT_VARIABLE = "PRAXION_STEP_LOOP_END_WAIT_SECONDS"
@@ -188,7 +197,7 @@ def record_return(
     gate = run_gate(task, step, request)
     verdict = read_verdict(task, step.id, request, gate)
     committing = Committing(None, None)
-    if verdict["verdict"] == VERIFIED:
+    if commits_work(verdict["verdict"], stop_reason):
         committing = commit_attempt(task, step, asked, gate.deciding)
         if committing.failure is not None:
             gate = add_refusal(task, step.id, request, gate, committing.failure)
@@ -484,6 +493,12 @@ def read_return(
 
 
 # --- 4. Commit: by explicit path, once per request -------------------------------------------
+
+
+def commits_work(verdict_word: str, stop_reason: str) -> bool:
+    """Whether the attempt's work is committed and its step ticked: it verified, and its agent
+    did not call the scope incomplete. [PARTIAL] is not such a call: the check decides."""
+    return verdict_word == VERIFIED and stop_reason not in MARKED_STOPS
 
 
 class Committing(NamedTuple):

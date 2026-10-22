@@ -239,7 +239,7 @@ def test_a_literal_lands_in_exactly_one_class(literal: str, expected: str) -> No
 
 def _index_of(**modules: str) -> Any:
     """A literal index holding one module per keyword: `name="<python source>"`."""
-    index = python_selection._LiteralIndex()
+    index = python_selection._LiteralIndex(python_selection._Pockets((".",)))
     for name, source in modules.items():
         index.add_module(f"{name}.py", ast.parse(source))
     return index
@@ -764,7 +764,7 @@ def test_a_dotted_multi_segment_import_still_crosses_a_pocket(tmp_path: Path) ->
     assert _via(derivation.tests, "scripts/test_entry.py") == "import"
 
 
-def test_a_path_whose_last_connection_was_cross_pocket_widens(tmp_path: Path) -> None:
+def test_a_path_whose_only_connections_cross_pockets_is_not_mapped(tmp_path: Path) -> None:
     derivation = _derive_in_pockets(
         tmp_path,
         EVAL_CLI,

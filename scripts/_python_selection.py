@@ -13,14 +13,14 @@ sources, listed in attribution order:
 3. **path-literal** -- any string constant in any pocket module, in one of
    five classes. With a `/`: a path suffix (of the file or of one of its
    directories), or a glob when it has wildcards. Without a `/`: an exact
-   basename (see "Pockets" below), or a basename pattern (`*.md`) matching the basename of a changed
-   path at any depth. A wildcard literal with no letter or digit outside its
-   wildcards (`*`, `.*`, `*.*`) names no file. Suffixes, globs and exact
-   basenames are *named* edges that hold at every hop. A basename pattern
-   selects only holders that are themselves runnable test modules, directly
-   from a changed path: nothing propagates from such a holder, and a
-   production module holding `*.md` reads no file in particular, so it
-   selects nothing;
+   basename (see "Pockets" below), or a basename pattern (`*.md`) matching
+   the basename of a changed path at any depth. A wildcard literal with no
+   letter or digit outside its wildcards (`*`, `.*`, `*.*`) names no file.
+   Suffixes, globs and exact basenames are *named* edges that hold at every
+   hop. A basename pattern selects only holders that are themselves
+   runnable test modules, directly from a changed path: nothing propagates
+   from such a holder, and a production module holding `*.md` reads no file
+   in particular, so it selects nothing;
 4. **declared** -- `tests/declared-deps.toml` entries.
 
 A changed path selects every test that reaches it through reverse
@@ -252,9 +252,6 @@ class _Pockets:
             if under(path, root):
                 return root
         return "."
-
-
-_ROOT_POCKET_ONLY = _Pockets((".",))
 
 
 class Graph:
@@ -505,7 +502,7 @@ def _literal_class(literal: str) -> _LiteralClass:
 class _LiteralIndex:
     """String constants, indexed so a node looks up only candidate literals."""
 
-    def __init__(self, pockets: _Pockets = _ROOT_POCKET_ONLY) -> None:
+    def __init__(self, pockets: _Pockets) -> None:
         self._pockets = pockets
         self._by_basename: dict[str, set[str]] = {}
         self._by_last_segment: dict[str, list[tuple[str, str]]] = {}
@@ -527,7 +524,7 @@ class _LiteralIndex:
                 self._by_last_segment.setdefault(last, []).append((normalized, module))
 
     def modules_matching(self, node: str) -> set[str]:
-        """Holders of a *named* literal: exact basename (same pocket only), path suffix or path glob."""
+        """Holders of a *named* literal: exact basename (same pocket only), path suffix or glob."""
         pocket = self._pockets.of(node)
         found = {
             module

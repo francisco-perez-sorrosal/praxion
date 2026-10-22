@@ -198,7 +198,8 @@ def test_a_done_marked_step_with_another_step_left_is_shown_complete_while_next_
     stopped = next_action(inputs)
 
     assert step_state_word(step_series(STEP_ONE, inputs)) == "verified-complete"
-    assert (type(stopped), stopped.cause) == (Stop, "blocked-marker")
+    assert isinstance(stopped, Stop)
+    assert stopped.cause == "blocked-marker"
 
 
 def test_a_marked_step_stops_the_loop_with_a_cause_that_names_the_marker_status_shows():

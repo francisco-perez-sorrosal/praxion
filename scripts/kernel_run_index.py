@@ -21,29 +21,28 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, get_args
+from typing import Any
 
 import kernel_model as km
+
+# `CLEAR` is read back as `kernel_run_index.CLEAR` by the ledger checks.
+from kernel_run_standing import (
+    CLEAR as CLEAR,
+)
+from kernel_run_standing import (
+    Standing,
+    as_list,
+    as_mapping,
+    as_text,
+    read_standing,
+)
 
 RESULTS_DIR = ".ai-state/eval_ledger/adherence"
 INDEX_NAME = "index.json"
 INDEX_PATH = f"{RESULTS_DIR}/{INDEX_NAME}"
 INDEX_SCHEMA = 2
 REINDEX_HINT = "rebuild it with the adherence eval's --reindex"
-Flip = Literal["clear", "not clear", "underpowered"]  # a closed lineage already reads "not clear"
-FLIP_LABELS: tuple[Flip, ...] = get_args(Flip)
-CLEAR: Flip = "clear"
 RESULTS_GLOB = "*.json"
-
-
-@dataclass(frozen=True)
-class Standing:
-    """What a lineage reached for one role it measured, and the checks its verdict scored (sorted,
-    unique)."""
-
-    complete_pairs: int
-    flip: Flip
-    scored_checks: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -113,9 +112,12 @@ def parse_index(data: bytes) -> tuple[Mapping[str, Entry], frozenset[str]]:
         raw = json.loads(data.decode("utf-8"))
         if raw["schema"] != INDEX_SCHEMA:
             raise ValueError(f"schema {raw['schema']!r}, not {INDEX_SCHEMA}; {REINDEX_HINT}")
-        entries = {_text(run_id): _entry(row) for run_id, row in _mapping(raw["runs"]).items()}
+        entries = {
+            as_text(run_id, "run id"): _entry(row)
+            for run_id, row in as_mapping(raw["runs"], "runs").items()
+        }
         _refuse_split_lineages(entries)
-        skipped = frozenset(_text(name) for name in _list(raw["skipped"]))
+        skipped = frozenset(as_text(name, "skipped") for name in as_list(raw["skipped"], "skipped"))
     except (ValueError, KeyError, TypeError) as exc:  # JSON and UTF-8 decode errors are ValueErrors
         raise km.KernelModelError(
             f"{INDEX_PATH}: not a run index this gate can read: {exc}"
@@ -139,46 +141,19 @@ def _refuse_split_lineages(entries: Mapping[str, Entry]) -> None:
 
 
 def _entry(row: Any) -> Entry:
-    row = _mapping(row)
-    roles = {_text(role): _standing(value) for role, value in _mapping(row["roles"]).items()}
+    row = as_mapping(row, "run")
+    roles = {
+        as_text(role, "role"): _standing(value)
+        for role, value in as_mapping(row["roles"], "roles").items()
+    }
     return Entry(
-        _text(row["file"]),
-        _text(row["sha256"]),
-        _text(row["lineage_root"]),
+        as_text(row["file"], "file"),
+        as_text(row["sha256"], "sha256"),
+        as_text(row["lineage_root"], "lineage_root"),
         MappingProxyType(roles),
     )
 
 
 def _standing(value: Any) -> Standing:
-    value = _mapping(value)
-    pairs, flip = value["complete_pairs"], value["flip"]
-    if type(pairs) is not int or pairs < 0:
-        raise ValueError(f"complete_pairs {pairs!r} is not a count")
-    if flip not in FLIP_LABELS:
-        raise ValueError(f"flip {flip!r} is none of {', '.join(FLIP_LABELS)}")
-    return Standing(pairs, flip, _scored_checks(value["scored_checks"]))
-
-
-def _scored_checks(value: Any) -> tuple[str, ...]:
-    checks = tuple(_text(name) for name in _list(value))
-    if list(checks) != sorted(set(checks)):
-        raise ValueError(f"scored_checks {list(checks)!r} are not sorted and unique")
-    return checks
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise TypeError(f"{value!r} is not a mapping")
-    return value
-
-
-def _list(value: Any) -> list[Any]:
-    if not isinstance(value, list):
-        raise TypeError(f"{value!r} is not a list")
-    return value
-
-
-def _text(value: Any) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{value!r} is not text")
-    return value
+    value = as_mapping(value, "standing")
+    return read_standing(value["complete_pairs"], value["flip"], value["scored_checks"])

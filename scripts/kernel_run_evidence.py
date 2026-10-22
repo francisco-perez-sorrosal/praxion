@@ -28,6 +28,17 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from kernel_run_standing import (
+    NOT_CLEAR,
+    UNDERPOWERED,
+    Flip,
+    Standing,
+    as_list,
+    as_mapping,
+    as_text,
+    read_standing,
+)
+
 RESULTS_SCHEMA = "adherence/1"
 RESULTS_GLOB = "*.json"
 CLOSED_ENDING = "closed"
@@ -39,10 +50,6 @@ CONVENTION_CHECK_TEMPLATE = (
 
 Arm = Literal["full", "lean"]
 ARMS: tuple[Arm, ...] = get_args(Arm)
-Flip = Literal["clear", "not clear", "underpowered"]
-FLIP_LABELS: tuple[Flip, ...] = get_args(Flip)
-NOT_CLEAR: Flip = "not clear"
-UNDERPOWERED: Flip = "underpowered"
 
 
 class RunEvidenceError(ValueError):
@@ -66,15 +73,6 @@ class SessionRow:
     template_id: str
     arm: Arm
     measured: bool
-
-
-@dataclass(frozen=True)
-class Standing:
-    """What a run stands on for one role: complete pairs, flip label, checks its verdict scored."""
-
-    complete_pairs: int
-    flip: Flip
-    scored_checks: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -148,28 +146,28 @@ def read_run_files(results_dir: Path) -> tuple[RunFile, ...]:
 
 
 def _parse_file(data: Mapping[str, Any]) -> RunFile:
-    run = _mapping(data["run"])
+    run = as_mapping(data["run"], "run")
     continues = run.get("continues")
-    run_id = _text(run["id"])
+    run_id = as_text(run["id"], "run id")
     return RunFile(
         run_id,
-        None if continues is None else _text(continues),
-        _text(_mapping(run.get("ending") or {}).get("kind", LEGACY_ENDING)),
-        tuple(_session(row) for row in _list(data["sessions"])),
+        None if continues is None else as_text(continues, "continues"),
+        as_text(as_mapping(run.get("ending") or {}, "ending").get("kind", LEGACY_ENDING), "ending"),
+        tuple(_session(row) for row in as_list(data["sessions"], "sessions")),
         _recorded(data, run_id, continues is None),
     )
 
 
 def _session(row: Any) -> SessionRow:
-    row = _mapping(row)
-    setup, status = _mapping(row["setup"]), _mapping(row["status"])
+    row = as_mapping(row, "session")
+    setup, status = as_mapping(row["setup"], "setup"), as_mapping(row["status"], "status")
     arm = setup["arm"]
     if arm not in ARMS:
         raise ValueError(f"arm {arm!r} is none of {', '.join(ARMS)}")
     return SessionRow(
-        _text(setup["role"]),
-        _text(setup["task_id"]),
-        _text(setup["template_id"]),
+        as_text(setup["role"], "role"),
+        as_text(setup["task_id"], "task_id"),
+        as_text(setup["template_id"], "template_id"),
         arm,
         status["kind"] == "measured",
     )
@@ -196,44 +194,31 @@ def _unless_continued(file: RunFile, continued: set[str]) -> RunFile:
 
 def _standing_entries(value: Any) -> dict[str, LineageStanding]:
     entries = {}
-    for role, entry in _mapping(value).items():
-        entry = _mapping(entry)
-        parts = tuple(_text(part) for part in _list(entry["parts"]))
-        if not parts or _text(entry["lineage_root"]) != parts[0]:
+    for role, entry in as_mapping(value, "standing").items():
+        entry = as_mapping(entry, "standing entry")
+        parts = tuple(as_text(part, "parts") for part in as_list(entry["parts"], "parts"))
+        if not parts or as_text(entry["lineage_root"], "lineage_root") != parts[0]:
             raise ValueError(
                 f"the standing of {role} does not name its lineage root as its first part"
             )
-        entries[_text(role)] = LineageStanding(
-            parts, _figures(entry["complete_pairs"], entry["flip"], entry["scored_checks"])
+        entries[as_text(role, "role")] = LineageStanding(
+            parts, read_standing(entry["complete_pairs"], entry["flip"], entry["scored_checks"])
         )
     return entries
 
 
 def _legacy_roles(verdicts: Any) -> dict[str, Standing]:
     roles = {}
-    for role, verdict in _mapping(verdicts).items():
-        verdict = _mapping(verdict)
+    for role, verdict in as_mapping(verdicts, "verdicts").items():
+        verdict = as_mapping(verdict, "verdict")
         flip = verdict.get("flip")
         if flip is None and verdict.get("underpowered") is True:
             flip = UNDERPOWERED
         names = verdict.get("check_verdicts") or verdict.get("check_details") or {}
-        left_out = set(_list(verdict["not_covered"]))
-        scored = sorted(set(_mapping(names)) - left_out)
-        roles[_text(role)] = _figures(verdict["complete_pairs"], flip, scored)
+        left_out = set(as_list(verdict["not_covered"], "not_covered"))
+        scored = sorted(set(as_mapping(names, "check verdicts")) - left_out)
+        roles[as_text(role, "role")] = read_standing(verdict["complete_pairs"], flip, scored)
     return roles
-
-
-def _figures(pairs: Any, flip: Any, scored: Any) -> Standing:
-    if type(pairs) is not int or pairs < 0:
-        raise ValueError(f"complete_pairs {pairs!r} is not a count")
-    if flip not in FLIP_LABELS:
-        raise ValueError(f"flip {flip!r} is none of {', '.join(FLIP_LABELS)}")
-    checks = tuple(_text(name) for name in _list(scored))
-    if list(checks) != sorted(set(checks)):
-        raise ValueError(f"scored_checks {list(checks)!r} are not sorted and unique")
-    if flip == UNDERPOWERED and checks:
-        raise ValueError(f"an underpowered standing scored no check, yet lists {list(checks)!r}")
-    return Standing(pairs, flip, checks)
 
 
 # -- Deriving and judging ------------------------------------------------------------------
@@ -324,24 +309,3 @@ def _complete_pairs(lineage: Sequence[RunFile], role: str) -> int:
                 task = (session.task_id, session.template_id)
                 latest.setdefault(task, {})[session.arm] = session.measured
     return sum(1 for arms in latest.values() if set(arms) == set(ARMS) and all(arms.values()))
-
-
-# -- Typed reads of untrusted JSON -----------------------------------------------------------
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping):
-        raise TypeError(f"{value!r} is not a mapping")
-    return value
-
-
-def _list(value: Any) -> list[Any]:
-    if not isinstance(value, list):
-        raise TypeError(f"{value!r} is not a list")
-    return value
-
-
-def _text(value: Any) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"{value!r} is not text")
-    return value

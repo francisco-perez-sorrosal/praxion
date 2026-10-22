@@ -32,9 +32,18 @@ from _step_loop_io import (  # noqa: E402
     CommitRefused,
     Committed,
     NothingToCommit,
+    PocketScope,
     ScopeRuns,
+    ScopeUnresolved,
     TreeDisturbed,
     TreeSnapshot,
+)
+from _step_loop_pocket_runs import (  # noqa: E402
+    BoundSource,
+    CutOff,
+    Finished,
+    NotStarted,
+    PocketBound,
 )
 from _step_loop_render import RequestKey, spawn_request  # noqa: E402
 from _step_loop_state import LoopInputs  # noqa: E402
@@ -187,8 +196,8 @@ def test_the_implementer_definition_declares_the_turn_cap_and_an_unknown_agent_n
         ),
     ],
 )
-def test_a_derived_scope_of_several_runs_merges_into_one(runs, counts, failed, pending):
-    merged = gating.merge_runs(runs)
+def test_the_finished_runs_of_a_derived_scope_merge_into_one(runs, counts, failed, pending):
+    merged = gating.merge_finished(runs)
 
     assert (merged.counts, merged.failed_ids, merged.pending_ids, merged.command) == (
         counts,
@@ -198,10 +207,209 @@ def test_a_derived_scope_of_several_runs_merges_into_one(runs, counts, failed, p
     )
 
 
-def test_one_run_that_showed_no_summary_makes_the_merged_scope_no_run():
-    merged = gating.merge_runs((run(9), GateRun("pytest b", NoRun("timed out"))))
+# --- The derived scope, read pocket run by pocket run ------------------------------------------
 
-    assert (merged.counts, merged.red) == (NoRun("timed out"), True)
+REPO = Path("/repo")
+LOGS = REPO / ".ai-work" / "demo" / "gate" / REQUEST
+PASSED_OUTPUT = "== 3 passed in 0.10s =="
+FAILED_OUTPUT = "FAILED t.py::test_x - assert 0\n== 1 failed, 2 passed in 0.10s =="
+LATER = "t.py::test_later"
+
+
+class PendingNodes:
+    """A pending rule that owns exactly the nodes it is given."""
+
+    def __init__(self, *nodes: str) -> None:
+        self.nodes = nodes
+
+    def is_pending(self, node_id: str) -> bool:
+        return node_id in self.nodes
+
+    def is_pending_error(self, node_id: str) -> bool:
+        return False
+
+
+NOTHING_PENDING = PendingNodes()
+LATER_PENDING = PendingNodes(LATER)
+
+
+def finished(pocket, output=PASSED_OUTPUT, number=1):
+    return Finished(pocket, ("pytest", pocket), 0, output, LOGS / f"{number}.log")
+
+
+def cut_off(pocket, seen=(), seconds=7.0, source: BoundSource = "override", number=2):
+    bound = PocketBound(pocket, seconds, source)
+    return CutOff(bound, ("pytest", pocket), tuple(seen), "", LOGS / f"{number}.log")
+
+
+def scope(*pockets, widened=False, listed=1):
+    return ScopeRuns(
+        "selected", tuple(PocketScope(p, widened, listed, tuple(runs)) for p, *runs in pockets)
+    )
+
+
+def read(*pockets, rule=NOTHING_PENDING, widened=False, listed=1):
+    return gating.read_scope(scope(*pockets, widened=widened, listed=listed), rule, REPO)
+
+
+def test_a_scope_whose_runs_all_finished_is_read_as_their_merged_counts():
+    reading = read((".", finished(".")), ("eval", finished("eval", number=2)))
+
+    assert (reading.deciding.counts, reading.deciding.command, reading.kept, reading.notes) == (
+        Counts(6, 0, 0, 0),
+        "pytest . ; pytest eval",
+        (),
+        (),
+    )
+
+
+def test_a_run_past_its_bound_makes_the_scope_red_and_names_its_pocket_and_bound():
+    reading = read((".", finished(".")), ("eval", cut_off("eval")))
+
+    assert (reading.deciding.red, reading.deciding.counts, reading.notes) == (
+        True,
+        NoRun("eval cut off after 7s (override)"),
+        ("Cut off: eval after 7s (override)",),
+    )
+
+
+def test_the_counts_and_failures_of_the_runs_that_finished_stay_beside_a_cut_off_one():
+    reading = read(
+        (".", finished(".", FAILED_OUTPUT)), ("eval", cut_off("eval", seen=("e.py::a", "e.py::b")))
+    )
+
+    assert (reading.kept[0].counts, reading.notes) == (
+        Counts(2, 1, 0, 0),
+        (
+            "Cut off: eval after 7s (override)",
+            "Failed: t.py::test_x",
+            "Failed: e.py::a",
+            "Failed: e.py::b",
+        ),
+    )
+
+
+def test_a_failure_seen_before_the_cut_that_a_later_step_owns_is_not_this_steps_failure():
+    reading = read(("eval", cut_off("eval", seen=("e.py::a", LATER))), rule=LATER_PENDING)
+
+    assert reading.notes == ("Cut off: eval after 7s (override)", "Failed: e.py::a")
+
+
+def test_a_failure_shown_by_two_runs_is_listed_once():
+    reading = read(
+        (".", finished(".", FAILED_OUTPUT)), ("eval", cut_off("eval", seen=("t.py::test_x",)))
+    )
+
+    assert reading.notes.count("Failed: t.py::test_x") == 1
+
+
+def test_twenty_failures_are_listed_and_the_rest_are_counted_with_where_they_are_kept():
+    seen = [f"e.py::t{n:02d}" for n in range(27)]
+
+    reading = read(("eval", cut_off("eval", seen=seen)))
+
+    failed = [line for line in reading.notes if line.startswith("Failed:")]
+    assert (len(failed), failed[0], failed[-2], failed[-1]) == (
+        21,
+        "Failed: e.py::t00",
+        "Failed: e.py::t19",
+        f"Failed: … 7 more in {LOGS.relative_to(REPO)}",
+    )
+
+
+def test_a_run_that_ended_without_a_summary_is_a_red_run_that_keeps_the_others_counts():
+    reading = read((".", finished(".")), ("eval", finished("eval", "it crashed", number=2)))
+
+    assert (reading.deciding.counts, reading.kept[0].counts, reading.notes) == (
+        NoRun("eval: the output holds no pytest summary line"),
+        Counts(3, 0, 0, 0),
+        (),
+    )
+
+
+def test_a_run_that_never_started_is_a_red_run_naming_its_pocket():
+    reading = read(("eval", NotStarted("eval", "no run was started")))
+
+    assert (reading.deciding.counts, reading.kept) == (
+        NoRun("eval did not run (no run was started)"),
+        (),
+    )
+
+
+def test_several_unfinished_runs_are_all_named_in_the_one_deciding_line():
+    reading = read(("a", cut_off("a")), ("b", NotStarted("b", "gone")))
+
+    assert reading.deciding.counts == NoRun("a cut off after 7s (override); b did not run (gone)")
+
+
+VERBOSE_PASSES = "a.py::t1 PASSED  [ 50%]\nb.py::t1 PASSED  [ 75%]\nb.py::t2 PASSED  [100%]\n== 3 passed in 0.10s =="
+HEAD = "0123456789abcdef0123456789abcdef01234567"
+
+
+def test_each_pocket_that_finished_gets_a_line_with_its_files_tests_and_how_it_was_selected():
+    reading = read((".", finished(".", number=1)), ("eval", finished("eval", number=2)), listed=3)
+
+    assert reading.scopes == (
+        "Scope: . files=3 tests=3 narrow",
+        "Scope: eval files=3 tests=3 narrow",
+    )
+
+
+def test_a_widened_pocket_names_no_files_so_they_are_counted_from_its_log():
+    reading = read(("eval", finished("eval", VERBOSE_PASSES)), widened=True, listed=0)
+
+    assert reading.scopes == ("Scope: eval files=2 tests=3 widened",)
+
+
+def test_a_pocket_with_several_invocations_is_one_line_summing_their_tests():
+    reading = read(("eval", finished("eval", number=1), finished("eval", number=2)), listed=4)
+
+    assert reading.scopes == ("Scope: eval files=4 tests=6 narrow",)
+
+
+def test_a_pocket_that_did_not_finish_has_no_scope_line_and_the_others_keep_theirs():
+    reading = read((".", finished(".")), ("eval", cut_off("eval")))
+
+    assert reading.scopes == ("Scope: . files=1 tests=3 narrow",)
+
+
+def test_a_pocket_whose_files_are_unknown_leaves_the_count_out():
+    reading = read(("dashboard_app", finished("dashboard_app", "Tests  3 passed (3)")), listed=0)
+
+    assert reading.scopes == ("Scope: dashboard_app tests=3 narrow",)
+
+
+def run_the_gate_over(monkeypatch, tmp_path, *pockets):
+    monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py",))
+    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: scope(*pockets))
+    task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
+    return gating.run_gate(task, task.inputs.steps[0], REQUEST)
+
+
+def test_a_cut_off_run_ends_the_block_on_a_red_result_line_whatever_the_check_showed(
+    monkeypatch, tmp_path
+):
+    gate = run_the_gate_over(
+        monkeypatch, tmp_path, (".", finished(".", FAILED_OUTPUT)), ("eval", cut_off("eval"))
+    )
+
+    body = "\n".join(gate.body)
+    assert (gate.red, gate.deciding) == (True, "Result: none — eval cut off after 7s (override)")
+    assert "Cut off: eval after 7s (override)" in body
+    assert "Failed: t.py::test_x" in body
+    assert "Result: pass=2 fail=1 skip=0 pending=0 by=step-loop" in body
+
+
+def test_a_cut_off_block_is_read_back_red(monkeypatch, tmp_path):
+    gate = run_the_gate_over(monkeypatch, tmp_path, ("eval", cut_off("eval")))
+
+    again = gating.recorded_gate(tmp_path / gating.RESULTS_FILE, gating.gate_heading("1", REQUEST))
+
+    assert again == gate
+    assert again is not None
+    assert again.red
 
 
 def verdicts_of(word):
@@ -412,6 +620,7 @@ def gate_task(tmp_path, plan):
 
 
 def run_the_gate(monkeypatch, tmp_path, plan, *, changed=(), decision=None):
+    monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
     monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
     monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeRuns(decision, ()))
@@ -502,3 +711,29 @@ def test_a_scope_that_selects_but_lists_no_invocation_is_still_a_red_run(monkeyp
     )
 
     assert (gate.red, "the test scope selects no test" in gate.deciding) == (True, True)
+
+
+def test_a_green_block_summarises_the_scope_and_keeps_only_the_checks_own_command(
+    monkeypatch, tmp_path
+):
+    gate = run_the_gate_over(monkeypatch, tmp_path, (".", finished(".")))
+
+    assert gate.body == (
+        "Scope: . files=1 tests=3 narrow",
+        "Derived from: 1 declared files differing from 0123456",
+        "Command: `python3 -m pytest -q`",
+        "Result: pass=3 fail=0 skip=0 pending=0 by=step-loop",
+        "Result: pass=3 fail=0 skip=0 pending=0 by=step-loop",
+    )
+
+
+def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkeypatch, tmp_path):
+    monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py", "b.py"))
+    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeUnresolved(PASSED))
+    task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
+
+    gate = gating.run_gate(task, task.inputs.steps[0], REQUEST)
+
+    assert "Derived from: 2 declared files differing from 0123456" in gate.body

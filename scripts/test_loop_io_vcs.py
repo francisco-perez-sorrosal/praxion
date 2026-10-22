@@ -45,6 +45,7 @@ from _step_loop_io import (  # noqa: E402
     snapshot_outside,
     split_outer_loop,
 )
+from _step_loop_pocket_runs import CutOff, Finished  # noqa: E402
 
 REPO_ROOT = SCRIPT_DIR.parent
 BASE_FILES = {
@@ -841,29 +842,169 @@ def write_stub_resolver(tmp_path: Path, answer: str, exit_code: int = 0) -> Path
     return stub
 
 
-def scope_answer(*invocations: dict) -> str:
-    return json.dumps(
-        {"schema": 2, "decision": "narrow", "pockets": [{"invocations": list(invocations)}]}
-    )
+def pocket_answer(
+    root: str, *argvs: tuple[str, ...], selection: str = "tests", tests: int = 1
+) -> dict:
+    return {
+        "root": root,
+        "selection": selection,
+        "tests": [{"path": f"{root}/t{n}.py"} for n in range(tests)],
+        "invocations": [{"cwd": root, "argv": list(argv)} for argv in argvs],
+    }
 
 
-def test_every_invocation_the_resolver_lists_runs_on_its_own(
+def scope_answer(*pockets: dict) -> str:
+    return json.dumps({"schema": 2, "decision": "narrow", "pockets": list(pockets)})
+
+
+def derived_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *pockets: dict, environ: dict | None = None
+):
+    monkeypatch.setattr(step_io, "RESOLVER", write_stub_resolver(tmp_path, scope_answer(*pockets)))
+    run_dir = tmp_path / "gate" / "request"
+    return run_derived_scope(tmp_path, ["a.py"], run_dir, environ or {}), run_dir
+
+
+def test_every_invocation_the_resolver_lists_runs_on_its_own_in_its_pockets_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "pocket").mkdir()
-    first = {"cwd": ".", "argv": list(py("print('one')"))}
-    second = {"cwd": "pocket", "argv": list(py("import os; print(os.path.basename(os.getcwd()))"))}
-    monkeypatch.setattr(
-        step_io, "RESOLVER", write_stub_resolver(tmp_path, scope_answer(first, second))
+    first = py("print('one')")
+    second = py("import os; print(os.path.basename(os.getcwd()))")
+
+    result, _ = derived_scope(
+        tmp_path, monkeypatch, pocket_answer(".", first), pocket_answer("pocket", second)
     )
 
-    result = run_derived_scope(tmp_path, ["a.py"])
+    assert isinstance(result, ScopeRuns)
+    runs = [run for pocket in result.pockets for run in pocket.runs]
+    outputs = [run.output.splitlines()[-1] for run in runs if isinstance(run, Finished)]
+    assert (result.decision, [p.pocket for p in result.pockets], outputs) == (
+        "narrow",
+        [".", "pocket"],
+        ["one", "pocket"],
+    )
 
-    assert (
-        isinstance(result, ScopeRuns),
-        result.decision,
-        [run.output for run in result.runs],
-    ) == (True, "narrow", ["one\n", "pocket\n"])
+
+def test_each_run_leaves_a_numbered_log_under_the_requests_directory_starting_with_its_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result, run_dir = derived_scope(
+        tmp_path,
+        monkeypatch,
+        pocket_answer(".", py("print('a')"), py("print('b')")),
+        pocket_answer(".", py("print('c')")),
+    )
+
+    assert isinstance(result, ScopeRuns)
+    logs = sorted(path.name for path in run_dir.glob("*.log"))
+    first_lines = [(run_dir / name).read_text().splitlines()[0] for name in logs]
+    assert (logs, first_lines) == (
+        ["1.log", "2.log", "3.log"],
+        [f"$ {shlex.join(py(code))}" for code in ("print('a')", "print('b')", "print('c')")],
+    )
+
+
+def test_a_pocket_says_whether_its_selection_was_widened_and_how_many_tests_it_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ok = py("pass")
+
+    result, _ = derived_scope(
+        tmp_path,
+        monkeypatch,
+        pocket_answer(".", ok, tests=3),
+        pocket_answer("wide", ok, selection="full", tests=0),
+        pocket_answer("native", ok, selection="native", tests=2),
+    )
+
+    assert isinstance(result, ScopeRuns)
+    assert [(p.pocket, p.widened, p.listed_test_files) for p in result.pockets] == [
+        (".", False, 3),
+        ("wide", True, 0),
+        ("native", False, 2),
+    ]
+
+
+def test_a_pocket_the_resolver_selects_nothing_in_has_no_runs_and_is_not_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result, _ = derived_scope(
+        tmp_path, monkeypatch, pocket_answer("dashboard_app", selection="nothing", tests=0)
+    )
+
+    assert isinstance(result, ScopeRuns)
+    assert result.pockets == ()
+
+
+def test_a_pytest_invocation_is_run_with_the_flags_that_report_each_outcome(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    echo = ("sh", "-c", 'echo "$@"', "sh", "pytest", "a.py")
+
+    result, _ = derived_scope(tmp_path, monkeypatch, pocket_answer(".", echo))
+
+    assert isinstance(result, ScopeRuns)
+    (run,) = result.pockets[0].runs
+    assert isinstance(run, Finished)
+    assert (run.argv[-4:], run.output.splitlines()[-1]) == (
+        ("pytest", "-v", "-rfE", "a.py"),
+        "pytest -v -rfE a.py",
+    )
+
+
+def test_a_pocket_is_bound_by_its_own_override_and_a_run_past_it_is_cut_off_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "slow").mkdir()
+    hang = py("import time; print('started', flush=True); time.sleep(60)")
+
+    result, _ = derived_scope(
+        tmp_path,
+        monkeypatch,
+        pocket_answer(".", py("print('done')")),
+        pocket_answer("slow", hang),
+        environ={"PRAXION_STEP_LOOP_POCKET_TIMEOUTS": "slow=0.3"},
+    )
+
+    assert isinstance(result, ScopeRuns)
+    done, slow = (pocket.runs[0] for pocket in result.pockets)
+    assert isinstance(done, Finished)
+    assert isinstance(slow, CutOff)
+    assert (slow.pocket, slow.bound.seconds, slow.bound.source) == ("slow", 0.3, "override")
+    assert "started" in slow.output
+
+
+def test_a_bound_that_cannot_be_read_is_reported_on_stderr_and_the_default_applies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    result, _ = derived_scope(
+        tmp_path,
+        monkeypatch,
+        pocket_answer(".", py("pass")),
+        environ={"PRAXION_STEP_LOOP_POCKET_TIMEOUTS": ".=soon"},
+    )
+
+    assert isinstance(result, ScopeRuns)
+    assert [type(run) for run in result.pockets[0].runs] == [Finished]
+    assert "skipped" in capsys.readouterr().err
+
+
+def test_a_scope_run_again_for_the_same_request_attaches_to_a_finished_run_and_runs_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    count = tmp_path / "count.txt"
+    once = py(f"open({str(count)!r}, 'a').write('x')")
+    answer = pocket_answer(".", once)
+    monkeypatch.setattr(step_io, "RESOLVER", write_stub_resolver(tmp_path, scope_answer(answer)))
+    run_dir = tmp_path / "gate" / "request"
+
+    first = run_derived_scope(tmp_path, ["a.py"], run_dir, {})
+    again = run_derived_scope(tmp_path, ["a.py"], run_dir, {})
+
+    assert isinstance(first, ScopeRuns)
+    assert isinstance(again, ScopeRuns)
+    assert (count.read_text(), type(again.pockets[0].runs[0])) == ("x", Finished)
 
 
 def test_the_resolver_is_asked_for_json_about_the_changed_paths_in_this_repo(
@@ -871,7 +1012,7 @@ def test_the_resolver_is_asked_for_json_about_the_changed_paths_in_this_repo(
 ) -> None:
     monkeypatch.setattr(step_io, "RESOLVER", write_stub_resolver(tmp_path, scope_answer()))
 
-    run_derived_scope(tmp_path, ["a.py", "b.py"])
+    run_derived_scope(tmp_path, ["a.py", "b.py"], tmp_path / "gate", {})
 
     asked = (tmp_path / "asked.txt").read_text()
     assert asked == f"--repo-root {tmp_path} --changed a.py b.py --json"
@@ -886,7 +1027,7 @@ def test_a_resolver_that_gives_no_plan_is_unresolved_never_an_empty_scope(
 ) -> None:
     monkeypatch.setattr(step_io, "RESOLVER", write_stub_resolver(tmp_path, answer, exit_code))
 
-    result = run_derived_scope(tmp_path, ["a.py"])
+    result = run_derived_scope(tmp_path, ["a.py"], tmp_path / "gate", {})
 
     assert (isinstance(result, ScopeUnresolved), result.resolver.returncode) == (True, exit_code)
 

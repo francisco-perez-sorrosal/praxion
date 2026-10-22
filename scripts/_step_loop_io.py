@@ -12,9 +12,11 @@ repository or runs a command.
   whatever the plan declares.
 * **Scope**: `tree_patch`, the whole tree's difference from `HEAD` (the index untouched), and
   `restore_paths`, which returns a declared scope to `HEAD` and touches nothing else.
-* **Runner**: the `Check:` command and the derived test scope. Each invocation the resolver
-  lists runs and comes back on its own; merging them is the caller's job. No runner is asked to
-  colour, and each command leads a process group that a timeout kills whole.
+* **Runner**: the `Check:` command and the derived test scope. The `Check:` runs here, under
+  one timeout. Each invocation the scope lists runs through the pocket-run module -- detached,
+  under its pocket's own bound, found again by a later call -- and comes back as that module's
+  record of it, grouped by pocket; reading the records is the caller's job. No runner is asked
+  to colour, and each command leads a process group that a timeout kills whole.
 
 Every git call goes through `_git_runner.run_git`; from `commit_paths`, a git that cannot run is
 `CommitInterrupted` and one that refuses a command is `CommitRefused`. Pathspecs are
@@ -25,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import os
 import posixpath
 import re
@@ -34,12 +37,20 @@ import subprocess
 import sys
 import tempfile
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union
 
 from _git_runner import GIT_TIMEOUT_SECONDS, GitUnavailableError, run_git
+from _step_loop_pocket_runs import (
+    Observed,
+    RunSpec,
+    no_colour_environment,
+    pocket_bound,
+    run_detached,
+    with_outcome_reports,
+)
 
 OUTER_LOOP_PREFIXES = ("tests/acceptance/", "tests/e2e/")
 # The commit runs the repository's hooks (about twenty, installing environments on a first
@@ -60,6 +71,7 @@ _HOOK_BOOKKEEPING = ("- hook id:", "- exit code:")
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
 _LITERAL_PATHSPEC = ":(literal)"
 _NODE_SEPARATOR = "::"
+_WIDENED = "full"  # the resolver's word for a pocket that runs its whole suite
 _STATUS_PATH_OFFSET = 3  # porcelain v1: two status letters and a space precede the path
 _UNTRACKED_DIRECTORY_MARK = "/"
 _GIT_DIRECTORY = ".git/"
@@ -72,8 +84,6 @@ _PATCH_FORMAT = (
 _MISSING = " missing"  # the end of `git cat-file --batch-check`'s line for an absent object
 _DELETED = "deleted"
 _NOT_A_FILE = "not-a-file"
-_NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
-_FORCED_COLOUR_VARS = ("FORCE_COLOR", "CLICOLOR_FORCE")
 
 Entries = tuple[tuple[str, str], ...]
 
@@ -344,7 +354,7 @@ def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:
         return NothingToCommit(job.withheld)
     after = snapshot_outside(repo, frozenset(job.paths))
     if after != job.before:
-        sha = _head_sha(repo) if refused is None else None
+        sha = head_sha(repo) if refused is None else None
         return TreeDisturbed(job.before, after, job.before.paths_differing(after), sha)
     if refused is not None:
         return CommitRefused(refused)
@@ -390,7 +400,7 @@ def _try_commit(repo: Path, job: _Job) -> str | None:
 
 def _verified(repo: Path, job: _Job, expected: frozenset[str]) -> Union[Committed, TreeDisturbed]:  # noqa: UP007 -- runtime value, 3.9 floor
     """The commit just made, if its file set is exactly what was staged."""
-    sha = _head_sha(repo)
+    sha = head_sha(repo)
     listing = _git(
         repo,
         "diff-tree",
@@ -408,7 +418,8 @@ def _verified(repo: Path, job: _Job, expected: frozenset[str]) -> Union[Committe
     return Committed(sha, tuple(sorted(files)), job.withheld)
 
 
-def _head_sha(repo: Path) -> str:
+def head_sha(repo: Path) -> str:
+    """The full id of the commit `HEAD` names."""
     return _git(repo, "rev-parse", "--verify", "HEAD").strip()
 
 
@@ -514,11 +525,24 @@ class CommandRun:
 
 
 @dataclass(frozen=True)
+class PocketScope:
+    """One pocket's part of the derived scope: how its tests were chosen and what each of its
+    invocations left behind. `listed_test_files` counts the files the resolver named; a widened
+    pocket runs its whole suite and names none."""
+
+    pocket: str
+    widened: bool
+    listed_test_files: int
+    runs: tuple[Observed, ...]
+
+
+@dataclass(frozen=True)
 class ScopeRuns:
-    """The derived scope: the resolver's decision and each invocation's own run."""
+    """The derived scope: the resolver's decision and the pockets it ran, in the resolver's
+    order. A pocket with nothing selected is not listed."""
 
     decision: str
-    runs: tuple[CommandRun, ...]
+    pockets: tuple[PocketScope, ...]
 
 
 @dataclass(frozen=True)
@@ -534,17 +558,41 @@ def run_check(repo: Path, command: str, timeout: float = RUN_TIMEOUT_SECONDS) ->
 
 
 def run_derived_scope(
-    repo: Path, changed: Iterable[str], timeout: float = RUN_TIMEOUT_SECONDS
+    repo: Path,
+    changed: Iterable[str],
+    run_dir: Path,
+    environ: Mapping[str, str],
+    give_up_at: float = math.inf,
 ) -> Union[ScopeRuns, ScopeUnresolved]:  # noqa: UP007 -- runtime value, 3.9 floor
-    """Resolve the test scope for `changed` and run every invocation it lists."""
+    """Resolve the test scope for `changed` and run every invocation it lists, each under its
+    pocket's bound, in order. The runs live under `run_dir`: asked again with the same `run_dir`,
+    a run already started is picked up instead of started, and a finished one is not run again."""
     ask = (sys.executable, str(RESOLVER), "--repo-root", str(repo), "--changed", *changed, "--json")
     resolver = run_command(ask, repo, RESOLVER_TIMEOUT_SECONDS)
     plan = _read_plan(resolver)
     if plan is None:
         return ScopeUnresolved(resolver)
-    invocations = [i for pocket in plan["pockets"] for i in pocket["invocations"]]
-    runs = tuple(run_command(tuple(i["argv"]), repo / i["cwd"], timeout) for i in invocations)
-    return ScopeRuns(str(plan["decision"]), runs)
+    pockets, number = [], 1
+    for entry in plan["pockets"]:
+        invocations = entry["invocations"]
+        if not invocations:
+            continue
+        reading = pocket_bound(repo, entry["root"], environ)
+        for warning in reading.warnings:
+            print(f"step-loop: {warning}", file=sys.stderr)
+        specs = [
+            RunSpec(
+                run_dir, number + at, with_outcome_reports(tuple(i["argv"])),
+                repo / i["cwd"], reading.bound,
+            )
+            for at, i in enumerate(invocations)
+        ]  # fmt: skip
+        number += len(specs)
+        runs = tuple(run_detached(spec, give_up_at) for spec in specs)
+        pockets.append(
+            PocketScope(entry["root"], entry["selection"] == _WIDENED, len(entry["tests"]), runs)
+        )
+    return ScopeRuns(str(plan["decision"]), tuple(pockets))
 
 
 def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
@@ -557,7 +605,7 @@ def run_command(argv: tuple[str, ...], cwd: Path, timeout: float) -> CommandRun:
     with sigterm_as_exit():
         try:
             proc = subprocess.Popen(
-                argv, cwd=str(cwd), env=_no_colour_env(), stdout=subprocess.PIPE,
+                argv, cwd=str(cwd), env=no_colour_environment(os.environ), stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
                 start_new_session=True,
             )  # fmt: skip
@@ -605,8 +653,3 @@ def _read_plan(resolver: CommandRun) -> dict | None:
     except json.JSONDecodeError:
         return None
     return plan if isinstance(plan, dict) and "pockets" in plan else None
-
-
-def _no_colour_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in _FORCED_COLOUR_VARS}
-    return {**env, **_NO_COLOUR_ENV}

@@ -20,8 +20,11 @@ from _step_loop_pocket_runs import (  # noqa: E402
     POCKET_TIMEOUTS_VARIABLE,
     PocketBound,
     failed_node_ids,
+    files_with_outcomes,
+    no_colour_environment,
     pocket_bound,
     resolve_bound,
+    with_outcome_reports,
 )
 
 DECLARES_1200 = "[tool.praxion.step-loop]\ngate-timeout-seconds = 1200\n"
@@ -250,3 +253,69 @@ def test_a_log_cut_mid_line_still_yields_the_ids_it_completed():
     log = "tests/test_a.py::test_two FAILED   [ 20%]\ntests/test_a.py::test_thr"
 
     assert failed_node_ids(log) == ("tests/test_a.py::test_two",)
+
+
+# --- What a run is asked to report, and the environment it is asked in ---
+
+
+@pytest.mark.parametrize(
+    ("argv", "asked"),
+    [
+        (("uv", "run", "pytest", "a.py"), ("uv", "run", "pytest", "-v", "-rfE", "a.py")),
+        (("python", "-m", "pytest", "-n", "0", "a.py"), ("python", "-m", "pytest", "-v", "-rfE", "-n", "0", "a.py")),
+        (("uv", "run", "pytest"), ("uv", "run", "pytest", "-v", "-rfE")),
+    ],
+)  # fmt: skip
+def test_a_pytest_invocation_is_asked_for_each_outcome_and_the_failures_and_errors_it_names(
+    argv, asked
+):
+    assert with_outcome_reports(argv) == asked
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [("npx", "vitest", "run", "src/a.test.ts"), ("pnpm", "exec", "vitest", "run"), ("cargo", "test"), ()],
+)  # fmt: skip
+def test_an_invocation_of_another_runner_is_left_as_it_is(argv):
+    assert with_outcome_reports(argv) == argv
+
+
+def test_only_the_runner_word_is_taken_for_pytest_not_a_path_that_contains_it():
+    argv = ("uv", "run", "pytest", "tests/pytest/test_a.py", "pytest")
+
+    assert with_outcome_reports(argv)[:6] == (
+        "uv",
+        "run",
+        "pytest",
+        "-v",
+        "-rfE",
+        "tests/pytest/test_a.py",
+    )
+
+
+def test_the_child_environment_asks_for_no_colour_and_drops_the_variables_that_force_it():
+    environ = {
+        "PATH": "/bin",
+        "FORCE_COLOR": "1",
+        "CLICOLOR_FORCE": "1",
+        "NO_COLOR": "",
+        "PY_COLORS": "1",
+    }
+
+    assert no_colour_environment(environ) == {"PATH": "/bin", "NO_COLOR": "1", "PY_COLORS": "0"}
+
+
+# --- The test files a log shows outcomes for ---
+
+
+def test_the_test_files_of_a_plain_and_an_xdist_log_are_counted_once_each():
+    assert files_with_outcomes(PLAIN_LOG) == 2
+    assert files_with_outcomes(PLAIN_LOG + XDIST_LOG) == 2
+    assert files_with_outcomes("[gw0] [ 10%] PASSED tests/test_c.py::t[a b]\n") == 1
+
+
+@pytest.mark.parametrize(
+    "log", ["", "== 3 passed in 0.10s ==\n", "a PASSED in prose\n", "FAILED t.py::x - why\n"]
+)
+def test_a_log_without_streamed_outcomes_shows_no_files(log):
+    assert files_with_outcomes(log) == 0

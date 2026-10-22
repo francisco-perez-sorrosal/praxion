@@ -246,6 +246,11 @@ printf '%s %s\n' "$code" "$(date +%s)" > "$done.tmp" && mv "$done.tmp" "$done"
 _FIRST_SIGNALLABLE_PID = 2  # pid 1 and group 0 (our own) are never signalled
 _NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
 _FORCED_COLOUR_VARS = ("FORCE_COLOR", "CLICOLOR_FORCE")
+_PYTEST_WORD = "pytest"
+# `-v` streams one outcome per test as it finishes, so a run cut off part-way still shows its
+# failures. `-rfE` is pytest's own default summary: a bare `-rf` would replace an `-ra` in a
+# pocket's configuration and drop the lines that name errors.
+_OUTCOME_REPORTS = ("-v", "-rfE")
 
 
 @dataclass(frozen=True)
@@ -367,9 +372,8 @@ def _start_once(spec: RunSpec, now: Callable[[], float]) -> NotStarted | None:
 def _launch(spec: RunSpec) -> int:
     """Start the launcher in a session of its own; its pid leads the run's process group."""
     command = ["sh", "-c", _LAUNCHER, "sh", str(spec.log_path), str(spec.exit_path), *spec.argv]
-    environment = {k: v for k, v in os.environ.items() if k not in _FORCED_COLOUR_VARS}
     process = subprocess.Popen(
-        command, cwd=spec.cwd, env={**environment, **_NO_COLOUR_ENV},
+        command, cwd=spec.cwd, env=no_colour_environment(os.environ),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )  # fmt: skip
@@ -379,6 +383,21 @@ def _launch(spec: RunSpec) -> int:
         pid = process.pid
         del process
     return pid
+
+
+def no_colour_environment(environ: Mapping[str, str]) -> dict[str, str]:
+    """`environ` for a child whose output is read by a program: no colour asked for, none forced."""
+    kept = {name: value for name, value in environ.items() if name not in _FORCED_COLOUR_VARS}
+    return {**kept, **_NO_COLOUR_ENV}
+
+
+def with_outcome_reports(argv: tuple[str, ...]) -> tuple[str, ...]:
+    """`argv` with the flags that make a pytest run report each outcome; another runner's
+    invocation comes back as it is. The flags follow the first `pytest` word, the runner's own."""
+    if _PYTEST_WORD not in argv:
+        return argv
+    at = argv.index(_PYTEST_WORD) + 1
+    return (*argv[:at], *_OUTCOME_REPORTS, *argv[at:])
 
 
 def _record_pid(spec: RunSpec, pid: int) -> None:
@@ -464,7 +483,7 @@ def _reap(pid: int, wait: bool = False) -> None:
 
 # --- The failures a log shows ---
 #
-# `pytest -v -rf` streams one outcome per test as it finishes, so a run killed part-way still
+# `pytest -v` streams one outcome per test as it finishes, so a run killed part-way still
 # shows the failures before the cut. The short summary that names them again comes last and is the
 # gate's to read: a killed run never prints it.
 
@@ -483,3 +502,18 @@ def failed_node_ids(log: str) -> tuple[str, ...]:
         _PLAIN_OUTCOME_RE.match(line) or _XDIST_OUTCOME_RE.match(line) for line in log.splitlines()
     )
     return tuple(dict.fromkeys(match["id"] for match in matches if match))
+
+
+_ANY_OUTCOME = r"(?:PASSED|FAILED|SKIPPED|ERROR|XFAIL|XPASS)"
+_SEEN_FILE_RES = (
+    re.compile(rf"^(?P<file>[^\s:]+)::\S.* {_ANY_OUTCOME}\b"),  # path::test PASSED   [ 50%]
+    re.compile(
+        rf"^\[gw\d+\] \[\s*\d+%\] {_ANY_OUTCOME} (?P<file>[^\s:]+)::"
+    ),  # [gw1] PASSED path::test
+)
+
+
+def files_with_outcomes(log: str) -> int:
+    """How many distinct test files a `-v` log shows an outcome for."""
+    matches = (regex.match(line) for line in log.splitlines() for regex in _SEEN_FILE_RES)
+    return len({match["file"] for match in matches if match})

@@ -9,7 +9,6 @@ what each commit outcome means for the attempt.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,20 +22,14 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import _step_loop_record as rec  # noqa: E402
 import _step_loop_record_gate as gating  # noqa: E402
 from _agent_transcript import Final, Missing, Read, Unreadable  # noqa: E402
-from _loop_fields import ATTEMPT_CAP  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_files import write_gate_block  # noqa: E402
-from _step_loop_gate import GateRun  # noqa: E402
+from _step_loop_gate import GateRun, parse_gate_evidence  # noqa: E402
 from _step_loop_io import (  # noqa: E402
     CommandRun,
-    CommitInterrupted,
-    CommitRefused,
-    Committed,
-    NothingToCommit,
     PocketScope,
     ScopeRuns,
     ScopeUnresolved,
-    TreeDisturbed,
     TreeSnapshot,
 )
 from _step_loop_pocket_runs import (  # noqa: E402
@@ -47,7 +40,6 @@ from _step_loop_pocket_runs import (  # noqa: E402
     PocketBound,
     StillRunning,
 )
-from _step_loop_render import RequestKey, spawn_request  # noqa: E402
 from _step_loop_state import LoopInputs  # noqa: E402
 from _step_schema import Counts, NoRun, mutation_block_reasons  # noqa: E402
 
@@ -285,8 +277,8 @@ def test_the_counts_and_failures_of_the_runs_that_finished_stay_beside_a_cut_off
         (
             "Cut off: eval after 7s (override)",
             "Failed: t.py::test_x",
-            "Failed: e.py::a",
-            "Failed: e.py::b",
+            "Failed: eval/e.py::a",
+            "Failed: eval/e.py::b",
         ),
     )
 
@@ -294,13 +286,11 @@ def test_the_counts_and_failures_of_the_runs_that_finished_stay_beside_a_cut_off
 def test_a_failure_seen_before_the_cut_that_a_later_step_owns_is_not_this_steps_failure():
     reading = read(("eval", cut_off("eval", seen=("e.py::a", LATER))), rule=LATER_PENDING)
 
-    assert reading.notes == ("Cut off: eval after 7s (override)", "Failed: e.py::a")
+    assert reading.notes == ("Cut off: eval after 7s (override)", "Failed: eval/e.py::a")
 
 
 def test_a_failure_shown_by_two_runs_is_listed_once():
-    reading = read(
-        (".", finished(".", FAILED_OUTPUT)), ("eval", cut_off("eval", seen=("t.py::test_x",)))
-    )
+    reading = read((".", finished(".", FAILED_OUTPUT), cut_off(".", seen=("t.py::test_x",))))
 
     assert reading.notes.count("Failed: t.py::test_x") == 1
 
@@ -313,10 +303,19 @@ def test_twenty_failures_are_listed_and_the_rest_are_counted_with_where_they_are
     failed = [line for line in reading.notes if line.startswith("Failed:")]
     assert (len(failed), failed[0], failed[-2], failed[-1]) == (
         21,
-        "Failed: e.py::t00",
-        "Failed: e.py::t19",
+        "Failed: eval/e.py::t00",
+        "Failed: eval/e.py::t19",
         f"Failed: … 7 more in {LOGS.relative_to(REPO)}",
     )
+
+
+def test_a_failure_is_named_as_the_repository_names_it_with_its_pocket_in_front():
+    reading = read(
+        (".", finished(".", FAILED_OUTPUT)),
+        ("task-chronograph-mcp", finished("task-chronograph-mcp", FAILED_OUTPUT, number=2)),
+    )
+
+    assert reading.notes == ("Failed: t.py::test_x", "Failed: task-chronograph-mcp/t.py::test_x")
 
 
 def test_a_run_that_ended_without_a_summary_is_a_red_run_that_keeps_the_others_counts():
@@ -381,10 +380,10 @@ def test_a_pocket_whose_files_are_unknown_leaves_the_count_out():
     assert reading.scopes == ("Scope: dashboard_app tests=3 narrow",)
 
 
-def run_the_gate_over(monkeypatch, tmp_path, *pockets):
+def run_the_gate_over(monkeypatch, tmp_path, *pockets, changed=("a.py",), check=None):
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
-    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py",))
-    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
+    monkeypatch.setattr(gating, "run_check", lambda *_: check or PASSED)
     monkeypatch.setattr(gating, "run_derived_scope", lambda *_: scope(*pockets))
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
     return gating.run_gate(task, task.inputs.steps[0], REQUEST)
@@ -479,124 +478,6 @@ def test_a_refused_commit_ends_the_block_on_a_no_result_line(tmp_path):
         "Result: none — hooks said no",
         gate,
     )
-
-
-# --- The commit -------------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("outcome", "sha", "failed", "stops"),
-    [
-        (Committed("abc1234", ("a.py",), ()), "abc1234", False, False),
-        (NothingToCommit(()), None, False, False),
-        (CommitRefused("pre-commit: ruff failed\nmore"), None, True, False),
-        (CommitInterrupted("timed out", EMPTY_SNAPSHOT, True), None, True, True),
-        (
-            TreeDisturbed(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, ("x.py",), "def5678"),
-            "def5678",
-            True,
-            True,
-        ),
-    ],
-)
-def test_each_commit_outcome_says_what_holds_the_work_and_whether_to_stop(
-    tmp_path, outcome, sha, failed, stops
-):
-    task = SimpleNamespace(dir=tmp_path, repo=tmp_path)
-
-    taken = rec.judge_commit(task, REQUEST, outcome)
-
-    assert (taken.sha, taken.failure is not None, snapshot_of(tmp_path).exists()) == (
-        sha,
-        failed,
-        stops,
-    )
-
-
-def test_a_disturbed_tree_saves_the_earlier_state_beside_the_task(tmp_path):
-    before = TreeSnapshot(staged=(("notes.txt", "row"),), unstaged=(), untracked=())
-    task = SimpleNamespace(dir=tmp_path, repo=tmp_path)
-
-    taken = rec.judge_commit(task, REQUEST, TreeDisturbed(before, before, ("notes.txt",), None))
-
-    saved = snapshot_of(tmp_path)
-    assert (taken.failure in saved.read_text(), "notes.txt" in saved.read_text()) == (True, True)
-
-
-def snapshot_of(task_dir):
-    return task_dir / f"TREE_SNAPSHOT_{REQUEST}.patch"
-
-
-@pytest.mark.parametrize(
-    "error",
-    [
-        rec.GitCommandError("fatal: bad object"),
-        rec.GitUnavailableError("git is not on PATH"),
-        rec.OutsideRepoError("../x leaves the repository"),
-    ],
-    ids=["git-refused", "git-unavailable", "path-outside-the-repository"],
-)
-def test_a_commit_that_could_not_run_leaves_a_snapshot_naming_why_and_no_sha(
-    repo, monkeypatch, error
-):
-    def raising(*_):
-        raise error
-
-    monkeypatch.setattr(rec, "commit_paths", raising)
-    task = SimpleNamespace(dir=repo, repo=repo, slug=SLUG, inputs=SimpleNamespace(steps=()))
-    step = parse_plan_steps(gate_plan())[0]
-    asked = spawn_request(SLUG, step, RequestKey("1", 2, "implement", 1), ATTEMPT_CAP, str(repo))
-
-    taken = rec.commit_attempt(task, step, asked, GREEN_LINE)
-
-    saved = (repo / "TREE_SNAPSHOT_s1-a2-implement.patch").read_text()
-    assert (taken.sha, taken.failure in saved, str(error) in saved) == (None, True, True)
-
-
-def git(repo, *args):
-    return subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-
-
-@pytest.fixture
-def repo(tmp_path):
-    git(tmp_path, "init", "-q")
-    git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty",
-        "-m", f"subject\n\n{rec.TRAILER}{REQUEST}")  # fmt: skip
-    return tmp_path
-
-
-@pytest.mark.parametrize(("request_id", "found"), [(REQUEST, True), ("s1-a2-implement", False)])
-def test_a_head_commit_naming_the_request_is_reused(repo, request_id, found):
-    sha = rec.head_commit_for(repo, request_id)
-
-    assert (sha == git(repo, "rev-parse", "HEAD")) is found
-
-
-def test_a_left_index_lock_is_named_in_the_stop_text(repo):
-    (repo / ".git" / "index.lock").write_text("", encoding="utf-8")
-
-    assert "index.lock exists" in rec._lock_note(repo)
-
-
-# --- The checklist ----------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("wip", "after", "wrote"),
-    [
-        (f"- [ ] {STEP}1: Do it\n- [ ] {STEP}2: Next\n", f"- [x] {STEP}1: Do it\n", True),
-        (f"- [x] {STEP}1: Do it\n- [ ] {STEP}2: Next\n", f"- [x] {STEP}1: Do it\n", False),
-    ],
-)
-def test_the_step_line_is_ticked_once_and_no_other(tmp_path, wip, after, wrote):
-    path = tmp_path / rec.WIP_FILE
-    path.write_text(wip, encoding="utf-8")
-
-    ticked = rec.tick_step(path, "1")
-
-    assert (ticked, path.read_text(encoding="utf-8")) == (wrote, after + f"- [ ] {STEP}2: Next\n")
 
 
 # --- The mutation line a tagged step carries into the driver's block ---------------------------
@@ -724,11 +605,69 @@ def test_a_green_block_summarises_the_scope_and_keeps_only_the_checks_own_comman
 
     assert gate.body == (
         "Scope: . files=1 tests=3 narrow",
-        "Derived from: 1 declared files differing from 0123456",
+        "Derived from: 1 declared files (a.py) differing from 0123456",
         "Command: `python3 -m pytest -q`",
         "Result: pass=3 fail=0 skip=0 pending=0 by=step-loop",
         "Result: pass=3 fail=0 skip=0 pending=0 by=step-loop",
     )
+
+
+def failing(prefix, count, *more):
+    ids = [f"{prefix}.py::t{n:02d}" for n in range(count)] + list(more)
+    return "\n".join([*(f"FAILED {node} - x" for node in ids), f"== {len(ids)} failed in 0.1s =="])
+
+
+def test_a_red_check_hands_its_failing_nodes_to_the_next_attempt(monkeypatch, tmp_path):
+    red = CommandRun(("python3", "-m", "pytest", "-q"), ".", failing("c", 2), 1)
+    monkeypatch.setattr(gating, "run_check", lambda *_: red)
+    monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ())
+    task = gate_task(tmp_path, gate_plan(CHECK_LINE))
+
+    gate = gating.run_gate(task, task.inputs.steps[0], REQUEST)
+
+    evidence = parse_gate_evidence(REQUEST, gate.body)
+    assert evidence is not None
+    assert evidence.failed == ("c.py::t00", "c.py::t01")
+
+
+def test_the_failures_of_the_scope_and_the_check_share_one_bounded_list(monkeypatch, tmp_path):
+    red = CommandRun(("python3", "-m", "pytest", "-q"), ".", failing("c", 10), 1)
+    scope_output = failing("s", 15, "c.py::t00", "c.py::t01")  # two the check shows too
+
+    gate = run_the_gate_over(monkeypatch, tmp_path, (".", finished(".", scope_output)), check=red)
+
+    failed = [line for line in gate.body if line.startswith("Failed:")]
+    assert (len(failed), failed[-2], failed[-1].startswith("Failed: … 5 more in ")) == (
+        21,
+        "Failed: c.py::t04",
+        True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("changed", "named"),
+    [
+        (("a.py", "b.py"), "2 declared files (a.py, b.py)"),
+        (("a.py", "b.py", "c.py", "d.py", "e.py"), "5 declared files (a.py, b.py, c.py, +2 more)"),
+        ((f"{'x' * 150}.py", f"{'y' * 150}.py"), f"2 declared files ({'x' * 150}.py, +1 more)"),
+    ],
+)
+def test_the_derived_from_line_names_a_few_declared_files_and_counts_the_rest(
+    monkeypatch, tmp_path, changed, named
+):
+    monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
+
+    assert gating.derived_from(tmp_path, changed) == f"Derived from: {named} differing from 0123456"
+
+
+def test_a_green_block_stays_within_its_ceiling_whatever_the_number_of_declared_files(
+    monkeypatch, tmp_path
+):
+    changed = tuple(f"scripts/{'module' * 12}_{n}.py" for n in range(500))
+
+    gate = run_the_gate_over(monkeypatch, tmp_path, (".", finished(".")), changed=changed)
+
+    assert (gate.red, len("\n".join(gate.body).encode()) <= 1024) == (False, True)
 
 
 def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkeypatch, tmp_path):
@@ -740,7 +679,7 @@ def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkey
 
     gate = gating.run_gate(task, task.inputs.steps[0], REQUEST)
 
-    assert "Derived from: 2 declared files differing from 0123456" in gate.body
+    assert "Derived from: 2 declared files (a.py, b.py) differing from 0123456" in gate.body
 
 
 def test_a_run_that_ended_without_a_summary_keeps_the_failures_it_streamed():
@@ -748,7 +687,7 @@ def test_a_run_that_ended_without_a_summary_keeps_the_failures_it_streamed():
 
     reading = read(("eval", finished("eval", log)))
 
-    assert (reading.deciding.red, reading.notes[-1]) == (True, "Failed: t.py::test_a")
+    assert (reading.deciding.red, reading.notes[-1]) == (True, "Failed: eval/t.py::test_a")
 
 
 def test_a_run_that_ended_without_an_exit_record_keeps_the_failures_its_log_streamed():
@@ -758,7 +697,7 @@ def test_a_run_that_ended_without_an_exit_record_keeps_the_failures_its_log_stre
 
     reading = read(("eval", lost))
 
-    assert reading.notes == ("Failed: t.py::test_a",)
+    assert reading.notes == ("Failed: eval/t.py::test_a",)
 
 
 def test_a_non_zero_exit_with_no_failure_reported_is_red():

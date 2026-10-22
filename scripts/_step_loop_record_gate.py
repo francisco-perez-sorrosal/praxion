@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 import os
+import posixpath
 import shlex
 import time
 from collections.abc import Sequence
@@ -81,7 +82,11 @@ GATE_DIRECTORY = "gate"  # under the task directory: one subdirectory of run log
 GATE_WAIT_VARIABLE = "PRAXION_STEP_LOOP_GATE_WAIT_SECONDS"
 DEFAULT_GATE_WAIT_SECONDS = 480.0  # under the skill's 600 s ceiling on one `record` call
 FAILED_LINES_SHOWN = 20
+DERIVED_FILES_SHOWN = 3  # declared files the `Derived from:` line names, the rest only counted
+DERIVED_NAMES_MAX_CHARS = 200  # keeps a green block inside its ceiling whatever the path lengths
 SHORT_SHA_LENGTH = 7
+ROOT_POCKET = "."
+CHECK_OUTPUT = "the Check: run's output"  # where a check's failures beyond the list were shown
 _MORE_FAILURES = "…"
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
 
@@ -141,14 +146,22 @@ class ScopeReading:
 
     `deciding` is the scope's own verdict: the counts of every run when all finished, otherwise a
     red no-run saying which did not. `kept` holds the counts of the runs that did finish beside
-    such a verdict. `scopes` are the `Scope:` lines of the pockets that finished, `notes` the
-    `Cut off:` and `Failed:` lines.
+    such a verdict. `scopes` are the `Scope:` lines of the pockets that finished, `cut_offs` the
+    runs that outlived their bound and `failures` the nodes that failed, as the repository names
+    them, with `where` their runs' logs are kept.
     """
 
     deciding: GateRun
     kept: tuple[GateRun, ...] = ()
-    notes: tuple[str, ...] = ()
+    cut_offs: tuple[str, ...] = ()
+    failures: tuple[str, ...] = ()
+    where: str = ""
     scopes: tuple[str, ...] = ()
+
+    @property
+    def notes(self) -> tuple[str, ...]:
+        """The `Cut off:` and `Failed:` lines."""
+        return (*self.cut_offs, *failure_lines(self.failures, self.where))
 
 
 def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
@@ -185,13 +198,22 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     body = (
         *summary,
         *command,
-        *(scope.notes if scope else ()),
+        *evidence_lines(scope, check),
         *carried_mutation(results, step.id),
         *kept,
         *lines,
     )
     write_gate_block(results, step.id, request, body)
     return Gate(body, any(run.red for run in runs))
+
+
+def evidence_lines(scope: ScopeReading | None, check: GateRun | None) -> tuple[str, ...]:
+    """The `Cut off:` lines and one bounded `Failed:` list for the scope's failures, then the
+    check's: the next attempt's prompt reads one pointer to the failures the list has no room for."""
+    cut_offs = scope.cut_offs if scope else ()
+    failures = (*(scope.failures if scope else ()), *(check.failed_ids if check else ()))
+    where = scope.where if scope and scope.where else CHECK_OUTPUT
+    return (*cut_offs, *failure_lines(tuple(dict.fromkeys(failures)), where))
 
 
 def finished_line(run: GateRun) -> str:
@@ -201,8 +223,19 @@ def finished_line(run: GateRun) -> str:
 
 
 def derived_from(repo: Path, changed: Sequence[str]) -> str:
-    """The line saying which declared files the scope was derived from, and against what."""
-    return f"Derived from: {len(changed)} declared files differing from {head_sha(repo)[:SHORT_SHA_LENGTH]}"
+    """The line saying which declared files the scope was derived from, and against what: the
+    first few by name, the rest counted."""
+    names: list[str] = []
+    for path in changed[:DERIVED_FILES_SHOWN]:
+        if len(", ".join([*names, path])) > DERIVED_NAMES_MAX_CHARS:
+            break
+        names.append(path)
+    unnamed = len(changed) - len(names)
+    listed = ", ".join([*names, f"+{unnamed} more"] if unnamed else names)
+    return (
+        f"Derived from: {len(changed)} declared files ({listed}) "
+        f"differing from {head_sha(repo)[:SHORT_SHA_LENGTH]}"
+    )
 
 
 def goal_runs(
@@ -279,13 +312,15 @@ def read_scope(resolved: ScopeRuns, rule: PendingRule, repo: Path) -> ScopeReadi
     reasons = [reading.reason for reading in readings if reading.reason]
     failures = tuple(dict.fromkeys(node for reading in readings for node in reading.failures))
     cut_offs = dict.fromkeys(f"Cut off: {r.cut_off}" for r in readings if r.cut_off)
-    notes = (*cut_offs, *failure_lines(failures, _log_directory(repo, observed)))
     scopes = tuple(line for line in map(scope_line, resolved.pockets, pocket_readings) if line)
     merged = merge_finished(finished) if finished else None
+    where = _log_directory(repo, observed)
     if merged is not None and not reasons:
-        return ScopeReading(merged, notes=notes, scopes=scopes)
+        return ScopeReading(merged, (), tuple(cut_offs), failures, where, scopes)
     deciding = GateRun(command, NoRun("; ".join(reasons) or "nothing ran"))
-    return ScopeReading(deciding, (merged,) if merged else (), notes, scopes)
+    return ScopeReading(
+        deciding, (merged,) if merged else (), tuple(cut_offs), failures, where, scopes
+    )
 
 
 def scope_line(pocket: PocketScope, readings: Sequence[_RunReading]) -> str | None:
@@ -313,25 +348,34 @@ def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunRea
         run = classify_run(command, observed.output, rule)
         if isinstance(run.counts, NoRun):
             seen = _unanswered(observed.output, rule)
-            return _RunReading(command, reason=f"{pocket}: {run.counts.rationale}", failures=seen)
+            why = f"{pocket}: {run.counts.rationale}"
+            return _RunReading(command, reason=why, failures=_in_pocket(pocket, seen))
         if observed.returncode != 0 and not run.red and not run.pending_ids:
             # A runner that exits non-zero with no failure to show is not a pass.
             why = f"{pocket}: exited {observed.returncode} with no failure reported"
             return _RunReading(command, finished=run, reason=why)
-        return _RunReading(command, finished=run, failures=run.failed_ids)
+        return _RunReading(command, finished=run, failures=_in_pocket(pocket, run.failed_ids))
     if isinstance(observed, CutOff):
         bound = observed.bound
         cut = f"{pocket} after {bound.seconds:g}s ({bound.source})"
         seen = _unanswered(observed.output, rule, observed.failed_seen)
         return _RunReading(
             shlex.join(observed.argv), reason=f"{pocket} cut off after {bound.seconds:g}s "
-            f"({bound.source})", cut_off=cut, failures=seen,
+            f"({bound.source})", cut_off=cut, failures=_in_pocket(pocket, seen),
         )  # fmt: skip
     if isinstance(observed, NotStarted):
         seen = _unanswered(observed.output, rule)
-        return _RunReading("", reason=f"{pocket} did not run ({observed.reason})", failures=seen)
+        why = f"{pocket} did not run ({observed.reason})"
+        return _RunReading("", reason=why, failures=_in_pocket(pocket, seen))
     elapsed, bound = f"{observed.elapsed:.0f}", f"{observed.bound.seconds:g}"
     return _RunReading("", reason=f"{pocket} still running after {elapsed}s (bound {bound}s)")
+
+
+def _in_pocket(pocket: str, nodes: Sequence[str]) -> tuple[str, ...]:
+    """The node ids as the repository names them: a pocket's runs print theirs relative to it."""
+    if pocket == ROOT_POCKET:
+        return tuple(nodes)
+    return tuple(posixpath.join(pocket, node) for node in nodes)
 
 
 def _unanswered(log: str, rule: PendingRule, known: Sequence[str] = ()) -> tuple[str, ...]:

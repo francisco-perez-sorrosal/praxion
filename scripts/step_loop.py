@@ -175,16 +175,25 @@ def read_task(args: argparse.Namespace) -> Task:
     return Task(args.slug, repo, work, directory, base_ref, wip_text, brief_text, inputs)
 
 
+# Where the pipeline and the hooks write on their own, so a path under them is no attempt's edit.
+PIPELINE_STATE = (".ai-work/", ".ai-state/observations")
+
+
 def uncommitted_files(repo: Path, inputs: LoopInputs) -> dict[str, tuple[str, ...]]:
-    """What each marked step left behind: its declared files that differ from HEAD. A marked
-    return commits nothing, so the stop names these files for the person who takes them over."""
+    """What each marked step left behind: every path of the tree that differs from HEAD, tracked
+    or not, bar the pipeline's own state. A marked return commits and restores nothing, and a
+    [CONFLICT] is most often an edit outside the step's files, so the stop names them all for
+    the person who takes the work over."""
     states = series_states(inputs)
-    left = {
-        step.id: paths_differing_from_head(repo, step.files)
-        for step in inputs.steps
-        if isinstance(states[step.id], Marked)
-    }
-    return {step_id: files for step_id, files in left.items() if files}
+    marked = [step.id for step in inputs.steps if isinstance(states[step.id], Marked)]
+    if not marked:
+        return {}
+    left = tuple(
+        path
+        for path in paths_differing_from_head(repo, ["."])
+        if not path.startswith(PIPELINE_STATE)
+    )
+    return dict.fromkeys(marked, left) if left else {}
 
 
 def _required(path: Path) -> str:

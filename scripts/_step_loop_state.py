@@ -238,14 +238,10 @@ Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
 def is_done(state: Series) -> bool:
     """Done outside the loop, or verified by the driver with its light review satisfied.
 
-    A marked series is done too, once its review is satisfied, when a verified record holds a
-    commit: a marked return commits nothing, so its own verified record never completes the
-    step. The marker still stops the loop while other steps remain (completion outranks that
-    stop only once every step is done).
+    A marked series is never done: its return called the scope incomplete, so it commits and
+    ticks nothing and the loop stops on the marker until the step's block is revised, whatever
+    an earlier verified record committed.
     """
-    if isinstance(state, Marked):
-        committed = any(r.verdict == VERIFIED and r.commit for r in state.attempts)
-        return committed and satisfied(state.review)
     return isinstance(state, DoneOutside) or (
         isinstance(state, Verified) and satisfied(state.review)
     )
@@ -269,14 +265,12 @@ StateWord = Literal[
 def step_state_word(state: Series) -> StateWord:
     """The one word `status` shows for a step, from the state `next` acts on. The reconciler's
     own word never reaches it: a marked return whose check passes is `verified-complete` to the
-    reconciler and `marked` here, unless the step `is_done`. The word is the cause `next` stops
-    on for an exhausted bound and a human verdict. It differs where `next` has no stop of that
-    name: a spent goal bound reads `attempts-exhausted` (the stop's cause is `stalled`), a
-    marked step reads `marked` (the stop is `blocked-marker` or `conflict-marker`), a step the
-    loop does not drive reads `pending` (the stop is `not-driven`), a marked step that `is_done`
-    reads `verified-complete` while `next` still stops on its marker for as long as another step
-    remains, and a verified step whose review is unsatisfied reads by what `next` does about
-    it."""
+    reconciler and `marked` here. The word is the cause `next` stops on for an exhausted bound
+    and a human verdict. It differs where `next` has no stop of that name: a spent goal bound
+    reads `attempts-exhausted` (the stop's cause is `stalled`), a marked step reads `marked`
+    (the stop is `blocked-marker` or `conflict-marker`), a step the loop does not drive reads
+    `pending` (the stop is `not-driven`), and a verified step whose review is unsatisfied reads
+    by what `next` does about it."""
     if isinstance(state, (Fresh, NotDriven)):
         return "pending"
     if isinstance(state, Running):
@@ -286,7 +280,7 @@ def step_state_word(state: Series) -> StateWord:
     if isinstance(state, Exhausted):
         return "attempts-exhausted"
     if isinstance(state, Marked):
-        return "verified-complete" if is_done(state) else "marked"
+        return "marked"
     if isinstance(state, Verified):
         return _verified_word(state.review)
     if isinstance(state, DoneOutside):

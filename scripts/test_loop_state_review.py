@@ -246,7 +246,7 @@ def committed(record, sha):
     return replace(record, commit=sha)
 
 
-# --- A marked series is done only when its review is satisfied and its work is committed ------
+# --- A marked series is never done: the marker stops the loop until the block is revised ------
 
 BLOCKED_REVISION = [
     verified(FORCED_STEP),
@@ -268,16 +268,14 @@ def test_the_marker_stops_the_loop_apart_from_the_done_reading():
 
 
 @pytest.mark.parametrize(
-    ("steps", "reviews", "done"),
+    ("steps", "reviews"),
     [
-        pytest.param([FORCED_STEP], {"1": ACCEPT}, True, id="review-accepted"),
-        pytest.param([PLAIN_STEP], {}, True, id="no-review-required"),
-        pytest.param([FORCED_STEP], {"1": REVISE}, False, id="review-asked-for-revision"),
+        pytest.param([FORCED_STEP], {"1": ACCEPT}, id="review-accepted"),
+        pytest.param([PLAIN_STEP], {}, id="no-review-required"),
+        pytest.param([FORCED_STEP], {"1": REVISE}, id="review-asked-for-revision"),
     ],
 )
-def test_a_marked_series_with_committed_work_is_done_exactly_when_its_review_is_satisfied(
-    steps, reviews, done
-):
+def test_a_marked_series_with_committed_work_is_never_done(steps, reviews):
     step = steps[0]
     returned = committed(
         rec(step, 1, "implement", stop="blocked", verdict="verified-complete"), FIRST_SHA
@@ -286,7 +284,7 @@ def test_a_marked_series_with_committed_work_is_done_exactly_when_its_review_is_
 
     state = step_series(step, read(steps, records=[returned, *asked], reviews=reviews))
 
-    assert (isinstance(state, Marked), is_done(state)) == (True, done)
+    assert (isinstance(state, Marked), is_done(state)) == (True, False)
 
 
 @pytest.mark.parametrize("stop", ["blocked", "conflict"])

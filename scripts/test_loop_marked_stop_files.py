@@ -55,6 +55,19 @@ def test_a_marked_stop_with_no_uncommitted_file_names_only_the_step_and_the_mark
     assert stop.evidence == f"the latest return at {STEP_LABEL}1 carried [CONFLICT]"
 
 
+def test_a_marked_stop_names_a_few_files_and_the_count_when_many_were_left():
+    many = tuple(f"scripts/m{n:02d}.py" for n in range(40))
+    _, inputs = marked_inputs("conflict", {"1": many})
+
+    stop = next_action(inputs)
+
+    assert isinstance(stop, Stop)
+    assert many[0] in stop.evidence
+    assert many[-1] not in stop.evidence
+    assert "40 files" in stop.evidence
+    assert len(stop.evidence) < 400, stop.evidence
+
+
 def test_the_stop_repeats_while_its_evidence_holds():
     _, inputs = marked_inputs("blocked", {"1": LEFT})
 
@@ -87,14 +100,25 @@ def two_steps(first_stop):
     return read([first, second], records=records)
 
 
-def test_a_marked_steps_uncommitted_files_are_its_declared_files_differing_from_head(repo):
+def test_a_marked_steps_uncommitted_files_are_every_path_the_attempt_left(repo):
     (repo / "scripts" / "a.py").write_text("x = 2\n")
-    (repo / "scripts" / "b.py").write_text("x = 3\n")
     (repo / "scripts" / "other.py").write_text("x = 4\n")
+    (repo / "scripts" / "stray.py").write_text("x = 5\n")
 
     found = uncommitted_files(repo, two_steps("conflict"))
 
-    assert found == {"1": LEFT}
+    assert found == {"1": ("scripts/a.py", "scripts/other.py", "scripts/stray.py")}
+
+
+def test_the_pipelines_own_and_hook_maintained_state_is_not_named(repo):
+    for rel in (".ai-work/slug/WIP.md", ".ai-state/observations_summary.jsonl"):
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text("{}\n")
+    (repo / "scripts" / "a.py").write_text("x = 2\n")
+
+    found = uncommitted_files(repo, two_steps("blocked"))
+
+    assert found == {"1": ("scripts/a.py",)}
 
 
 def test_a_marked_step_with_a_clean_tree_has_no_entry(repo):

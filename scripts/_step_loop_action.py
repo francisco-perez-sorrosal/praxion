@@ -72,6 +72,7 @@ if TYPE_CHECKING:
 
 BUDGET_CAUSE = "iteration-budget"
 GLOB_MARKS = "*?["
+UNCOMMITTED_SHOWN = 5  # file names a marked stop spells out; the rest are counted
 HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed not-driven dependency-defect
@@ -201,9 +202,15 @@ def _marked_stop(inputs: LoopInputs) -> Stop | None:
         if isinstance(state, Marked):
             evidence = f"the latest return at {STEP_LABEL}{step.id} carried [{state.marker}]"
             if left := inputs.uncommitted.get(step.id):
-                evidence += f"; uncommitted: {', '.join(left)}"
+                evidence += f"; uncommitted: {_some_files(left)}"
             return Stop(f"{state.marker.lower()}-marker", step.id, evidence, state.attempts)
     return None
+
+
+def _some_files(files: tuple[str, ...]) -> str:
+    """The first few names, and the count when there are more: a stop's text stays short."""
+    shown = ", ".join(files[:UNCOMMITTED_SHOWN])
+    return shown if len(files) <= UNCOMMITTED_SHOWN else f"{shown} ... ({len(files)} files)"
 
 
 def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:

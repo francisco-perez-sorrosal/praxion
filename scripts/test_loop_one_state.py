@@ -34,7 +34,7 @@ from _loop_state_testkit import (  # noqa: E402
     verified,
 )
 from _loop_state_testkit import SECOND as SECOND_STEP  # noqa: E402
-from _step_loop_action import Complete, Spawn, Stop, next_action  # noqa: E402
+from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
 from _step_loop_state import (  # noqa: E402
     DoneOutside,
     Exhausted,
@@ -179,25 +179,28 @@ def test_a_verified_step_with_its_review_satisfied_is_shown_complete(step, recor
     assert step_state_word(step_series(step, inputs)) == "verified-complete"
 
 
-def test_a_done_marked_step_that_is_the_last_left_is_shown_complete_as_next_answers():
-    """A marked return commits nothing; a verified record holding a commit completes the step."""
+def test_a_marked_series_is_never_done_so_status_shows_it_marked_as_next_answers():
+    """A marked series is open until the step's block is revised, whatever an earlier verified
+    record committed: the loop stops on the marker, and `status` says what `next` acts on."""
     committed = replace(verified(STEP_ONE), commit="abc1234")
     inputs = read([STEP_ONE], records=[committed, rec(STEP_ONE, 2, stop="blocked")])
 
     state = step_series(STEP_ONE, inputs)
+    stopped = next_action(inputs)
 
-    assert (type(state), is_done(state)) == (Marked, True)
-    assert step_state_word(state) == "verified-complete"
-    assert isinstance(next_action(inputs), Complete)
+    assert (type(state), is_done(state)) == (Marked, False)
+    assert step_state_word(state) == "marked"
+    assert isinstance(stopped, Stop)
+    assert stopped.cause == "blocked-marker"
 
 
-def test_a_done_marked_step_with_another_step_left_is_shown_complete_while_next_stops_on_its_marker():
+def test_a_marked_step_over_committed_work_is_shown_marked_with_another_step_left():
     committed = replace(verified(STEP_ONE), commit="abc1234")
     inputs = read([STEP_ONE, SECOND_STEP], records=[committed, rec(STEP_ONE, 2, stop="blocked")])
 
     stopped = next_action(inputs)
 
-    assert step_state_word(step_series(STEP_ONE, inputs)) == "verified-complete"
+    assert step_state_word(step_series(STEP_ONE, inputs)) == "marked"
     assert isinstance(stopped, Stop)
     assert stopped.cause == "blocked-marker"
 

@@ -15,6 +15,10 @@ Judged in this order, the first that applies deciding:
 5. The progress record gained no line: `Unkept`.
 6. Otherwise: `Progressing`.
 
+A return marked [CONFLICT] or [BLOCKED] is not judged at all: the worker called its scope
+incomplete, so `Stopped` commits, ticks and restores nothing, whatever the check shows. Every edit
+stays in the tree for a person, and the loop stops on the marker.
+
 Acted on as follows:
 
 * `Progressing`: the step's `Files:` are committed by explicit path with the request's trailer
@@ -73,7 +77,7 @@ from _step_loop_record_gate import (
 )
 from _step_loop_render import SpawnRequest, spawn_request
 from _step_loop_settle import Warnings, edit_warnings, settle_replan, tick_step
-from _step_loop_state import VERIFIED, series_work, step_cap
+from _step_loop_state import MARKED_STOPS, VERIFIED, series_work, step_cap
 from _step_schema import Counts, parse_result_line
 from iteration_ledger import IterationRecord
 
@@ -216,6 +220,13 @@ class Protected:
             raise ValueError("a protected change names at least one path")
 
 
+@dataclass(frozen=True)
+class Stopped:
+    """The worker returned `marker` ([BLOCKED] or [CONFLICT]): nothing is judged or acted on."""
+
+    marker: str
+
+
 Judgement = Union[Progressing, Unkept, Protected]  # noqa: UP007 -- runtime value, 3.9 floor
 
 RED_GATE = "the gate is red"
@@ -279,7 +290,7 @@ class Settled(NamedTuple):
 
     gate: Gate
     committing: ordinary.Committing
-    judgement: Judgement
+    judgement: Judgement | Stopped
 
 
 def record_goal(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> ordinary.Taken:
@@ -290,7 +301,11 @@ def record_goal(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> or
     ending = take_end(task, asked, agent_id, relayed)
     gate = run_gate(task, step, key.id)
     progress = progress_line_count((task.dir / ordinary.WIP_FILE).read_text(encoding="utf-8"))
-    settled = settle_iteration(task, step, asked, gate, progress)
+    settled = (
+        Settled(gate, ordinary.Committing(None, None), Stopped(MARKED_STOPS[ending.stop_reason]))
+        if ending.stop_reason in MARKED_STOPS
+        else settle_iteration(task, step, asked, gate, progress)
+    )
     verdict = read_verdict(task, step.id, key.id, settled.gate)
     sha, failure = settled.committing
     if sha is not None and failure is None and verdict["verdict"] == VERIFIED:
@@ -320,12 +335,14 @@ def record_goal(task: TaskView, spawn: Spawn, agent_id: str, relayed: str) -> or
     return ordinary.Taken(ordinary.recorded_object(record, ending.marker, said), step.id, warnings)
 
 
-def describe(judgement: Judgement, worker: WorkerEnd | None) -> str:
+def describe(judgement: Judgement | Stopped, worker: WorkerEnd | None) -> str:
     """The judgement in words for the call's summary, naming how an `error_*` worker ended."""
     if isinstance(judgement, Progressing):
         said = KEPT_WORDS
     elif isinstance(judgement, Protected):
         said = f"stopped on a protected change: {', '.join(judgement.paths)}"
+    elif isinstance(judgement, Stopped):
+        said = f"stopped on [{judgement.marker}]: nothing committed, every edit left in the tree"
     else:
         said = f"{NOT_KEPT_PREFIX}{judgement.reason}"
     return said if worker is None else f"{said}{SUMMARY_SEPARATOR}the worker ended {worker.subtype}"

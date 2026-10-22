@@ -33,7 +33,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, Union, assert_never
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, Union
 
 from _loop_fields import (
     AnyAttempt,
@@ -269,8 +269,12 @@ StateWord = Literal[
 def step_state_word(state: Series) -> StateWord:
     """The one word `status` shows for a step, from the state `next` acts on. The reconciler's
     own word never reaches it: a marked return whose check passes is `verified-complete` to the
-    reconciler and still `marked` here. Only two states differ from the cause `next` stops on:
-    a spent goal bound (`stalled`) and a verified step whose review stands between it and done."""
+    reconciler and `marked` here, unless the step `is_done`. The word is the cause `next` stops
+    on for an exhausted bound and a human verdict. It differs where `next` has no stop of that
+    name: a spent goal bound reads `attempts-exhausted` (the stop's cause is `stalled`), a
+    marked step reads `marked` (the stop is `blocked-marker` or `conflict-marker`), a step the
+    loop does not drive reads `pending` (the stop is `not-driven`), and a verified step whose
+    review is unsatisfied reads by what `next` does about it."""
     if isinstance(state, (Fresh, NotDriven)):
         return "pending"
     if isinstance(state, Running):
@@ -280,14 +284,14 @@ def step_state_word(state: Series) -> StateWord:
     if isinstance(state, Exhausted):
         return "attempts-exhausted"
     if isinstance(state, Marked):
-        return "marked"
+        return "verified-complete" if is_done(state) else "marked"
     if isinstance(state, Verified):
         return _verified_word(state.review)
     if isinstance(state, DoneOutside):
         return "verified-complete"
     if isinstance(state, HumanVerdict):
         return "attempts-exhausted" if state.verdict == EXHAUSTED else "human-verdict"
-    assert_never(state)
+    _unreachable(state)
 
 
 def _verified_word(review: ReviewState) -> StateWord:
@@ -302,7 +306,14 @@ def _verified_word(review: ReviewState) -> StateWord:
         return "in-flight"
     if isinstance(review, (RevisedTwice, Unfinished, RevisionFailed)):
         return "human-verdict"
-    assert_never(review)
+    _unreachable(review)
+
+
+def _unreachable(value: NoReturn) -> NoReturn:
+    """Closes an exhaustive `isinstance` chain: the type checker narrows `value` to `Never`
+    only when every case above it is handled. `typing.assert_never` is 3.11+, and the step-loop
+    modules keep their 3.9 runtime floor."""
+    raise AssertionError(f"unhandled case: {value!r}")
 
 
 def is_driven(step: PlanStep) -> bool:

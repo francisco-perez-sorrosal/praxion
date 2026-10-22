@@ -8,6 +8,7 @@ out: no file is written, no process runs, nothing is mocked.
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import get_args
 
@@ -32,7 +33,7 @@ from _loop_state_testkit import (  # noqa: E402
     verdict,
     verified,
 )
-from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
+from _step_loop_action import Complete, Spawn, Stop, next_action  # noqa: E402
 from _step_loop_state import (  # noqa: E402
     DoneOutside,
     Exhausted,
@@ -45,9 +46,16 @@ from _step_loop_state import (  # noqa: E402
     Series,
     StateWord,
     Verified,
+    is_done,
     step_series,
     step_state_word,
 )
+
+
+def action_cause(acted):
+    """What `next` acts on: the kind of the request it issues, or the cause it stops on."""
+    return acted.key.kind if isinstance(acted, Spawn) else acted.cause
+
 
 STEP_ONE = PLAIN_STEP
 FIRST, SECOND = rec(STEP_ONE, 1), rec(STEP_ONE, 2)
@@ -154,18 +162,32 @@ def test_a_verified_step_whose_review_is_not_satisfied_is_not_shown_complete(
     acted = next_action(inputs)
 
     assert step_state_word(step_series(FORCED_STEP, inputs)) == word
-    assert isinstance(acted, (Spawn, Stop))
-    assert (acted.key.kind if isinstance(acted, Spawn) else acted.cause) == acts
+    assert action_cause(acted) == acts
 
 
-@pytest.mark.parametrize("file", [ACCEPT, None])
-def test_a_verified_step_with_its_review_satisfied_is_shown_complete(file):
-    forced = file is not None
-    step = FORCED_STEP if forced else PLAIN_STEP
-    records = [verified(step), *([reviewed(step)] if forced else [])]
-    inputs = read([step], records=records, reviews={"1": file} if forced else {})
+@pytest.mark.parametrize(
+    ("step", "records", "reviews"),
+    [
+        pytest.param(PLAIN_STEP, [verified(PLAIN_STEP)], {}, id="no-review-required"),
+        pytest.param(FORCED_STEP, VERIFIED_AND_REVIEWED, {"1": ACCEPT}, id="review-accepted"),
+    ],
+)
+def test_a_verified_step_with_its_review_satisfied_is_shown_complete(step, records, reviews):
+    inputs = read([step], records=records, reviews=reviews)
 
     assert step_state_word(step_series(step, inputs)) == "verified-complete"
+
+
+def test_a_done_marked_step_that_is_the_last_left_is_shown_complete_as_next_answers():
+    """A marked return commits nothing; a verified record holding a commit completes the step."""
+    committed = replace(verified(STEP_ONE), commit="abc1234")
+    inputs = read([STEP_ONE], records=[committed, rec(STEP_ONE, 2, stop="blocked")])
+
+    state = step_series(STEP_ONE, inputs)
+
+    assert (type(state), is_done(state)) == (Marked, True)
+    assert step_state_word(state) == "verified-complete"
+    assert isinstance(next_action(inputs), Complete)
 
 
 def test_a_marked_step_stops_the_loop_with_a_cause_that_names_the_marker_status_shows():

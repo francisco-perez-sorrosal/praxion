@@ -200,3 +200,8 @@ pythonVersion = "3.11"
 venvPath = "."
 venv = ".venv"
 # --- end static type-check baseline -----------------------------------------
+
+# The step-loop gate runs the whole root suite when a runner config changes: 930 s measured, so
+# 1500 s leaves 61 percent headroom (the driver default is 540 s).
+[tool.praxion.step-loop]
+gate-timeout-seconds = 1500

@@ -26,6 +26,7 @@ HOOKS_JSON = HOOKS_DIR / "hooks.json"
 sys.path.insert(0, str(HOOKS_DIR))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import _step_loop_outstanding as probe  # noqa: E402
 import guard_step_loop_stop as guard  # noqa: E402
 from _step_loop_cli import SCRIPT, SELF_HOST_INVOCATION  # noqa: E402
 from _step_loop_outstanding import Held, Outstanding  # noqa: E402
@@ -254,6 +255,15 @@ def test_a_stale_task_sharing_a_request_id_is_never_held_with_the_current_agent(
 
     assert f"record current-task --request {REQUEST} --agent-id {AGENT}" in message
     assert "stale-task" not in message
+
+
+def test_a_bound_of_the_probe_reached_before_a_hold_lets_the_stop_through(tmp_path, monkeypatch):
+    checkout = _checkout(tmp_path)
+    _issue(checkout, "loop-task", 100.0)
+    stop = _stop(checkout, "loop-task")
+    monkeypatch.setattr(probe, "MAX_TRANSCRIPTS", 0)
+
+    assert _hold_from(stop, checkout, monkeypatch) == ""
 
 
 def test_a_nested_checkout_does_not_reach_the_outer_checkouts_loop(tmp_path, monkeypatch):

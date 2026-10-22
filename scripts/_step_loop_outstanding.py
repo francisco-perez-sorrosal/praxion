@@ -23,6 +23,9 @@ takes `.ai-work/` at the top level of the checkout, which is where the Stop guar
 `work_root` (its walk-up stops at the first ancestor holding a `.git` entry). A caller whose
 `work_root` is not at its checkout's root breaks that equality. Transcripts older than the oldest
 outstanding request's prompt file, and files whose names are not agent ids, are never read.
+The work per Stop is bounded: transcripts are examined newest first, at most `MAX_TRANSCRIPTS`
+of them, at most `MAX_BYTES_READ` in total, before `DEADLINE_SECONDS` have passed since the
+probe started; a bound reached before a hold leaves the request `NotHeld`, so the stop proceeds.
 Stdlib-only and 3.9-safe at runtime.
 """
 
@@ -30,6 +33,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +68,9 @@ NEVER_ISSUED = float("-inf")  # a request whose prompt file is gone sorts as the
 _SLUG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 # The ids `hooks/_agent_transcript.locate` accepts: any other file is one `record` cannot find.
 _AGENT_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
+# The bounds of one probe: a stale request in a busy session must not read every transcript of
+# it, nor run the Stop guard into the harness's timeout.
+MAX_TRANSCRIPTS, MAX_BYTES_READ, DEADLINE_SECONDS = 64, 16 * 1024 * 1024, 5.0
 _TRANSCRIPT_PREFIX, _TRANSCRIPT_GLOBS = "agent-", ("agent-*.jsonl", "workflows/*/agent-*.jsonl")
 
 NotHeldReason = Literal["no-transcript-in-session", "running", "unreadable"]
@@ -124,10 +131,11 @@ def judge_outstanding(
     work_root: Path, subagents_dir: Path, invocation: Invocation
 ) -> tuple[tuple[Outstanding, Verdict], ...]:
     """Every outstanding request with its verdict; no transcript is read without a request."""
+    deadline = time.monotonic() + DEADLINE_SECONDS
     outstanding = outstanding_requests(work_root)
     if not outstanding:
         return ()
-    transcripts = _load_transcripts(subagents_dir, min(o.issued_at for o in outstanding))
+    transcripts = _load_transcripts(subagents_dir, min(o.issued_at for o in outstanding), deadline)
     repo_root = work_root.parent
     return tuple((o, _judge(o, transcripts, repo_root, invocation)) for o in outstanding)
 
@@ -164,20 +172,40 @@ def _issued_at(task: Path, request: str) -> float:
 
 
 def _mtime(path: Path) -> float:
+    return _stamp(path)[0]
+
+
+def _stamp(path: Path) -> tuple[float, int]:
+    """(mtime, size in bytes); a file that cannot be statted is the oldest and empty."""
     try:
-        return path.stat().st_mtime
+        status = path.stat()
     except OSError:
-        return NEVER_ISSUED
+        return NEVER_ISSUED, 0
+    return status.st_mtime, status.st_size
 
 
 # --- The transcripts of the session --------------------------------------------------------
 
 
-def _load_transcripts(subagents_dir: Path, since: float) -> tuple[_Transcript, ...]:
-    """The session's transcripts written at or after `since` under an agent id, each read once."""
-    paths = sorted({path for glob in _TRANSCRIPT_GLOBS for path in subagents_dir.glob(glob)})
-    candidates = [path for path in paths if _AGENT_ID_RE.fullmatch(_agent_id_of(path))]
-    return tuple(_load(path) for path in candidates if _mtime(path) >= since)
+def _load_transcripts(
+    subagents_dir: Path, since: float, deadline: float
+) -> tuple[_Transcript, ...]:
+    """The session's newest transcripts written at or after `since` under an agent id, each read
+    once, until a bound of the probe (count, bytes, `deadline` on the monotonic clock) is reached."""
+    paths = {path for glob in _TRANSCRIPT_GLOBS for path in subagents_dir.glob(glob)}
+    stamped = [
+        (*_stamp(path), path) for path in paths if _AGENT_ID_RE.fullmatch(_agent_id_of(path))
+    ]
+    loaded: list[_Transcript] = []
+    bytes_read = 0
+    for mtime, size, path in sorted(stamped, reverse=True):
+        if mtime < since or len(loaded) >= MAX_TRANSCRIPTS:
+            break
+        if bytes_read + size > MAX_BYTES_READ or time.monotonic() >= deadline:
+            break
+        loaded.append(_load(path))
+        bytes_read += size
+    return tuple(loaded)
 
 
 def _agent_id_of(path: Path) -> str:

@@ -364,6 +364,61 @@ def test_a_request_whose_prompt_file_is_gone_keeps_every_transcript(world: World
     assert [h.agent_id for h in world.held()] == [AGENT]
 
 
+# --- The bounds of one probe ---------------------------------------------------------------
+
+LONG_SLUG = "t" * 64  # the longest slug a task directory may carry
+
+
+def test_a_task_named_with_64_characters_has_its_ended_request_held(world: World) -> None:
+    world.issue(slug=LONG_SLUG)
+    world.put(ended_of(LONG_SLUG))
+
+    assert [h.outstanding.slug for h in world.held()] == [LONG_SLUG]
+
+
+def aged(path: Path, at: float) -> Path:
+    os.utime(path, (at, at))
+    return path
+
+
+def test_transcripts_are_examined_newest_first_up_to_the_count_bound(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.issue(at=100.0)
+    aged(world.put(MARKED, "old"), 200.0)
+    aged(world.put(ended_of("other"), "mid"), 300.0)
+    aged(world.put(ended_of("other"), "new"), 400.0)
+    monkeypatch.setattr(probe, "MAX_TRANSCRIPTS", 2)
+
+    assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("no-transcript-in-session")])
+    monkeypatch.setattr(probe, "MAX_TRANSCRIPTS", 3)
+    assert [h.agent_id for h in world.held()] == ["old"]
+
+
+def test_transcripts_are_read_up_to_the_byte_bound(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.issue(at=100.0)
+    held = world.put(MARKED, "old")
+    aged(held, 200.0)
+    aged(world.put(ended_of("other"), "new"), 300.0)
+    monkeypatch.setattr(probe, "MAX_BYTES_READ", held.stat().st_size)
+
+    assert world.held() == ()
+    monkeypatch.setattr(probe, "MAX_BYTES_READ", 2 * held.stat().st_size + 1024)
+    assert [h.agent_id for h in world.held()] == ["old"]
+
+
+def test_nothing_is_read_once_the_deadline_has_passed(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world.issue()
+    world.put(MARKED)
+    monkeypatch.setattr(probe, "DEADLINE_SECONDS", 0.0)
+
+    assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("no-transcript-in-session")])
+
+
 # --- The observation log -------------------------------------------------------------------
 
 

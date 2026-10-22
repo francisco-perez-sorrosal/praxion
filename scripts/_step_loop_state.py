@@ -223,13 +223,14 @@ Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
 def is_done(state: Series) -> bool:
     """Done outside the loop, or verified by the driver with its light review satisfied.
 
-    A marked series whose work verified is done too, once its review is satisfied: the marker
-    still stops the loop while other steps remain (completion outranks that stop only once
-    every step is done).
+    A marked series is done too, once its review is satisfied, when a verified record holds a
+    commit: a marked return commits nothing, so its own verified record never completes the
+    step. The marker still stops the loop while other steps remain (completion outranks that
+    stop only once every step is done).
     """
     if isinstance(state, Marked):
-        verified = any(record.verdict == VERIFIED for record in state.attempts)
-        return verified and satisfied(state.review)
+        committed = any(r.verdict == VERIFIED and r.commit for r in state.attempts)
+        return committed and satisfied(state.review)
     return isinstance(state, DoneOutside) or (
         isinstance(state, Verified) and satisfied(state.review)
     )

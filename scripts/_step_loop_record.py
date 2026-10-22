@@ -65,6 +65,7 @@ from _step_loop_files import (  # noqa: E402
 )
 from _step_loop_gate import (  # noqa: E402
     Marker,
+    StopReason,
     derive_stop_reason,
     end_source,
     parse_marker,
@@ -495,7 +496,7 @@ def read_return(
 # --- 4. Commit: by explicit path, once per request -------------------------------------------
 
 
-def commits_work(verdict_word: str, stop_reason: str) -> bool:
+def commits_work(verdict_word: str, stop_reason: StopReason) -> bool:
     """Whether the attempt's work is committed and its step ticked: it verified, and its agent
     did not call the scope incomplete. [PARTIAL] is not such a call: the check decides."""
     return verdict_word == VERIFIED and stop_reason not in MARKED_STOPS

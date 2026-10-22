@@ -53,37 +53,55 @@ def test_only_a_verified_attempt_that_did_not_call_its_scope_incomplete_commits(
 
 @pytest.fixture
 def returned(monkeypatch, tmp_path):
-    """`record_return` over a verified gate, with the effects it would have recorded."""
-    effects = SimpleNamespace(committed=[], ticked=[], ledger=[])
-    key = RequestKey("1", 1, "implement", 1, None)
-    spawn = SimpleNamespace(step=THE_STEP, key=key)
-    gate = SimpleNamespace(deciding="Result: pass=1 fail=0 skip=0 pending=0 by=step-loop")
-    inputs = LoopInputs((THE_STEP,), {}, (), {})
-    task = SimpleNamespace(slug="demo", dir=tmp_path, repo=tmp_path, inputs=inputs)
+    """`record_return` over a verified gate, with the effects it would have recorded.
 
-    def take_back(marker):
-        monkeypatch.setattr(rec, "_pending", lambda *_: spawn)
-        asked = SimpleNamespace(key=key, agent_call=SimpleNamespace(subagent_type="implementer"))
-        monkeypatch.setattr(rec, "spawn_request", lambda *_: asked)
-        monkeypatch.setattr(rec, "declared_max_turns", lambda *_: 100)
-        monkeypatch.setattr(rec, "await_end", lambda *_, **__: SimpleNamespace(turns=5))
-        monkeypatch.setattr(
-            rec, "read_return", lambda *_: (marker, rec.derive_stop_reason(marker, 5, 100), ())
-        )
-        monkeypatch.setattr(rec, "run_gate", lambda *_: gate)
-        monkeypatch.setattr(
-            rec, "read_verdict", lambda *_: {"verdict": VERIFIED, "decided_by": "check"}
-        )
+    The names `record_return` calls are replaced with explicit-signature stand-ins, `_pending`
+    among them; the acceptance nodes in the step's Check pin the same behavior end to end.
+    `read_return` stands for the resolved marker, so `relayed` can differ from it.
+    """
+    effects = SimpleNamespace(committed=[], ticked=[], ledger=[])
+    key = RequestKey(step="1", attempt=1, kind="implement")
+    gate = SimpleNamespace(deciding="Result: pass=1 fail=0 skip=0 pending=0 by=step-loop")
+    inputs = LoopInputs(steps=(THE_STEP,), attempts={}, records=(), verdicts={})
+    task = SimpleNamespace(slug="demo", dir=tmp_path, repo=tmp_path, inputs=inputs)
+    asked = SimpleNamespace(key=key, agent_call=SimpleNamespace(subagent_type="implementer"))
+
+    def take_back(resolved, relayed=None):
+        def pending(inputs, request):
+            return SimpleNamespace(step=THE_STEP, key=key)
+
+        def the_request(slug, step, key, cap, task_dir):
+            return asked
+
+        def the_end(repo, request, agent_id, max_turns, exited=False):
+            return SimpleNamespace(turns=5)
+
+        def the_return(seen, relayed_marker, asked, max_turns):
+            return resolved, rec.derive_stop_reason(resolved, seen.turns, max_turns), ()
+
+        def commit(task, step, asked, deciding):
+            effects.committed.append(step.id)
+            return rec.Committing(COMMIT, None)
+
+        monkeypatch.setattr(rec, "_pending", pending)
+        monkeypatch.setattr(rec, "spawn_request", the_request)
+        monkeypatch.setattr(rec, "declared_max_turns", lambda subagent_type: 100)
+        monkeypatch.setattr(rec, "await_end", the_end)
+        monkeypatch.setattr(rec, "read_return", the_return)
+        monkeypatch.setattr(rec, "run_gate", lambda task, step, request: gate)
         monkeypatch.setattr(
             rec,
-            "commit_attempt",
-            lambda *_: effects.committed.append(1) or rec.Committing(COMMIT, None),
+            "read_verdict",
+            lambda task, step_id, request, gate: {"verdict": VERIFIED, "decided_by": "check"},
         )
-        monkeypatch.setattr(rec, "tick_step", lambda _wip, step: effects.ticked.append(step))
-        monkeypatch.setattr(rec, "append_ledger_record", lambda _dir, r: effects.ledger.append(r))
-        monkeypatch.setattr(rec, "settle_replan", lambda *_: False)
-        monkeypatch.setattr(rec, "edit_warnings", lambda *_: ())
-        taken = rec.record_return(task, REQUEST, "agent-1", marker)
+        monkeypatch.setattr(rec, "commit_attempt", commit)
+        monkeypatch.setattr(rec, "tick_step", lambda wip, step_id: effects.ticked.append(step_id))
+        monkeypatch.setattr(
+            rec, "append_ledger_record", lambda task_dir, record: effects.ledger.append(record)
+        )
+        monkeypatch.setattr(rec, "settle_replan", lambda wip, inputs, step, request: False)
+        monkeypatch.setattr(rec, "edit_warnings", lambda task, step, request: ())
+        taken = rec.record_return(task, REQUEST, "agent-1", relayed or resolved)
         return effects, taken
 
     return take_back
@@ -109,5 +127,12 @@ def test_a_marked_return_is_one_ledger_record_with_no_commit(returned, marker):
 def test_an_unmarked_return_whose_check_passes_commits_and_ticks_the_step(returned, marker):
     effects, taken = returned(marker)
 
-    assert (effects.committed, effects.ticked) == ([1], ["1"])
+    assert (effects.committed, effects.ticked) == (["1"], ["1"])
     assert taken.recorded["commit"] == COMMIT
+
+
+def test_the_transcripts_marker_outranks_a_relayed_complete(returned):
+    effects, taken = returned("conflict", relayed="complete")
+
+    assert (effects.committed, effects.ticked) == ([], [])
+    assert taken.recorded["commit"] is None

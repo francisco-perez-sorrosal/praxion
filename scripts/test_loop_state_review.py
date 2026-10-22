@@ -268,16 +268,35 @@ def test_the_marker_stops_the_loop_apart_from_the_done_reading():
         pytest.param([FORCED_STEP], {"1": REVISE}, False, id="review-asked-for-revision"),
     ],
 )
-def test_a_marked_series_with_verified_work_is_done_exactly_when_its_review_is_satisfied(
+def test_a_marked_series_with_committed_work_is_done_exactly_when_its_review_is_satisfied(
     steps, reviews, done
 ):
     step = steps[0]
-    returned = rec(step, 1, "implement", stop="blocked", verdict="verified-complete")
+    returned = replace(
+        rec(step, 1, "implement", stop="blocked", verdict="verified-complete"), commit=FIRST_SHA
+    )
     asked = [reviewed(step)] if step is FORCED_STEP else []
 
     state = step_series(step, read(steps, records=[returned, *asked], reviews=reviews))
 
     assert (isinstance(state, Marked), is_done(state)) == (True, done)
+
+
+@pytest.mark.parametrize("stop", ["blocked", "conflict"])
+def test_a_marked_series_whose_verified_return_holds_no_commit_is_not_done(stop):
+    returned = rec(PLAIN_STEP, 1, "implement", stop=stop, verdict="verified-complete")
+
+    state = step_series(PLAIN_STEP, read([PLAIN_STEP], records=[returned]))
+
+    assert (isinstance(state, Marked), is_done(state)) == (True, False)
+
+
+def test_a_conflicted_only_step_whose_check_passed_does_not_complete_the_loop():
+    returned = rec(PLAIN_STEP, 1, "implement", stop="conflict", verdict="verified-complete")
+
+    stop = act([PLAIN_STEP], records=[returned])
+
+    assert (stop.cause, stop.step) == ("conflict-marker", "1")
 
 
 # --- the range a review reads, and the requests a review leaves outstanding --------------------

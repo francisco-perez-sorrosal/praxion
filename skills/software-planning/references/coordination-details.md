@@ -193,7 +193,7 @@ Oracles come from the spec, never from reading an existing implementation: an or
 
 ### Path Classes and the First Production Commit
 
-A function of the path and, for the *outer-loop fixture allowlist* class alone, of the lines a commit adds to it; the first match wins, so every path lands in exactly one class:
+A function of the path and, for the *outer-loop fixture allowlist* class alone, of the commit's whole change to it; the first match wins, so every path lands in exactly one class:
 
 1. *outer-loop driver*: under `tests/acceptance/` or `tests/e2e/`, inside a `drivers/` directory
 2. *outer-loop scenario*: any other path under `tests/acceptance/` or `tests/e2e/`

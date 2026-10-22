@@ -4,7 +4,7 @@ title: "A [CONFLICT] or [BLOCKED] return commits nothing and stops; status and n
 status: proposed
 category: behavioral
 date: 2026-10-22
-summary: "record never commits or ticks a step whose return carries [CONFLICT] or [BLOCKED], keeps every edit, records a null commit and stops naming the uncommitted files; status's per-step verdict comes from the same series state next acts on"
+summary: "record never commits or ticks a step, ordinary or goal, whose return carries [CONFLICT] or [BLOCKED], keeps every edit, records a null commit and stops naming the paths left uncommitted (five names and a count); a marked series is never done, and status reads marked as next does"
 tags: [step-loop, markers, status]
 made_by: agent
 agent_type: systems-architect
@@ -27,7 +27,7 @@ td-478. On a [CONFLICT] return whose check passed, the driver committed the step
 
 ## Decision
 
-`record` gates the commit and the tick on the resolved marker: [CONFLICT] or [BLOCKED] never commits or ticks, every edit stays in the tree, the ledger record carries a null commit, and the loop stops naming the step, the marker and each uncommitted file. The step stays open until its block is revised; the revision opens a fresh series at attempt 1 whose prompt names the kept edits. The conflicting attempt counts in its series and in the loop's iterations. `status`'s per-step `verdict` is derived by the same function from the same series state `next` acts on. [BLOCKED] is included by the user's default answer to the spec question: the state already reads both markers alike. [PARTIAL] keeps the check-decides rule.
+`record` gates the commit and the tick on the resolved marker, for ordinary and goal steps alike: [CONFLICT] or [BLOCKED] never commits or ticks (a goal iteration so marked stops unjudged), every edit stays in the tree, the ledger record carries a null commit, and the loop stops naming the step, the marker and every path the attempt left uncommitted, tracked or untracked, outside `.ai-work/` and the observation log (at most five names, then a count). A marked series is never done: `status` reads `marked`, as `next` does. The step is cleared only by revising its block; the revision opens a fresh series at attempt 1 whose prompt names the kept edits. The conflicting attempt counts in its series and in the loop's iterations. `status`'s per-step `verdict` is derived by the same function from the same series state `next` acts on. [BLOCKED] is included by the user's default answer to the spec question: the state already reads both markers alike. [PARTIAL] keeps the check-decides rule.
 
 ## Considered Options
 

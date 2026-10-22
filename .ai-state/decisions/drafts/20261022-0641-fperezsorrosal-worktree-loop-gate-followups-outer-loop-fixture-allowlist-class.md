@@ -30,7 +30,7 @@ Insert the class *outer-loop fixture allowlist* after inner-loop test: `.gitleak
 
 ## Considered Options
 
-### Path plus added lines (chosen)
+### Path plus the whole change to the file (chosen)
 
 ### Path only
 

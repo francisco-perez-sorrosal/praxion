@@ -41,7 +41,7 @@ SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # workflow must match them character-for-character, never re-resolve to a
 # newer/older SHA of its own.
 CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
-SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
+SETUP_UV_SHA = "c18668ad3cf93ea998bef934396af7bb5c839dc7"  # astral-sh/setup-uv v10.2.0
 CLAUDE_CODE_ACTION_SHA = (
     "51ea8ea73a139f2a74ff649e3092c25a904aed7e"  # anthropics/claude-code-action v1
 )

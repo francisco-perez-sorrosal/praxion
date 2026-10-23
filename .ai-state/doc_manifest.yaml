@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-22T20:38:25Z'
+generated_at: '2026-10-22T20:39:52Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -634,7 +634,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -2974,7 +2974,7 @@ surfaces:
   path: .ai-state/decisions/386-test-results-fixed-shape.md
   type: markdown
   title: TEST_RESULTS.md has a fixed green-step shape, bounded by a byte ceiling the verifier checks; failures-only is the test-invocation default
-  last_modified: '2026-10-21'
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-387-intentional-compaction-handoff
   path: .ai-state/decisions/387-intentional-compaction-handoff.md
@@ -3119,13 +3119,13 @@ surfaces:
   path: .ai-state/decisions/410-outer-loop-provenance-and-reverse-barrier.md
   type: markdown
   title: "Outer-loop reverse barrier and provenance without a hook \u2014 driver layer, owning steps, pending accounting, verifier history checks"
-  last_modified: '2026-10-21'
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-411-basename-pattern-literals
   path: .ai-state/decisions/411-basename-pattern-literals.md
   type: markdown
   title: Slash-less wildcard literals select only their test holders and account only for data files
-  last_modified: '2026-10-21'
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-412-raise-spawn-budgets
   path: .ai-state/decisions/412-raise-spawn-budgets.md
@@ -3445,13 +3445,13 @@ surfaces:
   path: .ai-state/decisions/464-orientation-reports-driver-position.md
   type: markdown
   title: During a step loop the post-compaction orientation reports the driver's position and the outstanding request's record command, read from the driver's status
-  last_modified: '2026-10-21'
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-465-step-loop-stop-guard
   path: .ai-state/decisions/465-step-loop-stop-guard.md
   type: markdown
   title: A Stop hook holds the orchestrator's stop once when a step-loop agent of this session has ended unrecorded, judged by the driver's own end evidence
-  last_modified: '2026-10-21'
+  last_modified: '2026-10-22'
   renderer: adr_card
 - id: ai-state-decisions-466-flip-gate-standing-leaf-gathered-evidence
   path: .ai-state/decisions/466-flip-gate-standing-leaf-gathered-evidence.md
@@ -3505,7 +3505,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-22'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3746,6 +3746,12 @@ surfaces:
   - ai-state-decisions-457-startup-and-routing-instruments
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+- id: ai-state-specs-spec-loop-gate-followups-2026-10-22
+  path: .ai-state/specs/SPEC_loop-gate-followups_2026-10-22.md
+  type: markdown
+  title: 'Spec: loop-gate-followups (the step-loop driver, its Stop guard, the flip gate, agent hygiene)'
+  last_modified: '2026-10-22'
+  renderer: default_markdown
 - id: ai-state-specs-spec-loop-gate-hardening-2026-10-20
   path: .ai-state/specs/SPEC_loop-gate-hardening_2026-10-20.md
   type: markdown
@@ -4403,6 +4409,7 @@ groups:
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
+  - ai-state-specs-spec-loop-gate-followups-2026-10-22
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11

@@ -1,3 +1,60 @@
+## v0.53.0 (2026-10-23)
+
+### Feat
+
+- Reap background work; admit outer-loop allowlists
+- Judge cited runs from gathered evidence
+- Let a record call outlast its gate's runs
+- Gate each pocket's run and keep its evidence
+- Add the step-loop pocket-run module
+- Refuse a passing run that left the convention unscored
+- Judge cited runs from their results files
+- Read a cited run's results files in the gate
+- Hold a stop while an ended agent's return is unrecorded
+- Find step-loop requests whose agent ended unrecorded
+- Let the startup probe bill a subscription
+- Make the implementer eligible to be switched
+- Resolve every cited run through the run index
+- Refuse changing eligibility beside a flip
+- Pin the eligible roles in a gate-owned module
+- Report liveness unknown over a lost segment
+- Accept omitClaudeMd only as a literal true
+- Write a digest-checked adherence run index
+- Count a continued run as one run
+- Refuse a continuation that measures elsewhere
+- Continue a stopped run without repaying its finished pairs
+- Decide continuation refusals and the pre-commitment
+- Report the model each session resolved to
+- Score the forced-stop check only on a role that ran out of turns
+- Size every allowance by the run's own discordance
+- State each mechanical allowance beside the margin
+- Seed each task's arm launch order
+
+### Fix
+
+- Hold goal steps to the marked-return rule
+- Carry a red check's failures to the next attempt
+- Close the allowlist class against production riders
+- Say what to do on gate-running
+- Guard the gate's detached runs and evidence
+- Keep the probe's not-held reason a literal type
+- Tie stop-guard holds to their own task and checkout
+- Pass the invocation to status_object's callers
+- Keep a continued run on its first fixture page
+- Run the kernel gate on deletion-only commits
+- Run the kernel gate on every input it reads
+- Refuse an unreadable parent ledger as input
+- Let a budget-stopped session break the stop streak
+- Name transcript directories as the harness does
+- Read inline-array rule paths in the Codex bridge
+- Link only the manifest's symlink rules
+- One canonical stop line in five more definitions
+
+### Refactor
+
+- Break the adherence checks import cycle
+- Split the ledger checks and liveness out of the kernel gate
+
 ## v0.52.1 (2026-10-16)
 
 ### Fix

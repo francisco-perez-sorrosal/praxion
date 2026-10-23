@@ -422,7 +422,7 @@ wheels = [
 
 [[package]]
 name = "praxion-evals"
-version = "0.52.1"
+version = "0.53.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

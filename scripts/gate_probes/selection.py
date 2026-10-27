@@ -56,6 +56,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from _step_loop_pocket_runs import pocket_bound
+
 import gate_probes
 from gate_probes.verdict import GateId, Verdict
 
@@ -71,18 +73,18 @@ ROOT_POCKET_ROOTS = (".", "")
 NO_ROOT_POCKET = "absent"
 SELECTS_FULL = "full"
 
-# Per-effect limits. Their sum stays under the 900 s the CLI gives this probe, so the
-# probe's own process-group kill always fires before the CLI's (pinned by a test there).
+# Per-effect limits. The traced suite is held to `suite_timeout_s`; the others' sum stays under
+# the allowance the CLI gives this probe beyond that bound, so the probe's own process-group kill
+# always fires before the CLI's (pinned by a test there).
 PREFLIGHT_TIMEOUT_S = 30.0  # each of: resolver --help, git ls-files, tracer load check
 CANARY_TIMEOUT_S = 60.0
-SUITE_TIMEOUT_S = 540.0
 RESOLVER_TIMEOUT_S = 180.0
-EFFECT_LIMITS_S = (
+FIXED_EFFECT_LIMITS_S = (
     PREFLIGHT_TIMEOUT_S * 3,
     CANARY_TIMEOUT_S,
-    SUITE_TIMEOUT_S,
     RESOLVER_TIMEOUT_S,
 )
+SUITE_POCKET = "."
 RESOLVER_PROCESSES = min(8, os.cpu_count() or 1)
 SUITE_EXIT_CODES = (0, 1)  # 1 = failing tests, a note; anything else means the suite did not run
 
@@ -375,6 +377,15 @@ def _check_resolver(repo_root: Path, env: Mapping[str, str]) -> None:
         )
 
 
+def suite_timeout_s(repo_root: Path, env: Mapping[str, str]) -> float:
+    """The traced suite's bound: the one the root pocket declares for its gate runs.
+
+    The step loop holds the same default suite to it, so both read one declaration
+    (`gate-timeout-seconds`), and a checkout that declares none gets the step loop's default.
+    """
+    return pocket_bound(repo_root, SUITE_POCKET, env).bound.seconds
+
+
 def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedReads, tuple[str, ...]]:
     out_dir = Path(tempfile.mkdtemp(prefix="gate-liveness-trace-"))
     try:
@@ -385,7 +396,8 @@ def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedRead
             sys.executable, "-m", "pytest", "--no-cov", "-p", "no:cacheprovider",
             "-p", "selection_trace_plugin", "--continue-on-collection-errors", "--color=no",
         ]  # fmt: skip
-        done = _capture(argv, repo_root, traced, SUITE_TIMEOUT_S, "the traced default suite")
+        bound = suite_timeout_s(repo_root, env)
+        done = _capture(argv, repo_root, traced, bound, "the traced default suite")
         if done.returncode not in SUITE_EXIT_CODES:
             observed = f"pytest exit code {done.returncode}: {_tail(done.stderr or done.stdout)}"
             raise ProbeError(_failure("the default suite to run under the tracer", observed))

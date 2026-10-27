@@ -50,6 +50,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from _repo_root import git_toplevel_from_cwd, is_plugin_cache_path  # noqa: E402
+from _step_loop_pocket_runs import pocket_bound  # noqa: E402
 from gate_probes.verdict import GateId, Verdict, parse_json, render_json  # noqa: E402
 
 EXIT_PASS = 0
@@ -65,12 +66,17 @@ PROBE_ENTRYPOINTS: dict[GateId, str] = {
     GateId.SELECTION_AUDIT: "gate_probes.selection:run",
 }
 
+# Each probe's own allowance, in seconds. The selection audit also runs the root pocket's
+# default suite, which that pocket bounds itself (`gate-timeout-seconds`), so its limit is its
+# allowance plus that bound, read as the probe reads it (`time_limit_s`).
 TIME_LIMITS_S: dict[GateId, float] = {
     GateId.MUTATION_SENSOR: 300.0,
     GateId.OBSERVATION_HOOKS: 60.0,
     GateId.SPAWN_COUNT: 120.0,
-    GateId.SELECTION_AUDIT: 900.0,
+    GateId.SELECTION_AUDIT: 360.0,
 }
+SUITE_BOUNDED_GATES = frozenset({GateId.SELECTION_AUDIT})
+SUITE_POCKET = "."
 
 _SCRUBBED_PREFIXES = ("CLAUDE", "PRAXION_", "GIT_", "ANTHROPIC_")
 _SCRUBBED_NAMES = frozenset({"GH_TOKEN", "GITHUB_TOKEN"})
@@ -138,7 +144,7 @@ def run_gates(gates: Sequence[GateId], repo_root: Path, env: Mapping[str, str]) 
 
 def run_probe(gate: GateId, repo_root: Path, env: Mapping[str, str]) -> Verdict:
     """One probe in its own process group, contained: always returns a verdict for `gate`."""
-    limit = TIME_LIMITS_S[gate]
+    limit = time_limit_s(gate, repo_root, env)
     command = [
         sys.executable,
         "-c",
@@ -150,6 +156,14 @@ def run_probe(gate: GateId, repo_root: Path, env: Mapping[str, str]) -> Verdict:
     started = time.monotonic()
     outcome = _run_child(command, repo_root, env, limit)
     return _judge(gate, outcome, limit, time.monotonic() - started)
+
+
+def time_limit_s(gate: GateId, repo_root: Path, env: Mapping[str, str]) -> float:
+    """The time `gate`'s probe may take: its allowance, plus the suite's bound if it runs one."""
+    allowance = TIME_LIMITS_S[gate]
+    if gate not in SUITE_BOUNDED_GATES:
+        return allowance
+    return allowance + pocket_bound(repo_root, SUITE_POCKET, env).bound.seconds
 
 
 def _run_child(

@@ -23,6 +23,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import selection  # noqa: E402
+from _step_loop_pocket_runs import DEFAULT_BOUND_SECONDS  # noqa: E402
 
 from gate_probes.verdict import GateId  # noqa: E402
 
@@ -582,3 +583,27 @@ def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_sele
 
     assert not verdict.passed, verdict
     assert name in verdict.reason
+
+
+def test_the_traced_suite_is_held_to_the_bound_the_root_pocket_declares(tmp_path, monkeypatch):
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.praxion.step-loop]\ngate-timeout-seconds = 77\n", encoding="utf-8"
+    )
+    real_capture = selection._capture
+    bounds: dict[str, float] = {}
+
+    def capture(argv, cwd, env, timeout, what):
+        if what != "the traced default suite":
+            return real_capture(argv, cwd, env, timeout, what)
+        bounds[what] = timeout
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(selection, "_capture", capture)
+
+    selection._traced_suite(tmp_path, {**_env(), "PRAXION_STEP_LOOP_POCKET_TIMEOUTS": ""})
+
+    assert bounds == {"the traced default suite": 77}
+
+
+def test_a_checkout_that_declares_no_bound_holds_the_suite_to_the_step_loops_default(tmp_path):
+    assert selection.suite_timeout_s(tmp_path, {}) == DEFAULT_BOUND_SECONDS

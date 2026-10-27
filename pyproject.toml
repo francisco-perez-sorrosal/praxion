@@ -202,6 +202,8 @@ venv = ".venv"
 # --- end static type-check baseline -----------------------------------------
 
 # The step-loop gate runs the whole root suite when a runner config changes: 930 s measured, so
-# 1500 s leaves 61 percent headroom (the driver default is 540 s).
+# 1500 s leaves 61 percent headroom (the driver default is 540 s). The selection audit holds its
+# traced run of the same suite to this bound (1,240 s measured locally on 2026-10-26); on CI that
+# run also sits inside the gate-liveness step's 20-minute limit (dec-419).
 [tool.praxion.step-loop]
 gate-timeout-seconds = 1500

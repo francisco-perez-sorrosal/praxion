@@ -89,7 +89,13 @@ def test_the_spawn_tally_declares_the_attribution_marker_among_its_agent_start_n
     assert "slug_attribution" in tally.needs[registry.EventClass.AGENT_START]
 
 
-SPAWN_RESULT_FIELDS = ("spawned_agent_id", "spawned_agent_type", "task_slug")
+SPAWN_RESULT_FIELDS = (
+    "spawned_agent_id",
+    "spawned_agent_type",
+    "task_slug",
+    "session_kind",
+    "checkout",
+)
 
 
 def test_the_spawn_result_class_writes_tool_use_rows_in_standard_and_full():
@@ -100,7 +106,7 @@ def test_the_spawn_result_class_writes_tool_use_rows_in_standard_and_full():
     assert spec.modes == frozenset({Mode.FULL, Mode.STANDARD})
 
 
-def test_the_spawn_result_class_declares_the_tool_use_envelope_plus_its_three_fields():
+def test_the_spawn_result_class_declares_the_tool_use_envelope_plus_its_spawn_fields():
     spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
     tool_use_envelope = registry.EVENTS[registry.EventClass.TOOL_FILE_CHANGE].fields
 

@@ -346,6 +346,9 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> dict
     for one test's scenario run under `mode`."""
     proj, parent, marker_dir = _build_project(tmp_path)
     _isolate_env(monkeypatch, mode, marker_dir, _build_plugin(tmp_path))
+    # A spawn result records the origin its session shows, so the session must show one.
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-cli")
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(proj))
     cs = _load("capture_session")
     co = _load("capture_observations")
     mc = _load("measure_context_surface")

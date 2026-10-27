@@ -122,6 +122,23 @@ def test_only_the_spawn_result_class_declares_the_spawn_result_fields():
         assert declaring == [registry.EventClass.TOOL_AGENT_SPAWN], field
 
 
+def test_the_spawn_result_class_marks_only_the_origin_pair_optional():
+    spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
+
+    assert spec.optional == frozenset({"session_kind", "checkout"})
+
+
+def test_every_optional_field_is_a_declared_field_of_its_class():
+    for event_class, spec in registry.EVENTS.items():
+        assert spec.optional <= set(spec.fields), event_class
+
+
+def test_no_other_class_marks_a_field_optional():
+    marking = [event_class for event_class, spec in registry.EVENTS.items() if spec.optional]
+
+    assert marking == [registry.EventClass.TOOL_AGENT_SPAWN]
+
+
 @pytest.mark.parametrize(
     "consumer_name",
     [

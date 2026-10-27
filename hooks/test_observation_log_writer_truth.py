@@ -341,14 +341,19 @@ def _isolate_env(
     monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(plugin_root))
 
 
-def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> dict:
+def _prepare(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, *, origin_shown: bool = True
+) -> dict:
     """Load the hooks, build the fixture tree, and isolate the environment
-    for one test's scenario run under `mode`."""
+    for one test's scenario run under `mode`. `origin_shown` says whether the
+    session's entrypoint classifies a kind (a spawn row then records its origin)
+    or shows nothing, as a host that exports no entrypoint does."""
     proj, parent, marker_dir = _build_project(tmp_path)
     _isolate_env(monkeypatch, mode, marker_dir, _build_plugin(tmp_path))
-    # A spawn result records the origin its session shows, so the session must show one.
-    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-cli")
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(proj))
+    if origin_shown:
+        monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-cli")
+    else:
+        monkeypatch.delenv("CLAUDE_CODE_ENTRYPOINT", raising=False)
     cs = _load("capture_session")
     co = _load("capture_observations")
     mc = _load("measure_context_surface")
@@ -407,7 +412,12 @@ def _run_scenario(
 # ---------------------------------------------------------------------------
 
 
-def _violations(outcomes, mode, events, records_fn, event_class) -> list[Violation]:
+def _violations(
+    outcomes, mode, events, records_fn, event_class, *, origin_shown: bool = True
+) -> list[Violation]:
+    """Every way the written rows part from the registry. A field the class lists
+    as optional may be absent only when the session showed no origin: where it was
+    shown, a row that omits it is as wrong as one that omits any declared field."""
     registered_types = {spec.event_type for spec in events.values()}
     violations: list[Violation] = []
     for step_name, expected, new_rows in outcomes:
@@ -429,7 +439,8 @@ def _violations(outcomes, mode, events, records_fn, event_class) -> list[Violati
             undeclared = sorted(set(row) - set(spec.fields))
             if undeclared:
                 violations.append(Violation(step_name, "undeclared", undeclared))
-            missing = sorted(set(spec.fields) - set(row) - expect.absent_ok)
+            may_omit = expect.absent_ok | (frozenset() if origin_shown else spec.optional)
+            missing = sorted(set(spec.fields) - set(row) - may_omit)
             if missing:
                 violations.append(Violation(step_name, "declared-but-absent", missing))
     return violations
@@ -440,9 +451,12 @@ def _violations(outcomes, mode, events, records_fn, event_class) -> list[Violati
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("origin_shown", [True, False], ids=["origin-shown", "no-origin"])
 @pytest.mark.parametrize("mode", ["full", "standard", "off"])
-def test_every_writer_records_exactly_what_the_registry_declares(tmp_path, monkeypatch, mode):
-    ctx = _prepare(tmp_path, monkeypatch, mode)
+def test_every_writer_records_exactly_what_the_registry_declares(
+    tmp_path, monkeypatch, mode, origin_shown
+):
+    ctx = _prepare(tmp_path, monkeypatch, mode, origin_shown=origin_shown)
     cs = ctx["cs"]
     outcomes = _run_scenario(
         hooks=ctx["hooks"],
@@ -459,8 +473,38 @@ def test_every_writer_records_exactly_what_the_registry_declares(tmp_path, monke
         cs.writer.registry.EVENTS,
         cs.writer.registry.records,
         cs.EventClass,
+        origin_shown=origin_shown,
     )
     assert violations == []
+
+
+def _spawn_rows(origin_shown: bool, tmp_path, monkeypatch) -> list[dict]:
+    ctx = _prepare(tmp_path, monkeypatch, "full", origin_shown=origin_shown)
+    outcomes = _run_scenario(
+        hooks=ctx["hooks"],
+        reader_mod=ctx["cs"].reader,
+        ai_state_dir=ctx["proj"] / ".ai-state",
+        base=ctx["base"],
+        proj=ctx["proj"],
+        monkeypatch=monkeypatch,
+    )
+    return [row for name, _, rows in outcomes if name == "tool Agent result" for row in rows]
+
+
+def test_a_session_showing_no_origin_writes_a_spawn_row_without_either_optional_field(
+    tmp_path, monkeypatch
+):
+    (row,) = _spawn_rows(False, tmp_path, monkeypatch)
+
+    assert {"session_kind", "checkout"}.isdisjoint(row)
+
+
+def test_a_session_showing_its_origin_writes_a_spawn_row_with_both_optional_fields(
+    tmp_path, monkeypatch
+):
+    (row,) = _spawn_rows(True, tmp_path, monkeypatch)
+
+    assert {"session_kind", "checkout"} <= set(row)
 
 
 def test_scenario_drives_every_recorded_event_class(tmp_path, monkeypatch):
@@ -617,6 +661,15 @@ def test_canary_dropped_declared_field_is_flagged_exactly(tmp_path, monkeypatch)
     violations = _run_with_injection(tmp_path, monkeypatch, "full", inject)
 
     assert violations == [Violation("gate_fire", "declared-but-absent", ["hook"])]
+
+
+def test_canary_dropped_optional_field_is_flagged_when_the_origin_was_shown(tmp_path, monkeypatch):
+    def inject(observation: dict) -> dict:
+        return {k: v for k, v in observation.items() if k != "checkout"}
+
+    violations = _run_with_injection(tmp_path, monkeypatch, "full", inject)
+
+    assert violations == [Violation("tool Agent result", "declared-but-absent", ["checkout"])]
 
 
 def test_canary_writer_ignoring_mode_flags_every_step(tmp_path, monkeypatch):

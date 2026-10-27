@@ -83,29 +83,19 @@ SESSION_KIND_BY_ENTRYPOINT = MappingProxyType(
     }
 )
 
-PROJECT_DIR_ENV = "CLAUDE_PROJECT_DIR"
 
+def session_origin(environ: Mapping[str, str], checkout: str) -> dict[str, str]:
+    """What ``environ`` shows of a session: its ``session_kind``, with the ``checkout`` it ran in.
 
-def session_origin(environ: Mapping[str, str]) -> dict[str, str]:
-    """What ``environ`` shows of a session: its ``session_kind`` and ``checkout``.
-
-    A key is present only when its evidence is: an entrypoint outside
-    ``SESSION_KIND_BY_ENTRYPOINT`` or an unset one names no kind, and a project
-    directory that is unset, relative or not a directory names no checkout (the
-    resolved path otherwise). Total over its input, so a malformed variable
-    costs the row a key, never the session a crash.
+    ``checkout`` is handed in, resolved by the caller from the same location that
+    decides where the row is logged -- never read from the environment, which
+    names the directory a session was started in, not the checkout around it.
+    The two keys travel together: an entrypoint outside ``SESSION_KIND_BY_ENTRYPOINT``
+    (or an unset one) shows no kind, and a reader treats a checkout without a kind
+    as no evidence at all, so neither is recorded. Pure and total over its input.
     """
-    origin: dict[str, str] = {}
     kind = SESSION_KIND_BY_ENTRYPOINT.get(environ.get(ENTRYPOINT_ENV, ""))
-    if kind:
-        origin["session_kind"] = kind
-    try:
-        project_dir = Path(environ.get(PROJECT_DIR_ENV, ""))
-        if project_dir.is_absolute() and project_dir.is_dir():
-            origin["checkout"] = str(project_dir.resolve())
-    except (OSError, ValueError, RuntimeError):
-        pass
-    return origin
+    return {"session_kind": kind, "checkout": checkout} if kind else {}
 
 
 def record_gate_fire(

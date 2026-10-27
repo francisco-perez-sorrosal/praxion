@@ -262,7 +262,9 @@ def main() -> None:
     if location is None:
         return  # graceful degradation: no project serves this directory
 
-    origin = session_origin(os.environ) if tool_name in SPAWN_TOOLS else None
+    origin = None
+    if tool_name in SPAWN_TOOLS:
+        origin = session_origin(os.environ, str(location.state_dir.parent.resolve()))
     observation = build_observation(payload, project=location.project, origin=origin)
     writer.record_tool_call(
         location.state_dir, observation, is_subagent=bool(payload.get("agent_id"))

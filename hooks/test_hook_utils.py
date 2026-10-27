@@ -253,7 +253,9 @@ def test_record_gate_fire_writes_nothing_when_mode_is_off(tmp_path, monkeypatch)
     assert not (tmp_path / ".ai-state" / "observations.jsonl").exists()
 
 
-# -- session_origin: the one reading of how and where a session runs ----------
+# -- session_origin: the one reading of how a session was started --------------
+
+CHECKOUT = "/work/some-pipeline"
 
 
 @pytest.mark.parametrize(
@@ -267,54 +269,26 @@ def test_record_gate_fire_writes_nothing_when_mode_is_off(tmp_path, monkeypatch)
         ("claude-desktop", "interactive"),
     ],
 )
-def test_session_origin_names_the_kind_of_each_classified_entrypoint(entrypoint, kind):
-    origin = _import_hook_utils().session_origin({"CLAUDE_CODE_ENTRYPOINT": entrypoint})
+def test_session_origin_names_the_kind_of_each_classified_entrypoint_with_the_checkout(
+    entrypoint, kind
+):
+    origin = _import_hook_utils().session_origin({"CLAUDE_CODE_ENTRYPOINT": entrypoint}, CHECKOUT)
 
-    assert origin == {"session_kind": kind}
+    assert origin == {"session_kind": kind, "checkout": CHECKOUT}
 
 
 @pytest.mark.parametrize("entrypoint", ["", "mcp", "remote", "SDK-CLI", " cli", "sdk-cli "])
-def test_session_origin_leaves_an_unclassified_entrypoint_without_a_kind(entrypoint):
-    assert _import_hook_utils().session_origin({"CLAUDE_CODE_ENTRYPOINT": entrypoint}) == {}
+def test_session_origin_shows_nothing_for_an_unclassified_entrypoint(entrypoint):
+    environ = {"CLAUDE_CODE_ENTRYPOINT": entrypoint}
+
+    assert _import_hook_utils().session_origin(environ, CHECKOUT) == {}
 
 
 def test_session_origin_is_empty_when_the_session_shows_nothing():
-    assert _import_hook_utils().session_origin({}) == {}
+    assert _import_hook_utils().session_origin({}, CHECKOUT) == {}
 
 
-def test_session_origin_records_an_absolute_directory_as_its_resolved_path(tmp_path):
-    real = tmp_path / "real"
-    real.mkdir()
-    link = tmp_path / "link"
-    link.symlink_to(real, target_is_directory=True)
+def test_session_origin_never_reads_the_directory_the_session_was_started_in():
+    environ = {"CLAUDE_CODE_ENTRYPOINT": "cli", "CLAUDE_PROJECT_DIR": "/work/some-pipeline/sub"}
 
-    origin = _import_hook_utils().session_origin({"CLAUDE_PROJECT_DIR": str(link)})
-
-    assert origin == {"checkout": str(real.resolve())}
-
-
-@pytest.mark.parametrize("value", ["relative/dir", ".", "", "bad\0dir"])
-def test_session_origin_records_no_checkout_for_a_value_that_is_not_an_absolute_path(value):
-    assert _import_hook_utils().session_origin({"CLAUDE_PROJECT_DIR": value}) == {}
-
-
-def test_session_origin_records_no_checkout_for_a_path_that_is_not_a_directory(tmp_path):
-    a_file = tmp_path / "file.txt"
-    a_file.write_text("x")
-    hu = _import_hook_utils()
-
-    assert hu.session_origin({"CLAUDE_PROJECT_DIR": str(a_file)}) == {}
-    assert hu.session_origin({"CLAUDE_PROJECT_DIR": str(tmp_path / "gone")}) == {}
-
-
-def test_session_origin_records_no_checkout_for_a_symlink_loop(tmp_path):
-    loop = tmp_path / "loop"
-    loop.symlink_to(loop)
-
-    assert _import_hook_utils().session_origin({"CLAUDE_PROJECT_DIR": str(loop)}) == {}
-
-
-def test_session_origin_keeps_the_kind_when_the_directory_names_no_checkout(tmp_path):
-    environ = {"CLAUDE_CODE_ENTRYPOINT": "sdk-py", "CLAUDE_PROJECT_DIR": str(tmp_path / "gone")}
-
-    assert _import_hook_utils().session_origin(environ) == {"session_kind": "headless"}
+    assert _import_hook_utils().session_origin(environ, CHECKOUT)["checkout"] == CHECKOUT

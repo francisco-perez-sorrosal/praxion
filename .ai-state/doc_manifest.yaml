@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-27T05:29:47Z'
+generated_at: '2026-10-27T18:30:32Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -634,13 +634,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3137,7 +3137,7 @@ surfaces:
   path: .ai-state/decisions/413-spawns-attributed-by-prompt-task-slug.md
   type: markdown
   title: Spawns count toward the Task slug their prompt states, joined on agent id from the recorded Agent result; unknown spawns pend
-  last_modified: '2026-10-01'
+  last_modified: '2026-10-27'
   renderer: adr_card
 - id: ai-state-decisions-414-wal-rows-resolve-to-nearest-project
   path: .ai-state/decisions/414-wal-rows-resolve-to-nearest-project.md
@@ -3463,7 +3463,7 @@ surfaces:
   path: .ai-state/decisions/467-gate-pocket-runs.md
   type: markdown
   title: The step-loop gate runs each pocket detached under the pocket's own declared bound, keeps a cut-off run's evidence and feeds it to the next attempt
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   renderer: adr_card
 - id: ai-state-decisions-468-marked-return-commits-nothing
   path: .ai-state/decisions/468-marked-return-commits-nothing.md
@@ -3500,6 +3500,24 @@ surfaces:
   type: markdown
   title: The step-loop Stop guard bounds its per-Stop transcript reading by count, bytes and its own deadline, and lets the stop through at a bound
   last_modified: '2026-10-22'
+  renderer: adr_card
+- id: ai-state-decisions-474-eval-driving-tests-selected-by-pocket-drive
+  path: .ai-state/decisions/474-eval-driving-tests-selected-by-pocket-drive.md
+  type: markdown
+  title: Select tests that drive another pocket through a derived pocket-drive edge
+  last_modified: '2026-10-27'
+  renderer: adr_card
+- id: ai-state-decisions-475-gate-runs-bound-themselves-verbose-in-any-pocket
+  path: .ai-state/decisions/475-gate-runs-bound-themselves-verbose-in-any-pocket.md
+  type: markdown
+  title: Gate runs enforce their own bound, and read one line per test in any pocket
+  last_modified: '2026-10-27'
+  renderer: adr_card
+- id: ai-state-decisions-476-spawn-rows-carry-session-kind-and-checkout
+  path: .ai-state/decisions/476-spawn-rows-carry-session-kind-and-checkout.md
+  type: markdown
+  title: Spawn rows carry the spawning session's kind and checkout; headless slug-less spawns are left out
+  last_modified: '2026-10-27'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -4368,6 +4386,9 @@ groups:
   - ai-state-decisions-471-selection-bare-names-pocket-scoped
   - ai-state-decisions-472-status-emits-attempt-cap
   - ai-state-decisions-473-stop-guard-per-stop-bounds
+  - ai-state-decisions-474-eval-driving-tests-selected-by-pocket-drive
+  - ai-state-decisions-475-gate-runs-bound-themselves-verbose-in-any-pocket
+  - ai-state-decisions-476-spawn-rows-carry-session-kind-and-checkout
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

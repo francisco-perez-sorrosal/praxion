@@ -1,7 +1,8 @@
 ---
-id: dec-draft-7a68ab13
+id: dec-476
+draft_id: dec-draft-7a68ab13
 title: Spawn rows carry the spawning session's kind and checkout; headless slug-less spawns are left out
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-27
 summary: The spawn-result row records session_kind (from the harness entrypoint, closed map) and checkout; the tally leaves a headless session's slug-less spawn out of every slug and lists it, and charges an interactive slug-less spawn only to the pipeline's own checkout.

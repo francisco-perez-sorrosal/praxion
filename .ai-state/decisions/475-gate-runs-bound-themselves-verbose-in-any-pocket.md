@@ -1,7 +1,8 @@
 ---
-id: dec-draft-2801fd08
+id: dec-475
+draft_id: dec-draft-2801fd08
 title: Gate runs enforce their own bound, and read one line per test in any pocket
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-27
 summary: Each detached gate run's background watchdog stops the run's process group at its recorded deadline and writes the cut marker first, while the command keeps the launcher's foreground; gate pytest runs pass --verbosity=1 instead of -v so a pocket's -q cannot hide per-test outcomes.

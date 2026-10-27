@@ -1,7 +1,8 @@
 ---
-id: dec-draft-f90fa3fc
+id: dec-474
+draft_id: dec-draft-f90fa3fc
 title: Select tests that drive another pocket through a derived pocket-drive edge
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-27
 summary: A module outside a pocket whose code holds the constant --project and a constant equal to the pocket's root path drives that pocket; a change inside the pocket selects, through the import closure, every test that imports such a module.

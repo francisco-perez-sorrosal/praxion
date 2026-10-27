@@ -53,8 +53,13 @@ def test_the_convention_check_template_equals_the_one_the_eval_names_checks_by()
 
 
 def eval_convention_template() -> str:
-    """The f-string `convention_check_name` returns, with its one name written as `<name>`."""
-    tree = ast.parse(EVAL_MODEL.read_text(encoding="utf-8"))
+    """The f-string `convention_check_name` returns, with its one name written as `<name>`.
+
+    Only that function is parsed: the eval pocket needs Python 3.13, and the rest of its module
+    may use syntax this pocket's oldest interpreter (3.11) cannot parse.
+    """
+    source = EVAL_MODEL.read_text(encoding="utf-8")
+    tree = ast.parse(_module_level_def(source, "convention_check_name"))
     function = next(
         node
         for node in ast.walk(tree)
@@ -63,6 +68,17 @@ def eval_convention_template() -> str:
     returned = next(node.value for node in ast.walk(function) if isinstance(node, ast.Return))
     assert isinstance(returned, ast.JoinedStr), "the eval builds the check name as an f-string"
     return "".join(_template_part(part) for part in returned.values)
+
+
+def _module_level_def(source: str, name: str) -> str:
+    """The lines of the module-level function `name`, up to the next line that starts unindented."""
+    lines = source.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.startswith(f"def {name}("))
+    end = next(
+        (index for index in range(start + 1, len(lines)) if lines[index][:1].strip()),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
 
 
 def _template_part(part: ast.expr) -> str:

@@ -688,11 +688,30 @@ def test_the_real_hooks_and_the_real_counter_agree_on_the_known_spawns(tmp_path,
     scratch_root.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(scratch_root))
     log = REAL_CHECKOUT / ".ai-state" / "observations.jsonl"
-    before = log.stat().st_mtime_ns if log.exists() else None
+    before = _probe_rows(log)
 
     verdict = _count(REAL_CHECKOUT, dict(os.environ))
 
     assert verdict.passed, verdict.reason
     assert verdict.gate is GateId.SPAWN_COUNT
-    assert (log.stat().st_mtime_ns if log.exists() else None) == before
+    assert _probe_rows(log) == before  # other sessions may append meanwhile; the probe never does
     assert list(scratch_root.iterdir()) == []
+
+
+def _probe_rows(log: Path) -> list[str]:
+    """The log's rows under the probe's session id: every row its replayed hooks write carries it."""
+    if not log.exists():
+        return []
+    return [
+        line
+        for line in log.read_text(encoding="utf-8").splitlines()
+        if observation.SESSION_ID in line and _session_id(line) == observation.SESSION_ID
+    ]
+
+
+def _session_id(line: str) -> object:
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:  # a row another session is still appending
+        return None
+    return row.get("session_id") if isinstance(row, dict) else None

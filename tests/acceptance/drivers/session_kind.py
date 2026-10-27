@@ -5,18 +5,14 @@ Agent SDK host); an interactive session is one a person types into. Scenarios pl
 from either kind through the observation harness (`observation_harness.Session`), then read
 the tally through `spawn_tally`.
 
-Bound here, because the specification or the base commit fixes them:
+How the kinds are shown to the hooks: Claude Code names how it was started in the
+`CLAUDE_CODE_ENTRYPOINT` environment variable and the checkout it runs in in
+`CLAUDE_PROJECT_DIR`; those two are all the hooks read. A session with no evidence of its
+kind sets neither, which is today's harness session, as rows written before sessions
+carried their kind.
 
-- a session with no evidence of its kind is today's harness session, unchanged: its rows
-  carry nothing about how the session was started, as rows written before this change;
-- the tally is `spawn_tally.spawn_count`, run as a command with `--json`.
-
-Not yet bound (each raises until a binding step binds it to the designed interface):
-
-- how a session shows the hooks that it was started non-interactively, or that a person
-  types into it;
-- where the tally's report lists the agents it left out of every slug, with the reason
-  each was left out.
+The tally is `spawn_tally.spawn_count`, run as a command with `--json`; the agents it leaves
+out of every slug are the `left_out` list of that report.
 """
 
 from __future__ import annotations
@@ -25,9 +21,11 @@ from pathlib import Path
 
 from tests.acceptance.drivers.observation_harness import HookHarness, Session
 
-
-class UnboundDriverError(NotImplementedError):
-    """A boundary assumption no binding step has bound to the designed interface yet."""
+ENTRYPOINT_VARIABLE = "CLAUDE_CODE_ENTRYPOINT"
+PROJECT_DIR_VARIABLE = "CLAUDE_PROJECT_DIR"
+HEADLESS_ENTRYPOINT = "sdk-cli"
+INTERACTIVE_ENTRYPOINT = "cli"
+LEFT_OUT_KEY = "left_out"
 
 
 def unknown_kind_session(scratch: Path, session_id: str, cwd: Path) -> Session:
@@ -37,23 +35,23 @@ def unknown_kind_session(scratch: Path, session_id: str, cwd: Path) -> Session:
 
 def headless_session(scratch: Path, session_id: str, cwd: Path) -> Session:
     """A session started non-interactively, as Claude Code shows that to the hooks."""
-    raise UnboundDriverError(
-        "a session started non-interactively (claude -p, or an Agent SDK host) shows the "
-        "hooks that it is headless, so the spawns it makes carry that evidence"
-    )
+    return _session_started_as(HEADLESS_ENTRYPOINT, scratch, session_id, cwd)
 
 
 def interactive_session(scratch: Path, session_id: str, cwd: Path) -> Session:
     """A session a person types into, as Claude Code shows that to the hooks."""
-    raise UnboundDriverError(
-        "a session a person types into is recorded the way an interactive session is, "
-        "whatever evidence of its kind the hooks see"
-    )
+    return _session_started_as(INTERACTIVE_ENTRYPOINT, scratch, session_id, cwd)
 
 
 def left_out(report: dict) -> dict[str, str]:
     """Each agent the tally left out of every slug, mapped to the reason it gives."""
-    raise UnboundDriverError(
-        "the tally's report lists, apart from the charged and unattributed agents, each "
-        f"agent it left out of every slug with the reason it was left out: {sorted(report)}"
+    assert LEFT_OUT_KEY in report, (
+        f"the tally's report lists no `{LEFT_OUT_KEY}` key for the agents it left out of "
+        f"every slug; its keys are {sorted(report)}"
     )
+    return {entry["agent_id"]: entry["reason"] for entry in report[LEFT_OUT_KEY]}
+
+
+def _session_started_as(entrypoint: str, scratch: Path, session_id: str, cwd: Path) -> Session:
+    environment = {ENTRYPOINT_VARIABLE: entrypoint, PROJECT_DIR_VARIABLE: str(cwd)}
+    return Session(HookHarness(scratch, extra_env=environment), session_id, cwd)

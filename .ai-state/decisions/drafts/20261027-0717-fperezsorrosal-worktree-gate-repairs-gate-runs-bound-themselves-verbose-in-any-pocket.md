@@ -4,7 +4,7 @@ title: Gate runs enforce their own bound, and read one line per test in any pock
 status: proposed
 category: behavioral
 date: 2026-10-27
-summary: Each detached gate run's launcher stops its own process group at its recorded deadline and writes the cut marker first; gate pytest runs pass --verbosity=1 instead of -v so a pocket's -q cannot hide per-test outcomes.
+summary: Each detached gate run's background watchdog stops the run's process group at its recorded deadline and writes the cut marker first, while the command keeps the launcher's foreground; gate pytest runs pass --verbosity=1 instead of -v so a pocket's -q cannot hide per-test outcomes.
 tags: [step-loop, gate, pocket-runs, pytest]
 made_by: agent
 agent_type: systems-architect
@@ -22,7 +22,7 @@ dec-467 clause 2: the bound is enforced when a later `record` attaches; nothing 
 
 ## Decision
 
-1. The launcher that leads each run's process group receives its deadline (recorded start plus the bound recorded in `<n>.start`) at start. When the command outlives it by a 5 s grace, the launcher writes `<n>.cut`, ignores SIGTERM itself, signals its group with SIGTERM, then SIGKILL to survivors after 2 s, and exits. The stop lands well inside the 30 s allowance. The attach-time kill stays as the backstop for a launcher the system killed. Stdlib only: no `timeout` tool, no hook.
+1. The command runs in the foreground of the launcher that leads the run's process group, so it keeps default signal dispositions (a non-interactive POSIX shell starts a background command with SIGINT ignored, which every test the gate ran would inherit). A background watchdog receives the run's deadline (recorded start plus the bound recorded in `<n>.start`, the bound capped at ten years) at start and ticks once a second. When the command outlives the deadline by a 5 s grace, the watchdog writes `<n>.cut` (and signals nothing when it cannot), ignores SIGTERM itself, sends SIGTERM to the launcher's own group in the POSIX spelling `kill -s TERM -- -<leader>` (dash refuses `kill -TERM --`), then SIGKILL to survivors after 2 s, and exits; it also ends with the run. The stop lands well inside the 30 s allowance. The attach-time kill stays as the backstop for a launcher the system killed. Stdlib only: no `timeout` tool, no hook.
 2. Gate pytest invocations pass `--verbosity=1` (an absolute setting, applied after the ini `addopts`) instead of `-v`; `-rfE` stays. No pocket configuration is edited.
 
 **Activation:** no -- each alternative fails a stated requirement (macOS lacks `timeout`; a kill without the marker reads as not started).

@@ -79,6 +79,17 @@ The source frontmatter capsule preserves Claude-specific tool, hook,
 permission, memory, background, max-turn, and skill semantics that Codex
 does not model natively in the wrapper TOML.
 
+A definition can place a passage in its wrapper by putting it, on lines of
+their own, between `<!-- codex-wrapper:begin -->` and
+`<!-- codex-wrapper:end -->`. The exporter embeds each marked passage in
+`developer_instructions` after the kernel strings and before the capsule, and
+the closing sentence then reads "Do not duplicate the canonical agent body
+here beyond the marked passages." A definition without markers exports
+unchanged. Use it only for an instruction a Codex agent must carry without
+reading the definition, since a Codex host has no commit gate to enforce it.
+An unclosed, nested, or stray marker fails the export with an error naming the
+definition file.
+
 ## Skill Export
 
 `export-codex-skills.py` converts `skills/*/SKILL.md` into Codex skill wrappers

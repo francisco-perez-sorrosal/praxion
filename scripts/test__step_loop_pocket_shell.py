@@ -1,10 +1,12 @@
 """Tests for the shell of the pocket-run module (``scripts/_step_loop_pocket_runs.py``): a pocket's
 tests run detached, in a session of their own, and a later call picks the run up again.
 
-Every run here is a real short subprocess. Nothing waits on elapsed time: the code under test
-takes its clock and its sleep as arguments, so a bound passing is a fake clock moving, and the
-only real waiting is ``wait_until`` -- polling for a condition the OS settles on its own (a
-process written its first line, a killed process gone) with a generous guard.
+Every run here is a real short subprocess. Apart from the launcher's own deadline, nothing waits
+on elapsed time: the code under test takes its clock and its sleep as arguments, so a bound passing
+is a fake clock moving, and the only real waiting is ``wait_until`` -- polling for a condition the
+OS settles on its own (a process written its first line, a killed process gone) with a generous
+guard. The launcher keeps real time (its deadline is the bound plus a grace of several seconds),
+so the tests of its stop run a one-second bound and wait out that deadline.
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from _step_loop_pocket_runs import (  # noqa: E402
 
 GUARD_SECONDS = 30.0
 BOUND = 100.0
+SHORT_BOUND = 1.0  # the launcher's stop is real time: a short bound keeps those tests brief
 LONG_RUNNING = ("sleep", "600")
 PYTHON = sys.executable
 
@@ -70,6 +73,12 @@ def process_exists(pid: int) -> bool:
     except ProcessLookupError:
         return False
     return True
+
+
+def has_exited(pid: int) -> bool:
+    """Whether `pid` is gone, collecting it first when it is this process's own child."""
+    pocket_runs._reap(pid)
+    return not process_exists(pid)
 
 
 @pytest.fixture
@@ -329,9 +338,12 @@ def test_a_run_that_exited_but_took_longer_than_its_bound_is_cut_off_all_the_sam
 
 def test_a_run_whose_group_was_killed_from_outside_ends_without_a_record(make_spec):
     clock = FakeClock(1000.0)
-    spec = make_spec(LONG_RUNNING, bound_seconds=BOUND)
+    spec = make_spec(
+        python_run("print('re' + 'ady', flush=True); import time; time.sleep(600)"),
+        bound_seconds=BOUND,
+    )
     run_detached(spec, give_up_at=clock(), now=clock, sleep=clock.sleep)
-    wait_until(lambda: has_text(spec.pid_path), "the launcher's pid file")
+    wait_for_text(spec, "ready")  # a group still being forked can outlive the signal
     os.killpg(int(spec.pid_path.read_text(encoding="utf-8")), signal.SIGKILL)
 
     wait_until(lambda: isinstance(read_run(spec, now=clock), NotStarted), "the group to be gone")
@@ -461,3 +473,92 @@ def test_a_launcher_that_cannot_write_its_pid_runs_nothing(make_spec, tmp_path):
 
     assert isinstance(run, NotStarted)
     assert not marker.exists()
+
+
+# --- The launcher stops its own run at the bound it was started with ---
+
+
+def hangs_with_a_child(child_pid_file: Path) -> tuple[str, ...]:
+    return ("sh", "-c", f"sleep 600 & echo $! > {child_pid_file}; wait")
+
+
+def stop_was_recorded(spec: RunSpec) -> bool:
+    return spec.cut_path.exists()
+
+
+def test_a_run_that_outlives_its_bound_is_stopped_by_its_launcher_with_its_child(
+    make_spec, tmp_path
+):
+    child_pid_file = tmp_path / "child.pid"
+    spec = make_spec(hangs_with_a_child(child_pid_file), bound_seconds=SHORT_BOUND)
+    run_detached(spec, give_up_at=0.0)
+    wait_until(lambda: has_text(child_pid_file), "the child to record its pid")
+    child = int(child_pid_file.read_text(encoding="utf-8"))
+    leader = int(spec.pid_path.read_text(encoding="utf-8"))
+
+    wait_until(lambda: has_exited(child), "the launcher to stop the child")
+
+    wait_until(lambda: has_exited(leader), "the launcher to be gone")
+    assert isinstance(read_run(spec), CutOff)
+
+
+def test_a_run_that_exits_inside_its_bound_is_untouched_and_leaves_no_cut_marker(make_spec):
+    spec = make_spec(python_run("print('done')"), bound_seconds=BOUND)
+
+    run = run_detached(spec, give_up_at=time.time() + GUARD_SECONDS)
+
+    assert isinstance(run, Finished)
+    launcher = int(spec.pid_path.read_text(encoding="utf-8"))
+    wait_until(lambda: has_exited(launcher), "the launcher to end")
+    assert not spec.cut_path.exists()
+
+
+def test_the_bound_given_at_start_is_the_one_the_launcher_enforces(
+    make_spec, monkeypatch, tmp_path
+):
+    spec = make_spec(LONG_RUNNING, bound_seconds=SHORT_BOUND)
+    run_detached(spec, give_up_at=0.0)
+    monkeypatch.setenv(pocket_runs.POCKET_TIMEOUTS_VARIABLE, f"{spec.pocket}=900")
+    (tmp_path / "pyproject.toml").write_text(
+        f"[tool.praxion.step-loop]\n{pocket_runs.DECLARATION_KEY} = 900\n", encoding="utf-8"
+    )
+
+    wait_until(lambda: stop_was_recorded(spec), "the launcher to stop the run at its own bound")
+
+
+def test_a_command_run_through_the_launcher_keeps_the_default_interrupt_and_terminate_handling(
+    make_spec,
+):
+    spec = make_spec(
+        python_run(
+            "import signal; print(signal.getsignal(signal.SIGINT) is signal.default_int_handler,"
+            " signal.getsignal(signal.SIGTERM) == signal.SIG_DFL)"
+        ),
+        bound_seconds=BOUND,
+    )
+
+    run = run_detached(spec, give_up_at=time.time() + GUARD_SECONDS)
+
+    assert isinstance(run, Finished)
+    assert run.output.splitlines()[-1] == "True True"
+
+
+def test_the_cut_marker_exists_before_the_launcher_sends_any_signal(make_spec, tmp_path):
+    saw_marker = tmp_path / "saw-marker"
+    spec = make_spec(
+        (
+            "sh",
+            "-c",
+            f"trap 'test -e {spec_cut(tmp_path)} && touch {saw_marker}; exit 0' TERM;"
+            " while :; do sleep 0.1; done",
+        ),
+        bound_seconds=SHORT_BOUND,
+    )
+    run_detached(spec, give_up_at=0.0)
+
+    wait_until(lambda: saw_marker.exists(), "the run to be signalled after the cut marker exists")
+
+
+def spec_cut(tmp_path: Path) -> Path:
+    """Where the cut marker of the first run `make_spec` builds lives."""
+    return tmp_path / "gate" / "request-1" / "1.cut"

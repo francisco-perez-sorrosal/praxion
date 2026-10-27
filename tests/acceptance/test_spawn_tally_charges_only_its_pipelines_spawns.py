@@ -100,6 +100,7 @@ def test_a_headless_slugless_spawn_is_listed_apart_with_the_reason_it_was_left_o
 
     tally = _tally(tmp_path, checkouts)
 
+    assert tally.report is not None, tally.describe()
     reasons = session_kind.left_out(tally.report)
     assert reasons.get("a-headless-probe", "").strip(), tally.describe()
 

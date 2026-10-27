@@ -27,8 +27,8 @@ message (skipped under `--no-context`): the slug that message states, or the sta
 `project` when it states none. (4) Otherwise it is unattributed, and counts toward no slug.
 A transcript is evidence only for as long as it exists; nothing is written back. A resume
 follows its spawn's owner. A slug is seen when some row's `project` names it or
-some agent's owner is it; a resume's message, an unattributed spawn or a left-out one never
-makes one seen. An agent left out is listed under the conditional `left_out` key with its
+some agent's owner is it; a resume's message, an unattributed spawn or a left-out one makes
+none seen through its owner. An agent left out is listed under the conditional `left_out` key with its
 reason, is never pending and is never charged.
 
 Each resume is classified against the resuming agent's own subagent transcript (globbed
@@ -72,7 +72,7 @@ import sys
 from collections import namedtuple
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _script_cli import configure_logging
@@ -130,7 +130,7 @@ class LeftOut:
     reason: str
 
 
-Owner = Owned | Unattributed | LeftOut
+Owner = Union[Owned, Unattributed, LeftOut]  # noqa: UP007 -- runtime value, 3.9 floor
 
 UNATTRIBUTED = Unattributed()
 
@@ -139,6 +139,15 @@ SessionKind = Literal["headless", "interactive", "unknown"]
 
 HEADLESS_LEFT_OUT = "spawned by a headless session without a task slug"
 STRAY_CHECKOUT_LEFT_OUT = "spawned without a task slug in another checkout bearing the root's name"
+
+
+@dataclass(frozen=True)
+class SpawnOrigin:
+    """Where and how a spawn was made, as its result row shows it; `checkout` is None when not shown."""
+
+    kind: SessionKind
+    checkout: Path | None
+    project: str
 
 
 @dataclass(frozen=True)
@@ -248,26 +257,25 @@ def _row_owner(first_start: dict | None, result: dict | None, root: Path | None)
         return _owned_by(first_start.get("project"))
     if result is None:
         return UNATTRIBUTED
-    if result.get("task_slug"):
-        return Owned(result["task_slug"])
-    return _slugless_owner(result, root)
+    stated = result.get("task_slug")
+    if stated and isinstance(stated, str):
+        return Owned(stated)
+    return slugless_owner(_spawn_origin(result), root)
 
 
 def _owned_by(name: object) -> Owner:
     return Owned(name) if name and isinstance(name, str) else UNATTRIBUTED
 
 
-def _slugless_owner(result: dict, root: Path | None) -> Owner:
-    """The owner of a spawn whose prompt stated no slug, from how and where it was spawned."""
-    if _session_kind(result.get("session_kind")) == "headless":
-        return LeftOut(HEADLESS_LEFT_OUT)
+def _spawn_origin(result: dict) -> SpawnOrigin:
+    """Parse a spawn-result row's session kind, checkout and project; anything unreadable is absent."""
     checkout = result.get("checkout")
-    if not checkout or not isinstance(checkout, str):
-        return _owned_by(result.get("project"))
-    checkout_path = Path(checkout)
-    if root is not None and checkout_path != root and checkout_path.name == root.name:
-        return LeftOut(STRAY_CHECKOUT_LEFT_OUT)
-    return _owned_by(checkout_path.name)
+    project = result.get("project")
+    return SpawnOrigin(
+        kind=_session_kind(result.get("session_kind")),
+        checkout=Path(checkout) if checkout and isinstance(checkout, str) else None,
+        project=project if isinstance(project, str) else "",
+    )
 
 
 def _session_kind(raw: object) -> SessionKind:
@@ -277,6 +285,21 @@ def _session_kind(raw: object) -> SessionKind:
     if raw == "interactive":
         return "interactive"
     return "unknown"
+
+
+def slugless_owner(origin: SpawnOrigin, root: Path | None) -> Owner:
+    """The owner of a spawn whose prompt stated no slug, from how and where it was spawned.
+
+    `root` is the resolved repository root the tally runs from; without it no checkout is
+    read as a stray.
+    """
+    if origin.kind == "headless":
+        return LeftOut(HEADLESS_LEFT_OUT)
+    if origin.checkout is None:
+        return _owned_by(origin.project)
+    if root is not None and origin.checkout != root and origin.checkout.name == root.name:
+        return LeftOut(STRAY_CHECKOUT_LEFT_OUT)
+    return _owned_by(origin.checkout.name)
 
 
 def seen_slugs(rows: list[dict], tallies: tuple[AgentTally, ...]) -> set[str]:

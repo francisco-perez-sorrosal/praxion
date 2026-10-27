@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 import spawn_count
-from spawn_count import UNATTRIBUTED, LeftOut, Owned
+from spawn_count import UNATTRIBUTED, LeftOut, Owned, SpawnOrigin, slugless_owner
 
 ROOT = Path("/work/pipeline-a")
 OTHER_ROOT_NAME = Path("/elsewhere/pipeline-a")
@@ -70,60 +70,70 @@ def test_a_stated_slug_owns_the_agent_from_any_session_kind_and_checkout(
     assert _owner_of(row) == Owned(SLUG_STATED)
 
 
-# -- A slug-less spawn from a headless session is left out -----------------------------------
+# -- The pure rule for a spawn whose prompt stated no slug -----------------------------------
 
 
-@pytest.mark.parametrize("checkout", [str(ROOT), str(SIBLING), None])
-def test_a_slugless_headless_spawn_is_left_out_wherever_it_ran(checkout: str | None) -> None:
-    owner = _owner_of(_result_row(session_kind="headless", checkout=checkout))
+def _origin(kind: spawn_count.SessionKind, checkout: Path | None = None) -> SpawnOrigin:
+    return SpawnOrigin(kind=kind, checkout=checkout, project=PROJECT)
+
+
+@pytest.mark.parametrize("checkout", [ROOT, SIBLING, None])
+def test_a_slugless_headless_spawn_is_left_out_wherever_it_ran(checkout: Path | None) -> None:
+    owner = slugless_owner(_origin("headless", checkout), ROOT)
 
     assert owner == LeftOut(spawn_count.HEADLESS_LEFT_OUT)
 
 
 def test_a_slugless_headless_spawn_is_left_out_even_without_a_root() -> None:
-    assert _owner_of(_result_row(session_kind="headless"), root=None) == LeftOut(
-        spawn_count.HEADLESS_LEFT_OUT
-    )
+    assert slugless_owner(_origin("headless"), None) == LeftOut(spawn_count.HEADLESS_LEFT_OUT)
 
 
-# -- A slug-less spawn from any other session belongs to its checkout ------------------------
+@pytest.mark.parametrize("kind", ["interactive", "unknown"])
+def test_a_slugless_spawn_belongs_to_the_checkout_it_ran_in(kind: spawn_count.SessionKind) -> None:
+    assert slugless_owner(_origin(kind, SIBLING), ROOT) == Owned("pipeline-b")
 
 
-@pytest.mark.parametrize("session_kind", ["interactive", "unknown", None])
-def test_a_slugless_spawn_belongs_to_the_checkout_it_ran_in(session_kind: str | None) -> None:
-    owner = _owner_of(_result_row(session_kind=session_kind, checkout=str(SIBLING)))
-
-    assert owner == Owned("pipeline-b")
-
-
-@pytest.mark.parametrize("session_kind", ["interactive", "unknown"])
-def test_a_slugless_spawn_in_the_root_itself_belongs_to_the_roots_name(session_kind: str) -> None:
-    owner = _owner_of(_result_row(session_kind=session_kind, checkout=str(ROOT)))
-
-    assert owner == Owned("pipeline-a")
-
-
-@pytest.mark.parametrize("session_kind", ["interactive", "unknown"])
-def test_a_slugless_spawn_in_another_checkout_bearing_the_roots_name_is_left_out(
-    session_kind: str,
+@pytest.mark.parametrize("kind", ["interactive", "unknown"])
+def test_a_slugless_spawn_in_the_root_itself_belongs_to_the_roots_name(
+    kind: spawn_count.SessionKind,
 ) -> None:
-    owner = _owner_of(_result_row(session_kind=session_kind, checkout=str(OTHER_ROOT_NAME)))
+    assert slugless_owner(_origin(kind, ROOT), ROOT) == Owned("pipeline-a")
+
+
+@pytest.mark.parametrize("kind", ["interactive", "unknown"])
+def test_a_slugless_spawn_in_another_checkout_bearing_the_roots_name_is_left_out(
+    kind: spawn_count.SessionKind,
+) -> None:
+    owner = slugless_owner(_origin(kind, OTHER_ROOT_NAME), ROOT)
 
     assert owner == LeftOut(spawn_count.STRAY_CHECKOUT_LEFT_OUT)
 
 
 def test_without_a_root_no_checkout_is_a_stray() -> None:
-    owner = _owner_of(_result_row(checkout=str(OTHER_ROOT_NAME)), root=None)
-
-    assert owner == Owned("pipeline-a")
+    assert slugless_owner(_origin("interactive", OTHER_ROOT_NAME), None) == Owned("pipeline-a")
 
 
-# -- A row that shows no checkout, or an unreadable kind, is attributed as it always was -----
+@pytest.mark.parametrize("kind", ["interactive", "unknown"])
+def test_a_slugless_spawn_with_no_checkout_belongs_to_its_project(
+    kind: spawn_count.SessionKind,
+) -> None:
+    assert slugless_owner(_origin(kind), ROOT) == Owned(PROJECT)
 
 
-@pytest.mark.parametrize("session_kind", ["interactive", "unknown", None, "surprise", 7])
-def test_a_slugless_spawn_with_no_checkout_belongs_to_its_project(session_kind: object) -> None:
-    assert _owner_of(_result_row(session_kind=session_kind)) == Owned(PROJECT)
+def test_a_slugless_spawn_with_no_checkout_and_no_project_is_unattributed() -> None:
+    origin = SpawnOrigin(kind="interactive", checkout=None, project="")
+
+    assert slugless_owner(origin, ROOT) == UNATTRIBUTED
+
+
+# -- The boundary reads the row into that rule's input --------------------------------------
+
+
+@pytest.mark.parametrize("session_kind", [None, "surprise", "Headless", 7])
+def test_an_unrecognised_session_kind_is_never_read_as_headless(session_kind: object) -> None:
+    owner = _owner_of(_result_row(session_kind=session_kind, checkout=str(SIBLING)))
+
+    assert owner == Owned("pipeline-b")
 
 
 @pytest.mark.parametrize("checkout", ["", 7, ["a"]])
@@ -131,17 +141,22 @@ def test_a_checkout_that_is_not_a_path_string_is_not_read(checkout: object) -> N
     assert _owner_of(_result_row(checkout=checkout)) == Owned(PROJECT)
 
 
-def test_an_unrecognised_session_kind_is_never_read_as_headless() -> None:
-    assert _owner_of(_result_row(session_kind="Headless", checkout=str(SIBLING))) == Owned(
-        "pipeline-b"
-    )
+@pytest.mark.parametrize("task_slug", [7, ["a"]])
+def test_a_stated_slug_that_is_not_a_string_is_not_read_as_one(task_slug: object) -> None:
+    assert _owner_of(_result_row(task_slug=task_slug)) == Owned(PROJECT)
 
 
-def test_rows_without_the_new_keys_are_attributed_the_same_with_or_without_a_root() -> None:
-    rows = [_start_row(), _result_row(task_slug=None)]
+# -- A row written before the new keys is attributed as it always was -------------------------
 
-    assert spawn_count.tally(rows, ROOT) == spawn_count.tally(rows)
-    assert spawn_count.tally(rows)[0].owner == Owned(PROJECT)
+
+def test_a_result_row_without_the_new_keys_belongs_to_its_project() -> None:
+    rows = [_start_row(), _result_row()]
+
+    assert [t.owner for t in spawn_count.tally(rows, ROOT)] == [Owned(PROJECT)]
+
+
+def test_a_start_row_alone_is_unattributed() -> None:
+    assert [t.owner for t in spawn_count.tally([_start_row()], ROOT)] == [UNATTRIBUTED]
 
 
 def test_a_legacy_start_outranks_every_new_key() -> None:
@@ -154,14 +169,18 @@ def test_a_legacy_start_outranks_every_new_key() -> None:
 # -- What the rest of the tally does with a left-out agent -----------------------------------
 
 
+def _left_out_rows() -> list[dict]:
+    return [_start_row(), _result_row(session_kind="headless")]
+
+
 def _left_out_tally() -> tuple[spawn_count.AgentTally, ...]:
-    return spawn_count.tally([_start_row(), _result_row(session_kind="headless")], ROOT)
+    return spawn_count.tally(_left_out_rows(), ROOT)
 
 
-def test_a_left_out_agent_makes_no_slug_seen() -> None:
-    rows = [{"project": "elsewhere"}]
+def test_a_left_out_agent_makes_no_slug_seen_through_its_owner() -> None:
+    seen = spawn_count.seen_slugs(_left_out_rows(), _left_out_tally())
 
-    assert spawn_count.seen_slugs(rows, _left_out_tally()) == {"elsewhere"}
+    assert seen == {PROJECT}
 
 
 def test_a_left_out_agent_is_not_attributed_from_its_transcript(tmp_path: Path) -> None:
@@ -181,7 +200,16 @@ def test_an_unattributed_agent_stays_unattributed_without_a_transcript(tmp_path:
 
 def _envelope(left_out: tuple[spawn_count.AgentTally, ...]) -> dict:
     result = spawn_count.verdict((), budget=1, threshold=1)
-    return spawn_count._build_envelope("slug", [], ROOT, 0, (), result, 1, (), None, left_out)
+    return spawn_count._build_envelope(
+        slug="slug",
+        sources=[],
+        repo_root=ROOT,
+        rows_skipped=0,
+        tallies=(),
+        result=result,
+        threshold=1,
+        left_out=left_out,
+    )
 
 
 def test_the_envelope_has_no_left_out_key_when_nothing_was_left_out() -> None:

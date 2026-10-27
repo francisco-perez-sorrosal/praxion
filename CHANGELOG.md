@@ -1,3 +1,16 @@
+## v0.54.0 (2026-10-27)
+
+### Feat
+
+- Select the root tests that drive a pocket
+
+### Fix
+
+- Record a spawn's checkout from the log it lands in
+- Signal the gate run's group in a form dash accepts
+- Hold the selection audit to the root suite's bound
+- Install the Bash sandbox before the sentinel
+
 ## v0.53.0 (2026-10-23)
 
 ### Feat

@@ -22,7 +22,7 @@ PROJECT = "row-project"
 
 
 def _result_row(
-    *, task_slug: str | None = None, session_kind: object = None, checkout: object = None
+    *, task_slug: object = None, session_kind: object = None, checkout: object = None
 ) -> dict:
     row = {
         "timestamp": "2026-10-20T09:00:02+00:00",

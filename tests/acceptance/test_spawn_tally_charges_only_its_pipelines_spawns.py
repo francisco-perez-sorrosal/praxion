@@ -84,7 +84,9 @@ def test_a_headless_slugless_spawn_is_not_pending_as_unattributed(
 
     tally = _tally(tmp_path, checkouts)
 
-    unattributed = [agent["agent_id"] for agent in tally.report["unattributed"]]
+    assert tally.report is not None, tally.describe()
+    # The key is present only when something is unattributed; absent reads as none.
+    unattributed = [agent["agent_id"] for agent in tally.report.get("unattributed", [])]
     assert "a-headless-probe" not in unattributed, tally.describe()
 
 
@@ -128,7 +130,7 @@ def test_a_spawn_stating_the_slug_is_charged_from_any_checkout_and_session_kind(
     assert tally.agent_ids() == ["a-stated"], tally.describe()
 
 
-@pytest.mark.parametrize("kind", ["headless", "interactive", "unknown"])
+@pytest.mark.parametrize("kind", ["headless", "interactive"])
 def test_a_slugless_spawn_in_another_checkout_bearing_the_slugs_name_is_never_charged(
     tmp_path: Path, checkouts: dict[str, Path], kind: str
 ) -> None:
@@ -150,6 +152,17 @@ def test_from_a_checkout_not_named_after_the_slug_every_checkout_named_after_it_
     tally = spawn_count(checkouts["main"], SLUG, scratch=tmp_path / "tally", budget=99)
 
     assert tally.agent_ids() == ["a-elsewhere", "a-in-pipeline"], tally.describe()
+
+
+def test_a_slugless_spawn_of_unknown_kind_in_another_checkout_keeps_todays_attribution(
+    tmp_path: Path, checkouts: dict[str, Path]
+) -> None:
+    _session(tmp_path, "unknown", checkouts["other"]).spawn_foreground(SLUGLESS, "a-elsewhere")
+    _session(tmp_path, "unknown", checkouts["pipeline"]).spawn_foreground(STATED, "a-step")
+
+    tally = _tally(tmp_path, checkouts)
+
+    assert tally.agent_ids() == ["a-elsewhere", "a-step"], tally.describe()
 
 
 # -- An unattributable spawn still withholds the verdict ---------------------------------------

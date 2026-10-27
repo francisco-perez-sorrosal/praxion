@@ -6,7 +6,8 @@ kill-switch flag consumed by the capture/telemetry hooks (``capture_observations
 ``notify_bg_session_state``).
 
 Also provides ``stated_task_slug`` -- the one reading of the ``Task slug:``
-marker an orchestrator writes into a spawn prompt -- and
+marker an orchestrator writes into a spawn prompt --, ``session_origin`` -- the
+one reading of where a session runs and how it was started -- and
 ``record_gate_fire`` -- a thin forwarding wrapper for
 commit-gate scripts recording their own pass/warn/block verdict. The row
 shape, mode gating, and the append/rotate/lock machinery now live in
@@ -18,7 +19,9 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 # -- Per-project opt-out flag --------------------------------------------------
 # Read from Claude Code's per-project settings.json `env` block. Set to "1",
@@ -63,6 +66,36 @@ def stated_task_slug(text: object) -> str | None:
         return None
     match = _TASK_SLUG_RE.search(text)
     return match.group(1) if match else None
+
+
+# How a session was started, from the entrypoint Claude Code exports. The map is
+# closed: an entrypoint nobody has classified is left unclassified rather than
+# guessed, because a reader treats "headless" as proof and "no kind" as doubt.
+ENTRYPOINT_ENV = "CLAUDE_CODE_ENTRYPOINT"
+SESSION_KIND_BY_ENTRYPOINT = MappingProxyType(
+    {
+        "sdk-cli": "headless",
+        "sdk-py": "headless",
+        "sdk-ts": "headless",
+        "cli": "interactive",
+        "claude-vscode": "interactive",
+        "claude-desktop": "interactive",
+    }
+)
+
+
+def session_origin(environ: Mapping[str, str], checkout: str) -> dict[str, str]:
+    """What ``environ`` shows of a session: its ``session_kind``, with the ``checkout`` it ran in.
+
+    ``checkout`` is handed in, resolved by the caller from the same location that
+    decides where the row is logged -- never read from the environment, which
+    names the directory a session was started in, not the checkout around it.
+    The two keys travel together: an entrypoint outside ``SESSION_KIND_BY_ENTRYPOINT``
+    (or an unset one) shows no kind, and a reader treats a checkout without a kind
+    as no evidence at all, so neither is recorded. Pure and total over its input.
+    """
+    kind = SESSION_KIND_BY_ENTRYPOINT.get(environ.get(ENTRYPOINT_ENV, ""))
+    return {"session_kind": kind, "checkout": checkout} if kind else {}
 
 
 def record_gate_fire(

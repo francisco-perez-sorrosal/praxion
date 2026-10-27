@@ -7,6 +7,7 @@ file, and it does so under ``tmp_path``.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -261,15 +262,33 @@ def test_a_log_cut_mid_line_still_yields_the_ids_it_completed():
 @pytest.mark.parametrize(
     ("argv", "asked"),
     [
-        (("uv", "run", "pytest", "a.py"), ("uv", "run", "pytest", "-v", "-rfE", "a.py")),
-        (("python", "-m", "pytest", "-n", "0", "a.py"), ("python", "-m", "pytest", "-v", "-rfE", "-n", "0", "a.py")),
-        (("uv", "run", "pytest"), ("uv", "run", "pytest", "-v", "-rfE")),
+        (("uv", "run", "pytest", "a.py"), ("uv", "run", "pytest", "--verbosity=1", "-rfE", "a.py")),
+        (("python", "-m", "pytest", "-n", "0", "a.py"), ("python", "-m", "pytest", "--verbosity=1", "-rfE", "-n", "0", "a.py")),
+        (("uv", "run", "pytest"), ("uv", "run", "pytest", "--verbosity=1", "-rfE")),
     ],
 )  # fmt: skip
 def test_a_pytest_invocation_is_asked_for_each_outcome_and_the_failures_and_errors_it_names(
     argv, asked
 ):
     assert with_outcome_reports(argv) == asked
+
+
+@pytest.mark.parametrize("quiet_option", ["-q", "-qq"])
+def test_a_quiet_pocket_still_prints_each_outcome_and_names_its_failure(tmp_path, quiet_option):
+    (tmp_path / "pyproject.toml").write_text(
+        f'[tool.pytest.ini_options]\naddopts = "{quiet_option}"\n', encoding="utf-8"
+    )
+    (tmp_path / "test_pocket.py").write_text(
+        "def test_passes():\n    pass\n\n\ndef test_fails():\n    assert 1 == 2\n",
+        encoding="utf-8",
+    )
+    argv = with_outcome_reports((sys.executable, "-m", "pytest", "-p", "no:cacheprovider"))
+
+    ran = subprocess.run(argv, cwd=tmp_path, capture_output=True, text=True, check=False)
+
+    assert "test_pocket.py::test_passes PASSED" in ran.stdout
+    assert failed_node_ids(ran.stdout) == ("test_pocket.py::test_fails",)
+    assert files_with_outcomes(ran.stdout) == 1
 
 
 @pytest.mark.parametrize(
@@ -287,7 +306,7 @@ def test_only_the_runner_word_is_taken_for_pytest_not_a_path_that_contains_it():
         "uv",
         "run",
         "pytest",
-        "-v",
+        "--verbosity=1",
         "-rfE",
         "tests/pytest/test_a.py",
     )

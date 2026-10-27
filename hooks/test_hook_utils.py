@@ -251,3 +251,44 @@ def test_record_gate_fire_writes_nothing_when_mode_is_off(tmp_path, monkeypatch)
     hu.record_gate_fire("check_token_ratchet", "block", "listing over ceiling")
 
     assert not (tmp_path / ".ai-state" / "observations.jsonl").exists()
+
+
+# -- session_origin: the one reading of how a session was started --------------
+
+CHECKOUT = "/work/some-pipeline"
+
+
+@pytest.mark.parametrize(
+    ("entrypoint", "kind"),
+    [
+        ("sdk-cli", "headless"),
+        ("sdk-py", "headless"),
+        ("sdk-ts", "headless"),
+        ("cli", "interactive"),
+        ("claude-vscode", "interactive"),
+        ("claude-desktop", "interactive"),
+    ],
+)
+def test_session_origin_names_the_kind_of_each_classified_entrypoint_with_the_checkout(
+    entrypoint, kind
+):
+    origin = _import_hook_utils().session_origin({"CLAUDE_CODE_ENTRYPOINT": entrypoint}, CHECKOUT)
+
+    assert origin == {"session_kind": kind, "checkout": CHECKOUT}
+
+
+@pytest.mark.parametrize("entrypoint", ["", "mcp", "remote", "SDK-CLI", " cli", "sdk-cli "])
+def test_session_origin_shows_nothing_for_an_unclassified_entrypoint(entrypoint):
+    environ = {"CLAUDE_CODE_ENTRYPOINT": entrypoint}
+
+    assert _import_hook_utils().session_origin(environ, CHECKOUT) == {}
+
+
+def test_session_origin_is_empty_when_the_session_shows_nothing():
+    assert _import_hook_utils().session_origin({}, CHECKOUT) == {}
+
+
+def test_session_origin_never_reads_the_directory_the_session_was_started_in():
+    environ = {"CLAUDE_CODE_ENTRYPOINT": "cli", "CLAUDE_PROJECT_DIR": "/work/some-pipeline/sub"}
+
+    assert _import_hook_utils().session_origin(environ, CHECKOUT)["checkout"] == CHECKOUT

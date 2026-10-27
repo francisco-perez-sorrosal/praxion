@@ -24,6 +24,7 @@ affected_files:
   - skills/step-loop/SKILL.md
 affected_reqs: [REQ-04, REQ-05, REQ-06, REQ-07, REQ-08]
 supersedes_in_part: [dec-386]
+superseded_in_part_by: [dec-draft-2801fd08]
 ---
 
 # The step-loop gate runs each pocket detached under the pocket's own declared bound, keeps a cut-off run's evidence and feeds it to the next attempt

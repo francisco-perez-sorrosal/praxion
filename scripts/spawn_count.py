@@ -17,13 +17,19 @@ Other `agent_stop`/`tool_use` rows never contribute.
 Attribution: each agent counts toward exactly one slug, its owner, decided by the first
 rule that applies. (1) Its first `agent_start` lacks `slug_attribution` (a row written
 before spawns were attributed by prompt): the row's `project`. (2) A spawn-result row
-names it: that row's `task_slug` (the slug the spawn's prompt stated), or its `project`
-when the prompt stated none. (3) At read time, its own transcript's first user message
-(skipped under `--no-context`): the slug that message states, or the start row's `project`
-when it states none. (4) Otherwise it is unattributed, and counts toward no slug. A
-transcript is evidence only for as long as it exists; nothing is written back. A resume
+names it: that row's `task_slug` (the slug the spawn's prompt stated) whichever checkout or
+session kind spawned it; when the prompt stated none, by the spawning session's kind -- a
+`headless` session's agent is left out of every slug; any other session's agent belongs to
+the checkout it ran in (the row's `checkout`, else its `project`), except that a checkout
+other than the root bearing the root's own name is left out too, so a stray directory named
+after the pipeline never charges it. (3) At read time, its own transcript's first user
+message (skipped under `--no-context`): the slug that message states, or the start row's
+`project` when it states none. (4) Otherwise it is unattributed, and counts toward no slug.
+A transcript is evidence only for as long as it exists; nothing is written back. A resume
 follows its spawn's owner. A slug is seen when some row's `project` names it or
-some agent's owner is it; a resume's message or an unattributed spawn never makes one seen.
+some agent's owner is it; a resume's message, an unattributed spawn or a left-out one makes
+none seen through its owner. An agent left out is listed under the conditional `left_out` key with its
+reason, is never pending and is never charged.
 
 Each resume is classified against the resuming agent's own subagent transcript (globbed
 on the session UUID, since this CLI is never handed the hashed project-dir name Claude
@@ -66,6 +72,7 @@ import sys
 from collections import namedtuple
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Literal, Union
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _script_cli import configure_logging
@@ -105,18 +112,56 @@ class Resume:
 
 
 @dataclass(frozen=True)
+class Owned:
+    """The agent counts toward this slug."""
+
+    slug: str
+
+
+@dataclass(frozen=True)
+class Unattributed:
+    """No rule has attributed the agent yet: pending for every slug."""
+
+
+@dataclass(frozen=True)
+class LeftOut:
+    """The agent belongs to no slug and is not pending; `reason` says why."""
+
+    reason: str
+
+
+Owner = Union[Owned, Unattributed, LeftOut]  # noqa: UP007 -- runtime value, 3.9 floor
+
+UNATTRIBUTED = Unattributed()
+
+# How the spawning session was started; the log's raw string is parsed once, at the boundary.
+SessionKind = Literal["headless", "interactive", "unknown"]
+
+HEADLESS_LEFT_OUT = "spawned by a headless session without a task slug"
+STRAY_CHECKOUT_LEFT_OUT = "spawned without a task slug in another checkout bearing the root's name"
+
+
+@dataclass(frozen=True)
+class SpawnOrigin:
+    """Where and how a spawn was made, as its result row shows it; `checkout` is None when not shown."""
+
+    kind: SessionKind
+    checkout: Path | None
+    project: str
+
+
+@dataclass(frozen=True)
 class AgentTally:
     """One agent_id's spawn plus every later resume, in WAL order.
 
-    `owner` is the slug the agent counts toward; `None` means unattributed and has no
-    other meaning. `session_id` and `project` come from the spawn's first record.
+    `session_id` and `project` come from the spawn's first record.
     """
 
     agent_id: str
     agent_type: str
     spawned_at: str
     resumes: tuple[Resume, ...]
-    owner: str | None = None
+    owner: Owner = UNATTRIBUTED
     session_id: str = ""
     project: str = ""
 
@@ -151,13 +196,14 @@ def distinct_in_time_order(rows: list[dict]) -> list[dict]:
     return sorted(distinct, key=reader.row_time)
 
 
-def tally(rows: list[dict]) -> tuple[AgentTally, ...]:
+def tally(rows: list[dict], root: Path | None = None) -> tuple[AgentTally, ...]:
     """Group the rows naming a spawned agent by `agent_id`, in order of first record.
 
     The first `agent_start` is the spawn and every later one a resume; a spawn-result
     `tool_use` row also witnesses the spawn, so an agent whose start was never delivered
     still counts once. Ignores every other row. Deliberately does not filter by slug --
-    scoping to the owner is the I/O shell's job, upstream.
+    scoping to the owner is the I/O shell's job, upstream. `root` is the resolved
+    repository root the tally runs from; without it no checkout is read as a stray.
     """
     order: dict[str, None] = {}
     starts: dict[str, list[dict]] = {}
@@ -178,12 +224,14 @@ def tally(rows: list[dict]) -> tuple[AgentTally, ...]:
                 results.setdefault(agent_id, row)
 
     return tuple(
-        _agent_tally(agent_id, starts.get(agent_id, []), results.get(agent_id))
+        _agent_tally(agent_id, starts.get(agent_id, []), results.get(agent_id), root)
         for agent_id in order
     )
 
 
-def _agent_tally(agent_id: str, starts: list[dict], result: dict | None) -> AgentTally:
+def _agent_tally(
+    agent_id: str, starts: list[dict], result: dict | None, root: Path | None
+) -> AgentTally:
     spawn_row = starts[0] if starts else (result or {})
     return AgentTally(
         agent_id=agent_id,
@@ -197,25 +245,67 @@ def _agent_tally(agent_id: str, starts: list[dict], result: dict | None) -> Agen
             )
             for row in starts[1:]
         ),
-        owner=_row_owner(starts[0] if starts else None, result),
+        owner=_row_owner(starts[0] if starts else None, result, root),
         session_id=str(spawn_row.get("session_id") or ""),
         project=str(spawn_row.get("project") or ""),
     )
 
 
-def _row_owner(first_start: dict | None, result: dict | None) -> str | None:
-    """The slug the logged rows attribute an agent to, or `None` when they do not."""
+def _row_owner(first_start: dict | None, result: dict | None, root: Path | None) -> Owner:
+    """The owner the logged rows give an agent: `UNATTRIBUTED` when they give none."""
     if first_start is not None and not first_start.get("slug_attribution"):
-        return first_start.get("project") or None
-    if result is not None:
-        return result.get("task_slug") or result.get("project") or None
-    return None
+        return _owned_by(first_start.get("project"))
+    if result is None:
+        return UNATTRIBUTED
+    stated = result.get("task_slug")
+    if stated and isinstance(stated, str):
+        return Owned(stated)
+    return slugless_owner(_spawn_origin(result), root)
+
+
+def _owned_by(name: object) -> Owner:
+    return Owned(name) if name and isinstance(name, str) else UNATTRIBUTED
+
+
+def _spawn_origin(result: dict) -> SpawnOrigin:
+    """Parse a spawn-result row's session kind, checkout and project; anything unreadable is absent."""
+    checkout = result.get("checkout")
+    project = result.get("project")
+    return SpawnOrigin(
+        kind=_session_kind(result.get("session_kind")),
+        checkout=Path(checkout) if checkout and isinstance(checkout, str) else None,
+        project=project if isinstance(project, str) else "",
+    )
+
+
+def _session_kind(raw: object) -> SessionKind:
+    """A row's `session_kind`; anything but the two known kinds reads as `unknown`."""
+    if raw == "headless":
+        return "headless"
+    if raw == "interactive":
+        return "interactive"
+    return "unknown"
+
+
+def slugless_owner(origin: SpawnOrigin, root: Path | None) -> Owner:
+    """The owner of a spawn whose prompt stated no slug, from how and where it was spawned.
+
+    `root` is the resolved repository root the tally runs from; without it no checkout is
+    read as a stray.
+    """
+    if origin.kind == "headless":
+        return LeftOut(HEADLESS_LEFT_OUT)
+    if origin.checkout is None:
+        return _owned_by(origin.project)
+    if root is not None and origin.checkout != root and origin.checkout.name == root.name:
+        return LeftOut(STRAY_CHECKOUT_LEFT_OUT)
+    return _owned_by(origin.checkout.name)
 
 
 def seen_slugs(rows: list[dict], tallies: tuple[AgentTally, ...]) -> set[str]:
     """Every slug the log can speak for: any row's `project`, plus every agent's owner."""
     projects = {row["project"] for row in rows if isinstance(row, dict) and row.get("project")}
-    return projects | {t.owner for t in tallies if t.owner is not None}
+    return projects | {t.owner.slug for t in tallies if isinstance(t.owner, Owned)}
 
 
 def classify_resume(context_tokens: int | None, threshold: int) -> str:
@@ -447,7 +537,7 @@ def resolve_owner(agent_tally: AgentTally, projects_dir: Path) -> AgentTally:
     The owner is the slug the transcript's first user message states, else the spawn's
     `project`. No readable prompt leaves the agent unattributed.
     """
-    if agent_tally.owner is not None:
+    if agent_tally.owner != UNATTRIBUTED:
         return agent_tally
     transcript = _find_agent_transcript(projects_dir, agent_tally.session_id, agent_tally.agent_id)
     if transcript is None:
@@ -455,8 +545,7 @@ def resolve_owner(agent_tally: AgentTally, projects_dir: Path) -> AgentTally:
     prompt = _first_user_text(transcript)
     if prompt is None:
         return agent_tally
-    owner = stated_task_slug(prompt) or agent_tally.project or None
-    return replace(agent_tally, owner=owner)
+    return replace(agent_tally, owner=_owned_by(stated_task_slug(prompt) or agent_tally.project))
 
 
 def _ledger_requests(repo_root: Path, slug: str) -> dict[str, str]:
@@ -487,6 +576,7 @@ def _build_envelope(
     threshold: int,
     unattributed: tuple[AgentTally, ...] = (),
     iterations: dict[str, str] | None = None,
+    left_out: tuple[AgentTally, ...] = (),
 ) -> dict:
     by_agent_type: dict[str, int] = {}
     agents: list[dict] = []
@@ -535,6 +625,12 @@ def _build_envelope(
             }
             for t in unattributed
         ]
+    if left_out:  # likewise, so a log with no left-out agent reports what it always did
+        envelope["left_out"] = [
+            {"agent_id": t.agent_id, "agent_type": t.agent_type, "reason": t.owner.reason}
+            for t in left_out
+            if isinstance(t.owner, LeftOut)
+        ]
     if iterations:  # likewise, so a task with no loop agent reports what it always did
         envelope["iterations"] = [
             {
@@ -559,6 +655,8 @@ def _format_human(envelope: dict) -> str:
     ]
     if "unattributed" in envelope:
         lines.append(f"  unattributed={len(envelope['unattributed'])}")
+    if "left_out" in envelope:
+        lines.append(f"  left_out={len(envelope['left_out'])}")
     if "iterations" in envelope:
         lines.append(f"  iterations={len(envelope['iterations'])}")
     return "\n".join(lines)
@@ -619,7 +717,7 @@ def _run(args: argparse.Namespace) -> int:
     if not sources:
         _fail("wal-absent", f"no observation log found under {repo_root} (checked .ai-state/).")
         return 2
-    all_tallies = tally(all_rows)
+    all_tallies = tally(all_rows, repo_root.resolve())
     projects_dir = _projects_dir(args)
     if projects_dir is not None:
         all_tallies = tuple(resolve_owner(t, projects_dir) for t in all_tallies)
@@ -628,8 +726,9 @@ def _run(args: argparse.Namespace) -> int:
         _fail("slug-unseen", _unseen_message(args.slug, seen))
         return 2
 
-    tallies = tuple(t for t in all_tallies if t.owner == args.slug)
-    unattributed = tuple(t for t in all_tallies if t.owner is None)
+    tallies = tuple(t for t in all_tallies if t.owner == Owned(args.slug))
+    unattributed = tuple(t for t in all_tallies if t.owner == UNATTRIBUTED)
+    left_out = tuple(t for t in all_tallies if isinstance(t.owner, LeftOut))
     if projects_dir is not None:
         tallies = tuple(resolve_resume_context(t, projects_dir) for t in tallies)
     # Each unattributed spawn, and each resume of one, could still be charged to this slug.
@@ -647,6 +746,7 @@ def _run(args: argparse.Namespace) -> int:
         args.heavy_context,
         unattributed,
         in_loop,
+        left_out,
     )
     print(json.dumps(envelope, indent=2) if args.json else _format_human(envelope))
     return 1 if result.label == "over" else 0

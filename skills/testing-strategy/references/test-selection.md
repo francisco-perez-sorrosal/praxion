@@ -4,9 +4,9 @@ The procedural contract behind Principle 4 ("selection is derived from the code,
 
 This file replaces the hand-kept test-topology protocol. There is no `.ai-state/TEST_TOPOLOGY.md` to author or refresh: the resolver derives a test selection directly from the change set, on every invocation, and widens to the full suite whenever it cannot prove a change is covered.
 
-## The Four Edge Sources
+## The Five Edge Sources
 
-The resolver builds one dependency graph per pocket from four sources, then unions all four (not first-match — every source contributes; the order below governs only which source a test's `via` attribution names when more than one connects it):
+The resolver builds one dependency graph per pocket from five sources, then unions all five (not first-match — every source contributes; the order below governs only which source a test's `via` attribution names when more than one connects it):
 
 1. **Layout.** `dir/test_foo.py` / `dir/foo_test.py` depend on `dir/foo.py`. Mirrored layout matches by basename with the longest common directory suffix; ties select all matches. A layout pairing connects only within one pocket. A `conftest.py` (or equivalent) is depended on by every test under its directory.
 2. **Import.** Static imports (`ast.Import`/`ast.ImportFrom`, relative imports, `importlib.import_module("<literal>")` for Python). Resolution tries, in order: a sibling file; the dotted path from the pocket root and any configured import root; a flat stem match across the pocket (ambiguous stems connect to all matches). A single-segment stem connects only within the importing file's pocket; it falls back across pockets only for a stem that exactly one file in the repository bears.
@@ -21,8 +21,9 @@ The resolver builds one dependency graph per pocket from four sources, then unio
 
    **Data files narrow, code widens.** A changed file reached only by a basename pattern always selects the test modules that hold it, but it counts as accounted for (no `unmapped-path`) only when it is a data file. A source file of any pocket ecosystem — Python `.py`; JavaScript and TypeScript `.js .jsx .mjs .cjs .ts .tsx .mts .cts .vue .svelte`; Rust `.rs`; Go `.go`; JVM `.java .kt` — reached only by a pattern still widens, and its readers run within that full run: a pattern is a guess about what a module reads, never a substitute for the import and layout tracing that code relies on.
 4. **Declared.** Non-code dependencies the first three sources cannot see — see [The Declared List](#the-declared-list-testsdeclared-depstoml) below.
+5. **Pocket-drive.** A module outside pocket P that holds, among its string constants, `--project` and P's root-relative path (`eval`) starts P in a child process (`uv run --project eval …`), so it depends on every file of P without importing one. A changed path inside P selects every test that is such a driver, or reaches one through the import closure, `because` the changed path. Only the first hop out of the changed path takes this edge, so a pocket file met further along does not select the drivers. It is derived on every call, like the other four: no state, no listing to keep. A module holding only one of the two constants is no driver, and a project with no driver gets the answer it had before. A pocket's configuration or lockfile change still widens that pocket; the drivers are selected in addition.
 
-A changed test file always selects itself (`via: self`). Selection is reverse reachability: which test files reach a changed path through any of the four edges.
+A changed test file always selects itself (`via: self`). Selection is reverse reachability: which test files reach a changed path through any of the five edges.
 
 **State data stops after one hop.** A changed file under `.ai-state/` that is not source code selects only the tests one hop away: those holding its path or a matching pattern, and those declared for it. Nothing propagates from a production module that names it. Such a module reads the project's live state at run time, while the tests that import it build their own state under a temp directory, so the live file cannot change their outcome. Before this rule, one ledger schema imported by a `conftest.py` selected about 175 tests for every state commit. A state file no test reaches directly widens as `unmapped-path`. A test that does read live state must hold its path or be declared, and the weekly selection audit reports one that does neither.
 
@@ -70,11 +71,11 @@ If the file is absent, the resolver reads it as an empty list — no entries req
 
 ## Ecosystem Dispatch
 
-Python is derived (the four edges above, read with stdlib `ast`). Every other ecosystem is dispatched to its own native tool — Praxion derives only where no native tool exists:
+Python is derived (the five edges above, read with stdlib `ast`). Every other ecosystem is dispatched to its own native tool — Praxion derives only where no native tool exists:
 
 | Ecosystem | Tool | Invocation |
 |---|---|---|
-| Python | (derived) | The four-edge graph above |
+| Python | (derived) | The five-edge graph above |
 | TypeScript/JS (vitest) | vitest | `related` |
 | TypeScript/JS (jest) | jest | `--findRelatedTests` |
 | Rust | cargo | changed crates plus dependents (`cargo metadata`) |
@@ -102,7 +103,7 @@ Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--
     "root": ".", "ecosystem": "python | typescript | rust | go | jvm | monorepo",
     "adapter": "python-derived | vitest | jest | cargo | go | maven | gradle | nx | turbo | pants | none",
     "selection": "tests | native | full | nothing",
-    "tests": [{"path": "scripts/test_foo.py", "via": "self | layout | import | path-literal | declared", "because": "scripts/foo.py"}],
+    "tests": [{"path": "scripts/test_foo.py", "via": "self | layout | import | path-literal | declared | pocket-drive", "because": "scripts/foo.py"}],
     "invocations": [{"cwd": ".", "argv": ["uv", "run", "pytest", "-n", "0", "scripts/test_foo.py"]}]
   }]
 }

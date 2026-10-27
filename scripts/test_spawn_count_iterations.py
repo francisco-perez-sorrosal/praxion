@@ -220,9 +220,11 @@ def test_a_heavy_resume_of_a_loop_agent_is_still_charged() -> None:
         agent_type=_IMPLEMENTER,
         spawned_at="",
         resumes=(spawn_count.Resume(at="", context_tokens=300_000),),
-        owner=_SLUG,
+        owner=spawn_count.Owned(_SLUG),
     )
-    other = spawn_count.AgentTally("agent-planner", _PLANNER, "", (), owner=_SLUG)
+    other = spawn_count.AgentTally(
+        "agent-planner", _PLANNER, "", (), owner=spawn_count.Owned(_SLUG)
+    )
 
     result = spawn_count.verdict(
         (other, loop_agent), budget=3, threshold=250_000, iterations=frozenset({"agent-driven"})

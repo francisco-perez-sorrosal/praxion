@@ -757,10 +757,17 @@ def _result(
     }
 
 
+def _slug_of(owner) -> str | None:
+    """The slug an owner counts toward; `None` for every owner that counts toward none."""
+    import spawn_count
+
+    return owner.slug if isinstance(owner, spawn_count.Owned) else None
+
+
 def _owners(rows: list[dict]) -> dict[str, str | None]:
     import spawn_count
 
-    return {t.agent_id: t.owner for t in spawn_count.tally(rows)}
+    return {t.agent_id: _slug_of(t.owner) for t in spawn_count.tally(rows)}
 
 
 def test_a_row_written_before_slug_attribution_counts_toward_its_project() -> None:
@@ -800,7 +807,7 @@ def test_a_result_row_alone_makes_a_spawn_dated_and_typed_by_that_row() -> None:
 
     (only,) = spawn_count.tally([_result("a1", "stated-slug", at=_T1)])
 
-    assert (only.agent_id, only.owner, only.spawned_at, only.agent_type) == (
+    assert (only.agent_id, _slug_of(only.owner), only.spawned_at, only.agent_type) == (
         "a1",
         "stated-slug",
         _T1,
@@ -922,7 +929,7 @@ def _one_spawn_with_an_unsized_resume():
             agent_type="praxion:implementer",
             spawned_at="t0",
             resumes=(spawn_count.Resume(at="t1", context_tokens=None),),
-            owner="slug",
+            owner=spawn_count.Owned("slug"),
         ),
     )
 
@@ -1129,7 +1136,7 @@ def test_a_row_missing_its_fields_reads_as_blank_ones() -> None:
 
     for agent in (bare, bare_result):
         assert (agent.agent_type, agent.spawned_at, agent.session_id, agent.project) == ("",) * 4
-        assert agent.owner is None
+        assert agent.owner == spawn_count.UNATTRIBUTED
 
 
 def test_a_resume_keeps_its_time_and_its_session() -> None:
@@ -1153,7 +1160,7 @@ def test_the_verdict_counts_light_and_heavy_resumes_apart() -> None:
     resumes = tuple(
         spawn_count.Resume(at="t", context_tokens=tokens) for tokens in (10, 20, 300_000, None)
     )
-    agent = spawn_count.AgentTally("a1", "t", "t0", resumes, owner="slug")
+    agent = spawn_count.AgentTally("a1", "t", "t0", resumes, owner=spawn_count.Owned("slug"))
 
     result = spawn_count.verdict((agent,), budget=9, threshold=250_000)
 
@@ -1171,7 +1178,11 @@ def test_a_heavy_resume_is_found_by_the_given_threshold() -> None:
     import spawn_count
 
     agent = spawn_count.AgentTally(
-        "a1", "t", "t0", (spawn_count.Resume(at="t", context_tokens=500),), owner="slug"
+        "a1",
+        "t",
+        "t0",
+        (spawn_count.Resume(at="t", context_tokens=500),),
+        owner=spawn_count.Owned("slug"),
     )
 
     assert spawn_count.verdict((agent,), None, threshold=500).resumes_heavy == 1
@@ -1410,14 +1421,14 @@ def _unattributed(agent_id: str = "a1", project: str = _CHECKOUT):
     import spawn_count
 
     (agent,) = spawn_count.tally([_start(agent_id, project=project)])
-    assert agent.owner is None
+    assert agent.owner == spawn_count.UNATTRIBUTED
     return agent
 
 
 def _owner_read_from(projects_dir: Path, agent) -> str | None:
     import spawn_count
 
-    return spawn_count.resolve_owner(agent, projects_dir).owner
+    return _slug_of(spawn_count.resolve_owner(agent, projects_dir).owner)
 
 
 def test_the_slug_a_transcripts_first_message_states_attributes_its_agent(tmp_path: Path) -> None:
@@ -1545,7 +1556,7 @@ def test_an_agent_with_no_session_is_never_looked_up(tmp_path: Path) -> None:
     _write_agent_transcript(tmp_path, "a1", [_user_line("Task slug: wrong-slug")], session_id="")
     (agent,) = spawn_count.tally([_start("a1") | {"session_id": None}])
 
-    assert spawn_count.resolve_owner(agent, tmp_path).owner is None
+    assert spawn_count.resolve_owner(agent, tmp_path).owner == spawn_count.UNATTRIBUTED
 
 
 def test_an_agent_the_rows_attribute_is_never_read_from_a_transcript(tmp_path: Path) -> None:
@@ -1567,7 +1578,7 @@ def test_a_resolved_agent_keeps_everything_but_its_owner(tmp_path: Path) -> None
 
     resolved = spawn_count.resolve_owner(agent, tmp_path)
 
-    assert dataclasses.replace(resolved, owner=None) == agent
+    assert dataclasses.replace(resolved, owner=spawn_count.UNATTRIBUTED) == agent
 
 
 def test_a_workflow_runs_resume_is_sized_from_its_run_directory(tmp_path: Path) -> None:
@@ -1778,7 +1789,7 @@ def test_every_resume_is_sized_up_to_its_own_time(tmp_path: Path) -> None:
         spawn_count.Resume(at=_T1, context_tokens=None, session_id="sess-1"),
         spawn_count.Resume(at=_T2, context_tokens=None, session_id="sess-1"),
     )
-    agent = spawn_count.AgentTally("a1", "t", _T0, resumes, owner="s")
+    agent = spawn_count.AgentTally("a1", "t", _T0, resumes, owner=spawn_count.Owned("s"))
 
     sized = spawn_count.resolve_resume_context(agent, tmp_path)
 

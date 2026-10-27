@@ -15,8 +15,11 @@ never emitted as a test target -- its surviving dependents are.
 The flow: changed set -> global widen triggers -> partition by pocket (the
 longest matching root) -> Python derivation (`_python_selection`) or the
 pocket's native adapter -> unmapped paths through the non-source predicate ->
-one `Selection` per pocket. Contract:
-`skills/testing-strategy/references/test-selection.md`.
+one `Selection` per pocket. A Python test is connected to a changed path by five
+sources, unioned: layout, import, path-literal, declared and pocket-drive (a
+module holding `--project` and another pocket's root path starts that pocket in a
+child process, so a change inside the pocket selects the tests reaching it).
+Contract: `skills/testing-strategy/references/test-selection.md`.
 
 
 The safety property

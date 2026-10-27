@@ -89,7 +89,13 @@ def test_the_spawn_tally_declares_the_attribution_marker_among_its_agent_start_n
     assert "slug_attribution" in tally.needs[registry.EventClass.AGENT_START]
 
 
-SPAWN_RESULT_FIELDS = ("spawned_agent_id", "spawned_agent_type", "task_slug")
+SPAWN_RESULT_FIELDS = (
+    "spawned_agent_id",
+    "spawned_agent_type",
+    "task_slug",
+    "session_kind",
+    "checkout",
+)
 
 
 def test_the_spawn_result_class_writes_tool_use_rows_in_standard_and_full():
@@ -100,7 +106,7 @@ def test_the_spawn_result_class_writes_tool_use_rows_in_standard_and_full():
     assert spec.modes == frozenset({Mode.FULL, Mode.STANDARD})
 
 
-def test_the_spawn_result_class_declares_the_tool_use_envelope_plus_its_three_fields():
+def test_the_spawn_result_class_declares_the_tool_use_envelope_plus_its_spawn_fields():
     spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
     tool_use_envelope = registry.EVENTS[registry.EventClass.TOOL_FILE_CHANGE].fields
 
@@ -114,6 +120,23 @@ def test_only_the_spawn_result_class_declares_the_spawn_result_fields():
         ]
 
         assert declaring == [registry.EventClass.TOOL_AGENT_SPAWN], field
+
+
+def test_the_spawn_result_class_marks_only_the_origin_pair_optional():
+    spec = registry.EVENTS[registry.EventClass.TOOL_AGENT_SPAWN]
+
+    assert spec.optional == frozenset({"session_kind", "checkout"})
+
+
+def test_every_optional_field_is_a_declared_field_of_its_class():
+    for event_class, spec in registry.EVENTS.items():
+        assert spec.optional <= set(spec.fields), event_class
+
+
+def test_no_other_class_marks_a_field_optional():
+    marking = [event_class for event_class, spec in registry.EVENTS.items() if spec.optional]
+
+    assert marking == [registry.EventClass.TOOL_AGENT_SPAWN]
 
 
 @pytest.mark.parametrize(

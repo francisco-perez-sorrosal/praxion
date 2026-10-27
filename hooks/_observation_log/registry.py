@@ -64,7 +64,13 @@ class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ target
 # seen in this log -- because it is the only class with no `min_mode:
 # standard` consumer. Every other class is recorded in both `full` and
 # `standard`.
-EventSpec = namedtuple("EventSpec", ("event_type", "writer", "modes", "fields"))
+#
+# `optional` names the declared fields a row may omit: a row either carries
+# them or shows no evidence of them. It is a subset of `fields`, empty unless a
+# class says otherwise, and the writer-truth scenario is where it is enforced.
+EventSpec = namedtuple(
+    "EventSpec", ("event_type", "writer", "modes", "fields", "optional"), defaults=(frozenset(),)
+)
 
 _FULL_AND_STANDARD = frozenset({Mode.FULL, Mode.STANDARD})
 _EVERY_MODE = frozenset(Mode)  # RECOVERY bypasses the writer -- never gated.
@@ -127,8 +133,17 @@ _TOOL_USE_FIELDS = (
 )
 # An `Agent`/`Task` result names the agent it started. That id joins the result
 # to the agent's `agent_start` at read time, and `task_slug` carries the slug the
-# spawn prompt stated (None when it stated none).
-_AGENT_SPAWN_FIELDS = _TOOL_USE_FIELDS + ("spawned_agent_id", "spawned_agent_type", "task_slug")
+# spawn prompt stated (None when it stated none). `session_kind` and `checkout`
+# say how and where the spawning session ran, as a pair: both are absent when the
+# session's entrypoint classifies no kind, and a reader treats absence as unknown.
+_AGENT_SPAWN_FIELDS = _TOOL_USE_FIELDS + (
+    "spawned_agent_id",
+    "spawned_agent_type",
+    "task_slug",
+    "session_kind",
+    "checkout",
+)
+_AGENT_SPAWN_OPTIONAL = frozenset({"session_kind", "checkout"})
 
 EVENTS = MappingProxyType(
     {
@@ -163,7 +178,11 @@ EVENTS = MappingProxyType(
             "tool_use", "capture_observations", frozenset({Mode.FULL}), _TOOL_USE_FIELDS
         ),
         EventClass.TOOL_AGENT_SPAWN: EventSpec(
-            "tool_use", "capture_observations", _FULL_AND_STANDARD, _AGENT_SPAWN_FIELDS
+            "tool_use",
+            "capture_observations",
+            _FULL_AND_STANDARD,
+            _AGENT_SPAWN_FIELDS,
+            _AGENT_SPAWN_OPTIONAL,
         ),
         EventClass.SKILL_ACTIVATION: EventSpec(
             "skill_activation",
@@ -318,6 +337,8 @@ CONSUMERS = (
                 "spawned_agent_id",
                 "spawned_agent_type",
                 "task_slug",
+                "session_kind",
+                "checkout",
             ),
         },
         Mode.STANDARD,

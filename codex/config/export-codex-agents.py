@@ -13,6 +13,11 @@ FRONTMATTER_BOUNDARY = "---"
 SKIP_AGENT_FILES = {"CLAUDE.md", "README.md"}
 KERNEL_INDEX_PATH = Path("claude") / "kernels" / "index.json"
 PLUGIN_ROOT_VARIABLE = "${CLAUDE_PLUGIN_ROOT}"
+# A definition body places on its own lines the passages its Codex wrapper must carry:
+# a Codex host has no commit gate, so an instruction reached only by reading the
+# definition is not enforced there.
+WRAPPER_BEGIN_MARKER = "<!-- codex-wrapper:begin -->"
+WRAPPER_END_MARKER = "<!-- codex-wrapper:end -->"
 # Frontmatter keys that steer only Claude's own loading of a definition; Codex has no
 # use for them, and a definition must export the same with or without them.
 CLAUDE_ONLY_FRONTMATTER_KEYS = ("omitClaudeMd",)
@@ -139,6 +144,33 @@ def parse_simple_yaml(lines: list[str], path: Path) -> dict[str, str]:
     return metadata
 
 
+def extract_wrapper_passages(body: str, path: Path) -> list[str]:
+    """The passages a definition body marks for its wrapper, in document order.
+
+    A marker that does not pair up raises: a passage dropped silently would leave the
+    Codex agent without an instruction its author believed was delivered.
+    """
+
+    passages: list[str] = []
+    open_passage: list[str] | None = None
+    for line in body.splitlines():
+        marker = line.strip()
+        if marker == WRAPPER_BEGIN_MARKER:
+            if open_passage is not None:
+                raise AgentParseError(f"{path}: nested {WRAPPER_BEGIN_MARKER}")
+            open_passage = []
+        elif marker == WRAPPER_END_MARKER:
+            if open_passage is None:
+                raise AgentParseError(f"{path}: stray {WRAPPER_END_MARKER}")
+            passages.append("\n".join(open_passage).strip())
+            open_passage = None
+        elif open_passage is not None:
+            open_passage.append(line)
+    if open_passage is not None:
+        raise AgentParseError(f"{path}: unclosed {WRAPPER_BEGIN_MARKER}")
+    return [passage for passage in passages if passage]
+
+
 def toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -167,8 +199,16 @@ def render_developer_instructions(
     source_path: Path,
     frontmatter_lines: list[str],
     kernel_strings: list[str],
+    wrapper_passages: list[str] | None = None,
 ) -> str:
     capsule = render_frontmatter_capsule(frontmatter_lines)
+    passages = wrapper_passages or []
+    marked_passages = (
+        ["The canonical definition marks these passages for this wrapper:", "", *passages, ""]
+        if passages
+        else []
+    )
+    duplication_limit = "here beyond the marked passages." if passages else "here."
     return "\n".join(
         [
             f"You are a Codex wrapper for the Praxion `{name}` agent.",
@@ -179,9 +219,10 @@ def render_developer_instructions(
             "",
             *kernel_strings,
             "",
+            *marked_passages,
             capsule,
             "",
-            "Do not duplicate the canonical agent body here. Read it from the source file when you need the full workflow narrative.",
+            f"Do not duplicate the canonical agent body {duplication_limit} Read it from the source file when you need the full workflow narrative.",
         ]
     )
 
@@ -192,6 +233,7 @@ def render_codex_agent(
     frontmatter_lines: list[str],
     routing: dict[str, object],
     kernel_strings: list[str],
+    wrapper_passages: list[str] | None = None,
 ) -> str:
     description = metadata["description"]
     codex_adapter = routing.get("codex_adapter", {})
@@ -202,7 +244,7 @@ def render_codex_agent(
             f"{source_path}: missing Codex model settings for routing tier: {tier}"
         )
     developer_instructions = render_developer_instructions(
-        metadata["name"], source_path, frontmatter_lines, kernel_strings
+        metadata["name"], source_path, frontmatter_lines, kernel_strings, wrapper_passages
     )
 
     return "\n".join(
@@ -230,7 +272,7 @@ def export_agents(repo_root: Path, out_dir: Path) -> list[Path]:
     for source_path in sorted(agents_dir.glob("*.md")):
         if source_path.name in SKIP_AGENT_FILES:
             continue
-        frontmatter_lines, metadata, _body = split_frontmatter_agent(source_path)
+        frontmatter_lines, metadata, body = split_frontmatter_agent(source_path)
         routing = routes.get(metadata["name"])
         if routing is None:
             raise AgentParseError(
@@ -244,7 +286,12 @@ def export_agents(repo_root: Path, out_dir: Path) -> list[Path]:
         target_path = out_dir / f"{metadata['name']}.toml"
         target_path.write_text(
             render_codex_agent(
-                metadata, source_path.resolve(), frontmatter_lines, routing, kernel_strings
+                metadata,
+                source_path.resolve(),
+                frontmatter_lines,
+                routing,
+                kernel_strings,
+                extract_wrapper_passages(body, source_path),
             ),
             encoding="utf-8",
         )

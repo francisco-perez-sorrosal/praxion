@@ -69,3 +69,66 @@ def test_parse_rejects_missing_frontmatter(tmp_path: Path):
 
     with pytest.raises(exporter.AgentParseError, match="missing YAML frontmatter"):
         exporter.parse_frontmatter_agent(path)
+
+
+WRAPPER_BEGIN = "<!-- codex-wrapper:begin -->"
+WRAPPER_END = "<!-- codex-wrapper:end -->"
+UNMARKED_ENDING = "Do not duplicate the canonical agent body here. Read it from the source file"
+
+
+def render_instructions(exporter, passages: list[str]) -> str:
+    return exporter.render_developer_instructions(
+        "scribe", Path("/x/scribe.md"), ["name: scribe"], ["KERNEL"], passages
+    )
+
+
+def test_a_marked_passage_is_embedded_once_outside_the_capsule():
+    exporter = load_exporter()
+    body = f"Intro.\n{WRAPPER_BEGIN}\n- run the check\n{WRAPPER_END}\nOutro.\n"
+
+    passages = exporter.extract_wrapper_passages(body, Path("agents/scribe.md"))
+    text = render_instructions(exporter, passages)
+
+    assert text.count("- run the check") == 1
+    assert text.index("KERNEL") < text.index("- run the check") < text.index("```yaml")
+    assert WRAPPER_BEGIN not in text
+    assert "Intro." not in text
+    assert "beyond the marked passages" in text
+
+
+def test_two_marked_passages_keep_their_order():
+    exporter = load_exporter()
+    body = f"{WRAPPER_BEGIN}\nfirst\n{WRAPPER_END}\n{WRAPPER_BEGIN}\nsecond\n{WRAPPER_END}\n"
+
+    passages = exporter.extract_wrapper_passages(body, Path("agents/scribe.md"))
+
+    assert passages == ["first", "second"]
+
+
+def test_an_unmarked_definition_exports_the_unchanged_wrapper():
+    exporter = load_exporter()
+
+    passages = exporter.extract_wrapper_passages("Just a body.\n", Path("agents/scribe.md"))
+    text = render_instructions(exporter, passages)
+
+    assert passages == []
+    assert text.endswith(f"{UNMARKED_ENDING} when you need the full workflow narrative.")
+    assert "marked passages" not in text
+    assert text == exporter.render_developer_instructions(
+        "scribe", Path("/x/scribe.md"), ["name: scribe"], ["KERNEL"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("body", "complaint"),
+    [
+        (f"{WRAPPER_BEGIN}\nnever closed\n", "unclosed"),
+        (f"{WRAPPER_BEGIN}\n{WRAPPER_BEGIN}\n{WRAPPER_END}\n{WRAPPER_END}\n", "nested"),
+        (f"text\n{WRAPPER_END}\n", "stray"),
+    ],
+)
+def test_a_malformed_marker_raises_naming_the_file(body: str, complaint: str):
+    exporter = load_exporter()
+
+    with pytest.raises(exporter.AgentParseError, match=rf"agents/scribe\.md.*{complaint}"):
+        exporter.extract_wrapper_passages(body, Path("agents/scribe.md"))

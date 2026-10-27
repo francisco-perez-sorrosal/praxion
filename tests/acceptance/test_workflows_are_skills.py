@@ -81,6 +81,12 @@ def test_the_plugin_manifest_neither_registers_nor_mentions_commands():
 # the root guidance file and the agents directory's two prose files. Nothing else is tolerated.
 _HOOK_QUOTING = r"Shell command uses \$\{CLAUDE_PLUGIN_ROOT\} without quotes"
 _PRE_EXISTING_FILES = ("/CLAUDE.md", "/agents/README.md", "/agents/CLAUDE.md")
+# Plugin-directory advisories the validator added in Claude Code 2.1.310, about no component: the
+# plugin has no icon, and its system-file scan stops at a size limit.
+_DIRECTORY_ADVISORIES = (
+    r"\(ICON_MISSING\)",
+    r"Looked for macOS and Windows system files in the first \d+ entries",
+)
 
 
 def _validator_sections(output: str) -> list[tuple[str, list[str]]]:
@@ -94,7 +100,7 @@ def _validator_sections(output: str) -> list[tuple[str, list[str]]]:
 
 
 def _tolerated(header: str, warning: str) -> bool:
-    if re.search(_HOOK_QUOTING, warning):
+    if any(re.search(pattern, warning) for pattern in (_HOOK_QUOTING, *_DIRECTORY_ADVISORIES)):
         return True
     path = header.split(":", 1)[-1].strip()
     root_relative = path[len(str(REPO_ROOT)) :] if path.startswith(str(REPO_ROOT)) else path

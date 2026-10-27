@@ -22,7 +22,7 @@ ran). Which of the three a run is does not depend on who looked when: the shell 
 recorded start and finish against its bound.
 
 The shell, `run_detached`, starts one invocation in a session of its own and returns to it on
-every later call, so a `record` call cut off at its ceiling loses nothing. A run lives in four
+every later call, so a `record` call cut off at its ceiling loses nothing. A run lives in five
 files under its request's directory (`<n>` is the invocation's number):
 
 * `<n>.log` -- the command on its first line, then both output streams;
@@ -32,15 +32,27 @@ files under its request's directory (`<n>` is the invocation's number):
 * `<n>.pid` -- the launcher's process id, which leads the run's process group, written by the
   launcher itself as its first act, so a live run is never without a reference;
 * `<n>.exit` -- `<return code> <finish time>`, written by the launcher when the command exits;
-* `<n>.cut` -- empty, written when the run was killed for outliving its bound, so a later look
+* `<n>.cut` -- empty, written when the run was stopped for outliving its bound, so a later look
   reads the same verdict.
 
-A run with no exit file past its bound is killed with its whole group, once the pid on record is
-confirmed to be a live launcher of this run (its command line holds the run's log path); a run whose
-launcher is gone is read as not started. Nothing enforces the bound between calls: a run outliving a
-killed driver is stopped by the next attach, which measures from the recorded start. A launcher that cannot record its pid exits before the command runs. A run that exited later
-than its start plus its bound is cut off too, though nothing killed it: the verdict follows the
-recorded times, not the moment somebody looked.
+The launcher stops its own run. It is given the bound as an argument when it starts and computes
+its deadline once from it (the bound and five seconds of grace), so nothing later re-reads the
+environment or the pocket's file. A watchdog it starts watches that deadline; with no exit file at
+the deadline it writes the cut file first, then sends SIGTERM to the group (the watchdog ignores the
+signal itself), and after two seconds SIGKILL to what survives: the whole stop lands inside 30
+seconds of the bound, with no call of ours to make it. A cut file that cannot be written means no
+signal at all: the attach-time check below then stands alone, and nothing is stopped unrecorded. It
+needs only what macOS and Linux ship (`date`, `sleep`, `mv`, `printf`) and the POSIX spelling of
+`kill`, which dash accepts too. The command itself runs in the launcher's foreground, with the
+signal dispositions it would have anywhere else.
+
+The attach-time check is the second line of defence, for a launcher the operating system killed:
+a run with no exit file past its bound is killed with its whole group, once the pid on record is
+confirmed to be a live launcher of this run (its command line holds the run's log path); a run
+whose launcher is gone and left no cut file is read as not started. A launcher that cannot record
+its pid exits before the command runs. A run that exited later than its start plus its bound is cut
+off too, though nothing stopped it: the verdict follows the recorded times, not the moment somebody
+looked.
 
 Stdlib-only and 3.9-safe at runtime. `tomllib` is guarded: on an interpreter without it a
 declaration cannot be read, which is a skipped source like any other.
@@ -242,13 +254,46 @@ PocketRun = Union[Finished, CutOff, NotStarted]  # noqa: UP007 -- runtime value,
 # --- One run: start it detached, or attach to it ---
 
 POLL_SECONDS = 0.1
-# $1 the log, $2 the exit file, $3 the pid file, then the command. The shell leads the run's
-# process group (the run starts in a session of its own) and records its own pid before anything
-# else, so no live run is ever without a reference; the pid and exit files appear whole or not
-# at all.
-_LAUNCHER = r"""
-log=$1; done=$2; pidfile=$3; shift 3
-printf '%s\n' "$$" > "$pidfile.tmp" && mv "$pidfile.tmp" "$pidfile" || exit 70
+_GRACE_SECONDS = 5  # past its bound, a run that is exiting still gets to say so
+_KILL_WAIT_SECONDS = 2  # between SIGTERM and SIGKILL for the run's group
+_WATCH_TICK_SECONDS = 1  # how often the watchdog looks at the exit file and the clock
+# The bound the shell is handed is capped: its integer arithmetic wraps (bash) or aborts (dash)
+# for a bound near the width of a machine integer, which would kill a run at once or never start it.
+_MAX_LAUNCHER_BOUND_SECONDS = 10 * 365 * 24 * 3600
+# $1 the log, $2 the exit file, $3 the pid file, $4 the cut file, $5 the bound in whole seconds,
+# then the command. The shell leads the run's process group (the run starts in a session of its
+# own) and records its own pid before anything else, so no live run is ever without a reference;
+# the pid and exit files appear whole or not at all. The command runs in the launcher's
+# foreground, so it keeps the default signal dispositions: a background job of a non-interactive
+# shell starts with SIGINT ignored, and every test run under it would inherit that. The deadline
+# is computed once, from the bound this call was given, and watched by a background subshell that
+# stops when the exit file appears. Past the deadline (plus the grace that lets a run exiting at its
+# bound say so) the watchdog writes the cut file first, then sends SIGTERM to the group -- it
+# ignores the signal itself, which only a subshell can do without the command inheriting the
+# ignore -- and SIGKILL to what survives; then it is done, whether or not the signals landed. The
+# signals name the group by the launcher's pid, so a launcher that does not lead its group (not
+# started in a session of its own) signals nothing. `kill -s NAME --` is the spelling every
+# POSIX shell takes: dash reads `kill -TERM --` as a pid. A cut file that cannot be written ends
+# the watchdog before any signal: no marker, no kill (printf is a regular built-in, so the failed
+# redirection is a status here and not an exit, in any shell).
+_LAUNCHER = rf"""
+log=$1; done=$2; pidfile=$3; cutfile=$4; bound=$5; shift 5
+leader=$$
+printf '%s\n' "$leader" > "$pidfile.tmp" && mv "$pidfile.tmp" "$pidfile" || exit 70
+deadline=$(( $(date +%s) + bound + {_GRACE_SECONDS} ))
+(
+    trap '' TERM
+    while [ ! -e "$done" ]; do
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            printf '' > "$cutfile" || exit 0
+            kill -s TERM -- "-$leader"
+            sleep {_KILL_WAIT_SECONDS}
+            kill -s KILL -- "-$leader"
+            exit 0
+        fi
+        sleep {_WATCH_TICK_SECONDS}
+    done
+) &
 "$@" >> "$log" 2>&1
 code=$?
 printf '%s %s\n' "$code" "$(date +%s)" > "$done.tmp" && mv "$done.tmp" "$done"
@@ -261,10 +306,12 @@ _FIRST_SIGNALLABLE_PID = 2  # pid 1 and group 0 (our own) are never signalled
 _NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
 _FORCED_COLOUR_VARS = ("FORCE_COLOR", "CLICOLOR_FORCE")
 _PYTEST_WORD = "pytest"
-# `-v` streams one outcome per test as it finishes, so a run cut off part-way still shows its
-# failures. `-rfE` is pytest's own default summary: a bare `-rf` would replace an `-ra` in a
-# pocket's configuration and drop the lines that name errors.
-_OUTCOME_REPORTS = ("-v", "-rfE")
+# Pytest applies a pocket's ini `addopts` first, so a later `--verbosity=1` sets verbosity to
+# exactly one whatever `-q`, `-qq` or `-v` the pocket declares: the per-test outcome lines a
+# cut-off reader parses are always printed, and a run cut off part-way still shows its failures.
+# `-rfE` is pytest's own default summary: a bare `-rf` would replace an `-ra` in a pocket's
+# configuration and drop the lines that name errors.
+_OUTCOME_REPORTS = ("--verbosity=1", "-rfE")
 
 
 @dataclass(frozen=True)
@@ -410,12 +457,18 @@ def _refuse_another_run(spec: RunSpec) -> NotStarted | None:
     return NotStarted(spec.pocket, "the run on record was started for another command or bound")
 
 
+def _launcher_command(spec: RunSpec, shell: str = "sh") -> list[str]:
+    """The launcher's command line: its files, then the bound in whole seconds (capped), then the
+    run's own command. The bound is the one argument the launcher's deadline comes from."""
+    files = (str(spec.log_path), str(spec.exit_path), str(spec.pid_path), str(spec.cut_path))
+    bound = str(min(math.ceil(spec.bound.seconds), _MAX_LAUNCHER_BOUND_SECONDS))
+    return [shell, "-c", _LAUNCHER, "sh", *files, bound, *spec.argv]
+
+
 def _launch(spec: RunSpec) -> None:
     """Start the launcher in a session of its own; its pid, which it records, leads the group."""
-    files = (str(spec.log_path), str(spec.exit_path), str(spec.pid_path))
-    command = ["sh", "-c", _LAUNCHER, "sh", *files, *spec.argv]
     process = subprocess.Popen(
-        command, cwd=spec.cwd, env=no_colour_environment(os.environ),
+        _launcher_command(spec), cwd=spec.cwd, env=no_colour_environment(os.environ),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )  # fmt: skip

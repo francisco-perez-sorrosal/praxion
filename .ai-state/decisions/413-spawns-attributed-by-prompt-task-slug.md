@@ -22,6 +22,7 @@ affected_files:
   - skills/software-planning/references/coordination-details.md
 affected_reqs: [REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09]
 supersedes_in_part: [dec-394]
+superseded_in_part_by: [dec-draft-7a68ab13]
 ---
 
 ## Context

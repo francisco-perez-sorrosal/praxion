@@ -232,6 +232,26 @@ def _assert_allowed_tools_subset_of_sentinel_grant(parsed: dict) -> None:
         )
 
 
+def _assert_sandbox_installed_before_the_scrubbed_agent_step(parsed: dict) -> None:
+    steps = _all_steps(parsed)
+    scrubbed = [
+        idx
+        for idx, step in enumerate(steps)
+        if (step.get("env") or {}).get("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB") == "1"
+    ]
+    assert scrubbed, "Expected an agent step with the subprocess env scrub on"
+    earlier = "\n".join(str(step.get("run") or "") for step in steps[: scrubbed[0]])
+    assert re.search(r"apt-get install\b.*\bbubblewrap\b.*\bsocat\b", earlier), (
+        "The env scrub forces Claude Code's Bash sandbox, which on Linux needs "
+        "bubblewrap and socat; a step before the agent step must install both, "
+        "or Claude Code exits at start and the sentinel never runs"
+    )
+    assert re.search(r"^\s*bwrap\s", earlier, re.MULTILINE), (
+        "A step before the agent step must run bwrap once, so a sandbox that "
+        "cannot be built fails the job before any model spend"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers — mutators for the mutation canaries
 # ---------------------------------------------------------------------------
@@ -276,6 +296,15 @@ def _mutate_widen_allowed_tools_beyond_grant(parsed: dict) -> dict:
         with_block["claude_args"] = (
             args[: match.start()] + prefix + tools + ",Edit" + suffix + args[match.end() :]
         )
+    return mutated
+
+
+def _mutate_drop_the_sandbox_install(parsed: dict) -> dict:
+    mutated = copy.deepcopy(parsed)
+    for job in _jobs(mutated).values():
+        job["steps"] = [
+            step for step in job.get("steps") or [] if "bubblewrap" not in (step.get("run") or "")
+        ]
     return mutated
 
 
@@ -522,6 +551,10 @@ def test_env_scrub_is_set_on_the_agent_step() -> None:
         )
 
 
+def test_the_bash_sandbox_is_installed_and_proven_before_the_scrubbed_agent_step() -> None:
+    _assert_sandbox_installed_before_the_scrubbed_agent_step(_parsed())
+
+
 # ---------------------------------------------------------------------------
 # (j) Checkout never persists credentials
 # ---------------------------------------------------------------------------
@@ -672,6 +705,11 @@ MUTATION_CANARIES = [
         _mutate_widen_allowed_tools_beyond_grant,
         _assert_allowed_tools_subset_of_sentinel_grant,
         id="widening_allowed_tools_beyond_the_sentinel_agents_grant",
+    ),
+    pytest.param(
+        _mutate_drop_the_sandbox_install,
+        _assert_sandbox_installed_before_the_scrubbed_agent_step,
+        id="dropping_the_bash_sandbox_install",
     ),
 ]
 

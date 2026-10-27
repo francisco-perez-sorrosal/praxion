@@ -124,6 +124,9 @@ Before reporting completion, check your changes against coding-style conventions
 - [ ] Effects at the edges — new logic separates gather → compute (pure) → use; no hidden ambient inputs (globals, singletons, wall clock) behind a pure-looking signature; core logic testable without mocks (see `coding-style § Side-Effect Discipline`)
 - [ ] The file reads top-down by decreasing abstraction; every comment says what the code cannot (why, invariant, cross-file obligation) — no restatements, no commented-out code (see `coding-style § Reading Order and Narrative`)
 - [ ] No code duplication (check for repeated logic in this file and grep sibling modules for similar patterns)
+<!-- codex-wrapper:begin -->
+- [ ] `check_id_citation_discipline.py --files <changed-paths...>` exits 0 for the files you changed in this step (the commit gate's own check: on `PATH`, else `python3 scripts/check_id_citation_discipline.py` in the Praxion checkout, else the same script under the installed plugin's `scripts/` directory); rewrite each site it lists and rerun the touched tests; where it cannot run (not installed, an older Praxion), report it as not run and proceed, since the commit gate stays the backstop
+<!-- codex-wrapper:end -->
 
 Fix any violations before reporting. Do not produce a formal report — just fix the code.
 

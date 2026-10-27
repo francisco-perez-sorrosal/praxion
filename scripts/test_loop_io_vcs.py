@@ -948,8 +948,8 @@ def test_a_pytest_invocation_is_run_with_the_flags_that_report_each_outcome(
     (run,) = result.pockets[0].runs
     assert isinstance(run, Finished)
     assert (run.argv[-4:], run.output.splitlines()[-1]) == (
-        ("pytest", "-v", "-rfE", "a.py"),
-        "pytest -v -rfE a.py",
+        ("pytest", "--verbosity=1", "-rfE", "a.py"),
+        "pytest --verbosity=1 -rfE a.py",
     )
 
 

@@ -11,6 +11,7 @@ so the tests of its stop run a one-second bound and wait out that deadline.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shlex
 import signal
@@ -41,6 +42,9 @@ BOUND = 100.0
 SHORT_BOUND = 1.0  # the launcher's stop is real time: a short bound keeps those tests brief
 LONG_RUNNING = ("sleep", "600")
 PYTHON = sys.executable
+# Every POSIX shell a launcher may run under: `sh` is dash on Debian-family CI runners and bash on
+# macOS, and they disagree about `kill`, arithmetic and redirection errors.
+SHELLS = ["sh", "/bin/dash", "/bin/bash"]
 
 
 class FakeClock:
@@ -502,28 +506,32 @@ def test_a_run_that_outlives_its_bound_is_stopped_by_its_launcher_with_its_child
     assert isinstance(read_run(spec), CutOff)
 
 
-def test_a_run_that_exits_inside_its_bound_is_untouched_and_leaves_no_cut_marker(make_spec):
+def test_a_run_that_exits_inside_its_bound_is_untouched_and_its_watchdog_ends_with_it(make_spec):
     spec = make_spec(python_run("print('done')"), bound_seconds=BOUND)
 
     run = run_detached(spec, give_up_at=time.time() + GUARD_SECONDS)
 
     assert isinstance(run, Finished)
-    launcher = int(spec.pid_path.read_text(encoding="utf-8"))
-    wait_until(lambda: has_exited(launcher), "the launcher to end")
+    wait_until(lambda: not pocket_runs._group_is_alive(spec), "the run's group, watchdog included")
     assert not spec.cut_path.exists()
 
 
-def test_the_bound_given_at_start_is_the_one_the_launcher_enforces(
-    make_spec, monkeypatch, tmp_path
-):
-    spec = make_spec(LONG_RUNNING, bound_seconds=SHORT_BOUND)
-    run_detached(spec, give_up_at=0.0)
-    monkeypatch.setenv(pocket_runs.POCKET_TIMEOUTS_VARIABLE, f"{spec.pocket}=900")
-    (tmp_path / "pyproject.toml").write_text(
-        f"[tool.praxion.step-loop]\n{pocket_runs.DECLARATION_KEY} = 900\n", encoding="utf-8"
-    )
+def test_the_bound_the_launcher_is_handed_is_the_one_the_run_was_started_with(make_spec):
+    spec = make_spec(LONG_RUNNING, bound_seconds=2.4)
 
-    wait_until(lambda: stop_was_recorded(spec), "the launcher to stop the run at its own bound")
+    command = pocket_runs._launcher_command(spec)
+
+    assert command[-len(spec.argv) - 1] == "3"  # whole seconds, rounded up, just before the command
+
+
+def test_a_bound_too_large_for_the_shells_arithmetic_is_capped_before_it_reaches_the_shell(
+    make_spec,
+):
+    spec = make_spec(LONG_RUNNING, bound_seconds=1e19)
+
+    command = pocket_runs._launcher_command(spec)
+
+    assert command[-len(spec.argv) - 1] == str(pocket_runs._MAX_LAUNCHER_BOUND_SECONDS)
 
 
 def test_a_command_run_through_the_launcher_keeps_the_default_interrupt_and_terminate_handling(
@@ -543,22 +551,120 @@ def test_a_command_run_through_the_launcher_keeps_the_default_interrupt_and_term
     assert run.output.splitlines()[-1] == "True True"
 
 
-def test_the_cut_marker_exists_before_the_launcher_sends_any_signal(make_spec, tmp_path):
-    saw_marker = tmp_path / "saw-marker"
+# --- The stop itself: every shell, the second signal, the order, the leader ---
+
+
+@pytest.fixture
+def launched():
+    """Start launcher processes by hand; at teardown whatever they lead or share is killed."""
+    started: list[subprocess.Popen] = []
+
+    def start(command, **popen_kwargs) -> subprocess.Popen:
+        process = subprocess.Popen(
+            command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, **popen_kwargs,
+        )  # fmt: skip
+        started.append(process)
+        return process
+
+    yield start
+    for process in started:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.kill(process.pid, signal.SIGKILL)
+    for process in started:
+        process.wait(timeout=GUARD_SECONDS)
+
+
+def shell_or_skip(shell: str) -> str:
+    if os.path.isabs(shell) and not os.path.exists(shell):
+        pytest.skip(f"{shell} is not installed on this host")
+    return shell
+
+
+def pid_in(path: Path) -> int:
+    return int(path.read_text(encoding="utf-8"))
+
+
+def command_that_records_its_pid(pid_file: Path, then: str) -> tuple[str, ...]:
+    return ("sh", "-c", f"echo $$ > {pid_file}; {then}")
+
+
+@pytest.mark.parametrize("shell", SHELLS)
+def test_the_cut_marker_exists_before_the_launcher_signals_the_run_whatever_the_shell(
+    make_spec, launched, tmp_path, shell
+):
+    command_pid = tmp_path / "command.pid"
     spec = make_spec(
-        (
-            "sh",
-            "-c",
-            f"trap 'test -e {spec_cut(tmp_path)} && touch {saw_marker}; exit 0' TERM;"
-            " while :; do sleep 0.1; done",
-        ),
-        bound_seconds=SHORT_BOUND,
+        command_that_records_its_pid(command_pid, "exec sleep 600"), bound_seconds=SHORT_BOUND
     )
+    spec.run_dir.mkdir(parents=True)
+    os.mkfifo(spec.cut_path)  # writing the marker blocks until somebody reads it
+    launcher = launched(
+        pocket_runs._launcher_command(spec, shell_or_skip(shell)), start_new_session=True
+    )
+    wait_until(lambda: has_text(command_pid), "the run to record its pid")
+    time.sleep(SHORT_BOUND + pocket_runs._GRACE_SECONDS + 2 * pocket_runs._WATCH_TICK_SECONDS)
+
+    still_alive_with_the_marker_unwritten = process_exists(pid_in(command_pid))
+    reader = os.open(spec.cut_path, os.O_RDONLY)  # lets the watchdog's write through
+    os.close(reader)
+
+    assert still_alive_with_the_marker_unwritten
+    wait_until(lambda: has_exited(pid_in(command_pid)), "the stop to land on the run")
+    wait_until(lambda: has_exited(launcher.pid), "the launcher to be gone")
+
+
+@pytest.mark.parametrize("shell", SHELLS)
+def test_a_cut_marker_that_cannot_be_written_means_no_signal_whatever_the_shell(
+    make_spec, launched, tmp_path, shell
+):
+    command_pid = tmp_path / "command.pid"
+    spec = make_spec(
+        command_that_records_its_pid(command_pid, "exec sleep 600"), bound_seconds=SHORT_BOUND
+    )
+    spec.run_dir.mkdir(parents=True)
+    spec.cut_path.mkdir()  # a directory where the marker goes: writing it fails
+    launched(pocket_runs._launcher_command(spec, shell_or_skip(shell)), start_new_session=True)
+    wait_until(lambda: has_text(command_pid), "the run to record its pid")
+    time.sleep(SHORT_BOUND + pocket_runs._GRACE_SECONDS + 2 * pocket_runs._WATCH_TICK_SECONDS)
+
+    assert process_exists(pid_in(command_pid))
+
+
+def test_a_run_and_its_child_that_both_ignore_sigterm_are_still_gone_after_the_second_signal(
+    make_spec, tmp_path
+):
+    command_pid, child_pid = tmp_path / "command.pid", tmp_path / "child.pid"
+    script = (
+        f"trap '' TERM; echo $$ > {command_pid}; sleep 600 & echo $! > {child_pid};"
+        " while :; do sleep 1; done"
+    )
+    spec = make_spec(("sh", "-c", script), bound_seconds=SHORT_BOUND)
     run_detached(spec, give_up_at=0.0)
+    wait_until(lambda: has_text(command_pid) and has_text(child_pid), "the run to record its pids")
 
-    wait_until(lambda: saw_marker.exists(), "the run to be signalled after the cut marker exists")
+    wait_until(lambda: has_exited(pid_in(child_pid)), "the child to be killed")
+    wait_until(lambda: has_exited(pid_in(command_pid)), "the command to be killed")
+
+    assert isinstance(read_run(spec), CutOff)
 
 
-def spec_cut(tmp_path: Path) -> Path:
-    """Where the cut marker of the first run `make_spec` builds lives."""
-    return tmp_path / "gate" / "request-1" / "1.cut"
+def test_a_launcher_that_does_not_lead_its_group_signals_no_sibling(make_spec, launched, tmp_path):
+    command_pid = tmp_path / "command.pid"
+    spec = make_spec(
+        command_that_records_its_pid(command_pid, "exec sleep 600"), bound_seconds=SHORT_BOUND
+    )
+    spec.run_dir.mkdir(parents=True)
+    sibling = launched(LONG_RUNNING, preexec_fn=os.setpgrp)  # leads a group that is not ours
+    launched(
+        pocket_runs._launcher_command(spec),
+        preexec_fn=lambda: os.setpgid(0, sibling.pid),  # joins it without leading it
+    )
+
+    wait_until(lambda: stop_was_recorded(spec), "the watchdog to reach its deadline")
+    time.sleep(pocket_runs._KILL_WAIT_SECONDS + 1)  # past the second signal too
+
+    assert sibling.poll() is None
+    assert process_exists(pid_in(command_pid))

@@ -40,8 +40,10 @@ its deadline once from it (the bound and five seconds of grace), so nothing late
 environment or the pocket's file. A watchdog it starts watches that deadline; with no exit file at
 the deadline it writes the cut file first, then sends SIGTERM to the group (the watchdog ignores the
 signal itself), and after two seconds SIGKILL to what survives: the whole stop lands inside 30
-seconds of the bound, with no call of ours to make it. It needs only what macOS and Linux ship
-(`date`, `sleep`, `mv`, `printf`). The command itself runs in the launcher's foreground, with the
+seconds of the bound, with no call of ours to make it. A cut file that cannot be written means no
+signal at all: the attach-time check below then stands alone, and nothing is stopped unrecorded. It
+needs only what macOS and Linux ship (`date`, `sleep`, `mv`, `printf`) and the POSIX spelling of
+`kill`, which dash accepts too. The command itself runs in the launcher's foreground, with the
 signal dispositions it would have anywhere else.
 
 The attach-time check is the second line of defence, for a launcher the operating system killed:
@@ -254,6 +256,10 @@ PocketRun = Union[Finished, CutOff, NotStarted]  # noqa: UP007 -- runtime value,
 POLL_SECONDS = 0.1
 _GRACE_SECONDS = 5  # past its bound, a run that is exiting still gets to say so
 _KILL_WAIT_SECONDS = 2  # between SIGTERM and SIGKILL for the run's group
+_WATCH_TICK_SECONDS = 1  # how often the watchdog looks at the exit file and the clock
+# The bound the shell is handed is capped: its integer arithmetic wraps (bash) or aborts (dash)
+# for a bound near the width of a machine integer, which would kill a run at once or never start it.
+_MAX_LAUNCHER_BOUND_SECONDS = 10 * 365 * 24 * 3600
 # $1 the log, $2 the exit file, $3 the pid file, $4 the cut file, $5 the bound in whole seconds,
 # then the command. The shell leads the run's process group (the run starts in a session of its
 # own) and records its own pid before anything else, so no live run is ever without a reference;
@@ -264,9 +270,12 @@ _KILL_WAIT_SECONDS = 2  # between SIGTERM and SIGKILL for the run's group
 # stops when the exit file appears. Past the deadline (plus the grace that lets a run exiting at its
 # bound say so) the watchdog writes the cut file first, then sends SIGTERM to the group -- it
 # ignores the signal itself, which only a subshell can do without the command inheriting the
-# ignore -- and SIGKILL to what survives. The signals name the group by the launcher's pid, so a
-# launcher that does not lead its group (not started in a session of its own) signals nothing;
-# the watchdog is in the group and goes with it.
+# ignore -- and SIGKILL to what survives; then it is done, whether or not the signals landed. The
+# signals name the group by the launcher's pid, so a launcher that does not lead its group (not
+# started in a session of its own) signals nothing. `kill -s NAME --` is the spelling every
+# POSIX shell takes: dash reads `kill -TERM --` as a pid. A cut file that cannot be written ends
+# the watchdog before any signal: no marker, no kill (printf is a regular built-in, so the failed
+# redirection is a status here and not an exit, in any shell).
 _LAUNCHER = rf"""
 log=$1; done=$2; pidfile=$3; cutfile=$4; bound=$5; shift 5
 leader=$$
@@ -276,12 +285,13 @@ deadline=$(( $(date +%s) + bound + {_GRACE_SECONDS} ))
     trap '' TERM
     while [ ! -e "$done" ]; do
         if [ "$(date +%s)" -ge "$deadline" ]; then
-            : > "$cutfile"
-            kill -TERM -- "-$leader"
+            printf '' > "$cutfile" || exit 0
+            kill -s TERM -- "-$leader"
             sleep {_KILL_WAIT_SECONDS}
-            kill -KILL -- "-$leader"
+            kill -s KILL -- "-$leader"
+            exit 0
         fi
-        sleep 0.1 || sleep 1
+        sleep {_WATCH_TICK_SECONDS}
     done
 ) &
 "$@" >> "$log" 2>&1
@@ -447,13 +457,18 @@ def _refuse_another_run(spec: RunSpec) -> NotStarted | None:
     return NotStarted(spec.pocket, "the run on record was started for another command or bound")
 
 
+def _launcher_command(spec: RunSpec, shell: str = "sh") -> list[str]:
+    """The launcher's command line: its files, then the bound in whole seconds (capped), then the
+    run's own command. The bound is the one argument the launcher's deadline comes from."""
+    files = (str(spec.log_path), str(spec.exit_path), str(spec.pid_path), str(spec.cut_path))
+    bound = str(min(math.ceil(spec.bound.seconds), _MAX_LAUNCHER_BOUND_SECONDS))
+    return [shell, "-c", _LAUNCHER, "sh", *files, bound, *spec.argv]
+
+
 def _launch(spec: RunSpec) -> None:
     """Start the launcher in a session of its own; its pid, which it records, leads the group."""
-    files = (str(spec.log_path), str(spec.exit_path), str(spec.pid_path), str(spec.cut_path))
-    bound = str(math.ceil(spec.bound.seconds))
-    command = ["sh", "-c", _LAUNCHER, "sh", *files, bound, *spec.argv]
     process = subprocess.Popen(
-        command, cwd=spec.cwd, env=no_colour_environment(os.environ),
+        _launcher_command(spec), cwd=spec.cwd, env=no_colour_environment(os.environ),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )  # fmt: skip

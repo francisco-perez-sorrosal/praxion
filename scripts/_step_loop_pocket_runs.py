@@ -261,10 +261,12 @@ _FIRST_SIGNALLABLE_PID = 2  # pid 1 and group 0 (our own) are never signalled
 _NO_COLOUR_ENV = {"NO_COLOR": "1", "PY_COLORS": "0"}
 _FORCED_COLOUR_VARS = ("FORCE_COLOR", "CLICOLOR_FORCE")
 _PYTEST_WORD = "pytest"
-# `-v` streams one outcome per test as it finishes, so a run cut off part-way still shows its
-# failures. `-rfE` is pytest's own default summary: a bare `-rf` would replace an `-ra` in a
-# pocket's configuration and drop the lines that name errors.
-_OUTCOME_REPORTS = ("-v", "-rfE")
+# Pytest applies a pocket's ini `addopts` first, so a later `--verbosity=1` sets verbosity to
+# exactly one whatever `-q`, `-qq` or `-v` the pocket declares: the per-test outcome lines a
+# cut-off reader parses are always printed, and a run cut off part-way still shows its failures.
+# `-rfE` is pytest's own default summary: a bare `-rf` would replace an `-ra` in a pocket's
+# configuration and drop the lines that name errors.
+_OUTCOME_REPORTS = ("--verbosity=1", "-rfE")
 
 
 @dataclass(frozen=True)

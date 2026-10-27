@@ -14,11 +14,13 @@ Exit 0 unconditionally.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timezone
 
-from _hook_utils import DISABLE_OBSERVABILITY, is_disabled, stated_task_slug
+from _hook_utils import DISABLE_OBSERVABILITY, is_disabled, session_origin, stated_task_slug
 from _observation_log import writer
 from _observation_log.location import locate
 from _observation_log.registry import SPAWN_TOOLS
@@ -131,14 +133,21 @@ def build_summary(tool_name: str, tool_input: dict, classification: str) -> str:
     return _truncate(", ".join(parts)) if parts else tool_name
 
 
-def spawn_result_fields(tool_name: str, tool_input: dict, tool_response: object) -> dict:
+def spawn_result_fields(
+    tool_name: str,
+    tool_input: dict,
+    tool_response: object,
+    origin: Mapping[str, str] | None = None,
+) -> dict:
     """The fields that tie a spawn call's result to the agent it started.
 
     Empty unless this is a spawn tool whose result is an object naming the
     agent it started (``agentId``, non-empty text) -- a failed or garbled
     result started nothing, so its row stays an ordinary tool row. The slug is
     read from the prompt the call was made with, else from the one the result
-    echoes back; ``None`` when neither states one.
+    echoes back; ``None`` when neither states one. ``origin`` is the spawning
+    session's ``session_origin`` -- handed in, never read here -- and joins the
+    fields as it stands, so a session that shows nothing adds nothing.
     """
     if tool_name not in SPAWN_TOOLS or not isinstance(tool_response, dict):
         return {}
@@ -151,14 +160,18 @@ def spawn_result_fields(tool_name: str, tool_input: dict, tool_response: object)
         "spawned_agent_type": agent_type,
         "task_slug": stated_task_slug(tool_input.get("prompt"))
         or stated_task_slug(tool_response.get("prompt")),
+        **(origin or {}),
     }
 
 
-def build_observation(payload: dict, *, project: str) -> dict:
+def build_observation(
+    payload: dict, *, project: str, origin: Mapping[str, str] | None = None
+) -> dict:
     """Assemble an observation record from a completed PostToolUse payload.
 
     ``project`` is the checkout's name as resolved by ``locate``; the payload's
-    ``cwd`` may sit anywhere below it and is not consulted here.
+    ``cwd`` may sit anywhere below it and is not consulted here. ``origin`` is
+    the spawning session's ``session_origin``, which only a spawn result records.
 
     Pure function -- reads only its arguments and performs no I/O, so the
     classification branches are unit-testable without a stdin/subprocess
@@ -225,7 +238,7 @@ def build_observation(payload: dict, *, project: str) -> dict:
     if tool_name == "Skill":
         observation["skill_name"] = tool_input.get("skill", "")
 
-    observation.update(spawn_result_fields(tool_name, tool_input, tool_response))
+    observation.update(spawn_result_fields(tool_name, tool_input, tool_response, origin))
 
     return observation
 
@@ -249,7 +262,8 @@ def main() -> None:
     if location is None:
         return  # graceful degradation: no project serves this directory
 
-    observation = build_observation(payload, project=location.project)
+    origin = session_origin(os.environ) if tool_name in SPAWN_TOOLS else None
+    observation = build_observation(payload, project=location.project, origin=origin)
     writer.record_tool_call(
         location.state_dir, observation, is_subagent=bool(payload.get("agent_id"))
     )

@@ -6,7 +6,8 @@ kill-switch flag consumed by the capture/telemetry hooks (``capture_observations
 ``notify_bg_session_state``).
 
 Also provides ``stated_task_slug`` -- the one reading of the ``Task slug:``
-marker an orchestrator writes into a spawn prompt -- and
+marker an orchestrator writes into a spawn prompt --, ``session_origin`` -- the
+one reading of where a session runs and how it was started -- and
 ``record_gate_fire`` -- a thin forwarding wrapper for
 commit-gate scripts recording their own pass/warn/block verdict. The row
 shape, mode gating, and the append/rotate/lock machinery now live in
@@ -18,7 +19,9 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 # -- Per-project opt-out flag --------------------------------------------------
 # Read from Claude Code's per-project settings.json `env` block. Set to "1",
@@ -63,6 +66,46 @@ def stated_task_slug(text: object) -> str | None:
         return None
     match = _TASK_SLUG_RE.search(text)
     return match.group(1) if match else None
+
+
+# How a session was started, from the entrypoint Claude Code exports. The map is
+# closed: an entrypoint nobody has classified is left unclassified rather than
+# guessed, because a reader treats "headless" as proof and "no kind" as doubt.
+ENTRYPOINT_ENV = "CLAUDE_CODE_ENTRYPOINT"
+SESSION_KIND_BY_ENTRYPOINT = MappingProxyType(
+    {
+        "sdk-cli": "headless",
+        "sdk-py": "headless",
+        "sdk-ts": "headless",
+        "cli": "interactive",
+        "claude-vscode": "interactive",
+        "claude-desktop": "interactive",
+    }
+)
+
+PROJECT_DIR_ENV = "CLAUDE_PROJECT_DIR"
+
+
+def session_origin(environ: Mapping[str, str]) -> dict[str, str]:
+    """What ``environ`` shows of a session: its ``session_kind`` and ``checkout``.
+
+    A key is present only when its evidence is: an entrypoint outside
+    ``SESSION_KIND_BY_ENTRYPOINT`` or an unset one names no kind, and a project
+    directory that is unset, relative or not a directory names no checkout (the
+    resolved path otherwise). Total over its input, so a malformed variable
+    costs the row a key, never the session a crash.
+    """
+    origin: dict[str, str] = {}
+    kind = SESSION_KIND_BY_ENTRYPOINT.get(environ.get(ENTRYPOINT_ENV, ""))
+    if kind:
+        origin["session_kind"] = kind
+    try:
+        project_dir = Path(environ.get(PROJECT_DIR_ENV, ""))
+        if project_dir.is_absolute() and project_dir.is_dir():
+            origin["checkout"] = str(project_dir.resolve())
+    except (OSError, ValueError, RuntimeError):
+        pass
+    return origin
 
 
 def record_gate_fire(

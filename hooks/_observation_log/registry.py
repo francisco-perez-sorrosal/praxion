@@ -127,8 +127,16 @@ _TOOL_USE_FIELDS = (
 )
 # An `Agent`/`Task` result names the agent it started. That id joins the result
 # to the agent's `agent_start` at read time, and `task_slug` carries the slug the
-# spawn prompt stated (None when it stated none).
-_AGENT_SPAWN_FIELDS = _TOOL_USE_FIELDS + ("spawned_agent_id", "spawned_agent_type", "task_slug")
+# spawn prompt stated (None when it stated none). `session_kind` and `checkout`
+# say how and where the spawning session ran; each is absent when the session
+# showed no evidence of it, and a reader treats absence as unknown.
+_AGENT_SPAWN_FIELDS = _TOOL_USE_FIELDS + (
+    "spawned_agent_id",
+    "spawned_agent_type",
+    "task_slug",
+    "session_kind",
+    "checkout",
+)
 
 EVENTS = MappingProxyType(
     {
@@ -318,6 +326,8 @@ CONSUMERS = (
                 "spawned_agent_id",
                 "spawned_agent_type",
                 "task_slug",
+                "session_kind",
+                "checkout",
             ),
         },
         Mode.STANDARD,

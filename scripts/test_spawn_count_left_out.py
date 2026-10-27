@@ -7,6 +7,7 @@ to the checkout it ran in, unless that is another checkout bearing the root's ow
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -185,8 +186,23 @@ def test_a_left_out_agent_makes_no_slug_seen_through_its_owner() -> None:
 
 def test_a_left_out_agent_is_not_attributed_from_its_transcript(tmp_path: Path) -> None:
     (agent,) = _left_out_tally()
+    _write_prompt_transcript(tmp_path, agent, "Task slug: some-pipeline\nDo the step.")
 
-    assert spawn_count.resolve_owner(agent, tmp_path) is agent
+    assert spawn_count.resolve_owner(agent, tmp_path).owner == LeftOut(
+        spawn_count.HEADLESS_LEFT_OUT
+    )
+
+
+def _write_prompt_transcript(
+    projects_dir: Path, agent: spawn_count.AgentTally, prompt: str
+) -> None:
+    """The agent's own transcript, at the layout the tally globs, opening with `prompt`."""
+    transcript_dir = projects_dir / "-fake-project-dir" / agent.session_id / "subagents"
+    transcript_dir.mkdir(parents=True)
+    row = {"type": "user", "message": {"content": prompt}}
+    (transcript_dir / f"agent-{agent.agent_id}.jsonl").write_text(
+        json.dumps(row) + "\n", encoding="utf-8"
+    )
 
 
 def test_an_unattributed_agent_stays_unattributed_without_a_transcript(tmp_path: Path) -> None:

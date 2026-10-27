@@ -1,6 +1,6 @@
 """Python test selection derived from the code itself.
 
-Nodes are repo-relative files; an edge "A depends on B" comes from one of four
+Nodes are repo-relative files; an edge "A depends on B" comes from one of five
 sources, listed in attribution order:
 
 1. **layout** -- `dir/test_foo.py` / `dir/foo_test.py` depend on `foo.py`, the
@@ -21,10 +21,15 @@ sources, listed in attribution order:
    runnable test modules, directly from a changed path: nothing propagates
    from such a holder, and a production module holding `*.md` reads no file
    in particular, so it selects nothing;
-4. **declared** -- `tests/declared-deps.toml` entries.
+4. **declared** -- `tests/declared-deps.toml` entries;
+5. **pocket-drive** -- a module outside pocket P that holds the string constants
+   `--project` and P's root-relative path starts P in a child process, so it
+   depends on every file of P without importing one. Only the first hop out of a
+   changed path takes it: the tests reaching such a driver follow the import
+   edges as for any module.
 
 A changed path selects every test that reaches it through reverse
-reachability over all four sources -- a union, never first-match, because
+reachability over all five sources -- a union, never first-match, because
 stopping at the first source to connect drops the tests of modules that
 import the changed one. The order above only decides the `via` attribution:
 the kind of the first hop out of the changed path, along the test's shortest
@@ -85,7 +90,9 @@ from _test_inventory import (  # noqa: E402
 )
 
 SERIAL_BELOW_TESTS = 20
-VIA_ORDER = ("layout", "import", "path-literal", "declared")
+POCKET_DRIVE = "pocket-drive"
+VIA_ORDER = ("layout", "import", "path-literal", "declared", POCKET_DRIVE)
+_HOP_KINDS = tuple(via for via in VIA_ORDER if via != POCKET_DRIVE)  # the edges every hop takes
 _VIA_RANK = {"self": -1, **{via: rank for rank, via in enumerate(VIA_ORDER)}}
 _PATTERN_RANK = _VIA_RANK["path-literal"]
 _TEST_DEF = re.compile(r"^[ \t]*(?:async[ \t]+)?def[ \t]+test_", re.MULTILINE)
@@ -188,7 +195,9 @@ def _reach(
     higher-priority first hop wins. With `patterns`, a test whose basename
     pattern matches `start` is found directly at the `path-literal` rank, unless
     a named edge of higher priority also reaches it; it is never expanded, so
-    nothing propagates from a pattern holder. State data stops after the first hop.
+    nothing propagates from a pattern holder. State data stops after the first hop,
+    and a pocket-drive edge is taken only out of `start`: a file of the driven pocket
+    reached on the way is not a changed one.
     """
     fans_out = is_source_code(start) or not start.startswith(STATE_DIR)
     found: dict[str, str] = {}
@@ -208,7 +217,7 @@ def _reach(
         for node, rank in frontier.items():
             if is_any_test_file(node) and is_runnable(node):
                 found.setdefault(node, VIA_ORDER[rank])
-            for kind in VIA_ORDER:
+            for kind in _HOP_KINDS:
                 for dependent in graph.dependents(node, kind):
                     if dependent not in visited:
                         following[dependent] = min(following.get(dependent, rank), rank)
@@ -275,6 +284,7 @@ class Graph:
         resolver = _ImportResolver(root, known, self._pockets)
         self._importers: dict[str, set[str]] = {}
         self._literals = _LiteralIndex(self._pockets)
+        self._drivers = _PocketDrivers(self._pockets)
         for module in modules:
             tree = _parse(root / module)
             if tree is None:
@@ -282,6 +292,7 @@ class Graph:
             for target in resolver.resolve_all(module, tree):
                 self._importers.setdefault(target, set()).add(module)
             self._literals.add_module(module, tree)
+            self._drivers.add_module(module, tree)
         self.dependents = functools.lru_cache(maxsize=None)(self._dependents)
 
     def knows(self, paths: Iterable[str]) -> bool:
@@ -295,6 +306,8 @@ class Graph:
             found = self._importers.get(node, set())
         elif via == "path-literal":
             found = self._literals.modules_matching(node)
+        elif via == POCKET_DRIVE:
+            found = self._drivers.driving(node)
         else:
             found = self._declared(node)
         return tuple(sorted(dependent for dependent in found if dependent != node))
@@ -547,6 +560,40 @@ class _LiteralIndex:
             module
             for pattern, module in self._basename_patterns
             if module != node and pattern.match(name)
+        }
+
+
+# --- Pocket-drive edges ------------------------------------------------------------
+
+PROJECT_FLAG = "--project"
+
+
+class _PocketDrivers:
+    """Modules that start another pocket in a child process (`uv run --project eval ...`).
+
+    The child imports the pocket under its own environment, so no import edge
+    connects the driver to the files it runs.
+    """
+
+    def __init__(self, pockets: _Pockets) -> None:
+        self._roots = tuple(root for root in pockets.roots if root not in ("", "."))
+        self._by_root: dict[str, set[str]] = {}
+
+    def add_module(self, module: str, tree: ast.Module) -> None:
+        constants = set(_string_constants(tree))
+        if PROJECT_FLAG not in constants:
+            return
+        for root in self._roots:
+            if root in constants and not under(module, root):
+                self._by_root.setdefault(root, set()).add(module)
+
+    def driving(self, node: str) -> set[str]:
+        """Drivers of every pocket `node` lies in."""
+        return {
+            driver
+            for root, drivers in self._by_root.items()
+            if under(node, root)
+            for driver in drivers
         }
 
 

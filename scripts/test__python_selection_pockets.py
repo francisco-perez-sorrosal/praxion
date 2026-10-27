@@ -242,3 +242,125 @@ def test_a_path_whose_only_connections_cross_pockets_is_not_mapped(tmp_path: Pat
     )
 
     assert EVAL_CLI not in derivation.mapped
+
+
+# -- Pocket-drive: a module starting a pocket in a child process depends on the pocket ---------
+
+EVAL_CORE = "eval/src/evals/core.py"
+EVAL_CORE_SOURCE = "def version():\n    return '1'\n"
+RUNNER = "tests/drivers/runner.py"
+RUNS_IN_EVAL = (
+    'COMMAND = ["uv", "run", "--project", "eval", "python", "-c"]\n\n\n'
+    "def run_in_eval(code):\n    return COMMAND + [code]\n"
+)
+TEST_USING_RUNNER = (
+    "from tests.drivers.runner import run_in_eval\n\n\n"
+    "def test_runs():\n    assert run_in_eval('1')\n"
+)
+
+
+def _changed_eval_core(root: Path, files: dict[str, str]) -> Any:
+    return _derive_in_pockets(root, EVAL_CORE, {EVAL_CORE: EVAL_CORE_SOURCE, **files})
+
+
+def test_a_test_importing_a_driver_of_the_changed_pocket_is_selected(tmp_path: Path) -> None:
+    derivation = _changed_eval_core(
+        tmp_path, {RUNNER: RUNS_IN_EVAL, "tests/test_uses_runner.py": TEST_USING_RUNNER}
+    )
+
+    assert _via(derivation.tests, "tests/test_uses_runner.py") == "pocket-drive"
+    assert {test.because for test in derivation.tests} == {EVAL_CORE}
+    assert EVAL_CORE in derivation.mapped
+
+
+def test_a_test_holding_both_constants_is_itself_a_driver(tmp_path: Path) -> None:
+    derivation = _changed_eval_core(tmp_path, {"tests/test_starts_eval.py": RUNS_IN_EVAL})
+
+    assert _selected(derivation) == {"tests/test_starts_eval.py"}
+
+
+def test_a_driver_is_selected_by_a_change_to_any_file_of_the_pocket(tmp_path: Path) -> None:
+    derivation = _derive_in_pockets(
+        tmp_path,
+        "eval/uv.lock",
+        {"eval/uv.lock": "", RUNNER: RUNS_IN_EVAL, "tests/test_uses_runner.py": TEST_USING_RUNNER},
+    )
+
+    assert _via(derivation.tests, "tests/test_uses_runner.py") == "pocket-drive"
+
+
+def test_a_module_holding_only_the_project_flag_drives_nothing(tmp_path: Path) -> None:
+    flag_only = 'COMMAND = ["uv", "run", "--project"]\n'
+    derivation = _changed_eval_core(
+        tmp_path, {RUNNER: flag_only, "tests/test_uses_runner.py": TEST_USING_RUNNER}
+    )
+
+    assert _selected(derivation) == set()
+    assert derivation.mapped == frozenset()
+
+
+def test_a_module_holding_only_the_pocket_path_drives_nothing(tmp_path: Path) -> None:
+    path_only = 'EVAL_DIR = "eval"\n'
+    derivation = _changed_eval_core(
+        tmp_path, {RUNNER: path_only, "tests/test_uses_runner.py": TEST_USING_RUNNER}
+    )
+
+    assert _selected(derivation) == set()
+
+
+def test_a_test_reaches_a_driver_through_a_non_test_module(tmp_path: Path) -> None:
+    helper = "from tests.drivers.runner import run_in_eval\n\n\ndef run_twice():\n    return 2\n"
+    uses_helper = (
+        "from tests.drivers.helper import run_twice\n\n\ndef test_runs():\n    assert run_twice()\n"
+    )
+    derivation = _changed_eval_core(
+        tmp_path,
+        {
+            RUNNER: RUNS_IN_EVAL,
+            "tests/drivers/helper.py": helper,
+            "tests/test_uses_helper.py": uses_helper,
+        },
+    )
+
+    assert _via(derivation.tests, "tests/test_uses_helper.py") == "pocket-drive"
+
+
+def test_a_driver_is_not_selected_by_a_file_outside_the_pocket(tmp_path: Path) -> None:
+    derivation = _derive_in_pockets(
+        tmp_path,
+        "scripts/tool.py",
+        {
+            "scripts/tool.py": "def tool():\n    return 1\n",
+            RUNNER: RUNS_IN_EVAL,
+            "tests/test_uses_runner.py": TEST_USING_RUNNER,
+        },
+    )
+
+    assert _selected(derivation) == set()
+
+
+def test_a_pocket_file_met_on_the_way_does_not_select_the_pocket_drivers(tmp_path: Path) -> None:
+    pocket_test = "from tool import tool\n\n\ndef test_tool():\n    assert tool()\n"
+    derivation = _derive_in_pockets(
+        tmp_path,
+        "scripts/tool.py",
+        {
+            "scripts/tool.py": "def tool():\n    return 1\n",
+            "eval/tests/test_tool.py": pocket_test,
+            RUNNER: RUNS_IN_EVAL,
+            "tests/test_uses_runner.py": TEST_USING_RUNNER,
+        },
+    )
+
+    assert _selected(derivation) == {"eval/tests/test_tool.py"}
+
+
+def test_a_project_with_only_a_root_pocket_has_no_drivers(tmp_path: Path) -> None:
+    derivation = _derive_in_pockets(
+        tmp_path,
+        "scripts/tool.py",
+        {"scripts/tool.py": "def tool():\n    return 1\n", RUNNER: RUNS_IN_EVAL},
+        pocket_roots=(".",),
+    )
+
+    assert _selected(derivation) == set()

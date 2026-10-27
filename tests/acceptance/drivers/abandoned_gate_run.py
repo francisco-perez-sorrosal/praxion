@@ -17,9 +17,9 @@ Bound here, because the specification or the base commit fixes them:
 - "no tool the systems do not ship" is a `PATH` of the systems' own directories plus a
   shim for this suite's interpreter, a scratch `HOME`, and no plugin root.
 
-Provisional (Spec Question on the stop allowance): a run past its bound is stopped within
-`STOP_ALLOWANCE_SECONDS` of the bound; scenarios wait that long before reading it as not
-stopped.
+A run past its bound is stopped no later than `STOP_ALLOWANCE_SECONDS` (30) past the bound.
+Scenarios measure from the moment the `record` call is cut off, which is after the run
+started, so the wait they allow never ends before the allowance does.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ SLOW_POCKET = "eval"
 SLOW_TESTS = "eval/tests/test_slow_pocket.py"
 BOUND_SECONDS = 15
 STOP_ALLOWANCE_SECONDS = 30
-_MARGIN_SECONDS = 5
+_MARGIN_SECONDS = 0
 SYSTEM_PATH = ("/usr/bin", "/bin", "/usr/sbin", "/sbin")
 
 

@@ -148,6 +148,17 @@ DRIVING_TEST = (
     "def test_the_eval_reports_its_version():\n"
     "    assert run_in_eval('from praxion_evals import core; print(core.version())')\n"
 )
+SELF_DRIVING_TEST = (
+    "import shutil\nimport subprocess\nfrom pathlib import Path\n\n"
+    'EVAL_PROJECT = Path(__file__).resolve().parents[1] / "eval"\n\n\n'
+    "def test_the_eval_reports_its_version():\n"
+    "    result = subprocess.run(\n"
+    '        [shutil.which("uv"), "run", "--project", str(EVAL_PROJECT), "python", "-c",\n'
+    '         "from praxion_evals import core; print(core.version())"],\n'
+    "        capture_output=True, text=True, timeout=600,\n"
+    "    )\n"
+    "    assert result.stdout\n"
+)
 PROJECT_EVAL_FILE = "eval/src/praxion_evals/core.py"
 PROJECT_DRIVING_TEST = "tests/acceptance/test_drives_the_eval.py"
 
@@ -204,6 +215,21 @@ def test_a_managed_projects_root_test_driving_its_eval_pocket_is_selected(
     selected = {test["path"]: test["because"] for test in pocket(payload, ".")["tests"]}
     assert selected.get(PROJECT_DRIVING_TEST) == PROJECT_EVAL_FILE, (
         f"the root test driving the eval was not selected for {PROJECT_EVAL_FILE}: {selected}"
+    )
+
+
+def test_a_managed_projects_root_test_that_itself_starts_the_eval_is_selected(
+    tmp_path: Path,
+) -> None:
+    repo = build_project(tmp_path, drives_the_eval=False)
+    repo.write("tests/test_starts_the_eval.py", SELF_DRIVING_TEST)
+    repo.commit_all("a root test that starts the eval itself")
+
+    payload = resolve(repo, "--changed", PROJECT_EVAL_FILE)
+
+    selected = {test["path"]: test["because"] for test in pocket(payload, ".")["tests"]}
+    assert selected.get("tests/test_starts_the_eval.py") == PROJECT_EVAL_FILE, (
+        f"the root test starting the eval itself was not selected: {selected}"
     )
 
 

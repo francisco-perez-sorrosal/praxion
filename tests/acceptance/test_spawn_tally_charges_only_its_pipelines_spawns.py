@@ -140,6 +140,18 @@ def test_a_slugless_spawn_in_another_checkout_bearing_the_slugs_name_is_never_ch
     assert "a-elsewhere" not in tally.agent_ids(), tally.describe()
 
 
+@pytest.mark.parametrize("kind", ["interactive", "unknown"])
+def test_from_a_checkout_not_named_after_the_slug_every_checkout_named_after_it_is_charged(
+    tmp_path: Path, checkouts: dict[str, Path], kind: str
+) -> None:
+    _session(tmp_path, kind, checkouts["pipeline"]).spawn_foreground(SLUGLESS, "a-in-pipeline")
+    _session(tmp_path, kind, checkouts["other"]).spawn_foreground(SLUGLESS, "a-elsewhere")
+
+    tally = spawn_count(checkouts["main"], SLUG, scratch=tmp_path / "tally", budget=99)
+
+    assert tally.agent_ids() == ["a-elsewhere", "a-in-pipeline"], tally.describe()
+
+
 # -- An unattributable spawn still withholds the verdict ---------------------------------------
 
 

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-27T18:30:32Z'
+generated_at: '2026-10-27T18:31:55Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3523,7 +3523,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-22'
+  last_modified: '2026-10-27'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3746,6 +3746,12 @@ surfaces:
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-gate-repairs-2026-10-27
+  path: .ai-state/specs/SPEC_gate-repairs_2026-10-27.md
+  type: markdown
+  title: 'Spec: gate-repairs (the five rows Phase 3 leans on)'
+  last_modified: '2026-10-27'
   renderer: default_markdown
 - id: ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   path: .ai-state/specs/SPEC_lean-spawn-continuation_2026-10-20.md
@@ -4428,6 +4434,7 @@ groups:
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
+  - ai-state-specs-spec-gate-repairs-2026-10-27
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-loop-gate-followups-2026-10-22

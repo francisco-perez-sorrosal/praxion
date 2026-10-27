@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-22T20:39:52Z'
+generated_at: '2026-10-27T05:29:47Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-16'
+  last_modified: '2026-10-23'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -3573,12 +3573,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-10-02'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.json
-  type: json
-  title: METRICS_REPORT_2026-09-06_19-30-28.json
-  last_modified: '2026-09-06'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.json
   type: json
@@ -3633,12 +3627,12 @@ surfaces:
   title: METRICS_REPORT_2026-10-19_12-13-43.json
   last_modified: '2026-10-19'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-06_19-30-28.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-09-06'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-26_12-19-04.json
+  type: json
+  title: METRICS_REPORT_2026-10-26_12-19-04.json
+  last_modified: '2026-10-26'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.md
   type: markdown
@@ -3692,6 +3686,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-10-19'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-10-26_12-19-04.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-10-26'
   renderer: default_markdown
 - id: ai-state-specs-spec-adherence-eval-2026-10-12
   path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
@@ -4372,8 +4372,6 @@ groups:
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
-  - ai-state-metrics-reports-metrics-report-2026-09-06-19-30-28
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
@@ -4392,6 +4390,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-10-12-14-30-52
   - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
   - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
+  - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
+  - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
   - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49

@@ -8,7 +8,9 @@ code serialises with `dataclasses.asdict`; the shapes the drivers read back are:
 
 - `arms.build` returns an arm set `{"arms": {arm: {"copy", "changes"}}}`, each change a
   `{"path", "sha256"}` mapping or a `[path, sha256]` pair (a removal carries no digest), or an
-  arm refusal `{"reason"}`; the two are told apart by the class name `ArmRefusal`.
+  arm refusal `{"reason"}`; the two are told apart by `refused`. A declaration the loader
+  refuses (`declaration.DeclarationError`, raised before `arms.build` runs) reads the same way:
+  `{"refused": true, "reason": <the loader's message>}`.
 - `arms.check_copy` returns the refusal's message or None.
 - `kit_git.tasks` returns the tasks `{"task_id", "fixture", "fixture_kind", "wording_variant",
   "wording", "named_files", "planted_credential"}`; `kit_git.build_fixture` returns the
@@ -51,6 +53,24 @@ declared = (
 """
 )
 
+# A declaration the loader refuses is the arm build's refusal too (the boundary refuses it before
+# `arms.build` runs). Only the declaration module's own error is caught: anything else raises.
+_LOAD_REFUSING = (
+    _PRELUDE
+    + """
+from praxion_evals.adherence.moves import declaration
+try:
+    declared = (
+        declaration.load(Path(request["declaration"]))
+        if request["declaration"]
+        else declaration.kit(request["move"])
+    )
+except declaration.DeclarationError as refusal:
+    emit({"refused": True, "reason": str(refusal)})
+    sys.exit(0)
+"""
+)
+
 _BUILD_ARMS = """
 from praxion_evals.adherence.moves import arms
 built = arms.build(declared, Path(request["checkout"]), Path(request["workspace"]))
@@ -76,7 +96,7 @@ emit(str(kit_git.build_fixture(declared, task, Path(request["where"]))))
 
 def build_arms(move: str, declaration: Path | None, checkout: Path, workspace: Path) -> Any:
     request = {"checkout": str(checkout), "workspace": str(workspace)}
-    return call_with_declaration(_BUILD_ARMS, move, declaration, request)
+    return call_with_declaration(_BUILD_ARMS, move, declaration, request, load=_LOAD_REFUSING)
 
 
 def check_copy(
@@ -98,12 +118,17 @@ def build_fixture(
 
 
 def call_with_declaration(
-    code: str, move: str, declaration: Path | None, request: Mapping[str, Any]
+    code: str,
+    move: str,
+    declaration: Path | None,
+    request: Mapping[str, Any],
+    *,
+    load: str = _LOAD,
 ) -> Any:
     """Run `code` with `declared` loaded: the file at `declaration`, or `move`'s own kit."""
     payload = {"move": move, "declaration": None if declaration is None else str(declaration)}
     return adherence_eval.run_in_eval(
-        _LOAD + code, {**payload, **request}, timeout=POCKET_TIMEOUT_SECONDS
+        load + code, {**payload, **request}, timeout=POCKET_TIMEOUT_SECONDS
     )
 
 

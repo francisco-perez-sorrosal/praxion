@@ -30,7 +30,8 @@ from typing import Any
 
 SESSION_START_ORIGINS = ("SessionStart", "instructions")
 HOOK_ATTACHMENT = "hook_additional_context"
-INSTRUCTION_ATTACHMENTS = ("instructions", "nested_memory")
+NESTED_MEMORY = "nested_memory"  # the attachment of a rule the harness loaded lazily
+INSTRUCTION_ATTACHMENTS = ("instructions", NESTED_MEMORY)
 
 
 @dataclass(frozen=True)
@@ -154,18 +155,16 @@ def _delivery(attachment: object) -> Iterator[Delivery]:
 
 
 def _delivered_text(kind: str, attachment: dict[str, Any]) -> str:
-    match kind:
-        case "instructions":
-            files = attachment.get("files")
-            if not isinstance(files, list):
-                raise _MalformedError("an instructions attachment carries no list of files")
-            return "\n".join(_file_text(file) for file in files)
-        case "nested_memory":
-            return _file_text(attachment.get("content"))
-        case _:
-            if "content" not in attachment:
-                raise _MalformedError(f"a {kind} attachment carries no content")
-            return _text(attachment["content"])
+    if kind == "instructions":
+        files = attachment.get("files")
+        if not isinstance(files, list):
+            raise _MalformedError("an instructions attachment carries no list of files")
+        return "\n".join(_file_text(file) for file in files)
+    if kind == NESTED_MEMORY:
+        return _file_text(attachment.get("content"))
+    if "content" not in attachment:
+        raise _MalformedError(f"a {kind} attachment carries no content")
+    return _text(attachment["content"])
 
 
 def _file_text(file: object) -> str:

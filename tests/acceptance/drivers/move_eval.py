@@ -22,10 +22,10 @@ Bound here, because the specification or the base commit fixes them:
   process from a declared read set and copied for each scenario.
 
 Unbound until a binding step ties them to the designed surface (each raises
-`UnboundDriverError` with the assumption's words): the dry run's printed form for a move; the move
-results file's fields; building and checking a move's arms; and the generated task list and its
-fixtures. A move's declaration and its known-bad variants are bound: `move_declarations` reads
-the kit's declaration file and writes each variant as that file edited.
+`UnboundDriverError` with the assumption's words): building and checking a move's arms; and the
+generated task list and its fixtures. A move's declaration and its known-bad variants are bound
+(`move_declarations` reads the kit's declaration file and writes each variant as that file
+edited), as are the dry run's printed lines and the move results file's keys.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, NoReturn
+from typing import Any, Literal, NoReturn
 
 from tests.acceptance.drivers import adherence_eval, move_declarations
 from tests.acceptance.drivers.adherence_eval import (
@@ -265,11 +265,77 @@ class MoveListing:
 
 
 def move_listing(stdout: str) -> MoveListing:
-    unbound(
-        "a move's dry run prints, for the floor run and the paired run, every session it would"
-        " launch with its task, fixture kind, wording variant and arm, the session count per"
-        " task and the totals, in a printed form not yet designed"
-    )
+    """Parse the printed dry run: `session`, `task`, `total` and `calibration` lines.
+
+    Lines of other shapes are ignored; a listing lacking its total or calibration line, or a
+    line of a known shape that does not parse, raises with the line.
+    """
+    sessions: list[PlannedMoveSession] = []
+    per_task: dict[tuple[RunKind, str], int] = {}
+    totals: dict[str, int] | None = None
+    calibration: int | None = None
+    for line in stdout.splitlines():
+        tokens = line.split()
+        kind = tokens[0] if tokens else ""
+        try:
+            if kind == "session":
+                _, run, task_id, fixture, fixture_kind, wording, arm = tokens
+                sessions.append(
+                    PlannedMoveSession(
+                        _run_kind(run),
+                        task_id,
+                        fixture,
+                        _fixture_kind(fixture_kind),
+                        wording,
+                        _arm(arm),
+                    )
+                )
+            elif kind == "task":
+                _, run, task_id, count = tokens
+                per_task[(_run_kind(run), task_id)] = _session_count(count)
+            elif kind == "total":
+                totals = dict(_keyed(token) for token in tokens[1:])
+                if set(totals) != {"floor", "paired", "all"}:
+                    raise ValueError(f"expected floor, paired and all, found {sorted(totals)}")
+            elif kind == "calibration":
+                calibration = _session_count(tokens[1])
+        except ValueError as error:
+            raise ValueError(f"unreadable dry-run line {line!r}: {error}") from error
+    if totals is None or calibration is None:
+        raise ValueError("the dry run printed no `total` line or no `calibration` line")
+    return MoveListing(tuple(sessions), per_task, totals, calibration)
+
+
+def _keyed(token: str) -> tuple[str, int]:
+    name, separator, value = token.partition("=")
+    if not separator:
+        raise ValueError(f"expected <name>=<n>, found {token!r}")
+    return name, int(value)
+
+
+def _session_count(token: str) -> int:
+    name, count = _keyed(token)
+    if name != "sessions":
+        raise ValueError(f"expected sessions=<n>, found {token!r}")
+    return count
+
+
+def _run_kind(value: str) -> RunKind:
+    if value not in ("floor", "paired"):
+        raise ValueError(f"run {value!r} is neither floor nor paired")
+    return value
+
+
+def _fixture_kind(value: str) -> FixtureKind:
+    if value not in FIXTURE_KINDS:
+        raise ValueError(f"fixture kind {value!r} is neither managed nor unmanaged")
+    return value
+
+
+def _arm(value: str) -> Arm:
+    if value not in MOVE_ARMS:
+        raise ValueError(f"arm {value!r} is not full, lean or floor")
+    return value
 
 
 # -- The move results file --------------------------------------------------------------------
@@ -313,12 +379,69 @@ class MoveResults:
 
 
 def read_move_results(path: Path) -> MoveResults:
-    unbound(
-        "a move run's results file names its subject as a move with the move's identity (the"
-        " moved rule's text and every declared change with its content), its pinned settings per"
-        " arm, its allowance method, launch orders, the cited floor lineage and each refused"
-        " take's reason, in fields not yet designed"
-    )
+    """Read a move results file; keys outside the format are ignored, a missing one raises."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{path} is not a JSON move results file: {error}") from error
+
+    def need(*keys: str) -> Any:
+        value = document
+        for depth, key in enumerate(keys):
+            if not isinstance(value, dict) or key not in value:
+                raise ValueError(
+                    f"{path}: the move results file lacks {'.'.join(keys[: depth + 1])!r}"
+                )
+            value = value[key]
+        return value
+
+    if need("schema") != "move-results/1":
+        raise ValueError(f"{path}: schema {need('schema')!r} is not move-results/1")
+    sessions = need("sessions")
+    try:
+        return MoveResults(
+            subject_kind=need("subject", "kind"),
+            subject=need("subject", "name"),
+            run_kind=_run_kind(need("run_kind")),
+            moved_rule_text=need("identity", "moved_rule_text"),
+            declared_changes={
+                _arm(arm): tuple(DeclaredChange(c["path"], c["sha256"]) for c in changes)
+                for arm, changes in need("identity", "arms").items()
+            },
+            allowance_method=need("allowance_method"),
+            pinned={
+                _arm(arm): PinnedSettings(**_pinned(values))
+                for arm, values in need("pinned").items()
+            },
+            declared_at=need("declared_at"),
+            first_launch_at=need("first_launch_at"),
+            checks_graded=frozenset(name for session in sessions for name in session["checks"]),
+            complete_pairs=need("complete_pairs"),
+            verdicts=need("verdicts"),
+            launch_orders={
+                task: (_arm(first), _arm(second))
+                for task, (first, second) in need("launch_orders").items()
+            },
+            seed=need("seed"),
+            cited_floor_lineage=tuple(need("cited_floor")),
+            ending=need("ending", "kind"),
+            refusal_reasons={
+                session["session_id"]: session["reason"]
+                for session in sessions
+                if session["status"] == "refused"
+            },
+            earlier_floor_runs=tuple(need("earlier_runs", "floor")),
+            earlier_paired_runs=tuple(need("earlier_runs", "paired")),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            f"{path}: a malformed field in the move results file: {error!r}"
+        ) from error
+
+
+def _pinned(values: Mapping[str, str]) -> dict[str, str]:
+    keys = ("commit_attribution", "model", "effort", "user_instructions")
+    return {key: values[key] for key in keys}
 
 
 def role_index_entries(checkout: Path) -> dict[str, object]:

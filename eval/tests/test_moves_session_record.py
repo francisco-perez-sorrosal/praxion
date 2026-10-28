@@ -12,7 +12,7 @@ import pytest
 
 from praxion_evals.adherence.moves import session_record
 from praxion_evals.adherence.moves.session_record import (
-    Arrival,
+    Delivery,
     Parsed,
     ToolResult,
     ToolUse,
@@ -27,8 +27,17 @@ def hook_context(event: str, text: str, **extra: Any) -> Entry:
     return {"type": "attachment", "attachment": {**attachment, **extra}}
 
 
-def instructions(text: str) -> Entry:
-    return {"type": "attachment", "attachment": {"type": "instructions", "content": text}}
+def instructions(*texts: str) -> Entry:
+    files = [
+        {"path": f"/work/rule-{n}.md", "type": "Project", "content": t} for n, t in enumerate(texts)
+    ]
+    return {"type": "attachment", "attachment": {"type": "instructions", "files": files}}
+
+
+def lazy_rule(text: str) -> Entry:
+    file = {"path": "/work/rules/x.md", "type": "Project", "content": text, "globs": ["x/**"]}
+    attachment = {"type": "nested_memory", "path": file["path"], "content": file}
+    return {"type": "attachment", "attachment": attachment}
 
 
 def tool_call(use_id: str, name: str, tool_input: Mapping[str, Any]) -> Entry:
@@ -75,8 +84,8 @@ def test_events_come_back_in_the_order_the_record_gives_them(tmp_path):
     )
 
     assert parsed(path).events == (
-        Arrival("SessionStart", "start text"),
-        Arrival("PreToolUse", "use text", tool_use_id="toolu_1"),
+        Delivery("SessionStart", "start text"),
+        Delivery("PreToolUse", "use text", tool_use_id="toolu_1"),
         ToolUse("toolu_1", "Bash", "git commit -m x", None),
         ToolResult("toolu_1", "[main 1a2b] x"),
     )
@@ -100,15 +109,15 @@ def test_instruction_files_and_lazy_rule_loads_arrive_as_the_harness_names_them(
     path = write_record(
         tmp_path / "s.jsonl",
         [
-            instructions("eager rule text"),
-            {"type": "attachment", "attachment": {"type": "nested_memory", "content": "lazy"}},
+            instructions("eager rule text", "second file"),
+            lazy_rule("lazy"),
         ],
     )
 
-    arrivals = parsed(path).arrivals
+    arrivals = parsed(path).deliveries
 
     assert [(a.origin, a.text, a.at_session_start) for a in arrivals] == [
-        ("instructions", "eager rule text", True),
+        ("instructions", "eager rule text\nsecond file", True),
         ("nested_memory", "lazy", False),
     ]
 
@@ -124,7 +133,20 @@ def test_records_that_deliver_no_text_are_not_events(tmp_path):
         ],
     )
 
-    assert parsed(path).events == (Arrival("SessionStart", "start"),)
+    assert parsed(path).events == (Delivery("SessionStart", "start"),)
+
+
+def test_a_tool_result_part_without_text_is_skipped_not_refused(tmp_path):
+    parts = [{"type": "tool_reference", "tool_name": "Bash"}, {"type": "image", "source": {}}]
+    path = write_record(
+        tmp_path / "s.jsonl",
+        [
+            hook_context("SessionStart", "start"),
+            tool_output("toolu_1", [*parts, {"type": "text", "text": "found"}]),
+        ],
+    )
+
+    assert parsed(path).events[-1] == ToolResult("toolu_1", "found")
 
 
 def test_a_tool_result_given_as_a_plain_string_is_read(tmp_path):
@@ -186,7 +208,15 @@ def test_a_missing_record_is_unreadable_naming_the_path(tmp_path):
     [
         {"type": "attachment", "attachment": {"type": "hook_additional_context", "content": ["x"]}},
         {"type": "attachment", "attachment": {"type": "instructions"}},
+        {"type": "attachment", "attachment": {"type": "instructions", "files": [{"path": "x"}]}},
         {"type": "attachment", "attachment": {"type": "nested_memory", "content": {"a": 1}}},
+        {"type": "attachment", "attachment": {"type": "nested_memory", "content": "bare"}},
+        {
+            "type": "user",
+            "message": {
+                "content": [{"type": "tool_result", "tool_use_id": "t", "content": [{"x": 1}]}]
+            },
+        },
         {"type": "attachment"},
         {
             "type": "assistant",
@@ -199,8 +229,11 @@ def test_a_missing_record_is_unreadable_naming_the_path(tmp_path):
     ],
     ids=[
         "hook-without-event",
-        "instructions-without-text",
-        "text-of-no-known-shape",
+        "instructions-without-files",
+        "instructions-file-without-text",
+        "lazy-load-without-file-text",
+        "lazy-load-as-bare-text",
+        "result-part-of-no-known-shape",
         "attachment-without-object",
         "call-without-id",
         "result-without-call",

@@ -14,6 +14,7 @@ from praxion_evals.adherence.moves.model import MoveDeclaration
 from tests.test_moves_session_record import (
     hook_context,
     instructions,
+    lazy_rule,
     prompt,
     tool_call,
     write_record,
@@ -73,6 +74,19 @@ def test_a_lean_session_with_its_kernel_and_the_rest_at_the_point_of_use_is_scor
     move, checkout, tmp_path
 ):
     result = prove(move, checkout, "lean", session(tmp_path, KERNEL, "\n".join(OTHERS)))
+
+    assert result.scored
+    assert not result.trigger_failure
+
+
+def test_a_lean_session_whose_rest_of_the_rule_was_loaded_lazily_is_scored_without_a_failure(
+    move, checkout, tmp_path
+):
+    record = write_record(
+        tmp_path / "s.jsonl", [instructions(KERNEL), lazy_rule("\n".join(OTHERS))]
+    )
+
+    result = prove(move, checkout, "lean", record)
 
     assert result.scored
     assert not result.trigger_failure
@@ -146,7 +160,7 @@ def test_text_loaded_as_an_instruction_file_counts_as_arriving_at_session_start(
     assert prove(move, checkout, "full", record).scored
 
 
-def test_a_lean_rule_text_arriving_at_the_point_of_use_never_stands_in_for_the_start(
+def test_a_full_session_given_the_rule_only_at_the_point_of_use_is_refused(
     move, checkout, tmp_path
 ):
     result = prove(move, checkout, "full", session(tmp_path, UNRELATED, WHOLE))

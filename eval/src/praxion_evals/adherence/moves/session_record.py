@@ -4,8 +4,8 @@ This is the only reader of the raw record: the take proof and the trigger record
 events it returns and never touch the file. The record is the harness's JSONL (one JSON object
 per line); the events are the three things a score needs, in the order the record gives them:
 
-- ``Arrival``: text that entered the session, by a hook (``hook_additional_context``, whose
-  ``hookEvent`` names the channel), as an eager instruction file (``instructions``) or as a lazy
+- ``Delivery``: text that entered the session, by a hook (``hook_additional_context``, whose
+  ``hookEvent`` names the channel), as eager instruction files (``instructions``) or as a lazy
   rule load (``nested_memory``);
 - ``ToolUse``: a tool call the session composed;
 - ``ToolResult``: what that call printed, which is where a gate's refusal reads.
@@ -13,9 +13,11 @@ per line); the events are the three things a score needs, in the order the recor
 A record that cannot say what arrived is ``Unreadable`` with the reason, never an empty
 success: a line that is not a JSON object, a known record or attachment of a shape no reader
 knows, or a record showing no arrival at session start (a harness that does not record arrivals
-at all). The shapes are the harness's as probed (Claude Code 2.1.302) and as the move stand-in
-plants them; a version that writes them differently reads as unreadable, so it is never scored
-from a mis-parse.
+at all). The shapes are the harness's as read from its own records (Claude Code 2.1.283 to
+2.1.312): ``instructions`` holds ``files`` of ``{path, type, content}``, ``nested_memory`` holds
+one such file as ``content``, a hook holds ``content`` as text; the move stand-in plants the hook
+form. A version that writes them differently reads as unreadable, so it is never scored from a
+mis-parse. A part that carries no text (an image, a tool reference) is skipped, not refused.
 """
 
 from __future__ import annotations
@@ -29,11 +31,10 @@ from typing import Any
 SESSION_START_ORIGINS = ("SessionStart", "instructions")
 HOOK_ATTACHMENT = "hook_additional_context"
 INSTRUCTION_ATTACHMENTS = ("instructions", "nested_memory")
-ATTACHMENT_TEXT_KEYS = ("content", "rawContent")
 
 
 @dataclass(frozen=True)
-class Arrival:
+class Delivery:
     origin: str  # the hook event, or the attachment type of a file the harness loaded
     text: str
     tool_use_id: str | None = None  # the call a tool hook fired for, when the record names it
@@ -57,7 +58,7 @@ class ToolResult:
     text: str
 
 
-Event = Arrival | ToolUse | ToolResult
+Event = Delivery | ToolUse | ToolResult
 
 
 @dataclass(frozen=True)
@@ -65,8 +66,8 @@ class Parsed:
     events: tuple[Event, ...]
 
     @property
-    def arrivals(self) -> tuple[Arrival, ...]:
-        return tuple(event for event in self.events if isinstance(event, Arrival))
+    def deliveries(self) -> tuple[Delivery, ...]:
+        return tuple(event for event in self.events if isinstance(event, Delivery))
 
 
 @dataclass(frozen=True)
@@ -96,7 +97,7 @@ def parse(path: Path) -> SessionEvents:
     except _MalformedError as error:
         return Unreadable(f"the session record at {path} is not one this reader knows: {error}")
     parsed = Parsed(events)
-    if not any(arrival.at_session_start for arrival in parsed.arrivals):
+    if not any(delivery.at_session_start for delivery in parsed.deliveries):
         return Unreadable(
             f"the session record at {path} shows no arrival at session start, so it cannot say"
             " what the session was given"
@@ -125,7 +126,7 @@ def _record_events(number: int, record: dict[str, Any]) -> Iterator[Event]:
     try:
         match record.get("type"):
             case "attachment":
-                yield from _arrival(record.get("attachment"))
+                yield from _delivery(record.get("attachment"))
             case "assistant":
                 yield from _tool_uses(record)
             case "user":
@@ -134,7 +135,7 @@ def _record_events(number: int, record: dict[str, Any]) -> Iterator[Event]:
         raise _MalformedError(f"line {number}: {error}") from error
 
 
-def _arrival(attachment: object) -> Iterator[Arrival]:
+def _delivery(attachment: object) -> Iterator[Delivery]:
     if not isinstance(attachment, dict):
         raise _MalformedError("an attachment record carries no attachment object")
     kind = attachment.get("type")
@@ -147,14 +148,31 @@ def _arrival(attachment: object) -> Iterator[Arrival]:
     else:
         return  # an attachment that delivers no text to the session
     use_id = attachment.get("toolUseID")
-    yield Arrival(origin, _attachment_text(attachment), use_id if isinstance(use_id, str) else None)
+    yield Delivery(
+        origin, _delivered_text(kind, attachment), use_id if isinstance(use_id, str) else None
+    )
 
 
-def _attachment_text(attachment: dict[str, Any]) -> str:
-    for key in ATTACHMENT_TEXT_KEYS:
-        if key in attachment:
-            return _text(attachment[key])
-    raise _MalformedError(f"a {attachment['type']} attachment carries no {ATTACHMENT_TEXT_KEYS[0]}")
+def _delivered_text(kind: str, attachment: dict[str, Any]) -> str:
+    match kind:
+        case "instructions":
+            files = attachment.get("files")
+            if not isinstance(files, list):
+                raise _MalformedError("an instructions attachment carries no list of files")
+            return "\n".join(_file_text(file) for file in files)
+        case "nested_memory":
+            return _file_text(attachment.get("content"))
+        case _:
+            if "content" not in attachment:
+                raise _MalformedError(f"a {kind} attachment carries no content")
+            return _text(attachment["content"])
+
+
+def _file_text(file: object) -> str:
+    text = file.get("content") if isinstance(file, dict) else None
+    if not isinstance(text, str):
+        raise _MalformedError("a loaded file carries no text")
+    return text
 
 
 def _tool_uses(record: dict[str, Any]) -> Iterator[ToolUse]:
@@ -187,17 +205,20 @@ def _blocks(record: dict[str, Any], kind: str) -> Iterator[dict[str, Any]]:
 
 
 def _text(content: object) -> str:
-    """Text held as a string, or as a list of strings and ``{"text": ...}`` blocks."""
+    """Text held as a string, or as a list of strings and typed blocks (those without text skipped)."""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return "\n".join(_text_part(part) for part in content)
+        return "\n".join(text for text in map(_text_part, content) if text is not None)
     raise _MalformedError(f"text is held as a string or a list, not {type(content).__name__}")
 
 
-def _text_part(part: object) -> str:
+def _text_part(part: object) -> str | None:
     if isinstance(part, str):
         return part
-    if isinstance(part, dict) and isinstance(part.get("text"), str):
-        return part["text"]
-    raise _MalformedError("a part of the text is neither a string nor a text block")
+    if isinstance(part, dict):
+        if isinstance(part.get("text"), str):
+            return part["text"]
+        if isinstance(part.get("type"), str):
+            return None  # a typed block that carries no text, such as an image or a tool reference
+    raise _MalformedError("a part of the text is neither a string nor a typed block")

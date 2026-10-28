@@ -23,14 +23,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
 
-from praxion_evals.adherence.moves import session_record
+from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT
+from praxion_evals.adherence.moves import arms, session_record
 from praxion_evals.adherence.moves.model import KernelDerive, MoveArm, MoveDeclaration, Take
-from praxion_evals.adherence.moves.session_record import Arrival, Parsed
+from praxion_evals.adherence.moves.session_record import Delivery, Parsed
 
-CHECKOUT_ROOT = Path(__file__).resolve().parents[5]  # the checkout whose rule a session was given
 CODE_FENCE = "```"
 HEADING = "#"
-_FRONTMATTER_FENCE = "---"
 QUOTED_LINES = 1  # how many missing or carried lines a refusal quotes
 
 
@@ -119,31 +118,18 @@ def _quote(lines: tuple[str, ...]) -> str:
 
 
 def _read_rule(declaration: MoveDeclaration, checkout: Path) -> _Rule:
-    path = checkout / declaration.moved_rule.value
+    """The rule's prose lines, and the ones the arm builder's own kernel keeps."""
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as error:
-        raise _RefusalError(f"the moved rule at {path} cannot be read: {error}") from error
-    body = [line.rstrip() for line in _without_frontmatter(text).splitlines()]
-    prefixes = tuple(
-        prefix
-        for change in declaration.arms.for_arm("lean")
-        if isinstance(change, KernelDerive)
-        for prefix in change.prefixes
-    )
-    prose = tuple(line.strip() for line in body if _is_prose(line))
-    kernel = tuple(line.strip() for line in body if _is_prose(line) and line.startswith(prefixes))
-    return _Rule(prose, kernel)
-
-
-def _without_frontmatter(text: str) -> str:
-    lines = text.splitlines(keepends=True)
-    if not lines or lines[0].strip() != _FRONTMATTER_FENCE:
-        return text
-    for end, line in enumerate(lines[1:], start=1):
-        if line.strip() == _FRONTMATTER_FENCE:
-            return "".join(lines[end + 1 :])
-    return text
+        lines = arms.file_lines(checkout, declaration.moved_rule.value)
+        kernels = (
+            arms.kernel_text(change, declaration, checkout)
+            for change in declaration.arms.for_arm("lean")
+            if isinstance(change, KernelDerive)
+        )
+        kernel = tuple(line.strip() for text in kernels for line in text.splitlines())
+    except arms.ArmError as error:
+        raise _RefusalError(f"the moved rule cannot be read: {error}") from error
+    return _Rule(tuple(filter(_is_prose, lines)), tuple(filter(_is_prose, kernel)))
 
 
 def _is_prose(line: str) -> bool:
@@ -165,14 +151,17 @@ def _read_record(record_path: Path) -> Parsed:
 
 def _arrived_lines(events: Parsed) -> tuple[frozenset[str], frozenset[str]]:
     """The lines that arrived at session start, and the lines that arrived later."""
-    arrivals = events.arrivals
+    deliveries = events.deliveries
     return (
-        _lines_of(a for a in arrivals if a.at_session_start),
-        _lines_of(a for a in arrivals if not a.at_session_start),
+        _lines_of(d for d in deliveries if d.at_session_start),
+        _lines_of(d for d in deliveries if not d.at_session_start),
     )
 
 
-def _lines_of(arrivals: Iterable[Arrival]) -> frozenset[str]:
+def _lines_of(deliveries: Iterable[Delivery]) -> frozenset[str]:
     return frozenset(
-        line.strip() for arrival in arrivals for line in arrival.text.splitlines() if line.strip()
+        line.strip()
+        for delivery in deliveries
+        for line in delivery.text.splitlines()
+        if line.strip()
     )

@@ -185,7 +185,7 @@ def attempt[R](
     reserved = ledger.reserve(budget)
     if isinstance(reserved, LiveErrored):
         return ledger, finish(Errored("launch_refused", reserved.detail), 0.0)
-    root = _new_sandbox_root(launch, task)
+    root = new_sandbox_root(launch, task)
     try:
         try:
             spec, commit = _prepare(launch, task, build, populate, page_url, root)
@@ -196,8 +196,8 @@ def attempt[R](
             run = run_session(spec, env)
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
-        settled, charged = _settle(reserved, budget, run)
-        tails, model = _tails_of(run, env, launch.tail_chars), _resolved_model(run)
+        settled, charged = settle(reserved, budget, run)
+        tails, model = tails_of(run, env, launch.tail_chars), resolved_model(run)
         try:
             evidence = _evidence(launch, task, build, page_url, root, run, commit)
             return settled, finish(assess(evidence), charged, tails, model)
@@ -212,7 +212,7 @@ def _crash(error: Exception) -> Errored:
     return Errored("evaluation_exception", f"{type(error).__name__}: {error}")
 
 
-def _new_sandbox_root(launch: Launch, task: TaskSpec) -> Path:
+def new_sandbox_root(launch: Launch, task: TaskSpec) -> Path:
     parent = launch.run_root / task.role / "sessions"
     parent.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix="s-", dir=parent))
@@ -244,19 +244,19 @@ def _prepare(
     return spec, commit
 
 
-def _settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:
+def settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:
     """Settle the reservation at the reported cost, or at the full budget when none was reported."""
     final = parse_stream(run.stdout).final_result
     cost = None if final is None else final.total_cost_usd
     return ledger.settle(budget, cost), budget if cost is None else cost
 
 
-def _resolved_model(run: SessionRun) -> str | None:
+def resolved_model(run: SessionRun) -> str | None:
     init = parse_stream(run.stdout).init
     return None if init is None else init.model
 
 
-def _tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTail:
+def tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTail:
     """The end of the session's error output and of its result text, with the credentials
     the session was given (and any API key shape) redacted before the bound clips them."""
     final = parse_stream(run.stdout).final_result

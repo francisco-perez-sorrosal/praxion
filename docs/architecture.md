@@ -205,7 +205,7 @@ The hand-kept test topology (`.ai-state/TEST_TOPOLOGY.md`, its schema reference,
 ### 9.2 Caveats developers should know
 
 - To debug a single test, use `-n 0`. `-p no:xdist` fails with `unrecognized arguments: -n --dist` because `addopts` carries `-n auto`.
-- Coverage is not in the default run. CI requests it explicitly with `--cov-fail-under=80`; `/project-metrics --refresh-coverage` passes `--cov` itself.
+- Coverage is not in the default run. CI requests it explicitly in each of the root suite's shards (`--shard K/N`, `tests/support/pytest_shard.py`) and holds the 80% floor over their combined data; `/project-metrics --refresh-coverage` passes `--cov` itself.
 - Every selected test carries `via` (layout, import, path-literal, declared, pocket-drive: a root test that starts another pocket through `uv run --project` in a child process, or imports a module that does) and `because` (the changed file) in `--json`, so a surprising selection can be traced.
 - A change the resolver cannot map, a change to the resolver itself, and a bad declared list all widen to the full suite. It never narrows.
 - The resolver parses every tracked `.py` file; a selection takes about 2 s.

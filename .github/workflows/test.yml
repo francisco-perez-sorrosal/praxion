@@ -98,15 +98,37 @@ jobs:
     # REMAINING DRAG: auto_complete_install.py is still 38.1%. It is the last
     # member of the original list and the reason this went to 80 rather than
     # 82 -- the margin absorbs it. Raise toward 82 when it is covered.
-    name: Test root suite
+    #
+    # SHARDED since 2026-10-27 (td-512). One 4-CPU job stopped fitting: the
+    # suite ran 12.5 min on CI with no coverage (scheduled run of 2026-10-26),
+    # and branch coverage on 3.11 slows its in-process code further, so every
+    # push from 2026-10-23 hit the 15-min limit with no test failed. Each shard
+    # runs the tests whose node id hashes to it (tests/support/pytest_shard.py):
+    # every test is in exactly one shard by construction, so the shards run the
+    # whole suite with no file list to keep in step, and the count is the
+    # matrix's length alone. The coverage floor moves to the job below, which
+    # combines the shards' data, so it measures the same set as before.
+    name: Test root suite (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
     concurrency:
-      group: test-root-${{ github.ref }}
+      group: test-root-${{ github.ref }}-${{ matrix.shard }}
       cancel-in-progress: true
 
+    outputs:
+      shard-count: ${{ steps.shards.outputs.count }}  # every shard writes the same value
+
     steps:
+      - name: Name the shard count for the coverage floor
+        id: shards
+        run: echo "count=${{ strategy.job-total }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -127,20 +149,28 @@ jobs:
         # precondition so the tier cannot stop running without saying so.
         run: command -v jq
 
-      - name: Pytest (tests/ + scripts/ + hooks/ + skills/)
-        # One measured run over every `testpaths` entry -- `hooks` joined on
-        # 2026-08-06 (retiring a separate `--no-cov` step that threw hook
-        # coverage away), `skills` on 2026-09-27. Parallel via pyproject
-        # addopts (`-n auto`); pytest-cov combines the workers' data.
-        # Coverage is requested HERE, not in addopts: it is the backstop's
-        # measurement, and the default local run stays uninstrumented.
+      - name: Pytest (this shard of tests/ + scripts/ + hooks/ + skills/)
+        # One measured run over this shard of every `testpaths` entry --
+        # `hooks` joined on 2026-08-06 (retiring a separate `--no-cov` step
+        # that threw hook coverage away), `skills` on 2026-09-27. Parallel via
+        # pyproject addopts (`-n auto`); pytest-cov combines the workers' data
+        # into this shard's COVERAGE_FILE. Coverage is requested HERE, not in
+        # addopts: it is the backstop's measurement, and the default local run
+        # stays uninstrumented. `python -m` puts the repository root on
+        # sys.path, which the `-p` plugin import needs before pytest's own
+        # `pythonpath` setting applies.
+        env:
+          COVERAGE_FILE: .coverage.shard-${{ matrix.shard }}
         run: >-
-          uv run --frozen pytest
-          --cov --cov-config=pyproject.toml --cov-report=xml
-          --cov-report=term-missing --cov-fail-under=80
-          --junitxml=junit.xml
+          uv run --frozen python -m pytest
+          -p tests.support.pytest_shard
+          --shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          --cov --cov-config=pyproject.toml --cov-report=
+          --junitxml=junit-shard-${{ matrix.shard }}.xml
 
       - name: Shell test suites
+        # Not pytest items, so not sharded: the first shard runs them all.
+        if: matrix.shard == 1
         # `tests/*.sh` are bash suites that pytest cannot collect, so nothing
         # ran them and nothing reported them red. `new_project_test.sh` T7
         # asserts the canonical .gitignore block byte-for-byte and sat failing
@@ -190,6 +220,67 @@ jobs:
           grep -h '^\[SKIP\]' "${logdir}"/*.log 2>/dev/null \
             | sed 's/^/::notice::shell suite skip: /' || true
 
+      - name: Upload this shard's coverage data and test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: root-shard-${{ matrix.shard }}
+          path: |
+            .coverage.shard-${{ matrix.shard }}
+            junit-shard-${{ matrix.shard }}.xml
+          include-hidden-files: true  # the coverage data file's name starts with a dot
+          if-no-files-found: warn
+
+  test-root-coverage:
+    # The coverage floor over the whole root suite, moved here when the suite
+    # was sharded: it combines every shard's data, so it measures the same set
+    # one run measured before. It runs only when every shard passed (a failed
+    # shard is already a red check), and it refuses to judge a floor over data
+    # from fewer shards than the matrix ran, which would read low or high for
+    # the wrong reason.
+    name: Test root suite (coverage floor)
+    needs: test-root
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    concurrency:
+      group: test-root-coverage-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Download the shards' coverage data and test reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: root-shard-*
+          path: shards
+          merge-multiple: true
+
+      - name: Combine the shards and check the floor
+        env:
+          SHARDS: ${{ needs.test-root.outputs.shard-count }}
+        run: |
+          set -eo pipefail
+          shopt -s nullglob
+          data=(shards/.coverage.shard-*)
+          if [ "${#data[@]}" -ne "${SHARDS}" ]; then
+            echo "::error::Expected coverage data from ${SHARDS} shards, found ${#data[@]}: ${data[*]}"
+            exit 1
+          fi
+          uv run --frozen coverage combine "${data[@]}"
+          uv run --frozen coverage xml
+          uv run --frozen coverage report --fail-under=80
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -197,7 +288,7 @@ jobs:
           name: root-coverage
           path: |
             coverage.xml
-            junit.xml
+            shards/junit-shard-*.xml
           if-no-files-found: warn
 
   test-dashboard:

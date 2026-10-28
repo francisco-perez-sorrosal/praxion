@@ -39,6 +39,17 @@ ADR_RULE = "rules/swe/adr-conventions.md"
 STAGE_LINE = "- Stage specific files by name — avoid `git add -A` or `git add .`"
 NOT_IN_THE_KERNEL = "- Prefer small, focused commits over large sweeping ones"
 READ_TREES = ("rules", "lib", "hooks")
+# Read by the build: both rules exports (reach) and the user-instruction renderer (pinning).
+READ_FILES = (
+    "cursor/config/export-cursor-rules.py",
+    "codex/config/export-codex-rules-bridge.py",
+    *(
+        f"codex/config/{path.name}"
+        for path in (REPO_ROOT / "codex/config").glob("rules_bridge_*.py")
+    ),
+    "claude/config/CLAUDE.md.tmpl",
+    "scripts/render_claude_md.py",
+)
 COMMIT = {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}
 SESSION_START = {"source": "startup"}
 
@@ -49,6 +60,9 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("arms") / "checkout"
     for tree in READ_TREES:
         shutil.copytree(REPO_ROOT / tree, root / tree, ignore=shutil.ignore_patterns("__pycache__"))
+    for relpath in READ_FILES:
+        (root / relpath).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relpath, root / relpath)
     return root
 
 
@@ -136,8 +150,9 @@ def test_a_building_arm_leaves_no_bytecode_cache_in_its_copy(first_move):
 def test_the_kernel_is_the_moved_rules_lines_in_the_rules_order(first_move):
     kernel = (first_move.arms["lean"].copy / GIT_KERNEL).read_text(encoding="utf-8").splitlines()
 
-    assert kernel[0] == STAGE_LINE
-    assert len(kernel) == 6
+    assert kernel[0] == "## Git Conventions"  # the title keeps the file a rule both exporters read
+    assert kernel[1] == STAGE_LINE
+    assert len(kernel) == 7
     assert NOT_IN_THE_KERNEL not in kernel
 
 

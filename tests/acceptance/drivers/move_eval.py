@@ -23,8 +23,9 @@ Bound here, because the specification or the base commit fixes them:
 Unbound until a binding step ties them to the designed surface (each raises
 `UnboundDriverError` with the assumption's words): how the operator names a move, picks its
 floor or paired run and cites a floor run; the dry run's printed form for a move; the move
-results file's fields; building and checking a move's arms; the move declarations and their
-known-bad variants; and the generated task list and its fixtures.
+results file's fields; building and checking a move's arms; and the generated task list and its
+fixtures. A move's declaration and its known-bad variants are bound: `move_declarations` reads
+the kit's declaration file and writes each variant as that file edited.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NoReturn
 
-from tests.acceptance.drivers import adherence_eval
+from tests.acceptance.drivers import adherence_eval, move_declarations
 from tests.acceptance.drivers.adherence_eval import (
     DUMMY_CREDENTIAL,
     EVAL_PROJECT,
@@ -344,11 +345,27 @@ class MoveDeclaration:
     fixture_kinds: tuple[FixtureKind, ...]  # one kind only when the move says so
 
 
+_SCOPE_KINDS: dict[str, tuple[FixtureKind, ...]] = {
+    "both": FIXTURE_KINDS,
+    "managed": ("managed",),
+    "unmanaged": ("unmanaged",),
+}
+
+
 def kit_declaration(move: str) -> MoveDeclaration:
-    unbound(
-        "a move's kit declares its arms' changes, its governed checks (each naming a rule file,"
-        " a section and the phrases a task wording may not carry), the lean arm's resident"
-        " kernel and the fixture kinds it changes delivery in, in a form not yet designed"
+    """The move's kit declaration, as its file at the base of the kit directory declares it."""
+    return _parse_declaration(move_declarations.kit_payload(move))
+
+
+def _parse_declaration(payload: move_declarations.Payload) -> MoveDeclaration:
+    return MoveDeclaration(
+        move=payload["move"],
+        checks=tuple(
+            GovernedCheck(c["name"], c["rule_file"], c["section"], tuple(c["phrases"]))
+            for c in payload["checks"]
+        ),
+        resident_kernel=move_declarations.resident_kernel(payload),
+        fixture_kinds=_SCOPE_KINDS[payload["fixture_scope"]],
     )
 
 
@@ -380,10 +397,8 @@ class Declared:
 
 
 def declare(move: str, variant: Variant, workspace: Path) -> Declared:
-    unbound(
-        f"the runner reads a move declaration a scenario writes, and the driver can write the"
-        f" {move} declaration with this variation: {variant}"
-    )
+    """The declaration the runner reads for `move` under `variant`, written under `workspace`."""
+    return Declared(move, variant, move_declarations.write_variant(move, variant, workspace))
 
 
 @dataclass(frozen=True)

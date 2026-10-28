@@ -10,7 +10,8 @@ Bound here, because the specification or the base commit fixes them:
 
 - the console entry and its existing options `--dry-run`, `--report`, `--continue`,
   `--close`, `--reason`, `--reindex`, `--max-tasks` and `--stop-count`, reached as the
-  adherence driver reaches it (`adherence_eval`), with a `claude` stand-in first on `PATH`;
+  adherence driver reaches it (`adherence_eval`), with a `claude` stand-in first on `PATH`, and
+  the move options `--move`, `--run`, `--floor-run` and `--declaration`;
 - the first move's name, `git-conventions`, its rule `rules/swe/vcs/git-conventions.md`, the
   second move's name, `adr-conventions`, and the arm names `full`, `lean` and `floor`;
 - the defaults a dry run prices: 24 tasks paired (48 sessions) and 8 floor sessions;
@@ -21,8 +22,7 @@ Bound here, because the specification or the base commit fixes them:
   process from a declared read set and copied for each scenario.
 
 Unbound until a binding step ties them to the designed surface (each raises
-`UnboundDriverError` with the assumption's words): how the operator names a move, picks its
-floor or paired run and cites a floor run; the dry run's printed form for a move; the move
+`UnboundDriverError` with the assumption's words): the dry run's printed form for a move; the move
 results file's fields; building and checking a move's arms; and the generated task list and its
 fixtures. A move's declaration and its known-bad variants are bound: `move_declarations` reads
 the kit's declaration file and writes each variant as that file edited.
@@ -178,12 +178,27 @@ class MoveRun:
 
 
 def move_arguments(run: MoveRun) -> list[str]:
-    """The entry's command line for `run`, after the checkout positional."""
-    unbound(
-        "the operator names a move in place of a role, chooses its floor run or its paired run,"
-        " and has a paired run cite a floor run's results file, by options of the adherence"
-        " entry not yet designed; a dry run names the move alone and prices both runs"
-    )
+    """The entry's command line for `run`, after the checkout positional.
+
+    A move run names its run kind and, for a paired run, the floor results file it cites; a dry
+    run names neither, because it prices both runs.
+    """
+    if run.dry_run == (run.kind is not None):
+        raise ValueError(f"a dry run names no run kind and any other run names one: {run}")
+    args = ["--move", run.move, *_run_kind_arguments(run), "--seed", str(run.seed)]
+    if run.floor_citation is not None:
+        args += ["--floor-run", str(run.floor_citation)]
+    if run.max_tasks is not None:
+        args += ["--max-tasks", str(run.max_tasks)]
+    if run.stop_count is not None:
+        args += ["--stop-count", str(run.stop_count)]
+    if run.declared is not None:
+        args += declaration_arguments(run.declared)
+    return args
+
+
+def _run_kind_arguments(run: MoveRun) -> list[str]:
+    return ["--dry-run"] if run.kind is None else ["--run", run.kind]
 
 
 def run_move(run: MoveRun, claude_bin: Path, extra: Sequence[str] = ()) -> CliResult:
@@ -198,7 +213,8 @@ def continue_run(
 
 
 def declaration_arguments(declared: Declared) -> list[str]:
-    unbound("the operator hands the entry a written move declaration in place of the kit's own")
+    """`--declaration FILE` for a written variant; the kit's own declaration needs no option."""
+    return [] if declared.path is None else ["--declaration", str(declared.path)]
 
 
 def close_run(checkout: Path, stopped: Path, reason: str, claude_bin: Path) -> CliResult:

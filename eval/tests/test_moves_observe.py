@@ -4,7 +4,10 @@ channel run rather than read from a declaration, and a refusal naming whatever c
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -24,6 +27,10 @@ INJECTION_HEADER = "## Praxion Rules (auto-injected)"
 INJECTED = (INJECTION_HEADER, *RULE_BODY)
 HOOK_COMMAND = f"python3 ${{CLAUDE_PLUGIN_ROOT}}/hooks/{KIT_HOOK}"
 BASH_COMMIT = {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}
+REAL_RULE_ID = "swe/agent-model-routing"
+REAL_RULE_PATH = "rules/swe/agent-model-routing.md"
+REAL_RULE_FIRST_LINE = "## Agent Model Routing"
+GONE_WITHIN_SECONDS = 3
 
 
 BASELINE_ROW = ("baseline", "rules/baseline.md", "symlink")
@@ -51,6 +58,29 @@ def _write(root: Path, relative: str, text: str) -> None:
 
 def _rule_text(body: list[str], frontmatter: str = "core: false\nload: always_on") -> str:
     return f"---\n{frontmatter}\n---\n" + "\n".join(body) + "\n"
+
+
+def _emitting(context: str) -> str:
+    """A registered command printing a hook result that carries ``context``."""
+    return "printf '%s' " + json.dumps(
+        json.dumps({"hookSpecificOutput": {"additionalContext": context}})
+    )
+
+
+def _gone(pid: int) -> bool:
+    deadline = time.monotonic() + GONE_WITHIN_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def _without_row(manifest: str, rule_id: str) -> str:
+    """The manifest text with the rule's row cut out, as the lean arm's text edit does."""
+    return re.sub(rf"- id: {re.escape(rule_id)}\n(?:  .*\n)+", "", manifest)
 
 
 def _files(root: Path) -> dict[str, str]:
@@ -285,3 +315,172 @@ def test_the_kit_hook_in_a_real_checkout_copy_is_observed_with_the_checkouts_own
 
     assert "## Git Conventions" in lines
     assert any(line.startswith("- Stage specific files by name") for line in lines)
+
+
+# -- The real checkout ------------------------------------------------------------------------
+
+
+@pytest.fixture
+def real_copy(tmp_path: Path) -> Path:
+    """The checkout's own rules, linker and hooks: the real manifest, linker and injector together."""
+    root = tmp_path / "plugin"
+    for tree in ("rules", "lib", "hooks"):
+        shutil.copytree(REPO_ROOT / tree, root / tree)
+    return root
+
+
+def test_a_real_hook_delivered_rule_is_resident_until_its_real_manifest_row_is_removed(real_copy):
+    assert REAL_RULE_FIRST_LINE in _lines(observe.session_start(real_copy))
+
+    manifest = real_copy / "rules/_manifest.yaml"
+    manifest.write_text(_without_row(manifest.read_text(), REAL_RULE_ID), encoding="utf-8")
+
+    assert REAL_RULE_FIRST_LINE not in _lines(observe.session_start(real_copy))
+    assert (real_copy / REAL_RULE_PATH).is_file()
+
+
+def test_the_skip_header_is_the_one_the_real_rule_injection_prints():
+    hook = (REPO_ROOT / "hooks/inject_rules.py").read_text(encoding="utf-8")
+
+    assert observe.RULE_INJECTION_SKIPPED in hook
+
+
+# -- Refusals, not empty observations ---------------------------------------------------------
+
+
+def _refused_hook(copy: Path, registry: str, payload=BASH_COMMIT, event="PreToolUse") -> str:
+    _write(copy, "hooks/hooks.json", registry)
+    return _refusal(observe.hook_output(copy, event, payload))
+
+
+def test_a_matcher_keyed_on_a_field_the_payload_lacks_is_refused_not_read_as_no_match(full_copy):
+    registry = _registry("SubagentStart", "^praxion:.*", "exit 9")
+
+    reason = _refused_hook(full_copy, registry, {"cwd": "/x"}, "SubagentStart")
+
+    assert "^praxion:.*" in reason
+
+
+def test_a_matcher_over_the_agent_type_is_applied_to_it(full_copy):
+    registry = _registry("SubagentStart", "^praxion:.*", _emitting("- arrives"))
+    _write(full_copy, "hooks/hooks.json", registry)
+
+    hit = observe.hook_output(full_copy, "SubagentStart", {"agent_type": "praxion:verifier"})
+    miss = observe.hook_output(full_copy, "SubagentStart", {"agent_type": "other"})
+
+    assert (_lines(hit), _lines(miss)) == (("- arrives",), ())
+
+
+def test_the_star_matcher_takes_every_event(full_copy):
+    _write(full_copy, "hooks/hooks.json", _registry("Stop", "*", _emitting("- at stop")))
+
+    assert _lines(observe.hook_output(full_copy, "Stop", {"cwd": "/x"})) == ("- at stop",)
+
+
+def test_a_hook_that_is_not_a_command_is_refused_naming_it(full_copy):
+    registry = json.dumps(
+        {"hooks": {"Stop": [{"matcher": "", "hooks": [{"type": "prompt", "prompt": "be brief"}]}]}}
+    )
+
+    assert "be brief" in _refused_hook(full_copy, registry, {"cwd": "/x"}, "Stop")
+
+
+def test_a_result_with_no_additional_context_is_refused_not_read_as_empty(full_copy):
+    command = 'echo \'{"systemMessage": "remember"}\''
+
+    reason = _refused_hook(full_copy, _registry("PreToolUse", "Bash", command))
+
+    assert "no additionalContext" in reason
+
+
+def test_a_result_that_is_json_but_not_an_object_is_refused(full_copy):
+    reason = _refused_hook(full_copy, _registry("PreToolUse", "Bash", "echo '[1]'"))
+
+    assert "not a hook result" in reason
+
+
+def test_an_empty_result_object_is_a_real_empty_observation(full_copy):
+    _write(full_copy, "hooks/hooks.json", _registry("PreToolUse", "Bash", "echo '{}'"))
+
+    assert _lines(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT)) == ()
+
+
+def test_a_script_no_registered_hook_runs_is_refused_not_read_as_emitting_nothing(full_copy):
+    reason = _refusal(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT, script="gone.py"))
+
+    assert "gone.py" in reason
+
+
+def test_a_session_start_copy_that_does_not_register_the_rule_injection_is_refused(full_copy):
+    _write(full_copy, "hooks/hooks.json", _registry("SessionStart", "", "true"))
+
+    assert observe.RULE_INJECTION_HOOK in _refusal(observe.session_start(full_copy))
+
+
+@pytest.mark.parametrize("registry", ["[]", '{"hooks": []}', '{"hooks": {"PreToolUse": null}}'])
+def test_a_registry_of_the_wrong_shape_is_refused_not_raised(full_copy, registry):
+    assert "hooks.json" in _refused_hook(full_copy, registry)
+
+
+def test_a_registry_that_is_not_utf8_is_refused(full_copy):
+    (full_copy / "hooks/hooks.json").write_bytes(b"\xff\xfe")
+
+    assert "hooks.json" in _refusal(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT))
+
+
+@pytest.mark.parametrize("manifest", ["", "rules: [", "[]", "rules: {}"])
+def test_a_manifest_that_holds_no_list_of_rules_is_refused(full_copy, manifest):
+    _write(full_copy, "rules/_manifest.yaml", manifest)
+
+    assert "_manifest.yaml" in _refusal(observe.session_start(full_copy))
+
+
+def test_a_manifest_row_that_is_not_a_mapping_is_refused(full_copy):
+    _write(full_copy, "rules/_manifest.yaml", "version: 1\nrules:\n- just-a-string\n")
+
+    assert "just-a-string" in _refusal(observe.session_start(full_copy))
+
+
+def test_a_manifest_that_is_not_utf8_is_refused(full_copy):
+    (full_copy / "rules/_manifest.yaml").write_bytes(b"\xff\xfe")
+
+    assert "_manifest.yaml" in _refusal(observe.session_start(full_copy))
+
+
+def test_a_linked_rule_that_cannot_be_read_is_refused_naming_it(full_copy):
+    _lean(full_copy)
+    (full_copy / KERNEL_PATH).write_bytes(b"\xff\xfe")
+
+    assert "git-conventions-resident.md" in _refusal(observe.session_start(full_copy))
+
+
+# -- The sandbox ------------------------------------------------------------------------------
+
+
+def test_the_side_effect_kill_switches_reach_the_hooks(full_copy):
+    command = 'printf \'{"hookSpecificOutput":{"additionalContext":"%s"}}\' "$PRAXION_DISABLE_EVENT_POSTING"'
+    _write(full_copy, "hooks/hooks.json", _registry("PreToolUse", "Bash", command))
+
+    assert _lines(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT)) == ("1",)
+
+
+def test_a_relative_copy_path_is_observed_as_the_copy_it_names(full_copy, monkeypatch):
+    monkeypatch.chdir(full_copy.parent)
+
+    assert _lines(observe.session_start(Path(full_copy.name))) == INJECTED
+
+
+def test_non_ascii_rule_text_is_delivered_intact(full_copy):
+    _write(full_copy, "hooks/hooks.json", _registry("PreToolUse", "Bash", _emitting("- café")))
+
+    assert _lines(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT)) == ("- café",)
+
+
+def test_a_timeout_takes_the_hooks_grandchildren_with_it(full_copy, tmp_path, monkeypatch):
+    monkeypatch.setattr(observe, "SUBPROCESS_TIMEOUT_SECONDS", 1)
+    pid_file = tmp_path / "grandchild.pid"
+    command = f"sleep 30 & echo $! > {pid_file}; wait"
+    _write(full_copy, "hooks/hooks.json", _registry("PreToolUse", "Bash", command))
+
+    assert "did not finish" in _refusal(observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT))
+    assert _gone(int(pid_file.read_text()))

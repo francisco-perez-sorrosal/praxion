@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import assert_never, get_args
 
 from praxion_evals.adherence.model import Failed, Passed
-from praxion_evals.adherence.moves import session_record
+from praxion_evals.adherence.moves import checks_git, session_record
 from praxion_evals.adherence.moves.model import (
     Arrival,
     ArrivalTiming,
@@ -65,11 +65,7 @@ from praxion_evals.adherence.moves.session_record import (
 
 CREATING_WRITE = "Write"
 
-# The commands the lean hook fires for, and the rewrite that repairs a commit.
-_SEGMENT_BREAK = re.compile(r"&&|\|\||[;|\n]")
-_STAGING_OR_COMMITTING = re.compile(
-    r"(?:\S+=\S*\s+)*git\s+(?:-[Cc]\s+\S+\s+)*(?:add|stage|commit)\b"
-)
+# The rewrite that repairs a commit.
 _AMEND = re.compile(r"git\s+(?:\S+\s+)*commit\b.*--amend\b")
 # How the harness words a hook's refusal in the tool result it stands in for.
 _GATE_REFUSAL = re.compile(
@@ -179,10 +175,7 @@ def _is_governed(declaration: MoveDeclaration, use: ToolUse) -> bool:
 
 
 def _is_staging_if_shell(use: ToolUse) -> bool:
-    if use.command is None:
-        return True
-    segments = (segment.strip() for segment in _SEGMENT_BREAK.split(use.command))
-    return any(_STAGING_OR_COMMITTING.match(segment) for segment in segments)
+    return use.command is None or checks_git.stages_or_commits(use.command)
 
 
 def _matches_any(file_path: str | None, globs: Sequence[str]) -> bool:

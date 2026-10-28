@@ -5,13 +5,16 @@ Over planted session records the runner refuses to score, with the reason, a ful
 lacking the moved rule at session start, a lean session carrying the rule's full text or
 lacking its resident kernel, and a floor session carrying any line of the rule; a lean session
 whose point-of-use text never arrived is scored, as a trigger failure. Over frozen copies of
-recorded real sessions (the research probes, Claude Code 2.1.302) the trigger record reads:
+real main-session records, each frozen with the Claude Code version it was recorded on (and
+over real records only: until one of a kind is frozen, its clause stays unproven and its test
+says so), the trigger record reads:
 an amended commit as arrived before execution, history repaired, final state passed; a commit
 a gate refused with a reason and the session then recomposed as arrived before execution,
 right first time, final state passed, the refusal recorded; a session-start rule as arrived
 before composition; a path-matched load on a creating write as arrived after execution (read
-as the adr-conventions move's governed action). A record from which arrivals cannot be read
-reads as unknown, never as never arrived.
+as the adr-conventions move's governed action). A record from which arrivals cannot be read,
+whichever version wrote it, reads as unknown, never as never arrived (proven over constructed
+records).
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ import pytest
 from tests.acceptance.drivers.move_eval import FIRST_MOVE, SECOND_MOVE, Declared, declare
 from tests.acceptance.drivers.move_scoring import (
     PlantedSession,
+    UnreadableShape,
     probe_record,
     prove_take,
     trigger_records,
@@ -139,10 +143,13 @@ def test_a_path_matched_load_on_a_creating_write_reads_as_arrived_after_executio
     assert any(t.arrivals.get("path-matched load") == "after execution" for t in triggers), triggers
 
 
+@pytest.mark.parametrize(
+    "shape", ["lines that are not JSON", "events of a later harness no reader knows"]
+)
 def test_a_record_whose_arrivals_cannot_be_read_reads_as_unknown_never_as_never(
-    first_move, tmp_path: Path
+    first_move, tmp_path: Path, shape: UnreadableShape
 ):
-    triggers = trigger_records(first_move, unreadable_record(tmp_path))
+    triggers = trigger_records(first_move, unreadable_record(tmp_path, shape))
 
     timings = {timing for t in triggers for timing in t.arrivals.values()}
 

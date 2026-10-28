@@ -7,8 +7,12 @@ session the runner refuses: an arm copy with an undeclared change or missing a d
 delivered (naming the line); a move with no governed check or more than two; arms that would
 differ in the commit-attribution setting, the model, the effort or the user instruction file
 (naming it); and a lean arm that would leave a host without hooks (Cursor, Codex) reaching
-less of the rule than it reaches today (naming the section and the host). The second ranked
-move, adr-conventions, builds its arms and passes the same checks with no task kit.
+less of the rule than it reaches today (naming the section and the host). Reach is measured
+line by line by running both exports over each tree: a section is reached when every non-blank
+line it holds in the checkout's rule file appears unchanged in a file the export carries (for
+Codex, a file its manifest lists with a load other than excluded), and a section Codex reaches
+through an always-on listing today must still be reached through one. The second ranked move,
+adr-conventions, builds its arms and passes the same checks with no task kit.
 
 The kit's own arms are built once per move and shared; each known-bad variant builds its own.
 """
@@ -34,8 +38,8 @@ from tests.acceptance.drivers.move_eval import (
     check_arm_copy,
     declare,
     move_checkout,
+    reach,
     rule_sections,
-    sections_reached,
     tracked_snapshot,
     working_state,
 )
@@ -238,11 +242,27 @@ def test_arms_that_would_differ_in_a_pinned_setting_are_refused_naming_it(tmp_pa
 def test_the_lean_arm_reaches_on_a_host_without_hooks_every_section_reached_today(
     built, host, tmp_path
 ):
-    today = sections_reached(built.checkout, built.move, host, tmp_path / "today")
-    lean = sections_reached(built.build.arms["lean"].copy, built.move, host, tmp_path / "lean")
+    today = reach(built.checkout, built.checkout, built.move, host, tmp_path / "today")
+    lean_copy = built.build.arms["lean"].copy
+    lean = reach(lean_copy, built.checkout, built.move, host, tmp_path / "lean")
 
-    assert today, f"{host} reaches no section of {MOVED_RULES[built.move]} today"
-    assert today <= lean, f"{host} loses {sorted(today - lean)} under the lean arm of {built.move}"
+    assert today.sections, f"{host} reaches no section of {MOVED_RULES[built.move]} today"
+    assert today.sections <= lean.sections, (
+        f"{host} loses {sorted(today.sections - lean.sections)} under the lean arm of {built.move}"
+    )
+
+
+def test_on_codex_every_section_reached_always_on_today_stays_always_on_under_the_lean_arm(
+    built, tmp_path
+):
+    today = reach(built.checkout, built.checkout, built.move, "codex", tmp_path / "today")
+    lean_copy = built.build.arms["lean"].copy
+    lean = reach(lean_copy, built.checkout, built.move, "codex", tmp_path / "lean")
+
+    assert today.always_on, f"Codex reaches no section of {built.move} always-on today"
+    assert today.always_on <= lean.always_on, (
+        f"no longer always-on on Codex: {sorted(today.always_on - lean.always_on)}"
+    )
 
 
 def test_a_section_delivered_only_by_hook_text_read_from_no_exported_rule_file_is_refused(tmp_path):
@@ -254,3 +274,14 @@ def test_a_section_delivered_only_by_hook_text_read_from_no_exported_rule_file_i
     assert refusal is not None, "a lean arm leaving a host without hooks with less was accepted"
     assert any(section in refusal for section in sections), f"no section named: {refusal}"
     assert any(host in refusal.lower() for host in HOSTS), f"no host named: {refusal}"
+
+
+def test_a_section_turned_from_always_on_to_path_scoped_on_codex_is_refused_naming_it(tmp_path):
+    sections = rule_sections((REPO_ROOT / MOVED_RULES[FIRST_MOVE]).read_text(encoding="utf-8"))
+    variant: Variant = "a file holding a section turned from always-on to path-scoped on Codex"
+
+    refusal = _build(tmp_path, FIRST_MOVE, variant).build.refusal
+
+    assert refusal is not None, "a lean arm narrowing Codex's always-on listing was accepted"
+    assert any(section in refusal for section in sections), f"no section named: {refusal}"
+    assert "codex" in refusal.lower(), f"the host is not named: {refusal}"

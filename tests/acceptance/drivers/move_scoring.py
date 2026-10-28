@@ -16,8 +16,8 @@ Bound here, because the specification or the base commit fixes them:
 - planted end states: scratch git repositories with a git identity, the commits and untracked
   files a scenario names;
 - a session record the reader cannot read: a file of lines that are not JSON;
-- the frozen copies of the recorded research-probe sessions, read from
-  `tests/fixtures/main_session_probes/`, found by walking up to the `tests/fixtures` directory.
+- the frozen copies of real main-session records, each with the Claude Code version it was
+  recorded on, read from `tests/fixtures/main_session_probes/`, found by walking up to the `tests/fixtures` directory.
 
 Unbound until a binding step ties them to the designed surface: proving a planted session's
 take; reading a trigger record; grading an end state by a governed check; the move verdict and
@@ -108,18 +108,37 @@ class CheckTrigger:
 
 
 def probe_record(name: ProbeName) -> Path:
-    path = PROBES_DIR / (name.replace(" ", "-").replace(",", "") + ".jsonl")
-    if not path.is_file():
+    """A frozen real main-session record and, beside it, the Claude Code version that wrote it.
+
+    Each kind is frozen as `<slug>.jsonl` (the session's own record, byte for byte) next to
+    `<slug>.version` (one line: the Claude Code version it was recorded on, e.g. `2.1.310`).
+    Until both exist the clause it proves is unproven over real records, and says so.
+    """
+    stem = PROBES_DIR / name.replace(" ", "-").replace(",", "")
+    record, version = stem.with_suffix(".jsonl"), stem.with_suffix(".version")
+    if not (record.is_file() and version.is_file() and version.read_text().strip()):
         unbound(
-            "the frozen copies of the recorded research-probe sessions (Claude Code 2.1.302) are"
-            f" in tests/fixtures/main_session_probes/; missing: {path.name}"
+            "unproven over real records: no frozen real main-session record of this kind, with"
+            f" the Claude Code version it was recorded on, is in tests/fixtures/main_session_probes/"
+            f" (expected {record.name} and {version.name})"
         )
-    return path
+    return record
 
 
-def unreadable_record(workspace: Path) -> Path:
+UnreadableShape = Literal["lines that are not JSON", "events of a later harness no reader knows"]
+_UNREADABLE = {
+    "lines that are not JSON": "not a session record\n{\x00 neither is this\n",
+    "events of a later harness no reader knows": (
+        '{"type": "session-v9", "version": "99.0.0", "payload": "opaque"}\n'
+        '{"type": "attachments-v9", "version": "99.0.0", "blob": "b64:AAAA"}\n'
+    ),
+}
+
+
+def unreadable_record(workspace: Path, shape: UnreadableShape = "lines that are not JSON") -> Path:
+    """A constructed session record from which no arrival can be read."""
     path = workspace / "unreadable-session.jsonl"
-    path.write_text("not a session record\n{\x00 neither is this\n", encoding="utf-8")
+    path.write_text(_UNREADABLE[shape], encoding="utf-8")
     return path
 
 
@@ -257,7 +276,7 @@ class CheckReport:
     trigger_failures: Mapping[Arm, int]  # failures with no arrival
     failures_with_arrival: Mapping[Arm, int]
     allowance_pp: float
-    expected_total_loss_discordance: float  # the sensitivity line's figure
+    sensitivity_shown: str  # the sensitivity line's figure as printed, to one decimal place
     not_covered: bool
 
 

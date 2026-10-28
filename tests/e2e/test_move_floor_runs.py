@@ -5,8 +5,10 @@ continuation launches again only the streak's tasks; a citation of any part of t
 floor lineage resolves to the whole lineage. While a stopped run of the move is neither
 continued nor closed, a fresh run of the move is refused; once it is closed with a reason a
 fresh run is accepted, and a paired run citing the stopped or closed floor run is refused. A
-paired run stops on its third identical lean failure in a row, as a role run does, and its
-continuation is refused when the moved rule's text or the declaration differs. A paired run
+paired run stops on the launch a role run stops on: the session completing the stop count of
+identical failures in a row among one arm's sessions in launch order (a retry being that arm's
+next session), the other arm's sessions between them neither breaking nor extending the streak.
+Its continuation is refused when the moved rule's text or the declaration differs. A paired run
 declaring a governed check its cited floor run never failed on final state is refused.
 
 Each journey runs once per module and its tests only read it.
@@ -23,6 +25,7 @@ from tests.acceptance.drivers.move_eval import (
     FIRST_MOVE,
     FLOOR_MINIMUM,
     MOVED_RULES,
+    PAIRED_ARMS,
     Arm,
     close_run,
     continue_run,
@@ -170,6 +173,7 @@ def test_a_paired_run_citing_a_closed_floor_run_is_refused(closed_floor):
 @dataclass(frozen=True)
 class StoppedPaired:
     checkout: Path
+    floor: RunOutcome
     stopped: RunOutcome
 
 
@@ -189,7 +193,7 @@ def stopped_paired(tmp_path_factory: pytest.TempPathFactory) -> StoppedPaired:
         floor_citation=floor.results,
         stop_count=STOP_COUNT,
     )
-    return StoppedPaired(checkout, stopped)
+    return StoppedPaired(checkout, floor, stopped)
 
 
 def test_a_paired_move_run_stops_after_its_third_identical_lean_failure_in_a_row(stopped_paired):
@@ -198,6 +202,24 @@ def test_a_paired_move_run_stops_after_its_third_identical_lean_failure_in_a_row
     assert read_move_results(stopped_paired.stopped.results).ending == "stopped"
     assert [launch.arm for launch in launches].count("lean") == STOP_COUNT
     assert launches[-1].arm == "lean", "the run went on past the third lean failure"
+
+
+def test_the_other_arms_identical_failures_do_not_extend_a_streak(stopped_paired, tmp_path):
+    copy = copy_checkout(stopped_paired.checkout, tmp_path)
+    floor = copy / stopped_paired.floor.results.relative_to(stopped_paired.checkout)
+    two_each: dict[tuple[Arm, int], Ending] = {
+        (arm, n): "infrastructure error" for arm in PAIRED_ARMS for n in (1, 2)
+    }
+    stand_in = install_stand_in(tmp_path, Script(by_launch=two_each))
+
+    outcome = run(
+        stand_in, copy, "paired", max_tasks=2, floor_citation=floor, stop_count=STOP_COUNT
+    )
+
+    assert outcome.cli.exit_code == 0, outcome.describe()
+    assert read_move_results(outcome.results).ending == "finished", (
+        "four identical failures, two per arm, stopped the run"
+    )
 
 
 def test_a_continuation_after_the_moved_rule_text_changed_is_refused(stopped_paired, tmp_path):

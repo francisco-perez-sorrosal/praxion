@@ -6,12 +6,14 @@ the history shows. Each mechanical allowance is the exact one-sided quantile at 
 discordant count for that move and check, never another check's and never moved by a floor
 session. The report shows, per arm and governed check, the final-state counts, the history
 outcomes, the arrival timing by channel and the trigger failures apart from failures with
-arrival; the floor failures out of the floor sessions and a sensitivity line (the net
-discordance a total loss would be expected to produce at the paired target, from the floor's
-failure rate against the full arm's) beside the check's allowance in percentage points and the
-margin; and per-kind counts beside the pooled verdict. A check not covered, by its allowance or
-by its sensitivity, is listed and named in the clearance claim. The wording claims bounded
-non-regression within the margin and nothing about one channel beating another.
+arrival; the floor failures out of the floor sessions scored on the check, and a sensitivity
+line: the paired target times the floor's failure rate (its failures over its scored floor
+sessions) minus the full arm's (its final-state failures over the check's usable pairs), shown
+to one decimal place beside the check's allowance; and per-kind counts beside the pooled
+verdict. A check whose unrounded sensitivity figure does not exceed its allowance (zero or below
+included), or whose allowance exceeds the margin times the usable pairs, is listed not covered
+and named in the clearance claim; the sensitivity line changes no verdict. The wording claims
+bounded non-regression within the margin and nothing about one channel beating another.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -201,35 +204,72 @@ def test_the_report_shows_floor_failures_out_of_the_floor_sessions(discordant_re
     assert (message.floor_failures, message.floor_sessions) == (2, 8)
 
 
-def test_an_errored_floor_session_enters_no_failure_count():
+def test_an_errored_floor_session_enters_neither_the_failures_nor_the_scored_sessions():
     report = move_report(replace(DISCORDANT, floor=_floor(message=2, staging=1, errored=1)))
 
-    assert report.checks[MESSAGE].floor_failures == 2
+    message = report.checks[MESSAGE]
+
+    assert (message.floor_failures, message.floor_sessions) == (2, 7)
 
 
-def test_the_sensitivity_line_is_the_net_discordance_a_total_loss_would_produce_at_the_target(
+def _sensitivity(floor_failed: int, floor_scored: int, full_failed: int, usable: int) -> Fraction:
+    """The sensitivity figure in exact arithmetic: target times the floor rate minus the full rate."""
+    return TARGET_PAIRS * (Fraction(floor_failed, floor_scored) - Fraction(full_failed, usable))
+
+
+def test_the_sensitivity_line_shows_the_target_times_the_floor_rate_minus_the_full_rate(
     discordant_report,
 ):
-    floor_rate, full_rate = 1 / 8, 1 / PAIRED_TASKS
+    figure = _sensitivity(floor_failed=1, floor_scored=8, full_failed=1, usable=PAIRED_TASKS)
 
-    expected = discordant_report.checks[STAGING].expected_total_loss_discordance
+    shown = discordant_report.checks[STAGING].sensitivity_shown
 
-    assert expected == pytest.approx(TARGET_PAIRS * (floor_rate - full_rate), abs=0.05)
+    assert f"{float(figure):.1f}" == "1.7"
+    assert shown == "1.7"
 
 
-def test_a_check_whose_total_loss_would_not_exceed_its_allowance_is_not_covered_and_named(
+def test_a_check_whose_figure_does_not_exceed_its_allowance_is_not_covered_and_named(
     discordant_report,
 ):
+    figure = _sensitivity(floor_failed=1, floor_scored=8, full_failed=1, usable=PAIRED_TASKS)
+
     assert exact_allowance(2) <= 0.10 * PAIRED_TASKS, "the check must be covered at the margin"
+    assert figure <= exact_allowance(2)
     assert discordant_report.checks[STAGING].not_covered
     assert STAGING in discordant_report.clearance_claim
 
 
-def test_a_check_whose_total_loss_would_exceed_its_allowance_within_the_margin_is_covered():
+def test_a_check_whose_floor_rate_is_at_or_below_the_full_arms_is_not_covered_and_named():
+    report = move_report(replace(DISCORDANT, floor=_floor(message=8, staging=0)))
+
+    assert _sensitivity(0, 8, 1, PAIRED_TASKS) <= 0
+    assert report.checks[STAGING].not_covered
+    assert STAGING in report.clearance_claim
+
+
+def test_a_check_whose_figure_exceeds_its_allowance_within_the_margin_is_covered():
     report = move_report(replace(DISCORDANT, floor=_floor(message=8, staging=8)))
 
     assert not report.checks[STAGING].not_covered
     assert STAGING not in report.clearance_claim
+
+
+def test_coverage_reads_the_unrounded_figure_not_the_one_shown():
+    """Staging: 1 failure of 7 scored floor sessions (one errored) against full 1 of 24."""
+    figure = _sensitivity(floor_failed=1, floor_scored=7, full_failed=1, usable=PAIRED_TASKS)
+    report = move_report(replace(DISCORDANT, floor=_floor(message=8, staging=1, errored=1)))
+
+    assert f"{float(figure):.1f}" == f"{exact_allowance(2)}.0"
+    assert figure > exact_allowance(2)
+    assert report.checks[STAGING].sensitivity_shown == "2.0"
+    assert not report.checks[STAGING].not_covered, "a figure of 2.02 exceeds an allowance of 2"
+
+
+def test_the_sensitivity_line_changes_no_verdict():
+    blind = replace(DISCORDANT, floor=_floor(message=0, staging=0))
+    seeing = replace(DISCORDANT, floor=_floor(message=8, staging=8))
+
+    assert move_verdict(blind).check_verdicts == move_verdict(seeing).check_verdicts
 
 
 def test_each_allowance_is_shown_in_points_beside_the_declared_margin(discordant_report):

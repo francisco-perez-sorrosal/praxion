@@ -358,6 +358,7 @@ Variant = Literal[
     "no governed check",
     "three governed checks",
     "a section delivered only by hook text read from no exported rule file",
+    "a file holding a section turned from always-on to path-scoped on Codex",
     "delivery changed in the managed fixture kind only",
     "the arms differ in the commit-attribution setting",
     "the arms differ in the model",
@@ -448,31 +449,54 @@ def rule_sections(text: str) -> tuple[str, ...]:
     return tuple(line.lstrip("#").strip() for line in text.splitlines() if line.startswith("### "))
 
 
-def sections_reached(root: Path, move: str, host: Host, scratch: Path) -> frozenset[str]:
-    """The sections of the moved rule (as the checkout holds it) a host's export reaches in `root`."""
-    sections = rule_sections((REPO_ROOT / MOVED_RULES[move]).read_text(encoding="utf-8"))
+def section_lines(text: str) -> dict[str, tuple[str, ...]]:
+    """Each `###` section of a rule, by title: its non-blank lines, heading included."""
+    sections: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in text.splitlines():
+        if line.startswith("### "):
+            current = sections.setdefault(line.lstrip("#").strip(), [])
+        elif line.startswith(("# ", "## ")):
+            current = None
+        if current is not None and line.strip():
+            current.append(line.rstrip())
+    return {title: tuple(lines) for title, lines in sections.items()}
+
+
+@dataclass(frozen=True)
+class Reach:
+    """What a host's export reaches of the moved rule, measured line by line over one tree."""
+
+    sections: frozenset[str]  # every non-blank line unchanged in a file the export carries
+    always_on: frozenset[str]  # Codex only: reached through files the bridge lists always-on
+
+
+def reach(root: Path, checkout: Path, move: str, host: Host, scratch: Path) -> Reach:
+    """Run `host`'s export over `root` and measure the moved rule's sections (as `checkout` holds them)."""
+    sections = section_lines((checkout / MOVED_RULES[move]).read_text(encoding="utf-8"))
     out = scratch / f"{host}-export"
     if host == "cursor":
         _export(["cursor/config/export-cursor-rules.py", str(root), str(out)])
-        exported = out / CURSOR_RULE_EXPORT[move]
-        text = exported.read_text(encoding="utf-8") if exported.is_file() else ""
-        return frozenset(s for s in sections if f"### {s}" in text)
-    _export(
-        [
-            "codex/config/export-codex-rules-bridge.py",
-            "--repo-root",
-            str(root),
-            "--out-dir",
-            str(out),
-        ]
-    )
+        carried = [path for path in out.rglob("*") if path.is_file()]
+        return Reach(_reached(sections, carried), frozenset())
+    argv = ["codex/config/export-codex-rules-bridge.py", "--repo-root", str(root)]
+    _export([*argv, "--out-dir", str(out)])
     manifest = json.loads((out / "praxion" / "rules_manifest.json").read_text(encoding="utf-8"))
-    listed = {*manifest.get("always_on_rule_ids", ()), *manifest.get("path_scoped_rule_ids", ())}
-    rule = root / MOVED_RULES[move]
-    if CODEX_RULE_ID[move] not in listed or not rule.is_file():
-        return frozenset()
-    text = rule.read_text(encoding="utf-8")
-    return frozenset(s for s in sections if f"### {s}" in text)
+    always_on_ids = set(manifest.get("always_on_rule_ids", ()))
+    listed = [rule for rule in manifest["rules"] if rule.get("codex_load") != "excluded"]
+    carried = [root / rule["relpath"] for rule in listed]
+    always_on = [root / rule["relpath"] for rule in listed if rule["id"] in always_on_ids]
+    return Reach(_reached(sections, carried), _reached(sections, always_on))
+
+
+def _reached(sections: Mapping[str, tuple[str, ...]], files: Sequence[Path]) -> frozenset[str]:
+    lines = {
+        line.rstrip()
+        for path in files
+        if path.is_file()
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+    }
+    return frozenset(title for title, held in sections.items() if set(held) <= lines)
 
 
 def _export(argv: list[str]) -> None:

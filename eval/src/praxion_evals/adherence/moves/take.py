@@ -26,7 +26,7 @@ from typing import assert_never
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT
 from praxion_evals.adherence.moves import arms, session_record, trigger
 from praxion_evals.adherence.moves.model import KernelDerive, MoveArm, MoveDeclaration, Take
-from praxion_evals.adherence.moves.session_record import Delivery, Parsed
+from praxion_evals.adherence.moves.session_record import Event, Parsed
 
 CODE_FENCE = "```"
 HEADING = "#"
@@ -67,7 +67,7 @@ def prove(
                 _require_kernel_only(rule, start)
                 return Take.taken(trigger_failure=bool(_absent(rule.beyond_kernel, later)))
             case "floor":
-                _require_none(rule, record.deliveries)
+                _require_none(rule, record.events)
             case _:
                 assert_never(arm)
     except _RefusalError as refusal:
@@ -98,13 +98,18 @@ def _require_kernel_only(rule: _Rule, start: Collection[str]) -> None:
         raise _RefusalError("a lean session carries the whole moved rule at session start")
 
 
-def _require_none(rule: _Rule, deliveries: Iterable[Delivery]) -> None:
-    for delivery in deliveries:
-        carried = tuple(line for line in rule.lines if line in _lines_of([delivery]))
+def _require_none(rule: _Rule, events: Iterable[Event]) -> None:
+    for event in events:
+        arrival = trigger.arrival_of(event)
+        if arrival is None:
+            continue
+        channel, text = arrival
+        arrived = _lines_of([text])
+        carried = tuple(line for line in rule.lines if line in arrived)
         if carried:
             raise _RefusalError(
                 f"a floor session carries {len(carried)} of {len(rule.lines)} lines of the moved"
-                f" rule by the {trigger.channel_of(delivery)} channel, e.g. {_quote(carried)}"
+                f" rule by the {channel} channel, e.g. {_quote(carried)}"
             )
 
 
@@ -155,15 +160,10 @@ def _arrived_lines(events: Parsed) -> tuple[frozenset[str], frozenset[str]]:
     """The lines that arrived at session start, and the lines that arrived later."""
     deliveries = events.deliveries
     return (
-        _lines_of(d for d in deliveries if d.at_session_start),
-        _lines_of(d for d in deliveries if not d.at_session_start),
+        _lines_of(d.text for d in deliveries if d.at_session_start),
+        _lines_of(d.text for d in deliveries if not d.at_session_start),
     )
 
 
-def _lines_of(deliveries: Iterable[Delivery]) -> frozenset[str]:
-    return frozenset(
-        line.strip()
-        for delivery in deliveries
-        for line in delivery.text.splitlines()
-        if line.strip()
-    )
+def _lines_of(texts: Iterable[str]) -> frozenset[str]:
+    return frozenset(line.strip() for text in texts for line in text.splitlines() if line.strip())

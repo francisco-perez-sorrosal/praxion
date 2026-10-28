@@ -17,6 +17,7 @@ from tests.test_moves_session_record import (
     lazy_rule,
     prompt,
     tool_call,
+    tool_output,
     write_record,
 )
 
@@ -154,6 +155,25 @@ def test_a_floor_session_whose_rule_was_loaded_lazily_is_refused_naming_the_chan
 
     assert not result.scored
     assert "path_matched" in (result.reason or "")
+
+
+def test_a_floor_session_whose_gate_refused_with_the_rule_text_is_refused_naming_the_channel(
+    move, checkout, tmp_path
+):
+    refusal = f"PreToolUse:Bash hook error: [hooks/gate.sh]: {OTHERS[1]}"
+    record = write_record(
+        tmp_path / "s.jsonl",
+        [
+            instructions(UNRELATED),
+            tool_call("t1", "Bash", {"command": "git commit"}),
+            tool_output("t1", refusal),
+        ],
+    )
+
+    result = prove(move, checkout, "floor", record)
+
+    assert not result.scored
+    assert "gate_refusal" in (result.reason or "")
 
 
 def test_a_floor_session_carrying_only_the_kernel_is_refused(move, checkout, tmp_path):

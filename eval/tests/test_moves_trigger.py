@@ -11,6 +11,7 @@ import pytest
 from praxion_evals.adherence.model import Failed, Passed
 from praxion_evals.adherence.moves import declaration, trigger
 from praxion_evals.adherence.moves.model import (
+    Arrived,
     CheckTrigger,
     GateRefusal,
     MoveDeclaration,
@@ -20,6 +21,7 @@ from praxion_evals.adherence.moves.model import (
 from praxion_evals.adherence.moves.session_record import (
     Delivery,
     Parsed,
+    SessionEvents,
     ToolResult,
     ToolUse,
     Unreadable,
@@ -40,7 +42,10 @@ WHOLE_RULE = f"{FORM_TEXT}\n{STAGING_TEXT}"
 UNRELATED = "Session context: nothing of the rule."
 CHAINED = "git add -- notes.md && git commit -m 'Add the notes'"
 AMEND = "git commit --amend -m 'Add the notes'"
-REFUSAL = "PreToolUse:Bash hook error: [hooks/commit_gate.sh]: the subject is too long"
+REFUSAL = (
+    "PreToolUse:Bash hook error: [hooks/commit_gate.sh]: the subject is too long\n"
+    "This hook comes from the praxion plugin."
+)
 COMMITTED = "[main 1a2b3c4] Add the notes"
 
 START = Delivery("SessionStart", UNRELATED)
@@ -63,23 +68,31 @@ def shell(use_id: str, command: str) -> ToolUse:
     return ToolUse(use_id, "Bash", command, None)
 
 
+def trigger_in(move: MoveDeclaration, check: str, events: SessionEvents) -> CheckTrigger:
+    return next(t for t in trigger.triggers(move, events) if t.check == check)
+
+
 def trigger_of(move: MoveDeclaration, check: str, *events) -> CheckTrigger:
-    found = trigger.triggers(move, Parsed(tuple(events)))
-    return next(t for t in found if t.check == check)
+    return trigger_in(move, check, Parsed(tuple(events)))
+
+
+def timing_of(t: CheckTrigger, channel: str) -> str:
+    arrival = t.arrivals[channel]
+    assert isinstance(arrival, Arrived), f"{channel} did not arrive: {arrival}"
+    return arrival.timing
 
 
 # -- An unreadable record ---------------------------------------------------------------------
 
 
-def test_an_unreadable_record_reads_every_arrival_as_unknown_for_every_check(git):
-    found = trigger.triggers(git, Unreadable("the record is not one this reader knows"))
+@pytest.mark.parametrize("check", [COMMIT_FORM, STAGING])
+def test_an_unreadable_record_reads_every_arrival_as_unknown_for_every_check(git, check):
+    t = trigger_in(git, check, Unreadable("the record is not one this reader knows"))
 
-    assert [t.check for t in found] == [COMMIT_FORM, STAGING]
-    for t in found:
-        assert set(t.arrivals) == {"session_start", "hook_context"}
-        assert {type(a).__name__ for a in t.arrivals.values()} == {"Unknown"}
-        assert t.history is None
-        assert not t.trigger_failure
+    assert set(t.arrivals) == {"session_start", "hook_context"}
+    assert {type(a).__name__ for a in t.arrivals.values()} == {"Unknown"}
+    assert t.history is None
+    assert not t.trigger_failure
 
 
 def test_a_record_file_that_cannot_be_read_gives_unknown_in_the_results_words(git, tmp_path):
@@ -101,7 +114,7 @@ def test_a_rule_delivered_at_session_start_arrives_before_composition(git):
         git, COMMIT_FORM, RULE_AT_START, shell("t1", CHAINED), ToolResult("t1", COMMITTED)
     )
 
-    assert t.arrivals["session_start"].timing == "before composition"  # type: ignore[union-attr]
+    assert timing_of(t, "session_start") == "before composition"
 
 
 def test_context_between_a_call_and_its_result_arrives_before_execution(git):
@@ -109,7 +122,7 @@ def test_context_between_a_call_and_its_result_arrives_before_execution(git):
         git, COMMIT_FORM, START, shell("t1", CHAINED), AT_USE, ToolResult("t1", COMMITTED)
     )
 
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"
 
 
 def test_context_ahead_of_the_call_arrives_before_composition(git):
@@ -117,14 +130,14 @@ def test_context_ahead_of_the_call_arrives_before_composition(git):
         git, COMMIT_FORM, START, AT_USE, shell("t1", CHAINED), ToolResult("t1", COMMITTED)
     )
 
-    assert t.arrivals["hook_context"].timing == "before composition"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before composition"
 
 
 def test_a_path_matched_load_after_a_creating_write_arrives_after_execution(adr):
     write = ToolUse("t1", "Write", None, "/work/.ai-state/decisions/drafts/x.md")
     t = trigger_of(adr, "decision draft placement", START, write, ToolResult("t1", "created"), LAZY)
 
-    assert t.arrivals["path_matched"].timing == "after execution"  # type: ignore[union-attr]
+    assert timing_of(t, "path_matched") == "after execution"
     assert t.history == "right_first_time"
 
 
@@ -134,7 +147,7 @@ def test_a_write_outside_the_globs_is_no_governed_action(adr):
 
     assert t.history == "never_taken"
     assert t.final is None
-    assert t.arrivals["path_matched"].timing == "before composition"  # type: ignore[union-attr]
+    assert timing_of(t, "path_matched") == "before composition"
 
 
 def test_a_shell_call_that_neither_stages_nor_commits_is_no_governed_action(git):
@@ -149,7 +162,7 @@ def test_a_shell_call_that_neither_stages_nor_commits_is_no_governed_action(git)
         ToolResult("t1", COMMITTED),
     )
 
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"
 
 
 # -- Whether it arrived at all ----------------------------------------------------------------
@@ -200,7 +213,7 @@ def test_a_commit_amended_after_the_context_arrived_reads_as_repaired(git):
         ToolResult("t2", COMMITTED),
     )
 
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"
     assert t.history == "repaired"
     assert t.final == Passed()
 
@@ -220,14 +233,14 @@ def test_a_commit_a_gate_refused_and_the_session_recomposed_reads_as_right_first
     assert t.history == "right_first_time"
     assert t.final == Passed()
     assert t.refusals == ("the subject is too long",)
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"
 
 
 def test_a_chained_add_and_commit_in_one_call_is_one_governed_action(git):
     t = trigger_of(git, STAGING, START, shell("t1", CHAINED), AT_USE, ToolResult("t1", COMMITTED))
 
     assert t.history == "right_first_time"
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"
 
 
 def test_a_last_governed_action_the_gate_refused_is_not_repaired_and_failed(git):
@@ -267,7 +280,7 @@ def test_a_gate_refusal_carrying_the_governing_text_arrives_by_the_gate_channel(
 
     t = trigger_of(gated, COMMIT_FORM, START, shell("t1", CHAINED), ToolResult("t1", reason))
 
-    assert t.arrivals["gate_refusal"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "gate_refusal") == "before execution"
 
 
 # -- The results file's words, from a record on disk ------------------------------------------
@@ -297,4 +310,4 @@ def test_a_call_the_record_never_answers_says_nothing_about_what_the_session_lef
 
     assert t.history == "never_taken"
     assert t.final is None
-    assert t.arrivals["hook_context"].timing == "before execution"  # type: ignore[union-attr]
+    assert timing_of(t, "hook_context") == "before execution"

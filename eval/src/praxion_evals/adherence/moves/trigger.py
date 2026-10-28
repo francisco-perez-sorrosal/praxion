@@ -64,7 +64,6 @@ from praxion_evals.adherence.moves.session_record import (
 )
 
 CREATING_WRITE = "Write"
-LAZY_RULE_ORIGIN = "nested_memory"  # how session_record names a rule the harness loaded lazily
 
 # The commands the lean hook fires for, and the rewrite that repairs a commit.
 _SEGMENT_BREAK = re.compile(r"&&|\|\||[;|\n]")
@@ -73,14 +72,29 @@ _STAGING_OR_COMMITTING = re.compile(
 )
 _AMEND = re.compile(r"git\s+(?:\S+\s+)*commit\b.*--amend\b")
 # How the harness words a hook's refusal in the tool result it stands in for.
-_GATE_REFUSAL = re.compile(r"PreToolUse:\S+ hook error: \[[^\]]*\]:?\s*(?P<reason>.*)", re.DOTALL)
+_GATE_REFUSAL = re.compile(
+    r"PreToolUse:\S+ hook error: \[[^\]]*\]:?\s*(?P<reason>.*?)\s*(?:\nThis hook comes from [^\n]*)?\Z",
+    re.DOTALL,
+)
 
 
-def channel_of(delivery: Delivery) -> Channel:
-    """The channel a delivery of text reached the session by."""
+def arrival_of(event: Event) -> tuple[Channel, str] | None:
+    """The channel an event's text reached the session by, with the text; None for an event that
+    delivers none. A gate's refusal is a tool result, not a delivery, and is the one result that
+    does; its text is the reason the gate gave."""
+    match event:
+        case Delivery():
+            return _channel_of(event), event.text
+        case ToolResult() if (reason := _refusal(event)) is not None:
+            return "gate_refusal", reason
+        case _:
+            return None
+
+
+def _channel_of(delivery: Delivery) -> Channel:
     if delivery.at_session_start:
         return "session_start"
-    if delivery.origin == LAZY_RULE_ORIGIN:
+    if delivery.origin == session_record.NESTED_MEMORY:
         return "path_matched"
     return "hook_context"
 
@@ -220,13 +234,10 @@ def _arrival(
 
 
 def _carries(channel: Channel, event: Event, check: GovernedCheck) -> bool:
-    match event:
-        case Delivery() if channel_of(event) == channel:
-            return _holds_governing_text(event.text, check)
-        case ToolResult() if channel == "gate_refusal" and _refusal(event) is not None:
-            return _holds_governing_text(event.text, check)
-        case _:
-            return False
+    arrival = arrival_of(event)
+    return (
+        arrival is not None and arrival[0] == channel and _holds_governing_text(arrival[1], check)
+    )
 
 
 def _holds_governing_text(text: str, check: GovernedCheck) -> bool:

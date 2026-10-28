@@ -22,10 +22,10 @@ Bound here, because the specification or the base commit fixes them:
   process from a declared read set and copied for each scenario.
 
 Unbound until a binding step ties them to the designed surface (each raises
-`UnboundDriverError` with the assumption's words): building and checking a move's arms; and the
-generated task list and its fixtures. A move's declaration and its known-bad variants are bound
-(`move_declarations` reads the kit's declaration file and writes each variant as that file
-edited), as are the dry run's printed lines and the move results file's keys.
+`UnboundDriverError` with the assumption's words): nothing remains in this module that is not
+bound. A move's declaration and its known-bad variants (`move_declarations`), the dry run's
+printed lines and the results file's keys, and the arm build, the arm-copy check, the task list
+and the fixture builder (through `move_pocket`, the one seam into the eval pocket) are bound.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, NoReturn
 
-from tests.acceptance.drivers import adherence_eval, move_declarations
+from tests.acceptance.drivers import adherence_eval, move_declarations, move_pocket
 from tests.acceptance.drivers.adherence_eval import (
     DUMMY_CREDENTIAL,
     EVAL_PROJECT,
@@ -99,12 +99,29 @@ def unbound(assumption: str) -> NoReturn:
 #     blocks, which the kit takes from the checkout;
 #   - `claude/kernels`: `scripts/check_kernel_manifest.py`, run over the checkout before and
 #     after a move run is recorded, reads the committed kernels.
+#   - the hook, config and exporter files below, each named with its reader: found by running
+#     the registered session-start and PreToolUse commands and both rules exports offline.
 # A binding step that finds the runner reading another path adds it here, naming the reader.
-MOVE_CHECKOUT_FILES = adherence_eval.CHECKOUT_FILES
+MOVE_CHECKOUT_FILES = (
+    *adherence_eval.CHECKOUT_FILES,
+    "hooks/inject_rules.py",  # the registered session-start rule injection, run over an arm copy
+    "claude/config/praxion-rules.yaml.example",  # read by inject_rules.py
+    "hooks/_hook_utils.py",  # imported by inject_rules.py and remind_adr.py
+    "hooks/commit_gate.sh",  # the wrapper the registered PreToolUse Bash commands run through
+    "hooks/remind_adr.py",  # a registered PreToolUse hook on Bash, run on a commit command
+    "cursor/config/export-cursor-rules.py",  # the Cursor rules export, run over each arm's tree
+    "codex/config/export-codex-rules-bridge.py",  # the Codex rules bridge, run over each tree
+    "codex/config/rules_bridge_delegate_hooks.py",  # imported by the bridge export
+    "codex/config/rules_bridge_parsing.py",  # imported by the bridge export
+    "codex/config/rules_bridge_registrations.py",  # imported by the bridge export
+    "codex/config/rules_bridge_routing_hooks.py",  # imported by the bridge export
+    "codex/config/rules_bridge_static_modules.py",  # imported by the bridge export
+)
 MOVE_CHECKOUT_TREES = (
     *adherence_eval.CHECKOUT_TREES,
     "claude/canonical-blocks",
     "claude/kernels",
+    "hooks/_observation_log",  # imported by remind_adr.py
 )
 _TEMPLATE: dict[str, Path] = {}
 
@@ -556,19 +573,31 @@ class ArmBuild:
 
 
 def build_arms(declared: Declared, checkout: Path, workspace: Path) -> ArmBuild:
-    unbound(
-        "the runner builds a declared move's full, lean and floor arms over its own copy of the"
-        " checkout and runs every check it makes before any session, offline, reachable without"
-        " launching a session"
+    """Build the three arms over the runner's own copy, with every check made before a session."""
+    result = move_pocket.build_arms(declared.move, declared.path, checkout, workspace)
+    if result["refused"]:
+        return ArmBuild({}, result["reason"])
+    return ArmBuild(
+        {
+            _arm(arm): BuiltArm(
+                _arm(arm), Path(built["copy"]), tuple(_declared_change(c) for c in built["changes"])
+            )
+            for arm, built in result["arms"].items()
+        },
+        None,
     )
+
+
+def _declared_change(change: Mapping[str, str] | Sequence[str | None]) -> DeclaredChange:
+    if isinstance(change, Mapping):
+        return DeclaredChange(change["path"], change.get("sha256") or "")
+    path, digest = change
+    return DeclaredChange(str(path), digest or "")
 
 
 def check_arm_copy(declared: Declared, arm: Arm, copy: Path, checkout: Path) -> str | None:
     """The refusal the runner gives an arm copy as it stands (None: accepted)."""
-    unbound(
-        "the runner's check that an arm's copy differs from the checkout in exactly the arm's"
-        " declared changes can be asked about a copy a scenario has altered"
-    )
+    return move_pocket.check_copy(declared.move, declared.path, arm, copy, checkout)
 
 
 # -- Tasks and fixtures -----------------------------------------------------------------------
@@ -586,14 +615,23 @@ class MoveTask:
 
 
 def move_tasks(declared: Declared, seed: int = SEED) -> tuple[MoveTask, ...]:
-    unbound(
-        "a move's generated task list can be read with each task's fixture, kind, wording"
-        " and the files its request names"
+    return tuple(
+        MoveTask(
+            task["task_id"],
+            task["fixture"],
+            _fixture_kind(task["fixture_kind"]),
+            task["wording_variant"],
+            task["wording"],
+            tuple(task["named_files"]),
+            task["planted_credential"],
+        )
+        for task in move_pocket.tasks(declared.move, declared.path, seed)
     )
 
 
 def build_task_fixture(declared: Declared, task: MoveTask, workspace: Path) -> Path:
-    unbound("the kit builds one task's fixture repository where a scenario can inspect it")
+    """The task's fixture repository, built under `workspace` from the default seed's task list."""
+    return move_pocket.build_fixture(declared.move, declared.path, SEED, task.task_id, workspace)
 
 
 # -- Reach on hosts without hooks -------------------------------------------------------------

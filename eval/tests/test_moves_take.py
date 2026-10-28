@@ -133,6 +133,29 @@ def test_a_floor_session_carrying_any_line_of_the_rule_is_refused(move, checkout
     assert OTHERS[1] in (result.reason or "")
 
 
+def test_a_floor_session_given_the_rule_at_the_point_of_use_is_refused_naming_the_channel(
+    move, checkout, tmp_path
+):
+    result = prove(move, checkout, "floor", session(tmp_path, UNRELATED, OTHERS[1]))
+
+    assert not result.scored
+    assert "hook_context" in (result.reason or "")
+    assert OTHERS[1] in (result.reason or "")
+
+
+def test_a_floor_session_whose_rule_was_loaded_lazily_is_refused_naming_the_channel(
+    move, checkout, tmp_path
+):
+    record = write_record(
+        tmp_path / "s.jsonl", [instructions(UNRELATED), lazy_rule("\n".join(OTHERS))]
+    )
+
+    result = prove(move, checkout, "floor", record)
+
+    assert not result.scored
+    assert "path_matched" in (result.reason or "")
+
+
 def test_a_floor_session_carrying_only_the_kernel_is_refused(move, checkout, tmp_path):
     assert not prove(move, checkout, "floor", session(tmp_path, KERNEL)).scored
 

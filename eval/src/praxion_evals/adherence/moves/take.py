@@ -6,7 +6,7 @@ What each arm owes the record at session start, judged over the lines of the mov
 - ``lean``: every line of the rule's resident kernel and not the whole rule; the lines the
   kernel does not keep are owed at the point of use, and a session they never reached is still
   scored, as a trigger failure (the move's risk, not a fault of the arm);
-- ``floor``: no line of the rule.
+- ``floor``: no line of the rule, by any channel at any time in the session.
 
 Anything else is refused with the reason, and so is a record that cannot be read or a rule that
 cannot be found: a take that cannot be proven is never scored. No session is asked to echo
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import assert_never
 
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT
-from praxion_evals.adherence.moves import arms, session_record
+from praxion_evals.adherence.moves import arms, session_record, trigger
 from praxion_evals.adherence.moves.model import KernelDerive, MoveArm, MoveDeclaration, Take
 from praxion_evals.adherence.moves.session_record import Delivery, Parsed
 
@@ -58,7 +58,8 @@ def prove(
     """Whether the session recorded at ``record_path`` was given what ``arm`` owes it."""
     try:
         rule = _read_rule(declaration, checkout)
-        start, later = _arrived_lines(_read_record(record_path))
+        record = _read_record(record_path)
+        start, later = _arrived_lines(record)
         match arm:
             case "full":
                 _require_whole(rule, start)
@@ -66,7 +67,7 @@ def prove(
                 _require_kernel_only(rule, start)
                 return Take.taken(trigger_failure=bool(_absent(rule.beyond_kernel, later)))
             case "floor":
-                _require_none(rule, start)
+                _require_none(rule, record.deliveries)
             case _:
                 assert_never(arm)
     except _RefusalError as refusal:
@@ -97,13 +98,14 @@ def _require_kernel_only(rule: _Rule, start: Collection[str]) -> None:
         raise _RefusalError("a lean session carries the whole moved rule at session start")
 
 
-def _require_none(rule: _Rule, start: Collection[str]) -> None:
-    carried = tuple(line for line in rule.lines if line in start)
-    if carried:
-        raise _RefusalError(
-            f"a floor session carries {len(carried)} of {len(rule.lines)} lines of the moved rule"
-            f" at session start, e.g. {_quote(carried)}"
-        )
+def _require_none(rule: _Rule, deliveries: Iterable[Delivery]) -> None:
+    for delivery in deliveries:
+        carried = tuple(line for line in rule.lines if line in _lines_of([delivery]))
+        if carried:
+            raise _RefusalError(
+                f"a floor session carries {len(carried)} of {len(rule.lines)} lines of the moved"
+                f" rule by the {trigger.channel_of(delivery)} channel, e.g. {_quote(carried)}"
+            )
 
 
 def _absent(owed: tuple[str, ...], arrived: Collection[str]) -> tuple[str, ...]:

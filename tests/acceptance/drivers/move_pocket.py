@@ -15,6 +15,10 @@ code serialises with `dataclasses.asdict`; the shapes the drivers read back are:
   repository's path.
 
 A request names the declaration by `declaration` (a written file) or `move` (the kit's own).
+`call_with_declaration` runs code against that declaration; `call_in_pocket` runs code that needs
+none (the verdict and the report read a measurement alone). The shapes of the other calls the
+drivers make (the take proof, the trigger record, the end-state grade, the verdict) are pinned
+in the header of `move_scoring`.
 """
 
 from __future__ import annotations
@@ -27,19 +31,25 @@ from tests.acceptance.drivers import adherence_eval
 
 POCKET_TIMEOUT_SECONDS = 600  # a build runs both rules exports over the lean copy
 
-_LOAD = """
+_PRELUDE = """
 import dataclasses, json, sys
 from pathlib import Path
-from praxion_evals.adherence.moves import declaration
 request = json.load(sys.stdin)
+def emit(value):
+    print(json.dumps(value, default=str))
+"""
+
+_LOAD = (
+    _PRELUDE
+    + """
+from praxion_evals.adherence.moves import declaration
 declared = (
     declaration.load(Path(request["declaration"]))
     if request["declaration"]
     else declaration.kit(request["move"])
 )
-def emit(value):
-    print(json.dumps(value, default=str))
 """
+)
 
 _BUILD_ARMS = """
 from praxion_evals.adherence.moves import arms
@@ -66,29 +76,37 @@ emit(str(kit_git.build_fixture(declared, task, Path(request["where"]))))
 
 def build_arms(move: str, declaration: Path | None, checkout: Path, workspace: Path) -> Any:
     request = {"checkout": str(checkout), "workspace": str(workspace)}
-    return _call(_BUILD_ARMS, move, declaration, request)
+    return call_with_declaration(_BUILD_ARMS, move, declaration, request)
 
 
 def check_copy(
     move: str, declaration: Path | None, arm: str, copy: Path, checkout: Path
 ) -> str | None:
     request = {"arm": arm, "copy": str(copy), "checkout": str(checkout)}
-    return _call(_CHECK_COPY, move, declaration, request)
+    return call_with_declaration(_CHECK_COPY, move, declaration, request)
 
 
 def tasks(move: str, declaration: Path | None, seed: int) -> list[Mapping[str, Any]]:
-    return _call(_TASKS, move, declaration, {"seed": seed})
+    return call_with_declaration(_TASKS, move, declaration, {"seed": seed})
 
 
 def build_fixture(
     move: str, declaration: Path | None, seed: int, task_id: str, where: Path
 ) -> Path:
     request = {"seed": seed, "task_id": task_id, "where": str(where)}
-    return Path(_call(_BUILD_FIXTURE, move, declaration, request))
+    return Path(call_with_declaration(_BUILD_FIXTURE, move, declaration, request))
 
 
-def _call(code: str, move: str, declaration: Path | None, request: Mapping[str, Any]) -> Any:
+def call_with_declaration(
+    code: str, move: str, declaration: Path | None, request: Mapping[str, Any]
+) -> Any:
+    """Run `code` with `declared` loaded: the file at `declaration`, or `move`'s own kit."""
     payload = {"move": move, "declaration": None if declaration is None else str(declaration)}
     return adherence_eval.run_in_eval(
         _LOAD + code, {**payload, **request}, timeout=POCKET_TIMEOUT_SECONDS
     )
+
+
+def call_in_pocket(code: str, request: Mapping[str, Any]) -> Any:
+    """Run `code` that needs no declaration; `request` and `emit` are in scope."""
+    return adherence_eval.run_in_eval(_PRELUDE + code, request, timeout=POCKET_TIMEOUT_SECONDS)

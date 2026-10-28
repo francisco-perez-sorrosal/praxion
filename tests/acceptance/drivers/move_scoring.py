@@ -19,8 +19,9 @@ Bound here, because the specification or the base commit fixes them:
 - the frozen copies of real main-session records, each with the Claude Code version it was
   recorded on, read from `tests/fixtures/main_session_probes/`, found by walking up to the `tests/fixtures` directory.
 
-- the take proof over a planted session record and the trigger record over a session record,
-  each a call into the eval pocket (`move_pocket`) over a record `move_records` writes.
+- the take proof over a planted session record, the trigger record over a session record, the
+  grade of a planted end state, and the verdict and report over constructed measurements, each
+  a call into the eval pocket (`move_pocket`), the records written by `move_records`.
 
 Their result shapes, pinned here for the production side to meet (a mismatch is a question to
 the planner, never a silent driver edit): `moves.take.prove(declaration, arm, record_path)`
@@ -33,8 +34,16 @@ are the declaration's names (`session_start`, `path_matched`, `hook_context`, `g
 scenarios' words. `prove` takes no checkout, so the moved rule's text reaches it through the
 declaration.
 
-Unbound until a binding step ties them to the designed surface: grading an end state by a
-governed check; the move verdict and the move report over constructed pairs.
+`moves.checks_git.grade(declaration, check, repo, named_files)` takes the check's name and the
+named files as a tuple, and returns `outcome` ("passed" or "failed") and `failed_parts` (a list
+of part names). `moves.verdict.move_verdict(measurement)` returns `check_verdicts`, `allowances`
+and `discordant` (check -> value) and `complete_pairs`, with `cleared` optional. The measurement
+is the JSON of `moves.verdict.Measurement.from_json` and `moves.report.render(measurement)`
+returns the report text: arrivals are keyed by the declaration's channel names, history and
+timing are the specification's words, and the report prints its figures as the lines
+`move_report` documents.
+
+Nothing in this module remains unbound.
 """
 
 from __future__ import annotations
@@ -49,7 +58,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from tests.acceptance.drivers import adherence_eval, move_declarations, move_pocket, move_records
-from tests.acceptance.drivers.move_eval import Arm, Declared, FixtureKind, unbound
+from tests.acceptance.drivers.move_eval import TARGET_PAIRS, Arm, Declared, FixtureKind, unbound
 from tests.acceptance.drivers.move_records import SessionStart
 
 Final = Literal["passed", "failed"]
@@ -118,7 +127,7 @@ def prove_take(declared: Declared, planted: PlantedSession) -> Take:
             planted.at_session_start,
             planted.point_of_use_arrived,
         )
-        answer = move_pocket._call(
+        answer = move_pocket.call_with_declaration(
             _PROVE_TAKE, declared.move, declared.path, {"arm": planted.arm, "record": str(record)}
         )
     try:
@@ -193,7 +202,7 @@ _HISTORY_WORDS = {"never taken": "action never taken"}
 
 def trigger_records(declared: Declared, record: Path) -> tuple[CheckTrigger, ...]:
     """The trigger record of every governed check of the move over one session record."""
-    answer = move_pocket._call(
+    answer = move_pocket.call_with_declaration(
         _TRIGGER_RECORDS, declared.move, declared.path, {"record": str(record)}
     )
     return tuple(_check_trigger(entry) for entry in answer)
@@ -279,11 +288,33 @@ class Grade:
     failed_parts: frozenset[str]  # the parts of the check that failed, each reported
 
 
-def grade_end_state(declared: Declared, check: str, state: EndState) -> Grade:
-    unbound(
-        "a move's governed check can grade a planted end state (a repository and the files its"
-        " request named) with no session, reporting the outcome and each failed part"
+_GRADE_END_STATE = """
+from praxion_evals.adherence.moves import checks_git
+emit(
+    dataclasses.asdict(
+        checks_git.grade(
+            declared, request["check"], Path(request["repo"]), tuple(request["named_files"])
+        )
     )
+)
+"""
+
+
+def grade_end_state(declared: Declared, check: str, state: EndState) -> Grade:
+    """Ask the named governed check to grade a planted end state, with no session."""
+    answer = move_pocket.call_with_declaration(
+        _GRADE_END_STATE,
+        declared.move,
+        declared.path,
+        {"check": check, "repo": str(state.repo), "named_files": list(state.named_files)},
+    )
+    try:
+        return Grade(answer["outcome"], frozenset(answer["failed_parts"]))
+    except KeyError as missing:
+        raise AssertionError(
+            f"the grade answered {answer!r}, which lacks {missing}: it returns outcome and"
+            " failed_parts"
+        ) from missing
 
 
 # -- Constructed pairs, the verdict and the report --------------------------------------------
@@ -326,12 +357,66 @@ class MoveVerdict:
     cleared: bool | None  # None: underpowered, no clearance verdict
 
 
+_CHANNEL_NAMES = {words: name for name, words in _CHANNEL_WORDS.items()}
+
+
+def _measurement_json(measurement: MoveMeasurement) -> dict[str, Any]:
+    """The measurement in the form `Measurement.from_json` reads."""
+    return {
+        "checks": list(measurement.checks),
+        "margin_pp": measurement.margin_pp,
+        "target_pairs": TARGET_PAIRS,
+        "kind_restriction": measurement.restricted_to,
+        "pairs": [
+            {
+                "task_id": pair.task_id,
+                "fixture_kind": pair.fixture_kind,
+                "full": _side_json(pair.full),
+                "lean": _side_json(pair.lean),
+            }
+            for pair in measurement.pairs
+        ],
+        "floor": [None if s is None else {"final": dict(s.final)} for s in measurement.floor],
+    }
+
+
+def _side_json(outcome: ArmOutcome | None) -> dict[str, Any] | None:
+    if outcome is None:
+        return None  # the arm's session errored
+    return {
+        "final": dict(outcome.final),
+        "history": dict(outcome.history),
+        "arrivals": {
+            check: {_CHANNEL_NAMES[channel]: timing for channel, timing in arrived.items()}
+            for check, arrived in outcome.arrivals.items()
+        },
+    }
+
+
+_MOVE_VERDICT = """
+from praxion_evals.adherence.moves.verdict import Measurement, move_verdict
+emit(dataclasses.asdict(move_verdict(Measurement.from_json(request["measurement"]))))
+"""
+
+
 def move_verdict(measurement: MoveMeasurement) -> MoveVerdict:
-    unbound(
-        "the move verdict can be computed over constructed move pairs (final state, history and"
-        " arrivals per arm and governed check) and floor sessions, with the move in the role's"
-        " place"
+    """The move verdict over constructed pairs and floor sessions."""
+    answer = move_pocket.call_in_pocket(
+        _MOVE_VERDICT, {"measurement": _measurement_json(measurement)}
     )
+    try:
+        return MoveVerdict(
+            answer["check_verdicts"],
+            answer["allowances"],
+            answer["discordant"],
+            answer["complete_pairs"],
+            answer.get("cleared"),
+        )
+    except KeyError as missing:
+        raise AssertionError(
+            f"the verdict answered {answer!r}, which lacks {missing}: it returns check_verdicts,"
+            " allowances, discordant and complete_pairs"
+        ) from missing
 
 
 @dataclass(frozen=True)
@@ -359,11 +444,97 @@ class MoveReport:
     margin_pp: float
 
 
+_MOVE_REPORT = """
+from praxion_evals.adherence.moves import report
+from praxion_evals.adherence.moves.verdict import Measurement
+emit(report.render(Measurement.from_json(request["measurement"])))
+"""
+_FIGURE = "figure | "
+
+
 def move_report(measurement: MoveMeasurement) -> MoveReport:
-    unbound(
-        "the move report can be rendered from constructed move pairs and floor sessions, and its"
-        " per-check figures, per-kind counts, restriction and clearance claim read back from it"
+    """Render the report over constructed pairs and floor sessions, and read its figures back.
+
+    The report is prose with its figures also printed as lines `figure | <subject> | <topic> |
+    <values...>`, fields separated by ` | `, in the specification's words (channels by the
+    declaration's names). The subject is a governed check's name, or `run`:
+
+        figure | <check> | floor | <failures> | <scored sessions>
+        figure | <check> | final | <arm> | <failures>
+        figure | <check> | history | <arm> | <history word> | <sessions>
+        figure | <check> | timing | <arm> | <channel> | <timing word> | <sessions>
+        figure | <check> | trigger | <arm> | <trigger failures> | <failures with arrival>
+        figure | <check> | allowance | <points, one decimal>
+        figure | <check> | sensitivity | <figure as printed, one decimal>
+        figure | <check> | coverage | covered | not covered
+        figure | <check> | verdict | <word>
+        figure | run | kind | <fixture kind> | <pairs>
+        figure | run | restriction | <fixture kind> | none
+        figure | run | margin | <points>
+        figure | run | clearance | <the clearance claim, as one line>
+    """
+    text = move_pocket.call_in_pocket(_MOVE_REPORT, {"measurement": _measurement_json(measurement)})
+    return _read_report(text, measurement.checks)
+
+
+def _read_report(text: str, checks: Sequence[str]) -> MoveReport:
+    rows: dict[str, list[tuple[str, list[str]]]] = {}
+    for line in text.splitlines():
+        if line.startswith(_FIGURE):
+            _, subject, topic, *values = line.split(" | ")
+            rows.setdefault(subject, []).append((topic, values))
+    run = rows.get("run", [])
+    return MoveReport(
+        text=text,
+        checks={check: _check_report(check, rows.get(check, [])) for check in checks},
+        per_kind_pairs={cast(FixtureKind, v[0]): int(v[1]) for t, v in run if t == "kind"},
+        pooled_verdict={check: _only(check, rows.get(check, []), "verdict")[0] for check in checks},
+        restriction=_restriction(_only("run", run, "restriction")[0]),
+        clearance_claim=_only("run", run, "clearance")[0],
+        margin_pp=float(_only("run", run, "margin")[0]),
     )
+
+
+def _check_report(check: str, rows: list[tuple[str, list[str]]]) -> CheckReport:
+    history: dict[str, dict[str, int]] = {}
+    timing: dict[str, dict[str, dict[str, int]]] = {}
+    for topic, values in rows:
+        if topic == "history":
+            arm, word, sessions = values
+            history.setdefault(arm, {})[_history_word(word) or word] = int(sessions)
+        elif topic == "timing":
+            arm, channel, when, sessions = values
+            channel_words = _CHANNEL_WORDS.get(channel, channel)
+            timing.setdefault(arm, {}).setdefault(channel_words, {})[when] = int(sessions)
+    floor_failures, floor_sessions = _only(check, rows, "floor")
+    return CheckReport(
+        floor_failures=int(floor_failures),
+        floor_sessions=int(floor_sessions),
+        final_failures=_per_arm(rows, "final", 1),
+        history=cast(Any, history),
+        timing=cast(Any, timing),
+        trigger_failures=_per_arm(rows, "trigger", 1),
+        failures_with_arrival=_per_arm(rows, "trigger", 2),
+        allowance_pp=float(_only(check, rows, "allowance")[0]),
+        sensitivity_shown=_only(check, rows, "sensitivity")[0],
+        not_covered=_only(check, rows, "coverage")[0] == "not covered",
+    )
+
+
+def _per_arm(rows: list[tuple[str, list[str]]], topic: str, index: int) -> dict[Arm, int]:
+    return {cast(Arm, values[0]): int(values[index]) for t, values in rows if t == topic}
+
+
+def _only(subject: str, rows: list[tuple[str, list[str]]], topic: str) -> list[str]:
+    found = [values for row_topic, values in rows if row_topic == topic]
+    assert len(found) == 1, (
+        f"the report prints {len(found)} lines `{_FIGURE}{subject} | {topic} | ...`, not one"
+    )
+    return found[0]
+
+
+def _restriction(word: str) -> FixtureKind | None:
+    return None if word == "none" else cast(FixtureKind, word)
 
 
 def shared_rule_verdict(measurement: MoveMeasurement) -> Mapping[str, str]:

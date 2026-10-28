@@ -23,7 +23,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CALLER_DOCS = [
     _REPO_ROOT / "agents" / "sentinel.md",
     _REPO_ROOT / "skills" / "project-metrics" / "SKILL.md",
-    _REPO_ROOT / "skills" / "eval-praxion" / "SKILL.md",
 ]
 
 # Matches the value token of a `--family <value>` CLI invocation as it

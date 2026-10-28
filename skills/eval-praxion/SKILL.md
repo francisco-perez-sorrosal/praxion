@@ -91,8 +91,6 @@ Eval complete: <N> PASS / <N> WARN / <N> FAIL
 Report: .ai-state/praxion_eval_reports/PRAXION_EVAL_REPORT_<timestamp>.md
 ```
 
-Then bound the directory: run `prune_reports.py --family .ai-state/praxion_eval_reports:PRAXION_EVAL` (PATH-installed by `install_claude.sh`; in the Praxion self-host checkout use `python3 scripts/prune_reports.py --family .ai-state/praxion_eval_reports:PRAXION_EVAL`) to retain the last 10 `PRAXION_EVAL_REPORT_*` runs. It never touches `PRAXION_EVAL_LOG.md` (the full history stays) or `judge_cache.jsonl`; pruned reports remain in git history. Skip it when `--output-dir` sent the report elsewhere. Stage the pruned deletions in the same commit as the new report.
-
 ### 4. Flag anomalies
 
 If any check emits FAIL, surface the check name, the artifact path, and the verdict reason. The user decides whether to act on the finding or defer it.

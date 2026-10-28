@@ -241,7 +241,7 @@ class GovernedChecks:
     def __post_init__(self) -> None:
         _require(
             len(self.checks) in GOVERNED_CHECK_COUNTS,
-            f"a move governs one or two checks, got {len(self.checks)}",
+            f"a move declares one or two governed checks, got {len(self.checks)}",
         )
         _require(len({c.name for c in self.checks}) == len(self.checks), "check names are distinct")
 

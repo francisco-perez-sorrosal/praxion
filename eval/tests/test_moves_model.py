@@ -152,7 +152,7 @@ def test_a_move_governs_one_or_two_checks(names: tuple[str, ...]) -> None:
 
 @pytest.mark.parametrize("names", [(), ("a", "b", "c")])
 def test_a_move_governing_zero_or_three_checks_is_refused(names: tuple[str, ...]) -> None:
-    with pytest.raises(ValueError, match="one or two checks"):
+    with pytest.raises(ValueError, match="one or two governed checks"):
         GovernedChecks(tuple(a_check(n) for n in names))
 
 

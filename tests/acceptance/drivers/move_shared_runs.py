@@ -13,6 +13,13 @@ it (the checkout, the stand-in's configuration and launch log). Two calls with d
 never share an entry, and a replay hands the caller its own copies of every file, with the
 spelling of the producer's paths swapped for the caller's.
 
+An entry is immutable. The producer stages every file a caller receives into a private directory
+while it still holds the key's lock and renames the directory into place before releasing it;
+nothing writes to an entry afterwards, and a replay reads only the entry (and, for a repository's
+own metadata, the replaying caller's own repository), never another caller's workspace. The
+repository metadata is the one thing an entry cannot hold: two workers build their template
+checkouts apart, so their commits differ, and a copy must equal its own caller's original.
+
 The entries live beside the pytest base temp every worker of one session shares: the parent of
 a worker's base temp (`popen-gwN`) under xdist, the base temp itself otherwise. A caller whose
 directories sit under no such base temp computes its outcome unshared.
@@ -82,9 +89,10 @@ class Watch:
 
     root: Path
     skip_git: bool = False  # the repository's own metadata is neither keyed nor replayed
-    # A file under a `.git` inside this root that is a verbatim copy of the same file of the
-    # `.git` here is replayed as a copy of the caller's own: a repository's index holds file
-    # stats that differ between two builds of the same tree, and a copy must equal its original.
+    # Every `.git` directory inside this root is a copy of the `.git` of this repository. An entry
+    # holds none of them: it records where they are, and a replay copies the caller's own `.git`
+    # there, so a copy equals its own original whichever worker produced the entry. An outcome
+    # whose copies differ from the repository's `.git` is returned to its caller but not published.
     mirrors: Path | None = None
 
 
@@ -124,7 +132,7 @@ def share(
             return _replay(entry, roles, watches)
         state = unshareable_if_changed()
         result = produce()
-        if unshareable_if_changed() == state:
+        if unshareable_if_changed() == state and _git_copies_hold(watches):
             after = {name: _snapshot(watch, roles) for name, watch in watches.items()}
             _publish(root, digest, roles, watches, before, after, result)
         return result
@@ -184,7 +192,7 @@ def _snapshot(watch: Watch, roles: Roles) -> Snapshot:
     snapshot: Snapshot = {}
     for directory, subdirs, files in os.walk(watch.root):
         base = Path(directory)
-        if watch.skip_git and _GIT_DIR in subdirs:
+        if (watch.skip_git or watch.mirrors is not None) and _GIT_DIR in subdirs:
             subdirs.remove(_GIT_DIR)
         for name in subdirs:
             path = base / name
@@ -234,7 +242,8 @@ def _publish(
     for name, watch in watches.items():
         added = _added(before[name], after[name])
         removed = sorted(set(before[name]) - set(after[name]))
-        meta["trees"][name] = {"added": added, "removed": removed}
+        gitdirs = _git_dirs(watch) if watch.mirrors is not None else []
+        meta["trees"][name] = {"added": added, "removed": removed, "gitdirs": gitdirs}
         for relpath, (kind, value) in added.items():
             stored = staging / name / relpath
             if kind == "dir":
@@ -244,10 +253,6 @@ def _publish(
                 meta["trees"][name]["added"][relpath] = (kind, roles.encode_text(value))
             else:
                 source = watch.root / relpath
-                mirrored = _mirrored_git_file(watch, relpath)
-                if mirrored is not None:
-                    meta["trees"][name]["added"][relpath] = ("mirror", mirrored)
-                    continue
                 stored.parent.mkdir(parents=True, exist_ok=True)
                 stored.write_bytes(roles.encode(source.read_bytes()))
                 shutil.copystat(source, stored)
@@ -270,33 +275,44 @@ def _replay(entry: Path, roles: Roles, watches: Mapping[str, Watch]) -> Any:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 _remove(target)
                 target.symlink_to(roles.decode_text(value))
-            elif kind == "mirror":
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(_mirror_root(watches[name]) / value, target)
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 stored = entry / name / relpath
                 target.write_bytes(roles.decode(stored.read_bytes()))
                 shutil.copystat(stored, target)
+        for relpath in tree["gitdirs"]:
+            shutil.copytree(
+                _own_git(watches[name]), root / relpath, symlinks=True, dirs_exist_ok=True
+            )
     return json.loads(roles.decode_text(json.dumps(meta["result"])))
 
 
-def _mirror_root(watch: Watch) -> Path:
+def _own_git(watch: Watch) -> Path:
     if watch.mirrors is None:
-        raise ValueError(f"an entry mirrors a repository but {watch.root} watches none")
-    return watch.mirrors
+        raise ValueError(f"an entry records a repository's metadata but {watch.root} watches none")
+    return watch.mirrors / _GIT_DIR
 
 
-def _mirrored_git_file(watch: Watch, relpath: str) -> str | None:
-    """The `.git/...` part of `relpath` when the file is a verbatim copy of the mirrored one."""
-    parts = Path(relpath).parts
-    if watch.mirrors is None or _GIT_DIR not in parts:
-        return None
-    inside = str(Path(*parts[parts.index(_GIT_DIR) :]))
-    original = watch.mirrors / inside
-    if original.is_file() and original.read_bytes() == (watch.root / relpath).read_bytes():
-        return inside
-    return None
+def _git_dirs(watch: Watch) -> list[str]:
+    """Where, relative to the watched root, the repository copies are."""
+    found = []
+    for directory, subdirs, _ in os.walk(watch.root):
+        if _GIT_DIR in subdirs:
+            subdirs.remove(_GIT_DIR)
+            found.append(str((Path(directory) / _GIT_DIR).relative_to(watch.root)))
+    return sorted(found)
+
+
+def _git_copies_hold(watches: Mapping[str, Watch]) -> bool:
+    """Whether every repository copy in the watched roots equals the repository it copies."""
+    no_roles = Roles({})
+    return all(
+        _snapshot(Watch(watch.root / gitdir), no_roles) == _snapshot(Watch(own), no_roles)
+        for watch in watches.values()
+        if watch.mirrors is not None
+        for own in (_own_git(watch),)
+        for gitdir in _git_dirs(watch)
+    )
 
 
 def _remove(path: Path) -> None:

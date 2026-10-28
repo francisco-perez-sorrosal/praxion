@@ -99,8 +99,6 @@ from typing import Any, Literal
 
 import yaml
 
-from tests.acceptance.drivers.gate_liveness import make_copy
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EVAL_PROJECT = REPO_ROOT / "eval"
 EVAL_SRC = EVAL_PROJECT / "src"
@@ -670,9 +668,59 @@ def install_fake_claude(workspace: Path, *, cost_usd: float | None = 0.01) -> Fa
 # ---------------------------------------------------------------------------
 
 
+# What a run, its stand-in `claude` and the tests that measure it read of the checkout. A run copies
+# the whole checkout once per role and arm, digests every copy and removes them all, so each file
+# the fixture carries beyond this set is paid for a dozen times over by every run.
+#   - the agent definitions: arms are built from them, the tests compare the plugin copy's with
+#     them, and the stand-in reads the measured role's;
+#   - the adoption ledger and the kernel index: a role's identity and whether its copy delivers a
+#     kernel;
+#   - the renderer, its template and the rule linker, and the rules they link: every proof and task
+#     sandbox is installed with the copy's own primitives;
+#   - the hook registration: the stand-in records the plugin copy's, and a test compares it;
+#   - the results directory: earlier runs are listed from it, and a test points a continuation at
+#     a run committed there;
+#   - `README.md`, which tests change to make a later commit; `.gitignore`, so the checkout ignores
+#     what the full one does and a run leaves it as clean as that one.
+CHECKOUT_FILES = (
+    ".gitignore",
+    "README.md",
+    ".ai-state/kernel_adoption.yaml",
+    "claude/kernels/index.json",
+    "claude/config/CLAUDE.md.tmpl",
+    "scripts/render_claude_md.py",
+    "lib/install_shared.sh",
+    "hooks/hooks.json",
+)
+CHECKOUT_TREES = ("agents", "rules", ".ai-state/eval_ledger/adherence")
+
+
 def checkout_under_test(workspace: Path) -> Path:
-    """A clean, committed copy of this repository: a Praxion checkout a run may be pointed at."""
-    return make_copy(workspace, "checkout").root
+    """A small, clean, committed Praxion checkout a run may be pointed at.
+
+    It holds what `CHECKOUT_FILES` and `CHECKOUT_TREES` name, as this working tree has it (a few
+    dozen files rather than the repository's thousands), in one commit. Its object store borrows
+    this repository's, as a shared clone's does, so a results file written before identities were
+    recorded still finds the role definitions at the commit it ran on.
+    """
+    root = workspace / "checkout"
+    root.mkdir(parents=True)
+    listed = _git(
+        REPO_ROOT,
+        *("ls-files", "-z", "--cached", "--others", "--exclude-standard"),
+        *("--", *CHECKOUT_FILES, *CHECKOUT_TREES),
+    )
+    for relpath in sorted(set(filter(None, listed.split("\0")))):
+        source = REPO_ROOT / relpath
+        if source.is_file():  # a tracked file deleted from the working tree is not part of it
+            (root / relpath).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, root / relpath, follow_symlinks=False)
+    _git(root, "init", "-q", "-b", "main")
+    objects = _git(REPO_ROOT, "rev-parse", "--path-format=absolute", "--git-path", "objects")
+    (root / ".git" / "objects" / "info" / "alternates").write_text(objects, encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "a checkout of the files an adherence run reads")
+    return root
 
 
 def _git(root: Path, *args: str) -> str:

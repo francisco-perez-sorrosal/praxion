@@ -162,7 +162,8 @@ def results_dir(checkout: Path) -> Path:
 
 
 def _results_files(checkout: Path) -> set[Path]:
-    return {p for p in results_dir(checkout).glob("*.json") if p.name != "index.json"}
+    # A move run's file sits one level down (moves/<run_id>.json), a role run's at the top.
+    return {p for p in results_dir(checkout).rglob("*.json") if p.name != "index.json"}
 
 
 @dataclass(frozen=True)

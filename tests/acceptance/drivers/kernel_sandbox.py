@@ -1,10 +1,10 @@
 """Driver for the kernel surfaces of a plugin checkout, reached from outside.
 
 A scenario works on a sandbox: a copy of this checkout's files (tracked, plus
-untracked files git does not ignore, minus the trees no kernel surface reads) in a
+untracked files git does not ignore, minus what no kernel surface reads) in a
 git repository of its own, so a scenario may edit rules, agent definitions or the
-audience manifest without touching this checkout. A module builds one template per
-worker and every scenario copies it.
+audience manifest without touching this checkout. A process builds one template, on
+its first call, and every scenario copies it.
 
 Bound here, because the specification or the base commit fixes them:
 
@@ -32,6 +32,7 @@ shell shim exec-ing this suite's interpreter, so its venv resolves), and no inhe
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import re
@@ -39,6 +40,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,6 +57,7 @@ SHARED_BLOCKS_GATE = "check_agent_shared_blocks.py"
 KERNELS_DIR = "claude/kernels"
 AUDIENCE_MANIFEST = "rules/_audience.yaml"
 ADOPTION_LEDGER = ".ai-state/kernel_adoption.yaml"
+ADHERENCE_RESULTS = ".ai-state/eval_ledger/adherence"
 CONTRACT_RULE = "rules/swe/agent-behavioral-contract.md"
 USER_TEMPLATE = "claude/config/CLAUDE.md.tmpl"
 PROJECT_INSTRUCTIONS = "CLAUDE.md"
@@ -82,6 +85,26 @@ _SKIPPED_TREES = (
     "fitness",
     ".obsidian",
     ".github",
+    "docs",
+    "skills",
+)
+# Of `.ai-state/` the kernel surfaces read the adoption ledger and the adherence results
+# the ratification gates cite; the rest is reports and records nothing here opens.
+_KEPT_STATE = (ADOPTION_LEDGER, f"{ADHERENCE_RESULTS}/")
+# Scripts the sandbox runs are the ones the kernel and shared-block gates register as
+# their read set in `.pre-commit-config.yaml`; every other script is another tool's.
+_GATE_SCRIPTS = (*KERNEL_GATE_SCRIPTS, SHARED_BLOCKS_GATE)
+# The hooks' own test modules; the sandbox runs the hooks, never their tests.
+_HOOK_TEST_MODULE = re.compile(r"(?:^|/)(?:test_[^/]*\.py|conftest\.py)$")
+# Files a scenario cannot be meaningful without; a template missing one is a narrowing bug.
+_REQUIRED_FILES = (
+    GENERATOR,
+    AUDIENCE_MANIFEST,
+    ADOPTION_LEDGER,
+    CONTRACT_RULE,
+    USER_TEMPLATE,
+    PROJECT_INSTRUCTIONS,
+    ".pre-commit-config.yaml",
 )
 _IDENTITY = (
     "-c",
@@ -161,11 +184,23 @@ def _git(root: Path, *args: str, **env: str) -> str:
 
 def _in_sandbox(rel: str) -> bool:
     path = REPO_ROOT / rel
+    top = rel.split("/", 1)[0]
     return (
         bool(rel)
-        and rel.split("/", 1)[0] not in _SKIPPED_TREES
+        and top not in _SKIPPED_TREES
+        and (top != ".ai-state" or rel.startswith(_KEPT_STATE))
+        and not (top == "hooks" and _HOOK_TEST_MODULE.search(rel))
         and (path.is_file() or path.is_symlink())
     )
+
+
+def _gate_read_scripts(candidates: list[str]) -> set[str]:
+    """The `scripts/` files the kernel and shared-block gates register as their read set."""
+    gates = [
+        h for h in _local_hooks(REPO_ROOT) if any(s in h.get("entry", "") for s in _GATE_SCRIPTS)
+    ]
+    scripts = [rel for rel in candidates if rel.startswith("scripts/")]
+    return {rel for hook in gates for rel in _hook_files(hook, scripts)}
 
 
 def _checkout_files() -> list[str]:
@@ -177,11 +212,35 @@ def _checkout_files() -> list[str]:
         check=True,
         timeout=60,
     ).stdout.split("\0")
-    return sorted(rel for rel in set(listed) if _in_sandbox(rel))
+    files = sorted(rel for rel in set(listed) if _in_sandbox(rel))
+    gate_scripts = _gate_read_scripts(files)
+    return [rel for rel in files if not rel.startswith("scripts/") or rel in gate_scripts]
 
 
-def build_template(dest: Path) -> Path:
-    """A copy of this checkout's files in a fresh git repository with one commit."""
+_template: Path | None = None
+
+
+def build_template(_dest: Path) -> Path:
+    """This process's template: a copy of this checkout's files in a fresh git repository.
+
+    Built on the first call and handed to every later one, so `_dest` is not where it
+    lives: a caller's directory may be gone before another caller needs the template.
+    The template is read-only by contract -- a scenario copies it with `new_sandbox`
+    and edits the copy -- and is removed when the process exits.
+    """
+    global _template
+    if _template is None:
+        parent = Path(tempfile.mkdtemp(prefix="kernel-template-"))
+        try:
+            _template = _build_template(parent / "checkout")
+        except BaseException:
+            shutil.rmtree(parent, ignore_errors=True)
+            raise
+        atexit.register(shutil.rmtree, parent, ignore_errors=True)
+    return _template
+
+
+def _build_template(dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     for rel in _checkout_files():
         source = REPO_ROOT / rel
@@ -191,6 +250,8 @@ def build_template(dest: Path) -> Path:
             target.symlink_to(os.readlink(source))
         else:
             shutil.copy2(source, target)
+    missing = [rel for rel in _REQUIRED_FILES if not (dest / rel).is_file()]
+    assert not missing, f"the narrowed template lacks {missing}, which every scenario reads"
     _git(dest, "init", "-q")
     # Committing this many files trips `gc --auto`, which detaches and deletes loose
     # objects while the first scenario is still copying the template; the copies

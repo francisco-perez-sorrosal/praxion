@@ -5,7 +5,7 @@ audience: developer
 
 # Switch a role to its kernel
 
-Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on trial, measure it with the adherence instrument (stop, continue or close a run, read its allowance lines, index its results), flip it or hold it, move the eligibility pin, read a `kernel_injected` row and run the liveness check. For what each part is and why, see [Lean spawn: role kernels and the adoption ledger](lean-spawn-kernels.md).
+Recipes for the lean-spawn mechanism: regenerate the kernels, put a role on trial, measure it with the adherence instrument (stop, continue or close a run, read its allowance lines, index its results), measure a main-session move (price it, run the floor, then the paired run, read its report), flip a role or hold it, move the eligibility pin, read a `kernel_injected` row and run the liveness check. For what each part is and why, see [Lean spawn: role kernels and the adoption ledger](lean-spawn-kernels.md); for the design of the move instrument, `eval/EVAL_PLAN.md` (section *Main-session move eval*).
 
 Run commands from the repository root.
 
@@ -150,6 +150,70 @@ On a refusal:
 Verify: `python3 -m pytest scripts/test_kernel_run_evidence.py scripts/test_kernel_run_evidence_parity.py scripts/test_kernel_ledger_checks_evidence.py scripts/test_kernel_ledger_checks_scored.py -q`; `uv run pytest tests/acceptance/test_flip_gate_takes_standing_from_results.py tests/acceptance/test_implementer_scores_the_project_convention.py -q`; `cd eval && uv run pytest tests/test_adherence_standing.py -q`.
 
 Index verify: `python3 -m pytest scripts/test_kernel_run_index.py -q`; `cd eval && uv run pytest tests/test_adherence_run_index.py -q`; `uv run pytest tests/acceptance/test_switched_records_rest_on_their_results.py -q`; `python3 scripts/check_kernel_manifest.py` over the committed ledger.
+
+## Measure a main-session move
+
+A *move* relocates one rule's text so it reaches the main session by another deterministic path, and the move eval asks whether a session still follows the rule. Nothing here claims the relocated text works better; the report claims at most non-regression within a declared margin. Commands run from `eval/` under `uv run`; design and verification paths are in `eval/EVAL_PLAN.md`, section *Main-session move eval*. A move has three arms: `full` (the checkout as it is), `lean` (a resident kernel plus the rest of the text at the point of use) and `floor` (no line of the rule by any channel).
+
+1. **Price it first.** The dry run launches nothing and writes nothing:
+
+   ```bash
+   uv run praxion-evals-adherence --move git-conventions --dry-run
+   ```
+
+   It prints one `session <floor|paired> <task_id> <fixture> <managed|unmanaged> <wording_variant> <arm>` line per session, one `task` line per task, then `total floor=8 paired=48 all=56` and `calibration sessions=0` (a move has no calibration run). Verify: `uv run pytest ../tests/acceptance/test_move_dry_run.py -q`.
+
+2. **Run the floor first.** A floor run launches only `floor` sessions (8 tasks by default, at least 6) and shows whether the governed checks can fail at all when the text never arrives:
+
+   ```bash
+   uv run praxion-evals-adherence --move git-conventions --run floor \
+     --session-oauth-token-file ~/.claude/praxion-session-token --max-total-usd 20
+   ```
+
+   The run prints where its results file went: `.ai-state/eval_ledger/adherence/moves/<run>.json`. Billing and caps are the role path's, option for option (see [Run the sessions on a subscription](#run-the-sessions-on-a-subscription)); `--max-total-usd` caps the run and `--session-budget-usd` each session.
+
+3. **Run the pairs, citing the floor.** A paired run launches `full` and `lean` for each task and is refused before any launch unless it cites a finished floor run of the same measured identity that failed every governed check it declares:
+
+   ```bash
+   uv run praxion-evals-adherence --move git-conventions --run paired --floor-run <floor-run-id> \
+     --session-oauth-token-file ~/.claude/praxion-session-token --max-total-usd 100
+   ```
+
+   Every refusal names what it refuses and exits 2. A change confined to the lean declaration leaves the floor run citable, because the lean arm never loads into a floor run.
+
+4. **Continue or close a stopped run.** A move run stops itself on repeated identical infrastructure failures in one arm (`--stop-count`, default 3), as a role run does; a floor run is continuable on its own streak. `--continue RUN` launches again only the planned tasks no part finished, under an identical measured identity; `--close RUN --reason TEXT` records the give-up. A fresh run of the move is refused while a continuable stopped run is neither continued nor closed. `--reindex` rebuilds `index.json` beside the move results files from the files alone. Verify: `uv run pytest tests/test_moves_stop.py tests/test_moves_lineage.py -q`.
+
+5. **Read the report.** `uv run praxion-evals-adherence --report .ai-state/eval_ledger/adherence/moves/<run>.json` renders a move results file. Per governed check it states:
+   - the final-state failures of each arm and the history outcomes (right first time, repaired, not repaired, never taken);
+   - the trigger record: when each channel carried the check's governing text (before composition, before execution, after execution, never, unknown), with *trigger failures* (the text never arrived) counted apart from failures with arrival. Arrival and history are shown and gate nothing;
+   - the allowance in pairs and in points beside the margin, as the role report states it;
+   - the sensitivity line: the target pairs times the floor's failure rate less the `full` arm's, beside the allowance;
+   - coverage: a check whose sensitivity figure does not exceed its allowance is *not covered*, and the claim is silent on it.
+
+   Every figure is also on a line `figure | <check> | <topic> | <values...>`. Verify: `uv run pytest tests/test_moves_report.py -q`, `uv run pytest ../tests/acceptance/test_move_verdict_and_report.py -q`.
+
+### The git-conventions kit and the moves the instrument can express
+
+The kit under `src/praxion_evals/adherence/moves/kits/git-conventions/` moves `rules/swe/vcs/git-conventions.md`: the lean arm keeps six lines resident and registers `hooks/inject_git_conventions_at_use.py` on `PreToolUse` for `Bash`, so the rest of the rule arrives when a session stages or commits. Each task asks a session to commit named files in a scratch repository holding more. Two governed checks grade the end state: `commit message form` (subject at most 50 characters, no trailing period, no AI authorship line) and `staging by name` (exactly the named files committed, nothing staged all at once).
+
+The instrument expresses a move as a `move-declaration/1` file: files written into, removed from or derived from an arm's copy (a resident kernel of chosen lines, the manifest with the rule's row removed or repointed, the hook registry with the arm's hooks), delivered over a session-start, path-matched, hook-context, gate-refusal or project-gating channel, for managed fixtures, unmanaged fixtures or both. Two declarations ship. `git-conventions` is runnable. `adr-conventions` is declared (one governed check on decision-draft placement, kernel at session start, the full rule loaded when `.ai-state/decisions/**` is touched) but has no task kit, so a run of it is refused:
+
+```bash
+uv run praxion-evals-adherence --move adr-conventions --dry-run
+# praxion-evals-adherence: the adr-conventions move has no task kit, so no run of it exists
+```
+
+A lean arm is refused when a line of the rule is neither resident nor delivered by a declared channel, when Cursor or Codex would reach less of the rule than the checkout does, or when the arms differ in model, effort, attribution or user instructions. Verify: `uv run pytest tests/test_moves_kits.py tests/test_moves_arms.py tests/test_moves_reach.py tests/test_moves_pinning.py -q`.
+
+### Before the first paid run
+
+No paid move run has been made, and none belongs to the pipeline that built the instrument. Each needs the user's go. The reader and the take proof are verified over planted records only; the real-record nodes of `tests/acceptance/test_move_session_take.py` stay red as unproven until real records are frozen. Work through this checklist first:
+
+- [ ] Real main-session records are frozen for each channel the move delivers by, each with the Claude Code version it was recorded on, and read by `moves/session_record.py` on the harness in use. A version that writes the record differently reads as unreadable and is never scored from a mis-parse.
+- [ ] One lean session's record shows the point-of-use hook context (the hook in the arm copy fires from a plugin directory as it does from the installed plugin; the offline stand-in cannot show that).
+- [ ] The commit-gate shake-down: one session per arm commits in a fixture, and any refusal by the plugin's own commit-time hooks is equal across arms.
+- [ ] The floor run has finished its plan before the paired run starts, and the paired run cites it.
+- [ ] The credential (API key or subscription token file) and every cap (`--max-total-usd`, `--session-budget-usd`, `--stop-count`, `--max-tasks`) are stated to the user before launch, after reading the dry run.
 
 ## Move the eligibility pin
 

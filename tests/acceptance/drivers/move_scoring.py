@@ -19,23 +19,38 @@ Bound here, because the specification or the base commit fixes them:
 - the frozen copies of real main-session records, each with the Claude Code version it was
   recorded on, read from `tests/fixtures/main_session_probes/`, found by walking up to the `tests/fixtures` directory.
 
-Unbound until a binding step ties them to the designed surface: proving a planted session's
-take; reading a trigger record; grading an end state by a governed check; the move verdict and
-the move report over constructed pairs.
+- the take proof over a planted session record and the trigger record over a session record,
+  each a call into the eval pocket (`move_pocket`) over a record `move_records` writes.
+
+Their result shapes, pinned here for the production side to meet (a mismatch is a question to
+the planner, never a silent driver edit): `moves.take.prove(declaration, arm, record_path)`
+returns a frozen dataclass with `scored` (bool), `reason` (str or None) and `trigger_failure`
+(bool); `moves.trigger.records(declaration, record_path)` returns one frozen dataclass per
+governed check with `check`, `arrivals` (channel -> timing word, in the results file's form),
+`final` ("passed" or "failed", or None), `history` and `refusals` (a list of reasons). Channels
+are the declaration's names (`session_start`, `path_matched`, `hook_context`, `gate_refusal`,
+`project_gating`) and history words may use underscores; the readers below put both in the
+scenarios' words. `prove` takes no checkout, so the moved rule's text reaches it through the
+declaration.
+
+Unbound until a binding step ties them to the designed surface: grading an end state by a
+governed check; the move verdict and the move report over constructed pairs.
 """
 
 from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from math import comb
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
-from tests.acceptance.drivers import adherence_eval
+from tests.acceptance.drivers import adherence_eval, move_declarations, move_pocket, move_records
 from tests.acceptance.drivers.move_eval import Arm, Declared, FixtureKind, unbound
+from tests.acceptance.drivers.move_records import SessionStart
 
 Final = Literal["passed", "failed"]
 History = Literal["right first time", "repaired", "not repaired", "action never taken"]
@@ -66,14 +81,13 @@ ProbeName = Literal[
 
 # -- The take ---------------------------------------------------------------------------------
 
-SessionStart = Literal[
-    "the whole rule", "the resident kernel only", "one line of the rule", "no line of the rule"
-]
-
 
 @dataclass(frozen=True)
 class PlantedSession:
-    """A session record as the harness would leave it, described by what arrived."""
+    """A session record as the harness would leave it, described by what arrived.
+
+    Point-of-use text belongs to the lean arm's delivery, so the flag matters to a lean record only.
+    """
 
     arm: Arm
     at_session_start: SessionStart
@@ -87,12 +101,33 @@ class Take:
     trigger_failure: bool = False  # scored, and the point-of-use text never arrived
 
 
+_PROVE_TAKE = """
+from praxion_evals.adherence.moves import take
+emit(dataclasses.asdict(take.prove(declared, request["arm"], Path(request["record"]))))
+"""
+
+
 def prove_take(declared: Declared, planted: PlantedSession) -> Take:
-    unbound(
-        "the runner's take proof can be asked about one planted session record of a move's arm,"
-        " with the record written in the harness's own form, and answers whether it is scored"
-        " and why not"
-    )
+    """Plant one session record from `planted` and ask the runner whether its arm took."""
+    payload = move_declarations.declared_payload(declared.move, declared.path)
+    with tempfile.TemporaryDirectory(prefix="planted-session-") as scratch:
+        record = move_records.plant_session(
+            Path(scratch) / "session.jsonl",
+            payload,
+            planted.arm,
+            planted.at_session_start,
+            planted.point_of_use_arrived,
+        )
+        answer = move_pocket._call(
+            _PROVE_TAKE, declared.move, declared.path, {"arm": planted.arm, "record": str(record)}
+        )
+    try:
+        return Take(answer["scored"], answer["reason"], answer["trigger_failure"])
+    except KeyError as missing:
+        raise AssertionError(
+            f"the take proof answered {answer!r}, which lacks {missing}: it returns scored,"
+            " reason and trigger_failure"
+        ) from missing
 
 
 # -- The trigger record -----------------------------------------------------------------------
@@ -142,13 +177,46 @@ def unreadable_record(workspace: Path, shape: UnreadableShape = "lines that are 
     return path
 
 
+_TRIGGER_RECORDS = """
+from praxion_evals.adherence.moves import trigger
+emit([dataclasses.asdict(t) for t in trigger.records(declared, Path(request["record"]))])
+"""
+_CHANNEL_WORDS = {
+    "session_start": "session start",
+    "path_matched": "path-matched load",
+    "hook_context": "hook context",
+    "gate_refusal": "gate refusal",
+    "project_gating": "project gating",
+}
+_HISTORY_WORDS = {"never taken": "action never taken"}
+
+
 def trigger_records(declared: Declared, record: Path) -> tuple[CheckTrigger, ...]:
     """The trigger record of every governed check of the move over one session record."""
-    unbound(
-        "the runner's trigger record can be read for each governed check of a move over one"
-        " session record, naming each channel's arrival timing, the final-state and history"
-        " outcomes and any gate refusal"
+    answer = move_pocket._call(
+        _TRIGGER_RECORDS, declared.move, declared.path, {"record": str(record)}
     )
+    return tuple(_check_trigger(entry) for entry in answer)
+
+
+def _check_trigger(entry: Mapping[str, Any]) -> CheckTrigger:
+    return CheckTrigger(
+        entry["check"],
+        {
+            cast(Channel, _CHANNEL_WORDS.get(channel, channel)): cast(Timing, timing)
+            for channel, timing in entry["arrivals"].items()
+        },
+        entry["final"],
+        _history_word(entry["history"]),
+        tuple(entry["refusals"]),
+    )
+
+
+def _history_word(history: str | None) -> History | None:
+    if history is None:
+        return None
+    spaced = history.replace("_", " ")
+    return cast(History, _HISTORY_WORDS.get(spaced, spaced))
 
 
 # -- Planted end states -----------------------------------------------------------------------

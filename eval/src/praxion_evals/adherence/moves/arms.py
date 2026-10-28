@@ -5,11 +5,11 @@ the declared file in, a ``remove`` takes one out, and a ``derive`` computes a fi
 checkout's current content so the kit never holds a copy of it that could drift:
 
 - ``kernel``: the moved rule's body lines that begin with each declared prefix, one line per
-  prefix (a prefix matching none or two lines is refused);
+  prefix (a prefix matching none or two lines is refused), under the rule's own title line;
 - ``manifest_row_removed``: the moved rule's manifest row, removed, or pointed at the arm's kernel
   file when it derives one (same id, core flag and install kind, so the project's rule disable list
   reaches the kernel exactly as it reached the rule);
-- ``hook_registered``: the hook registry with the arm's written hook script registered under
+- ``hook_registered``: the hook registry with the arm's written hook scripts registered under
   every declared hook-context delivery.
 
 ``plan`` is the one place an arm's expected files are computed; ``build`` applies it and
@@ -21,6 +21,10 @@ start comes from running the copy's own linker and rule injection, and the arm i
 line of the moved rule is neither resident nor delivered by a declared channel (the move
 relocates text, it never cuts it). A path-matched delivery is held to the file's own ``paths:``
 frontmatter; the manifest row that would link it for a real session is not synthesised here.
+
+Two more refusals close the build: the lean copy must reach every host without hooks as much of
+the moved rule as the checkout does (``reach``), and the arms must run under equal competing
+settings (``pinning``), which the arm set then carries as one value.
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ from pathlib import Path
 from typing import assert_never
 
 from praxion_evals.adherence.arms import ArmCopyError, verify_copy_diff
-from praxion_evals.adherence.moves import observe
+from praxion_evals.adherence.moves import observe, pinning, reach
 from praxion_evals.adherence.moves.declaration import DeclarationError, check_sections
 from praxion_evals.adherence.moves.model import (
     MOVE_ARMS,
@@ -48,6 +52,7 @@ from praxion_evals.adherence.moves.model import (
     MoveArm,
     MoveDeclaration,
     PathMatched,
+    Pinned,
     ProjectGating,
     Remove,
     SessionStart,
@@ -58,6 +63,7 @@ HOOK_SCRIPT = re.compile(r"hooks/[^/]+\.py")
 HOOK_TIMEOUT_SECONDS = 5
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _ROW_START = "- id:"
+_TITLE = "## "
 
 
 class ArmError(ValueError):
@@ -82,6 +88,7 @@ class BuiltArm:
 @dataclass(frozen=True)
 class ArmSet:
     arms: dict[MoveArm, BuiltArm]
+    pinned: Pinned  # the one set of competing settings every arm runs under
 
 
 @dataclass(frozen=True)
@@ -99,8 +106,19 @@ class Planned:
         return None if self.content is None else hashlib.sha256(self.content).hexdigest()
 
 
-def build(declaration: MoveDeclaration, checkout: Path, workspace: Path) -> ArmSet | ArmRefusal:
-    """Copy ``checkout`` once per arm under ``workspace`` and apply that arm's declared changes."""
+def build(
+    declaration: MoveDeclaration,
+    checkout: Path,
+    workspace: Path,
+    *,
+    model: str = pinning.DEFAULT_MODEL,
+    effort: str = pinning.DEFAULT_EFFORT,
+) -> ArmSet | ArmRefusal:
+    """Copy ``checkout`` once per arm under ``workspace`` and apply that arm's declared changes.
+
+    The lean copy must still reach every hook-less host as the checkout does, and the arms must
+    run under equal competing settings (``model`` and ``effort`` are the run's own).
+    """
     made: list[Path] = []
     try:
         check_sections(declaration, checkout)
@@ -109,11 +127,14 @@ def build(declaration: MoveDeclaration, checkout: Path, workspace: Path) -> ArmS
         for arm in MOVE_ARMS:
             made.append(workspace / arm)
             built[arm] = _build_arm(declaration, arm, plans[arm], checkout, workspace / arm)
-    except (DeclarationError, ArmError) as error:
+        pinned = pinning.pin(
+            declaration, {arm: built[arm].copy for arm in MOVE_ARMS}, model=model, effort=effort
+        )
+    except (DeclarationError, ArmError, reach.ReachError, pinning.PinningError) as error:
         for copy in made:
             shutil.rmtree(copy, ignore_errors=True)
         return ArmRefusal(str(error))
-    return ArmSet(built)
+    return ArmSet(built, pinned)
 
 
 def check_copy(
@@ -169,7 +190,11 @@ def _kernel_text(change: KernelDerive, declaration: MoveDeclaration, checkout: P
                 f"{change.path.value}: the kernel prefix {prefix!r} matches {hits} lines of "
                 f"{rule}, not one"
             )
-    return "".join(f"{line}\n" for line in body if line.startswith(change.prefixes))
+    # The title stays: the Codex bridge refuses a rule file with no level-2 heading.
+    title = next((line for line in body if line.startswith(_TITLE)), None)
+    return "".join(
+        f"{line}\n" for line in body if line == title or line.startswith(change.prefixes)
+    )
 
 
 def _manifest(
@@ -210,26 +235,35 @@ def _repoint(line: str, kernel: str, chars: int) -> str:
 def _hook_registry(
     path: str, siblings: Sequence[ArmChange], declaration: MoveDeclaration, checkout: Path
 ) -> bytes:
-    scripts = [
-        c.path.value
-        for c in siblings
-        if isinstance(c, Write) and HOOK_SCRIPT.fullmatch(c.path.value)
-    ]
-    deliveries = [d for d in declaration.deliveries if isinstance(d, HookContext)]
-    if len(scripts) != 1 or not deliveries:
+    scripts = hook_scripts(siblings)
+    slots = (
+        dict.fromkeys(  # one registration per event and matcher, however many deliveries share it
+            (d.event, d.matcher) for d in declaration.deliveries if isinstance(d, HookContext)
+        )
+    )
+    if not scripts or not slots:
         raise ArmError(
-            f"{path}: a registration needs one written hook script (found {scripts}) "
-            f"and a hook-context delivery (found {len(deliveries)})"
+            f"{path}: a registration needs a written hook script (found {scripts}) "
+            f"and a hook-context delivery (found {len(slots)})"
         )
     try:
         registry = json.loads(_read_text(checkout / path))
-        for delivery in deliveries:
-            registry["hooks"].setdefault(delivery.event, []).append(
-                {"matcher": delivery.matcher, "hooks": [_command_hook(scripts[0])]}
+        for event, matcher in slots:
+            registry["hooks"].setdefault(event, []).append(
+                {"matcher": matcher, "hooks": [_command_hook(script) for script in scripts]}
             )
     except (ValueError, KeyError, AttributeError, TypeError) as error:
         raise ArmError(f"{path}: the hook registry cannot be extended: {error!r}") from error
     return (json.dumps(registry, indent=2) + "\n").encode()
+
+
+def hook_scripts(changes: Sequence[ArmChange]) -> list[str]:
+    """The hook scripts an arm writes into its copy."""
+    return [
+        c.path.value
+        for c in changes
+        if isinstance(c, Write) and HOOK_SCRIPT.fullmatch(c.path.value)
+    ]
 
 
 def _command_hook(script: str) -> dict[str, object]:
@@ -257,11 +291,12 @@ def _build_arm(
         _apply(copy / change.path, change.content)
     _verify_copy(checkout, copy, planned)
     observed = observe.session_start(copy)
-    _drop_bytecode(copy, checkout)
     if isinstance(observed, observe.Refused):
         raise ArmError(f"the {arm} arm's session start cannot be observed: {observed.reason}")
     if arm == "lean":
+        reach.require_reach(declaration, checkout, copy, hook_scripts(declaration.arms.lean))
         _require_relocation(declaration, checkout, copy, observed.lines)
+    _drop_bytecode(copy, checkout)
     changes = tuple(AppliedChange(change.path, change.sha256) for change in planned)
     return BuiltArm(copy, changes, observed.lines)
 
@@ -304,7 +339,8 @@ def _require_relocation(
     for delivery in declaration.deliveries:
         match delivery:
             case SessionStart(file=file, lines=declared):
-                _require_resident(file.value, declared or _file_lines(copy, file.value), reached)
+                expected = declared or _prose(_file_lines(copy, file.value))
+                _require_resident(file.value, expected, reached)
             case PathMatched(file=file, globs=globs):
                 _require_path_scoped(copy, file.value, globs)
                 reached.update(_file_lines(copy, file.value))
@@ -315,8 +351,8 @@ def _require_relocation(
             case _:
                 assert_never(delivery)
     rule = declaration.moved_rule.value
-    for line in _file_lines(checkout, rule):
-        if not line.startswith("#") and line not in reached:
+    for line in _prose(_file_lines(checkout, rule)):
+        if line not in reached:
             raise ArmError(
                 f'the lean arm leaves this line of {rule} neither resident nor delivered: "{line}"'
             )
@@ -346,6 +382,10 @@ def _require_path_scoped(copy: Path, file: str, globs: Sequence[str]) -> None:
 def _file_lines(root: Path, relpath: str) -> list[str]:
     """The non-blank lines of a rule file's body, stripped; a file the copy lacks is a refusal."""
     return [line.strip() for line in _body(_read_text(root / relpath)) if line.strip()]
+
+
+def _prose(lines: Sequence[str]) -> list[str]:
+    return [line for line in lines if not line.startswith("#")]
 
 
 def _body(text: str) -> list[str]:

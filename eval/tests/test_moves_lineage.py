@@ -24,6 +24,7 @@ from praxion_evals.adherence.moves.lineage import (
     Closed,
     FloorIdentity,
     FloorPart,
+    Launch,
     MoveIdentity,
     NoCitation,
     NotFinished,
@@ -38,6 +39,7 @@ from praxion_evals.adherence.moves.lineage import (
     continuation_refusals,
     pending_stop,
     refusal_text,
+    relaunch_tasks,
 )
 from praxion_evals.adherence.moves.stop import Launched, MoveStopReason
 
@@ -339,3 +341,58 @@ def test_a_change_confined_to_the_lean_declaration_leaves_the_floor_run_citable(
 def test_failures_cannot_exceed_the_sessions_scored():
     with pytest.raises(ValueError, match="among the scored"):
         CheckCounts(5, 4)
+
+
+# --- what a continuation launches again ---
+
+PLANNED = ("t1", "t2", "t3", "t4")
+
+
+def _ran(task: str, arm: str, attempt: int = 1) -> Launch:
+    return Launch(task, arm, attempt, None)  # type: ignore[arg-type]
+
+
+def _errored(task: str, arm: str, kind: str = "auth", attempt: int = 1) -> Launch:
+    return Launch(task, arm, attempt, kind)  # type: ignore[arg-type]
+
+
+def _streak(arm: str, *tasks: str) -> Stopped:
+    sessions = tuple(Launched(task, arm, 1) for task in tasks)  # type: ignore[arg-type]
+    return Stopped(MoveStopReason("auth", "401", arm, sessions, "one-arm"))  # type: ignore[arg-type]
+
+
+def test_a_floor_continuation_launches_the_streaks_tasks_and_those_never_reached():
+    sessions = [_ran("t1", "floor"), _errored("t2", "floor"), _errored("t3", "floor")]
+
+    assert relaunch_tasks(PLANNED, ("floor",), [(sessions, _streak("floor", "t2", "t3"))]) == (
+        "t2",
+        "t3",
+        "t4",
+    )
+
+
+def test_an_error_outside_the_stopping_streak_stands_and_its_task_is_not_launched_again():
+    sessions = [_errored("t1", "floor", "tool"), _errored("t2", "floor"), _errored("t3", "floor")]
+
+    assert relaunch_tasks(PLANNED, ("floor",), [(sessions, _streak("floor", "t2", "t3"))]) == (
+        "t2",
+        "t3",
+        "t4",
+    )
+
+
+def test_a_task_a_later_part_finished_stays_finished():
+    first = ([_errored("t1", "floor"), _errored("t2", "floor")], _streak("floor", "t1", "t2"))
+    second = ([_ran("t1", "floor"), _ran("t2", "floor")], Finished())
+
+    assert relaunch_tasks(PLANNED, ("floor",), [first, second]) == ("t3", "t4")
+
+
+def test_a_task_with_only_one_arm_standing_is_launched_again_in_both():
+    sessions = [_ran("t1", "full"), _ran("t1", "lean"), _ran("t2", "full")]
+
+    assert relaunch_tasks(PLANNED, ("full", "lean"), [(sessions, SpendRefused(("t2",)))]) == (
+        "t2",
+        "t3",
+        "t4",
+    )

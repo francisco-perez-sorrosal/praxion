@@ -156,6 +156,9 @@ class MoveRunCommon:
     ending: MoveEnding
     harness_version: str
     earlier: EarlierMoveRuns
+    # Every task the run (with its continuations) plans, in order; empty only in a file that
+    # did not record them, which cannot be continued.
+    planned_tasks: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _require(bool(_RUN_ID.fullmatch(self.run_id)), f"{self.run_id!r} is not a file-safe run id")
@@ -172,6 +175,10 @@ class MoveRunCommon:
                     first <= instant(session.started_at, "a session's started_at"),
                     f"the session {session.session_id} began before the first launch",
                 )
+        stray_tasks = {s.task_id for s in self.sessions} - set(self.planned_tasks)
+        _require(
+            not (self.planned_tasks and stray_tasks), f"unplanned tasks launched: {stray_tasks}"
+        )
         keys = [(s.task_id, s.arm, s.attempt) for s in self.sessions]
         _require(len(set(keys)) == len(keys), "a task's attempt in an arm is recorded once")
         _frozen(self, "pinned", self.pinned)
@@ -435,6 +442,7 @@ def to_json(run: MoveRun) -> dict[str, Any]:
         "first_launch_at": common.first_launch_at,
         "seed": common.seed,
         "launch_orders": {task: list(order) for task, order in common.launch_orders.items()},
+        "planned_tasks": list(common.planned_tasks),
         "sessions": [_session_to_json(s) for s in common.sessions],
         "complete_pairs": pairs,
         "verdicts": verdicts,
@@ -605,6 +613,7 @@ def _common_from_json(data: Mapping[str, Any], move: MoveName) -> MoveRunCommon:
         ending=ending_from_json(_object(_need(data, "ending", what), "the ending")),
         harness_version=_need(data, "harness_version", what),
         earlier=_earlier_from_json(_object(_need(data, "earlier_runs", what), "the earlier runs")),
+        planned_tasks=tuple(_list(data.get("planned_tasks", []), "the planned tasks")),
     )
 
 

@@ -149,8 +149,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _move_named(argv: Sequence[str] | None) -> moves_cli.MoveSubject | None:
-    """The move the command line names, or None for a role; a role beside a move is refused."""
-    return getattr(_parser().parse_known_args(argv)[0], "move", None)
+    """The move the command line names or the run it continues or closes belongs to, else None."""
+    return getattr(_parser().parse_known_args(argv)[0], "move", None) or moves_cli.run_subject(argv)
 
 
 def parse_config(argv: Sequence[str] | None) -> RunConfig:
@@ -393,7 +393,7 @@ def _reindex(config: RunConfig) -> int:
     )
     index = run_index.write_index(directory)
     print(f"indexed {directory}: {index.name}")
-    return EXIT_COMPLETE
+    return moves_cli.reindex(directory)
 
 
 def _read_part(

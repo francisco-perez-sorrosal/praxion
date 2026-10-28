@@ -130,6 +130,21 @@ def test_a_floor_round_trip_keeps_every_field(tmp_path):
     assert results.load(path) == run
 
 
+def test_the_planned_tasks_of_a_run_round_trip_and_an_older_file_records_none(tmp_path):
+    run = floor_run(planned_tasks=("t1", "t2", "t3"))
+    path = results.write(moves_dir(tmp_path), run)
+    older = json.loads(path.read_text(encoding="utf-8"))
+    del older["planned_tasks"]
+
+    assert results.load(path).common.planned_tasks == ("t1", "t2", "t3")
+    assert results.from_json(older).common.planned_tasks == ()
+
+
+def test_a_run_that_launched_a_task_it_did_not_plan_is_refused():
+    with pytest.raises(ValueError, match="unplanned tasks launched"):
+        floor_run(planned_tasks=("t2", "t3"))  # the default sessions include t1
+
+
 def test_a_paired_round_trip_keeps_every_field_and_derives_its_complete_pairs(tmp_path):
     run = paired_run()
 

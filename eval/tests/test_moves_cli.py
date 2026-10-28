@@ -3,6 +3,7 @@ prices the floor run and the paired run together without launching or writing an
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -14,8 +15,11 @@ from praxion_evals.adherence import cli
 from praxion_evals.adherence.lineage import Finished, Interrupted
 from praxion_evals.adherence.moves import cli as moves_cli
 from praxion_evals.adherence.moves import declaration, results, runner
+from praxion_evals.adherence.moves.lineage import Closed, Stopped
+from praxion_evals.adherence.moves.model import MoveName
 from praxion_evals.adherence.moves.results import FloorRun, PairedRun
-from tests.test_moves_results import common, floor_run, scored, trigger
+from praxion_evals.adherence.moves.stop import Launched, MoveStopReason
+from tests.test_moves_results import common, floor_run, moves_dir, scored, trigger
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MOVE = "git-conventions"
@@ -299,3 +303,118 @@ def test_the_report_of_a_floor_run_states_its_floor_failures(tmp_path):
 
     assert text.startswith(f"Move {MOVE}: floor run floor-1")
     assert "figure | commit message form | floor | 0 | 3" in text
+
+
+# --- --continue, --close and --reindex: a run is found by its file in moves/ ---
+
+STOPPED = Stopped(MoveStopReason("auth", "401", "floor", (Launched("t1", "floor", 1),), "one-arm"))  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def stopped_in(tmp_path) -> Path:
+    """A checkout whose move results hold one stopped floor run, ``floor-1``."""
+    results.write(moves_dir(tmp_path), floor_run("floor-1", sessions=(), ending=STOPPED))
+    return tmp_path
+
+
+def test_a_run_is_a_moves_by_where_its_file_lives(stopped_in):
+    subject = moves_cli.run_subject([str(stopped_in), "--close", "floor-1", "--reason", "x"])
+
+    assert subject == moves_cli.MoveSubject(MoveName(MOVE))
+
+
+def test_a_run_with_no_file_in_moves_is_left_to_the_role_path(stopped_in):
+    assert moves_cli.run_subject([str(stopped_in), "--continue", "role-run-9"]) is None
+
+
+def test_a_command_line_that_names_no_run_is_left_to_the_role_path(stopped_in):
+    assert moves_cli.run_subject([str(stopped_in), "--reindex"]) is None
+
+
+def test_closing_a_stopped_move_run_records_the_reason_in_its_own_file(stopped_in, capsys):
+    code = cli.main([str(stopped_in), "--close", "floor-1", "--reason", "the credential lapsed"])
+
+    ending = results.load(moves_dir(stopped_in) / "floor-1.json").common.ending
+    assert (code, isinstance(ending, Closed), ending.reason) == (0, True, "the credential lapsed")
+    assert "closed run floor-1: the credential lapsed" in capsys.readouterr().out
+
+
+def test_a_closed_run_is_standing_closed_in_the_index(stopped_in):
+    cli.main([str(stopped_in), "--close", "floor-1", "--reason", "gone"])
+
+    index = json.loads((moves_dir(stopped_in) / "index.json").read_text(encoding="utf-8"))
+
+    assert index["runs"]["floor-1"]["standing"] == "closed"
+
+
+def test_a_run_that_did_not_stop_cannot_be_closed(tmp_path, capsys):
+    results.write(moves_dir(tmp_path), floor_run("floor-1", sessions=()))
+
+    code = cli.main([str(tmp_path), "--close", "floor-1", "--reason", "gone"])
+
+    assert code == moves_cli.EXIT_USAGE
+    assert "nothing to close" in capsys.readouterr().err
+
+
+def test_a_close_without_a_reason_is_a_usage_error(stopped_in, capsys):
+    with pytest.raises(SystemExit):
+        cli.main([str(stopped_in), "--move", MOVE, "--close", "floor-1"])
+
+    assert "--close RUN and --reason TEXT go together" in capsys.readouterr().err
+
+
+def test_a_continuation_names_no_run_to_start(stopped_in, capsys):
+    with pytest.raises(SystemExit):
+        cli.main([str(stopped_in), "--continue", "floor-1", "--run", "floor"])
+
+    assert "--continue RUN takes no --run" in capsys.readouterr().err
+
+
+def test_a_continuation_carries_the_options_beside_it_into_its_plan(stopped_in, monkeypatch):
+    plans: list[runner.RunPlan] = []
+    rule = Path("rules/swe/vcs/git-conventions.md")  # the declaration reads the rule it moves
+    (stopped_in / rule).parent.mkdir(parents=True)
+    (stopped_in / rule).write_text((REPO_ROOT / rule).read_text(encoding="utf-8"), encoding="utf-8")
+
+    def fake_conduct(plan):
+        plans.append(plan)
+        common = SimpleNamespace(run_id="floor-2", ending=Finished())
+        run = SimpleNamespace(run_kind=plan.kind, common=common)
+        return SimpleNamespace(path=plan.moves_dir / "floor-2.json", run=run)
+
+    monkeypatch.setattr(runner, "conduct", fake_conduct)
+    monkeypatch.setattr(moves_cli, "query_claude_version", lambda: "2.1.312")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+
+    cli.main([str(stopped_in), "--continue", "floor-1", "--seed", "3", "--max-total-usd", "9"])
+
+    assert (plans[0].continues, plans[0].supplied_options, plans[0].run_cap_usd) == (
+        "floor-1",
+        ("--seed", "--max-total-usd"),
+        9.0,
+    )
+
+
+def test_reindexing_rebuilds_the_move_index_beside_its_files(stopped_in, capsys):
+    (moves_dir(stopped_in) / "index.json").unlink()
+
+    code = moves_cli.reindex(moves_dir(stopped_in).parent)
+
+    assert (code, (moves_dir(stopped_in) / "index.json").exists()) == (0, True)
+    assert "indexed" in capsys.readouterr().out
+
+
+def test_reindexing_a_checkout_with_no_move_results_creates_nothing(tmp_path):
+    assert moves_cli.reindex(tmp_path / "adherence") == 0
+    assert not (tmp_path / "adherence").exists()
+
+
+def test_the_report_of_a_continued_floor_run_counts_the_sessions_of_its_whole_lineage(tmp_path):
+    written(tmp_path, floor_run("floor-1", sessions=kit_sessions(["floor"]), ending=STOPPED))
+    path = written(
+        tmp_path, floor_run("floor-2", sessions=kit_sessions(["floor"]), continues="floor-1")
+    )
+
+    text = moves_cli.report_text(path)
+
+    assert "figure | commit message form | floor | 0 | 6" in text

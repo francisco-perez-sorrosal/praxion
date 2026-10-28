@@ -150,6 +150,8 @@ class RunPlan:
     effort: str
     max_tasks: int | None = None
     floor_run: str | None = None  # a run id of the floor lineage a paired run cites
+    continues: str | None = None  # the stopped run this one picks up; see ``continuing``
+    supplied_options: tuple[str, ...] = ()  # the options the operator named beside ``continues``
     target_pairs: int = DEFAULT_TARGET
     session_token_file: Path | None = None
     keep_sandbox: bool = False
@@ -180,6 +182,8 @@ class _Prepared:
     base: MoveRunCommon  # the run before its first session
     cited: CitedFloor | None
     launch: launch.MoveLaunch
+    planned: tuple[MoveTask, ...]  # the whole plan; ``tasks`` are those this run launches
+    prior: tuple[MoveSession, ...] = ()  # the sessions the lineage's earlier parts launched
 
 
 @dataclass(frozen=True)
@@ -355,13 +359,20 @@ def _checkpoint(plan: RunPlan, prepared: _Prepared, state: _State, ending: MoveE
     if plan.kind == "floor":
         return results.write(plan.moves_dir, FloorRun(common))
     assert prepared.cited is not None  # a paired run is prepared only with its citation
-    flip, verdicts = _standing(_verdict(plan, prepared.tasks, state.sessions))
+    flip, verdicts = _standing(_verdict(plan, prepared, state.sessions))
     return results.write(plan.moves_dir, PairedRun(common, prepared.cited.lineage, flip, verdicts))
 
 
-def _verdict(plan: RunPlan, tasks: tuple[MoveTask, ...], sessions: tuple[MoveSession, ...]):
+def _verdict(plan: RunPlan, prepared: _Prepared, sessions: tuple[MoveSession, ...]):
+    """The lineage's reading so far: the earlier parts' sessions, then this part's."""
     return verdict.move_verdict(
-        measurement(plan.declaration, plan.margin_pp, plan.target_pairs, tasks, sessions)
+        measurement(
+            plan.declaration,
+            plan.margin_pp,
+            plan.target_pairs,
+            prepared.planned,
+            (*prepared.prior, *sessions),
+        )
     )
 
 
@@ -441,19 +452,31 @@ def _prepare(plan: RunPlan, workspace: Path, declared: datetime) -> _Prepared:
         raise RunRefusedError(
             f"the {declaration.move.value} move has no task kit, so no run of it exists"
         )
-    _require_no_pending_stop(plan)
+    if plan.continues is None:
+        _require_no_pending_stop(plan)
+        parts, continued_by = (), None
+    else:
+        parts, continued_by = read_lineage(plan.moves_dir, plan.continues)
     built = arms.build(
         declaration, plan.checkout, workspace / "arms", model=plan.model, effort=plan.effort
     )
     if isinstance(built, arms.ArmRefusal):
         raise RunRefusedError(f"arms: {built.reason}")
     try:
-        tasks = planned_tasks(plan.kind, kit.tasks(declaration, plan.seed), plan.max_tasks)
+        drawn = kit.tasks(declaration, plan.seed)
     except TaskListError as error:
         raise RunRefusedError(f"tasks: {error}") from error
+    tasks = (
+        drawn[: len(parts[-1].common.planned_tasks)]
+        if parts
+        else planned_tasks(plan.kind, drawn, plan.max_tasks)
+    )
     identity = _identity(declaration, plan.checkout, built, kit)
+    if parts:
+        _refuse_continuation(plan, parts, continued_by, identity, built.pinned, tasks)
     cited = _cite(plan, identity, built.pinned) if plan.kind == "paired" else None
-    base = _base(plan, built.pinned, identity, tasks, declared)
+    launched = _unfinished(plan, tasks, parts)
+    base = _base(plan, built.pinned, identity, (tasks, launched), declared, parts)
     moves = launch.MoveLaunch(
         workspace,
         built.pinned,
@@ -463,7 +486,8 @@ def _prepare(plan: RunPlan, workspace: Path, declared: datetime) -> _Prepared:
         plan.keep_sandbox,
         plan.tail_chars,
     )
-    return _Prepared(kit, built, tasks, base, cited, moves)
+    prior = tuple(s for part in parts for s in part.common.sessions)
+    return _Prepared(kit, built, launched, base, cited, moves, tasks, prior)
 
 
 def _require_no_pending_stop(plan: RunPlan) -> None:
@@ -483,6 +507,113 @@ def _require_no_pending_stop(plan: RunPlan) -> None:
             f"run {pending.run_id} of {plan.declaration.move.value} stopped and is neither"
             " continued nor closed; continue it or close it with a reason first"
         )
+
+
+# ---------------------------------------------------------------------------
+# Continuing a stopped run
+# ---------------------------------------------------------------------------
+
+
+def read_lineage(moves_dir: Path, run_id: str) -> tuple[tuple[MoveRun, ...], str | None]:
+    """The parts of ``run_id``'s lineage up to it, oldest first, and the run that continues it
+    (``None`` when it is the latest part). A run no readable results file holds is refused."""
+    for group in results.lineage_groups(results.read_directory(moves_dir)[0], moves_dir):
+        ids = [part.common.run_id for part in group]
+        if run_id in ids:
+            at = ids.index(run_id)
+            return group[: at + 1], ids[at + 1] if at + 1 < len(ids) else None
+    raise RunRefusedError(f"no readable move run {run_id} in {moves_dir}")
+
+
+def continuing(plan: RunPlan, run_id: str, supplied: Sequence[str]) -> RunPlan:
+    """``plan`` as the continuation of the stopped run ``run_id``: it declares what the run
+    declared, so the run's kind, seed, stop rule, margin, target, model, effort and cited floor
+    stand in place of the plan's own. What would make it measure something else is refused when
+    it is prepared."""
+    parts, _ = read_lineage(plan.moves_dir, run_id)
+    common, tip = parts[0].common, parts[-1]
+    return replace(
+        plan,
+        kind=tip.run_kind,
+        seed=common.seed,
+        stop_rule=common.settings.stop_rule or plan.stop_rule,
+        margin_pp=common.settings.margin_pp,
+        target_pairs=common.settings.required_pairs,
+        model=next(iter(common.pinned.values())).model,
+        effort=next(iter(common.pinned.values())).effort,
+        floor_run=tip.cited_floor[-1] if isinstance(tip, PairedRun) else None,
+        max_tasks=None,
+        continues=run_id,
+        supplied_options=tuple(supplied),
+    )
+
+
+def _refuse_continuation(
+    plan: RunPlan,
+    parts: Sequence[MoveRun],
+    continued_by: str | None,
+    identity: MoveIdentity,
+    pinned: Pinned,
+    tasks: Sequence[MoveTask],
+) -> None:
+    tip = parts[-1].common
+    read = lineage.ReadTip(tip.run_id, tip.ending, tip.identity, continued_by)
+    changed = (*_plan_changes(tip, tasks), *_pinned_changes(tip, pinned))
+    refusals = lineage.continuation_refusals(read, identity, plan.supplied_options, changed)
+    if refusals:
+        raise RunRefusedError(
+            f"run {tip.run_id} cannot be continued:" + "".join(f"\n  {line}" for line in refusals)
+        )
+
+
+def _plan_changes(tip: MoveRunCommon, tasks: Sequence[MoveTask]) -> tuple[str, ...]:
+    if not tip.planned_tasks:
+        return ("the run does not record its planned tasks",)
+    drawn = tuple(t.task_id for t in tasks)
+    return () if drawn == tip.planned_tasks else ("the tasks drawn differ from the ones planned",)
+
+
+def _pinned_changes(tip: MoveRunCommon, pinned: Pinned) -> tuple[str, ...]:
+    differing = {name for then in tip.pinned.values() for name in then.differences(pinned)}
+    return tuple(f"the pinned {name} differs" for name in sorted(differing))
+
+
+def _unfinished(
+    plan: RunPlan, tasks: tuple[MoveTask, ...], parts: Sequence[MoveRun]
+) -> tuple[MoveTask, ...]:
+    """The planned tasks this run launches: all of a fresh run's, a continuation's unfinished."""
+    if not parts:
+        return tasks
+    held = [
+        (
+            [
+                lineage.Launch(s.task_id, s.arm, s.attempt, _error_kind(s))
+                for s in part.common.sessions
+            ],
+            part.common.ending,
+        )
+        for part in parts
+    ]
+    again = lineage.relaunch_tasks([t.task_id for t in tasks], ARMS_OF[plan.kind], held)
+    return tuple(t for t in tasks if t.task_id in again)
+
+
+def _error_kind(session: MoveSession) -> str | None:
+    """The error kind of an errored session, from the ``kind: detail`` reason ``_recorded`` wrote."""
+    return (
+        session.reason.partition(":")[0] if session.status == "errored" and session.reason else None
+    )
+
+
+def interim(run: MoveRun) -> dict[str, str]:
+    """Per governed check, where the run stood: a paired run's verdict words, a floor run's
+    final-state failures among the sessions scored."""
+    if isinstance(run, PairedRun):
+        return dict(run.verdicts)
+    return {
+        check: f"{counts.failed} of {counts.scored} scored sessions failed"
+        for check, counts in _counts(run).items()
+    }
 
 
 def _identity(
@@ -574,11 +705,14 @@ def _base(
     plan: RunPlan,
     pinned: Pinned,
     identity: MoveIdentity,
-    tasks: tuple[MoveTask, ...],
+    tasks: tuple[tuple[MoveTask, ...], tuple[MoveTask, ...]],
     declared: datetime,
+    parts: Sequence[MoveRun] = (),
 ) -> MoveRunCommon:
+    """The run before its first session; ``tasks`` are the whole plan and those this run launches."""
     declaration = plan.declaration
     arms_run = ARMS_OF[plan.kind]
+    planned, launched = tasks
     return MoveRunCommon(
         run_id=new_run_id(declared),
         move=declaration.move,
@@ -589,15 +723,21 @@ def _base(
         first_launch_at=None,
         seed=plan.seed,
         launch_orders=(
-            {t.task_id: launch_order(plan.seed, t.task_id) for t in tasks}
+            {t.task_id: launch_order(plan.seed, t.task_id) for t in launched}
             if plan.kind == "paired"
             else {}
         ),
         sessions=(),
-        continues=None,
+        continues=plan.continues,
         ending=Interrupted(),
         harness_version=plan.harness_version,
-        earlier=results.earlier_runs(plan.moves_dir, declaration.move, identity),
+        earlier=results.earlier_runs(
+            plan.moves_dir,
+            declaration.move,
+            identity,
+            exclude=[part.common.run_id for part in parts],
+        ),
+        planned_tasks=tuple(t.task_id for t in planned),
     )
 
 

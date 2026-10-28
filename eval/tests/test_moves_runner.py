@@ -443,3 +443,127 @@ def test_a_floor_run_takes_the_declared_handful_and_a_cap_lowers_both_kinds_of_r
 def test_a_cap_below_one_is_refused():
     with pytest.raises(RunRefusedError, match="at least one task"):
         runner.planned_tasks("paired", (_task(1),), 0)
+
+
+# --- continuing a stopped run ---
+
+
+@pytest.fixture
+def stopped_floor(checkout, moves_dir, move) -> Conducted:
+    outage = StandIn(checkout, moves_dir, lambda arm, n: "result_error")
+    return _floor(checkout, moves_dir, move, outage)
+
+
+def _continuation(checkout, moves_dir, move, stopped: Conducted, *options: str) -> RunPlan:
+    base = _plan(checkout, moves_dir, move, kind="paired", seed=99, max_tasks=None)
+    return runner.continuing(base, stopped.run.common.run_id, options)
+
+
+def test_a_floor_continuation_declares_what_the_stopped_run_declared(
+    checkout, moves_dir, move, stopped_floor
+):
+    plan = _continuation(checkout, moves_dir, move, stopped_floor)
+
+    assert (plan.kind, plan.seed, plan.stop_rule, plan.continues) == (
+        "floor",
+        SEED,
+        STOP_RULE,
+        stopped_floor.run.common.run_id,
+    )
+
+
+def test_a_floor_continuation_launches_again_the_streaks_tasks_and_those_never_reached(
+    checkout, moves_dir, move, stand_in, stopped_floor
+):
+    plan = _continuation(checkout, moves_dir, move, stopped_floor)
+
+    done = _conduct(plan, stand_in)
+
+    streak = [s.task_id for s in stopped_floor.run.common.sessions]
+    launched = [task for task, _ in stand_in.launches]
+    assert launched[:3] == streak
+    assert len(launched) == len(set(launched)) == FLOOR_TASKS
+    assert done.run.common.continues == stopped_floor.run.common.run_id
+    assert isinstance(done.run.common.ending, Finished)
+
+
+def test_a_continuation_leaves_the_stopped_runs_file_as_it_was(
+    checkout, moves_dir, move, stand_in, stopped_floor
+):
+    before = stopped_floor.path.read_bytes()
+
+    _conduct(_continuation(checkout, moves_dir, move, stopped_floor), stand_in)
+
+    assert stopped_floor.path.read_bytes() == before
+
+
+def test_a_continuation_after_the_moved_rule_text_changed_is_refused_naming_the_change(
+    checkout, moves_dir, move, stand_in, stopped_floor, tmp_path
+):
+    changed = tmp_path / "changed"
+    shutil.copytree(checkout, changed)
+    (changed / RULE).write_text((checkout / RULE).read_text() + "\n- One more.\n")
+    plan = _continuation(changed, moves_dir, move, stopped_floor)
+
+    _refused(plan, stand_in, moves_dir, "changed since the stop: the moved rule's text")
+
+
+def test_a_continuation_given_an_option_that_changes_what_it_measures_is_refused(
+    checkout, moves_dir, move, stand_in, stopped_floor
+):
+    plan = _continuation(checkout, moves_dir, move, stopped_floor, "--seed")
+
+    _refused(plan, stand_in, moves_dir, "--seed would change what the run measures")
+
+
+def test_a_continuation_of_a_run_already_continued_is_refused(
+    checkout, moves_dir, move, stand_in, stopped_floor
+):
+    _conduct(_continuation(checkout, moves_dir, move, stopped_floor), stand_in)
+
+    _refused(
+        _continuation(checkout, moves_dir, move, stopped_floor),
+        StandIn(checkout, moves_dir),
+        moves_dir,
+        "already has a continuation",
+    )
+
+
+def test_a_continuation_of_a_run_that_finished_is_refused(checkout, moves_dir, move, stand_in):
+    done = _floor(checkout, moves_dir, move, StandIn(checkout, moves_dir))
+
+    _refused(
+        _continuation(checkout, moves_dir, move, done),
+        stand_in,
+        moves_dir,
+        "finished its plan",
+    )
+
+
+def test_a_continuation_of_a_run_no_file_holds_is_refused(checkout, moves_dir, move):
+    with pytest.raises(RunRefusedError, match="no readable move run missing"):
+        runner.continuing(_plan(checkout, moves_dir, move), "missing", ())
+
+
+def test_a_paired_continuation_cites_the_floor_lineage_its_run_cited(
+    checkout, moves_dir, move, stand_in, cited_floor
+):
+    lean_outage = StandIn(
+        checkout, moves_dir, lambda arm, n: "result_error" if arm == "lean" else CONFORMING
+    )
+    stopped = _paired(checkout, moves_dir, move, lean_outage, cited_floor, max_tasks=4)
+
+    plan = _continuation(checkout, moves_dir, move, stopped)
+
+    assert (plan.kind, plan.floor_run) == ("paired", cited_floor.run.common.run_id)
+
+
+def test_a_floor_run_stands_for_each_check_as_the_failures_among_its_scored_sessions(
+    checkout, moves_dir, move
+):
+    done = _floor(checkout, moves_dir, move, StandIn(checkout, moves_dir, lambda arm, n: VIOLATING))
+
+    assert runner.interim(done.run) == {
+        "commit message form": "6 of 6 scored sessions failed",
+        "staging by name": "6 of 6 scored sessions failed",
+    }

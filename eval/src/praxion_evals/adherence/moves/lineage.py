@@ -215,6 +215,55 @@ def _continued_refusals(tip: ReadTip) -> tuple[str, ...]:
 
 
 # ---------------------------------------------------------------------------
+# What a continuation launches again
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Launch:
+    """A recorded session as a continuation reads it; ``errored`` is its error kind, or ``None``
+    when it ran (scored or refused)."""
+
+    task_id: str
+    arm: MoveArm
+    attempt: int
+    errored: str | None
+
+
+Part = tuple[Sequence[Launch], MoveEnding]  # one results file: its sessions, in launch order
+
+
+def relaunch_tasks(
+    planned: Sequence[str], arms: Sequence[MoveArm], parts: Sequence[Part]
+) -> tuple[str, ...]:
+    """The planned tasks a continuation launches, in planned order: those missing a standing
+    session in some arm. ``parts`` are the lineage's files, oldest first, each holding only the
+    sessions it launched; a later session replaces an earlier of its task and arm.
+
+    A session of the stopping streak counts as never launched, like the role run's; every other
+    session stands, an error among them, so a task whose lean arm alone errored is a lean failure
+    and is not launched again.
+    """
+    standing = {
+        (launch.task_id, launch.arm)
+        for sessions, ending in parts
+        for position, launch in enumerate(sessions)
+        if position not in _never_launched(sessions, ending)
+    }
+    return tuple(t for t in planned if any((t, arm) not in standing for arm in arms))
+
+
+def _never_launched(sessions: Sequence[Launch], ending: MoveEnding) -> frozenset[int]:
+    """The positions of the stopping streak. The other arm's errors inside its window need no
+    discarding: each belongs to a task whose streak session is discarded too, so the task is
+    launched again whole either way."""
+    if not isinstance(ending, Stopped):
+        return frozenset()
+    streak = {(s.task_id, s.arm, s.attempt) for s in ending.reason.sessions}
+    return frozenset(i for i, s in enumerate(sessions) if (s.task_id, s.arm, s.attempt) in streak)
+
+
+# ---------------------------------------------------------------------------
 # What a stopped run blocks, and closing one
 # ---------------------------------------------------------------------------
 

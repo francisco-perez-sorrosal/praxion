@@ -7,6 +7,12 @@ prints where its results file went. Billing and caps are the role path's, option
 ``--session-oauth-token-file`` bills the sessions to a subscription instead of the API key,
 ``--max-total-usd`` caps the run and ``--session-budget-usd`` caps each session (the
 ``--max-budget-usd`` it hands the harness).
+``--continue RUN`` picks up the stopped run RUN and ``--close RUN --reason TEXT`` gives up on it, each
+finding the run by its file in ``moves/``, so the entry routes them here without ``--move``; a
+continuation declares what the run declared and launches again only the planned tasks no part
+finished. ``--reindex`` rebuilds the index beside the move results files. A fresh run is refused
+while a stopped run of its move is neither continued nor closed, and so is a continuation that
+would measure something else; either way nothing is launched or written.
 ``--dry-run`` prices the floor run and the paired run together, printing one line per session, one
 per task, the totals and a calibration line (a move has no calibration run, so it is always
 ``sessions=0``), and launches and writes nothing. Tokens of a line contain no spaces:
@@ -30,7 +36,8 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 from praxion_evals.adherence.infra_stop import (
@@ -41,7 +48,7 @@ from praxion_evals.adherence.infra_stop import (
 )
 from praxion_evals.adherence.lineage import Finished
 from praxion_evals.adherence.moves import declaration as declarations
-from praxion_evals.adherence.moves import report, results, runner
+from praxion_evals.adherence.moves import lineage, report, results, runner
 from praxion_evals.adherence.moves.model import ARMS_OF, MoveDeclaration, MoveName, RunKind
 from praxion_evals.adherence.moves.tasks import MoveTask
 from praxion_evals.adherence.session_launch import DEFAULT_TAIL_CHARS
@@ -65,6 +72,8 @@ DEFAULT_SESSION_BUDGET_USD = 3.0
 DEFAULT_MODEL = "opus"
 DEFAULT_EFFORT = "medium"
 RUN_KINDS: tuple[RunKind, ...] = ("floor", "paired")
+# Named on the command line but not options of the run a continuation may be refused over.
+NOT_AN_OPTION_OF_THE_RUN = frozenset({"checkout", "move", "continue_run"})
 ARMS_PER_TASK = {kind: len(ARMS_OF[kind]) for kind in RUN_KINDS}
 
 
@@ -77,7 +86,8 @@ class MoveSubject:
 
 @dataclass(frozen=True)
 class MoveOptions:
-    """The options of a move run, after the entry's own checks; a dry run names no run kind."""
+    """The options of a move command, after the entry's own checks; a dry run names no run kind,
+    and ``--continue``, ``--close`` and ``--reindex`` name no run to start."""
 
     checkout: Path | None
     run: RunKind | None
@@ -90,6 +100,11 @@ class MoveOptions:
     run_cap_usd: float
     session_budget_usd: float
     session_oauth_token_file: Path | None
+    continue_run: str | None
+    close_run: str | None
+    reason: str | None
+    reindex: bool
+    given: tuple[str, ...]  # each option the command line named, as spelled there
 
 
 def move_subject(text: str) -> MoveSubject:
@@ -104,6 +119,10 @@ def main(subject: MoveSubject, argv: Sequence[str] | None = None) -> int:
     options = _parse(argv)
     try:
         checkout = _checkout(options.checkout)
+        if options.reindex:
+            return reindex(checkout / OUTPUT_DIR)
+        if options.close_run is not None:
+            return _close(_moves_dir(checkout), options.close_run, options.reason or "")
         declared = _declaration(subject, options, checkout)
         if options.dry_run:
             print("\n".join(dry_run_lines(options, declared)))
@@ -118,6 +137,28 @@ def main(subject: MoveSubject, argv: Sequence[str] | None = None) -> int:
     return EXIT_COMPLETE if isinstance(ending, Finished) else EXIT_INCOMPLETE
 
 
+def run_subject(argv: Sequence[str] | None) -> MoveSubject | None:
+    """The move of the run ``--continue`` or ``--close`` names when its results file lives in
+    ``moves/``, else ``None``: the entry leaves a run elsewhere to the role path."""
+    args = _parser().parse_known_args(argv)[0]
+    named = args.continue_run or args.close_run
+    if named is None:
+        return None
+    try:
+        path = _moves_dir(_checkout(args.checkout)) / f"{named}.json"
+        return MoveSubject(results.load(path).common.move) if path.exists() else None
+    except (ValueError, OSError):
+        return None  # the role path names what is wrong with the command line
+
+
+def reindex(results_dir: Path) -> int:
+    """Rebuild the index beside the move results files under ``results_dir``, if there are any."""
+    moves_dir = results_dir / results.MOVES_DIR_NAME
+    if moves_dir.is_dir():
+        print(f"indexed {moves_dir}: {results.write_index(moves_dir).name}")
+    return EXIT_COMPLETE
+
+
 def _word(ending: object) -> str:
     return type(ending).__name__.lower()
 
@@ -128,25 +169,48 @@ def _word(ending: object) -> str:
 def _parse(argv: Sequence[str] | None) -> MoveOptions:
     parser = _parser()
     args = parser.parse_args(argv)
+    if args.continue_run and (args.close_run or args.run or args.floor_run or args.dry_run):
+        parser.error("--continue RUN takes no --run, --floor-run, --close or --dry-run")
+    if args.close_run and (args.run or args.floor_run or args.dry_run):
+        parser.error("--close RUN takes no --run, --floor-run or --dry-run")
+    if (args.close_run is None) != (args.reason is None):
+        parser.error("--close RUN and --reason TEXT go together: a run is closed with a reason")
     if args.dry_run and (args.run or args.floor_run):
         parser.error("--dry-run prices both runs; it takes no --run or --floor-run")
-    if not args.dry_run and args.run is None:
+    starts_run = not (args.dry_run or args.continue_run or args.close_run or args.reindex)
+    if starts_run and args.run is None:
         parser.error("name the run: --run floor|paired, or --dry-run to price both")
     if args.floor_run and args.run != "paired":
         parser.error("--floor-run names the floor run a paired run cites; it needs --run paired")
     return MoveOptions(
-        args.checkout,
-        args.run,
-        args.floor_run,
-        args.declaration,
-        args.max_tasks,
-        args.stop_count,
-        args.seed,
-        args.dry_run,
-        args.run_cap_usd,
-        args.session_budget_usd,
-        args.session_oauth_token_file,
+        checkout=args.checkout,
+        run=args.run,
+        floor_run=args.floor_run,
+        declaration=args.declaration,
+        max_tasks=args.max_tasks,
+        stop_count=args.stop_count,
+        seed=args.seed,
+        dry_run=args.dry_run,
+        run_cap_usd=args.run_cap_usd,
+        session_budget_usd=args.session_budget_usd,
+        session_oauth_token_file=args.session_oauth_token_file,
+        continue_run=args.continue_run,
+        close_run=args.close_run,
+        reason=args.reason,
+        reindex=args.reindex,
+        given=_given(argv),
     )
+
+
+def _given(argv: Sequence[str] | None) -> tuple[str, ...]:
+    """Each option ``argv`` names beside the move and the run it continues, as spelled there."""
+    parser = _parser()
+    actions = parser._actions  # argparse lists its actions only privately
+    for action in actions:
+        action.default = argparse.SUPPRESS  # an option argv does not name is left out
+    named = vars(parser.parse_args(argv))
+    spelling = {action.dest: (action.option_strings or [action.dest])[0] for action in actions}
+    return tuple(spelling[dest] for dest in named if dest not in NOT_AN_OPTION_OF_THE_RUN)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -155,7 +219,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     add = parser.add_argument
     add("checkout", nargs="?", type=Path, help="default: this repository's root")
-    add("--move", type=move_subject, required=True, help="the move to measure")
+    add("--move", type=move_subject, help="the move to measure")
     add(
         "--run", choices=RUN_KINDS, help="floor: no line of the rule anywhere; paired: full vs lean"
     )
@@ -183,6 +247,10 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="a `claude setup-token` file: sessions bill its subscription, never the API key",
     )
+    add("--continue", dest="continue_run", metavar="RUN", help="pick up the stopped run RUN")
+    add("--close", dest="close_run", metavar="RUN", help="give up on the stopped run RUN")
+    add("--reason", help="why --close gives up on the run")
+    add("--reindex", action="store_true", help="rebuild the index of the move results files")
     return parser
 
 
@@ -233,16 +301,24 @@ def _declaration(subject: MoveSubject, options: MoveOptions, checkout: Path) -> 
 
 
 def _plan(options: MoveOptions, declared: MoveDeclaration, checkout: Path) -> runner.RunPlan:
-    assert options.run is not None  # _parse leaves no run kind only on a dry run
+    """The plan of a fresh run, or of the continuation ``options`` names, which takes what the
+    stopped run declared in place of the kind, seed, stop count and the like given here."""
+    plan = _fresh_plan(options, declared, checkout)
+    if options.continue_run is None:
+        return plan
+    return runner.continuing(plan, options.continue_run, options.given)
+
+
+def _fresh_plan(options: MoveOptions, declared: MoveDeclaration, checkout: Path) -> runner.RunPlan:
     if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
         raise ValueError(
             f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
         )
     return runner.RunPlan(
         declaration=declared,
-        kind=options.run,
+        kind=options.run or "floor",  # a continuation's kind is its run's, set by ``continuing``
         checkout=checkout,
-        moves_dir=checkout / OUTPUT_DIR / results.MOVES_DIR_NAME,
+        moves_dir=_moves_dir(checkout),
         seed=options.seed,
         stop_rule=StopRule.parse(options.stop_count, COUNTING_KINDS, DEFAULT_TAIL_CHARS),
         harness_version=query_claude_version(),
@@ -256,6 +332,21 @@ def _plan(options: MoveOptions, declared: MoveDeclaration, checkout: Path) -> ru
         floor_run=_run_id(options.floor_run),
         session_token_file=options.session_oauth_token_file,
     )
+
+
+def _moves_dir(checkout: Path) -> Path:
+    return checkout / OUTPUT_DIR / results.MOVES_DIR_NAME
+
+
+def _close(moves_dir: Path, run_id: str, reason: str) -> int:
+    """Write the closing ending into the stopped run's own results file."""
+    parts, continued_by = runner.read_lineage(moves_dir, run_id)
+    run = parts[-1]
+    tip = lineage.ReadTip(run_id, run.common.ending, run.common.identity, continued_by)
+    ending = lineage.close(tip, reason, datetime.now(UTC), runner.interim(run))
+    results.write(moves_dir, replace(run, common=replace(run.common, ending=ending)))
+    print(f"closed run {run_id}: {reason}")
+    return EXIT_COMPLETE
 
 
 def _run_id(cited: str | None) -> str | None:
@@ -276,17 +367,22 @@ def report_text(path: Path) -> str:
 
     The governed checks, the tasks' fixture kinds and the fixture restriction are the kit's own
     declaration for the move; a paired run's floor figures come from the floor parts it cites,
-    read from beside it.
+    read from beside it. A continued run reports the sessions of its whole lineage.
     """
     run = results.load(path)
     common = run.common
     declared = declarations.kit(common.move.value)
     tasks = runner.KITS[common.move.value].tasks(declared, common.seed)
+    held = tuple(
+        s
+        for part in runner.read_lineage(path.parent, common.run_id)[0]
+        for s in part.common.sessions
+    )
     match run:
         case results.FloorRun():
-            pairs, floor = (), common.sessions
+            pairs, floor = (), held
         case results.PairedRun():
-            pairs, floor = common.sessions, _floor_sessions(path.parent, run.cited_floor)
+            pairs, floor = held, _floor_sessions(path.parent, run.cited_floor)
     measured = runner.measurement(
         declared,
         common.settings.margin_pp,

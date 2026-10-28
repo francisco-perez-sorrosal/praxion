@@ -26,12 +26,13 @@ from __future__ import annotations
 import json
 import shutil
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from tests.acceptance.drivers import adherence_eval
+from tests.acceptance.drivers import adherence_eval, move_eval, move_shared_runs
 from tests.acceptance.drivers.move_eval import (
     FIRST_MOVE,
     Arm,
@@ -105,9 +106,21 @@ class StandIn:
         variant = Declared(move, "as declared") if declared is None else declared
         key = (move, variant.variant)
         if key not in _TASK_TABLES:
-            _TASK_TABLES[key] = {t.task_id: list(t.named_files) for t in move_tasks(variant)}
+            _TASK_TABLES[key] = self._task_table(variant)
         path = None if variant.path is None else str(variant.path)
         self._update(move=move, declaration=path, tasks=_TASK_TABLES[key])
+
+    def _task_table(self, variant: Declared) -> dict[str, list[str]]:
+        """The kit's tasks for `variant`, listed once per test session (a pocket call each)."""
+        declared = None if variant.path is None else variant.path.read_bytes()
+        inputs = {"tasks": variant.move, "variant": variant.variant, "declaration": declared}
+        return move_shared_runs.share(
+            self.root,
+            {k: (v.hex() if isinstance(v, bytes) else v) for k, v in inputs.items()},
+            move_shared_runs.Roles({}),
+            {},
+            lambda: {t.task_id: list(t.named_files) for t in move_tasks(variant)},
+        )
 
     def _update(self, **changes: object) -> None:
         config = json.loads(self._config.read_text(encoding="utf-8"))
@@ -207,12 +220,64 @@ def run(
 
 
 def observe(stand_in: StandIn, checkout: Path, invoke) -> RunOutcome:
-    """Run `invoke` and report the launches and results files it added."""
+    """Run `invoke` and report the launches and results files it added.
+
+    The entry runs once per test session for a given set of inputs (see `_shared_entry`); a
+    caller that finds it already run is handed its own copy of what that run wrote.
+    """
     files_before, launched_before = _results_files(checkout), len(stand_in.launches())
-    cli = invoke()
+    with _shared_entry(stand_in, checkout):
+        cli = invoke()
     launches = tuple(stand_in.launches()[launched_before:])
     written = tuple(sorted(_results_files(checkout) - files_before))
     return RunOutcome(cli, launches, written)
+
+
+@contextmanager
+def _shared_entry(stand_in: StandIn, checkout: Path) -> Iterator[None]:
+    """Answer the console entry's invocations from the session's shared outcomes while it runs.
+
+    Every invocation `invoke` makes goes through `move_eval.run_entry`; the shared version of it
+    keys the outcome on the checkout's content and history, the stand-in's configuration and
+    launch log, and the arguments, then replays the files it wrote into the caller's checkout and
+    stand-in directory. An invocation that cannot be keyed runs for real.
+    """
+    real = move_eval.run_entry
+    roles = move_shared_runs.Roles({"checkout": checkout, "stand_in": stand_in.root})
+    watches = {
+        "checkout": move_shared_runs.Watch(checkout, skip_git=True),
+        "stand_in": move_shared_runs.Watch(stand_in.root),
+    }
+
+    def shared(args, claude_bin, *, timeout=900):
+        identity = move_shared_runs.git_identity(checkout, adherence_eval._git)
+        arguments = move_shared_runs.normalize_arguments(
+            list(args), roles, [checkout, stand_in.root]
+        )
+        if identity is None or arguments is None or claude_bin != stand_in.bin_dir:
+            return real(args, claude_bin, timeout=timeout)
+
+        def produce() -> dict[str, object]:
+            cli = real(args, claude_bin, timeout=timeout)
+            return {"exit_code": cli.exit_code, "stdout": cli.stdout, "stderr": cli.stderr}
+
+        shared_result = move_shared_runs.share(
+            checkout,
+            {"entry": arguments, "repository": identity},
+            roles,
+            watches,
+            produce,
+            unshareable_if_changed=lambda: move_shared_runs.git_state(
+                checkout, adherence_eval._git
+            ),
+        )
+        return adherence_eval.CliResult(**shared_result)
+
+    move_eval.run_entry = shared
+    try:
+        yield
+    finally:
+        move_eval.run_entry = real
 
 
 def copy_checkout(checkout: Path, workspace: Path) -> Path:

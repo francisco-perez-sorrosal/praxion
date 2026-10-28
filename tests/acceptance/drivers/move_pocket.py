@@ -25,11 +25,12 @@ in the header of `move_scoring`.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from tests.acceptance.drivers import adherence_eval
+from tests.acceptance.drivers import adherence_eval, move_shared_runs
 
 POCKET_TIMEOUT_SECONDS = 600  # a build runs both rules exports over the lean copy
 
@@ -95,8 +96,35 @@ emit(str(kit_git.build_fixture(declared, task, Path(request["where"]))))
 
 
 def build_arms(move: str, declaration: Path | None, checkout: Path, workspace: Path) -> Any:
+    """Build the arms once per test session for these inputs; each caller gets its own copies.
+
+    The build is keyed on the move, the declaration file's content, and the checkout's content and
+    history; a caller that finds it built is handed copies of the arm trees under its own
+    `workspace` and a result naming them.
+    """
     request = {"checkout": str(checkout), "workspace": str(workspace)}
-    return call_with_declaration(_BUILD_ARMS, move, declaration, request, load=_LOAD_REFUSING)
+
+    def build() -> Any:
+        return call_with_declaration(_BUILD_ARMS, move, declaration, request, load=_LOAD_REFUSING)
+
+    identity = move_shared_runs.git_identity(checkout, adherence_eval._git)
+    if identity is None:
+        return build()
+    paths = {"checkout": checkout, "workspace": workspace}
+    if declaration is not None:
+        paths["declaration"] = declaration
+    declared = None if declaration is None else hashlib.sha256(declaration.read_bytes()).hexdigest()
+    return move_shared_runs.share(
+        checkout,
+        {"build_arms": move, "declaration": declared, "repository": identity},
+        move_shared_runs.Roles(paths),
+        {
+            "checkout": move_shared_runs.Watch(checkout, skip_git=True),
+            "workspace": move_shared_runs.Watch(workspace, mirrors=checkout),
+        },
+        build,
+        unshareable_if_changed=lambda: move_shared_runs.git_state(checkout, adherence_eval._git),
+    )
 
 
 def check_copy(

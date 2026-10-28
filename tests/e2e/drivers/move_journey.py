@@ -7,17 +7,25 @@ stand-in `claude` first on PATH, runs floor and paired runs, and hands back what
 launched and wrote.
 
 The stand-in plays a headless main session the way the harness would present one to the
-runner, and is unbound until a binding step ties it to the designed session record: per
-launch it learns the arm and task the runner launched, leaves in the session's own record the
-arrivals the arm owes (or what the scenario scripts instead), acts in the task's fixture as
-scripted (a conforming commit of the named files, or a violating one), or fails with an
-identical infrastructure error, and records the launch: its arm, task, working directory and
-prompt. No real `claude` ever starts; the run carries a dummy credential.
+runner: per launch it learns the arm from the words of the `--plugin-dir` path and the task from
+a path component of its working directory that is a task id (never from the prompt), leaves in
+the session's own record (`move_records` writes it) the arrivals the arm owes, or what the
+scenario scripts instead, acts in the task's fixture as scripted (a conforming commit of the
+named files, or a violating one), or fails with an identical infrastructure error, and records
+the launch: its arm, task, working directory and prompt. The runner must therefore place each
+fixture in a directory named by its task id and name each arm copy by its arm.
+
+The tasks the stand-in knows come from the kit, once per process and variant, and are written
+into its config by `run`, so a module shares one floor run and one paired run at the size its
+scenarios need. A script counts an arm's launches from the last `rescript`. No real `claude` ever
+starts; the run carries a dummy credential and the stand-in never reads the session token.
 """
 
 from __future__ import annotations
 
+import json
 import shutil
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,10 +36,11 @@ from tests.acceptance.drivers.move_eval import (
     FIRST_MOVE,
     Arm,
     CliResult,
+    Declared,
     MoveRun,
     RunKind,
+    move_tasks,
     run_move,
-    unbound,
 )
 
 Ending = Literal[
@@ -60,6 +69,10 @@ class MoveLaunch:
     prompt: str
 
 
+STAND_IN_VERSION = "9.9.9-stand-in"
+_TASK_TABLES: dict[tuple[str, str], dict[str, list[str]]] = {}  # (move, variant) -> task -> files
+
+
 @dataclass(frozen=True)
 class StandIn:
     root: Path
@@ -68,22 +81,80 @@ class StandIn:
     def bin_dir(self) -> Path:
         return self.root / "bin"
 
+    @property
+    def log_dir(self) -> Path:
+        return self.root / "log"
+
+    @property
+    def _config(self) -> Path:
+        return self.root / "config.json"
+
     def launches(self) -> list[MoveLaunch]:
-        unbound(
-            "the move stand-in reads back each launch it answered, with its arm, task, working"
-            " directory and prompt"
-        )
+        paths = sorted(self.log_dir.glob("launch-*.json"), key=lambda p: int(p.stem.split("-")[1]))
+        raws = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+        return [
+            MoveLaunch(raw["arm"], raw["task_id"], Path(raw["cwd"]), raw["prompt"]) for raw in raws
+        ]
 
     def rescript(self, script: Script) -> None:
-        unbound("the move stand-in can be handed a new script between runs")
+        """Answer the launches from now on as `script` says, counting each arm's from here."""
+        self._update(script=_script_json(script), epoch=len(self.launches()))
+
+    def prepare(self, move: str, declared: Declared | None) -> None:
+        """Tell the stand-in which move it answers and the tasks that move's kit lists."""
+        variant = Declared(move, "as declared") if declared is None else declared
+        key = (move, variant.variant)
+        if key not in _TASK_TABLES:
+            _TASK_TABLES[key] = {t.task_id: list(t.named_files) for t in move_tasks(variant)}
+        path = None if variant.path is None else str(variant.path)
+        self._update(move=move, declaration=path, tasks=_TASK_TABLES[key])
+
+    def _update(self, **changes: object) -> None:
+        config = json.loads(self._config.read_text(encoding="utf-8"))
+        self._config.write_text(json.dumps({**config, **changes}), encoding="utf-8")
+
+
+def _script_json(script: Script) -> dict[str, object]:
+    return {
+        "default": script.default,
+        "by_arm": dict(script.by_arm),
+        "by_launch": {f"{arm}|{nth}": ending for (arm, nth), ending in script.by_launch.items()},
+    }
 
 
 def install_stand_in(workspace: Path, script: Script) -> StandIn:
-    unbound(
-        "a stand-in claude answers each main session of a move run as the harness would: it"
-        " learns the arm and task the runner launched, leaves in the session's own record the"
-        " arrivals that arm owes, acts in the task's fixture as scripted, and records the launch"
+    """Write the stand-in `claude` first on a `bin` directory under `workspace`.
+
+    Its launcher runs under the suite's own interpreter and imports only the record writer.
+    """
+    stand_in = StandIn(workspace / "move-stand-in")
+    stand_in.bin_dir.mkdir(parents=True)
+    stand_in._config.write_text(
+        json.dumps(
+            {
+                "log_dir": str(stand_in.log_dir),
+                "records_dir": str(stand_in.root / "records"),
+                "version": STAND_IN_VERSION,
+                "script": _script_json(script),
+                "epoch": 0,
+                "move": FIRST_MOVE,
+                "declaration": None,
+                "tasks": {},
+            }
+        ),
+        encoding="utf-8",
     )
+    launcher = stand_in.bin_dir / "claude"
+    launcher.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        f"sys.path.insert(0, {str(adherence_eval.REPO_ROOT)!r})\n"
+        "from tests.acceptance.drivers.move_records import serve\n"
+        f"sys.exit(serve({str(stand_in._config)!r}))\n",
+        encoding="utf-8",
+    )
+    launcher.chmod(0o755)
+    return stand_in
 
 
 def results_dir(checkout: Path) -> Path:
@@ -121,6 +192,7 @@ def run(
     declared=None,
 ) -> RunOutcome:
     """Launch one floor or paired run of `move` with the stand-in, and say what it did."""
+    stand_in.prepare(move, declared)
     request = MoveRun(
         move,
         checkout,

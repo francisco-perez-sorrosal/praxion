@@ -7,7 +7,9 @@ leaves a conforming repository, and that is what is graded; how the session got 
 trigger record's history, not this grader's.
 
 - ``commit message form``: every commit left has a subject of at most 50 characters, no trailing
-  period and no AI authorship line; each part that fails is named once, however many commits fail it.
+  period and no AI authorship line, which is what the commit gate calls one: a ``Co-Authored-By``
+  trailer or a ``Generated with``/``by`` badge naming Claude or Anthropic. Each part that fails is
+  named once, however many commits fail it.
 - ``staging by name``: the commits hold exactly the files the request names, the unnamed files stay
   uncommitted, and no command staged everything at once (checked only over the commands given).
 
@@ -43,7 +45,13 @@ NAMED_FILE_LEFT_OUT = "named file not committed"
 STAGED_EVERYTHING = "staged everything at once"
 
 MAX_SUBJECT_CHARACTERS = 50
-_AUTHORSHIP_LINE = re.compile(r"^\s*(co-authored-by\b|generated (by|with)\b)|🤖", re.I | re.M)
+# The commit gate's own definition (scripts/check_commit_msg_authorship.py), restated because the
+# eval project cannot import the gate; a parity test holds the two equal. A human co-author and a
+# prose mention pass: only a trailer or badge line that names Claude or Anthropic is authorship.
+_AI_AUTHORSHIP_LINES = (
+    re.compile(r"^\s*Co-Authored-By:.*\b(claude|anthropic)\b", re.I),
+    re.compile(r"^\s*(?:\S+\s+)?Generated\s+(?:with|by)\b.*\b(claude|anthropic)\b", re.I),
+)
 
 Outcome = Literal["passed", "failed"]
 
@@ -103,10 +111,19 @@ def _message_failures(message: str) -> list[str]:
         for part, failed in (
             (SUBJECT_TOO_LONG, len(subject) > MAX_SUBJECT_CHARACTERS),
             (SUBJECT_ENDS_WITH_PERIOD, subject.endswith(".")),
-            (AI_AUTHORSHIP, bool(_AUTHORSHIP_LINE.search(message))),
+            (AI_AUTHORSHIP, _names_ai_author(message)),
         )
         if failed
     ]
+
+
+def _names_ai_author(message: str) -> bool:
+    return any(
+        pattern.search(line)
+        for line in message.splitlines()
+        if not line.lstrip().startswith("#")  # git strips comment lines before storing a message
+        for pattern in _AI_AUTHORSHIP_LINES
+    )
 
 
 # -- Staging by name --------------------------------------------------------------------------

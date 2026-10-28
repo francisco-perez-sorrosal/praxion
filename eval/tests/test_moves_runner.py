@@ -1,13 +1,14 @@
 """A move run is refused before any launch, or conducted: each session proven from its own record,
 graded on its end state, folded into the stop, and written whole after it. A stand-in launcher
-plays the harness in process, building the task's real fixture and acting on it as scripted."""
+plays the harness in process, answering what the scripted session would leave; only the first test
+runs real processes end to end."""
 
 from __future__ import annotations
 
 import json
 import shutil
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,14 +18,21 @@ import pytest
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS, StopRule
 from praxion_evals.adherence.lineage import Finished, Interrupted, SpendRefused
 from praxion_evals.adherence.model import Errored, Failed, Passed
-from praxion_evals.adherence.moves import declaration, observe, runner
+from praxion_evals.adherence.moves import arms, declaration, observe, runner
 from praxion_evals.adherence.moves.launch import Finished as Launched
 from praxion_evals.adherence.moves.lineage import Stopped
 from praxion_evals.adherence.moves.model import LaunchOptions, MoveArm, MoveDeclaration
 from praxion_evals.adherence.moves.results import FloorRun, PairedRun
-from praxion_evals.adherence.moves.runner import Conducted, RunPlan, RunRefusedError
+from praxion_evals.adherence.moves.runner import (
+    Conducted,
+    RunPlan,
+    RunRefusedError,
+    Scored,
+    Unscored,
+)
 from praxion_evals.adherence.moves.tasks import MoveTask
 from praxion_evals.adherence.session_launch import Attempt
+from praxion_evals.live.materialize import make_writable
 from tests.test_moves_session_record import (
     hook_context,
     prompt,
@@ -74,19 +82,74 @@ def move() -> MoveDeclaration:
 # --- a stand-in for the harness ---
 
 
+def _conforming(arm: MoveArm, number: int) -> str:
+    return CONFORMING
+
+
+_BUILD_ARMS = arms.build  # kept before any test swaps it for the module's shared builder
+
+
+class Rehearsal:
+    """What this module's scripted sessions yield, kept so each is worked out once.
+
+    Building the arms, a task's fixture, the end state of a scripted commit and its grading are
+    subprocess work, and a session scripted the same way on the same copy yields the same
+    assessment. A launcher that asks the rehearsal for it pays for each distinct session once per
+    module instead of once per test.
+    """
+
+    def __init__(self, scratch: Path) -> None:
+        self.scratch = scratch
+        self._arm_sets: dict[tuple, arms.ArmSet | arms.ArmRefusal] = {}
+        self._starts: dict[Path, tuple[str, ...]] = {}
+        self._end_states: dict[tuple[str, bool], Path] = {}
+        self._assessed: dict[tuple, Scored | Unscored] = {}
+
+    def build_arms(self, declaration, checkout, workspace, *, model, effort):
+        key = (repr(declaration), checkout, model, effort)
+        if key not in self._arm_sets:
+            built_in = self.scratch / f"arms-{len(self._arm_sets)}"
+            self._arm_sets[key] = _BUILD_ARMS(
+                declaration, checkout, built_in, model=model, effort=effort
+            )
+        return self._arm_sets[key]
+
+    def session_start(self, copy: Path) -> tuple[str, ...]:
+        if copy not in self._starts:
+            self._starts[copy] = tuple(observe.session_start(copy).lines)  # type: ignore[union-attr]
+        return self._starts[copy]
+
+    def end_state(self, task: MoveTask, committed: tuple[str, ...], build_fixture) -> Path:
+        key = (task.task_id, committed[0] == "git add -A")
+        if key not in self._end_states:
+            repo = self.scratch / "end-states" / f"{task.task_id}-{len(self._end_states)}"
+            build_fixture(repo)
+            for command in committed:
+                subprocess.run(command, shell=True, cwd=repo, check=True, capture_output=True)
+            self._end_states[key] = repo
+        return self._end_states[key]
+
+    def assessed(self, key: tuple, assess: Callable[[], Scored | Unscored]) -> Scored | Unscored:
+        if key not in self._assessed:
+            self._assessed[key] = assess()
+        return self._assessed[key]
+
+
 @dataclass
 class StandIn:
-    """Launches one scripted session: the fixture, its commits, and the record the harness keeps.
+    """Launches one scripted session in process: what the harness would return for it.
 
     ``script`` answers per (arm, launch number) with what the session does: ``CONFORMING`` stages
     the named files and commits by the rule, ``VIOLATING`` stages everything and commits badly,
     ``LEAKING`` also sees the rule at start in a floor arm, and any other word is an error kind
-    (``launch_refused`` among them).
+    (``launch_refused`` among them). A scored session is assessed by the runner's own assessment
+    of the record and end state the script leaves, through the ``rehearsal``.
     """
 
     checkout: Path
     moves_dir: Path
-    script: Callable[[MoveArm, int], str] = lambda arm, n: CONFORMING
+    rehearsal: Rehearsal
+    script: Callable[[MoveArm, int], str] = _conforming
     launches: list[tuple[str, MoveArm]] = field(default_factory=list)
     results_when_launched: list[dict | None] = field(default_factory=list)
 
@@ -100,33 +163,39 @@ class StandIn:
             return ledger, _attempt(
                 Errored(what, "scripted"), 0.0 if what == "launch_refused" else 1.0
             )
-        repo = config.run_root / "fixture" / str(len(self.launches)) / task.task_id
-        build_fixture(repo)
-        record = self._act(config.run_root, repo, task, arm, copy, what)
-        finished = Launched(None, None, record, repo, config.run_root)  # type: ignore[arg-type]
-        return ledger.settle(0.0, 0.25), _attempt(assess(finished), 0.25)
+        result = self.rehearsal.assessed(
+            (task.task_id, arm, what, copy),
+            lambda: assess(self._finished(config, task, arm, copy, what, build_fixture)),
+        )
+        return ledger.settle(0.0, 0.25), _attempt(result, 0.25)
 
     def _declared(self) -> dict | None:
         found = sorted(self.moves_dir.glob("*.json"))
         found = [path for path in found if path.name != "index.json"]
         return json.loads(found[-1].read_text(encoding="utf-8")) if found else None
 
-    def _act(self, root: Path, repo: Path, task: MoveTask, arm: MoveArm, copy: Path, what: str):
-        start = "\n".join(observe.session_start(copy).lines)  # type: ignore[union-attr]
+    def _finished(self, config, task: MoveTask, arm: MoveArm, copy: Path, what: str, build_fixture):
+        stage = "git add -A" if what == VIOLATING else "git add " + " ".join(task.named_files)
+        message = "Added all the things." if what == VIOLATING else "Add the notes"
+        commands = (stage, f'git commit -m "{message}"')
+        repo = self.rehearsal.end_state(task, commands, build_fixture)
+        record = self._record(config.run_root, task, arm, copy, what, commands)
+        return Launched(None, None, record, repo, config.run_root)  # type: ignore[arg-type]
+
+    def _record(
+        self, root: Path, task: MoveTask, arm: MoveArm, copy: Path, what: str, commands
+    ) -> Path:
+        start = "\n".join(self.rehearsal.session_start(copy))
         rule = (self.checkout / RULE).read_text(encoding="utf-8")
         if what == LEAKING:
             start += "\n" + rule
-        stage = "git add -A" if what == VIOLATING else "git add " + " ".join(task.named_files)
-        message = "Added all the things." if what == VIOLATING else "Add the notes"
-        commands = [stage, f'git commit -m "{message}"']
         entries = [hook_context("SessionStart", start), prompt(task.wording)]
         if arm == "lean":
             entries.append(hook_context("PreToolUse", rule))
         for number, command in enumerate(commands):
             entries.append(tool_call(f"toolu_{number}", "Bash", {"command": command}))
             entries.append(tool_output(f"toolu_{number}", "ok"))
-            subprocess.run(command, shell=True, cwd=repo, check=True, capture_output=True)
-        path = root / "records" / f"{task.task_id}-{arm}-{len(self.launches)}.jsonl"
+        path = root / "records" / f"{task.task_id}-{arm}-{what}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         return write_record(path, entries)
 
@@ -160,9 +229,31 @@ def moves_dir(tmp_path: Path) -> Path:
     return tmp_path / ".ai-state" / "eval_ledger" / "adherence" / "moves"
 
 
+@pytest.fixture(scope="module")
+def rehearsal(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Rehearsal]:
+    scratch = tmp_path_factory.mktemp("rehearsal")
+    yield Rehearsal(scratch)
+    make_writable(scratch)  # an arm's copy is read-only
+
+
+@pytest.fixture(autouse=True)
+def arms_built_once(monkeypatch: pytest.MonkeyPatch, rehearsal: Rehearsal) -> None:
+    monkeypatch.setattr(runner.arms, "build", rehearsal.build_arms)
+
+
 @pytest.fixture
-def stand_in(checkout: Path, moves_dir: Path) -> StandIn:
-    return StandIn(checkout, moves_dir)
+def new_stand_in(checkout: Path, moves_dir: Path, rehearsal: Rehearsal) -> Callable[..., StandIn]:
+    """A stand-in that plays ``script`` (every session conforming when none is given)."""
+
+    def make(script: Callable[[MoveArm, int], str] = _conforming) -> StandIn:
+        return StandIn(checkout, moves_dir, rehearsal, script)
+
+    return make
+
+
+@pytest.fixture
+def stand_in(new_stand_in: Callable[..., StandIn]) -> StandIn:
+    return new_stand_in()
 
 
 def _clock() -> datetime:
@@ -185,8 +276,12 @@ def _files(moves_dir: Path) -> list[str]:
 
 
 def test_a_floor_run_launches_one_floor_session_per_task_and_writes_one_results_file(
-    checkout, moves_dir, move, stand_in
+    checkout, moves_dir, move, tmp_path, monkeypatch
 ):
+    """The one test that starts real processes: real arms, fixtures, hooks, git and grading."""
+    monkeypatch.setattr(runner.arms, "build", _BUILD_ARMS)
+    stand_in = StandIn(checkout, moves_dir, Rehearsal(tmp_path / "rehearsal"))
+
     done = _floor(checkout, moves_dir, move, stand_in)
 
     assert isinstance(done.run, FloorRun)
@@ -265,11 +360,11 @@ def test_the_third_identical_floor_failure_in_a_row_stops_the_run_and_launches_n
 
 
 def test_a_stopped_run_blocks_a_fresh_run_of_its_move_until_it_is_closed_or_continued(
-    checkout, moves_dir, move, stand_in
+    checkout, moves_dir, move, stand_in, new_stand_in
 ):
     stand_in.script = lambda arm, n: "result_error"
     stopped = _floor(checkout, moves_dir, move, stand_in)
-    again = StandIn(checkout, moves_dir)
+    again = new_stand_in()
 
     with pytest.raises(RunRefusedError, match=f"{stopped.run.common.run_id}.*neither continued"):
         _floor(checkout, moves_dir, move, again)
@@ -307,8 +402,8 @@ def _paired(checkout, moves_dir, move, stand_in, floor: Conducted, **changes) ->
 
 
 @pytest.fixture
-def cited_floor(checkout, moves_dir, move) -> Conducted:
-    violating = StandIn(checkout, moves_dir, lambda arm, n: VIOLATING)
+def cited_floor(checkout, moves_dir, move, new_stand_in) -> Conducted:
+    violating = new_stand_in(lambda arm, n: VIOLATING)
     return _floor(checkout, moves_dir, move, violating)
 
 
@@ -382,9 +477,9 @@ def test_a_paired_run_citing_no_floor_run_is_refused(checkout, moves_dir, move, 
 
 
 def test_a_paired_run_citing_a_floor_run_that_never_failed_a_check_is_refused_naming_it(
-    checkout, moves_dir, move, stand_in
+    checkout, moves_dir, move, stand_in, new_stand_in
 ):
-    conforming = _floor(checkout, moves_dir, move, StandIn(checkout, moves_dir))
+    conforming = _floor(checkout, moves_dir, move, new_stand_in())
     plan = _plan(checkout, moves_dir, move, kind="paired", floor_run=conforming.run.common.run_id)
 
     _refused(plan, stand_in, moves_dir, "never failed commit message form, staging by name")
@@ -449,8 +544,8 @@ def test_a_cap_below_one_is_refused():
 
 
 @pytest.fixture
-def stopped_floor(checkout, moves_dir, move) -> Conducted:
-    outage = StandIn(checkout, moves_dir, lambda arm, n: "result_error")
+def stopped_floor(checkout, moves_dir, move, new_stand_in) -> Conducted:
+    outage = new_stand_in(lambda arm, n: "result_error")
     return _floor(checkout, moves_dir, move, outage)
 
 
@@ -517,20 +612,22 @@ def test_a_continuation_given_an_option_that_changes_what_it_measures_is_refused
 
 
 def test_a_continuation_of_a_run_already_continued_is_refused(
-    checkout, moves_dir, move, stand_in, stopped_floor
+    checkout, moves_dir, move, stand_in, stopped_floor, new_stand_in
 ):
     _conduct(_continuation(checkout, moves_dir, move, stopped_floor), stand_in)
 
     _refused(
         _continuation(checkout, moves_dir, move, stopped_floor),
-        StandIn(checkout, moves_dir),
+        new_stand_in(),
         moves_dir,
         "already has a continuation",
     )
 
 
-def test_a_continuation_of_a_run_that_finished_is_refused(checkout, moves_dir, move, stand_in):
-    done = _floor(checkout, moves_dir, move, StandIn(checkout, moves_dir))
+def test_a_continuation_of_a_run_that_finished_is_refused(
+    checkout, moves_dir, move, stand_in, new_stand_in
+):
+    done = _floor(checkout, moves_dir, move, new_stand_in())
 
     _refused(
         _continuation(checkout, moves_dir, move, done),
@@ -546,11 +643,9 @@ def test_a_continuation_of_a_run_no_file_holds_is_refused(checkout, moves_dir, m
 
 
 def test_a_paired_continuation_cites_the_floor_lineage_its_run_cited(
-    checkout, moves_dir, move, stand_in, cited_floor
+    checkout, moves_dir, move, cited_floor, new_stand_in
 ):
-    lean_outage = StandIn(
-        checkout, moves_dir, lambda arm, n: "result_error" if arm == "lean" else CONFORMING
-    )
+    lean_outage = new_stand_in(lambda arm, n: "result_error" if arm == "lean" else CONFORMING)
     stopped = _paired(checkout, moves_dir, move, lean_outage, cited_floor, max_tasks=4)
 
     plan = _continuation(checkout, moves_dir, move, stopped)
@@ -559,9 +654,9 @@ def test_a_paired_continuation_cites_the_floor_lineage_its_run_cited(
 
 
 def test_a_floor_run_stands_for_each_check_as_the_failures_among_its_scored_sessions(
-    checkout, moves_dir, move
+    checkout, moves_dir, move, new_stand_in
 ):
-    done = _floor(checkout, moves_dir, move, StandIn(checkout, moves_dir, lambda arm, n: VIOLATING))
+    done = _floor(checkout, moves_dir, move, new_stand_in(lambda arm, n: VIOLATING))
 
     assert runner.interim(done.run) == {
         "commit message form": "6 of 6 scored sessions failed",

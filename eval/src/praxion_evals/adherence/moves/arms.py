@@ -171,7 +171,7 @@ def _planned(
                 raise ArmError(f"{path.value}: the arm removes a file the checkout does not hold")
             return Planned(path.value, None)
         case KernelDerive(path=path):
-            return Planned(path.value, _kernel_text(change, declaration, checkout).encode())
+            return Planned(path.value, kernel_text(change, declaration, checkout).encode())
         case ManifestRowRemoved(path=path):
             return Planned(path.value, _manifest(path.value, siblings, declaration, checkout))
         case HookRegistered(path=path):
@@ -180,7 +180,7 @@ def _planned(
             assert_never(change)
 
 
-def _kernel_text(change: KernelDerive, declaration: MoveDeclaration, checkout: Path) -> str:
+def kernel_text(change: KernelDerive, declaration: MoveDeclaration, checkout: Path) -> str:
     rule = declaration.moved_rule.value
     body = [line.rstrip() for line in _body(_read_text(checkout / rule)) if line.strip()]
     for prefix in change.prefixes:
@@ -208,7 +208,7 @@ def _manifest(
     start, end = _row_span(lines, moved, path)
     row = lines[start:end]
     if kernels:
-        text = _kernel_text(kernels[0], declaration, checkout)
+        text = kernel_text(kernels[0], declaration, checkout)
         row = [_repoint(line, kernels[0].path.value, len(text)) for line in row]
     else:
         row = []
@@ -339,19 +339,19 @@ def _require_relocation(
     for delivery in declaration.deliveries:
         match delivery:
             case SessionStart(file=file, lines=declared):
-                expected = declared or _prose(_file_lines(copy, file.value))
+                expected = declared or _prose(file_lines(copy, file.value))
                 _require_resident(file.value, expected, reached)
             case PathMatched(file=file, globs=globs):
                 _require_path_scoped(copy, file.value, globs)
-                reached.update(_file_lines(copy, file.value))
+                reached.update(file_lines(copy, file.value))
             case HookContext(reads=file) | GateRefusal(reads=file):
-                reached.update(_file_lines(copy, file.value))
+                reached.update(file_lines(copy, file.value))
             case ProjectGating():
                 pass
             case _:
                 assert_never(delivery)
     rule = declaration.moved_rule.value
-    for line in _prose(_file_lines(checkout, rule)):
+    for line in _prose(file_lines(checkout, rule)):
         if line not in reached:
             raise ArmError(
                 f'the lean arm leaves this line of {rule} neither resident nor delivered: "{line}"'
@@ -379,7 +379,7 @@ def _require_path_scoped(copy: Path, file: str, globs: Sequence[str]) -> None:
 # -- Reading ----------------------------------------------------------------------------------
 
 
-def _file_lines(root: Path, relpath: str) -> list[str]:
+def file_lines(root: Path, relpath: str) -> list[str]:
     """The non-blank lines of a rule file's body, stripped; a file the copy lacks is a refusal."""
     return [line.strip() for line in _body(_read_text(root / relpath)) if line.strip()]
 

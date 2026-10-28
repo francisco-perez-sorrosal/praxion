@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -89,16 +89,18 @@ from praxion_evals.adherence.moves.session_record import Parsed, ToolUse
 from praxion_evals.adherence.moves.tasks import MoveTask, TaskListError, target_with_slack
 from praxion_evals.adherence.moves.verdict import MovePair, MoveVerdict, Side
 from praxion_evals.adherence.results import new_run_id
+from praxion_evals.adherence.run_identity import RESULTS_DIR
 from praxion_evals.adherence.session_launch import DEFAULT_TAIL_CHARS, Attempt
 from praxion_evals.adherence.session_loop import launch_order
 from praxion_evals.adherence.tasks import DEFAULT_TARGET
-from praxion_evals.live.materialize import make_writable, tree_digest
+from praxion_evals.live.materialize import digest_entries, make_writable, tree_entries
 from praxion_evals.live.spend import SpendLedger
 
 DEFAULT_FLOOR_TASKS = 8  # the floor run's declared handful of tasks
 FLOOR_MINIMUM = 6
 REFUSED_LAUNCH = "launch_refused"  # a session the spend cap refused: nothing started
 WORKSPACE_PREFIX = "praxion-evals-moves-"
+GIT_DIR = ".git/"
 TREE_ENTRY = "(whole tree)"
 TASKS_ENTRY = "(task list)"
 EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()  # what a removal leaves at its path
@@ -358,6 +360,20 @@ def _checkpoint(plan: RunPlan, prepared: _Prepared, state: _State, ending: MoveE
 
 
 def _verdict(plan: RunPlan, tasks: tuple[MoveTask, ...], sessions: tuple[MoveSession, ...]):
+    return verdict.move_verdict(
+        measurement(plan.declaration, plan.margin_pp, plan.target_pairs, tasks, sessions)
+    )
+
+
+def measurement(
+    declaration: MoveDeclaration,
+    margin_pp: float,
+    target_pairs: int,
+    tasks: Sequence[MoveTask],
+    sessions: Sequence[MoveSession],
+    floor: Sequence[MoveSession] = (),
+) -> verdict.Measurement:
+    """What a paired run measured, from its sessions alone; ``floor`` holds the cited floor's."""
     kinds: dict[str, FixtureKind] = {t.task_id: t.fixture_kind for t in tasks}
     latest = {(s.task_id, s.arm): s for s in sessions}  # a later record replaces an earlier
     pairs = tuple(
@@ -369,16 +385,14 @@ def _verdict(plan: RunPlan, tasks: tuple[MoveTask, ...], sessions: tuple[MoveSes
         )
         for task_id in dict.fromkeys(s.task_id for s in sessions)
     )
-    scope = plan.declaration.fixture_scope
-    return verdict.move_verdict(
-        verdict.Measurement(
-            checks=tuple(c.name for c in plan.declaration.checks.checks),
-            margin_pp=plan.margin_pp,
-            target_pairs=plan.target_pairs,
-            kind_restriction=scope.kind if isinstance(scope, OnlyKind) else None,
-            pairs=pairs,
-            floor=(),
-        )
+    scope = declaration.fixture_scope
+    return verdict.Measurement(
+        checks=tuple(c.name for c in declaration.checks.checks),
+        margin_pp=margin_pp,
+        target_pairs=target_pairs,
+        kind_restriction=scope.kind if isinstance(scope, OnlyKind) else None,
+        pairs=pairs,
+        floor=tuple(_side(s) for s in floor),
     )
 
 
@@ -439,7 +453,7 @@ def _prepare(plan: RunPlan, workspace: Path, declared: datetime) -> _Prepared:
         raise RunRefusedError(f"tasks: {error}") from error
     identity = _identity(declaration, plan.checkout, built, kit)
     cited = _cite(plan, identity, built.pinned) if plan.kind == "paired" else None
-    base = _base(plan, built.pinned, identity, tasks, declared, cited)
+    base = _base(plan, built.pinned, identity, tasks, declared)
     moves = launch.MoveLaunch(
         workspace,
         built.pinned,
@@ -483,12 +497,24 @@ def _identity(
         arms={
             arm: (
                 *(ChangeDigest(c.path, c.sha256 or EMPTY_DIGEST) for c in built.arms[arm].changes),
-                ChangeDigest(TREE_ENTRY, tree_digest(built.arms[arm].copy)),
+                ChangeDigest(TREE_ENTRY, _copy_digest(built.arms[arm].copy)),
                 ChangeDigest(TASKS_ENTRY, pool),
             )
             for arm in MOVE_ARMS
         },
     )
+
+
+def _copy_digest(copy: Path) -> str:
+    """The digest of what an arm's session can read of its copy: the repository's own history and
+    the results directory are left out, since a run's own results file (and git's bookkeeping) land
+    in the checkout between one run and the next without changing what a session is shown."""
+    entries = {
+        path: entry
+        for path, entry in tree_entries(copy).items()
+        if not path.startswith((GIT_DIR, RESULTS_DIR))
+    }
+    return digest_entries(entries)
 
 
 def floor_identity(
@@ -550,7 +576,6 @@ def _base(
     identity: MoveIdentity,
     tasks: tuple[MoveTask, ...],
     declared: datetime,
-    cited: CitedFloor | None,
 ) -> MoveRunCommon:
     declaration = plan.declaration
     arms_run = ARMS_OF[plan.kind]
@@ -572,12 +597,7 @@ def _base(
         continues=None,
         ending=Interrupted(),
         harness_version=plan.harness_version,
-        earlier=results.earlier_runs(
-            plan.moves_dir,
-            declaration.move,
-            identity,
-            exclude=cited.lineage if cited else (),
-        ),
+        earlier=results.earlier_runs(plan.moves_dir, declaration.move, identity),
     )
 
 

@@ -118,6 +118,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{PROG}: --calibration-run: {CALIBRATION_RUN_NOTE}", file=sys.stderr)
     try:
         if config.report is not None:
+            if moves_cli.is_move_results(config.report):
+                print(moves_cli.report_text(config.report))
+                return EXIT_COMPLETE
             tip = results.load(config.report)
             print(report.render(tip, parts_before(tip, config.report.parent)), end="")
             return EXIT_COMPLETE

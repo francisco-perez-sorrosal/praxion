@@ -2,11 +2,13 @@
 """Retain-last-N pruning for timestamped report families in ``.ai-state/``.
 
 Bounds the unbounded growth of per-run report directories (``metrics_reports``,
-``sentinel_reports``). Keeps the N most-recent report *runs* per family and
-removes older ones. The append-only ``*_LOG.md`` index and any ``.lock`` files
-are never touched — they do not carry a ``_REPORT_`` token, so they are not
-reports. A run is grouped by its ``YYYY-MM-DD_HH-MM-SS`` timestamp, so a metrics
-run's ``.md`` + ``.json`` pair is always kept or pruned together.
+``sentinel_reports``, ``praxion_eval_reports``). Keeps the N most-recent report
+*runs* per family and removes older ones. The append-only ``*_LOG.md`` index,
+any ``.lock`` files and the eval judge cache are never touched — they do not
+carry a ``_REPORT_`` token, so they are not reports. A run is grouped by its
+timestamp (``YYYY-MM-DD_HH-MM-SS``, or ``YYYY-MM-DDTHH-MM-SSZ`` for the eval
+reports), so a metrics run's ``.md`` + ``.json`` pair is always kept or pruned
+together.
 
 Deletes from the working tree only — pruned reports remain in git history (the
 prior audit's ``historical-retained`` rationale, now served by history rather
@@ -64,16 +66,23 @@ DEFAULT_KEEP = 10
 # `METRICS_REPORT_2026-06-11_08-38-15.{json,md}` twice, once on 2026-08-05 and
 # again on 2026-08-06, while reporting `kept 10` — a count correct for the mixed
 # pool and wrong for either real series.
+#
+# The `/eval-praxion` reports are the third directory: a single series whose
+# runs are stamped `YYYY-MM-DDTHH-MM-SSZ`; its gitignored `judge_cache.jsonl`
+# carries no `_REPORT_` token and is never pruned.
 _REPORT_FAMILIES = (
     (".ai-state/metrics_reports", "METRICS"),
     (".ai-state/metrics_reports", "SELF_HEALING"),
     (".ai-state/sentinel_reports", "SENTINEL"),
+    (".ai-state/praxion_eval_reports", "PRAXION_EVAL"),
 )
 
 # A report file carries `<PREFIX>_REPORT_` and a sortable timestamp; the LOG
-# index and lock files carry neither, so they are structurally exempt.
+# index and lock files carry neither, so they are structurally exempt. Each
+# family uses one stamp form throughout (`_` or `T...Z`), so lexical order is
+# chronological within a family, which is the only order pruning compares.
 _REPORT_MARKER = "_REPORT_"
-_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
+_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2}|T\d{2}-\d{2}-\d{2}Z)")
 
 logger = logging.getLogger("prune_reports")
 
@@ -82,7 +91,7 @@ logger = logging.getLogger("prune_reports")
 
 
 def _timestamp_of(name: str) -> str | None:
-    """Return the ``YYYY-MM-DD_HH-MM-SS`` run token in a filename, or None."""
+    """Return the run token (``_`` or ``T...Z`` form) in a filename, or None."""
     match = _TIMESTAMP_RE.search(name)
     return match.group(0) if match else None
 

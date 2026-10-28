@@ -23,6 +23,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CALLER_DOCS = [
     _REPO_ROOT / "agents" / "sentinel.md",
     _REPO_ROOT / "skills" / "project-metrics" / "SKILL.md",
+    _REPO_ROOT / "skills" / "eval-praxion" / "SKILL.md",
 ]
 
 # Matches the value token of a `--family <value>` CLI invocation as it
@@ -74,6 +75,21 @@ def _make_sentinel(root: Path, timestamps: list[str]) -> Path:
     (d / "SENTINEL_LOG.md").write_text("log index\n")
     for ts in timestamps:
         (d / f"SENTINEL_REPORT_{ts}.md").write_text("md\n")
+    return d
+
+
+def _make_eval_reports(root: Path, timestamps: list[str]) -> Path:
+    """Build .ai-state/praxion_eval_reports with one report per run, its LOG and judge cache.
+
+    Its runs are stamped in the T/Z form (`2026-01-01T00-00-00Z`), not the `_` form the
+    metrics and sentinel families carry.
+    """
+    d = root / ".ai-state" / "praxion_eval_reports"
+    d.mkdir(parents=True)
+    (d / "PRAXION_EVAL_LOG.md").write_text("log index\n")
+    (d / "judge_cache.jsonl").write_text("{}\n")
+    for ts in timestamps:
+        (d / f"PRAXION_EVAL_REPORT_{ts}.md").write_text("md\n")
     return d
 
 
@@ -159,6 +175,43 @@ def test_keeps_newest_n_prunes_older(tmp_path: Path) -> None:
         "SENTINEL_REPORT_2026-05-01_00-00-00.md",
     ]
     assert result["total_pruned"] == 3
+
+
+def test_eval_reports_stamped_in_t_z_form_keep_newest_n(tmp_path: Path) -> None:
+    mod = _load_module()
+    d = _make_eval_reports(tmp_path, [ts.replace("_", "T") + "Z" for ts in _TIMESTAMPS])
+
+    result = mod.prune_all(tmp_path, keep=2, dry_run=False)
+
+    assert sorted(p.name for p in d.glob("PRAXION_EVAL_REPORT_*")) == [
+        "PRAXION_EVAL_REPORT_2026-04-01T00-00-00Z.md",
+        "PRAXION_EVAL_REPORT_2026-05-01T00-00-00Z.md",
+    ]
+    assert result["total_pruned"] == 3
+
+
+def test_eval_reports_prune_spares_their_log_and_judge_cache(tmp_path: Path) -> None:
+    mod = _load_module()
+    d = _make_eval_reports(tmp_path, [ts.replace("_", "T") + "Z" for ts in _TIMESTAMPS])
+
+    mod.prune_all(tmp_path, keep=0, dry_run=False)
+
+    assert _inventory(d) == {"PRAXION_EVAL_LOG.md": "log index\n", "judge_cache.jsonl": "{}\n"}
+
+
+def test_eval_family_prune_leaves_the_other_families_untouched(tmp_path: Path) -> None:
+    mod = _load_module()
+    _make_eval_reports(tmp_path, [ts.replace("_", "T") + "Z" for ts in _TIMESTAMPS])
+    metrics = _make_metrics(tmp_path, _TIMESTAMPS)
+    sentinel = _make_sentinel(tmp_path, _TIMESTAMPS)
+    before = (_inventory(metrics), _inventory(sentinel))
+    selected, unknown = mod.select_families([".ai-state/praxion_eval_reports:PRAXION_EVAL"])
+
+    result = mod.prune_all(tmp_path, keep=1, dry_run=False, families=selected)
+
+    assert unknown == []
+    assert result["total_pruned"] == 4
+    assert (_inventory(metrics), _inventory(sentinel)) == before
 
 
 def test_preserves_log_and_lock(tmp_path: Path) -> None:

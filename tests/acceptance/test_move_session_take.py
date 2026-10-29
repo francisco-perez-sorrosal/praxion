@@ -39,8 +39,6 @@ from tests.acceptance.drivers.move_scoring import (
     unreadable_record,
 )
 
-SECOND_MOVE_SHAPE = "a resident line and a path-matched rule for the decision records"
-
 
 @pytest.fixture(scope="module")
 def first_move(tmp_path_factory: pytest.TempPathFactory) -> Declared:
@@ -49,7 +47,7 @@ def first_move(tmp_path_factory: pytest.TempPathFactory) -> Declared:
 
 @pytest.fixture(scope="module")
 def second_move(tmp_path_factory: pytest.TempPathFactory) -> Declared:
-    return declare(SECOND_MOVE, SECOND_MOVE_SHAPE, tmp_path_factory.mktemp("second-move"))
+    return declare(SECOND_MOVE, "as declared", tmp_path_factory.mktemp("second-move"))
 
 
 @pytest.fixture(params=("first", "second"))
@@ -147,9 +145,9 @@ def test_a_rule_delivered_at_session_start_reads_as_arrived_before_composition(f
     raises=UnboundDriverError,
     strict=True,
     reason=(
-        "no real record of a path-matched load can be frozen yet: the lean arm leaves the "
-        "path-scoped rule unlinked in a real session, and the declared check phrase is not in "
-        "the rule; remove this mark when td-518 lands and a record is frozen"
+        "no real record of a path-matched load on a creating write is frozen yet: recording one "
+        "is a paid probe session that needs the user's approval; remove this mark when a "
+        "probe records one and its record is frozen"
     ),
 )
 def test_a_path_matched_load_on_a_creating_write_reads_as_arrived_after_execution(second_move):

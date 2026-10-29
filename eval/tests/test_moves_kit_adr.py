@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -13,7 +14,7 @@ from praxion_evals.adherence.moves import checks_adr, checks_git, kit_adr
 from praxion_evals.adherence.moves.declaration import kit
 from praxion_evals.adherence.moves.fixture_project import CANONICAL_BLOCKS
 from praxion_evals.adherence.moves.model import OnlyKind
-from praxion_evals.adherence.moves.tasks import MoveTask
+from praxion_evals.adherence.moves.tasks import MoveTask, target_with_slack
 
 DECLARATION = kit("adr-conventions")
 
@@ -175,3 +176,114 @@ def test_a_declaration_that_does_not_admit_the_managed_kind_is_refused(
 def test_a_task_of_no_fixture_here_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="no fixture named 'job-runner'"):
         kit_adr.build_fixture(DECLARATION, a_task(an_adr_fixture()), tmp_path / "repo")
+
+
+# -- The filled kit ---------------------------------------------------------------------------
+
+SEED = 20260101
+RULE = Path(__file__).resolve().parents[2] / "rules" / "swe" / "adr-conventions.md"
+RULE_LINE_MINIMUM = 20
+CATEGORY_VALUES = ("architectural", "behavioral", "implementation", "configuration")
+# A backtick; a dollar sign and a space; a slash opening a word, then a letter; or a program
+# name standing as a whole word, then a space and an argument.
+COMMAND = re.compile(
+    r"`|\$ |(?:^|\s)/[A-Za-z]|\b(?:git|python|uv|bash|pytest|npm|make|praxion-[\w-]*) \S"
+)
+FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
+
+
+def rule_lines() -> frozenset[str]:
+    body = FRONTMATTER.sub("", RULE.read_text(encoding="utf-8"), count=1)
+    lines = (re.sub(r"^[-*\d.\s]+", "", line).strip().casefold() for line in body.splitlines())
+    return frozenset(line for line in lines if len(line) > RULE_LINE_MINIMUM)
+
+
+def declared_phrases() -> tuple[str, ...]:
+    return tuple(p.casefold() for check in DECLARATION.checks.checks for p in check.phrases)
+
+
+@pytest.fixture(scope="module")
+def candidates() -> tuple[MoveTask, ...]:
+    return kit_adr.candidates()
+
+
+def test_the_candidates_outnumber_a_draw_and_pair_every_fixture_with_every_wording(
+    candidates: tuple[MoveTask, ...],
+) -> None:
+    assert len(candidates) == len(kit_adr.FIXTURES) * len(kit_adr.WORDINGS)
+    assert len(candidates) > target_with_slack()
+    assert len({(t.fixture, t.wording) for t in candidates}) == len(candidates)
+    assert {t.fixture_kind for t in candidates} == {"managed"}
+
+
+def test_the_kit_holds_decisions_of_both_sorts_and_a_draw_always_asks_for_both() -> None:
+    sorts = {type(fixture.sort) for fixture in kit_adr.FIXTURES}
+    drawn = kit_adr.tasks(DECLARATION, SEED)
+    drawn_sorts = {type(kit_adr.sort_of(task)) for task in drawn}
+
+    assert sorts == drawn_sorts == {kit_adr.Architectural, kit_adr.WithinComponent}
+    assert len(drawn) == target_with_slack()
+
+
+def test_a_tasks_sort_is_its_fixtures_sort(candidates: tuple[MoveTask, ...]) -> None:
+    fixtures = {fixture.name: fixture for fixture in kit_adr.FIXTURES}
+
+    assert all(kit_adr.sort_of(t) is fixtures[t.fixture].sort for t in candidates)
+
+
+def test_a_task_of_no_fixture_has_no_sort() -> None:
+    with pytest.raises(ValueError, match="no fixture named"):
+        kit_adr.sort_of(a_task(an_adr_fixture()))
+
+
+def test_every_request_asks_for_the_decision_and_describes_it(
+    candidates: tuple[MoveTask, ...],
+) -> None:
+    summaries = {f.name: f.summary for f in kit_adr.FIXTURES}
+
+    assert [t.task_id for t in candidates if "decision" not in t.wording.casefold()] == []
+    assert [t.task_id for t in candidates if summaries[t.fixture] not in t.wording] == []
+
+
+def test_no_request_holds_a_line_of_the_rule_or_a_declared_phrase(
+    candidates: tuple[MoveTask, ...],
+) -> None:
+    needles = rule_lines() | set(declared_phrases())
+
+    carried = [(t.task_id, n) for t in candidates for n in needles if n in t.wording.casefold()]
+
+    assert needles
+    assert carried == []
+
+
+def test_no_request_names_a_category_value_as_a_whole_word(
+    candidates: tuple[MoveTask, ...],
+) -> None:
+    values = re.compile(r"\b(" + "|".join(CATEGORY_VALUES) + r")\b", re.IGNORECASE)
+
+    assert [t.task_id for t in candidates if values.search(t.wording)] == []
+
+
+def test_no_request_holds_a_command(candidates: tuple[MoveTask, ...]) -> None:
+    assert [(t.task_id, m.group(0)) for t in candidates if (m := COMMAND.search(t.wording))] == []
+
+
+@pytest.mark.parametrize("fixture", [f.name for f in kit_adr.FIXTURES])
+def test_a_built_fixture_carries_no_line_of_the_rule_and_no_declared_phrase(
+    fixture: str, tmp_path: Path
+) -> None:
+    chosen = next(f for f in kit_adr.FIXTURES if f.name == fixture)
+    root = kit_adr.build_fixture(DECLARATION, a_task(chosen), tmp_path / "repo")
+    needles = rule_lines() | set(declared_phrases())
+    files = [p for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts]
+
+    carried = [
+        (p.relative_to(root).as_posix(), n)
+        for p in files
+        for n in needles
+        if n in p.read_text(encoding="utf-8", errors="replace").casefold()
+    ]
+
+    assert carried == []
+    assert checks_adr.fixture_branch(root) == chosen.branch
+    assert len(chosen.prior) >= kit_adr.MIN_PRIOR_RECORDS

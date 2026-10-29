@@ -30,6 +30,7 @@ from praxion_evals.adherence.moves.checks_adr import (
     NumberedName,
     OtherId,
     OtherName,
+    admissible_branches,
     baseline_paths,
     branch_segment,
     classify_id,
@@ -37,11 +38,13 @@ from praxion_evals.adherence.moves.checks_adr import (
     fixture_branch,
     grade,
     grade_records,
+    is_record_path,
     read_records,
 )
 from praxion_evals.adherence.moves.model import Grade, NothingToGrade
 
 BRANCH = "record-storage-choice"
+BRANCHES = frozenset({BRANCH})
 DRAFTS = ".ai-state/decisions/drafts"
 DRAFT_ID = "dec-draft-3f9a0c1e"  # id-citation-discipline:ignore
 FRAGMENT = f"20261029-1430-fixture-author-{BRANCH}-adopt-sqlite.md"
@@ -60,7 +63,7 @@ def _write(root: Path, path: str, text: str = "# note\n") -> None:
 
 def _record(root: Path, path: str, text: str, branch: str = BRANCH) -> DecisionRecord:
     _write(root, path, text)
-    (record,) = read_records(root, before=frozenset(), branch=branch)
+    (record,) = read_records(root, before=frozenset(), branches=frozenset({branch}))
     return record
 
 
@@ -68,13 +71,13 @@ def _record(root: Path, path: str, text: str, branch: str = BRANCH) -> DecisionR
 
 
 def test_a_stamp_user_branch_slug_name_is_a_fragment_carrying_its_stamp():
-    assert classify_name(FRAGMENT, BRANCH) == Fragment(
+    assert classify_name(FRAGMENT, BRANCHES) == Fragment(
         datetime(2026, 10, 29, 14, 30), f"fixture-author-{BRANCH}-adopt-sqlite"
     )
 
 
 def test_a_name_led_by_a_record_number_is_a_numbered_name():
-    assert classify_name("043-adopt-sqlite.md", BRANCH) == NumberedName(43, "adopt-sqlite")
+    assert classify_name("043-adopt-sqlite.md", BRANCHES) == NumberedName(43, "adopt-sqlite")
 
 
 @pytest.mark.parametrize(
@@ -92,13 +95,35 @@ def test_a_name_led_by_a_record_number_is_a_numbered_name():
     ],
 )
 def test_a_name_that_is_neither_a_fragment_of_the_branch_nor_numbered_is_other(filename):
-    assert classify_name(filename, BRANCH) == OtherName(filename)
+    assert classify_name(filename, BRANCHES) == OtherName(filename)
 
 
 def test_a_stamp_shaped_name_with_the_wrong_branch_is_other_not_numbered():
     wrong = "20261029-1430-fixture-author-main-adopt-sqlite.md"
 
-    assert classify_name(wrong, BRANCH) == OtherName(wrong)
+    assert classify_name(wrong, BRANCHES) == OtherName(wrong)
+
+
+def test_a_name_is_a_fragment_when_any_admissible_branch_matches_under_the_segment_rule():
+    name = "20261029-1430-fixture-author-cache-follow-up-slug.md"
+
+    assert isinstance(classify_name(name, frozenset({BRANCH, "Cache/Follow-Up"})), Fragment)
+
+
+def test_a_name_is_other_when_no_admissible_branch_matches():
+    name = "20261029-1430-fixture-author-cache-follow-up-slug.md"
+
+    assert classify_name(name, BRANCHES) == OtherName(name)
+
+
+def test_a_stamp_shaped_name_is_other_when_no_branch_is_admissible():
+    assert classify_name(FRAGMENT, frozenset()) == OtherName(FRAGMENT)
+
+
+def test_a_fragment_name_with_an_uppercase_extension_is_other_not_a_fragment():
+    name = FRAGMENT.removesuffix(".md") + ".MD"
+
+    assert classify_name(name, BRANCHES) == OtherName(name)
 
 
 # -- The branch segment -----------------------------------------------------------------------
@@ -118,20 +143,21 @@ def test_a_name_carrying_the_cut_segment_of_a_long_branch_is_a_fragment():
     cut = branch_segment(LONG_BRANCH)
 
     assert isinstance(
-        classify_name(f"20261029-1430-fixture-author-{cut}-slug.md", LONG_BRANCH), Fragment
+        classify_name(f"20261029-1430-fixture-author-{cut}-slug.md", frozenset({LONG_BRANCH})),
+        Fragment,
     )
 
 
 def test_a_name_carrying_the_long_branch_uncut_is_other():
     uncut = f"20261029-1430-fixture-author-{LONG_BRANCH}-slug.md"
 
-    assert classify_name(uncut, LONG_BRANCH) == OtherName(uncut)
+    assert classify_name(uncut, frozenset({LONG_BRANCH})) == OtherName(uncut)
 
 
 def test_a_name_carrying_the_segment_of_a_slashed_branch_is_a_fragment():
     name = "20261029-1430-fixture-author-feature-record-storage-slug.md"
 
-    assert isinstance(classify_name(name, "Feature/Record_Storage"), Fragment)
+    assert isinstance(classify_name(name, frozenset({"Feature/Record_Storage"})), Fragment)
 
 
 # -- Ids --------------------------------------------------------------------------------------
@@ -164,7 +190,7 @@ def test_a_record_in_the_draft_directory_reads_its_name_id_category_and_disconfi
     assert record == DecisionRecord(
         path=f"{DRAFTS}/{FRAGMENT}",
         in_drafts=True,
-        name=classify_name(FRAGMENT, BRANCH),
+        name=classify_name(FRAGMENT, BRANCHES),
         id=DraftId("3f9a0c1e"),
         category="architectural",
         disconfirmed=True,
@@ -230,6 +256,17 @@ def test_a_category_written_in_any_case_is_kept_as_written(tmp_path):
         pytest.param(
             "Falsifier, Steelmanned runner-up, Reversal trigger\n", False, id="no-heading"
         ),
+        pytest.param(
+            "## Disconfirmation\n- Falsifier\n```\n## Next\n```\n"
+            "- Steelmanned runner-up\n- Reversal trigger\n",
+            True,
+            id="a-fenced-number-sign-line-ends-no-section",
+        ),
+        pytest.param(
+            "```\n## Disconfirmation\n- Falsifier\n- Steelmanned runner-up\n- Reversal trigger\n```\n",
+            False,
+            id="a-heading-only-inside-a-fence",
+        ),
     ],
 )
 def test_a_record_is_disconfirmed_when_a_disconfirmation_section_names_all_three_items(
@@ -249,27 +286,80 @@ def test_discovery_leaves_out_what_the_baseline_held_and_what_is_not_markdown(tm
     _write(tmp_path, "src/code.py", "x = 1\n")
 
     found = read_records(
-        tmp_path, before=frozenset({".ai-state/decisions/001-first.md"}), branch=BRANCH
+        tmp_path, before=frozenset({".ai-state/decisions/001-first.md"}), branches=BRANCHES
     )
 
     assert [record.path for record in found] == [f"{DRAFTS}/{FRAGMENT}"]
 
 
-def test_discovery_leaves_out_the_git_and_ai_work_trees_at_the_root_only(tmp_path):
-    _write(tmp_path, ".git/NOTE.md")
-    _write(tmp_path, ".ai-work/slug/PLAN.md")
-    _write(tmp_path, "docs/.ai-work/kept.md")
+def test_discovery_leaves_out_every_dot_directory_but_the_decision_directory(tmp_path):
+    for path in (
+        ".git/NOTE.md",
+        ".ai-work/slug/PLAN.md",
+        "docs/.ai-work/skipped.md",
+        ".pytest_cache/README.md",
+        ".ai-state/calibration_log.md",
+        ".ai-state/sessions/NOTES.md",
+    ):
+        _write(tmp_path, path)
+    _write(tmp_path, ".ai-state/decisions/kept.md")
+    _write(tmp_path, f"{DRAFTS}/{FRAGMENT}")
 
-    found = read_records(tmp_path, before=frozenset(), branch=BRANCH)
+    found = read_records(tmp_path, before=frozenset(), branches=BRANCHES)
 
-    assert [record.path for record in found] == ["docs/.ai-work/kept.md"]
+    assert [record.path for record in found] == [
+        f"{DRAFTS}/{FRAGMENT}",
+        ".ai-state/decisions/kept.md",
+    ]
+
+
+@pytest.mark.parametrize("marker", [".git", ".git/HEAD"])
+def test_discovery_leaves_out_a_nested_repository_or_worktree_and_all_below_it(tmp_path, marker):
+    _write(tmp_path, "vendor/lib/README.md")
+    _write(tmp_path, "vendor/lib/docs/guide.md")
+    _write(tmp_path, f"vendor/lib/{marker}", "gitdir: ../../.git/worktrees/lib\n")
+    _write(tmp_path, "vendor/NOTE.md")
+
+    found = read_records(tmp_path, before=frozenset(), branches=BRANCHES)
+
+    assert [record.path for record in found] == ["vendor/NOTE.md"]
+
+
+def test_discovery_sees_an_uppercase_markdown_extension_as_a_record(tmp_path):
+    _write(tmp_path, f"{DRAFTS}/{FRAGMENT.removesuffix('.md')}.MD", "---\nid: x\n---\n")
+
+    (record,) = read_records(tmp_path, before=frozenset(), branches=BRANCHES)
+
+    assert isinstance(record.name, OtherName)
+
+
+@pytest.mark.parametrize(
+    ("rel", "nested", "expected"),
+    [
+        pytest.param("docs/guide.md", set(), True, id="a-markdown-file-outside-dot-directories"),
+        pytest.param("README.MD", set(), True, id="an-uppercase-extension"),
+        pytest.param("src/code.py", set(), False, id="not-markdown"),
+        pytest.param(".ai-state/decisions/x.md", set(), True, id="under-the-decision-directory"),
+        pytest.param(".ai-state/decisions/a/.b/x.md", set(), True, id="deep-under-the-decisions"),
+        pytest.param(".ai-state/log.md", set(), False, id="elsewhere-in-the-state-directory"),
+        pytest.param("a/.cache/x.md", set(), False, id="in-a-nested-dot-directory"),
+        pytest.param(".hidden.md", set(), True, id="a-dot-named-file-is-no-directory"),
+        pytest.param("vendor/lib/x.md", {"vendor/lib"}, False, id="in-a-nested-repository"),
+        pytest.param("vendor/lib/a/x.md", {"vendor/lib"}, False, id="below-a-nested-repository"),
+        pytest.param("vendor/libs/x.md", {"vendor/lib"}, True, id="a-sibling-sharing-a-prefix"),
+    ],
+)
+def test_a_markdown_path_is_a_record_outside_dot_directories_and_nested_repositories(
+    rel, nested, expected
+):
+    assert is_record_path(rel, frozenset(nested)) is expected
 
 
 def test_discovery_ignores_gitignore_so_a_record_under_an_ignored_path_is_found(tmp_path):
     _write(tmp_path, ".gitignore", ".ai-state/\n")
     _write(tmp_path, f"{DRAFTS}/{FRAGMENT}")
 
-    found = read_records(tmp_path, before=frozenset(), branch=BRANCH)
+    found = read_records(tmp_path, before=frozenset(), branches=BRANCHES)
 
     assert f"{DRAFTS}/{FRAGMENT}" in [record.path for record in found]
 
@@ -325,7 +415,7 @@ def _text(
 def _graded(check: str, root: Path, *records: tuple[str, str]) -> Grade | NothingToGrade:
     for path, text in records:
         _write(root, path, text)
-    return grade_records(check, frozenset(), BRANCH, root)
+    return grade_records(check, frozenset(), BRANCHES, root)
 
 
 def _failed(check: str, root: Path, *records: tuple[str, str]) -> set[str]:
@@ -418,16 +508,14 @@ def test_one_misplaced_record_among_conforming_ones_fails_the_check(tmp_path):
     }
 
 
-def test_a_committed_older_habit_record_moved_into_conformance_passes(tmp_path):
+@pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
+def test_a_committed_older_habit_record_moved_into_conformance_passes(tmp_path, check):
     repo = _planted_repo(tmp_path)
     (repo / DRAFTS).mkdir(parents=True)
     _git(repo, "mv", ".ai-state/decisions/001-first.md", FRAGMENT_PATH)
     _write(repo, FRAGMENT_PATH, _text())
-    adr = declaration.kit("adr-conventions")
 
-    answers = [grade(adr, check.name, repo, ()) for check in adr.checks.checks]
-
-    assert answers == [Grade("passed", ())] * len(answers)
+    assert grade(declaration.kit("adr-conventions"), check, repo, ()) == Grade("passed", ())
 
 
 @pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
@@ -444,7 +532,7 @@ def test_a_markdown_file_under_ai_work_is_no_decision_record(tmp_path, check):
 
 def test_a_check_this_module_does_not_grade_is_refused(tmp_path):
     with pytest.raises(ValueError, match="no grader"):
-        grade_records("commit message form", frozenset(), BRANCH, tmp_path)
+        grade_records("commit message form", frozenset(), BRANCHES, tmp_path)
 
 
 def _planted_repo(root: Path, *session: tuple[str, str]) -> Path:
@@ -459,13 +547,39 @@ def _planted_repo(root: Path, *session: tuple[str, str]) -> Path:
     return root
 
 
-def test_the_run_adapter_reads_the_baseline_and_branch_refs_and_grades_the_new_records(tmp_path):
+@pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
+def test_the_run_adapter_reads_the_baseline_and_branch_refs_and_grades_the_new_records(
+    tmp_path, check
+):
     repo = _planted_repo(tmp_path, (FRAGMENT_PATH, _text()))
-    adr = declaration.kit("adr-conventions")
 
-    answers = [grade(adr, check.name, repo, (), ()) for check in adr.checks.checks]
+    assert grade(declaration.kit("adr-conventions"), check, repo, (), ()) == Grade("passed", ())
 
-    assert answers == [Grade("passed", ())] * len(answers)
+
+def test_the_admissible_branches_are_the_fixtures_and_the_ones_the_session_created():
+    local = ["main", BRANCH, "Cache/Follow-Up", "other"]
+
+    assert admissible_branches(BRANCH, local) == {BRANCH, "Cache/Follow-Up", "other"}
+    assert admissible_branches(BRANCH, ["main"]) == BRANCHES
+
+
+def test_the_run_adapter_passes_a_fragment_named_by_a_branch_the_session_created(tmp_path):
+    cache = f"{DRAFTS}/20261029-1430-fixture-author-cache-follow-up-slug.md"
+    repo = _planted_repo(tmp_path, (cache, _text()))
+    _git(repo, "branch", "Cache/Follow-Up")
+
+    answer = grade(declaration.kit("adr-conventions"), DRAFT_PLACEMENT, repo, ())
+
+    assert answer == Grade("passed", ())
+
+
+def test_the_run_adapter_fails_a_fragment_named_by_the_default_branch(tmp_path):
+    default = f"{DRAFTS}/20261029-1430-fixture-author-main-slug.md"
+    repo = _planted_repo(tmp_path, (default, _text()))
+
+    answer = grade(declaration.kit("adr-conventions"), DRAFT_PLACEMENT, repo, ())
+
+    assert answer == Grade("failed", (MALFORMED_NAME,))
 
 
 def test_the_run_adapter_leaves_the_baseline_records_ungraded(tmp_path):
@@ -476,14 +590,11 @@ def test_the_run_adapter_leaves_the_baseline_records_ungraded(tmp_path):
     assert answer == NothingToGrade("no decision record written")
 
 
-def test_the_run_adapter_refuses_a_governed_check_it_cannot_grade_before_reading_any_ref(
-    tmp_path, monkeypatch
-):
-    adr = declaration.kit("adr-conventions")
-    monkeypatch.delitem(checks_adr._GRADERS, DECISION_CATEGORY)
+def test_the_run_adapter_refuses_a_governed_check_it_cannot_grade_before_reading_any_ref(tmp_path):
+    other_kit = declaration.kit("git-conventions")  # governs a check this module grades none of
 
     with pytest.raises(ValueError, match="no grader"):
-        grade(adr, DECISION_CATEGORY, tmp_path, ())
+        grade(other_kit, "commit message form", tmp_path, ())
 
 
 def test_the_run_adapter_refuses_a_check_the_declaration_does_not_govern(tmp_path):

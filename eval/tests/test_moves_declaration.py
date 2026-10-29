@@ -245,6 +245,45 @@ def test_a_phrase_held_by_a_sub_heading_of_its_section_counts_as_inside(tmp_path
     assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
 
 
+def test_a_number_sign_line_inside_a_fenced_block_ends_no_section(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## {SECTION}\n```\n## not a heading\n```\nkeep it to 50\n\n## Staging Discipline\n",
+    )
+
+    assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
+
+
+def test_a_section_heading_only_inside_a_fenced_block_is_no_section(tmp_path: Path) -> None:
+    checkout = a_checkout(tmp_path / "checkout", f"```\n## {SECTION}\nkeep it to 50\n```\n")
+
+    assert SECTION in refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+
+def levels(*lines: str) -> list[int | None]:
+    return [heading and heading.level for heading in declaration.markdown_headings(list(lines))]
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected"),
+    [
+        pytest.param(("# a", "text", "### b  "), [1, None, 3], id="plain-headings"),
+        pytest.param(("```", "# a", "```", "# b"), [None, None, None, 1], id="backtick-fence"),
+        pytest.param(("~~~", "# a", "~~~", "# b"), [None, None, None, 1], id="tilde-fence"),
+        pytest.param(("   ```", "# a", "   ```", "# b"), [None, None, None, 1], id="indented-3"),
+        pytest.param(("    ```", "# a"), [None, 1], id="indented-4-is-no-fence"),
+        pytest.param(
+            ("````", "```", "# a", "````", "# b"), [None, None, None, None, 1], id="longer"
+        ),
+        pytest.param(("```", "~~~", "# a", "```", "# b"), [None, None, None, None, 1], id="mixed"),
+        pytest.param(("```", "# a", "``` x", "# b"), [None, None, None, None], id="close-bare"),
+        pytest.param(("```python", "# a"), [None, None], id="unclosed-runs-to-the-end"),
+    ],
+)
+def test_headings_are_found_outside_fenced_code_only(lines, expected) -> None:
+    assert levels(*lines) == expected
+
+
 @pytest.mark.parametrize(
     "path", ["../outside.md", "/etc/passwd", "a/../../b", ".ai-state/eval_ledger/x.json"]
 )

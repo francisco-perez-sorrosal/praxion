@@ -5,12 +5,16 @@ module reads the end state, then grades it: each record's file name, id and cate
 into closed sum types whose variants are disjoint, so a grader can fail one part of the rule
 without failing another.
 
-A decision record is a Markdown file in the end-state tree that the baseline tree did not hold,
-outside ``.git/`` and ``.ai-work/``. Discovery walks the filesystem and ignores ``.gitignore``, so a
-record a session wrote under an ignored path is still a record.
+A decision record is a Markdown file (any letter case of ``.md``) in the end-state tree that the
+baseline tree did not hold, lying under ``.ai-state/decisions/`` or else outside every dot-directory
+and every nested repository or worktree. Discovery walks the filesystem and ignores ``.gitignore``,
+so a record a session wrote under an ignored path is still a record; it never descends into a
+dot-directory other than ``.ai-state/decisions/``.
 
-The fixture's branch is fixed by the fixture, so the fragment schema's branch segment is judged
-against it: a stamp-shaped name carrying another branch is ``OtherName``, never numbered.
+The fragment schema's branch segment is judged against the admissible branches: the fixture's own
+and any local branch the session created, since the rule names the branch the record was authored
+on and the end state cannot say which. A stamp-shaped name carrying no admissible branch is
+``OtherName``, never numbered, and so is a name whose extension is not lowercase ``.md``.
 
 The two governed checks then grade the records, each part of the rule on its own:
 
@@ -31,11 +35,12 @@ import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
 from praxion_evals.adherence.moves.checks_git import BASELINE_REF
+from praxion_evals.adherence.moves.declaration import markdown_headings, section_text
 from praxion_evals.adherence.moves.fixture_project import git
 from praxion_evals.adherence.moves.model import Grade, MoveDeclaration, NothingToGrade, holds_phrase
 
@@ -44,8 +49,10 @@ BRANCH_REF = (
 )
 _HEADS_PREFIX = "refs/heads/"
 
-DRAFTS_DIR = ".ai-state/decisions/drafts"
-_EXCLUDED_ROOTS = frozenset({".git", ".ai-work"})
+DECISIONS_DIR = ".ai-state/decisions"
+DRAFTS_DIR = f"{DECISIONS_DIR}/drafts"
+# If the fixture's default branch changes, change kit_adr.BASELINE_BRANCH with it.
+DEFAULT_BRANCH = "main"
 BRANCH_SEGMENT_LIMIT = 40
 
 _STAMP_FORMAT = "%Y%m%d-%H%M"
@@ -53,7 +60,6 @@ _STAMP_SHAPED = re.compile(r"(?P<stamp>\d{8}-\d{4})-(?P<rest>.+)\.md")
 _NUMBERED = re.compile(r"(?P<number>\d+)-(?P<slug>.+)\.md")
 _DRAFT_ID = re.compile(r"dec-draft-(?P<hex8>[0-9a-f]{8})")
 _NUMBERED_ID = re.compile(r"dec-(?P<number>\d+)")
-_HEADING = re.compile(r"(?P<hashes>#{1,6})\s+(?P<title>.*?)\s*")
 _FRONTMATTER_FENCE = "---"
 
 DRAFT_PLACEMENT = "decision draft placement"
@@ -150,15 +156,17 @@ def grade(
     if check not in {governed.name for governed in declaration.checks.checks}:
         raise ValueError(f"{declaration.move.value} governs no check named {check!r}")
     _require_grader(check)
-    return grade_records(check, baseline_paths(repo), fixture_branch(repo), repo)
+    branches = admissible_branches(fixture_branch(repo), local_branches(repo))
+    return grade_records(check, baseline_paths(repo), branches, repo)
 
 
 def grade_records(
-    check: str, before: frozenset[str], branch: str, repo: Path
+    check: str, before: frozenset[str], branches: frozenset[str], repo: Path
 ) -> Grade | NothingToGrade:
-    """``check`` over the records ``repo`` holds beyond ``before``, judged against ``branch``."""
+    """``check`` over the records ``repo`` holds beyond ``before``, their names judged against the
+    admissible ``branches``."""
     _require_grader(check)
-    records = read_records(repo, before=before, branch=branch)
+    records = read_records(repo, before=before, branches=branches)
     if not records:
         return NothingToGrade(NO_RECORD)
     return _GRADERS[check](records)
@@ -254,34 +262,69 @@ def fixture_branch(repo: Path) -> str:
     return git(repo, "symbolic-ref", BRANCH_REF).strip().removeprefix(_HEADS_PREFIX)
 
 
-def read_records(repo: Path, *, before: frozenset[str], branch: str) -> tuple[DecisionRecord, ...]:
-    """Every Markdown file now in ``repo`` that ``before`` did not hold, as a record, in path order."""
+def local_branches(repo: Path) -> tuple[str, ...]:
+    """Every local branch ``repo`` holds, by its short name."""
+    listed = git(repo, "for-each-ref", "--format=%(refname:short)", _HEADS_PREFIX)
+    return tuple(line for line in listed.splitlines() if line)
+
+
+def admissible_branches(fixture: str, local: Sequence[str]) -> frozenset[str]:
+    """The fixture's branch and the local branches the fixture did not hold: it held its own and
+    the default, so any other is one the session created."""
+    return frozenset(local) - {fixture, DEFAULT_BRANCH} | {fixture}
+
+
+def read_records(
+    repo: Path, *, before: frozenset[str], branches: frozenset[str]
+) -> tuple[DecisionRecord, ...]:
+    """Every record now in ``repo`` that ``before`` did not hold, parsed, in path order."""
     return tuple(
-        _parse_record(repo, path, branch)
-        for path in sorted(_markdown_paths(repo))
+        _parse_record(repo, path, branches)
+        for path in sorted(_record_paths(repo))
         if path not in before
     )
 
 
-def _markdown_paths(repo: Path) -> list[str]:
-    found: list[str] = []
+def is_record_path(rel: str, nested_roots: frozenset[str]) -> bool:
+    """Whether the repo-relative POSIX path ``rel`` names a decision record: Markdown that lies
+    under the decision directory, or else outside every dot-directory and nested repository."""
+    path = PurePosixPath(rel)
+    if path.suffix.lower() != ".md":
+        return False
+    if path.is_relative_to(DECISIONS_DIR):
+        return True
+    in_dot_directory = any(part.startswith(".") for part in path.parent.parts)
+    in_nested_repository = any(path.is_relative_to(root) for root in nested_roots)
+    return not (in_dot_directory or in_nested_repository)
+
+
+def _record_paths(repo: Path) -> list[str]:
+    files: list[str] = []
+    nested_roots: set[str] = set()
     for directory, subdirectories, filenames in os.walk(repo):
-        relative_dir = Path(directory).relative_to(repo)
-        if relative_dir == Path("."):
-            subdirectories[:] = [d for d in subdirectories if d not in _EXCLUDED_ROOTS]
-        found += [
-            (relative_dir / name).as_posix() for name in filenames if name.lower().endswith(".md")
-        ]
-    return found
+        relative_dir = PurePosixPath(Path(directory).relative_to(repo).as_posix())
+        if relative_dir != PurePosixPath(".") and ".git" in {*subdirectories, *filenames}:
+            nested_roots.add(relative_dir.as_posix())
+        subdirectories[:] = [d for d in subdirectories if _descended(relative_dir / d)]
+        files += [(relative_dir / name).as_posix() for name in filenames]
+    return [rel for rel in files if is_record_path(rel, frozenset(nested_roots))]
 
 
-def _parse_record(repo: Path, path: str, branch: str) -> DecisionRecord:
+def _descended(directory: PurePosixPath) -> bool:
+    """Whether the walk enters ``directory``: any without a dot-named part, and the decision
+    directory with the way to it and everything below it."""
+    decisions = PurePosixPath(DECISIONS_DIR)
+    on_the_way = decisions.is_relative_to(directory) or directory.is_relative_to(decisions)
+    return on_the_way or not any(part.startswith(".") for part in directory.parts)
+
+
+def _parse_record(repo: Path, path: str, branches: frozenset[str]) -> DecisionRecord:
     text = (repo / path).read_text(encoding="utf-8", errors="replace")
     frontmatter, body = _split_frontmatter(text)
     return DecisionRecord(
         path=path,
         in_drafts=Path(path).parent.as_posix() == DRAFTS_DIR,
-        name=classify_name(Path(path).name, branch),
+        name=classify_name(Path(path).name, branches),
         id=classify_id(frontmatter.get("id")),
         category=_category(frontmatter.get("category")),
         disconfirmed=_disconfirmed(body),
@@ -327,30 +370,36 @@ def _uncut_segment(branch: str) -> str:
     return re.sub(r"[^a-z0-9-]+", "-", branch.lower()).strip("-")
 
 
-def classify_name(filename: str, branch: str) -> NameForm:
-    """Read a file name as a fragment of ``branch``, a record that numbers itself, or neither.
+def classify_name(filename: str, branches: frozenset[str]) -> NameForm:
+    """Read a file name as a fragment of one of the admissible ``branches``, a record that numbers
+    itself, or neither.
 
-    A stamp-shaped name is never numbered: with an impossible date, the wrong branch or the branch
-    uncut past the limit it is ``OtherName``, because it tried to be a fragment and failed."""
+    A stamp-shaped name is never numbered: with an impossible date, no admissible branch or the
+    branch uncut past the limit it is ``OtherName``, because it tried to be a fragment and failed."""
     stamped = _STAMP_SHAPED.fullmatch(filename)
     if stamped:
-        return _fragment(filename, stamped["stamp"], stamped["rest"], branch)
+        return _fragment(filename, stamped["stamp"], stamped["rest"], branches)
     numbered = _NUMBERED.fullmatch(filename)
     if numbered:
         return NumberedName(int(numbered["number"]), numbered["slug"])
     return OtherName(filename)
 
 
-def _fragment(filename: str, stamp_text: str, rest: str, branch: str) -> NameForm:
+def _fragment(filename: str, stamp_text: str, rest: str, branches: frozenset[str]) -> NameForm:
     try:
         stamp = datetime.strptime(stamp_text, _STAMP_FORMAT)
     except ValueError:
         return OtherName(filename)
-    uncut = _uncut_segment(branch)
-    carries_uncut = len(uncut) > BRANCH_SEGMENT_LIMIT and _between_sides(rest, uncut)
-    if carries_uncut or not _between_sides(rest, branch_segment(branch)):
+    if not any(_names_branch(rest, branch) for branch in branches):
         return OtherName(filename)
     return Fragment(stamp, rest)
+
+
+def _names_branch(rest: str, branch: str) -> bool:
+    """Whether ``rest`` carries the branch's cut segment, and not the branch uncut past the limit."""
+    uncut = _uncut_segment(branch)
+    carries_uncut = len(uncut) > BRANCH_SEGMENT_LIMIT and _between_sides(rest, uncut)
+    return not carries_uncut and _between_sides(rest, branch_segment(branch))
 
 
 def _between_sides(rest: str, segment: str) -> bool:
@@ -389,20 +438,9 @@ def _disconfirmed(body: str) -> bool:
 def _disconfirmation_spans(lines: list[str]) -> list[str]:
     """Each such section's text: its heading through the line before the next heading of the same
     or a higher level."""
-    spans: list[str] = []
-    for start, line in enumerate(lines):
-        heading = _HEADING.fullmatch(line)
-        if not heading or not holds_phrase(heading["title"], DISCONFIRMATION_HEADING):
-            continue
-        level = len(heading["hashes"])
-        end = next(
-            (i for i in range(start + 1, len(lines)) if _level(lines[i]) in range(1, level + 1)),
-            len(lines),
-        )
-        spans.append("\n".join(lines[start:end]))
-    return spans
-
-
-def _level(line: str) -> int:
-    heading = _HEADING.fullmatch(line)
-    return len(heading["hashes"]) if heading else 0
+    headings = markdown_headings(lines)
+    return [
+        section_text(lines, headings, start, heading.level)
+        for start, heading in enumerate(headings)
+        if heading and holds_phrase(heading.title, DISCONFIRMATION_HEADING)
+    ]

@@ -15,7 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -117,22 +118,67 @@ def _section_span(text: str, section: str) -> str | None:
     """The heading line of ``section`` through the line before the next heading of the same or
     a higher level (sub-headings included); None when no heading names it."""
     lines = text.splitlines()
-    heading = re.compile(rf"(#{{1,6}})\s+{re.escape(section)}\s*")
-    for start, line in enumerate(lines):
-        found = heading.fullmatch(line)
-        if found:
-            level = len(found.group(1))
-            end = next(
-                (i for i in range(start + 1, len(lines)) if 0 < _heading_level(lines[i]) <= level),
-                len(lines),
-            )
-            return "\n".join(lines[start:end])
+    headings = markdown_headings(lines)
+    for start, heading in enumerate(headings):
+        if heading and heading.title == section:
+            return section_text(lines, headings, start, heading.level)
     return None
 
 
-def _heading_level(line: str) -> int:
-    found = re.match(r"(#{1,6})\s", line)
-    return len(found.group(1)) if found else 0
+# -- Markdown headings ------------------------------------------------------------------------
+
+_HEADING = re.compile(r"(?P<hashes>#{1,6})\s+(?P<title>.*?)\s*")
+_FENCE = re.compile(r" {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)")
+
+
+@dataclass(frozen=True)
+class Heading:
+    level: int
+    title: str
+
+
+def markdown_headings(lines: Sequence[str]) -> list[Heading | None]:
+    """Each line's heading, or None for a line that is none. Fenced code holds no headings: a fence
+    opens on three or more backticks or tildes indented up to three spaces and closes on the same
+    character at least as many times with nothing after; an unclosed fence runs to the end."""
+    found: list[Heading | None] = []
+    open_run: str | None = None
+    for line in lines:
+        fence = _FENCE.fullmatch(line)
+        if open_run is None:
+            open_run = fence["run"] if fence else None
+            found.append(None if fence else _heading(line))
+        else:
+            found.append(None)
+            if fence and _closes(fence, open_run):
+                open_run = None
+    return found
+
+
+def section_text(
+    lines: Sequence[str], headings: Sequence[Heading | None], start: int, level: int
+) -> str:
+    """The section whose heading of ``level`` is line ``start``: through the line before the next
+    heading of the same or a higher level, sub-headings included."""
+    end = next(
+        (
+            i
+            for i in range(start + 1, len(lines))
+            if (heading := headings[i]) is not None and heading.level <= level
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
+def _closes(fence: re.Match[str], open_run: str) -> bool:
+    run = fence["run"]
+    return run[0] == open_run[0] and len(run) >= len(open_run) and not fence["rest"].strip()
+
+
+def _heading(line: str) -> Heading | None:
+    found = _HEADING.fullmatch(line)
+    return Heading(len(found["hashes"]), found["title"]) if found else None
 
 
 # -- The declaration ------------------------------------------------------------------------

@@ -86,7 +86,7 @@ from praxion_evals.live.materialize import (
     make_writable,
     materialize_path,
 )
-from praxion_evals.live.report import CREDENTIAL_KEYS
+from praxion_evals.live.report import require_credential
 from praxion_evals.live.session import (
     CLAUDE_BINARY,
     SandboxPaths,
@@ -255,10 +255,7 @@ def begin(
     ``planned`` is what this run launches; a ``continuation`` is a later part of a stopped run,
     which launches again only the tasks no earlier part finished and records the whole plan.
     """
-    if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
-        raise ValueError(
-            f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
-        )
+    require_credential(os.environ, config.session_oauth_token_file)
     settings = declare(config, checkout, planned)
     judge = _open_judge(config)
     version = query_claude_version()

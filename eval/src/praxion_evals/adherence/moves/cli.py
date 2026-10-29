@@ -57,7 +57,7 @@ from praxion_evals.adherence.session_loop import (
     launch_order,
     query_claude_version,
 )
-from praxion_evals.live.report import CREDENTIAL_KEYS
+from praxion_evals.live.report import require_credential
 from praxion_evals.live.spend import RUNNER_SPEND_CAP_USD
 
 PROG = "praxion-evals-adherence"
@@ -310,10 +310,7 @@ def _plan(options: MoveOptions, declared: MoveDeclaration, checkout: Path) -> ru
 
 
 def _fresh_plan(options: MoveOptions, declared: MoveDeclaration, checkout: Path) -> runner.RunPlan:
-    if not any(os.environ.get(key) for key in CREDENTIAL_KEYS):
-        raise ValueError(
-            f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
-        )
+    require_credential(os.environ, options.session_oauth_token_file)
     return runner.RunPlan(
         declaration=declared,
         kind=options.run or "floor",  # a continuation's kind is its run's, set by ``continuing``

@@ -19,6 +19,7 @@ from praxion_evals.adherence.moves.lineage import Closed, Stopped
 from praxion_evals.adherence.moves.model import MoveName
 from praxion_evals.adherence.moves.results import FloorRun, PairedRun
 from praxion_evals.adherence.moves.stop import Launched, MoveStopReason
+from praxion_evals.live.report import CREDENTIAL_KEYS
 from tests.test_moves_results import common, floor_run, moves_dir, scored, trigger
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -188,6 +189,7 @@ def test_a_move_run_takes_the_token_file_and_every_cap_option_as_a_role_run_does
     conducted, tmp_path
 ):
     token = tmp_path / TOKEN_FILE
+    token.write_text("sk-ant-oat01-example\n", encoding="utf-8")
     code, plan = conducted(
         "--run",
         "floor",
@@ -238,13 +240,45 @@ def test_a_run_carries_its_options_into_the_plan(conducted):
 
 
 def test_a_run_without_a_credential_is_refused_before_it_is_conducted(conducted, monkeypatch):
-    for key in moves_cli.CREDENTIAL_KEYS:
+    for key in CREDENTIAL_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     code, plan = conducted("--run", "floor")
 
     assert (code, plan) == (moves_cli.EXIT_USAGE, None)
     assert "no credential" in conducted.capsys.readouterr().err
+
+
+def test_a_run_whose_only_credential_is_the_token_file_is_conducted(
+    conducted, monkeypatch, tmp_path
+):
+    for key in CREDENTIAL_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    token = tmp_path / TOKEN_FILE
+    token.write_text("sk-ant-oat01-example\n", encoding="utf-8")
+
+    code, plan = conducted("--run", "floor", "--session-oauth-token-file", str(token))
+
+    assert code == 0
+    assert plan is not None
+    assert plan.session_token_file == token
+
+
+@pytest.mark.parametrize(
+    "prepare",
+    [lambda token: None, lambda token: token.write_text(" \n", encoding="utf-8")],
+    ids=["missing", "blank"],
+)
+def test_a_token_file_that_holds_no_token_is_refused_before_the_run_is_conducted(
+    conducted, tmp_path, prepare
+):
+    token = tmp_path / TOKEN_FILE
+    prepare(token)
+
+    code, plan = conducted("--run", "floor", "--session-oauth-token-file", str(token))
+
+    assert (code, plan) == (moves_cli.EXIT_USAGE, None)
+    assert "session token file" in conducted.capsys.readouterr().err
 
 
 def test_a_run_that_did_not_finish_exits_incomplete_and_says_where_its_file_is(conducted):

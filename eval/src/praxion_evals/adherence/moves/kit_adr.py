@@ -157,11 +157,34 @@ FIXTURES: tuple[AdrFixture, ...] = (
         source=(
             (
                 "runner/jobs.py",
-                "RETRIES: list = []\n\n\ndef run(job):\n    try:\n        return job()\n    except Exception:\n        RETRIES.append(job)\n        return None\n\n\ndef retry_failed():\n    pending, RETRIES[:] = list(RETRIES), []\n    return [run(job) for job in pending]\n",
+                "RETRIES: list = []\n"
+                "\n"
+                "\n"
+                "def run(job):\n"
+                "    try:\n"
+                "        return job()\n"
+                "    except Exception:\n"
+                "        RETRIES.append(job)\n"
+                "        return None\n"
+                "\n"
+                "\n"
+                "def retry_failed():\n"
+                "    pending, RETRIES[:] = list(RETRIES), []\n"
+                "    return [run(job) for job in pending]\n",
             ),
             (
                 "runner/poller.py",
-                "import time\n\nfrom runner.jobs import retry_failed, run\n\n\ndef poll(source):\n    while True:\n        for job in source():\n            run(job)\n        retry_failed()\n        time.sleep(1)\n",
+                "import time\n"
+                "\n"
+                "from runner.jobs import retry_failed, run\n"
+                "\n"
+                "\n"
+                "def poll(source):\n"
+                "    while True:\n"
+                "        for job in source():\n"
+                "            run(job)\n"
+                "        retry_failed()\n"
+                "        time.sleep(1)\n",
             ),
         ),
         history=("Added the runner.", "Added a poller.", "Moved retries out of the inline path."),
@@ -190,11 +213,33 @@ FIXTURES: tuple[AdrFixture, ...] = (
         source=(
             (
                 "search/cache.py",
-                "import time\n\nTTL_SECONDS = 600\n_entries: dict = {}\n\n\ndef put(query, hits):\n    _entries[query] = (time.monotonic(), hits)\n\n\ndef get(query):\n    stored = _entries.get(query)\n    if stored is None or time.monotonic() - stored[0] > TTL_SECONDS:\n        return None\n    return stored[1]\n",
+                "import time\n"
+                "\n"
+                "TTL_SECONDS = 600\n"
+                "_entries: dict = {}\n"
+                "\n"
+                "\n"
+                "def put(query, hits):\n"
+                "    _entries[query] = (time.monotonic(), hits)\n"
+                "\n"
+                "\n"
+                "def get(query):\n"
+                "    stored = _entries.get(query)\n"
+                "    if stored is None or time.monotonic() - stored[0] > TTL_SECONDS:\n"
+                "        return None\n"
+                "    return stored[1]\n",
             ),
             (
                 "search/query.py",
-                "from search import cache\n\n\ndef search(query, index):\n    hits = cache.get(query)\n    if hits is None:\n        hits = [doc for doc in index if query in doc]\n        cache.put(query, hits)\n    return hits\n",
+                "from search import cache\n"
+                "\n"
+                "\n"
+                "def search(query, index):\n"
+                "    hits = cache.get(query)\n"
+                "    if hits is None:\n"
+                "        hits = [doc for doc in index if query in doc]\n"
+                "        cache.put(query, hits)\n"
+                "    return hits\n",
             ),
         ),
         history=("Added the search module.", "Cached results by query.", "Expired old results."),
@@ -224,7 +269,20 @@ FIXTURES: tuple[AdrFixture, ...] = (
         source=(
             (
                 "exporter/export.py",
-                "import csv\n\nPAGE_SIZE = 500\n\n\ndef export(rows, out):\n    writer = csv.writer(out)\n    page = []\n    for row in rows:\n        page.append(row)\n        if len(page) == PAGE_SIZE:\n            writer.writerows(page)\n            page = []\n    writer.writerows(page)\n",
+                "import csv\n"
+                "\n"
+                "PAGE_SIZE = 500\n"
+                "\n"
+                "\n"
+                "def export(rows, out):\n"
+                "    writer = csv.writer(out)\n"
+                "    page = []\n"
+                "    for row in rows:\n"
+                "        page.append(row)\n"
+                "        if len(page) == PAGE_SIZE:\n"
+                "            writer.writerows(page)\n"
+                "            page = []\n"
+                "    writer.writerows(page)\n",
             ),
             (
                 "exporter/tables.py",
@@ -258,15 +316,33 @@ FIXTURES: tuple[AdrFixture, ...] = (
         source=(
             (
                 "orders/service.py",
-                "from orders.notify import notify_customer\n\n\ndef place(order):\n    order['status'] = 'placed'\n    notify_customer(order['customer'], 'Your order is placed')\n    return order\n",
+                "from orders.notify import notify_customer\n"
+                "\n"
+                "\n"
+                "def place(order):\n"
+                "    order['status'] = 'placed'\n"
+                "    notify_customer(order['customer'], 'Your order is placed')\n"
+                "    return order\n",
             ),
             (
                 "orders/notify.py",
-                "import json\nimport urllib.request\n\nNOTIFIER_URL = 'http://notifier.internal/send'\n\n\ndef notify_customer(customer, text):\n    body = json.dumps({'to': customer, 'text': text}).encode()\n    urllib.request.urlopen(urllib.request.Request(NOTIFIER_URL, body))\n",
+                "import json\n"
+                "import urllib.request\n"
+                "\n"
+                "NOTIFIER_URL = 'http://notifier.internal/send'\n"
+                "\n"
+                "\n"
+                "def notify_customer(customer, text):\n"
+                "    body = json.dumps({'to': customer, 'text': text}).encode()\n"
+                "    urllib.request.urlopen(urllib.request.Request(NOTIFIER_URL, body))\n",
             ),
             (
                 "notifier/app.py",
-                "TEMPLATES = {'placed': 'Thanks, {name}: your order is placed.'}\n\n\ndef send(to, text, channel='email'):\n    return {'channel': channel, 'to': to, 'text': text}\n",
+                "TEMPLATES = {'placed': 'Thanks, {name}: your order is placed.'}\n"
+                "\n"
+                "\n"
+                "def send(to, text, channel='email'):\n"
+                "    return {'channel': channel, 'to': to, 'text': text}\n",
             ),
         ),
         history=(
@@ -299,11 +375,29 @@ FIXTURES: tuple[AdrFixture, ...] = (
         source=(
             (
                 "worker/main.py",
-                "import time\n\nfrom worker.timers import due\n\n\ndef loop(next_task, run):\n    while True:\n        for job in due(time.time()):\n            run(job)\n        task = next_task()\n        if task is not None:\n            run(task)\n",
+                "import time\n"
+                "\n"
+                "from worker.timers import due\n"
+                "\n"
+                "\n"
+                "def loop(next_task, run):\n"
+                "    while True:\n"
+                "        for job in due(time.time()):\n"
+                "            run(job)\n"
+                "        task = next_task()\n"
+                "        if task is not None:\n"
+                "            run(task)\n",
             ),
             (
                 "worker/timers.py",
-                "SCHEDULE = {'cleanup': 3600, 'report': 86400}\n_last: dict = {}\n\n\ndef due(now):\n    jobs = [name for name, every in SCHEDULE.items() if now - _last.get(name, 0) >= every]\n    _last.update({name: now for name in jobs})\n    return jobs\n",
+                "SCHEDULE = {'cleanup': 3600, 'report': 86400}\n"
+                "_last: dict = {}\n"
+                "\n"
+                "\n"
+                "def due(now):\n"
+                "    jobs = [name for name, every in SCHEDULE.items() if now - _last.get(name, 0) >= every]\n"
+                "    _last.update({name: now for name in jobs})\n"
+                "    return jobs\n",
             ),
         ),
         history=(

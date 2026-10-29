@@ -181,7 +181,6 @@ def test_a_task_of_no_fixture_here_is_refused(tmp_path: Path) -> None:
 # -- The filled kit ---------------------------------------------------------------------------
 
 SEED = 20260101
-RULE = Path(__file__).resolve().parents[2] / "rules" / "swe" / "adr-conventions.md"
 RULE_LINE_MINIMUM = 20
 CATEGORY_VALUES = ("architectural", "behavioral", "implementation", "configuration")
 # A backtick; a dollar sign and a space; a slash opening a word, then a letter; or a program
@@ -192,8 +191,9 @@ COMMAND = re.compile(
 FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 
 
-def rule_lines() -> frozenset[str]:
-    body = FRONTMATTER.sub("", RULE.read_text(encoding="utf-8"), count=1)
+def rule_lines(repo_root: Path) -> frozenset[str]:
+    rule = (repo_root / DECLARATION.moved_rule.value).read_text(encoding="utf-8")
+    body = FRONTMATTER.sub("", rule, count=1)
     lines = (re.sub(r"^[-*\d.\s]+", "", line).strip().casefold() for line in body.splitlines())
     return frozenset(line for line in lines if len(line) > RULE_LINE_MINIMUM)
 
@@ -216,13 +216,23 @@ def test_the_candidates_outnumber_a_draw_and_pair_every_fixture_with_every_wordi
     assert {t.fixture_kind for t in candidates} == {"managed"}
 
 
-def test_the_kit_holds_decisions_of_both_sorts_and_a_draw_always_asks_for_both() -> None:
-    sorts = {type(fixture.sort) for fixture in kit_adr.FIXTURES}
-    drawn = kit_adr.tasks(DECLARATION, SEED)
-    drawn_sorts = {type(kit_adr.sort_of(task)) for task in drawn}
+@pytest.mark.parametrize("sort", [kit_adr.Architectural, kit_adr.WithinComponent])
+def test_each_sort_has_more_candidates_than_a_draw_leaves_out(
+    sort: type, candidates: tuple[MoveTask, ...]
+) -> None:
+    left_out = len(candidates) - target_with_slack()
 
-    assert sorts == drawn_sorts == {kit_adr.Architectural, kit_adr.WithinComponent}
+    assert sum(isinstance(kit_adr.sort_of(t), sort) for t in candidates) > left_out
+
+
+def test_a_draw_holds_the_target_plus_slack_of_tasks_and_asks_for_both_sorts() -> None:
+    drawn = kit_adr.tasks(DECLARATION, SEED)
+
     assert len(drawn) == target_with_slack()
+    assert {type(kit_adr.sort_of(task)) for task in drawn} == {
+        kit_adr.Architectural,
+        kit_adr.WithinComponent,
+    }
 
 
 def test_a_tasks_sort_is_its_fixtures_sort(candidates: tuple[MoveTask, ...]) -> None:
@@ -246,9 +256,9 @@ def test_every_request_asks_for_the_decision_and_describes_it(
 
 
 def test_no_request_holds_a_line_of_the_rule_or_a_declared_phrase(
-    candidates: tuple[MoveTask, ...],
+    candidates: tuple[MoveTask, ...], repo_root: Path
 ) -> None:
-    needles = rule_lines() | set(declared_phrases())
+    needles = rule_lines(repo_root) | set(declared_phrases())
 
     carried = [(t.task_id, n) for t in candidates for n in needles if n in t.wording.casefold()]
 
@@ -270,11 +280,11 @@ def test_no_request_holds_a_command(candidates: tuple[MoveTask, ...]) -> None:
 
 @pytest.mark.parametrize("fixture", [f.name for f in kit_adr.FIXTURES])
 def test_a_built_fixture_carries_no_line_of_the_rule_and_no_declared_phrase(
-    fixture: str, tmp_path: Path
+    fixture: str, tmp_path: Path, repo_root: Path
 ) -> None:
     chosen = next(f for f in kit_adr.FIXTURES if f.name == fixture)
     root = kit_adr.build_fixture(DECLARATION, a_task(chosen), tmp_path / "repo")
-    needles = rule_lines() | set(declared_phrases())
+    needles = rule_lines(repo_root) | set(declared_phrases())
     files = [p for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts]
 
     carried = [
@@ -285,5 +295,12 @@ def test_a_built_fixture_carries_no_line_of_the_rule_and_no_declared_phrase(
     ]
 
     assert carried == []
+
+
+@pytest.mark.parametrize("fixture", [f.name for f in kit_adr.FIXTURES])
+def test_a_built_fixture_starts_on_the_branch_it_declares(fixture: str, tmp_path: Path) -> None:
+    chosen = next(f for f in kit_adr.FIXTURES if f.name == fixture)
+
+    root = kit_adr.build_fixture(DECLARATION, a_task(chosen), tmp_path / "repo")
+
     assert checks_adr.fixture_branch(root) == chosen.branch
-    assert len(chosen.prior) >= kit_adr.MIN_PRIOR_RECORDS

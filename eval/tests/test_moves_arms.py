@@ -489,9 +489,16 @@ def test_the_floor_arm_has_no_line_of_the_rule_resident(first_move):
 
 def test_a_lean_arm_delivering_only_the_kernel_is_refused_naming_a_line_it_cuts(checkout, tmp_path):
     declared = declaration.kit(ADR_MOVE)
-    kernel_only = tuple(d for d in declared.deliveries if isinstance(d, SessionStart))
+    removed_row = _lean_with(
+        declared,
+        *(
+            ManifestRowRemoved(c.path) if isinstance(c, ManifestRowScoped) else c
+            for c in declared.arms.lean
+        ),
+    )
+    kernel_only = tuple(d for d in removed_row.deliveries if isinstance(d, SessionStart))
 
-    reason = _refusal(replace(declared, deliveries=kernel_only), checkout, tmp_path)
+    reason = _refusal(replace(removed_row, deliveries=kernel_only), checkout, tmp_path)
 
     assert "neither resident nor delivered" in reason
     assert ADR_RULE in reason
@@ -502,7 +509,7 @@ def test_a_declared_resident_kernel_that_is_not_resident_is_refused_naming_its_l
 ):
     declared = declaration.kit(ADR_MOVE)
 
-    reason = _refusal(_lean_without(declared, ManifestRowRemoved), checkout, tmp_path)
+    reason = _refusal(_lean_without(declared, ManifestRowScoped), checkout, tmp_path)
 
     assert "declared resident" in reason
     assert "Architecture Decision Records live in" in reason

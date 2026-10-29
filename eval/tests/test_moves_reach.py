@@ -6,6 +6,7 @@ file both hosts carry is refused naming the section, the line or the host."""
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 
 

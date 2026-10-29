@@ -33,6 +33,8 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,7 +60,9 @@ from praxion_evals.adherence.moves.model import (
     SessionStart,
     Write,
 )
+from praxion_evals.live.materialize import copy_listed
 
+ORIGINAL_DIRNAME = "original"  # beside the arm copies; never an arm's name
 HOOK_SCRIPT = re.compile(r"hooks/[^/]+\.py")
 HOOK_TIMEOUT_SECONDS = 5
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -114,23 +118,34 @@ def build(
     model: str = pinning.DEFAULT_MODEL,
     effort: str = pinning.DEFAULT_EFFORT,
 ) -> ArmSet | ArmRefusal:
-    """Copy ``checkout`` once per arm under ``workspace`` and apply that arm's declared changes.
+    """Copy ``checkout``'s tracked and unignored files once under ``workspace``, then copy that
+    once per arm and apply the arm's declared changes.
 
-    The lean copy must still reach every hook-less host as the checkout does, and the arms must
-    run under equal competing settings (``model`` and ``effort`` are the run's own).
+    The ignored trees of a working checkout (linked worktrees, virtual environments, caches) never
+    reach an arm, as they never reach a role's copy. The lean copy must still reach every hook-less
+    host as the checkout does, and the arms must run under equal competing settings (``model`` and
+    ``effort`` are the run's own).
     """
-    made: list[Path] = []
+    original = workspace / ORIGINAL_DIRNAME
+    made: list[Path] = [original]
     try:
-        check_sections(declaration, checkout)
-        plans = {arm: plan(declaration, arm, checkout) for arm in MOVE_ARMS}
+        copy_listed(checkout, original)
+        check_sections(declaration, original)
+        plans = {arm: plan(declaration, arm, original) for arm in MOVE_ARMS}
         built: dict[MoveArm, BuiltArm] = {}
         for arm in MOVE_ARMS:
             made.append(workspace / arm)
-            built[arm] = _build_arm(declaration, arm, plans[arm], checkout, workspace / arm)
+            built[arm] = _build_arm(declaration, arm, plans[arm], original, workspace / arm)
         pinned = pinning.pin(
             declaration, {arm: built[arm].copy for arm in MOVE_ARMS}, model=model, effort=effort
         )
-    except (DeclarationError, ArmError, reach.ReachError, pinning.PinningError) as error:
+    except (
+        DeclarationError,
+        ArmError,
+        reach.ReachError,
+        pinning.PinningError,
+        subprocess.CalledProcessError,
+    ) as error:
         for copy in made:
             shutil.rmtree(copy, ignore_errors=True)
         return ArmRefusal(str(error))
@@ -140,11 +155,17 @@ def build(
 def check_copy(
     declaration: MoveDeclaration, arm: MoveArm, copy: Path, checkout: Path
 ) -> str | None:
-    """The refusal the runner gives ``copy`` as ``arm``'s copy (None: it is exactly the declaration)."""
-    try:
-        _verify_copy(checkout, copy, plan(declaration, arm, checkout))
-    except ArmError as error:
-        return str(error)
+    """The refusal the runner gives ``copy`` as ``arm``'s copy (None: it is exactly the declaration).
+
+    Judged, as ``build`` judges it, against the checkout's tracked and unignored files.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        original = Path(scratch) / ORIGINAL_DIRNAME
+        copy_listed(checkout, original)
+        try:
+            _verify_copy(original, copy, plan(declaration, arm, original))
+        except ArmError as error:
+            return str(error)
     return None
 
 

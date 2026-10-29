@@ -145,16 +145,25 @@ def materialize_ref(
 
 def materialize_path(source: Path, dest: Path, variant: Variant = "head") -> Materialization:
     """Copy a working tree's tracked and unignored files into ``dest``."""
-    listing = _git(source, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-    dest.mkdir(parents=True)
-    for relpath in sorted(set(filter(None, listing.split("\0")))):
-        _copy_entry(source / relpath, dest / relpath)
+    copy_listed(source, dest)
     target = PathTarget(
         path=str(source.resolve()),
         head_sha=_git(source, "rev-parse", "HEAD").strip(),
         dirty=bool(_git(source, "status", "--porcelain").strip()),
     )
     return _finish(dest, variant, target)
+
+
+def copy_listed(source: Path, dest: Path) -> None:
+    """Copy ``source``'s tracked and unignored files into a new, writable ``dest``.
+
+    Never its ignored trees: in a working checkout those hold the linked worktrees, virtual
+    environments and caches, many times the size of the repository itself.
+    """
+    listing = _git(source, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    dest.mkdir(parents=True)
+    for relpath in sorted(set(filter(None, listing.split("\0")))):
+        _copy_entry(source / relpath, dest / relpath)
 
 
 def _finish(dest: Path, variant: Variant, target: TargetIdentity) -> Materialization:

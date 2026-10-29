@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import pytest
 from praxion_evals.adherence.moves import arms, declaration, observe
 from praxion_evals.adherence.moves.arms import ArmRefusal, ArmSet
 from praxion_evals.adherence.moves.model import (
+    MOVE_ARMS,
     ArmChange,
     ArmChanges,
     KernelDerive,
@@ -63,6 +65,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 
 
@@ -122,6 +125,22 @@ def test_building_the_arms_leaves_the_checkout_byte_identical(checkout, tmp_path
     _built(declaration.kit(GIT_MOVE), checkout, tmp_path)
 
     assert tree_digest(checkout) == before
+
+
+def test_an_arm_copy_holds_what_git_lists_and_none_of_the_ignored_trees(checkout, tmp_path):
+    working = tmp_path / "working"
+    shutil.copytree(checkout, working, symlinks=True)
+    (working / ".gitignore").write_text("linked-worktrees/\n", encoding="utf-8")
+    ignored = working / "linked-worktrees" / "another-checkout" / "rules" / "big.md"
+    ignored.parent.mkdir(parents=True)
+    ignored.write_text("a linked worktree's copy of the rules\n", encoding="utf-8")
+    (working / "notes.md").write_text("untracked and not ignored\n", encoding="utf-8")
+
+    built = _built(declaration.kit(GIT_MOVE), working, tmp_path / "arms")
+
+    copies = {arm: built.arms[arm].copy for arm in MOVE_ARMS}
+    assert {arm for arm, copy in copies.items() if (copy / "linked-worktrees").exists()} == set()
+    assert {arm for arm, copy in copies.items() if (copy / "notes.md").is_file()} == set(MOVE_ARMS)
 
 
 def test_each_change_is_recorded_with_the_digest_of_the_content_it_wrote(first_move):

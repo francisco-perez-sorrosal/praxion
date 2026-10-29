@@ -71,6 +71,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 
 

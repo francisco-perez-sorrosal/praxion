@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import posixpath
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from pathlib import Path
 from types import MappingProxyType
@@ -349,6 +349,28 @@ class NothingToGrade:
 
     def __post_init__(self) -> None:
         _non_empty(self.reason, "why nothing was left to grade")
+
+
+Outcome = Literal["passed", "failed"]
+
+
+@dataclass(frozen=True)
+class Grade:
+    """A governed check's grade of an end state: it fails exactly when it names a failed part."""
+
+    outcome: Outcome
+    failed_parts: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require(
+            (self.outcome == "failed") == bool(self.failed_parts),
+            "a grade fails exactly when it names a failed part",
+        )
+
+    @classmethod
+    def of(cls, failed_parts: Sequence[str]) -> Grade:
+        parts = tuple(dict.fromkeys(failed_parts))
+        return cls("failed" if parts else "passed", parts)
 
 
 FinalState = Passed | Failed | NothingToGrade

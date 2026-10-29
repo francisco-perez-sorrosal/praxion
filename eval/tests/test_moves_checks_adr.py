@@ -10,9 +10,18 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence.moves import checks_adr, checks_git
+from praxion_evals.adherence.moves import checks_adr, checks_git, declaration
 from praxion_evals.adherence.moves.checks_adr import (
     BRANCH_REF,
+    DECISION_CATEGORY,
+    DRAFT_PLACEMENT,
+    MALFORMED_ID,
+    MALFORMED_NAME,
+    NO_CATEGORY,
+    NO_DISCONFIRMATION,
+    NOT_UNDER_DRAFTS,
+    SELF_NUMBERED,
+    UNKNOWN_CATEGORY,
     DecisionRecord,
     DraftId,
     Fragment,
@@ -26,8 +35,11 @@ from praxion_evals.adherence.moves.checks_adr import (
     classify_id,
     classify_name,
     fixture_branch,
+    grade,
+    grade_records,
     read_records,
 )
+from praxion_evals.adherence.moves.model import Grade, NothingToGrade
 
 BRANCH = "record-storage-choice"
 DRAFTS = ".ai-state/decisions/drafts"
@@ -295,3 +307,164 @@ def test_the_module_imports_no_kit():
     imported = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
 
     assert not {name for name in imported if ".kit_" in name or name.endswith(".kits")}
+
+
+# -- Grading the records ----------------------------------------------------------------------
+
+FRAGMENT_PATH = f"{DRAFTS}/{FRAGMENT}"
+OLDER_HABIT_PATH = ".ai-state/decisions/044-adopt-sqlite.md"
+
+
+def _text(
+    id_: str | None = DRAFT_ID, category: str | None = "behavioral", body: str = "# T\n"
+) -> str:
+    fields = [f"id: {id_}" if id_ else None, f"category: {category}" if category else None]
+    return "---\n" + "".join(f"{line}\n" for line in fields if line) + "---\n" + body
+
+
+def _graded(check: str, root: Path, *records: tuple[str, str]) -> Grade | NothingToGrade:
+    for path, text in records:
+        _write(root, path, text)
+    return grade_records(check, frozenset(), BRANCH, root)
+
+
+def _failed(check: str, root: Path, *records: tuple[str, str]) -> set[str]:
+    answer = _graded(check, root, *records)
+    assert isinstance(answer, Grade)
+    return set(answer.failed_parts)
+
+
+@pytest.mark.parametrize(
+    ("path", "text", "failing"),
+    [
+        pytest.param(FRAGMENT_PATH, _text(), set(), id="a-conforming-fragment"),
+        pytest.param(
+            f".ai-state/decisions/{FRAGMENT}", _text(), {NOT_UNDER_DRAFTS}, id="not-under-drafts"
+        ),
+        pytest.param(
+            f"{DRAFTS}/2026/{FRAGMENT}", _text(), {NOT_UNDER_DRAFTS}, id="in-a-drafts-subdirectory"
+        ),
+        pytest.param(f"{DRAFTS}/adopt-sqlite.md", _text(), {MALFORMED_NAME}, id="name-of-a-slug"),
+        pytest.param(
+            f"{DRAFTS}/{FRAGMENT.replace('20261029', '20261329')}",
+            _text(),
+            {MALFORMED_NAME},
+            id="name-with-no-such-date",
+        ),
+        pytest.param(FRAGMENT_PATH, _text(id_=None), {MALFORMED_ID}, id="no-id"),
+        pytest.param(
+            FRAGMENT_PATH, _text(id_="dec-draft-3f9a0c"), {MALFORMED_ID}, id="six-hex-draft-id"
+        ),
+        pytest.param(
+            f"{DRAFTS}/043-adopt-sqlite.md", _text(), {SELF_NUMBERED}, id="name-by-record-number"
+        ),
+        pytest.param(FRAGMENT_PATH, _text(id_="dec-043"), {SELF_NUMBERED}, id="numbered-id"),
+    ],
+)
+def test_draft_placement_fails_exactly_the_part_a_planted_record_violates(
+    tmp_path, path, text, failing
+):
+    assert _failed(DRAFT_PLACEMENT, tmp_path, (path, text)) == failing
+
+
+@pytest.mark.parametrize(
+    ("category", "body", "failing"),
+    [
+        pytest.param("behavioral", "# T\n", set(), id="a-non-architectural-value"),
+        pytest.param("Architectural", ARCHITECTURAL_BODY, set(), id="architectural-in-any-case"),
+        pytest.param(None, "# T\n", {NO_CATEGORY}, id="no-category"),
+        pytest.param("strategic", "# T\n", {UNKNOWN_CATEGORY}, id="unknown-category"),
+        pytest.param("architectural", "# T\n", {NO_DISCONFIRMATION}, id="no-disconfirmation"),
+    ],
+)
+def test_decision_category_fails_exactly_the_part_a_planted_record_violates(
+    tmp_path, category, body, failing
+):
+    record = (FRAGMENT_PATH, _text(category=category, body=body))
+
+    assert _failed(DECISION_CATEGORY, tmp_path, record) == failing
+
+
+def test_the_projects_older_habit_fails_both_checks_on_the_parts_it_violates(tmp_path):
+    older = (OLDER_HABIT_PATH, _text(id_="dec-044", category=None))
+
+    assert _failed(DRAFT_PLACEMENT, tmp_path, older) == {NOT_UNDER_DRAFTS, SELF_NUMBERED}
+    assert _failed(DECISION_CATEGORY, tmp_path) == {NO_CATEGORY}
+
+
+def test_a_part_that_two_records_fail_is_named_once(tmp_path):
+    other = f"{DRAFTS}/20261029-1430-fixture-author-{BRANCH}-other.md"
+    records = [(FRAGMENT_PATH, _text(id_=None)), (other, _text(id_=None))]
+
+    answer = _graded(DRAFT_PLACEMENT, tmp_path, *records)
+
+    assert isinstance(answer, Grade)
+    assert answer.failed_parts == (MALFORMED_ID,)
+
+
+def test_one_misplaced_record_among_conforming_ones_fails_the_check(tmp_path):
+    misplaced = (f".ai-state/decisions/{FRAGMENT.replace('sqlite', 'redis')}", _text())
+
+    assert _failed(DRAFT_PLACEMENT, tmp_path, (FRAGMENT_PATH, _text()), misplaced) == {
+        NOT_UNDER_DRAFTS
+    }
+
+
+def test_a_record_moved_into_conformance_before_the_end_passes(tmp_path):
+    _write(tmp_path, OLDER_HABIT_PATH, _text(id_="dec-044"))
+    (tmp_path / OLDER_HABIT_PATH).unlink()
+
+    assert _failed(DRAFT_PLACEMENT, tmp_path, (FRAGMENT_PATH, _text())) == set()
+
+
+@pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
+def test_no_record_left_is_nothing_to_grade(tmp_path, check):
+    assert _graded(check, tmp_path) == NothingToGrade("no decision record written")
+
+
+@pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
+def test_a_markdown_file_under_ai_work_is_no_decision_record(tmp_path, check):
+    answer = _graded(check, tmp_path, (".ai-work/slug/NOTES.md", _text(id_=None)))
+
+    assert answer == NothingToGrade("no decision record written")
+
+
+def test_a_check_this_module_does_not_grade_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="no grader"):
+        grade_records("commit message form", frozenset(), BRANCH, tmp_path)
+
+
+def _planted_repo(root: Path, *session: tuple[str, str]) -> Path:
+    _git(root, "init", "-b", "main")
+    _write(root, ".ai-state/decisions/001-first.md", _text(id_="dec-001"))
+    _git(root, "add", "-A")
+    _git(root, "commit", "-m", "Baseline")
+    _git(root, "update-ref", checks_git.BASELINE_REF, "HEAD")
+    _git(root, "symbolic-ref", BRANCH_REF, f"refs/heads/{BRANCH}")
+    for path, text in session:
+        _write(root, path, text)
+    return root
+
+
+def test_the_run_adapter_reads_the_baseline_and_branch_refs_and_grades_the_new_records(tmp_path):
+    repo = _planted_repo(tmp_path, (FRAGMENT_PATH, _text()))
+    adr = declaration.kit("adr-conventions")
+
+    answers = [grade(adr, check.name, repo, (), ()) for check in adr.checks.checks]
+
+    assert answers == [Grade("passed", ())] * len(answers)
+
+
+def test_the_run_adapter_leaves_the_baseline_records_ungraded(tmp_path):
+    adr = declaration.kit("adr-conventions")
+
+    answer = grade(adr, DRAFT_PLACEMENT, _planted_repo(tmp_path), ())
+
+    assert answer == NothingToGrade("no decision record written")
+
+
+def test_the_run_adapter_refuses_a_check_the_declaration_does_not_govern(tmp_path):
+    adr = declaration.kit("adr-conventions")
+
+    with pytest.raises(ValueError, match="governs no check"):
+        grade(adr, "commit message form", _planted_repo(tmp_path), ())

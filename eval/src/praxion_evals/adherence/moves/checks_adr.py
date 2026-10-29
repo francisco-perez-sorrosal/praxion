@@ -11,12 +11,24 @@ record a session wrote under an ignored path is still a record.
 
 The fixture's branch is fixed by the fixture, so the fragment schema's branch segment is judged
 against it: a stamp-shaped name carrying another branch is ``OtherName``, never numbered.
+
+The two governed checks then grade the records, each part of the rule on its own:
+
+- ``decision draft placement``: every record lies directly under the draft directory, is named by
+  the fragment schema and carries a draft id; a record that numbers itself fails its own part.
+- ``decision category``: every record carries one of the four category values, and every
+  architectural one a Disconfirmation section naming its three items. Whether the value is the one
+  the rule's test gives is never graded: structure, not prose.
+
+Only the end state is read, so a record moved or renamed into conformance passes. A session that
+left no record leaves nothing to grade (``NothingToGrade``).
 """
 
 from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +37,7 @@ import yaml
 
 from praxion_evals.adherence.moves.checks_git import BASELINE_REF
 from praxion_evals.adherence.moves.fixture_project import git
-from praxion_evals.adherence.moves.model import holds_phrase
+from praxion_evals.adherence.moves.model import Grade, MoveDeclaration, NothingToGrade, holds_phrase
 
 BRANCH_REF = (
     "refs/fixture/branch"  # a symbolic ref to the branch heads/<name> the session starts on
@@ -43,6 +55,21 @@ _DRAFT_ID = re.compile(r"dec-draft-(?P<hex8>[0-9a-f]{8})")
 _NUMBERED_ID = re.compile(r"dec-(?P<number>\d+)")
 _HEADING = re.compile(r"(?P<hashes>#{1,6})\s+(?P<title>.*?)\s*")
 _FRONTMATTER_FENCE = "---"
+
+DRAFT_PLACEMENT = "decision draft placement"
+DECISION_CATEGORY = "decision category"
+
+NO_RECORD = "no decision record written"
+NOT_UNDER_DRAFTS = "a record not directly under the draft directory"
+MALFORMED_NAME = "a malformed fragment name"
+MALFORMED_ID = "a malformed draft id"
+SELF_NUMBERED = "a record that numbers itself"
+NO_CATEGORY = "no category"
+UNKNOWN_CATEGORY = "an unknown category"
+NO_DISCONFIRMATION = "an architectural record with no disconfirmation"
+
+ARCHITECTURAL = "architectural"
+CATEGORY_VALUES = frozenset({ARCHITECTURAL, "behavioral", "implementation", "configuration"})
 
 DISCONFIRMATION_HEADING = "disconfirmation"
 DISCONFIRMATION_ITEMS = ("falsifier", "steelmanned runner-up", "reversal trigger")
@@ -101,6 +128,111 @@ class DecisionRecord:
     id: IdForm
     category: str | None  # as written; its comparison is the grader's
     disconfirmed: bool  # a Disconfirmation section naming a falsifier, runner-up and trigger
+
+
+# -- Grading ----------------------------------------------------------------------------------
+
+Part = tuple[str, Callable[[DecisionRecord], bool]]  # a failing part's words, and when it fails
+
+
+def grade(
+    declaration: MoveDeclaration,
+    check: str,
+    repo: Path,
+    named_files: Sequence[str] = (),
+    commands: Sequence[str] = (),
+) -> Grade | NothingToGrade:
+    """The named governed check's grade of the end state in ``repo``: the call shape of every kit's
+    grader, though the records alone are read, never the files the request names or the commands.
+
+    Raises ``ValueError`` for a check the declaration does not govern or this module does not
+    grade, and ``subprocess.CalledProcessError`` for a repository git cannot read."""
+    if check not in {governed.name for governed in declaration.checks.checks}:
+        raise ValueError(f"{declaration.move.value} governs no check named {check!r}")
+    return grade_records(check, baseline_paths(repo), fixture_branch(repo), repo)
+
+
+def grade_records(
+    check: str, before: frozenset[str], branch: str, repo: Path
+) -> Grade | NothingToGrade:
+    """``check`` over the records ``repo`` holds beyond ``before``, judged against ``branch``."""
+    if check not in _GRADERS:
+        raise ValueError(f"no grader for the check {check!r}; it grades {sorted(_GRADERS)}")
+    records = read_records(repo, before=before, branch=branch)
+    if not records:
+        return NothingToGrade(NO_RECORD)
+    return _GRADERS[check](records)
+
+
+def _grade_placement(records: Sequence[DecisionRecord]) -> Grade:
+    return _grade_parts(records, _PLACEMENT_PARTS)
+
+
+def _grade_category(records: Sequence[DecisionRecord]) -> Grade:
+    return _grade_parts(records, _CATEGORY_PARTS)
+
+
+def _grade_parts(records: Sequence[DecisionRecord], parts: tuple[Part, ...]) -> Grade:
+    """Each part that any record fails, named once."""
+    return Grade.of([part for part, fails in parts if any(map(fails, records))])
+
+
+def _outside_drafts(record: DecisionRecord) -> bool:
+    return not record.in_drafts
+
+
+def _malformed_name(record: DecisionRecord) -> bool:
+    match record.name:
+        case OtherName():
+            return True
+        case Fragment() | NumberedName():
+            return False
+
+
+def _malformed_id(record: DecisionRecord) -> bool:
+    match record.id:
+        case OtherId() | NoId():
+            return True
+        case DraftId() | NumberedId():
+            return False
+
+
+def _self_numbered(record: DecisionRecord) -> bool:
+    return isinstance(record.name, NumberedName) or isinstance(record.id, NumberedId)
+
+
+def _value(record: DecisionRecord) -> str:
+    """The category as compared: without outer space, ignoring case; empty when none is written."""
+    return (record.category or "").strip().casefold()
+
+
+def _no_category(record: DecisionRecord) -> bool:
+    return not _value(record)
+
+
+def _unknown_category(record: DecisionRecord) -> bool:
+    return bool(_value(record)) and _value(record) not in CATEGORY_VALUES
+
+
+def _undisconfirmed(record: DecisionRecord) -> bool:
+    return _value(record) == ARCHITECTURAL and not record.disconfirmed
+
+
+_PLACEMENT_PARTS: tuple[Part, ...] = (
+    (NOT_UNDER_DRAFTS, _outside_drafts),
+    (MALFORMED_NAME, _malformed_name),
+    (MALFORMED_ID, _malformed_id),
+    (SELF_NUMBERED, _self_numbered),
+)
+_CATEGORY_PARTS: tuple[Part, ...] = (
+    (NO_CATEGORY, _no_category),
+    (UNKNOWN_CATEGORY, _unknown_category),
+    (NO_DISCONFIRMATION, _undisconfirmed),
+)
+_GRADERS: dict[str, Callable[[Sequence[DecisionRecord]], Grade]] = {
+    DRAFT_PLACEMENT: _grade_placement,
+    DECISION_CATEGORY: _grade_category,
+}
 
 
 # -- Reading the end state --------------------------------------------------------------------

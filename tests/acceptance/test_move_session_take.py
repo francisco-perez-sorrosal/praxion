@@ -23,7 +23,13 @@ from pathlib import Path
 
 import pytest
 
-from tests.acceptance.drivers.move_eval import FIRST_MOVE, SECOND_MOVE, Declared, declare
+from tests.acceptance.drivers.move_eval import (
+    FIRST_MOVE,
+    SECOND_MOVE,
+    Declared,
+    UnboundDriverError,
+    declare,
+)
 from tests.acceptance.drivers.move_scoring import (
     PlantedSession,
     UnreadableShape,
@@ -137,6 +143,15 @@ def test_a_rule_delivered_at_session_start_reads_as_arrived_before_composition(f
     assert any(t.arrivals.get("session start") == "before composition" for t in triggers), triggers
 
 
+@pytest.mark.xfail(
+    raises=UnboundDriverError,
+    strict=True,
+    reason=(
+        "no real record of a path-matched load can be frozen yet: the lean arm leaves the "
+        "path-scoped rule unlinked in a real session, and the declared check phrase is not in "
+        "the rule; remove this mark when td-518 lands and a record is frozen"
+    ),
+)
 def test_a_path_matched_load_on_a_creating_write_reads_as_arrived_after_execution(second_move):
     triggers = trigger_records(second_move, probe_record("a path-matched load on a creating write"))
 

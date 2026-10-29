@@ -282,7 +282,9 @@ def test_a_reopening_that_records_an_earlier_start_never_gets_held_spawns_report
     reopened = reopened_verifier(runs, kernel_adoption.start_before_the_reopening(start, hold))
     kernel_adoption.rewrite(sandbox.root, reopened)
     verdict = kernel_sandbox.commit_gate(sandbox.root)
-    kernel_adoption.commit_records(sandbox.root, reopened)
+    # The spawn was made while held: the re-opening must not share its whole second.
+    reopening = kernel_adoption.next_whole_second(datetime.now(UTC))
+    kernel_adoption.commit_records(sandbox.root, reopened, at=reopening)
 
     findings = kernel_spawn.kernel_liveness_findings(project, sandbox.root)
 

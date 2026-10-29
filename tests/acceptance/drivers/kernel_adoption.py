@@ -75,6 +75,15 @@ def ledger_instant(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def next_whole_second(moment: datetime) -> datetime:
+    """The first whole second after `moment`.
+
+    Commit times have whole-second resolution, so a commit dated here sorts after every event
+    recorded inside `moment`'s own second; one dated now may share that second.
+    """
+    return moment.replace(microsecond=0) + timedelta(seconds=1)
+
+
 def commit_hold(root: Path, record: AdoptionRecord, held_for: timedelta = HELD_FOR) -> datetime:
     """Commit `record`, a held one, as a hold made `held_for` ago; return the hold's moment."""
     hold = datetime.now(UTC) - held_for
@@ -98,7 +107,7 @@ def reopened_after(moment: datetime) -> str:
     Whatever happened by `moment` (a spawn made while the role was held) then comes
     before the start, at any resolution a reader compares instants at.
     """
-    return ledger_instant(moment.replace(microsecond=0) + timedelta(seconds=1))
+    return ledger_instant(next_whole_second(moment))
 
 
 def start_before_the_reopening(kind: str, hold: datetime) -> str:
@@ -253,10 +262,13 @@ def record(root: Path, *records: AdoptionRecord) -> None:
     _write(root, records)
 
 
-def commit_records(root: Path, *records: AdoptionRecord) -> None:
-    """Write `records` and commit the ledger without the gate: the parent of the move under test."""
+def commit_records(root: Path, *records: AdoptionRecord, at: datetime | None = None) -> None:
+    """Write `records` and commit the ledger without the gate: the parent of the move under test.
+
+    `at` dates the commit instead of now.
+    """
     _write(root, records)
-    commit_paths(root, "ledger: the records before the move", ADOPTION_LEDGER)
+    commit_paths(root, "ledger: the records before the move", ADOPTION_LEDGER, at=at)
 
 
 def rewrite(root: Path, *records: AdoptionRecord) -> None:

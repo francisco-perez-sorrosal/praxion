@@ -7,8 +7,9 @@ the rule numbers its record, leaves it outside the draft directory and names no 
 governed checks grade those records (``checks_adr``), never the session's words.
 
 The fixture's branch is fixed by the fixture and named by ``checks_adr.BRANCH_REF``, so the
-fragment schema's branch segment can be judged against it. The history ends at
-``checks_git.BASELINE_REF``, so the records a session leaves are those the baseline tree lacks.
+fragment schema's branch segment can be judged against it. The default branch holds the project's
+history; the fixture's branch adds commits of its own, and ``checks_git.BASELINE_REF`` marks the
+branch tip, so the records a session leaves are those the baseline tree lacks.
 """
 
 from __future__ import annotations
@@ -100,6 +101,8 @@ class AdrFixture:
     prior: tuple[PriorRecord, ...]  # the project's own records, numbered 1..n
     source: Files  # the code the decision concerns
     history: tuple[str, ...]  # the project's commit subjects, oldest first
+    branch_work: Files  # what the branch adds to the project, the work the decision came from
+    branch_subjects: tuple[str, ...]  # the branch's commit subjects, oldest first
 
     def __post_init__(self) -> None:
         if not _BRANCH_FORM.fullmatch(self.branch) or self.branch in _RESERVED_BRANCHES:
@@ -112,6 +115,8 @@ class AdrFixture:
             raise ValueError(f"{self.name}: the prior records have distinct slugs")
         if not self.history:
             raise ValueError(f"{self.name}: a fixture commits a history of its own")
+        if not self.branch_work or not self.branch_subjects:
+            raise ValueError(f"{self.name}: a fixture commits work on its branch")
 
     def committed(self) -> Files:
         """The tracked files the history leaves: the source, the records and their index."""
@@ -187,7 +192,20 @@ FIXTURES: tuple[AdrFixture, ...] = (
                 "        time.sleep(1)\n",
             ),
         ),
-        history=("Added the runner.", "Added a poller.", "Moved retries out of the inline path."),
+        history=("Added the runner.", "Added a poller."),
+        branch_work=(
+            (
+                "tests/test_jobs.py",
+                "from runner.jobs import RETRIES, retry_failed, run\n"
+                "\n"
+                "\n"
+                "def test_a_failed_job_is_retried_later():\n"
+                "    run(lambda: 1 / 0)\n"
+                "    assert len(RETRIES) == 1\n"
+                "    retry_failed()\n",
+            ),
+        ),
+        branch_subjects=("Moved retries out of the inline path.",),
     ),
     AdrFixture(
         name="search-index",
@@ -242,7 +260,19 @@ FIXTURES: tuple[AdrFixture, ...] = (
                 "    return hits\n",
             ),
         ),
-        history=("Added the search module.", "Cached results by query.", "Expired old results."),
+        history=("Added the search module.", "Cached results by query."),
+        branch_work=(
+            (
+                "tests/test_cache.py",
+                "from search import cache\n"
+                "\n"
+                "\n"
+                "def test_a_stored_result_is_served_while_fresh():\n"
+                "    cache.put('shoes', ['a'])\n"
+                "    assert cache.get('shoes') == ['a']\n",
+            ),
+        ),
+        branch_subjects=("Expired old results.",),
     ),
     AdrFixture(
         name="table-export",
@@ -286,10 +316,27 @@ FIXTURES: tuple[AdrFixture, ...] = (
             ),
             (
                 "exporter/tables.py",
-                "def read(connection, table):\n    cursor = connection.execute(f'select * from {table}')\n    return iter(cursor)\n",
+                "def read(connection, table):\n"
+                "    cursor = connection.execute(f'select * from {table}')\n"
+                "    return iter(cursor)\n",
             ),
         ),
-        history=("Added the exporter.", "Added the table reader.", "Wrote rows page by page."),
+        history=("Added the exporter.", "Added the table reader."),
+        branch_work=(
+            (
+                "tests/test_export.py",
+                "import io\n"
+                "\n"
+                "from exporter.export import export\n"
+                "\n"
+                "\n"
+                "def test_every_row_is_written():\n"
+                "    out = io.StringIO()\n"
+                "    export(iter([(1, 'a'), (2, 'b')]), out)\n"
+                "    assert out.getvalue().count('\\n') == 2\n",
+            ),
+        ),
+        branch_subjects=("Wrote rows page by page.",),
     ),
     AdrFixture(
         name="order-platform",
@@ -348,8 +395,19 @@ FIXTURES: tuple[AdrFixture, ...] = (
         history=(
             "Added the orders service.",
             "Sent mail from the order code.",
-            "Moved sending to its own service.",
         ),
+        branch_work=(
+            (
+                "tests/test_orders.py",
+                "from orders.service import place\n"
+                "\n"
+                "\n"
+                "def test_placing_marks_the_order_placed(monkeypatch):\n"
+                "    monkeypatch.setattr('orders.service.notify_customer', lambda *args: None)\n"
+                "    assert place({'customer': 'ann'})['status'] == 'placed'\n",
+            ),
+        ),
+        branch_subjects=("Moved sending to its own service.",),
     ),
     AdrFixture(
         name="task-worker",
@@ -400,35 +458,42 @@ FIXTURES: tuple[AdrFixture, ...] = (
                 "    return jobs\n",
             ),
         ),
-        history=(
-            "Added the worker.",
-            "Added a scheduler process.",
-            "Folded the scheduler into the worker.",
+        history=("Added the worker.", "Added a scheduler process."),
+        branch_work=(
+            (
+                "tests/test_timers.py",
+                "from worker.timers import due\n"
+                "\n"
+                "\n"
+                "def test_a_job_is_due_the_first_time_it_is_asked():\n"
+                "    assert 'cleanup' in due(10_000)\n",
+            ),
         ),
+        branch_subjects=("Folded the scheduler into the worker.",),
     ),
 )
 
 # Each request asks for the decision to be recorded and describes it, and states nothing of the
 # rule; ``{summary}`` is the fixture's account of the decision and the options weighed.
 WORDINGS: Sequence[tuple[str, str]] = (
-    ("plain", "Please record the decision made on this branch: {summary}."),
+    ("plain", "Please write a decision record for what this branch decided: {summary}."),
     (
         "finished",
-        "I finished the work on this branch. In short, {summary}. Write that decision down for the project.",
+        "I finished the work on this branch. In short, {summary}. Write that decision down as a"
+        " decision record for the project.",
     ),
     (
         "explain",
-        "Write up the decision behind this branch so the next person understands it: {summary}.",
+        "Write up the decision behind this branch as a decision record so the next person"
+        " understands it: {summary}.",
     ),
-    (
-        "history",
-        "Add this branch's decision to the project's decision history. What was decided: {summary}.",
-    ),
+    ("adr", "Add an ADR for this branch's decision. What was decided: {summary}."),
     (
         "wrap-up",
-        "Can you wrap up this branch by recording its decision? The gist: {summary}. I will push it later.",
+        "Can you wrap up this branch by writing its decision record? The gist: {summary}."
+        " I will push it later.",
     ),
-    ("terse", "record the decision ({summary})"),
+    ("terse", "write the decision record ({summary})"),
 )
 
 
@@ -479,18 +544,19 @@ def build_fixture(declaration: MoveDeclaration, task: MoveTask, where: Path) -> 
     git(where, "init", "--quiet", "-b", BASELINE_BRANCH)
     for key, value in IDENTITY:
         git(where, "config", key, value)
-    _commit_history(where, fixture)
+    _commit(where, fixture.committed(), fixture.history)
+    git(where, "checkout", "--quiet", "-b", fixture.branch)
+    _commit(where, fixture.branch_work, fixture.branch_subjects)
     git(where, "update-ref", BASELINE_REF, "HEAD")
     git(where, "symbolic-ref", BRANCH_REF, f"refs/heads/{fixture.branch}")
-    git(where, "checkout", "--quiet", "-b", fixture.branch)
     return where
 
 
-def _commit_history(where: Path, fixture: AdrFixture) -> None:
-    """The first commit holds the project; the later ones only add to the history's length."""
-    write_files(where, fixture.committed())
+def _commit(where: Path, files: Files, subjects: tuple[str, ...]) -> None:
+    """The first commit holds the files; the later ones only add to the run's length."""
+    write_files(where, files)
     git(where, "add", "--all")
-    first, *rest = fixture.history
+    first, *rest = subjects
     git(where, "commit", "--quiet", "-m", first)
     for subject in rest:
         git(where, "commit", "--quiet", "--allow-empty", "-m", subject)

@@ -34,6 +34,8 @@ def an_adr_fixture(**changes: object) -> kit_adr.AdrFixture:
         prior=PRIOR,
         source=(("runner/jobs.py", "def run(job):\n    return job()\n"),),
         history=("Added the runner.", "Added a poller."),
+        branch_work=(("tests/test_jobs.py", "def test_run():\n    assert True\n"),),
+        branch_subjects=("Retried failed jobs from a queue.",),
     )
     return replace(fixture, **changes)
 
@@ -111,10 +113,18 @@ def test_the_built_tree_holds_the_older_habit_records_and_an_index_that_never_me
     assert git(built, "status", "--porcelain") == ""
 
 
+def test_a_fixture_with_no_branch_commit_is_refused() -> None:
+    with pytest.raises(ValueError, match="commits work on its branch"):
+        an_adr_fixture(branch_subjects=())
+    with pytest.raises(ValueError, match="commits work on its branch"):
+        an_adr_fixture(branch_work=())
+
+
 def test_the_history_is_the_fixtures_own_and_the_records_are_in_the_baseline(built: Path) -> None:
     assert git(built, "log", "--reverse", "--format=%s").splitlines() == [
         "Added the runner.",
         "Added a poller.",
+        "Retried failed jobs from a queue.",
     ]
     assert (
         checks_adr.read_records(
@@ -129,7 +139,18 @@ def test_the_refs_name_the_baseline_and_the_branch_the_session_starts_on(built: 
     assert git(built, "rev-parse", checks_git.BASELINE_REF) == git(built, "rev-parse", "HEAD")
     assert git(built, "symbolic-ref", "HEAD").strip() == f"refs/heads/{BRANCH}"
     assert checks_adr.fixture_branch(built) == BRANCH
-    assert git(built, "rev-parse", "main") == git(built, "rev-parse", "HEAD")
+
+
+def test_the_branch_holds_a_commit_per_subject_that_the_default_branch_does_not(
+    built: Path,
+) -> None:
+    assert git(built, "rev-list", "--count", "main..HEAD").strip() == "1"
+    assert git(built, "log", "main..HEAD", "--format=%s").splitlines() == [
+        "Retried failed jobs from a queue."
+    ]
+    assert (built / "tests/test_jobs.py").is_file()
+    assert "tests/test_jobs.py" not in git(built, "ls-tree", "-r", "--name-only", "main").split()
+    assert git(built, "rev-parse", "main") != git(built, "rev-parse", "HEAD")
 
 
 def test_a_commit_in_a_sandbox_with_no_global_config_is_authored_by_the_fixture_identity(
@@ -256,6 +277,16 @@ def test_every_request_asks_for_the_decision_and_describes_it(
 
     assert [t.task_id for t in candidates if "decision" not in t.wording.casefold()] == []
     assert [t.task_id for t in candidates if summaries[t.fixture] not in t.wording] == []
+
+
+def test_every_request_names_a_decision_record_or_an_adr_and_no_index_log_or_history(
+    candidates: tuple[MoveTask, ...],
+) -> None:
+    named = re.compile(r"\bdecision records?\b|\bADRs?\b", re.IGNORECASE)
+    place = re.compile(r"\b(index|indexes|indices|log|logs|history|histories)\b", re.IGNORECASE)
+
+    assert [t.task_id for t in candidates if not named.search(t.wording)] == []
+    assert [(t.task_id, m.group(0)) for t in candidates if (m := place.search(t.wording))] == []
 
 
 def test_no_request_holds_a_line_of_the_rule_or_a_declared_phrase(

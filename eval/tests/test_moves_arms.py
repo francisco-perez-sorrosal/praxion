@@ -530,6 +530,36 @@ def test_a_path_matched_file_without_the_declared_globs_is_refused_naming_the_fi
     assert "elsewhere/**" in reason
 
 
+# -- A path-matched rule the lean installer does not link is refused ---------------------------
+
+
+def test_a_lean_manifest_without_the_path_matched_rules_row_is_refused_naming_the_rule(
+    checkout, tmp_path
+):
+    declared = declaration.kit(ADR_MOVE)
+    row_removed = _lean_with(
+        declared,
+        *(
+            ManifestRowRemoved(c.path) if isinstance(c, ManifestRowScoped) else c
+            for c in declared.arms.lean
+        ),
+    )
+
+    reason = _refusal(row_removed, checkout, tmp_path)
+
+    assert (
+        f"{ADR_RULE} is declared path-matched but the lean copy's installer does not link it"
+        in (reason)
+    )
+
+
+def test_a_build_declaring_no_path_matched_delivery_is_not_refused_for_linking(first_move):
+    declared = declaration.kit(GIT_MOVE)
+
+    assert not any(isinstance(d, PathMatched) for d in declared.deliveries)
+    assert "lean" in first_move.arms
+
+
 # -- The channels honour the project's rule disable list --------------------------------------
 
 

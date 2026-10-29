@@ -410,7 +410,7 @@ def _build_arm(
         raise ArmError(f"the {arm} arm's session start cannot be observed: {observed.reason}")
     if arm == "lean":
         reach.require_reach(declaration, checkout, copy, hook_scripts(declaration.arms.lean))
-        _require_relocation(declaration, checkout, copy, observed.lines)
+        _require_relocation(declaration, checkout, copy, observed)
     _drop_bytecode(copy, checkout)
     changes = tuple(AppliedChange(change.path, change.sha256) for change in planned)
     return BuiltArm(copy, changes, observed.lines)
@@ -447,10 +447,10 @@ def _drop_bytecode(copy: Path, checkout: Path) -> None:
 
 
 def _require_relocation(
-    declaration: MoveDeclaration, checkout: Path, copy: Path, resident: Sequence[str]
+    declaration: MoveDeclaration, checkout: Path, copy: Path, observed: observe.Observed
 ) -> None:
     """Refuse a lean copy leaving a line of the moved rule neither resident nor delivered."""
-    reached = {line.strip() for line in resident}
+    reached = {line.strip() for line in observed.lines}
     for delivery in declaration.deliveries:
         match delivery:
             case SessionStart(file=file, lines=declared):
@@ -458,6 +458,7 @@ def _require_relocation(
                 _require_resident(file.value, expected, reached)
             case PathMatched(file=file, globs=globs):
                 _require_path_scoped(copy, file.value, globs)
+                _require_linked(file.value, observed.linked)
                 reached.update(file_lines(copy, file.value))
             case HookContext(reads=file) | GateRefusal(reads=file):
                 reached.update(file_lines(copy, file.value))
@@ -488,6 +489,14 @@ def _require_path_scoped(copy: Path, file: str, globs: Sequence[str]) -> None:
     if not re.search(r"^paths\s*:", scoped, re.MULTILINE) or missing:
         raise ArmError(
             f"{file} is declared path-matched but its paths: frontmatter lacks {missing or globs}"
+        )
+
+
+def _require_linked(file: str, linked: frozenset[str]) -> None:
+    """A path-matched rule reaches a session only if the copy's own installer links it."""
+    if file not in linked:
+        raise ArmError(
+            f"{file} is declared path-matched but the lean copy's installer does not link it"
         )
 
 

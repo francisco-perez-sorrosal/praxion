@@ -255,6 +255,43 @@ def test_a_repository_with_no_commit_at_all_leaves_nothing_to_grade(git, tmp_pat
     assert grade_of(git, STAGING_BY_NAME, repo) == NothingToGrade(NO_COMMIT)
 
 
+# -- The fixture's own history ----------------------------------------------------------------
+
+
+def test_only_the_commits_after_the_baseline_ref_are_graded(git, tmp_path):
+    repo = plant(
+        tmp_path,
+        ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"}),
+        (GOOD, NAMED),
+    )
+    run_git(repo, "update-ref", checks_git.BASELINE_REF, "HEAD~1")
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade("passed", ())
+
+
+def test_without_a_baseline_ref_every_commit_after_the_root_is_graded(git, tmp_path):
+    repo = plant(
+        tmp_path,
+        ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"}),
+        (GOOD, NAMED),
+    )
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade(
+        "failed", (SUBJECT_TOO_LONG, SUBJECT_ENDS_WITH_PERIOD)
+    )
+
+
+def test_a_session_that_commits_nothing_after_the_baseline_ref_leaves_nothing_to_grade(
+    git, tmp_path
+):
+    repo = plant(
+        tmp_path, ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"})
+    )
+    run_git(repo, "update-ref", checks_git.BASELINE_REF, "HEAD")
+
+    assert grade_of(git, STAGING_BY_NAME, repo) == NothingToGrade(NO_COMMIT)
+
+
 # -- The grade's shape and its refusals -------------------------------------------------------
 
 

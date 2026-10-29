@@ -64,6 +64,8 @@ LEFT_OUT_BLOCKS = ("hackathon-mode.md", "sidecar-placement.md")
 DEFAULT_BRANCHES = ("main", "master")
 OLDER_HABIT_NAME = re.compile(r"\d{3,}-[a-z0-9][a-z0-9-]*\.md")
 NUMBERED_ID = re.compile(r"dec-\d{3,}")
+RECORD_NAMED = re.compile(r"decision record|\bADR\b", re.IGNORECASE)
+PLACE_NAMED = re.compile(r"\b(index|indexes|indices|log|logs|history|histories)\b", re.IGNORECASE)
 # A backtick; a dollar sign and a space; a slash opening a word, then a letter; or a program
 # name standing as a whole word, then a space and an argument.
 COMMAND = re.compile(
@@ -136,6 +138,18 @@ def test_no_request_holds_a_command(kit):
     assert commands == [], commands
 
 
+def test_every_request_names_a_decision_record_or_an_adr(kit):
+    unnamed = [t.task_id for t in kit.tasks if not RECORD_NAMED.search(t.wording)]
+
+    assert unnamed == [], unnamed
+
+
+def test_no_request_points_at_an_index_a_log_or_a_history(kit):
+    pointed = [(t.task_id, m.group(0)) for t in kit.tasks if (m := PLACE_NAMED.search(t.wording))]
+
+    assert pointed == [], pointed
+
+
 def test_the_kits_fixtures_ask_for_decisions_of_both_sorts(kit):
     sorts_by_fixture = {(task.fixture, task.sort) for task in kit.tasks}
 
@@ -168,6 +182,12 @@ def test_every_fixture_is_on_a_named_branch_other_than_its_default(fixtures):
     branches = {name: _branch(root) for name, root in fixtures.items()}
 
     assert {n: b for n, b in branches.items() if not b or b in DEFAULT_BRANCHES} == {}, branches
+
+
+def test_every_fixture_branch_carries_a_commit_its_default_branch_does_not_hold(fixtures):
+    own = {name: _own_commits(root) for name, root in fixtures.items()}
+
+    assert {name: n for name, n in own.items() if n < 1} == {}, own
 
 
 def test_every_fixture_has_a_git_identity_a_session_can_read(fixtures):
@@ -228,6 +248,14 @@ def _git(root: Path, *args: str) -> str:
 
 def _branch(root: Path) -> str:
     return _git(root, "symbolic-ref", "--short", "HEAD")
+
+
+def _own_commits(root: Path) -> int:
+    """Commits on the checked-out branch that the default branch (main or master) lacks."""
+    defaults = [b for b in DEFAULT_BRANCHES if _git(root, "rev-parse", "--verify", "-q", b)]
+    if not defaults:
+        return 0
+    return int(_git(root, "rev-list", "--count", f"{defaults[0]}..HEAD") or 0)
 
 
 def _not_managed_as_shipped(root: Path) -> list[str]:

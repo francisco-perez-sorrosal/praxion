@@ -131,6 +131,8 @@ class Record:
     disconfirmation_heading: str | None = None  # the heading text, when the section is there
     disconfirmation_items: tuple[str, ...] = DISCONFIRMATION_ITEMS
     title: str = "Adopt SQLite for the cache"
+    fenced_in_disconfirmation: str | None = None  # a line set in a fenced block after its heading
+    disconfirmation_fenced: bool = False  # the whole section, heading included, inside a fence
 
     def text(self) -> str:
         front = [f"id: {self.id}"] if self.id is not None else []
@@ -145,7 +147,13 @@ class Record:
         ]
         if self.disconfirmation_heading is not None:
             items = "\n".join(f"- **{item}** -- named here." for item in self.disconfirmation_items)
-            body.append(f"## {self.disconfirmation_heading}\n\n{items}")
+            fence = (
+                f"```text\n{self.fenced_in_disconfirmation}\n```\n\n"
+                if self.fenced_in_disconfirmation
+                else ""
+            )
+            section = f"## {self.disconfirmation_heading}\n\n{fence}{items}"
+            body.append(f"```markdown\n{section}\n```" if self.disconfirmation_fenced else section)
         return "---\n" + "\n".join(front) + "\n---\n\n" + "\n\n".join(body) + "\n"
 
 
@@ -177,6 +185,25 @@ def leave(project: Path, *records: Record) -> None:
         path = project / record.relpath
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(record.text(), encoding="utf-8")
+
+
+def leave_file(project: Path, relpath: str, text: str) -> None:
+    path = project / relpath
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def nested_repository(project: Path, relpath: str) -> Path:
+    """A directory below the project root holding its own git metadata."""
+    root = project / relpath
+    root.mkdir(parents=True)
+    git(root, "init", "-q", "-b", DEFAULT_BRANCH)
+    return root
+
+
+def create_branch(project: Path, name: str) -> None:
+    """Check out a new local branch, as a session might before writing its record."""
+    git(project, "checkout", "-q", "-b", name)
 
 
 def leave_then_move(project: Path, first: Record, final: Record) -> None:

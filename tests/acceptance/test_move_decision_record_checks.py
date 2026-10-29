@@ -42,10 +42,13 @@ from tests.acceptance.drivers.decision_records import (
     Record,
     branch_segment,
     conforming,
+    create_branch,
     draft_id,
     fragment_name,
     leave,
+    leave_file,
     leave_then_move,
+    nested_repository,
     numbered_id,
     older_habit,
     planted_project,
@@ -103,6 +106,16 @@ PLACEMENT_STATES = [
         with_changes(DRAFT, relpath=f"{DRAFTS_DIR}/{fragment_name(branch='some-other-branch')}"),
         {MALFORMED_NAME},
         id="a-name-carrying-a-branch-other-than-the-fixtures",
+    ),
+    pytest.param(
+        with_changes(DRAFT, relpath=f"docs/decisions/{fragment_name()}"),
+        {NOT_UNDER_DRAFTS},
+        id="a-fragment-under-a-documentation-directory",
+    ),
+    pytest.param(
+        with_changes(DRAFT, relpath=f"{DRAFTS_DIR}/{fragment_name()[:-3]}.MD"),
+        {MALFORMED_NAME},
+        id="a-fragment-name-ending-in-upper-case-md",
     ),
     pytest.param(with_changes(DRAFT, id=None), {MALFORMED_ID}, id="no-id"),
     pytest.param(
@@ -194,6 +207,44 @@ def test_a_fragment_carrying_the_branch_uncut_past_forty_characters_is_a_malform
     assert (grade.outcome, grade.failed_parts) == ("failed", {MALFORMED_NAME}), grade
 
 
+def test_a_fragment_named_by_a_branch_the_session_created_passes_draft_placement(kit, planted):
+    create_branch(planted.project, "Cache/Follow-Up")
+    segment = branch_segment("Cache/Follow-Up")
+    named = with_changes(DRAFT, relpath=f"{DRAFTS_DIR}/{fragment_name(branch=segment)}")
+
+    grade = _grade(kit, DRAFT_PLACEMENT, planted, named)
+
+    assert (grade.outcome, grade.failed_parts) == ("passed", frozenset()), grade
+
+
+NOT_RECORDS = [
+    pytest.param(".ai-state/calibration_log.md", id="a-calibration-log-in-the-state-directory"),
+    pytest.param(".pytest_cache/README.md", id="a-tool-cache"),
+]
+NESTED_REPOSITORY = "vendor/cache-lib"
+NOTES = "# Notes\n\nA line a tool or a log wrote.\n"
+
+
+@pytest.mark.parametrize("relpath", NOT_RECORDS)
+@pytest.mark.parametrize("check", DECISION_CHECKS)
+def test_markdown_inside_a_dot_named_directory_is_no_decision_record(kit, planted, check, relpath):
+    leave_file(planted.project, relpath, NOTES)
+
+    grade = grade_decision_end_state(kit, check, planted.fixture, planted.project)
+
+    assert (grade.outcome, grade.reason) == ("nothing to grade", NO_RECORD_REASON), grade
+
+
+@pytest.mark.parametrize("check", DECISION_CHECKS)
+def test_markdown_inside_a_nested_repository_is_no_decision_record(kit, planted, check):
+    nested_repository(planted.project, NESTED_REPOSITORY)
+    leave_file(planted.project, f"{NESTED_REPOSITORY}/README.md", NOTES)
+
+    grade = grade_decision_end_state(kit, check, planted.fixture, planted.project)
+
+    assert (grade.outcome, grade.reason) == ("nothing to grade", NO_RECORD_REASON), grade
+
+
 # -- Decision category ------------------------------------------------------------------------
 
 ARCHITECTURAL = conforming("architectural")
@@ -226,6 +277,16 @@ CATEGORY_STATES = [
     pytest.param(with_changes(ARCHITECTURAL, category=None), {NO_CATEGORY}, id="no-category"),
     pytest.param(
         with_changes(ARCHITECTURAL, category="strategic"), {UNKNOWN_CATEGORY}, id="unknown"
+    ),
+    pytest.param(
+        with_changes(ARCHITECTURAL, fenced_in_disconfirmation="## Not a heading, set in a fence"),
+        set(),
+        id="a-fenced-number-sign-line-ends-no-disconfirmation-section",
+    ),
+    pytest.param(
+        with_changes(ARCHITECTURAL, disconfirmation_fenced=True),
+        {NO_DISCONFIRMATION},
+        id="a-disconfirmation-heading-only-inside-a-fenced-block",
     ),
     pytest.param(
         with_changes(ARCHITECTURAL, disconfirmation_heading=None),

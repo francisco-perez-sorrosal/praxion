@@ -294,15 +294,27 @@ def section_text(rule_text: str, heading: str) -> str:
     the same or a higher level, sub-headings included. Raises when no heading has that text.
     """
     lines = rule_text.splitlines()
+    levels = _heading_levels(lines)
     for start, line in enumerate(lines):
-        level = _heading_level(line)
+        level = levels[start]
         if level and line.lstrip("#").strip() == heading:
             end = next(
-                (j for j in range(start + 1, len(lines)) if 0 < _heading_level(lines[j]) <= level),
+                (j for j in range(start + 1, len(lines)) if 0 < levels[j] <= level),
                 len(lines),
             )
             return "\n".join(lines[start:end])
     raise AssertionError(f"no heading {heading!r} in the rule")
+
+
+def _heading_levels(lines: list[str]) -> list[int]:
+    """Each line's heading level, 0 for a line that is no heading; a line inside a fenced code
+    block is never a heading."""
+    levels, fenced = [], False
+    for line in lines:
+        if re.match(r"\s*(```|~~~)", line):
+            fenced = not fenced
+        levels.append(0 if fenced else _heading_level(line))
+    return levels
 
 
 def _heading_level(line: str) -> int:

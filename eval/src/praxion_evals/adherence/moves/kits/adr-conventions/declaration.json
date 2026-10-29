@@ -11,6 +11,15 @@
         "fragment",
         "drafts"
       ]
+    },
+    {
+      "name": "decision category",
+      "rule_file": "rules/swe/adr-conventions.md",
+      "section": "What makes a decision `architectural`",
+      "phrases": [
+        "what exists or what connects",
+        "however consequential"
+      ]
     }
   ],
   "fixture_scope": "managed",
@@ -20,7 +29,7 @@
       {
         "op": "derive",
         "path": "rules/_manifest.yaml",
-        "kind": "manifest_row_removed"
+        "kind": "manifest_row_scoped"
       },
       {
         "op": "derive",

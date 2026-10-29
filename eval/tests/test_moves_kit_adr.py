@@ -117,7 +117,10 @@ def test_the_history_is_the_fixtures_own_and_the_records_are_in_the_baseline(bui
         "Added a poller.",
     ]
     assert (
-        checks_adr.read_records(built, before=checks_adr.baseline_paths(built), branch=BRANCH) == ()
+        checks_adr.read_records(
+            built, before=checks_adr.baseline_paths(built), branches=frozenset({BRANCH})
+        )
+        == ()
     )
     assert PRIOR[1].path in checks_adr.baseline_paths(built)
 

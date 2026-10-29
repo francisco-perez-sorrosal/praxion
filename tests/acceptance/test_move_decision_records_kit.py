@@ -6,8 +6,8 @@ rule, a declared phrase of either governed check, any of the four `category` val
 command; across the kit's fixtures both sorts of decision are asked for, at least one fixture of
 each sort.
 
-Every fixture is a managed project (a state directory, and a `CLAUDE.md` carrying the shipped
-blocks except the hackathon block) on a named branch other than its default, under a git
+Every fixture is a managed project (a state directory, and a `CLAUDE.md` carrying every shipped
+block but the hackathon and sidecar-placement blocks, since its state lives in the repository) on a named branch other than its default, under a git
 identity a session can read, whose decision directory holds at least two records in the older
 habit and a `DECISIONS_INDEX.md` listing them, holds no draft directory, and holds no file
 carrying a line of the moved rule or a declared phrase. A record scripted with no model and
@@ -59,7 +59,8 @@ from tests.acceptance.drivers.move_eval import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHIPPED_BLOCKS = REPO_ROOT / "claude" / "canonical-blocks"
-HACKATHON_BLOCK = "hackathon-mode.md"
+# A fixture is outside hackathon mode and keeps its state in the repository.
+LEFT_OUT_BLOCKS = ("hackathon-mode.md", "sidecar-placement.md")
 DEFAULT_BRANCHES = ("main", "master")
 OLDER_HABIT_NAME = re.compile(r"\d{3,}-[a-z0-9][a-z0-9-]*\.md")
 NUMBERED_ID = re.compile(r"dec-\d{3,}")
@@ -155,7 +156,7 @@ def fixtures(kit, tmp_path_factory) -> dict[str, Path]:
     }
 
 
-def test_every_fixture_is_a_managed_project_with_the_shipped_blocks_but_the_hackathon_one(
+def test_every_fixture_is_a_managed_project_with_every_shipped_block_but_hackathon_and_sidecar(
     fixtures,
 ):
     wrong = {name: _not_managed_as_shipped(root) for name, root in fixtures.items()}
@@ -230,16 +231,16 @@ def _branch(root: Path) -> str:
 
 
 def _not_managed_as_shipped(root: Path) -> list[str]:
-    """What keeps `root` from being a managed project carrying the non-hackathon shipped blocks."""
+    """What keeps `root` from being a managed project carrying every shipped block but the left-out."""
     claude_md = root / "CLAUDE.md"
     text = claude_md.read_text(encoding="utf-8") if claude_md.is_file() else ""
     blocks = {p.name: p.read_text(encoding="utf-8").strip() for p in SHIPPED_BLOCKS.glob("*.md")}
     why = [
         f"lacks the {name} block"
         for name, block in blocks.items()
-        if name != HACKATHON_BLOCK and block not in text
+        if name not in LEFT_OUT_BLOCKS and block not in text
     ]
-    why += ["carries the hackathon block"] if blocks[HACKATHON_BLOCK] in text else []
+    why += [f"carries the {name} block" for name in LEFT_OUT_BLOCKS if blocks[name] in text]
     why += [] if (root / ".ai-state").is_dir() else ["has no state directory"]
     return why
 

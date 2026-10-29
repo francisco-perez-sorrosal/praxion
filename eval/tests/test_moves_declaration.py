@@ -21,6 +21,7 @@ from praxion_evals.adherence.moves.model import (
     KernelDerive,
     LaunchOptions,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveName,
     OnlyKind,
     PathMatched,
@@ -227,6 +228,17 @@ def test_an_unknown_channel_is_refused(tmp_path: Path) -> None:
         payload["deliveries"].append({"channel": "telepathy"})
 
     assert "telepathy" in refused_by(edited(tmp_path, edit))
+
+
+def test_a_scoped_manifest_row_derive_parses_to_its_value(tmp_path: Path) -> None:
+    def edit(payload: dict[str, Any]) -> None:
+        payload["arms"]["lean"][2]["kind"] = "manifest_row_scoped"
+
+    loaded = declaration.load(edited(tmp_path, edit))
+
+    assert loaded.arms.for_arm("lean")[2] == ManifestRowScoped(
+        RelPath.parse("rules/_manifest.yaml")
+    )
 
 
 def test_an_unknown_derive_kind_or_op_is_refused(tmp_path: Path) -> None:

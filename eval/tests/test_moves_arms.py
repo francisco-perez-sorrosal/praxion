@@ -12,6 +12,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 from praxion_evals.adherence.moves import arms, declaration, observe
 from praxion_evals.adherence.moves.arms import ArmRefusal, ArmSet
@@ -21,6 +22,7 @@ from praxion_evals.adherence.moves.model import (
     ArmChanges,
     KernelDerive,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveDeclaration,
     PathMatched,
     RelPath,
@@ -38,6 +40,10 @@ GIT_RULE_ID = "swe/vcs/git-conventions"
 GIT_KERNEL = "rules/swe/vcs/git-conventions-resident.md"
 GIT_HOOK = "inject_git_conventions_at_use.py"
 ADR_RULE = "rules/swe/adr-conventions.md"
+ADR_RULE_ID = "swe/adr-conventions"
+ADR_KERNEL = "rules/swe/adr-conventions-resident.md"
+ADR_KERNEL_ID = "swe/adr-conventions-resident"
+MANIFEST = "rules/_manifest.yaml"
 STAGE_LINE = "- Stage specific files by name — avoid `git add -A` or `git add .`"
 NOT_IN_THE_KERNEL = "- Prefer small, focused commits over large sweeping ones"
 READ_TREES = ("rules", "lib", "hooks")
@@ -236,6 +242,171 @@ def test_a_write_whose_source_changed_since_it_was_declared_is_refused(checkout,
     reason = _refusal(_lean_with(declared, stale), checkout, tmp_path / "ws")
 
     assert "docs/note.md" in reason
+
+
+# -- The scoped manifest row ------------------------------------------------------------------
+
+
+def _scoped(declared: MoveDeclaration) -> MoveDeclaration:
+    """The declaration with the moved rule's row kept path-scoped instead of removed."""
+    scoped = ManifestRowScoped(RelPath.parse(MANIFEST))
+    return _lean_with(
+        declared, *(scoped if isinstance(c, ManifestRowRemoved) else c for c in declared.arms.lean)
+    )
+
+
+def _rows(manifest: Path) -> list[dict]:
+    return yaml.safe_load(manifest.read_text(encoding="utf-8"))["rules"]
+
+
+def _with_manifest(checkout: Path, where: Path, edit) -> Path:
+    """A copy of the checkout whose manifest text has been through ``edit``."""
+    changed = where / "checkout"
+    shutil.copytree(checkout, changed, symlinks=True)
+    manifest = changed / MANIFEST
+    manifest.write_text(edit(manifest.read_text(encoding="utf-8")), encoding="utf-8")
+    return changed
+
+
+@pytest.fixture(scope="module")
+def scoped_move(checkout: Path, tmp_path_factory: pytest.TempPathFactory) -> ArmSet:
+    return _built(_scoped(declaration.kit(ADR_MOVE)), checkout, tmp_path_factory.mktemp("scoped"))
+
+
+def test_the_kept_row_is_path_scoped_to_the_deliverys_globs_with_the_written_rules_chars(
+    scoped_move,
+):
+    lean = scoped_move.arms["lean"].copy
+    kept = next(row for row in _rows(lean / MANIFEST) if row["id"] == ADR_RULE_ID)
+
+    assert kept == {
+        "id": ADR_RULE_ID,
+        "path": ADR_RULE,
+        "load": "path_scoped",
+        "core": True,
+        "install": "symlink",
+        "chars": len((lean / ADR_RULE).read_text(encoding="utf-8")),
+        "paths": [".ai-state/decisions/**"],
+    }
+
+
+def test_the_kernel_row_follows_the_kept_row_and_is_always_on(scoped_move):
+    lean = scoped_move.arms["lean"].copy
+    rows = _rows(lean / MANIFEST)
+    kept = next(i for i, row in enumerate(rows) if row["id"] == ADR_RULE_ID)
+
+    assert rows[kept + 1] == {
+        "id": ADR_KERNEL_ID,
+        "path": ADR_KERNEL,
+        "load": "always_on",
+        "core": True,
+        "install": "symlink",
+        "chars": len((lean / ADR_KERNEL).read_text(encoding="utf-8")),
+    }
+
+
+def test_no_other_manifest_entry_changes(scoped_move, checkout):
+    lean = _rows(scoped_move.arms["lean"].copy / MANIFEST)
+    original = _rows(checkout / MANIFEST)
+
+    others = [row for row in lean if row["id"] not in (ADR_RULE_ID, ADR_KERNEL_ID)]
+
+    assert others == [row for row in original if row["id"] != ADR_RULE_ID]
+
+
+def test_the_scoped_row_without_a_kernel_sibling_adds_no_kernel_row(checkout):
+    declared = _scoped(declaration.kit(ADR_MOVE))
+    no_kernel = _lean_without(declared, KernelDerive)
+
+    planned = {p.path: p for p in arms.plan(no_kernel, "lean", checkout)}
+    rows = yaml.safe_load(planned[MANIFEST].content)["rules"]
+
+    assert [row["id"] for row in rows if row["id"].startswith(ADR_RULE_ID)] == [ADR_RULE_ID]
+
+
+@pytest.mark.parametrize("copies", [0, 2], ids=["none", "two"])
+def test_a_scoped_row_needs_exactly_one_path_matched_delivery_of_the_moved_rule(
+    checkout, tmp_path, copies
+):
+    declared = _scoped(declaration.kit(ADR_MOVE))
+    matched = [d for d in declared.deliveries if isinstance(d, PathMatched)]
+    others = [d for d in declared.deliveries if not isinstance(d, PathMatched)]
+    bent = replace(declared, deliveries=(*others, *matched * copies))
+
+    reason = _refusal(bent, checkout, tmp_path)
+
+    assert MANIFEST in reason
+    assert "path-matched" in reason
+
+
+def test_a_path_matched_delivery_of_another_file_does_not_count_for_the_scoped_row(
+    checkout, tmp_path
+):
+    declared = _scoped(declaration.kit(ADR_MOVE))
+    elsewhere = tuple(
+        replace(d, file=RelPath.parse(GIT_RULE)) if isinstance(d, PathMatched) else d
+        for d in declared.deliveries
+    )
+
+    reason = _refusal(replace(declared, deliveries=elsewhere), checkout, tmp_path)
+
+    assert MANIFEST in reason
+    assert ADR_RULE in reason
+
+
+def test_a_scoped_row_whose_arm_does_not_write_the_moved_rule_is_refused_naming_the_manifest(
+    checkout, tmp_path
+):
+    declared = _scoped(declaration.kit(ADR_MOVE))
+
+    reason = _refusal(_lean_without(declared, Write), checkout, tmp_path)
+
+    assert MANIFEST in reason
+    assert "write" in reason
+    assert ADR_RULE in reason
+
+
+def test_a_scoped_row_for_a_rule_that_is_not_symlinked_is_refused_naming_the_manifest(
+    checkout, tmp_path
+):
+    hook_delivered = _with_manifest(
+        checkout,
+        tmp_path / "edited",
+        lambda text: text.replace(
+            f"path: {ADR_RULE}\n  load: always_on\n  core: true\n  install: symlink",
+            f"path: {ADR_RULE}\n  load: always_on\n  core: true\n  install: hook-deliver",
+        ),
+    )
+
+    reason = _refusal(_scoped(declaration.kit(ADR_MOVE)), hook_delivered, tmp_path / "ws")
+
+    assert MANIFEST in reason
+    assert "hook-deliver" in reason
+
+
+def test_a_scoped_row_whose_kernel_id_is_already_taken_is_refused_naming_the_manifest(
+    checkout, tmp_path
+):
+    taken = _with_manifest(
+        checkout,
+        tmp_path / "edited",
+        lambda text: text + f"- id: {ADR_KERNEL_ID}\n  path: rules/other.md\n  load: always_on\n",
+    )
+
+    reason = _refusal(_scoped(declaration.kit(ADR_MOVE)), taken, tmp_path / "ws")
+
+    assert MANIFEST in reason
+    assert ADR_KERNEL_ID in reason
+
+
+def test_a_scoped_row_with_two_kernels_is_refused_as_a_removed_row_is(checkout, tmp_path):
+    declared = _scoped(declaration.kit(ADR_MOVE))
+    second = KernelDerive(RelPath.parse("rules/swe/second-resident.md"), ("Architecture",))
+
+    reason = _refusal(_lean_with(declared, *declared.arms.lean, second), checkout, tmp_path)
+
+    assert MANIFEST in reason
+    assert "one kernel" in reason
 
 
 # -- A copy that is not its declaration is refused --------------------------------------------

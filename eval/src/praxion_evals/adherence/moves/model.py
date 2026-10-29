@@ -127,7 +127,12 @@ class HookRegistered:  # computed from the checkout's hook registry
     path: RelPath
 
 
-Derive = KernelDerive | ManifestRowRemoved | HookRegistered
+@dataclass(frozen=True)
+class ManifestRowScoped:  # computed from the checkout's rule manifest and the path-matched delivery
+    path: RelPath
+
+
+Derive = KernelDerive | ManifestRowRemoved | HookRegistered | ManifestRowScoped
 ArmChange = Write | Remove | Derive
 
 

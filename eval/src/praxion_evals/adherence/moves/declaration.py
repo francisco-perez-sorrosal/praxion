@@ -34,6 +34,7 @@ from praxion_evals.adherence.moves.model import (
     KernelDerive,
     LaunchOptions,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveArm,
     MoveDeclaration,
     MoveName,
@@ -211,9 +212,12 @@ def _derive(change: Json, path: RelPath) -> ArmChange:
             return ManifestRowRemoved(path)
         case "hook_registered":
             return HookRegistered(path)
+        case "manifest_row_scoped":
+            return ManifestRowScoped(path)
         case _:
             raise ValueError(
-                f"a derive is kernel, manifest_row_removed or hook_registered, got {kind!r}"
+                f"a derive is kernel, manifest_row_removed, hook_registered or "
+                f"manifest_row_scoped, got {kind!r}"
             )
 
 

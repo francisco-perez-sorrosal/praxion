@@ -177,7 +177,7 @@ from praxion_evals.adherence.moves import checks_adr, checks_git, model
 answer = checks_adr.grade_records(
     request["check"],
     frozenset(request["before"]),
-    request["branch"],
+    frozenset(request["branches"]),
     Path(request["end_state"]),
 )
 match answer:
@@ -197,7 +197,7 @@ def grade_decision_end_state(
     request = {
         "check": check,
         "before": _files_as_built(fixture),
-        "branch": _branch_as_built(fixture),
+        "branches": _admissible_branches(fixture, end_state),
         "end_state": str(end_state),
     }
     answer = move_pocket.call_with_declaration(_GRADE, declared.move, declared.path, request)
@@ -224,9 +224,22 @@ def _files_as_built(fixture: Path) -> list[str]:
     return sorted(listed)
 
 
+def _admissible_branches(fixture: Path, end_state: Path) -> list[str]:
+    """The branch the fixture was built on, and every local branch the end state holds that the
+    built fixture did not (a branch the session created), as raw branch names."""
+    created = _local_branches(end_state) - _local_branches(fixture)
+    return sorted({_branch_as_built(fixture), *created})
+
+
 def _branch_as_built(fixture: Path) -> str:
     """The branch the fixture project is on, read apart from the operator's git configuration."""
     return adherence_eval._git(fixture, "symbolic-ref", "--short", "HEAD").strip()
+
+
+def _local_branches(root: Path) -> frozenset[str]:
+    """Every `refs/heads/*` branch of the repository at `root`, by its short name."""
+    listed = adherence_eval._git(root, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+    return frozenset(line.strip() for line in listed.splitlines() if line.strip())
 
 
 # -- The lean copy's own installer and session start ------------------------------------------

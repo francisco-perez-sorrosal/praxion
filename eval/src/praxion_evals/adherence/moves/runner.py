@@ -45,7 +45,9 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.adherence.moves import (
     arms,
+    checks_adr,
     checks_git,
+    kit_adr,
     kit_git,
     launch,
     lineage,
@@ -130,7 +132,10 @@ class Kit:
 KITS: Mapping[str, Kit] = {
     "git-conventions": Kit(
         kit_git.tasks, kit_git.candidates, kit_git.build_fixture, checks_git.grade
-    )
+    ),
+    "adr-conventions": Kit(
+        kit_adr.tasks, kit_adr.candidates, kit_adr.build_fixture, checks_adr.grade
+    ),
 }
 
 

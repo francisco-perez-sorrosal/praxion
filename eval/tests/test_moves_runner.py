@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from praxion_evals.adherence import cli
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS, StopRule
 from praxion_evals.adherence.lineage import Finished, Interrupted, SpendRefused
 from praxion_evals.adherence.model import Errored, Failed, Passed
@@ -48,6 +49,7 @@ from tests.test_moves_session_record import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MOVE = "git-conventions"
+ADR_MOVE = "adr-conventions"
 RULE = "rules/swe/vcs/git-conventions.md"
 READ_TREES = ("rules", "lib", "hooks")
 READ_FILES = (
@@ -278,6 +280,10 @@ def _floor(checkout, moves_dir, move, stand_in, **changes) -> Conducted:
 
 def _files(moves_dir: Path) -> list[str]:
     return sorted(p.name for p in moves_dir.glob("*")) if moves_dir.exists() else []
+
+
+def _tree(root: Path) -> list[str]:
+    return sorted(str(p.relative_to(root)) for p in root.rglob("*") if ".git/" not in f"{p}/")
 
 
 # --- a floor run ---
@@ -537,13 +543,43 @@ def test_arms_that_would_differ_in_a_pinned_setting_are_refused_naming_it(
     _refused(_plan(checkout, moves_dir, differing), stand_in, moves_dir, "arms:.*model")
 
 
-def test_a_move_without_a_task_kit_is_refused(checkout, moves_dir, stand_in):
+def test_a_move_without_a_task_kit_is_refused(checkout, moves_dir, stand_in, monkeypatch):
+    monkeypatch.setattr(runner, "KITS", {MOVE: runner.KITS[MOVE]})
+
     _refused(
-        _plan(checkout, moves_dir, declaration.kit("adr-conventions")),
+        _plan(checkout, moves_dir, declaration.kit(ADR_MOVE)),
         stand_in,
         moves_dir,
         "no task kit",
     )
+
+
+def test_the_registry_holds_both_moves_each_under_its_own_name():
+    assert set(runner.KITS) == {MOVE, ADR_MOVE}
+
+
+def test_the_adr_kit_draws_twenty_four_paired_tasks_and_a_floor_of_eight_at_the_defaults():
+    drawn = runner.KITS[ADR_MOVE].tasks(declaration.kit(ADR_MOVE), SEED)
+
+    assert len(runner.planned_tasks("paired", drawn, None)) == 24
+    assert len(runner.planned_tasks("floor", drawn, None)) == runner.DEFAULT_FLOOR_TASKS
+
+
+def test_a_dry_run_of_the_adr_move_launches_nothing_and_writes_nothing(
+    checkout, capsys, monkeypatch
+):
+    def refuse_to_conduct(*args, **kwargs):
+        raise AssertionError("a dry run launched a run")
+
+    monkeypatch.setattr(runner, "conduct", refuse_to_conduct)
+    before = _tree(checkout)
+
+    code = cli.main([str(checkout), "--move", ADR_MOVE, "--dry-run"])
+
+    captured = capsys.readouterr()
+    assert code == 0, captured.err
+    assert "total floor=8 paired=48 all=56" in captured.out.splitlines()
+    assert _tree(checkout) == before
 
 
 def test_a_floor_run_of_fewer_tasks_than_the_minimum_is_refused(

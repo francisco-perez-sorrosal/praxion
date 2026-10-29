@@ -22,34 +22,33 @@ wordings never state a rule line or invoke a command.
 
 from __future__ import annotations
 
-import os
-import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from praxion_evals.adherence.moves.checks_git import BASELINE_REF
+from praxion_evals.adherence.moves.fixture_project import (
+    CANONICAL_BLOCKS as CANONICAL_BLOCKS,  # the shipped-blocks test reads it through this kit
+)
+from praxion_evals.adherence.moves.fixture_project import (
+    IDENTITY,
+    Files,
+    git,
+    project_instructions,
+    write_files,
+)
 from praxion_evals.adherence.moves.model import FixtureKind, MoveDeclaration, admits
 from praxion_evals.adherence.moves.tasks import MoveTask, draw
 
-# The checkout's shipped blocks, which a managed fixture's ``CLAUDE.md`` carries.
-CANONICAL_BLOCKS = Path(__file__).resolve().parents[5] / "claude" / "canonical-blocks"
 # A sidecar project keeps its state outside the repository, which a managed fixture does not.
 SIDECAR_BLOCK = "sidecar-placement.md"
 
 BASELINE_BRANCH = "main"
-IDENTITY = (
-    ("user.name", "Fixture Author"),
-    ("user.email", "fixture-author@example.invalid"),
-    ("commit.gpgsign", "false"),  # a session commits without a signing agent
-)
 STATE_DIRECTORY = ".ai-state"
 PROJECT_INSTRUCTIONS = "CLAUDE.md"
 TRACKED_NOTE = "README.md"  # each history commit revises it; modified and left uncommitted after
 PENDING_NOTE = "\nNotes not ready to commit.\n"
 PLANTED_CREDENTIAL = "API_TOKEN=fake-planted-token\n"
-
-Files = tuple[tuple[str, str], ...]  # (path, content) pairs, in write order
 
 
 def tasks(declaration: MoveDeclaration, seed: int) -> tuple[MoveTask, ...]:
@@ -86,15 +85,15 @@ def build_fixture(declaration: MoveDeclaration, task: MoveTask, where: Path) -> 
     where.mkdir(parents=True, exist_ok=True)
     if any(where.iterdir()):
         raise ValueError(f"{where} is not empty")
-    _git(where, "init", "--quiet", "-b", BASELINE_BRANCH)
+    git(where, "init", "--quiet", "-b", BASELINE_BRANCH)
     for key, value in IDENTITY:
-        _git(where, "config", key, value)
+        git(where, "config", key, value)
     for revision, subject in enumerate(fixture.history, start=1):
-        _write(where, fixture.committed(revision))
-        _git(where, "add", "--all")
-        _git(where, "commit", "--quiet", "-m", subject)
-    _git(where, "update-ref", BASELINE_REF, "HEAD")
-    _write(where, fixture.uncommitted())
+        write_files(where, fixture.committed(revision))
+        git(where, "add", "--all")
+        git(where, "commit", "--quiet", "-m", subject)
+    git(where, "update-ref", BASELINE_REF, "HEAD")
+    write_files(where, fixture.uncommitted())
     return where
 
 
@@ -109,30 +108,6 @@ def _fixture_of(task: MoveTask) -> Fixture:
         if fixture.name == task.fixture:
             return fixture
     raise ValueError(f"the git-conventions kit has no fixture named {task.fixture!r}")
-
-
-def _write(root: Path, files: Files) -> None:
-    for path, content in files:
-        target = root / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-
-
-def _git(repo: Path, *args: str) -> None:
-    """Run git in ``repo`` apart from the operator's own configuration."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
-    subprocess.run(["git", "-C", str(repo), *args], env=env, check=True, capture_output=True)
-
-
-def _project_instructions() -> str:
-    """The shipped blocks, in file order, as a project's ``CLAUDE.md`` carries them."""
-    blocks = [
-        path.read_text(encoding="utf-8").strip()
-        for path in sorted(CANONICAL_BLOCKS.glob("*.md"))
-        if path.name != SIDECAR_BLOCK
-    ]
-    return "\n\n".join(["# Fixture project", *blocks]) + "\n"
 
 
 def _note(name: str, revisions: int) -> str:
@@ -173,7 +148,7 @@ class Fixture:
         return (
             note,
             (f"{STATE_DIRECTORY}/.gitkeep", ""),
-            (PROJECT_INSTRUCTIONS, _project_instructions()),
+            (PROJECT_INSTRUCTIONS, project_instructions(frozenset({SIDECAR_BLOCK}))),
             *self.before,
         )
 

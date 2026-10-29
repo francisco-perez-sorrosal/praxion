@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-27T18:31:55Z'
+generated_at: '2026-10-29T03:49:06Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-23'
+  last_modified: '2026-10-27'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-28'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -469,7 +469,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-20'
+  last_modified: '2026-10-28'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-28'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-28'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -640,7 +640,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-28'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3519,6 +3519,18 @@ surfaces:
   title: Spawn rows carry the spawning session's kind and checkout; headless slug-less spawns are left out
   last_modified: '2026-10-27'
   renderer: adr_card
+- id: ai-state-decisions-477-move-results-own-directory
+  path: .ai-state/decisions/477-move-results-own-directory.md
+  type: markdown
+  title: Move results live in their own subdirectory with their own index, outside the kernel flip gate's read surface
+  last_modified: '2026-10-28'
+  renderer: adr_card
+- id: ai-state-decisions-478-move-subject-sibling-subpackage
+  path: .ai-state/decisions/478-move-subject-sibling-subpackage.md
+  type: markdown
+  title: A rule move is a second subject kind in a sibling subpackage over the adherence eval's shared kernel
+  last_modified: '2026-10-28'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3781,6 +3793,12 @@ surfaces:
   type: markdown
   title: 'Spec: loop-gate-hardening (the session-stall fixes and the flip gate''s evidence)'
   last_modified: '2026-10-20'
+  renderer: default_markdown
+- id: ai-state-specs-spec-main-session-adherence-2026-10-28
+  path: .ai-state/specs/SPEC_main-session-adherence_2026-10-28.md
+  type: markdown
+  title: 'Spec: main-session-adherence (the adherence eval measures a rule move in headless main sessions, so a rule can leave session-start residency only on evidence)'
+  last_modified: '2026-10-28'
   renderer: default_markdown
 - id: ai-state-specs-spec-merge-triggers-2026-10-03
   path: .ai-state/specs/SPEC_merge-triggers_2026-10-03.md
@@ -4395,6 +4413,8 @@ groups:
   - ai-state-decisions-474-eval-driving-tests-selected-by-pocket-drive
   - ai-state-decisions-475-gate-runs-bound-themselves-verbose-in-any-pocket
   - ai-state-decisions-476-spawn-rows-carry-session-kind-and-checkout
+  - ai-state-decisions-477-move-results-own-directory
+  - ai-state-decisions-478-move-subject-sibling-subpackage
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4439,6 +4459,7 @@ groups:
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-loop-gate-followups-2026-10-22
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
+  - ai-state-specs-spec-main-session-adherence-2026-10-28
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30

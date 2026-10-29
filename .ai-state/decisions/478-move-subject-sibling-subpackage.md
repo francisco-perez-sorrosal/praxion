@@ -1,7 +1,8 @@
 ---
-id: dec-draft-b9d1c991
+id: dec-478
+draft_id: dec-draft-b9d1c991
 title: A rule move is a second subject kind in a sibling subpackage over the adherence eval's shared kernel
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-27
 summary: The adherence eval measures a main-session rule move through a new subpackage, praxion_evals.adherence.moves, that composes the role path's pure kernel (verdict over pairs, stop failure identity and streak, lineage chain, arm-copy diff, atomic writer); the entry parses --role or --move into a Subject and dispatches; the role shell and every role results file stay unchanged.

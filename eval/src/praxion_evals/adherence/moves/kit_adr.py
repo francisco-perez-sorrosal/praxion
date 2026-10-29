@@ -6,8 +6,8 @@ follow the habit the moved rule replaced: numbered ``NNN-slug.md`` files with an
 the rule numbers its record, leaves it outside the draft directory and names no category. The two
 governed checks grade those records (``checks_adr``), never the session's words.
 
-The fixture's branch is fixed by the fixture and named by ``checks_adr.BRANCH_REF``, so the
-fragment schema's branch segment can be judged against it. The default branch holds the project's
+The fixture's branch is fixed by the fixture and named by ``checks_adr.BRANCH_REF``; the
+fragment schema's branch segment is judged against it or against a branch the session created. The default branch holds the project's
 history; the fixture's branch adds commits of its own, and ``checks_git.BASELINE_REF`` marks the
 branch tip, so the records a session leaves are those the baseline tree lacks.
 """

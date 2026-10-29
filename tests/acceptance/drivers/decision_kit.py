@@ -13,13 +13,10 @@ Bound here, because the specification or the base commit fixes them:
   `move_pocket`, the one seam into the eval pocket (the modules live in a Python 3.13 project this
   suite's interpreter does not import, so each is imported inside the code string run there);
 - the grade of one governed check over a planted end state, given the fixture project as it was
-  built and the project as a session left it, answered as `DecisionGrade`.
-
-Unbound until a binding step ties it to the designed surface (it raises `UnboundDriverError`
-with the assumption's words):
-
+  built and the project as a session left it, answered as `DecisionGrade`;
 - the observation of a lean copy's own installer linking rules into a sandbox home, and of the
-  text a session started from that home receives at session start.
+  text a session started from that home receives at session start, answered as `LeanStart`
+  (the copy needs no declaration, so it goes through `move_pocket.call_in_pocket`).
 """
 
 from __future__ import annotations
@@ -38,7 +35,6 @@ from tests.acceptance.drivers.move_eval import (
     SECOND_MOVE,
     Declared,
     FixtureKind,
-    unbound,
 )
 
 DECISION_MOVE = SECOND_MOVE
@@ -233,7 +229,7 @@ def _branch_as_built(fixture: Path) -> str:
     return adherence_eval._git(fixture, "symbolic-ref", "--short", "HEAD").strip()
 
 
-# -- The lean copy's own installer and session start (unbound) -------------------------------
+# -- The lean copy's own installer and session start ------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -242,9 +238,29 @@ class LeanStart:
     session_start_text: str  # every text the session start injected, joined
 
 
+# The observation owns its sandbox home; the answer is told apart by a total match.
+_LEAN_START = """
+from typing import assert_never
+from praxion_evals.adherence.moves import observe
+
+match observe.session_start(Path(request["lean_copy"])):
+    case observe.Observed() as seen:
+        emit({"refused": False, "linked": sorted(seen.linked), "lines": list(seen.lines)})
+    case observe.Refused(reason=reason):
+        emit({"refused": True, "reason": reason})
+    case unreachable:
+        assert_never(unreachable)
+"""
+
+
 def lean_session_start(lean_copy: Path, sandbox: Path) -> LeanStart:
-    unbound(
-        "a lean copy's own installer is run offline into a sandbox home under a given directory,"
-        " reporting which rule files of the copy it linked there, and a session start over that"
-        " home is observed offline, reporting the text injected at session start"
-    )
+    """What `lean_copy`'s own installer links and its session start injects.
+
+    `sandbox` is this driver's scratch only: the observation runs in a sandbox home of its own.
+    """
+    answer = move_pocket.call_in_pocket(_LEAN_START, {"lean_copy": str(lean_copy)})
+    if answer["refused"]:
+        raise AssertionError(
+            f"the lean copy's session start could not be observed: {answer['reason']}"
+        )
+    return LeanStart(frozenset(answer["linked"]), "\n".join(answer["lines"]))

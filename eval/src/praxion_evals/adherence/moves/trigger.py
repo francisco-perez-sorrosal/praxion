@@ -54,6 +54,7 @@ from praxion_evals.adherence.moves.model import (
     NothingToGrade,
     PathMatched,
     Unknown,
+    holds_phrase,
 )
 from praxion_evals.adherence.moves.session_record import (
     Delivery,
@@ -236,8 +237,7 @@ def _carries(channel: Channel, event: Event, check: GovernedCheck) -> bool:
 
 
 def _holds_governing_text(text: str, check: GovernedCheck) -> bool:
-    lowered = text.lower()
-    return all(phrase.lower() in lowered for phrase in check.phrases or (check.section,))
+    return all(holds_phrase(text, phrase) for phrase in check.phrases or (check.section,))
 
 
 def _timing(arrived_at: int, actions: Sequence[_Action]) -> ArrivalTiming:

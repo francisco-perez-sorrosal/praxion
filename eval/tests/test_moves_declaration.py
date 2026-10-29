@@ -180,7 +180,7 @@ def test_zero_or_three_governed_checks_are_refused(tmp_path: Path, count: int) -
 
 def test_a_section_its_rule_file_lacks_is_refused_naming_it(tmp_path: Path) -> None:
     path = write(tmp_path, a_payload())
-    checkout = a_checkout(tmp_path / "checkout", f"### {SECTION}\ntext\n")
+    checkout = a_checkout(tmp_path / "checkout", f"### {SECTION}\nkeep it to 50\n")
 
     message = refused_by(path, checkout=checkout)
 
@@ -198,7 +198,48 @@ def test_a_rule_file_the_checkout_lacks_is_refused_naming_it(tmp_path: Path) -> 
 
 def test_every_section_held_is_accepted_against_the_checkout(tmp_path: Path) -> None:
     checkout = a_checkout(
-        tmp_path / "checkout", f"## {SECTION}\ntext\n\n### Staging Discipline  \n"
+        tmp_path / "checkout", f"## {SECTION}\nkeep it to 50\n\n### Staging Discipline  \n"
+    )
+
+    assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
+
+
+def test_a_phrase_its_section_does_not_hold_is_refused_naming_check_phrase_section_and_rule(
+    tmp_path: Path,
+) -> None:
+    checkout = a_checkout(tmp_path / "checkout", f"## {SECTION}\nno number here\n")
+
+    message = refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+    named = ("message form", "'50'", SECTION, RULE)
+    assert [value for value in named if value not in message] == [], message
+
+
+def test_a_phrase_differing_only_in_letter_case_is_accepted(tmp_path: Path) -> None:
+    payload = a_payload()
+    payload["checks"][0]["phrases"] = ["FIFTY chars"]
+    checkout = a_checkout(
+        tmp_path / "checkout", f"## {SECTION}\nKeep it to fifty Chars\n\n## Staging Discipline\n"
+    )
+
+    assert declaration.load(write(tmp_path, payload), checkout=checkout).checks.checks
+
+
+def test_a_phrase_held_only_outside_its_section_is_refused(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## Before\n50\n\n## {SECTION}\ntext\n\n## After\n50\n\n## Staging Discipline\n",
+    )
+
+    message = refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+    assert "'50'" in message
+
+
+def test_a_phrase_held_by_a_sub_heading_of_its_section_counts_as_inside(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## {SECTION}\ntext\n\n### Detail\nkeep it to 50\n\n## Staging Discipline\n",
     )
 
     assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks

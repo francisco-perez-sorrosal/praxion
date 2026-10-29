@@ -251,6 +251,12 @@ class GovernedChecks:
         _require(len({c.name for c in self.checks}) == len(self.checks), "check names are distinct")
 
 
+def holds_phrase(text: str, phrase: str) -> bool:
+    """Whether ``text`` holds ``phrase``, ignoring letter case: the one comparison by which a
+    declared phrase is held, shared by the declaration check and the trigger reader."""
+    return phrase.lower() in text.lower()
+
+
 @dataclass(frozen=True)
 class BothKinds: ...
 

@@ -45,6 +45,7 @@ from praxion_evals.adherence.moves.model import (
     Remove,
     SessionStart,
     Write,
+    holds_phrase,
 )
 
 SCHEMA = "move-declaration/1"
@@ -89,7 +90,8 @@ def kit(name: str, checkout: Path | None = None) -> MoveDeclaration:
 
 
 def check_sections(declaration: MoveDeclaration, checkout: Path) -> None:
-    """Refuse a governed check whose section is no heading of its rule file in ``checkout``."""
+    """Refuse a governed check whose section is no heading of its rule file in ``checkout``,
+    or whose declared phrase that section does not hold."""
     for check in declaration.checks.checks:
         rule = checkout / check.rule_file.value
         if not rule.is_file():
@@ -97,16 +99,40 @@ def check_sections(declaration: MoveDeclaration, checkout: Path) -> None:
                 f"the check {check.name!r} names the rule file {check.rule_file.value}, "
                 f"which the checkout does not hold"
             )
-        if not _has_heading(rule.read_text(encoding="utf-8"), check.section):
+        span = _section_span(rule.read_text(encoding="utf-8"), check.section)
+        if span is None:
             raise DeclarationError(
                 f"the check {check.name!r} names the section {check.section!r}, "
                 f"which {check.rule_file.value} does not hold"
             )
+        for phrase in check.phrases:
+            if not holds_phrase(span, phrase):
+                raise DeclarationError(
+                    f"the check {check.name!r} declares the phrase {phrase!r}, which the "
+                    f"section {check.section!r} of {check.rule_file.value} does not hold"
+                )
 
 
-def _has_heading(text: str, section: str) -> bool:
-    heading = re.compile(rf"#{{1,6}}\s+{re.escape(section)}\s*")
-    return any(heading.fullmatch(line) for line in text.splitlines())
+def _section_span(text: str, section: str) -> str | None:
+    """The heading line of ``section`` through the line before the next heading of the same or
+    a higher level (sub-headings included); None when no heading names it."""
+    lines = text.splitlines()
+    heading = re.compile(rf"(#{{1,6}})\s+{re.escape(section)}\s*")
+    for start, line in enumerate(lines):
+        found = heading.fullmatch(line)
+        if found:
+            level = len(found.group(1))
+            end = next(
+                (i for i in range(start + 1, len(lines)) if 0 < _heading_level(lines[i]) <= level),
+                len(lines),
+            )
+            return "\n".join(lines[start:end])
+    return None
+
+
+def _heading_level(line: str) -> int:
+    found = re.match(r"(#{1,6})\s", line)
+    return len(found.group(1)) if found else 0
 
 
 # -- The declaration ------------------------------------------------------------------------

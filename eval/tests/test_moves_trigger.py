@@ -14,9 +14,11 @@ from praxion_evals.adherence.moves.model import (
     Arrived,
     CheckTrigger,
     GateRefusal,
+    GovernedCheck,
     MoveDeclaration,
     ProjectGating,
     RelPath,
+    holds_phrase,
 )
 from praxion_evals.adherence.moves.session_record import (
     Delivery,
@@ -180,6 +182,17 @@ def test_text_holding_only_part_of_a_checks_phrases_does_not_carry_it(git):
     t = trigger_of(git, COMMIT_FORM, kernel_only)
 
     assert type(t.arrivals["session_start"]).__name__ == "NeverArrived"
+
+
+@pytest.mark.parametrize(
+    "text", ["Subject Lines Under 50 chars", "subject lines under 50", "no number here"]
+)
+def test_the_trigger_reader_agrees_with_the_phrase_predicate(text):
+    check = GovernedCheck("form", RelPath.parse("rules/x.md"), "Form", ("SUBJECT lines", "50"))
+
+    assert trigger._holds_governing_text(text, check) == all(
+        holds_phrase(text, phrase) for phrase in check.phrases
+    )
 
 
 def test_a_failed_check_that_nothing_reached_is_a_trigger_failure_derived_from_the_two(git):

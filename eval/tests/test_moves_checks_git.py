@@ -133,6 +133,18 @@ def test_a_human_co_author_or_a_prose_mention_is_not_ai_authorship(git, tmp_path
     assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade("passed", ())
 
 
+def test_a_stored_hash_prefixed_ai_line_fails_the_authorship_part(git, tmp_path):
+    repo = plant(tmp_path, (f"{GOOD}\n\n# {TRAILER}", NAMED))
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade("failed", (AI_AUTHORSHIP,))
+
+
+def test_a_stored_hash_prefixed_line_naming_no_ai_passes(git, tmp_path):
+    repo = plant(tmp_path, (f"{GOOD}\n\n# Co-Authored-By: Jane Doe <jane@example.com>", NAMED))
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade("passed", ())
+
+
 def test_a_subject_of_exactly_fifty_characters_passes(git, tmp_path):
     repo = plant(tmp_path, ("A" * 50, NAMED))
 
@@ -368,6 +380,10 @@ GATE_ACCEPTED_LINES = [
     "Co-Authored-By: Jane Doe <jane@example.com>",
     "Signed-off-by: Jane Doe <jane@example.com>",
     "The body says this was generated with help and names Anthropic; that is prose.",
+]
+# The one deliberate divergence: the gate reads a message before cleanup, so it takes a
+# `#`-prefixed line for a comment; the grader reads the stored message, where git kept the line.
+GATE_ACCEPTED_GRADER_FAILED_LINES = [
     "# Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
     "#\t🤖 Generated with [Claude Code](https://claude.com/claude-code)",
 ]
@@ -391,3 +407,13 @@ def test_the_authorship_part_agrees_with_the_commit_gate_on_what_an_ai_line_is(c
 
     assert graded == bool(commit_gate.check_commit_message(message)), line
     assert graded == (line in GATE_BAD_LINES), line
+
+
+@pytest.mark.parametrize("line", GATE_ACCEPTED_GRADER_FAILED_LINES)
+def test_a_hash_prefixed_ai_line_is_the_one_line_the_grader_fails_and_the_gate_accepts(
+    commit_gate, line
+):
+    message = f"{GOOD}\n\n{line}\n"
+
+    assert AI_AUTHORSHIP in checks_git._message_failures(message.strip()), line
+    assert not commit_gate.check_commit_message(message), line

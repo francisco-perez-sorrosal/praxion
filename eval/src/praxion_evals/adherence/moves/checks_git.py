@@ -118,10 +118,12 @@ def _message_failures(message: str) -> list[str]:
 
 
 def _names_ai_author(message: str) -> bool:
+    # Every line is content: the grader reads stored messages, and `git commit -m` or `-F` keeps a
+    # `#` line verbatim (only an edited message has its comment lines stripped). The patterns
+    # anchor at the line start, so the comment marker is dropped before matching.
     return any(
-        pattern.search(line)
+        pattern.search(line.lstrip().lstrip("#"))
         for line in message.splitlines()
-        if not line.lstrip().startswith("#")  # git strips comment lines before storing a message
         for pattern in _AI_AUTHORSHIP_LINES
     )
 

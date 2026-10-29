@@ -1,0 +1,64 @@
+{
+  "schema": "move-declaration/1",
+  "move": "adr-conventions",
+  "moved_rule": "rules/swe/adr-conventions.md",
+  "checks": [
+    {
+      "name": "decision draft placement",
+      "rule_file": "rules/swe/adr-conventions.md",
+      "section": "File Format",
+      "phrases": [
+        "fragment",
+        "drafts"
+      ]
+    }
+  ],
+  "fixture_scope": "managed",
+  "arms": {
+    "full": [],
+    "lean": [
+      {
+        "op": "derive",
+        "path": "rules/_manifest.yaml",
+        "kind": "manifest_row_removed"
+      },
+      {
+        "op": "derive",
+        "path": "rules/swe/adr-conventions-resident.md",
+        "kind": "kernel",
+        "lines": [
+          "Architecture Decision Records live in"
+        ]
+      },
+      {
+        "op": "write",
+        "path": "rules/swe/adr-conventions.md",
+        "source": "rules__swe__adr-conventions.md"
+      }
+    ],
+    "floor": [
+      {
+        "op": "remove",
+        "path": "rules/swe/adr-conventions.md"
+      },
+      {
+        "op": "derive",
+        "path": "rules/_manifest.yaml",
+        "kind": "manifest_row_removed"
+      }
+    ]
+  },
+  "deliveries": [
+    {
+      "channel": "session_start",
+      "file": "rules/swe/adr-conventions-resident.md"
+    },
+    {
+      "channel": "path_matched",
+      "file": "rules/swe/adr-conventions.md",
+      "globs": [
+        ".ai-state/decisions/**"
+      ]
+    }
+  ]
+}

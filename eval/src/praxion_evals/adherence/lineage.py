@@ -295,20 +295,12 @@ class Lineage:
     def parse(cls, results_dir: Path, run_id: str) -> Lineage:
         """The whole lineage ``run_id`` belongs to, whichever of its parts that is.
 
-        Refused: a run no readable results file holds, a part continuing a run that is missing
-        (a gap) or itself, and a run that two parts continue (a fork, even on a branch the
-        named run is not on).
+        Refused: a run no readable results file holds, and whatever ``chain_of`` refuses.
         """
         parts = {held: ref for held, (ref, _) in _runs_in(results_dir).items()}
         if run_id not in parts:
             raise ValueError(f"no results file in {results_dir} holds run {run_id}")
-        chain = [_root_of(parts, run_id, results_dir)]
-        while later := [p for p in parts.values() if p.continues == chain[-1].run_id]:
-            if len(later) > 1:
-                names = ", ".join(sorted(p.run_id for p in later))
-                raise ValueError(f"the lineage forks: {names} all continue {chain[-1].run_id}")
-            chain.append(later[0])
-        return cls(tuple(chain))
+        return cls(chain_of(parts, run_id))
 
 
 def parts_before(results: RunResults, results_dir: Path) -> tuple[RunResults, ...]:
@@ -339,20 +331,28 @@ def _runs_in(results_dir: Path) -> dict[str, tuple[PartRef, RunResults]]:
     return runs
 
 
-def _root_of(parts: Mapping[str, PartRef], run_id: str, results_dir: Path) -> PartRef:
+def chain_of(parts: Mapping[str, PartRef], run_id: str) -> tuple[PartRef, ...]:
+    """The whole chain ``run_id`` belongs to, root first. Refused: a gap, a loop, and a run two
+    parts continue (even on a branch ``run_id`` is not on)."""
     part, walked = parts[run_id], {run_id}
     while part.continues is not None:
         earlier = parts.get(part.continues)
         if earlier is None:
             raise ValueError(
                 f"the lineage has a gap: run {part.run_id} continues {part.continues}, which no"
-                f" readable results file in {results_dir} holds"
+                f" readable results file in {part.path.parent} holds"
             )
         if earlier.run_id in walked:
             raise ValueError(f"the lineage loops: run {earlier.run_id} continues itself")
         walked.add(earlier.run_id)
         part = earlier
-    return part
+    chain = [part]
+    while later := [p for p in parts.values() if p.continues == chain[-1].run_id]:
+        if len(later) > 1:
+            names = ", ".join(sorted(p.run_id for p in later))
+            raise ValueError(f"the lineage forks: {names} all continue {chain[-1].run_id}")
+        chain.append(later[0])
+    return tuple(chain)
 
 
 # ---------------------------------------------------------------------------

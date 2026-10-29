@@ -26,7 +26,7 @@ Pure: nothing here touches a process, a file or a clock.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import takewhile
 from typing import Literal
@@ -286,8 +286,13 @@ def _streak(
 ) -> tuple[tuple[int, Seen], ...]:
     """The trailing run of ``failure`` among ``arm``'s sessions, as (position, session)."""
     mine = [(i, s) for i, s in enumerate(state.seen) if s.role == role and s.session.arm == arm]
-    run = takewhile(lambda item: item[1].failure == failure, reversed(mine))
-    return tuple(reversed(list(run)))
+    length = trailing_streak([s.failure for _, s in mine], failure)
+    return tuple(mine[len(mine) - length :])
+
+
+def trailing_streak(failures: Sequence[Failure | None], failure: Failure) -> int:
+    """How many of the last ``failures`` are ``failure``, uninterrupted: 0 when the last is not."""
+    return len(tuple(takewhile(lambda seen: seen == failure, reversed(failures))))
 
 
 def _stop_reason(

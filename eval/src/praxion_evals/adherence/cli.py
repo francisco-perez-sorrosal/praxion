@@ -70,6 +70,7 @@ from praxion_evals.adherence.model import (
     Role,
     TaskSpec,
 )
+from praxion_evals.adherence.moves import cli as moves_cli
 from praxion_evals.adherence.run_ending import Continuation
 from praxion_evals.adherence.run_identity import (
     UNCOUNTED_PATHS,
@@ -110,11 +111,16 @@ CALIBRATION_RUN_NOTE = (
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if (subject := _move_named(argv)) is not None:
+        return moves_cli.main(subject, argv)
     config = parse_config(argv)
     if config.calibration_run is not None:
         print(f"{PROG}: --calibration-run: {CALIBRATION_RUN_NOTE}", file=sys.stderr)
     try:
         if config.report is not None:
+            if moves_cli.is_move_results(config.report):
+                print(moves_cli.report_text(config.report))
+                return EXIT_COMPLETE
             tip = results.load(config.report)
             print(report.render(tip, parts_before(tip, config.report.parent)), end="")
             return EXIT_COMPLETE
@@ -140,6 +146,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 # --- argv, parsed once ---
+
+
+def _move_named(argv: Sequence[str] | None) -> moves_cli.MoveSubject | None:
+    """The move the command line names or the run it continues or closes belongs to, else None."""
+    return getattr(_parser().parse_known_args(argv)[0], "move", None) or moves_cli.run_subject(argv)
 
 
 def parse_config(argv: Sequence[str] | None) -> RunConfig:
@@ -195,7 +206,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     add = parser.add_argument
     add("checkout", nargs="?", type=Path, help="default: this repository's root")
-    add("--role", dest="roles", action="append", choices=ROLES, help="repeatable")
+    subject = parser.add_mutually_exclusive_group()
+    subject.add_argument("--role", dest="roles", action="append", choices=ROLES, help="repeatable")
+    subject.add_argument(
+        "--move",
+        type=moves_cli.move_subject,
+        default=argparse.SUPPRESS,
+        help="measure a move instead of a role; its options are those of the move entry",
+    )
     add("--arm", dest="arms", action="append", choices=ARMS, help="repeatable; default both")
     add("--output", type=Path, help=f"default: <repo>/{OUTPUT_DIR}/<run-id>.json")
     add("--seed", type=int, default=DEFAULT_SEED)
@@ -375,7 +393,7 @@ def _reindex(config: RunConfig) -> int:
     )
     index = run_index.write_index(directory)
     print(f"indexed {directory}: {index.name}")
-    return EXIT_COMPLETE
+    return moves_cli.reindex(directory)
 
 
 def _read_part(

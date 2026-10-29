@@ -1,0 +1,85 @@
+{
+  "schema": "move-declaration/1",
+  "move": "git-conventions",
+  "moved_rule": "rules/swe/vcs/git-conventions.md",
+  "checks": [
+    {
+      "name": "commit message form",
+      "rule_file": "rules/swe/vcs/git-conventions.md",
+      "section": "Commit Message Format",
+      "phrases": [
+        "imperative mood",
+        "50 characters",
+        "authorship lines"
+      ]
+    },
+    {
+      "name": "staging by name",
+      "rule_file": "rules/swe/vcs/git-conventions.md",
+      "section": "Staging Discipline",
+      "phrases": [
+        "specific files by name",
+        "git diff --staged",
+        "accidental inclusions"
+      ]
+    }
+  ],
+  "fixture_scope": "both",
+  "arms": {
+    "full": [],
+    "lean": [
+      {
+        "op": "write",
+        "path": "hooks/inject_git_conventions_at_use.py",
+        "source": "inject_git_conventions_at_use.py"
+      },
+      {
+        "op": "derive",
+        "path": "rules/swe/vcs/git-conventions-resident.md",
+        "kind": "kernel",
+        "lines": [
+          "- Stage specific files by name",
+          "- Review `git diff --staged`",
+          "- Verify the staged diff matches intent",
+          "- **Never a bare `git stash`",
+          "- **Treat any git command that is routine on a clean tree",
+          "- Never include AI authorship lines"
+        ]
+      },
+      {
+        "op": "derive",
+        "path": "rules/_manifest.yaml",
+        "kind": "manifest_row_removed"
+      },
+      {
+        "op": "derive",
+        "path": "hooks/hooks.json",
+        "kind": "hook_registered"
+      }
+    ],
+    "floor": [
+      {
+        "op": "remove",
+        "path": "rules/swe/vcs/git-conventions.md"
+      },
+      {
+        "op": "derive",
+        "path": "rules/_manifest.yaml",
+        "kind": "manifest_row_removed"
+      }
+    ]
+  },
+  "deliveries": [
+    {
+      "channel": "session_start",
+      "file": "rules/swe/vcs/git-conventions-resident.md"
+    },
+    {
+      "channel": "hook_context",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "reads": "rules/swe/vcs/git-conventions.md",
+      "repeat": "each"
+    }
+  ]
+}

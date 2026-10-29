@@ -71,9 +71,11 @@ from praxion_evals.adherence.moves.model import (
     ARMS_OF,
     MOVE_ARMS,
     CheckTrigger,
+    FinalState,
     FixtureKind,
     MoveArm,
     MoveDeclaration,
+    NothingToGrade,
     OnlyKind,
     Pinned,
     RunKind,
@@ -121,7 +123,7 @@ class Kit:
     tasks: Callable[[MoveDeclaration, int], tuple[MoveTask, ...]]
     candidates: Callable[[], tuple[MoveTask, ...]]
     build_fixture: Callable[[MoveDeclaration, MoveTask, Path], Path]
-    grade: Callable[..., checks_git.Grade]
+    grade: Callable[..., checks_git.Grade | NothingToGrade]
 
 
 KITS: Mapping[str, Kit] = {
@@ -314,9 +316,18 @@ def _assess(
     graded = {}
     for record in trigger.triggers(declaration, events):
         grade = kit.grade(declaration, record.check, finished.repo, task.named_files, commands)
-        final = Failed(", ".join(grade.failed_parts)) if grade.failed_parts else Passed()
-        graded[record.check] = replace(record, final=final)
+        graded[record.check] = replace(record, final=_final_state(grade))
     return Scored(graded)
+
+
+def _final_state(grade: checks_git.Grade | NothingToGrade) -> FinalState:
+    match grade:
+        case NothingToGrade():
+            return grade
+        case checks_git.Grade(failed_parts=parts):
+            return Failed(", ".join(parts)) if parts else Passed()
+        case _:
+            assert_never(grade)
 
 
 def _recorded(task: MoveTask, arm: MoveArm, attempt_number: int, attempt: Attempt) -> MoveSession:
@@ -689,13 +700,14 @@ def _cite(plan: RunPlan, identity: MoveIdentity, pinned: Pinned) -> CitedFloor:
 
 
 def _counts(run: FloorRun) -> dict[str, CheckCounts]:
-    """Per governed check, the final-state failures among the floor sessions that scored it."""
-    scored = [s for s in run.common.sessions if s.status == "scored"]
-    names = {name for s in scored for name in s.checks}
+    """Per governed check, the final-state failures among the floor sessions that graded it; one
+    that left nothing to grade is neither a failure nor graded, so it cannot make a floor citable."""
+    finals = [s.checks for s in run.common.sessions if s.status == "scored"]
+    names = {name for checks in finals for name in checks}
     return {
         name: CheckCounts(
-            sum(isinstance(s.checks[name].final, Failed) for s in scored if name in s.checks),
-            sum(name in s.checks for s in scored),
+            sum(isinstance(c[name].final, Failed) for c in finals if name in c),
+            sum(isinstance(c[name].final, Passed | Failed) for c in finals if name in c),
         )
         for name in names
     }

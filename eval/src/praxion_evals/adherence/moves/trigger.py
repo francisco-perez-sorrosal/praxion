@@ -44,12 +44,14 @@ from praxion_evals.adherence.moves.model import (
     Arrived,
     Channel,
     CheckTrigger,
+    FinalState,
     GateRefusal,
     GovernedCheck,
     History,
     HookContext,
     MoveDeclaration,
     NeverArrived,
+    NothingToGrade,
     PathMatched,
     Unknown,
 )
@@ -101,7 +103,7 @@ class TriggerRecord:
 
     check: str
     arrivals: dict[str, str]  # channel -> timing word, "never" or "unknown"
-    final: str | None  # "passed" or "failed"
+    final: str | None  # "passed", "failed" or "nothing_to_grade"
     history: str | None
     refusals: tuple[str, ...]
 
@@ -295,7 +297,7 @@ def _timing_word(arrival: Arrival) -> str:
             assert_never(arrival)
 
 
-def _outcome_word(final: Passed | Failed | None) -> str | None:
+def _outcome_word(final: FinalState | None) -> str | None:
     match final:
         case None:
             return None
@@ -303,5 +305,7 @@ def _outcome_word(final: Passed | Failed | None) -> str | None:
             return "passed"
         case Failed():
             return "failed"
+        case NothingToGrade():
+            return "nothing_to_grade"
         case _:
             assert_never(final)

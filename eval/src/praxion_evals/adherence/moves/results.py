@@ -51,10 +51,12 @@ from praxion_evals.adherence.moves.model import (
     Arrived,
     Channel,
     CheckTrigger,
+    FinalState,
     History,
     MoveArm,
     MoveName,
     NeverArrived,
+    NothingToGrade,
     Pinned,
     RunKind,
     Unknown,
@@ -483,14 +485,26 @@ def _session_to_json(session: MoveSession) -> dict[str, Any]:
 
 
 def _trigger_to_json(trigger: CheckTrigger) -> dict[str, Any]:
-    final = trigger.final
     return {
-        "final": None if final is None else ("passed" if isinstance(final, Passed) else "failed"),
-        **({"detail": final.detail} if isinstance(final, Failed) else {}),
+        **_final_to_json(trigger.final),
         "history": trigger.history,
         "arrivals": {channel: _arrival_word(a) for channel, a in trigger.arrivals.items()},
         "refusals": list(trigger.refusals),
     }
+
+
+def _final_to_json(final: FinalState | None) -> dict[str, Any]:
+    match final:
+        case None:
+            return {"final": None}
+        case Passed():
+            return {"final": "passed"}
+        case Failed(detail=detail):
+            return {"final": "failed", "detail": detail}
+        case NothingToGrade(reason=reason):
+            return {"final": "nothing_to_grade", "detail": reason}
+        case _:
+            assert_never(final)
 
 
 def _arrival_word(arrival: Arrival) -> str:
@@ -679,9 +693,7 @@ def _trigger_from_json(name: str, record: Mapping[str, Any]) -> CheckTrigger:
     )
 
 
-def _final_from_json(
-    word: str | None, record: Mapping[str, Any], what: str
-) -> Passed | Failed | None:
+def _final_from_json(word: str | None, record: Mapping[str, Any], what: str) -> FinalState | None:
     match word:
         case None:
             return None
@@ -689,6 +701,8 @@ def _final_from_json(
             return Passed()
         case "failed":
             return Failed(_need(record, "detail", what))
+        case "nothing_to_grade":
+            return NothingToGrade(_need(record, "detail", what))
         case _:
             raise ValueError(f"{what} has an unknown final {word!r}")
 

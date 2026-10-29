@@ -13,7 +13,8 @@ trigger record's history, not this grader's.
 - ``staging by name``: the commits hold exactly the files the request names, the unnamed files stay
   uncommitted, and no command staged everything at once (checked only over the commands given).
 
-A session that commits nothing fails both checks on that one part.
+A session that commits nothing leaves nothing to grade (``NothingToGrade``): a pair reads that
+as failing both checks, and a floor counts it apart.
 
 This module also owns how a shell command reads as a git call, which the trigger record shares so
 that what it calls a governed action is what the lean hook fires for.
@@ -31,7 +32,7 @@ from pathlib import Path
 from typing import Literal
 
 from praxion_evals.adherence.model import _require
-from praxion_evals.adherence.moves.model import MoveDeclaration
+from praxion_evals.adherence.moves.model import MoveDeclaration, NothingToGrade
 
 COMMIT_MESSAGE_FORM = "commit message form"
 STAGING_BY_NAME = "staging by name"
@@ -79,8 +80,9 @@ def grade(
     repo: Path,
     named_files: Sequence[str],
     commands: Sequence[str] = (),
-) -> Grade:
-    """The named governed check's grade of the end state in ``repo``.
+) -> Grade | NothingToGrade:
+    """The named governed check's grade of the end state in ``repo``, or ``NothingToGrade`` when
+    the session made no commit.
 
     Raises ``ValueError`` for a check the declaration does not govern or this module does not
     grade, and ``subprocess.CalledProcessError`` for a repository git cannot read."""
@@ -89,7 +91,7 @@ def grade(
     if check not in _GRADERS:
         raise ValueError(f"no grader for the check {check!r}; it grades {sorted(_GRADERS)}")
     if not _session_commits(repo):
-        return Grade.of([NO_COMMIT])
+        return NothingToGrade(NO_COMMIT)
     return _GRADERS[check](repo, tuple(named_files), tuple(commands))
 
 

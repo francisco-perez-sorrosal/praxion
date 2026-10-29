@@ -4,7 +4,9 @@ The move takes the role's place in :func:`praxion_evals.adherence.verdict.role_v
 paired task becomes a ``model.Pair`` whose outcomes are the governed checks graded on final
 state, so the verdict, its exact own-discordance allowances and its worst-case recount are the
 shared rule's, unchanged. History and arrival timing are kept on the measurement for the report
-and enter no pair, so they cannot gate. Floor sessions enter no pair and no allowance.
+and enter no pair, so they cannot gate. Floor sessions enter no pair and no allowance. A session
+that left nothing to grade fails its pair (:func:`in_pair`), but on the floor it is counted apart
+and enters neither the failures nor the rate.
 
 The sensitivity figure asks whether the paired run could have seen the failure the floor shows:
 the target pairs times the floor's failure rate minus the full arm's. It is exact ``Fraction``
@@ -47,9 +49,11 @@ from praxion_evals.adherence.moves.model import (
     Arrival,
     Arrived,
     Channel,
+    FinalState,
     FixtureKind,
     History,
     NeverArrived,
+    NothingToGrade,
     Unknown,
 )
 
@@ -61,13 +65,14 @@ SHOWN_DECIMALS = 1
 _SHOWN_SCALE = 10**SHOWN_DECIMALS
 MOVE_RETRY_POLICY = "none: an errored session is an errored side of its pair"
 FAILED_ON_FINAL_STATE = "the check failed on final state"
+NOTHING_ON_FINAL_STATE = "the session left nothing to grade"
 
 
 @dataclass(frozen=True)
 class Side:
     """One arm's graded session: each governed check's final state, and what the report shows."""
 
-    final: Mapping[str, Passed | Failed]
+    final: Mapping[str, FinalState]
     history: Mapping[str, History]
     arrivals: Mapping[str, Mapping[Channel, Arrival]]
 
@@ -101,10 +106,12 @@ class MovePair:
 
 @dataclass(frozen=True)
 class FloorTally:
-    """A check's floor sessions: the failures out of the sessions that scored it."""
+    """A check's floor sessions: the failures out of the sessions that graded it, and apart from
+    both, the sessions that left nothing to grade."""
 
     failures: int
     scored: int
+    ungraded: int = 0
 
     @property
     def rate(self) -> Fraction:
@@ -129,7 +136,11 @@ class Measurement:
         outcomes = [
             session.final[check] for session in self.floor if session and check in session.final
         ]
-        return FloorTally(sum(isinstance(o, Failed) for o in outcomes), len(outcomes))
+        return FloorTally(
+            failures=sum(isinstance(o, Failed) for o in outcomes),
+            scored=sum(isinstance(o, Passed | Failed) for o in outcomes),
+            ungraded=sum(isinstance(o, NothingToGrade) for o in outcomes),
+        )
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> Measurement:
@@ -252,10 +263,22 @@ def _one_decimal(figure: Fraction) -> str:
 # -- Wire form to typed values ----------------------------------------------------------------
 
 
+def in_pair(final: FinalState) -> Passed | Failed:
+    """How a pair reads a final state: nothing left to grade fails, since the arm left the task
+    the check governs undone."""
+    match final:
+        case NothingToGrade(reason=reason):
+            return Failed(reason)
+        case Passed() | Failed():
+            return final
+        case _:
+            assert_never(final)
+
+
 def _status(side: Side | None) -> SessionStatus:
     if side is None:
         return Errored(ERRORED_KIND, UNREADABLE_SESSION)
-    outcomes: dict[str, CheckOutcome] = dict(side.final)
+    outcomes: dict[str, CheckOutcome] = {name: in_pair(f) for name, f in side.final.items()}
     return Measured(outcomes, None)
 
 
@@ -287,14 +310,16 @@ def _side_from_json(data: Mapping[str, Any]) -> Side:
     )
 
 
-def _final(word: str) -> Passed | Failed:
+def _final(word: str) -> FinalState:
     match word:
         case "passed":
             return Passed()
         case "failed":
             return Failed(FAILED_ON_FINAL_STATE)
+        case "nothing_to_grade":
+            return NothingToGrade(NOTHING_ON_FINAL_STATE)
         case _:
-            raise ValueError(f"a final state is passed or failed, got {word!r}")
+            raise ValueError(f"a final state is passed, failed or nothing_to_grade, got {word!r}")
 
 
 def _fixture_kind(word: str) -> FixtureKind:

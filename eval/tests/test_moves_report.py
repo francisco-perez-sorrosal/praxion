@@ -193,6 +193,23 @@ def test_floor_failures_are_shown_out_of_the_sessions_that_scored_the_check():
     assert only(report, MESSAGE, "floor") == ["2", "7"]
 
 
+def test_a_floor_session_that_made_no_commit_is_shown_apart_from_the_floor_failures():
+    made_no_commit = {MESSAGE: "nothing_to_grade", STAGING: "nothing_to_grade"}
+    report = render(measurement(DISCORDANT, [made_no_commit, *floor(1, 0, sessions=7)]))
+
+    assert only(report, MESSAGE, "floor") == ["1", "7"]
+    assert only(report, MESSAGE, "floor nothing to grade") == ["1"]
+
+
+def test_a_lean_session_that_made_no_commit_is_a_lean_final_state_failure():
+    made_no_commit = {MESSAGE: "nothing_to_grade", STAGING: "passed"}
+    wire = pairs(1, OK, made_no_commit) + pairs(23, OK, OK, start=1)
+
+    report = render(measurement(wire, floor(8, 8)))
+
+    assert figures(report, MESSAGE, "final") == [["full", "0"], ["lean", "1"]]
+
+
 def test_the_sensitivity_is_the_target_times_the_floor_rate_less_the_full_rate():
     report = render(measurement(DISCORDANT, floor(2, 1)))
 

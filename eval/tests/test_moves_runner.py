@@ -21,7 +21,12 @@ from praxion_evals.adherence.model import Errored, Failed, Passed
 from praxion_evals.adherence.moves import arms, declaration, observe, runner
 from praxion_evals.adherence.moves.launch import Finished as Launched
 from praxion_evals.adherence.moves.lineage import Stopped
-from praxion_evals.adherence.moves.model import LaunchOptions, MoveArm, MoveDeclaration
+from praxion_evals.adherence.moves.model import (
+    LaunchOptions,
+    MoveArm,
+    MoveDeclaration,
+    NothingToGrade,
+)
 from praxion_evals.adherence.moves.results import FloorRun, PairedRun
 from praxion_evals.adherence.moves.runner import (
     Conducted,
@@ -60,6 +65,7 @@ SEED = 7
 FLOOR_TASKS = runner.FLOOR_MINIMUM
 STARTED = datetime(2026, 10, 28, 10, 0, tzinfo=UTC)
 CONFORMING, VIOLATING, LEAKING = "conforming", "violating", "leaking"
+IDLE = "idle"  # stages the named files and never commits
 
 
 @pytest.fixture(scope="module")
@@ -121,7 +127,7 @@ class Rehearsal:
         return self._starts[copy]
 
     def end_state(self, task: MoveTask, committed: tuple[str, ...], build_fixture) -> Path:
-        key = (task.task_id, committed[0] == "git add -A")
+        key = (task.task_id, committed)
         if key not in self._end_states:
             repo = self.scratch / "end-states" / f"{task.task_id}-{len(self._end_states)}"
             build_fixture(repo)
@@ -142,7 +148,8 @@ class StandIn:
 
     ``script`` answers per (arm, launch number) with what the session does: ``CONFORMING`` stages
     the named files and commits by the rule, ``VIOLATING`` stages everything and commits badly,
-    ``LEAKING`` also sees the rule at start in a floor arm, and any other word is an error kind
+    ``IDLE`` stages the named files and never commits, ``LEAKING`` also sees the rule at start in
+    a floor arm, and any other word is an error kind
     (``launch_refused`` among them). A scored session is assessed by the runner's own assessment
     of the record and end state the script leaves, through the ``rehearsal``.
     """
@@ -160,7 +167,7 @@ class StandIn:
         what = self.script(arm, len(self.launches))
         if what == "interrupt":
             raise KeyboardInterrupt
-        if what not in (CONFORMING, VIOLATING, LEAKING):
+        if what not in (CONFORMING, VIOLATING, LEAKING, IDLE):
             return ledger, _attempt(
                 Errored(what, "scripted"), 0.0 if what == "launch_refused" else 1.0
             )
@@ -178,7 +185,7 @@ class StandIn:
     def _finished(self, config, task: MoveTask, arm: MoveArm, copy: Path, what: str, build_fixture):
         stage = "git add -A" if what == VIOLATING else "git add " + " ".join(task.named_files)
         message = "Added all the things." if what == VIOLATING else "Add the notes"
-        commands = (stage, f'git commit -m "{message}"')
+        commands = (stage,) if what == IDLE else (stage, f'git commit -m "{message}"')
         repo = self.rehearsal.end_state(task, commands, build_fixture)
         record = self._record(config.run_root, task, arm, copy, what, commands)
         return Launched(None, None, record, repo, config.run_root)  # type: ignore[arg-type]
@@ -484,6 +491,31 @@ def test_a_paired_run_citing_a_floor_run_that_never_failed_a_check_is_refused_na
     plan = _plan(checkout, moves_dir, move, kind="paired", floor_run=conforming.run.common.run_id)
 
     _refused(plan, stand_in, moves_dir, "never failed commit message form, staging by name")
+
+
+def test_a_paired_run_citing_a_floor_whose_only_failures_made_no_commit_is_refused_naming_it(
+    checkout, moves_dir, move, stand_in, new_stand_in
+):
+    idle_once = _floor(
+        checkout, moves_dir, move, new_stand_in(lambda arm, n: IDLE if n == 1 else CONFORMING)
+    )
+    plan = _plan(checkout, moves_dir, move, kind="paired", floor_run=idle_once.run.common.run_id)
+
+    _refused(plan, stand_in, moves_dir, "never failed commit message form, staging by name")
+
+
+def test_a_floor_session_that_made_no_commit_leaves_nothing_to_grade(
+    checkout, moves_dir, move, new_stand_in
+):
+    done = _floor(
+        checkout, moves_dir, move, new_stand_in(lambda arm, n: IDLE if n == 1 else CONFORMING)
+    )
+
+    idle = done.run.common.sessions[0]
+    assert {name: t.final for name, t in idle.checks.items()} == {
+        "commit message form": NothingToGrade("no commit made"),
+        "staging by name": NothingToGrade("no commit made"),
+    }
 
 
 def test_a_paired_run_on_a_checkout_the_floor_run_was_not_measured_on_is_refused(

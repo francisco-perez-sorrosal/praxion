@@ -338,13 +338,30 @@ Arrival = Arrived | NeverArrived | Unknown
 
 
 @dataclass(frozen=True)
+class NothingToGrade:
+    """The end state holds nothing the check governs, such as a session that made no commit.
+
+    A pair reads it as a failure, since the arm left undone the task the check governs; a floor
+    counts it apart, since it shows nothing of whether the check can see the rule's absence.
+    """
+
+    reason: str
+
+    def __post_init__(self) -> None:
+        _non_empty(self.reason, "why nothing was left to grade")
+
+
+FinalState = Passed | Failed | NothingToGrade
+
+
+@dataclass(frozen=True)
 class CheckTrigger:
     """What arrived for one governed check, when, and what it left; ``history`` is ``None``
     only for a record that could not be read, where every arrival is unknown too."""
 
     check: str
     arrivals: Mapping[Channel, Arrival]
-    final: Passed | Failed | None
+    final: FinalState | None
     history: History | None
     refusals: tuple[str, ...] = ()
 

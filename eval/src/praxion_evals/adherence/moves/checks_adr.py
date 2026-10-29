@@ -1,9 +1,9 @@
 """The decision records a session leaves in a repository, parsed once into values.
 
-The adr-conventions move's two governed checks grade these records, never the session's words. This
-module reads the end state and does no grading: each record's file name, id and category are
-classified into closed sum types whose variants are disjoint, so a grader can fail one part of the
-rule without failing another.
+The adr-conventions move's two governed checks grade these records, never the session's words. The
+module reads the end state, then grades it: each record's file name, id and category are classified
+into closed sum types whose variants are disjoint, so a grader can fail one part of the rule
+without failing another.
 
 A decision record is a Markdown file in the end-state tree that the baseline tree did not hold,
 outside ``.git/`` and ``.ai-work/``. Discovery walks the filesystem and ignores ``.gitignore``, so a
@@ -149,6 +149,7 @@ def grade(
     grade, and ``subprocess.CalledProcessError`` for a repository git cannot read."""
     if check not in {governed.name for governed in declaration.checks.checks}:
         raise ValueError(f"{declaration.move.value} governs no check named {check!r}")
+    _require_grader(check)
     return grade_records(check, baseline_paths(repo), fixture_branch(repo), repo)
 
 
@@ -156,12 +157,16 @@ def grade_records(
     check: str, before: frozenset[str], branch: str, repo: Path
 ) -> Grade | NothingToGrade:
     """``check`` over the records ``repo`` holds beyond ``before``, judged against ``branch``."""
-    if check not in _GRADERS:
-        raise ValueError(f"no grader for the check {check!r}; it grades {sorted(_GRADERS)}")
+    _require_grader(check)
     records = read_records(repo, before=before, branch=branch)
     if not records:
         return NothingToGrade(NO_RECORD)
     return _GRADERS[check](records)
+
+
+def _require_grader(check: str) -> None:
+    if check not in _GRADERS:
+        raise ValueError(f"no grader for the check {check!r}; it grades {sorted(_GRADERS)}")
 
 
 def _grade_placement(records: Sequence[DecisionRecord]) -> Grade:
@@ -202,8 +207,8 @@ def _self_numbered(record: DecisionRecord) -> bool:
 
 
 def _value(record: DecisionRecord) -> str:
-    """The category as compared: without outer space, ignoring case; empty when none is written."""
-    return (record.category or "").strip().casefold()
+    """The category as compared, ignoring case; empty when none is written."""
+    return (record.category or "").casefold()
 
 
 def _no_category(record: DecisionRecord) -> bool:

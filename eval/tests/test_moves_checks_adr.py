@@ -385,11 +385,19 @@ def test_decision_category_fails_exactly_the_part_a_planted_record_violates(
     assert _failed(DECISION_CATEGORY, tmp_path, record) == failing
 
 
-def test_the_projects_older_habit_fails_both_checks_on_the_parts_it_violates(tmp_path):
+@pytest.mark.parametrize(
+    ("check", "failing"),
+    [
+        pytest.param(DRAFT_PLACEMENT, {NOT_UNDER_DRAFTS, SELF_NUMBERED}, id="placement"),
+        pytest.param(DECISION_CATEGORY, {NO_CATEGORY}, id="category"),
+    ],
+)
+def test_the_projects_older_habit_fails_both_checks_on_the_parts_it_violates(
+    tmp_path, check, failing
+):
     older = (OLDER_HABIT_PATH, _text(id_="dec-044", category=None))
 
-    assert _failed(DRAFT_PLACEMENT, tmp_path, older) == {NOT_UNDER_DRAFTS, SELF_NUMBERED}
-    assert _failed(DECISION_CATEGORY, tmp_path) == {NO_CATEGORY}
+    assert _failed(check, tmp_path, older) == failing
 
 
 def test_a_part_that_two_records_fail_is_named_once(tmp_path):
@@ -410,11 +418,16 @@ def test_one_misplaced_record_among_conforming_ones_fails_the_check(tmp_path):
     }
 
 
-def test_a_record_moved_into_conformance_before_the_end_passes(tmp_path):
-    _write(tmp_path, OLDER_HABIT_PATH, _text(id_="dec-044"))
-    (tmp_path / OLDER_HABIT_PATH).unlink()
+def test_a_committed_older_habit_record_moved_into_conformance_passes(tmp_path):
+    repo = _planted_repo(tmp_path)
+    (repo / DRAFTS).mkdir(parents=True)
+    _git(repo, "mv", ".ai-state/decisions/001-first.md", FRAGMENT_PATH)
+    _write(repo, FRAGMENT_PATH, _text())
+    adr = declaration.kit("adr-conventions")
 
-    assert _failed(DRAFT_PLACEMENT, tmp_path, (FRAGMENT_PATH, _text())) == set()
+    answers = [grade(adr, check.name, repo, ()) for check in adr.checks.checks]
+
+    assert answers == [Grade("passed", ())] * len(answers)
 
 
 @pytest.mark.parametrize("check", [DRAFT_PLACEMENT, DECISION_CATEGORY])
@@ -461,6 +474,16 @@ def test_the_run_adapter_leaves_the_baseline_records_ungraded(tmp_path):
     answer = grade(adr, DRAFT_PLACEMENT, _planted_repo(tmp_path), ())
 
     assert answer == NothingToGrade("no decision record written")
+
+
+def test_the_run_adapter_refuses_a_governed_check_it_cannot_grade_before_reading_any_ref(
+    tmp_path, monkeypatch
+):
+    adr = declaration.kit("adr-conventions")
+    monkeypatch.delitem(checks_adr._GRADERS, DECISION_CATEGORY)
+
+    with pytest.raises(ValueError, match="no grader"):
+        grade(adr, DECISION_CATEGORY, tmp_path, ())
 
 
 def test_the_run_adapter_refuses_a_check_the_declaration_does_not_govern(tmp_path):

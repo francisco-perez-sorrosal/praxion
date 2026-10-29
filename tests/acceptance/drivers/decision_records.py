@@ -19,6 +19,7 @@ Nothing here is unbound.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, replace
@@ -50,6 +51,15 @@ def numbered_id(number: str = NEXT_NUMBER) -> str:
     return f"dec-{number}"
 
 
+BRANCH_SEGMENT_LIMIT = 40
+
+
+def branch_segment(branch: str) -> str:
+    """The branch as a fragment name writes it: lowercased, each run of characters other than
+    lowercase letters, digits and hyphens made one hyphen, outer hyphens trimmed, cut to 40."""
+    return re.sub(r"[^a-z0-9-]+", "-", branch.lower()).strip("-")[:BRANCH_SEGMENT_LIMIT]
+
+
 def fragment_name(
     *, stamp: str = STAMP, user: str = USER, branch: str = BRANCH, slug: str = SLUG
 ) -> str:
@@ -65,7 +75,7 @@ class Planted:
     project: Path  # the copy a scenario changes as a session would
 
 
-def planted_project(workspace: Path) -> Planted:
+def planted_project(workspace: Path, branch: str = BRANCH) -> Planted:
     fixture = workspace / "fixture"
     (fixture / DECISIONS_DIR).mkdir(parents=True)
     (fixture / "CLAUDE.md").write_text("# Orders service\n\nA small service.\n", encoding="utf-8")
@@ -79,7 +89,7 @@ def planted_project(workspace: Path) -> Planted:
         git(fixture, "config", key, value)
     git(fixture, "add", "-A")
     git(fixture, "commit", "-q", "-m", "Start the orders service")
-    git(fixture, "checkout", "-q", "-b", BRANCH)
+    git(fixture, "checkout", "-q", "-b", branch)
     project = workspace / "project"
     shutil.copytree(fixture, project, symlinks=True)
     return Planted(fixture, project)

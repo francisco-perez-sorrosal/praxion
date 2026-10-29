@@ -44,6 +44,7 @@ from tests.acceptance.drivers.decision_records import (
     DECISIONS_DIR,
     DRAFTS_DIR,
     INDEX_FILE,
+    branch_segment,
     conforming,
     fragment_name,
     leave,
@@ -62,8 +63,10 @@ HACKATHON_BLOCK = "hackathon-mode.md"
 DEFAULT_BRANCHES = ("main", "master")
 OLDER_HABIT_NAME = re.compile(r"\d{3,}-[a-z0-9][a-z0-9-]*\.md")
 NUMBERED_ID = re.compile(r"dec-\d{3,}")
+# A backtick; a dollar sign and a space; a slash opening a word, then a letter; or a program
+# name standing as a whole word, then a space and an argument.
 COMMAND = re.compile(
-    r"`|(^|\s)\$\s|(^|\s)/[a-z][\w-]+|\b(git|python3?|uv|bash|pytest|npm|make|praxion-[\w-]+)\s+[-\w]"
+    r"`|\$ |(?:^|\s)/[A-Za-z]|\b(?:git|python|uv|bash|pytest|npm|make|praxion-[\w-]*) \S"
 )
 
 
@@ -280,11 +283,11 @@ def _graded_with_a_conforming_record(
 ) -> DecisionGrade:
     """Copy the fixture, leave one draft fragment written as the rule says, and grade it.
 
-    The fragment's user is the fixture's git user name in lower-case words joined by hyphens;
-    a slash in the branch name is written as a hyphen (provisional, see the open spec question).
+    The fragment's user is the fixture's git user name in lower-case words joined by hyphens,
+    and its branch is the fixture's branch segment.
     """
     shutil.copytree(fixture, end_state, symlinks=True)
     user = re.sub(r"[^a-z0-9]+", "-", _git(fixture, "config", "user.name").lower()).strip("-")
-    name = fragment_name(user=user, branch=_branch(fixture).replace("/", "-"))
+    name = fragment_name(user=user, branch=branch_segment(_branch(fixture)))
     leave(end_state, with_changes(conforming(), relpath=f"{DRAFTS_DIR}/{name}"))
     return grade_decision_end_state(declared, check, fixture, end_state)

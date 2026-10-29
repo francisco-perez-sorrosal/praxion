@@ -40,6 +40,7 @@ from tests.acceptance.drivers.decision_records import (
     DRAFTS_DIR,
     Planted,
     Record,
+    branch_segment,
     conforming,
     draft_id,
     fragment_name,
@@ -153,6 +154,44 @@ def test_a_record_moved_into_conformance_before_the_session_ended_passes_draft_p
     grade = grade_decision_end_state(kit, DRAFT_PLACEMENT, planted.fixture, planted.project)
 
     assert grade.outcome == "passed", grade
+
+
+# -- The branch segment ----------------------------------------------------------------------
+
+BRANCHES = [
+    pytest.param(
+        "Feature/Record_Storage-Choice", id="a-branch-with-a-slash-capitals-and-underscore"
+    ),
+    pytest.param(
+        "record-the-storage-choice-for-the-orders-service-cache", id="a-branch-over-forty"
+    ),
+]
+
+
+@pytest.mark.parametrize("branch", BRANCHES)
+def test_a_fragment_named_by_the_fixtures_branch_segment_passes_draft_placement(
+    kit, tmp_path, branch
+):
+    planted = planted_project(tmp_path, branch)
+    named = with_changes(
+        DRAFT, relpath=f"{DRAFTS_DIR}/{fragment_name(branch=branch_segment(branch))}"
+    )
+
+    grade = _grade(kit, DRAFT_PLACEMENT, planted, named)
+
+    assert (grade.outcome, grade.failed_parts) == ("passed", frozenset()), grade
+
+
+def test_a_fragment_carrying_the_branch_uncut_past_forty_characters_is_a_malformed_name(
+    kit, tmp_path
+):
+    branch = "record-the-storage-choice-for-the-orders-service-cache"
+    planted = planted_project(tmp_path, branch)
+    uncut = with_changes(DRAFT, relpath=f"{DRAFTS_DIR}/{fragment_name(branch=branch)}")
+
+    grade = _grade(kit, DRAFT_PLACEMENT, planted, uncut)
+
+    assert (grade.outcome, grade.failed_parts) == ("failed", {MALFORMED_NAME}), grade
 
 
 # -- Decision category ------------------------------------------------------------------------

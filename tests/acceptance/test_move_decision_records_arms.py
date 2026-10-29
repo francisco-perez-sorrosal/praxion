@@ -14,6 +14,7 @@ is launched and before any results file is written.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -181,7 +182,7 @@ class RefusedRun:
     exit_code: int
     output: str
     launches: int
-    results: list[str]
+    written: list[str]  # results files the run created or changed
     unchanged: bool
 
 
@@ -192,11 +193,12 @@ def refused_run(kit_arms, tmp_path_factory) -> RefusedRun:
     checkout = move_checkout(workspace)
     stand_in = install_fake_claude(workspace)
     before = (tracked_snapshot(checkout), working_state(checkout))
+    results_before = _results_files(checkout)
     result = run_move(
         MoveRun(DECISION_MOVE, checkout, "floor", declared=declared), stand_in.bin_dir
     )
-    results = checkout / RESULTS_DIRECTORY
-    written = sorted(p.name for p in results.rglob("*") if p.is_file()) if results.is_dir() else []
+    results_after = _results_files(checkout)
+    written = sorted(n for n, d in results_after.items() if results_before.get(n) != d)
     after = (tracked_snapshot(checkout), working_state(checkout))
     return RefusedRun(
         result.exit_code,
@@ -207,11 +209,26 @@ def refused_run(kit_arms, tmp_path_factory) -> RefusedRun:
     )
 
 
+def _results_files(checkout: Path) -> dict[str, str]:
+    """Every file in the move results directory, by path, with its content digest.
+
+    The checkout may already hold earlier runs' results; only what a run adds or changes is
+    what it wrote."""
+    results = checkout / RESULTS_DIRECTORY
+    if not results.is_dir():
+        return {}
+    return {
+        path.relative_to(results).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in results.rglob("*")
+        if path.is_file()
+    }
+
+
 def test_a_run_whose_path_matched_rule_would_never_load_is_refused_naming_the_rule(refused_run):
     assert refused_run.exit_code != 0, "the run was not refused"
     assert DECISION_RULE in refused_run.output, refused_run.output[-2000:]
 
 
 def test_a_refused_run_launches_no_session_and_writes_no_results_file(refused_run):
-    assert (refused_run.launches, refused_run.results) == (0, [])
+    assert (refused_run.launches, refused_run.written) == (0, [])
     assert refused_run.unchanged, "the refused run changed the checkout"

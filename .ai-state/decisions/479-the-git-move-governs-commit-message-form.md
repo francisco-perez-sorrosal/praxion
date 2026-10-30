@@ -1,7 +1,8 @@
 ---
-id: dec-draft-8d92b698
+id: dec-479
+draft_id: dec-draft-8d92b698
 title: The git-conventions move governs commit message form alone; staging by name leaves its governed checks
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-30
 summary: The git-conventions kit's declaration drops staging by name, which its floor run never saw fail, so a paired run can cite that kit's floor; the grader, its fixture traps and the resident kernel lines stay, and a declaration file can govern the check again.

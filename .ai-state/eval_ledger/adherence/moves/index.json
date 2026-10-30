@@ -24,6 +24,22 @@
       "continues": null,
       "ending": "finished",
       "standing": "finished"
+    },
+    "20261030T153351Z-632ecb": {
+      "move": "adr-conventions",
+      "run_kind": "paired",
+      "lineage_root": "20261030T153351Z-632ecb",
+      "continues": null,
+      "ending": "finished",
+      "standing": "clear"
+    },
+    "20261030T155504Z-fe0eec": {
+      "move": "git-conventions",
+      "run_kind": "floor",
+      "lineage_root": "20261030T155504Z-fe0eec",
+      "continues": null,
+      "ending": "finished",
+      "standing": "finished"
     }
   },
   "skipped": []

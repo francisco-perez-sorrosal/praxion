@@ -1,0 +1,1745 @@
+{
+  "schema": "move-results/1",
+  "subject": {
+    "kind": "move",
+    "name": "adr-conventions"
+  },
+  "run_kind": "paired",
+  "run_id": "20261030T153351Z-632ecb",
+  "continues": null,
+  "harness_version": "2.1.314",
+  "identity": {
+    "moved_rule_text": "---\ncore: true\nload: always_on\ninstall: symlink\n---\n\n## ADR Conventions\n\nArchitecture Decision Records live in `.ai-state/decisions/` as Markdown files with YAML frontmatter. They persist beyond `.ai-work/` cleanup and are committed to git.\n\n### File Format\n\nPipeline-authored ADRs follow the **fragment-name-at-create, finalize-at-merge** path: they land as a fragment under `.ai-state/decisions/drafts/`, then promote to a stable `<NNN>-<slug>.md` record at merge-to-main (see [Fragment Filename Schema](#fragment-filename-schema) and [Finalized ADRs](#finalized-adrs-post-merge)). The legacy NNN-at-create path survives only for manual, no-session ADRs.\n\n#### Fragment Filename Schema\n\nPipeline-authored ADRs land as `.ai-state/decisions/drafts/<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md` with id `dec-draft-<8-char-hash>`; drafts cross-reference via `dec-draft-<hash>`, never a speculative `dec-NNN` \u2014 [Finalize](#finalize-protocol) rewrites at merge. Full construction: [`adr-authoring-protocols.md` \u00a7 ADR Creation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create).\n\n#### Finalized ADRs (post-merge)\n\nAfter finalize, the ADR lives at `.ai-state/decisions/<NNN>-<slug>.md`, `<NNN>` assigned by the finalize script \u2014 pipeline-authored ADRs never pick their own. Manual, no-session ADRs alone may self-assign directly. Detail: [`adr-authoring-protocols.md` \u00a7 Who Creates ADRs](../../skills/software-planning/references/adr-authoring-protocols.md#who-creates-adrs).\n\n#### Frontmatter\n\nThe frontmatter schema is shared between draft and finalized ADRs; only `id` and the cross-reference fields (`supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`) differ in value form (`dec-draft-<hash>` during draft, `dec-NNN` after finalize).\n\nFields: `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`, `agent_type`, `branch`, `pipeline_tier`, `affected_files`, `affected_reqs`, `retires_elements`, `supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`, `retired_by`, `supersedes_in_part`, `superseded_in_part_by`, `dissent`. Full table: [`adr-authoring-protocols.md` \u00a7 Frontmatter Schema](../../skills/software-planning/references/adr-authoring-protocols.md#frontmatter-schema).\n\n#### What makes a decision `architectural`\n\nA decision is `architectural` **iff it changes what exists or what connects**:\n\n- **internal** \u2014 it adds, removes, merges, or splits a component in any artifact family (skill, agent, rule, hook, script, MCP server, package, service); moves a responsibility from one component to another; or introduces or removes a boundary or abstraction between them.\n- **published** \u2014 it changes a canonical block, a shipped template, or an onboard-contract phase.\n\nIf the component inventory and its boundaries are unchanged once the decision lands, it is **not** architectural \u2014 *however consequential the trade-off*.\n\n**Falsifier \u2014 name the component added, removed, or whose responsibility moved.** If no such name exists, the category is wrong: process, policy, deliberation method, and features inside one component are `behavioral`, `implementation`, or `configuration`.\n\nSource of truth for this test. Worked examples, evidence, and calibration: [`adr-authoring-protocols.md` \u00a7 The `architectural` Test](../../skills/software-planning/references/adr-authoring-protocols.md#the-architectural-test).\n\n**Body sections** (after frontmatter):\n\n1. **Context** -- what prompted the decision (problem, constraint, opportunity)\n2. **Decision** -- what was decided (clear, direct statement)\n3. **Considered Options** -- alternatives with pros/cons (subsections per option)\n4. **Consequences** -- positive and negative outcomes\n5. **Disconfirmation** -- **always-on for `category: architectural`**; three required sub-items (Falsifier, Steelmanned runner-up, Reversal trigger) \u2014 full definitions in `adr-authoring-protocols.md`'s creation protocol (see [Agent Writing Protocol](#agent-writing-protocol) below).\n6. **Prior Decision** -- only when superseding; summarizes what changed and why\n\n### Relation Protocols\n\n| Protocol | What changes | Fields touched |\n|---|---|---|\n| Supersession | Fully replaces old; old \u2192 `superseded` | `supersedes` / `superseded_by` |\n| Re-affirmation | Affirms old unchanged; old stays `accepted` | `re_affirms` / `re_affirmed_by` |\n| Retirement | Old subject removed, not re-decided; old \u2192 `retired` | `retired_by` |\n| Partial-Supersession | Narrows some clauses of old; old stays non-terminal | `supersedes_in_part` / `superseded_in_part_by` |\n\nEvery relation adds a `## Prior Decision` section (to the new ADR, or for Retirement the old) explaining what changed and why; `DECISIONS_INDEX.md` regenerates at finalize \u2014 never invoke manually. Full step sequences and the supersession-vs-retirement / supersession-vs-partial tests: [`adr-authoring-protocols.md`](../../skills/software-planning/references/adr-authoring-protocols.md) \u00a7\u00a7 Supersession / Re-affirmation / Retirement / Partial-Supersession Protocol.\n\n### Finalize Protocol\n\nFinalize promotes drafts to finalized `<NNN>-<slug>.md` records at merge-to-main (post-merge git hook + `/merge-worktree`). It is **idempotent** and rewrites `dec-draft-<hash>` cross-references to `dec-NNN` across a **bounded citation net** \u2014 never an arbitrary repo sweep, never code; `DECISIONS_INDEX.md` regenerates last. Full step sequence: [`adr-authoring-protocols.md \u00a7 Finalize at Merge-to-Main`](../../skills/software-planning/references/adr-authoring-protocols.md#finalize-at-merge-to-main).\n\n### Who Writes ADRs\n\nOnly systems-architect, implementation-planner, interface-designer, agentic-transactions-architect, orchestrator (Direct/Lightweight, no pipeline agent spawned), and the user (manual) create ADR fragments, always under `.ai-state/decisions/drafts/`. **The implementer authors no ADR** and may apply only mechanical corpus edits a plan step specifies \u2014 flip a `status:`, set a cross-reference field, or correct malformed frontmatter; a new record, rationale, or category judgement returns to the architect or planner.\n\nAll ADR authors record decisions in `LEARNINGS.md ### Decisions Made`; `dec-draft-<hash>` references there rewrite to `dec-NNN` at finalize. Full per-agent When/Scope/Destination table: [`adr-authoring-protocols.md` \u00a7 Who Writes ADRs](../../skills/software-planning/references/adr-authoring-protocols.md#who-writes-adrs).\n\n### Agent Writing Protocol\n\nThe fragment-creation procedure lives in [`adr-authoring-protocols.md \u00a7 ADR Creation Protocol`](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create) \u2014 canonical for every ADR-writing agent.\n\n### Discovery Protocol\n\nRetrieval-first. An ungated full `Read` of `DECISIONS_INDEX.md` is **forbidden** \u2014 it grows unbounded, running tens of thousands of tokens at a few hundred ADRs. Exception: a genuinely cross-cutting task a keyword scan would miss; say so when you take it.\n\n1. **Pre-scan**: prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`); otherwise `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md`, reading only matching rows via `offset`+`limit`\n2. Also scan `.ai-state/decisions/drafts/` \u2014 not indexed but authoritative in-flight\n3. Read full ADR files for matching decisions\n4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter\n\n### Linking to ADRs\n\nPersistent files (`docs/`, `.ai-state/DESIGN.md`, READMEs) link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/<\u2026>.md` fragment \u2014 a `drafts/` path stops resolving once the pipeline merges. Mid-pipeline, cite by `dec-draft-<hash>` id, not path \u2014 the id survives finalize as `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the frontmatter `id` form, not file-path links.)\n\n### Consumption\n\nConsumer behavior lives at its own definition, not duplicated here: sentinel's DL0x checks, skill-genesis's pattern-harvest scope, verifier's `affected_reqs` cross-reference, systems-architect's brownfield baseline, `architect-validator`'s code\u2194DSL\u2194ADR triangle check.\n\n### Relationship to LEARNINGS.md\n\n`LEARNINGS.md` is broader (gotchas, patterns, edge cases, tech debt, decisions) and ephemeral; ADR files are narrower (decisions only) and persist. Decisions appear in both. Draft-stage `dec-draft-<hash>` references in `LEARNINGS.md` rewrite to `dec-NNN` at finalize alongside the ADR files themselves.\n\n### Migration \u2014 historical ADRs\n\nPre-existing finalized ADRs keep their filenames, `dec-NNN` ids and cross-references; the fragment scheme applies only to newly authored records.\n",
+    "arms": {
+      "full": [
+        {
+          "path": "(whole tree)",
+          "sha256": "5d9f4fb19e2f9e016a8eb58632fa88ab2ed4b3e133c853ceed61db844afc1ecf"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ],
+      "lean": [
+        {
+          "path": "rules/_manifest.yaml",
+          "sha256": "a07cdc487038cb162c31109e4b1bc21f2e8adc838ecc17a6c56a82225c9188e9"
+        },
+        {
+          "path": "rules/swe/adr-conventions-resident.md",
+          "sha256": "540fef63baff18fc71bea4f788cd43ff2515387c96a2ea4fb68a5b6c796f22b5"
+        },
+        {
+          "path": "rules/swe/adr-conventions.md",
+          "sha256": "b0c7c3663c95fe7c384f28f7cd29394994a399e7c0685474233c601d10a2b226"
+        },
+        {
+          "path": "(whole tree)",
+          "sha256": "e99f304db8372d952320bb7897e2b1a97d0f359011e1ed2680a4a193eb71220f"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ],
+      "floor": [
+        {
+          "path": "rules/swe/adr-conventions.md",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "rules/_manifest.yaml",
+          "sha256": "1b960fc28d201b1dd6bc864f70391223cabf46153f520a529a2ba879b4a35a69"
+        },
+        {
+          "path": "(whole tree)",
+          "sha256": "d7dfb28ae67624044198f7c5e4e552d005375730e2a29761bdb76ed9e6a42787"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ]
+    }
+  },
+  "allowance_method": "own-discordance-exact",
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 20,
+    "pair_slack": 4,
+    "retry_policy": "none: an errored session is an errored side of its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "stop_rule": {
+      "count": 3,
+      "kinds": [
+        "envelope_unparseable",
+        "exit_nonzero",
+        "kernel_missing",
+        "no_result_event",
+        "result_error",
+        "timeout"
+      ],
+      "masking": "v1",
+      "tail_chars": 2000
+    },
+    "allowance_method": "own-discordance-exact"
+  },
+  "pinned": {
+    "full": {
+      "commit_attribution": "harness default",
+      "model": "opus",
+      "effort": "medium",
+      "user_instructions": "74121f944c50ad610a23a19ec56ee5657e5ba316dde47da86f3f6af5f109f5db"
+    },
+    "lean": {
+      "commit_attribution": "harness default",
+      "model": "opus",
+      "effort": "medium",
+      "user_instructions": "74121f944c50ad610a23a19ec56ee5657e5ba316dde47da86f3f6af5f109f5db"
+    }
+  },
+  "declared_at": "2026-10-30T15:33:51.175934+00:00",
+  "first_launch_at": "2026-10-30T15:33:58.403319+00:00",
+  "seed": 7,
+  "launch_orders": {
+    "retry-runner-terse": [
+      "full",
+      "lean"
+    ],
+    "order-platform-finished": [
+      "lean",
+      "full"
+    ],
+    "retry-runner-finished": [
+      "lean",
+      "full"
+    ],
+    "table-export-terse": [
+      "full",
+      "lean"
+    ],
+    "order-platform-wrap-up": [
+      "full",
+      "lean"
+    ],
+    "search-index-terse": [
+      "lean",
+      "full"
+    ],
+    "search-index-wrap-up": [
+      "full",
+      "lean"
+    ],
+    "task-worker-explain": [
+      "lean",
+      "full"
+    ],
+    "task-worker-plain": [
+      "full",
+      "lean"
+    ],
+    "order-platform-adr": [
+      "full",
+      "lean"
+    ],
+    "search-index-explain": [
+      "full",
+      "lean"
+    ],
+    "retry-runner-wrap-up": [
+      "full",
+      "lean"
+    ],
+    "retry-runner-explain": [
+      "full",
+      "lean"
+    ],
+    "search-index-plain": [
+      "full",
+      "lean"
+    ],
+    "order-platform-terse": [
+      "lean",
+      "full"
+    ],
+    "order-platform-plain": [
+      "lean",
+      "full"
+    ],
+    "table-export-explain": [
+      "full",
+      "lean"
+    ],
+    "table-export-finished": [
+      "full",
+      "lean"
+    ],
+    "task-worker-adr": [
+      "lean",
+      "full"
+    ],
+    "search-index-adr": [
+      "full",
+      "lean"
+    ],
+    "search-index-finished": [
+      "full",
+      "lean"
+    ],
+    "retry-runner-plain": [
+      "lean",
+      "full"
+    ],
+    "order-platform-explain": [
+      "lean",
+      "full"
+    ],
+    "table-export-plain": [
+      "lean",
+      "full"
+    ]
+  },
+  "planned_tasks": [
+    "retry-runner-terse",
+    "order-platform-finished",
+    "retry-runner-finished",
+    "table-export-terse",
+    "order-platform-wrap-up",
+    "search-index-terse",
+    "search-index-wrap-up",
+    "task-worker-explain",
+    "task-worker-plain",
+    "order-platform-adr",
+    "search-index-explain",
+    "retry-runner-wrap-up",
+    "retry-runner-explain",
+    "search-index-plain",
+    "order-platform-terse",
+    "order-platform-plain",
+    "table-export-explain",
+    "table-export-finished",
+    "task-worker-adr",
+    "search-index-adr",
+    "search-index-finished",
+    "retry-runner-plain",
+    "order-platform-explain",
+    "table-export-plain"
+  ],
+  "sessions": [
+    {
+      "session_id": "retry-runner-terse.full.1",
+      "task_id": "retry-runner-terse",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:33:58.403319+00:00",
+      "cost_usd": 0.4888352,
+      "duration_ms": 29279,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-terse.lean.1",
+      "task_id": "retry-runner-terse",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:34:27.694874+00:00",
+      "cost_usd": 0.611925,
+      "duration_ms": 36527,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-finished.lean.1",
+      "task_id": "order-platform-finished",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:35:04.235717+00:00",
+      "cost_usd": 0.5780316000000001,
+      "duration_ms": 38083,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-finished.full.1",
+      "task_id": "order-platform-finished",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:35:42.332205+00:00",
+      "cost_usd": 0.6201576000000001,
+      "duration_ms": 57198,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-finished.lean.1",
+      "task_id": "retry-runner-finished",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:36:39.545727+00:00",
+      "cost_usd": 0.5841941999999999,
+      "duration_ms": 36623,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-finished.full.1",
+      "task_id": "retry-runner-finished",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:37:16.186342+00:00",
+      "cost_usd": 0.5755518000000001,
+      "duration_ms": 39829,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-terse.full.1",
+      "task_id": "table-export-terse",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:37:56.028787+00:00",
+      "cost_usd": 0.5546766000000001,
+      "duration_ms": 32834,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-terse.lean.1",
+      "task_id": "table-export-terse",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:38:28.876085+00:00",
+      "cost_usd": 0.6051954,
+      "duration_ms": 39124,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-wrap-up.full.1",
+      "task_id": "order-platform-wrap-up",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:39:08.013701+00:00",
+      "cost_usd": 0.6731193999999999,
+      "duration_ms": 53781,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-wrap-up.lean.1",
+      "task_id": "order-platform-wrap-up",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:40:01.810746+00:00",
+      "cost_usd": 0.6393125999999999,
+      "duration_ms": 66449,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-terse.lean.1",
+      "task_id": "search-index-terse",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:41:08.275071+00:00",
+      "cost_usd": 0.5795018000000001,
+      "duration_ms": 34223,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-terse.full.1",
+      "task_id": "search-index-terse",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:41:42.514480+00:00",
+      "cost_usd": 0.5858622,
+      "duration_ms": 39675,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-wrap-up.full.1",
+      "task_id": "search-index-wrap-up",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:42:22.204238+00:00",
+      "cost_usd": 0.5851596,
+      "duration_ms": 49865,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-wrap-up.lean.1",
+      "task_id": "search-index-wrap-up",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:43:12.083830+00:00",
+      "cost_usd": 0.5447256,
+      "duration_ms": 49202,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-explain.lean.1",
+      "task_id": "task-worker-explain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:44:01.299651+00:00",
+      "cost_usd": 0.6278324,
+      "duration_ms": 50864,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-explain.full.1",
+      "task_id": "task-worker-explain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:44:52.190816+00:00",
+      "cost_usd": 0.548834,
+      "duration_ms": 54337,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-plain.full.1",
+      "task_id": "task-worker-plain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:45:46.579309+00:00",
+      "cost_usd": 0.6087312,
+      "duration_ms": 45741,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-plain.lean.1",
+      "task_id": "task-worker-plain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:46:32.366748+00:00",
+      "cost_usd": 0.61525,
+      "duration_ms": 38868,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-adr.full.1",
+      "task_id": "order-platform-adr",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:47:11.258026+00:00",
+      "cost_usd": 0.5596427999999999,
+      "duration_ms": 44645,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-adr.lean.1",
+      "task_id": "order-platform-adr",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:47:55.933523+00:00",
+      "cost_usd": 0.577123,
+      "duration_ms": 51845,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-explain.full.1",
+      "task_id": "search-index-explain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:48:47.813225+00:00",
+      "cost_usd": 0.4876896,
+      "duration_ms": 36893,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-explain.lean.1",
+      "task_id": "search-index-explain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:49:24.733850+00:00",
+      "cost_usd": 0.5798062,
+      "duration_ms": 40737,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-wrap-up.full.1",
+      "task_id": "retry-runner-wrap-up",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:50:05.489886+00:00",
+      "cost_usd": 0.5515262,
+      "duration_ms": 69452,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-wrap-up.lean.1",
+      "task_id": "retry-runner-wrap-up",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:51:14.959442+00:00",
+      "cost_usd": 0.5925720000000001,
+      "duration_ms": 45540,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-explain.full.1",
+      "task_id": "retry-runner-explain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:52:00.514600+00:00",
+      "cost_usd": 0.5777414000000001,
+      "duration_ms": 42742,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-explain.lean.1",
+      "task_id": "retry-runner-explain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:52:43.272677+00:00",
+      "cost_usd": 0.6330924,
+      "duration_ms": 64774,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-plain.full.1",
+      "task_id": "search-index-plain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:53:48.061865+00:00",
+      "cost_usd": 0.5845511999999999,
+      "duration_ms": 54816,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-plain.lean.1",
+      "task_id": "search-index-plain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:54:42.893812+00:00",
+      "cost_usd": 0.5911806,
+      "duration_ms": 37395,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-terse.lean.1",
+      "task_id": "order-platform-terse",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:55:20.303991+00:00",
+      "cost_usd": 0.6304516,
+      "duration_ms": 49373,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-terse.full.1",
+      "task_id": "order-platform-terse",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:56:09.695326+00:00",
+      "cost_usd": 0.6385786,
+      "duration_ms": 44282,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-plain.lean.1",
+      "task_id": "order-platform-plain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:56:53.995323+00:00",
+      "cost_usd": 0.5873510000000001,
+      "duration_ms": 41743,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-plain.full.1",
+      "task_id": "order-platform-plain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:57:35.753839+00:00",
+      "cost_usd": 0.5960826000000001,
+      "duration_ms": 44437,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-explain.full.1",
+      "task_id": "table-export-explain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:58:20.206299+00:00",
+      "cost_usd": 0.5533352,
+      "duration_ms": 35169,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-explain.lean.1",
+      "task_id": "table-export-explain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:58:55.389999+00:00",
+      "cost_usd": 0.5848409999999999,
+      "duration_ms": 38662,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-finished.full.1",
+      "task_id": "table-export-finished",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T15:59:34.067476+00:00",
+      "cost_usd": 0.5610438,
+      "duration_ms": 44209,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-finished.lean.1",
+      "task_id": "table-export-finished",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:00:18.291673+00:00",
+      "cost_usd": 0.6064464,
+      "duration_ms": 52210,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-adr.lean.1",
+      "task_id": "task-worker-adr",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:01:10.516101+00:00",
+      "cost_usd": 0.6436556000000001,
+      "duration_ms": 47194,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-adr.full.1",
+      "task_id": "task-worker-adr",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:01:57.725796+00:00",
+      "cost_usd": 0.6353676000000001,
+      "duration_ms": 49048,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-adr.full.1",
+      "task_id": "search-index-adr",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:02:46.788936+00:00",
+      "cost_usd": 0.5800161999999999,
+      "duration_ms": 42471,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-adr.lean.1",
+      "task_id": "search-index-adr",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:03:29.274968+00:00",
+      "cost_usd": 0.6136158000000002,
+      "duration_ms": 52947,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-finished.full.1",
+      "task_id": "search-index-finished",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:04:22.237800+00:00",
+      "cost_usd": 0.623991,
+      "duration_ms": 51295,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-finished.lean.1",
+      "task_id": "search-index-finished",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:05:13.548731+00:00",
+      "cost_usd": 0.5637038,
+      "duration_ms": 37432,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "repaired",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "repaired",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "after execution"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-plain.lean.1",
+      "task_id": "retry-runner-plain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:05:50.996275+00:00",
+      "cost_usd": 0.5844914,
+      "duration_ms": 36462,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-plain.full.1",
+      "task_id": "retry-runner-plain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:06:27.472966+00:00",
+      "cost_usd": 0.6144552,
+      "duration_ms": 42360,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-explain.lean.1",
+      "task_id": "order-platform-explain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:07:09.848941+00:00",
+      "cost_usd": 0.6045654,
+      "duration_ms": 49154,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-explain.full.1",
+      "task_id": "order-platform-explain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:07:59.019045+00:00",
+      "cost_usd": 0.6592138000000001,
+      "duration_ms": 60625,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-plain.lean.1",
+      "task_id": "table-export-plain",
+      "arm": "lean",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:08:59.660935+00:00",
+      "cost_usd": 0.6127528000000001,
+      "duration_ms": 37107,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-plain.full.1",
+      "task_id": "table-export-plain",
+      "arm": "full",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T16:09:36.783231+00:00",
+      "cost_usd": 0.47404760000000007,
+      "duration_ms": 46855,
+      "checks": {
+        "decision draft placement": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "passed",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "before composition",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    }
+  ],
+  "complete_pairs": 24,
+  "verdicts": {
+    "decision draft placement": "no regression",
+    "decision category": "no regression"
+  },
+  "cited_floor": [
+    "20261030T055223Z-42630f"
+  ],
+  "flip": "clear",
+  "ending": {
+    "kind": "finished"
+  },
+  "earlier_runs": {
+    "floor": [
+      "20261030T055223Z-42630f"
+    ],
+    "paired": [],
+    "apart": {}
+  }
+}

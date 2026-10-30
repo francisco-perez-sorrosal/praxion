@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-30T05:32:34Z'
+generated_at: '2026-10-30T15:54:49Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -469,7 +469,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-30'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -634,7 +634,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-29'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3531,6 +3531,12 @@ surfaces:
   title: A rule move is a second subject kind in a sibling subpackage over the adherence eval's shared kernel
   last_modified: '2026-10-28'
   renderer: adr_card
+- id: ai-state-decisions-479-the-git-move-governs-commit-message-form
+  path: .ai-state/decisions/479-the-git-move-governs-commit-message-form.md
+  type: markdown
+  title: The git-conventions move governs commit message form alone; staging by name leaves its governed checks
+  last_modified: '2026-10-30'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4422,6 +4428,7 @@ groups:
   - ai-state-decisions-476-spawn-rows-carry-session-kind-and-checkout
   - ai-state-decisions-477-move-results-own-directory
   - ai-state-decisions-478-move-subject-sibling-subpackage
+  - ai-state-decisions-479-the-git-move-governs-commit-message-form
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

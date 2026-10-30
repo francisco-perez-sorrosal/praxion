@@ -5,8 +5,9 @@ adr-conventions move's two governed checks with the rule section each grades, sa
 links the moved rule scoped to the decision directory beside its resident kernel, names the two
 build-time refusals (a path-matched rule the manifest would not link, a declared phrase its
 section does not hold), gives the move's dry-run total, and no longer says the move has no task
-kit or that the lean arm's rule never loads. It says no paired run has happened and that the
-path-matched trigger reading over a real record came from a probe, once a strict expected failure.
+kit or that the lean arm's rule never loads. It names the move's paired run and its verdict, and
+says the path-matched trigger reading over a real record came from a probe, once a strict expected
+failure.
 """
 
 from __future__ import annotations
@@ -28,13 +29,15 @@ STATED = (
     "kernel",
     "--move adr-conventions --dry-run",
     "56",
-    "no paired run",
+    "20261030t153351z-632ecb",
+    "no regression",
     "probe",
     "expected failure",
 )
 RETRACTED = (
     "has no task kit",
     "the path-scoped rule never loads",
+    "no paired run has happened",
 )
 
 

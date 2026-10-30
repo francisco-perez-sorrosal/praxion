@@ -27,7 +27,6 @@ from tests.acceptance.drivers.move_eval import (
     FIRST_MOVE,
     SECOND_MOVE,
     Declared,
-    UnboundDriverError,
     declare,
 )
 from tests.acceptance.drivers.move_scoring import (
@@ -141,15 +140,6 @@ def test_a_rule_delivered_at_session_start_reads_as_arrived_before_composition(f
     assert any(t.arrivals.get("session start") == "before composition" for t in triggers), triggers
 
 
-@pytest.mark.xfail(
-    raises=UnboundDriverError,
-    strict=True,
-    reason=(
-        "no real record of a path-matched load on a creating write is frozen yet: recording one "
-        "is a paid probe session that needs the user's approval; remove this mark when a "
-        "probe records one and its record is frozen"
-    ),
-)
 def test_a_path_matched_load_on_a_creating_write_reads_as_arrived_after_execution(second_move):
     triggers = trigger_records(second_move, probe_record("a path-matched load on a creating write"))
 

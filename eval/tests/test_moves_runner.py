@@ -39,6 +39,7 @@ from praxion_evals.adherence.moves.runner import (
 from praxion_evals.adherence.moves.tasks import MoveTask
 from praxion_evals.adherence.session_launch import Attempt
 from praxion_evals.live.materialize import make_writable
+from tests.staging_check_support import git_governing_staging
 from tests.test_moves_session_record import (
     hook_context,
     prompt,
@@ -85,7 +86,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def move() -> MoveDeclaration:
-    return declaration.kit(MOVE)
+    return git_governing_staging()
 
 
 # --- a stand-in for the harness ---

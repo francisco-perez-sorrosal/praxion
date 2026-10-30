@@ -28,6 +28,7 @@ from praxion_evals.adherence.moves.session_record import (
     ToolUse,
     Unreadable,
 )
+from tests.staging_check_support import git_governing_staging
 from tests.test_moves_session_record import (
     hook_context,
     instructions,
@@ -58,7 +59,7 @@ LAZY = Delivery("nested_memory", "the decision rule: fragments land under drafts
 
 @pytest.fixture(scope="module")
 def git() -> MoveDeclaration:
-    return declaration.kit("git-conventions")
+    return git_governing_staging()
 
 
 @pytest.fixture(scope="module")

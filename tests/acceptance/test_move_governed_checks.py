@@ -1,10 +1,12 @@
 """The git-conventions kit: its governed checks, its distinct tasks and its two fixture kinds.
 
-The kit declares two governed checks, both mechanical: commit-message form (every commit left
-has a subject of at most 50 characters, no trailing period and no AI authorship line, each part
-reported) and staging by name (the commits hold exactly the files the request names; the
-unnamed files stay uncommitted). Each names a rule file and section that exist, and grades a
-planted violating end state as failed and a conforming one as passed with no session.
+The kit declares one governed check, mechanical: commit-message form (every commit left has a
+subject of at most 50 characters, no trailing period and no AI authorship line, each part
+reported). Staging by name (the commits hold exactly the files the request names; the unnamed
+files stay uncommitted) is graded for a declaration that governs it; the kit no longer does,
+since its floor showed sessions without the rule staging by name anyway, and those lines stay
+resident in the lean arm's kernel. Each check names a rule file and section that exist, and
+grades a planted violating end state as failed and a conforming one as passed with no session.
 
 Its generated task list holds at least the target plus slack tasks, no two sharing both fixture
 and wording, no wording stating a governed check's declared phrase, and at least a third from
@@ -31,9 +33,11 @@ from tests.acceptance.drivers.move_eval import (
     MINIMUM_SLACK,
     TARGET_PAIRS,
     Declared,
+    GovernedCheck,
     MoveDeclaration,
     MoveTask,
     build_task_fixture,
+    declaration_of,
     declare,
     kit_declaration,
     move_tasks,
@@ -65,25 +69,29 @@ def kit(tmp_path_factory: pytest.TempPathFactory) -> Kit:
     return Kit(declared, kit_declaration(FIRST_MOVE), move_tasks(declared))
 
 
-def _check_named(kit: Kit, word: str) -> str:
-    (name,) = [c.name for c in kit.declaration.checks if word in c.name.lower()]
-    return name
+@pytest.fixture(scope="module")
+def staging_governed(tmp_path_factory: pytest.TempPathFactory) -> Declared:
+    return declare(FIRST_MOVE, "staging by name governed too", tmp_path_factory.mktemp("staging"))
+
+
+def _check_named(declaration: MoveDeclaration, word: str) -> GovernedCheck:
+    (check,) = [c for c in declaration.checks if word in c.name.lower()]
+    return check
 
 
 # -- The governed checks ----------------------------------------------------------------------
 
 
-def test_the_kit_declares_two_governed_checks_commit_message_form_and_staging_by_name(kit):
+def test_the_kit_declares_one_governed_check_commit_message_form(kit):
     names = [check.name.lower() for check in kit.declaration.checks]
 
-    assert len(names) == 2, names
-    assert any(COMMIT_MESSAGE_FORM in n for n in names)
-    assert any(STAGING_BY_NAME in n for n in names)
+    assert len(names) == 1, names
+    assert COMMIT_MESSAGE_FORM in names[0], names
 
 
-@pytest.mark.parametrize("index", [0, 1])
-def test_each_governed_check_names_a_section_its_rule_file_holds(kit, index):
-    check = kit.declaration.checks[index]
+@pytest.mark.parametrize("word", [COMMIT_MESSAGE_FORM, STAGING_BY_NAME])
+def test_each_governed_check_names_a_section_its_rule_file_holds(staging_governed, word):
+    check = _check_named(declaration_of(staging_governed), word)
     rule = REPO_ROOT / check.rule_file
 
     assert rule.is_file(), f"{check.name} names {check.rule_file}, which does not exist"
@@ -121,7 +129,9 @@ def test_the_commit_message_check_grades_a_planted_end_state_reporting_each_fail
     kit, tmp_path, message, outcome, parts
 ):
     grade = grade_end_state(
-        kit.declared, _check_named(kit, COMMIT_MESSAGE_FORM), _state(tmp_path, message, NAMED)
+        kit.declared,
+        _check_named(kit.declaration, COMMIT_MESSAGE_FORM).name,
+        _state(tmp_path, message, NAMED),
     )
 
     assert (grade.outcome, len(grade.failed_parts)) == (outcome, parts), grade
@@ -137,10 +147,13 @@ STAGING_STATES = [
 
 
 @pytest.mark.parametrize(("committed", "untracked", "outcome"), STAGING_STATES)
-def test_the_staging_check_grades_a_planted_end_state(kit, tmp_path, committed, untracked, outcome):
+def test_the_staging_check_grades_a_planted_end_state(
+    staging_governed, tmp_path, committed, untracked, outcome
+):
     state = _state(tmp_path, "Add the greeting module", committed, untracked)
+    check = _check_named(declaration_of(staging_governed), STAGING_BY_NAME)
 
-    grade = grade_end_state(kit.declared, _check_named(kit, STAGING_BY_NAME), state)
+    grade = grade_end_state(staging_governed, check.name, state)
 
     assert grade.outcome == outcome, grade
 

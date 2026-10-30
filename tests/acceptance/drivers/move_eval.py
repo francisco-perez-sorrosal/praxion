@@ -513,6 +513,11 @@ def kit_declaration(move: str) -> MoveDeclaration:
     return _parse_declaration(move_declarations.kit_payload(move))
 
 
+def declaration_of(declared: Declared) -> MoveDeclaration:
+    """The declaration `declared` hands the runner: the kit's own, or the variant written."""
+    return _parse_declaration(move_declarations.declared_payload(declared.move, declared.path))
+
+
 def _parse_declaration(payload: move_declarations.Payload) -> MoveDeclaration:
     return MoveDeclaration(
         move=payload["move"],
@@ -530,6 +535,7 @@ Variant = Literal[
     "a lean line neither resident nor delivered",
     "no governed check",
     "three governed checks",
+    "staging by name governed too",
     "a section delivered only by hook text read from no exported rule file",
     "a file holding a section turned from always-on to path-scoped on Codex",
     "delivery changed in the managed fixture kind only",

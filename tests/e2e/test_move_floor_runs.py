@@ -251,9 +251,17 @@ def test_a_continuation_under_a_differing_declaration_is_refused(stopped_paired,
 def test_a_paired_run_declaring_a_check_its_floor_never_failed_is_refused_naming_it(tmp_path):
     checkout = move_checkout(tmp_path)
     stand_in = install_stand_in(tmp_path, Script(by_arm={"floor": "violating the message only"}))
-    floor = run(stand_in, checkout, "floor", max_tasks=FLOOR_MINIMUM)
+    declared = declare(FIRST_MOVE, "staging by name governed too", tmp_path)
+    floor = run(stand_in, checkout, "floor", max_tasks=FLOOR_MINIMUM, declared=declared)
 
-    outcome = run(stand_in, checkout, "paired", max_tasks=1, floor_citation=floor.results)
+    outcome = run(
+        stand_in,
+        checkout,
+        "paired",
+        max_tasks=1,
+        floor_citation=floor.results,
+        declared=declared,
+    )
 
     _refused(outcome)
     assert "stag" in (outcome.cli.stderr + outcome.cli.stdout).lower(), outcome.describe()

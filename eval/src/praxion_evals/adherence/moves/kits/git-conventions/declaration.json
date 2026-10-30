@@ -12,16 +12,6 @@
         "50 characters",
         "authorship lines"
       ]
-    },
-    {
-      "name": "staging by name",
-      "rule_file": "rules/swe/vcs/git-conventions.md",
-      "section": "Staging Discipline",
-      "phrases": [
-        "specific files by name",
-        "git diff --staged",
-        "accidental inclusions"
-      ]
     }
   ],
   "fixture_scope": "both",

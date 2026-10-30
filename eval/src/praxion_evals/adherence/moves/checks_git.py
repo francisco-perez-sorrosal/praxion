@@ -1,4 +1,5 @@
-"""The git-conventions move's two governed checks, graded on the end state a session leaves.
+"""The git-conventions move's checks, graded on the end state a session leaves. The kit governs
+commit message form; staging by name is graded for a declaration that governs it.
 
 ``grade`` reads a repository, and optionally the shell commands the session ran, never what the
 session said. The session's commits are those after the fixture's baseline: the commit

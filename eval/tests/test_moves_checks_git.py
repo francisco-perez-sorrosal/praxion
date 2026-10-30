@@ -27,6 +27,7 @@ from praxion_evals.adherence.moves.checks_git import (
     Grade,
 )
 from praxion_evals.adherence.moves.model import MoveDeclaration, NothingToGrade
+from tests.staging_check_support import git_governing_staging
 
 NAMED = {"greeting.py": "print('hello')\n"}
 UNNAMED = {"notes.txt": "scratch notes\n"}
@@ -43,7 +44,7 @@ HOOK = (
 
 @pytest.fixture(scope="module")
 def git() -> MoveDeclaration:
-    return declaration.kit("git-conventions")
+    return git_governing_staging()
 
 
 def run_git(repo: Path, *args: str) -> str:

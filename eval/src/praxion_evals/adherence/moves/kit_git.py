@@ -13,8 +13,9 @@ so that a session without the rule can be seen to fall into them:
 - most fixtures name tracked files the work changed, so a commit of every tracked change takes
   the unnamed note along, and some name several files at once.
 
-The two governed checks (commit message form, staging by name) grade what the session leaves
-behind. The fixture's history ends at ``checks_git.BASELINE_REF``, so the session's commits are
+The kit's governed check (commit message form) grades what the session leaves behind; the
+staging traps serve a declaration that governs staging by name, which ``checks_git`` grades
+too. The fixture's history ends at ``checks_git.BASELINE_REF``, so the session's commits are
 exactly those after it. A managed fixture is a project the toolchain onboarded (a state directory
 and a ``CLAUDE.md`` carrying the shipped blocks); an unmanaged one is a bare directory. Task
 wordings never state a rule line or invoke a command.

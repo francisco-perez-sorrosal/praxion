@@ -213,10 +213,27 @@ def _word_runs(text: str) -> list[str]:
     return re.findall(r"[A-Za-z]{3,}(?: [A-Za-z]{2,}){2,5}", text)
 
 
+# -- A variant that governs more ------------------------------------------------------------
+
+
+def _staging_by_name_governed(payload: Payload, here: Path) -> None:
+    """Govern staging by name beside the kit's own check: the kit no longer declares it, and its
+    grader still grades it for a declaration that does."""
+    payload["checks"].append(
+        {
+            "name": "staging by name",
+            "rule_file": "rules/swe/vcs/git-conventions.md",
+            "section": "Staging Discipline",
+            "phrases": ["specific files by name", "git diff --staged", "accidental inclusions"],
+        }
+    )
+
+
 _EDITS: dict[str, Callable[[Payload, Path], None]] = {
     "a lean line neither resident nor delivered": _cut_a_rule_line,
     "no governed check": _no_governed_check,
     "three governed checks": _three_governed_checks,
+    "staging by name governed too": _staging_by_name_governed,
     "a section delivered only by hook text read from no exported rule file": (
         _hook_embedding_its_own_text
     ),

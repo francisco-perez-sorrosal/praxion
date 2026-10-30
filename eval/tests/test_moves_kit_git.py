@@ -14,9 +14,11 @@ from praxion_evals.adherence.moves import checks_git, kit_git
 from praxion_evals.adherence.moves.declaration import kit
 from praxion_evals.adherence.moves.model import MoveDeclaration, OnlyKind
 from praxion_evals.adherence.moves.tasks import MoveTask, screen, target_with_slack
+from tests.staging_check_support import git_governing_staging
 
 SEED = 7
 DECLARATION = kit("git-conventions")
+GOVERNING_STAGING = git_governing_staging()
 MANAGED_ONLY = replace(DECLARATION, fixture_scope=OnlyKind("managed"))
 PHRASES = [p for check in DECLARATION.checks.checks for p in check.phrases]
 
@@ -205,8 +207,11 @@ def test_a_scripted_commit_of_the_named_files_succeeds_and_grades_conforming(
     git(root, "commit", "-m", "Commit the named files", home=home)
 
     assert git(root, "log", "-1", "--format=%ae", home=home) == git(root, "config", "user.email")
-    for check in DECLARATION.checks.checks:
-        assert checks_git.grade(DECLARATION, check.name, root, task.named_files).outcome == "passed"
+    outcomes = [
+        checks_git.grade(GOVERNING_STAGING, check.name, root, task.named_files).outcome
+        for check in GOVERNING_STAGING.checks.checks
+    ]
+    assert outcomes == ["passed", "passed"]
 
 
 def test_a_commit_of_everything_fails_the_staging_check(tmp_path: Path) -> None:
@@ -216,7 +221,7 @@ def test_a_commit_of_everything_fails_the_staging_check(tmp_path: Path) -> None:
     git(root, "add", "--all")
     git(root, "commit", "-m", "Commit everything")
 
-    grade = checks_git.grade(DECLARATION, checks_git.STAGING_BY_NAME, root, task.named_files)
+    grade = checks_git.grade(GOVERNING_STAGING, checks_git.STAGING_BY_NAME, root, task.named_files)
     assert grade.failed_parts == (checks_git.UNNAMED_FILE_COMMITTED,)
 
 
@@ -229,7 +234,7 @@ def test_a_commit_of_every_tracked_change_takes_the_unnamed_note_along(
 
     git(root, "commit", "-a", "-m", "Commit the tracked changes")
 
-    grade = checks_git.grade(DECLARATION, checks_git.STAGING_BY_NAME, root, task.named_files)
+    grade = checks_git.grade(GOVERNING_STAGING, checks_git.STAGING_BY_NAME, root, task.named_files)
     assert checks_git.UNNAMED_FILE_COMMITTED in grade.failed_parts
 
 

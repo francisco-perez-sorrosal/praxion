@@ -96,10 +96,10 @@ def test_a_kit_directory_holds_the_declaration_and_exactly_the_files_it_writes(n
 # -- The git-conventions kit ----------------------------------------------------------------
 
 
-def test_the_git_kit_governs_commit_message_form_and_staging_by_name():
+def test_the_git_kit_governs_commit_message_form_alone():
     names = [check.name for check in declaration.kit(GIT_KIT).checks.checks]
 
-    assert names == ["commit message form", "staging by name"]
+    assert names == ["commit message form"]
 
 
 def test_each_governed_phrase_is_a_phrase_of_its_own_section():

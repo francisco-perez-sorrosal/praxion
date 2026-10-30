@@ -45,7 +45,9 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.adherence.moves import (
     arms,
+    checks_adr,
     checks_git,
+    kit_adr,
     kit_git,
     launch,
     lineage,
@@ -73,6 +75,7 @@ from praxion_evals.adherence.moves.model import (
     CheckTrigger,
     FinalState,
     FixtureKind,
+    Grade,
     MoveArm,
     MoveDeclaration,
     NothingToGrade,
@@ -123,13 +126,16 @@ class Kit:
     tasks: Callable[[MoveDeclaration, int], tuple[MoveTask, ...]]
     candidates: Callable[[], tuple[MoveTask, ...]]
     build_fixture: Callable[[MoveDeclaration, MoveTask, Path], Path]
-    grade: Callable[..., checks_git.Grade | NothingToGrade]
+    grade: Callable[..., Grade | NothingToGrade]
 
 
 KITS: Mapping[str, Kit] = {
     "git-conventions": Kit(
         kit_git.tasks, kit_git.candidates, kit_git.build_fixture, checks_git.grade
-    )
+    ),
+    "adr-conventions": Kit(
+        kit_adr.tasks, kit_adr.candidates, kit_adr.build_fixture, checks_adr.grade
+    ),
 }
 
 
@@ -320,11 +326,11 @@ def _assess(
     return Scored(graded)
 
 
-def _final_state(grade: checks_git.Grade | NothingToGrade) -> FinalState:
+def _final_state(grade: Grade | NothingToGrade) -> FinalState:
     match grade:
         case NothingToGrade():
             return grade
-        case checks_git.Grade(failed_parts=parts):
+        case Grade(failed_parts=parts):
             return Failed(", ".join(parts)) if parts else Passed()
         case _:
             assert_never(grade)

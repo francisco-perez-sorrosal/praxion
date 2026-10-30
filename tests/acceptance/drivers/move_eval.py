@@ -539,8 +539,13 @@ Variant = Literal[
     "the arms differ in the user instruction file",
     "a change confined to the lean arm",
     "a change to the floor arm",
-    "a resident line and a path-matched rule for the decision records",
+    "a check phrase its section does not hold",
+    "a check phrase differing only in letter case from its section",
+    "a check phrase its rule holds only outside the named section",
+    "the moved rule's manifest entry removed",
+    "the moved rule's manifest entry repointed at the kernel",
 ]
+ManifestEdit = Literal["removed", "repointed at the kernel"]
 
 
 @dataclass(frozen=True)
@@ -555,6 +560,22 @@ class Declared:
 def declare(move: str, variant: Variant, workspace: Path) -> Declared:
     """The declaration the runner reads for `move` under `variant`, written under `workspace`."""
     return Declared(move, variant, move_declarations.write_variant(move, variant, workspace))
+
+
+def declare_manifest_variant(
+    move: str, edit: ManifestEdit, lean_copy: Path, workspace: Path
+) -> Declared:
+    """The kit's declaration with the moved rule's entry `edit`ed in the manifest its lean arm
+    writes, every other entry as the built lean copy (`lean_copy`) holds it."""
+    manifest = lean_copy / move_declarations.MANIFEST
+    path = move_declarations.write_lean_manifest_variant(move, edit, manifest, workspace)
+    return Declared(move, _MANIFEST_VARIANTS[edit], path)
+
+
+_MANIFEST_VARIANTS: dict[ManifestEdit, Variant] = {
+    "removed": "the moved rule's manifest entry removed",
+    "repointed at the kernel": "the moved rule's manifest entry repointed at the kernel",
+}
 
 
 @dataclass(frozen=True)

@@ -30,7 +30,7 @@ import sys
 import tempfile
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +63,8 @@ _PATHS_KEY = re.compile(r"^paths\s*:", re.MULTILINE)
 @dataclass(frozen=True)
 class Observed:
     lines: tuple[str, ...]  # non-blank lines, in delivery order; empty is a real observation
+    # Repository paths of the rule files the copy's own linker linked, path-scoped ones too.
+    linked: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass(frozen=True)
@@ -120,7 +122,7 @@ def session_start(copy: Path) -> Observation:
         return injected
     if injected.lines[:1] and injected.lines[0].startswith(RULE_INJECTION_SKIPPED):
         return Refused("the rule injection reports it was skipped: " + " ".join(injected.lines[1:]))
-    return Observed(linked.lines + injected.lines)
+    return Observed(linked.lines + injected.lines, linked.linked)
 
 
 def hook_output(
@@ -154,14 +156,16 @@ def _linked_rule_lines(copy: Path, sandbox: _Sandbox) -> Observed | Refused:
     if isinstance(link, Refused):
         return link
     lines: list[str] = []
+    linked: set[str] = set()
     for rule in sorted(target.rglob("*.md")):
         try:
             text = rule.read_text(encoding="utf-8")
+            linked.add(rule.resolve().relative_to(copy).as_posix())
         except (OSError, ValueError) as error:
             return Refused(f"the linked rule {rule.relative_to(target)} cannot be read: {error}")
         if not _is_path_scoped(text):
             lines.extend(_body_lines(text))
-    return Observed(tuple(lines))
+    return Observed(tuple(lines), frozenset(linked))
 
 
 def _manifest_refusal(copy: Path) -> Refused | None:

@@ -32,8 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from praxion_evals.adherence.model import _require
-from praxion_evals.adherence.moves.model import MoveDeclaration, NothingToGrade
+from praxion_evals.adherence.moves.model import Grade, MoveDeclaration, NothingToGrade
 
 COMMIT_MESSAGE_FORM = "commit message form"
 STAGING_BY_NAME = "staging by name"
@@ -55,25 +54,6 @@ _AI_AUTHORSHIP_LINES = (
     re.compile(r"^\s*Co-Authored-By:.*\b(claude|anthropic)\b", re.I),
     re.compile(r"^\s*(?:\S+\s+)?Generated\s+(?:with|by)\b.*\b(claude|anthropic)\b", re.I),
 )
-
-Outcome = Literal["passed", "failed"]
-
-
-@dataclass(frozen=True)
-class Grade:
-    outcome: Outcome
-    failed_parts: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        _require(
-            (self.outcome == "failed") == bool(self.failed_parts),
-            "a grade fails exactly when it names a failed part",
-        )
-
-    @classmethod
-    def of(cls, failed_parts: Sequence[str]) -> Grade:
-        parts = tuple(dict.fromkeys(failed_parts))
-        return cls("failed" if parts else "passed", parts)
 
 
 def grade(

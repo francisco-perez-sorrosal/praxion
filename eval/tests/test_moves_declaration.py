@@ -21,6 +21,7 @@ from praxion_evals.adherence.moves.model import (
     KernelDerive,
     LaunchOptions,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveName,
     OnlyKind,
     PathMatched,
@@ -179,7 +180,7 @@ def test_zero_or_three_governed_checks_are_refused(tmp_path: Path, count: int) -
 
 def test_a_section_its_rule_file_lacks_is_refused_naming_it(tmp_path: Path) -> None:
     path = write(tmp_path, a_payload())
-    checkout = a_checkout(tmp_path / "checkout", f"### {SECTION}\ntext\n")
+    checkout = a_checkout(tmp_path / "checkout", f"### {SECTION}\nkeep it to 50\n")
 
     message = refused_by(path, checkout=checkout)
 
@@ -197,10 +198,90 @@ def test_a_rule_file_the_checkout_lacks_is_refused_naming_it(tmp_path: Path) -> 
 
 def test_every_section_held_is_accepted_against_the_checkout(tmp_path: Path) -> None:
     checkout = a_checkout(
-        tmp_path / "checkout", f"## {SECTION}\ntext\n\n### Staging Discipline  \n"
+        tmp_path / "checkout", f"## {SECTION}\nkeep it to 50\n\n### Staging Discipline  \n"
     )
 
     assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
+
+
+def test_a_phrase_its_section_does_not_hold_is_refused_naming_check_phrase_section_and_rule(
+    tmp_path: Path,
+) -> None:
+    checkout = a_checkout(tmp_path / "checkout", f"## {SECTION}\nno number here\n")
+
+    message = refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+    named = ("message form", "'50'", SECTION, RULE)
+    assert [value for value in named if value not in message] == [], message
+
+
+def test_a_phrase_differing_only_in_letter_case_is_accepted(tmp_path: Path) -> None:
+    payload = a_payload()
+    payload["checks"][0]["phrases"] = ["FIFTY chars"]
+    checkout = a_checkout(
+        tmp_path / "checkout", f"## {SECTION}\nKeep it to fifty Chars\n\n## Staging Discipline\n"
+    )
+
+    assert declaration.load(write(tmp_path, payload), checkout=checkout).checks.checks
+
+
+def test_a_phrase_held_only_outside_its_section_is_refused(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## Before\n50\n\n## {SECTION}\ntext\n\n## After\n50\n\n## Staging Discipline\n",
+    )
+
+    message = refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+    assert "'50'" in message
+
+
+def test_a_phrase_held_by_a_sub_heading_of_its_section_counts_as_inside(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## {SECTION}\ntext\n\n### Detail\nkeep it to 50\n\n## Staging Discipline\n",
+    )
+
+    assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
+
+
+def test_a_number_sign_line_inside_a_fenced_block_ends_no_section(tmp_path: Path) -> None:
+    checkout = a_checkout(
+        tmp_path / "checkout",
+        f"## {SECTION}\n```\n## not a heading\n```\nkeep it to 50\n\n## Staging Discipline\n",
+    )
+
+    assert declaration.load(write(tmp_path, a_payload()), checkout=checkout).checks.checks
+
+
+def test_a_section_heading_only_inside_a_fenced_block_is_no_section(tmp_path: Path) -> None:
+    checkout = a_checkout(tmp_path / "checkout", f"```\n## {SECTION}\nkeep it to 50\n```\n")
+
+    assert SECTION in refused_by(write(tmp_path, a_payload()), checkout=checkout)
+
+
+def levels(*lines: str) -> list[int | None]:
+    return [heading and heading.level for heading in declaration.markdown_headings(list(lines))]
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected"),
+    [
+        pytest.param(("# a", "text", "### b  "), [1, None, 3], id="plain-headings"),
+        pytest.param(("```", "# a", "```", "# b"), [None, None, None, 1], id="backtick-fence"),
+        pytest.param(("~~~", "# a", "~~~", "# b"), [None, None, None, 1], id="tilde-fence"),
+        pytest.param(("   ```", "# a", "   ```", "# b"), [None, None, None, 1], id="indented-3"),
+        pytest.param(("    ```", "# a"), [None, 1], id="indented-4-is-no-fence"),
+        pytest.param(
+            ("````", "```", "# a", "````", "# b"), [None, None, None, None, 1], id="longer"
+        ),
+        pytest.param(("```", "~~~", "# a", "```", "# b"), [None, None, None, None, 1], id="mixed"),
+        pytest.param(("```", "# a", "``` x", "# b"), [None, None, None, None], id="close-bare"),
+        pytest.param(("```python", "# a"), [None, None], id="unclosed-runs-to-the-end"),
+    ],
+)
+def test_headings_are_found_outside_fenced_code_only(lines, expected) -> None:
+    assert levels(*lines) == expected
 
 
 @pytest.mark.parametrize(
@@ -227,6 +308,17 @@ def test_an_unknown_channel_is_refused(tmp_path: Path) -> None:
         payload["deliveries"].append({"channel": "telepathy"})
 
     assert "telepathy" in refused_by(edited(tmp_path, edit))
+
+
+def test_a_scoped_manifest_row_derive_parses_to_its_value(tmp_path: Path) -> None:
+    def edit(payload: dict[str, Any]) -> None:
+        payload["arms"]["lean"][2]["kind"] = "manifest_row_scoped"
+
+    loaded = declaration.load(edited(tmp_path, edit))
+
+    assert loaded.arms.for_arm("lean")[2] == ManifestRowScoped(
+        RelPath.parse("rules/_manifest.yaml")
+    )
 
 
 def test_an_unknown_derive_kind_or_op_is_refused(tmp_path: Path) -> None:

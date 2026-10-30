@@ -9,6 +9,8 @@ checkout's current content so the kit never holds a copy of it that could drift:
 - ``manifest_row_removed``: the moved rule's manifest row, removed, or pointed at the arm's kernel
   file when it derives one (same id, core flag and install kind, so the project's rule disable list
   reaches the kernel exactly as it reached the rule);
+- ``manifest_row_scoped``: the moved rule's manifest row kept, as a path-scoped row over the
+  path-matched delivery's globs, with a resident row for the arm's kernel beside it;
 - ``hook_registered``: the hook registry with the arm's written hook scripts registered under
   every declared hook-context delivery.
 
@@ -38,7 +40,9 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import assert_never
+from typing import Any, assert_never
+
+import yaml
 
 from praxion_evals.adherence.arms import ArmCopyError, verify_copy_diff
 from praxion_evals.adherence.moves import observe, pinning, reach
@@ -51,6 +55,7 @@ from praxion_evals.adherence.moves.model import (
     HookRegistered,
     KernelDerive,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveArm,
     MoveDeclaration,
     PathMatched,
@@ -195,6 +200,10 @@ def _planned(
             return Planned(path.value, kernel_text(change, declaration, checkout).encode())
         case ManifestRowRemoved(path=path):
             return Planned(path.value, _manifest(path.value, siblings, declaration, checkout))
+        case ManifestRowScoped(path=path):
+            return Planned(
+                path.value, _scoped_manifest(path.value, siblings, declaration, checkout)
+            )
         case HookRegistered(path=path):
             return Planned(path.value, _hook_registry(path.value, siblings, declaration, checkout))
         case _:
@@ -222,18 +231,103 @@ def _manifest(
     path: str, siblings: Sequence[ArmChange], declaration: MoveDeclaration, checkout: Path
 ) -> bytes:
     moved = declaration.moved_rule.value
-    kernels = [c for c in siblings if isinstance(c, KernelDerive)]
-    if len(kernels) > 1:
-        raise ArmError(f"{path}: the moved rule's row can point at one kernel, not {len(kernels)}")
+    kernel = _single_kernel(path, siblings)
     lines = _read_text(checkout / path).splitlines(keepends=True)
     start, end = _row_span(lines, moved, path)
     row = lines[start:end]
-    if kernels:
-        text = kernel_text(kernels[0], declaration, checkout)
-        row = [_repoint(line, kernels[0].path.value, len(text)) for line in row]
+    if kernel:
+        text = kernel_text(kernel, declaration, checkout)
+        row = [_repoint(line, kernel.path.value, len(text)) for line in row]
     else:
         row = []
     return "".join([*lines[:start], *row, *lines[end:]]).encode()
+
+
+def _single_kernel(manifest: str, siblings: Sequence[ArmChange]) -> KernelDerive | None:
+    kernels = [c for c in siblings if isinstance(c, KernelDerive)]
+    if len(kernels) > 1:
+        raise ArmError(
+            f"{manifest}: the moved rule's row can point at one kernel, not {len(kernels)}"
+        )
+    return kernels[0] if kernels else None
+
+
+def _scoped_manifest(
+    path: str, siblings: Sequence[ArmChange], declaration: MoveDeclaration, checkout: Path
+) -> bytes:
+    """Keep the moved rule's row, scoped to its path-matched globs, and add the kernel's row."""
+    moved = declaration.moved_rule.value
+    globs = _scoped_globs(path, declaration)
+    written = _written_rule(path, siblings, moved)
+    kernel = _single_kernel(path, siblings)
+    text = _read_text(checkout / path)
+    lines = text.splitlines(keepends=True)
+    start, end = _row_span(lines, moved, path)
+    current = _yaml(path, "".join(lines[start:end]))[0]
+    if current.get("install") != "symlink":
+        raise ArmError(
+            f"{path}: the row of {moved} installs by {current.get('install')!r}, not symlink; "
+            "a rule delivered by hook cannot be scoped by path"
+        )
+    kept = {
+        "id": current["id"],
+        "path": current["path"],
+        "load": "path_scoped",
+        "core": current.get("core", False),
+        "install": "symlink",
+        "chars": len(_read_text(written.source)),
+        "paths": list(globs),
+    }
+    rows = [kept]
+    if kernel:
+        taken = {row["id"] for row in _yaml(path, text)["rules"]}
+        rows.append(
+            _kernel_row(path, kernel, kept, kernel_text(kernel, declaration, checkout), taken)
+        )
+    dumped = yaml.dump(rows, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    return "".join([*lines[:start], dumped, *lines[end:]]).encode()
+
+
+def _scoped_globs(manifest: str, declaration: MoveDeclaration) -> tuple[str, ...]:
+    moved = declaration.moved_rule
+    matched = [d for d in declaration.deliveries if isinstance(d, PathMatched) and d.file == moved]
+    if len(matched) != 1:
+        raise ArmError(
+            f"{manifest}: a scoped row needs exactly one path-matched delivery of "
+            f"{moved.value}, found {len(matched)}"
+        )
+    return matched[0].globs
+
+
+def _written_rule(manifest: str, siblings: Sequence[ArmChange], moved: str) -> Write:
+    for change in siblings:
+        if isinstance(change, Write) and change.path.value == moved:
+            return change
+    raise ArmError(f"{manifest}: a scoped row needs the arm to write {moved}, which it does not")
+
+
+def _kernel_row(
+    manifest: str, kernel: KernelDerive, kept: dict[str, Any], text: str, taken: set[str]
+) -> dict[str, Any]:
+    # The generator's id for a rule: its path without the rules directory and extension.
+    kernel_id = kernel.path.value.removeprefix("rules/").removesuffix(".md")
+    if kernel_id in taken:
+        raise ArmError(f"{manifest}: the kernel's id {kernel_id!r} is already a rule's id")
+    return {
+        "id": kernel_id,
+        "path": kernel.path.value,
+        "load": "always_on",
+        "core": kept["core"],
+        "install": "symlink",
+        "chars": len(text),
+    }
+
+
+def _yaml(path: str, text: str) -> Any:
+    try:
+        return yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        raise ArmError(f"{path}: the manifest cannot be read: {error}") from error
 
 
 def _row_span(lines: Sequence[str], rule: str, manifest: str) -> tuple[int, int]:
@@ -316,7 +410,7 @@ def _build_arm(
         raise ArmError(f"the {arm} arm's session start cannot be observed: {observed.reason}")
     if arm == "lean":
         reach.require_reach(declaration, checkout, copy, hook_scripts(declaration.arms.lean))
-        _require_relocation(declaration, checkout, copy, observed.lines)
+        _require_relocation(declaration, checkout, copy, observed)
     _drop_bytecode(copy, checkout)
     changes = tuple(AppliedChange(change.path, change.sha256) for change in planned)
     return BuiltArm(copy, changes, observed.lines)
@@ -353,10 +447,10 @@ def _drop_bytecode(copy: Path, checkout: Path) -> None:
 
 
 def _require_relocation(
-    declaration: MoveDeclaration, checkout: Path, copy: Path, resident: Sequence[str]
+    declaration: MoveDeclaration, checkout: Path, copy: Path, observed: observe.Observed
 ) -> None:
     """Refuse a lean copy leaving a line of the moved rule neither resident nor delivered."""
-    reached = {line.strip() for line in resident}
+    reached = {line.strip() for line in observed.lines}
     for delivery in declaration.deliveries:
         match delivery:
             case SessionStart(file=file, lines=declared):
@@ -364,6 +458,7 @@ def _require_relocation(
                 _require_resident(file.value, expected, reached)
             case PathMatched(file=file, globs=globs):
                 _require_path_scoped(copy, file.value, globs)
+                _require_linked(file.value, observed.linked)
                 reached.update(file_lines(copy, file.value))
             case HookContext(reads=file) | GateRefusal(reads=file):
                 reached.update(file_lines(copy, file.value))
@@ -394,6 +489,14 @@ def _require_path_scoped(copy: Path, file: str, globs: Sequence[str]) -> None:
     if not re.search(r"^paths\s*:", scoped, re.MULTILINE) or missing:
         raise ArmError(
             f"{file} is declared path-matched but its paths: frontmatter lacks {missing or globs}"
+        )
+
+
+def _require_linked(file: str, linked: frozenset[str]) -> None:
+    """A path-matched rule reaches a session only if the copy's own installer links it."""
+    if file not in linked:
+        raise ArmError(
+            f"{file} is declared path-matched but the lean copy's installer does not link it"
         )
 
 

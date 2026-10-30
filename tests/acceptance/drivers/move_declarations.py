@@ -3,10 +3,12 @@
 A declaration is JSON in a kit directory under the move subpackage (`kits/<move>/`), with the
 files its arms write beside it. Every known-bad variant is that declaration edited as data: the
 kit's directory is copied into the scenario's workspace and the copy changed, so a variant
-differs from the kit in the one defect it names and in nothing else. The second ranked move has
-no kit to copy a task list from, so its declaration is written whole here, from the shape the
-specification names: one resident line, and the rest of the rule delivered when a decision
-record is written.
+differs from the kit in the one defect it names and in nothing else. A variant that edits the
+lean arm's rules manifest is written from the manifest the kit's own lean copy holds once built
+(`write_lean_manifest_variant`), so it too differs from the kit in its one named defect.
+
+A rule file's *section* is one of its headings and every line after it up to the next heading
+of the same or a higher level, sub-headings included (`section_text`).
 
 The module speaks plain JSON values and file paths. `move_eval` turns them into its own
 declaration values and `Declared` handles, so this module imports nothing from it.
@@ -21,6 +23,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 Payload = dict[str, Any]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -28,15 +32,10 @@ KITS_ROOT = REPO_ROOT / "eval" / "src" / "praxion_evals" / "adherence" / "moves"
 DECLARATION_FILE = "declaration.json"
 SCHEMA = "move-declaration/1"
 MANIFEST = "rules/_manifest.yaml"
-DECISION_RECORDS_MOVE = "adr-conventions"
-DECISION_RECORDS_RULE = "rules/swe/adr-conventions.md"
-DECISION_RECORDS_GLOB = ".ai-state/decisions/**"
-DECISION_RECORDS_SHAPE = "a resident line and a path-matched rule for the decision records"
 LEAN_ONLY_NOTE = "docs/lean-arm-only-note.md"
 FLOOR_ONLY_NOTE = "docs/floor-arm-only-note.md"
 EMBEDDED_HOOK = "hooks/embedded_rule_text.py"
 SCOPED_PATHS = ("  - src/**",)
-CODEX_STAYS_ALWAYS_ON = ("codex:", "  load: always_on")
 ARMS = ("full", "lean", "floor")
 
 
@@ -79,66 +78,12 @@ def write_variant(move: str, variant: str, workspace: Path) -> Path | None:
         return None
     here = workspace / f"{move}-{re.sub(r'[^a-z0-9]+', '-', variant.lower()).strip('-')}"
     shutil.rmtree(here, ignore_errors=True)
-    if variant == DECISION_RECORDS_SHAPE:
-        here.mkdir(parents=True)
-        payload = _decision_records_payload(here)
-    else:
-        shutil.copytree(kit_directory(move), here)
-        payload = read_payload(here / DECLARATION_FILE)
-        _EDITS[variant](payload, here)
+    shutil.copytree(kit_directory(move), here)
+    payload = read_payload(here / DECLARATION_FILE)
+    _EDITS[variant](payload, here)
     path = here / DECLARATION_FILE
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path
-
-
-def _decision_records_payload(here: Path) -> Payload:
-    """The second move: one resident line, and the rule matched to writes of decision records.
-
-    The rule's file gains a `paths:` list for Claude Code and says `codex: load: always_on`, so
-    the Codex bridge keeps listing it always-on and the move leaves that host reaching what it
-    reaches today.
-    """
-    rule_text = (REPO_ROOT / DECISION_RECORDS_RULE).read_text(encoding="utf-8")
-    resident_line = next(line for line in _body_lines(rule_text) if _is_prose(line))
-    kernel_file = "rules/swe/adr-conventions-resident.md"
-    matched = _with_frontmatter(
-        rule_text, ["paths:", f"  - {DECISION_RECORDS_GLOB}", *CODEX_STAYS_ALWAYS_ON]
-    )
-    return {
-        "schema": SCHEMA,
-        "move": DECISION_RECORDS_MOVE,
-        "moved_rule": DECISION_RECORDS_RULE,
-        "checks": [
-            {
-                "name": "decision draft placement",
-                "rule_file": DECISION_RECORDS_RULE,
-                "section": "File Format",
-                "phrases": ["drafts directory"],
-            }
-        ],
-        "fixture_scope": "managed",
-        "arms": {
-            "full": [],
-            "lean": [
-                {"op": "derive", "path": MANIFEST, "kind": "manifest_row_removed"},
-                {"op": "derive", "path": kernel_file, "kind": "kernel", "lines": [resident_line]},
-                _written_file(here, DECISION_RECORDS_RULE, matched),
-            ],
-            "floor": [
-                {"op": "remove", "path": DECISION_RECORDS_RULE},
-                {"op": "derive", "path": MANIFEST, "kind": "manifest_row_removed"},
-            ],
-        },
-        "deliveries": [
-            {"channel": "session_start", "file": kernel_file, "lines": [resident_line]},
-            {
-                "channel": "path_matched",
-                "file": DECISION_RECORDS_RULE,
-                "globs": [DECISION_RECORDS_GLOB],
-            },
-        ],
-        "launch": {arm: _default_launch() for arm in ARMS},
-    }
 
 
 def _default_launch() -> Payload:
@@ -234,6 +179,40 @@ def _floor_arm_only_note(payload: Payload, here: Path) -> None:
     payload["arms"]["floor"].append(change)
 
 
+UNHELD_PHRASE = "drafts directory"  # a phrase no section of either moved rule holds
+
+
+def _phrase_its_section_does_not_hold(payload: Payload, here: Path) -> None:
+    payload["checks"][0]["phrases"].append(UNHELD_PHRASE)
+
+
+def _phrase_differing_only_in_letter_case(payload: Payload, here: Path) -> None:
+    """A run of the named section's own words, in capitals."""
+    check = payload["checks"][0]
+    held = _word_runs(section_text(_rule_file_text(check), check["section"]))
+    phrase = next(run.upper() for run in held if run.upper() != run)
+    check["phrases"].append(phrase)
+
+
+def _phrase_held_only_outside_the_section(payload: Payload, here: Path) -> None:
+    """A run of the rule's words found in another section and nowhere in the named one."""
+    check = payload["checks"][0]
+    rule = _rule_file_text(check)
+    inside = section_text(rule, check["section"]).casefold()
+    outside = "\n".join(_body_lines(rule)).replace(section_text(rule, check["section"]), "")
+    phrase = next(run for run in _word_runs(outside) if run.casefold() not in inside)
+    check["phrases"].append(phrase)
+
+
+def _rule_file_text(check: Payload) -> str:
+    return (REPO_ROOT / check["rule_file"]).read_text(encoding="utf-8")
+
+
+def _word_runs(text: str) -> list[str]:
+    """Contiguous runs of three to six words of letters, exactly as the text holds them."""
+    return re.findall(r"[A-Za-z]{3,}(?: [A-Za-z]{2,}){2,5}", text)
+
+
 _EDITS: dict[str, Callable[[Payload, Path], None]] = {
     "a lean line neither resident nor delivered": _cut_a_rule_line,
     "no governed check": _no_governed_check,
@@ -251,7 +230,96 @@ _EDITS: dict[str, Callable[[Payload, Path], None]] = {
     "the arms differ in the user instruction file": _arms_differ_in_user_instructions,
     "a change confined to the lean arm": _lean_arm_only_note,
     "a change to the floor arm": _floor_arm_only_note,
+    "a check phrase its section does not hold": _phrase_its_section_does_not_hold,
+    "a check phrase differing only in letter case from its section": (
+        _phrase_differing_only_in_letter_case
+    ),
+    "a check phrase its rule holds only outside the named section": (
+        _phrase_held_only_outside_the_section
+    ),
 }
+
+
+# -- Lean-manifest variants, written from a built lean copy -----------------------------------
+
+MANIFEST_EDITS = ("removed", "repointed at the kernel")
+
+
+def write_lean_manifest_variant(move: str, edit: str, lean_manifest: Path, workspace: Path) -> Path:
+    """The kit's declaration whose lean arm writes `lean_manifest` with the moved rule's entry
+    removed or repointed at the resident kernel, every other entry as the built copy holds it.
+    """
+    if edit not in MANIFEST_EDITS:
+        raise ValueError(f"no manifest edit {edit!r}; known: {MANIFEST_EDITS}")
+    here = workspace / f"{move}-manifest-entry-{edit.replace(' ', '-')}"
+    shutil.rmtree(here, ignore_errors=True)
+    shutil.copytree(kit_directory(move), here)
+    payload = read_payload(here / DECLARATION_FILE)
+    manifest = yaml.safe_load(lean_manifest.read_text(encoding="utf-8"))
+    moved = payload["moved_rule"]
+    if edit == "removed":
+        manifest["rules"] = [row for row in manifest["rules"] if row.get("path") != moved]
+    else:
+        kernel = kernel_file(payload)
+        for row in manifest["rules"]:
+            if row.get("path") == moved:
+                row["path"] = kernel
+    text = yaml.safe_dump(manifest, sort_keys=False)
+    _replace_lean(payload, _written_file(here, MANIFEST, text))
+    path = here / DECLARATION_FILE
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def kernel_file(payload: Payload) -> str:
+    """The file the lean arm delivers its resident kernel from at session start."""
+    files = [d["file"] for d in payload["deliveries"] if d["channel"] == "session_start"]
+    if len(files) != 1:
+        raise AssertionError(f"the declaration delivers {len(files)} files at session start")
+    return files[0]
+
+
+def path_matched_globs(payload: Payload) -> tuple[str, ...]:
+    """Every glob a path-matched delivery of the moved rule declares."""
+    return tuple(
+        glob
+        for delivery in payload["deliveries"]
+        if delivery["channel"] == "path_matched"
+        for glob in delivery.get("globs", ())
+    )
+
+
+def section_text(rule_text: str, heading: str) -> str:
+    """The section `heading` names: its heading line and every line up to the next heading of
+    the same or a higher level, sub-headings included. Raises when no heading has that text.
+    """
+    lines = rule_text.splitlines()
+    levels = _heading_levels(lines)
+    for start, line in enumerate(lines):
+        level = levels[start]
+        if level and line.lstrip("#").strip() == heading:
+            end = next(
+                (j for j in range(start + 1, len(lines)) if 0 < levels[j] <= level),
+                len(lines),
+            )
+            return "\n".join(lines[start:end])
+    raise AssertionError(f"no heading {heading!r} in the rule")
+
+
+def _heading_levels(lines: list[str]) -> list[int]:
+    """Each line's heading level, 0 for a line that is no heading; a line inside a fenced code
+    block is never a heading."""
+    levels, fenced = [], False
+    for line in lines:
+        if re.match(r"\s*(```|~~~)", line):
+            fenced = not fenced
+        levels.append(0 if fenced else _heading_level(line))
+    return levels
+
+
+def _heading_level(line: str) -> int:
+    match = re.match(r"(#{1,6}) ", line)
+    return len(match.group(1)) if match else 0
 
 
 # -- Shared helpers ---------------------------------------------------------------------------
@@ -288,6 +356,11 @@ def _split_frontmatter(text: str) -> tuple[list[str], list[str]]:
         end = lines.index("---", 1)
         return lines[1:end], lines[end + 1 :]
     return [], lines
+
+
+def body_lines(text: str) -> list[str]:
+    """A rule's lines below its frontmatter."""
+    return _body_lines(text)
 
 
 def _body_lines(text: str) -> list[str]:

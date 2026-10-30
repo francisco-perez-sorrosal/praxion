@@ -20,6 +20,7 @@ from praxion_evals.adherence.moves.model import (
     HookRegistered,
     KernelDerive,
     ManifestRowRemoved,
+    ManifestRowScoped,
     Remove,
     SessionStart,
     Write,
@@ -31,6 +32,8 @@ KITS = [GIT_KIT, "adr-conventions"]
 HOOK_FILE = "inject_git_conventions_at_use.py"
 RULE = "rules/swe/vcs/git-conventions.md"
 RULE_ID = "swe/vcs/git-conventions"
+ADR_KIT = "adr-conventions"
+ADR_RULE = "rules/swe/adr-conventions.md"
 
 
 @pytest.fixture(scope="module")
@@ -264,3 +267,56 @@ def test_run_as_an_arm_copy_registers_it_the_hook_prints_one_pre_tool_use_contex
     assert result.returncode == 0
     assert output["hookEventName"] == "PreToolUse"
     assert output["additionalContext"].startswith("## Git Conventions")
+
+
+# -- The adr-conventions kit ------------------------------------------------------------------
+
+
+def _adr_section(heading: str) -> str:
+    """The text under ``heading`` (any level) up to the next heading of the same or higher level."""
+    lines = (REPO_ROOT / ADR_RULE).read_text(encoding="utf-8").splitlines()
+    (start,) = [i for i, row in enumerate(lines) if row.lstrip("#").strip() == heading]
+    level = len(lines[start]) - len(lines[start].lstrip("#"))
+    body: list[str] = []
+    for row in lines[start + 1 :]:
+        if row.startswith("#") and len(row) - len(row.lstrip("#")) <= level:
+            break
+        body.append(row)
+    return "\n".join(body)
+
+
+def test_the_adr_kit_governs_draft_placement_then_decision_category():
+    names = [check.name for check in declaration.kit(ADR_KIT).checks.checks]
+
+    assert names == ["decision draft placement", "decision category"]
+
+
+def test_the_adr_kits_lean_arm_scopes_the_manifest_row_rather_than_removing_it():
+    lean = declaration.kit(ADR_KIT).arms.lean
+
+    assert sum(isinstance(c, ManifestRowScoped) for c in lean) == 1
+    assert not [c for c in lean if isinstance(c, ManifestRowRemoved)]
+
+
+def test_the_adr_kits_rule_copy_is_path_scoped_and_keeps_its_paths_and_codex_override():
+    copy = KITS_ROOT / ADR_KIT / "rules__swe__adr-conventions.md"
+    frontmatter = copy.read_text(encoding="utf-8").split("---", 2)[1].splitlines()
+
+    assert "load: path_scoped" in frontmatter
+    assert "load: always_on" not in frontmatter  # only the indented codex override remains
+    assert "  - .ai-state/decisions/**" in frontmatter
+    assert "codex:" in frontmatter
+    assert "  load: always_on" in frontmatter
+
+
+def test_each_adr_governed_phrase_lies_in_its_own_section():
+    checks = declaration.kit(ADR_KIT, REPO_ROOT).checks.checks
+    phrases_missing = [
+        (check.name, phrase)
+        for check in checks
+        for phrase in check.phrases
+        if phrase.casefold() not in _adr_section(check.section).casefold()
+    ]
+
+    assert phrases_missing == []
+    assert all(check.phrases for check in checks)

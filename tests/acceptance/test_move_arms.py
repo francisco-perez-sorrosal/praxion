@@ -12,7 +12,7 @@ line by line by running both exports over each tree: a section is reached when e
 line it holds in the checkout's rule file appears unchanged in a file the export carries (for
 Codex, a file its manifest lists with a load other than excluded), and a section Codex reaches
 through an always-on listing today must still be reached through one. The second ranked move,
-adr-conventions, builds its arms and passes the same checks with no task kit.
+adr-conventions, builds its arms from its own kit's declaration and passes the same checks.
 
 The kit's own arms are built once per move and shared; each known-bad variant builds its own.
 """
@@ -45,7 +45,6 @@ from tests.acceptance.drivers.move_eval import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SECOND_MOVE_SHAPE: Variant = "a resident line and a path-matched rule for the decision records"
 
 
 @dataclass(frozen=True)
@@ -73,7 +72,7 @@ def first_move(tmp_path_factory: pytest.TempPathFactory) -> Built:
 
 @pytest.fixture(scope="module")
 def second_move(tmp_path_factory: pytest.TempPathFactory) -> Built:
-    return _build(tmp_path_factory.mktemp("second-move-arms"), SECOND_MOVE, SECOND_MOVE_SHAPE)
+    return _build(tmp_path_factory.mktemp("second-move-arms"), SECOND_MOVE, "as declared")
 
 
 @pytest.fixture(params=("first", "second"))

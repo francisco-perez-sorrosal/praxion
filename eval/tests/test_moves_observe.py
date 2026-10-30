@@ -178,6 +178,27 @@ def test_a_path_scoped_linked_rule_is_not_resident_at_session_start(full_copy):
     assert _lines(observe.session_start(full_copy)) == tuple(KERNEL_BODY)
 
 
+def test_the_linked_set_holds_the_rules_the_installer_linked_path_scoped_ones_included(full_copy):
+    observed = observe.session_start(_lean(full_copy))
+
+    assert isinstance(observed, Observed), observed
+    assert observed.linked == {BASELINE_ROW[1], KERNEL_PATH}
+
+
+def test_a_hook_delivered_rule_is_not_in_the_linked_set(full_copy):
+    observed = observe.session_start(full_copy)
+
+    assert isinstance(observed, Observed), observed
+    assert RULE_PATH not in observed.linked
+
+
+def test_a_hook_output_observation_links_nothing(full_copy):
+    observed = observe.hook_output(full_copy, "PreToolUse", BASH_COMMIT, script=KIT_HOOK)
+
+    assert isinstance(observed, Observed), observed
+    assert observed.linked == frozenset()
+
+
 def test_a_manifest_with_no_linked_row_is_observed_as_the_linker_treats_it_linking_every_rule(
     full_copy,
 ):

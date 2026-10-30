@@ -15,7 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ from praxion_evals.adherence.moves.model import (
     KernelDerive,
     LaunchOptions,
     ManifestRowRemoved,
+    ManifestRowScoped,
     MoveArm,
     MoveDeclaration,
     MoveName,
@@ -44,6 +46,7 @@ from praxion_evals.adherence.moves.model import (
     Remove,
     SessionStart,
     Write,
+    holds_phrase,
 )
 
 SCHEMA = "move-declaration/1"
@@ -88,7 +91,8 @@ def kit(name: str, checkout: Path | None = None) -> MoveDeclaration:
 
 
 def check_sections(declaration: MoveDeclaration, checkout: Path) -> None:
-    """Refuse a governed check whose section is no heading of its rule file in ``checkout``."""
+    """Refuse a governed check whose section is no heading of its rule file in ``checkout``,
+    or whose declared phrase that section does not hold."""
     for check in declaration.checks.checks:
         rule = checkout / check.rule_file.value
         if not rule.is_file():
@@ -96,16 +100,85 @@ def check_sections(declaration: MoveDeclaration, checkout: Path) -> None:
                 f"the check {check.name!r} names the rule file {check.rule_file.value}, "
                 f"which the checkout does not hold"
             )
-        if not _has_heading(rule.read_text(encoding="utf-8"), check.section):
+        span = _section_span(rule.read_text(encoding="utf-8"), check.section)
+        if span is None:
             raise DeclarationError(
                 f"the check {check.name!r} names the section {check.section!r}, "
                 f"which {check.rule_file.value} does not hold"
             )
+        for phrase in check.phrases:
+            if not holds_phrase(span, phrase):
+                raise DeclarationError(
+                    f"the check {check.name!r} declares the phrase {phrase!r}, which the "
+                    f"section {check.section!r} of {check.rule_file.value} does not hold"
+                )
 
 
-def _has_heading(text: str, section: str) -> bool:
-    heading = re.compile(rf"#{{1,6}}\s+{re.escape(section)}\s*")
-    return any(heading.fullmatch(line) for line in text.splitlines())
+def _section_span(text: str, section: str) -> str | None:
+    """The heading line of ``section`` through the line before the next heading of the same or
+    a higher level (sub-headings included); None when no heading names it."""
+    lines = text.splitlines()
+    headings = markdown_headings(lines)
+    for start, heading in enumerate(headings):
+        if heading and heading.title == section:
+            return section_text(lines, headings, start, heading.level)
+    return None
+
+
+# -- Markdown headings ------------------------------------------------------------------------
+
+_HEADING = re.compile(r"(?P<hashes>#{1,6})\s+(?P<title>.*?)\s*")
+_FENCE = re.compile(r" {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)")
+
+
+@dataclass(frozen=True)
+class Heading:
+    level: int
+    title: str
+
+
+def markdown_headings(lines: Sequence[str]) -> list[Heading | None]:
+    """Each line's heading, or None for a line that is none. Fenced code holds no headings: a fence
+    opens on three or more backticks or tildes indented up to three spaces and closes on the same
+    character at least as many times with nothing after; an unclosed fence runs to the end."""
+    found: list[Heading | None] = []
+    open_run: str | None = None
+    for line in lines:
+        fence = _FENCE.fullmatch(line)
+        if open_run is None:
+            open_run = fence["run"] if fence else None
+            found.append(None if fence else _heading(line))
+        else:
+            found.append(None)
+            if fence and _closes(fence, open_run):
+                open_run = None
+    return found
+
+
+def section_text(
+    lines: Sequence[str], headings: Sequence[Heading | None], start: int, level: int
+) -> str:
+    """The section whose heading of ``level`` is line ``start``: through the line before the next
+    heading of the same or a higher level, sub-headings included."""
+    end = next(
+        (
+            i
+            for i in range(start + 1, len(lines))
+            if (heading := headings[i]) is not None and heading.level <= level
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
+def _closes(fence: re.Match[str], open_run: str) -> bool:
+    run = fence["run"]
+    return run[0] == open_run[0] and len(run) >= len(open_run) and not fence["rest"].strip()
+
+
+def _heading(line: str) -> Heading | None:
+    found = _HEADING.fullmatch(line)
+    return Heading(len(found["hashes"]), found["title"]) if found else None
 
 
 # -- The declaration ------------------------------------------------------------------------
@@ -211,9 +284,12 @@ def _derive(change: Json, path: RelPath) -> ArmChange:
             return ManifestRowRemoved(path)
         case "hook_registered":
             return HookRegistered(path)
+        case "manifest_row_scoped":
+            return ManifestRowScoped(path)
         case _:
             raise ValueError(
-                f"a derive is kernel, manifest_row_removed or hook_registered, got {kind!r}"
+                f"a derive is kernel, manifest_row_removed, hook_registered or "
+                f"manifest_row_scoped, got {kind!r}"
             )
 
 

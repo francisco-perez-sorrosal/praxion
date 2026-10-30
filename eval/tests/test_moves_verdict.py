@@ -146,7 +146,7 @@ def test_a_history_word_means_the_same_spoken_or_named(spoken, named):
 @pytest.mark.parametrize(
     ("bad", "reason"),
     [
-        ({"final": {MESSAGE: "maybe"}}, "passed or failed"),
+        ({"final": {MESSAGE: "maybe"}}, "passed, failed or nothing_to_grade"),
         ({"final": {MESSAGE: "passed"}, "history": {MESSAGE: "eventually"}}, "history outcome"),
         (
             {"final": {MESSAGE: "passed"}, "arrivals": {MESSAGE: {"carrier_pigeon": "never"}}},
@@ -277,6 +277,24 @@ def test_an_errored_floor_session_and_one_without_the_check_score_nothing():
     tally = measurement(DISCORDANT, floor=floor).floor_tally(MESSAGE)
 
     assert (tally.failures, tally.scored) == (1, 2)
+
+
+def test_a_floor_session_that_left_nothing_to_grade_is_counted_apart_from_failures_and_rate():
+    floor = [{MESSAGE: "nothing_to_grade"}, {MESSAGE: "failed"}, {MESSAGE: "passed"}]
+
+    tally = measurement(DISCORDANT, floor=floor).floor_tally(MESSAGE)
+
+    assert (tally.failures, tally.scored, tally.ungraded) == (1, 2, 1)
+    assert tally.rate == Fraction(1, 2)
+
+
+def test_a_lean_session_that_left_nothing_to_grade_fails_its_pair():
+    left_nothing = {MESSAGE: "nothing_to_grade", STAGING: "passed"}
+    pairs = wire_pairs(1, OK, left_nothing) + wire_pairs(23, OK, OK, start=1)
+
+    verdict = move_verdict(measurement(pairs))
+
+    assert verdict.counts[MESSAGE].lean_failed_only == 1
 
 
 def full_failing_once_in_24():

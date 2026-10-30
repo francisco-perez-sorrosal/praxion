@@ -18,10 +18,10 @@ import pytest
 from praxion_evals.adherence import (
     cli,
     model,
-    session_loop,
     tasks,
 )
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
+from praxion_evals.live.report import CREDENTIAL_KEYS
 from tests.adherence_run_support import (
     ROLE,
     SMALL_RUN,
@@ -248,7 +248,7 @@ def test_a_role_with_no_task_kit_is_a_usage_error(
 def test_a_paid_run_without_a_credential_is_a_usage_error(
     monkeypatch: pytest.MonkeyPatch, no_launch: None, tmp_path: Path
 ) -> None:
-    for key in session_loop.CREDENTIAL_KEYS:
+    for key in CREDENTIAL_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     code = cli.main(

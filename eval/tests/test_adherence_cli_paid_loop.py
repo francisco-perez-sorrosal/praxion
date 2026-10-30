@@ -28,6 +28,7 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.harness.schemas import JudgeVerdict
+from praxion_evals.live.report import CREDENTIAL_KEYS
 from praxion_evals.live.session import SessionRun, SessionSpec
 from tests.adherence_run_support import (
     AGENT_ID,
@@ -241,6 +242,22 @@ def test_golden_cases_are_judged_once_and_recorded_before_any_session(
     assert recorded is not None
     assert recorded["observed_error"] == 0.0
     assert recorded["cases"]["C3"]["separates"] is True
+
+
+@pytest.mark.usefixtures("full_first")
+def test_an_unjudged_run_whose_only_credential_is_the_token_file_runs(
+    paid: Callable[[Script], None], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    paid(Script())
+    for key in CREDENTIAL_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    token_file = tmp_path / "session-token"
+    token_file.write_text("sk-ant-oat01-example\n", encoding="utf-8")
+
+    code, loaded = run_small(tmp_path, "--no-judge", "--session-oauth-token-file", str(token_file))
+
+    assert code == 0
+    assert sessions_of(loaded) == [("full", "Measured"), ("lean", "Measured")]
 
 
 def test_judging_that_is_unavailable_is_a_usage_error_before_anything_is_written(

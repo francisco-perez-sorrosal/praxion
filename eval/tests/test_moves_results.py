@@ -18,6 +18,7 @@ from praxion_evals.adherence.moves.model import (
     CheckTrigger,
     MoveName,
     NeverArrived,
+    NothingToGrade,
     Pinned,
     Unknown,
 )
@@ -124,6 +125,15 @@ def test_a_floor_round_trip_keeps_every_field(tmp_path):
         ending=Closed("credit cut off", "2026-10-28T11:00:00+00:00", {"message": "1/1"}, STOP),
         earlier=EarlierMoveRuns(("floor-0",), (), {"old": "the moved rule's text differs"}),
     )
+
+    path = results.write(moves_dir(tmp_path), run)
+
+    assert results.load(path) == run
+
+
+def test_a_session_that_left_nothing_to_grade_round_trips(tmp_path):
+    left_nothing = replace(trigger(), final=NothingToGrade("no commit made"))
+    run = floor_run(sessions=(replace(scored("t1", "floor"), checks={"message": left_nothing}),))
 
     path = results.write(moves_dir(tmp_path), run)
 

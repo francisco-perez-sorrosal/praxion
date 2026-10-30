@@ -3,8 +3,9 @@
 ``render`` reads a typed ``Measurement`` and states, per governed check: the final-state
 failures of each arm, the history outcomes, the arrival timing by channel with trigger failures
 (the text never arrived) counted apart from failures with arrival, the floor's failures out of
-the floor sessions that scored the check, the sensitivity line beside the check's allowance in
-pairs and points beside the declared margin, and whether the clearance claim covers the check.
+the floor sessions that graded the check (those that left nothing to grade counted apart), the
+sensitivity line beside the check's allowance in pairs and points beside the declared margin,
+and whether the clearance claim covers the check.
 Per-kind counts sit beside the pooled verdict, and a one-kind restriction is named.
 
 The wording claims bounded non-regression within the margin and nothing about one channel
@@ -41,6 +42,7 @@ from praxion_evals.adherence.moves.verdict import (
     MoveVerdict,
     Sensitivity,
     Side,
+    in_pair,
     move_verdict,
     sensitivity,
 )
@@ -67,6 +69,8 @@ READING_NOTES = (
     "- Floor sessions enter no pair and no allowance. The sensitivity line is the target pairs"
     " times the floor's failure rate less the full arm's; it changes no verdict. A check whose"
     " figure does not exceed its allowance is not covered by the clearance claim.",
+    "- A session that left nothing to grade (it made no commit) fails its pair, but on the floor"
+    " it is counted apart and enters neither the floor's failures nor its rate.",
 )
 
 
@@ -180,6 +184,7 @@ def _check_section(view: _CheckView, verdict: MoveVerdict, complete: Sequence[Mo
         view.name,
         _figure(view.name, "verdict", verdict.check_verdicts.get(view.name, NONE)),
         _figure(view.name, "floor", view.floor.failures, view.floor.scored),
+        _figure(view.name, "floor nothing to grade", view.floor.ungraded),
         *_final_lines(view, sides),
         *_history_lines(view.name, sides),
         *_timing_lines(view.name, sides),
@@ -202,7 +207,12 @@ def _final_lines(view: _CheckView, sides: dict[str, list[Side]]) -> list[str]:
 
 
 def _final_failures(check: str, sides: Iterable[Side]) -> int:
-    return sum(isinstance(side.final.get(check), Failed) for side in sides)
+    return sum(_fails_in_pair(side, check) for side in sides)
+
+
+def _fails_in_pair(side: Side, check: str) -> bool:
+    final = side.final.get(check)
+    return final is not None and isinstance(in_pair(final), Failed)
 
 
 def _history_lines(check: str, sides: dict[str, list[Side]]) -> list[str]:
@@ -245,7 +255,7 @@ def _trigger_lines(check: str, sides: dict[str, list[Side]]) -> list[str]:
         seen = Counter(
             _arrival_class(side.arrivals.get(check, {}))
             for side in arm_sides
-            if isinstance(side.final.get(check), Failed)
+            if _fails_in_pair(side, check)
         )
         lines.append(
             _figure(

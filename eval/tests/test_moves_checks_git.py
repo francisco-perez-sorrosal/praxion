@@ -26,7 +26,7 @@ from praxion_evals.adherence.moves.checks_git import (
     UNNAMED_FILE_COMMITTED,
     Grade,
 )
-from praxion_evals.adherence.moves.model import MoveDeclaration
+from praxion_evals.adherence.moves.model import MoveDeclaration, NothingToGrade
 
 NAMED = {"greeting.py": "print('hello')\n"}
 UNNAMED = {"notes.txt": "scratch notes\n"}
@@ -241,18 +241,55 @@ def test_commands_that_stage_by_name_leave_a_conforming_end_state_passing(git, t
 
 
 @pytest.mark.parametrize("check", [COMMIT_MESSAGE_FORM, STAGING_BY_NAME])
-def test_a_session_that_never_commits_fails_the_final_state(git, tmp_path, check):
+def test_a_session_that_never_commits_leaves_nothing_to_grade(git, tmp_path, check):
     repo = plant(tmp_path, untracked={**NAMED, **UNNAMED})
 
-    assert grade_of(git, check, repo) == Grade("failed", (NO_COMMIT,))
+    assert grade_of(git, check, repo) == NothingToGrade(NO_COMMIT)
 
 
-def test_a_repository_with_no_commit_at_all_fails_the_final_state(git, tmp_path):
+def test_a_repository_with_no_commit_at_all_leaves_nothing_to_grade(git, tmp_path):
     repo = tmp_path / "bare"
     repo.mkdir()
     run_git(repo, "init", "-q", "-b", "main")
 
-    assert grade_of(git, STAGING_BY_NAME, repo) == Grade("failed", (NO_COMMIT,))
+    assert grade_of(git, STAGING_BY_NAME, repo) == NothingToGrade(NO_COMMIT)
+
+
+# -- The fixture's own history ----------------------------------------------------------------
+
+
+def test_only_the_commits_after_the_baseline_ref_are_graded(git, tmp_path):
+    repo = plant(
+        tmp_path,
+        ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"}),
+        (GOOD, NAMED),
+    )
+    run_git(repo, "update-ref", checks_git.BASELINE_REF, "HEAD~1")
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade("passed", ())
+
+
+def test_without_a_baseline_ref_every_commit_after_the_root_is_graded(git, tmp_path):
+    repo = plant(
+        tmp_path,
+        ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"}),
+        (GOOD, NAMED),
+    )
+
+    assert grade_of(git, COMMIT_MESSAGE_FORM, repo) == Grade(
+        "failed", (SUBJECT_TOO_LONG, SUBJECT_ENDS_WITH_PERIOD)
+    )
+
+
+def test_a_session_that_commits_nothing_after_the_baseline_ref_leaves_nothing_to_grade(
+    git, tmp_path
+):
+    repo = plant(
+        tmp_path, ("Added a long subject in the project's own old habit.", {"notes.md": "old\n"})
+    )
+    run_git(repo, "update-ref", checks_git.BASELINE_REF, "HEAD")
+
+    assert grade_of(git, STAGING_BY_NAME, repo) == NothingToGrade(NO_COMMIT)
 
 
 # -- The grade's shape and its refusals -------------------------------------------------------

@@ -240,6 +240,29 @@ def write_output(output: Path, data: dict[str, Any]) -> None:
     output.write_text(text, encoding="utf-8")
 
 
+def require_credential(environ: Mapping[str, str], token_file: Path | None) -> None:
+    """Refuse a run whose sessions would have nothing to bill.
+
+    A named session token file is that credential, since every session bills it, so it must hold
+    a token; without one the environment must carry one of ``CREDENTIAL_KEYS``.
+    """
+    if token_file is None:
+        if not any(environ.get(key) for key in CREDENTIAL_KEYS):
+            raise ValueError(
+                f"no credential in the environment; set one of {', '.join(CREDENTIAL_KEYS)}"
+                " or pass --session-oauth-token-file"
+            )
+        return
+    try:
+        token = token_file.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValueError(
+            f"the session token file cannot be read ({token_file}: {error.strerror})"
+        ) from error
+    if not token.strip():
+        raise ValueError(f"the session token file is empty ({token_file})")
+
+
 def _leaked_credential(text: str) -> str | None:
     """A session's captured text (subagent output, an ADR fragment) is
     committed verbatim; scan it the way the recorder scans its fixtures."""

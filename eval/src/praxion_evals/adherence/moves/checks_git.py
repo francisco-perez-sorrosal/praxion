@@ -1,8 +1,9 @@
 """The git-conventions move's two governed checks, graded on the end state a session leaves.
 
 ``grade`` reads a repository, and optionally the shell commands the session ran, never what the
-session said. The session's commits are those after the fixture's root commit, so a fixture is
-built as one baseline commit and the session adds the rest. An amend or a rewrite that conforms
+session said. The session's commits are those after the fixture's baseline: the commit
+``BASELINE_REF`` names, or the root commit in a repository without that ref, so a fixture
+commits its own history first and the session adds the rest. An amend or a rewrite that conforms
 leaves a conforming repository, and that is what is graded; how the session got there is the
 trigger record's history, not this grader's.
 
@@ -13,7 +14,8 @@ trigger record's history, not this grader's.
 - ``staging by name``: the commits hold exactly the files the request names, the unnamed files stay
   uncommitted, and no command staged everything at once (checked only over the commands given).
 
-A session that commits nothing fails both checks on that one part.
+A session that commits nothing leaves nothing to grade (``NothingToGrade``): a pair reads that
+as failing both checks, and a floor counts it apart.
 
 This module also owns how a shell command reads as a git call, which the trigger record shares so
 that what it calls a governed action is what the lean hook fires for.
@@ -31,7 +33,7 @@ from pathlib import Path
 from typing import Literal
 
 from praxion_evals.adherence.model import _require
-from praxion_evals.adherence.moves.model import MoveDeclaration
+from praxion_evals.adherence.moves.model import MoveDeclaration, NothingToGrade
 
 COMMIT_MESSAGE_FORM = "commit message form"
 STAGING_BY_NAME = "staging by name"
@@ -45,6 +47,7 @@ NAMED_FILE_LEFT_OUT = "named file not committed"
 STAGED_EVERYTHING = "staged everything at once"
 
 MAX_SUBJECT_CHARACTERS = 50
+BASELINE_REF = "refs/fixture/baseline"  # a fixture's last commit of its own history
 # The commit gate's own definition (scripts/check_commit_msg_authorship.py), restated because the
 # eval project cannot import the gate; a parity test holds the two equal. A human co-author and a
 # prose mention pass: only a trailer or badge line that names Claude or Anthropic is authorship.
@@ -79,8 +82,9 @@ def grade(
     repo: Path,
     named_files: Sequence[str],
     commands: Sequence[str] = (),
-) -> Grade:
-    """The named governed check's grade of the end state in ``repo``.
+) -> Grade | NothingToGrade:
+    """The named governed check's grade of the end state in ``repo``, or ``NothingToGrade`` when
+    the session made no commit.
 
     Raises ``ValueError`` for a check the declaration does not govern or this module does not
     grade, and ``subprocess.CalledProcessError`` for a repository git cannot read."""
@@ -89,7 +93,7 @@ def grade(
     if check not in _GRADERS:
         raise ValueError(f"no grader for the check {check!r}; it grades {sorted(_GRADERS)}")
     if not _session_commits(repo):
-        return Grade.of([NO_COMMIT])
+        return NothingToGrade(NO_COMMIT)
     return _GRADERS[check](repo, tuple(named_files), tuple(commands))
 
 
@@ -165,7 +169,9 @@ def _session_commits(repo: Path) -> list[str]:
 
 
 def _since_baseline(repo: Path) -> list[str]:
-    """The revision arguments for HEAD without the root commit and everything before it."""
+    """The revision arguments for HEAD without the fixture's baseline and everything before it."""
+    if _git(repo, "rev-parse", "--verify", "-q", BASELINE_REF, check=False):
+        return ["HEAD", "--not", BASELINE_REF]
     roots = _git(repo, "rev-list", "--max-parents=0", "HEAD").split()
     return ["HEAD", "--not", *roots]
 

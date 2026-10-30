@@ -1,0 +1,390 @@
+{
+  "schema": "move-results/1",
+  "subject": {
+    "kind": "move",
+    "name": "adr-conventions"
+  },
+  "run_kind": "floor",
+  "run_id": "20261030T055223Z-42630f",
+  "continues": null,
+  "harness_version": "2.1.314",
+  "identity": {
+    "moved_rule_text": "---\ncore: true\nload: always_on\ninstall: symlink\n---\n\n## ADR Conventions\n\nArchitecture Decision Records live in `.ai-state/decisions/` as Markdown files with YAML frontmatter. They persist beyond `.ai-work/` cleanup and are committed to git.\n\n### File Format\n\nPipeline-authored ADRs follow the **fragment-name-at-create, finalize-at-merge** path: they land as a fragment under `.ai-state/decisions/drafts/`, then promote to a stable `<NNN>-<slug>.md` record at merge-to-main (see [Fragment Filename Schema](#fragment-filename-schema) and [Finalized ADRs](#finalized-adrs-post-merge)). The legacy NNN-at-create path survives only for manual, no-session ADRs.\n\n#### Fragment Filename Schema\n\nPipeline-authored ADRs land as `.ai-state/decisions/drafts/<YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md` with id `dec-draft-<8-char-hash>`; drafts cross-reference via `dec-draft-<hash>`, never a speculative `dec-NNN` \u2014 [Finalize](#finalize-protocol) rewrites at merge. Full construction: [`adr-authoring-protocols.md` \u00a7 ADR Creation Protocol](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create).\n\n#### Finalized ADRs (post-merge)\n\nAfter finalize, the ADR lives at `.ai-state/decisions/<NNN>-<slug>.md`, `<NNN>` assigned by the finalize script \u2014 pipeline-authored ADRs never pick their own. Manual, no-session ADRs alone may self-assign directly. Detail: [`adr-authoring-protocols.md` \u00a7 Who Creates ADRs](../../skills/software-planning/references/adr-authoring-protocols.md#who-creates-adrs).\n\n#### Frontmatter\n\nThe frontmatter schema is shared between draft and finalized ADRs; only `id` and the cross-reference fields (`supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`) differ in value form (`dec-draft-<hash>` during draft, `dec-NNN` after finalize).\n\nFields: `id`, `title`, `status`, `category`, `date`, `summary`, `tags`, `made_by`, `agent_type`, `branch`, `pipeline_tier`, `affected_files`, `affected_reqs`, `retires_elements`, `supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`, `retired_by`, `supersedes_in_part`, `superseded_in_part_by`, `dissent`. Full table: [`adr-authoring-protocols.md` \u00a7 Frontmatter Schema](../../skills/software-planning/references/adr-authoring-protocols.md#frontmatter-schema).\n\n#### What makes a decision `architectural`\n\nA decision is `architectural` **iff it changes what exists or what connects**:\n\n- **internal** \u2014 it adds, removes, merges, or splits a component in any artifact family (skill, agent, rule, hook, script, MCP server, package, service); moves a responsibility from one component to another; or introduces or removes a boundary or abstraction between them.\n- **published** \u2014 it changes a canonical block, a shipped template, or an onboard-contract phase.\n\nIf the component inventory and its boundaries are unchanged once the decision lands, it is **not** architectural \u2014 *however consequential the trade-off*.\n\n**Falsifier \u2014 name the component added, removed, or whose responsibility moved.** If no such name exists, the category is wrong: process, policy, deliberation method, and features inside one component are `behavioral`, `implementation`, or `configuration`.\n\nSource of truth for this test. Worked examples, evidence, and calibration: [`adr-authoring-protocols.md` \u00a7 The `architectural` Test](../../skills/software-planning/references/adr-authoring-protocols.md#the-architectural-test).\n\n**Body sections** (after frontmatter):\n\n1. **Context** -- what prompted the decision (problem, constraint, opportunity)\n2. **Decision** -- what was decided (clear, direct statement)\n3. **Considered Options** -- alternatives with pros/cons (subsections per option)\n4. **Consequences** -- positive and negative outcomes\n5. **Disconfirmation** -- **always-on for `category: architectural`**; three required sub-items (Falsifier, Steelmanned runner-up, Reversal trigger) \u2014 full definitions in `adr-authoring-protocols.md`'s creation protocol (see [Agent Writing Protocol](#agent-writing-protocol) below).\n6. **Prior Decision** -- only when superseding; summarizes what changed and why\n\n### Relation Protocols\n\n| Protocol | What changes | Fields touched |\n|---|---|---|\n| Supersession | Fully replaces old; old \u2192 `superseded` | `supersedes` / `superseded_by` |\n| Re-affirmation | Affirms old unchanged; old stays `accepted` | `re_affirms` / `re_affirmed_by` |\n| Retirement | Old subject removed, not re-decided; old \u2192 `retired` | `retired_by` |\n| Partial-Supersession | Narrows some clauses of old; old stays non-terminal | `supersedes_in_part` / `superseded_in_part_by` |\n\nEvery relation adds a `## Prior Decision` section (to the new ADR, or for Retirement the old) explaining what changed and why; `DECISIONS_INDEX.md` regenerates at finalize \u2014 never invoke manually. Full step sequences and the supersession-vs-retirement / supersession-vs-partial tests: [`adr-authoring-protocols.md`](../../skills/software-planning/references/adr-authoring-protocols.md) \u00a7\u00a7 Supersession / Re-affirmation / Retirement / Partial-Supersession Protocol.\n\n### Finalize Protocol\n\nFinalize promotes drafts to finalized `<NNN>-<slug>.md` records at merge-to-main (post-merge git hook + `/merge-worktree`). It is **idempotent** and rewrites `dec-draft-<hash>` cross-references to `dec-NNN` across a **bounded citation net** \u2014 never an arbitrary repo sweep, never code; `DECISIONS_INDEX.md` regenerates last. Full step sequence: [`adr-authoring-protocols.md \u00a7 Finalize at Merge-to-Main`](../../skills/software-planning/references/adr-authoring-protocols.md#finalize-at-merge-to-main).\n\n### Who Writes ADRs\n\nOnly systems-architect, implementation-planner, interface-designer, agentic-transactions-architect, orchestrator (Direct/Lightweight, no pipeline agent spawned), and the user (manual) create ADR fragments, always under `.ai-state/decisions/drafts/`. **The implementer authors no ADR** and may apply only mechanical corpus edits a plan step specifies \u2014 flip a `status:`, set a cross-reference field, or correct malformed frontmatter; a new record, rationale, or category judgement returns to the architect or planner.\n\nAll ADR authors record decisions in `LEARNINGS.md ### Decisions Made`; `dec-draft-<hash>` references there rewrite to `dec-NNN` at finalize. Full per-agent When/Scope/Destination table: [`adr-authoring-protocols.md` \u00a7 Who Writes ADRs](../../skills/software-planning/references/adr-authoring-protocols.md#who-writes-adrs).\n\n### Agent Writing Protocol\n\nThe fragment-creation procedure lives in [`adr-authoring-protocols.md \u00a7 ADR Creation Protocol`](../../skills/software-planning/references/adr-authoring-protocols.md#adr-creation-protocol-fragment-name-at-create) \u2014 canonical for every ADR-writing agent.\n\n### Discovery Protocol\n\nRetrieval-first. An ungated full `Read` of `DECISIONS_INDEX.md` is **forbidden** \u2014 it grows unbounded, running tens of thousands of tokens at a few hundred ADRs. Exception: a genuinely cross-cutting task a keyword scan would miss; say so when you take it.\n\n1. **Pre-scan**: prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`); otherwise `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md`, reading only matching rows via `offset`+`limit`\n2. Also scan `.ai-state/decisions/drafts/` \u2014 not indexed but authoritative in-flight\n3. Read full ADR files for matching decisions\n4. Fallback (if index missing): `Glob .ai-state/decisions/[0-9]*.md` + `Glob .ai-state/decisions/drafts/*.md` + Grep frontmatter\n\n### Linking to ADRs\n\nPersistent files (`docs/`, `.ai-state/DESIGN.md`, READMEs) link the **finalized** record at `.ai-state/decisions/<NNN>-<slug>.md`, never a `drafts/<\u2026>.md` fragment \u2014 a `drafts/` path stops resolving once the pipeline merges. Mid-pipeline, cite by `dec-draft-<hash>` id, not path \u2014 the id survives finalize as `dec-NNN`; the path does not. (ADR-to-ADR cross-references use the frontmatter `id` form, not file-path links.)\n\n### Consumption\n\nConsumer behavior lives at its own definition, not duplicated here: sentinel's DL0x checks, skill-genesis's pattern-harvest scope, verifier's `affected_reqs` cross-reference, systems-architect's brownfield baseline, `architect-validator`'s code\u2194DSL\u2194ADR triangle check.\n\n### Relationship to LEARNINGS.md\n\n`LEARNINGS.md` is broader (gotchas, patterns, edge cases, tech debt, decisions) and ephemeral; ADR files are narrower (decisions only) and persist. Decisions appear in both. Draft-stage `dec-draft-<hash>` references in `LEARNINGS.md` rewrite to `dec-NNN` at finalize alongside the ADR files themselves.\n\n### Migration \u2014 historical ADRs\n\nPre-existing finalized ADRs keep their filenames, `dec-NNN` ids and cross-references; the fragment scheme applies only to newly authored records.\n",
+    "arms": {
+      "full": [
+        {
+          "path": "(whole tree)",
+          "sha256": "5d9f4fb19e2f9e016a8eb58632fa88ab2ed4b3e133c853ceed61db844afc1ecf"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ],
+      "lean": [
+        {
+          "path": "rules/_manifest.yaml",
+          "sha256": "a07cdc487038cb162c31109e4b1bc21f2e8adc838ecc17a6c56a82225c9188e9"
+        },
+        {
+          "path": "rules/swe/adr-conventions-resident.md",
+          "sha256": "540fef63baff18fc71bea4f788cd43ff2515387c96a2ea4fb68a5b6c796f22b5"
+        },
+        {
+          "path": "rules/swe/adr-conventions.md",
+          "sha256": "b0c7c3663c95fe7c384f28f7cd29394994a399e7c0685474233c601d10a2b226"
+        },
+        {
+          "path": "(whole tree)",
+          "sha256": "e99f304db8372d952320bb7897e2b1a97d0f359011e1ed2680a4a193eb71220f"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ],
+      "floor": [
+        {
+          "path": "rules/swe/adr-conventions.md",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "rules/_manifest.yaml",
+          "sha256": "1b960fc28d201b1dd6bc864f70391223cabf46153f520a529a2ba879b4a35a69"
+        },
+        {
+          "path": "(whole tree)",
+          "sha256": "d7dfb28ae67624044198f7c5e4e552d005375730e2a29761bdb76ed9e6a42787"
+        },
+        {
+          "path": "(task list)",
+          "sha256": "fd6b1ec2d185ebf362ecb8a1becd92773cc8a7c265e58d0ff0f9f2ba0feec729"
+        }
+      ]
+    }
+  },
+  "allowance_method": "none",
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 20,
+    "pair_slack": 4,
+    "retry_policy": "none: an errored session is an errored side of its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "stop_rule": {
+      "count": 3,
+      "kinds": [
+        "envelope_unparseable",
+        "exit_nonzero",
+        "kernel_missing",
+        "no_result_event",
+        "result_error",
+        "timeout"
+      ],
+      "masking": "v1",
+      "tail_chars": 2000
+    }
+  },
+  "pinned": {
+    "floor": {
+      "commit_attribution": "harness default",
+      "model": "opus",
+      "effort": "medium",
+      "user_instructions": "74121f944c50ad610a23a19ec56ee5657e5ba316dde47da86f3f6af5f109f5db"
+    }
+  },
+  "declared_at": "2026-10-30T05:52:23.146576+00:00",
+  "first_launch_at": "2026-10-30T05:52:30.033425+00:00",
+  "seed": 7,
+  "launch_orders": {},
+  "planned_tasks": [
+    "retry-runner-terse",
+    "order-platform-finished",
+    "retry-runner-finished",
+    "table-export-terse",
+    "order-platform-wrap-up",
+    "search-index-terse",
+    "search-index-wrap-up",
+    "task-worker-explain"
+  ],
+  "sessions": [
+    {
+      "session_id": "retry-runner-terse.floor.1",
+      "task_id": "retry-runner-terse",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:52:30.033425+00:00",
+      "cost_usd": 0.5096942,
+      "duration_ms": 25557,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-finished.floor.1",
+      "task_id": "order-platform-finished",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:52:55.602985+00:00",
+      "cost_usd": 0.5431085999999999,
+      "duration_ms": 37929,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "retry-runner-finished.floor.1",
+      "task_id": "retry-runner-finished",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:53:33.546120+00:00",
+      "cost_usd": 0.42978159999999993,
+      "duration_ms": 25939,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "table-export-terse.floor.1",
+      "task_id": "table-export-terse",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:53:59.498301+00:00",
+      "cost_usd": 0.5109488,
+      "duration_ms": 26928,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "order-platform-wrap-up.floor.1",
+      "task_id": "order-platform-wrap-up",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:54:26.439069+00:00",
+      "cost_usd": 0.6124229999999999,
+      "duration_ms": 46609,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-terse.floor.1",
+      "task_id": "search-index-terse",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:55:13.062350+00:00",
+      "cost_usd": 0.41745659999999996,
+      "duration_ms": 21849,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "search-index-wrap-up.floor.1",
+      "task_id": "search-index-wrap-up",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:55:34.924591+00:00",
+      "cost_usd": 0.44054879999999996,
+      "duration_ms": 28136,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    },
+    {
+      "session_id": "task-worker-explain.floor.1",
+      "task_id": "task-worker-explain",
+      "arm": "floor",
+      "attempt": 1,
+      "status": "scored",
+      "reason": null,
+      "started_at": "2026-10-30T05:56:03.074165+00:00",
+      "cost_usd": 0.5358887999999999,
+      "duration_ms": 34729,
+      "checks": {
+        "decision draft placement": {
+          "final": "failed",
+          "detail": "a record not directly under the draft directory, a record that numbers itself",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "before composition"
+          },
+          "refusals": []
+        },
+        "decision category": {
+          "final": "failed",
+          "detail": "no category",
+          "history": "right_first_time",
+          "arrivals": {
+            "session_start": "never",
+            "path_matched": "never"
+          },
+          "refusals": []
+        }
+      }
+    }
+  ],
+  "complete_pairs": 0,
+  "verdicts": {},
+  "cited_floor": [],
+  "ending": {
+    "kind": "finished"
+  },
+  "earlier_runs": {
+    "floor": [],
+    "paired": [],
+    "apart": {}
+  }
+}

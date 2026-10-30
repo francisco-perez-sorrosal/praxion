@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-29T03:49:06Z'
+generated_at: '2026-10-30T05:32:34Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-29'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-29'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-29'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -640,7 +640,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-29'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3535,7 +3535,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-28'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3732,6 +3732,13 @@ surfaces:
   surfaces_referenced:
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+- id: ai-state-specs-spec-adr-move-readiness-2026-10-29
+  path: .ai-state/specs/SPEC_adr-move-readiness_2026-10-29.md
+  type: markdown
+  title: 'Spec: adr-move-readiness (the move instrument measures the adr-conventions move: its lean arm delivers the path-scoped rule, a kit of managed tasks sets the rule''s trap, and two governed checks
+    grade the end state)'
+  last_modified: '2026-10-29'
+  renderer: default_markdown
 - id: ai-state-specs-spec-agent-model-routing-2026-04-25
   path: .ai-state/specs/SPEC_agent-model-routing_2026-04-25.md
   type: markdown
@@ -4450,6 +4457,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-14-07-59-49
   - ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
   - ai-state-specs-spec-adherence-eval-2026-10-12
+  - ai-state-specs-spec-adr-move-readiness-2026-10-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17

@@ -2,10 +2,11 @@
 
 A path-scoped rule may keep a one-line projection of itself that stays always loaded; the
 projection declares which rule it stands for with `resident_of: <repository-relative path>`.
-Everything that must treat such a file as "not an independent source" (the kernel tooling, the
-Cursor exporter) asks here, so the key is never parsed twice and the readers cannot drift.
+The kernel tooling asks here to treat such a file as a projection, not an independent source. The
+Cursor exporter and the Codex bridge check the key themselves, so they still run from a copy that
+carries their own directory alone; parity tests hold both checks equal to this reader.
 
-Stdlib-only and Python 3.9-safe, like the exporters that load it.
+Stdlib-only and Python 3.9-safe.
 """
 
 from __future__ import annotations

@@ -82,7 +82,19 @@ roles:
   implementer:
     status: trial
     since: 2026-10-31T19:39:18Z
-    runs: []
+    runs:
+      - id: 20261031T194025Z-257479
+        complete_pairs: 24
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261031T194025Z-257479.json: full run on the subscription token from a
+        # checkout frozen at a3ba7469, 24 tasks, 48 opus sessions, 0 errored, golden judge error 0.00; flip verdict clear:
+        # no regression on any scored mechanical check, C3 non-inferior (lean 18 of 18, full 17 of 18); C5 not covered (4
+        # pairs ran out on both sides, 5 needed; td-461), C6 withheld (no fixture page), sibling-read and project-convention
+        # not covered (allowance over the margin; lean 24 of 24 vs full 18 of 24 on sibling-read). C2, the 5-line return and
+        # the TEST_RESULTS.md shape fail in every session of both arms because the kit denies running tests (td-544), so
+        # their no-regression is vacuous. Lean first-request median 33,275 vs full 47,154; estimated session cost 25.52
+        # (subscription, not charged; cap 110).
+        entry: praxion-evals-adherence
     # Trial opened for one paired run on the subscription (48 opus sessions, cap USD 110 of
     # estimated usage, session cap USD 3); close it (switched or held) before any release so no
     # trial reaches managed projects. Forced-stop check C5 (td-461): the kit has 6 early-stop

@@ -8,6 +8,11 @@ from pathlib import Path
 
 FRONTMATTER_BOUNDARY = "---"
 SKIP_RULE_FILES = {"CLAUDE.md", "README.md"}
+# A resident file declares, as a top-level frontmatter key, the rule it is a projection of. The
+# bridge checks that key itself so it runs from any copy that carries codex/config/ alone (the
+# move instrument's narrowed checkouts do); tests/test_codex_rules_bridge_parsing.py holds this
+# check equal to scripts/_resident_of.py, the reader the kernel tooling uses.
+RESIDENT_OF = re.compile(r"""^["']?resident_of["']?\s*:\s*(.*?)\s*$""")
 
 STOPWORDS = {
     "a",
@@ -69,6 +74,23 @@ CLAUDE_ONLY_PATTERNS = [
 
 class RuleParseError(ValueError):
     """Raised when a Praxion rule cannot be converted safely."""
+
+
+def is_resident(text: str) -> bool:
+    """Whether a rule file's frontmatter names, in `resident_of`, the rule it stands for."""
+    lines = text.splitlines()
+    if not lines or lines[0].rstrip() != FRONTMATTER_BOUNDARY:
+        return False
+    closing = next(
+        (i for i in range(1, len(lines)) if lines[i].rstrip() == FRONTMATTER_BOUNDARY), None
+    )
+    if closing is None:  # never closed: not frontmatter
+        return False
+    for line in lines[1:closing]:
+        match = RESIDENT_OF.match(line)
+        if match:
+            return bool(match.group(1).strip("\"'"))
+    return False
 
 
 def parse_rule(path: Path, repo_root: Path) -> dict[str, object]:
@@ -332,6 +354,9 @@ def build_manifest(repo_root: Path) -> dict[str, object]:
     rules: list[dict[str, object]] = []
     for source_path in sorted(rules_dir.rglob("*.md")):
         if source_path.name in SKIP_RULE_FILES:
+            continue
+        # A resident file is a projection of a rule the manifest already carries.
+        if is_resident(source_path.read_text(encoding="utf-8")):
             continue
         rules.append(parse_rule(source_path, repo_root))
 

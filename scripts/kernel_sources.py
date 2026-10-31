@@ -9,7 +9,10 @@ What is always loaded -- found by reading the tree, never from a list, so a new
 rule without a path scope is covered the day it is written:
 
 - every `rules/**/*.md` whose frontmatter declares no `paths:` key, except the
-  directory guides (`README.md`, `CLAUDE.md`), which are not rules;
+  directory guides (`README.md`, `CLAUDE.md`), which are not rules, and except a resident
+  file (one declaring `resident_of:`), which is a projection and not an independent source;
+- the rule a resident file names, even when it is path-scoped: the resident stands for the
+  rule's text at session start, so the rule stays a source that must be classified in full;
 - the user-level template `claude/config/CLAUDE.md.tmpl` (the source, never its
   render under `claude/config/CLAUDE.md`);
 - the checkout's own root `CLAUDE.md`.
@@ -42,6 +45,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from _markdown_tables import code_mask
+from _resident_of import resident_parent
 
 USER_TEMPLATE = "claude/config/CLAUDE.md.tmpl"
 PROJECT_INSTRUCTIONS = "CLAUDE.md"
@@ -98,6 +102,15 @@ class Part:
     @property
     def sha(self) -> str:
         return pin_sha(self.text)
+
+
+@dataclass(frozen=True)
+class ForeignLine:
+    """A line of a resident file that is no line of the rule it stands for."""
+
+    source: str  # the resident file
+    parent: str  # the rule it declares in `resident_of`
+    text: str
 
 
 def sha1_hex(text: str) -> str:
@@ -163,6 +176,18 @@ def is_path_scoped(text: str) -> bool:
     return any(_PATHS_KEY.match(line) for line in declared)
 
 
+def foreign_lines(resident_text: str, parent_text: str) -> tuple[str, ...]:
+    """The non-blank body lines of a resident file that the parent's body does not hold."""
+    held = {_without_ending(line) for line in _body(parent_text)}
+    lines = (_without_ending(line) for line in _body(resident_text))
+    return tuple(line for line in lines if line.strip() and line not in held)
+
+
+def _body(text: str) -> list[str]:
+    lines = _lines(text)
+    return lines[_frontmatter_end(lines) :]
+
+
 def _lines(text: str) -> list[str]:
     return _LINE.findall(text)
 
@@ -192,16 +217,42 @@ def _line_starting_with(section: Section, lines: list[str], prefix: str) -> int:
 
 
 def always_loaded_sources(root: Path) -> tuple[str, ...]:
-    """Repository-relative paths of the always-loaded sources: rules, template, project file."""
+    """Repository-relative paths of the sources to classify: rules, template, project file."""
     if not (root / USER_TEMPLATE).is_file():
         raise NotAPluginCheckoutError(f"{root} has no {USER_TEMPLATE}: not a plugin checkout")
-    rules = sorted(
-        path.relative_to(root).as_posix()
-        for path in (root / RULES_DIR).rglob("*.md")
-        if path.name not in _DIRECTORY_GUIDES and not is_path_scoped(_read(path))
-    )
+    rules = _rule_texts(root)
+    unscoped = {
+        path
+        for path, text in rules.items()
+        if not is_path_scoped(text) and not resident_parent(text)
+    }
+    parents = {parent for text in rules.values() if (parent := _existing_parent(root, text))}
     project = [PROJECT_INSTRUCTIONS] if (root / PROJECT_INSTRUCTIONS).is_file() else []
-    return (*rules, USER_TEMPLATE, *project)
+    return (*sorted(unscoped | parents), USER_TEMPLATE, *project)
+
+
+def resident_foreign_lines(root: Path) -> tuple[ForeignLine, ...]:
+    """Every resident file's lines that are no line of its rule; a missing rule holds no line, so all are."""
+    found: list[ForeignLine] = []
+    for path, text in _rule_texts(root).items():
+        parent = resident_parent(text)
+        if parent:
+            parent_text = _read(root / parent) if (root / parent).is_file() else ""
+            found += [ForeignLine(path, parent, line) for line in foreign_lines(text, parent_text)]
+    return tuple(found)
+
+
+def _rule_texts(root: Path) -> dict[str, str]:
+    """Each rule file under `rules/` (not a directory guide), by repository-relative path."""
+    paths = sorted(
+        path for path in (root / RULES_DIR).rglob("*.md") if path.name not in _DIRECTORY_GUIDES
+    )
+    return {path.relative_to(root).as_posix(): _read(path) for path in paths}
+
+
+def _existing_parent(root: Path, text: str) -> str | None:
+    parent = resident_parent(text)
+    return parent if parent and (root / parent).is_file() else None
 
 
 def load_sections(root: Path, source: str) -> tuple[Section, ...]:

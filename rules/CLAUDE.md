@@ -8,7 +8,7 @@ This file is the rules tree's directory guide, not a rule: the installer does no
 
 - Organized hierarchically by domain: `swe/` for software engineering, `writing/` for documentation, `ml/` for ML/AI training
 - Further nesting for related rules (e.g., `swe/vcs/` for version control)
-- Each rule is a `.md` file — `paths:` YAML frontmatter scopes it to specific file patterns (loaded when a matching file is read, written or edited); without `paths:` it always loads at session start
+- Each rule is a `.md` file — `paths:` YAML frontmatter scopes it to specific file patterns (loaded when a matching file is read, written or edited); without `paths:` it always loads at session start; a path-scoped rule may keep a one-line resident file (`resident_of: <rule path>` frontmatter) that stays always-loaded, its lines taken verbatim from the rule
   - Claude Code (2.1.288 and later) loads path-scoped rules on Read, Write and Edit, and on single-file Bash reads. A brand-new file is still composed inside its first Write, before the rule arrives, so the "read a sibling first" instruction in the `implementer`/`doc-engineer`/`test-engineer` prompts stays; it also covers Cursor, which ignores rule globs, and Codex, which routes path rules through its own bridge. Detail in `skills/rule-crafting/SKILL.md`.
 
 ## Token Budget

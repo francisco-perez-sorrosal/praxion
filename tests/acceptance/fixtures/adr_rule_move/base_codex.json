@@ -1,0 +1,35 @@
+{
+ "always_on": [
+  "rules::swe::adr-conventions",
+  "rules::swe::agent-behavioral-contract",
+  "rules::swe::agent-intermediate-documents",
+  "rules::swe::swe-agent-coordination-protocol",
+  "rules::swe::vcs::git-conventions"
+ ],
+ "pointer": "[Praxion rules bridge] Always-on Praxion rules for this project:\n- ADR Conventions \u2014 <repo>/rules/swe/adr-conventions.md\n- Agent Behavioral Contract \u2014 <repo>/rules/swe/agent-behavioral-contract.md\n- Agent Intermediate Documents \u2014 <repo>/rules/swe/agent-intermediate-documents.md\n- SWE Agent Coordination Protocol \u2014 <repo>/rules/swe/swe-agent-coordination-protocol.md\n- Git Conventions \u2014 <repo>/rules/swe/vcs/git-conventions.md\nCanonical Praxion rule files above remain the source of truth. Read them before acting.",
+ "rule_paths": [
+  "rules/eval/eval-data-governance.md",
+  "rules/ml/eval-driven-verification.md",
+  "rules/ml/experiment-commit-conventions.md",
+  "rules/ml/experiment-tracking-conventions.md",
+  "rules/ml/gpu-budget-conventions.md",
+  "rules/swe/adr-conventions.md",
+  "rules/swe/agent-behavioral-contract.md",
+  "rules/swe/agent-intermediate-documents.md",
+  "rules/swe/agent-model-routing.md",
+  "rules/swe/coding-style.md",
+  "rules/swe/gate-liveness.md",
+  "rules/swe/id-citation-discipline.md",
+  "rules/swe/plugin-install-conventions.md",
+  "rules/swe/shipped-artifact-isolation.md",
+  "rules/swe/staleness-policy.md",
+  "rules/swe/swe-agent-coordination-protocol.md",
+  "rules/swe/testing-conventions.md",
+  "rules/swe/vcs/git-conventions.md",
+  "rules/swe/vcs/pr-conventions.md",
+  "rules/writing/aac-dac-conventions.md",
+  "rules/writing/diagram-conventions.md",
+  "rules/writing/html-output-conventions.md",
+  "rules/writing/readme-style.md"
+ ]
+}

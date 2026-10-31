@@ -3,14 +3,22 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-12T00:27:01Z'
+generated_at: '2026-10-31T16:44:49Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
+  load: path_scoped
+  core: true
+  install: symlink
+  chars: 8786
+  paths:
+  - .ai-state/decisions/**
+- id: swe/adr-conventions-resident
+  path: rules/swe/adr-conventions-resident.md
   load: always_on
   core: true
   install: symlink
-  chars: 8725
+  chars: 281
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on

@@ -1,0 +1,20 @@
+{
+ "swe/adr-conventions": {
+  "core": true,
+  "id": "swe/adr-conventions",
+  "install": "symlink",
+  "load": "path_scoped",
+  "path": "rules/swe/adr-conventions.md",
+  "paths": [
+   ".ai-state/decisions/**"
+  ]
+ },
+ "swe/adr-conventions-resident": {
+  "core": true,
+  "id": "swe/adr-conventions-resident",
+  "install": "symlink",
+  "load": "always_on",
+  "path": "rules/swe/adr-conventions-resident.md",
+  "paths": null
+ }
+}

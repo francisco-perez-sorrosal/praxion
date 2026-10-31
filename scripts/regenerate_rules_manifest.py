@@ -35,6 +35,7 @@ EXPECTED_CORE_IDS = frozenset(
         "swe/swe-agent-coordination-protocol",
         "swe/agent-intermediate-documents",
         "swe/adr-conventions",
+        "swe/adr-conventions-resident",
     }
 )
 

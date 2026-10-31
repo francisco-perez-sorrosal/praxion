@@ -314,6 +314,12 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_decision_records.py",
+            "timeout": 20,
+            "async": false
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_token_ratchet.py",
             "timeout": 20,
             "async": false
@@ -326,6 +332,23 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/guard_memory_index.py",
+            "timeout": 5,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/decisions_gate.sh write",
+            "timeout": 5,
+            "async": false
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/decisions_gate.sh read",
             "timeout": 5,
             "async": false
           }

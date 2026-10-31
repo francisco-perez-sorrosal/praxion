@@ -255,6 +255,81 @@ def test_a_managed_projects_instruction_file_is_never_classified(tmp_path: Path)
         ks.always_loaded_sources(tmp_path)
 
 
+RULE = "rules/swe/moved-rule.md"
+RESIDENT = "rules/swe/moved-rule-resident.md"
+RULE_TEXT = "---\npaths:\n  - 'docs/**'\n---\n## Moved Rule\n\nFirst line.\nSecond line.\n"
+
+
+def _moved_pair(root: Path, resident_body: str = "## Moved Rule\n") -> Path:
+    """A checkout where the path-scoped RULE keeps an always-loaded RESIDENT of its lines."""
+    _write(root, RULE, RULE_TEXT)
+    _write(root, RESIDENT, f"---\nresident_of: {RULE}\ncore: true\n---\n{resident_body}")
+    return root
+
+
+def test_a_resident_file_is_not_an_independent_source(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path))
+
+    assert RESIDENT not in ks.always_loaded_sources(root)
+
+
+def test_the_rule_a_resident_names_stays_a_source_though_it_is_path_scoped(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path))
+
+    assert ks.is_path_scoped(RULE_TEXT)
+    assert RULE in ks.always_loaded_sources(root)
+
+
+def test_a_path_scoped_rule_without_a_resident_is_not_a_source(tmp_path: Path) -> None:
+    root = _checkout(tmp_path)
+    _write(root, RULE, RULE_TEXT)
+
+    assert RULE not in ks.always_loaded_sources(root)
+
+
+def test_a_rule_already_always_loaded_is_listed_once_with_a_resident(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path))
+    _write(root, RULE, RULE_TEXT.replace("paths:\n  - 'docs/**'\n", "core: true\n"))
+
+    assert ks.always_loaded_sources(root).count(RULE) == 1
+
+
+def test_a_resident_naming_a_missing_rule_adds_no_source(tmp_path: Path) -> None:
+    root = _checkout(tmp_path)
+    _write(root, RESIDENT, f"---\nresident_of: {RULE}\n---\nA line.\n")
+
+    assert ks.always_loaded_sources(root) == ("rules/swe/open-rule.md", TEMPLATE, ROOT_FILE)
+
+
+def test_a_faithful_resident_has_no_foreign_line(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path), "## Moved Rule\n\nSecond line.\n")
+
+    assert ks.resident_foreign_lines(root) == ()
+
+
+def test_a_resident_line_that_is_no_line_of_the_rule_is_named(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path), "## Moved Rule\n\nA line of nobody.\n")
+
+    assert ks.resident_foreign_lines(root) == (ks.ForeignLine(RESIDENT, RULE, "A line of nobody."),)
+
+
+def test_the_residents_frontmatter_is_not_judged_against_the_rule(tmp_path: Path) -> None:
+    root = _moved_pair(_checkout(tmp_path))
+
+    assert ks.resident_foreign_lines(root) == ()
+
+
+def test_every_line_of_a_resident_is_foreign_when_its_rule_is_missing(tmp_path: Path) -> None:
+    root = _checkout(tmp_path)
+    _write(root, RESIDENT, f"---\nresident_of: {RULE}\n---\nOne.\n\nTwo.\n")
+
+    assert [f.text for f in ks.resident_foreign_lines(root)] == ["One.", "Two."]
+
+
+def test_foreign_lines_ignore_blank_lines_and_line_endings() -> None:
+    assert ks.foreign_lines("a\r\n\n  \nb\n", "a\nb\n") == ()
+
+
 def test_a_source_is_read_as_the_bytes_on_disk(tmp_path: Path) -> None:
     _write(tmp_path, "rules/a.md", "## A\r\nbody\r\n")
 

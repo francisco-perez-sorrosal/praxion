@@ -1,0 +1,10 @@
+[
+ "<home>/.claude/CLAUDE.md",
+ "<repo>/CLAUDE.md",
+ "<repo>/rules/swe/adr-conventions.md",
+ "<repo>/rules/swe/agent-behavioral-contract.md",
+ "<repo>/rules/swe/agent-intermediate-documents.md",
+ "<repo>/rules/swe/agent-model-routing.md",
+ "<repo>/rules/swe/swe-agent-coordination-protocol.md",
+ "<repo>/rules/swe/vcs/git-conventions.md"
+]

@@ -13,6 +13,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 | `remind_calibration.py` | PreToolUse (Bash, commit-gated), Stop | stdin (JSON payload), `.ai-state/observations.jsonl`, `.ai-state/calibration_log.md` via `git diff` | `.ai-state/observations.jsonl` (one `gate_fire` row per Stop reminder) | None | Fail-open (exit 0); a Stop reminder forces one continuation turn, at most once per session |
 | `format_code.py` | PostToolUse (Write\|Edit) | stdin, `_lang_tools.py` registry, target source file | Target source file (formatted) | None | Fail-open (exit 0) |
 | `guard_memory_index.py` | PreToolUse (Write\|Edit) | stdin, the target memory index (`MEMORY.md`) | stdout: JSON deny decision when the write adds a violation | None | Fail-open (exit 0) |
+| `decisions_gate.sh` + `guard_decision_records.py` | PreToolUse (Write\|Edit, Read) | stdin (JSON payload), the target decision record (to replay an Edit), the rule text `rules/swe/adr-conventions.md` | stdout: JSON deny decision when the call would leave a record finalize cannot carry, or reads the whole decisions index | None | Fail-open (exit 0) |
 | `precompact_state.py` | PreCompact | stdin, `.ai-work/` pipeline docs | `.ai-work/PIPELINE_STATE.md` | None | Fail-open (exit 0) |
 | `capture_observations.py` | PostToolUse (all tools; a fixed noise blocklist is skipped) | stdin (JSON payload), `.ai-state/` (existence + `stat`), `$TMPDIR` first-call markers (existence) | Observation log (`.ai-state/observations.jsonl`, its numbered rotation archives (`.1` to `.5`), `.ai-state/observations.lock`); empty `0o600` digest-named first-call markers under `$TMPDIR` | None | Fail-open (exit 0), async |
 | `capture_session.py` | SessionStart, Stop, SubagentStart, SubagentStop, PostCompact | stdin (JSON payload), observation-log tail, session and subagent transcripts (usage fields only), `.ai-state/observations_summary.jsonl` | Observation log (as above); committed `.ai-state/observations_summary.jsonl` (+ `.ai-state/observations_summary.lock`, transient `.tmp` sibling) | None | Fail-open (exit 0), async |
@@ -152,6 +153,26 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 - Never reads any file but the targeted index, and returns before importing its rules for any other path
 - Never blocks on debt the write does not add
 - Never blocks on its own errors (fail-open, exit 0)
+
+### `decisions_gate.sh` and `guard_decision_records.py`
+
+**Purpose**: Refuse a Write or Edit under `.ai-state/decisions/` that would leave a record `finalize_adrs.py` cannot carry (misplaced, nested, self-numbered, malformed name or id, missing or invalid `category`), and refuse a whole Read of `DECISIONS_INDEX.md` (the Discovery Protocol's bounded read). `decisions_gate.sh` is a grep fast path that starts Python only when the payload could concern the decisions tree; the rules live in `scripts/_decision_records.py`, the refusal text in `scripts/_decision_record_refusal.py`. The commit-time half is `scripts/check_decision_records.py`, run by `commit_gate.sh --blocking`.
+
+**Reads**:
+- stdin: JSON hook payload (the pending Write, Edit or Read)
+- The target decision record, to replay an Edit against what is on disk
+- `rules/swe/adr-conventions.md`, for the lines a refusal quotes
+
+**Writes**:
+- stdout: a JSON `permissionDecision: deny` with the correct form, only when the call would leave a defect
+
+**External contact**:
+- None
+
+**Guarantees NOT to do**:
+- Never writes or edits any file
+- Never starts Python for a payload that names no decisions path
+- Never blocks on its own errors (fail-open, exit 0; the commit gate still holds)
 
 ### `precompact_state.py`
 

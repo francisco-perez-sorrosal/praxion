@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, NoReturn
 
-from tests.acceptance.drivers import adherence_eval, move_declarations, move_pocket
+from tests.acceptance.drivers import adherence_eval, adr_rule_move, move_declarations, move_pocket
 from tests.acceptance.drivers.adherence_eval import (
     DUMMY_CREDENTIAL,
     EVAL_PROJECT,
@@ -126,22 +126,25 @@ MOVE_CHECKOUT_TREES = (
 _TEMPLATE: dict[str, Path] = {}
 
 
-def move_checkout(workspace: Path) -> Path:
+def move_checkout(workspace: Path, *, shipped: bool = False) -> Path:
     """A small, clean, committed checkout a move run may be pointed at, copied from a template.
 
     The template is built once per process from the declared read set, as the adherence
     driver's narrowed checkout is; each scenario gets its own copy, which it may change.
+    The adr-conventions move has landed, so by default the checkout holds that rule as it was
+    before the move (the state the instrument measures); `shipped` keeps the tree as it is.
     """
-    if "root" not in _TEMPLATE:
+    key = "shipped" if shipped else "root"
+    if key not in _TEMPLATE:
         scratch = Path(tempfile.mkdtemp(prefix="move-checkout-template-"))
         atexit.register(shutil.rmtree, scratch, ignore_errors=True)
-        _TEMPLATE["root"] = _build_template(scratch)
+        _TEMPLATE[key] = _build_template(scratch, shipped=shipped)
     target = workspace / "checkout"
-    shutil.copytree(_TEMPLATE["root"], target, symlinks=True)
+    shutil.copytree(_TEMPLATE[key], target, symlinks=True)
     return target
 
 
-def _build_template(scratch: Path) -> Path:
+def _build_template(scratch: Path, *, shipped: bool) -> Path:
     """The read set, as this working tree has it, in one commit of a repository of its own."""
     root = scratch / "checkout"
     root.mkdir(parents=True)
@@ -155,6 +158,8 @@ def _build_template(scratch: Path) -> Path:
         if source.is_file():
             (root / relpath).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, root / relpath, follow_symlinks=False)
+    if not shipped:
+        adr_rule_move.restore_before_the_move(root)
     adherence_eval._git(root, "init", "-q", "-b", "main")
     objects = adherence_eval._git(
         REPO_ROOT, "rev-parse", "--path-format=absolute", "--git-path", "objects"

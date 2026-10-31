@@ -5,7 +5,7 @@ audience: developer
 
 # Rules Taxonomy and Disable Guide
 
-Every Praxion-onboarded project inherits a curated set of rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. Some are always-loaded (cost tokens on every session); others load only when their trigger paths are read. This guide explains how rules are categorized, how the per-project disable mechanism reaches each category, and how to measure the cost of your choices.
+Every Praxion-onboarded project inherits a curated set of rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. Some are always-loaded (cost tokens on every session); others load only when their trigger paths are read; a core rule may be path-scoped and keep a one-line resident that stays always-loaded. This guide explains how rules are categorized, how the per-project disable mechanism reaches each category, and how to measure the cost of your choices.
 
 ## Token-Savings Ceiling (Read This First)
 
@@ -30,18 +30,19 @@ Together the two mechanisms give the YAML uniform reach: **any rule named in the
 
 ## Three Categories of Rules
 
-### 1. Core Rules (non-disableable, always-loaded)
+### 1. Core Rules (non-disableable)
 
-Four rules encode Praxion's operating contract. They are **immune to the disable mechanism** — attempting to disable one emits a stderr warning and the rule remains loaded.
+Five core entries encode Praxion's operating contract: four rules and the resident file of the ADR rule. They are **immune to the disable mechanism** — attempting to disable one emits a stderr warning and the rule remains loaded.
 
 | ID | Rule file | Purpose | Token cost |
 |----|-----------|---------|------------|
-| `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | ~2499 tokens |
+| `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | path-scoped on `.ai-state/decisions/**` (~2499 tokens when loaded); Codex keeps it always-on |
+| `swe/adr-conventions-resident` | `rules/swe/adr-conventions-resident.md` | One-line resident of the ADR rule (its title and opening sentence), always-loaded | ~81 tokens (~132 with frontmatter) |
 | `swe/agent-behavioral-contract` | `rules/swe/agent-behavioral-contract.md` | Four non-negotiable behaviors: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First | ~370 tokens |
 | `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~1130 tokens |
 | `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4573 tokens |
 
-**Total core tokens:** ~8,572 on the gate's default tokenizer (see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`; `--model <id>` reads them on a current model's tokenizer, which counts higher).
+**Total always-loaded core tokens:** ~6,205 on the gate's default tokenizer (see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`; `--model <id>` reads them on a current model's tokenizer, which counts higher).
 
 `rules/CLAUDE.md` is not a rule: it is the rules tree's directory guide, skipped by the manifest and the installer, and Claude Code loads it on demand as a nested `CLAUDE.md` when a session touches `rules/`. It was a core rule until 2026-10-11.
 
@@ -142,7 +143,7 @@ If you attempt to disable a core rule, the SessionStart hook emits a warning to 
 [inject_rules] WARNING: cannot disable core rule 'swe/agent-behavioral-contract' — kept loaded
 ```
 
-The rule remains loaded. Core rules protect Praxion's operating contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First; ADR conventions; agent coordination protocol; `.ai-work/`/`.ai-state/` conventions) and are structurally load-bearing for the rest of the ecosystem to reason on top of.
+The rule remains loaded (the ADR rule on its path scope, its resident file always). Core rules protect Praxion's operating contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First; ADR conventions; agent coordination protocol; `.ai-work/`/`.ai-state/` conventions) and are structurally load-bearing for the rest of the ecosystem to reason on top of.
 
 ## Schema Version Handling
 

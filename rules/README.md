@@ -15,6 +15,7 @@ rules/
 │   └── gpu-budget-conventions.md
 ├── swe/
 │   ├── adr-conventions.md
+│   ├── adr-conventions-resident.md
 │   ├── agent-behavioral-contract.md
 │   ├── agent-intermediate-documents.md
 │   ├── agent-model-routing.md
@@ -44,7 +45,7 @@ rules/
 | `swe/agent-behavioral-contract.md` | Four-behavior contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) for every write/plan/review agent |
 | `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup |
 | `swe/agent-model-routing.md` | Per-agent Claude model tier table (one row per agent → opus/sonnet/haiku), 4-layer override precedence, operator kill switch, quality-cliff guards |
-| `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance |
+| `swe/adr-conventions-resident.md` | One-line resident of the ADR rule (its title and opening sentence), `core`; the full rule loads on `.ai-state/decisions/**` |
 | `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
 
@@ -59,6 +60,7 @@ Path-scoped rules load only when editing files matching their `paths:` pattern. 
 | `ml/experiment-commit-conventions.md` | Experiment-branch commit semantics — kept runs as logical units with run-tag labels. Paths: `program.md`, `train.py`, `prepare.py`, `runs/**`, `experiments/**`, `TRAINING_RESULTS.md` |
 | `ml/experiment-tracking-conventions.md` | Experiment lineage, run-tag mapping, tracker selection (MLflow/W&B/Aim). Paths: `runs/**`, `experiments/**`, `program.md` |
 | `ml/gpu-budget-conventions.md` | Compute-budget declaration in WIP.md and step prompts; open-ended training runs prohibited. Paths: `program.md`, `train.py`, `prepare.py`, `runs/**`, `experiments/**`, `neo_cloud_backend.yaml` |
+| `swe/adr-conventions.md` | ADR file format (YAML frontmatter + MADR body), naming convention, supersession protocol, agent authoring guidance. Paths: `.ai-state/decisions/**`. `core`, non-disableable; its resident `swe/adr-conventions-resident.md` stays always-loaded, and Codex keeps the rule always-on |
 | `swe/coding-style.md` | Immutability, data-structure invariants (illegal states, boundary parsing), side-effect discipline (functional core / imperative shell), reading order and narrative, expressive constructs, compatibility/deprecation, function/file size, nesting, error handling, naming, validation. Paths: source files across all tracked languages |
 | `swe/gate-liveness.md` | A gate must be proven to bite: substance-over-structure, a named producer for every consumer, no self-contradiction, a verification path per gate (a canary for CODE gates, a golden bad-case for PROMPT gates), scope fidelity (documented scope vs. actual computed scope), and a named consumer for every gate output. Paths: gate-authoring surfaces (`fitness/**`, `scripts/check_*`/`validate_*`, `hooks/*.py`, sentinel/verifier/planner agents) |
 | `swe/id-citation-discipline.md` | Detection and remediation rules for ephemeral identifier citations (REQ, AC, step numbers) leaking into production source. Paths: source files across all tracked languages |
@@ -255,6 +257,7 @@ rules/swe/agent-behavioral-contract.md        →  ~/.claude/rules/swe/agent-beh
 rules/swe/agent-intermediate-documents.md      →  ~/.claude/rules/swe/agent-intermediate-documents.md
 rules/swe/coding-style.md                     →  ~/.claude/rules/swe/coding-style.md
 rules/swe/adr-conventions.md                  →  ~/.claude/rules/swe/adr-conventions.md
+rules/swe/adr-conventions-resident.md         →  ~/.claude/rules/swe/adr-conventions-resident.md
 rules/swe/staleness-policy.md                 →  ~/.claude/rules/swe/staleness-policy.md
 rules/swe/swe-agent-coordination-protocol.md  →  ~/.claude/rules/swe/swe-agent-coordination-protocol.md
 rules/swe/vcs/git-conventions.md              →  ~/.claude/rules/swe/vcs/git-conventions.md

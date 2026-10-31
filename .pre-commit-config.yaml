@@ -129,6 +129,16 @@ repos:
         language: system
         pass_filenames: true
 
+      # Decision-record gate, at commit time. Judges the staged records (a numbered
+      # record on a feature branch, a category finalize cannot carry) against the
+      # true staged set, as the PreToolUse commit gate cannot.
+      - id: decision-records
+        name: Decision records
+        entry: python3 scripts/check_decision_records.py --repo-root . --staged
+        language: system
+        files: ^\.ai-state/decisions/
+        pass_filenames: false
+
       # Block B — canonical-block sync. Whole-repo --check; fires only when a
       # canonical block or one of its registered consumers (BLOCKS in
       # sync_canonical_blocks.py: the onboarding skill's consolidated
@@ -357,7 +367,7 @@ repos:
         entry: python scripts/check_kernel_manifest.py --repo-root .
         language: python
         additional_dependencies: ['pyyaml']
-        files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|\.ai-state/eval_ledger/adherence/[^/]+\.json|hooks/hooks\.json|hooks/_kernel_preamble\.py|hooks/inject_kernel\.py|hooks/_observation_log/[^/]+\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_eligibility|kernel_ledger|kernel_ledger_checks|kernel_ledger_history|kernel_liveness|kernel_model|kernel_run_evidence|kernel_run_index|kernel_run_standing|kernel_sources|check_agent_shared_blocks|_git_runner|_markdown_tables|_repo_root)\.py)$'
+        files: '^(rules/.*\.md|rules/_audience\.yaml|claude/config/CLAUDE\.md\.tmpl|CLAUDE\.md|claude/kernels/.*|agents/[^/]+\.md|\.ai-state/kernel_adoption\.yaml|\.ai-state/eval_ledger/adherence/[^/]+\.json|hooks/hooks\.json|hooks/_kernel_preamble\.py|hooks/inject_kernel\.py|hooks/_observation_log/[^/]+\.py|scripts/(check_kernel_manifest|generate_kernels|kernel_eligibility|kernel_ledger|kernel_ledger_checks|kernel_ledger_history|kernel_liveness|kernel_model|kernel_run_evidence|kernel_run_index|kernel_run_standing|kernel_sources|check_agent_shared_blocks|_git_runner|_markdown_tables|_repo_root|_resident_of)\.py)$'
         always_run: true
         pass_filenames: false
 

@@ -31,6 +31,7 @@ from praxion_evals.adherence.moves.model import (
     Write,
 )
 from praxion_evals.live.materialize import tree_digest
+from tests.landed_move_support import ADR_KERNEL, ADR_KERNEL_ID, MANIFEST, before_the_adr_move
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GIT_MOVE = "git-conventions"
@@ -41,9 +42,6 @@ GIT_KERNEL = "rules/swe/vcs/git-conventions-resident.md"
 GIT_HOOK = "inject_git_conventions_at_use.py"
 ADR_RULE = "rules/swe/adr-conventions.md"
 ADR_RULE_ID = "swe/adr-conventions"
-ADR_KERNEL = "rules/swe/adr-conventions-resident.md"
-ADR_KERNEL_ID = "swe/adr-conventions-resident"
-MANIFEST = "rules/_manifest.yaml"
 STAGE_LINE = "- Stage specific files by name — avoid `git add -A` or `git add .`"
 NOT_IN_THE_KERNEL = "- Prefer small, focused commits over large sweeping ones"
 READ_TREES = ("rules", "lib", "hooks")
@@ -71,6 +69,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    before_the_adr_move(root)
     subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 
@@ -242,6 +241,56 @@ def test_a_write_whose_source_changed_since_it_was_declared_is_refused(checkout,
     reason = _refusal(_lean_with(declared, stale), checkout, tmp_path / "ws")
 
     assert "docs/note.md" in reason
+
+
+# -- A landed move is not measured again -----------------------------------------------------
+
+
+def _landed_copy(checkout: Path, where: Path, *, kernel: bool, scope: bool) -> Path:
+    """A copy of the pre-move checkout with the shipped kernel file and/or the shipped rule back."""
+    landed = where / "checkout"
+    shutil.copytree(checkout, landed, symlinks=True)
+    if kernel:
+        shutil.copy2(REPO_ROOT / ADR_KERNEL, landed / ADR_KERNEL)
+    if scope:
+        shutil.copy2(REPO_ROOT / ADR_RULE, landed / ADR_RULE)
+    return landed
+
+
+def test_a_lean_arm_over_a_tree_already_holding_the_kernel_is_refused_naming_the_file(
+    checkout, tmp_path
+):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=False)
+
+    reason = _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert ADR_KERNEL in reason
+
+
+def test_a_lean_arm_over_a_rule_already_carrying_the_declared_scope_is_refused_naming_it(
+    checkout, tmp_path
+):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=False, scope=True)
+
+    reason = _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert ".ai-state/decisions/**" in reason
+
+
+def test_a_refused_landed_move_leaves_no_arm_copy_behind(checkout, tmp_path):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=True)
+
+    _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert list((tmp_path / "ws").iterdir()) == []
+
+
+def test_the_floor_and_full_arms_do_not_judge_whether_the_move_landed(checkout, tmp_path):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=True)
+    declared = declaration.kit(ADR_MOVE)
+
+    assert arms.plan(declared, "full", landed) == ()
+    assert ADR_RULE in [p.path for p in arms.plan(declared, "floor", landed)]
 
 
 # -- The scoped manifest row ------------------------------------------------------------------

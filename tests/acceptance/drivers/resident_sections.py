@@ -65,6 +65,12 @@ def section_fingerprints(text: str) -> dict[str, list[str]]:
     return prints
 
 
+def paragraph_digest(wording: str) -> str:
+    """The digest a section fingerprint records for this one paragraph of text."""
+    (paragraph,) = paragraphs(wording, shortest=1)
+    return digest(paragraph)
+
+
 def lost_paragraphs(root: Path, frozen: dict[str, dict[str, list[str]]]) -> list[str]:
     """Every frozen paragraph no longer present, word for word, in its own section."""
     lost = []

@@ -48,7 +48,7 @@ MIGRATED_MODULES = (
     "reconcile_ai_state.py",
     "reconcile_aac_surfaces.py",
     "build_doc_manifest.py",
-    "check_id_citation_discipline.py",
+    "_commit_scope.py",
     "_state_repo.py",
 )
 

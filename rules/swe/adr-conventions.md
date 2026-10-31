@@ -1,7 +1,11 @@
 ---
 core: true
-load: always_on
+load: path_scoped
 install: symlink
+paths:
+  - .ai-state/decisions/**
+codex:
+  load: always_on
 ---
 
 ## ADR Conventions

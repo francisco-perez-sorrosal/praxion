@@ -66,3 +66,60 @@ def test_repository_rules_with_inline_paths_are_path_scoped(rule):
     closing = lines.index("---", 1)
     globs = parsing.parse_rule_frontmatter(lines[1:closing], Path(rule)).get("paths")
     assert globs, f"{rule} parsed with no path globs, so Codex would load it always-on"
+
+
+RULE = "---\npaths:\n  - 'docs/**'\n---\n## Rule\n\nThe whole rule.\n"
+RESIDENT = "---\nresident_of: rules/swe/rule.md\n---\n## Rule\n\nOne line.\n"
+
+
+def _write_rules(root: Path, files: dict[str, str]) -> Path:
+    for rel, text in files.items():
+        path = root / "rules" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return root
+
+
+def test_a_resident_beside_its_rule_leaves_the_manifests_rules_unchanged(tmp_path: Path) -> None:
+    alone = parsing.build_manifest(_write_rules(tmp_path / "alone", {"swe/rule.md": RULE}))
+    both = parsing.build_manifest(
+        _write_rules(tmp_path / "both", {"swe/rule.md": RULE, "swe/rule-resident.md": RESIDENT})
+    )
+
+    assert [rule["id"] for rule in both["rules"]] == ["rules::swe::rule"]
+    assert [rule["relpath"] for rule in both["rules"]] == [
+        rule["relpath"] for rule in alone["rules"]
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        RESIDENT,
+        RULE,
+        "---\n'resident_of': \"rules/swe/rule.md\"\n---\nBody.\n",
+        "---\nresident_of:\n---\nBody.\n",
+        "---\n  resident_of: rules/swe/rule.md\n---\nBody.\n",
+        "---\nresident_of: rules/swe/rule.md\nBody, never closed.\n",
+        "No frontmatter; resident_of: rules/swe/rule.md\n",
+        "---\npaths: ['docs/**']\n---\nresident_of: rules/swe/rule.md\n",
+        "---\nresident_of: not-a-rule-path\n---\nBody.\n",
+        "---\nresident_ofx: rules/swe/rule.md\n---\nBody.\n",
+    ],
+    ids=[
+        "resident",
+        "rule",
+        "quoted",
+        "empty",
+        "indented",
+        "unclosed",
+        "none",
+        "in-body",
+        "non-md-value",
+        "longer-key",
+    ],
+)
+def test_the_bridges_resident_check_agrees_with_the_shared_reader(text: str) -> None:
+    from scripts._resident_of import resident_parent
+
+    assert parsing.is_resident(text) is bool(resident_parent(text))

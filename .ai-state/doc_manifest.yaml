@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-31T17:48:07Z'
+generated_at: '2026-10-31T19:38:51Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-27'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -634,7 +634,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-30'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3553,7 +3553,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-30'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3561,12 +3561,6 @@ surfaces:
   title: Idea Ledger
   last_modified: '2026-08-07'
   renderer: idea_grid
-- id: ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
-  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-07_14-00-50.md
-  type: markdown
-  title: Sentinel Report
-  last_modified: '2026-08-13'
-  renderer: default_markdown
 - id: ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-08-24_21-04-27.md
   type: markdown
@@ -3620,6 +3614,12 @@ surfaces:
   type: markdown
   title: Sentinel Report
   last_modified: '2026-10-02'
+  renderer: default_markdown
+- id: ai-state-sentinel-reports-sentinel-report-2026-10-31-12-26-50
+  path: .ai-state/sentinel_reports/SENTINEL_REPORT_2026-10-31_12-26-50.md
+  type: markdown
+  title: Sentinel Report
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.json
@@ -4473,7 +4473,6 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
   - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
   - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
-  - ai-state-sentinel-reports-sentinel-report-2026-08-07-14-00-50
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
   - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
@@ -4483,6 +4482,7 @@ groups:
   - ai-state-sentinel-reports-sentinel-report-2026-09-12-12-49-16
   - ai-state-sentinel-reports-sentinel-report-2026-09-14-07-59-49
   - ai-state-sentinel-reports-sentinel-report-2026-10-02-18-17-29
+  - ai-state-sentinel-reports-sentinel-report-2026-10-31-12-26-50
   - ai-state-specs-spec-adherence-eval-2026-10-12
   - ai-state-specs-spec-adr-move-readiness-2026-10-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25

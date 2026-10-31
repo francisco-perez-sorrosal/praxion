@@ -148,10 +148,11 @@ def test_the_implementer_is_eligible_beside_the_five_pilot_roles_and_no_other(
 # -- The implementer, ready for a trial ---------------------------------------------------------------
 
 
-def test_the_committed_adoption_ledger_records_no_status_for_the_implementer() -> None:
+def test_the_committed_adoption_ledger_never_records_the_implementer_switched() -> None:
     ledger = yaml.safe_load((REPO_ROOT / ADOPTION_LEDGER).read_text(encoding="utf-8"))
+    record = (ledger.get("roles") or {}).get("implementer") or {}
 
-    assert "implementer" not in (ledger.get("roles") or {})
+    assert record.get("status") != "switched"
 
 
 def test_the_implementers_definition_still_inherits_its_instruction_files() -> None:

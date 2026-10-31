@@ -82,7 +82,7 @@ def test_a_role_recorded_held_receives_nothing_at_spawn_and_leaves_no_row(
     assert kernel_rows(project) == [], f"held {role} left a kernel_injected row"
 
 
-@pytest.mark.parametrize("role", ["implementer", "systems-architect", "test-engineer"])
+@pytest.mark.parametrize("role", ["doc-engineer", "systems-architect", "test-engineer"])
 def test_a_role_at_no_adoption_status_receives_nothing_at_spawn(
     sandbox: Sandbox, project: Path, role: str
 ) -> None:
@@ -235,7 +235,7 @@ def test_a_spawn_that_receives_a_kernel_leaves_exactly_one_row_describing_it(
 
 
 def test_a_spawn_that_receives_no_kernel_leaves_no_row(sandbox: Sandbox, project: Path) -> None:
-    spawn(sandbox.root, project, "praxion:implementer")
+    spawn(sandbox.root, project, "praxion:doc-engineer")
 
     assert kernel_rows(project) == []
 

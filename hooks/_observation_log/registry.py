@@ -243,6 +243,7 @@ EVENTS = MappingProxyType(
                 "event_type",
                 "agent_type",
                 "agent_id",
+                "project",
                 "role",
                 "kernel_version",
                 "strings",

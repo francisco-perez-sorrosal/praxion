@@ -356,14 +356,16 @@ def render(version, delivery):
     return () if any(units(each.text) > INJECTION_CAP for each in injections) else injections
 
 
-def kernel_row(payload, role, version, injections, project_file, timestamp):
-    """The ``kernel_injected`` row for a delivering spawn."""
+def kernel_row(payload, role, version, injections, project_file, timestamp, project):
+    """The ``kernel_injected`` row for a delivering spawn; ``project`` is the one ``locate``
+    gives the spawn's directory, as every other agent row carries it."""
     return {
         "timestamp": timestamp,
         "session_id": payload.get("session_id"),
         "event_type": KERNEL_ROW,
         "agent_type": payload.get("agent_type"),
         "agent_id": payload.get("agent_id"),
+        "project": project,
         "role": role,
         "kernel_version": version,
         "strings": [
@@ -542,7 +544,9 @@ def record_delivery(payload, role, version, injections, project_file, environ):
         if location is None:
             return
         timestamp = datetime.now(timezone.utc).isoformat()
-        row = kernel_row(payload, role, version, injections, project_file, timestamp)
+        row = kernel_row(
+            payload, role, version, injections, project_file, timestamp, location.project
+        )
         writer.record(location.state_dir, EventClass.KERNEL_INJECTED, row, env=environ)
     except Exception:
         pass

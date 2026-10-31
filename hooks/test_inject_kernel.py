@@ -274,6 +274,16 @@ def test_a_spawn_that_receives_a_kernel_leaves_exactly_one_row_describing_it(tmp
     assert row["project_file"] == {"chars": len(project_text(5)), "parts": 1, "omitted": 0}
 
 
+def test_the_kernel_row_names_the_project_the_spawns_directory_belongs_to(tmp_path):
+    plugin = make_plugin(tmp_path)
+    project = make_project(tmp_path)
+
+    spawn(tmp_path, plugin, project)
+    (row,) = rows(project)
+
+    assert row["project"] == project.name
+
+
 def test_a_row_without_a_project_file_records_none(tmp_path):
     plugin = make_plugin(tmp_path)
     project = make_project(tmp_path)

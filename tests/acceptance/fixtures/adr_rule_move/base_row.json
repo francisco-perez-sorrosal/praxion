@@ -1,0 +1,8 @@
+{
+ "chars": 8725,
+ "core": true,
+ "id": "swe/adr-conventions",
+ "install": "symlink",
+ "load": "always_on",
+ "path": "rules/swe/adr-conventions.md"
+}

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-bee57879
+id: dec-481
+draft_id: dec-draft-bee57879
 title: A decision-record gate refuses misplaced, self-numbered, malformed or uncategorised records at write and commit time, and an unbounded read of the decisions index
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-31
 summary: A stdlib-only pure core, scripts/_decision_records.py, judges from values alone a pending change to .ai-state/decisions/ (placement, numbering, draft name and id, category) and an unbounded Read of DECISIONS_INDEX.md, and scripts/_decision_record_refusal.py renders the refusal with the rule's governing lines; hooks/guard_decision_records.py behind the shell fast path hooks/decisions_gate.sh refuses on time (PreToolUse Write|Edit and Read), and scripts/check_decision_records.py refuses at commit under the commit gate and Praxion's decision-records pre-commit hook; it ships through the plugin, so managed projects get it with no onboarding step.
@@ -70,7 +71,7 @@ On time where the miss happens, complete at commit; the core judges, the refusal
   - A default branch named other than `main` or `master` is not recognised, so a numbered record is refused on every branch of such a repository.
   - At write time, a path reached through the state mount's real path, not lexically through `.ai-state`, is not judged.
   - At write time, an existing draft whose id is rewritten from a valid draft id to a bad one is not caught.
-  - On Windows, where user-scope `paths:` is ignored, these refusals and the resident line are the rule's only on-time delivery (companion decision `dec-draft-209743cc`).
+  - On Windows, where user-scope `paths:` is ignored, these refusals and the resident line are the rule's only on-time delivery (companion decision `dec-480`).
 
 ## Disconfirmation
 

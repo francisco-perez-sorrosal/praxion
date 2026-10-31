@@ -1,7 +1,8 @@
 ---
-id: dec-draft-209743cc
+id: dec-480
+draft_id: dec-draft-209743cc
 title: The ADR rule loads by path scope on the decisions tree, with a declared resident projection at session start
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-31
 summary: rules/swe/adr-conventions.md ships as the measured lean arm (path-scoped on .ai-state/decisions/**, kept always-on for Codex by its own codex load key) and a new rule rules/swe/adr-conventions-resident.md carries its title and opening sentence at session start; the resident declares resident_of, which scripts/_resident_of.py reads for the kernel tooling and which the Cursor exporter and the Codex bridge each check themselves to skip the resident (parity tests hold both checks equal to that reader), so no role kernel changes and the moved rule stays fully classified.
@@ -66,7 +67,7 @@ One parser, but `cursor/config/` and `codex/config/` sit far from `scripts/`, an
 ## Consequences
 
 - Positive: the measured arm ships; kernels and their index are byte-identical; Codex and Cursor keep today's reach (Codex loads the full rule always-on, Cursor exports it unchanged, and neither exports the resident); the parent keeps kernel totality.
-- Negative: Claude Code ignores user-scope `paths:` on Windows, so a Windows session receives the resident line and the gate's refusals but never the path rule (declared limit). The new frontmatter key is read in three places: the shared reader and the two exporters' own checks, held equal only by the parity tests. The installer links rules file by file from the manifest, so the resident reaches a session only after the installer reruns. Until then, an install linked into a plugin version keeps that version's always-on rule, and an install linked into a checkout gets the path-scoped rule without the resident line. "Never read the index whole" now arrives late by path scope; the read guard in the companion decision (`dec-draft-bee57879`) closes that gap.
+- Negative: Claude Code ignores user-scope `paths:` on Windows, so a Windows session receives the resident line and the gate's refusals but never the path rule (declared limit). The new frontmatter key is read in three places: the shared reader and the two exporters' own checks, held equal only by the parity tests. The installer links rules file by file from the manifest, so the resident reaches a session only after the installer reruns. Until then, an install linked into a plugin version keeps that version's always-on rule, and an install linked into a checkout gets the path-scoped rule without the resident line. "Never read the index whole" now arrives late by path scope; the read guard in the companion decision (`dec-481`) closes that gap.
 
 ## Disconfirmation
 

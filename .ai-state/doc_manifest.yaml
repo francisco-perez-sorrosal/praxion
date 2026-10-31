@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-30T15:54:49Z'
+generated_at: '2026-10-31T17:48:07Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-31'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -41,7 +41,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-31'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -49,7 +49,7 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-10-10'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-29'
+  last_modified: '2026-10-31'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -469,7 +469,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-30'
+  last_modified: '2026-10-31'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -565,7 +565,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-10-11'
+  last_modified: '2026-10-31'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-29'
+  last_modified: '2026-10-31'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-29'
+  last_modified: '2026-10-31'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -634,13 +634,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-29'
+  last_modified: '2026-10-30'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-29'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3537,11 +3537,23 @@ surfaces:
   title: The git-conventions move governs commit message form alone; staging by name leaves its governed checks
   last_modified: '2026-10-30'
   renderer: adr_card
+- id: ai-state-decisions-480-adr-rule-path-scoped-with-resident
+  path: .ai-state/decisions/480-adr-rule-path-scoped-with-resident.md
+  type: markdown
+  title: The ADR rule loads by path scope on the decisions tree, with a declared resident projection at session start
+  last_modified: '2026-10-31'
+  renderer: adr_card
+- id: ai-state-decisions-481-decision-record-gate-and-read-guard
+  path: .ai-state/decisions/481-decision-record-gate-and-read-guard.md
+  type: markdown
+  title: A decision-record gate refuses misplaced, self-numbered, malformed or uncategorised records at write and commit time, and an unbounded read of the decisions index
+  last_modified: '2026-10-31'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-28'
+  last_modified: '2026-10-30'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3750,6 +3762,12 @@ surfaces:
   type: markdown
   title: 'SPEC: Per-Agent Model Routing Policy'
   last_modified: '2026-09-04'
+  renderer: default_markdown
+- id: ai-state-specs-spec-apply-rule-moves-2026-10-31
+  path: .ai-state/specs/SPEC_apply-rule-moves_2026-10-31.md
+  type: markdown
+  title: 'Spec: apply-rule-moves (the ADR rule loads by path scope beside a one-line resident, and a deterministic gate refuses the decision records the late-arriving rule let through)'
+  last_modified: '2026-10-31'
   renderer: default_markdown
 - id: ai-state-specs-spec-commands-to-skills-2026-10-10
   path: .ai-state/specs/SPEC_commands-to-skills_2026-10-10.md
@@ -4429,6 +4447,8 @@ groups:
   - ai-state-decisions-477-move-results-own-directory
   - ai-state-decisions-478-move-subject-sibling-subpackage
   - ai-state-decisions-479-the-git-move-governs-commit-message-form
+  - ai-state-decisions-480-adr-rule-path-scoped-with-resident
+  - ai-state-decisions-481-decision-record-gate-and-read-guard
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4466,6 +4486,7 @@ groups:
   - ai-state-specs-spec-adherence-eval-2026-10-12
   - ai-state-specs-spec-adr-move-readiness-2026-10-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25
+  - ai-state-specs-spec-apply-rule-moves-2026-10-31
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

@@ -129,6 +129,16 @@ repos:
         language: system
         pass_filenames: true
 
+      # Decision-record gate, at commit time. Judges the staged records (a numbered
+      # record on a feature branch, a category finalize cannot carry) against the
+      # true staged set, as the PreToolUse commit gate cannot.
+      - id: decision-records
+        name: Decision records
+        entry: python3 scripts/check_decision_records.py --repo-root . --staged
+        language: system
+        files: ^\.ai-state/decisions/
+        pass_filenames: false
+
       # Block B — canonical-block sync. Whole-repo --check; fires only when a
       # canonical block or one of its registered consumers (BLOCKS in
       # sync_canonical_blocks.py: the onboarding skill's consolidated

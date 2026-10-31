@@ -79,3 +79,13 @@ roles:
     since: 2026-10-14T02:32:49Z
     runs: []
     reason: "not measured: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; a full kit comes before any new trial"
+  implementer:
+    status: trial
+    since: 2026-10-31T19:39:18Z
+    runs: []
+    # Trial opened for one paired run on the subscription (48 opus sessions, cap USD 110 of
+    # estimated usage, session cap USD 3); close it (switched or held) before any release so no
+    # trial reaches managed projects. Forced-stop check C5 (td-461): the kit has 6 early-stop
+    # pairs at the 6-turn floor, so C5 is covered only if 5 of them run out on both sides; the
+    # verdict is silent on C5 otherwise. This run's early-stop sessions are the cap probe td-461
+    # asks for: their run-out rate is recorded in td-461 and sets the cap of any re-trial.

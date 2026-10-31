@@ -423,6 +423,12 @@ def test_the_last_category_wins_as_the_index_generator_and_pyyaml_read_it():
     assert front.category == "bogus"
 
 
+@pytest.mark.parametrize("spelling", ["category : bogus", "category\t: bogus"])
+def test_whitespace_before_the_colon_still_names_the_key_the_index_generator_reads(spelling):
+    front = gate.read_frontmatter(f"---\ncategory: behavioral\n{spelling}\n---\n")
+    assert front.category == "bogus"
+
+
 def test_a_duplicate_category_is_judged_by_its_last_value_on_a_creation():
     valid_then_invalid = "---\nid: " + DRAFT_ID + "\ncategory: behavioral\ncategory: bogus\n---\n"
     invalid_then_valid = "---\nid: " + DRAFT_ID + "\ncategory: bogus\ncategory: behavioral\n---\n"

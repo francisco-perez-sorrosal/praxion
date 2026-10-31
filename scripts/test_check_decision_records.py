@@ -102,6 +102,21 @@ def stale_local_main_clone(tmp_path: Path, default: str = "main") -> Path:
     return clone
 
 
+def clone_with_a_remote_branch_named_main(tmp_path: Path, name: str) -> Path:
+    """A clone on ``feature`` whose ``origin/<name>`` promoted a record; ``origin``'s default has none."""
+    origin = make_repo(tmp_path, name="origin")
+    clone = tmp_path / "clone"
+    git(tmp_path, "clone", "-q", str(origin), str(clone))
+    git(clone, "checkout", "-q", "-b", "feature")
+    put(clone, "feature.txt", "work\n")
+    commit_all(clone, "feature work")
+    git(origin, "checkout", "-q", "-b", name)
+    put(origin, NUMBERED, GOOD_NUMBERED)
+    commit_all(origin, "numbered on a side branch")
+    git(clone, "fetch", "-q", "origin")
+    return clone
+
+
 def run(repo: Path, *args: str, capsys) -> tuple[int, str, str]:
     code = cli.main(["--repo-root", str(repo), *args])
     captured = capsys.readouterr()
@@ -167,6 +182,14 @@ def test_a_staged_merge_of_the_remote_default_while_the_local_default_lags_is_cl
     clone = stale_local_main_clone(tmp_path, default)
     git(clone, "merge", "--no-commit", "--no-ff", "-q", f"origin/{default}")
     assert run(clone, "--staged", capsys=capsys) == (0, "", "")
+
+
+def test_a_staged_merge_of_a_remote_branch_merely_named_main_is_refused(tmp_path, capsys):
+    clone = clone_with_a_remote_branch_named_main(tmp_path, "feature/main")
+    git(clone, "merge", "--no-commit", "--no-ff", "-q", "origin/feature/main")
+    code, out, _ = run(clone, "--staged", capsys=capsys)
+    assert code == 1
+    assert f"{NUMBERED.rsplit('/', 1)[1]}: self-numbered" in out
 
 
 def test_a_staged_numbered_record_no_remote_default_holds_is_refused_beside_a_remote(

@@ -28,6 +28,7 @@ from test_check_decision_records import (  # noqa: E402
     GOOD_DRAFT,
     GOOD_NUMBERED,
     NUMBERED,
+    clone_with_a_remote_branch_named_main,
     commit_all,
     git,
     make_repo,
@@ -116,6 +117,14 @@ def test_a_merge_of_the_remote_default_while_the_local_default_lags_commits_in_s
     git(clone, "merge", "--no-commit", "--no-ff", "-q", f"origin/{default}")
     assert (clone / NUMBERED).exists()
     assert judge_commit(clone, "git commit --no-edit", monkeypatch, capsys) == (0, "", "")
+
+
+def test_a_merge_of_a_remote_branch_merely_named_main_is_refused(tmp_path, monkeypatch, capsys):
+    clone = clone_with_a_remote_branch_named_main(tmp_path, "feature/main")
+    git(clone, "merge", "--no-commit", "--no-ff", "-q", "origin/feature/main")
+    code, _, err = judge_commit(clone, "git commit --no-edit", monkeypatch, capsys)
+    assert code != 0
+    assert NUMBERED in err
 
 
 def test_a_numbered_record_no_default_branch_holds_is_refused_beside_a_remote(

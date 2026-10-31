@@ -15,8 +15,8 @@ Relative paths are repo-root relative. Deleted paths are not judged: nothing is 
 The branch decides whether a numbered record may appear (``main`` or ``master`` is where finalize
 promotes), and the numbered records the default branch already holds are allowed through (a merge
 or a rebase brings them in). "The default branch" is read as ``main`` or ``master``, local or
-remote-tracking (``origin/main``): a branch merges the remote's tip while its own local ``main`` is
-behind. A repository with a differently named default branch is not recognised, and a numbered
+remote-tracking (``<remote>/main``, any one remote; a remote branch merely named ``feature/main``
+is not one): a branch merges the remote's tip while its own local ``main`` is behind. A repository with a differently named default branch is not recognised, and a numbered
 record is refused on every branch of it.
 
 Commit payload: a PreToolUse hook fires before any command of the Bash call runs, so the index
@@ -96,7 +96,7 @@ JSON_SCHEMA = 1
 MAIN_BRANCHES = ("main", "master")
 DECISIONS_DIR = "/".join(DECISIONS_PARTS)
 _DEFAULT_BRANCH_REF = re.compile(
-    rf"refs/heads/(?:{'|'.join(MAIN_BRANCHES)})|refs/remotes/.+/(?:{'|'.join(MAIN_BRANCHES)})"
+    rf"refs/heads/(?:{'|'.join(MAIN_BRANCHES)})|refs/remotes/[^/]+/(?:{'|'.join(MAIN_BRANCHES)})"
 )
 NAME_SEPARATOR = "\0"
 # A command segment that is a `git commit`: after any `VAR=value` prefixes, shell openers (`(`, `!`,

@@ -52,7 +52,9 @@ NUMBERED_ID = re.compile(r"dec-(?P<number>[0-9]{3,})")
 CATEGORIES = ("architectural", "behavioral", "implementation", "configuration")
 
 _FRONTMATTER_FENCE = "---"
-_FRONTMATTER_KEY = re.compile(r"(?P<key>id|category):[ \t]*(?P<value>.*?)[ \t]*")
+# Whitespace before the colon is a key as well: ``regenerate_adr_index.parse_frontmatter`` (``\s*:``)
+# and PyYAML read ``category : x`` as ``category``.
+_FRONTMATTER_KEY = re.compile(r"(?P<key>id|category)[ \t]*:[ \t]*(?P<value>.*?)[ \t]*")
 _FIRST_WINS_KEY = "id"
 _INLINE_COMMENT = re.compile(r"(?:^|\s)#")
 _QUOTES = ("'", '"')

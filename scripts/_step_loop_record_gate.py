@@ -48,7 +48,7 @@ from _step_loop_io import (
     ScopeUnresolved,
     head_sha,
     paths_differing_from_head,
-    run_check,
+    run_bounded_check,
     run_derived_scope,
 )
 from _step_loop_pocket_runs import (
@@ -177,11 +177,12 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     ownership = Ownership(step.id, {s.id: s.read_only for s in task.inputs.steps}, done)
     changed = paths_differing_from_head(task.repo, step.files) if step.files else ()
     run_dir = task.dir / GATE_DIRECTORY / request
+    give_up_at = time.time() + gate_wait_seconds()
     if goal:
-        scope, check = goal_runs(task.repo, run_dir, step, changed)
+        scope, check = goal_runs(task.repo, run_dir, step, changed, give_up_at)
     else:
-        scope = scope_run(task.repo, run_dir, changed, ownership) if changed else None
-        check = check_run(task.repo, step, ownership)
+        scope = scope_run(task.repo, run_dir, changed, ownership, give_up_at) if changed else None
+        check = check_run(task.repo, run_dir, step, ownership, give_up_at)
     runs = tuple(run for run in (scope and scope.deciding, check) if run is not None)
     if not runs:
         runs = (GateRun("", NoRun(NOTHING_SELECTED if changed else NOTHING_RAN)),)
@@ -239,7 +240,7 @@ def derived_from(repo: Path, changed: Sequence[str]) -> str:
 
 
 def goal_runs(
-    repo: Path, run_dir: Path, step: PlanStep, changed: Sequence[str]
+    repo: Path, run_dir: Path, step: PlanStep, changed: Sequence[str], give_up_at: float
 ) -> tuple[ScopeReading | None, GateRun | None]:
     """A goal step's derived-scope run and check run, the check run first.
 
@@ -250,23 +251,28 @@ def goal_runs(
     targets = GoalTargets(frozenset())
     check: GateRun | None
     if isinstance(step.check, Check):
-        ran = run_check(repo, step.check.command)
+        ran = bounded_check(repo, run_dir, step.check.command, give_up_at)
         summary = None if ran.problem is not None else parse_pytest_summary(ran.output)
         targets = GoalTargets(frozenset(summary.failed_ids if summary else ()))
         check = classified(ran, targets, step.check.command)
     else:
-        check = check_run(repo, step, targets)
-    return (scope_run(repo, run_dir, changed, targets) if changed else None), check
+        check = check_run(repo, run_dir, step, targets, give_up_at)
+    scope = scope_run(repo, run_dir, changed, targets, give_up_at) if changed else None
+    return scope, check
 
 
 def scope_run(
-    repo: Path, run_dir: Path, changed: Sequence[str], rule: PendingRule
+    repo: Path,
+    run_dir: Path,
+    changed: Sequence[str],
+    rule: PendingRule,
+    give_up_at: float | None = None,
 ) -> ScopeReading | None:
     """The derived scope of `changed`, every invocation it lists run and read; None when the
-    resolver decides no test is needed (a run that failed is red, a run never asked is not)."""
-    resolved = run_derived_scope(
-        repo, changed, run_dir, os.environ, time.time() + gate_wait_seconds()
-    )
+    resolver decides no test is needed (a run that failed is red, a run never asked is not).
+    The runs are waited for until `give_up_at`, by default the call's gate wait from now."""
+    deadline = time.time() + gate_wait_seconds() if give_up_at is None else give_up_at
+    resolved = run_derived_scope(repo, changed, run_dir, os.environ, deadline)
     if isinstance(resolved, ScopeUnresolved):
         why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
         return ScopeReading(
@@ -413,12 +419,24 @@ def carried_mutation(results: Path, step_id: str) -> tuple[str, ...]:
     return () if reading is None else (render_mutation_line(reading),)
 
 
-def check_run(repo: Path, step: PlanStep, rule: PendingRule) -> GateRun | None:
+def check_run(
+    repo: Path, run_dir: Path, step: PlanStep, rule: PendingRule, give_up_at: float
+) -> GateRun | None:
     if step.check is None:
         return None
     if not isinstance(step.check, Check):
         return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
-    return classified(run_check(repo, step.check.command), rule, step.check.command)
+    ran = bounded_check(repo, run_dir, step.check.command, give_up_at)
+    return classified(ran, rule, step.check.command)
+
+
+def bounded_check(repo: Path, run_dir: Path, command: str, give_up_at: float) -> CommandRun:
+    """The step's `Check:` run, detached under its pocket's bound; one still inside its bound
+    at `give_up_at` leaves the call with nothing written, for the next call to attach to."""
+    ran = run_bounded_check(repo, command, run_dir, os.environ, give_up_at)
+    if isinstance(ran, StillRunning):
+        raise GateStillRunningError((f"{ran.pocket} (the Check: run)",))
+    return ran
 
 
 def classified(run: CommandRun, rule: PendingRule, command: str = "") -> GateRun:

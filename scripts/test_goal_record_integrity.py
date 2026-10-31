@@ -135,7 +135,7 @@ def test_an_ordinary_steps_written_block_is_read_back_without_running_the_check(
     def must_not_run(*_args):
         raise AssertionError("the check ran")
 
-    monkeypatch.setattr(gating, "run_check", must_not_run)
+    monkeypatch.setattr(gating, "run_bounded_check", must_not_run)
     monkeypatch.setattr(gating, "run_derived_scope", must_not_run)
     steps = tuple(parse_plan_steps(ORDINARY_STEP))
     assert isinstance(steps[0].check, Check)

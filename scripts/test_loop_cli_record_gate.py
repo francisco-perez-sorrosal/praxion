@@ -383,7 +383,7 @@ def test_a_pocket_whose_files_are_unknown_leaves_the_count_out():
 def run_the_gate_over(monkeypatch, tmp_path, *pockets, changed=("a.py",), check=None):
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
-    monkeypatch.setattr(gating, "run_check", lambda *_: check or PASSED)
+    monkeypatch.setattr(gating, "run_bounded_check", lambda *_: check or PASSED)
     monkeypatch.setattr(gating, "run_derived_scope", lambda *_: scope(*pockets))
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
     return gating.run_gate(task, task.inputs.steps[0], REQUEST)
@@ -507,7 +507,7 @@ def gate_task(tmp_path, plan):
 def run_the_gate(monkeypatch, tmp_path, plan, *, changed=(), decision=None):
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
-    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
     monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeRuns(decision, ()))
     task = gate_task(tmp_path, plan)
     return gating.run_gate(task, task.inputs.steps[0], REQUEST)
@@ -619,7 +619,7 @@ def failing(prefix, count, *more):
 
 def test_a_red_check_hands_its_failing_nodes_to_the_next_attempt(monkeypatch, tmp_path):
     red = CommandRun(("python3", "-m", "pytest", "-q"), ".", failing("c", 2), 1)
-    monkeypatch.setattr(gating, "run_check", lambda *_: red)
+    monkeypatch.setattr(gating, "run_bounded_check", lambda *_: red)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ())
     task = gate_task(tmp_path, gate_plan(CHECK_LINE))
 
@@ -673,7 +673,7 @@ def test_a_green_block_stays_within_its_ceiling_whatever_the_number_of_declared_
 def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkeypatch, tmp_path):
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py", "b.py"))
-    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
     monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeUnresolved(PASSED))
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
 
@@ -735,7 +735,7 @@ def test_a_scope_with_a_run_still_inside_its_bound_raises_before_anything_is_wri
     still = StillRunning("eval", 480.0, PocketBound("eval", 1200.0, "declared"))
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py",))
-    monkeypatch.setattr(gating, "run_check", lambda *_: PASSED)
+    monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
     monkeypatch.setattr(
         gating, "run_derived_scope", lambda *_: scope((".", finished(".")), ("eval", still))
     )

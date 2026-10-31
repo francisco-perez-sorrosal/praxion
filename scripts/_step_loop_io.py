@@ -12,10 +12,11 @@ repository or runs a command.
   whatever the plan declares.
 * **Scope**: `tree_patch`, the whole tree's difference from `HEAD` (the index untouched), and
   `restore_paths`, which returns a declared scope to `HEAD` and touches nothing else.
-* **Runner**: the `Check:` command and the derived test scope. The `Check:` runs here, under
-  one timeout. Each invocation the scope lists runs through the pocket-run module -- detached,
-  under its pocket's own bound, found again by a later call -- and comes back as that module's
-  record of it, grouped by pocket; reading the records is the caller's job. No runner is asked
+* **Runner**: the `Check:` command and the derived test scope, each held to the bound of the
+  pocket it runs in. The gate's `Check:` run and each invocation the scope lists run through the
+  pocket-run module -- detached, found again by a later call -- and come back as that module's
+  record of them, the scope's grouped by pocket; reading the records is the caller's job. A goal
+  being scaffolded runs its `Check:` in the foreground under the same bound. No runner is asked
   to colour, and each command leads a process group that a timeout kills whole.
 
 Every git call goes through `_git_runner.run_git`; from `commit_paths`, a git that cannot run is
@@ -44,7 +45,10 @@ from typing import Union
 
 from _git_runner import GIT_TIMEOUT_SECONDS, GitUnavailableError, run_git
 from _step_loop_pocket_runs import (
+    CutOff,
+    Finished,
     Observed,
+    PocketBound,
     RunSpec,
     StillRunning,
     no_colour_environment,
@@ -57,7 +61,12 @@ OUTER_LOOP_PREFIXES = ("tests/acceptance/", "tests/e2e/")
 # The commit runs the repository's hooks (about twenty, installing environments on a first
 # run): a bound of its own, not the thirty seconds of plain plumbing.
 COMMIT_TIMEOUT_SECONDS = 600.0
-RUN_TIMEOUT_SECONDS = 540.0
+# The `Check:` run's record in a request's run directory; the scope's invocations start at 1.
+CHECK_RUN_NUMBER = 0
+# The options naming the project a `Check:` command runs, as `uv run` spells them: the pocket
+# whose bound it is held to. A command naming none runs in the root pocket.
+_CHECK_POCKET_OPTIONS = ("--project", "--directory")
+_ROOT_POCKET = "."
 RESOLVER_TIMEOUT_SECONDS = 60.0
 KILL_GRACE_SECONDS = 5.0
 FAILURE_TAIL_LINES = 20
@@ -553,9 +562,57 @@ class ScopeUnresolved:
     resolver: CommandRun
 
 
-def run_check(repo: Path, command: str, timeout: float = RUN_TIMEOUT_SECONDS) -> CommandRun:
-    """Run a step's `Check:` command (split like a shell would, run without one)."""
-    return run_command(tuple(shlex.split(command)), repo, timeout)
+def run_check(repo: Path, command: str, timeout: float | None = None) -> CommandRun:
+    """Run a step's `Check:` command in the foreground (split like a shell would, run without
+    one), under `timeout` or else its pocket's bound."""
+    argv = tuple(shlex.split(command))
+    seconds = timeout if timeout is not None else check_bound(repo, argv, os.environ).seconds
+    return run_command(argv, repo, seconds)
+
+
+def run_bounded_check(
+    repo: Path, command: str, run_dir: Path, environ: Mapping[str, str], give_up_at: float
+) -> Union[CommandRun, StillRunning]:  # noqa: UP007 -- runtime value, 3.9 floor
+    """Run a step's `Check:` command detached under its pocket's bound, recorded in `run_dir`.
+
+    Asked again with the same `run_dir`, a run already started is picked up instead of started.
+    A run still inside its bound at `give_up_at` comes back as `StillRunning`; one that outlived
+    its bound, or never ran, is a run with a problem saying so.
+    """
+    argv = tuple(shlex.split(command))
+    spec = RunSpec(run_dir, CHECK_RUN_NUMBER, argv, repo, check_bound(repo, argv, environ))
+    observed = run_detached(spec, give_up_at)
+    if isinstance(observed, StillRunning):
+        return observed
+    if isinstance(observed, Finished):
+        return CommandRun(argv, str(repo), observed.output, observed.returncode)
+    if isinstance(observed, CutOff):
+        seconds = f"{observed.bound.seconds:g}"
+        why = f"outlived its pocket's bound ({observed.pocket}, {seconds}s)"
+        return CommandRun(argv, str(repo), observed.output, None, why)
+    return CommandRun(argv, str(repo), observed.output, None, f"did not run ({observed.reason})")
+
+
+def check_bound(repo: Path, argv: tuple[str, ...], environ: Mapping[str, str]) -> PocketBound:
+    """The bound a `Check:` command is held to: that of the pocket it names, else the root's."""
+    reading = pocket_bound(repo, check_pocket(argv), environ)
+    for warning in reading.warnings:
+        print(f"step-loop: {warning}", file=sys.stderr)
+    return reading.bound
+
+
+def check_pocket(argv: tuple[str, ...]) -> str:
+    """The pocket a `Check:` command runs in: the last directory a `--project` or `--directory`
+    option names (`--project eval` or `--project=eval`), else the root pocket."""
+    pocket = _ROOT_POCKET
+    for at, word in enumerate(argv):
+        option, separator, value = word.partition("=")
+        if option not in _CHECK_POCKET_OPTIONS:
+            continue
+        named = value if separator else (argv[at + 1] if at + 1 < len(argv) else "")
+        if named:
+            pocket = named
+    return pocket
 
 
 def run_derived_scope(

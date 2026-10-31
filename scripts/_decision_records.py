@@ -9,8 +9,12 @@ whether a change to one leaves such a record behind. Adapters parse their input 
 branch or a clock, so the same judgement serves the write hook, the commit gate and the
 pre-commit hook.
 
-Existing debt is never judged: for a file that existed before the change, placement, name and
-id are left alone and the category is judged only as *lost* (valid before, not valid after).
+Existing debt is never judged: for a file that held content before the change, placement, name
+and id are left alone and the category is judged only as *lost* (valid before, not valid after).
+An empty or whitespace-only file holds nothing to preserve, so a write over one is a creation.
+Declared limit: an existing draft whose id is rewritten from a valid draft id to a bad one is
+not caught at write time; the commit gate sees no earlier blob for a draft that was never
+committed and judges it as new.
 
 Stdlib-only and 3.9-safe (no runtime ``X | Y`` unions, no ``match``): the ambient ``python3``
 runs it.
@@ -28,7 +32,6 @@ from typing import Union
 # -- Where a record may live --------------------------------------------------------------
 
 STATE_DIR = ".ai-state"
-DECISIONS_DIR = f"{STATE_DIR}/decisions"
 DECISIONS_PARTS = (STATE_DIR, "decisions")
 DRAFTS_SUBDIR = "drafts"
 INDEX_NAME = "DECISIONS_INDEX.md"
@@ -52,7 +55,6 @@ _FRONTMATTER_FENCE = "---"
 _FRONTMATTER_KEY = re.compile(r"(?P<key>id|category):[ \t]*(?P<value>.*?)[ \t]*")
 _INLINE_COMMENT = re.compile(r"(?:^|\s)#")
 _QUOTES = ("'", '"')
-_BYTE_ORDER_MARK = "﻿"
 
 
 # -- The closed vocabulary ----------------------------------------------------------------
@@ -244,7 +246,7 @@ def _change_defects(change: Change, context: Context) -> tuple[Defect, ...]:
     if isinstance(record_path, (Outside, NonRecord)):
         return ()
     after = read_frontmatter(change.after)
-    if change.before is not None:
+    if change.before is not None and change.before.strip():
         return _existing_record_defects(read_frontmatter(change.before), after)
     return _new_record_defects(record_path, change.path, after, context)
 
@@ -376,19 +378,21 @@ def read_frontmatter(text: str) -> Frontmatter:
     """Read ``id`` and ``category`` from a leading ``---`` block; the first of each key wins.
 
     Line-based on purpose: the gate must not depend on a YAML library, and finalize itself
-    reads ``id`` with a line pattern. A block never closed is read to the end of the text.
+    reads ``id`` with a line pattern. A block never closed, or one preceded by a byte-order
+    mark, has no fields: ``regenerate_adr_index.parse_frontmatter`` reads it the same way, so
+    the gate and the index generator agree on which records have a category.
     """
-    lines = text.lstrip(_BYTE_ORDER_MARK).splitlines()
+    lines = text.splitlines()
     if not lines or lines[0].rstrip() != _FRONTMATTER_FENCE:
         return Frontmatter(None, None)
     found: dict[str, str] = {}
     for line in lines[1:]:
         if line.rstrip() == _FRONTMATTER_FENCE:
-            break
+            return Frontmatter(found.get("id") or None, _clean_category(found.get("category")))
         match = _FRONTMATTER_KEY.fullmatch(line)
         if match is not None:
             found.setdefault(match.group("key"), match.group("value"))
-    return Frontmatter(found.get("id") or None, _clean_category(found.get("category")))
+    return Frontmatter(None, None)
 
 
 def _clean_category(raw: str | None) -> str | None:

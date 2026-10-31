@@ -309,8 +309,12 @@ def test_rewriting_an_existing_draft_without_its_category_is_category_lost():
     assert defects_of(edited(DRAFT_PATH, before, record(category=None))) == (Defect.CATEGORY_LOST,)
 
 
-def test_an_empty_existing_file_is_not_a_record_that_held_a_category():
-    assert edited(DRAFT_PATH, "", record(id_="dec-043", category=None)) == Allowed()
+@pytest.mark.parametrize("empty", ["", "\n", "  \n\t\n"])
+def test_a_write_over_an_empty_existing_file_is_judged_as_a_creation(empty):
+    assert defects_of(edited(DRAFT_PATH, empty, record(id_="dec-043", category=None))) == (
+        Defect.SELF_PICKED_ID,
+        Defect.NO_CATEGORY,
+    )
 
 
 # -- Numbered records at commit time ------------------------------------------------------
@@ -423,13 +427,13 @@ def test_an_indented_key_is_not_a_top_level_field():
     assert gate.read_frontmatter("---\nmeta:\n  category: behavioral\n---\n").category is None
 
 
-def test_a_byte_order_mark_before_the_fence_is_tolerated():
-    assert gate.read_frontmatter("﻿---\ncategory: behavioral\n---\n").category == "behavioral"
+def test_a_byte_order_mark_before_the_fence_leaves_no_fields_as_the_index_generator_reads_it():
+    assert gate.read_frontmatter("﻿---\ncategory: behavioral\n---\n") == gate.Frontmatter(None, None)
 
 
-def test_a_frontmatter_block_never_closed_is_read_to_the_end():
-    unclosed = f"---\nid: {draft_id('aaaaaaaa')}\n"
-    assert gate.read_frontmatter(unclosed).id == draft_id("aaaaaaaa")
+def test_a_frontmatter_block_never_closed_has_no_fields():
+    unclosed = f"---\nid: {draft_id('aaaaaaaa')}\ncategory: behavioral\n"
+    assert gate.read_frontmatter(unclosed) == gate.Frontmatter(None, None)
 
 
 # -- Parity with finalize: the gate refuses exactly what finalize would strand ------------

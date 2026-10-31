@@ -38,6 +38,7 @@ MOVED_RULE = "rules/swe/adr-conventions.md"
 RESIDENT = "rules/swe/adr-conventions-resident.md"
 RULE_IDS = ("swe/adr-conventions", "swe/adr-conventions-resident")
 MANIFEST = "rules/_manifest.yaml"
+_GENERATED_ROW_ORDER = ("id", "path", "load", "core", "install", "paths", "chars")
 PATH_SCOPE = ".ai-state/decisions/**"
 RESIDENT_TITLE = "## ADR Conventions"
 MEASURED_KEYS = ("id", "path", "load", "core", "install", "paths")
@@ -234,7 +235,12 @@ def restore_before_the_move(root: Path) -> None:
     text = (root / MANIFEST).read_text(encoding="utf-8")
     header = "".join(line for line in text.splitlines(keepends=True) if line.startswith("#"))
     manifest = yaml.safe_load(text)
-    base_row = fixture_json("base_row.json")
+    frozen = fixture_json("base_row.json")
+    # The generator writes `id` first and readers find a row by its `- id:` line, so the frozen
+    # row (stored with sorted keys) goes back in the generator's key order.
+    base_row = {k: frozen[k] for k in _GENERATED_ROW_ORDER if k in frozen} | {
+        k: v for k, v in frozen.items() if k not in _GENERATED_ROW_ORDER
+    }
     manifest["rules"] = [
         base_row if row["id"] == RULE_IDS[0] else row
         for row in manifest["rules"]

@@ -5,12 +5,14 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 ## Agent reading order
 
 1. **CLAUDE.md** (this file) — Praxion-specific agent baseline
-2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, ADR conventions, agent intermediate documents, model routing, git conventions)
-3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
+2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, agent intermediate documents, model routing, git conventions)
+3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (ADR conventions on `.ai-state/decisions/**` with a one-line resident at session start, always-on in assistants without path scoping; diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
 4. **`skills/<name>/SKILL.md`** — load when description matches the task
 5. **`skills/<name>/references/*.md`** — on demand from the skill body
 6. **`.ai-state/DESIGN.md`** — when reasoning about Praxion's system design
 7. **`docs/architecture.md`** — when navigating the code-verified component map
+
+The ADR rule's resident file is `rules/swe/adr-conventions-resident.md`.
 
 ## Build / test / lint
 

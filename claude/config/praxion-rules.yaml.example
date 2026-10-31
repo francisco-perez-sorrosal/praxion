@@ -59,10 +59,12 @@
 #
 # Full enumeration of disableable rules — what `disable:` can actually target.
 # Canonical source: `rules/_manifest.yaml`. Full token accounting and rationale:
-# `docs/rules-taxonomy.md`. Five core rules are NON-disableable (CLAUDE,
-# swe/adr-conventions, swe/agent-behavioral-contract,
-# swe/agent-intermediate-documents, swe/swe-agent-coordination-protocol) —
-# attempting to list them emits a SessionStart warning and they stay loaded.
+# `docs/rules-taxonomy.md`. Five core rules are NON-disableable
+# (swe/adr-conventions [path-scoped on .ai-state/decisions/**],
+# swe/adr-conventions-resident [its always-loaded one-line resident],
+# swe/agent-behavioral-contract, swe/agent-intermediate-documents,
+# swe/swe-agent-coordination-protocol) — attempting to list any of them,
+# either ADR id included, emits a SessionStart warning and they stay loaded.
 #
 #   Hook-deliver, always-loaded (3 rules — disabling reclaims SessionStart tokens):
 #     - swe/memory-protocol            — Memory MCP protocol (~1.2k tokens)

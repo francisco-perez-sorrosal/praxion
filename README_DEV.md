@@ -63,7 +63,8 @@ agents/                              # Shared agent definitions
 rules/                               # Rules (installed to ~/.claude/rules/ or .cursor/rules/)
 ├── CLAUDE.md                        # Rule conventions (lazy loaded)
 ├── swe/
-│   ├── adr-conventions.md
+│   ├── adr-conventions.md               # path-scoped: .ai-state/decisions/**
+│   ├── adr-conventions-resident.md      # its always-loaded one-line resident
 │   ├── agent-intermediate-documents.md
 │   ├── coding-style.md
 │   ├── swe-agent-coordination-protocol.md

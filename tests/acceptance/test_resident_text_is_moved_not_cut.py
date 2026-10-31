@@ -10,9 +10,35 @@ import pytest
 from tests.acceptance.drivers import kernel_sandbox, resident_sections
 from tests.acceptance.drivers.kernel_sandbox import REPO_ROOT, frontmatter
 
+# A paragraph a ratified, measured declaration rewords on purpose, pinned to its new wording: the
+# reading order stops listing the ADR rule as always-on and names its path scope and resident.
+DECLARED_REWORDINGS = {
+    ("CLAUDE.md", "## Agent reading order [1]", 0): (
+        "1. **CLAUDE.md** (this file) — Praxion-specific agent baseline\n"
+        "2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination"
+        " protocol, behavioral contract, agent intermediate documents, model routing, git"
+        " conventions)\n"
+        "3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched"
+        " (ADR conventions on `.ai-state/decisions/**` with a one-line resident at session start,"
+        " always-on in assistants without path scoping; diagram conventions, coding style,"
+        " dashboard conventions, PR conventions, etc.)\n"
+        "4. **`skills/<name>/SKILL.md`** — load when description matches the task\n"
+        "5. **`skills/<name>/references/*.md`** — on demand from the skill body\n"
+        "6. **`.ai-state/DESIGN.md`** — when reasoning about Praxion's system design\n"
+        "7. **`docs/architecture.md`** — when navigating the code-verified component map"
+    ),
+}
+
+
+def _frozen_with_declared_rewordings() -> dict[str, dict[str, list[str]]]:
+    frozen = resident_sections.load("instruction_sections.json")
+    for (rel, key, index), wording in DECLARED_REWORDINGS.items():
+        frozen[rel][key][index] = resident_sections.paragraph_digest(wording)
+    return frozen
+
 
 def test_no_paragraph_of_any_rule_or_instruction_file_is_deleted_or_reworded() -> None:
-    frozen = resident_sections.load("instruction_sections.json")
+    frozen = _frozen_with_declared_rewordings()
 
     lost = resident_sections.lost_paragraphs(REPO_ROOT, frozen)
 

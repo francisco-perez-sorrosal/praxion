@@ -77,8 +77,21 @@ def _exporter_module():
         "---\nresident_of: rules/swe/rule.md\nBody, never closed.\n",
         "No frontmatter; resident_of: rules/swe/rule.md\n",
         "---\npaths: ['docs/**']\n---\nresident_of: rules/swe/rule.md\n",
+        "---\nresident_of: not-a-rule-path\n---\nBody.\n",
+        "---\nresident_ofx: rules/swe/rule.md\n---\nBody.\n",
     ],
-    ids=["resident", "rule", "quoted", "empty", "indented", "unclosed", "none", "in-body"],
+    ids=[
+        "resident",
+        "rule",
+        "quoted",
+        "empty",
+        "indented",
+        "unclosed",
+        "none",
+        "in-body",
+        "non-md-value",
+        "longer-key",
+    ],
 )
 def test_the_exporters_resident_check_agrees_with_the_shared_reader(text: str) -> None:
     from scripts._resident_of import resident_parent

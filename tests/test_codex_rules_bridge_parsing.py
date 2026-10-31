@@ -69,9 +69,7 @@ def test_repository_rules_with_inline_paths_are_path_scoped(rule):
 
 
 RULE = "---\npaths:\n  - 'docs/**'\n---\n## Rule\n\nThe whole rule.\n"
-RESIDENT = (
-    "---\nresident_of: rules/swe/rule.md\ncodex:\n  load: exclude\n---\n## Rule\n\nOne line.\n"
-)
+RESIDENT = "---\nresident_of: rules/swe/rule.md\n---\n## Rule\n\nOne line.\n"
 
 
 def _write_rules(root: Path, files: dict[str, str]) -> Path:
@@ -105,8 +103,21 @@ def test_a_resident_beside_its_rule_leaves_the_manifests_rules_unchanged(tmp_pat
         "---\nresident_of: rules/swe/rule.md\nBody, never closed.\n",
         "No frontmatter; resident_of: rules/swe/rule.md\n",
         "---\npaths: ['docs/**']\n---\nresident_of: rules/swe/rule.md\n",
+        "---\nresident_of: not-a-rule-path\n---\nBody.\n",
+        "---\nresident_ofx: rules/swe/rule.md\n---\nBody.\n",
     ],
-    ids=["resident", "rule", "quoted", "empty", "indented", "unclosed", "none", "in-body"],
+    ids=[
+        "resident",
+        "rule",
+        "quoted",
+        "empty",
+        "indented",
+        "unclosed",
+        "none",
+        "in-body",
+        "non-md-value",
+        "longer-key",
+    ],
 )
 def test_the_bridges_resident_check_agrees_with_the_shared_reader(text: str) -> None:
     from scripts._resident_of import resident_parent

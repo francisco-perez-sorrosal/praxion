@@ -84,8 +84,10 @@ hooks/                               # Hook scripts (auto-discovered by Claude C
 ├── check_code_quality.py
 ├── cleanup_gate.sh
 ├── commit_gate.sh
+├── decisions_gate.sh                  # Fast path for the decision-record guard (grep before Python)
 ├── detect_duplication.py
 ├── format_code.py
+├── guard_decision_records.py          # Gate: decision-record writes stay in a shape finalize can carry
 ├── guard_memory_index.py              # Gate: memory-index writes add only short pointers
 ├── inject_decisions.py
 ├── precompact_state.py

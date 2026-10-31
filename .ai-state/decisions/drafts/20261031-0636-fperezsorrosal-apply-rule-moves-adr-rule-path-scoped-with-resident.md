@@ -42,7 +42,7 @@ Ship the kit's rule bytes unchanged: `rules/swe/adr-conventions.md` gains `paths
 
 The move instrument (`eval/src/praxion_evals/adherence/moves/arms.py`) refuses explicitly to build the lean arm over a tree where the move has landed.
 
-Shipped versus measured: the rule is byte-identical. The resident's body is byte-identical, and the resident differs only by its 94 bytes of frontmatter. The two manifest rows match the measured rows on every compared key (`id`, `path`, `load`, `core`, `install`, `paths`); the generation stamp and the `chars` counts are not compared. The resident line was not grown: a larger kernel would be an unmeasured arm. FC-01 (always-loaded tokens under a scratch home) read 23,652 at base and 20,273 after the resident's unread `codex:` key was dropped (20,284 before), against a limit of 20,300: 3,379 tokens fewer. The unread `codex:` key, dropped after that reading, removes 23 more bytes; FC-01 was not re-read.
+Shipped versus measured: the rule is byte-identical. The resident's body is byte-identical, and the resident differs only by its 94 bytes of frontmatter. The two manifest rows match the measured rows on every compared key (`id`, `path`, `load`, `core`, `install`, `paths`); the generation stamp and the `chars` counts are not compared. The resident line was not grown: a larger kernel would be an unmeasured arm. FC-01 (always-loaded tokens under a scratch home) read 23,652 at base and 20,273 after the resident's unread `codex:` key was dropped (20,284 before), against a limit of 20,300: 3,379 tokens fewer.
 
 Activation: no — one load-bearing representation choice with measured evidence; no lens sweep needed.
 

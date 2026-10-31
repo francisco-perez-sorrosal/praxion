@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Judge decision-record changes from the command line.
+
+The decision-record gate's pure core (``_decision_records.py``) decides, from values alone,
+whether a change leaves a record finalize cannot carry. This command gathers those values from a
+git repository and renders the verdict, so the pre-commit hook and the commit gate share one
+judgement with the write hook.
+
+  PATH...     each file's working-tree text, judged against its ``HEAD`` blob (or none).
+  --staged    each staged file's index blob, judged against its ``HEAD`` blob (or none).
+
+Relative paths are repo-root relative. Deleted paths are not judged: nothing is left to refuse.
+The branch decides whether a numbered record may appear (``main`` or ``master`` is where finalize
+promotes), and the numbered records the default branch already holds are allowed through (a merge
+or a rebase brings them in).
+
+Exit codes: 0 clean, 1 findings, 2 input error. A gate that cannot read its input never passes:
+a missing file, a path outside the repository, a directory that is no repository and a
+plugin-cache root are all exit 2.
+
+Usage:
+    python3 scripts/check_decision_records.py PATH [PATH ...]
+    python3 scripts/check_decision_records.py --staged
+    python3 scripts/check_decision_records.py --json --repo-root DIR PATH
+
+Stdlib-only and 3.9-safe: the ambient ``python3`` runs it. The repo root is ``--repo-root`` or
+the git toplevel of the cwd, never ``__file__``: hooks run it through a symlink into the plugin.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from _decision_record_refusal import CORRECT_FORM
+from _decision_records import (
+    DECISIONS_PARTS,
+    Change,
+    Context,
+    Numbered,
+    Outside,
+    Refused,
+    TopLevel,
+    classify_name,
+    classify_path,
+    judge_change,
+)
+from _git_runner import run_git
+from _repo_root import is_plugin_cache_path, resolve_repo_root
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+EXIT_CLEAN = 0
+EXIT_FINDINGS = 1
+EXIT_INPUT_ERROR = 2
+
+JSON_SCHEMA = 1
+MAIN_BRANCHES = ("main", "master")
+DECISIONS_DIR = "/".join(DECISIONS_PARTS)
+NAME_SEPARATOR = "\0"
+
+
+class InputError(Exception):
+    """The gate cannot read what it was asked to judge."""
+
+
+# -- Command line -------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    try:
+        root = _resolve_root(args.repo_root)
+        context = _gather_context(root)
+        changes = _staged_changes(root) if args.staged else _path_changes(root, args.paths)
+    except (InputError, OSError) as error:
+        sys.stderr.write(f"check_decision_records: {error}\n")
+        return EXIT_INPUT_ERROR
+    refusals = _refusals(changes, context)
+    sys.stdout.write(_render_json(refusals) if args.json else _render_text(refusals))
+    return EXIT_FINDINGS if refusals else EXIT_CLEAN
+
+
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    # The module docstring is the help text: one description, nothing per option to drift from it.
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("paths", nargs="*")
+    parser.add_argument("--staged", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--repo-root")
+    args = parser.parse_args(argv)
+    if args.staged == bool(args.paths):
+        parser.error("give either --staged or one or more PATH arguments")
+    return args
+
+
+def _refusals(changes: list[Change], context: Context) -> list[Refused]:
+    verdicts = (judge_change(change, context) for change in changes)
+    return [verdict for verdict in verdicts if isinstance(verdict, Refused)]
+
+
+# -- Rendering ----------------------------------------------------------------------------
+
+
+def _render_text(refusals: list[Refused]) -> str:
+    rows = (f"{r.path}: {_defect_names(r)} -- {CORRECT_FORM}\n" for r in refusals)
+    return "".join(rows)
+
+
+def _render_json(refusals: list[Refused]) -> str:
+    findings = [{"path": r.path, "defects": [d.value for d in r.defects]} for r in refusals]
+    return json.dumps({"schema": JSON_SCHEMA, "findings": findings}) + "\n"
+
+
+def _defect_names(refused: Refused) -> str:
+    return ", ".join(defect.value for defect in refused.defects)
+
+
+# -- Gathering: the root and the context --------------------------------------------------
+
+
+def _resolve_root(cli_repo_root: str | None) -> Path:
+    root = resolve_repo_root(
+        cli_repo_root, script_dir=SCRIPT_DIR, on_fallback=_refuse_script_relative_root
+    )
+    if is_plugin_cache_path(root):
+        raise InputError(f"refusing to run against a plugin-cache root: {root}")
+    return root
+
+
+def _refuse_script_relative_root(fallback: Path) -> None:
+    raise InputError(f"not inside a git repository and no --repo-root given (not {fallback})")
+
+
+def _gather_context(root: Path) -> Context:
+    branch = _current_branch(root)
+    return Context(on_main=branch in MAIN_BRANCHES, default_holds=_default_branch_records(root))
+
+
+def _current_branch(root: Path) -> str:
+    # `symbolic-ref` answers on an unborn branch, where `rev-parse HEAD` has no commit to name.
+    for command in (("rev-parse", "--abbrev-ref", "HEAD"), ("symbolic-ref", "--short", "HEAD")):
+        result = run_git(root, *command)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    raise InputError(f"cannot read the current branch of {root}: not a git repository?")
+
+
+def _default_branch_records(root: Path) -> frozenset[str]:
+    """The numbered record paths local ``main`` (else ``master``) holds; empty with neither."""
+    ref = next((name for name in MAIN_BRANCHES if _branch_exists(root, name)), None)
+    if ref is None:
+        return frozenset()
+    listing = run_git(root, "ls-tree", "-z", "--name-only", ref, f"{DECISIONS_DIR}/")
+    if listing.returncode != 0:
+        raise InputError(f"cannot list {DECISIONS_DIR}/ on {ref}: {listing.stderr.strip()}")
+    return frozenset(path for path in listing.stdout.split(NAME_SEPARATOR) if _is_numbered(path))
+
+
+def _branch_exists(root: Path, name: str) -> bool:
+    return run_git(root, "rev-parse", "--verify", f"refs/heads/{name}").returncode == 0
+
+
+def _is_numbered(path: str) -> bool:
+    record_path = classify_path(path)
+    return isinstance(record_path, TopLevel) and isinstance(
+        classify_name(record_path.name), Numbered
+    )
+
+
+# -- Gathering: the changes ---------------------------------------------------------------
+
+
+def _path_changes(root: Path, raw_paths: list[str]) -> list[Change]:
+    changes = []
+    for raw in raw_paths:
+        rel = _repo_relative(root, raw)
+        changes.append(Change(rel, _head_text(root, rel), _working_text(root, rel)))
+    return changes
+
+
+def _staged_changes(root: Path) -> list[Change]:
+    # No rename detection: a renamed record is an added path and a deleted one, as a commit sees it.
+    listing = run_git(
+        root, "diff", "--cached", "--name-only", "--no-renames", "--diff-filter=ACMR", "-z"
+    )
+    if listing.returncode != 0:
+        raise InputError(f"cannot list the staged set: {listing.stderr.strip()}")
+    staged = (path for path in listing.stdout.split(NAME_SEPARATOR) if path)
+    return [
+        Change(path, _head_text(root, path), _index_text(root, path))
+        for path in staged
+        if not isinstance(classify_path(path), Outside)
+    ]
+
+
+def _repo_relative(root: Path, raw: str) -> str:
+    path = Path(raw)
+    if path.is_absolute():
+        try:
+            path = path.resolve().relative_to(root.resolve())
+        except ValueError:
+            raise InputError(f"{raw} is outside the repository {root}") from None
+    rel = os.path.normpath(path.as_posix())
+    if rel == ".." or rel.startswith("../"):
+        raise InputError(f"{raw} is outside the repository {root}")
+    return rel.replace(os.sep, "/")
+
+
+def _head_text(root: Path, rel: str) -> str | None:
+    """The ``HEAD`` blob's text, or ``None`` when ``HEAD`` does not hold the path."""
+    result = run_git(root, "show", f"HEAD:{rel}")
+    return result.stdout if result.returncode == 0 else None
+
+
+def _index_text(root: Path, rel: str) -> str:
+    result = run_git(root, "show", f":{rel}")
+    if result.returncode != 0:
+        raise InputError(f"cannot read the staged blob of {rel}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def _working_text(root: Path, rel: str) -> str:
+    try:
+        return (root / rel).read_bytes().decode("utf-8", errors="replace")
+    except OSError as error:
+        raise InputError(f"cannot read {rel}: {error}") from None
+
+
+if __name__ == "__main__":
+    sys.exit(main())

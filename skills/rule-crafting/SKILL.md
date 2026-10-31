@@ -159,7 +159,7 @@ Claude Code assembles always-loaded instruction context from a layered hierarchy
 | Project-local override | `./CLAUDE.local.md` | Always at launch; **`.gitignore` it** | Private per-project prefs (supported, not deprecated). Worktree caveat: exists only in the worktree where created — to share across worktrees, `@~/.claude/...`-import instead |
 | Subdirectory | `<subdir>/CLAUDE.md` | **On-demand** when Claude reads a file under `<subdir>/` — not at launch | Directory-local conventions (e.g. `scripts/CLAUDE.md`, `tests/CLAUDE.md`); keeps them off the launch-time always-loaded surface |
 
-Path-scoped rules (`paths:` frontmatter, in project or user `rules/`) sit alongside the project / user layers but load **when a matching file is touched** (Read, Write/Edit, or a single-file Bash read) — see [Path-Scoped Rules: Loading Trigger](#path-scoped-rules-loading-trigger).
+Path-scoped rules (`paths:` frontmatter, in project or user `rules/`) sit alongside the project / user layers but load **when a matching file is touched** (Read, Write/Edit, or a single-file Bash read) — see [Path-Scoped Rules: Loading Trigger](#path-scoped-rules-loading-trigger). A path-scoped rule may keep a one-line always-loaded resident file — see [Path-Scoped Rule With a Resident File](#path-scoped-rule-with-a-resident-file).
 
 - **`claudeMdExcludes`** — real setting (array; set in `.claude/settings.local.json` etc.; merges across layers): skip specific `CLAUDE.md` / rules files by absolute-path glob. Useful for monorepos with irrelevant ancestor files. Managed-policy `CLAUDE.md` can't be excluded.
 - **`InstructionsLoaded` hook** — the docs recommend it to log exactly which instruction files load, when, and why; it's the tool for debugging path-scoped rules and lazy-loaded subdirectory files. (`--add-dir` does *not* load `CLAUDE.md` from extra dirs unless `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`.)
@@ -189,7 +189,7 @@ Use `##` (h2) as the top-level heading — rules are injected into a larger cont
 
 ### Frontmatter Fields
 
-Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical rules (`rules/**/*.md`, shipped via the plugin) carry four more, read by its installer, SessionStart hook, and Codex bridge — project-local rules in `.claude/rules/` do not need them. All are optional, and `scripts/regenerate_rules_manifest.py` copies them into the generated `rules/_manifest.yaml`, which is what those consumers actually read: regenerate after changing any of them.
+Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical rules (`rules/**/*.md`, shipped via the plugin) carry five more, read by its installer, SessionStart hook, Codex bridge, kernel tools and Cursor exporter — project-local rules in `.claude/rules/` do not need them. All are optional, and `scripts/regenerate_rules_manifest.py` copies them into the generated `rules/_manifest.yaml`, which is what those consumers actually read: regenerate after changing any of them.
 
 | Field | Values (default) | Meaning — and the consumer that reads it |
 |---|---|---|
@@ -198,6 +198,7 @@ Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical
 | `load` | `always_on` / `path_scoped` (`path_scoped`) | **Descriptive only** — copied into the manifest, but no installer, hook, or runtime path branches on it. Actual loading is decided by `paths` (runtime) and `install` (delivery). Keep it consistent with `paths` so the manifest reads true |
 | `install` | `symlink` / `hook-deliver` (`symlink`) | Delivery channel. `symlink` → `link_rules()` in `lib/install_shared.sh` links the file into `~/.claude/rules/`. `hook-deliver` → the installer skips it and `hooks/inject_rules.py` injects it at SessionStart, where a project blacklist can suppress it. Every `hook-deliver` rule must also appear in `HOOK_DELIVER_ORDER` in `regenerate_rules_manifest.py` |
 | `codex` | nested `portability` / `load` (absent) | Codex-export classification only, read by `codex/config/export-codex-rules-bridge.py` — see [Automatic Codex Classification](#automatic-codex-classification) |
+| `resident_of` | path of a rule (absent) | Marks the file as the always-loaded projection of the named path-scoped rule. Read by the kernel tools (`scripts/kernel_sources.py`, through `scripts/_resident_of.py`) and the Cursor exporter, which skips the file; see [Path-Scoped Rule With a Resident File](#path-scoped-rule-with-a-resident-file) |
 
 **Nested `codex.load` is not the top-level `load`.** Different keys, different consumers, different value sets — `codex.load` also accepts `exclude` and `auto`, and any value other than `exclude` requires `codex.portability: portable`. The nesting is the only thing keeping them apart; never flatten one into the other.
 
@@ -243,16 +244,36 @@ The rule loads only when Claude is working on files matching the glob patterns.
 - `tests/` — all files under `tests/` directory
 
 ### Path-Scoped Rules: Loading Trigger
-<!-- last-verified: 2026-10-11 -->
+<!-- last-verified: 2026-10-31 -->
 
 A path-scoped rule injects when Claude touches a file matching the glob: a Read, a `Write` or `Edit` (Claude Code 2.1.288 and later), or a single-file Bash read such as `cat`, `head` or `sed -n` (2.1.293). Before 2.1.288 only Read triggered it. One gap remains, and it is the one the mitigation exists for:
 
 - **Symptom**: an agent that *creates* a new file composes the content inside its first `Write` call, so the rule that call triggers arrives after the content is written. A new `.py`/`.ts` is drafted without `coding-style.md`; a new doc without `readme-style.md` / `diagram-conventions.md` / `html-output-conventions.md`; a new `.github/*.md` without `pr-conventions.md`; any new file without `id-citation-discipline.md`, `staleness-policy.md`, etc. The miss is **silent**. Later edits of the same file do see the rule.
 - **Why it's usually fine**: agents normally read existing files in a directory before working there, which loads the path-scoped rules first. The gap bites on *greenfield file creation* in a directory the agent hasn't touched yet.
 - **Mitigation**: before creating a new file in a directory, read an existing sibling first (or, if the directory is empty, a canonical example of that file type elsewhere) so the path-scoped rules load before the content is composed. Praxion's `implementer`, `doc-engineer`, and `test-engineer` agent prompts carry this instruction. It also covers the other harnesses Praxion exports to: Cursor ignores rule globs, and Codex routes path rules through Praxion's rules bridge.
-- **For a hard guarantee, use a hook** — a `PreToolUse(Write)` hook that holds the first write of a new file until a matching rule has loaded is the deterministic version. That's heavier to maintain; reach for it only if the prompt-level mitigation proves insufficient. (Rules shape behavior; hooks enforce it.)
+- **For a hard guarantee, use a hook** — a path rule that arrives after the content is composed cannot guard that content; a deterministic `PreToolUse` gate can. Praxion ships the instance for ADR records: `hooks/decisions_gate.sh` refuses a misplaced or malformed record at the write, edit and index-read, and `scripts/check_decision_records.py` is the commit-time backstop. Each refusal quotes the rule's own governing lines, so the gate is also what delivers the rule on a platform that ignores `paths:`. (Rules shape behavior; hooks enforce it.)
 
 Verified 2026-10-11 against `code.claude.com/docs/en/memory` and the Claude Code changelog (2.1.288: path-scoped rules and nested CLAUDE.md load on Write/Edit; 2.1.293: on single-file Bash reads). Earlier history: [#23478](https://github.com/anthropics/claude-code/issues/23478) and the feature request [#38487](https://github.com/anthropics/claude-code/issues/38487) were closed before the behaviour shipped; [#16853](https://github.com/anthropics/claude-code/issues/16853) tracks multi-entry YAML `paths:` parsing. **Windows note**: per [#21858](https://github.com/anthropics/claude-code/issues/21858), `paths:` frontmatter in `~/.claude/rules/` is ignored on Windows (closed-as-stale, not confirmed fixed; not reproduced on macOS/Linux) — on Windows, keep path-scoped rules under a project-level `.claude/rules/` instead.
+
+### Path-Scoped Rule With a Resident File
+
+A rule that must stay discoverable from session start but costs too much to load in full can be split into a pair, never into main + satellite (see [Self-Containment Constraint](#self-containment-constraint)):
+
+- **The rule** `P`: path-scoped (`paths:`), byte-identical to the lean arm measured in the paired run. It keeps `codex: load: always_on`, because Codex has no path scoping and must keep today's text.
+- **The resident** `R`: a small always-loaded file next to it, named `<rule>-resident.md`, with `resident_of: <path of P>`, the `core`, `load` and `install` keys mirrored from `P`, and `codex: load: exclude`. Every non-blank body line of `R` is a line of `P`, verbatim; the kernel check enforces it, and `R` gets no audience entry.
+
+Order of work: declare the move in a kit; run the paired run (full rule against the pair); ship exactly the lean arm's files; generate `rules/_manifest.yaml` with `scripts/regenerate_rules_manifest.py`, never by hand; name every difference from the measured arm (frontmatter, `chars`, stamp) instead of letting it pass unremarked.
+
+Invariants that bite:
+
+- **`paths:` within the first eight lines** of `P`. `scripts/measure_token_budget.py` reads only that head, while the kernel tools parse the whole frontmatter; a key added above `paths:` flips the budget reading with no failing kernel check.
+- **`P` stays in the required set** of the kernel sources. A path-scoped parent otherwise drops out of "always loaded", and a section added to it would pass unclassified.
+- **A resident line is a pointer, not a guard.** Behavior that must hold before the first write needs the deterministic gate described above, with a commit-time backstop.
+- **Windows**: `paths:` in `~/.claude/rules/` is ignored there, so a user-scope `P` never path-scopes; only `R` and the gate's refusals reach the session. State this as a declared limit.
+
+Shipped instance: `rules/swe/adr-conventions.md` is path-scoped to `.ai-state/decisions/**`, and `rules/swe/adr-conventions-resident.md` is its resident.
+
+The pair applies to path-scoped rules only. A hook-delivered rule has no manifest model for a projection, so it is not a second instance of this pattern.
 
 ## Directory Organization
 

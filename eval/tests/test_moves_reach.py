@@ -15,6 +15,7 @@ from praxion_evals.adherence.moves import arms, declaration, reach
 from praxion_evals.adherence.moves.arms import ArmSet
 from praxion_evals.adherence.moves.model import MoveDeclaration
 from praxion_evals.adherence.moves.reach import ReachError
+from tests.landed_move_support import before_the_adr_move
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GIT_MOVE = "git-conventions"
@@ -49,6 +50,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    before_the_adr_move(root)
     subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 

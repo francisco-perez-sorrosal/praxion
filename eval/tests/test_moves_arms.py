@@ -31,6 +31,7 @@ from praxion_evals.adherence.moves.model import (
     Write,
 )
 from praxion_evals.live.materialize import tree_digest
+from tests.landed_move_support import ADR_KERNEL, ADR_KERNEL_ID, MANIFEST, before_the_adr_move
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GIT_MOVE = "git-conventions"
@@ -41,9 +42,6 @@ GIT_KERNEL = "rules/swe/vcs/git-conventions-resident.md"
 GIT_HOOK = "inject_git_conventions_at_use.py"
 ADR_RULE = "rules/swe/adr-conventions.md"
 ADR_RULE_ID = "swe/adr-conventions"
-ADR_KERNEL = "rules/swe/adr-conventions-resident.md"
-ADR_KERNEL_ID = "swe/adr-conventions-resident"
-MANIFEST = "rules/_manifest.yaml"
 STAGE_LINE = "- Stage specific files by name — avoid `git add -A` or `git add .`"
 NOT_IN_THE_KERNEL = "- Prefer small, focused commits over large sweeping ones"
 READ_TREES = ("rules", "lib", "hooks")
@@ -71,6 +69,7 @@ def checkout(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for relpath in READ_FILES:
         (root / relpath).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relpath, root / relpath)
+    before_the_adr_move(root)
     subprocess.run(["git", "init", "-q", str(root)], check=True)  # arms copy what git lists
     return root
 

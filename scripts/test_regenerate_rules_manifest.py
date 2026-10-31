@@ -129,13 +129,13 @@ def _patched_module(monkeypatch, rules_dir: Path, manifest_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# Fixture: minimal valid rules tree with all 5 core rules present
+# Fixture: minimal valid rules tree with all 6 core rules present
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
 def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
-    """Build a synthetic rules/ tree with the 5 required core rules.
+    """Build a synthetic rules/ tree with the 6 required core rules.
 
     Returns (rules_dir, manifest_path).
     """
@@ -150,6 +150,7 @@ def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
             # swe/ core rules
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR Conventions\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Behavioral Contract\n",
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## Intermediate Docs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
@@ -185,6 +186,7 @@ def test_manifest_schema_contains_expected_fields_per_rule(
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
@@ -280,7 +282,7 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
     rules_dir = tmp_path / "rules"
     manifest_path = rules_dir / "_manifest.yaml"
 
-    # All 5 core rules present (with core: true) so the validator passes.
+    # All 6 core rules present (with core: true) so the validator passes.
     # Add one path-scoped rule without any core: field.
     _seed(
         rules_dir,
@@ -288,6 +290,7 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
@@ -329,13 +332,14 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
     rules_dir = tmp_path / "rules"
     manifest_path = rules_dir / "_manifest.yaml"
 
-    # All 5 expected core IDs present but one has core: false — triggers ERROR.
+    # All 6 expected core IDs present but one has core: false — triggers ERROR.
     _seed(
         rules_dir,
         {
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
                 # agent-intermediate-documents.md: core: false — should trigger ERROR.  # noqa: E501
                 "agent-intermediate-documents.md": (
@@ -365,6 +369,26 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
     assert "agent-intermediate-documents" in combined, (
         f"Expected offending rule path in error. Got: {combined!r}"
     )
+
+
+def test_resident_file_dropping_core_true_fails_the_drift_check(
+    monkeypatch: pytest.MonkeyPatch,
+    minimal_rules_tree: tuple[Path, Path],
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """The resident line is the rule's only always-loaded text; losing core: true must be loud."""
+    rules_dir, manifest_path = minimal_rules_tree
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    assert mod.run_generate() == 0
+    assert mod.run_check() == 0
+
+    resident = rules_dir / "swe" / "adr-conventions-resident.md"
+    resident.write_text(
+        "---\ncore: false\nload: always_on\ninstall: symlink\n---\n## ADR\n", encoding="utf-8"
+    )
+
+    assert mod.run_check() == 1
+    assert "adr-conventions-resident.md" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +435,7 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
@@ -457,7 +482,7 @@ def test_hook_deliver_rule_missing_from_order_list_fails_generation(
     rules_dir = tmp_path / "rules"
     manifest_path = rules_dir / "_manifest.yaml"
 
-    # Minimal valid tree (5 core rules + 3 known hook-deliver rules) PLUS
+    # Minimal valid tree (6 core rules + 3 known hook-deliver rules) PLUS
     # one new hook-deliver rule that is NOT in HOOK_DELIVER_ORDER.
     _seed(
         rules_dir,
@@ -465,6 +490,7 @@ def test_hook_deliver_rule_missing_from_order_list_fails_generation(
             "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
             "swe": {
                 "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
+                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
                 "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",

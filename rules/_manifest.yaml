@@ -3,14 +3,16 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-31T08:53:53Z'
+generated_at: '2026-10-31T10:50:17Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
-  load: always_on
+  load: path_scoped
   core: true
   install: symlink
-  chars: 8725
+  chars: 8786
+  paths:
+  - .ai-state/decisions/**
 - id: swe/adr-conventions-resident
   path: rules/swe/adr-conventions-resident.md
   load: always_on

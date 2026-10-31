@@ -8,15 +8,27 @@ judgement with the write hook.
 
   PATH...     each file's working-tree text, judged against its ``HEAD`` blob (or none).
   --staged    each staged file's index blob, judged against its ``HEAD`` blob (or none).
+  (neither)   under ``PRAXION_COMMIT_PAYLOAD=1``, stdin carries the PreToolUse Bash payload and
+              the commit-to-be is judged: see "Commit payload" below.
 
 Relative paths are repo-root relative. Deleted paths are not judged: nothing is left to refuse.
 The branch decides whether a numbered record may appear (``main`` or ``master`` is where finalize
 promotes), and the numbered records the default branch already holds are allowed through (a merge
 or a rebase brings them in).
 
+Commit payload: a PreToolUse hook fires before any command of the Bash call runs, so the index
+alone misses a record that ``git add x && git commit`` stages. The scope is the one the
+id-citation gate uses (``_commit_scope.hook_scope_files``); when the call restages (a ``git add``
+before the commit, or ``-a``) a path is judged by its working-tree text, else by its index blob.
+A command that is no ``git commit`` exits 0 silently, findings print to stderr as the commit
+refusal text, a clean commit prints nothing. A payload or scope the gate cannot read passes with
+one stderr line, never a block on a transient, as the id-citation gate does. Declared limits:
+``git -C dir commit`` is not seen as a commit, and a path staged with further unstaged edits is
+judged by its working-tree text whenever the call restages anything.
+
 Exit codes: 0 clean, 1 findings, 2 input error. A gate that cannot read its input never passes:
 a missing file, a path outside the repository, a directory that is no repository and a
-plugin-cache root are all exit 2.
+plugin-cache root are all exit 2 (the commit payload mode excepted, as above).
 
 Usage:
     python3 scripts/check_decision_records.py PATH [PATH ...]
@@ -32,10 +44,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
-from _decision_record_refusal import CORRECT_FORM
+from _commit_scope import (
+    _COMMAND_SEPARATOR,
+    _COMMIT_ALL_FLAG,
+    _PAYLOAD_ENV,
+    _same_call_add_pathspecs,
+    hook_scope_files,
+)
+from _decision_record_refusal import CORRECT_FORM, commit_refusal_text, find_rule_text
 from _decision_records import (
     DECISIONS_PARTS,
     Change,
@@ -61,6 +81,8 @@ JSON_SCHEMA = 1
 MAIN_BRANCHES = ("main", "master")
 DECISIONS_DIR = "/".join(DECISIONS_PARTS)
 NAME_SEPARATOR = "\0"
+# A command segment that opens with `git commit`, after any `VAR=value` prefixes.
+_GIT_COMMIT_SEGMENT = re.compile(r"\s*(?:\w+=\S*\s+)*git\s+commit(?:\s|$)")
 
 
 class InputError(Exception):
@@ -72,6 +94,8 @@ class InputError(Exception):
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.payload:
+        return _judge_commit_payload(sys.stdin.read())
     try:
         root = _resolve_root(args.repo_root)
         context = _gather_context(root)
@@ -94,7 +118,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--repo-root")
     args = parser.parse_args(argv)
-    if args.staged == bool(args.paths):
+    explicit = args.staged or bool(args.paths)
+    args.payload = not explicit and bool(os.environ.get(_PAYLOAD_ENV))
+    if args.staged == bool(args.paths) and not args.payload:
         parser.error("give either --staged or one or more PATH arguments")
     return args
 
@@ -102,6 +128,74 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 def _refusals(changes: list[Change], context: Context) -> list[Refused]:
     verdicts = (judge_change(change, context) for change in changes)
     return [verdict for verdict in verdicts if isinstance(verdict, Refused)]
+
+
+# -- The commit payload -------------------------------------------------------------------
+
+
+def _judge_commit_payload(raw: str) -> int:
+    """Judge the commit a Bash payload is about to run; every doubt but a finding passes."""
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return _pass_safe("the hook payload is unreadable")
+    command = _payload_command(payload)
+    if not _is_git_commit(command):
+        return EXIT_CLEAN
+    scope = hook_scope_files(payload, Path.cwd())
+    if not isinstance(scope, tuple):  # under the payload signal: no repository, or git contended
+        return _pass_safe("the commit scope is unavailable")
+    root, files = scope
+    try:
+        if is_plugin_cache_path(root):
+            raise InputError(f"refusing to run against a plugin-cache root: {root}")
+        context = _gather_context(root)
+        changes = _commit_changes(root, files, restages=_restages(command))
+    except (InputError, OSError) as error:
+        return _pass_safe(str(error))
+    refusals = _refusals(changes, context)
+    if refusals:
+        sys.stderr.write(commit_refusal_text(refusals, find_rule_text()) + "\n")
+    return EXIT_FINDINGS if refusals else EXIT_CLEAN
+
+
+def _pass_safe(reason: str) -> int:
+    sys.stderr.write(f"check_decision_records: {reason}; passing.\n")
+    return EXIT_CLEAN
+
+
+def _payload_command(payload: object) -> str:
+    tool_input = payload.get("tool_input") if isinstance(payload, dict) else None
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    return command if isinstance(command, str) else ""
+
+
+def _is_git_commit(command: str) -> bool:
+    # A pattern per segment, not shlex: a commit message heredoc leaves the first line's quote open.
+    return any(_GIT_COMMIT_SEGMENT.match(segment) for segment in _COMMAND_SEPARATOR.split(command))
+
+
+def _restages(command: str) -> bool:
+    """Whether the call itself moves working-tree text into the index before the commit."""
+    return _same_call_add_pathspecs(command) is not None or bool(_COMMIT_ALL_FLAG.search(command))
+
+
+def _commit_changes(root: Path, files: list[Path], restages: bool) -> list[Change]:
+    rels = (file.relative_to(root).as_posix() for file in files)
+    return [
+        Change(rel, _head_text(root, rel), _commit_text(root, rel, restages))
+        for rel in rels
+        if not isinstance(classify_path(rel), Outside)
+    ]
+
+
+def _commit_text(root: Path, rel: str, restages: bool) -> str:
+    if restages:
+        try:
+            return _working_text(root, rel)
+        except InputError:
+            pass  # gone from the working tree: the index blob is what the commit would record
+    return _index_text(root, rel)
 
 
 # -- Rendering ----------------------------------------------------------------------------

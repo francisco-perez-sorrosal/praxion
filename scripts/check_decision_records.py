@@ -23,8 +23,13 @@ before the commit, or ``-a``) a path is judged by its working-tree text, else by
 A command that is no ``git commit`` exits 0 silently, findings print to stderr as the commit
 refusal text, a clean commit prints nothing. A payload or scope the gate cannot read passes with
 one stderr line, never a block on a transient, as the id-citation gate does. Declared limits:
-``git -C dir commit`` is not seen as a commit, and a path staged with further unstaged edits is
-judged by its working-tree text whenever the call restages anything.
+  - a record the same call itself creates or rewrites (heredoc, ``cp``, ``mv``, ``sed -i``) is not
+    on disk when the hook fires, so only a write from an earlier call is seen;
+  - ``git add -u`` names no pathspec, so the tracked edits it stages are judged by their index blob;
+  - ``git commit -- PATH`` is judged by the staged set, not by PATH's working-tree text;
+  - ``git -C DIR commit`` and ``--git-dir`` judge the payload's cwd repository, not DIR's;
+  - a path staged with further unstaged edits is judged by its working-tree text whenever the call
+    restages anything.
 
 Exit codes: 0 clean, 1 findings, 2 input error. A gate that cannot read its input never passes:
 a missing file, a path outside the repository, a directory that is no repository and a
@@ -81,8 +86,21 @@ JSON_SCHEMA = 1
 MAIN_BRANCHES = ("main", "master")
 DECISIONS_DIR = "/".join(DECISIONS_PARTS)
 NAME_SEPARATOR = "\0"
-# A command segment that opens with `git commit`, after any `VAR=value` prefixes.
-_GIT_COMMIT_SEGMENT = re.compile(r"\s*(?:\w+=\S*\s+)*git\s+commit(?:\s|$)")
+# A command segment that is a `git commit`: after any `VAR=value` prefixes, shell openers (`(`, `!`,
+# `if`, `time`...) and wrapper words, the git executable, git's global options, then `commit`.
+_SHELL_ARGUMENT = r"""(?:"[^"]*"|'[^']*'|\S+)"""
+_SEGMENT_PREFIX = (
+    r"(?:[(!{]\s*|\w+=\S*\s+"
+    r"|(?:if|then|else|elif|do|while|until|time|command|exec|env|nohup|sudo)\s+)*"
+)
+_GIT_GLOBAL_OPTION = (
+    rf"(?:-[cC]\s+{_SHELL_ARGUMENT}"
+    rf"|--(?:git-dir|work-tree|namespace)\s+{_SHELL_ARGUMENT}"
+    r"|--[\w-]+(?:=\S*)?|-p)\s+"
+)
+_GIT_COMMIT_SEGMENT = re.compile(
+    rf"\s*{_SEGMENT_PREFIX}(?:\S*/)?git\s+(?:{_GIT_GLOBAL_OPTION})*commit(?:[\s;)}}]|$)"
+)
 
 
 class InputError(Exception):

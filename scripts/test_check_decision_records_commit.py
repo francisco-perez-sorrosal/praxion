@@ -3,7 +3,8 @@
 Every case builds a throwaway git repository under ``tmp_path`` and feeds ``main`` a real payload
 on stdin with ``PRAXION_COMMIT_PAYLOAD=1``, the way ``hooks/commit_gate.sh`` does. The hook fires
 before any command of the Bash call runs, so the same-call cases leave the repository in the state
-the hook would see: the file on disk, the ``git add`` not yet run.
+the hook would see: the file on disk, the ``git add`` not yet run. A file the same call creates or
+rewrites is therefore not modelled: it is not on disk when the hook fires.
 """
 
 from __future__ import annotations
@@ -111,7 +112,16 @@ def test_a_merge_bringing_in_a_numbered_record_the_default_branch_holds_commits_
 
 @pytest.mark.parametrize(
     "command",
-    ["git status", "git log --grep commit", "echo 'git commit'", "git add -A", "ls && git diff"],
+    [
+        "git status",
+        "git log --grep commit",
+        "echo 'git commit'",
+        "git add -A",
+        "ls && git diff",
+        "git commit-graph write",
+        "git -c user.name=x log commit",
+        "git diff --stat commit",
+    ],
 )
 def test_a_command_that_is_not_a_git_commit_exits_silently_even_over_a_bad_stage(
     feature, monkeypatch, capsys, command
@@ -169,6 +179,33 @@ def test_a_commit_whose_message_is_a_heredoc_is_judged(feature, monkeypatch, cap
 def test_a_commit_anywhere_in_a_compound_command_is_judged(feature, monkeypatch, capsys, command):
     stage(feature, NUMBERED, GOOD_NUMBERED)
     assert judge_commit(feature, command, monkeypatch, capsys)[0] == 1
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'git -c user.name=x commit -m "m"',
+        'git -c "user.name=A B" commit -m "m"',
+        'git -C . commit -m "m"',
+        'git --git-dir .git commit -m "m"',
+        'git --git-dir=.git --work-tree=. commit -m "m"',
+        'git --no-pager commit -m "m"',
+        '(git commit -m "m")',
+        'if ! git commit -m "m"; then echo failed; fi',
+        'command git commit -m "m"',
+        'time git commit -m "m"',
+        'nohup git commit -m "m"',
+        '/usr/bin/git commit -m "m"',
+        'FOO=1 BAR="a" git -c x.y=z commit -m "m"',
+    ],
+)
+def test_a_commit_spelled_with_global_options_or_a_wrapper_is_judged(
+    feature, monkeypatch, capsys, command
+):
+    stage(feature, NUMBERED, GOOD_NUMBERED)
+    code, _, err = judge_commit(feature, command, monkeypatch, capsys)
+    assert code == 1
+    assert NUMBERED in err
 
 
 # -- The stale-index trap: what the same call will stage ----------------------------------
@@ -231,6 +268,30 @@ def test_a_commit_all_judges_the_tracked_working_tree_edit(feature, monkeypatch,
     code, _, err = judge_commit(feature, 'git commit -am "edit"', monkeypatch, capsys)
     assert code == 1
     assert DRAFT in err
+
+
+# -- Declared limits ----------------------------------------------------------------------
+
+
+def test_a_commit_naming_a_pathspec_is_still_judged_by_the_staged_set(feature, monkeypatch, capsys):
+    # `git commit -- <paths>` records those paths' working-tree text and ignores the rest of the
+    # index; the gate does not read the pathspec, so another path's staged blob decides.
+    stage(feature, NUMBERED, GOOD_NUMBERED)
+    put(feature, "docs/notes.md", "notes\n")
+    code, _, err = judge_commit(feature, "git commit -m m -- docs/notes.md", monkeypatch, capsys)
+    assert code == 1
+    assert NUMBERED in err
+
+
+def test_an_add_update_does_not_bring_a_tracked_edit_into_the_judged_set(
+    feature, monkeypatch, capsys
+):
+    # `git add -u` stages tracked edits, but names no pathspec, so the scope adds nothing for it.
+    put(feature, DRAFT, GOOD_DRAFT)
+    commit_all(feature, "a good draft")
+    put(feature, DRAFT, NO_CATEGORY_DRAFT)
+    command = f"git add -u && {COMMIT}"
+    assert judge_commit(feature, command, monkeypatch, capsys) == (0, "", "")
 
 
 # -- Doubts pass --------------------------------------------------------------------------

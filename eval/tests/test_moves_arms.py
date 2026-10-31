@@ -243,6 +243,56 @@ def test_a_write_whose_source_changed_since_it_was_declared_is_refused(checkout,
     assert "docs/note.md" in reason
 
 
+# -- A landed move is not measured again -----------------------------------------------------
+
+
+def _landed_copy(checkout: Path, where: Path, *, kernel: bool, scope: bool) -> Path:
+    """A copy of the pre-move checkout with the shipped kernel file and/or the shipped rule back."""
+    landed = where / "checkout"
+    shutil.copytree(checkout, landed, symlinks=True)
+    if kernel:
+        shutil.copy2(REPO_ROOT / ADR_KERNEL, landed / ADR_KERNEL)
+    if scope:
+        shutil.copy2(REPO_ROOT / ADR_RULE, landed / ADR_RULE)
+    return landed
+
+
+def test_a_lean_arm_over_a_tree_already_holding_the_kernel_is_refused_naming_the_file(
+    checkout, tmp_path
+):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=False)
+
+    reason = _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert ADR_KERNEL in reason
+
+
+def test_a_lean_arm_over_a_rule_already_carrying_the_declared_scope_is_refused_naming_it(
+    checkout, tmp_path
+):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=False, scope=True)
+
+    reason = _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert ".ai-state/decisions/**" in reason
+
+
+def test_a_refused_landed_move_leaves_no_arm_copy_behind(checkout, tmp_path):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=True)
+
+    _refusal(declaration.kit(ADR_MOVE), landed, tmp_path / "ws")
+
+    assert list((tmp_path / "ws").iterdir()) == []
+
+
+def test_the_floor_and_full_arms_do_not_judge_whether_the_move_landed(checkout, tmp_path):
+    landed = _landed_copy(checkout, tmp_path / "landed", kernel=True, scope=True)
+    declared = declaration.kit(ADR_MOVE)
+
+    assert arms.plan(declared, "full", landed) == ()
+    assert ADR_RULE in [p.path for p in arms.plan(declared, "floor", landed)]
+
+
 # -- The scoped manifest row ------------------------------------------------------------------
 
 

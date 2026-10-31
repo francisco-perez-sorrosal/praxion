@@ -178,8 +178,13 @@ def check_copy(
 
 
 def plan(declaration: MoveDeclaration, arm: MoveArm, checkout: Path) -> tuple[Planned, ...]:
-    """The files ``arm`` changes and the content each must hold, computed from the checkout."""
+    """The files ``arm`` changes and the content each must hold, computed from the checkout.
+
+    The lean arm is refused over a checkout where the move has already landed.
+    """
     siblings = declaration.arms.for_arm(arm)
+    if arm == "lean":
+        _require_unlanded(declaration, siblings, checkout)
     return tuple(_planned(change, siblings, declaration, checkout) for change in siblings)
 
 
@@ -208,6 +213,35 @@ def _planned(
             return Planned(path.value, _hook_registry(path.value, siblings, declaration, checkout))
         case _:
             assert_never(change)
+
+
+def _require_unlanded(
+    declaration: MoveDeclaration, siblings: Sequence[ArmChange], checkout: Path
+) -> None:
+    """Refuse a checkout that already holds what the lean arm adds.
+
+    Measuring a landed move builds a lean arm out of the shipped tree: the kernel file would be
+    written over itself and the rule's scope declared twice, so the arm would differ from the
+    base by nothing the move changed. A move is measured over the tree from before it.
+    """
+    for change in siblings:
+        if isinstance(change, KernelDerive) and (checkout / change.path.value).is_file():
+            raise ArmError(
+                f"{change.path.value} already exists: the move has landed, so the lean arm adds "
+                "nothing; measure a checkout from before the move"
+            )
+    rule = declaration.moved_rule.value
+    scope = _frontmatter_scope(_read_text(checkout / rule))
+    if not re.search(r"^paths\s*:", scope, re.MULTILINE):
+        return
+    for delivery in declaration.deliveries:
+        if isinstance(delivery, PathMatched) and delivery.file == declaration.moved_rule:
+            held = [glob for glob in delivery.globs if glob in scope]
+            if held:
+                raise ArmError(
+                    f"{rule} already carries the path scope {held}: the move has landed, so the "
+                    "lean arm adds nothing; measure a checkout from before the move"
+                )
 
 
 def kernel_text(change: KernelDerive, declaration: MoveDeclaration, checkout: Path) -> str:
@@ -483,13 +517,18 @@ def _require_resident(file: str, expected: Sequence[str], reached: set[str]) -> 
 
 
 def _require_path_scoped(copy: Path, file: str, globs: Sequence[str]) -> None:
-    match = _FRONTMATTER.match(_read_text(copy / file))
-    scoped = match.group(1) if match else ""
+    scoped = _frontmatter_scope(_read_text(copy / file))
     missing = [glob for glob in globs if glob not in scoped]
     if not re.search(r"^paths\s*:", scoped, re.MULTILINE) or missing:
         raise ArmError(
             f"{file} is declared path-matched but its paths: frontmatter lacks {missing or globs}"
         )
+
+
+def _frontmatter_scope(text: str) -> str:
+    """The file's frontmatter block, empty when it has none."""
+    match = _FRONTMATTER.match(text)
+    return match.group(1) if match else ""
 
 
 def _require_linked(file: str, linked: frozenset[str]) -> None:

@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -92,6 +93,52 @@ def test_a_new_heading_in_a_path_scoped_rule_needs_no_entry(repo: Path) -> None:
     append(repo, "rules/swe/testing-conventions.md", PROBE_SECTION)
 
     assert cb.check(repo) == ()
+
+
+PROBE_PARENT = "rules/swe/probe-moved-rule.md"
+PROBE_RESIDENT = "rules/swe/probe-moved-rule-resident.md"
+PROBE_PARENT_HEADING = "Probe Moved Rule"
+
+
+@pytest.fixture
+def moved_pair(repo: Path) -> Path:
+    """A path-scoped rule whose one section is classified, and a faithful always-loaded resident."""
+    (repo / PROBE_PARENT).write_text(
+        f"---\npaths:\n  - 'docs/**'\n---\n## {PROBE_PARENT_HEADING}\n\nA line.\nAnother line.\n",
+        encoding="utf-8",
+    )
+    (repo / PROBE_RESIDENT).write_text(
+        f"---\nresident_of: {PROBE_PARENT}\n---\n## {PROBE_PARENT_HEADING}\n\nA line.\n",
+        encoding="utf-8",
+    )
+    entry = {
+        "source": PROBE_PARENT,
+        "heading": PROBE_PARENT_HEADING,
+        "scope": "no-actor",
+        "reason": "probe text",
+    }
+    edit_manifest(repo, lambda m: m["entries"].append(entry))
+    return repo
+
+
+def test_a_faithful_resident_needs_no_entry_and_leaves_the_tree_clean(moved_pair: Path) -> None:
+    assert cb.check(moved_pair) == ()
+
+
+def test_a_resident_line_that_is_no_line_of_its_rule_is_reported_by_its_text(
+    moved_pair: Path,
+) -> None:
+    append(moved_pair, PROBE_RESIDENT, "\nA line of nobody.\n")
+
+    assert subjects(moved_pair, "I1-unclassified") == [f"{PROBE_RESIDENT} 'A line of nobody.'"]
+
+
+def test_a_section_added_to_a_path_scoped_rule_with_a_resident_is_reported(
+    moved_pair: Path,
+) -> None:
+    append(moved_pair, PROBE_PARENT, PROBE_SECTION)
+
+    assert subjects(moved_pair, "I1-unclassified") == [f"{PROBE_PARENT} '{PROBE_HEADING}'"]
 
 
 def test_the_leading_part_of_a_mixed_section_must_be_classified(repo: Path) -> None:

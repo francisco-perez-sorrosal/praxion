@@ -8,7 +8,7 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 
 | Kind                         | Holds when                                                              |
 | ---------------------------- | ----------------------------------------------------------------------- |
-| `I1-unclassified`            | every section and part of every always-loaded source has an audience entry |
+| `I1-unclassified`            | every section and part of every always-loaded source (and of each rule a resident file names) has an audience entry; every line of a resident file is a line of its rule |
 | `I1-orphan`                  | every entry names a section or part that exists                         |
 | `I1-duplicate-heading`       | no source holds two sections of one heading (an entry could not tell apart) |
 | `I2-missing-core`            | every detected agent has a kernel core: the index lists it with strings |
@@ -135,6 +135,16 @@ def totality_findings(
     return tuple(
         km.Finding(f"I1-{found.kind}", found.subject, found.detail)
         for found in km.check_totality(manifest, sections, required)
+    )
+
+
+def foreign_line_findings(foreign: Sequence[ks.ForeignLine]) -> tuple[km.Finding, ...]:
+    """I1: a resident file is a projection, so each of its lines must be a line of its rule."""
+    return tuple(
+        km.Finding(
+            "I1-unclassified", f"{line.source} '{line.text}'", f"is no line of {line.parent}"
+        )
+        for line in foreign
     )
 
 
@@ -364,6 +374,7 @@ class Evidence:
     manifest: km.Manifest
     sections: Mapping[str, Sequence[ks.Section]]
     required: tuple[str, ...]
+    foreign_lines: tuple[ks.ForeignLine, ...]  # resident-file lines that are no line of their rule
     kernel_files: Mapping[str, str]  # name -> text, for each `claude/kernels/*.md`
     index_strings: Mapping[str, tuple[str, ...]] | None  # role -> injected strings; None: no index
     index_slots: int | None  # how many spawn-hook slots the index asks for; None: no index
@@ -393,6 +404,7 @@ def gather(root: Path) -> Evidence:
         manifest,
         {s: ks.load_sections(root, s) for s in sorted(sources) if (root / s).is_file()},
         required,
+        ks.resident_foreign_lines(root),
         _kernel_files(root),
         _index_strings(root),
         _index_slots(root),
@@ -418,6 +430,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
     flags = omit_flags(evidence.definitions)
     return (
         *totality,
+        *foreign_line_findings(evidence.foreign_lines),
         *core_findings(evidence.definitions, evidence.index_strings, evidence.kernel_files),
         *contract_findings(
             evidence.manifest, evidence.sections, evidence.kernel_files, evidence.preamble

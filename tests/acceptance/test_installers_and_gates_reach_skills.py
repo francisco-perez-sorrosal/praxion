@@ -361,6 +361,12 @@ _BEFORE = json.loads((FIXTURES / "selection_before.json").read_text(encoding="ut
 # with its tests. The frozen record keeps the path as history; it is compared only while it exists.
 DELETED_ON_PURPOSE = {"scripts/test_export_codex_command_skills.py"}
 
+# A recorded test a later change stops reaching on purpose, with its reason. The git-runner
+# migration test was selected by a skill edit only through `check_id_citation_discipline.py`,
+# whose exempt `skills/` prefix is a path literal; once that gate's git calls moved to
+# `_commit_scope.py` the migration test names that module instead, and the edge went with it.
+UNREACHED_ON_PURPOSE = {"scripts/test__git_runner.py"}
+
 
 def _selected(changed: str) -> set[str] | None:
     result = subprocess.run(
@@ -378,8 +384,8 @@ def _selected(changed: str) -> set[str] | None:
 )
 def test_editing_a_moved_workflow_selects_narrowly_every_test_its_old_file_selected(name):
     recorded = set(_BEFORE[name]["tests"])
-    expected = {t for t in recorded if (REPO_ROOT / t).is_file()}
-    vanished = recorded - expected - DELETED_ON_PURPOSE
+    expected = {t for t in recorded if (REPO_ROOT / t).is_file()} - UNREACHED_ON_PURPOSE
+    vanished = recorded - expected - DELETED_ON_PURPOSE - UNREACHED_ON_PURPOSE
 
     after = _selected(f"skills/{name}/SKILL.md")
 

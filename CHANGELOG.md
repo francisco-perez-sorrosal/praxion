@@ -1,3 +1,26 @@
+## v0.55.0 (2026-10-31)
+
+### Feat
+
+- Give the git kit the traps its rule targets
+- Route move continuations and record planned tasks
+
+### Fix
+
+- Narrow the gate's default-branch and key reading
+- Drop the resident's unread Codex key
+- Close two decision-record gate edges
+- Drop staging by name from git move checks
+- Count a no-commit floor session apart
+- Accept the session token file as the credential
+- Build move arms from what git lists
+- Withdraw the eval-praxion prune trigger
+
+### Refactor
+
+- Export the lazy-load origin from the record reader
+- Share the kernel and rule-line helpers of the arm build
+
 ## v0.54.0 (2026-10-27)
 
 ### Feat

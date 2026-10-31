@@ -350,6 +350,16 @@ repos:
         files: '^(agents/[^/]+\.md|claude/kernels/core-blocks\.md|scripts/check_agent_shared_blocks\.py)$'
         pass_filenames: false
 
+      # Each agent definition's `model:` equals its row in the routing rule's tier table
+      # (the consultant's declared floor aside), so a spawn reaches its tier from the
+      # definition alone.
+      - id: model-routing-parity
+        name: Model routing parity
+        entry: python3 scripts/check_model_routing_parity.py --repo-root .
+        language: system
+        files: '^(agents/[^/]+\.md|rules/swe/agent-model-routing\.md|scripts/check_model_routing_parity\.py)$'
+        pass_filenames: false
+
       # Block B7 — the per-role kernels against the guidance they are cut from.
       # Every section of every always-loaded source has an audience (I1), each
       # agent has a kernel core (I2), the core's contract is the rule's own text

@@ -40,6 +40,14 @@
       "continues": null,
       "ending": "finished",
       "standing": "finished"
+    },
+    "20261031T054616Z-f494d2": {
+      "move": "git-conventions",
+      "run_kind": "paired",
+      "lineage_root": "20261031T054616Z-f494d2",
+      "continues": null,
+      "ending": "finished",
+      "standing": "not clear"
     }
   },
   "skipped": []

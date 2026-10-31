@@ -45,8 +45,8 @@ roles:
     flip_rule_ratified: true
     flip_ratified: true
   verifier:
-    status: held
-    since: 2026-10-14T02:32:49Z
+    status: trial
+    since: 2026-10-31T20:34:09Z
     runs:
       - id: 20261015T035717Z-03a785
         # .ai-state/eval_ledger/adherence/20261015T035717Z-03a785.json: full run on the subscription token, 24 tasks, 48 sessions, 0 errored, golden judge error 0.00; flip verdict NOT clear: C5 (forced-stop partial title) full 6 of 9, lean 0 of 9 (b 6, c 0); C1 23 vs 24 (b 1); write-early title check 12 vs 13 (b 8, c 7); C3 non-inferior 6 of 14 both arms; lean first-request median 40,392 vs full 58,986; estimated session cost 79.85 (subscription, not charged)
@@ -58,7 +58,9 @@ roles:
         complete_pairs: 2
         passes_flip_rule: false
         entry: praxion-evals-adherence
-    reason: "the flip rule did not pass on run 20261015T035717Z-03a785 (the forced-stop partial-title check fell from 6 to 0 of 9, and two single-pair differences count under the zero allowance); a diagnostic draw found no kernel text missing; a same-arm calibration run comes before any new trial"
+    # Re-opened from held on 2026-10-31 for one paired run under the dec-462 flip rule (allowances from the
+    # run's own discordance, C5 covered only from 5 pairs that ran out on both sides); the held reason was the
+    # forced-stop regression of 20261015T035717Z-03a785, which a diagnostic draw traced to no missing kernel text.
   context-engineer:
     status: held
     since: 2026-10-14T02:32:49Z

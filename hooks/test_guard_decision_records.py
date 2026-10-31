@@ -165,6 +165,32 @@ def test_canary_refuses_an_edit_that_strips_the_category(run, repo: Path) -> Non
     _assert_denied(run(repo, "Edit", edit), "without a valid category")
 
 
+def test_canary_refuses_a_write_whose_last_category_is_invalid(run, repo: Path) -> None:
+    text = VALID_DRAFT.replace(
+        "category: behavioral\n", "category: behavioral\ncategory: bogus\n", 1
+    )
+    rel = f"{DRAFT_DIR}/{DRAFT_NAME}"
+    _assert_denied(run(repo, "Write", _write(repo, rel, text)), "category is none of")
+
+
+def test_a_write_whose_last_category_is_valid_is_silent(run, repo: Path) -> None:
+    text = VALID_DRAFT.replace(
+        "category: behavioral\n", "category: bogus\ncategory: behavioral\n", 1
+    )
+    _assert_silent(run(repo, "Write", _write(repo, f"{DRAFT_DIR}/{DRAFT_NAME}", text)))
+
+
+def test_canary_refuses_an_edit_that_appends_a_second_invalid_category(run, repo: Path) -> None:
+    record = repo / DRAFT_DIR / DRAFT_NAME
+    record.write_text(VALID_DRAFT, encoding="utf-8")
+    edit = {
+        "file_path": str(record),
+        "old_string": "category: behavioral\n",
+        "new_string": "category: behavioral\ncategory: bogus\n",
+    }
+    _assert_denied(run(repo, "Edit", edit), "without a valid category")
+
+
 def test_canary_refuses_a_write_through_the_shadow_link(run, tmp_path: Path) -> None:
     project = tmp_path / "project"
     mount = tmp_path / "mount"

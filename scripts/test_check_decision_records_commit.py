@@ -33,6 +33,7 @@ from test_check_decision_records import (  # noqa: E402
     make_repo,
     put,
     record,
+    stale_local_main_clone,
 )
 
 SECOND_NUMBERED = ".ai-state/decisions/008-adopt-duckdb.md"
@@ -105,6 +106,26 @@ def test_a_merge_bringing_in_a_numbered_record_the_default_branch_holds_commits_
     git(repo, "merge", "--no-commit", "--no-ff", "-q", "main")
     assert (repo / NUMBERED).exists()
     assert judge_commit(repo, "git commit --no-edit", monkeypatch, capsys) == (0, "", "")
+
+
+@pytest.mark.parametrize("default", ["main", "master"])
+def test_a_merge_of_the_remote_default_while_the_local_default_lags_commits_in_silence(
+    tmp_path, monkeypatch, capsys, default
+):
+    clone = stale_local_main_clone(tmp_path, default)
+    git(clone, "merge", "--no-commit", "--no-ff", "-q", f"origin/{default}")
+    assert (clone / NUMBERED).exists()
+    assert judge_commit(clone, "git commit --no-edit", monkeypatch, capsys) == (0, "", "")
+
+
+def test_a_numbered_record_no_default_branch_holds_is_refused_beside_a_remote(
+    tmp_path, monkeypatch, capsys
+):
+    clone = stale_local_main_clone(tmp_path)
+    stage(clone, SECOND_NUMBERED, record("dec-008"))
+    code, _, err = judge_commit(clone, COMMIT, monkeypatch, capsys)
+    assert code == 1
+    assert SECOND_NUMBERED in err
 
 
 # -- A command that is no commit ----------------------------------------------------------

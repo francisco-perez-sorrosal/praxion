@@ -53,6 +53,7 @@ CATEGORIES = ("architectural", "behavioral", "implementation", "configuration")
 
 _FRONTMATTER_FENCE = "---"
 _FRONTMATTER_KEY = re.compile(r"(?P<key>id|category):[ \t]*(?P<value>.*?)[ \t]*")
+_FIRST_WINS_KEY = "id"
 _INLINE_COMMENT = re.compile(r"(?:^|\s)#")
 _QUOTES = ("'", '"')
 
@@ -375,12 +376,14 @@ class Frontmatter:
 
 
 def read_frontmatter(text: str) -> Frontmatter:
-    """Read ``id`` and ``category`` from a leading ``---`` block; the first of each key wins.
+    """Read ``id`` and ``category`` from a leading ``---`` block.
 
-    Line-based on purpose: the gate must not depend on a YAML library, and finalize itself
-    reads ``id`` with a line pattern. A block never closed, or one preceded by a byte-order
-    mark, has no fields: ``regenerate_adr_index.parse_frontmatter`` reads it the same way, so
-    the gate and the index generator agree on which records have a category.
+    Line-based on purpose: the gate must not depend on a YAML library. A duplicated key is read
+    as its reader reads it: the first ``id`` wins, because finalize takes it with ``re.search``,
+    and the last ``category`` wins, as in ``regenerate_adr_index.parse_frontmatter`` and PyYAML.
+    A block never closed, or one preceded by a byte-order mark, has no fields: the index
+    generator reads it the same way, so the gate and the index agree on which records have a
+    category.
     """
     lines = text.splitlines()
     if not lines or lines[0].rstrip() != _FRONTMATTER_FENCE:
@@ -391,8 +394,15 @@ def read_frontmatter(text: str) -> Frontmatter:
             return Frontmatter(found.get("id") or None, _clean_category(found.get("category")))
         match = _FRONTMATTER_KEY.fullmatch(line)
         if match is not None:
-            found.setdefault(match.group("key"), match.group("value"))
+            _record_field(found, match.group("key"), match.group("value"))
     return Frontmatter(None, None)
+
+
+def _record_field(found: dict[str, str], key: str, value: str) -> None:
+    if key == _FIRST_WINS_KEY:
+        found.setdefault(key, value)
+    else:
+        found[key] = value
 
 
 def _clean_category(raw: str | None) -> str | None:

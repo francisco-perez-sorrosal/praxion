@@ -24,6 +24,7 @@ _PAYLOAD_ENV = "PRAXION_COMMIT_PAYLOAD"
 _COMMIT_ALL_FLAG = re.compile(r"(?:^|\s)(?:-a|--all|-[a-zA-Z]*a[a-zA-Z]*)(?:\s|$)")
 
 # Shell operators that separate the commands of one Bash call.
+# Declared limit: `|`, `&`, `$(...)`, `xargs` and wrapper shells are not split on (td-528).
 _COMMAND_SEPARATOR = re.compile(r"&&|\|\||;|\n")
 # `git add` flags that stage every change in the working tree; `:/` is the
 # pathspec for the repository root, so it matches them from any subdirectory.

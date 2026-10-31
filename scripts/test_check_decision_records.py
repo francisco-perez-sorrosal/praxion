@@ -88,6 +88,20 @@ def feature(tmp_path: Path) -> Path:
     return repo
 
 
+def stale_local_main_clone(tmp_path: Path, default: str = "main") -> Path:
+    """A clone on ``feature`` whose local default branch lags ``origin``, which promoted a record."""
+    origin = make_repo(tmp_path, branch=default, name="origin")
+    clone = tmp_path / "clone"
+    git(tmp_path, "clone", "-q", str(origin), str(clone))
+    git(clone, "checkout", "-q", "-b", "feature")
+    put(clone, "feature.txt", "work\n")
+    commit_all(clone, "feature work")
+    put(origin, NUMBERED, GOOD_NUMBERED)
+    commit_all(origin, "promoted on origin")
+    git(clone, "fetch", "-q", "origin")
+    return clone
+
+
 def run(repo: Path, *args: str, capsys) -> tuple[int, str, str]:
     code = cli.main(["--repo-root", str(repo), *args])
     captured = capsys.readouterr()
@@ -144,6 +158,26 @@ def test_a_numbered_record_a_master_default_branch_holds_is_clean_on_a_feature_b
     git(repo, "checkout", "-q", "feature")
     put(repo, NUMBERED, GOOD_NUMBERED)
     assert run(repo, NUMBERED, capsys=capsys)[0] == 0
+
+
+@pytest.mark.parametrize("default", ["main", "master"])
+def test_a_staged_merge_of_the_remote_default_while_the_local_default_lags_is_clean(
+    tmp_path, capsys, default
+):
+    clone = stale_local_main_clone(tmp_path, default)
+    git(clone, "merge", "--no-commit", "--no-ff", "-q", f"origin/{default}")
+    assert run(clone, "--staged", capsys=capsys) == (0, "", "")
+
+
+def test_a_staged_numbered_record_no_remote_default_holds_is_refused_beside_a_remote(
+    tmp_path, capsys
+):
+    clone = stale_local_main_clone(tmp_path)
+    put(clone, f"{DECISIONS}/008-other.md", record("dec-008"))
+    git(clone, "add", "-A")
+    code, out, _ = run(clone, "--staged", capsys=capsys)
+    assert code == 1
+    assert "008-other.md: self-numbered" in out
 
 
 def test_an_absolute_path_inside_the_repository_is_judged_like_a_relative_one(feature, capsys):

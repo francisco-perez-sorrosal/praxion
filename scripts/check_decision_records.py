@@ -14,7 +14,10 @@ judgement with the write hook.
 Relative paths are repo-root relative. Deleted paths are not judged: nothing is left to refuse.
 The branch decides whether a numbered record may appear (``main`` or ``master`` is where finalize
 promotes), and the numbered records the default branch already holds are allowed through (a merge
-or a rebase brings them in).
+or a rebase brings them in). "The default branch" is read as ``main`` or ``master``, local or
+remote-tracking (``origin/main``): a branch merges the remote's tip while its own local ``main`` is
+behind. A repository with a differently named default branch is not recognised, and a numbered
+record is refused on every branch of it.
 
 Commit payload: a PreToolUse hook fires before any command of the Bash call runs, so the index
 alone misses a record that ``git add x && git commit`` stages. The scope is the one the
@@ -25,7 +28,14 @@ refusal text, a clean commit prints nothing. A payload or scope the gate cannot 
 one stderr line, never a block on a transient, as the id-citation gate does. Declared limits:
   - a record the same call itself creates or rewrites (heredoc, ``cp``, ``mv``, ``sed -i``) is not
     on disk when the hook fires, so only a write from an earlier call is seen;
-  - ``git add -u`` names no pathspec, so the tracked edits it stages are judged by their index blob;
+  - ``git add -u`` names no pathspec, so a tracked edit it would stage is not judged at all: only
+    what the index already holds is seen, whatever the working tree says;
+  - a commit spelled so the segment splitter cannot see it is not seen: inside a wrapper shell
+    (``bash -c "git commit"``), after a pipe (``echo m | git commit -F -``), after ``&`` or inside
+    ``$(...)``, under ``xargs``, or behind a quoted environment prefix (``FOO="a b" git commit``).
+    The pre-commit hook judges the true staged set whatever the spelling, and the write hook
+    refuses the Write or Edit itself, so the residual is a record a shell wrote, committed in one
+    of these spellings (td-528 tracks catching them; the id-citation gate shares the blind spot);
   - ``git commit -- PATH`` is judged by the staged set, not by PATH's working-tree text;
   - ``git -C DIR commit`` and ``--git-dir`` judge the payload's cwd repository, not DIR's;
   - a path staged with further unstaged edits is judged by its working-tree text whenever the call
@@ -85,6 +95,9 @@ EXIT_INPUT_ERROR = 2
 JSON_SCHEMA = 1
 MAIN_BRANCHES = ("main", "master")
 DECISIONS_DIR = "/".join(DECISIONS_PARTS)
+_DEFAULT_BRANCH_REF = re.compile(
+    rf"refs/heads/(?:{'|'.join(MAIN_BRANCHES)})|refs/remotes/.+/(?:{'|'.join(MAIN_BRANCHES)})"
+)
 NAME_SEPARATOR = "\0"
 # A command segment that is a `git commit`: after any `VAR=value` prefixes, shell openers (`(`, `!`,
 # `if`, `time`...) and wrapper words, the git executable, git's global options, then `commit`.
@@ -264,18 +277,27 @@ def _current_branch(root: Path) -> str:
 
 
 def _default_branch_records(root: Path) -> frozenset[str]:
-    """The numbered record paths local ``main`` (else ``master``) holds; empty with neither."""
-    ref = next((name for name in MAIN_BRANCHES if _branch_exists(root, name)), None)
-    if ref is None:
-        return frozenset()
-    listing = run_git(root, "ls-tree", "-z", "--name-only", ref, f"{DECISIONS_DIR}/")
+    """The numbered record paths any default-branch ref holds; empty with none.
+
+    A default-branch ref is local ``main``/``master`` or a remote-tracking one
+    (``refs/remotes/<remote>/main|master``). Both count because a branch merges
+    ``origin/main`` while the local ``main`` is behind, and the record that merge
+    brings in is one the default branch already holds.
+    """
+    records: set[str] = set()
+    for ref in _default_branch_refs(root):
+        listing = run_git(root, "ls-tree", "-z", "--name-only", ref, f"{DECISIONS_DIR}/")
+        if listing.returncode != 0:
+            raise InputError(f"cannot list {DECISIONS_DIR}/ on {ref}: {listing.stderr.strip()}")
+        records.update(path for path in listing.stdout.split(NAME_SEPARATOR) if _is_numbered(path))
+    return frozenset(records)
+
+
+def _default_branch_refs(root: Path) -> list[str]:
+    listing = run_git(root, "for-each-ref", "--format=%(refname)", "refs/heads/", "refs/remotes/")
     if listing.returncode != 0:
-        raise InputError(f"cannot list {DECISIONS_DIR}/ on {ref}: {listing.stderr.strip()}")
-    return frozenset(path for path in listing.stdout.split(NAME_SEPARATOR) if _is_numbered(path))
-
-
-def _branch_exists(root: Path, name: str) -> bool:
-    return run_git(root, "rev-parse", "--verify", f"refs/heads/{name}").returncode == 0
+        raise InputError(f"cannot list the branches of {root}: {listing.stderr.strip()}")
+    return [ref for ref in listing.stdout.splitlines() if _DEFAULT_BRANCH_REF.fullmatch(ref)]
 
 
 def _is_numbered(path: str) -> bool:

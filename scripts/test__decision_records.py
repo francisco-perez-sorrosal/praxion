@@ -418,6 +418,30 @@ def test_the_first_occurrence_of_a_key_wins():
     assert front.id == draft_id("aaaaaaaa")
 
 
+def test_the_last_category_wins_as_the_index_generator_and_pyyaml_read_it():
+    front = gate.read_frontmatter("---\ncategory: behavioral\ncategory: bogus\n---\n")
+    assert front.category == "bogus"
+
+
+def test_a_duplicate_category_is_judged_by_its_last_value_on_a_creation():
+    valid_then_invalid = "---\nid: " + DRAFT_ID + "\ncategory: behavioral\ncategory: bogus\n---\n"
+    invalid_then_valid = "---\nid: " + DRAFT_ID + "\ncategory: bogus\ncategory: behavioral\n---\n"
+    assert defects_of(created(DRAFT_PATH, valid_then_invalid)) == (Defect.INVALID_CATEGORY,)
+    assert created(DRAFT_PATH, invalid_then_valid) == Allowed()
+
+
+def test_an_edit_that_appends_a_second_invalid_category_to_a_valid_record_is_category_lost():
+    before = record("dec-041", "behavioral")
+    after = before.replace("category: behavioral\n", "category: behavioral\ncategory: bogus\n", 1)
+    assert defects_of(edited(OLDER_PATH, before, after)) == (Defect.CATEGORY_LOST,)
+
+
+def test_an_edit_that_appends_a_second_valid_category_to_a_bad_record_is_allowed():
+    before = record("dec-041", "bogus")
+    after = before.replace("category: bogus\n", "category: bogus\ncategory: behavioral\n", 1)
+    assert edited(OLDER_PATH, before, after) == Allowed()
+
+
 def test_a_key_after_the_closing_fence_is_not_frontmatter():
     front = gate.read_frontmatter("---\ntitle: x\n---\ncategory: behavioral\n")
     assert front.category is None

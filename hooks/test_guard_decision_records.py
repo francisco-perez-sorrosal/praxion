@@ -148,6 +148,11 @@ def test_canary_refuses_a_write_that_leaves_a_stranded_record(
     _assert_denied(result, f"Refused {rel}", phrase, "Correct form")
 
 
+def test_a_refusal_quotes_the_rule_it_enforces(run, repo: Path) -> None:
+    result = run(repo, "Write", _write(repo, ".ai-state/decisions/loose-note.md", VALID_DRAFT))
+    _assert_denied(result, "From the ADR conventions rule:")
+
+
 def test_canary_refuses_an_unbounded_read_of_the_index(run, repo: Path) -> None:
     result = run(repo, "Read", {"file_path": str(repo / INDEX)})
     _assert_denied(result, "no line limit", "query_adrs.py")
@@ -210,6 +215,21 @@ def test_an_edit_whose_old_string_is_absent_is_silent(run, repo: Path) -> None:
     _assert_silent(run(repo, "Edit", edit))
 
 
+def test_canary_refuses_an_edit_that_creates_a_misplaced_record(run, repo: Path) -> None:
+    rel = ".ai-state/decisions/loose-note.md"
+    edit = {"file_path": str(repo / rel), "old_string": "", "new_string": VALID_DRAFT}
+    _assert_denied(run(repo, "Edit", edit), f"Refused {rel}", "directly under decisions/")
+
+
+def test_an_edit_that_creates_a_conforming_draft_is_silent(run, repo: Path) -> None:
+    edit = {
+        "file_path": str(repo / DRAFT_DIR / DRAFT_NAME),
+        "old_string": "",
+        "new_string": VALID_DRAFT,
+    }
+    _assert_silent(run(repo, "Edit", edit))
+
+
 def test_an_edit_of_a_missing_file_is_silent(run, repo: Path) -> None:
     edit = {"file_path": str(repo / DRAFT_DIR / "gone.md"), "old_string": "a", "new_string": "b"}
     _assert_silent(run(repo, "Edit", edit))
@@ -264,6 +284,18 @@ def test_a_path_outside_any_repo_is_silent(run, tmp_path: Path) -> None:
     _assert_silent(run(tmp_path, "Write", _write(tmp_path, rel, "no frontmatter\n")))
 
 
+@pytest.mark.parametrize("file_path", ["", None, 5])
+def test_a_call_without_a_usable_file_path_is_silent(run, repo: Path, file_path) -> None:
+    decisions_dir = repo / ".ai-state" / "decisions"
+    _assert_silent(run(decisions_dir, "Write", {"file_path": file_path, "content": VALID_DRAFT}))
+
+
+@pytest.mark.parametrize("content", [None, 5, ["x"]])
+def test_a_write_whose_content_is_not_text_is_silent(run, repo: Path, content) -> None:
+    target = {"file_path": str(repo / ".ai-state/decisions/loose-note.md"), "content": content}
+    _assert_silent(run(repo, "Write", target))
+
+
 @pytest.mark.parametrize("tool_name", ["Bash", "Glob", "NotebookEdit"])
 def test_a_tool_the_gate_does_not_judge_is_silent(run, repo: Path, tool_name: str) -> None:
     _assert_silent(run(repo, tool_name, {"file_path": str(repo / ".ai-state/decisions/x.md")}))
@@ -286,6 +318,22 @@ def test_a_payload_that_fails_to_parse_is_silent(stdin: str) -> None:
     _assert_silent(_run_raw(stdin))
 
 
+def test_a_hook_whose_gate_modules_are_missing_lets_the_call_through(tmp_path: Path) -> None:
+    lone_hook = tmp_path / "hooks" / HOOK.name
+    lone_hook.parent.mkdir()
+    lone_hook.write_text(HOOK.read_text(encoding="utf-8"), encoding="utf-8")
+    payload = _payload(tmp_path, "Write", _write(tmp_path, ".ai-state/decisions/x.md", "x"))
+    result = subprocess.run(
+        [sys.executable, str(lone_hook)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    _assert_silent(result)
+
+
 def test_an_unreadable_target_lets_the_write_through(repo: Path) -> None:
     (repo / DRAFT_DIR / DRAFT_NAME).mkdir()
     edit = {"file_path": str(repo / DRAFT_DIR / DRAFT_NAME), "old_string": "a", "new_string": "b"}
@@ -302,6 +350,9 @@ def test_an_unreadable_target_lets_the_write_through(repo: Path) -> None:
         ("a b a", "a", "c", True, "c b c"),
         ("a b", "z", "c", False, None),
         ("a b", "", "c", False, None),
+        (None, "", "c", False, "c"),
+        ("", "", "c", False, "c"),
+        (" \n", "", "c", True, "c"),
         (None, "a", "c", False, None),
         ("a b", None, "c", False, None),
         ("a b", "a", None, False, None),
@@ -327,6 +378,35 @@ def test_a_limit_of_zero_still_counts_as_bounded(repo: Path) -> None:
     request = guard.build_request("Read", {"file_path": str(repo / INDEX), "limit": 0}, str(repo))
     assert request is not None
     assert request.bounded is True
+
+
+def test_the_directory_itself_is_anchored(repo: Path) -> None:
+    assert guard.repo_relative(str(repo / ".ai-state" / "decisions")) == ".ai-state/decisions"
+
+
+def test_a_relative_path_has_no_repo_root_to_anchor_in(repo: Path, monkeypatch) -> None:
+    monkeypatch.chdir(repo)
+    assert guard.repo_relative(".ai-state/decisions/x.md") is None
+
+
+def _hook_at(monkeypatch, hook_dir: Path) -> None:
+    hook_dir.mkdir(parents=True)
+    monkeypatch.setattr(guard, "__file__", str(hook_dir / "guard_decision_records.py"))
+
+
+def test_the_scripts_directory_beside_the_hooks_is_preferred(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "root" / "scripts").mkdir(parents=True)
+    _hook_at(monkeypatch, tmp_path / "root" / "hooks")
+    assert guard._scripts_dir() == (tmp_path / "root" / "scripts").resolve()
+
+
+def test_the_scripts_directory_one_level_further_up_is_the_fallback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "scripts").mkdir()
+    _hook_at(monkeypatch, tmp_path / "copy" / "hooks")
+    assert guard._scripts_dir() == (tmp_path / "scripts").resolve()
 
 
 def test_the_gate_core_is_found_beside_the_hook() -> None:

@@ -75,6 +75,8 @@ def test_the_scripts_are_executable() -> None:
         _payload("Write", "/repo/.ai-state//decisions/x.md", content="x"),
         _payload("Write", "C:\\repo\\.ai-state\\decisions\\x.md", content="x"),
         _payload("Write", "/repo/docs/x.md", content="see .ai-state/decisions"),
+        _payload("Write", "/repo/.ai-state/x/../decisions/loose.md", content="x"),
+        {"cwd": "/repo/.ai-state", **_payload("Write", "decisions/loose.md", content="x")},
     ],
     ids=[
         "write",
@@ -84,6 +86,8 @@ def test_the_scripts_are_executable() -> None:
         "double-slash",
         "backslash",
         "content-only",
+        "parent-segment",
+        "relative-under-cwd",
     ],
 )
 def test_write_mode_starts_python_for_a_payload_that_holds_the_decisions_tree(
@@ -186,4 +190,56 @@ def test_the_real_hook_stays_silent_for_a_conforming_write(tmp_path: Path) -> No
     content = "---\nid: dec-draft-" + DRAFT_HASH + "\ncategory: behavioral\n---\n"
     payload = {"cwd": str(tmp_path), **_payload("Write", str(record), content=content)}
     result = _gate(HOOKS_DIR, "write", payload)
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_the_real_hook_denies_a_write_addressed_through_a_parent_segment(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+    path = f"{tmp_path}/.ai-state/elsewhere/../decisions/loose-note.md"
+    payload = {"cwd": str(tmp_path), **_payload("Write", path, content="---\n---\n")}
+    result = _gate(HOOKS_DIR, "write", payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_the_real_hook_denies_a_relative_write_from_a_cwd_inside_the_state_dir(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".ai-state").mkdir()
+    payload = {
+        "cwd": str(tmp_path / ".ai-state"),
+        **_payload("Write", "decisions/loose-note.md", content="---\n---\n"),
+    }
+    result = _gate(HOOKS_DIR, "write", payload)
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_a_missing_guard_lets_the_call_through_silently(tmp_path: Path) -> None:
+    shutil.copy(GATE, tmp_path / GATE.name)
+    result = _gate(tmp_path, "write", _payload("Write", DECISIONS_PATH, content="x"))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_a_guard_that_crashes_at_import_lets_the_call_through_silently(spied: Path) -> None:
+    (spied / GUARD.name).write_text("raise RuntimeError('broken')\n", encoding="utf-8")
+    result = _gate(spied, "write", _payload("Write", DECISIONS_PATH, content="x"))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_a_guard_that_exits_non_zero_cannot_block_the_call(spied: Path) -> None:
+    (spied / GUARD.name).write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
+    result = _gate(spied, "write", _payload("Write", DECISIONS_PATH, content="x"))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_a_gate_run_without_a_directory_part_in_its_name_does_not_block(spied: Path) -> None:
+    result = subprocess.run(
+        ["sh", GATE.name, "write"],
+        input=json.dumps(_payload("Write", DECISIONS_PATH, content="x")),
+        capture_output=True,
+        text=True,
+        cwd=spied,
+        timeout=15,
+        check=False,
+    )
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")

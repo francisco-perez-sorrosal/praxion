@@ -27,34 +27,38 @@ from pathlib import Path
 from typing import Union
 
 SCRIPTS_DIR = "scripts"
-GATE_CORE = "_decision_records.py"
 
 
 def _scripts_dir() -> Path:
-    """The ``scripts`` directory that ships beside this hook, found from this file's location.
+    """The ``scripts`` directory that ships beside this hook: ``../scripts`` in the plugin.
 
-    Nearest ancestor first: in the plugin it is ``../scripts``; the walk also finds it when a
-    test harness runs a copy of this file one level deeper.
+    The mutation sensor runs a copy of this file one level deeper (``mutants/hooks``), where the
+    same directory sits one level further up; no other ancestor is searched.
     """
-    here = Path(__file__).resolve()
-    candidates = [ancestor / SCRIPTS_DIR for ancestor in here.parents]
-    return next(
-        (c for c in candidates if (c / GATE_CORE).is_file()), here.parent.parent / SCRIPTS_DIR
+    hook_dir = Path(__file__).resolve().parent
+    nearest, one_up = (root / SCRIPTS_DIR for root in (hook_dir.parent, hook_dir.parent.parent))
+    return nearest if nearest.is_dir() else one_up
+
+
+try:
+    # Appended, never inserted first: the gate modules must not shadow the standard library.
+    sys.path.append(str(_scripts_dir()))
+    from _decision_record_refusal import find_rule_text, refusal_text
+    from _decision_records import (
+        DECISIONS_PARTS,
+        WRITE_TIME_CONTEXT,
+        Change,
+        Read,
+        Refused,
+        judge_change,
+        judge_read,
     )
-
-
-sys.path.insert(0, str(_scripts_dir()))
-
-from _decision_record_refusal import find_rule_text, refusal_text  # noqa: E402
-from _decision_records import (  # noqa: E402
-    DECISIONS_PARTS,
-    WRITE_TIME_CONTEXT,
-    Change,
-    Read,
-    Refused,
-    judge_change,
-    judge_read,
-)
+except Exception:
+    # Fail-open also when the gate modules are missing or broken. Imported (by a test), the
+    # error stays visible; run as the hook, it must neither block nor write to stderr.
+    if __name__ != "__main__":
+        raise
+    sys.exit(0)
 
 GIT_ENTRY = ".git"
 READ_TOOL = "Read"
@@ -144,10 +148,16 @@ def _after(tool_name: str, tool_input: dict, before: str | None) -> str | None:
 
 
 def apply_edit(before: str | None, old: object, new: object, replace_all: bool) -> str | None:
-    """``before`` with ``old`` replaced by ``new``; ``None`` when the harness would refuse the edit."""
-    if before is None or not isinstance(old, str) or not isinstance(new, str):
+    """The text the edit would leave; ``None`` when the harness would refuse it.
+
+    An empty ``old`` creates the file when it is absent or blank, so that creation is judged
+    like a write; on a file with content it is refused.
+    """
+    if not isinstance(old, str) or not isinstance(new, str):
         return None
-    if not old or old not in before:
+    if not old:
+        return new if before is None or not before.strip() else None
+    if before is None or old not in before:
         return None
     return before.replace(old, new) if replace_all else before.replace(old, new, 1)
 

@@ -5,30 +5,40 @@
 # of interpreter startup.
 #
 # Usage: decisions_gate.sh <write|read>
-#   write  Write and Edit: the payload must hold `.ai-state/decisions`
+#   write  Write and Edit: the payload must hold both `.ai-state` and `decisions`
 #   read   Read: the payload must hold `DECISIONS_INDEX.md`
 #
 # The filter is deliberately loose and case-insensitive (the gate's path
 # classifier folds case): a false positive just runs Python, which stays
-# authoritative. The separator class takes `/`, JSON's `\/`, a backslash and a
-# `.` so `.ai-state/./decisions` is not a way past it. Any other mode exits 0.
+# authoritative. Write mode tests the two words separately, not as one path, so
+# every spelling Python normalises into the decisions tree reaches it:
+# `.ai-state/./decisions`, `.ai-state/x/../decisions`, `\` separators, and a
+# relative `decisions/x.md` under a `cwd` inside `.ai-state`. Any other mode
+# exits 0.
+#
+# Fail-open: this script always exits 0 and is silent apart from the guard's own
+# stdout. A guard that is missing, cannot start or crashes lets the call through
+# (exit 2 would block it), and the commit gate still holds.
 #
 # The payload is forwarded with printf, never echo (td-188): /bin/sh on macOS is
 # bash in POSIX mode, whose echo interprets backslash escapes, so a payload that
 # carries `\n` or `\s` would reach Python as invalid JSON.
 
-set -e
+holds() {
+    printf '%s\n' "$input" | grep -qiE "$1"
+}
 
-case "$1" in
-    write) pattern='\.ai-state[/\\.]+decisions' ;;
-    read) pattern='DECISIONS_INDEX\.md' ;;
-    *) exit 0 ;;
-esac
+concerns_decisions() {
+    case "$1" in
+        write) holds '\.ai-state' && holds 'decisions' ;;
+        read) holds 'DECISIONS_INDEX\.md' ;;
+        *) return 1 ;;
+    esac
+}
 
 input=$(cat)
 
-if printf '%s\n' "$input" | grep -qiE "$pattern"; then
-    printf '%s\n' "$input" | python3 "${0%/*}/guard_decision_records.py"
-else
-    exit 0
+if concerns_decisions "$1"; then
+    printf '%s\n' "$input" | python3 "${0%/*}/guard_decision_records.py" 2>/dev/null || exit 0
 fi
+exit 0

@@ -1,11 +1,11 @@
 # Who each always-loaded section serves.
 #
-# Every section (heading level two to four) of every always-loaded source, and every
-# part of a mixed-audience section, has exactly one entry here. The sources are found
-# from the repository (rules without a path scope, the user template, the project file),
-# never listed. A part starts at the one line that begins with its `part` prefix and
-# runs to the next part or the section's end; the first part starts at the section's
-# first text line, so nothing is left unclassified.
+# Every section (heading level two to four) of every always-loaded source and of every
+# rule a resident file names, and every part of a mixed-audience section, has exactly one
+# entry here. The sources are found from the repository (rules without a path scope, the
+# user template, the project file), never listed. A part starts at the one line that
+# begins with its `part` prefix and runs to the next part or the section's end; the first
+# part starts at the section's first text line, so nothing is left unclassified.
 #
 # scope: core (every agent), role (the named agents or groups), orchestrator-only and
 # no-actor (kept resident for the main session, never in a kernel; each gives a reason).

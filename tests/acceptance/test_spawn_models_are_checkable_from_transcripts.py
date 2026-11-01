@@ -2,10 +2,14 @@
 
 The check reads each spawn's requested role, any per-spawn model and its prompt markers from the
 parent session's transcript, and the model the spawn ran on from the spawn's own transcript. It
-classifies each spawn as matching its definition's floor, a sanctioned override (the listed
-deviations, or every spawn of a session on one model under the kill switch), unexplained, or
-unknown when a model is missing. It exits non-zero on an unexplained spawn and starts no model
-session.
+classifies each spawn as matching its definition's floor, a sanctioned override, unexplained, or
+unknown. Sanctioned: any per-spawn model on a researcher; a consultant on opus not marked
+routine, or on its sonnet floor; acceptance design, the implementer step hint and light review on
+their markers; and every spawn of a session holding two or more spawns whose floors differ, all
+run on one model (the kill switch). Unknown: a spawn whose model is missing, or the only spawn of
+its session run off its floor with no sanctioning marker, where the kill switch cannot be told
+apart. It exits non-zero only on an unexplained spawn, exits zero when its only findings are
+unknown spawns, and starts no model session.
 """
 
 from __future__ import annotations
@@ -80,7 +84,33 @@ def test_a_listed_deviation_reads_as_a_sanctioned_override(tmp_path, case):
     assert result.exit_code == 0
 
 
+CONSULTS_ON_THE_FLOOR = {
+    "a routine consult routed down": Spawn(
+        "discipline-consultant",
+        ran_on="claude-sonnet-5-5",
+        model="sonnet",
+        prompt="A routine consult on the draft.\nTask slug: x",
+    ),
+    "a consult that fell through to its floor": Spawn(
+        "discipline-consultant",
+        ran_on="claude-sonnet-5-5",
+        prompt="Consult on the draft.\nTask slug: x",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(CONSULTS_ON_THE_FLOOR))
+def test_a_consult_on_its_sonnet_floor_is_never_a_finding(tmp_path, case):
+    spawn = CONSULTS_ON_THE_FLOOR[case]
+
+    result = _check(tmp_path, spawn)
+
+    assert result.verdicts[spawn.agent_id] in ("floor", "override"), result.verdicts
+    assert result.exit_code == 0
+
+
 def test_a_per_spawn_model_with_no_listed_deviation_is_unexplained_and_fails_the_check(tmp_path):
+    steady = Spawn("systems-architect", ran_on=_at_floor("systems-architect"))
     spawn = Spawn(
         "verifier",
         ran_on="claude-sonnet-5-5",
@@ -88,7 +118,7 @@ def test_a_per_spawn_model_with_no_listed_deviation_is_unexplained_and_fails_the
         prompt="Verify the feature.\nTask slug: x",
     )
 
-    result = _check(tmp_path, spawn)
+    result = _check(tmp_path, steady, spawn)
 
     assert result.verdicts[spawn.agent_id] == "unexplained", result.verdicts
     assert result.exit_code != 0
@@ -119,12 +149,26 @@ def test_every_spawn_of_a_session_on_one_model_reads_as_the_kill_switch(tmp_path
     assert result.exit_code == 0
 
 
-def test_a_spawn_whose_own_transcript_is_missing_is_unknown(tmp_path):
+def test_a_spawn_whose_own_transcript_is_missing_is_unknown_and_passes_the_check(tmp_path):
     lost = Spawn("implementer", ran_on=None)
 
     result = _check(tmp_path, lost)
 
     assert result.verdicts[lost.agent_id] == "unknown", result.verdicts
+    assert result.exit_code == 0
+
+
+def test_the_only_spawn_of_a_session_off_its_floor_without_a_marker_is_unknown_not_unexplained(
+    tmp_path,
+):
+    alone = Spawn(
+        "verifier", ran_on="claude-sonnet-5-5", prompt="Verify the feature.\nTask slug: x"
+    )
+
+    result = _check(tmp_path, alone)
+
+    assert result.verdicts[alone.agent_id] == "unknown", result.verdicts
+    assert result.exit_code == 0
 
 
 def test_the_check_starts_no_model_session(tmp_path):

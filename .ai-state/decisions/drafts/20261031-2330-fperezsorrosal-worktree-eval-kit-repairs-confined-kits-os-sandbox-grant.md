@@ -67,6 +67,9 @@ A session of a confined kit that shows the sandbox inactive or a prescribed comm
 - Negative: `git add` and `git commit` now work inside the fixture, so C4 can see a real commit. Hooks, the Read tool and WebFetch stay outside the sandbox. Print mode silently ignores invalid settings, so only the first paid session (REQ-16) proves enforcement. The grant depends on the eval venv's `dev` group providing pytest, ruff and pyright.
 - Activation: no. The design-synthesis gate did not fire. One-way-door stakes are absent: the change is reversible by removing `--settings`, and recorded runs are untouched.
 
+
+**Exception to the first-breach stop (rework, verifier #warn-3).** A refused prescribed command that carries a leading `VAR=value` assignment is kept on the session record, but it does not stop the run. The sandboxing docs send such commands through the regular permission flow even inside the sandbox, which under `--permission-prompts none` is a refusal by design, not a broken confinement. The fixtures declare `pythonpath`, so no prescribed form needs the prefix. The cost: a role that prefixes every test run would produce a run that continues but measures nothing of its shell work. The record makes that visible, and td-555 tracks it with the other residual forms.
+
 ## Disconfirmation
 
 - **Falsifier.** The component added is `eval/src/praxion_evals/adherence/confinement.py`, the confinement builder. The responsibility that moves is keeping a measured session's shell inside its sandbox: it moves from `tasks.allowed_tools` (command-text patterns) to the harness's OS sandbox. If, once this lands, the confined kits still depend on `READ_ONLY_BASH` patterns for safety, the decision did not take effect.

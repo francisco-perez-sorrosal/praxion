@@ -58,6 +58,18 @@ roles:
         complete_pairs: 2
         passes_flip_rule: false
         entry: praxion-evals-adherence
+      - id: 20261031T203813Z-47ce6d
+        complete_pairs: 24
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261031T203813Z-47ce6d.json: full run on the subscription token from a
+        # checkout frozen at 1969292a, 24 tasks, 48 opus sessions, 0 errored, golden judge error 0.50 (the judge failed
+        # the good C3 case); flip verdict clear on the three scored checks: C3 non-inferior (lean 7 of 15, full 8 of 15),
+        # C4 24 of 24 and project-convention 16 of 16 in both arms. Not covered: C5 full 6 of 7 vs lean 2 of 8 (b 5, c 1),
+        # the held reason's direction again (20261015T035717Z-03a785: b 6, c 0), though C5 reads only the title and cannot
+        # tell a finished report cut off before its return from an unfinished one (td-545); write-early lean 15 vs full 12,
+        # which on a forced stop fails the [PARTIAL] title C5 requires (td-545); C1 lean 21 vs full 23; C2; tags 19 of 24 both;
+        # ledger rows. Run-outs full 7 of 8, lean 8 of 8 (td-461); 30 of 48 returns report a denied Bash (td-544). Lean
+        # first-request median 40,902 vs full 54,776; estimated session cost 77.11 (subscription, not charged; cap 110).
     # Re-opened from held on 2026-10-31 for one paired run under the dec-462 flip rule (allowances from the
     # run's own discordance, C5 covered only from 5 pairs that ran out on both sides); the held reason was the
     # forced-stop regression of 20261015T035717Z-03a785, which a diagnostic draw traced to no missing kernel text.

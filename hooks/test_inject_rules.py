@@ -177,6 +177,17 @@ def _make_manifest(plugin_root: Path) -> None:
     (rules_dir / "_manifest.yaml").write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
 
 
+def _hook_env(plugin_root: Path) -> dict[str, str]:
+    """The environment a child hook process runs in.
+
+    The mutation sensor sets MUTANT_UNDER_TEST for its own process; a child hook cannot locate
+    mutmut's config from its cwd, so it must run the code as written.
+    """
+    env = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root)}
+    env.pop("MUTANT_UNDER_TEST", None)
+    return env
+
+
 def _run_hook(
     plugin_root: Path,
     project_dir: Path,
@@ -190,11 +201,7 @@ def _run_hook(
     Returns the CompletedProcess with captured stdout and stderr.
     Raises FileNotFoundError if the hook script does not yet exist (RED state).
     """
-    env = {
-        **os.environ,
-        "CLAUDE_PLUGIN_ROOT": str(plugin_root),
-    }
-    env.update(extra_env or {})
+    env = {**_hook_env(plugin_root), **(extra_env or {})}
     return subprocess.run(
         [sys.executable, str(HOOK_SCRIPT)],
         capture_output=True,
@@ -956,7 +963,7 @@ def test_missing_pyyaml_tells_the_session_rules_were_not_loaded(
         capture_output=True,
         text=True,
         cwd=str(project_dir),
-        env={**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root)},
+        env=_hook_env(plugin_root),
         timeout=10,
     )
 
@@ -981,15 +988,11 @@ def test_missing_manifest_tells_the_session_rules_were_not_loaded(
 
 
 def _import_hook_module():
-    import importlib.util
+    # A plain import, not a path load: the mutation sensor only counts calls that reach the
+    # module it relocates through the import system.
+    import inject_rules
 
-    sys.path.insert(0, str(HOOK_SCRIPT.parent))
-    spec = importlib.util.spec_from_file_location("inject_rules_under_test", HOOK_SCRIPT)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return inject_rules
 
 
 def test_pyyaml_fix_never_suggests_pip_for_an_externally_managed_interpreter() -> None:
@@ -1010,3 +1013,239 @@ def test_pyyaml_fix_suggests_pip_for_a_pip_managed_interpreter() -> None:
     fix = module._pyyaml_fix("/usr/local/bin/python3", externally_managed=False)
 
     assert "`/usr/local/bin/python3 -m pip install pyyaml`" in fix
+
+
+# ===========================================================================
+# Residents: disabling a rule suppresses the one-line projection that stands for it
+# ===========================================================================
+
+_RESIDENT_BODY = "## Model Routing Resident\n\nOne line of the model routing rule.\n"
+_RESIDENT_ID = "residents/model-routing"  # outside swe/ so a swe/* glob never names it directly
+
+
+def _add_resident(plugin_root: Path, parent_path: str, *, core: bool = False) -> None:
+    """Add a hook-deliver resident of `parent_path` to the synthetic plugin root."""
+    resident = plugin_root / "rules" / "residents" / "model-routing.md"
+    resident.parent.mkdir(parents=True, exist_ok=True)
+    resident.write_text(f"---\nresident_of: {parent_path}\n---\n{_RESIDENT_BODY}", encoding="utf-8")
+    manifest = plugin_root / "rules" / "_manifest.yaml"
+    row = (
+        f"- id: {_RESIDENT_ID}\n"
+        "  path: rules/residents/model-routing.md\n"
+        "  load: always_on\n"
+        f"  core: {str(core).lower()}\n"
+        "  install: hook-deliver\n"
+        "  chars: 100\n"
+    )
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("categories:", row + "categories:", 1),
+        encoding="utf-8",
+    )
+
+
+def _disable(project_dir: Path, *patterns: str) -> None:
+    items = "".join(f"  - {pattern}\n" for pattern in patterns)
+    _write_project_config(project_dir, f"version: 1\ndisable:\n{items}")
+
+
+def test_disabling_a_rule_by_id_suppresses_its_resident(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md")
+    _disable(project_dir, "swe/agent-model-routing")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    context = _additional_context(result)
+    assert _RESIDENT_BODY.strip() not in context, "the resident must go with its disabled parent"
+    assert _GIT_CONVENTIONS_BODY.strip() in context, "an unrelated rule must stay injected"
+    excludes = json.loads((project_dir / ".claude" / "settings.json").read_text())[
+        "claudeMdExcludes"
+    ]
+    assert f"**/.claude/rules/{_RESIDENT_ID}.md" in excludes
+
+
+def test_disabling_a_rule_by_glob_suppresses_its_resident(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md")
+    _disable(project_dir, "swe/*")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    assert _RESIDENT_BODY.strip() not in _additional_context(result)
+
+
+def test_a_resident_whose_parent_is_not_disabled_is_still_injected(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md")
+    _disable(project_dir, "swe/_fixture-rule")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    context = _additional_context(result)
+    assert _RESIDENT_BODY.strip() in context
+    assert _AGENT_MODEL_ROUTING_BODY.strip() in context
+
+
+def test_a_resident_of_a_core_parent_stays_when_the_parent_cannot_be_disabled(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-behavioral-contract.md")
+    _disable(project_dir, "swe/agent-behavioral-contract")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    assert "cannot disable core rule" in result.stderr
+    assert _RESIDENT_BODY.strip() in _additional_context(result)
+
+
+def test_a_core_resident_stays_even_when_its_parent_is_disabled(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md", core=True)
+    _disable(project_dir, "swe/agent-model-routing")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    assert _RESIDENT_BODY.strip() in _additional_context(result)
+
+
+def test_a_resident_listed_in_the_manifest_but_unreadable_stays_injected_and_exits_zero(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md")
+    (plugin_root / "rules" / "residents" / "model-routing.md").unlink()
+    _disable(project_dir, "swe/agent-model-routing")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    assert result.returncode == 0, f"stderr: {result.stderr!r}"
+    assert "could not read rule file" in result.stderr
+
+
+def test_the_summary_line_names_the_parent_and_its_resident_as_suppressed(
+    plugin_root: Path, project_dir: Path
+) -> None:
+    _add_resident(plugin_root, "rules/swe/agent-model-routing.md")
+    _disable(project_dir, "swe/agent-model-routing")
+
+    result = _run_hook(plugin_root, project_dir)
+
+    summary = next(line for line in result.stderr.splitlines() if "(suppressed:" in line)
+    suppressed, _, excludes = summary.partition("claudeMdExcludes entries:")
+    assert "swe/agent-model-routing" in suppressed
+    assert _RESIDENT_ID in suppressed
+    assert "swe/agent-model-routing" in excludes
+    assert _RESIDENT_ID in excludes
+
+
+# Same cases as tests/test_export_cursor_rules_resident.py: the two local checks and the shared
+# reader must agree on a malformed frontmatter as well as on a well-formed one.
+_RESIDENT_TEXTS = {
+    "resident": "---\nresident_of: rules/swe/rule.md\n---\n## Rule\n\nOne line of it.\n",
+    "rule": "---\npaths:\n  - 'docs/**'\n---\n## Rule\n\nThe whole rule.\n",
+    "quoted": "---\n'resident_of': \"rules/swe/rule.md\"\n---\nBody.\n",
+    "empty": "---\nresident_of:\n---\nBody.\n",
+    "indented": "---\n  resident_of: rules/swe/rule.md\n---\nBody.\n",
+    "unclosed": "---\nresident_of: rules/swe/rule.md\nBody, never closed.\n",
+    "none": "No frontmatter; resident_of: rules/swe/rule.md\n",
+    "in-body": "---\npaths: ['docs/**']\n---\nresident_of: rules/swe/rule.md\n",
+    "non-md-value": "---\nresident_of: not-a-rule-path\n---\nBody.\n",
+    "empty-frontmatter": "---\n---\nresident_of: rules/swe/rule.md\n",
+    "padded-delimiters": "---  \nresident_of: rules/swe/rule.md\n---  \nBody.\n",
+    "single-quoted-value": "---\nresident_of: 'rules/swe/rule.md'\n---\nBody.\n",
+    "later-key": "---\npaths: ['a']\nresident_of: rules/swe/rule.md\n---\nBody.\n",
+    "longer-key": "---\nresident_ofx: rules/swe/rule.md\n---\nBody.\n",
+}
+
+
+def _shared_resident_reader():
+    """Load scripts/_resident_of.py from the nearest ancestor that carries it.
+
+    Walking up, not importing `scripts`, keeps the test working when a mutation
+    run relocates it under `hooks/mutants/`, where the repository root is not on
+    the import path.
+    """
+    import importlib.util
+
+    for ancestor in Path(__file__).resolve().parents:
+        candidate = ancestor / "scripts" / "_resident_of.py"
+        if candidate.is_file():
+            spec = importlib.util.spec_from_file_location("resident_of_shared", candidate)
+            assert spec is not None
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    raise AssertionError("scripts/_resident_of.py not found above this test")
+
+
+@pytest.mark.parametrize("text", _RESIDENT_TEXTS.values(), ids=_RESIDENT_TEXTS.keys())
+def test_the_injectors_resident_check_agrees_with_the_shared_reader(text: str) -> None:
+    shared = _shared_resident_reader().resident_parent
+
+    assert _import_hook_module()._resident_parent(text) == shared(text)
+
+
+def _rule_row(
+    rule_id: str, path: str, *, install: str = "hook-deliver", core: bool = False
+) -> dict:
+    return {"id": rule_id, "path": path, "install": install, "core": core}
+
+
+def _write_rule(plugin_root: Path, rel_path: str, frontmatter: str) -> None:
+    path = plugin_root / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"---\n{frontmatter}\n---\nBody.\n", encoding="utf-8")
+
+
+def test_a_disabled_rule_adds_only_the_hook_deliver_non_core_residents_that_name_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _import_hook_module()
+    _write_rule(tmp_path, "rules/a/resident.md", "resident_of: rules/swe/parent.md")
+    _write_rule(tmp_path, "rules/a/other.md", "resident_of: rules/swe/other-parent.md")
+    _write_rule(tmp_path, "rules/a/core.md", "resident_of: rules/swe/parent.md")
+    _write_rule(tmp_path, "rules/a/linked.md", "resident_of: rules/swe/parent.md")
+    _write_rule(tmp_path, "rules/a/plain.md", "paths: ['docs/**']")
+    rules = [
+        _rule_row("a/resident", "rules/a/resident.md"),
+        _rule_row("a/other", "rules/a/other.md"),
+        _rule_row("a/core", "rules/a/core.md", core=True),
+        _rule_row("a/linked", "rules/a/linked.md", install="symlink"),
+        _rule_row("a/plain", "rules/a/plain.md"),
+        {"id": "a/pathless", "install": "hook-deliver"},
+    ]
+
+    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+
+    assert disabled == {"swe/parent", "a/resident"}
+    assert capsys.readouterr().err == "", "a row without a path is no resident, not a read failure"
+
+
+def test_an_empty_disable_set_reads_no_rule_file(tmp_path: Path) -> None:
+    module = _import_hook_module()
+    rules = [_rule_row("a/resident", "rules/a/missing.md")]
+
+    assert module._add_residents_of_disabled(set(), rules, tmp_path) == set()
+
+
+def test_an_unreadable_resident_file_is_kept_and_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _import_hook_module()
+    rules = [_rule_row("a/resident", "rules/a/missing.md")]
+
+    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+
+    assert disabled == {"swe/parent"}
+    warning = capsys.readouterr().err
+    assert "[inject_rules] WARNING: could not read rule file" in warning
+    assert str(tmp_path / "rules" / "a" / "missing.md") in warning

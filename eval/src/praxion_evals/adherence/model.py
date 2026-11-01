@@ -552,13 +552,34 @@ class NotMeasured:
 SessionStatus = Measured | Errored | NotMeasured
 
 
+RefusalSource = Literal["permission_denials", "transcript"]
+REFUSAL_SOURCES: tuple[str, ...] = get_args(RefusalSource)
+
+
+@dataclass(frozen=True)
+class RefusedCommand:
+    """A shell command the harness refused, and which stream surface reported it."""
+
+    command: str
+    source: RefusalSource
+
+    def __post_init__(self) -> None:
+        _non_empty(self.command, "a refused command")
+        _one_of(self.source, REFUSAL_SOURCES, "a refused command's source")
+
+
 @dataclass(frozen=True)
 class SessionRecord:
+    """``refused_commands`` is kept beside the status, not inside it: a measured and an
+    errored session alike can have had a command refused, and a record written before they
+    were kept has none."""
+
     setup: SessionSetup
     status: SessionStatus
     cost_usd: float
     duration_ms: int
     started_at: str
+    refused_commands: tuple[RefusedCommand, ...] = ()
 
     def __post_init__(self) -> None:
         _require(self.cost_usd >= 0 and self.duration_ms >= 0, "cost and duration are not negative")

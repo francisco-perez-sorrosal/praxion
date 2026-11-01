@@ -37,6 +37,7 @@ from praxion_evals.adherence.model import (
     DeclaredSettings,
     Measured,
     Pair,
+    RefusedCommand,
     RoleVerdict,
     RuleRef,
     SessionRecord,
@@ -654,13 +655,20 @@ def _entry_to_json(entry: CatalogEntry) -> dict[str, Any]:
 
 
 def _session_to_json(record: SessionRecord) -> dict[str, Any]:
-    return {
+    encoded: dict[str, Any] = {
         "setup": setup_to_json(record.setup),
         "status": status_to_json(record.status),
         "cost_usd": record.cost_usd,
         "duration_ms": record.duration_ms,
         "started_at": record.started_at,
     }
+    # Additive under adherence/1: a record with none stays byte-identical to an older file's.
+    if record.refused_commands:
+        encoded["refused_commands"] = [
+            {"command": refused.command, "source": refused.source}
+            for refused in record.refused_commands
+        ]
+    return encoded
 
 
 def from_json(data: Mapping[str, Any]) -> RunResults:
@@ -745,4 +753,14 @@ def _session_from_json(record: Mapping[str, Any]) -> SessionRecord:
         cost_usd=float(_need(record, "cost_usd", "a session")),
         duration_ms=int(_need(record, "duration_ms", "a session")),
         started_at=_need(record, "started_at", "a session"),
+        refused_commands=tuple(
+            _refused_command_from_json(refused) for refused in record.get("refused_commands", ())
+        ),
+    )
+
+
+def _refused_command_from_json(refused: Mapping[str, Any]) -> RefusedCommand:
+    return RefusedCommand(
+        command=_need(refused, "command", "a refused command"),
+        source=_need(refused, "source", "a refused command"),
     )

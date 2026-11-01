@@ -36,6 +36,7 @@ from praxion_evals.adherence.model import (
     NotBuilt,
     NotMeasured,
     Passed,
+    RefusedCommand,
     Regression,
     RuleRef,
     ScopeConflict,
@@ -392,6 +393,31 @@ def test_a_session_record_echoes_the_setup_its_status_carries():
     record = SessionRecord(SETUP, STATUSES[0], 0.5, 1000, "2026-10-12T10:00:00Z")
 
     assert record.status.setup == record.setup
+
+
+@pytest.mark.parametrize("status", [STATUSES[0], STATUSES[6]], ids=["measured", "errored"])
+def test_a_session_record_of_either_kind_may_carry_refused_commands(status):
+    refused = (RefusedCommand("rm -rf /", "permission_denials"),)
+
+    record = SessionRecord(SETUP, status, 0.5, 1000, "2026-10-12T10:00:00Z", refused)
+
+    assert record.refused_commands == refused
+
+
+def test_a_session_record_without_refused_commands_holds_none():
+    record = SessionRecord(SETUP, STATUSES[0], 0.5, 1000, "2026-10-12T10:00:00Z")
+
+    assert record.refused_commands == ()
+
+
+@pytest.mark.parametrize(
+    ("command", "source"),
+    [("", "transcript"), ("ls", "stderr")],
+    ids=["empty-command", "unknown-source"],
+)
+def test_a_refused_command_needs_a_command_and_a_known_source(command, source):
+    with pytest.raises(ValueError, match="refused command"):
+        RefusedCommand(command, source)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

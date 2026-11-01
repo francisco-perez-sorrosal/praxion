@@ -6,6 +6,14 @@ transcripts, and nothing of their layout beyond this module. A transcript direct
 agent id) and `<session>/subagents/agent-<id>.jsonl` (the spawn's own transcript, whose assistant
 entries carry the model it ran on).
 
+Claude Code also records a call's message in other record kinds (an `api-request-blob` repeats the
+Agent `tool_use` block), so a spawn is keyed on the `tool_use` id: one Agent call is one spawn, however
+many records carry it. A prompt marker counts only at the start of a line, or as a parenthesised
+hint such as "(tier: H)", so a sentence that mentions one ("not Mode: light-review") sanctions
+nothing. A prompt whose first line is
+`Task slug: <slug>` and a later line starts with `Spawn request: <id>` was issued by the step-loop
+driver, and the spawn keeps that id.
+
 Stdlib only and Python 3.9-safe: the check runs under the ambient interpreter.
 """
 
@@ -36,7 +44,12 @@ PROMPT_MARKERS = (
 # model's reply.
 SYNTHETIC_MODEL = "<synthetic>"
 
-_MARKER_PATTERNS = {marker: re.compile(rf"\b{re.escape(marker)}\b") for marker in PROMPT_MARKERS}
+_MARKER_PATTERNS = {
+    marker: re.compile(rf"(?:^|\()(?:{re.escape(marker)})\b", re.MULTILINE)
+    for marker in PROMPT_MARKERS
+}
+_TASK_SLUG_LINE = re.compile(r"Task slug: \S")
+_SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -50,6 +63,7 @@ class Spawn:
     requested_model: str | None
     ran_model: str | None
     prompt_markers: frozenset[str]
+    driver_request: str | None = None
 
 
 def read_spawns(transcripts_dir: Path) -> list[Spawn]:
@@ -85,6 +99,7 @@ def _session_spawns(transcripts_dir: Path, session_file: Path) -> list[Spawn]:
             continue
         own = transcripts_dir / session / "subagents" / f"agent-{agent_id}.jsonl"
         model = call.get("model")
+        prompt = call.get("prompt")
         spawns.append(
             Spawn(
                 session=session,
@@ -92,18 +107,21 @@ def _session_spawns(transcripts_dir: Path, session_file: Path) -> list[Spawn]:
                 role=call["subagent_type"][len(ROLE_PREFIX) :],
                 requested_model=model if isinstance(model, str) else None,
                 ran_model=_ran_model(_read_records(own)),
-                prompt_markers=_prompt_markers(call.get("prompt")),
+                prompt_markers=_prompt_markers(prompt),
+                driver_request=_driver_request(prompt),
             )
         )
     return spawns
 
 
 def _agent_calls(records: list[dict]):
-    """(tool_use id, input) for each `praxion:` Agent call."""
+    """(tool_use id, input) for each `praxion:` Agent call, once per id."""
+    seen: set[object] = set()
     for block in _blocks(records, "tool_use"):
         call = block.get("input")
-        if block.get("name") != "Agent" or not isinstance(call, dict):
+        if block.get("name") != "Agent" or not isinstance(call, dict) or block.get("id") in seen:
             continue
+        seen.add(block.get("id"))
         subagent_type = call.get("subagent_type")
         if isinstance(subagent_type, str) and subagent_type.startswith(ROLE_PREFIX):
             yield block.get("id"), call
@@ -137,6 +155,14 @@ def _ran_model(own_records: list[dict]) -> str | None:
 def _prompt_markers(prompt: object) -> frozenset[str]:
     text = prompt if isinstance(prompt, str) else ""
     return frozenset(marker for marker, found in _MARKER_PATTERNS.items() if found.search(text))
+
+
+def _driver_request(prompt: object) -> str | None:
+    """The request id of a step-loop driver prompt, None for any other prompt."""
+    text = prompt if isinstance(prompt, str) else ""
+    first_line, _, rest = text.partition("\n")
+    request = _SPAWN_REQUEST_LINE.search(rest)
+    return request.group(1) if request and _TASK_SLUG_LINE.match(first_line) else None
 
 
 def _blocks(records: list[dict], block_type: str):

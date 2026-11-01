@@ -6,11 +6,32 @@ holds equal to the routing rule's tier table. This reads Claude Code's recorded 
 classifies every ``praxion:`` spawn:
 
 - ``floor``: it ran on its floor's model family and nothing in its request contradicts that.
-- ``override``: it ran on a sanctioned deviation the routing rule's directive lists, or the whole
-  session ran on one model while its spawns' floors differ (the operator kill switch).
+- ``override``: it ran on a sanctioned deviation the routing rule's directive lists, the step-loop
+  driver issued it, or the whole session ran on one model while its spawns' floors differ (the
+  operator kill switch).
 - ``unexplained``: it ran off its floor with no sanctioned reason; the check fails on these.
 - ``unknown``: the transcripts cannot say (no recorded model, an unknown role, or the lone spawn
   of its session off its floor, where the kill switch cannot be told apart); reported, not failed.
+
+Four rules refine the reading of production transcripts:
+
+- A spawn the step-loop driver issued is sanctioned. Its prompt's first line is ``Task slug:
+  <slug>`` and a later line starts with ``Spawn request: <id>``; the driver applies the plan's
+  routing (step tier hints, light review at ``sonnet``), so the spawn reads ``override`` with the
+  reason "issued by the step-loop driver (<id>)".
+- A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts only at the start
+  of a line or as a parenthesised hint such as ``(tier: H)``, so a sentence that merely mentions
+  one ("not Mode: light-review") never sanctions a deviation.
+- A session reads as the kill switch only when it holds at least two spawns whose floors differ,
+  all on one model, and none of its spawns passed a per-spawn ``model``: with
+  ``CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`` Claude cannot pass one (code.claude.com/docs/en/sub-agents.md).
+  A session where every spawn passed the same model is judged spawn by spawn.
+- Aliases compare by family: ``haiku`` matches any ``claude-haiku-*``, ``sonnet`` any
+  ``claude-sonnet-*``, ``opus`` any ``claude-opus-*`` and ``fable`` any ``claude-fable-*``. No alias
+  maps to a single version (the docs resolve ``haiku`` to Haiku 5.5 on the Anthropic API and 4.5
+  elsewhere; td-547).
+
+Each Agent call is one spawn, keyed on its ``tool_use`` id (``spawn_transcripts.py``).
 
 Advisory and re-runnable, not a commit gate (transcripts are local and unversioned). Its readers
 are the verifier of any routing change and the sentinel's routing audit. It starts no model
@@ -43,15 +64,8 @@ SCHEMA_VERSION = 1
 INPUT_ERROR = 2
 
 LOW_TIER_PIN = "claude-haiku-4-5"
-# The bare `haiku` alias resolves to Haiku 3.5, a different family from the pin, so the two never
-# match each other.
-_ALIAS_FAMILIES = {"opus": "opus", "sonnet": "sonnet", "haiku": "haiku-3.5"}
-_FAMILY_PREFIXES = (
-    ("claude-opus-", "opus"),
-    ("claude-sonnet-", "sonnet"),
-    (f"{LOW_TIER_PIN}-", LOW_TIER_PIN),
-    ("claude-3-5-haiku-", "haiku-3.5"),
-)
+# A family is an alias; its models are the `claude-<alias>-*` names.
+FAMILIES = ("opus", "sonnet", "haiku", "fable")
 
 
 @dataclass(frozen=True)
@@ -83,12 +97,8 @@ SANCTIONED: dict[str, tuple[Deviation, ...]] = {
 def model_family(model: str) -> str:
     """The family a model name belongs to; a name of no known family stands for itself."""
     name = model.strip().lower()
-    if name in _ALIAS_FAMILIES:
-        return _ALIAS_FAMILIES[name]
-    if name == LOW_TIER_PIN:
-        return LOW_TIER_PIN
-    for prefix, family in _FAMILY_PREFIXES:
-        if name.startswith(prefix):
+    for family in FAMILIES:
+        if name == family or name.startswith(f"claude-{family}-"):
             return family
     return name
 
@@ -108,6 +118,8 @@ def classify(
         return "override", f"every spawn of the session ran on {ran} (operator kill switch)"
     if ran == model_family(floor) and not _requested_other_than(spawn, floor):
         return "floor", f"ran on {spawn.ran_model}, the {floor} floor"
+    if spawn.driver_request is not None:
+        return "override", f"issued by the step-loop driver ({spawn.driver_request})"
     if _sanctioned(spawn):
         return "override", f"ran on {spawn.ran_model}, a listed deviation"
     if len(session_spawns) == 1:
@@ -127,8 +139,10 @@ def _requested_other_than(spawn: Spawn, floor: str) -> bool:
 
 
 def _runs_under_kill_switch(session_spawns: list[Spawn], floors: dict[str, str]) -> bool:
-    """Two or more spawns whose floors differ that all ran on one family: no routing explains
-    that, an operator pin does."""
+    """Two or more spawns whose floors differ that all ran on one family, none of which passed a
+    model: no routing explains that, an operator pin does (it also stops a spawn passing one)."""
+    if any(s.requested_model is not None for s in session_spawns):
+        return False
     known = [s for s in session_spawns if s.ran_model is not None and s.role in floors]
     floor_families = {model_family(floors[s.role]) for s in known}
     ran_families = {model_family(s.ran_model) for s in known if s.ran_model is not None}

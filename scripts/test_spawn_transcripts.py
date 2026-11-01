@@ -40,6 +40,17 @@ def _result(use_id: str, agent_id: str) -> dict:
     }
 
 
+def _blob_copy(record: dict) -> dict:
+    """The `api-request-blob` record Claude Code writes for the same message: same content blocks,
+    a different record kind."""
+    return {
+        "type": "api-request-blob",
+        "sessionId": SESSION,
+        "hash": "0" * 8,
+        "message": record["message"],
+    }
+
+
 def _own_transcript(model: str | None) -> list[dict]:
     reply = {"role": "assistant", "content": [{"type": "text", "text": "Done."}]}
     if model is not None:
@@ -105,7 +116,7 @@ def test_a_per_spawn_model_is_the_requested_model_apart_from_the_ran_model(tmp_p
 
 
 def test_prompt_markers_are_the_closed_phrases_the_prompt_states(tmp_path):
-    prompt = "Task slug: x\nMode: acceptance-design\nThe step is tier: H and a routine one."
+    prompt = "Task slug: x\nMode: acceptance-design\ntier: H\nroutine consult"
     _record(tmp_path, SESSION, "test-engineer", "a1", prompt=prompt)
 
     (spawn,) = st.read_spawns(tmp_path)
@@ -113,13 +124,70 @@ def test_prompt_markers_are_the_closed_phrases_the_prompt_states(tmp_path):
     assert spawn.prompt_markers == {"Mode: acceptance-design", "tier: H", "routine"}
 
 
-@pytest.mark.parametrize("prompt", ["a tier: High hint", "routinely", "Mode: acceptance-designs"])
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "a tier: High hint",
+        "routinely",
+        "Mode: acceptance-designs",
+        "This is not Mode: light-review work.",
+        "The step is tier: H and a routine one.",
+        "Task slug: x\n  Mode: light-review",
+    ],
+)
 def test_a_marker_is_matched_as_a_whole_phrase_only(tmp_path, prompt):
     _record(tmp_path, SESSION, "implementer", "a1", prompt=prompt)
 
     (spawn,) = st.read_spawns(tmp_path)
 
     assert spawn.prompt_markers == frozenset()
+
+
+def test_a_parenthesised_hint_at_the_end_of_a_line_is_a_marker(tmp_path):
+    _record(tmp_path, SESSION, "implementer", "a1", prompt="Implement the refactor (tier: H)")
+
+    (spawn,) = st.read_spawns(tmp_path)
+
+    assert spawn.prompt_markers == {"tier: H"}
+
+
+def test_one_agent_call_is_one_spawn_whatever_record_kinds_carry_a_copy_of_it(tmp_path):
+    call = _call("toolu_a1", "implementer")
+    _write_lines(
+        tmp_path / f"{SESSION}.jsonl",
+        [call, _blob_copy(call), _result("toolu_a1", "a1"), _blob_copy(call)],
+    )
+
+    spawns = st.read_spawns(tmp_path)
+
+    assert [s.agent_id for s in spawns] == ["a1"]
+
+
+def test_a_driver_pointer_prompt_names_the_request_it_answers(tmp_path):
+    prompt = "Task slug: x\nSpawn request: s7-a1-review-r1\nRead PROMPT_s7.md first."
+    _record(tmp_path, SESSION, "verifier", "a1", prompt=prompt)
+
+    (spawn,) = st.read_spawns(tmp_path)
+
+    assert spawn.driver_request == "s7-a1-review-r1"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Do the step.",
+        "Spawn request: s7-a1\nTask slug: x",
+        "Task slug: x\nWe answer the Spawn request: s7-a1 today.",
+        "Intro\nTask slug: x\nSpawn request: s7-a1",
+        "Task slug: x\nNo request here.",
+    ],
+)
+def test_a_prompt_that_is_not_a_driver_pointer_names_no_request(tmp_path, prompt):
+    _record(tmp_path, SESSION, "verifier", "a1", prompt=prompt)
+
+    (spawn,) = st.read_spawns(tmp_path)
+
+    assert spawn.driver_request is None
 
 
 def test_a_spawn_with_no_transcript_of_its_own_has_no_ran_model(tmp_path):

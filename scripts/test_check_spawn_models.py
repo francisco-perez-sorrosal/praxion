@@ -32,8 +32,10 @@ FLOORS = {
 }
 
 
-def spawn(role, ran=None, requested=None, markers=(), agent_id="a1", session=SESSION) -> Spawn:
-    return Spawn(session, agent_id, role, requested, ran, frozenset(markers))
+def spawn(
+    role, ran=None, requested=None, markers=(), agent_id="a1", session=SESSION, request=None
+) -> Spawn:
+    return Spawn(session, agent_id, role, requested, ran, frozenset(markers), request)
 
 
 def verdict_of(target: Spawn, *others: Spawn) -> str:
@@ -58,10 +60,15 @@ def steady_pair() -> tuple[Spawn, Spawn]:
         ("claude-opus-5-5", "opus"),
         ("sonnet", "sonnet"),
         ("claude-sonnet-5-5", "sonnet"),
-        ("claude-haiku-4-5", "claude-haiku-4-5"),
-        ("claude-haiku-4-5-20251001", "claude-haiku-4-5"),
-        ("haiku", "haiku-3.5"),
-        ("claude-3-5-haiku-20241022", "haiku-3.5"),
+        ("claude-opus-6", "opus"),
+        ("claude-sonnet-4-6", "sonnet"),
+        ("haiku", "haiku"),
+        ("claude-haiku-4-5", "haiku"),
+        ("claude-haiku-4-5-20251001", "haiku"),
+        ("claude-haiku-5-5", "haiku"),
+        ("fable", "fable"),
+        ("claude-fable-1", "fable"),
+        ("claude-3-5-haiku-20241022", "claude-3-5-haiku-20241022"),
         ("something-new", "something-new"),
     ],
 )
@@ -69,8 +76,9 @@ def test_a_model_name_maps_to_its_family(model, family):
     assert csm.model_family(model) == family
 
 
-def test_the_bare_haiku_alias_never_matches_the_pinned_haiku():
-    assert csm.model_family("haiku") != csm.model_family("claude-haiku-4-5-20251001")
+@pytest.mark.parametrize("version", ["claude-haiku-4-5", "claude-haiku-5-5-20260101"])
+def test_an_alias_matches_every_version_of_its_family(version):
+    assert csm.model_family("haiku") == csm.model_family(version)
 
 
 # -- classification -------------------------------------------------------------------------------
@@ -84,7 +92,7 @@ def test_a_spawn_on_the_pinned_low_tier_floor_is_floor():
     assert verdict_of(spawn("doc-engineer", ran="claude-haiku-4-5-20251001")) == "floor"
 
 
-def test_the_bare_haiku_alias_landing_on_the_old_family_is_not_the_pinned_floor():
+def test_a_model_of_no_known_family_is_not_the_floors_family():
     landed = spawn("doc-engineer", ran="claude-3-5-haiku-20241022", requested="haiku")
     steady = spawn("implementer", ran="claude-sonnet-5-5", agent_id="a2")
 
@@ -187,6 +195,49 @@ def test_a_session_on_one_model_whose_floors_agree_is_not_the_kill_switch():
     assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["unexplained"] * 2
 
 
+def test_a_session_where_a_spawn_passed_a_model_is_not_the_kill_switch():
+    pinned = "claude-haiku-4-5-20251001"
+    asked = spawn("systems-architect", ran=pinned, requested="claude-haiku-4-5", agent_id="a1")
+    silent = spawn("implementer", ran=pinned, agent_id="a2")
+
+    assert csm.classify(asked, [asked, silent], FLOORS)[0] == "unexplained"
+
+
+def test_a_session_where_every_spawn_passed_the_same_model_is_judged_spawn_by_spawn():
+    pinned = "claude-haiku-4-5-20251001"
+    spawns = [
+        spawn("systems-architect", ran=pinned, requested="haiku", agent_id="a1"),
+        spawn("implementer", ran=pinned, requested="haiku", agent_id="a2"),
+    ]
+
+    assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["unexplained"] * 2
+
+
+def test_a_spawn_the_step_loop_driver_issued_is_an_override_naming_its_request():
+    issued = spawn(
+        "verifier", ran="claude-sonnet-5-5", requested="sonnet", request="s7-a1-review-r1"
+    )
+
+    verdict, reason = csm.classify(issued, [issued, *steady_pair()], FLOORS)
+
+    assert (verdict, reason) == (
+        "override",
+        "issued by the step-loop driver (s7-a1-review-r1)",
+    )
+
+
+def test_a_driver_spawn_with_no_recorded_model_is_still_unknown():
+    issued = spawn("verifier", ran=None, requested="sonnet", request="s7-a1-review-r1")
+
+    assert verdict_of(issued, *steady_pair()) == "unknown"
+
+
+def test_a_spawn_the_driver_did_not_issue_gets_no_such_sanction():
+    plain = spawn("verifier", ran="claude-sonnet-5-5", requested="sonnet")
+
+    assert verdict_of(plain, *steady_pair()) == "unexplained"
+
+
 def test_the_kill_switch_is_judged_per_session():
     other = spawn("implementer", ran="claude-haiku-4-5-20251001", session="other", agent_id="b1")
     mine = spawn("verifier", ran="claude-haiku-4-5-20251001", agent_id="a1")
@@ -210,11 +261,19 @@ def _record(directory: Path, spawns: list[Spawn]) -> None:
     lines = []
     for item in spawns:
         use_id = f"toolu_{item.agent_id}"
-        call = {"subagent_type": f"praxion:{item.role}", "prompt": "Do the step."}
+        prompt = "Do the step."
+        if item.driver_request:
+            prompt = f"Task slug: x\nSpawn request: {item.driver_request}\nRead the prompt file."
+        call = {"subagent_type": f"praxion:{item.role}", "prompt": prompt}
         if item.requested_model:
             call["model"] = item.requested_model
         block = {"type": "tool_use", "id": use_id, "name": "Agent", "input": call}
-        lines.append({"type": "assistant", "message": {"role": "assistant", "content": [block]}})
+        message = {"role": "assistant", "content": [block]}
+        lines.append({"type": "assistant", "message": message})
+        # Claude Code records the same call a second time as an api-request-blob.
+        lines.append(
+            {"type": "api-request-blob", "sessionId": SESSION, "hash": "h", "message": message}
+        )
         result = {"type": "tool_result", "tool_use_id": use_id}
         lines.append(
             {
@@ -302,6 +361,43 @@ def test_json_output_has_the_documented_shape(tmp_path):
         "verdict",
         "reason",
     }
+
+
+def test_a_call_recorded_twice_is_one_row_in_the_json(tmp_path):
+    _record(
+        tmp_path,
+        [
+            spawn("implementer", ran=_repo_floor("implementer"), agent_id="a1"),
+            spawn("systems-architect", ran=_repo_floor("systems-architect"), agent_id="a2"),
+        ],
+    )
+
+    payload = json.loads(_run(str(tmp_path), "--repo-root", str(REPO_ROOT), "--json").stdout)
+
+    assert [row["agent_id"] for row in payload["spawns"]] == ["a1", "a2"]
+
+
+def test_a_driver_issued_verifier_on_sonnet_reads_override_on_the_command_line(tmp_path):
+    _record(
+        tmp_path,
+        [
+            spawn("implementer", ran=_repo_floor("implementer"), agent_id="a1"),
+            spawn(
+                "verifier",
+                ran="claude-sonnet-5-5",
+                requested="sonnet",
+                agent_id="a2",
+                request="s7-a1-review-r1",
+            ),
+        ],
+    )
+
+    result = _run(str(tmp_path), "--repo-root", str(REPO_ROOT))
+
+    assert result.returncode == 0, result.stdout
+    assert (
+        "a2  verifier  override  issued by the step-loop driver (s7-a1-review-r1)" in result.stdout
+    )
 
 
 def test_the_module_launches_no_subprocess(tmp_path, monkeypatch):

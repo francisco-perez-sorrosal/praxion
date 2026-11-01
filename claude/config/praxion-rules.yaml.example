@@ -32,8 +32,11 @@
 #
 # === Token-savings ceiling ===
 # The maximum baseline token reduction is the sum of the *hook-deliver*
-# rule sizes — currently ~5,100 tokens across three rules (memory-protocol,
-# agent-model-routing, vcs/git-conventions). Path-scoped rules cost zero
+# rule sizes — currently about 2,450 tokens across two rules (the session-start
+# text of agent-model-routing, ~750; vcs/git-conventions, ~1,700; measured 2026-11-01).
+# agent-model-routing itself is path-scoped (agents/**); only its short
+# session-start text is hook-delivered, and disabling `swe/agent-model-routing`
+# (or `swe/*`) removes both. Path-scoped rules cost zero
 # tokens at SessionStart; disabling them yields a *policy guarantee* but
 # no baseline savings. Core rules are non-disableable. To shrink the
 # always-loaded surface further, the lever is the `core: true/false`
@@ -66,9 +69,10 @@
 # swe/swe-agent-coordination-protocol) — attempting to list any of them,
 # either ADR id included, emits a SessionStart warning and they stay loaded.
 #
-#   Hook-deliver, always-loaded (3 rules — disabling reclaims SessionStart tokens):
+#   Hook-deliver, always-loaded (3 entries — disabling reclaims SessionStart tokens):
 #     - swe/memory-protocol            — Memory MCP protocol (~1.2k tokens)
-#     - swe/agent-model-routing        — Per-agent Claude model tier policy (~1.6k tokens)
+#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~750 tokens)
+#                                        Disabling the rule id removes the path-scoped rule and its session-start text
 #     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
 #
 #   Path-scoped (13 rules — zero baseline cost; disabling is a declarative
@@ -97,8 +101,8 @@
 #     - ml/*       → all 3 ML rules
 #     - writing/*  → all 4 writing rules
 #     - swe/vcs/*  → swe/vcs/git-conventions + swe/vcs/pr-conventions
-#     - swe/*      → 9 SWE rules (3 hook-deliver + 6 path-scoped); core rules
-#                    emit a warning and stay loaded
+#     - swe/*      → every SWE rule, the routing rule's session-start text
+#                    included; core rules emit a warning and stay loaded
 
 # List of rules to disable for this project, by ID (directory-prefixed
 # path without the `.md` extension). fnmatch glob syntax is supported.
@@ -107,7 +111,8 @@ disable:
   # like `prepare.py` or `runs/` appears in the tree for unrelated reasons
   # - ml/*
 
-  # Project uses default model routing only (no multi-tier pipeline)
+  # Project uses default model routing only (no multi-tier pipeline);
+  # removes the path-scoped rule and its session-start text together
   # - swe/agent-model-routing
 
 # Schema version. Currently 1. Bumped on breaking config changes.

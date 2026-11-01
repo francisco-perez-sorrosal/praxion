@@ -1,0 +1,77 @@
+{
+ "always_on": [
+  "rules::swe::adr-conventions",
+  "rules::swe::agent-behavioral-contract",
+  "rules::swe::agent-intermediate-documents",
+  "rules::swe::swe-agent-coordination-protocol",
+  "rules::swe::vcs::git-conventions"
+ ],
+ "path_scoped": [
+  "rules::eval::eval-data-governance",
+  "rules::ml::eval-driven-verification",
+  "rules::ml::experiment-commit-conventions",
+  "rules::ml::experiment-tracking-conventions",
+  "rules::ml::gpu-budget-conventions",
+  "rules::swe::coding-style",
+  "rules::swe::gate-liveness",
+  "rules::swe::id-citation-discipline",
+  "rules::swe::shipped-artifact-isolation",
+  "rules::swe::testing-conventions",
+  "rules::swe::vcs::pr-conventions",
+  "rules::writing::aac-dac-conventions",
+  "rules::writing::diagram-conventions",
+  "rules::writing::html-output-conventions",
+  "rules::writing::readme-style"
+ ],
+ "pointer": "[Praxion rules bridge] Always-on Praxion rules for this project:\n- ADR Conventions \u2014 <repo>/rules/swe/adr-conventions.md\n- Agent Behavioral Contract \u2014 <repo>/rules/swe/agent-behavioral-contract.md\n- Agent Intermediate Documents \u2014 <repo>/rules/swe/agent-intermediate-documents.md\n- SWE Agent Coordination Protocol \u2014 <repo>/rules/swe/swe-agent-coordination-protocol.md\n- Git Conventions \u2014 <repo>/rules/swe/vcs/git-conventions.md\nCanonical Praxion rule files above remain the source of truth. Read them before acting.",
+ "portable_always_on": [
+  "rules::swe::adr-conventions",
+  "rules::swe::agent-behavioral-contract",
+  "rules::swe::agent-intermediate-documents",
+  "rules::swe::swe-agent-coordination-protocol",
+  "rules::swe::vcs::git-conventions"
+ ],
+ "routing_entry": {
+  "codex_load": "exclude",
+  "codex_portability": "claude_only",
+  "id": "rules::swe::agent-model-routing",
+  "keywords": [
+   "agent",
+   "agents",
+   "model",
+   "routing",
+   "swe"
+  ],
+  "path_globs": [],
+  "relpath": "rules/swe/agent-model-routing.md",
+  "scope": "always_on",
+  "source_path": "<repo>/rules/swe/agent-model-routing.md",
+  "summary": "Tier table for Praxion subagents. Resolution order at spawn:",
+  "title": "Agent Model Routing"
+ },
+ "rule_paths": [
+  "rules/eval/eval-data-governance.md",
+  "rules/ml/eval-driven-verification.md",
+  "rules/ml/experiment-commit-conventions.md",
+  "rules/ml/experiment-tracking-conventions.md",
+  "rules/ml/gpu-budget-conventions.md",
+  "rules/swe/adr-conventions.md",
+  "rules/swe/agent-behavioral-contract.md",
+  "rules/swe/agent-intermediate-documents.md",
+  "rules/swe/agent-model-routing.md",
+  "rules/swe/coding-style.md",
+  "rules/swe/gate-liveness.md",
+  "rules/swe/id-citation-discipline.md",
+  "rules/swe/plugin-install-conventions.md",
+  "rules/swe/shipped-artifact-isolation.md",
+  "rules/swe/staleness-policy.md",
+  "rules/swe/swe-agent-coordination-protocol.md",
+  "rules/swe/testing-conventions.md",
+  "rules/swe/vcs/git-conventions.md",
+  "rules/swe/vcs/pr-conventions.md",
+  "rules/writing/aac-dac-conventions.md",
+  "rules/writing/diagram-conventions.md",
+  "rules/writing/html-output-conventions.md",
+  "rules/writing/readme-style.md"
+ ]
+}

@@ -150,9 +150,18 @@ def test_a_definition_exports_to_codex_identically_with_or_without_omit_claude_m
 # -- Cursor --------------------------------------------------------------------------------
 
 
+# The model-routing move restates the routing rule's directive paragraph on purpose; its own
+# scenarios hold that file to that one difference.
+LATER_DECLARED_CURSOR_CHANGES = {"swe/agent-model-routing.md"}
+
+
 def test_the_cursor_export_is_byte_identical_to_before_the_change(tmp_path: Path) -> None:
     frozen = resident_sections.load("cursor_export.json")
 
     exported = kernel_sandbox.export_cursor(REPO_ROOT, tmp_path / "cursor")
+    digests = {rel: resident_sections.digest(data) for rel, data in exported.items()}
 
-    assert {rel: resident_sections.digest(data) for rel, data in exported.items()} == frozen
+    assert sorted(digests) == sorted(frozen)
+    assert {k: v for k, v in digests.items() if k not in LATER_DECLARED_CURSOR_CHANGES} == {
+        k: v for k, v in frozen.items() if k not in LATER_DECLARED_CURSOR_CHANGES
+    }

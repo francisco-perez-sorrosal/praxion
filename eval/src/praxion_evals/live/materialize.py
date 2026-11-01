@@ -36,7 +36,7 @@ SECTION_PREFIX = "### "
 
 GLOBAL_TEMPLATE = "claude/config/CLAUDE.md.tmpl"
 PLUGIN_AGENT = "agents/researcher.md"
-HOOK_DELIVERED_RULE = "rules/swe/agent-model-routing.md"
+HOOK_DELIVERED_RULE = "rules/swe/vcs/git-conventions.md"
 MARKER_PREFIX = "PRXLIVE"
 NONCE_BYTES = 4
 

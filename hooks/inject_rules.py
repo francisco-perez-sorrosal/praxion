@@ -25,6 +25,11 @@ type flipped from `symlink` to `hook-deliver`) cannot bypass the
 blacklist. The structural fix lives in the installer's
 `sweep_stale_rule_symlinks` step; this is the runtime safety net.
 
+A disabled rule's resident (a hook-deliver rule whose frontmatter names the
+disabled rule's path in `resident_of:`) is suppressed with it, so an opt-out
+keeps its reach when a rule is split into a path-scoped body and an
+always-loaded one-line projection.
+
 Core rules (core: true in manifest) are never suppressible by either
 mechanism — any attempt produces a stderr warning and is ignored.
 
@@ -81,6 +86,12 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 # Any entry starting with this prefix is recomputed on every SessionStart;
 # any entry not starting with it is preserved as a user-managed exclusion.
 _PRAXION_EXCLUSION_PREFIX = "**/.claude/rules/"
+
+# A resident file names the rule it stands for in a top-level `resident_of:` frontmatter key.
+# Local copy of scripts/_resident_of.py::resident_parent — the injector runs from copies that
+# carry only rules/, lib/ and hooks/ — held equal to it by a parity test in test_inject_rules.py.
+_RESIDENT_OF_KEY = re.compile(r"""^["']?resident_of["']?\s*:\s*(.*?)\s*$""")
+_FRONTMATTER_DELIMITER = "---"
 
 
 # -- Frontmatter stripping -----------------------------------------------------
@@ -522,6 +533,69 @@ def _compute_disable_set(
     return _filter_core_rules(disable_set, rules)
 
 
+def _resident_parent(text: str) -> str | None:
+    """The rule path a file's frontmatter names in `resident_of`, or None when it names none."""
+    lines = text.splitlines()
+    if not lines or lines[0].rstrip() != _FRONTMATTER_DELIMITER:
+        return None
+    closing = next(
+        (i for i in range(1, len(lines)) if lines[i].rstrip() == _FRONTMATTER_DELIMITER), None
+    )
+    if closing is None:  # never closed: not frontmatter
+        return None
+    for line in lines[1:closing]:
+        match = _RESIDENT_OF_KEY.match(line)
+        if match:
+            return match.group(1).strip("\"'") or None
+    return None
+
+
+def _read_resident_parent_id(plugin_root: Path, rule: dict) -> str | None:
+    """The id of the rule this manifest row stands for as a resident, or None.
+
+    A rule's id is its path minus `rules/` and `.md`. Fail-open: an unreadable
+    file is treated as no resident, so it stays injected.
+    """
+    rel_path = rule.get("path", "")
+    if not rel_path:
+        return None
+    try:
+        text = (plugin_root / rel_path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(
+            f"[inject_rules] WARNING: could not read rule file {plugin_root / rel_path}: {exc}",
+            file=sys.stderr,
+        )
+        return None
+    parent_path = _resident_parent(text)
+    if parent_path is None:
+        return None
+    return parent_path.removeprefix("rules/").removesuffix(".md")
+
+
+def _add_residents_of_disabled(
+    disable_set: set[str], rules: list[dict], plugin_root: Path
+) -> set[str]:
+    """Add to the disable set every hook-deliver resident whose parent rule is in it.
+
+    A path-scoped rule keeps its always-loaded one-line projection as a separate
+    rule, so the blacklist's id globs would otherwise miss it and an opt-out
+    would silently regain the session-start text. A core resident stays loaded,
+    like any core rule; a core parent never reaches the disable set.
+    """
+    if not disable_set:
+        return disable_set
+    residents = {
+        rule["id"]
+        for rule in rules
+        if rule.get("install") == "hook-deliver"
+        and rule.get("core") is not True
+        and "id" in rule
+        and _read_resident_parent_id(plugin_root, rule) in disable_set
+    }
+    return disable_set | residents
+
+
 def _select_hook_deliver_rules(
     rules: list[dict], disable_set: set[str]
 ) -> tuple[list[dict], list[dict], list[str]]:
@@ -599,6 +673,7 @@ def main() -> None:
     # Malformed YAML is fail-open; schema version > 1 is fail-open.
     disable_patterns = _resolve_disable_patterns(cwd)
     disable_set = _compute_disable_set(disable_patterns, rules, all_rule_ids)
+    disable_set = _add_residents_of_disabled(disable_set, rules, plugin_root)
 
     # Reconcile claudeMdExcludes in .claude/settings.json with the symlinked
     # rules in the disable set. Hook-deliver rules are handled below via the

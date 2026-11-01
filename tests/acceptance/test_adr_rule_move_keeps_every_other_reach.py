@@ -102,8 +102,19 @@ def test_the_codex_bridge_exports_no_rule_for_the_resident_file(codex):
     assert move.RESIDENT not in codex["rule_paths"]
 
 
+# The model-routing move restates the routing rule's directive paragraph on purpose; its own
+# scenarios hold that file to that one difference.
+LATER_DECLARED_CURSOR_CHANGES = {"swe/agent-model-routing.md"}
+
+
 def test_the_cursor_export_is_the_bases_byte_for_byte(tmp_path):
-    assert move.cursor_digests(tmp_path) == move.fixture_json("base_cursor.json")
+    exported = move.cursor_digests(tmp_path)
+    base = move.fixture_json("base_cursor.json")
+
+    assert sorted(exported) == sorted(base)
+    assert {k: v for k, v in exported.items() if k not in LATER_DECLARED_CURSOR_CHANGES} == {
+        k: v for k, v in base.items() if k not in LATER_DECLARED_CURSOR_CHANGES
+    }
 
 
 # -- What readers are told ------------------------------------------------------------------------

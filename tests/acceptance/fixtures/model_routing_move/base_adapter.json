@@ -1,0 +1,391 @@
+{
+ "model_routing.json": {
+  "agent_routes": [
+   {
+    "agent": "systems-architect",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Trade-offs, ADRs, cross-codebase reasoning"
+   },
+   {
+    "agent": "promethean",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Ideation, multi-lens synthesis, long-horizon framing"
+   },
+   {
+    "agent": "roadmap-cartographer",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Multi-phase synthesis, 6-way fan-out"
+   },
+   {
+    "agent": "verifier",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Quality-critical gate; structural reasoning"
+   },
+   {
+    "agent": "architect-validator",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Structural reasoning across DSL + code graph + ADR set; pre-merge gate"
+   },
+   {
+    "agent": "interface-designer",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Design taste under trade-offs across web/TUI/API/agentic surfaces; like systems-architect/verifier, value is quality judgement across a broad space"
+   },
+   {
+    "agent": "agentic-transactions-architect",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Domain-expert shadow sub-architect: mandate/finality/ToS/HITL judgment in a regulated, high-stakes, fast-moving domain; peers with systems-architect and interface-designer"
+   },
+   {
+    "agent": "discipline-consultant",
+    "canonical_alias": "opus",
+    "canonical_tier": "H",
+    "codex_adapter": {
+     "codex_tier": "high",
+     "model_selection": "strongest_available_codex_model",
+     "reasoning_effort": "high"
+    },
+    "rationale": "Adversarial specialist judgment against a draft; frontmatter floor is sonnet so a routine consult can route down \u2014 the only sanctioned downgrade"
+   },
+   {
+    "agent": "implementation-planner",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Feature-scoped decomposition"
+   },
+   {
+    "agent": "implementer",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Single-step execution; step-H/L override"
+   },
+   {
+    "agent": "test-engineer",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Outer-loop test judgment; acceptance-design mode spawns at opus"
+   },
+   {
+    "agent": "context-engineer",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Placement, conflict detection"
+   },
+   {
+    "agent": "researcher",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Default; modes route up or down"
+   },
+   {
+    "agent": "cicd-engineer",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Pipeline design, security review"
+   },
+   {
+    "agent": "sentinel",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Mechanical scan + judgment"
+   },
+   {
+    "agent": "skill-genesis",
+    "canonical_alias": "sonnet",
+    "canonical_tier": "M",
+    "codex_adapter": {
+     "codex_tier": "medium",
+     "model_selection": "default_strong_codex_coding_model",
+     "reasoning_effort": "medium"
+    },
+    "rationale": "Triage, dedup, autonomous report writing"
+   },
+   {
+    "agent": "doc-engineer",
+    "canonical_alias": "claude-haiku-4-5",
+    "canonical_tier": "L",
+    "codex_adapter": {
+     "codex_tier": "low",
+     "model_selection": "fast_cost_efficient_codex_model",
+     "reasoning_effort": "low"
+    },
+    "rationale": "Mechanical doc verification, pattern writing; pinned full ID (see alias note above)"
+   }
+  ],
+  "codex_resolution_order": [
+   "explicit_spawn_agent_model_or_reasoning_effort",
+   "generated_agent_route",
+   "main_session_default"
+  ],
+  "generated_by": "Praxion Codex pipeline adapter exporter",
+  "notes": [
+   "tier_mapping and agent_routes[].codex_adapter are keyed by the routing rule's canonical Tier column (H/M/L), never by the rule's Alias column; canonical_alias is opaque source-rule provenance and is not resolved here.",
+   "Choose the strongest available Codex model for high-tier routes, a strong default coding model for medium-tier routes, and a fast cost-efficient model for low-tier routes."
+  ],
+  "schema_version": 1,
+  "source_path": "<repo>/rules/swe/agent-model-routing.md",
+  "tier_mapping": {
+   "H": {
+    "codex_tier": "high",
+    "model_selection": "strongest_available_codex_model",
+    "reasoning_effort": "high"
+   },
+   "L": {
+    "codex_tier": "low",
+    "model_selection": "fast_cost_efficient_codex_model",
+    "reasoning_effort": "low"
+   },
+   "M": {
+    "codex_tier": "medium",
+    "model_selection": "default_strong_codex_coding_model",
+    "reasoning_effort": "medium"
+   }
+  }
+ },
+ "pipeline_semantics.json": {
+  "agents": [
+   {
+    "agent": "promethean",
+    "bg_safe": "No",
+    "output": ".ai-work/<slug>/IDEA_PROPOSAL.md, .ai-state/idea_ledgers/IDEA_LEDGER_*.md"
+   },
+   {
+    "agent": "researcher",
+    "bg_safe": "Yes",
+    "output": ".ai-work/<slug>/RESEARCH_FINDINGS.md"
+   },
+   {
+    "agent": "systems-architect",
+    "bg_safe": "Yes",
+    "output": "\u2192 Delegation Checklists"
+   },
+   {
+    "agent": "implementation-planner",
+    "bg_safe": "Yes",
+    "output": "\u2192 Delegation Checklists"
+   },
+   {
+    "agent": "context-engineer",
+    "bg_safe": "Yes",
+    "output": "Audit report + artifact changes, .ai-work/<slug>/CONTEXT_REVIEW.md (shadowing)"
+   },
+   {
+    "agent": "implementer",
+    "bg_safe": "Yes",
+    "output": "\u2192 Delegation Checklists"
+   },
+   {
+    "agent": "test-engineer",
+    "bg_safe": "Yes",
+    "output": "Test code + .ai-work/<slug>/WIP.md update + .ai-work/<slug>/TEST_RESULTS.md (canonical when paired); in acceptance-design mode .ai-work/<slug>/ACCEPTANCE_TESTS.md + outer-loop tests"
+   },
+   {
+    "agent": "verifier",
+    "bg_safe": "Yes",
+    "output": "\u2192 Delegation Checklists"
+   },
+   {
+    "agent": "doc-engineer",
+    "bg_safe": "Yes",
+    "output": "Doc report or file fixes"
+   },
+   {
+    "agent": "sentinel",
+    "bg_safe": "Yes",
+    "output": ".ai-state/sentinel_reports/SENTINEL_REPORT_*.md, .ai-state/sentinel_reports/SENTINEL_LOG.md"
+   },
+   {
+    "agent": "architect-validator",
+    "bg_safe": "Yes",
+    "output": ".ai-work/<task-slug>/ARCHITECTURE_VALIDATION.md, .ai-state/TECH_DEBT_LEDGER.md rows on FAIL"
+   },
+   {
+    "agent": "skill-genesis",
+    "bg_safe": "Yes",
+    "output": ".ai-state/skill_genesis_reports/SKILL_GENESIS_REPORT_*.md, .ai-state/skill_genesis_reports/SKILL_GENESIS_LOG.md"
+   },
+   {
+    "agent": "cicd-engineer",
+    "bg_safe": "Yes",
+    "output": "Workflow files + pipeline config"
+   },
+   {
+    "agent": "roadmap-cartographer",
+    "bg_safe": "No",
+    "output": "ROADMAP.md at project root, .ai-work/<slug>/ROADMAP_DRAFT.md, .ai-work/<slug>/AUDIT_<lens>.md fragments"
+   },
+   {
+    "agent": "interface-designer",
+    "bg_safe": "Yes",
+    "output": ".ai-work/<slug>/INTERFACE_DESIGN.md + ADR fragments in .ai-state/decisions/drafts/"
+   },
+   {
+    "agent": "agentic-transactions-architect",
+    "bg_safe": "Yes",
+    "output": ".ai-work/<slug>/TRANSACTIONS_DESIGN.md + ADR fragments in .ai-state/decisions/drafts/"
+   },
+   {
+    "agent": "discipline-consultant",
+    "bg_safe": "Yes",
+    "output": ".ai-work/<slug>/CONSULT_<discipline>.md; convener appends .ai-state/CONSULT_LEDGER.md rows"
+   }
+  ],
+  "generated_by": "Praxion Codex pipeline adapter exporter",
+  "pipeline": {
+   "canonical_flow": [
+    "promethean",
+    "researcher",
+    "systems-architect",
+    "implementation-planner",
+    "implementer",
+    "test-engineer",
+    "doc-engineer",
+    "verifier"
+   ],
+   "codex_boundary": "Use Codex subagents only from the main agent; keep agent-to-agent coordination document-based.",
+   "persistent_document_root": ".ai-state/",
+   "shared_document_root": ".ai-work/<task-slug>/",
+   "task_slug_required": true
+  },
+  "process_tiers": [
+   {
+    "canonical_process": "Fix \u2192 verify \u2192 commit. No agents, no planning documents, no spec.",
+    "codex_adapter": {
+     "agents": "none",
+     "codex_process": "work_in_main_thread",
+     "planning_documents": "none",
+     "worktree": "current_checkout"
+    },
+    "signals": "Single-file fix, config, doc, typo",
+    "tier": "Direct"
+   },
+   {
+    "canonical_process": "Optional researcher; no other agents (escalate to Standard if architect/planner needed). Acceptance criteria inline. Task tools for tracking. No SDD, no three-document planning. A single pytest-checkable behaviour may run as Ralph-lite (/praxion:ralph-lite), an execution mode, not a tier.",
+    "codex_adapter": {
+     "agents": "optional_researcher_only",
+     "codex_process": "main_thread_with_optional_researcher",
+     "planning_documents": "inline_acceptance_criteria",
+     "worktree": "current_checkout"
+    },
+    "signals": "2-3 files, single behavior, clear scope",
+    "tier": "Lightweight"
+   },
+   {
+    "canonical_process": "Full agent pipeline. SDD behavioral spec with REQ IDs. Three-document model.",
+    "codex_adapter": {
+     "agents": "researcher_to_architect_to_planner_to_implementation_group_to_verifier",
+     "codex_process": "pipeline_with_shared_documents",
+     "planning_documents": "three_document_model_plus_sdd",
+     "worktree": "dedicated_worktree"
+    },
+    "signals": "4-8 files, 2-4 behaviors, architectural decisions",
+    "tier": "Standard"
+   },
+   {
+    "canonical_process": "Standard plus parallel execution, doc-engineer in groups, context-engineer shadowing, structured decisions, spec archival.",
+    "codex_adapter": {
+     "agents": "standard_plus_context_engineer_doc_engineer_parallelism",
+     "codex_process": "expanded_pipeline_with_parallel_execution",
+     "planning_documents": "three_document_model_plus_sdd_and_archival",
+     "worktree": "dedicated_worktree"
+    },
+    "signals": "9+ files, 5+ behaviors, cross-cutting",
+    "tier": "Full"
+   },
+   {
+    "canonical_process": "Timeboxed researcher. Decision in LEARNINGS.md. No implementation until resolved.",
+    "codex_adapter": {
+     "agents": "researcher_only",
+     "codex_process": "timeboxed_research_before_implementation",
+     "planning_documents": "learnings_decision_only",
+     "worktree": "current_checkout"
+    },
+    "signals": "Exploratory, outcome uncertain",
+    "tier": "Spike"
+   }
+  ],
+  "schema_version": 1,
+  "source_paths": {
+   "agent_intermediate_documents": "<repo>/rules/swe/agent-intermediate-documents.md",
+   "agent_roster": "<repo>/skills/software-planning/references/coordination-details.md",
+   "coordination_protocol": "<repo>/rules/swe/swe-agent-coordination-protocol.md"
+  }
+ }
+}

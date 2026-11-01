@@ -255,7 +255,7 @@ entries:
   - source: rules/swe/agent-model-routing.md
     heading: "Agent Model Routing"
     scope: orchestrator-only
-    reason: "Delivered to the main session by a hook; a spawned role never inherits it and its model is set by its own definition."
+    reason: "Only the main session spawns and so chooses a model; a spawned role never acts on it and its model is set by its own definition."
   - source: rules/swe/agent-model-routing.md
     heading: "Tier Table"
     scope: orchestrator-only

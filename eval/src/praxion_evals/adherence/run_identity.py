@@ -78,7 +78,9 @@ class MeasuredIdentity:
     """Everything a run was measured on that a continuation must reproduce.
 
     ``tree`` is ``None`` for a file written before identity was recorded; ``model`` is ``None``
-    until a session reports one (the alias a run asked for is not a resolved model).
+    until a session reports one (the alias a run asked for is not a resolved model). ``checks``
+    digests the runner's grading sources and is ``None`` for a file written before they were
+    digested: the checkout's tree cannot set such runs apart, since the runner is not part of it.
     """
 
     tree: str | None
@@ -88,6 +90,7 @@ class MeasuredIdentity:
     launch_orders: Mapping[str, Mapping[str, tuple[str, ...]]]  # by role, then task id
     declared: DeclaredSettings
     roles: Mapping[str, RoleIdentityOrUnknown]
+    checks: str | None = None
 
 
 def measured_identity(recorded: RunResults, repo: Path) -> MeasuredIdentity:
@@ -99,11 +102,12 @@ def measured_identity(recorded: RunResults, repo: Path) -> MeasuredIdentity:
         commit = _field(_field(extra, "checkout", "a run"), "commit", "a checkout")
         read = at_commit(repo, commit)
         roles = {role: role_identity(read, role) for role in _field(extra, "roles", "a run")}
-        tree = model = None
+        tree = model = checks = None
     else:
         what = "a run identity"
         roles = {role: _role_from_json(e) for role, e in _field(identity, "roles", what).items()}
         tree, model = _field(identity, "tree", what), _field(identity, "model", what)
+        checks = identity.get("checks")
     return MeasuredIdentity(
         tree=tree,
         model=model,
@@ -115,6 +119,7 @@ def measured_identity(recorded: RunResults, repo: Path) -> MeasuredIdentity:
         },
         declared=recorded.settings,
         roles=roles,
+        checks=checks,
     )
 
 
@@ -122,11 +127,13 @@ def diff(a: MeasuredIdentity, b: MeasuredIdentity) -> tuple[str, ...]:
     """Every way ``a`` and ``b`` differ, one line each; empty when nothing differs.
 
     A model that either run has not reported yet is not a difference: it is compared once both
-    are known. Neither is a launch order or a role only one of them recorded, since a run that
+    are known; a ``checks`` digest one side lacks is a difference, since that run was graded by
+    sources nobody recorded. Neither is a launch order or a role only one of them recorded, since a run that
     has not reached a task has drawn nothing for it. A role whose identity is unknown is
     always reported.
     """
     found = list(_differences("tree", _abbreviated(a.tree), _abbreviated(b.tree)))
+    found += _differences("checks", _abbreviated(a.checks), _abbreviated(b.checks))
     if a.model is not None and b.model is not None:
         found += _differences("model", a.model, b.model)
     found += _differences("seed", a.seed, b.seed)
@@ -195,12 +202,13 @@ def _shown(value: Any) -> str:
 
 
 def current_identity(checkout: Path, roles: Sequence[str]) -> dict[str, Any]:
-    """The identity record a run writes when it begins: the checkout's tree and each role's
-    identity there. The model is ``None`` until the first session reports one."""
+    """The identity record a run writes when it begins: the checkout's tree, the runner's
+    grading sources and each role's identity there. The model is ``None`` until the first session reports one."""
     read = working_tree(checkout)
     return {
         "tree": tree_digest(checkout),
         "model": None,
+        "checks": checks_digest(),
         "roles": {role: _role_to_json(role_identity(read, role)) for role in roles},
     }
 
@@ -222,6 +230,27 @@ def tree_digest(checkout: Path) -> str:
         blob = _blob_id(checkout / name)
         if blob is not None:  # a tracked file deleted from the tree, or a submodule, has none
             digest.update(blob.encode() + b"\t" + path + b"\0")
+    return digest.hexdigest()
+
+
+# The runner's own sources that decide a verdict, under the adherence package directory.
+ADHERENCE_DIR = Path(__file__).parent
+GRADING_SOURCES: tuple[str, ...] = (
+    "checks_*.py",
+    "catalog*.py",
+    "grade.py",
+    "output_forms.py",
+    "transcript.py",
+)
+
+
+def checks_digest(package: Path = ADHERENCE_DIR) -> str:
+    """sha256 over the sorted ``(file name, content)`` of the grading sources installed with
+    this runner."""
+    sources = {path for pattern in GRADING_SOURCES for path in package.glob(pattern)}
+    digest = hashlib.sha256()
+    for path in sorted(sources):
+        digest.update(path.name.encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
 
 

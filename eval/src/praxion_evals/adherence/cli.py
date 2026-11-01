@@ -75,6 +75,7 @@ from praxion_evals.adherence.run_ending import Continuation
 from praxion_evals.adherence.run_identity import (
     UNCOUNTED_PATHS,
     MeasuredIdentity,
+    checks_digest,
     role_identity,
     tree_digest,
     working_tree,
@@ -628,6 +629,7 @@ def identity_now(
         },
         declared=declared_settings(config),
         roles={role: role_identity(read, role) for role in config.roles},
+        checks=checks_digest(),
     )
 
 

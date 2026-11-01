@@ -438,6 +438,15 @@ def test_a_finished_report_whose_prose_quotes_the_pending_marker_still_passes():
     assert _verifier_c5(_report(sections=quoting)) == Passed()
 
 
+def test_an_unmarked_report_with_a_half_filled_section_that_kept_its_marker_line_fails():
+    half = "## Findings\nThe first check passed.\n[pending]\n"
+
+    outcome = _verifier_c5(_report(sections=half))
+
+    assert isinstance(outcome, Failed)
+    assert "'Findings' is still [pending]" in outcome.detail
+
+
 @pytest.mark.parametrize("verdict", [None, "", "WARN", "[pending]", "PASSED"])
 def test_an_unmarked_report_whose_verdict_is_missing_or_names_no_outcome_fails(verdict):
     outcome = _verifier_c5(_report(verdict=verdict))

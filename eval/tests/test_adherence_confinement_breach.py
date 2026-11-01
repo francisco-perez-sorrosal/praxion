@@ -8,7 +8,9 @@ import pytest
 
 from praxion_evals.adherence.confinement import (
     CONFINED_ROLES,
+    EVIDENCE_CHARS,
     PRESCRIBED_COMMANDS,
+    ShellRun,
     confinement_breach,
     refused_prescribed,
 )
@@ -32,8 +34,9 @@ def _breach(
     results=(),
     stderr="",
     started=True,
+    runs=(),
 ) -> str | None:
-    return confinement_breach(role, tuple(refused), tuple(results), stderr, started)
+    return confinement_breach(role, tuple(refused), tuple(results), stderr, started, tuple(runs))
 
 
 # -- The error kind --------------------------------------------------------------------------------
@@ -199,8 +202,6 @@ def test_every_form_of_a_verifiers_prescribed_command_is_read_as_prescribed(comm
 COMPOSITIONS = [
     "cd /work/task && pytest -q",
     "cd /work/task\npytest -q",
-    "PYTHONPATH=src pytest -q",
-    "FOO=1 BAR=2 python -m pytest -q",
     "env PYTHONPATH=src pytest -q",
     "mkdir -p .ai-work/s/logs && pytest -q > .ai-work/s/logs/step-1.log 2>&1; tail -n 30 .ai-work/s/logs/step-1.log",
     "pytest -q 2>&1 | tail -n 30",
@@ -217,6 +218,131 @@ def test_chaining_env_prefixes_redirects_cd_and_git_c_do_not_hide_a_prescribed_c
     refused = _refused(command)
 
     assert refused_prescribed("implementer", (refused,)) == refused
+
+
+WRAPPED = [
+    "timeout 60 pytest -q",
+    "timeout -k 5 -s KILL 1.5m python -m pytest -q",
+    "env pytest -q",
+    "env -i PYTHONPATH=src pytest -q",
+    "bash -c 'pytest -q'",
+    'sh -c "cd /work/task && pytest -q"',
+    "bash -lc 'ruff check .'",
+    "timeout 60 bash -c 'pytest -q'",
+    "cd /work/task && timeout 60 uv run pytest -q",
+]
+
+
+@pytest.mark.parametrize("command", WRAPPED)
+def test_timeout_env_and_a_shell_c_do_not_hide_a_prescribed_command(command):
+    refused = _refused(command)
+
+    assert refused_prescribed("implementer", (refused,)) == refused
+
+
+def test_a_verifier_prescribed_command_is_read_inside_a_wrapper():
+    refused = _refused("timeout 30 ruff check .")
+
+    assert refused_prescribed("verifier", (refused,)) == refused
+
+
+NOT_PRESCRIBED_WRAPPED = [
+    "timeout 60 curl -s https://example.com",
+    "bash -c 'curl -s https://example.com'",
+    "bash install.sh pytest",
+    "sh -c",
+    "timeout pytest",
+    "env",
+    "env -i",
+]
+
+
+@pytest.mark.parametrize("command", NOT_PRESCRIBED_WRAPPED)
+def test_a_wrapper_around_a_command_no_definition_prescribes_is_not_read_as_prescribed(command):
+    assert refused_prescribed("implementer", (_refused(command),)) is None
+
+
+ENV_PREFIXED = [
+    "PYTHONPATH=src pytest -q",
+    "FOO=1 BAR=2 python -m pytest -q",
+    "cd /work/task && PYTHONPATH=src pytest -q",
+    "bash -c 'PYTHONPATH=src pytest -q'",
+]
+
+
+@pytest.mark.parametrize("command", ENV_PREFIXED)
+def test_a_refused_env_prefixed_command_is_not_a_breach(command):
+    refused = _refused(command)
+
+    assert refused_prescribed("implementer", (refused,)) is None
+    assert _breach("implementer", refused=[refused]) is None
+
+
+def test_an_env_prefix_hides_only_the_command_it_prefixes():
+    refused = _refused("PYTHONPATH=src pytest -q && ruff check .")
+
+    assert refused_prescribed("implementer", (refused,)) == refused
+
+
+def test_a_prescribed_command_over_the_clip_with_a_quote_cut_by_it_is_still_a_breach():
+    command = 'cd /work/task && python -m pytest -k "' + "a" * 400 + ' or b"'
+
+    evidence = _breach("implementer", refused=[_refused(command)])
+
+    assert evidence is not None
+    assert command[:EVIDENCE_CHARS] in evidence
+    assert command[: EVIDENCE_CHARS + 1] not in evidence
+
+
+# -- A prescribed command the confinement blocked ----------------------------------------------------
+
+EPERM = "bash: /work/venv/bin/pytest: Operation not permitted"
+
+
+def test_a_prescribed_command_whose_result_is_operation_not_permitted_is_broken_and_named():
+    evidence = _breach("implementer", runs=[ShellRun("pytest -q", EPERM)])
+
+    assert evidence is not None
+    assert "pytest -q" in evidence
+    assert "Operation not permitted" in evidence
+
+
+def test_an_env_prefixed_prescribed_command_that_ran_into_the_block_is_broken():
+    runs = [ShellRun("PYTHONPATH=src pytest -q", EPERM)]
+
+    assert _breach("implementer", runs=runs) is not None
+
+
+def test_the_command_in_the_evidence_is_bounded():
+    command = "pytest -k " + "a" * 1000
+
+    evidence = _breach("implementer", runs=[ShellRun(command, EPERM)])
+
+    assert evidence is not None
+    assert command[:EVIDENCE_CHARS] in evidence
+    assert command[: EVIDENCE_CHARS + 1] not in evidence
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        ShellRun("cat /etc/hosts", EPERM),
+        ShellRun("curl -s https://example.com", EPERM),
+        ShellRun("pytest -q", "3 passed"),
+        ShellRun("pytest -q", "operation not permitted"),
+    ],
+    ids=["other-command", "refused-network-command", "no-eperm", "other-wording"],
+)
+def test_only_operation_not_permitted_on_a_prescribed_command_is_a_signal(run):
+    assert _breach("implementer", runs=[run]) is None
+
+
+def test_a_verifier_that_ran_the_test_runner_into_the_block_is_not_broken():
+    assert _breach("verifier", runs=[ShellRun("pytest -q", EPERM)]) is None
+
+
+def test_a_role_outside_the_confined_kits_is_not_broken_by_the_block():
+    assert _breach("researcher", runs=[ShellRun("pytest -q", EPERM)]) is None
 
 
 NOT_PRESCRIBED = [

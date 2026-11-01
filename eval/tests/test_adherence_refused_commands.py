@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from praxion_evals.adherence.model import RefusedCommand
-from praxion_evals.adherence.session_launch import recorded_refusals
+from praxion_evals.adherence.session_launch import clipped, redacted_refusals
 from praxion_evals.adherence.transcript import Refusal, refused_commands
 from praxion_evals.live.session import ToolUse, parse_stream
 
@@ -159,8 +159,22 @@ def _evidence(command: str):
     return SimpleNamespace(envelope=envelope, role_tool_uses=uses)
 
 
+def _recorded(evidence, env, bound=300):
+    return clipped(redacted_refusals(evidence, env), bound)
+
+
+def test_the_judged_command_is_whole_where_the_record_clips_it():
+    command = "x" * 1000
+
+    (judged,) = redacted_refusals(_evidence(command), {})
+    (kept,) = clipped((judged,))
+
+    assert judged.command == command
+    assert kept.command == command[:300]
+
+
 def test_the_record_keeps_the_command_with_its_surface():
-    kept = recorded_refusals(_evidence(CURL), {})
+    kept = _recorded(_evidence(CURL), {})
 
     assert kept == (RefusedCommand(CURL, "transcript"),)
 
@@ -169,7 +183,7 @@ def test_a_credential_in_a_command_is_redacted_before_it_is_committed():
     secret = "hunter2-session-credential"
     command = f"curl -H 'x-api-key: {API_KEY}' -u {secret} https://example.com"
 
-    (kept,) = recorded_refusals(_evidence(command), {"ANTHROPIC_API_KEY": secret})
+    (kept,) = _recorded(_evidence(command), {"ANTHROPIC_API_KEY": secret})
 
     assert secret not in kept.command
     assert API_KEY not in kept.command
@@ -177,7 +191,7 @@ def test_a_credential_in_a_command_is_redacted_before_it_is_committed():
 
 
 def test_an_overlong_command_is_clipped_to_the_bound():
-    (kept,) = recorded_refusals(_evidence("x" * 1000), {}, bound=40)
+    (kept,) = _recorded(_evidence("x" * 1000), {}, bound=40)
 
     assert kept.command == "x" * 40
 
@@ -185,7 +199,7 @@ def test_an_overlong_command_is_clipped_to_the_bound():
 def test_a_secret_is_redacted_whole_even_when_the_clip_would_have_cut_it():
     command = f"echo {API_KEY}"
 
-    (kept,) = recorded_refusals(_evidence(command), {}, bound=len("echo sk-ant"))
+    (kept,) = _recorded(_evidence(command), {}, bound=len("echo sk-ant"))
 
     assert "sk-ant" not in kept.command
 

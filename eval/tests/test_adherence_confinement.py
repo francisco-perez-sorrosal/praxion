@@ -133,6 +133,7 @@ def test_the_rendered_key_set_is_pinned(world):
         "autoAllowBashIfSandboxed",
         "filesystem",
         "credentials",
+        "network",
     }
     assert set(sandbox["filesystem"]) == {"denyWrite", "denyRead", "allowRead"}
     assert set(sandbox["credentials"]) == {"files", "envVars"}
@@ -149,8 +150,15 @@ def test_the_fixed_flags_require_the_sandbox_and_allow_no_unconfined_command(wor
     assert sandbox["autoAllowBashIfSandboxed"] is True
 
 
-def test_no_network_domain_is_allowed(world):
-    assert "network" not in settings_for(world)
+def test_no_network_domain_is_allowed_and_a_host_outside_the_empty_list_is_denied_not_asked(world):
+    assert settings_for(world)["network"] == {"strictAllowlist": True}
+
+
+def test_the_file_tools_are_blocked_from_reading_outside_the_working_directories(world):
+    settings = settings_of(confinement_for("verifier", world.places, world.operator))
+
+    assert set(settings) == {"sandbox", "permissions"}
+    assert settings["permissions"] == {"blockReadsOutsideWorkingDirectories": True}
 
 
 def test_the_settings_serialize_to_json(world):

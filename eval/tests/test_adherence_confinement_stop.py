@@ -3,6 +3,10 @@ stop it leaves is one the operator can continue once the grant is repaired."""
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
+from praxion_evals.adherence import session_launch
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
     REDACTED,
@@ -30,6 +34,7 @@ from praxion_evals.adherence.model import (
     SessionSetup,
     SessionStatus,
 )
+from praxion_evals.live.session import SessionRun, parse_stream
 from tests.lineage_support import identity
 from tests.test_adherence_results import run_results
 
@@ -118,3 +123,89 @@ def test_redaction_replaces_a_secret_and_an_api_key_shape_in_any_text():
 
 def _results_ending_in(reason):
     return run_results([], run_id="run-a", extra={"ending": ending_to_json(InfraStopped(reason))})
+
+
+# -- The session's own commands, read before the record clips them ------------------------------------
+
+REFUSAL_WORDING = "Claude requested permissions to use Bash, but you haven't granted it yet."
+SPAWN = "toolu_spawn"
+
+
+def _assessed(monkeypatch, command: str, output: str):
+    """What `_assessed` makes of a confined session whose one shell command drew `output`."""
+    events = [
+        {"type": "system", "subtype": "init"},
+        {
+            "type": "assistant",
+            "parent_tool_use_id": SPAWN,
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": command}}
+                ],
+            },
+        },
+        {
+            "type": "user",
+            "parent_tool_use_id": SPAWN,
+            "message": {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "b1", "content": output}],
+            },
+        },
+        {"type": "result", "subtype": "success", "is_error": False, "result": "done"},
+    ]
+    stream = "\n".join(json.dumps(event) for event in events) + "\n"
+    envelope = parse_stream(stream)
+    evidence = SimpleNamespace(envelope=envelope, role_tool_uses=envelope.tool_uses)
+    monkeypatch.setattr(session_launch, "_evidence", lambda *args: evidence)
+    return session_launch._assessed(
+        None,
+        SimpleNamespace(role="implementer"),
+        None,
+        None,
+        None,
+        SessionRun(stream, "", 0),
+        "abc1234",
+        {},
+        lambda _: "assessed",
+    )
+
+
+def test_a_long_prescribed_command_the_clip_cuts_mid_quote_is_still_a_broken_confinement(
+    monkeypatch,
+):
+    command = 'python -m pytest -k "' + "a" * 400 + ' or b"'
+
+    result, refused = _assessed(monkeypatch, command, REFUSAL_WORDING)
+
+    assert isinstance(result, Errored)
+    assert result.kind == "confinement_broken"
+    assert len(refused[0].command) == session_launch.REFUSED_COMMAND_CHARS
+    assert refused[0].command == command[: session_launch.REFUSED_COMMAND_CHARS]
+
+
+def test_a_refused_env_prefixed_command_is_kept_on_the_record_and_stops_nothing(monkeypatch):
+    result, refused = _assessed(monkeypatch, "PYTHONPATH=src pytest -q", REFUSAL_WORDING)
+
+    assert result == "assessed"
+    assert [r.command for r in refused] == ["PYTHONPATH=src pytest -q"]
+
+
+def test_a_prescribed_command_the_sandbox_blocked_is_a_broken_confinement(monkeypatch):
+    result, refused = _assessed(
+        monkeypatch, "pytest -q", "bash: /venv/bin/pytest: Operation not permitted"
+    )
+
+    assert isinstance(result, Errored)
+    assert result.kind == "confinement_broken"
+    assert "Operation not permitted" in result.detail
+    assert refused == ()
+
+
+def test_the_block_on_a_command_no_definition_prescribes_is_the_roles_own(monkeypatch):
+    result, _ = _assessed(
+        monkeypatch, "cat /etc/shadow", "cat: /etc/shadow: Operation not permitted"
+    )
+
+    assert result == "assessed"

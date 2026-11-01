@@ -22,10 +22,14 @@ The one outside read is ``os.path.realpath``, which follows symlinks on disk; ot
 module is a function of its arguments.
 
 The same module reads a broken confinement back from a session's record
-(``confinement_breach``): a sandbox that never started, a sandbox refusal after startup, or a
-refused command the role's definition prescribes. Each means the grant, not the role, failed.
+(``confinement_breach``): a sandbox that never started, a sandbox refusal after startup, a
+refused command the role's definition prescribes, or a prescribed command the sandbox blocked
+(``Operation not permitted``). Each means the grant, not the role, failed. A refused command
+that starts with a variable assignment is the exception: the harness sends it through the
+regular permission flow by design, so its refusal says nothing of the grant.
 
-The settings keys were last checked against code.claude.com/docs/en/sandboxing.md.
+The settings keys were last checked against code.claude.com/docs/en/sandboxing.md and
+code.claude.com/docs/en/settings-reference.md.
 """
 
 from __future__ import annotations
@@ -33,10 +37,11 @@ from __future__ import annotations
 import os
 import re
 import shlex
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from itertools import dropwhile
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from praxion_evals.adherence.model import RefusedCommand, Role
 
@@ -77,6 +82,15 @@ _FIXED_FLAGS: tuple[tuple[str, bool], ...] = (
     ("autoAllowBashIfSandboxed", True),
 )
 _DENY = "deny"
+# sandboxing.md § Network isolation: set from `--settings`, a host outside the (empty)
+# allowlist is denied instead of prompting, so the refusal never rests on the permission mode.
+_NETWORK = {"strictAllowlist": True}
+# sandboxing.md § Filesystem isolation (and settings-reference.md, Permission settings): the
+# file tools refuse reads outside the working directories in every permission mode. The
+# sandbox's `denyRead` does not reach the Read tool, so this is what keeps it off the token
+# file. The working directories are the session's own (the run's scratch) and its `--add-dir`
+# (the plugin copy).
+_PERMISSIONS = {"blockReadsOutsideWorkingDirectories": True}
 
 
 @dataclass(frozen=True)
@@ -169,13 +183,16 @@ def confinement_for(role: Role, places: Places, operator: Operator) -> Confineme
 
 
 def settings_of(confinement: Confinement) -> dict[str, Any]:
-    """The `sandbox` settings block that puts `confinement` into force.
+    """The settings that put `confinement` into force: the `sandbox` block and the one
+    `permissions` key that holds the file tools to the working directories.
 
     No `network.allowedDomains`: a confined command opens no connection.
     """
     return {
+        "permissions": dict(_PERMISSIONS),
         "sandbox": {
             **dict(_FIXED_FLAGS),
+            "network": dict(_NETWORK),
             "filesystem": {
                 "denyWrite": list(confinement.deny_write),
                 "denyRead": list(confinement.deny_read),
@@ -185,7 +202,7 @@ def settings_of(confinement: Confinement) -> dict[str, Any]:
                 "files": [{"path": path, "mode": _DENY} for path in confinement.credential_files],
                 "envVars": [{"name": name, "mode": _DENY} for name in confinement.env_drops],
             },
-        }
+        },
     }
 
 
@@ -236,12 +253,24 @@ PRESCRIBED_COMMANDS: dict[Role, frozenset[str]] = {
 }
 
 SANDBOX_REFUSAL = re.compile(r"Sandbox is required but failed to initialize[^\n]*")
+BLOCKED_BY_SANDBOX = "Operation not permitted"
 EVIDENCE_CHARS = 300
 _CHAIN_OPERATORS = frozenset({"&&", "||", ";", ";;", "|", "&", "\n"})
 _REDIRECT_START = ("<", ">")
 _ENV_ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=")
 _PYTHON_PROGRAM = re.compile(r"python[\d.]*")
 _PACKAGE_RUNNERS = frozenset({"uv", "pixi", "poetry", "pipenv", "hatch"})
+_SHELLS = frozenset({"bash", "sh"})
+_DURATION = re.compile(r"\d+(\.\d+)?[smhd]?")
+_TIMEOUT_OPTIONS_WITH_VALUE = frozenset({"-s", "-k", "--signal", "--kill-after"})
+_ENV_OPTIONS_WITH_VALUE = frozenset({"-u", "-C", "-S", "--unset", "--chdir", "--split-string"})
+
+
+class ShellRun(NamedTuple):
+    """A shell command the role ran, and the output its tool result carried."""
+
+    command: str
+    output: str
 
 
 def confinement_breach(
@@ -250,12 +279,15 @@ def confinement_breach(
     tool_result_texts: Iterable[str],
     stderr: str,
     started: bool,
+    shell_runs: Iterable[ShellRun] = (),
 ) -> str | None:
     """The evidence that `role`'s session ran without its confinement, or None.
 
     `started` is whether the session produced its ``init`` event. The harness's startup text
     under ``failIfUnavailable`` is not documented, so a session that never started and whose
-    stderr names the sandbox (any case) counts. The caller redacts the evidence it records.
+    stderr names the sandbox (any case) counts. `refused` and `shell_runs` carry the commands
+    as the session ran them, unclipped, so the reading never parses half a command; the
+    evidence clips what it names. The caller redacts everything it passes in.
     """
     if role not in CONFINED_ROLES:
         return None
@@ -265,18 +297,44 @@ def confinement_breach(
         if match := SANDBOX_REFUSAL.search(text):
             return _clip(match.group())
     if (prescribed := refused_prescribed(role, refused)) is not None:
-        return f"a command the role's definition prescribes was refused: {prescribed.command}"
+        return (
+            f"a command the role's definition prescribes was refused: {_clip(prescribed.command)}"
+        )
+    if (blocked := blocked_prescribed(role, shell_runs)) is not None:
+        return f"a command the role's definition prescribes met {BLOCKED_BY_SANDBOX!r}: " + _clip(
+            blocked.command
+        )
     return None
 
 
 def refused_prescribed(role: Role, refused: Sequence[RefusedCommand]) -> RefusedCommand | None:
-    """The first refused command that runs something `role`'s definition prescribes."""
+    """The first refused command that runs something `role`'s definition prescribes.
+
+    A command that starts with a variable assignment goes through the regular permission flow
+    by design (sandboxing.md § Auto-allow), so its refusal is not read: the fixtures declare
+    ``pythonpath``, which leaves no prescribed form needing the prefix.
+    """
     prescribed = PRESCRIBED_COMMANDS.get(role, frozenset())
     return next(
         (
             r
             for r in refused
-            if any(_runs_one_of(argv, prescribed) for argv in _simple_commands(r.command))
+            if any(not c.env_prefixed for c in _prescribed_commands(r.command, prescribed))
+        ),
+        None,
+    )
+
+
+def blocked_prescribed(role: Role, shell_runs: Iterable[ShellRun]) -> ShellRun | None:
+    """The first prescribed command whose output says the sandbox blocked it: the grant is too
+    narrow for work the role must do. The same output on any other command is the role's own."""
+    prescribed = PRESCRIBED_COMMANDS.get(role, frozenset())
+    return next(
+        (
+            run
+            for run in shell_runs
+            if BLOCKED_BY_SANDBOX in run.output
+            and next(_prescribed_commands(run.command, prescribed), None) is not None
         ),
         None,
     )
@@ -286,8 +344,26 @@ def _clip(text: str) -> str:
     return text[:EVIDENCE_CHARS]
 
 
+class _Command(NamedTuple):
+    argv: list[str]
+    env_prefixed: bool
+
+
+def _prescribed_commands(line: str, prescribed: frozenset[str]) -> Iterator[_Command]:
+    return (c for c in _commands(line) if _runs_one_of(c.argv, prescribed))
+
+
+def _commands(line: str) -> Iterator[_Command]:
+    """Every command a shell line runs: the chained ones, then what a wrapper runs in turn."""
+    for words in _simple_commands(line):
+        argv = list(dropwhile(_ENV_ASSIGNMENT.match, words))
+        if argv:
+            yield _Command(argv, len(argv) < len(words))
+            yield from _wrapped_commands(argv)
+
+
 def _simple_commands(command: str) -> Iterable[list[str]]:
-    """The commands a shell line chains, each as words with env prefixes and redirects dropped."""
+    """The commands a shell line chains, each as words with redirects dropped."""
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\n")
         lexer.whitespace, lexer.whitespace_split = " \t\r", True
@@ -300,8 +376,8 @@ def _simple_commands(command: str) -> Iterable[list[str]]:
         if skip_target:
             skip_target = False
         elif token in _CHAIN_OPERATORS:
-            if command_words := _without_env(words):
-                yield command_words
+            if words:
+                yield words
             words = []
         elif token.startswith(_REDIRECT_START):
             skip_target = True
@@ -309,11 +385,37 @@ def _simple_commands(command: str) -> Iterable[list[str]]:
             words.append(token)
 
 
-def _without_env(words: list[str]) -> list[str]:
-    rest = list(words)
-    while rest and (_ENV_ASSIGNMENT.match(rest[0]) or rest[0] == "env"):
-        rest.pop(0)
-    return rest
+def _wrapped_commands(argv: list[str]) -> Iterator[_Command]:
+    """What ``timeout N``, ``env`` and ``bash -c '...'`` run, however deeply they nest."""
+    program, args = os.path.basename(argv[0]), argv[1:]
+    if program in _SHELLS:
+        yield from _commands(_shell_script(args))
+        return
+    if program == "timeout":
+        inner = _past_options(args, _TIMEOUT_OPTIONS_WITH_VALUE)
+        inner = inner[1:] if inner and _DURATION.fullmatch(inner[0]) else []
+    elif program == "env":
+        inner = list(dropwhile(_ENV_ASSIGNMENT.match, _past_options(args, _ENV_OPTIONS_WITH_VALUE)))
+    else:
+        return
+    if inner:
+        yield _Command(inner, False)
+        yield from _wrapped_commands(inner)
+
+
+def _shell_script(args: list[str]) -> str:
+    """The text after a shell's ``-c`` (``-lc`` and the like included); empty with none."""
+    for position, arg in enumerate(args[:-1]):
+        if arg.startswith("-") and not arg.startswith("--") and "c" in arg:
+            return args[position + 1]
+    return ""
+
+
+def _past_options(args: list[str], with_value: frozenset[str]) -> list[str]:
+    position = 0
+    while position < len(args) and args[position].startswith("-"):
+        position += 2 if args[position] in with_value else 1
+    return args[position:]
 
 
 def _runs_one_of(argv: list[str], prescribed: frozenset[str]) -> bool:

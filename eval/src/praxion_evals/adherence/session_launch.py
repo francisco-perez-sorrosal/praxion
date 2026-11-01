@@ -25,6 +25,7 @@ from praxion_evals.adherence.confinement import (
     Confinement,
     Operator,
     Places,
+    ShellRun,
     confinement_breach,
     confinement_for,
 )
@@ -245,25 +246,31 @@ def _assessed[R](
 
     A confined kit's broken confinement replaces the assessment, whatever it was: the session
     ran under other settings than the run declared, so its outcome says nothing of the role.
+    The breach is read from the commands as they ran; the record keeps them clipped.
     """
-    refused: tuple[RefusedCommand, ...] = ()
+    judged: tuple[RefusedCommand, ...] = ()
     tool_results: Iterable[str] = ()
+    shell_runs: tuple[ShellRun, ...] = ()
     try:
         evidence = _evidence(launch, task, build, page_url, root, run, commit)
-        refused = recorded_refusals(evidence, session_env)
+        judged = redacted_refusals(evidence, session_env)
         tool_results = evidence.envelope.tool_results.values()
+        shell_runs = _shell_runs(evidence)
         result: R | Errored = assess(evidence)
     except Exception as error:  # one unreadable session must not discard the paid run
         result = _crash(error)
     secrets = _credentials(session_env)
     broken = confinement_breach(
         task.role,
-        refused,
+        judged,
         (redacted(text, secrets) for text in tool_results),
         redacted(run.stderr, secrets),
         started=parse_stream(run.stdout).init is not None,
+        shell_runs=(
+            ShellRun(redacted(r.command, secrets), redacted(r.output, secrets)) for r in shell_runs
+        ),
     )
-    return (result if broken is None else Errored("confinement_broken", broken)), refused
+    return (result if broken is None else Errored("confinement_broken", broken)), clipped(judged)
 
 
 def _crash(error: Exception) -> Errored:
@@ -362,23 +369,39 @@ def _credentials(env: Mapping[str, str]) -> list[str]:
     return [env[key] for key in CREDENTIAL_KEYS if key in env]
 
 
-def recorded_refusals(
-    evidence: SessionEvidence, env: Mapping[str, str], bound: int = REFUSED_COMMAND_CHARS
+def redacted_refusals(
+    evidence: SessionEvidence, env: Mapping[str, str]
 ) -> tuple[RefusedCommand, ...]:
-    """The commands the harness refused the role, as the record keeps them: the credentials the
-    session was given (and any API key shape) redacted before the bound clips the command."""
+    """The commands the harness refused the role, whole, with the credentials the session was
+    given (and any API key shape) redacted: what the breach reading judges."""
     final = evidence.envelope.final_result
     denied = () if final is None else final.denied_commands
     secrets = _credentials(env)
     return tuple(
-        RefusedCommand(_redacted_clip(refusal.command, secrets, bound), refusal.source)
+        RefusedCommand(_redacted(refusal.command, secrets), refusal.source)
         for refusal in refused_commands(evidence.envelope, evidence.role_tool_uses, denied)
     )
 
 
-def _redacted_clip(command: str, secrets: list[str], bound: int) -> str:
-    redacted = EvidenceTail.capture(command, "", len(command), secrets).error_tail
-    return redacted[:bound]
+def clipped(
+    refusals: Sequence[RefusedCommand], bound: int = REFUSED_COMMAND_CHARS
+) -> tuple[RefusedCommand, ...]:
+    """The refusals as the record keeps them: each command bounded, after its redaction."""
+    return tuple(RefusedCommand(r.command[:bound], r.source) for r in refusals)
+
+
+def _redacted(command: str, secrets: list[str]) -> str:
+    return EvidenceTail.capture(command, "", len(command), secrets).error_tail
+
+
+def _shell_runs(evidence: SessionEvidence) -> tuple[ShellRun, ...]:
+    """Each shell command the role ran, with the output its tool result carried."""
+    results = evidence.envelope.tool_results
+    return tuple(
+        ShellRun(use.input["command"], results.get(use.id, ""))
+        for use in evidence.role_tool_uses
+        if use.name == "Bash" and isinstance(use.input.get("command"), str)
+    )
 
 
 def _evidence(

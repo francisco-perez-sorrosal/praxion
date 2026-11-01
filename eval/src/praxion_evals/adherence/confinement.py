@@ -18,6 +18,9 @@ Reads are denied across the real home and re-opened only where a session needs t
 runner's environment, the plugin copy, the run root); the narrower path wins. A credential
 entry that an ``allow_read`` entry covers would be re-opened, so such a pair is refused.
 
+The one outside read is ``os.path.realpath``, which follows symlinks on disk; otherwise the
+module is a function of its arguments.
+
 The settings keys were last checked against code.claude.com/docs/en/sandboxing.md.
 """
 
@@ -99,8 +102,8 @@ class Operator:
 class Confinement:
     """The paths, variables and program order of one confined session.
 
-    Invariants, checked at construction: every path is absolute, and no ``allow_read`` entry
-    covers a ``credential_files`` entry.
+    Invariants, checked at construction: every path, ``program_order`` directories included, is
+    absolute, and no ``allow_read`` entry covers a ``credential_files`` entry.
     """
 
     deny_write: tuple[str, ...]
@@ -111,7 +114,13 @@ class Confinement:
     program_order: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        paths = (*self.deny_write, *self.deny_read, *self.allow_read, *self.credential_files)
+        paths = (
+            *self.deny_write,
+            *self.deny_read,
+            *self.allow_read,
+            *self.credential_files,
+            *self.program_order,
+        )
         relative = [path for path in paths if not os.path.isabs(path)]
         if relative:
             raise ValueError(f"confinement paths must be absolute, got {relative}")

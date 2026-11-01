@@ -41,6 +41,23 @@ ACCEPTANCE_LOCATIONS = (
 )
 OTHER_ROLES = tuple(role for role in get_args(Role) if role not in CONFINED_ROLES)
 AMBIENT = ("/usr/local/bin", "/usr/bin")
+# The architect's real-home names, pinned apart from the module so a dropped one fails here.
+EXPECTED_CREDENTIAL_LOCATIONS = {
+    ".ssh",
+    ".aws",
+    ".config/gcloud",
+    ".azure",
+    ".kube",
+    ".docker",
+    ".npmrc",
+    ".pypirc",
+    ".cargo/credentials.toml",
+    ".gem/credentials",
+    ".config/gh",
+    ".netrc",
+    ".claude",
+    ".claude.json",
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -173,7 +190,12 @@ def test_no_token_file_adds_no_token_entry(world):
     assert not any("session-token" in path for path in confinement.credential_files)
 
 
-@pytest.mark.parametrize("name", CREDENTIAL_LOCATIONS)
+def test_the_credential_locations_are_the_fourteen_named_ones():
+    assert len(CREDENTIAL_LOCATIONS) == len(set(CREDENTIAL_LOCATIONS))
+    assert set(CREDENTIAL_LOCATIONS) == EXPECTED_CREDENTIAL_LOCATIONS
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_CREDENTIAL_LOCATIONS))
 def test_each_credential_location_is_denied_under_the_real_home(world, name):
     denied = credential_paths(settings_for(world))
     assert set(both_spellings(world, f"home/{name}")) <= set(denied)
@@ -218,6 +240,13 @@ def test_programs_resolve_from_the_copys_scripts_then_the_runner_then_the_ambien
 @pytest.mark.parametrize("field", ["home", "token_file", "runner_prefix", "runner_base_prefix"])
 def test_a_relative_operator_path_raises(world, field):
     operator = dataclasses.replace(world.operator, **{field: Path("relative/place")})
+    with pytest.raises(ValueError, match="absolute"):
+        confinement_for("implementer", world.places, operator)
+
+
+@pytest.mark.parametrize("entry", ["", ".", "relative/bin"])
+def test_a_relative_ambient_path_entry_raises(world, entry):
+    operator = dataclasses.replace(world.operator, ambient_path=(*AMBIENT, entry))
     with pytest.raises(ValueError, match="absolute"):
         confinement_for("implementer", world.places, operator)
 

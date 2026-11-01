@@ -3,6 +3,7 @@ plugin copy first; every other kit's session is built exactly as before."""
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from dataclasses import replace
@@ -21,7 +22,7 @@ from praxion_evals.live.session import SandboxPaths, build_argv
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OTHER_ROLES: list[Role] = ["researcher", "doc-engineer"]
 SEED = 7
-AMBIENT = {"PATH": f"/usr/local/bin{':'}relative{':'}{':'}/usr/bin"}
+AMBIENT = {"PATH": "/usr/local/bin:relative::/usr/bin"}
 
 
 def _build(role: Role, tmp_path: Path) -> ArmBuild:
@@ -61,6 +62,7 @@ def _launch(tmp_path: Path, **overrides) -> Launch:
         "keep_sandbox": True,
         "env_for": lambda root, path_first: {},
         "real_home": tmp_path / "home",
+        "ambient": AMBIENT,
     }
     return Launch(**{**fields, **overrides})
 
@@ -100,6 +102,22 @@ def test_the_confinement_leaves_the_tool_grant_as_it_was(role, tmp_path):
     )
 
     assert confined.allowed_tools == plain.allowed_tools == tasks.allowed_tools(build)
+
+
+def test_a_confinement_built_for_another_copy_is_refused(tmp_path):
+    build = _build("implementer", tmp_path)
+    elsewhere = _confinement("implementer", tmp_path / "other")
+
+    with pytest.raises(ValueError, match="does not protect the plugin copy"):
+        tasks.session_spec(
+            _task("implementer"),
+            build,
+            SandboxPaths(tmp_path / "sandbox"),
+            model="m",
+            effort="low",
+            max_budget_usd=1.0,
+            confinement=elsewhere,
+        )
 
 
 @pytest.mark.parametrize("role", ["researcher", "verifier", "implementer"])
@@ -184,7 +202,7 @@ def test_a_launched_sessions_environment_is_built_with_the_confinements_program_
         seen["path_first"] = path_first
         return {}
 
-    monkeypatch.setattr(session_launch, "run_session", lambda spec, env: _raise_after(seen))
+    monkeypatch.setattr(session_launch, "run_session", lambda spec, env: _stop())
     session_launch.attempt(
         _launch(tmp_path, env_for=env_for),
         session_launch.SpendLedger(cap_usd=10.0),
@@ -199,7 +217,7 @@ def test_a_launched_sessions_environment_is_built_with_the_confinements_program_
     assert seen["path_first"][:1] == expected  # type: ignore[index]
 
 
-def _raise_after(seen: dict[str, object]):
+def _stop():
     raise RuntimeError("stop here: only the launch's inputs are under test")
 
 
@@ -209,7 +227,22 @@ def test_a_session_environment_resolves_the_given_directories_first(tmp_path):
 
     env = session_env(config, tmp_path / "sandbox", {"PATH": "/usr/bin"}, [copy_scripts])
 
-    assert env["PATH"].split(":")[0] == str(copy_scripts)
+    assert env["PATH"].split(os.pathsep)[0] == str(copy_scripts)
+
+
+def test_the_run_builds_a_sessions_environment_with_the_directories_it_is_given(tmp_path):
+    context = SimpleNamespace(
+        config=_config(),
+        checkout=SimpleNamespace(commit="abc"),
+        run_root=tmp_path,
+        page_url="",
+        judge=None,
+    )
+    copy_scripts = tmp_path / "copy" / "scripts"
+
+    env = _launch_of(context).env_for(tmp_path / "sandbox", [copy_scripts])  # type: ignore[arg-type]
+
+    assert env["PATH"].split(os.pathsep)[0] == str(copy_scripts)
 
 
 def test_a_session_environment_with_no_directories_given_is_as_it_was(tmp_path):

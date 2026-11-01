@@ -743,6 +743,8 @@ def session_spec(
             f"{task.task_id} needs a plugin copy capped at {wanted_cap} turns, "
             f"not {arm_copy.turn_cap}"
         )
+    if confinement is not None and str(arm_copy.copy_root) not in confinement.deny_write:
+        raise ValueError(f"the confinement does not protect the plugin copy {arm_copy.copy_root}")
     return SessionSpec(
         prompt=main_prompt(task),
         model=model,

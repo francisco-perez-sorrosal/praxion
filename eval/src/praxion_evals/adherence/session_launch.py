@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -83,8 +83,11 @@ class Launch:
     # a session's environment, given its sandbox root and the directories its programs resolve from first
     env_for: Callable[[Path, Sequence[Path]], Mapping[str, str]]
     tail_chars: int = DEFAULT_TAIL_CHARS  # what an errored session keeps of each output stream
-    real_home: Path = REAL_HOME  # the operator inputs a confined kit's sandbox is built around
+    # the operator inputs a confined kit's sandbox is built around; `ambient` is the same
+    # environment the session's `env_for` reads, so the confinement and the PATH agree
+    real_home: Path = REAL_HOME
     token_file: Path | None = None
+    ambient: Mapping[str, str] = field(default_factory=lambda: os.environ)
 
 
 # --- one task session ---
@@ -119,7 +122,7 @@ def task_session(
         build,
         populate,
         page_url,
-        lambda evidence: _grade(launch.judge, evidence, task, setup),
+        lambda evidence: _grade(launch, evidence, task, setup),
     )
     status: SessionStatus = done.result
     if isinstance(status, Errored):
@@ -134,7 +137,7 @@ def task_session(
 
 
 def _grade(
-    judge: JudgeClient | None, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
+    launch: Launch, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
 ) -> SessionStatus:
     """C3 is named only for a task that planted a gap or a conflict: without one it passes vacuously."""
     names = [
@@ -142,7 +145,7 @@ def _grade(
         for check in check_catalog(task.role)
         if not (check.name == "C3" and isinstance(task.variant, EarlyStop))
     ]
-    return grade.grade(evidence, names, judge, setup, real_home=REAL_HOME)
+    return grade.grade(evidence, names, launch.judge, setup, real_home=launch.real_home)
 
 
 def injection_of(task: TaskSpec) -> tasks.Injection | None:
@@ -262,7 +265,7 @@ def _prepare(
         launch.run_root,
         home=launch.real_home,
         token_file=launch.token_file,
-        ambient=os.environ,
+        ambient=launch.ambient,
     )
     spec = tasks.session_spec(
         task,
@@ -289,7 +292,7 @@ def session_confinement(
 
     The one place the runner's interpreter and the ambient PATH are read into the confinement, so
     the dry run shows what a live session gets. A relative PATH entry names no fixed directory, so
-    it is left out.
+    it is left out of the confinement's program order (the session's own PATH is built apart).
     """
     ambient_path = tuple(
         entry for entry in ambient.get("PATH", os.defpath).split(os.pathsep) if os.path.isabs(entry)

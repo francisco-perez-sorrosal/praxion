@@ -233,6 +233,7 @@ def session_env(
 
 def _launch_of(context: Context) -> Launch:
     config = context.config
+    ambient = os.environ
     return Launch(
         run_root=context.run_root,
         checkout_commit=context.checkout.commit,
@@ -243,9 +244,10 @@ def _launch_of(context: Context) -> Launch:
         effort=config.effort,
         session_budget_usd=config.session_budget_usd,
         keep_sandbox=config.keep_sandbox,
-        env_for=lambda root, path_first: session_env(config, root, os.environ, path_first),
+        env_for=lambda root, path_first: session_env(config, root, ambient, path_first),
         tail_chars=config.tail_chars,
         token_file=config.session_oauth_token_file,
+        ambient=ambient,
     )
 
 

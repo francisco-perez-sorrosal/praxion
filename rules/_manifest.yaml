@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-01T08:44:34Z'
+generated_at: '2026-11-01T13:16:27Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -42,7 +42,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 1841
+  chars: 1918
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on
@@ -123,7 +123,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3924
+  chars: 4001
   paths:
   - agents/**
   - skills/agent-crafting/references/model-routing-policy.md

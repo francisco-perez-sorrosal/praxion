@@ -5,7 +5,7 @@ audience: developer
 
 # Rules Taxonomy and Disable Guide
 
-Every Praxion-onboarded project inherits a curated set of rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. Some are always-loaded (cost tokens on every session); others load only when their trigger paths are read; a core rule may be path-scoped and keep a one-line resident that stays always-loaded. This guide explains how rules are categorized, how the per-project disable mechanism reaches each category, and how to measure the cost of your choices.
+Every Praxion-onboarded project inherits a curated set of rules: coding style, behavioral contract, agent coordination protocol, ADR conventions, and more. Some are always-loaded (cost tokens on every session); others load only when their trigger paths are read; a core rule may be path-scoped and keep a session-start text that stays always-loaded. This guide explains how rules are categorized, how the per-project disable mechanism reaches each category, and how to measure the cost of your choices.
 
 ## Token-Savings Ceiling (Read This First)
 
@@ -37,7 +37,7 @@ Five core entries encode Praxion's operating contract: four rules and the reside
 | ID | Rule file | Purpose | Token cost |
 |----|-----------|---------|------------|
 | `swe/adr-conventions` | `rules/swe/adr-conventions.md` | Architecture Decision Record format, lifecycle, finalize protocol | path-scoped on `.ai-state/decisions/**` (~2499 tokens when loaded); Codex keeps it always-on |
-| `swe/adr-conventions-resident` | `rules/swe/adr-conventions-resident.md` | One-line resident of the ADR rule (its title and opening sentence), always-loaded | ~81 tokens (~132 with frontmatter) |
+| `swe/adr-conventions-resident` | `rules/swe/adr-conventions-resident.md` | Session-start text of the ADR rule (its title and opening sentence), always-loaded | ~81 tokens (~132 with frontmatter) |
 | `swe/agent-behavioral-contract` | `rules/swe/agent-behavioral-contract.md` | Four non-negotiable behaviors: Surface Assumptions, Register Objection, Stay Surgical, Simplicity First | ~370 tokens |
 | `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~1130 tokens |
 | `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4573 tokens |
@@ -52,10 +52,12 @@ Two rules ship at SessionStart and contribute to the always-loaded token baselin
 
 | ID | Rule file | Purpose | Token cost | Typical disabler |
 |----|-----------|---------|------------|------------------|
-| `swe/agent-model-routing-resident` | `rules/swe/agent-model-routing-resident.md` | Session-start text of the model-routing rule: the spawn directive and its deviations. The full rule (tier table, per-agent allocation) loads on `agents/**` and the routing policy reference. Disabled by listing its parent id `swe/agent-model-routing` | ~500 tokens | Projects using default model routing only |
-| `swe/vcs/git-conventions` | `rules/swe/vcs/git-conventions.md` | Commit scope, message format, secrets discipline | ~1300 tokens | Projects with different VCS policy or no Git |
+| `swe/agent-model-routing-resident` | `rules/swe/agent-model-routing-resident.md` | Session-start text of the model-routing rule: the spawn directive and its deviations. The full rule (tier table, per-agent allocation) loads on `agents/**` and the routing policy reference. Disabled by listing its parent id `swe/agent-model-routing` | ~750 tokens | Projects using default model routing only |
+| `swe/vcs/git-conventions` | `rules/swe/vcs/git-conventions.md` | Commit scope, message format, secrets discipline | ~1,700 tokens | Projects with different VCS policy or no Git |
 
 **Total hook-deliver tokens reclaimable:** ~2,450
+
+The full routing rule is path-scoped on `agents/**`, so a subagent that reads or edits `agents/**` now loads the whole rule, orchestrator directive included; hook delivery never reached a subagent before.
 
 ### 3. Path-Scoped Rules (disableable, declarative-only — zero baseline cost)
 
@@ -132,7 +134,7 @@ The disable list supports fnmatch glob patterns. Note that fnmatch's `*` crosses
 |------|---------|--------|
 | `ml/*` | 3 ML rules (all path-scoped) | `claudeMdExcludes` patterns added; no SessionStart token savings; declarative-only guarantee |
 | `writing/*` | 4 writing rules (all path-scoped) | Same as above |
-| `swe/vcs/*` | 2 VCS rules: `git-conventions` (hook-deliver) + `pr-conventions` (path-scoped) | `git-conventions` filtered from `additionalContext` (reclaims ~1.3k tokens); `pr-conventions` added to `claudeMdExcludes` |
+| `swe/vcs/*` | 2 VCS rules: `git-conventions` (hook-deliver) + `pr-conventions` (path-scoped) | `git-conventions` filtered from `additionalContext` (reclaims ~1.7k tokens); `pr-conventions` added to `claudeMdExcludes` |
 | `swe/*` | 16 SWE rules | 5 core: warnings emitted, kept loaded; 2 hook-deliver: filtered from `additionalContext` (~2.45k tokens reclaimed); 9 path-scoped: `claudeMdExcludes` patterns added |
 
 ## Core Rule Protection

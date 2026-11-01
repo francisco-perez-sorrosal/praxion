@@ -7,10 +7,11 @@ is instructed to spawn a `praxion:researcher` subagent — and asserts the
 executable guard for the subagent-inheritance correction (`skills/agent-crafting/SKILL.md`):
 a top-level Claude Code session inherits the user's global CLAUDE.md, the
 project's own CLAUDE.md, every always-loaded rule, AND the two
-`install: hook-deliver` rules (`agent-model-routing.md`,
-`git-conventions.md` -- `load: always_on` in `rules/_manifest.yaml`, injected
-into `additionalContext` by `inject_rules.py` on the `SessionStart` hook
-event). A subagent session never fires `SessionStart` (its lifecycle uses
+`install: hook-deliver` rules (`agent-model-routing-resident.md`, the routing
+rule's session-start text, and `git-conventions.md` -- `load: always_on` in
+`rules/_manifest.yaml`, injected into `additionalContext` by `inject_rules.py`
+on the `SessionStart` hook event). A subagent session never fires
+`SessionStart` (its lifecycle uses
 `SubagentStart`/`SubagentStop` instead), so it inherits the first set but
 never the hook-delivered rules.
 
@@ -21,8 +22,8 @@ was v1's bug — a bare top-level `claude -p` invocation
 was checked against a claim that is specifically about subagent inheritance,
 so the guard could never fail. v2 makes both runs report a discriminating
 fact -- whether a section headed `## Agent Model Routing` (the hook-delivered
-rule's own heading) appears anywhere in context -- and requires the two runs
-to disagree on it.
+session-start text's own heading) appears anywhere in context -- and requires
+the two runs to disagree on it.
 
 Why a standalone script, not a SeededScenarioFamily check: grading a static
 fixture can prove a checker is correct, but it cannot prove what a *live*

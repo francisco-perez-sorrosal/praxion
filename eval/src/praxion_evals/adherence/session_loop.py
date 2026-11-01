@@ -216,10 +216,15 @@ class RunState:
     stop: StopReason | None = None  # set once by the fold; nothing is launched after it
 
 
-def session_env(config: RunConfig, root: Path, ambient: Mapping[str, str]) -> dict[str, str]:
+def session_env(
+    config: RunConfig,
+    root: Path,
+    ambient: Mapping[str, str],
+    path_first: Sequence[Path] = (),
+) -> dict[str, str]:
     """A session's environment: the sandbox allowlist, and the token file's token in place of
     the API key when the run names one (the runner's own process keeps the key for the judge)."""
-    env = build_env(root, ambient)
+    env = build_env(root, ambient, path_first=path_first)
     if config.session_oauth_token_file is None:
         return env
     token = config.session_oauth_token_file.read_text(encoding="utf-8")
@@ -238,8 +243,9 @@ def _launch_of(context: Context) -> Launch:
         effort=config.effort,
         session_budget_usd=config.session_budget_usd,
         keep_sandbox=config.keep_sandbox,
-        env_for=lambda root: session_env(config, root, os.environ),
+        env_for=lambda root, path_first: session_env(config, root, os.environ, path_first),
         tail_chars=config.tail_chars,
+        token_file=config.session_oauth_token_file,
     )
 
 

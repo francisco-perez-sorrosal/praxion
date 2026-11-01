@@ -8,11 +8,12 @@ the run's context or state back.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +21,12 @@ from typing import Any
 
 from praxion_evals.adherence import grade, tasks
 from praxion_evals.adherence.catalog import check_catalog
+from praxion_evals.adherence.confinement import (
+    Confinement,
+    Operator,
+    Places,
+    confinement_for,
+)
 from praxion_evals.adherence.infra_stop import EvidenceTail
 from praxion_evals.adherence.model import (
     Arm,
@@ -27,6 +34,7 @@ from praxion_evals.adherence.model import (
     EarlyStop,
     Errored,
     RefusedCommand,
+    Role,
     SessionEvidence,
     SessionRecord,
     SessionSetup,
@@ -72,8 +80,11 @@ class Launch:
     effort: str
     session_budget_usd: float
     keep_sandbox: bool
-    env_for: Callable[[Path], Mapping[str, str]]  # a session's environment, given its sandbox root
+    # a session's environment, given its sandbox root and the directories its programs resolve from first
+    env_for: Callable[[Path, Sequence[Path]], Mapping[str, str]]
     tail_chars: int = DEFAULT_TAIL_CHARS  # what an errored session keeps of each output stream
+    real_home: Path = REAL_HOME  # the operator inputs a confined kit's sandbox is built around
+    token_file: Path | None = None
 
 
 # --- one task session ---
@@ -197,11 +208,11 @@ def attempt[R](
     root = new_sandbox_root(launch, task)
     try:
         try:
-            spec, commit = _prepare(launch, task, build, populate, page_url, root)
+            spec, commit, confinement = _prepare(launch, task, build, populate, page_url, root)
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
         try:
-            env = launch.env_for(root)
+            env = launch.env_for(root, [Path(path) for path in _program_order(confinement)])
             run = run_session(spec, env)
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
@@ -236,14 +247,23 @@ def _prepare(
     populate: Callable[[Path], None],
     page_url: str | None,
     root: Path,
-) -> tuple[SessionSpec, str]:
+) -> tuple[SessionSpec, str, Confinement | None]:
     """Populate the sandbox and build the scratch repository; nothing is launched yet.
 
-    Returns the session to launch and the fixture commit the scratch repository starts from.
+    Returns the session to launch, the fixture commit the scratch repository starts from, and the
+    confinement the session starts under (None for a kit that is not confined).
     """
     sandbox = SandboxPaths(root)
     populate(root)
     commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
+    confinement = session_confinement(
+        task.role,
+        build.copy_root,
+        launch.run_root,
+        home=launch.real_home,
+        token_file=launch.token_file,
+        ambient=os.environ,
+    )
     spec = tasks.session_spec(
         task,
         build,
@@ -251,8 +271,35 @@ def _prepare(
         model=launch.model,
         effort=launch.effort,
         max_budget_usd=launch.session_budget_usd,
+        confinement=confinement,
     )
-    return spec, commit
+    return spec, commit, confinement
+
+
+def session_confinement(
+    role: Role,
+    plugin_copy: Path,
+    run_root: Path,
+    *,
+    home: Path,
+    token_file: Path | None,
+    ambient: Mapping[str, str],
+) -> Confinement | None:
+    """The confinement of a `role` session on this machine; None for a kit that is not confined.
+
+    The one place the runner's interpreter and the ambient PATH are read into the confinement, so
+    the dry run shows what a live session gets. A relative PATH entry names no fixed directory, so
+    it is left out.
+    """
+    ambient_path = tuple(
+        entry for entry in ambient.get("PATH", os.defpath).split(os.pathsep) if os.path.isabs(entry)
+    )
+    operator = Operator(home, token_file, Path(sys.prefix), Path(sys.base_prefix), ambient_path)
+    return confinement_for(role, Places(run_root, plugin_copy), operator)
+
+
+def _program_order(confinement: Confinement | None) -> tuple[str, ...]:
+    return () if confinement is None else confinement.program_order
 
 
 def settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:

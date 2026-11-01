@@ -20,6 +20,7 @@ Bound here, because the specification or the base commit fixes them:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 from pathlib import Path
@@ -31,6 +32,10 @@ ROLE = "implementer"
 SEED = adherence_eval.SEED
 OBSERVANCE_LINE = "Filed under the project house rules."
 INSTRUCTION_FILE = "CLAUDE.md"
+PROJECT_CONFIG = "pyproject.toml"
+# The one change admitted to a fixture's `pyproject.toml` since the kit was frozen: the
+# block that lets the fixture repository collect its own tests, appended after a blank line.
+COLLECTION_BLOCK = '\n[tool.pytest.ini_options]\npythonpath = ["src"]\n'
 FROZEN = Path(__file__).resolve().parents[1] / "fixtures" / "implementer_kit_before.json"
 
 _SNAPSHOT_CODE = """
@@ -75,8 +80,13 @@ def frozen() -> dict:
 
 
 def without_instruction_file(task: dict) -> dict:
-    """A task's identity and fixture with its `CLAUDE.md` and convention left out."""
+    """A task's identity and fixture with its `CLAUDE.md` and convention left out, and its
+    `pyproject.toml` as it was before the fixture gained the test-collection block."""
     files = {k: v for k, v in task["files"].items() if k != INSTRUCTION_FILE}
+    config = (task.get("texts") or {}).get(PROJECT_CONFIG)
+    if config is not None and config.endswith(COLLECTION_BLOCK):
+        before = config[: -len(COLLECTION_BLOCK)]
+        files[PROJECT_CONFIG] = hashlib.sha256(before.encode("utf-8")).hexdigest()
     kept = ("task_id", "template_id", "fixture_id", "variant", "slug", "main_prompt")
     return {**{k: task[k] for k in kept}, "files": files}
 

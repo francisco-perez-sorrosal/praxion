@@ -29,12 +29,14 @@ from praxion_evals.adherence.model import (
     Interval,
     JudgedCheck,
     Measured,
+    MechanicalCheck,
     NonInferior,
     NoRegression,
     NotApplicable,
     NotBuilt,
     NotMeasured,
     Passed,
+    RefusedCommand,
     Regression,
     RuleRef,
     ScopeConflict,
@@ -98,8 +100,12 @@ def test_the_arms_and_the_webfetch_roles_are_known_names():
     assert WEBFETCH_ROLES <= set(ROLES)
 
 
-def test_the_error_kinds_are_the_live_kinds_plus_a_refused_launch_and_a_missing_kernel():
-    assert set(ERROR_KINDS) == set(get_args(LiveErrorKind)) | {"launch_refused", "kernel_missing"}
+def test_the_error_kinds_are_the_live_kinds_plus_the_adherence_only_ones():
+    assert set(ERROR_KINDS) == set(get_args(LiveErrorKind)) | {
+        "launch_refused",
+        "kernel_missing",
+        "confinement_broken",
+    }
     assert "kernel_missing" not in get_args(LiveErrorKind)
 
 
@@ -393,6 +399,31 @@ def test_a_session_record_echoes_the_setup_its_status_carries():
     assert record.status.setup == record.setup
 
 
+@pytest.mark.parametrize("status", [STATUSES[0], STATUSES[6]], ids=["measured", "errored"])
+def test_a_session_record_of_either_kind_may_carry_refused_commands(status):
+    refused = (RefusedCommand("rm -rf /", "permission_denials"),)
+
+    record = SessionRecord(SETUP, status, 0.5, 1000, "2026-10-12T10:00:00Z", refused)
+
+    assert record.refused_commands == refused
+
+
+def test_a_session_record_without_refused_commands_holds_none():
+    record = SessionRecord(SETUP, STATUSES[0], 0.5, 1000, "2026-10-12T10:00:00Z")
+
+    assert record.refused_commands == ()
+
+
+@pytest.mark.parametrize(
+    ("command", "source"),
+    [("", "transcript"), ("ls", "stderr")],
+    ids=["empty-command", "unknown-source"],
+)
+def test_a_refused_command_needs_a_command_and_a_known_source(command, source):
+    with pytest.raises(ValueError, match="refused command"):
+        RefusedCommand(command, source)  # type: ignore[arg-type]
+
+
 # ---------------------------------------------------------------------------
 # Declared settings
 # ---------------------------------------------------------------------------
@@ -497,3 +528,36 @@ def test_the_verdict_json_names_each_verdict_and_reports_judged_intervals():
         {"C6": "no page to fetch"},
     )
     assert (encoded["flip"], encoded["check_details"]["C1"]["allowance"]) == ("not clear", 0)
+
+
+# ---------------------------------------------------------------------------
+# A mechanical check carries one canary or several
+# ---------------------------------------------------------------------------
+
+
+def _mechanical(**extra) -> MechanicalCheck:
+    return MechanicalCheck(
+        name="a check",
+        rule=RuleRef("rules/x.md", "A section"),
+        common=False,
+        binds=lambda role, facts: Binds(),
+        evaluate=lambda evidence: Passed(),
+        violation=lambda: "first",  # type: ignore[return-value,arg-type]
+        **extra,
+    )
+
+
+def test_a_check_built_without_extras_has_one_violation():
+    check = _mechanical()
+
+    assert check.extra_violations == ()
+    assert [build() for build in check.violations] == ["first"]
+
+
+def test_the_violations_are_the_first_canary_then_the_extras_in_order():
+    extras = (lambda: "second", lambda: "third")  # type: ignore[return-value,arg-type]
+
+    check = _mechanical(extra_violations=extras)
+
+    assert check.violations == (check.violation, *extras)
+    assert [build() for build in check.violations] == ["first", "second", "third"]

@@ -16,8 +16,10 @@ from pathlib import Path
 import pytest
 
 from praxion_evals.adherence import (
+    arms,
     cli,
     model,
+    session_loop,
     tasks,
 )
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
@@ -142,6 +144,74 @@ def test_a_dry_run_lists_every_task_of_every_named_arm(
 
 
 @pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_shows_a_confined_kits_confinement_places_and_program_order(capsys, tmp_path):
+    token_file = tmp_path / "session-token"
+    token_file.write_text("sk-ant-oat01-example\n")
+
+    lines = dry_run(
+        capsys,
+        tmp_path,
+        "--role",
+        "implementer",
+        "--max-tasks",
+        "1",
+        "--session-oauth-token-file",
+        str(token_file),
+    )
+
+    assert lines, "the dry run plans sessions"
+    for line in lines:
+        settings = json.loads(line["argv"][line["argv"].index("--settings") + 1])["sandbox"]
+        copy = line["places"]["plugin_copy"]
+        assert settings["failIfUnavailable"] is True
+        assert copy in settings["filesystem"]["denyWrite"]
+        assert str(token_file) in {c["path"] for c in settings["credentials"]["files"]}
+        assert line["program_order"][0] == f"{copy}/scripts"
+        assert line["places"]["scratch"].startswith(line["places"]["sandbox"])
+        assert line["argv"][line["argv"].index("--plugin-dir") + 1] == copy
+
+
+@pytest.mark.parametrize("arm", ["full", "lean"])
+@pytest.mark.parametrize("variant", ["injection", "early-stop"])
+def test_the_dry_run_names_the_plugin_copy_a_real_run_builds(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, arm: model.Arm, variant: str
+) -> None:
+    built: list[Path] = []
+    monkeypatch.setattr(arms, "build_arm", lambda original, dest, *_, **__: built.append(dest))
+    every_task = tasks.generate(ROLE, cli.DEFAULT_SEED, tasks.producible_task_count(ROLE, 7))
+    task = next(t for t in every_task if t.task_id.endswith(f".{variant}"))
+
+    session_loop._build_copy(tmp_path / task.role, None, task.role, arm, tasks.turn_cap_of(task))
+
+    assert cli._planned_copy(tmp_path, task, arm) == built[0]
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_relative_token_file_is_made_absolute_for_the_dry_runs_confinement(
+    capsys, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    Path("session-token").write_text("sk-ant-oat01-example\n")
+
+    lines = dry_run(
+        capsys, tmp_path, "--role", "implementer", "--max-tasks", "1",
+        "--session-oauth-token-file", "session-token",
+    )  # fmt: skip
+
+    settings = json.loads(lines[0]["argv"][lines[0]["argv"].index("--settings") + 1])["sandbox"]
+    assert str(tmp_path / "session-token") in {c["path"] for c in settings["credentials"]["files"]}
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_leaves_another_kits_line_without_confinement_or_places(capsys, tmp_path):
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--max-tasks", "1")
+
+    assert lines, "the dry run plans sessions"
+    for line in lines:
+        assert list(line) == ["role", "arm", "task_id", "argv", "env_names"]
+        assert "--settings" not in line["argv"]
+
+
 @pytest.mark.usefixtures("no_launch")
 def test_a_token_file_puts_the_token_in_every_session_and_takes_the_api_key_out(
     capsys, tmp_path, monkeypatch

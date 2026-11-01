@@ -1,8 +1,9 @@
-"""Where each role's definition puts its output, and the partial form it states for a forced stop.
+"""Where each role's definition puts its output, and the forms it states for a forced stop.
 
-Two tables read off the agent definitions, one row per role: C1 holds a session to
-:data:`DURABLE_OUTPUTS` and C5 to :data:`PARTIAL_FORMS`. A role absent from either has had its
-definition unread, which the check reports as withheld.
+Three tables read off the agent definitions, one row per role: C1 holds a session to
+:data:`DURABLE_OUTPUTS`, and C5 to :data:`PARTIAL_FORMS` and, for a role that states one,
+:data:`FINISHED_FORMS`. A role absent from the first two has had its definition unread, which
+the check reports as withheld; one absent from the third states no finished form.
 """
 
 from __future__ import annotations
@@ -118,4 +119,26 @@ PARTIAL_FORMS: Mapping[str, PartialForm | None] = {
     "promethean": PartialForm((COMPLETED_PHASES, STOPPED_AT)),
     "roadmap-cartographer": PartialForm((COMPLETED_PHASES, STOPPED_AT)),
     "skill-genesis": PartialForm((COMPLETED_PHASES, FAILED_AT)),
+}
+
+
+@dataclass(frozen=True)
+class FinishedForm:
+    """What a role's definition says a finished report looks like once its last edit is made.
+
+    Every section starts as ``open_marker`` and is closed by its content or by
+    ``closed_marker``; the section named ``verdict_heading`` then opens with one of ``verdicts``.
+    """
+
+    open_marker: str
+    closed_marker: str
+    verdict_heading: str
+    verdicts: tuple[str, ...]
+
+
+# A role absent from the table states no finished form: an unmarked title is a failure for it.
+FINISHED_FORMS: Mapping[str, FinishedForm] = {
+    "verifier": FinishedForm(
+        "[pending]", "[not reached]", "Verdict", ("PASS", "PASS WITH FINDINGS", "FAIL")
+    ),
 }

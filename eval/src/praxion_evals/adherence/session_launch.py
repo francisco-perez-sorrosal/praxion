@@ -8,24 +8,35 @@ the run's context or state back.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from praxion_evals.adherence import grade, tasks
 from praxion_evals.adherence.catalog import check_catalog
-from praxion_evals.adherence.infra_stop import EvidenceTail
+from praxion_evals.adherence.confinement import (
+    Confinement,
+    Operator,
+    Places,
+    ShellRun,
+    confinement_breach,
+    confinement_for,
+)
+from praxion_evals.adherence.infra_stop import EvidenceTail, redacted
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
     EarlyStop,
     Errored,
+    RefusedCommand,
+    Role,
     SessionEvidence,
     SessionRecord,
     SessionSetup,
@@ -33,6 +44,7 @@ from praxion_evals.adherence.model import (
     Standard,
     TaskSpec,
 )
+from praxion_evals.adherence.transcript import refused_commands
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.materialize import install_user_scope
 from praxion_evals.live.report import CREDENTIAL_KEYS
@@ -53,6 +65,8 @@ REAL_HOME = Path.home()  # read once, here: the isolation scan takes it in as an
 DEFAULT_TAIL_CHARS = 2000
 # A session that never started, or whose output is lost, has no output to keep.
 NO_OUTPUT = EvidenceTail("", "")
+# A refused command is committed text in the results file, so it is bounded like a tail.
+REFUSED_COMMAND_CHARS = 300
 
 
 @dataclass(frozen=True)
@@ -68,8 +82,14 @@ class Launch:
     effort: str
     session_budget_usd: float
     keep_sandbox: bool
-    env_for: Callable[[Path], Mapping[str, str]]  # a session's environment, given its sandbox root
+    # a session's environment, given its sandbox root and the directories its programs resolve from first
+    env_for: Callable[[Path, Sequence[Path]], Mapping[str, str]]
     tail_chars: int = DEFAULT_TAIL_CHARS  # what an errored session keeps of each output stream
+    # the operator inputs a confined kit's sandbox is built around; `ambient` is the same
+    # environment the session's `env_for` reads, so the confinement and the PATH agree
+    real_home: Path = REAL_HOME
+    token_file: Path | None = None
+    ambient: Mapping[str, str] = field(default_factory=lambda: os.environ)
 
 
 # --- one task session ---
@@ -104,12 +124,14 @@ def task_session(
         build,
         populate,
         page_url,
-        lambda evidence: _grade(launch.judge, evidence, task, setup),
+        lambda evidence: _grade(launch, evidence, task, setup),
     )
     status: SessionStatus = done.result
     if isinstance(status, Errored):
         status = replace(status, setup=setup)
-    record = SessionRecord(setup, status, done.charged_usd, done.duration_ms, done.started_at)
+    record = SessionRecord(
+        setup, status, done.charged_usd, done.duration_ms, done.started_at, done.refused_commands
+    )
     print(
         f"{task.role} {slot} {task.task_id}: {type(status).__name__}", file=sys.stderr, flush=True
     )
@@ -117,7 +139,7 @@ def task_session(
 
 
 def _grade(
-    judge: JudgeClient | None, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
+    launch: Launch, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
 ) -> SessionStatus:
     """C3 is named only for a task that planted a gap or a conflict: without one it passes vacuously."""
     names = [
@@ -125,7 +147,7 @@ def _grade(
         for check in check_catalog(task.role)
         if not (check.name == "C3" and isinstance(task.variant, EarlyStop))
     ]
-    return grade.grade(evidence, names, judge, setup, real_home=REAL_HOME)
+    return grade.grade(evidence, names, launch.judge, setup, real_home=launch.real_home)
 
 
 def injection_of(task: TaskSpec) -> tasks.Injection | None:
@@ -142,7 +164,8 @@ class Attempt[R]:
     ``charged_usd`` is what the ledger took: the reported cost, or the full budget when the
     session reported none. An errored result carries the tails of the session's output.
     ``model`` is the model the session's init event reported; None when it started no process
-    or the stream carried none.
+    or the stream carried none. ``refused_commands`` are the shell commands the harness refused
+    the role, redacted and bounded.
     """
 
     result: R | Errored
@@ -150,6 +173,7 @@ class Attempt[R]:
     duration_ms: int
     started_at: str
     model: str | None = None
+    refused_commands: tuple[RefusedCommand, ...] = ()
 
 
 def attempt[R](
@@ -176,11 +200,12 @@ def attempt[R](
         charged: float,
         tails: EvidenceTail = NO_OUTPUT,
         model: str | None = None,
+        refused: tuple[RefusedCommand, ...] = (),
     ) -> Attempt[R]:
         if isinstance(result, Errored):
             result = replace(result, tails=tails)
         duration_ms = int((time.monotonic() - began) * MS_PER_S)
-        return Attempt(result, charged, duration_ms, started_at, model)
+        return Attempt(result, charged, duration_ms, started_at, model, refused)
 
     reserved = ledger.reserve(budget)
     if isinstance(reserved, LiveErrored):
@@ -188,24 +213,64 @@ def attempt[R](
     root = new_sandbox_root(launch, task)
     try:
         try:
-            spec, commit = _prepare(launch, task, build, populate, page_url, root)
+            spec, commit, confinement = _prepare(launch, task, build, populate, page_url, root)
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
         try:
-            env = launch.env_for(root)
+            env = launch.env_for(root, [Path(path) for path in _program_order(confinement)])
             run = run_session(spec, env)
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = settle(reserved, budget, run)
         tails, model = tails_of(run, env, launch.tail_chars), resolved_model(run)
-        try:
-            evidence = _evidence(launch, task, build, page_url, root, run, commit)
-            return settled, finish(assess(evidence), charged, tails, model)
-        except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged, tails, model)
+        result, refused = _assessed(launch, task, build, page_url, root, run, commit, env, assess)
+        return settled, finish(result, charged, tails, model, refused)
     finally:
         if not launch.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
+
+
+def _assessed[R](
+    launch: Launch,
+    task: TaskSpec,
+    build: ArmBuild,
+    page_url: str | None,
+    root: Path,
+    run: SessionRun,
+    commit: str,
+    session_env: Mapping[str, str],
+    assess: Callable[[SessionEvidence], R],
+) -> tuple[R | Errored, tuple[RefusedCommand, ...]]:
+    """What the session's output yields: its assessment (or the error that kept it from having
+    one), and the commands the harness refused the role.
+
+    A confined kit's broken confinement replaces the assessment, whatever it was: the session
+    ran under other settings than the run declared, so its outcome says nothing of the role.
+    The breach is read from the commands as they ran; the record keeps them clipped.
+    """
+    judged: tuple[RefusedCommand, ...] = ()
+    tool_results: Iterable[str] = ()
+    shell_runs: tuple[ShellRun, ...] = ()
+    try:
+        evidence = _evidence(launch, task, build, page_url, root, run, commit)
+        judged = redacted_refusals(evidence, session_env)
+        tool_results = evidence.envelope.tool_results.values()
+        shell_runs = _shell_runs(evidence)
+        result: R | Errored = assess(evidence)
+    except Exception as error:  # one unreadable session must not discard the paid run
+        result = _crash(error)
+    secrets = _credentials(session_env)
+    broken = confinement_breach(
+        task.role,
+        judged,
+        (redacted(text, secrets) for text in tool_results),
+        redacted(run.stderr, secrets),
+        started=parse_stream(run.stdout).init is not None,
+        shell_runs=(
+            ShellRun(redacted(r.command, secrets), redacted(r.output, secrets)) for r in shell_runs
+        ),
+    )
+    return (result if broken is None else Errored("confinement_broken", broken)), clipped(judged)
 
 
 def _crash(error: Exception) -> Errored:
@@ -225,14 +290,23 @@ def _prepare(
     populate: Callable[[Path], None],
     page_url: str | None,
     root: Path,
-) -> tuple[SessionSpec, str]:
+) -> tuple[SessionSpec, str, Confinement | None]:
     """Populate the sandbox and build the scratch repository; nothing is launched yet.
 
-    Returns the session to launch and the fixture commit the scratch repository starts from.
+    Returns the session to launch, the fixture commit the scratch repository starts from, and the
+    confinement the session starts under (None for a kit that is not confined).
     """
     sandbox = SandboxPaths(root)
     populate(root)
     commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
+    confinement = session_confinement(
+        task.role,
+        build.copy_root,
+        launch.run_root,
+        home=launch.real_home,
+        token_file=launch.token_file,
+        ambient=launch.ambient,
+    )
     spec = tasks.session_spec(
         task,
         build,
@@ -240,8 +314,35 @@ def _prepare(
         model=launch.model,
         effort=launch.effort,
         max_budget_usd=launch.session_budget_usd,
+        confinement=confinement,
     )
-    return spec, commit
+    return spec, commit, confinement
+
+
+def session_confinement(
+    role: Role,
+    plugin_copy: Path,
+    run_root: Path,
+    *,
+    home: Path,
+    token_file: Path | None,
+    ambient: Mapping[str, str],
+) -> Confinement | None:
+    """The confinement of a `role` session on this machine; None for a kit that is not confined.
+
+    The one place the runner's interpreter and the ambient PATH are read into the confinement, so
+    the dry run shows what a live session gets. A relative PATH entry names no fixed directory, so
+    it is left out of the confinement's program order (the session's own PATH is built apart).
+    """
+    ambient_path = tuple(
+        entry for entry in ambient.get("PATH", os.defpath).split(os.pathsep) if os.path.isabs(entry)
+    )
+    operator = Operator(home, token_file, Path(sys.prefix), Path(sys.base_prefix), ambient_path)
+    return confinement_for(role, Places(run_root, plugin_copy), operator)
+
+
+def _program_order(confinement: Confinement | None) -> tuple[str, ...]:
+    return () if confinement is None else confinement.program_order
 
 
 def settle(ledger: SpendLedger, budget: float, run: SessionRun) -> tuple[SpendLedger, float]:
@@ -261,8 +362,46 @@ def tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTai
     the session was given (and any API key shape) redacted before the bound clips them."""
     final = parse_stream(run.stdout).final_result
     result_text = final.result_text if final and final.result_text else ""
-    secrets = [env[key] for key in CREDENTIAL_KEYS if key in env]
-    return EvidenceTail.capture(run.stderr, result_text, bound, secrets)
+    return EvidenceTail.capture(run.stderr, result_text, bound, _credentials(env))
+
+
+def _credentials(env: Mapping[str, str]) -> list[str]:
+    return [env[key] for key in CREDENTIAL_KEYS if key in env]
+
+
+def redacted_refusals(
+    evidence: SessionEvidence, env: Mapping[str, str]
+) -> tuple[RefusedCommand, ...]:
+    """The commands the harness refused the role, whole, with the credentials the session was
+    given (and any API key shape) redacted: what the breach reading judges."""
+    final = evidence.envelope.final_result
+    denied = () if final is None else final.denied_commands
+    secrets = _credentials(env)
+    return tuple(
+        RefusedCommand(_redacted(refusal.command, secrets), refusal.source)
+        for refusal in refused_commands(evidence.envelope, evidence.role_tool_uses, denied)
+    )
+
+
+def clipped(
+    refusals: Sequence[RefusedCommand], bound: int = REFUSED_COMMAND_CHARS
+) -> tuple[RefusedCommand, ...]:
+    """The refusals as the record keeps them: each command bounded, after its redaction."""
+    return tuple(RefusedCommand(r.command[:bound], r.source) for r in refusals)
+
+
+def _redacted(command: str, secrets: list[str]) -> str:
+    return EvidenceTail.capture(command, "", len(command), secrets).error_tail
+
+
+def _shell_runs(evidence: SessionEvidence) -> tuple[ShellRun, ...]:
+    """Each shell command the role ran, with the output its tool result carried."""
+    results = evidence.envelope.tool_results
+    return tuple(
+        ShellRun(use.input["command"], results.get(use.id, ""))
+        for use in evidence.role_tool_uses
+        if use.name == "Bash" and isinstance(use.input.get("command"), str)
+    )
 
 
 def _evidence(

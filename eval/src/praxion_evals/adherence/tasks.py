@@ -42,6 +42,7 @@ from typing import assert_never
 
 import yaml
 
+from praxion_evals.adherence.confinement import Confinement, settings_of
 from praxion_evals.adherence.model import (
     CONVENTION_MARKER,
     PILOT_ROLES,
@@ -728,8 +729,12 @@ def session_spec(
     effort: str,
     max_budget_usd: float,
     timeout_s: int = DEFAULT_TIMEOUT_S,
+    confinement: Confinement | None = None,
 ) -> SessionSpec:
-    """The main session for one task in one arm; only ``arm_copy`` differs between arms."""
+    """The main session for one task in one arm; only ``arm_copy`` differs between arms.
+
+    A confined kit's ``confinement`` rides as the session's settings; its tool grant is unchanged.
+    """
     if arm_copy.role != task.role:
         raise ValueError(f"a {arm_copy.role} plugin copy cannot run a {task.role} task")
     wanted_cap = turn_cap_of(task)
@@ -738,6 +743,8 @@ def session_spec(
             f"{task.task_id} needs a plugin copy capped at {wanted_cap} turns, "
             f"not {arm_copy.turn_cap}"
         )
+    if confinement is not None and str(arm_copy.copy_root) not in confinement.deny_write:
+        raise ValueError(f"the confinement does not protect the plugin copy {arm_copy.copy_root}")
     return SessionSpec(
         prompt=main_prompt(task),
         model=model,
@@ -749,6 +756,7 @@ def session_spec(
         allowed_tools=allowed_tools(arm_copy),
         timeout_s=timeout_s,
         add_dir=arm_copy.copy_root,
+        settings=None if confinement is None else settings_of(confinement),
     )
 
 

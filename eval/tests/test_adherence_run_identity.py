@@ -19,6 +19,7 @@ from praxion_evals.adherence.run_identity import (
     RoleIdentity,
     UnknownIdentity,
     at_commit,
+    checks_digest,
     current_identity,
     diff,
     measured_identity,
@@ -267,6 +268,7 @@ def _identity() -> MeasuredIdentity:
                 "identity": {
                     "tree": "b" * 64,
                     "model": "claude-opus-5-5",
+                    "checks": "e" * 64,
                     "roles": {"researcher": {"definition_sha": "a" * 64, "kernel": KERNEL_VERSION}},
                 },
             }
@@ -313,6 +315,8 @@ def test_identities_that_are_the_same_differ_in_nothing() -> None:
             "launch_orders.researcher.task-000: [full, lean] -> [lean, full]",
         ),
         (_changed(tree="c" * 64), "tree: bbbbbbbbbbbb -> cccccccccccc"),
+        (_changed(checks="f" * 64), "checks: eeeeeeeeeeee -> ffffffffffff"),
+        (_changed(checks=None), "checks: eeeeeeeeeeee -> None"),
         (
             _changed(roles={"researcher": RoleIdentity("d" * 64, KERNEL_VERSION)}),
             "roles.researcher.definition: aaaaaaaaaaaa -> dddddddddddd",
@@ -330,12 +334,32 @@ def test_identities_that_are_the_same_differ_in_nothing() -> None:
         "stop count",
         "launch order",
         "tree",
+        "grading sources",
+        "grading sources lost",
         "role definition",
         "role kernel",
     ],
 )
 def test_diff_names_each_way_two_identities_differ(other: MeasuredIdentity, named: str) -> None:
     assert diff(_identity(), other) == (named,)
+
+
+def test_a_file_without_checks_reads_back_with_none_and_differs_from_a_digested_run() -> None:
+    recorded = measured_identity(
+        _recorded(
+            {
+                **_legacy_extra("0" * 40),
+                "identity": {"tree": "b" * 64, "model": None, "roles": {}},
+            }
+        ),
+        Path("/not-read"),
+    )
+
+    assert recorded.checks is None
+    digested = replace(recorded, checks="e" * 64)
+    assert diff(digested, recorded) == ("checks: eeeeeeeeeeee -> None",)
+    assert diff(recorded, digested) == ("checks: None -> eeeeeeeeeeee",)
+    assert diff(recorded, recorded) == ()
 
 
 def test_diff_names_every_difference_not_only_the_first() -> None:
@@ -393,8 +417,9 @@ def test_a_new_run_records_what_it_was_measured_on_when_it_begins(
 
     recorded = loaded.run.extra["identity"]
     definition = (scripted_checkout() / "agents" / f"{ROLE}.md").read_bytes()
-    assert set(recorded) == {"tree", "model", "roles"}
+    assert set(recorded) == {"tree", "model", "checks", "roles"}
     assert len(recorded["tree"]) == len(hashlib.sha256().hexdigest())
+    assert recorded["checks"] == checks_digest()
     assert recorded["roles"][ROLE]["definition_sha"] == hashlib.sha256(definition).hexdigest()
 
 
@@ -432,6 +457,7 @@ def test_the_record_a_run_begins_with_names_the_tree_of_the_checkout(checkout: P
     assert record == {
         "tree": tree_digest(checkout),
         "model": None,
+        "checks": checks_digest(),
         "roles": {
             "researcher": {
                 "definition_sha": hashlib.sha256(DEFINITION.encode()).hexdigest(),
@@ -476,3 +502,49 @@ def test_a_change_beside_the_telemetry_still_changes_the_tree_digest(
     _put(checkout, path, "changed\n")
 
     assert tree_digest(checkout) != before
+
+
+# ---------------------------------------------------------------------------
+# The runner's grading sources
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def package(tmp_path: Path) -> Path:
+    root = tmp_path / "adherence"
+    for name in ("checks_roles.py", "catalog.py", "grade.py", "output_forms.py", "transcript.py"):
+        _put(root, name, f"# {name}\n")
+    _put(root, "cli.py", "# not a grading source\n")
+    return root
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["checks_roles.py", "catalog.py", "grade.py", "output_forms.py", "transcript.py"],
+)
+def test_editing_a_grading_source_changes_the_checks_digest(package: Path, name: str) -> None:
+    before = checks_digest(package)
+
+    _put(package, name, "# edited\n")
+
+    assert checks_digest(package) != before
+
+
+def test_a_new_grading_source_changes_the_checks_digest(package: Path) -> None:
+    before = checks_digest(package)
+
+    _put(package, "catalog_rows.py", "# a new one\n")
+
+    assert checks_digest(package) != before
+
+
+def test_editing_an_unrelated_module_leaves_the_checks_digest(package: Path) -> None:
+    before = checks_digest(package)
+
+    _put(package, "cli.py", "# edited\n")
+
+    assert checks_digest(package) == before
+
+
+def test_the_installed_grading_sources_are_found() -> None:
+    assert checks_digest() != checks_digest(Path("/nowhere"))

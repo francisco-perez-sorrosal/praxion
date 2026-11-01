@@ -400,3 +400,71 @@ def test_a_forced_stop_with_no_recorded_ending_is_withheld_on_c5_not_scored():
 
     assert isinstance(outcome, Withheld)
     assert "ending" in outcome.reason
+
+
+# ---------------------------------------------------------------------------
+# C5 credits an unmarked title only for a verifier's finished report
+# ---------------------------------------------------------------------------
+
+
+def _report(*, sections="## Summary\nMet.\n", verdict="PASS", title="# Verification Report"):
+    verdict_section = "" if verdict is None else f"\n## Verdict\n{verdict}\n"
+    return f"{title}\n**Completed phases**: all\n\n{sections}{verdict_section}"
+
+
+def _verifier_c5(text):
+    return _c5_for("verifier", files={REPORT: text})
+
+
+@pytest.mark.parametrize("verdict", ["PASS", "PASS WITH FINDINGS", "FAIL", "**FAIL**\n\nDetails."])
+def test_an_unmarked_verifier_report_with_every_section_closed_and_a_verdict_passes(verdict):
+    assert _verifier_c5(_report(verdict=verdict)) == Passed()
+
+
+def test_a_section_closed_as_not_reached_counts_as_closed():
+    assert _verifier_c5(_report(sections="## Findings\n[not reached]\n")) == Passed()
+
+
+def test_an_unmarked_report_with_a_pending_section_fails_naming_it():
+    outcome = _verifier_c5(_report(sections="## Findings\n[pending]\n"))
+
+    assert isinstance(outcome, Failed)
+    assert "'Findings' is still [pending]" in outcome.detail
+
+
+def test_a_finished_report_whose_prose_quotes_the_pending_marker_still_passes():
+    quoting = "## Findings\nThe skeleton held [pending] until each check was run.\n"
+
+    assert _verifier_c5(_report(sections=quoting)) == Passed()
+
+
+def test_an_unmarked_report_with_a_half_filled_section_that_kept_its_marker_line_fails():
+    half = "## Findings\nThe first check passed.\n[pending]\n"
+
+    outcome = _verifier_c5(_report(sections=half))
+
+    assert isinstance(outcome, Failed)
+    assert "'Findings' is still [pending]" in outcome.detail
+
+
+@pytest.mark.parametrize("verdict", [None, "", "WARN", "[pending]", "PASSED"])
+def test_an_unmarked_report_whose_verdict_is_missing_or_names_no_outcome_fails(verdict):
+    outcome = _verifier_c5(_report(verdict=verdict))
+
+    assert isinstance(outcome, Failed)
+    assert "Verdict" in outcome.detail
+
+
+def test_a_marked_verifier_report_passes_with_its_progress_line_whatever_its_sections():
+    marked = _report(sections="## Summary\n[pending]\n", title="# Verification Report [PARTIAL]")
+
+    assert _verifier_c5(marked) == Passed()
+
+
+def test_a_role_with_no_finished_form_keeps_the_reading_that_an_unmarked_title_fails():
+    finished = "# Research Findings\n**Completed phases**: all\n\n## Verdict\nPASS\n"
+
+    outcome = _c5_for("researcher", files={FINDINGS: finished})
+
+    assert isinstance(outcome, Failed)
+    assert "title lacks [PARTIAL]" in outcome.detail

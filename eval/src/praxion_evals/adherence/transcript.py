@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NamedTuple
+
+from praxion_evals.live.session import SessionEnvelope, ToolUse
 
 # The harness trailer of an Agent tool result, synchronous or a background launch stub.
 _AGENT_ID = re.compile(r"^agentId:\s*(?P<id>[\w-]+)", re.MULTILINE)
@@ -29,6 +31,15 @@ _AGENT_ID = re.compile(r"^agentId:\s*(?P<id>[\w-]+)", re.MULTILINE)
 # `+` and a non-ASCII letter: a macOS TMPDIR such as `/var/folders/x5/pt_h187.../T` becomes
 # `-private-var-folders-x5-pt-h187...-T`).
 _PROJECT_DIR_CHARS = re.compile(r"[^A-Za-z0-9]")
+# What the harness answers a tool use it refused, as recorded tool results show it: the
+# confinement failing to start, and a permission denied (a prompt nobody can answer, a grant
+# not given, a denial by rule).
+_REFUSAL_WORDING = re.compile(
+    r"Sandbox is required but failed to initialize"
+    r"|haven't granted it yet"
+    r"|Permission for this tool use was denied"
+    r"|Permission to use \w+ has been denied"
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +88,35 @@ class Unknown:
 
 
 RoleEnding = EndedOnItsOwn | StoppedAtCap | Unknown
+
+
+class Refusal(NamedTuple):
+    """A shell command the harness refused, and the stream surface that reported it. The source
+    names mirror ``model.RefusalSource``, which this module cannot import (model imports it)."""
+
+    command: str
+    source: Literal["permission_denials", "transcript"]
+
+
+def refused_commands(
+    envelope: SessionEnvelope, role_tool_uses: Iterable[ToolUse], denied: Iterable[str]
+) -> tuple[Refusal, ...]:
+    """The commands the harness refused the role: the result event's denials, then the role's
+    Bash uses whose tool result carries the harness's refusal wording, each command once."""
+    found = [Refusal(command, "permission_denials") for command in denied]
+    for use in role_tool_uses:
+        command = use.input.get("command")
+        refusal_text = envelope.tool_results.get(use.id, "")
+        if (
+            use.name == "Bash"
+            and isinstance(command, str)
+            and _REFUSAL_WORDING.search(refusal_text)
+        ):
+            found.append(Refusal(command, "transcript"))
+    first_report = {
+        refusal.command: refusal for refusal in reversed(found) if refusal.command.strip()
+    }
+    return tuple(first_report.values())[::-1]
 
 
 def spawned_agent_id(spawn_result: str | None) -> str | None:

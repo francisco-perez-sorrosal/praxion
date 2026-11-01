@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Deterministic substrate for REWORK_MANIFEST.md generation.
 
 Pure functions with no I/O — filesystem interaction happens in the calling

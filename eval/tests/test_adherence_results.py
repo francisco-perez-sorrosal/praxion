@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import lineage, results, session_loop
+from praxion_evals.adherence import lineage, report, results, session_loop
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import (
     Assessed,
@@ -21,6 +21,7 @@ from praxion_evals.adherence.model import (
     NoRegression,
     NotMeasured,
     Passed,
+    RefusedCommand,
     Regression,
     RuleRef,
     SessionRecord,
@@ -29,6 +30,7 @@ from praxion_evals.adherence.model import (
     Underpowered,
 )
 from praxion_evals.adherence.results import (
+    RUN_INDEX_NAME,
     CatalogEntry,
     EarlierRun,
     RunInfo,
@@ -710,3 +712,71 @@ def test_a_lineage_of_another_identity_is_set_apart_once(tmp_path: Path):
 
     assert earlier.by_role["researcher"].draws == ()
     assert earlier.by_role["researcher"].apart == {"run-a + run-b": "the kernel changed"}
+
+
+# ---------------------------------------------------------------------------
+# The shell commands the harness refused
+# ---------------------------------------------------------------------------
+
+REFUSED = (
+    RefusedCommand("rm -rf /", "permission_denials"),
+    RefusedCommand("curl example.org", "transcript"),
+)
+RECORDED_RESULTS = Path(__file__).resolve().parents[2] / session_loop.OUTPUT_DIR
+
+
+def test_a_records_refused_commands_round_trip_through_the_results_file(tmp_path: Path):
+    refusing = replace(session("t1", "full"), refused_commands=REFUSED)
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, run_results([refusing, session("t1", "lean")]))
+
+    assert results.load(path).sessions[0].refused_commands == REFUSED
+    stored = json.loads(path.read_text())["sessions"][0]["refused_commands"]
+    assert stored == [
+        {"command": "rm -rf /", "source": "permission_denials"},
+        {"command": "curl example.org", "source": "transcript"},
+    ]
+
+
+def test_an_errored_record_keeps_its_refused_commands_through_the_results_file(tmp_path: Path):
+    errored = replace(
+        session("t1", "full", Errored("exit_nonzero", "crashed")), refused_commands=REFUSED
+    )
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, run_results([errored]))
+
+    assert results.load(path).sessions[0].refused_commands == REFUSED
+
+
+def test_a_record_without_refused_commands_stores_no_key_and_an_older_file_decodes_with_none(
+    tmp_path: Path,
+):
+    path = tmp_path / "run.json"
+
+    results.write_atomic(path, run_results([session("t1", "full")]))
+
+    assert "refused_commands" not in json.loads(path.read_text())["sessions"][0]
+    assert results.load(path).sessions[0].refused_commands == ()
+
+
+def test_a_refused_command_with_an_unknown_source_is_refused_on_load(tmp_path: Path):
+    path = tmp_path / "run.json"
+    results.write_atomic(path, run_results([session("t1", "full")]))
+    document = json.loads(path.read_text())
+    document["sessions"][0]["refused_commands"] = [{"command": "ls", "source": "stderr"}]
+    path.write_text(json.dumps(document))
+
+    with pytest.raises(ValueError, match="source"):
+        results.load(path)
+
+
+def test_the_committed_results_files_still_decode_and_render_with_no_refused_commands():
+    files = [p for p in RECORDED_RESULTS.glob("*.json") if p.name != RUN_INDEX_NAME]
+    assert files
+
+    for path in files:
+        loaded = results.load(path)
+        assert all(record.refused_commands == () for record in loaded.sessions)
+        assert report.render(loaded)

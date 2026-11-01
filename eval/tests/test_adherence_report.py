@@ -495,7 +495,7 @@ def attempt_ending(
     cap_usd: float = 10.0,
 ) -> Errored:
     """The Errored one launch yields when the session ended as `ended` and grading says `error`."""
-    monkeypatch.setattr(session_launch, "_prepare", lambda *args: (None, "commit"))
+    monkeypatch.setattr(session_launch, "_prepare", lambda *args: (None, "commit", None))
     monkeypatch.setattr(session_launch, "run_session", lambda spec, env: ended)
     monkeypatch.setattr(session_launch, "_evidence", lambda *args: None)
     launch = session_launch.Launch(
@@ -508,7 +508,7 @@ def attempt_ending(
         effort="low",
         session_budget_usd=1.0,
         keep_sandbox=False,
-        env_for=lambda root: {"CLAUDE_CODE_OAUTH_TOKEN": TOKEN},
+        env_for=lambda root, path_first: {"CLAUDE_CODE_OAUTH_TOKEN": TOKEN},
         tail_chars=TAIL_BOUND,
     )
     task = SimpleNamespace(role="researcher")

@@ -65,9 +65,11 @@ WEBFETCH_ROLES: frozenset[str] = frozenset(
     }
 )
 
-# The live runner's error kinds, plus the two only the adherence eval can raise: a refused
-# spend reservation, and a lean session whose injected kernel never arrived.
-AdherenceErrorKind = Literal["launch_refused", "kernel_missing"]
+# The live runner's error kinds, plus the three only the adherence eval can raise: a refused
+# spend reservation, a lean session whose injected kernel never arrived, and a confined kit's
+# session whose confinement was inactive or refused a command its definition prescribes.
+# None of the three is a counting or a retryable kind: a retry would draw the same settings.
+AdherenceErrorKind = Literal["launch_refused", "kernel_missing", "confinement_broken"]
 ERROR_KINDS: tuple[str, ...] = (*get_args(LiveErrorKind), *get_args(AdherenceErrorKind))
 ErrorKind = LiveErrorKind | AdherenceErrorKind
 
@@ -371,7 +373,7 @@ BindsFor = Callable[[Role, TaskFacts], Binding]
 
 @dataclass(frozen=True)
 class MechanicalCheck:
-    """A check a script decides. ``violation`` builds evidence it must flag."""
+    """A check a script decides. Each canary in ``violations`` builds evidence it must flag."""
 
     name: str
     rule: RuleRef
@@ -380,9 +382,15 @@ class MechanicalCheck:
     evaluate: Callable[[SessionEvidence], CheckOutcome]
     violation: Callable[[], SessionEvidence]
     kind: Literal["mechanical"] = "mechanical"
+    # A check that relaxes a reading keeps one canary per violation it must still catch.
+    extra_violations: tuple[Callable[[], SessionEvidence], ...] = ()
 
     def __post_init__(self) -> None:
         _non_empty(self.name, "a check's name")
+
+    @property
+    def violations(self) -> tuple[Callable[[], SessionEvidence], ...]:
+        return (self.violation, *self.extra_violations)
 
 
 @dataclass(frozen=True)
@@ -546,13 +554,34 @@ class NotMeasured:
 SessionStatus = Measured | Errored | NotMeasured
 
 
+RefusalSource = Literal["permission_denials", "transcript"]
+REFUSAL_SOURCES: tuple[str, ...] = get_args(RefusalSource)
+
+
+@dataclass(frozen=True)
+class RefusedCommand:
+    """A shell command the harness refused, and which stream surface reported it."""
+
+    command: str
+    source: RefusalSource
+
+    def __post_init__(self) -> None:
+        _non_empty(self.command, "a refused command")
+        _one_of(self.source, REFUSAL_SOURCES, "a refused command's source")
+
+
 @dataclass(frozen=True)
 class SessionRecord:
+    """``refused_commands`` is kept beside the status, not inside it: a measured and an
+    errored session alike can have had a command refused, and a record written before they
+    were kept has none."""
+
     setup: SessionSetup
     status: SessionStatus
     cost_usd: float
     duration_ms: int
     started_at: str
+    refused_commands: tuple[RefusedCommand, ...] = ()
 
     def __post_init__(self) -> None:
         _require(self.cost_usd >= 0 and self.duration_ms >= 0, "cost and duration are not negative")

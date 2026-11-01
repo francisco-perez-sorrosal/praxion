@@ -11,7 +11,15 @@ scenario scripts how each session ends, in the specification's terms:
 - `crashed(text)`: the session exited non-zero, `text` on its error output;
 - `error_result(text)`: the session's stream ended in an error result carrying `text`
   (the way a spent credit balance ends a session);
-- `unparseable()`: the session printed no parseable result.
+- `unparseable()`: the session printed no parseable result;
+- `refused_command(cmd)`: the role's first call is the shell command `cmd`, which the
+  harness denies (a permission denial in its tool result and in the final result's
+  `permission_denials`); the role then works as in `ran()`;
+- `sandbox_refused(cmd)`: the same, the refusal being `Sandbox is required but failed to
+  initialize`, the harness's answer when required confinement failed after startup;
+- `confinement_unavailable_at_startup()`: the session exits at startup, before any
+  event, because the confinement it requires is unavailable (the harness's words for that
+  exit are a representative line until the first paired run records the real one).
 
 A script gives each arm a sequence of endings in that arm's own launch order (a retry
 is the next launch of its arm), or names an ending for a task's arm by its position in
@@ -113,7 +121,15 @@ NO_SPEND_CAP_USD = (
 UNREACHABLE_PAGES = "http://127.0.0.1:9/"  # nothing answers: the fetched-page probe fails at once
 
 EndingKind = Literal[
-    "ran", "graded failure", "isolation breach", "crashed", "error result", "unparseable"
+    "ran",
+    "graded failure",
+    "isolation breach",
+    "crashed",
+    "error result",
+    "unparseable",
+    "refused command",
+    "sandbox refused",
+    "confinement unavailable",
 ]
 
 
@@ -122,6 +138,7 @@ class Ending:
     kind: EndingKind
     error_output: str = ""  # what the session wrote on its error output
     result_text: str = ""  # the text of its final result event
+    command: str = ""  # the shell command the harness refused, for a refusing ending
 
 
 def ran() -> Ending:
@@ -146,6 +163,28 @@ def error_result(text: str, error_output: str = "") -> Ending:
 
 def unparseable() -> Ending:
     return Ending("unparseable")
+
+
+def refused_command(command: str) -> Ending:
+    return Ending("refused command", command=command)
+
+
+def sandbox_refused(command: str) -> Ending:
+    return Ending("sandbox refused", command=command)
+
+
+# A representative line the harness writes on its error output, before any event, when a session
+# that requires confinement (`failIfUnavailable`) cannot start its sandbox. The specification does
+# not quote the harness's text; the line names the sandbox in words, which is all the run reads of
+# it. The first real occurrence, recorded verbatim by the first paired run, replaces this line.
+CONFINEMENT_UNAVAILABLE_AT_STARTUP = (
+    "Error: sandbox required by settings (failIfUnavailable) but unavailable on this machine:"
+    " the sandbox could not be started."
+)
+
+
+def confinement_unavailable_at_startup() -> Ending:
+    return Ending("confinement unavailable", error_output=CONFINEMENT_UNAVAILABLE_AT_STARTUP)
 
 
 # Volatile tokens the masking rule hides: an id, a timestamp, a request id, a duration and

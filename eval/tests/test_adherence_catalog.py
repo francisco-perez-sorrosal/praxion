@@ -184,9 +184,10 @@ JUDGED = [(role, c) for role, c in ALL_CHECKS if c.kind == "judged"]
 
 @pytest.mark.parametrize(("role", "check"), MECHANICAL, ids=_ids(MECHANICAL))
 def test_a_mechanical_checks_planted_violation_is_flagged_failed(role, check):
-    outcome = check.evaluate(check.violation())
+    for index, build in enumerate(check.violations):
+        outcome = check.evaluate(build())
 
-    assert isinstance(outcome, Failed), f"{role}/{check.name}: the canary read as {outcome}"
+        assert isinstance(outcome, Failed), f"{role}/{check.name}: canary {index} read as {outcome}"
 
 
 @pytest.mark.parametrize(("role", "check"), JUDGED, ids=_ids(JUDGED))

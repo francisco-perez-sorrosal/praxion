@@ -29,6 +29,7 @@ from praxion_evals.adherence.model import (
     Interval,
     JudgedCheck,
     Measured,
+    MechanicalCheck,
     NonInferior,
     NoRegression,
     NotApplicable,
@@ -497,3 +498,36 @@ def test_the_verdict_json_names_each_verdict_and_reports_judged_intervals():
         {"C6": "no page to fetch"},
     )
     assert (encoded["flip"], encoded["check_details"]["C1"]["allowance"]) == ("not clear", 0)
+
+
+# ---------------------------------------------------------------------------
+# A mechanical check carries one canary or several
+# ---------------------------------------------------------------------------
+
+
+def _mechanical(**extra) -> MechanicalCheck:
+    return MechanicalCheck(
+        name="a check",
+        rule=RuleRef("rules/x.md", "A section"),
+        common=False,
+        binds=lambda role, facts: Binds(),
+        evaluate=lambda evidence: Passed(),
+        violation=lambda: "first",  # type: ignore[return-value,arg-type]
+        **extra,
+    )
+
+
+def test_a_check_built_without_extras_has_one_violation():
+    check = _mechanical()
+
+    assert check.extra_violations == ()
+    assert [build() for build in check.violations] == ["first"]
+
+
+def test_the_violations_are_the_first_canary_then_the_extras_in_order():
+    extras = (lambda: "second", lambda: "third")  # type: ignore[return-value,arg-type]
+
+    check = _mechanical(extra_violations=extras)
+
+    assert check.violations == (check.violation, *extras)
+    assert [build() for build in check.violations] == ["first", "second", "third"]

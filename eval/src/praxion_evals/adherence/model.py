@@ -371,7 +371,7 @@ BindsFor = Callable[[Role, TaskFacts], Binding]
 
 @dataclass(frozen=True)
 class MechanicalCheck:
-    """A check a script decides. ``violation`` builds evidence it must flag."""
+    """A check a script decides. Each canary in ``violations`` builds evidence it must flag."""
 
     name: str
     rule: RuleRef
@@ -380,9 +380,15 @@ class MechanicalCheck:
     evaluate: Callable[[SessionEvidence], CheckOutcome]
     violation: Callable[[], SessionEvidence]
     kind: Literal["mechanical"] = "mechanical"
+    # A check that relaxes a reading keeps one canary per violation it must still catch.
+    extra_violations: tuple[Callable[[], SessionEvidence], ...] = ()
 
     def __post_init__(self) -> None:
         _non_empty(self.name, "a check's name")
+
+    @property
+    def violations(self) -> tuple[Callable[[], SessionEvidence], ...]:
+        return (self.violation, *self.extra_violations)
 
 
 @dataclass(frozen=True)

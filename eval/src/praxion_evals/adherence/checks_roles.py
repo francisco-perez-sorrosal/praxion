@@ -150,6 +150,7 @@ def clause(
     binds: BindsFor | None,
     evaluate: Callable[[SessionEvidence], CheckOutcome],
     violation: Callable[[], SessionEvidence],
+    extra_violations: tuple[Callable[[], SessionEvidence], ...] = (),
 ) -> MechanicalCheck:
     return MechanicalCheck(
         name=name,
@@ -158,6 +159,7 @@ def clause(
         binds=binds or _always_binds,
         evaluate=evaluate,
         violation=violation,
+        extra_violations=extra_violations,
     )
 
 

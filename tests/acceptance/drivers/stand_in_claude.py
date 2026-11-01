@@ -15,7 +15,12 @@ the way a real session would present itself to the runner:
 - a scripted ending instead of that, when the scenario asks for one: a graded failure
   (the role returns no terminal marker), an isolation breach (a plugin from outside the
   sandbox in the init event), a crash (non-zero exit, text on the error output), an
-  error result (an error `result` event carrying text), or a stream with no result.
+  error result (an error `result` event carrying text), or a stream with no result;
+- a shell command the harness refused, ahead of the role's ordinary work: a permission
+  denial (the command's tool result is the harness's denial, and the final `result`
+  event lists it under `permission_denials`), or a confinement refusal (the command's
+  tool result is `Sandbox is required but failed to initialize`); or a session that exits
+  at startup, before any event, because its required confinement is unavailable.
 
 Every launch is logged with its arm, task and attempt, which is how a scenario sees what
 the run started. Nothing here reads the evaluation package: the stand-in reaches the run
@@ -58,7 +63,10 @@ def fingerprint(scratch: Path) -> str:
 
 
 class ScriptedEnding(Protocol):
-    """What a scenario scripts for one session (`adherence_runs.Ending`)."""
+    """What a scenario scripts for one session (`adherence_runs.Ending`).
+
+    An ending that refuses a shell command also carries it as `command`.
+    """
 
     kind: str
     error_output: str
@@ -156,6 +164,7 @@ def _ending_json(ending: ScriptedEnding) -> dict[str, str]:
         "kind": ending.kind,
         "error_output": ending.error_output,
         "result_text": ending.result_text,
+        "command": getattr(ending, "command", ""),
     }
 
 
@@ -190,6 +199,10 @@ MAIN_REQUEST = {
 }
 SESSION_COST_USD = 0.01
 EXIT_FAILED = 1
+# What the harness answers a shell command it refused, as the role's tool result shows it.
+PERMISSION_DENIAL = "Claude requested permissions to use Bash, but you haven't granted it yet."
+CONFINEMENT_REFUSAL = "Sandbox is required but failed to initialize"
+REFUSING_KINDS = frozenset({"refused command", "sandbox refused"})
 SLUG_IN_PROMPT = re.compile(r"Task slug: (?P<slug>[\w-]+)\.")
 TASK_TEXT = re.compile(r"<<<\n(?P<task>.*)\n>>>", re.DOTALL)
 CAP_IN_COPY_NAME = re.compile(r"-cap\d+$")
@@ -324,12 +337,19 @@ def _play(session: Session, ending: Mapping[str, str]) -> int:
         _emit([_init(session, sid), _result(sid, ending["result_text"], failed=True)])
         sys.stderr.write(ending["error_output"])
         return EXIT_FAILED
-    _emit(_role_session(session, sid, kind))
+    if kind == "confinement unavailable":
+        sys.stderr.write(ending["error_output"])
+        return EXIT_FAILED
+    _emit(_role_session(session, sid, kind, ending.get("command", "")))
     return 0
 
 
-def _role_session(session: Session, sid: str, kind: str) -> list[dict[str, Any]]:
-    """The main session that spawns the role, for every ending in which the role runs."""
+def _role_session(session: Session, sid: str, kind: str, refused: str = "") -> list[dict[str, Any]]:
+    """The main session that spawns the role, for every ending in which the role runs.
+
+    For an ending that refuses a shell command, the role's first call is `refused`, which
+    the harness refuses; the role then does its ordinary work.
+    """
     if session.place is None:
         answer = _proof_answer(session)
         actions: list[tuple[str, dict[str, Any], str]] = []
@@ -346,6 +366,24 @@ def _role_session(session: Session, sid: str, kind: str) -> list[dict[str, Any]]
         _assistant(sid, [_tool_use(spawn, "Agent", _spawn_input(session, prompt))], MAIN_REQUEST),
     ]
     events += [_started(sid, spawn, session, prompt)]
+    denials: list[dict[str, Any]] = []
+    if session.place is not None and kind in REFUSING_KINDS:
+        use_id = "toolu_stand_in_refused"
+        refusal = PERMISSION_DENIAL if kind == "refused command" else CONFINEMENT_REFUSAL
+        events += [
+            _assistant(
+                sid,
+                [_tool_use(use_id, "Bash", {"command": refused})],
+                first,
+                parent=spawn,
+                role=session.role,
+            ),
+            _tool_result(sid, use_id, refusal, parent=spawn, is_error=True),
+        ]
+        if kind == "refused command":
+            denials.append(
+                {"tool_name": "Bash", "tool_use_id": use_id, "tool_input": {"command": refused}}
+            )
     for i, (tool, tool_input, output) in enumerate(actions):
         use_id = f"toolu_stand_in_role_{i:03d}"
         usage = first if i == 0 else LATER_REQUEST
@@ -361,7 +399,7 @@ def _role_session(session: Session, sid: str, kind: str) -> list[dict[str, Any]]
     )
     events.append(_tool_result(sid, spawn, f"{answer}\nagentId: {agent_id}\n", parent=None))
     events.append(_assistant(sid, [{"type": "text", "text": answer}], MAIN_REQUEST))
-    events.append(_result(sid, answer, failed=False))
+    events.append(_result(sid, answer, failed=False, denials=denials))
     return events
 
 
@@ -509,25 +547,30 @@ def _started(sid: str, spawn: str, session: Session, prompt: str) -> dict[str, A
     }
 
 
-def _tool_result(sid: str, use_id: str, text: str, *, parent: str | None) -> dict[str, Any]:
+def _tool_result(
+    sid: str, use_id: str, text: str, *, parent: str | None, is_error: bool = False
+) -> dict[str, Any]:
+    block: dict[str, Any] = {
+        "tool_use_id": use_id,
+        "type": "tool_result",
+        "content": [{"type": "text", "text": text}],
+    }
+    if is_error:
+        block["is_error"] = True
     return {
         "type": "user",
         "message": {
             "role": "user",
-            "content": [
-                {
-                    "tool_use_id": use_id,
-                    "type": "tool_result",
-                    "content": [{"type": "text", "text": text}],
-                }
-            ],
+            "content": [block],
         },
         "parent_tool_use_id": parent,
         "session_id": sid,
     }
 
 
-def _result(sid: str, text: str, *, failed: bool) -> dict[str, Any]:
+def _result(
+    sid: str, text: str, *, failed: bool, denials: Sequence[Mapping[str, Any]] = ()
+) -> dict[str, Any]:
     return {
         "type": "result",
         "subtype": "success",
@@ -538,5 +581,5 @@ def _result(sid: str, text: str, *, failed: bool) -> dict[str, Any]:
         "duration_ms": 5,
         "total_cost_usd": 0.0 if failed else SESSION_COST_USD,
         "usage": {"input_tokens": 4, "output_tokens": 40},
-        "permission_denials": [],
+        "permission_denials": list(denials),
     }

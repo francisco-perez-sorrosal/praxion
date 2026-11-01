@@ -1,0 +1,41 @@
+{
+  "_about": "What the report of each kernel-trial results file showed at the base commit: the role's flip verdict and each check's verdict line.",
+  "20261031T194025Z-257479": {
+    "implementer": {
+      "flip": "clear",
+      "checks": {
+        "C1": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "C2": "verdict: no regression (b 1, c 0, n 19, lean failures 19; noise allowance 1)",
+        "C3": "verdict: non-inferior (pass rates: lean 18 of 18, full 17 of 18; b 0, c 1, n 18, lean failures 0); one-sided interval on lean minus full: lower -8.2 pp, upper +100.0 pp, width 108.2 pp, reported only",
+        "C4": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "C5": "verdict: not covered by the flip verdict (4 pairs ran out of turns on both sides, fewer than the 5 it needs to be scored)",
+        "C6": "verdict: not covered by the flip verdict (no fetchable page on a public host was available to this run)",
+        "implementer: [IN-PROGRESS] is written to WIP.md before any code change": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": "verdict: no regression (b 0, c 0, n 18, lean failures 18; noise allowance 0)",
+        "implementer: nothing changes under the acceptance or end-to-end test directories": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "implementer: check_id_citation_discipline.py exits 0 on its change": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": "verdict: not covered by the flip verdict (the task is not in parallel mode)",
+        "implementer: TEST_RESULTS.md has the shape its definition states": "verdict: no regression (b 0, c 0, n 24, lean failures 24; noise allowance 0)",
+        "implementer: an existing sibling file is read before a new file is created in a directory": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "implementer: it follows the convention its project's instruction file states": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)"
+      }
+    }
+  },
+  "20261031T203813Z-47ce6d": {
+    "verifier": {
+      "flip": "clear",
+      "checks": {
+        "C1": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "C2": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "C3": "verdict: non-inferior (pass rates: lean 7 of 15, full 8 of 15; b 3, c 2, n 15, lean failures 8); one-sided interval on lean minus full: lower -32.0 pp, upper +100.0 pp, width 132.0 pp, reported only",
+        "C4": "verdict: no regression (b 0, c 0, n 24, lean failures 0; noise allowance 0)",
+        "C5": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "C6": "verdict: not covered by the flip verdict (verifier holds no WebFetch tool, so a fetched page never reaches it)",
+        "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "verifier: its behavioral-contract findings use exactly the six canonical tags": "verdict: not covered by the flip verdict (the allowance exceeds the margin times the usable pairs)",
+        "verifier: the ledger rows it writes pass check_state_ledgers.py --check": "verdict: not covered by the flip verdict (the verifier changed none of .ai-state/TECH_DEBT_LEDGER.md)",
+        "verifier: it follows the convention its project's instruction file states": "verdict: no regression (b 0, c 0, n 16, lean failures 0; noise allowance 0)"
+      }
+    }
+  }
+}

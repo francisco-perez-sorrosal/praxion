@@ -143,6 +143,44 @@ def test_a_dry_run_lists_every_task_of_every_named_arm(
 
 @pytest.mark.usefixtures("no_launch")
 @pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_shows_a_confined_kits_confinement_places_and_program_order(capsys, tmp_path):
+    token_file = tmp_path / "session-token"
+    token_file.write_text("sk-ant-oat01-example\n")
+
+    lines = dry_run(
+        capsys,
+        tmp_path,
+        "--role",
+        "implementer",
+        "--max-tasks",
+        "1",
+        "--session-oauth-token-file",
+        str(token_file),
+    )
+
+    assert lines, "the dry run plans sessions"
+    for line in lines:
+        settings = json.loads(line["argv"][line["argv"].index("--settings") + 1])["sandbox"]
+        copy = line["places"]["plugin_copy"]
+        assert settings["failIfUnavailable"] is True
+        assert copy in settings["filesystem"]["denyWrite"]
+        assert str(token_file) in {c["path"] for c in settings["credentials"]["files"]}
+        assert line["program_order"][0] == f"{copy}/scripts"
+        assert line["places"]["scratch"].startswith(line["places"]["sandbox"])
+        assert line["argv"][line["argv"].index("--plugin-dir") + 1] == copy
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_leaves_another_kits_line_without_confinement_or_places(capsys, tmp_path):
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--max-tasks", "1")
+
+    assert lines, "the dry run plans sessions"
+    for line in lines:
+        assert list(line) == ["role", "arm", "task_id", "argv", "env_names"]
+        assert "--settings" not in line["argv"]
+
+
+@pytest.mark.usefixtures("no_launch")
 def test_a_token_file_puts_the_token_in_every_session_and_takes_the_api_key_out(
     capsys, tmp_path, monkeypatch
 ):

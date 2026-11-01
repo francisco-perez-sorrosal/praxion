@@ -41,6 +41,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 
 from praxion_evals.adherence import arms, report, results, run_index, session_loop, tasks
+from praxion_evals.adherence.confinement import Confinement, settings_of
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
     DEFAULT_STOP_COUNT,
@@ -80,6 +81,7 @@ from praxion_evals.adherence.run_identity import (
     tree_digest,
     working_tree,
 )
+from praxion_evals.adherence.session_launch import REAL_HOME, session_confinement
 from praxion_evals.adherence.session_loop import (
     DEFAULT_TAIL_CHARS,
     EXIT_COMPLETE,
@@ -657,25 +659,65 @@ def _print_dry_run(
         for index, task in enumerate(role_tasks):
             for arm in ordered_arms(config.arms, config.seed, task.task_id):
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
-                spec = _planned_spec(config, checkout, run_root, task, arm, sandbox)
+                copy = _planned_copy(run_root, task, arm)
+                confinement = session_confinement(
+                    role,
+                    copy,
+                    run_root,
+                    home=REAL_HOME,
+                    token_file=config.session_oauth_token_file,
+                    ambient=os.environ,
+                )
+                spec = _planned_spec(config, checkout, task, arm, sandbox, copy, confinement)
                 env_names = sorted(session_env(config, sandbox.root, os.environ))
-                line = {"role": role, "arm": arm, "task_id": task.task_id}
-                print(json.dumps({**line, "argv": build_argv(spec), "env_names": env_names}))
+                line = {
+                    "role": role,
+                    "arm": arm,
+                    "task_id": task.task_id,
+                    "argv": build_argv(spec),
+                    "env_names": env_names,
+                }
+                if confinement is not None:  # only a confined kit's line shows where it runs
+                    line["places"] = _planned_places(run_root, sandbox, task, copy)
+                    line["program_order"] = list(confinement.program_order)
+                print(json.dumps(line))
     return EXIT_COMPLETE
+
+
+def _planned_copy(run_root: Path, task: TaskSpec, arm: Arm) -> Path:
+    """Where a real run would put the arm's plugin copy; the dry run names it, never makes it."""
+    cap = tasks.turn_cap_of(task)
+    return run_root / task.role / f"{arm}-copy{cap or ''}"
+
+
+def _planned_places(
+    run_root: Path, sandbox: SandboxPaths, task: TaskSpec, copy: Path
+) -> dict[str, str]:
+    return {
+        "run_root": str(run_root),
+        "plugin_copy": str(copy),
+        "sandbox": str(sandbox.root),
+        "scratch": str(tasks.scratch_dir(sandbox)),
+        "home": str(sandbox.home),
+        "tmp": str(sandbox.tmp),
+        "slug": task.slug,
+    }
 
 
 def _planned_spec(
     config: RunConfig,
     checkout: Checkout,
-    run_root: Path,
     task: TaskSpec,
     arm: Arm,
     sandbox: SandboxPaths,
+    copy: Path,
+    confinement: Confinement | None,
 ) -> SessionSpec:
     """The spec a real run builds, with the plugin copy it would make named, not made.
 
     The role's tool line is read from the checkout's own definition, which every copy carries
-    unchanged.
+    unchanged. The confinement is attached after the spec is built because the stand-in build
+    names the checkout, not the copy the confinement protects.
     """
     cap = tasks.turn_cap_of(task)
     patched = (arms.definition_path(task.role),) if arm == "lean" or cap else ()
@@ -688,8 +730,8 @@ def _planned_spec(
         effort=config.effort,
         max_budget_usd=config.session_budget_usd,
     )
-    copy = run_root / task.role / f"{arm}-copy{cap or ''}"
-    return replace(spec, plugin_dir=copy, add_dir=copy)
+    settings = None if confinement is None else settings_of(confinement)
+    return replace(spec, plugin_dir=copy, add_dir=copy, settings=settings)
 
 
 if __name__ == "__main__":

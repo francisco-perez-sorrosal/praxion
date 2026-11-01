@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-01T08:01:20Z'
+generated_at: '2026-11-01T08:44:34Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -37,12 +37,12 @@ rules:
   core: true
   install: symlink
   chars: 18643
-- id: swe/agent-model-routing
-  path: rules/swe/agent-model-routing.md
+- id: swe/agent-model-routing-resident
+  path: rules/swe/agent-model-routing-resident.md
   load: always_on
   core: false
   install: hook-deliver
-  chars: 3850
+  chars: 1841
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on
@@ -118,6 +118,15 @@ rules:
   - .ai-work/**/SYSTEMS_PLAN.md
   - .ai-work/**/WIP.md
   - .ai-work/**/IMPLEMENTATION_PLAN.md
+- id: swe/agent-model-routing
+  path: rules/swe/agent-model-routing.md
+  load: path_scoped
+  core: false
+  install: symlink
+  chars: 3924
+  paths:
+  - agents/**
+  - skills/agent-crafting/references/model-routing-policy.md
 - id: swe/coding-style
   path: rules/swe/coding-style.md
   load: path_scoped

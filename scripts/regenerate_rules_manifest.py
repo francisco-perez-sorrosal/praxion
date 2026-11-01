@@ -45,7 +45,7 @@ EXPECTED_CORE_IDS = frozenset(
 # this list — _validate_hook_deliver_coverage() enforces this at check time.
 HOOK_DELIVER_ORDER = [
     "swe/memory-protocol",
-    "swe/agent-model-routing",
+    "swe/agent-model-routing-resident",
     "swe/vcs/git-conventions",
 ]
 

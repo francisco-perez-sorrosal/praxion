@@ -1,9 +1,10 @@
 ---
+paths: [agents/**, skills/agent-crafting/references/model-routing-policy.md]
 codex:
   portability: claude_only
 core: false
-load: always_on
-install: hook-deliver
+load: path_scoped
+install: symlink
 ---
 
 ## Agent Model Routing

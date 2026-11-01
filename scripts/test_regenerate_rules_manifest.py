@@ -157,7 +157,7 @@ def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
                 + "## Coordination Protocol\n",
                 # Hook-delivered blacklistable rules
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory Protocol\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Model Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Model Routing\n",
                 "vcs": {
                     "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git Conventions\n",
                 },
@@ -191,7 +191,7 @@ def test_manifest_schema_contains_expected_fields_per_rule(
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
                     "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
                 },
@@ -295,7 +295,7 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 # Rule with path-scoped frontmatter only — no core: field.
                 "coding-style.md": _PATH_SCOPED_FRONTMATTER + "## Coding Style\n",
                 "vcs": {
@@ -348,7 +348,7 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
                 ),
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
                     "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
                 },
@@ -441,7 +441,7 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 # memory-protocol with merged codex: + core: frontmatter
                 "memory-protocol.md": _MERGED_FRONTMATTER + "## Memory Protocol\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
                     "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
                 },
@@ -471,6 +471,15 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
 # ---------------------------------------------------------------------------
 
 
+def test_order_list_holds_the_routing_resident_and_not_its_path_scoped_parent() -> None:
+    """The routing rule is path-scoped (symlink-installed); only its resident is
+    hook-delivered, so only the resident takes an injection slot."""
+    mod = _load_module()
+
+    assert "swe/agent-model-routing-resident" in mod.HOOK_DELIVER_ORDER
+    assert "swe/agent-model-routing" not in mod.HOOK_DELIVER_ORDER
+
+
 def test_hook_deliver_rule_missing_from_order_list_fails_generation(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -495,7 +504,7 @@ def test_hook_deliver_rule_missing_from_order_list_fails_generation(
                 "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
                 "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
                 "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
+                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
                 "vcs": {
                     "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
                 },

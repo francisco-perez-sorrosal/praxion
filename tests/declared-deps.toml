@@ -1067,6 +1067,7 @@ paths = [
   "hooks/sidecar_autocommit.py",
   "hooks/surface_praxion_feedback.py",
   "rules/_manifest.yaml",
+  "rules/swe/agent-model-routing-resident.md",
   "rules/swe/agent-model-routing.md",
   "rules/swe/vcs/git-conventions.md",
   "scripts/_git_runner.py",

@@ -421,6 +421,10 @@ class PlannedSession:
     argv: tuple[str, ...]
     env_names: frozenset[str]
     prompt: str
+    # A confined kit's line also prints where the session runs and the directories it resolves a
+    # program in, first wins; None on a line that prints neither.
+    places: Mapping[str, str] | None = None
+    program_order: tuple[str, ...] | None = None
 
     def option_values(self, flag: str) -> list[str]:
         return _option_values(self.argv, flag)
@@ -440,6 +444,8 @@ def planned_sessions(stdout: str) -> list[PlannedSession]:
                 argv,
                 frozenset(entry["env_names"]),
                 argv[argv.index("-p") + 1],
+                entry.get("places"),
+                None if entry.get("program_order") is None else tuple(entry["program_order"]),
             )
         )
     return sessions

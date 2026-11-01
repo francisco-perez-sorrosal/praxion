@@ -18,8 +18,8 @@ scenario scripts how each session ends, in the specification's terms:
 - `sandbox_refused(cmd)`: the same, the refusal being `Sandbox is required but failed to
   initialize`, the harness's answer when required confinement failed after startup;
 - `confinement_unavailable_at_startup()`: the session exits at startup, before any
-  event, because the confinement it requires is unavailable (unbound: the harness's
-  words for that exit are not fixed by the specification).
+  event, because the confinement it requires is unavailable (the harness's words for that
+  exit are a representative line until the first paired run records the real one).
 
 A script gives each arm a sequence of endings in that arm's own launch order (a retry
 is the next launch of its arm), or names an ending for a task's arm by its position in
@@ -173,21 +173,17 @@ def sandbox_refused(command: str) -> Ending:
     return Ending("sandbox refused", command=command)
 
 
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
-
-
-# The words the harness writes when a session that requires confinement cannot establish it
-# at startup; None until a driver-binding step fixes them from the harness itself.
-CONFINEMENT_UNAVAILABLE_AT_STARTUP: str | None = None
+# A representative line the harness writes on its error output, before any event, when a session
+# that requires confinement (`failIfUnavailable`) cannot start its sandbox. The specification does
+# not quote the harness's text; the line names the sandbox in words, which is all the run reads of
+# it. The first real occurrence, recorded verbatim by the first paired run, replaces this line.
+CONFINEMENT_UNAVAILABLE_AT_STARTUP = (
+    "Error: sandbox required by settings (failIfUnavailable) but unavailable on this machine:"
+    " the sandbox could not be started."
+)
 
 
 def confinement_unavailable_at_startup() -> Ending:
-    if CONFINEMENT_UNAVAILABLE_AT_STARTUP is None:
-        raise UnboundDriverError(
-            "unbound: the words the harness writes, and the exit it takes, when a session"
-            " requiring shell confinement cannot establish it at startup are not bound yet"
-        )
     return Ending("confinement unavailable", error_output=CONFINEMENT_UNAVAILABLE_AT_STARTUP)
 
 

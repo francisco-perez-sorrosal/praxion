@@ -9,8 +9,8 @@ run in a sandbox materialized for a task without a session.
 Bound here, because the specification or the base commit fixes them:
 
 - the dry run and its printed sessions (`adherence_eval`): one JSON line per planned
-  session, `{"role","arm","task_id","argv","env_names"}`, the tool grant being the values
-  after `--allowedTools`;
+  session, `{"role","arm","task_id","argv","env_names"}` (a confined kit's line adds `places`
+  and `program_order`), the tool grant being the values after `--allowedTools`;
 - the option `--session-oauth-token-file`, which names the operator's session token file;
 - the roles whose kits are confined (the implementer and the verifier), the Praxion
   scripts their definitions name, and the session credentials (`CLAUDE_CODE_OAUTH_TOKEN`,
@@ -22,12 +22,12 @@ Bound here, because the specification or the base commit fixes them:
 - the grant every other role's sessions had at the base commit, frozen in
   `fixtures/eval_kit_grants_before.json` (`freeze_grants()` at that commit).
 
-Unbound, raising until a driver-binding step binds them to the designed surface:
+Bound to the designed surface:
 
-- `printed_confinement`: the confinement a printed session would be started with, read
-  in the consumer's terms of `Confinement`;
+- `printed_confinement`: the confinement a printed session would be started with, read from
+  the `--settings` argument its dry-run line prints, in the consumer's terms of `Confinement`;
 - `planned_places`: where that session's sandbox, fixture repository, home and plugin copy
-  sit;
+  sit, read from the `places` its dry-run line prints (`program_order` rides beside it);
 - `materialize`: a task sandbox built without a session, with the environment and working
   directory a confined shell command of that session starts with.
 
@@ -124,10 +124,6 @@ def prescribed_forms(role: str) -> tuple[str, ...]:
 
 def fill(form: str, *, plugin: Path, slug: str) -> str:
     return form.format(plugin=shlex.quote(str(plugin)).strip("'"), slug=slug)
-
-
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
 
 
 # -- The dry run -----------------------------------------------------------------------------
@@ -245,7 +241,7 @@ def freeze_grants() -> dict:
     return {"_about": "Each role's printed grant at the base commit, per arm.", "roles": roles}
 
 
-# -- The confinement a printed session would receive (unbound) ------------------------------------
+# -- The confinement a printed session would receive -------------------------------------
 
 
 @dataclass(frozen=True)
@@ -275,11 +271,81 @@ class Confinement:
 
 
 def printed_confinement(session: PlannedSession) -> Confinement | None:
-    """The confinement the printed session would be started with; None when it has none."""
-    raise UnboundDriverError(
-        "unbound: how a printed session states the shell confinement it would be started with"
-        " is not bound yet"
+    """The confinement the printed session would be started with; None when it has none.
+
+    Read from the session's `--settings` argument, the compact JSON the dry run prints.
+    """
+    printed = session.option_values("--settings")
+    if not printed:
+        return None
+    sandbox = json.loads(printed[-1]).get("sandbox", {})
+    filesystem = sandbox.get("filesystem", {})
+    credentials = sandbox.get("credentials", {})
+    enabled = bool(sandbox.get("enabled"))
+    denied_reads = _denied(filesystem.get("denyRead", ())) + _denied(credentials.get("files", ()))
+    allowed_domains = tuple(sandbox.get("network", {}).get("allowedDomains", ()))
+    auto_approved = enabled and bool(sandbox.get("autoAllowBashIfSandboxed"))
+    return Confinement(
+        required=enabled and bool(sandbox.get("failIfUnavailable")),
+        unconfined_fallback=not sandbox.get("failIfUnavailable"),
+        unconfined_retry=bool(sandbox.get("allowUnsandboxedCommands")),
+        approves_without_prompt=auto_approved,
+        program_order=session.program_order or (),
+        write_refused=lambda path: _write_refused(
+            path,
+            filesystem.get("denyWrite", ()),
+            _writable_places(session),
+        ),
+        read_refused=lambda path: _read_refused(
+            path, denied_reads, tuple(filesystem.get("allowRead", ()))
+        ),
+        network_refused=lambda host: (
+            not any(host == domain or host.endswith("." + domain) for domain in allowed_domains)
+        ),
+        shell_env_drops=frozenset(
+            entry["name"] for entry in credentials.get("envVars", ()) if entry.get("mode") == "deny"
+        ),
+        approves=lambda command: auto_approved,
     )
+
+
+def _denied(entries: Sequence[str | Mapping[str, str]]) -> tuple[str, ...]:
+    """The paths among `entries`: plain paths, or `{"path", "mode"}` objects in deny mode."""
+    return tuple(
+        entry if isinstance(entry, str) else entry["path"]
+        for entry in entries
+        if isinstance(entry, str) or entry.get("mode") == "deny"
+    )
+
+
+def _depth_under(path: str, roots: Sequence[str]) -> int | None:
+    """How deep the deepest of `roots` holding `path` is (its component count); None: none does."""
+    held = [len(Path(root).parts) for root in roots if _holds(root, path)]
+    return max(held, default=None)
+
+
+def _holds(root: str, path: str) -> bool:
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def _read_refused(path: str, denied: Sequence[str], allowed: Sequence[str]) -> bool:
+    """Refused when a denied location holds the path's realpath and no allowed one lies closer."""
+    real = os.path.realpath(path)
+    deny_depth = _depth_under(real, denied)
+    allow_depth = _depth_under(real, allowed)
+    return deny_depth is not None and (allow_depth is None or deny_depth >= allow_depth)
+
+
+def _write_refused(path: str, denied: Sequence[str], writable: Sequence[str]) -> bool:
+    real = os.path.realpath(path)
+    return _depth_under(real, denied) is not None or _depth_under(real, writable) is None
+
+
+def _writable_places(session: PlannedSession) -> tuple[str, ...]:
+    """The directories a confined command may write: the session's cwd, tmp and added ones."""
+    places = planned_places(session)
+    roots = [places.scratch, places.tmp, *map(Path, session.option_values("--add-dir"))]
+    return tuple(str(spelling) for root in roots for spelling in (root, root.resolve()))
 
 
 @dataclass(frozen=True)
@@ -296,13 +362,15 @@ class Places:
 
 
 def planned_places(session: PlannedSession) -> Places:
-    raise UnboundDriverError(
-        "unbound: where a planned session's run root, sandbox, fixture repository, sandbox"
-        " home and plugin copy sit is not bound yet"
+    """Where the printed session runs; read from the places its dry-run line prints."""
+    assert session.places is not None, (
+        f"the dry run prints no places for the {session.role}'s session {session.task_id}"
     )
+    printed = {name: Path(path) for name, path in session.places.items() if name != "slug"}
+    return Places(slug=session.places["slug"], **printed)
 
 
-# -- A task sandbox materialized without a session (unbound) -------------------------------------
+# -- A task sandbox materialized without a session -------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -316,6 +384,35 @@ class MaterializedSandbox:
     slug: str
 
 
+# The code path a live run takes for its first task, minus the model session: this repository's
+# committed tree is copied as the role's full arm, the sandbox home is populated from that copy,
+# the task's fixture repository is built, and the session's environment is built with the copy's
+# scripts first on the program path. `path_first` is the designed surface of `build_env`.
+_MATERIALIZE_CODE = """
+import json, os, sys
+from pathlib import Path
+from praxion_evals.adherence import arms, tasks
+from praxion_evals.live.materialize import install_user_scope, materialize_head
+from praxion_evals.live.session import SandboxPaths, build_env
+
+p = json.load(sys.stdin)
+role, run_root = p["role"], Path(p["run_root"])
+original = materialize_head(Path(p["repo"]), Path(p["original"]))
+copy = arms.build_arm(original, run_root / role / "full", role, "full")
+task = tasks.generate(role, p["seed"], 1)[0]
+sandbox = SandboxPaths(run_root / role / "000-full")
+install_user_scope(copy.copy_root, sandbox.root)
+tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), None)
+operator_path = os.pathsep.join(filter(None, [p["operator_path_first"], os.environ["PATH"]]))
+env = build_env(sandbox.root, {**os.environ, "PATH": operator_path},
+                path_first=(copy.copy_root / "scripts",))
+print(json.dumps({
+    "scratch": str(tasks.scratch_dir(sandbox)), "home": str(sandbox.home), "tmp": str(sandbox.tmp),
+    "plugin_copy": str(copy.copy_root), "run_root": str(run_root), "env": env, "slug": task.slug,
+}))
+"""
+
+
 def materialize(
     workspace: Path, role: str, *, operator_path_first: Path | None = None
 ) -> MaterializedSandbox:
@@ -324,9 +421,26 @@ def materialize(
     `operator_path_first` is a directory put first on the PATH of the operator's environment the
     runner is started from, as a copy of Praxion installed on the operator's machine would be.
     """
-    raise UnboundDriverError(
-        "unbound: a task sandbox built without a session, with the environment and working"
-        " directory a confined shell command of that session starts with, is not bound yet"
+    found = run_in_eval(
+        _MATERIALIZE_CODE,
+        {
+            "role": role,
+            "seed": adherence_eval.SEED,
+            "repo": str(adherence_eval.REPO_ROOT),
+            "original": str(workspace / "original"),
+            "run_root": str(workspace / "run"),
+            "operator_path_first": "" if operator_path_first is None else str(operator_path_first),
+        },
+        timeout=600,
+    )
+    return MaterializedSandbox(
+        scratch=Path(found["scratch"]),
+        home=Path(found["home"]),
+        tmp=Path(found["tmp"]),
+        plugin_copy=Path(found["plugin_copy"]),
+        run_root=Path(found["run_root"]),
+        shell_env=found["env"],
+        slug=found["slug"],
     )
 
 

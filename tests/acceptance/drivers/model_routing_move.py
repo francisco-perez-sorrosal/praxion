@@ -39,7 +39,7 @@ from pathlib import Path
 
 import yaml
 
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError, isolated_env
+from tests.acceptance.drivers.kernel_sandbox import isolated_env
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "model_routing_move"
@@ -434,13 +434,32 @@ def plant_old_install(scratch: Path) -> None:
 
 
 def marketplace_complete(scratch: Path) -> Path:
-    """The marketplace first-session completion, run over this checkout as the installed plugin
-    into `scratch`'s HOME; returns the user rules directory it linked."""
-    raise UnboundDriverError(
-        "the marketplace first-session completion is not yet driven over a checkout as the "
-        "installed plugin: the binding step names how a scratch HOME's plugin cache is laid out "
-        "so the completion links this checkout's rules"
+    """The marketplace first-session completion (`hooks/auto_complete_install.py`), run as it runs
+    on a first session: over this checkout laid out as the installed plugin's cache in `scratch`'s
+    HOME; returns the user rules directory it linked.
+
+    The cache is a directory of its own holding this checkout's `rules/` (a link) and a copy of the
+    CLAUDE.md template, not a link to the whole checkout: the completion renders CLAUDE.md into
+    its cache, and that must not write into the checkout."""
+    cache = scratch / "home" / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion"
+    (cache / "claude" / "config").mkdir(parents=True, exist_ok=True)
+    (cache / "rules").symlink_to(REPO_ROOT / "rules")
+    (cache / GLOBAL_INSTRUCTIONS).write_bytes((REPO_ROOT / GLOBAL_INSTRUCTIONS).read_bytes())
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "hooks" / "auto_complete_install.py")],
+        input="",
+        cwd=scratch,
+        env=isolated_env(scratch, PRAXION_AUTO_COMPLETE="1", PRAXION_DISABLE_AUTO_COMPLETE="0"),
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
+    rules = rules_dir(scratch)
+    if not linked_rules(rules):
+        raise AssertionError(
+            f"the marketplace completion linked no rule into {rules}: {result.stderr[-1000:]}"
+        )
+    return rules
 
 
 def budget(scratch: Path, root: Path = REPO_ROOT) -> tuple[int, dict]:
@@ -731,15 +750,46 @@ class SpawnCheck:
     claude_launches: list[str]
 
 
+SPAWN_CHECK_SCRIPT = "scripts/check_spawn_models.py"
+SPAWN_CHECK_INPUT_ERROR = 2
+
+
 def run_spawn_model_check(transcripts: Path, scratch: Path) -> SpawnCheck:
     """The re-runnable spawn-model check over a directory of recorded transcripts, with a
-    `claude` stand-in on PATH; each spawn's verdict keyed by its agent id."""
-    raise UnboundDriverError(
-        "the spawn-model check is not yet bound: the binding step names its command, how it is "
-        "pointed at a directory of recorded transcripts, and how its report names each spawn "
-        "and classifies it as matching its definition's floor, a sanctioned override, "
-        "unexplained or unknown"
+    `claude` stand-in on PATH; each spawn's verdict keyed by its agent id.
+
+    The check's exit 0 or 1 is its verdict on the sessions. Anything else (exit 2, a missing
+    script, unparseable or unclassified output) is no verdict at all, so it raises with the
+    check's own output rather than reading as a result a scenario could mistake for one."""
+    env = isolated_env(scratch)
+    env["PATH"] = f"{stand_in_claude(scratch)}:{env['PATH']}"
+    argv = [
+        sys.executable,
+        str(REPO_ROOT / SPAWN_CHECK_SCRIPT),
+        str(transcripts),
+        "--repo-root",
+        str(REPO_ROOT),
+        "--json",
+    ]
+    result = subprocess.run(
+        argv, cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=600
     )
+    output = f"exit {result.returncode}\nstdout: {result.stdout[-1000:]}\nstderr: {result.stderr[-1000:]}"
+    if result.returncode not in (0, 1):
+        raise AssertionError(
+            f"the spawn-model check gave no verdict ({SPAWN_CHECK_SCRIPT}): {output}"
+        )
+    try:
+        spawns = json.loads(result.stdout)["spawns"]
+        verdicts = {spawn["agent_id"]: spawn["verdict"] for spawn in spawns}
+    except (ValueError, KeyError, TypeError) as error:
+        raise AssertionError(
+            f"the spawn-model check's JSON is not the documented shape: {output}"
+        ) from error
+    unclassified = {agent: v for agent, v in verdicts.items() if v not in VERDICTS}
+    if unclassified:
+        raise AssertionError(f"verdicts outside {VERDICTS}: {unclassified}\n{output}")
+    return SpawnCheck(result.returncode, verdicts, claude_launches(scratch))
 
 
 # -- Freezing -------------------------------------------------------------------------------------

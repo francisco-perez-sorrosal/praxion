@@ -135,6 +135,39 @@ def test_build_argv_includes_add_dir_when_set_so_the_plugin_copy_is_readable():
     assert argv[argv.index("--add-dir") + 1] == "/tmp/copy"
 
 
+def _minimal_spec(**overrides):
+    from praxion_evals.live.session import SessionSpec
+
+    return SessionSpec(
+        prompt="p",
+        model="sonnet",
+        effort="medium",
+        plugin_dir=Path("/tmp/m"),
+        cwd=Path("/tmp/s/fixture"),
+        permission_mode="default",
+        max_budget_usd=1.0,
+        **overrides,
+    )
+
+
+def test_build_argv_without_settings_has_no_settings_flag():
+    """The argument list of every session that sets no settings is unchanged."""
+    from praxion_evals.live.session import build_argv
+
+    assert "--settings" not in build_argv(_minimal_spec())
+
+
+def test_build_argv_carries_the_settings_as_one_compact_sorted_json_value():
+    from praxion_evals.live.session import build_argv
+
+    argv = build_argv(_minimal_spec(settings={"sandbox": {"enabled": True}, "a": [1]}))
+
+    value = argv[argv.index("--settings") + 1]
+    assert value == '{"a":[1],"sandbox":{"enabled":true}}'
+    assert json.loads(value) == {"sandbox": {"enabled": True}, "a": [1]}
+    assert argv.count("--settings") == 1
+
+
 def test_build_argv_includes_allowed_tools_json_schema_and_subagent_forwarding_when_set():
     """The spawn-selection and subagent-carrying scenarios set every optional
     flag; each must reach argv exactly once, in a form `claude` accepts."""
@@ -276,6 +309,28 @@ def test_build_env_prepends_the_interpreter_parent_directory_to_path():
     assert path_entries[0] == interpreter_dir
     assert "/usr/bin" in path_entries
     assert "/bin" in path_entries
+
+
+def test_build_env_puts_path_first_directories_ahead_of_the_interpreter_and_ambient_path():
+    from praxion_evals.live.session import build_env
+
+    env = build_env(
+        Path("/tmp/run/session-1"),
+        {"PATH": "/usr/bin:/bin"},
+        path_first=(Path("/copy/scripts"), Path("/copy/bin")),
+    )
+
+    entries = env["PATH"].split(os.pathsep)
+    assert entries[:3] == ["/copy/scripts", "/copy/bin", str(Path(sys.executable).parent)]
+    assert entries[3:] == ["/usr/bin", "/bin"]
+
+
+def test_build_env_without_path_first_is_the_interpreter_directory_then_the_ambient_path():
+    from praxion_evals.live.session import build_env
+
+    env = build_env(Path("/tmp/run/session-1"), {"PATH": "/usr/bin:/bin"})
+
+    assert env["PATH"] == os.pathsep.join((str(Path(sys.executable).parent), "/usr/bin:/bin"))
 
 
 def test_build_env_sets_the_side_effect_kill_switches_and_harness_noise_flags():

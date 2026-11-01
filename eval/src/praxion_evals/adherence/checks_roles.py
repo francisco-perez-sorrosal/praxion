@@ -26,6 +26,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from praxion_evals.adherence.checks_common import (
+    CANARY_TURN_CAP,
     WRITE_TOOLS,
     _always_binds,  # the binding of a rule that holds for every task of the role
     _repo_relative,  # an absolute tool path as the scratch repository names it
@@ -51,7 +52,9 @@ from praxion_evals.adherence.model import (
     RuleRef,
     SessionEvidence,
     TaskFacts,
+    Withheld,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, RoleEnding, StoppedAtCap, Unknown
 from praxion_evals.live.session import InitInfo, ToolUse
 
 CANARY_SLUG = "canary-task"
@@ -233,25 +236,69 @@ def title_marker_first_unmarked_last(
     binds: BindsFor | None = None,
 ) -> MechanicalCheck:
     """Its first recorded Write carries ``marker`` in the title, within the role's first
-    ``within_first`` tool calls when that is given, and the file the session leaves carries none."""
+    ``within_first`` tool calls when that is given, and the file the session leaves carries none.
+
+    The opening binds on every session. The closing binds only on a session that ended on
+    its own or ran with no lowered cap: a role the harness stopped at its cap never got to
+    take the marker off, and one whose ending cannot be told is withheld unless it already fails.
+    """
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         path, final = slug_document(evidence, document)
         problems = _opening_problems(evidence, path, marker, within_first)
-        if not final.strip():
-            problems.append(f"{path} is missing or empty at the end")
-        elif marker in first_line(final):
-            problems.append(f"the title still carries {marker}: {first_line(final)[:80]!r}")
+        match evidence.role_ending:
+            case StoppedAtCap():
+                pass
+            case Unknown(reason=reason) if not problems:
+                return Withheld(reason)
+            case Unknown():
+                pass
+            case _:
+                problems.extend(_closing_problems(path, final, marker))
         return Failed("; ".join(problems)) if problems else Passed()
 
-    def violation() -> SessionEvidence:
-        path = canary_path(document)
-        opened = ToolUse("canary-open", "Write", {"file_path": path, "content": "# Report\n"}, None)
-        return synthetic_evidence(
-            role, slug=CANARY_SLUG, files={path: "# Report\n"}, tool_uses=[opened]
-        )
+    def canary(*, opened_marked: bool, final_marked: bool, ending: RoleEnding | None):
+        def build() -> SessionEvidence:
+            path = canary_path(document)
+            opened = f"# Report{' ' + marker if opened_marked else ''}\n"
+            final = f"# Report{' ' + marker if final_marked else ''}\n"
+            write = ToolUse("canary-open", "Write", {"file_path": path, "content": opened}, None)
+            return synthetic_evidence(
+                role,
+                slug=CANARY_SLUG,
+                files={path: final},
+                tool_uses=[write],
+                forced_stop=ending is not None,
+                role_ending=ending,
+            )
 
-    return clause(name, rule, binds, evaluate, violation)
+        return build
+
+    return clause(
+        name,
+        rule,
+        binds,
+        evaluate,
+        canary(opened_marked=False, final_marked=False, ending=None),
+        extra_violations=(
+            canary(
+                opened_marked=True, final_marked=True, ending=EndedOnItsOwn(CANARY_TURN_CAP - 1)
+            ),
+            canary(
+                opened_marked=False,
+                final_marked=False,
+                ending=StoppedAtCap(CANARY_TURN_CAP, CANARY_TURN_CAP),
+            ),
+        ),
+    )
+
+
+def _closing_problems(path: str, final: str, marker: str) -> list[str]:
+    if not final.strip():
+        return [f"{path} is missing or empty at the end"]
+    if marker in first_line(final):
+        return [f"the title still carries {marker}: {first_line(final)[:80]!r}"]
+    return []
 
 
 def _opening_problems(

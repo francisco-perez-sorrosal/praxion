@@ -40,7 +40,9 @@ from praxion_evals.adherence.model import (
     Passed,
     RuleRef,
     TaskFacts,
+    Withheld,
 )
+from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 from praxion_evals.live.session import ToolUse
 
 RULE = RuleRef("agents/researcher.md", "Constraints")
@@ -232,6 +234,81 @@ def test_an_absolute_tool_path_is_read_against_the_session_directory(tmp_path):
     )
 
     assert _marker_check().evaluate(evidence) == Passed()
+
+
+ENDINGS = {
+    "stopped at cap": StoppedAtCap(6, 6),
+    "ended on its own": EndedOnItsOwn(4),
+    "unknown": Unknown("the transcript could not be read"),
+    "no lowered cap": None,
+}
+
+
+def _ending_evidence(actions, final: str | None, ending: str, role: str = "verifier"):
+    files = {} if final is None else {DOC_PATH: final}
+    return synthetic_evidence(
+        role,
+        slug=SLUG,
+        files=files,
+        tool_uses=actions,
+        forced_stop=ending != "no lowered cap",
+        role_ending=ENDINGS[ending],
+    )
+
+
+@pytest.mark.parametrize("ending", ENDINGS)
+@pytest.mark.parametrize("role", ["verifier", "sentinel"])
+def test_a_bad_opening_fails_however_the_session_ended(role, ending):
+    evidence = _ending_evidence([_write("# Report\n")], "# Report\n", ending, role)
+
+    outcome = _marker_check().evaluate(evidence)
+
+    assert isinstance(outcome, Failed)
+    assert "opened without" in outcome.detail
+
+
+@pytest.mark.parametrize("final", ["# Report [PARTIAL]\n", "# Report\n", None])
+def test_a_capped_session_is_not_judged_on_its_closing_title(final):
+    evidence = _ending_evidence([_write("# Report [PARTIAL]\n")], final, "stopped at cap")
+
+    assert _marker_check().evaluate(evidence) == Passed()
+
+
+@pytest.mark.parametrize("ending", ["ended on its own", "no lowered cap"])
+@pytest.mark.parametrize(
+    ("final", "fragment"),
+    [("# Report [PARTIAL]\n", "still carries"), (None, "missing or empty")],
+)
+def test_a_session_with_the_turns_to_finish_is_judged_on_its_closing_title(ending, final, fragment):
+    evidence = _ending_evidence([_write("# Report [PARTIAL]\n")], final, ending)
+
+    outcome = _marker_check().evaluate(evidence)
+
+    assert isinstance(outcome, Failed)
+    assert fragment in outcome.detail
+
+
+@pytest.mark.parametrize("ending", ["ended on its own", "no lowered cap"])
+def test_a_session_that_closed_its_title_passes_whatever_it_ended_on(ending):
+    evidence = _ending_evidence([_write("# Report [PARTIAL]\n")], "# Report\n", ending)
+
+    assert _marker_check().evaluate(evidence) == Passed()
+
+
+def test_a_session_whose_ending_cannot_be_told_is_withheld_with_the_reason():
+    evidence = _ending_evidence([_write("# Report [PARTIAL]\n")], "# Report [PARTIAL]\n", "unknown")
+
+    outcome = _marker_check().evaluate(evidence)
+
+    assert isinstance(outcome, Withheld)
+    assert outcome.reason == "the transcript could not be read"
+
+
+def test_every_canary_of_the_marker_check_fails_it():
+    check = _marker_check()
+
+    assert len(check.violations) == 3
+    assert [type(check.evaluate(build())) for build in check.violations] == [Failed] * 3
 
 
 # ---------------------------------------------------------------------------

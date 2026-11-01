@@ -1,6 +1,6 @@
 version: 1
 disable:
-  # Hackathon mode preset — saves ~1,800 tokens (the routing rule's session-start
+  # Hackathon mode preset — saves ~2,450 tokens (the routing rule's session-start
   # text and git-conventions; the path-scoped routing rule is excluded too)
   - swe/agent-model-routing    # default model routing — hackathon uses inherited defaults
   - swe/vcs/git-conventions    # PoC commits don't need full conventional-commit rigor

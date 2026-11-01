@@ -38,7 +38,7 @@
 # attempting to list them emits a SessionStart warning and they stay loaded.
 #
 #   Hook-deliver, always-loaded (2 entries — disabling reclaims SessionStart tokens):
-#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~0.5k tokens)
+#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~750 tokens)
 #                                        Disabling the rule id removes the path-scoped rule and its session-start text
 #     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
 #

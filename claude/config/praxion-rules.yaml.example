@@ -32,8 +32,8 @@
 #
 # === Token-savings ceiling ===
 # The maximum baseline token reduction is the sum of the *hook-deliver*
-# rule sizes — currently ~2,700 tokens across three rules (memory-protocol,
-# the session-start text of agent-model-routing, vcs/git-conventions).
+# rule sizes — currently about 2,450 tokens across two rules (the session-start
+# text of agent-model-routing, ~750; vcs/git-conventions, ~1,700; measured 2026-11-01).
 # agent-model-routing itself is path-scoped (agents/**); only its short
 # session-start text is hook-delivered, and disabling `swe/agent-model-routing`
 # (or `swe/*`) removes both. Path-scoped rules cost zero
@@ -71,7 +71,7 @@
 #
 #   Hook-deliver, always-loaded (3 entries — disabling reclaims SessionStart tokens):
 #     - swe/memory-protocol            — Memory MCP protocol (~1.2k tokens)
-#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~0.5k tokens)
+#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~750 tokens)
 #                                        Disabling the rule id removes the path-scoped rule and its session-start text
 #     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
 #

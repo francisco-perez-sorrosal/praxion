@@ -1,7 +1,8 @@
 ---
-id: dec-draft-20e33f68
+id: dec-483
+draft_id: dec-draft-20e33f68
 title: The model-routing rule loads by path scope on the agent definitions, with a hook-delivered resident at session start
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-31
 summary: rules/swe/agent-model-routing.md flips from hook-deliver to symlink with paths agents/** and the routing policy reference; a new hook-deliver rule rules/swe/agent-model-routing-resident.md declares resident_of and carries the resolution order, the alias note, the restated directive with its deviation list and the policy pointer; the tier table and its cells stay byte-identical so the Codex adapter and the parity gate are unchanged.

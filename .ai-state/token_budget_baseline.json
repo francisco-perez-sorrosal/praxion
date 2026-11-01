@@ -10,12 +10,6 @@
   },
   "samples": [
     {
-      "date": "2026-09-26",
-      "governed_tokens": 16660,
-      "governed_bytes": 65152,
-      "basis": "tokenizer"
-    },
-    {
       "date": "2026-09-27",
       "governed_tokens": 16655,
       "governed_bytes": 65128,
@@ -210,6 +204,13 @@
       "date": "2026-10-31",
       "governed_tokens": 20273,
       "governed_bytes": 55270,
+      "basis": "tokenizer",
+      "ruler": "claude-sonnet-5-5"
+    },
+    {
+      "date": "2026-11-01",
+      "governed_tokens": 19724,
+      "governed_bytes": 54008,
       "basis": "tokenizer",
       "ruler": "claude-sonnet-5-5"
     }

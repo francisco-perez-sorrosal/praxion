@@ -1,7 +1,8 @@
 ---
-id: dec-draft-cd34787e
+id: dec-485
+draft_id: dec-draft-cd34787e
 title: A re-runnable spawn-model check over recorded transcripts
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-31
 summary: New stdlib checker scripts/check_spawn_models.py reads recorded parent and subagent transcripts, classifies each spawn as floor, override, unexplained or unknown against the definitions' model floors and the directive's sanctioned set, exits 1 only on an unexplained spawn, and starts no model session.

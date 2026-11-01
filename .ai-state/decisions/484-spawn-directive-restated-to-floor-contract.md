@@ -1,7 +1,8 @@
 ---
-id: dec-draft-fb3831ad
+id: dec-484
+draft_id: dec-draft-fb3831ad
 title: "The orchestrator directive is restated: omit model by default, pass one only for a listed deviation"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-31
 summary: "The routing directive no longer says pass the row's alias on every spawn or that a skipped alias falls through to the session model; it says a spawn passing no model runs at its definition's floor, held equal to the table by the parity gate, and lists the closed set of per-spawn deviations: consultant opus unless routine, test-engineer acceptance design opus, verifier light review sonnet, researcher modes, implementer step hint."

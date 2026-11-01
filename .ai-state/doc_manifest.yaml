@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-10-31T19:38:51Z'
+generated_at: '2026-11-01T14:02:52Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -41,7 +41,7 @@ surfaces:
   path: CLAUDE.md
   type: markdown
   title: Praxion
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
   surfaces_referenced:
   - docs-claude-code-limitations
@@ -132,7 +132,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -565,7 +565,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -595,7 +595,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -626,7 +626,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -640,7 +640,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3541,13 +3541,37 @@ surfaces:
   path: .ai-state/decisions/480-adr-rule-path-scoped-with-resident.md
   type: markdown
   title: The ADR rule loads by path scope on the decisions tree, with a declared resident projection at session start
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: adr_card
 - id: ai-state-decisions-481-decision-record-gate-and-read-guard
   path: .ai-state/decisions/481-decision-record-gate-and-read-guard.md
   type: markdown
   title: A decision-record gate refuses misplaced, self-numbered, malformed or uncategorised records at write and commit time, and an unbounded read of the decisions index
   last_modified: '2026-10-31'
+  renderer: adr_card
+- id: ai-state-decisions-482-disabling-a-rule-suppresses-its-resident
+  path: .ai-state/decisions/482-disabling-a-rule-suppresses-its-resident.md
+  type: markdown
+  title: Disabling a rule in the per-project blacklist also suppresses its resident
+  last_modified: '2026-11-01'
+  renderer: adr_card
+- id: ai-state-decisions-483-routing-rule-path-scoped-with-hook-resident
+  path: .ai-state/decisions/483-routing-rule-path-scoped-with-hook-resident.md
+  type: markdown
+  title: The model-routing rule loads by path scope on the agent definitions, with a hook-delivered resident at session start
+  last_modified: '2026-11-01'
+  renderer: adr_card
+- id: ai-state-decisions-484-spawn-directive-restated-to-floor-contract
+  path: .ai-state/decisions/484-spawn-directive-restated-to-floor-contract.md
+  type: markdown
+  title: 'The orchestrator directive is restated: omit model by default, pass one only for a listed deviation'
+  last_modified: '2026-11-01'
+  renderer: adr_card
+- id: ai-state-decisions-485-spawn-model-transcript-check
+  path: .ai-state/decisions/485-spawn-model-transcript-check.md
+  type: markdown
+  title: A re-runnable spawn-model check over recorded transcripts
+  last_modified: '2026-11-01'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3836,6 +3860,13 @@ surfaces:
   type: markdown
   title: 'Spec: merge-triggers (observation-log merge-in for merges that fire no post-merge hook)'
   last_modified: '2026-10-03'
+  renderer: default_markdown
+- id: ai-state-specs-spec-model-routing-move-2026-11-01
+  path: .ai-state/specs/SPEC_model-routing-move_2026-11-01.md
+  type: markdown
+  title: 'Spec: model-routing-move (the model-routing tier table leaves session start: the full rule loads by path scope, a hook-delivered resident carries the spawn directive, and a re-runnable check reads
+    spawn models from transcripts)'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: ai-state-specs-spec-multi-language-support-2026-05-11
   path: .ai-state/specs/SPEC_multi-language-support_2026-05-11.md
@@ -4449,6 +4480,10 @@ groups:
   - ai-state-decisions-479-the-git-move-governs-commit-message-form
   - ai-state-decisions-480-adr-rule-path-scoped-with-resident
   - ai-state-decisions-481-decision-record-gate-and-read-guard
+  - ai-state-decisions-482-disabling-a-rule-suppresses-its-resident
+  - ai-state-decisions-483-routing-rule-path-scoped-with-hook-resident
+  - ai-state-decisions-484-spawn-directive-restated-to-floor-contract
+  - ai-state-decisions-485-spawn-model-transcript-check
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4497,6 +4532,7 @@ groups:
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-main-session-adherence-2026-10-28
   - ai-state-specs-spec-merge-triggers-2026-10-03
+  - ai-state-specs-spec-model-routing-move-2026-11-01
   - ai-state-specs-spec-multi-language-support-2026-05-11
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24

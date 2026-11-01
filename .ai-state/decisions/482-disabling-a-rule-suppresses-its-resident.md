@@ -1,7 +1,8 @@
 ---
-id: dec-draft-4afb26ec
+id: dec-482
+draft_id: dec-draft-4afb26ec
 title: Disabling a rule in the per-project blacklist also suppresses its resident
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-31
 summary: hooks/inject_rules.py adds to the disable set every hook-deliver rule whose frontmatter names a disabled rule in resident_of, through a local check held equal to scripts/_resident_of.py by a parity test, so existing blacklists naming swe/agent-model-routing (the hackathon preset among them) keep removing all routing text.

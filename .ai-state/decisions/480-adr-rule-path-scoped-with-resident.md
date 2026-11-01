@@ -25,7 +25,7 @@ affected_files:
   - eval/src/praxion_evals/adherence/moves/arms.py
   - CLAUDE.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-19, REQ-20, REQ-21]
-re_affirmed_by: [dec-draft-20e33f68]
+re_affirmed_by: [dec-483]
 ---
 
 ## Context

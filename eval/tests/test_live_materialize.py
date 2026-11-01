@@ -106,9 +106,9 @@ def _build_stub_copy(root: Path) -> None:
     `plant_nonces` writes into, at the paths probe 1 recorded."""
     (root / "claude" / "config").mkdir(parents=True)
     (root / "claude" / "config" / "CLAUDE.md.tmpl").write_text("# {{PROJECT_NAME}}\n")
-    (root / "rules" / "swe").mkdir(parents=True)
+    (root / "rules" / "swe" / "vcs").mkdir(parents=True)
     (root / "rules" / "swe" / "agent-behavioral-contract.md").write_text("## Contract\n")
-    (root / "rules" / "swe" / "agent-model-routing.md").write_text("## Agent Model Routing\n")
+    (root / "rules" / "swe" / "vcs" / "git-conventions.md").write_text("## Git Conventions\n")
     (root / "agents").mkdir(parents=True)
     (root / "agents" / "researcher.md").write_text("---\nname: researcher\n---\nBody.\n")
 
@@ -123,7 +123,7 @@ def test_plant_nonces_writes_a_fresh_marker_into_each_of_the_four_locations(tmp_
     global_md = (tmp_path / "claude" / "config" / "CLAUDE.md.tmpl").read_text()
     rule_md = (tmp_path / "rules" / "swe" / "agent-behavioral-contract.md").read_text()
     agent_md = (tmp_path / "agents" / "researcher.md").read_text()
-    hook_rule_md = (tmp_path / "rules" / "swe" / "agent-model-routing.md").read_text()
+    hook_rule_md = (tmp_path / "rules" / "swe" / "vcs" / "git-conventions.md").read_text()
 
     assert plant.global_claude_md in global_md
     assert plant.coordination_rule in rule_md
@@ -196,10 +196,12 @@ def test_materialize_head_installs_a_rendered_claude_md_and_excludes_hook_delive
     assert rendered_claude_md.exists()
     assert rendered_claude_md.read_text(encoding="utf-8").strip() != ""
 
-    hook_delivered_rule_in_copy = materialization.root / "rules" / "swe" / "agent-model-routing.md"
+    hook_delivered_rule_in_copy = (
+        materialization.root / "rules" / "swe" / "vcs" / "git-conventions.md"
+    )
     assert hook_delivered_rule_in_copy.exists()
 
-    linked_hook_rule = sandbox / "home" / ".claude" / "rules" / "swe" / "agent-model-routing.md"
+    linked_hook_rule = sandbox / "home" / ".claude" / "rules" / "swe" / "vcs" / "git-conventions.md"
     assert not linked_hook_rule.exists()
 
     linked_regular_rule = sandbox / "home" / ".claude" / "rules" / "swe" / "coding-style.md"

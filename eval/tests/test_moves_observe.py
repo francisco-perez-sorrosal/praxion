@@ -27,9 +27,9 @@ INJECTION_HEADER = "## Praxion Rules (auto-injected)"
 INJECTED = (INJECTION_HEADER, *RULE_BODY)
 HOOK_COMMAND = f"python3 ${{CLAUDE_PLUGIN_ROOT}}/hooks/{KIT_HOOK}"
 BASH_COMMIT = {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}
-REAL_RULE_ID = "swe/agent-model-routing"
-REAL_RULE_PATH = "rules/swe/agent-model-routing.md"
-REAL_RULE_FIRST_LINE = "## Agent Model Routing"
+REAL_RULE_ID = "swe/vcs/git-conventions"
+REAL_RULE_PATH = "rules/swe/vcs/git-conventions.md"
+REAL_RULE_FIRST_LINE = "## Git Conventions"
 GONE_WITHIN_SECONDS = 3
 
 

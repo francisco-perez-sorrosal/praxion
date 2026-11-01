@@ -1,3 +1,18 @@
+## v0.56.0 (2026-11-01)
+
+### Feat
+
+- Restate the routing directive to its floor contract
+- Gate model-routing parity with agent models
+
+### Fix
+
+- Keep a half-filled section open in C5's finished reading
+- Make the verifier's two scripts runnable by name
+- Drop the directive's redundant kill-switch clause
+- Hold a step's Check to its pocket's bound
+- Carry the project on kernel_injected rows
+
 ## v0.55.0 (2026-10-31)
 
 ### Feat

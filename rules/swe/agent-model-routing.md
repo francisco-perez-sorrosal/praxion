@@ -17,7 +17,13 @@ Tier table for Praxion subagents. Resolution order at spawn:
 
 Aliases for `opus`/`sonnet` (they track the newest generation — Opus 5 / Sonnet 5 today). The L tier pins `claude-haiku-4-5` because the bare `haiku` alias resolves to Haiku 3.5, a silent two-generation downgrade. Otherwise pin full IDs at spawn time only when version-locking.
 
-**Orchestrator directive.** When spawning any agent below, pass that row's `model: <alias>` as the Agent tool's `model` parameter on every spawn. Skipping it lets the agent fall through to the session model, defeating the policy. Deviate from the table only on the sanctioned cases documented in `skills/agent-crafting/references/model-routing-policy.md` (researcher modes, implementer step-level hint).
+**Orchestrator directive.** A spawn that passes no `model` runs at its definition's `model:` floor, which the parity gate (`scripts/check_model_routing_parity.py`) holds equal to the Tier Table in `rules/swe/agent-model-routing.md`, so omit `model` by default. Pass a per-spawn `model` only for a sanctioned deviation listed here; the kill switch, when the operator sets it, overrides every spawn.
+
+- `discipline-consultant`: pass `opus` unless the matched registry row's `difficulty-hint` is `routine`, which omits `model` and runs on the `sonnet` floor.
+- `test-engineer` in `Mode: acceptance-design`, resumes included: pass `opus`.
+- `verifier` in `Mode: light-review`: pass `sonnet`.
+- `researcher`: its modes route up to `opus` or down to the L tier (identified by the pin `claude-haiku-4-5`, not a value to pass); selection signals in the policy reference.
+- `implementer`: the planner's step hint routes it, `tier: H` to `opus` and `tier: L` to the L tier; no hint omits `model`.
 
 ### Tier Table
 

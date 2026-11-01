@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-10-31T16:44:49Z'
+generated_at: '2026-11-01T08:01:20Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -42,7 +42,7 @@ rules:
   load: always_on
   core: false
   install: hook-deliver
-  chars: 3267
+  chars: 3850
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on

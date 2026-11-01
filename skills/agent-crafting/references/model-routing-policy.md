@@ -1,6 +1,6 @@
 # Model Routing Policy
 
-Effort routing, researcher routing modes, kill-switch precedence, per-spawn overrides, and quality-cliff guards for Praxion subagent model selection — the operational detail behind [`../SKILL.md`](../SKILL.md) and the resident Tier Table in `rules/swe/agent-model-routing.md`.
+Effort routing, researcher routing modes, kill-switch precedence, per-spawn overrides, and quality-cliff guards for Praxion subagent model selection — the operational detail behind [`../SKILL.md`](../SKILL.md) and `rules/swe/agent-model-routing.md`, which is path-scoped to load in full on `agents/**` and on this reference, while a session-start resident carries its spawn directive and deviations.
 
 ## Effort Routing
 
@@ -10,7 +10,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 
 1. **Frontmatter `model:` is a capability floor** — minimum tier; the rule may route up, never below.
 2. **Fan-out amplifiers** — `researcher` (up to 6×), `implementer` + `test-engineer` (2–3×) multiply mis-routes.
-3. **Aliases only in always-loaded surfaces** — full IDs decay; pin at spawn time only when version-locking. Sole standing exception: the L tier's `claude-haiku-4-5` pin, forced by the stale `haiku` alias.
+3. **Aliases only in always-loaded surfaces** — the `opus`/`sonnet` aliases track the newest generation, so full IDs decay; pin at spawn time only when version-locking. Sole standing exception: the L tier's `claude-haiku-4-5` pin, forced because bare `haiku` resolves to Haiku 3.5.
 4. **Override precedence is the lever** — per-spawn `model:` beats frontmatter; reach for it sparingly.
 
 ## Researcher Routing Modes
@@ -23,7 +23,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 
 **Implementer step-level override.** Planner annotates `WIP.md` with `tier: H` (cross-cutting refactor) or `tier: L` (typo/mechanical); no hint = `sonnet`.
 
-**Direct-invocation entry points.** User-invoked skills and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, `/eval-praxion`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: read the agent's row and pass its alias as the `model:` parameter. `sentinel` and `skill-genesis` are most often invoked this way; both default to `sonnet` unless overridden up.
+**Direct-invocation entry points.** User-invoked skills and user-driven spawns (e.g. `/sentinel`, `/roadmap`, `/eval`, `/eval-praxion`, ad-hoc `Agent` calls) bypass the orchestrator, so the entry point applies this rule: omit `model`; the definition's floor applies; pass one only for a deviation listed in the rule's directive. `sentinel` and `skill-genesis` are most often invoked this way; both run on their `sonnet` floor unless overridden up.
 
 ## Operator Kill Switch — `CLAUDE_CODE_SUBAGENT_MODEL`
 
@@ -42,6 +42,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 | Scenario | Agent | Override | Rationale |
 |----------|-------|----------|-----------|
 | Intra-step pair-review (`Mode: light-review`) | `verifier` | `sonnet` | Step-scoped diff review only; not a whole-pipeline quality gate. Sanctioned per-spawn override below the `opus` floor. |
+| Discipline consult (matched registry row's `difficulty-hint`) | `discipline-consultant` | `opus`; omit `model` when `routine` | The `sonnet` frontmatter floor is deliberate: a `routine` consult runs there, any other consult passes `opus`. The only sanctioned downgrade. |
 | Acceptance design (`Mode: acceptance-design`, resumes included) | `test-engineer` | `opus` | Independent outer-loop design from the spec alone is a judgment-heavy, one-shot task whose quality bounds every later gate. Sanctioned per-spawn override above the `sonnet` frontmatter floor: the upward mirror of the `verifier` light-review row. |
 
 ## Quality-Cliff Guards

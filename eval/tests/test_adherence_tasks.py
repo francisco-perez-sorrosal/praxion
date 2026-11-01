@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -802,3 +803,10 @@ def test_an_instruction_template_without_the_convention_token_refuses_the_kit(fi
 
     with pytest.raises(ValueError, match="lacks the convention"):
         tasks.kit_for("researcher")
+
+
+@pytest.mark.parametrize("fixture", sorted(path.name for path in tasks.REPOS_DIR.iterdir()))
+def test_a_fixture_repository_puts_its_source_on_the_test_path(fixture):
+    manifest = tomllib.loads((tasks.REPOS_DIR / fixture / "pyproject.toml.tmpl").read_text())
+
+    assert manifest["tool"]["pytest"]["ini_options"]["pythonpath"] == ["src"]

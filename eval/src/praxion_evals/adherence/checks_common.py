@@ -394,12 +394,15 @@ def _partial_problems(text: str, form: PartialForm, finished: FinishedForm | Non
 
 
 def _unfinished(text: str, form: FinishedForm) -> list[str]:
-    """What keeps a report from being finished: sections still open, a verdict naming no outcome."""
+    """What keeps a report from being finished: sections still open, a verdict naming no outcome.
+
+    A section is open only when its whole body is the marker, so prose quoting it stays closed.
+    """
     sections = _sections(text)
     problems = [
         f"{heading!r} is still {form.open_marker}"
         for heading, body in sections.items()
-        if form.open_marker in body and form.closed_marker not in body
+        if body.strip() == form.open_marker
     ]
     verdict = sections.get(form.verdict_heading)
     if verdict is None:

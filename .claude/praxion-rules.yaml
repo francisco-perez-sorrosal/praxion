@@ -37,8 +37,9 @@
 # swe/agent-intermediate-documents, swe/swe-agent-coordination-protocol) —
 # attempting to list them emits a SessionStart warning and they stay loaded.
 #
-#   Hook-deliver, always-loaded (2 rules — disabling reclaims SessionStart tokens):
-#     - swe/agent-model-routing        — Per-agent Claude model tier policy (~1.6k tokens)
+#   Hook-deliver, always-loaded (2 entries — disabling reclaims SessionStart tokens):
+#     - swe/agent-model-routing        — Model tier policy, path-scoped on agents/** (session-start text ~0.5k tokens)
+#                                        Disabling the rule id removes the path-scoped rule and its session-start text
 #     - swe/vcs/git-conventions        — Commit/staging/secrets conventions (~1.0k tokens)
 #
 #   Path-scoped (13 rules — zero baseline cost; disabling is a declarative
@@ -67,8 +68,8 @@
 #     - ml/*       → all 3 ML rules
 #     - writing/*  → all 4 writing rules
 #     - swe/vcs/*  → swe/vcs/git-conventions + swe/vcs/pr-conventions
-#     - swe/*      → 8 SWE rules (2 hook-deliver + 6 path-scoped); core rules
-#                    emit a warning and stay loaded
+#     - swe/*      → every SWE rule, the routing rule's session-start text
+#                    included; core rules emit a warning and stay loaded
 
 # List of rules to disable for this project, by ID (directory-prefixed
 # path without the `.md` extension). fnmatch glob syntax is supported.
@@ -76,7 +77,7 @@
 # Praxion (this project) is the META-project that defines training conventions
 # for downstream user projects — it doesn't train models itself. The disable
 # list reflects that: declare ML rules out of scope. Other rules
-# (agent-model-routing, git-conventions, writing/*) are kept loaded because
+# (agent-model-routing, git-conventions, writing/*) stay enabled because
 # Praxion's own pipeline and docs use them.
 disable:
   # Declarative guarantee — zero token savings (ML rules are path-scoped),
@@ -85,7 +86,8 @@ disable:
   - ml/*
 
   # Other rules are intentionally NOT disabled here:
-  # - swe/agent-model-routing  — Praxion uses the multi-tier pipeline
+  # - swe/agent-model-routing  — Praxion uses the multi-tier pipeline (the rule loads on
+  #                              agents/**; its session-start text arrives every session)
   # - swe/vcs/git-conventions  — Praxion follows the canonical git conventions
   # - writing/*                — Praxion's own docs (READMEs, ARCHITECTURE.md,
   #                              diagrams) use these conventions

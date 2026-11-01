@@ -9,13 +9,13 @@ Every Praxion-onboarded project inherits a curated set of rules: coding style, b
 
 ## Token-Savings Ceiling (Read This First)
 
-**The maximum baseline token reduction this mechanism can deliver is the sum of the *hook-deliver* rule sizes — currently ~3,600 tokens across two rules** (`swe/agent-model-routing`, `swe/vcs/git-conventions`). Everything else in the disable list is a *policy guarantee*, not a token saver:
+**The maximum baseline token reduction this mechanism can deliver is the sum of the *hook-deliver* rule sizes — currently ~1,800 tokens across two rules** (the routing rule's session-start text, `swe/agent-model-routing-resident`, and `swe/vcs/git-conventions`). Everything else in the disable list is a *policy guarantee*, not a token saver:
 
 - **Core rules** (`core: true`, ~9,174 tokens, tokenizer-measured) are non-disableable. They load unconditionally — listing them in `disable:` emits a warning and changes nothing.
 - **Path-scoped rules** (13 rules) are already lazy: they cost **zero tokens at SessionStart** regardless of the disable list. Adding them to `disable:` produces a *declarative* guarantee that they will never load — useful in projects where a generically-named trigger file could appear (`prepare.py` in a non-ML project) — but yields no baseline savings.
 - **Hook-deliver rules** are the only group whose disable status moves tokens.
 
-If your goal is to shrink the always-loaded surface beyond the ~3.6k-token hook-deliver ceiling, the lever is **not** the YAML — it is the `core: true/false` classification in `rules/_manifest.yaml`, or splitting bulky always-on rules into thin always-on summaries plus on-demand reference files under `skills/<name>/references/`. The YAML mechanism is a per-project filter over the rules already available; the `core` classification is the architectural decision about *which* rules are available at all.
+If your goal is to shrink the always-loaded surface beyond the ~1.8k-token hook-deliver ceiling, the lever is **not** the YAML — it is the `core: true/false` classification in `rules/_manifest.yaml`, or splitting bulky always-on rules into thin always-on summaries plus on-demand reference files under `skills/<name>/references/`. The YAML mechanism is a per-project filter over the rules already available; the `core` classification is the architectural decision about *which* rules are available at all.
 
 ## Two-Channel Delivery, One Disable List
 
@@ -52,10 +52,10 @@ Two rules ship at SessionStart and contribute to the always-loaded token baselin
 
 | ID | Rule file | Purpose | Token cost | Typical disabler |
 |----|-----------|---------|------------|------------------|
-| `swe/agent-model-routing` | `rules/swe/agent-model-routing.md` | Claude model tier routing table, per-agent allocation | ~2300 tokens | Projects using default model routing only |
+| `swe/agent-model-routing-resident` | `rules/swe/agent-model-routing-resident.md` | Session-start text of the model-routing rule: the spawn directive and its deviations. The full rule (tier table, per-agent allocation) loads on `agents/**` and the routing policy reference. Disabled by listing its parent id `swe/agent-model-routing` | ~500 tokens | Projects using default model routing only |
 | `swe/vcs/git-conventions` | `rules/swe/vcs/git-conventions.md` | Commit scope, message format, secrets discipline | ~1300 tokens | Projects with different VCS policy or no Git |
 
-**Total hook-deliver tokens reclaimable:** ~3,600
+**Total hook-deliver tokens reclaimable:** ~1,800
 
 ### 3. Path-Scoped Rules (disableable, declarative-only — zero baseline cost)
 
@@ -106,7 +106,7 @@ disable:
 
 - **No config file** → all rules load (backward compatible; no settings.json mutation)
 - **Empty `disable:` list** → all rules load (same)
-- **`disable: [swe/agent-model-routing]`** → suppressed from `additionalContext` at SessionStart (reclaims ~1.6k always-loaded tokens)
+- **`disable: [swe/agent-model-routing]`** → the rule's session-start text (its resident) is suppressed from `additionalContext` at SessionStart (reclaims ~0.5k always-loaded tokens), and the path-scoped rule is added to `claudeMdExcludes`
 - **`disable: [ml/*]`** → 3 `**/.claude/rules/ml/*.md` patterns written to `claudeMdExcludes`; ML rules guaranteed not to load even if trigger files appear (no SessionStart token savings — path-scoped rules already cost zero baseline)
 - **Attempting `disable: [swe/agent-behavioral-contract]`** → stderr warning emitted, rule stays loaded (core protection)
 
@@ -133,7 +133,7 @@ The disable list supports fnmatch glob patterns. Note that fnmatch's `*` crosses
 | `ml/*` | 3 ML rules (all path-scoped) | `claudeMdExcludes` patterns added; no SessionStart token savings; declarative-only guarantee |
 | `writing/*` | 4 writing rules (all path-scoped) | Same as above |
 | `swe/vcs/*` | 2 VCS rules: `git-conventions` (hook-deliver) + `pr-conventions` (path-scoped) | `git-conventions` filtered from `additionalContext` (reclaims ~1.3k tokens); `pr-conventions` added to `claudeMdExcludes` |
-| `swe/*` | 12 SWE rules | 4 core: warnings emitted, kept loaded; 2 hook-deliver: filtered from `additionalContext` (~3.6k tokens reclaimed); 6 path-scoped: `claudeMdExcludes` patterns added |
+| `swe/*` | 12 SWE rules | 4 core: warnings emitted, kept loaded; 2 hook-deliver: filtered from `additionalContext` (~1.8k tokens reclaimed); 6 path-scoped: `claudeMdExcludes` patterns added |
 
 ## Core Rule Protection
 
@@ -181,13 +181,13 @@ When a session starts, the `inject_rules.py` hook logs a summary line to stderr:
 [inject_rules] Loaded 5 core rules; injected 2/2 hook-deliver rules (suppressed: none); claudeMdExcludes entries: none
 ```
 
-With suppressions active (e.g., `disable: [ml/*, swe/agent-model-routing]`):
+With suppressions active (e.g., `disable: [ml/*, swe/vcs/git-conventions]`):
 
 ```
-[inject_rules] Loaded 5 core rules; injected 1/2 hook-deliver rules (suppressed: swe/agent-model-routing); claudeMdExcludes entries: ml/eval-driven-verification, ml/experiment-tracking-conventions, ml/gpu-budget-conventions, swe/agent-model-routing
+[inject_rules] Loaded 5 core rules; injected 1/2 hook-deliver rules (suppressed: swe/vcs/git-conventions); claudeMdExcludes entries: ml/eval-driven-verification, ml/experiment-commit-conventions, ml/experiment-tracking-conventions, ml/gpu-budget-conventions, swe/vcs/git-conventions
 ```
 
-This confirms which rules were loaded, which hook-deliver rules were filtered, and which rules were added to `claudeMdExcludes` for the session. Note: the disabled hook-deliver rule (`swe/agent-model-routing`) appears in *both* the `suppressed:` list and the `claudeMdExcludes entries:` list — the latter is defense-in-depth against stale symlinks (see [`hooks/inject_rules.py`](../hooks/inject_rules.py) `_compute_symlink_exclusions` docstring).
+This confirms which rules were loaded, which hook-deliver rules were filtered, and which rules were added to `claudeMdExcludes` for the session. Note: the disabled hook-deliver rule (`swe/vcs/git-conventions`) appears in *both* the `suppressed:` list and the `claudeMdExcludes entries:` list — the latter is defense-in-depth against stale symlinks (see [`hooks/inject_rules.py`](../hooks/inject_rules.py) `_compute_symlink_exclusions` docstring). Disabling `swe/agent-model-routing` suppresses the routing rule's session-start text through its parent's id, and adds both that text and the path-scoped rule to `claudeMdExcludes`.
 
 ### Misuse warnings
 
@@ -221,7 +221,7 @@ disable:
   - writing/*
 ```
 
-**SessionStart token reduction:** ~2,400 (both hook-deliver rules). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
+**SessionStart token reduction:** ~1,800 (both hook-deliver rules). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
 
 ### ML Project
 

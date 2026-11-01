@@ -1,7 +1,8 @@
 ---
-id: dec-draft-4999dfd9
+id: dec-487
+draft_id: dec-draft-4999dfd9
 title: Confine the implementer and verifier kits' shell with the harness's OS sandbox
-status: proposed
+status: accepted
 category: architectural
 date: 2026-10-31
 summary: The adherence eval's implementer and verifier sessions get Claude Code's own Bash sandbox, delivered as --settings JSON (required, no unconfined retry, auto-approved inside, copy write-denied, real home read-denied except the runner's interpreter, credentials unset), instead of narrow allow patterns; the first such session that shows the sandbox inactive or a prescribed command refused stops the run.

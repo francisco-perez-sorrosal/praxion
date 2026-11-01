@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-01T14:02:52Z'
+generated_at: '2026-11-01T18:45:38Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3573,11 +3573,23 @@ surfaces:
   title: A re-runnable spawn-model check over recorded transcripts
   last_modified: '2026-11-01'
   renderer: adr_card
+- id: ai-state-decisions-486-capped-report-finished-form
+  path: .ai-state/decisions/486-capped-report-finished-form.md
+  type: markdown
+  title: Read a capped report by how the session ended, and set grader changes apart in a run's identity
+  last_modified: '2026-11-01'
+  renderer: adr_card
+- id: ai-state-decisions-487-confined-kits-os-sandbox-grant
+  path: .ai-state/decisions/487-confined-kits-os-sandbox-grant.md
+  type: markdown
+  title: Confine the implementer and verifier kits' shell with the harness's OS sandbox
+  last_modified: '2026-11-01'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3813,6 +3825,13 @@ surfaces:
   type: markdown
   title: 'SPEC: LikeC4 + D2 Dual-Toolchain Diagram Convention'
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-eval-kit-repairs-2026-11-01
+  path: .ai-state/specs/SPEC_eval-kit-repairs_2026-11-01.md
+  type: markdown
+  title: 'Spec: eval-kit-repairs (the adherence eval''s implementer and verifier kits run their prescribed shell work inside the harness''s OS sandbox, and the partial-title checks tell a finished capped
+    report from an unfinished one stripped of its marker)'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: ai-state-specs-spec-gate-repairs-2026-10-27
   path: .ai-state/specs/SPEC_gate-repairs_2026-10-27.md
@@ -4484,6 +4503,8 @@ groups:
   - ai-state-decisions-483-routing-rule-path-scoped-with-hook-resident
   - ai-state-decisions-484-spawn-directive-restated-to-floor-contract
   - ai-state-decisions-485-spawn-model-transcript-check
+  - ai-state-decisions-486-capped-report-finished-form
+  - ai-state-decisions-487-confined-kits-os-sandbox-grant
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4525,6 +4546,7 @@ groups:
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30
+  - ai-state-specs-spec-eval-kit-repairs-2026-11-01
   - ai-state-specs-spec-gate-repairs-2026-10-27
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15

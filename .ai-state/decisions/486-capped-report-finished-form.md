@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d6800189
+id: dec-486
+draft_id: dec-draft-d6800189
 title: Read a capped report by how the session ended, and set grader changes apart in a run's identity
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-10-31
 summary: The write-early check judges a report's closing title only when the session ended on its own; C5 passes an unmarked capped verifier report only when it is finished (no [pending] section, a verdict); a run's measured identity gains a digest of the runner's grading sources so a run cannot be continued under changed checks.

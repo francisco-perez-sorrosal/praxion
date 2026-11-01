@@ -45,7 +45,7 @@ roles:
     flip_rule_ratified: true
     flip_ratified: true
   verifier:
-    status: trial
+    status: held
     since: 2026-10-31T20:34:09Z
     runs:
       - id: 20261015T035717Z-03a785
@@ -73,6 +73,7 @@ roles:
     # Re-opened from held on 2026-10-31 for one paired run under the dec-462 flip rule (allowances from the
     # run's own discordance, C5 covered only from 5 pairs that ran out on both sides); the held reason was the
     # forced-stop regression of 20261015T035717Z-03a785, which a diagnostic draw traced to no missing kernel text.
+    reason: "run 20261031T203813Z-47ce6d passed the flip rule on three scored checks only, with golden judge error 0.50, and C5 repeated the held direction (b 5, c 1) while C5 and the write-early check read only the title, so neither can tell a finished report from an unfinished one (td-545); its sessions were denied the shell (td-544); fix both, then re-measure the early-stop tasks with sandboxes kept before any new trial"
   context-engineer:
     status: held
     since: 2026-10-14T02:32:49Z

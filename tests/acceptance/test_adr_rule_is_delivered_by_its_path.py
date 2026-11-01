@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from tests.acceptance.drivers import adr_rule_move as move
+from tests.acceptance.drivers import model_routing_move as routing_move
 from tests.acceptance.drivers.adherence_eval import install_fake_claude
 from tests.acceptance.drivers.decision_kit import DECISION_MOVE
 from tests.acceptance.drivers.move_eval import MoveRun, build_arms, declare, move_checkout, run_move
@@ -188,13 +189,23 @@ def test_a_disable_list_naming_either_file_warns_it_is_core_and_keeps_both_loade
 # -- The always-loaded reading --------------------------------------------------------------------
 
 
+# The model-routing move, declared later, swaps the routing rule for its session-start text in
+# the same reading; its own scenarios hold that swap.
+LATER_DECLARED_BUDGET_SWAP = "<repo>/rules/swe/agent-model-routing.md"
+
+
 def test_the_always_loaded_reading_counts_the_resident_where_it_counted_the_rule(tmp_path):
     base = move.fixture_json("base_budget_files.json")
     expected = sorted(
-        f"<repo>/{move.RESIDENT}" if f == f"<repo>/{move.MOVED_RULE}" else f for f in base
+        f"<repo>/{move.RESIDENT}" if f == f"<repo>/{move.MOVED_RULE}" else f
+        for f in base
+        if f != LATER_DECLARED_BUDGET_SWAP
     )
+    routing_text = routing_move.session_start_routing_file(tmp_path / "routing")
 
-    assert move.budget_files(tmp_path) == expected
+    counted = [f for f in move.budget_files(tmp_path) if f != f"<repo>/{routing_text}"]
+
+    assert counted == expected
 
 
 # -- The move instrument and a landed move --------------------------------------------------------

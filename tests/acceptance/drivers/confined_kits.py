@@ -214,15 +214,36 @@ def shell_grants(session: PlannedSession) -> tuple[str, ...]:
 # -- The grant at the base commit ---------------------------------------------------------------
 
 
+# The session environment passes these through only when the ambient environment has them, so
+# their presence in a frozen reading describes the machine it was frozen on, not the code: a CI
+# runner has no TERM. A frozen name of this kind counts only where the current environment
+# carries it; every other name (the eval's own switches, the credentials) is compared as frozen.
+MACHINE_PASS_THROUGH = frozenset({"LANG", "LC_ALL", "LC_CTYPE", "TERM", "USER", "LOGNAME", "SHELL"})
+
+
 def frozen_grants() -> Mapping[str, Mapping[str, Mapping[str, list[str]]]]:
     """role -> arm -> {"tools", "options", "env_names"} as the base commit printed them."""
     raw = json.loads(FROZEN_GRANTS.read_text(encoding="utf-8"))
-    return raw["roles"]
+    return {
+        role: {
+            arm: {**kit, "env_names": _on_this_machine(kit["env_names"])}
+            for arm, kit in arms.items()
+        }
+        for role, arms in raw["roles"].items()
+    }
 
 
 def frozen_with_token_file() -> Mapping[str, Mapping[str, list[str]]]:
     """role -> arm -> the session's environment names when the run is given a token file."""
-    return json.loads(FROZEN_GRANTS.read_text(encoding="utf-8"))["with_token_file"]
+    raw = json.loads(FROZEN_GRANTS.read_text(encoding="utf-8"))["with_token_file"]
+    return {
+        role: {arm: _on_this_machine(names) for arm, names in arms.items()}
+        for role, arms in raw.items()
+    }
+
+
+def _on_this_machine(names: Sequence[str]) -> list[str]:
+    return [name for name in names if name not in MACHINE_PASS_THROUGH or name in os.environ]
 
 
 def freeze_grants() -> dict:

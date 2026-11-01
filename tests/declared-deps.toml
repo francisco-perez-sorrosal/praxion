@@ -1159,3 +1159,8 @@ tests = [
   "tests/acceptance/test_command_family_is_retired.py",
 ]
 why = "reads the model through a likec4 export of this directory, a source no path literal or import names; a change here selected none of them and two reds surfaced only in a full run"
+
+[[dep]]
+paths = [".ai-state/kernel_adoption.yaml"]
+tests = ["tests/acceptance/test_flag_eligibility_and_liveness_gates.py"]
+why   = "its sandboxes copy the checkout, the live adoption ledger included, and judge liveness and eligibility over that copy; no path literal names the ledger"

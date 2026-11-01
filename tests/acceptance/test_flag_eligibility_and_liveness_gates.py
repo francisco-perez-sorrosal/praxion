@@ -164,7 +164,7 @@ def test_the_implementers_definition_still_inherits_its_instruction_files() -> N
 def test_an_implementer_at_trial_receives_its_kernel_and_the_projects_instructions_in_one_row(
     sandbox: Sandbox, project: Path
 ) -> None:
-    kernel_adoption.record(sandbox.root, kernel_adoption.at_trial("implementer"))
+    kernel_adoption.commit_records(sandbox.root, kernel_adoption.at_trial("implementer"))
 
     injection = kernel_spawn.spawn(sandbox.root, project, "praxion:implementer")
     rows = kernel_spawn.kernel_rows(project)
@@ -179,7 +179,7 @@ def test_an_implementer_at_trial_receives_its_kernel_and_the_projects_instructio
 def test_an_implementer_spawn_at_trial_without_its_row_is_reported_missing(
     sandbox: Sandbox, project: Path
 ) -> None:
-    kernel_adoption.record(sandbox.root, kernel_adoption.at_trial("implementer"))
+    kernel_adoption.commit_records(sandbox.root, kernel_adoption.at_trial("implementer"))
     kernel_spawn.unregister_kernel_hooks(sandbox.root)
 
     kernel_spawn.spawn(sandbox.root, project, "praxion:implementer")

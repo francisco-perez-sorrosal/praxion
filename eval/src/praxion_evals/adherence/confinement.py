@@ -21,18 +21,24 @@ entry that an ``allow_read`` entry covers would be re-opened, so such a pair is 
 The one outside read is ``os.path.realpath``, which follows symlinks on disk; otherwise the
 module is a function of its arguments.
 
+The same module reads a broken confinement back from a session's record
+(``confinement_breach``): a sandbox that never started, a sandbox refusal after startup, or a
+refused command the role's definition prescribes. Each means the grant, not the role, failed.
+
 The settings keys were last checked against code.claude.com/docs/en/sandboxing.md.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+import re
+import shlex
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from praxion_evals.adherence.model import Role
+from praxion_evals.adherence.model import RefusedCommand, Role
 
 CONFINED_ROLES: frozenset[Role] = frozenset({"implementer", "verifier"})
 
@@ -191,3 +197,157 @@ def _spellings(paths: Iterable[Path]) -> tuple[str, ...]:
 
 def _covers(root: str, path: str) -> bool:
     return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+# ---------------------------------------------------------------------------
+# A broken confinement, read from a session's record
+# ---------------------------------------------------------------------------
+
+_GIT_READS = frozenset({"git diff", "git log", "git show", "git status"})
+
+# What each confined role's definition has it run, by program name, `python -m` module,
+# script file name or `git <subcommand>`. The verifier never runs the test runner.
+PRESCRIBED_COMMANDS: dict[Role, frozenset[str]] = {
+    "implementer": frozenset(
+        {
+            "pytest",
+            "py.test",
+            "ruff",
+            "resolve_test_scope.py",
+            "check_id_citation_discipline.py",
+            "mutation_sensor.py",
+            "audit_tests.py",
+        }
+    )
+    | _GIT_READS,
+    "verifier": frozenset(
+        {
+            "ruff",
+            "extract_spec.py",
+            "check_test_results_shape.py",
+            "check_state_ledgers.py",
+            "rework_manifest.py",
+            "check_footprint_criteria.py",
+            "query_adrs.py",
+            "reconcile_pipeline_state.py",
+        }
+    )
+    | _GIT_READS,
+}
+
+SANDBOX_REFUSAL = re.compile(r"Sandbox is required but failed to initialize[^\n]*")
+EVIDENCE_CHARS = 300
+_CHAIN_OPERATORS = frozenset({"&&", "||", ";", ";;", "|", "&", "\n"})
+_REDIRECT_START = ("<", ">")
+_ENV_ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=")
+_PYTHON_PROGRAM = re.compile(r"python[\d.]*")
+_PACKAGE_RUNNERS = frozenset({"uv", "pixi", "poetry", "pipenv", "hatch"})
+
+
+def confinement_breach(
+    role: Role,
+    refused: Sequence[RefusedCommand],
+    tool_result_texts: Iterable[str],
+    stderr: str,
+    started: bool,
+) -> str | None:
+    """The evidence that `role`'s session ran without its confinement, or None.
+
+    `started` is whether the session produced its ``init`` event. The harness's startup text
+    under ``failIfUnavailable`` is not documented, so a session that never started and whose
+    stderr names the sandbox (any case) counts. The caller redacts the evidence it records.
+    """
+    if role not in CONFINED_ROLES:
+        return None
+    if not started and "sandbox" in stderr.lower():
+        return f"the session exited at startup without its sandbox: {_clip(stderr.strip())}"
+    for text in tool_result_texts:
+        if match := SANDBOX_REFUSAL.search(text):
+            return _clip(match.group())
+    if (prescribed := refused_prescribed(role, refused)) is not None:
+        return f"a command the role's definition prescribes was refused: {prescribed.command}"
+    return None
+
+
+def refused_prescribed(role: Role, refused: Sequence[RefusedCommand]) -> RefusedCommand | None:
+    """The first refused command that runs something `role`'s definition prescribes."""
+    prescribed = PRESCRIBED_COMMANDS.get(role, frozenset())
+    return next(
+        (
+            r
+            for r in refused
+            if any(_runs_one_of(argv, prescribed) for argv in _simple_commands(r.command))
+        ),
+        None,
+    )
+
+
+def _clip(text: str) -> str:
+    return text[:EVIDENCE_CHARS]
+
+
+def _simple_commands(command: str) -> Iterable[list[str]]:
+    """The commands a shell line chains, each as words with env prefixes and redirects dropped."""
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>()\n")
+        lexer.whitespace, lexer.whitespace_split = " \t\r", True
+        tokens = list(lexer)
+    except ValueError:  # an unbalanced quote: the line never ran as written
+        return
+    words: list[str] = []
+    skip_target = False
+    for token in (*tokens, "\n"):
+        if skip_target:
+            skip_target = False
+        elif token in _CHAIN_OPERATORS:
+            if command_words := _without_env(words):
+                yield command_words
+            words = []
+        elif token.startswith(_REDIRECT_START):
+            skip_target = True
+        elif token not in ("(", ")"):
+            words.append(token)
+
+
+def _without_env(words: list[str]) -> list[str]:
+    rest = list(words)
+    while rest and (_ENV_ASSIGNMENT.match(rest[0]) or rest[0] == "env"):
+        rest.pop(0)
+    return rest
+
+
+def _runs_one_of(argv: list[str], prescribed: frozenset[str]) -> bool:
+    program = os.path.basename(argv[0])
+    if program == "git":
+        return _git_subcommand(argv[1:]) in prescribed
+    if _PYTHON_PROGRAM.fullmatch(program):
+        return _python_runs_one_of(argv[1:], prescribed)
+    if program in _PACKAGE_RUNNERS and "run" in argv:
+        start = argv.index("run") + 1
+        return any(_runs_one_of(argv[i:], prescribed) for i in range(start, len(argv)))
+    return program in prescribed
+
+
+def _git_subcommand(args: list[str]) -> str:
+    """``git -C <dir> -c <k=v> log`` is ``git log``."""
+    rest = iter(args)
+    for arg in rest:
+        if arg in ("-C", "-c"):
+            next(rest, None)
+        elif not arg.startswith("-"):
+            return f"git {arg}"
+    return "git"
+
+
+def _python_runs_one_of(args: list[str], prescribed: frozenset[str]) -> bool:
+    for position, arg in enumerate(args):
+        following = args[position + 1] if position + 1 < len(args) else ""
+        if arg == "-m":
+            return following in prescribed
+        if arg == "-c":
+            return any(
+                name.removesuffix(".py") in following for name in prescribed if name.endswith(".py")
+            )
+        if not arg.startswith("-"):
+            return os.path.basename(arg) in prescribed
+    return False

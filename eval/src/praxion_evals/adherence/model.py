@@ -65,9 +65,11 @@ WEBFETCH_ROLES: frozenset[str] = frozenset(
     }
 )
 
-# The live runner's error kinds, plus the two only the adherence eval can raise: a refused
-# spend reservation, and a lean session whose injected kernel never arrived.
-AdherenceErrorKind = Literal["launch_refused", "kernel_missing"]
+# The live runner's error kinds, plus the three only the adherence eval can raise: a refused
+# spend reservation, a lean session whose injected kernel never arrived, and a confined kit's
+# session whose confinement was inactive or refused a command its definition prescribes.
+# None of the three is a counting or a retryable kind: a retry would draw the same settings.
+AdherenceErrorKind = Literal["launch_refused", "kernel_missing", "confinement_broken"]
 ERROR_KINDS: tuple[str, ...] = (*get_args(LiveErrorKind), *get_args(AdherenceErrorKind))
 ErrorKind = LiveErrorKind | AdherenceErrorKind
 

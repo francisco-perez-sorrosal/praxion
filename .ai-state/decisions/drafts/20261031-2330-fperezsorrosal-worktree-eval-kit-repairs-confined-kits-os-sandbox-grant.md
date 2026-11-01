@@ -41,7 +41,8 @@ The implementer and verifier kits ("confined kits") launch with Claude Code's Ba
 - `sandbox.filesystem.allowRead`: the runner's `sys.prefix` and `sys.base_prefix`, the copy root and the run root, each in its given and realpath spelling
 - `sandbox.credentials.files`: `mode: "deny"` entries for the session token file and the operator's credential locations, by absolute real-home path, since `~` resolves to the sandbox home
 - `sandbox.credentials.envVars`: `mode: "deny"` for `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`. These are unset before each sandboxed command, while the session process and its hooks keep them.
-- No `network.allowedDomains`.
+- No `network.allowedDomains`, and `sandbox.network.strictAllowlist: true` (rework, verifier #warn-1), so a sandboxed command gets no network and has no prompt to fall back to.
+- `permissions.blockReadsOutsideWorkingDirectories: true` (rework, #warn-2; Claude Code 2.1.257 or later, honoured as true from any scope). The Read tool runs outside the sandbox, so this keeps it from reading the token file. The working directories are the cwd plus the plugin copy's `--add-dir`.
 
 `READ_ONLY_BASH` stays in `--allowedTools`. Every other kit is unchanged.
 

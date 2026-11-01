@@ -45,6 +45,10 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 | Discipline consult (matched registry row's `difficulty-hint`) | `discipline-consultant` | `opus`; omit `model` when `routine` | The `sonnet` frontmatter floor is deliberate: a `routine` consult runs there, any other consult passes `opus`. The only sanctioned downgrade. |
 | Acceptance design (`Mode: acceptance-design`, resumes included) | `test-engineer` | `opus` | Independent outer-loop design from the spec alone is a judgment-heavy, one-shot task whose quality bounds every later gate. Sanctioned per-spawn override above the `sonnet` frontmatter floor: the upward mirror of the `verifier` light-review row. |
 
+## Re-Checking the Claim
+
+The claim that a spawn passing no `model` runs at its definition's floor is re-checked from recorded transcripts, at no model cost: `python3 scripts/check_spawn_models.py <transcripts-dir> [--repo-root DIR] [--json]` (a local `~/.claude/projects/<project>/` directory). It reads each spawn as `floor`, `override` (a listed deviation, or a session pinned to one model by the kill switch), `unexplained` or `unknown`, and exits 1 only on `unexplained`. It is advisory, not a commit gate, and has two named readers: the verifier of any routing change, which runs it over the recorded sessions the change touches, and the sentinel's routing audit. Its sanctioned set mirrors the directive's deviation list, so a new deviation lands in both.
+
 ## Quality-Cliff Guards
 
 - **Deep scientific or math reasoning** — do not downgrade below Opus.

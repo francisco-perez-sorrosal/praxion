@@ -250,7 +250,7 @@ def _parser() -> argparse.ArgumentParser:
     add("--keep-sandbox", action="store_true")
     add(
         "--session-oauth-token-file",
-        type=Path,
+        type=_absolute_path,
         help="a `claude setup-token` file: sessions bill its subscription, the judge keeps the API key",
     )
     add(
@@ -296,6 +296,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     add("--fixture-pages-base-url", help="the directory URL that serves the fixture page")
     return parser
+
+
+def _absolute_path(raw: str) -> Path:
+    """An option path made absolute where it is read: a confinement names absolute paths only."""
+    return Path(raw).expanduser().absolute()
 
 
 def _number[N: (int, float)](
@@ -685,9 +690,12 @@ def _print_dry_run(
 
 
 def _planned_copy(run_root: Path, task: TaskSpec, arm: Arm) -> Path:
-    """Where a real run would put the arm's plugin copy; the dry run names it, never makes it."""
+    """Where a real run would put the arm's plugin copy; the dry run names it, never makes it.
+
+    Spells the directory as ``session_loop._build_copy`` does; a test pins the two together.
+    """
     cap = tasks.turn_cap_of(task)
-    return run_root / task.role / f"{arm}-copy{cap or ''}"
+    return run_root / task.role / (f"{arm}-cap{cap}" if cap else arm)
 
 
 def _planned_places(

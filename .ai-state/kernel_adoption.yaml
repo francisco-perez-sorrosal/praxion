@@ -95,7 +95,7 @@ roles:
     runs: []
     reason: "not measured: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; a full kit comes before any new trial"
   implementer:
-    status: trial
+    status: held
     since: 2026-10-31T19:39:18Z
     runs:
       - id: 20261031T194025Z-257479
@@ -116,3 +116,4 @@ roles:
     # pairs at the 6-turn floor, so C5 is covered only if 5 of them run out on both sides; the
     # verdict is silent on C5 otherwise. This run's early-stop sessions are the cap probe td-461
     # asks for: their run-out rate is recorded in td-461 and sets the cap of any re-trial.
+    reason: "run 20261031T194025Z-257479 passed the flip rule, but C2, the 5-line return and the TEST_RESULTS.md shape bound nothing, because its kit denied every test run (td-544, fixed in 5e25dd56: the kit now runs its shell work inside the OS sandbox); held so no open trial ships in the release; re-open for one paired run under the fixed kit"

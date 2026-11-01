@@ -13,7 +13,7 @@ import shutil
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,9 +25,10 @@ from praxion_evals.adherence.confinement import (
     Confinement,
     Operator,
     Places,
+    confinement_breach,
     confinement_for,
 )
-from praxion_evals.adherence.infra_stop import EvidenceTail
+from praxion_evals.adherence.infra_stop import EvidenceTail, redacted
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -221,16 +222,48 @@ def attempt[R](
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = settle(reserved, budget, run)
         tails, model = tails_of(run, env, launch.tail_chars), resolved_model(run)
-        refused: tuple[RefusedCommand, ...] = ()
-        try:
-            evidence = _evidence(launch, task, build, page_url, root, run, commit)
-            refused = recorded_refusals(evidence, env)
-            return settled, finish(assess(evidence), charged, tails, model, refused)
-        except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged, tails, model, refused)
+        result, refused = _assessed(launch, task, build, page_url, root, run, commit, env, assess)
+        return settled, finish(result, charged, tails, model, refused)
     finally:
         if not launch.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
+
+
+def _assessed[R](
+    launch: Launch,
+    task: TaskSpec,
+    build: ArmBuild,
+    page_url: str | None,
+    root: Path,
+    run: SessionRun,
+    commit: str,
+    session_env: Mapping[str, str],
+    assess: Callable[[SessionEvidence], R],
+) -> tuple[R | Errored, tuple[RefusedCommand, ...]]:
+    """What the session's output yields: its assessment (or the error that kept it from having
+    one), and the commands the harness refused the role.
+
+    A confined kit's broken confinement replaces the assessment, whatever it was: the session
+    ran under other settings than the run declared, so its outcome says nothing of the role.
+    """
+    refused: tuple[RefusedCommand, ...] = ()
+    tool_results: Iterable[str] = ()
+    try:
+        evidence = _evidence(launch, task, build, page_url, root, run, commit)
+        refused = recorded_refusals(evidence, session_env)
+        tool_results = evidence.envelope.tool_results.values()
+        result: R | Errored = assess(evidence)
+    except Exception as error:  # one unreadable session must not discard the paid run
+        result = _crash(error)
+    secrets = _credentials(session_env)
+    broken = confinement_breach(
+        task.role,
+        refused,
+        (redacted(text, secrets) for text in tool_results),
+        redacted(run.stderr, secrets),
+        started=parse_stream(run.stdout).init is not None,
+    )
+    return (result if broken is None else Errored("confinement_broken", broken)), refused
 
 
 def _crash(error: Exception) -> Errored:

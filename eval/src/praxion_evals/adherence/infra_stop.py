@@ -20,6 +20,9 @@ Four values carry the design:
   the trailing run of equal failures of one arm, derived rather than stored, so it cannot
   disagree with the record it summarises.
 
+A session of a confined kit whose confinement broke is the one stop no rule declares: ``step``
+ends the run on the first, since a refused grant is deterministic and a count would only spend.
+
 Pure: nothing here touches a process, a file or a clock.
 """
 
@@ -115,20 +118,17 @@ class EvidenceTail:
     ) -> EvidenceTail:
         if bound <= 0:
             raise ValueError(f"the tail bound must be positive, got {bound!r}")
-        # Longest first, so a secret that contains another is redacted whole.
-        needles = sorted({s for s in secrets if s}, key=len, reverse=True)
-        return cls(
-            _redact(raw_error, needles)[-bound:],
-            _redact(raw_result, needles)[-bound:],
-        )
+        return cls(redacted(raw_error, secrets)[-bound:], redacted(raw_result, secrets)[-bound:])
 
     def masked(self) -> str:
         """The tail as two sessions are compared: the streams masked, kept in their own halves."""
         return f"{mask(self.error_tail)}\n{mask(self.result_tail)}"
 
 
-def _redact(text: str, needles: Iterable[str]) -> str:
-    for needle in needles:
+def redacted(text: str, secrets: Iterable[str]) -> str:
+    """``text`` with every secret, and any API key shape, replaced."""
+    # Longest first, so a secret that contains another is redacted whole.
+    for needle in sorted({s for s in secrets if s}, key=len, reverse=True):
         text = text.replace(needle, REDACTED)
     return _API_KEY.sub(REDACTED, text)
 
@@ -245,6 +245,8 @@ def step(
     A counting failure extends its arm's streak when it matches the streak's kind and masked
     tail and starts a new one otherwise; any other record of the arm (one that ran, one its own
     spend budget stopped, one that errored outside the counting kinds) ends it. A retry is simply the arm's next session.
+
+    A session whose confinement broke stops the run at once, under no rule and before any retry.
     """
     setup = record.setup
     seen = Seen(
@@ -253,12 +255,35 @@ def step(
         _failure(rule, record, tails),
     )
     state = FoldState((*state.seen, seen))
+    if _is_broken_confinement(record):
+        return state, Stop(_confinement_stop(seen, record))
     if seen.failure is None:
         return state, Continue()
     streak = _streak(state, seen.role, setup.arm, seen.failure)
     if len(streak) < rule.count:
         return state, Continue()
     return state, Stop(_stop_reason(state, seen.role, setup.arm, seen.failure, streak))
+
+
+def _is_broken_confinement(record: SessionRecord) -> bool:
+    return isinstance(record.status, Errored) and record.status.kind == "confinement_broken"
+
+
+def _confinement_stop(seen: Seen, record: SessionRecord) -> StopReason:
+    """The stop a broken confinement ends the run with, at its first session and under no
+    ``StopRule``: a refused grant is deterministic, so a count could only waste sessions.
+
+    Its scope is ``both-arms`` because the role's other arm would draw the same settings, and
+    only a both-arm stop can be continued (once the operator has repaired the grant)."""
+    assert isinstance(record.status, Errored)
+    return StopReason(
+        record.status.kind,
+        mask(record.status.detail),
+        seen.role,
+        seen.session.arm,
+        (seen.session,),
+        "both-arms",
+    )
 
 
 def _attempt(state: FoldState, record: SessionRecord) -> int:

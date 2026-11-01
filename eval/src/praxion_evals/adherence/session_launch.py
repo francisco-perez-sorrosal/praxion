@@ -26,6 +26,7 @@ from praxion_evals.adherence.model import (
     ArmBuild,
     EarlyStop,
     Errored,
+    RefusedCommand,
     SessionEvidence,
     SessionRecord,
     SessionSetup,
@@ -33,6 +34,7 @@ from praxion_evals.adherence.model import (
     Standard,
     TaskSpec,
 )
+from praxion_evals.adherence.transcript import refused_commands
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.materialize import install_user_scope
 from praxion_evals.live.report import CREDENTIAL_KEYS
@@ -53,6 +55,8 @@ REAL_HOME = Path.home()  # read once, here: the isolation scan takes it in as an
 DEFAULT_TAIL_CHARS = 2000
 # A session that never started, or whose output is lost, has no output to keep.
 NO_OUTPUT = EvidenceTail("", "")
+# A refused command is committed text in the results file, so it is bounded like a tail.
+REFUSED_COMMAND_CHARS = 300
 
 
 @dataclass(frozen=True)
@@ -109,7 +113,9 @@ def task_session(
     status: SessionStatus = done.result
     if isinstance(status, Errored):
         status = replace(status, setup=setup)
-    record = SessionRecord(setup, status, done.charged_usd, done.duration_ms, done.started_at)
+    record = SessionRecord(
+        setup, status, done.charged_usd, done.duration_ms, done.started_at, done.refused_commands
+    )
     print(
         f"{task.role} {slot} {task.task_id}: {type(status).__name__}", file=sys.stderr, flush=True
     )
@@ -142,7 +148,8 @@ class Attempt[R]:
     ``charged_usd`` is what the ledger took: the reported cost, or the full budget when the
     session reported none. An errored result carries the tails of the session's output.
     ``model`` is the model the session's init event reported; None when it started no process
-    or the stream carried none.
+    or the stream carried none. ``refused_commands`` are the shell commands the harness refused
+    the role, redacted and bounded.
     """
 
     result: R | Errored
@@ -150,6 +157,7 @@ class Attempt[R]:
     duration_ms: int
     started_at: str
     model: str | None = None
+    refused_commands: tuple[RefusedCommand, ...] = ()
 
 
 def attempt[R](
@@ -176,11 +184,12 @@ def attempt[R](
         charged: float,
         tails: EvidenceTail = NO_OUTPUT,
         model: str | None = None,
+        refused: tuple[RefusedCommand, ...] = (),
     ) -> Attempt[R]:
         if isinstance(result, Errored):
             result = replace(result, tails=tails)
         duration_ms = int((time.monotonic() - began) * MS_PER_S)
-        return Attempt(result, charged, duration_ms, started_at, model)
+        return Attempt(result, charged, duration_ms, started_at, model, refused)
 
     reserved = ledger.reserve(budget)
     if isinstance(reserved, LiveErrored):
@@ -198,11 +207,13 @@ def attempt[R](
             return reserved.settle(budget, None), finish(_crash(error), budget)
         settled, charged = settle(reserved, budget, run)
         tails, model = tails_of(run, env, launch.tail_chars), resolved_model(run)
+        refused: tuple[RefusedCommand, ...] = ()
         try:
             evidence = _evidence(launch, task, build, page_url, root, run, commit)
-            return settled, finish(assess(evidence), charged, tails, model)
+            refused = recorded_refusals(evidence, env)
+            return settled, finish(assess(evidence), charged, tails, model, refused)
         except Exception as error:  # one unreadable session must not discard the paid run
-            return settled, finish(_crash(error), charged, tails, model)
+            return settled, finish(_crash(error), charged, tails, model, refused)
     finally:
         if not launch.keep_sandbox:
             shutil.rmtree(root, ignore_errors=True)
@@ -261,8 +272,30 @@ def tails_of(run: SessionRun, env: Mapping[str, str], bound: int) -> EvidenceTai
     the session was given (and any API key shape) redacted before the bound clips them."""
     final = parse_stream(run.stdout).final_result
     result_text = final.result_text if final and final.result_text else ""
-    secrets = [env[key] for key in CREDENTIAL_KEYS if key in env]
-    return EvidenceTail.capture(run.stderr, result_text, bound, secrets)
+    return EvidenceTail.capture(run.stderr, result_text, bound, _credentials(env))
+
+
+def _credentials(env: Mapping[str, str]) -> list[str]:
+    return [env[key] for key in CREDENTIAL_KEYS if key in env]
+
+
+def recorded_refusals(
+    evidence: SessionEvidence, env: Mapping[str, str], bound: int = REFUSED_COMMAND_CHARS
+) -> tuple[RefusedCommand, ...]:
+    """The commands the harness refused the role, as the record keeps them: the credentials the
+    session was given (and any API key shape) redacted before the bound clips the command."""
+    final = evidence.envelope.final_result
+    denied = () if final is None else final.denied_commands
+    secrets = _credentials(env)
+    return tuple(
+        RefusedCommand(_redacted_clip(refusal.command, secrets, bound), refusal.source)
+        for refusal in refused_commands(evidence.envelope, evidence.role_tool_uses, denied)
+    )
+
+
+def _redacted_clip(command: str, secrets: list[str], bound: int) -> str:
+    redacted = EvidenceTail.capture(command, "", len(command), secrets).error_tail
+    return redacted[:bound]
 
 
 def _evidence(

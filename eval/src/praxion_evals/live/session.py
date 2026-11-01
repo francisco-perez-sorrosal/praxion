@@ -313,6 +313,8 @@ class ResultInfo:
     usage: Mapping[str, Any] | None = None
     permission_denials: int | None = None
     subagents_spawned: int | None = None
+    # The shell commands among the denials, in the order the harness listed them.
+    denied_commands: tuple[str, ...] = ()
 
     @property
     def failed(self) -> bool:
@@ -534,7 +536,20 @@ def _result_info(event: Mapping[str, Any]) -> ResultInfo:
         usage=_optional(event, "usage", dict),
         permission_denials=None if denials is None else len(denials),
         subagents_spawned=None if stats is None else _optional(stats, "spawned", int),
+        denied_commands=_denied_commands(denials or ()),
     )
+
+
+def _denied_commands(denials: Sequence[object]) -> tuple[str, ...]:
+    """The Bash commands among ``permission_denials``; an entry of any other shape is no command."""
+    commands = (
+        entry["tool_input"].get("command")
+        for entry in denials
+        if isinstance(entry, dict)
+        and entry.get("tool_name") == "Bash"
+        and isinstance(entry.get("tool_input"), dict)
+    )
+    return tuple(command for command in commands if isinstance(command, str))
 
 
 def _parse_event(line: str) -> Mapping[str, Any]:

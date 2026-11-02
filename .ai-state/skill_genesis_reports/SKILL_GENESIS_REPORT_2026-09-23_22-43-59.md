@@ -5,8 +5,8 @@ generated_at: 2026-09-24T05:45:59Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@f731fa8e
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "3 of 13", dry_run: false }
-review_status: partial
-disposition_count: { pending: 1, approved: 0, rejected: 5, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 1, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:43:59
@@ -169,6 +169,7 @@ None recorded — no recurring "we needed a specialist voice" signal surfaced in
 | 2026-11-01T23:00:00Z | Proposal 4: intra-step-review.md - substitution-adequacy assessment for review force/off | reject | below-bar: One verification WARN; premise (RISKY signals, substituted reviews) reshaped by dec-430; prose without a check |
 | 2026-11-01T23:00:00Z | Proposal 5: gate-liveness.md - cross-directory sibling import guard must ship in same step | reject | built: check_gate_liveness already detects ambient-invoked scripts whose import has no guard, so the omission is caught mechanically |
 | 2026-11-01T23:00:00Z | Proposal 6: id-citation-discipline.md - second known-limitation (full-file scan) | reject | below-bar: Documents intended gate behavior, not a defect; rule already has a Declared limits paragraph and an ignore marker |
+| 2026-11-02T07:30:00Z | Proposal 1: gate-canaries.md — non-vacuity proof methodology | approve | pick 2 (bundled with 2026-10-31_19-40-39 P1): how to prove a canary bites, with a hash-checked restore, in gate-canaries.md. Lightweight, built after routing-facts merges |
 
 ## Recommended Next Steps
 

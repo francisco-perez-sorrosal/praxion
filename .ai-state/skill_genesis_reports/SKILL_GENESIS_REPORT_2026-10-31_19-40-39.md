@@ -5,8 +5,8 @@ generated_at: 2026-10-31T19:40:39Z
 task_slug: context-diet-resume
 agent_version: skill-genesis@a3ba7469
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest-diet", batch: "3 of 5", dry_run: false }
-review_status: partial
-disposition_count: { pending: 1, approved: 0, rejected: 3, refined: 0, deferred: 1 }
+review_status: complete
+disposition_count: { pending: 0, approved: 1, rejected: 3, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-10-31 19:40:39
@@ -162,6 +162,7 @@ Already filed, not repeated: td-432 (Read-only form), td-441 (refusal oracle), t
 | 2026-11-01T23:00:00Z | Proposal 3: Read-only: field is one line of backticked spans | reject | ledgered: td-432 open covers it (parser or template fix) |
 | 2026-11-01T23:00:00Z | Proposal 4: preflight a paid adherence run with free probes | reject | built: Checklist for move runs exists with caps and credential statement |
 | 2026-11-01T23:00:00Z | Proposal 5: test-engineer prompts carry allowed inputs only | reject | built: Allowed-inputs table and Spec-Question resume rule exist; residual gap is rework briefs |
+| 2026-11-02T07:30:00Z | Proposal 1: gate-canaries — a refusal canary asserts the gate's own exit code and finding, not "any nonzero" | approve | pick 2 (bundled with 2026-09-23_22-43-59 P1): a refusal canary asserts the gate's documented exit code and named finding. Lightweight, built after routing-facts merges |
 
 ## Recommended Next Steps
 

@@ -5,8 +5,8 @@ generated_at: 2026-10-31T19:33:49Z
 task_slug: context-diet-resume
 agent_version: skill-genesis@1ca8461a
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest-diet", batch: "2 of 5", dry_run: false }
-review_status: partial
-disposition_count: { pending: 1, approved: 0, rejected: 5, refined: 0, deferred: 1 }
+review_status: complete
+disposition_count: { pending: 0, approved: 1, rejected: 5, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-10-31 19:33:49
@@ -207,6 +207,7 @@ Existing rows are not repeated: `td-501`, `td-505`, `td-506`, `td-510`, `td-511`
 | 2026-11-01T23:00:00Z | Proposal 5: close-out record checklist for revised steps | reject | below-bar: Prose; check_test_results_shape already covers the shape half |
 | 2026-11-01T23:00:00Z | Proposal 6: mutation recipe additions for hooks/ and sibling-importing modules | reject | ledgered: Tool-side gaps are open rows |
 | 2026-11-01T23:00:00Z | Proposal 7: hook identity from where the hook writes; test the no-evidence row | reject | ledgered: Both defects fixed and resolved |
+| 2026-11-02T07:30:00Z | Proposal 1: coordination-details — record the Spec Question when the outer-loop change is made, not at verification | approve | pick 1: the Spec Question path for an outer-loop change the orchestrator makes itself, in coordination-details.md and agents/test-engineer.md. Lightweight, built after routing-facts merges |
 
 ## Recommended Next Steps
 

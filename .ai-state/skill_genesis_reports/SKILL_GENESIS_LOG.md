@@ -4,12 +4,12 @@ Auto-appended by each `/skill-genesis` run. Do not edit manually.
 
 | Timestamp | Report File | Items Extracted | Proposals | Review Status | Approved | Rejected |
 |---|---|---|---|---|---|---|
-| 2026-06-28 00:30:00 | SKILL_GENESIS_REPORT_2026-06-28_00-30-00.md | 14 | 4 | partial | 0 | 3 |
+| 2026-06-28 00:30:00 | SKILL_GENESIS_REPORT_2026-06-28_00-30-00.md | 14 | 4 | complete | 1 | 3 |
 | 2026-07-30 18:20:28 | SKILL_GENESIS_REPORT_2026-07-30_18-20-28.md | 20 | 5 | complete | 0 | 5 |
 | 2026-09-04 15:12:10 | SKILL_GENESIS_REPORT_2026-09-04_15-12-10.md | 14 | 6 | complete | 0 | 4 |
 | 2026-09-23 22:35:25 | SKILL_GENESIS_REPORT_2026-09-23_22-35-25.md | 14 | 4 | complete | 0 | 4 |
 | 2026-09-23 22:39:30 | SKILL_GENESIS_REPORT_2026-09-23_22-39-30.md | 21 | 7 | complete | 0 | 5 |
-| 2026-09-23 22:43:59 | SKILL_GENESIS_REPORT_2026-09-23_22-43-59.md | 13 | 6 | partial | 0 | 5 |
+| 2026-09-23 22:43:59 | SKILL_GENESIS_REPORT_2026-09-23_22-43-59.md | 13 | 6 | complete | 1 | 5 |
 | 2026-09-23 22:47:22 | SKILL_GENESIS_REPORT_2026-09-23_22-47-22.md | 14 | 5 | complete | 0 | 5 |
 | 2026-09-23 22:51:24 | SKILL_GENESIS_REPORT_2026-09-23_22-51-24.md | 13 | 7 | complete | 0 | 6 |
 | 2026-09-23 22:55:14 | SKILL_GENESIS_REPORT_2026-09-23_22-55-14.md | 7 | 5 | complete | 0 | 5 |
@@ -24,7 +24,7 @@ Auto-appended by each `/skill-genesis` run. Do not edit manually.
 | 2026-10-10 00:49:38 | SKILL_GENESIS_REPORT_2026-10-10_00-49-38.md | 24 | 7 | complete | 0 | 4 |
 | 2026-10-11 00:56:42 | SKILL_GENESIS_REPORT_2026-10-11_00-56-42.md | 31 | 6 | complete | 0 | 6 |
 | 2026-10-31 19:30:34 | SKILL_GENESIS_REPORT_2026-10-31_19-30-34.md | 24 | 6 | complete | 0 | 4 |
-| 2026-10-31 19:33:49 | SKILL_GENESIS_REPORT_2026-10-31_19-33-49.md | 22 | 7 | partial | 0 | 5 |
-| 2026-10-31 19:40:39 | SKILL_GENESIS_REPORT_2026-10-31_19-40-39.md | 22 | 5 | partial | 0 | 3 |
+| 2026-10-31 19:33:49 | SKILL_GENESIS_REPORT_2026-10-31_19-33-49.md | 22 | 7 | complete | 1 | 5 |
+| 2026-10-31 19:40:39 | SKILL_GENESIS_REPORT_2026-10-31_19-40-39.md | 22 | 5 | complete | 1 | 3 |
 | 2026-10-31 19:45:58 | SKILL_GENESIS_REPORT_2026-10-31_19-45-58.md | 28 | 5 | complete | 0 | 5 |
 | 2026-10-31 20:11:33 | SKILL_GENESIS_REPORT_2026-10-31_20-11-33.md | 19 | 6 | complete | 0 | 6 |

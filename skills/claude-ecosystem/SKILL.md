@@ -37,22 +37,22 @@ Structured knowledge of the Anthropic/Claude platform -- models, API features, S
 - **System prompt is not in the messages array**: Use the top-level `system` parameter. Placing the system prompt as `role: "system"` in `messages` does not work -- it is not a valid role in the Claude Messages API.
 
 ## Current Model Lineup
-<!-- last-verified: 2026-05-01 -->
+<!-- last-verified: 2026-11-02 -->
 
 | Model | Model ID | Context | Max Output | Key Strengths |
 | --- | --- | --- | --- | --- |
-| Opus 4.6 | `claude-opus-4-6-20250610` | 200K | 32K | Highest capability. Complex reasoning, coding, extended thinking, adaptive thinking |
-| Sonnet 4.5 | `claude-sonnet-4-5-20250514` | 200K | 16K | Balanced performance and cost. Hybrid extended thinking. Fast |
-| Haiku 4.5 | `claude-haiku-4-5-20250514` | 200K | 8K | Fastest and cheapest. Classification, routing, high-volume tasks |
+| Opus 5.5 | `claude-opus-5-5` | 1M | 128K | The default. Complex reasoning, coding, agentic work |
+| Sonnet 5.5 | `claude-sonnet-5-5` | 1M | 128K | Speed and capability for everyday coding and agent work, at half Opus's price |
+| Haiku 5.5 | `claude-haiku-5-5` | 1M | 128K | Fastest and cheapest. Classification, routing, extraction, sub-agent tasks |
 
-**Extended context (beta):** All models support up to 1M tokens with the `anthropic-beta: interleaved-thinking-2025-05-14` header or equivalent beta flag.
+Model IDs carry no date suffix. Fable 5.1 (`claude-fable-5-1`) is more capable than Opus and priced above it. Output above about 16K tokens needs streaming.
 
 ### Model Selection Heuristics
 
-- **Default choice:** Sonnet 4.5 -- best balance of capability, speed, and cost for most tasks
-- **Maximum quality:** Opus 4.6 -- when accuracy, nuance, or complex reasoning is critical
-- **High volume / low latency:** Haiku 4.5 -- classification, routing, extraction, simple Q&A
-- **Extended thinking needed:** Opus 4.6 (recommended) or Sonnet 4.5 -- set `thinking.budget_tokens`
+- **Default choice:** Opus 5.5 -- when accuracy, nuance, or complex reasoning matters
+- **High-volume production work:** Sonnet 5.5 -- everyday coding and agent tasks at lower cost
+- **High volume / low latency:** Haiku 5.5 -- classification, routing, extraction, simple Q&A
+- **Thinking:** adaptive and on by default on all three; set its depth with `output_config.effort` (`thinking.budget_tokens` returns a 400)
 - **Structured outputs:** All models support JSON mode and tool-schema-based structured outputs
 - **Cost-sensitive batch workloads:** Any model via Batch API (50% cost reduction)
 

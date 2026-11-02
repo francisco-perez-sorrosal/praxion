@@ -36,7 +36,7 @@ const options: Options = {
   allowedTools: ["Read", "Glob", "Grep"],
   permissionMode: "bypassPermissions",
   cwd: "/path/to/project",
-  model: "claude-sonnet-4-5-20250514",
+  model: "claude-sonnet-5-5",
   settingSources: ["project"],  // Load CLAUDE.md
 };
 
@@ -62,7 +62,7 @@ for await (const message of q) {
 // Runtime control (streaming input mode)
 await q.interrupt();
 await q.setPermissionMode("acceptEdits");
-await q.setModel("claude-opus-4-6-20250610");
+await q.setModel("claude-opus-5-5");
 await q.setMaxThinkingTokens(10000);
 
 // Inspection
@@ -83,7 +83,7 @@ const options: Options = {
   systemPrompt: "Custom system prompt",
   maxTurns: 10,
   cwd: "/path/to/project",
-  model: "claude-sonnet-4-5-20250514",
+  model: "claude-sonnet-5-5",
 
   // Tools
   allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task"],

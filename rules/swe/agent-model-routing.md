@@ -16,7 +16,7 @@ Tier table for Praxion subagents. Resolution order at spawn:
 3. `CLAUDE_CODE_SUBAGENT_MODEL` env (a kill switch only with `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`, which also ignores frontmatter)
 4. Main session model (fallback)
 
-Aliases: `opus`/`sonnet` track the newest generation (Opus 5 / Sonnet 5 today); `haiku` is never below Haiku 4.5. The Agent tool's per-spawn `model` takes an alias only, never a full ID; pin one in frontmatter only when version-locking.
+Aliases: `opus`/`sonnet` track the newest generation on the Anthropic API (Opus 5.5 / Sonnet 5.5 today); `haiku` is never below Haiku 4.5. The Agent tool's per-spawn `model` takes an alias only, never a full ID; pin one in frontmatter only when version-locking.
 
 `haiku` is Haiku 5.5 on the Anthropic API and Haiku 4.5 on Bedrock, Google Cloud's Agent Platform, Foundry and Claude Platform on AWS.
 

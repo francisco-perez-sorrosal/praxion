@@ -14,7 +14,7 @@ Tier table for Praxion subagents. Resolution order at spawn:
 3. `CLAUDE_CODE_SUBAGENT_MODEL` env (a kill switch only with `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`, which also ignores frontmatter)
 4. Main session model (fallback)
 
-Aliases: `opus`/`sonnet` track the newest generation (Opus 5 / Sonnet 5 today); `haiku` is never below Haiku 4.5. The Agent tool's per-spawn `model` takes an alias only, never a full ID; pin one in frontmatter only when version-locking.
+Aliases: `opus`/`sonnet` track the newest generation on the Anthropic API (Opus 5.5 / Sonnet 5.5 today); `haiku` is never below Haiku 4.5. The Agent tool's per-spawn `model` takes an alias only, never a full ID; pin one in frontmatter only when version-locking.
 
 **Orchestrator directive.** A spawn that passes no `model` runs at its definition's `model:` floor, which the parity gate (`scripts/check_model_routing_parity.py`) holds equal to the Tier Table in `rules/swe/agent-model-routing.md`, so omit `model` by default. Pass a per-spawn `model` only for a sanctioned deviation listed here.
 

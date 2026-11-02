@@ -83,7 +83,7 @@ ClaudeAgentOptions(
     system_prompt="Custom system prompt",
     max_turns=10,
     cwd="/path/to/project",
-    model="claude-sonnet-4-5-20250514",
+    model="claude-sonnet-5-5",
 
     # Tools
     allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task"],

@@ -177,7 +177,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           inspect eval evals/coding_tasks.py \
-            --model anthropic/claude-sonnet-4-6 \
+            --model anthropic/claude-sonnet-5-5 \
             -T 3 \
             --log-dir results/
 

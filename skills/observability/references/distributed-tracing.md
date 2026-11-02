@@ -255,7 +255,7 @@ Set the opt-in explicitly in any service you instrument so the emitted schema is
 | `openinference.span.kind` | AI operation type | `AGENT`, `LLM`, `TOOL` |
 | `input.value` | Input to the operation | Prompt text, tool input |
 | `output.value` | Output from the operation | LLM response, tool result |
-| `llm.model_name` | Model identifier | `claude-sonnet-4-20250514` |
+| `llm.model_name` | Model identifier | `claude-sonnet-5-5` |
 | `llm.token_count.prompt` | Input token count | `1024` |
 | `llm.token_count.completion` | Output token count | `512` |
 

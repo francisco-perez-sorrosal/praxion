@@ -96,7 +96,7 @@ generation: <int>          # Required. Iteration number in the eval loop.
 # Metrics
 primary_metric: <float>    # Required. The scored result (accuracy, F1, pass@k, …).
 held_out_delta: <float>    # Required. Held-out vs public delta (contamination signal).
-model_id: <string>         # Required. Model identifier (e.g., "claude-sonnet-4-5").
+model_id: <string>         # Required. Model identifier (e.g., "claude-sonnet-5-5").
 
 # Binding fields
 prompt_hash: <string>      # SHA of the prompt template that produced this run.
@@ -422,7 +422,7 @@ task: "swebench_verified"
 generation: 3
 primary_metric: 0.641
 held_out_delta: -0.012
-model_id: "claude-sonnet-4-5"
+model_id: "claude-sonnet-5-5"
 prompt_hash: "f3a9d2b7c1e84f6a2d0b9c3e7f1a4d8b"
 dataset_sha: "9e3c2a1b4d7f0e5c8a2b6d9f3e1c4a7b"
 token_usage:
@@ -441,7 +441,7 @@ verdict:
 
 ## Summary
 
-Generation 3 run on SWE-bench Verified with claude-sonnet-4-5. primary_metric improved
+Generation 3 run on SWE-bench Verified with claude-sonnet-5-5. primary_metric improved
 from 0.598 (gen2) to 0.641, beating the 0.62 threshold. Token usage 1.79M, cost $7.23.
 
 ## Metrics
@@ -464,7 +464,7 @@ The following shows a populated `EVAL_LOG.md` table consistent with the example 
 ```markdown
 | run_id | task | generation | primary_metric | held_out_delta | model_id | prompt_hash | dataset_sha | cost_usd | git_sha | store_uri |
 |---|---|---|---|---|---|---|---|---|---|---|
-| eval-swebench-g3-a4b2c1 | swebench_verified | 3 | 0.641 | -0.012 | claude-sonnet-4-5 | f3a9d2b7 | 9e3c2a1b | 7.23 | a1b2c3d | ~/.myproject/runs/eval-swebench-g3-a4b2c1/ |
+| eval-swebench-g3-a4b2c1 | swebench_verified | 3 | 0.641 | -0.012 | claude-sonnet-5-5 | f3a9d2b7 | 9e3c2a1b | 7.23 | a1b2c3d | ~/.myproject/runs/eval-swebench-g3-a4b2c1/ |
 ```
 
 Both cross-references (`run_id = eval-swebench-g3-a4b2c1`, `store_uri`) are consistent

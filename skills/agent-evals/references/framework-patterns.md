@@ -57,7 +57,7 @@ def coding_eval():
     )
 ```
 
-Run with: `inspect eval coding_eval.py --model anthropic/claude-sonnet-4-6`
+Run with: `inspect eval coding_eval.py --model anthropic/claude-sonnet-5-5`
 
 ### Custom Scorers
 
@@ -116,7 +116,7 @@ Handle non-determinism with multiple trials:
 
 ```bash
 # Run 5 trials per task, report pass@k metrics
-inspect eval coding_eval.py --model anthropic/claude-sonnet-4-6 -T 5
+inspect eval coding_eval.py --model anthropic/claude-sonnet-5-5 -T 5
 ```
 
 ### Evals Library
@@ -230,7 +230,7 @@ description: "Agent coding task evaluation"
 providers:
   - id: anthropic:claude-agent-sdk
     config:
-      model: claude-sonnet-4-6
+      model: claude-sonnet-5-5
       working_dir: ./test-codebase
       append_allowed_tools: ["Write", "Edit", "Bash", "Read"]
 
@@ -290,7 +290,7 @@ Direct integration with agent SDKs:
 providers:
   - id: anthropic:claude-agent-sdk
     config:
-      model: claude-sonnet-4-6
+      model: claude-sonnet-5-5
       working_dir: ./workspace
       append_allowed_tools: ["Write", "Edit", "Bash", "Read", "Glob", "Grep"]
       max_turns: 20

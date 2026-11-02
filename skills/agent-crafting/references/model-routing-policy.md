@@ -10,7 +10,7 @@ Per-agent `effort:` lives in agent frontmatter (single source of truth — this 
 
 1. **Frontmatter `model:` is a capability floor** — minimum tier; the rule may route up, never below.
 2. **Fan-out amplifiers** — `researcher` (up to 6×), `implementer` + `test-engineer` (2–3×) multiply mis-routes.
-3. **Aliases only in always-loaded surfaces** — the per-spawn `model` takes `sonnet`, `opus`, `haiku` or `fable`, never a full ID or `inherit`; a full ID is pinned in frontmatter only when version-locking. The `opus`/`sonnet` aliases track the newest generation, so full IDs decay. `haiku` is Haiku 5.5 on the Anthropic API and Haiku 4.5 on Bedrock, Google Cloud's Agent Platform, Foundry and Claude Platform on AWS, never below 4.5. `inherit`, a floor value only, selects the main session model. A family alias resolves to the main session's exact model when that model is of the same family.
+3. **Aliases only in always-loaded surfaces** — the per-spawn `model` takes `sonnet`, `opus`, `haiku` or `fable`, never a full ID or `inherit`; a full ID is pinned in frontmatter only when version-locking. The `opus`/`sonnet` aliases track the newest generation, so full IDs decay. `haiku` is Haiku 5.5 on the Anthropic API and Haiku 4.5 on Bedrock, Google Cloud's Agent Platform, Foundry and Claude Platform on AWS, never below 4.5. Off the Anthropic API `sonnet` is Sonnet 4.5 or 4.6 and Foundry's `opus` is Opus 4.6; a user there who wants the 5.5 models sets `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` and `ANTHROPIC_DEFAULT_HAIKU_MODEL`, and Praxion's definitions keep the aliases. `inherit`, a floor value only, selects the main session model. A family alias resolves to the main session's exact model when that model is of the same family.
 4. **Override precedence is the lever** — per-spawn `model` beats frontmatter, and frontmatter beats the subagent-model environment variable; reach for the per-spawn lever sparingly.
 
 ## Researcher Routing Modes
@@ -37,7 +37,7 @@ Without `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, the `CLAUDE_CODE_SUBAGENT_MODEL` var
 
 **`availableModels` fallback.** If a routed alias is rejected, fall back to the next-cheaper tier (Opus → Sonnet → Haiku) and log it: in-pipeline, a one-line `LEARNINGS.md` § Edge Cases entry naming the rejected alias, the fallback, and the spawning agent; outside a pipeline, surface it in session text so the operator can fix the managed setting.
 
-**Model-generation note.** The Claude 5 family (Opus 5, Sonnet 5) rejects `thinking.budget_tokens` and non-default `temperature`/`top_p`/`top_k` with HTTP 400 — thinking is adaptive by default; control depth via `effort`, never via those params on routed spawns. Haiku 4.5 additionally rejects `effort`. *Verified 2026-08-30 against the `claude-api` skill; re-verify there before relaxing.*
+**Model-generation note.** The Claude 5 family (Opus 5 and 5.5, Sonnet 5 and 5.5, Haiku 5.5) rejects `thinking.budget_tokens` and non-default `temperature`/`top_p`/`top_k` with HTTP 400 — thinking is adaptive by default; control depth via `effort`, never via those params on routed spawns. Haiku 4.5 additionally rejects `effort`, which Haiku 5.5 accepts. *Verified 2026-11-02 against the `claude-api` skill; re-verify there before relaxing.*
 
 ## Per-Spawn Overrides
 

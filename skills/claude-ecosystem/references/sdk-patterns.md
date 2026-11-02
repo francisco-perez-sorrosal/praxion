@@ -22,15 +22,15 @@ async_client = anthropic.AsyncAnthropic() # async -- same env var, use with asyn
 
 # Basic message
 message = client.messages.create(
-    model="claude-sonnet-4-5-20250514",
+    model="claude-sonnet-5-5",
     max_tokens=1024,
     messages=[{"role": "user", "content": "Explain quicksort."}],
 )
-print(message.content[0].text)
+print(next(b.text for b in message.content if b.type == "text"))  # thinking blocks may come first
 
 # Streaming (sync -- async uses `async with` / `async for`)
 with client.messages.stream(
-    model="claude-sonnet-4-5-20250514", max_tokens=1024,
+    model="claude-sonnet-5-5", max_tokens=1024,
     messages=[{"role": "user", "content": "Write a haiku."}],
 ) as stream:
     for text in stream.text_stream:
@@ -51,7 +51,7 @@ tools = [{
 }]
 
 message = client.messages.create(
-    model="claude-sonnet-4-5-20250514", max_tokens=1024,
+    model="claude-sonnet-5-5", max_tokens=1024,
     tools=tools, messages=[{"role": "user", "content": "Weather in Tokyo?"}],
 )
 if message.stop_reason == "tool_use":
@@ -63,8 +63,9 @@ if message.stop_reason == "tool_use":
 
 ```python
 message = client.messages.create(
-    model="claude-opus-4-6-20250610", max_tokens=16000,
-    thinking={"type": "enabled", "budget_tokens": 10000},
+    model="claude-opus-5-5", max_tokens=16000,
+    thinking={"type": "adaptive", "display": "summarized"},  # budget_tokens returns a 400
+    output_config={"effort": "high"},
     messages=[{"role": "user", "content": "Solve this step by step..."}],
 )
 for block in message.content:
@@ -102,13 +103,14 @@ import Anthropic, { APIError, RateLimitError } from "@anthropic-ai/sdk";
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
 const message = await client.messages.create({
-  model: "claude-sonnet-4-5-20250514", max_tokens: 1024,
+  model: "claude-sonnet-5-5", max_tokens: 1024,
   messages: [{ role: "user", content: "Explain quicksort." }],
 });
-console.log(message.content[0].text);
+const answer = message.content.find((b) => b.type === "text"); // thinking blocks may come first
+console.log(answer?.type === "text" ? answer.text : "");
 
 // Streaming -- event-based
-const stream = client.messages.stream({ model: "claude-sonnet-4-5-20250514", max_tokens: 1024,
+const stream = client.messages.stream({ model: "claude-sonnet-5-5", max_tokens: 1024,
   messages: [{ role: "user", content: "Write a haiku." }] });
 for await (const event of stream) {
   if (event.type === "content_block_delta" && event.delta.type === "text_delta")

@@ -134,7 +134,7 @@ description: "TypeScript agent coding eval"
 providers:
   - id: anthropic:claude-agent-sdk
     config:
-      model: claude-sonnet-4-6
+      model: claude-sonnet-5-5
       working_dir: ./test-workspace
       append_allowed_tools: ["Write", "Edit", "Bash", "Read", "Glob"]
       max_turns: 20
@@ -258,7 +258,7 @@ const summary: EvaluateSummary = await evaluate({
   providers: [
     {
       id: 'anthropic:claude-agent-sdk',
-      config: { model: 'claude-sonnet-4-6', maxTurns: 20 },
+      config: { model: 'claude-sonnet-5-5', maxTurns: 20 },
     },
   ],
   prompts: ['Fix the following issue: {{task}}'],

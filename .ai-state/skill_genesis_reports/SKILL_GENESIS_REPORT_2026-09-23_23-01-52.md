@@ -5,8 +5,8 @@ generated_at: 2026-09-23T23:01:52Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@bfebf639
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "8 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 3, refined: 0, deferred: 3 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:01:52
@@ -163,7 +163,12 @@ formalize). Review status: pending.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: whole-line diff counting inflates byte-budget checks | reject | below-bar: One pipeline's measurement quirk; 3-4 lines of prose, no check |
+| 2026-11-01T23:00:00Z | Proposal 2: Done-when phrasing must be greppable, not countable | defer | Valid planner convention but one observation; bundle with 22-39-30 P4 as a single decomposition-guide Done-when note once a second Done-when defect surfaces |
+| 2026-11-01T23:00:00Z | Proposal 3: ground-truth fixture fidelity for harness-shaped code | defer | Two occurrences in one pipeline plus a sibling (22-55-14 P5, merged here); real but prose; worth doing as one "canaries that bite" section with 22-43-59 P1 if that is built |
+| 2026-11-01T23:00:00Z | Proposal 4: mixed-precision ISO timestamps must be parsed before comparison | reject | below-bar: Timestamp Formatting section exists; one rework; a general-programming reminder with no check |
+| 2026-11-01T23:00:00Z | Proposal 5: claude-code-limitations.md - worktree-built user-invocable skill dogfood protocol | defer | Empirical, but docs/ is not shipped and the workaround is Praxion-dev only; add with 09-04 P1 when next editing the limitations doc |
+| 2026-11-01T23:00:00Z | Proposal 6: one fact per prompt, stated once | reject | below-bar: One pipeline, 3 lens agents; authoring-style prose, not checkable |
 
 ## Recommended Next Steps
 

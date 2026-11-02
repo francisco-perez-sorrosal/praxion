@@ -5,8 +5,8 @@ generated_at: 2026-10-31T20:11:33Z
 task_slug: context-diet-resume
 agent_version: skill-genesis@a3ba7469
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest-diet", batch: "5 of 5", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 6, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-10-31 20:11:33
@@ -178,7 +178,12 @@ Confirmed against the tree at `a3ba7469`. The ledger was not edited. td-412, td-
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: ordering traps when rebuilding a doc page under a read-only driver | reject | below-bar: One pipeline, four prose points, no check |
+| 2026-11-01T23:00:00Z | Proposal 2: read driver topic vocabulary before applying a page canon to itself | reject | duplicate: A trigger case of 2026-10-31_19-33-49 P1; single occurrence |
+| 2026-11-01T23:00:00Z | Proposal 3: verifier self-application pass | reject | below-bar: One verification; adds to a 57 KB per-spawn agent; the spec carried the REQ that found it |
+| 2026-11-01T23:00:00Z | Proposal 4: live run contradicting ADR draft amends the draft | reject | duplicate: Rider on 2026-10-31_19-33-49 P3, itself built |
+| 2026-11-01T23:00:00Z | Proposal 5: plan claim about neighbouring code names the file | reject | below-bar: One occurrence |
+| 2026-11-01T23:00:00Z | Proposal 6: probe acceptance driver by file path in sys.modules | reject | below-bar: One run, three-line recipe, narrow |
 
 ## Run-Level Summary (all five batches of the 2026-10-31 run)
 

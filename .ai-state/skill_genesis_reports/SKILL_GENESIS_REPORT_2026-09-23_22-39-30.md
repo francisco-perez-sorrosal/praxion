@@ -5,8 +5,8 @@ generated_at: 2026-09-24T05:41:46Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@queue-batch
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "2 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 7, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 2 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:39:30
@@ -188,7 +188,13 @@ None recorded this batch — no learning item surfaced a recurring "we needed a 
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: git-conventions.md - WAL-hook stash-pop conflict recovery | reject | built: Stash/apply-never-pop rule and clean-tree-vs-dirty-tree hazard class already in git-conventions; the WAL-hook variant is the same class (td-110) |
+| 2026-11-01T23:00:00Z | Proposal 2: test-topology.md - file-disjointness is not test-execution disjointness | reject | superseded: Hand-maintained topology and parallel_safe were retired; selection is now derived |
+| 2026-11-01T23:00:00Z | Proposal 3: testing-strategy - RED-GREEN paired-step handshake conventions | reject | below-bar: One task's two conventions; prose; xfail-with-reason already mandated and outer-loop xfail guarded |
+| 2026-11-01T23:00:00Z | Proposal 4: spec-driven-development / software-planning - acceptance-criteria scoping | defer | Valid (Done-when scoped to the step, corpus invariants to a sentinel check) but one observation; becomes worth doing with a second Done-when defect (see 23-01-52 P2) as one planner-reference note |
+| 2026-11-01T23:00:00Z | Proposal 5: software-design-principles - Balanced Coupling case study (stable column vs volatile alias) | reject | below-bar: Decision already captured as dec-372 with its fix; a skill case study is illustration only, unchecked |
+| 2026-11-01T23:00:00Z | Proposal 6: refactoring skill - mechanical-move verification + partial-duplication hoist guard | defer | Two observations from two tasks but prose in a skill body with no check; worth adding if a third mechanical-move regression is logged |
+| 2026-11-01T23:00:00Z | Proposal 7: coding-style.md - MULTILINE+DOTALL greedy regex section-extraction pitfall | reject | below-bar: Single task; ruff cannot check it; coding-style is already large, one of several parsing-gotcha proposals (see 22-58-35 P2/P6, 23-01-52 P1/P4) |
 
 ## Recommended Next Steps
 

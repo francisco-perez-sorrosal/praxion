@@ -5,8 +5,8 @@ generated_at: 2026-09-24T05:37:15Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@a32004c7
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "1 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 4, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 4, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:35:25
@@ -129,7 +129,10 @@ None recorded this batch — the one discipline convened (`evidence-appraiser` i
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: Gate-liveness three-site philosophy-drift example | reject | below-bar: Adds an example row to a rule; two-site pattern already stated with a worked example; the real fix would be a sync check, not prose |
+| 2026-11-01T23:00:00Z | Proposal 2: Evidence-appraisal - internal convergence-claim and absent-source-marker heuristics | reject | below-bar: Three heuristics from one task, prose only, no check; Convergence Standard already covers the imported-claim case |
+| 2026-11-01T23:00:00Z | Proposal 3: Discipline-consultant disposition - carrier-files field | reject | below-bar: One observation; process prose in coordination-details, not checkable; Praxion-internal convener protocol |
+| 2026-11-01T23:00:00Z | Proposal 4: id-citation-discipline - worktree self-verification limitation | reject | superseded: The limitation was fixed in the checker (repo-relative exclusion), so the note would document a defect that no longer exists |
 
 ## Recommended Next Steps
 

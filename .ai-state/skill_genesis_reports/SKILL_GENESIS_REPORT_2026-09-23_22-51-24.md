@@ -5,8 +5,8 @@ generated_at: 2026-09-24T05:53:22Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@bfebf639
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "5 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 7, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 6, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:51:24
@@ -174,7 +174,13 @@ generated, 6 deduplicated/skipped. Review status: pending.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: gate-liveness.md - heuristic detector severity must match its declared-limit status | reject | below-bar: One verification FAIL; sits under the existing No-self-contradiction clause; prose row with no mechanical check |
+| 2026-11-01T23:00:00Z | Proposal 2: gate-liveness.md - per-boundary vs end-state invariant wording | reject | below-bar: One verification FAIL; wording-ambiguity guidance, not checkable |
+| 2026-11-01T23:00:00Z | Proposal 3: gate-canaries.md - exhaustive grammar enumeration for totalising guards | reject | duplicate: Same artifact and theme as 22-43-59 P1/P2 (canary-writing techniques); narrower and single-use |
+| 2026-11-01T23:00:00Z | Proposal 4: gate-canaries.md - two-registry classification pattern for totalising scans | defer | Sound enforceable pattern (registry union == vars()), but one use; worth doing if a second totalising scan is written, as a gate-canaries subsection |
+| 2026-11-01T23:00:00Z | Proposal 5: coding-style.md - qualified-only access import idiom for totalising scans | reject | below-bar: Repo-internal test-import idiom, tied to P4's pattern; coding-style is path-scoped but already 15 KB |
+| 2026-11-01T23:00:00Z | Proposal 6: software-planning - measure first extracted unit's fixed overhead | reject | below-bar: One pipeline's estimate error; planning prose with no check |
+| 2026-11-01T23:00:00Z | Proposal 7: decision-precedence - mechanical gate outranks heuristic rule | reject | below-bar: Placement is the always-loaded behavioral contract (criterion 4) or nowhere; one tension, already resolved by the orchestrator in that run |
 
 ## Recommended Next Steps
 

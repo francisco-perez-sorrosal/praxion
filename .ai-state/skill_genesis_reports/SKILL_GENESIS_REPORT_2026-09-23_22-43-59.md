@@ -5,8 +5,8 @@ generated_at: 2026-09-24T05:45:59Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@f731fa8e
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "3 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: partial
+disposition_count: { pending: 1, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:43:59
@@ -164,7 +164,11 @@ None recorded — no recurring "we needed a specialist voice" signal surfaced in
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 2: gate-canaries.md - regex and lint gotchas for hand-written canaries | reject | below-bar: Three narrow gotchas; PT017 is already flagged by ruff; non-greedy bound is generic regex knowledge; could ride with P1 if P1 is built |
+| 2026-11-01T23:00:00Z | Proposal 3: intra-step-review.md - fourth RISKY auto-signal | reject | superseded: The auto-signal model was replaced by a plan-local trigger; no signal table exists any more |
+| 2026-11-01T23:00:00Z | Proposal 4: intra-step-review.md - substitution-adequacy assessment for review force/off | reject | below-bar: One verification WARN; premise (RISKY signals, substituted reviews) reshaped by dec-430; prose without a check |
+| 2026-11-01T23:00:00Z | Proposal 5: gate-liveness.md - cross-directory sibling import guard must ship in same step | reject | built: check_gate_liveness already detects ambient-invoked scripts whose import has no guard, so the omission is caught mechanically |
+| 2026-11-01T23:00:00Z | Proposal 6: id-citation-discipline.md - second known-limitation (full-file scan) | reject | below-bar: Documents intended gate behavior, not a defect; rule already has a Declared limits paragraph and an ignore marker |
 
 ## Recommended Next Steps
 

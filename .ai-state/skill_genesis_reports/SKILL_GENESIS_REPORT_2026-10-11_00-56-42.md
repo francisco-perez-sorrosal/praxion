@@ -5,8 +5,8 @@ generated_at: 2026-10-11T00:56:42
 task_slug: skill-genesis-2026-10-11
 agent_version: skill-genesis@7a7dc04d
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest-commands-to-skills, batch: "1 of 1", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 6, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-10-11 00:56:42
@@ -166,7 +166,12 @@ None recorded.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: retiring a producer: sweep what it wrote | reject | ledgered: Defects were Praxion installer rows already resolved; the lesson is one pipeline |
+| 2026-11-01T23:00:00Z | Proposal 2: step-loop plan hygiene for Files:/Check: | reject | built: Glob/bare-directory rule is built and enforced by the driver stop files-glob |
+| 2026-11-01T23:00:00Z | Proposal 3: records follow the edit during in-place rework | reject | duplicate: Part (a) Spec Question recording duplicates 2026-10-31_19-33-49 P1 (stronger, fresher, 3 more pipelines); (b)(c) are prose |
+| 2026-11-01T23:00:00Z | Proposal 4: description edit runs the diet check; shell state in one block | reject | below-bar: Diet check is a Praxion-internal script; shell-state gotcha is one sighting |
+| 2026-11-01T23:00:00Z | Proposal 5: outer-loop before-state fixtures need declared-deps edge | reject | below-bar: Self-declared seedling, one occurrence |
+| 2026-11-01T23:00:00Z | Proposal 6: baseline pre-commit run --all-files before demanding it clean | reject | ledgered: The one hit is td-405, resolved |
 
 ## Recommended Next Steps
 

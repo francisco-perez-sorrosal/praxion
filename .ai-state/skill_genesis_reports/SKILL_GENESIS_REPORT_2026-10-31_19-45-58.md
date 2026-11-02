@@ -5,8 +5,8 @@ generated_at: 2026-10-31T19:45:58
 task_slug: context-diet-resume
 agent_version: skill-genesis@a3ba7469
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest-diet, batch: "4 of 5", dry_run: false }
-review_status: pending
-disposition_count: { pending: 5, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-10-31 19:45:58
@@ -170,7 +170,11 @@ Already filed, not repeated: td-488, td-489, td-490, td-491, td-492, td-493, td-
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: name every mode of a governed function; return Narrowed items | reject | below-bar: One pipeline; adds prose to three large agent definitions per spawn; no check |
+| 2026-11-01T23:00:00Z | Proposal 2: probe the gate cost per step; Check for the pocket it runs in | reject | below-bar: Praxion-pocket-specific (eval/ pockets); prose |
+| 2026-11-01T23:00:00Z | Proposal 3: orchestrator ruling quotes the governing requirement | reject | below-bar: One step in one pipeline; memory-held lesson |
+| 2026-11-01T23:00:00Z | Proposal 4: footprint-criteria: measurer checks its own row | reject | below-bar: Self-declared seedling; td-477 same script |
+| 2026-11-01T23:00:00Z | Proposal 5: type-check changed files; pyright not installed | reject | below-bar: Per-spawn agent prose; managed projects have their own type-check config |
 
 ## Recommended Next Steps
 

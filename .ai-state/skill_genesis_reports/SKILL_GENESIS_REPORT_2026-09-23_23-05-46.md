@@ -5,8 +5,8 @@ generated_at: 2026-09-24T06:08:03Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@bfebf639
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "9 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 7, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 7, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:05:46
@@ -184,7 +184,13 @@ implementation-planner / verifier roster without an unmet discipline need.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: mutation-testing recipe for flat scripts/ layout | reject | superseded: python-testing.md deliberately makes the sensor docstring the single recipe source ("never the recipe itself"); layout limits are td-306/td-338/td-522 |
+| 2026-11-01T23:00:00Z | Proposal 2: gate-canaries: self-auditing guard independence | reject | below-bar: One pipeline, prose only, nothing checks it; no repeat evidence |
+| 2026-11-01T23:00:00Z | Proposal 3: third instance of fixture-mirrors-assumption | reject | below-bar: A drafting note extending a proposal in the other half; creates no artifact |
+| 2026-11-01T23:00:00Z | Proposal 4: Files: field syntax discipline | reject | ledgered: Parser quirk fixed at the root; td-238 resolved |
+| 2026-11-01T23:00:00Z | Proposal 5: WIP.md must carry checkbox lines | reject | ledgered: Table-only WIP parse defect is part of td-238, resolved |
+| 2026-11-01T23:00:00Z | Proposal 6: dogfood step unexecutable pre-merge | reject | below-bar: Single sighting; planning caution prose, no check |
+| 2026-11-01T23:00:00Z | Proposal 7: Turbopack/node_modules symlink workaround | reject | below-bar: Dashboard-only, worktree-only, one sighting; Praxion-internal |
 
 ## Recommended Next Steps
 

@@ -5,8 +5,8 @@ generated_at: 2026-09-28T04:39:17Z
 task_slug: skill-genesis-2026-09-28
 agent_version: skill-genesis@f5988784
 invocation_args: { since: null, scope: null, sources: "/Users/fperez/dev/praxion/.claude/worktrees/remove-chub/.ai-work", batch: "1 of 1", dry_run: false }
-review_status: pending
-disposition_count: { pending: 5, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 4, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-09-27 21:39:17
@@ -150,7 +150,11 @@ its WebFetch capability corollary) or against `.ai-state/TECH_DEBT_LEDGER.md`
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: rebase over generated files gotcha | reject | below-bar: One pipeline; prose in pipeline lifecycle reference; a merge driver, not prose, would be the fix |
+| 2026-11-01T23:00:00Z | Proposal 2: git patch-id --stable verification technique | reject | below-bar: One use, optional optimisation, no check |
+| 2026-11-01T23:00:00Z | Proposal 3: disposition-row-to-step cross-check | defer | Checkable in verify_plan (every SYSTEMS_PLAN disposition row owned by a step Files:); do it when a second plan leaves a disposition row unowned |
+| 2026-11-01T23:00:00Z | Proposal 4: split large commit-sequence items and reunify | reject | below-bar: One pipeline, planning-technique prose |
+| 2026-11-01T23:00:00Z | Proposal 5: Mutation: unavailable disposition convention | reject | superseded: Superseded by dec-421: refusals other than not-flat-layout now block the step; shape documented |
 
 ## Recommended Next Steps
 

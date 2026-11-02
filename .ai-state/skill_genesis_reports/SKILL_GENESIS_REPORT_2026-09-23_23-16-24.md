@@ -5,8 +5,8 @@ generated_at: 2026-09-23T23:16:24Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@f731fa8e
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "12 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:16:24
@@ -151,7 +151,11 @@ _(This entry is informational, not a numbered proposal — omitted from the prop
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: shared collection contracts are per-consumer | reject | below-bar: One verifier light-review catch; design prose, no check |
+| 2026-11-01T23:00:00Z | Proposal 2: mutation probes need adversarial noise inside winning selection | reject | below-bar: One pipeline; prose in gate-canaries |
+| 2026-11-01T23:00:00Z | Proposal 3: return provenance from the chooser | reject | below-bar: Design heuristic, no enforcement; evidence is one verification pass |
+| 2026-11-01T23:00:00Z | Proposal 4: git-corpus fixtures need a committed tree | reject | below-bar: Second instance of a class but fix is prose in testing-conventions; root fix is the script failing loud, not documenting |
+| 2026-11-01T23:00:00Z | Proposal 5: atomicity mandate overrides 1-step-per-commit | reject | below-bar: Targets always-loaded coordination protocol (criterion 4) for one planner judgement call |
 
 ## Recommended Next Steps
 

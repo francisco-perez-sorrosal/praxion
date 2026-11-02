@@ -5,8 +5,8 @@ generated_at: 2026-06-28T00:30:00Z
 task_slug: ad-hoc
 agent_version: skill-genesis@443f698
 invocation_args: { since: null, scope: "full ecosystem harvest", dry_run: false }
-review_status: pending
-disposition_count: { pending: 4, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: partial
+disposition_count: { pending: 1, approved: 0, rejected: 3, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-06-28 00:30:00
@@ -139,7 +139,9 @@ Review status: pending.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 2: Pre-commit Linter Version Skew Warning | reject | built: Ruff pin coupling gate + hazard docs shipped |
+| 2026-11-01T23:00:00Z | Proposal 3: ADR Discovery Before Convention Change | reject | below-bar: Single instance (FM-01); prose-only; Surface Assumptions already nominally covers; Discovery Protocol exists |
+| 2026-11-01T23:00:00Z | Proposal 4: Context-Engineer Multi-Skill Dispatch Operational Patterns | reject | built: Skeleton-first/PARTIAL protocol and Write-denial workaround now in every agent prompt + completion handshake |
 
 ## Recommended Next Steps
 

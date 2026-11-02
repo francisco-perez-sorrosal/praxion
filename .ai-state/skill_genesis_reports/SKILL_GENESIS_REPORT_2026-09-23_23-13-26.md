@@ -5,8 +5,8 @@ generated_at: 2026-09-23T23:13:26Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@f731fa8e
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "11 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:13:26
@@ -148,7 +148,11 @@ to formalize). Review status: pending.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: Reader-Degradation Audit checklist | reject | below-bar: One pipeline, prose in refactoring patterns, no check |
+| 2026-11-01T23:00:00Z | Proposal 2: validate_references anchor-slug/template-link gotchas | reject | below-bar: Prose about one script quirk; better as the script docstring if wanted |
+| 2026-11-01T23:00:00Z | Proposal 3: hook benchmarking confounds (git stash, $HOME) | reject | below-bar: One pipeline, measurement-methodology prose |
+| 2026-11-01T23:00:00Z | Proposal 4: WAL queries must filter on owning plugin agent_type prefix | reject | below-bar: One caught instance; Praxion-telemetry-internal; spawn tooling already keys on praxion: prefix |
+| 2026-11-01T23:00:00Z | Proposal 5: token-budget caveat: governed set excludes agents/*.md | reject | built: measure_token_budget documents the governed set and measures agents/*.md descriptions as a separate listing surface |
 
 ## Recommended Next Steps
 

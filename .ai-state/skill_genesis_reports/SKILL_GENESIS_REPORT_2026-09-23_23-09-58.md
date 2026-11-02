@@ -5,8 +5,8 @@ generated_at: 2026-09-24T06:11:53Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@bfebf639
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "10 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 4, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 2, refined: 0, deferred: 2 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:09:58
@@ -146,7 +146,10 @@ None recorded for this batch — no recurring "needed a specialist voice" observ
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: python-testing.md survivor-triage diagnostic workflow | defer | Fold into the R7P3 survivor-triage edit if that is built; alone it is one dogfood |
+| 2026-11-01T23:00:00Z | Proposal 2: pytest rootdir inheritance in manual validation | reject | below-bar: Narrow footgun, one sighting, prose in a rule |
+| 2026-11-01T23:00:00Z | Proposal 3: YAML fragment quoting discipline | reject | below-bar: One incident; prose in an unconditionally loaded rule would cost resident tokens (criterion 4) |
+| 2026-11-01T23:00:00Z | Proposal 4: mechanical fragment-shape check for YAML colon corruption | defer | Checkable, but single caught-by-hand incident; build when a second silent mapping-for-string corruption occurs (check: assert merged traceability items are strings) |
 
 ## Recommended Next Steps
 

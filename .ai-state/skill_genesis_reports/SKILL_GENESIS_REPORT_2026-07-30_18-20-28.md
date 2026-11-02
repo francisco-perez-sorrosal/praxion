@@ -5,8 +5,8 @@ generated_at: 2026-07-30T18:20:28Z
 task_slug: multidisciplinary-identities
 agent_version: skill-genesis@b6477a5
 invocation_args: { since: null, scope: null, dry_run: false }
-review_status: pending
-disposition_count: { pending: 5, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-07-30 18:20:28
@@ -157,7 +157,11 @@ this section exists to make the absence visible, not to fill it.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: Gate Liveness - Scope Fidelity (5th clause) | reject | built: Scope fidelity clause exists |
+| 2026-11-01T23:00:00Z | Proposal 2: Paired-Contract Site Synchronization | reject | built: Two-textual-sites row exists in gate-liveness |
+| 2026-11-01T23:00:00Z | Proposal 3: Testing-Strategy - Canary-Before-Artifact Staging Pattern | reject | below-bar: Single-pipeline idiom; prose-only; no recurrence evidence |
+| 2026-11-01T23:00:00Z | Proposal 4: Self-Hosting Plugin Version-Pin Verification Gate | reject | built: "copy being loaded is the copy you edited" covered by Existence-is-not-operation clause |
+| 2026-11-01T23:00:00Z | Proposal 5: Quantitative Acceptance Criteria Must Not Be Discharged by Structural Argument Alone | reject | built: Gotcha already in spec-driven-development |
 
 ## Recommended Next Steps
 

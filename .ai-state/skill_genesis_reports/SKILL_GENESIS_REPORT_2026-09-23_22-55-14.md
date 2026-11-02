@@ -5,8 +5,8 @@ generated_at: 2026-09-23T22:55:14Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@unknown
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "6 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 5, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:55:14
@@ -141,7 +141,11 @@ either too narrow or already implied by pending sibling proposals. Review status
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: gate-liveness.md - digest render modes must carry every field a downstream instruction reproduces | reject | built: The compact table now carries Withheld and Sample entity columns; the specific defect is fixed |
+| 2026-11-01T23:00:00Z | Proposal 2: adr-conventions.md - quote YAML frontmatter value containing ": " | reject | built: Authoring protocol already says to double-quote summary containing ": "; reciprocity/promotion gates fixed under td-204 |
+| 2026-11-01T23:00:00Z | Proposal 3: gate-liveness.md - digest must surface withheld findings | reject | built: Withheld is a first-class column in the digest |
+| 2026-11-01T23:00:00Z | Proposal 4: gate-canaries.md - terminal free-form capture group in a fullmatch grammar | reject | below-bar: One light-review finding; regex-design guidance, not checkable, narrow |
+| 2026-11-01T23:00:00Z | Proposal 5: gate-canaries.md - re-verify a synthetic probe fixture against the real artifact | reject | duplicate: Same discipline as 23-01-52 P3 (ground-truth fixture fidelity); that one is broader |
 
 ## Recommended Next Steps
 

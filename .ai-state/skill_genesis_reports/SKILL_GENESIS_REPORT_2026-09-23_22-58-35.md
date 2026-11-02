@@ -5,8 +5,8 @@ generated_at: 2026-09-24T06:00:02Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@bfebf639
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "7 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 8, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 7, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:58:35
@@ -197,7 +197,14 @@ pending.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: testing-strategy - pure-core/impure-adapter split needs its own adapter test | reject | below-bar: One task; defect already fixed (porcelain -z parse); prose in gate-canaries, not checkable |
+| 2026-11-01T23:00:00Z | Proposal 2: coding-style.md - git status --porcelain column-slicing after .strip() | reject | built: Defect fixed in code with a -z parser and documented offset |
+| 2026-11-01T23:00:00Z | Proposal 3: adr-conventions.md - re-title the ADR H1 when a decision reverses | reject | below-bar: One ADR (dec-387); a one-line prose rule with no check |
+| 2026-11-01T23:00:00Z | Proposal 4: adr-conventions.md - affected_files lists new files before modified | defer | Valid retrieval concern (query_adrs --paths depends on it) but one ADR; becomes worth doing as a check that created files appear in affected_files, if a second omission is found |
+| 2026-11-01T23:00:00Z | Proposal 5: id-citation-discipline.md - .ai-work paths and dotted milestone ids escape the shape set | reject | built: Concrete .ai-work/<slug>/ paths are an already-declared limit of the gate (deliberate: code reads them, tests build them); dotted ids stay unmatched by design |
+| 2026-11-01T23:00:00Z | Proposal 6: coding-style.md - zero-total test-result line is not green | reject | built: Already stated for the Result: line |
+| 2026-11-01T23:00:00Z | Proposal 7: swe-agent-coordination-protocol.md - satisfied REWORK_MANIFEST.md must be deleted | reject | below-bar: One-line addition would be always-loaded (coordination protocol has no paths:); clean_work_safety already warns on a lingering manifest |
+| 2026-11-01T23:00:00Z | Proposal 8: Widening rule-sets should union, not shadow via first-non-empty fallback chain | reject | below-bar: Generic design heuristic from one gate, placement undecided; fixed in the gate itself |
 
 ## Recommended Next Steps
 

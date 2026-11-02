@@ -5,8 +5,8 @@ generated_at: 2026-09-04T15:12:10Z
 task_slug: sidecar-placement
 agent_version: skill-genesis@a1dbf602
 invocation_args: { since: null, scope: sidecar-placement, dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 4, refined: 0, deferred: 2 }
 ---
 
 # Skill Genesis Report — 2026-09-04 15:12:10
@@ -161,7 +161,12 @@ No signal recorded this pass — no learning item named a decision that would ha
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: docs/claude-code-limitations.md - file-vs-directory symlink Write/Edit refusal | defer | Real but observed once, docs-only and not shipped to managed projects; worth a bullet if a second symlink-write refusal or a sidecar-mode user report appears |
+| 2026-11-01T23:00:00Z | Proposal 2: hook-crafting Gotchas - scrub git repo-scoping env vars | reject | below-bar: Already fixed in code at all three sites (shared runner + hook + chain script); a gotcha line adds little for managed-project hook authors |
+| 2026-11-01T23:00:00Z | Proposal 3: id-decontamination - ephemeral register ids leak undetected | defer | Real detector gap (no IF-nn class); fold with 2026-09-23_22-58-35 P5 into one shape-set extension if a second leak is logged |
+| 2026-11-01T23:00:00Z | Proposal 4: adr-authoring-protocols - draft id hash is hex-strict | reject | below-bar: Agents compute sha1[:8] so ids are hex by construction; only hand-authored test ids hit it; finalize already warns |
+| 2026-11-01T23:00:00Z | Proposal 5: testing-strategy - scenario/integration-fixture authoring gotchas | reject | below-bar: 30-40 lines of prose from one task, bash/git-fixture specific; no recurrence evidence or check |
+| 2026-11-01T23:00:00Z | Proposal 6: testing-strategy - "a row that cannot fail is noise" heuristic | reject | below-bar: Heuristic prose from one task; gate-side version already covered by "pair with verification path" |
 
 ## Recommended Next Steps
 

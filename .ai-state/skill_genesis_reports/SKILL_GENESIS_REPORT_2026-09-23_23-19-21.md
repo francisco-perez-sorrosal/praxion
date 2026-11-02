@@ -5,8 +5,8 @@ generated_at: 2026-09-23T23:19:21Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@f731fa8e
 invocation_args: { since: null, scope: null, sources: .ai-work/_harvest, batch: "13 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 2, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 2, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 23:19:21
@@ -88,7 +88,8 @@ No signal recorded this pass. No learning item in the sampled sections named a d
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: permissive resolver called from a writer is fail-open | reject | ledgered: The instance is fixed (td-160 resolved); generic gotcha is one sighting |
+| 2026-11-01T23:00:00Z | Proposal 2: test verdict flips between clean extraction and dirty tree | reject | ledgered: The three tests are covered by td-162 (b), closed except two git-less resolve() tests; no new systemic evidence |
 
 ## Recommended Next Steps
 

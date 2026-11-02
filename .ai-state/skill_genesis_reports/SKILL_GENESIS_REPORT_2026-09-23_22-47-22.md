@@ -5,8 +5,8 @@ generated_at: 2026-09-23T22:47:22Z
 task_slug: skill-genesis-2026-09-23
 agent_version: skill-genesis@unknown
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest", batch: "4 of 13", dry_run: false }
-review_status: pending
-disposition_count: { pending: 5, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 5, refined: 0, deferred: 0 }
 ---
 
 # Skill Genesis Report — 2026-09-23 22:47:22
@@ -143,7 +143,11 @@ _(none recorded this batch — no decision surfaced a "needed a specialist voice
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: git-conventions.md - pre-commit config-first ordering | reject | below-bar: Obvious, self-announcing failure (pre-commit refuses to run); one bullet of resident-class prose adds no check |
+| 2026-11-01T23:00:00Z | Proposal 2: coordination-details.md - regenerated tracked files bake generator cwd | reject | ledgered: The defect (install_codex.sh bakes checkout path into AGENTS.md) is td-206, open |
+| 2026-11-01T23:00:00Z | Proposal 3: calibration-procedure.md - evidentiary basis for judging calibration | reject | below-bar: Retrospective enum exists but a basis section is prose with no check; one verification report |
+| 2026-11-01T23:00:00Z | Proposal 4: coding-style.md - directory-scoped import convention for cross-directory test modules | reject | duplicate: Repo-internal idiom; same topic as 22-51-24 P5 (kept as the stronger, three-idiom form, which is itself below bar) |
+| 2026-11-01T23:00:00Z | Proposal 5: coordination-details.md - integration checkpoint for interdependent live-corpus assertions | reject | below-bar: One-pipeline planning variant; prose; no recurrence evidence |
 
 ## Recommended Next Steps
 

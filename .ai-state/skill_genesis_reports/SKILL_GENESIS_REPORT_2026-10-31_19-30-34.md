@@ -5,8 +5,8 @@ generated_at: 2026-10-31T19:30:34Z
 task_slug: context-diet-resume
 agent_version: skill-genesis@1ca8461a
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest-diet", batch: "1 of 5", dry_run: false }
-review_status: pending
-disposition_count: { pending: 6, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 4, refined: 0, deferred: 2 }
 ---
 
 # Skill Genesis Report — 2026-10-31 19:30:34
@@ -177,7 +177,12 @@ Ledger rows already present for the adherence-eval round-2 findings (`td-428`, `
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: agent-evals: design grader subject and fixtures against the real session | defer | Two pipelines, same class, but prose; worth doing if the move-run kit gains a pre-run grader-vs-recorded-session canary (the checkable form) |
+| 2026-11-01T23:00:00Z | Proposal 2: applied-statistics gate-design gotchas | defer | Exact derived figures now live only in an ephemeral consult; do it at the next gated A/B eval design, or when the draft ADR is finalized |
+| 2026-11-01T23:00:00Z | Proposal 3: do not tag mutation: on on a layout the sensor refuses | reject | ledgered: td-522 names this remedy ("teach the sensor or drop the tag") |
+| 2026-11-01T23:00:00Z | Proposal 4: put module a step will overflow into Files: | reject | below-bar: Prose planner checklist; existing surfacing path works (report concedes) |
+| 2026-11-01T23:00:00Z | Proposal 5: guard ownership, node partition check, binding order | reject | below-bar: Prose extension of a plan-authoring page whose core is built (R8P2); no check |
+| 2026-11-01T23:00:00Z | Proposal 6: rework-manifest: bundled FAIL+WARN names both | reject | below-bar: Self-declared single-sighting seedling |
 
 ## Recommended Next Steps
 

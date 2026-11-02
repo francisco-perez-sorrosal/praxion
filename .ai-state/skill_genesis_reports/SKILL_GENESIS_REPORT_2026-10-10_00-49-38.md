@@ -5,8 +5,8 @@ generated_at: 2026-10-10T07:49:38Z
 task_slug: likec4-diagram-craft
 agent_version: skill-genesis@53244ce9
 invocation_args: { since: null, scope: null, sources: ".claude/worktrees/likec4-diagram-craft/.ai-work/likec4-diagram-craft", batch: null, dry_run: false }
-review_status: pending
-disposition_count: { pending: 7, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: complete
+disposition_count: { pending: 0, approved: 0, rejected: 4, refined: 0, deferred: 3 }
 ---
 
 # Skill Genesis Report — 2026-10-10 00-49-38
@@ -209,7 +209,13 @@ None recorded.
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 1: hook that runs git from a subdirectory must pin the work tree (GIT_DIR) | defer | cleared the bar but not picked (at most 3 builds): Recurring (diagram-craft 22 stray renders; sibling 09-04 report; Praxion already hand-fixes it in three places); skills/hook-crafting has no GIT_DIR text |
+| 2026-11-01T23:00:00Z | Proposal 2: check staged deletions before pathspec commit | reject | below-bar: Lands in always_on git-conventions (criterion 4); one memory-only lesson |
+| 2026-11-01T23:00:00Z | Proposal 3: survivors in subprocess/env boundaries are test gaps not equivalents | defer | cleared the bar but not picked (at most 3 builds): The step-14 "unobservable" disposition let a hook-environment defect reach a commit; python-testing.md names only two equivalent classes and says nothing about caller environments |
+| 2026-11-01T23:00:00Z | Proposal 4: sensor blind spots: script-run subprocesses and __file__ lookups | defer | Fold into the R7P3 edit if built; the tool-side remedy is td-510/td-338 |
+| 2026-11-01T23:00:00Z | Proposal 5: retiring an identifier needs a template/example sweep | reject | below-bar: One pipeline; prose, no check |
+| 2026-11-01T23:00:00Z | Proposal 6: guards read the narrowest structure that can carry the claim | reject | below-bar: One pipeline; generalisation of gate-liveness clauses, no new enforcement |
+| 2026-11-01T23:00:00Z | Proposal 7: likec4 D2 emission recipes | reject | below-bar: Audience is a renderer maintainer, not managed-project users; reference page cost for rare activation |
 
 ## Recommended Next Steps
 

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-01T18:45:38Z'
+generated_at: '2026-11-02T06:07:33Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,13 +55,13 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
   type: markdown
   title: Praxion docs
-  last_modified: '2026-10-13'
+  last_modified: '2026-11-01'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -81,8 +81,10 @@ surfaces:
   - docs-decision-tracking
   - docs-diagrams-readme
   - docs-getting-started
+  - docs-independent-analysis-jev-typed-decisions-research
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
+  - docs-independent-analysis-skill-selection-code-mode-research
   - docs-independent-analysis-startup-context-diet-research
   - docs-independent-analysis-subagent-alignment-map
   - docs-lean-spawn-how-to
@@ -343,6 +345,14 @@ surfaces:
   title: "Research Brief \u2014 Autonomous CI/PR Failure Remediation via the Cursor Agent (installable across Praxion + managed projects)"
   last_modified: '2026-08-07'
   renderer: default_markdown
+- id: docs-independent-analysis-jev-typed-decisions-research
+  path: docs/independent-analysis/jev-typed-decisions-research.md
+  type: markdown
+  title: "Jev and Typed Decisions in Praxion \u2014 Routing, Gates and Compaction with a System-One Model"
+  last_modified: '2026-11-01'
+  diataxis: explanation
+  audience: architect / maintainer
+  renderer: explanation_shell
 - id: docs-independent-analysis-linear-integration-analysis
   path: docs/independent-analysis/linear-integration-analysis.md
   type: markdown
@@ -383,6 +393,30 @@ surfaces:
   surfaces_referenced:
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-independent-analysis-personal-software-factory-analysis
+- id: docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-codemode-landscape
+  path: docs/independent-analysis/research-evidence/2026-09-23-codemode-jev/RESEARCH_FINDINGS_codemode-landscape.md
+  type: markdown
+  title: 'Research Findings: Code Mode & Tool/Skill-Discovery Landscape (External Lens)'
+  last_modified: '2026-11-01'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-jev-product
+  path: docs/independent-analysis/research-evidence/2026-09-23-codemode-jev/RESEARCH_FINDINGS_jev-product.md
+  type: markdown
+  title: "Research Findings: TypeSafe / Jev \u2014 Product & Ecosystem Dossier (Lens: jev-product, external)"
+  last_modified: '2026-11-01'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-praxion-decision-sites
+  path: docs/independent-analysis/research-evidence/2026-09-23-codemode-jev/RESEARCH_FINDINGS_praxion-decision-sites.md
+  type: markdown
+  title: 'Research Findings: Praxion Decision Sites for Jev (System-One Model) Integration'
+  last_modified: '2026-11-01'
+  renderer: default_markdown
+- id: docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-praxion-selection-surface
+  path: docs/independent-analysis/research-evidence/2026-09-23-codemode-jev/RESEARCH_FINDINGS_praxion-selection-surface.md
+  type: markdown
+  title: 'Research Findings: Praxion''s Component-Selection Surface (internal ground truth)'
+  last_modified: '2026-11-01'
+  renderer: default_markdown
 - id: docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-context-review
   path: docs/independent-analysis/research-evidence/2026-10-11-startup-context-diet/CONTEXT_REVIEW.md
   type: markdown
@@ -427,6 +461,14 @@ surfaces:
   renderer: default_markdown
   surfaces_referenced:
   - docs-independent-analysis-cursor-ci-autofix-research-brief
+- id: docs-independent-analysis-skill-selection-code-mode-research
+  path: docs/independent-analysis/skill-selection-code-mode-research.md
+  type: markdown
+  title: "Reaching the Right Skill Without Paying for All of Them \u2014 Code Mode, Tool Search and Praxion's Selection Surface"
+  last_modified: '2026-11-01'
+  diataxis: explanation
+  audience: architect / maintainer
+  renderer: explanation_shell
 - id: docs-independent-analysis-startup-context-diet-research
   path: docs/independent-analysis/startup-context-diet-research.md
   type: markdown
@@ -634,7 +676,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-01'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -4008,8 +4050,10 @@ groups:
   - docs-context-prj-comparison-2026-05-12-07-praxion-roadmap
   - docs-context-prj-comparison-2026-05-12-readme
   - docs-decision-tracking
+  - docs-independent-analysis-jev-typed-decisions-research
   - docs-independent-analysis-personal-software-factory-analysis
   - docs-independent-analysis-process-economy-roadmap
+  - docs-independent-analysis-skill-selection-code-mode-research
   - docs-independent-analysis-startup-context-diet-research
   - docs-lean-spawn-kernels
   - docs-multidisciplinary-identities-evidence
@@ -4584,6 +4628,10 @@ groups:
   - docs-independent-analysis-linear-integration-analysis
   - docs-independent-analysis-praxion-artifact-lifecycle-audit
   - docs-independent-analysis-praxion-artifact-process-flow-analysis
+  - docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-codemode-landscape
+  - docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-jev-product
+  - docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-praxion-decision-sites
+  - docs-independent-analysis-research-evidence-2026-09-23-codemode-jev-research-findings-praxion-selection-surface
   - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-context-review
   - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-measurements
   - docs-independent-analysis-research-evidence-2026-10-11-startup-context-diet-research-findings-harness-native

@@ -5,8 +5,8 @@ generated_at: 2026-10-31T19:33:49Z
 task_slug: context-diet-resume
 agent_version: skill-genesis@1ca8461a
 invocation_args: { since: null, scope: null, sources: ".ai-work/_harvest-diet", batch: "2 of 5", dry_run: false }
-review_status: pending
-disposition_count: { pending: 7, approved: 0, rejected: 0, refined: 0, deferred: 0 }
+review_status: partial
+disposition_count: { pending: 1, approved: 0, rejected: 5, refined: 0, deferred: 1 }
 ---
 
 # Skill Genesis Report — 2026-10-31 19:33:49
@@ -201,7 +201,12 @@ Existing rows are not repeated: `td-501`, `td-505`, `td-506`, `td-510`, `td-511`
 
 | Timestamp | Proposal | Disposition | Notes |
 |---|---|---|---|
-| _(empty — pending review)_ | | | |
+| 2026-11-01T23:00:00Z | Proposal 2: gate that claims agreement with another reader is tested against its grammar | defer | Five falsifications in one pipeline but gate-liveness is path-scoped to Praxion gate sites; wait for a managed-project gate case or a second pipeline |
+| 2026-11-01T23:00:00Z | Proposal 3: ADR draft refreshed when a revision changes its decision | reject | built: The mechanical half (dead affected_files) exists as a non-blocking warning; Decision-text drift is not mechanically checkable |
+| 2026-11-01T23:00:00Z | Proposal 4: list consumers of a changed contract constant in Files: | reject | below-bar: Prose planner checklist; each out-of-Files edit was surfaced and amended, cost is small |
+| 2026-11-01T23:00:00Z | Proposal 5: close-out record checklist for revised steps | reject | below-bar: Prose; check_test_results_shape already covers the shape half |
+| 2026-11-01T23:00:00Z | Proposal 6: mutation recipe additions for hooks/ and sibling-importing modules | reject | ledgered: Tool-side gaps are open rows |
+| 2026-11-01T23:00:00Z | Proposal 7: hook identity from where the hook writes; test the no-evidence row | reject | ledgered: Both defects fixed and resolved |
 
 ## Recommended Next Steps
 
